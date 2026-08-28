@@ -1,5 +1,5 @@
 import { useMemo, useContext } from 'octane';
-import type { FC } from 'react';
+import type { ComponentBody } from 'octane';
 import type { AxisScale, TickLabelProps, AxisProps as VxAxisProps } from '@octanejs/visx/axis';
 import type { ScaleInput } from '@octanejs/visx/scale';
 import DataContext from '../../context/DataContext.tsrx';
@@ -12,7 +12,7 @@ export type BaseAxisProps<Scale extends AxisScale> = Omit<
   orientation: NonNullable<VxAxisProps<Scale>['orientation']>;
 } & {
   /** Rendered component which is passed VxAxisProps by BaseAxis after processing. */
-  AxisComponent: FC<VxAxisProps<Scale>>;
+  AxisComponent: ComponentBody<VxAxisProps<Scale>>;
 };
 
 /**

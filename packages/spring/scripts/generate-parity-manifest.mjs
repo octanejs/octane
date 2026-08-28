@@ -107,7 +107,7 @@ const manifest = {
 		sourceRoot: 'packages/core/src',
 		testRoot: 'packages/core/src',
 		license: 'MIT',
-		integrity: `sha256:${hashFile('packages/spring/upstream/SHA256SUMS')}`,
+		integrity: `sha256:${hashFile('packages/spring/audit/upstream.lock.json')}`,
 		verification: 'verified',
 	},
 	upstreamSuites: {
@@ -178,7 +178,7 @@ const manifest = {
 					sha256: 'pending',
 				},
 				{
-					path: 'packages/spring/upstream/SHA256SUMS',
+					path: 'packages/spring/audit/upstream.lock.json',
 					role: 'support',
 					sha256: 'pending',
 				},

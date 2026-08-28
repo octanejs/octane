@@ -1,8 +1,7 @@
-// @ts-nocheck -- retained upstream selector typing is outside the initial Area runtime port.
 import { createSelector } from 'reselect';
 import { SeriesPoint } from 'victory-vendor/d3-shape';
 import { NullableCoordinate } from '../../util/types';
-import { computeArea } from '../../cartesian/Area';
+import { computeArea } from '../../cartesian/Area.tsrx';
 import {
 	selectAxisWithScale,
 	selectStackGroups,

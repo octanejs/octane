@@ -324,7 +324,9 @@ describe('Fragment refs on public createElement descriptors', () => {
 		]);
 	});
 
-	it('keeps descriptor refs attached while Activity hides and reveals their hosts', () => {
+	// Per ReactFiberCommitWork.js disappearLayoutEffects/reappearLayoutEffects
+	// (React canary b740af2510de1e19fcb399abb862af26ff95ac80).
+	it('disconnects descriptor refs while Activity preserves and reveals their hosts', () => {
 		const fragmentRef: FragmentReference = { current: null };
 		const host = render(
 			createElement(ActivityDescriptorFragment, { fragmentRef, mode: 'visible' as const }),
@@ -337,7 +339,7 @@ describe('Fragment refs on public createElement descriptors', () => {
 		expect(child.reactFragments?.has(fragment)).toBe(true);
 
 		render(createElement(ActivityDescriptorFragment, { fragmentRef, mode: 'hidden' as const }));
-		expect(fragmentRef.current).toBe(fragment);
+		expect(fragmentRef.current).toBeNull();
 		expect(host.querySelector('#descriptor-activity-child')).toBe(child);
 		expect(child.style.display).toBe('none');
 		expect(child.reactFragments?.has(fragment)).toBe(false);

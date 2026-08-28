@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-pacer",
-  "version": "0.0.31",
+  "version": "0.0.38",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -24,7 +24,9 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "LICENSE.upstream",
+    "README.md",
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": "./src/index.ts",

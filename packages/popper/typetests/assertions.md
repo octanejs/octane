@@ -1,7 +1,7 @@
 # Type parity assertions
 
 Pinned `react-popper@2.3.0` ships two typings programs under
-`upstream/tag/typings/tests/`. The adapted counterparts under `typetests/` must
+`upstream/typings/tests/`. The adapted counterparts under `typetests/` must
 stay structurally one-for-one after the permitted transformations below.
 
 | # | Transformation | Why |

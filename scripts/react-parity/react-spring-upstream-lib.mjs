@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { verifyReactSpringTypes } from './react-spring-types-lib.mjs';
@@ -51,40 +53,23 @@ function loadInventory(repoRoot, inventoryPath) {
 
 export function verifyReactSpringVendoredBytes(repoRoot) {
 	const root = join(repoRoot, ROOT);
-	const inventoryPath = join(root, 'SHA256SUMS');
-	if (!existsSync(inventoryPath)) throw new Error('React Spring SHA256SUMS is missing');
-	const expected = new Map(
-		readFileSync(inventoryPath, 'utf8')
-			.trim()
-			.split('\n')
-			.map(function parseLine(line) {
-				const match = /^([a-f0-9]{64})  (\.\/.*)$/.exec(line);
-				if (match === null) throw new Error(`invalid checksum line: ${line}`);
-				return [match[2].slice(2), match[1]];
-			}),
+	// The committed upstream/ tree verifies offline against the upstream git
+	// blob shas in audit/upstream.lock.json.
+	// Resolve the materialize CLI from this module's real location so sandboxed
+	// repoRoot copies (negative-control fixtures) still verify offline.
+	const materialize = fileURLToPath(new URL('../react-port/materialize.mjs', import.meta.url));
+	execFileSync(
+		process.execPath,
+		['--', materialize, 'run', '--check', '--package-dir', join(repoRoot, 'packages/spring')],
+		{ stdio: 'pipe' },
 	);
+	const lockPath = join(repoRoot, 'packages/spring/audit/upstream.lock.json');
 	const actual = filesUnder(root)
-		.filter(function skipSums(path) {
-			return path !== inventoryPath;
-		})
 		.map(function relativePath(path) {
 			return relative(root, path).replaceAll('\\', '/');
 		})
 		.sort();
-	if (
-		actual.length !== expected.size ||
-		actual.some(function missing(path) {
-			return !expected.has(path);
-		})
-	) {
-		throw new Error('vendored file inventory drifted from the pinned release');
-	}
-	for (const path of actual) {
-		if (digest(join(root, path)) !== expected.get(path)) {
-			throw new Error(`vendored byte drift: ${path}`);
-		}
-	}
-	return { files: actual.length, checksum: digest(inventoryPath), testFiles: actual };
+	return { files: actual.length, checksum: digest(lockPath), testFiles: actual };
 }
 
 export function verifyReactSpringUpstream(repoRoot) {

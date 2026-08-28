@@ -11,7 +11,8 @@
     "packages/input-otp/tests/browser/upstream/base.slot.spec.ts",
     "packages/input-otp/tests/browser/upstream/base.typing.spec.ts",
     "packages/input-otp/tests/browser/upstream/with-autofocus.spec.ts",
-    "packages/input-otp/tests/browser/upstream/with-on-complete.spec.ts"
+    "packages/input-otp/tests/browser/upstream/with-on-complete.spec.ts",
+    "packages/input-otp/tests/browser/upstream/pwm-space.spec.ts"
   ],
   "tests": [
     {
@@ -62,45 +63,65 @@
     {
       "id": "runtime:input-otp-browser:0010",
       "file": "packages/input-otp/tests/browser/upstream/base.selections.spec.ts",
-      "fullName": "should replace last char if another one is pressed"
+      "fullName": "should move slot selection with arrow keys when input is full"
     },
     {
       "id": "runtime:input-otp-browser:0011",
       "file": "packages/input-otp/tests/browser/upstream/base.selections.spec.ts",
-      "fullName": "should replace multi-selected chars if another is pressed"
+      "fullName": "should replace last char if another one is pressed"
     },
     {
       "id": "runtime:input-otp-browser:0012",
       "file": "packages/input-otp/tests/browser/upstream/base.selections.spec.ts",
-      "fullName": "should replace selected char if another is pressed"
+      "fullName": "should replace multi-selected chars if another is pressed"
     },
     {
       "id": "runtime:input-otp-browser:0013",
+      "file": "packages/input-otp/tests/browser/upstream/base.selections.spec.ts",
+      "fullName": "should replace selected char if another is pressed"
+    },
+    {
+      "id": "runtime:input-otp-browser:0014",
+      "file": "packages/input-otp/tests/browser/upstream/base.selections.spec.ts",
+      "fullName": "should select previous slot when pressing arrow left in insert mode"
+    },
+    {
+      "id": "runtime:input-otp-browser:0015",
       "file": "packages/input-otp/tests/browser/upstream/base.slot.spec.ts",
       "fullName": "should expose the slot value"
     },
     {
-      "id": "runtime:input-otp-browser:0014",
+      "id": "runtime:input-otp-browser:0016",
       "file": "packages/input-otp/tests/browser/upstream/base.typing.spec.ts",
       "fullName": "should change the input value"
     },
     {
-      "id": "runtime:input-otp-browser:0015",
+      "id": "runtime:input-otp-browser:0017",
       "file": "packages/input-otp/tests/browser/upstream/base.typing.spec.ts",
       "fullName": "should prevent typing greater than max length"
     },
     {
-      "id": "runtime:input-otp-browser:0016",
+      "id": "runtime:input-otp-browser:0018",
       "file": "packages/input-otp/tests/browser/upstream/base.typing.spec.ts",
       "fullName": "should start as empty value"
     },
     {
-      "id": "runtime:input-otp-browser:0017",
+      "id": "runtime:input-otp-browser:0019",
+      "file": "packages/input-otp/tests/browser/upstream/pwm-space.spec.ts",
+      "fullName": "does not push inside a constrained scroll container"
+    },
+    {
+      "id": "runtime:input-otp-browser:0020",
+      "file": "packages/input-otp/tests/browser/upstream/pwm-space.spec.ts",
+      "fullName": "pushes the badge when the gutter fits"
+    },
+    {
+      "id": "runtime:input-otp-browser:0021",
       "file": "packages/input-otp/tests/browser/upstream/with-autofocus.spec.ts",
       "fullName": "should autofocus"
     },
     {
-      "id": "runtime:input-otp-browser:0018",
+      "id": "runtime:input-otp-browser:0022",
       "file": "packages/input-otp/tests/browser/upstream/with-on-complete.spec.ts",
       "fullName": "should change the input value"
     }

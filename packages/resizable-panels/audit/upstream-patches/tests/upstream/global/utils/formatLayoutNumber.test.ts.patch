@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/global/utils/formatLayoutNumber.test.ts b/tests/upstream/global/utils/formatLayoutNumber.test.ts
+--- a/tests/upstream/global/utils/formatLayoutNumber.test.ts
++++ b/tests/upstream/global/utils/formatLayoutNumber.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, test } from "vitest";
+-import { formatLayoutNumber } from "./formatLayoutNumber";
++import { formatLayoutNumber } from "../../../../src/global/utils/formatLayoutNumber";
+ 
+ describe("formatLayoutNumber", () => {
+   test.each([

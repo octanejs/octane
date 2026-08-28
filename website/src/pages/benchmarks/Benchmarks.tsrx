@@ -114,11 +114,11 @@ export function Benchmarks() @{
 					<h2 id="bench-frameworks" class="benchpage-h2">Octane vs the field</h2>
 					<p class="benchpage-note">
 						Octane compiled from .tsrx and .tsx, against React 19 with the official React Compiler,
-						Preact 10, Solid, Svelte 5, Ripple and Vue Vapor — each framework’s fixture written the
-						way its docs recommend. React Compiler is enabled for every primary React comparison;
-						memo-wall also includes a clearly labeled uncompiled React control. The ranked chips on
-						each card are that suite’s one-line reading: every framework’s geometric mean across the
-						card’s operations, relative to Octane, fastest first.
+						Preact 10, Solid, Svelte 5, Ripple, Vue Vapor and Inferno 9 — each framework’s fixture
+						written the way its docs recommend. React Compiler is enabled for every primary React
+						comparison; memo-wall also includes a clearly labeled uncompiled React control. The
+						ranked chips on each card are that suite’s one-line reading: every framework’s geometric
+						mean across the card’s operations, relative to Octane, fastest first.
 					</p>
 					<div class="benchpage-grid">
 						@for (const card of FRAMEWORK_CARDS; key card.id) {

@@ -35,6 +35,8 @@ type ServerErrorArguments = {
 	47: [unknown];
 	48: [unknown];
 	57: [];
+	58: [];
+	59: [unknown];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -158,6 +160,10 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 					'prerenderToNodeStream requires a Node.js runtime with process.getBuiltinModule; use prerender() in non-Node environments.',
 					args,
 				);
+			case 58:
+				return formatDevErrorMessage('Unsupported native-read compiler/runtime version.', args);
+			case 59:
+				return formatDevErrorMessage('%s requires an active server component.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

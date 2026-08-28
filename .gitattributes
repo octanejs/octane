@@ -1,2 +1,6 @@
 *.tsrx linguist-language=TSX
 packages/*/CHANGELOG.md whitespace=-space-before-tab
+packages/opentui/upstream/tests/__snapshots__/layout.test.tsx.snap whitespace=-blank-at-eol
+packages/floating-ui/upstream/** whitespace=-trailing-space
+packages/floating-ui/audit/upstream-patches/** whitespace=-trailing-space
+packages/floating-ui/LICENSE whitespace=-trailing-space

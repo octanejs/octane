@@ -1,11 +1,12 @@
 import type { Ref } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import type { AddSVGProps } from '../types';
 
 export type BarRoundedProps = {
 	/** className to apply to path element. */
-	className?: string;
+	className?: Octane.SVGProps<SVGPathElement>['className'];
 	/** reference to path element. */
 	innerRef?: Ref<SVGPathElement>;
 	/** left position of the bar */

@@ -1,0 +1,135 @@
+{
+  "name": "@formisch/core",
+  "description": "The lightweight, schema-first, and fully type-safe form library for React, Solid, Vue, Svelte and more",
+  "version": "1.0.0-rc.0",
+  "license": "MIT",
+  "author": "Fabian Hiller",
+  "homepage": "https://formisch.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-circle/formisch.git"
+  },
+  "keywords": [
+    "modular",
+    "typescript",
+    "schema",
+    "validation",
+    "parsing",
+    "bundle-size",
+    "type-safe"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./angular": {
+      "types": "./dist/index.angular.d.ts",
+      "default": "./dist/index.angular.js"
+    },
+    "./preact": {
+      "types": "./dist/index.preact.d.ts",
+      "default": "./dist/index.preact.js"
+    },
+    "./qwik": {
+      "types": "./dist/index.qwik.d.ts",
+      "default": "./dist/index.qwik.js"
+    },
+    "./solid": {
+      "types": "./dist/index.solid.d.ts",
+      "default": "./dist/index.solid.js"
+    },
+    "./svelte": {
+      "types": "./dist/index.svelte.d.ts",
+      "default": "./dist/index.svelte.js"
+    },
+    "./react": {
+      "types": "./dist/index.react.d.ts",
+      "default": "./dist/index.react.js"
+    },
+    "./vue": {
+      "types": "./dist/index.vue.d.ts",
+      "default": "./dist/index.vue.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "vitest run --typecheck",
+    "coverage": "vitest run --coverage --isolate",
+    "lint": "eslint \"src/**/*.ts*\" && tsc --noEmit",
+    "lint.fix": "eslint \"src/**/*.ts*\" --fix",
+    "format": "prettier --write ./src",
+    "format.check": "prettier --check ./src",
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "@angular/core": "^21.0.0",
+    "@formisch/eslint-config": "workspace:*",
+    "@preact/signals": "^2.9.0",
+    "@qwik.dev/core": "2.0.0-beta.5",
+    "@types/node": "24.0.13",
+    "@types/react": "^19.2.5",
+    "@vitest/coverage-v8": "^4.1.7",
+    "eslint": "^9.31.0",
+    "jsdom": "^26.1.0",
+    "react": "^19.2.1",
+    "rolldown": "1.0.0-beta.26",
+    "rolldown-plugin-dts": "^0.13.13",
+    "solid-js": "^1.9.7",
+    "svelte": "^5.36.17",
+    "tsdown": "^0.16.8",
+    "typescript": "^5.8.3",
+    "valibot": "^1.4.1",
+    "vitest": "4.1.7",
+    "vue": "^3.5.17"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=17.0.0",
+    "@qwik.dev/core": "^2.0.0",
+    "@types/react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
+    "react": "^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
+    "solid-js": "^1.6.0",
+    "svelte": "^5.29.0",
+    "typescript": ">=5",
+    "valibot": "^1.4.1",
+    "vue": "^3.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": true
+    },
+    "@preact/signals": {
+      "optional": true
+    },
+    "@qwik.dev/core": {
+      "optional": true
+    },
+    "@types/react": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "typescript": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  }
+}

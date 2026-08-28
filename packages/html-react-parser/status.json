@@ -1,0 +1,18 @@
+{
+  "upstream": {
+    "package": "html-react-parser",
+    "version": "6.1.7",
+    "source": "https://github.com/remarkablemark/html-react-parser/tree/v6.1.7",
+    "license": "MIT"
+  },
+  "surface": "Public runtime surface at html-react-parser 6.1.7: default parse, attributesToProps, domToReact, htmlToDOM, HTMLReactParserOptions, and re-exported domhandler node classes. library defaults to Octane createElement/cloneElement/isValidElement.",
+  "divergences": [
+    "Consumers import from @octanejs/html-react-parser instead of html-react-parser.",
+    "Default element library is Octane, not React.",
+    "PRESERVE_CUSTOM_ATTRIBUTES is hardcoded true because Octane matches React 16+ DOM attributes while octane.version is 0.x.",
+    "Public types use ElementDescriptor/OctaneNode instead of React JSX.Element/ReactNode.",
+    "Octane serializes style objects through CSSOM, so custom-element style attribute spelling can differ from React snapshots while the parsed style object stays identical."
+  ],
+  "ssr": "Parsing is string-to-element-tree and is SSR-safe. Rendering the tree uses Octane server renderToStaticMarkup.",
+  "verified": "2026-08-20"
+}

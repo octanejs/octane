@@ -1,0 +1,33 @@
+diff --git a/tests/upstream/useFieldArray.test.tsx b/tests/upstream/useFieldArray.test.tsx
+--- a/tests/upstream/useFieldArray.test.tsx
++++ b/tests/upstream/useFieldArray.test.tsx
+@@ -28,7 +28,10 @@ import noop from '../../src/utils/noop';
+ 
+ let i = 0;
+ 
+-vi.mock('../logic/generateId', () => () => String(i++));
++// octane: vitest module mock — path resolved from tests/upstream/, factory returns { default }
++vi.mock('../../src/logic/generateId', () => ({
++  default: () => String(i++),
++}));
+ 
+ describe('useFieldArray', () => {
+   beforeEach(() => {
+@@ -127,7 +130,7 @@ describe('useFieldArray', () => {
+     });
+ 
+     it('should render with FormProvider', () => {
+-      const Provider = ({ children }: { children: React.ReactNode }) => {
++      const Provider = ({ children }: { children?: unknown }) => {
+         const methods = useForm();
+         return <FormProvider {...methods}>{children}</FormProvider>;
+       };
+@@ -3409,7 +3412,7 @@ describe('useFieldArray', () => {
+       );
+     }
+ 
+-    render(<App />, { reactStrictMode: true });
++    render(<App />);
+ 
+     fireEvent.click(screen.getByRole('button', { name: 'Append' }));
+ 

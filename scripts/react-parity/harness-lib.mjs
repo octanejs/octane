@@ -437,6 +437,13 @@ export function validateManifest(manifest) {
 			if (file.role !== 'test' && file.role !== 'support') {
 				fail(`lane ${lane.id} file role must be test or support`);
 			}
+			if (
+				file.role === 'support' &&
+				resolve(toPortablePath(file.path)) === resolve('vitest.config.js')
+			)
+				fail(
+					`lane ${lane.id} cannot hash root vitest.config.js as support evidence; use live project ownership and execution validation`,
+				);
 			if (!/^[a-f0-9]{64}$/.test(file.sha256)) fail(`lane ${lane.id} file sha256 is invalid`);
 			if (file.role === 'test' && (!Array.isArray(file.cases) || file.cases.length === 0)) {
 				fail(`lane ${lane.id} test file cases must be non-empty`);

@@ -1,15 +1,33 @@
+import type { NativeMouseEvent, SVGProps } from '../util/OctaneTypes.ts';
+import type { Coordinate } from '../util/types';
+
+interface PolygonProps {
+	className?: SVGProps<SVGPathElement>['className'];
+	points?: ReadonlyArray<Coordinate>;
+	baseLinePoints?: ReadonlyArray<Coordinate>;
+	connectNulls?: boolean;
+	onClick?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseDown?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseUp?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseMove?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseOver?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseOut?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseEnter?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseLeave?: (e: NativeMouseEvent<SVGPathElement>) => void;
+}
+export type Props = Omit<SVGProps<SVGPathElement>, 'points'> & PolygonProps;
 // Port of shape/Polygon.tsx — closed/segmented polygon paths (Radar,
 // PolarGrid). Path strings mirror upstream's roundTemplateLiteral output.
 import { clsx } from 'clsx';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
 import { round } from '../util/round';
 
-function isValidatePoint(point) {
+function isValidatePoint(point: Coordinate | undefined) {
 	return point != null && point.x === +point.x && point.y === +point.y;
 }
 
-function getParsedPoints(points = []) {
-	let segmentPoints = [[]];
+function getParsedPoints(points: ReadonlyArray<Coordinate> = []) {
+	let segmentPoints: Coordinate[][] = [[]];
 	points.forEach((entry) => {
 		const lastLink = segmentPoints[segmentPoints.length - 1];
 		if (isValidatePoint(entry)) {
@@ -32,7 +50,7 @@ function getParsedPoints(points = []) {
 	return segmentPoints;
 }
 
-function getSinglePolygonPath(points, connectNulls) {
+function getSinglePolygonPath(points: ReadonlyArray<Coordinate>, connectNulls?: boolean) {
 	let segmentPoints = getParsedPoints(points);
 	if (connectNulls) {
 		segmentPoints = [segmentPoints.reduce((res, segPoints) => [...res, ...segPoints], [])];
@@ -47,13 +65,17 @@ function getSinglePolygonPath(points, connectNulls) {
 	return segmentPoints.length === 1 ? polygonPath + 'Z' : polygonPath;
 }
 
-function getRanglePath(points, baseLinePoints, connectNulls) {
+function getRanglePath(
+	points: ReadonlyArray<Coordinate>,
+	baseLinePoints: ReadonlyArray<Coordinate>,
+	connectNulls?: boolean,
+) {
 	const outerPath = getSinglePolygonPath(points, connectNulls);
 	return (outerPath.slice(-1) === 'Z' ? outerPath.slice(0, -1) : outerPath) + 'L' +
 		getSinglePolygonPath(Array.from(baseLinePoints).reverse(), connectNulls).slice(1);
 }
 
-export function Polygon(props) {
+export function Polygon(props: Props) {
 	const { points, className, baseLinePoints, connectNulls, ...others } = props;
 	if (!points || !points.length) {
 		return null;

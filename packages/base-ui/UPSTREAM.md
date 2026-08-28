@@ -23,13 +23,12 @@ release; upgrades require a new crosswalk.
 - React oracle: the workspace-pinned React and React DOM versions used by `@base-ui/react`
 
 The byte-exact React-facing source, runtime/type suites, shared support files, package metadata,
-and MIT license are vendored under `upstream/`. `upstream/SHA256SUMS` authenticates all 1,129
-vendored files. Regenerate the evidence from an immutable external checkout with:
-
-```sh
-git clone --filter=blob:none --depth 1 --branch v1.6.0 \
-  https://github.com/mui/base-ui.git base-ui-v1.6.0
-```
+and MIT license are vendored under `upstream/`. All 1,129 vendored files verify offline against
+the upstream git blob shas recorded in `audit/upstream.lock.json`, and the pinned license is
+republished at the package root as `LICENSE.upstream`. To restore or extend the vendored
+tree, fetch the pinned files with
+`pnpm react-port:materialize run --package-dir packages/base-ui` (or re-vendor from an
+immutable checkout of tag `v1.6.0` and re-run the lock).
 
 `audit/upstream-crosswalk.json` records all 43 public component/utility subpaths and 348
 runtime, type, and support artifacts. It classifies 35 subpaths as

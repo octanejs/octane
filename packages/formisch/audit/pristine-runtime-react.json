@@ -1,0 +1,226 @@
+{
+  "schemaVersion": 1,
+  "project": "formisch-pristine-react",
+  "roots": ["packages/formisch/upstream/frameworks/react/src"],
+  "files": [
+    "packages/formisch/upstream/frameworks/react/src/components/Field/Field.test.tsx",
+    "packages/formisch/upstream/frameworks/react/src/components/FieldArray/FieldArray.test.tsx",
+    "packages/formisch/upstream/frameworks/react/src/components/Form/Form.test.tsx",
+    "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+    "packages/formisch/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test.tsx",
+    "packages/formisch/upstream/frameworks/react/src/hooks/useForm/useForm.test.tsx",
+    "packages/formisch/upstream/frameworks/react/src/hooks/useSignals/useSignals.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:5e765b228adbe13b",
+      "file": "packages/formisch/upstream/frameworks/react/src/components/Field/Field.test.tsx",
+      "fullName": "Field should invoke children with the field store"
+    },
+    {
+      "id": "runtime:c6c7822b0e66c9fb",
+      "file": "packages/formisch/upstream/frameworks/react/src/components/Field/Field.test.tsx",
+      "fullName": "Field should re-render when the field store updates"
+    },
+    {
+      "id": "runtime:19dbeecfed68a6c9",
+      "file": "packages/formisch/upstream/frameworks/react/src/components/Field/Field.test.tsx",
+      "fullName": "Field should render JSX returned from children"
+    },
+    {
+      "id": "runtime:d0836f99e455f173",
+      "file": "packages/formisch/upstream/frameworks/react/src/components/FieldArray/FieldArray.test.tsx",
+      "fullName": "FieldArray should invoke children with the field array store"
+    },
+    {
+      "id": "runtime:97baed42f05e155c",
+      "file": "packages/formisch/upstream/frameworks/react/src/components/FieldArray/FieldArray.test.tsx",
+      "fullName": "FieldArray should re-render when the field array store updates"
+    },
+    {
+      "id": "runtime:2fbe875fb5383a62",
+      "file": "packages/formisch/upstream/frameworks/react/src/components/FieldArray/FieldArray.test.tsx",
+      "fullName": "FieldArray should render JSX returned from children"
+    },
+    {
+      "id": "runtime:603c3c066ae29409",
+      "file": "packages/formisch/upstream/frameworks/react/src/components/Form/Form.test.tsx",
+      "fullName": "Form should call onSubmit with the validated output when submitted"
+    },
+    {
+      "id": "runtime:5210170d2ecec30a",
+      "file": "packages/formisch/upstream/frameworks/react/src/components/Form/Form.test.tsx",
+      "fullName": "Form should not call onSubmit when validation fails"
+    },
+    {
+      "id": "runtime:1cac1f4cb5b13517",
+      "file": "packages/formisch/upstream/frameworks/react/src/components/Form/Form.test.tsx",
+      "fullName": "Form should render a form element with noValidate, children, and forwarded attributes"
+    },
+    {
+      "id": "runtime:ffeeb08354c4c3d7",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField edited state should keep isEdited after reverting the value to its initial value"
+    },
+    {
+      "id": "runtime:22814d49dd62eb66",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField edited state should not set isEdited on focus but should set isTouched"
+    },
+    {
+      "id": "runtime:698d681f6b50ddff",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField edited state should set isEdited on input"
+    },
+    {
+      "id": "runtime:45f830ac20f089e4",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField element registration should focus a remounted field after reset instead of a stale element"
+    },
+    {
+      "id": "runtime:1fa36dc61676d491",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField element registration should focus the registered element when validation fails on submit"
+    },
+    {
+      "id": "runtime:3a25fe0dcad076fa",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField element registration should unmount cleanly when the registered element is removed"
+    },
+    {
+      "id": "runtime:e454ddf79a97a3e0",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField initialization should reflect initialInput from form"
+    },
+    {
+      "id": "runtime:c0871cc39abd3a1f",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField initialization should return field store with default state and props"
+    },
+    {
+      "id": "runtime:ef31f3121cc0a107",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField input updates should update input and isDirty via DOM onChange"
+    },
+    {
+      "id": "runtime:c7641b5839acf3e4",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField input updates should update input and trigger validation via imperative onChange"
+    },
+    {
+      "id": "runtime:ad91ffd6babdff0c",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField store stability should return memoized store reference across re-renders"
+    },
+    {
+      "id": "runtime:97cd8f92e2717b3b",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField validation modes should run validate:\"blur\" on blur and surface errors"
+    },
+    {
+      "id": "runtime:98322b2e1f33ee83",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField validation modes should run validate:\"input\" on change and surface errors"
+    },
+    {
+      "id": "runtime:c7f1472e6fe2b2d7",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test.tsx",
+      "fullName": "useField validation modes should run validate:\"touch\" on focus and flip isTouched"
+    },
+    {
+      "id": "runtime:a8e8742fbaad1838",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test.tsx",
+      "fullName": "useFieldArray initialization should reflect initialInput from form"
+    },
+    {
+      "id": "runtime:79f89a704375135d",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test.tsx",
+      "fullName": "useFieldArray initialization should return field array store with default state and empty items"
+    },
+    {
+      "id": "runtime:a4987bbc25ae6143",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test.tsx",
+      "fullName": "useFieldArray reactivity should grow items when insert is called"
+    },
+    {
+      "id": "runtime:6ae3845090a300e4",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test.tsx",
+      "fullName": "useFieldArray reactivity should preserve item keys when swap is called"
+    },
+    {
+      "id": "runtime:bc801bcca71704ae",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test.tsx",
+      "fullName": "useFieldArray reactivity should re-render the component when items change"
+    },
+    {
+      "id": "runtime:92c5aa24694ab50c",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test.tsx",
+      "fullName": "useFieldArray reactivity should surface errors and isValid after validation"
+    },
+    {
+      "id": "runtime:7c146ff6d755dd82",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test.tsx",
+      "fullName": "useFieldArray store stability should return memoized store reference across re-renders"
+    },
+    {
+      "id": "runtime:2e426a9fd4243fa0",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useForm/useForm.test.tsx",
+      "fullName": "useForm initial validation should not run validation on mount otherwise"
+    },
+    {
+      "id": "runtime:0f9a0c5fc059d17d",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useForm/useForm.test.tsx",
+      "fullName": "useForm initial validation should run validation on mount when validate is \"initial\""
+    },
+    {
+      "id": "runtime:95b285391e790ca3",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useForm/useForm.test.tsx",
+      "fullName": "useForm initialization should return form store with default state"
+    },
+    {
+      "id": "runtime:5ca930bd3cb472f5",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useForm/useForm.test.tsx",
+      "fullName": "useForm reactivity should re-render the component when form state changes"
+    },
+    {
+      "id": "runtime:3a7cfe345a6b80b3",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useForm/useForm.test.tsx",
+      "fullName": "useForm store stability should return memoized store reference across re-renders"
+    },
+    {
+      "id": "runtime:7ae61c354448249f",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useSignals/useSignals.test.tsx",
+      "fullName": "useSignals cleanup should keep subscriptions alive across StrictMode effect re-runs"
+    },
+    {
+      "id": "runtime:f0c1b73d39dbabb2",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useSignals/useSignals.test.tsx",
+      "fullName": "useSignals cleanup should not re-render after unmount when a tracked signal changes"
+    },
+    {
+      "id": "runtime:c63b433e4f8c4e48",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useSignals/useSignals.test.tsx",
+      "fullName": "useSignals coexistence with React state should update signals and useState independently in the same component"
+    },
+    {
+      "id": "runtime:deaead923ee72d6e",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useSignals/useSignals.test.tsx",
+      "fullName": "useSignals multiple components should only re-render components that read the changed signal"
+    },
+    {
+      "id": "runtime:ffad00193eae0372",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useSignals/useSignals.test.tsx",
+      "fullName": "useSignals signal subscription should not re-render the component for signals that were not read"
+    },
+    {
+      "id": "runtime:90c4e67cdb5cad7d",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useSignals/useSignals.test.tsx",
+      "fullName": "useSignals signal subscription should re-render once per batched signal update cycle"
+    },
+    {
+      "id": "runtime:e942290162d4a47a",
+      "file": "packages/formisch/upstream/frameworks/react/src/hooks/useSignals/useSignals.test.tsx",
+      "fullName": "useSignals signal subscription should re-render the component when a tracked signal changes"
+    }
+  ]
+}

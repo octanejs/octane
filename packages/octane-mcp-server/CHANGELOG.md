@@ -1,5 +1,70 @@
 # @octanejs/mcp-server
 
+## 0.2.22
+
+### Patch Changes
+
+- 8adc693: Expose the scoped signals and native reads benchmark suites through the benchmark tool schema.
+
+## 0.2.21
+
+### Patch Changes
+
+- bba4cd0: Cache small complete CSS results while mapping routes through a shared Vite
+  manifest graph. Expose the accompanying client-asset benchmark through the
+  Octane MCP benchmark tool.
+- 3ca30fc: Cache configured root membership and the sorted language-service root list in TypeScript-backed text inference so repeated warm snapshots no longer scale with unrelated project roots, and expose the regression benchmark through the MCP benchmark runner.
+- 37a8ca1: Expose the conditional JSX return compiler benchmark through the MCP benchmark
+  runner.
+- 922df8c: Skip manifest-cache scans for ordinary watched source changes while preserving package-manifest, full-reset, and diagnostic invalidation behavior. Expose the accompanying manifest-cache invalidation benchmark through the Octane MCP benchmark tool.
+- 9dda682: Match static application routes without regular expressions and normalize each
+  request method once per dispatch. Expose the accompanying router benchmark
+  through the Octane MCP benchmark tool.
+- 8a8afd8: Cache shared ancestry while ordering batched component updates so deeply nested render waves do not repeatedly walk the same parent chains.
+
+  Expose the scheduler-depth benchmark through the Octane MCP benchmark tool.
+
+- a014043: Expose the UIbench benchmark suite through the Octane MCP benchmark tool.
+- 4a4996e: Treat `"use strong"` as an author assertion that every user-authored render call
+  is a pure projection of immutable snapshots and witnessed inputs. Condition
+  local, dynamic, ordinary hook-shaped, callback-bearing, constructed, and tagged
+  call shapes without React hook-name heuristics, while preserving compiler-proven
+  hook setup, compatibility-mode live receivers, and changing event captures.
+  Witness callable and receiver identities alongside explicit inputs, compare
+  memoized component and ordinary-list projection inputs with `Object.is`, and
+  preserve optional, aliased, cyclic, function-valued, or lexically shadowed
+  setup-hook paths. Add
+  bounded diagnostics for detectable state-snapshot mutations, cross-row writes
+  from retained keyed scopes, and impure clock or random reads, and document the
+  assumptions the production memoizer trusts.
+
+  Expose the template-call memoization benchmark through the Octane MCP benchmark
+  tool.
+
+## 0.2.20
+
+### Patch Changes
+
+- af0d999: Drain queued behavior-root interactions with amortized cursor compaction and
+  constant-time pending-adoption bookkeeping so late modules and separately
+  settling async adoptions stay linear while preserving FIFO and reentrant delivery.
+  Expose the accompanying browser benchmark through the Octane MCP benchmark tool.
+- 7e62361: Expose the development form-diagnostics benchmark through the MCP benchmark tool.
+- 4393bea: Expose the TSrX component-graph compilation benchmark through the MCP benchmark tool.
+
+## 0.2.19
+
+### Patch Changes
+
+- 7535acd: Deduplicate binding hook sub-slot derivation behind Octane's shared helper while preserving each binding's slotless and symbol-identity behavior.
+
+## 0.2.18
+
+### Patch Changes
+
+- 1a99f1b: Add the deterministic React-library port workflow, preserve the previous skill-name alias, and update React rewrite classifications.
+- 409682b: Expose the Activity benchmark through the MCP benchmark tool.
+
 ## 0.2.17
 
 ### Patch Changes

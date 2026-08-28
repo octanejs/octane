@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "waypoint-differential",
+  "roots": ["packages/waypoint/tests/differential"],
+  "files": ["packages/waypoint/tests/differential/parity.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:waypoint-differential:0001",
+      "file": "packages/waypoint/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/waypoint vs react-waypoint@6.0.0 matches default and custom marker markup"
+    }
+  ]
+}

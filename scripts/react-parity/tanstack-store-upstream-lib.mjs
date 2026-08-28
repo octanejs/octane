@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import ts from 'typescript';
 
 import { extractTestCases } from './inventory-lib.mjs';
-import { verifyTanstackStoreUpstream } from '../../packages/tanstack-store/scripts/verify-upstream.mjs';
+import { verifyMaterializedUpstreamEvidence } from './materialized-upstream-lib.mjs';
 
 export const RUNTIME_PARITY_CONFIG = 'packages/tanstack-store/audit/runtime-parity.json';
 
@@ -201,7 +201,7 @@ export function compareAdaptedRuntimeAssertions(upstreamSource, adaptedSource) {
 
 export function verifyTanstackStoreUpstreamEvidence(repoRoot) {
 	const config = readRuntimeParityConfig(repoRoot);
-	verifyTanstackStoreUpstream(resolve(repoRoot, 'packages/tanstack-store'));
+	verifyMaterializedUpstreamEvidence(repoRoot, 'packages/tanstack-store');
 	const upstreamSource = readFileSync(resolve(repoRoot, config.upstreamTest), 'utf8');
 	const adaptedSource = readFileSync(resolve(repoRoot, config.adaptedFixture), 'utf8');
 	const upstreamCount = registrationCount(upstreamSource, config.upstreamTest);

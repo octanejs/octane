@@ -54,6 +54,10 @@ import { patch_global_fetch, build_rpc_lookup, is_rpc_request } from '@ripple-ts
 
 export { resolveOctaneConfig } from '../resolve-config.js';
 
+const HEAD_MARKER = '<!--ssr-head-->';
+const BODY_MARKER = '<!--ssr-body-->';
+const BODY_CLOSE_TAG = /<\/body\s*>/i;
+
 // A server integration can reload its compiled manifest repeatedly while the
 // process (and global fetch) stays alive. Ripple's fetch patch is deliberately
 // idempotent, so calling it again cannot replace its closed-over handler or
@@ -125,6 +129,37 @@ function buildRpcDescriptors(rpcModules, hashFn) {
 }
 
 /**
+ * Split the immutable, validated production template around both insertion
+ * markers once. Dynamic head content is then concatenated into the prepared
+ * fragments without rescanning the complete template on every request.
+ *
+ * `splitSsrTemplate` historically revalidated after head insertion. Preserve
+ * that behavior on the exceptional path where inserted content could change
+ * the body-marker contract.
+ *
+ * @param {string} html
+ * @returns {(headContent: string) => string[]}
+ */
+function prepareSsrTemplate(html) {
+	const [prefix, suffix] = splitSsrTemplate(html);
+	const prefixHeadAt = prefix.indexOf(HEAD_MARKER);
+	const headInPrefix = prefixHeadAt !== -1;
+	const headAt = headInPrefix ? prefixHeadAt : suffix.indexOf(HEAD_MARKER);
+	const headSide = headInPrefix ? prefix : suffix;
+	const beforeHead = headSide.slice(0, headAt);
+	const afterHead = headSide.slice(headAt + HEAD_MARKER.length);
+
+	return (headContent) => {
+		const nextPrefix = headInPrefix ? beforeHead + headContent + afterHead : prefix;
+		const nextSuffix = headInPrefix ? suffix : beforeHead + headContent + afterHead;
+		if (headContent.includes(BODY_MARKER) || BODY_CLOSE_TAG.test(headContent)) {
+			return splitSsrTemplate(nextPrefix + BODY_MARKER + nextSuffix);
+		}
+		return [nextPrefix, nextSuffix];
+	};
+}
+
+/**
  * @typedef {import('@octanejs/app-core').RenderRoute} RenderRoute
  * @typedef {import('@octanejs/app-core').Middleware} Middleware
  * @typedef {import('@octanejs/app-core').Context} Context
@@ -132,6 +167,71 @@ function buildRpcDescriptors(rpcModules, hashFn) {
 /**
 @import { ServerManifest, HandlerOptions, ClientAssetEntry } from '../../types/production.d.ts'
  */
+
+/**
+ * @typedef {Object} PreparedRenderRoute
+ * @property {number} index
+ * @property {string | undefined} assetHead
+ */
+
+/**
+ * Index the production manifest once, matching the router's handler-lifetime
+ * snapshot. Integrations create a new handler when replacing that manifest.
+ * Asset tags are populated lazily on the first request for each route, avoiding
+ * both repeated assembly on hot routes and eager work for routes an isolate may
+ * never serve.
+ *
+ * @param {import('@octanejs/app-core').Route[]} routes
+ * @returns {Map<RenderRoute, PreparedRenderRoute>}
+ */
+function prepareRenderRoutes(routes) {
+	/** @type {Map<RenderRoute, PreparedRenderRoute>} */
+	const prepared = new Map();
+	let index = 0;
+	for (const route of routes) {
+		if (route.type !== 'render') continue;
+		// Preserve Array#indexOf semantics if a caller reuses one route object.
+		if (!prepared.has(route)) prepared.set(route, { index, assetHead: undefined });
+		index++;
+	}
+	return prepared;
+}
+
+/**
+ * @param {ServerManifest} manifest
+ * @param {RenderRoute} route
+ * @param {string | undefined} entryPath
+ * @returns {string}
+ */
+function prepareRouteAssetHead(manifest, route, entryPath) {
+	/** @type {string[]} */
+	const tags = [];
+	const clientAssets = manifest.clientAssets;
+	if (clientAssets) {
+		/** @type {Set<string>} */
+		const stylesheets = new Set();
+		for (const modulePath of [
+			entryPath,
+			route.layout,
+			manifest.rootBoundary?.pending ? manifest.rootBoundaryEntries?.pending?.path : undefined,
+			manifest.rootBoundary?.catch ? manifest.rootBoundaryEntries?.catch?.path : undefined,
+		]) {
+			if (!modulePath) continue;
+			for (const cssFile of clientAssets[modulePath]?.css ?? []) {
+				if (stylesheets.has(cssFile)) continue;
+				stylesheets.add(cssFile);
+				tags.push(`<link rel="stylesheet" href="/${cssFile}">`);
+			}
+		}
+	}
+	// Only the page chunk was already eager; do not promote layout, fallback,
+	// or island JavaScript while making their server-rendered CSS available.
+	const entryAssets = entryPath ? clientAssets?.[entryPath] : undefined;
+	if (entryAssets?.js) {
+		tags.push(`<link rel="modulepreload" href="/${entryAssets.js}">`);
+	}
+	return tags.join('\n');
+}
 
 /**
  * Create the production request handler from a manifest.
@@ -150,14 +250,17 @@ function buildRpcDescriptors(rpcModules, hashFn) {
 export function createHandler(manifest, deps) {
 	const { renderToReadableStream, prerender, htmlTemplate, executeServerFunction } = deps;
 	const router = createRouter(manifest.routes);
+	const preparedRenderRoutes = prepareRenderRoutes(manifest.routes);
 	const globalMiddlewares = manifest.middlewares ?? [];
 	const trustProxy = manifest.trustProxy ?? false;
 	const rpcPolicy = manifest.rpc;
 	const runtime = manifest.runtime;
 	validateSsrTemplate(htmlTemplate);
 	// Also pin the built-template contract up front. The marker is emitted by
-	// the integration's HTML transform and survives source hashing.
-	applyHydrationNonce(htmlTemplate, null);
+	// the integration's HTML transform and survives source hashing. Prepare the
+	// normalized no-nonce template once: this is the common request path, and its
+	// static fragments are identical for every request handled by this manifest.
+	const splitHydrationTemplate = prepareSsrTemplate(applyHydrationNonce(htmlTemplate, null));
 
 	// RPC lookup for statically imported `module server` functions
 	// (compiler hash → server function).
@@ -244,6 +347,7 @@ export function createHandler(manifest, deps) {
 	 * @returns {Promise<Response>}
 	 */
 	async function renderRoute(route, context) {
+		const preparedRoute = preparedRenderRoutes.get(route);
 		const entryPath = get_route_entry_path(route.entry);
 		const exportName = get_route_entry_export_name(route.entry);
 		const PageComponent = entryPath
@@ -288,7 +392,7 @@ export function createHandler(manifest, deps) {
 			entry: entryPath,
 			exportName: exportName ?? null,
 			layout: route.layout ?? null,
-			routeIndex: getRenderRouteIndex(manifest.routes, route),
+			routeIndex: preparedRoute?.index,
 			params: context.params,
 			url: requestUrl,
 			preHydrate: manifest.preHydrate ?? null,
@@ -300,35 +404,13 @@ export function createHandler(manifest, deps) {
 		// server HTML before hydration. Their asset records also include CSS for
 		// deferred Hydrate descendants, whose JavaScript must remain lazy. Keep
 		// page CSS first, preserve each record's order, and link shared files once.
-		/** @type {string[]} */
-		const preloadTags = [];
-		const clientAssets = manifest.clientAssets;
-		const entryAssets = entryPath ? clientAssets?.[entryPath] : undefined;
-		if (clientAssets) {
-			/** @type {Set<string>} */
-			const stylesheets = new Set();
-			for (const modulePath of [
-				entryPath,
-				route.layout,
-				manifest.rootBoundary?.pending ? manifest.rootBoundaryEntries?.pending?.path : undefined,
-				manifest.rootBoundary?.catch ? manifest.rootBoundaryEntries?.catch?.path : undefined,
-			]) {
-				if (!modulePath) continue;
-				for (const cssFile of clientAssets[modulePath]?.css ?? []) {
-					if (stylesheets.has(cssFile)) continue;
-					stylesheets.add(cssFile);
-					preloadTags.push(`<link rel="stylesheet" href="/${cssFile}">`);
-				}
-			}
+		let assetHead = preparedRoute?.assetHead;
+		if (assetHead === undefined) {
+			assetHead = prepareRouteAssetHead(manifest, route, entryPath);
+			if (preparedRoute) preparedRoute.assetHead = assetHead;
 		}
-		// Only the page chunk was already eager; do not promote layout, fallback,
-		// or island JavaScript while making their server-rendered CSS available.
-		if (entryAssets?.js) {
-			preloadTags.push(`<link rel="modulepreload" href="/${entryAssets.js}">`);
-		}
-
-		const headContent = [...preloadTags, dataScript].join('\n');
-		const noncedTemplate = applyHydrationNonce(htmlTemplate, nonce);
+		const headContent = assetHead === '' ? dataScript : assetHead + '\n' + dataScript;
+		const noncedTemplate = nonce === null ? null : applyHydrationNonce(htmlTemplate, nonce);
 
 		const status = route.status ?? 200;
 		const headers = { 'Content-Type': 'text/html; charset=utf-8' };
@@ -346,8 +428,12 @@ export function createHandler(manifest, deps) {
 		// match, and this text now carries author-controlled metadata as well as
 		// the serialized route data.
 		/** @param {string} hoistedHead */
-		const splitAroundBody = (hoistedHead) =>
-			splitSsrTemplate(noncedTemplate.replace('<!--ssr-head-->', () => headContent + hoistedHead));
+		const splitAroundBody = (hoistedHead) => {
+			const completeHead = headContent + hoistedHead;
+			return noncedTemplate === null
+				? splitHydrationTemplate(completeHead)
+				: splitSsrTemplate(noncedTemplate.replace(HEAD_MARKER, () => completeHead));
+		};
 
 		if (manifest.render === 'buffered') {
 			// Await-everything fallback (`prerender` from octane/static): no
@@ -395,17 +481,6 @@ export function createHandler(manifest, deps) {
 	}
 
 	return handler;
-}
-
-/**
- * @param {import('@octanejs/app-core').Route[]} routes
- * @param {RenderRoute} route
- * @returns {number | undefined}
- */
-function getRenderRouteIndex(routes, route) {
-	const renderRoutes = routes.filter((r) => r.type === 'render');
-	const index = renderRoutes.indexOf(route);
-	return index === -1 ? undefined : index;
 }
 
 /**

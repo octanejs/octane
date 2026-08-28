@@ -375,6 +375,13 @@ function classifyHost(node, scope, namespace, source, filename, diagnostics, cla
  * dedupe static warnings and arm only ambiguous direct-host sites.
  */
 export function analyzeNativeChangeDiagnostics(ast, source, filename, options = {}) {
+	// The parser permits trivia after `<` and Unicode escapes in JSX names. A
+	// decoded lowercase input/textarea must still leave either its literal name
+	// or a backslash in the paired authored source. False positives only retain
+	// the existing analysis for unrelated identifiers, comments, and strings.
+	if (!source.includes('input') && !source.includes('textarea') && !source.includes('\\')) {
+		return { diagnostics: [], classifications: new Map() };
+	}
 	const diagnostics = [];
 	const classifications = new Map();
 	const ownerRendererId = options.renderer?.id ?? (options.dom === false ? null : 'dom');

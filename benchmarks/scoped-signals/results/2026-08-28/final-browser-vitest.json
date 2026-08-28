@@ -1,0 +1,80 @@
+{
+  "numTotalTestSuites": 2,
+  "numPassedTestSuites": 2,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 4,
+  "numPassedTests": 4,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1787875038692,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["compiled native collection in a real browser"],
+          "fullName": "compiled native collection in a real browser keeps native reads current through memo reuse and reader retirement (dev)",
+          "status": "passed",
+          "title": "keeps native reads current through memo reuse and reader retirement (dev)",
+          "duration": 1389.022209,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled native collection in a real browser"],
+          "fullName": "compiled native collection in a real browser preserves ordinary hook state and browser input without native reads (dev)",
+          "status": "passed",
+          "title": "preserves ordinary hook state and browser input without native reads (dev)",
+          "duration": 1028.5924999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled native collection in a real browser"],
+          "fullName": "compiled native collection in a real browser keeps native reads current through memo reuse and reader retirement (prod)",
+          "status": "passed",
+          "title": "keeps native reads current through memo reuse and reader retirement (prod)",
+          "duration": 1369.865792,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["compiled native collection in a real browser"],
+          "fullName": "compiled native collection in a real browser preserves ordinary hook state and browser input without native reads (prod)",
+          "status": "passed",
+          "title": "preserves ordinary hook state and browser input without native reads (prod)",
+          "duration": 1245.2152500000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1787875039567,
+      "endTime": 1787875044599.2153,
+      "status": "passed",
+      "message": "",
+      "name": "/private/tmp/octane-final-verification-yCm8IZ/current-correctness-01/packages/octane/tests/browser/signals-native-collection/signals-native-collection.test.ts"
+    }
+  ]
+}

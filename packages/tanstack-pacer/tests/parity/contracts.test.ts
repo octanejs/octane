@@ -22,7 +22,13 @@ describe('@octanejs/tanstack-pacer parity audit contracts', () => {
 		expect(() =>
 			execFileSync(
 				process.execPath,
-				['packages/tanstack-pacer/scripts/check-upstream-ledger.mjs'],
+				[
+					'scripts/react-port/materialize.mjs',
+					'run',
+					'--check',
+					'--package-dir',
+					'packages/tanstack-pacer',
+				],
 				{
 					cwd: root,
 					stdio: 'pipe',

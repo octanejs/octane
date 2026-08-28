@@ -1,0 +1,2478 @@
+{
+  "schemaVersion": 1,
+  "pristineInventory": "packages/floating-ui/audit/pristine-runtime.json",
+  "adaptedInventory": "packages/floating-ui/audit/adapted-runtime.json",
+  "summary": {
+    "crosswalked": 301,
+    "compatible": 272,
+    "expectedFailureNegativeControls": 29
+  },
+  "tests": [
+    {
+      "id": "crosswalk:e7d357e10e46d1e7",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "external elements sync",
+      "pristineId": "runtime:5f8a08defdfb6305",
+      "adaptedId": "runtime:fbd0a41e655a2028",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:e2875a8117396246",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "external elements sync",
+      "pristineId": "runtime:5f8a08defdfb6305:2",
+      "adaptedId": "runtime:fbd0a41e655a2028:2",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f8519d4a9d784ad8",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "external elements sync update",
+      "pristineId": "runtime:f74ae7d3ddfa868f",
+      "adaptedId": "runtime:b41920a9f80953c8",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:07d1e9ec2d566502",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "external floating element sync",
+      "pristineId": "runtime:830f318db1669457",
+      "adaptedId": "runtime:b80e6a3f6c544c2a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:0ad5b241b955ae90",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "external reference element sync",
+      "pristineId": "runtime:4373361f9b71ab48",
+      "adaptedId": "runtime:33ae65723a3c5998",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:6f15389ceeaa9c9a",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "floatingStyles default",
+      "pristineId": "runtime:1604b84800db1f91",
+      "adaptedId": "runtime:35a986e7f96d7570",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9928d19e733cfaa9",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "floatingStyles no transform",
+      "pristineId": "runtime:aa08023f18368afd",
+      "adaptedId": "runtime:8425f2225db92a92",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:284f921518b0706a",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "isPositioned",
+      "pristineId": "runtime:e057d273296ac1d2",
+      "adaptedId": "runtime:794a505d9af1f81a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:372e95b197d75b5f",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "middleware is always fresh and does not cause an infinite loop",
+      "pristineId": "runtime:0042e890d5940f7a",
+      "adaptedId": "runtime:1267e42a88e83e87",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-ref-scheduling",
+      "divergenceCaseId": "divergence:ref-scheduling:01"
+    },
+    {
+      "id": "crosswalk:fdfaa0c44e3b3150",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "unstable callback refs",
+      "pristineId": "runtime:f9a8c9a4f241bf10",
+      "adaptedId": "runtime:8613f8b624d186e6",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-ref-scheduling",
+      "divergenceCaseId": "divergence:ref-scheduling:03"
+    },
+    {
+      "id": "crosswalk:5b1a8afa9a335ddd",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "whileElementsMounted calls the cleanup function",
+      "pristineId": "runtime:9c8df8d85907586f",
+      "adaptedId": "runtime:466b63724c155f1c",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-ref-scheduling",
+      "divergenceCaseId": "divergence:ref-scheduling:02"
+    },
+    {
+      "id": "crosswalk:80426bee2de6a23e",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "whileElementsMounted is called a single time after floating mounts conditionally",
+      "pristineId": "runtime:e7dd3e2262109cb4",
+      "adaptedId": "runtime:c4df5a2abb794a0e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:a15b9bfd9dd2339f",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "whileElementsMounted is called a single time after reference mounts conditionally",
+      "pristineId": "runtime:59d40599586b9552",
+      "adaptedId": "runtime:02cda58608914561",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f2a546d98fd596de",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "whileElementsMounted is called a single time both elements mount conditionally",
+      "pristineId": "runtime:e47125031ff3588f",
+      "adaptedId": "runtime:daa63c905c3b682a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:d2812e750a5dfc70",
+      "normalizedFile": "react-dom/index.test.tsx",
+      "fullName": "whileElementsMounted is called a single time when both elements mount",
+      "pristineId": "runtime:aa98f93226844871",
+      "adaptedId": "runtime:e6a8d5fa484b7a3d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:fd9ed0af0d4247fe",
+      "normalizedFile": "react/unit/Composite.test.tsx",
+      "fullName": "grid grid flow",
+      "pristineId": "runtime:f7d3d5b156b687b0",
+      "adaptedId": "runtime:c9d9ef755e5e069b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:3b0bf258b4def831",
+      "normalizedFile": "react/unit/Composite.test.tsx",
+      "fullName": "grid grid flow: dense",
+      "pristineId": "runtime:cbaed9ebec8fa31f",
+      "adaptedId": "runtime:23f52f31b7308bff",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:a54fee10a6c8f9f7",
+      "normalizedFile": "react/unit/Composite.test.tsx",
+      "fullName": "grid uniform 1x1 items",
+      "pristineId": "runtime:1961853f9c4eaae5",
+      "adaptedId": "runtime:a0bd282df7986e07",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:e85d763d9e693c9d",
+      "normalizedFile": "react/unit/Composite.test.tsx",
+      "fullName": "grid wider and taller item",
+      "pristineId": "runtime:5000b4fa04d39f3d",
+      "adaptedId": "runtime:bcb55e8ce7a9871e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:16381492bb456d93",
+      "normalizedFile": "react/unit/Composite.test.tsx",
+      "fullName": "grid wider item",
+      "pristineId": "runtime:d361489eb2dac920",
+      "adaptedId": "runtime:a6e09871d4c1dbfe",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:64685eec8ba57901",
+      "normalizedFile": "react/unit/Composite.test.tsx",
+      "fullName": "list controlled mode",
+      "pristineId": "runtime:4ed659bcacb72e27",
+      "adaptedId": "runtime:b6f23e77de8caca8",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c4be113d0b202293",
+      "normalizedFile": "react/unit/Composite.test.tsx",
+      "fullName": "list uncontrolled mode",
+      "pristineId": "runtime:3d682a9fbbc16f54",
+      "adaptedId": "runtime:7a7f214cee76f7fd",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:32c7c3adb4df63f6",
+      "normalizedFile": "react/unit/Composite.test.tsx",
+      "fullName": "rtl grid",
+      "pristineId": "runtime:9d0170f3a7885ecd",
+      "adaptedId": "runtime:6e31639d88595188",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c9cd1568b4ba6ad3",
+      "normalizedFile": "react/unit/Composite.test.tsx",
+      "fullName": "rtl list",
+      "pristineId": "runtime:9bf2cfbdffc9a6e2",
+      "adaptedId": "runtime:c470727e862db73b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:a7b34954d37887d7",
+      "normalizedFile": "react/unit/FloatingDelayGroup.test.tsx",
+      "fullName": "groups delays correctly",
+      "pristineId": "runtime:9d659a428323022a",
+      "adaptedId": "runtime:e7bee6bef6b0031e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:d97ea078b3b445e1",
+      "normalizedFile": "react/unit/FloatingDelayGroup.test.tsx",
+      "fullName": "timeoutMs",
+      "pristineId": "runtime:13a98453ece298c4",
+      "adaptedId": "runtime:af94ad3600bb7619",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:5d5d4ade476dadb5",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Drawer closeOnFocusOut=false - does not close when tabbing out",
+      "pristineId": "runtime:c8e914a0e2faffed",
+      "adaptedId": "runtime:749253eb54b2a905",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-react-context-fixture",
+      "divergenceCaseId": "divergence:react-context-fixture:02"
+    },
+    {
+      "id": "crosswalk:b9b6a26dd2997d81",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Drawer does not close when clicking another button outside",
+      "pristineId": "runtime:3c3fc31e28506f7c",
+      "adaptedId": "runtime:f3f1c7b37fe9db7f",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-react-context-fixture",
+      "divergenceCaseId": "divergence:react-context-fixture:01"
+    },
+    {
+      "id": "crosswalk:b13a07c3c34717c1",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Drawer returns focus when tabbing out then back to close button",
+      "pristineId": "runtime:12d81f173e56b3ea",
+      "adaptedId": "runtime:c5a775f54d76beb6",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-react-context-fixture",
+      "divergenceCaseId": "divergence:react-context-fixture:03"
+    },
+    {
+      "id": "crosswalk:1bba1f8835a6eb37",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation closes when unhovering floating element even when focus is inside it",
+      "pristineId": "runtime:30821b167ae807e7",
+      "adaptedId": "runtime:70201dc691fcd08a",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:05"
+    },
+    {
+      "id": "crosswalk:0706eb0b6976d2ca",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation does not focus reference when hovering it",
+      "pristineId": "runtime:ffa1178e86c4d4fc",
+      "adaptedId": "runtime:58476ab323620e73",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:01"
+    },
+    {
+      "id": "crosswalk:e351b7fe94cbc96e",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation does not re-open after closing via escape key",
+      "pristineId": "runtime:c677385308092605",
+      "adaptedId": "runtime:f79c1270a47a31fe",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:04"
+    },
+    {
+      "id": "crosswalk:7eed3960cb248701",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation returns focus to reference when floating element was opened by hover but is closed by an explicit close button",
+      "pristineId": "runtime:6b45db0578e7c54b",
+      "adaptedId": "runtime:3e5f59845553d1b6",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:03"
+    },
+    {
+      "id": "crosswalk:0767a06a75c74bc9",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation returns focus to reference when floating element was opened by hover but is closed by esc key",
+      "pristineId": "runtime:34fd289bb6bad095",
+      "adaptedId": "runtime:a4c41e79a5c2dc0a",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:02"
+    },
+    {
+      "id": "crosswalk:848ee12f52f080e1",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "aria-hidden is not applied on root combobox with virtual nested menu",
+      "pristineId": "runtime:0dc37f50ae66203d",
+      "adaptedId": "runtime:d1ab90628073905c",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-focus-scheduling",
+      "divergenceCaseId": "divergence:focus-scheduling:02"
+    },
+    {
+      "id": "crosswalk:d08568bbb8a69df1",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "closeOnFocusOut with FloatingPortal false: does not close when focus moves outside",
+      "pristineId": "runtime:0abbdb5714f90d16",
+      "adaptedId": "runtime:092c1d7df45394d4",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7e402527ee4f57d0",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "closeOnFocusOut with FloatingPortal true: closes when focus moves outside",
+      "pristineId": "runtime:3e2e2649e9c5185d",
+      "adaptedId": "runtime:1b501f62d1b332c2",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b90493d4ef8aa927",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "closeOnFocusOut without FloatingPortal false: does not close when focus moves outside",
+      "pristineId": "runtime:32d2a21bcf4a5901",
+      "adaptedId": "runtime:35eef39f791979d5",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9343a4cd757d2aef",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "closeOnFocusOut without FloatingPortal true: closes when focus moves outside",
+      "pristineId": "runtime:faf538e7691896b4",
+      "adaptedId": "runtime:df441b901b3c1e64",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:477770261acf4d50",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "disabled false",
+      "pristineId": "runtime:160fbe4989cf742f",
+      "adaptedId": "runtime:8d2bd3b35d2750c8",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:44b35b448d0ae46b",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "disabled supports keepMounted behavior",
+      "pristineId": "runtime:16fc19f4a19f3b40",
+      "adaptedId": "runtime:218e1fb915cfec8f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:406d9304ca481386",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "disabled true -> false",
+      "pristineId": "runtime:a1d7a6d16f0fdcc3",
+      "adaptedId": "runtime:b3f4e4e0df9e9500",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:176339a76aac4a4d",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "floating element closes upon tabbing out of modal combobox",
+      "pristineId": "runtime:912ddcec24d9ef84",
+      "adaptedId": "runtime:9146186146e98af7",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b96fcb428728081f",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "floating element with listbox role ignores tabIndex setting",
+      "pristineId": "runtime:816c7cc06ff7f505",
+      "adaptedId": "runtime:c340778c67873c3e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:131cd184680a32df",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "floating element with no focusable elements and no listbox role gets tabIndex=0 when initialFocus is -1",
+      "pristineId": "runtime:6ac3864c336ee724",
+      "adaptedId": "runtime:8878dbcd51e447ec",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:5f1e687b4958642a",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "focus does not return to reference when floating element is triggered by hover",
+      "pristineId": "runtime:cde46eab84db51c1",
+      "adaptedId": "runtime:3e90de9cd898fef9",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9e97ce00138d4026",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "focus is placed on element with floating props when floating element is a wrapper",
+      "pristineId": "runtime:b3822f2f8362ae72",
+      "adaptedId": "runtime:305a1b246ec4ec0b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4f517a19bf70dbf6",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "getInsideElements returns a list of elements that should be considered part of the floating element",
+      "pristineId": "runtime:ea5b4926d04d1a5e",
+      "adaptedId": "runtime:ef0c150b565c9157",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:a04a62d27091c9c5",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "guards false",
+      "pristineId": "runtime:21bc96e84a42ca2a",
+      "adaptedId": "runtime:c4121df4def14ee6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:1dce9dc2705bb7c3",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "guards true",
+      "pristineId": "runtime:b9a146c56268f4d6",
+      "adaptedId": "runtime:452039f5e4df3ea2",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:5720f00fc2ed7873",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "handles manual tabindex on dialog floating element",
+      "pristineId": "runtime:f8b4bedcf277eb61",
+      "adaptedId": "runtime:56d13787f5dabffa",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:8117ba13263b0c5d",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "iframe focus navigation shift+tab from the popover to the previous element in the iframe",
+      "pristineId": "runtime:ff9ac2eafb366a88",
+      "adaptedId": "runtime:beca616e8795308a",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-iframe-realm",
+      "divergenceCaseId": "divergence:iframe-realm:02"
+    },
+    {
+      "id": "crosswalk:24f9e0cf462c72e9",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "iframe focus navigation tabs from the popover to the next element in the iframe",
+      "pristineId": "runtime:9756684d622426d4",
+      "adaptedId": "runtime:6a306ee59640799b",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-iframe-realm",
+      "divergenceCaseId": "divergence:iframe-realm:01"
+    },
+    {
+      "id": "crosswalk:6d81934b49538032",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "initialFocus number",
+      "pristineId": "runtime:b2da9125c0ecc8b2",
+      "adaptedId": "runtime:7f708dd1696ca6db",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:ce235e7dfa57e939",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "initialFocus ref",
+      "pristineId": "runtime:c9f04d6464040185",
+      "adaptedId": "runtime:feb0700a123c645f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b88e70c12ceabd1f",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "initialFocus respects autoFocus",
+      "pristineId": "runtime:1b555abc6c54e689",
+      "adaptedId": "runtime:6258bee4c1d30448",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:59e57fcd88b414e4",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal fallback to floating element when it has no tabbable content",
+      "pristineId": "runtime:bfe991a15b2430f6",
+      "adaptedId": "runtime:7104b2dfdea9f2c2",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f0a327c5d29bd146",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal false",
+      "pristineId": "runtime:2cd1b3fcdb583186",
+      "adaptedId": "runtime:ed4c9e56eae7f353",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:ded8d12ed5a8dd01",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal false - comboboxes do not hide all other nodes",
+      "pristineId": "runtime:95e8850e9d58bf1e",
+      "adaptedId": "runtime:c94709b90ca02d14",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:10f564deff668446",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal false - does not apply inert to outside nodes",
+      "pristineId": "runtime:a7e49191f1b5a83f",
+      "adaptedId": "runtime:02f2b2ad1f06d82e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:5b4a6d9569a77037",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal false — shift tabbing does not trap focus when reference is in order",
+      "pristineId": "runtime:25e25a302c6a62ba",
+      "adaptedId": "runtime:8d2ee183b7467bf0",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:44a60806568675a7",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal mixed modality and nesting",
+      "pristineId": "runtime:e827674f68705934",
+      "adaptedId": "runtime:c979f66e54f9ffbd",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b0d72b43554d01a3",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal true",
+      "pristineId": "runtime:17fa1ce71dd9c636",
+      "adaptedId": "runtime:d339202d64b8f270",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:d96c248fb4d5dbf6",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal true - applies aria-hidden to outside nodes",
+      "pristineId": "runtime:bbd52ce566109cd7",
+      "adaptedId": "runtime:2f4632299a1f436e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f767bc6c58ce7186",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal true - applies inert to outside nodes when outsideElementsInert=true",
+      "pristineId": "runtime:528b7af066017572",
+      "adaptedId": "runtime:7adeeea43f338fec",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:247139cb4c33737f",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal true - comboboxes hide all other nodes with aria-hidden",
+      "pristineId": "runtime:c531910d2d44e7c8",
+      "adaptedId": "runtime:8fece9f8f957c602",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:144fae6bc438d7e2",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "modal true - comboboxes hide all other nodes with inert when outsideElementsInert=true",
+      "pristineId": "runtime:5d39636b44b458d8",
+      "adaptedId": "runtime:eec0707d96b204a0",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:2d0d0d32b2b9c189",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "non-modal + FloatingPortal focuses inside element, tabbing out focuses last document element",
+      "pristineId": "runtime:44da3a833d2085a1",
+      "adaptedId": "runtime:7e51ba02ee62c37e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:8eb9902791406bd5",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "non-modal + FloatingPortal order: [reference, content] focuses reference, then inside, then, last document element",
+      "pristineId": "runtime:9dbc065282e1400e",
+      "adaptedId": "runtime:0b1f327747f7e202",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:8509aa92064da419",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "non-modal + FloatingPortal order: [reference, floating, content] focuses reference, then inside, then, last document element",
+      "pristineId": "runtime:9706e885bf3d49ef",
+      "adaptedId": "runtime:e715eb5e6d989500",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:576f347f71909ab1",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "non-modal + FloatingPortal shift+tab",
+      "pristineId": "runtime:f398394613e17f60",
+      "adaptedId": "runtime:131dda4f8daf17bb",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:22f0c15f6c1fdfcd",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "order [floating, content]",
+      "pristineId": "runtime:53e6d28f552c4c69",
+      "adaptedId": "runtime:20eeb36a1745878e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:292e9e8c37043f8c",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "order [reference, content]",
+      "pristineId": "runtime:8a533429258f0fc8",
+      "adaptedId": "runtime:591291d8a7e31987",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:136b0c04c1f5c8a5",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "order [reference, floating, content]",
+      "pristineId": "runtime:72500b157381f9e6",
+      "adaptedId": "runtime:adcd4aa8c79190c6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f65715cd46d4bcae",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus always returns to the reference for nested elements",
+      "pristineId": "runtime:12db2b90baa59c29",
+      "adaptedId": "runtime:695aa22fedf34be4",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:86b98a721315fd78",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus does not return focus to reference on outside press when preventScroll is not supported",
+      "pristineId": "runtime:f354416e1edc7bb1",
+      "adaptedId": "runtime:e190fb0f6ee32f0c",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:07c1652a3cf36c5b",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus false",
+      "pristineId": "runtime:83d6eb0174f939ea",
+      "adaptedId": "runtime:1df915af585255a8",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:1e0b0088478f3053",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus preserves tabbable context next to reference element if removed (modal)",
+      "pristineId": "runtime:6cabf7414dcc89ed",
+      "adaptedId": "runtime:16d52e57d911312d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:0d9e2b9666efb927",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus preserves tabbable context next to reference element if removed (non-modal)",
+      "pristineId": "runtime:ae124a781f1c7107",
+      "adaptedId": "runtime:1598bf02602d15b0",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:82951084c942e1fb",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus ref",
+      "pristineId": "runtime:3811c92b0b20fd56",
+      "adaptedId": "runtime:d8b41cb5de9dea7f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4fedf18d27a1a659",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus return to the first focusable descendent of the reference, if the reference is not focusable",
+      "pristineId": "runtime:33c58d93e60e39a1",
+      "adaptedId": "runtime:521f06b7acd624c2",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-focus-scheduling",
+      "divergenceCaseId": "divergence:focus-scheduling:01"
+    },
+    {
+      "id": "crosswalk:6212a400f41e4a3d",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus returns focus to reference on outside press when preventScroll is supported",
+      "pristineId": "runtime:5eae8937724b1b8f",
+      "adaptedId": "runtime:e4ae51fe3a709d2e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:304e444ffad65e91",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus true",
+      "pristineId": "runtime:3dc192cb78a25861",
+      "adaptedId": "runtime:b15a7f121f114c1f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:cfc22451e5c5feb9",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returns focus to last connected element",
+      "pristineId": "runtime:5bad065147745b46",
+      "adaptedId": "runtime:0ab25f713861e512",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:1c35f566a222cb39",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "standard tabbing back and forth of a non-modal floating element",
+      "pristineId": "runtime:727a342d5607e061",
+      "adaptedId": "runtime:cc8c61cc5420726a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:a879f1e4b988b795",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "trapped combobox prevents focus moving outside floating element",
+      "pristineId": "runtime:e62c663c18b2c49c",
+      "adaptedId": "runtime:509433ea0120f0c9",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:3602d1e6b422dc10",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "untrapped combobox creates non-modal focus management",
+      "pristineId": "runtime:6cd6ac367e9dc419",
+      "adaptedId": "runtime:5dc35132e7936954",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4bbc9fab17ed9742",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "uses aria-hidden instead of inert on outside nodes if opened with hover and modal=true",
+      "pristineId": "runtime:021cf40cf40816c7",
+      "adaptedId": "runtime:b6a9c2538053ebbd",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:e65de5d60a3f3ee3",
+      "normalizedFile": "react/unit/FloatingList.test.tsx",
+      "fullName": "handles re-ordering",
+      "pristineId": "runtime:f63cd1df442b3a3a",
+      "adaptedId": "runtime:7a66920d58da74ee",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c8de393ee41144e8",
+      "normalizedFile": "react/unit/FloatingList.test.tsx",
+      "fullName": "registers an element ref and index correctly",
+      "pristineId": "runtime:a8454d633139bd6e",
+      "adaptedId": "runtime:ecd0ffe92396176a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:2d0df020cee17834",
+      "normalizedFile": "react/unit/FloatingList.test.tsx",
+      "fullName": "registers element ref and indexes correctly",
+      "pristineId": "runtime:622a6eb23e77953f",
+      "adaptedId": "runtime:ecd0cb6efd97e5d5",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b09af07dfee73afb",
+      "normalizedFile": "react/unit/FloatingList.test.tsx",
+      "fullName": "registers strings correctly (label)",
+      "pristineId": "runtime:6a9be027b70956d7",
+      "adaptedId": "runtime:fccb5adc0226b83f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:8110bc1545cc2420",
+      "normalizedFile": "react/unit/FloatingList.test.tsx",
+      "fullName": "registers strings correctly (no value)",
+      "pristineId": "runtime:80f1ac56a1573506",
+      "adaptedId": "runtime:2777c04107138369",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:748bd20b1146a322",
+      "normalizedFile": "react/unit/FloatingPortal.test.tsx",
+      "fullName": "allows custom roots",
+      "pristineId": "runtime:664026ea1fb61494",
+      "adaptedId": "runtime:479c45a9e046f0ea",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:3df2a8a46c97ad30",
+      "normalizedFile": "react/unit/FloatingPortal.test.tsx",
+      "fullName": "allows refs as roots",
+      "pristineId": "runtime:725a23137362e6d0",
+      "adaptedId": "runtime:039b10d2fcbb4434",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:243ed4f4d29c11cc",
+      "normalizedFile": "react/unit/FloatingPortal.test.tsx",
+      "fullName": "allows roots to be initially null",
+      "pristineId": "runtime:dcccb4b15cc0b715",
+      "adaptedId": "runtime:ba183cec9fe5e690",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:d21fcb546ea96c4d",
+      "normalizedFile": "react/unit/FloatingPortal.test.tsx",
+      "fullName": "creates a custom id node",
+      "pristineId": "runtime:b9159f323da267cb",
+      "adaptedId": "runtime:be3955a1d9e8d61b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:70e4cd9983d66749",
+      "normalizedFile": "react/unit/FloatingPortal.test.tsx",
+      "fullName": "creates a custom id node as the root",
+      "pristineId": "runtime:d33d4b69acd80821",
+      "adaptedId": "runtime:83f6a7dc6f0c26f7",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9ac8d224ddad6799",
+      "normalizedFile": "react/unit/FloatingPortal.test.tsx",
+      "fullName": "uses a custom id node as the root",
+      "pristineId": "runtime:f382737d798aa57c",
+      "adaptedId": "runtime:031bbe255e0fd1cb",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:8c1c4c6f94358b83",
+      "normalizedFile": "react/unit/NextFloatingDelayGroup.test.tsx",
+      "fullName": "does not re-render unrelated consumers",
+      "pristineId": "runtime:f8526ae5cbdd47ff",
+      "adaptedId": "runtime:0dccec5b91b8237a",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-render-count",
+      "divergenceCaseId": "divergence:render-count:01"
+    },
+    {
+      "id": "crosswalk:9c03cc053f1ac88a",
+      "normalizedFile": "react/unit/NextFloatingDelayGroup.test.tsx",
+      "fullName": "groups delays correctly",
+      "pristineId": "runtime:d17b3e625a50a531",
+      "adaptedId": "runtime:a2ec34ebd19f6d06",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:31f2dafd119e077d",
+      "normalizedFile": "react/unit/NextFloatingDelayGroup.test.tsx",
+      "fullName": "timeoutMs",
+      "pristineId": "runtime:a43eb1c0025c9b5a",
+      "adaptedId": "runtime:f4fc8c41d3b31202",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:ea621ddc375cb477",
+      "normalizedFile": "react/unit/markOthers.test.ts",
+      "fullName": "does not recurse infinitely with target inside anchor in shadow root",
+      "pristineId": "runtime:be4fc611c96b1963",
+      "adaptedId": "runtime:c14b7000400f6591",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4aba3ffcc2ce18c9",
+      "normalizedFile": "react/unit/markOthers.test.ts",
+      "fullName": "mixed controlAttribute usage (aria-hidden/inert/none)",
+      "pristineId": "runtime:ad6b921fe096112a",
+      "adaptedId": "runtime:3ff7fa79e6de37a4",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:fc7d2123a0b95344",
+      "normalizedFile": "react/unit/markOthers.test.ts",
+      "fullName": "multiple calls",
+      "pristineId": "runtime:84ef26f5cc94f631",
+      "adaptedId": "runtime:24223462fa2c24d3",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:27d00d3c92c1e17b",
+      "normalizedFile": "react/unit/markOthers.test.ts",
+      "fullName": "multiple cleanups with differing controlAttribute",
+      "pristineId": "runtime:6e1203cc768fc3b6",
+      "adaptedId": "runtime:426f5b1b7b29a662",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:78b655c4c5bbe7de",
+      "normalizedFile": "react/unit/markOthers.test.ts",
+      "fullName": "out of order cleanup",
+      "pristineId": "runtime:f5ca255de608f568",
+      "adaptedId": "runtime:b78bffd7d2200684",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7e760542e123e831",
+      "normalizedFile": "react/unit/markOthers.test.ts",
+      "fullName": "single call",
+      "pristineId": "runtime:c278c75284f6b0bb",
+      "adaptedId": "runtime:098a1452016092f6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:3196aaea33208723",
+      "normalizedFile": "react/unit/markOthers.test.ts",
+      "fullName": "uses shadow root host as avoid element when parent chain includes anchor",
+      "pristineId": "runtime:236aeaf91176b186",
+      "adaptedId": "runtime:a198d2a5f84b21ca",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f8100b334a809397",
+      "normalizedFile": "react/unit/nodes.test.ts",
+      "fullName": "handles deep parent structures correctly (onlyOpenChildren=false)",
+      "pristineId": "runtime:64bcdd3edf652258",
+      "adaptedId": "runtime:6fc136bf7c478db0",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:db7e26fbde93fa47",
+      "normalizedFile": "react/unit/nodes.test.ts",
+      "fullName": "handles deep parent structures correctly (onlyOpenChildren=true)",
+      "pristineId": "runtime:99ac373c24eff253",
+      "adaptedId": "runtime:871c63ce896dd09c",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f22b2bcbbb45c04a",
+      "normalizedFile": "react/unit/nodes.test.ts",
+      "fullName": "returns an array of ancestors",
+      "pristineId": "runtime:27c67d4e0b85d736",
+      "adaptedId": "runtime:5ba2b94a4a9eed6d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:da001a5544b73551",
+      "normalizedFile": "react/unit/nodes.test.ts",
+      "fullName": "returns an array of children, ignoring closed ones when onlyOpenChildren=true",
+      "pristineId": "runtime:79cd256bb280281a",
+      "adaptedId": "runtime:ab11c20c31283c68",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:95648bdf7a39b2c5",
+      "normalizedFile": "react/unit/nodes.test.ts",
+      "fullName": "returns an array of children, including closed ones when onlyOpenChildren=false",
+      "pristineId": "runtime:e78c2ce4fd0aa1e0",
+      "adaptedId": "runtime:c4c1b0df9e4b4ed2",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:0fa5017608558c77",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "`stickIfOpen` prop false: `open` state becomes `false` after click and mouseleave",
+      "pristineId": "runtime:c2d81c67a2dd304e",
+      "adaptedId": "runtime:fbc927ba41a29d40",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:5096c5a39c41216f",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "`stickIfOpen` prop true: `open` state remains `true` after click and mouseleave",
+      "pristineId": "runtime:0988a5ed90745c8f",
+      "adaptedId": "runtime:3778934329c5d2a4",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7f178fba505aec5b",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "`toggle` prop `open` state becomes `false` after clicking when initially open",
+      "pristineId": "runtime:94672052de46ed0c",
+      "adaptedId": "runtime:739ed0017cc93c26",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7670f0302a6cc689",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "`toggle` prop `open` state remains `true` after two clicks",
+      "pristineId": "runtime:5643c36414983bec",
+      "adaptedId": "runtime:c31ab1074565a6ab",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:ca160bb27e87937a",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "`toggle` prop `open` state remains `true` after two clicks with `mousedown`",
+      "pristineId": "runtime:1f3d693c83b10f27",
+      "adaptedId": "runtime:ab2ceebe4337358c",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:62c5c0ceb1b59962",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "`toggle` prop changes `open` state to `true` after click",
+      "pristineId": "runtime:a63bc8e69990416d",
+      "adaptedId": "runtime:85e977d0dba3ea63",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:28349b62b53ac250",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "default changes `open` state to `false` after two clicks",
+      "pristineId": "runtime:9b47716c03501d67",
+      "adaptedId": "runtime:3a352fb0e87c09b7",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:6536af133f4870ce",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "default changes `open` state to `true` after click",
+      "pristineId": "runtime:3e930c93e93f2217",
+      "adaptedId": "runtime:926a58cff254cea6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:1c4327f64895b1ff",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "ignores Space keydown on another element then keyup on the button",
+      "pristineId": "runtime:49bbdfe6e565fd46",
+      "adaptedId": "runtime:87347bef12f6e0ea",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:efe6618194b1d7a4",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "mousedown `event` prop changes `open` state to `false` after two clicks",
+      "pristineId": "runtime:d62f21f368b4ca58",
+      "adaptedId": "runtime:574aa2d8a4820e06",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:3e32117155cd5859",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "mousedown `event` prop changes `open` state to `true` after click",
+      "pristineId": "runtime:c5bf87ad58736f88",
+      "adaptedId": "runtime:568493da85744f7a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b7bc7b4fefd73e0b",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "non-buttons adds Enter keydown",
+      "pristineId": "runtime:8504ea6a21bf2382",
+      "adaptedId": "runtime:252446168af47121",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b3adc4dd573e9566",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "non-buttons adds Space keyup",
+      "pristineId": "runtime:6039127da8544bfb",
+      "adaptedId": "runtime:f99ddc750673ee93",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:99097a35e34c99b2",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "non-buttons anchor does not add Enter keydown",
+      "pristineId": "runtime:b7e276a9c8bcf5b3",
+      "adaptedId": "runtime:0132c6279eb2302b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:a7d02d4ace09373d",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "non-buttons typeable reference does not receive space key handler",
+      "pristineId": "runtime:56a469ef11fc30ad",
+      "adaptedId": "runtime:c61bee276867e542",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:5491d7210284ed59",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "non-buttons typeable reference does receive Enter key handler",
+      "pristineId": "runtime:b1bfc4ec2ba64bf7",
+      "adaptedId": "runtime:3fde8177e6202f5e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:5815c16155b8d4f5",
+      "normalizedFile": "react/unit/useClick.test.tsx",
+      "fullName": "reason string",
+      "pristineId": "runtime:714847ccce34b1cd",
+      "adaptedId": "runtime:2b8f04427d6131fb",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:73cda65d26d154e4",
+      "normalizedFile": "react/unit/useClientPoint.test.tsx",
+      "fullName": "axis x",
+      "pristineId": "runtime:604bf78d0bf87a00",
+      "adaptedId": "runtime:0d538739afda3892",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:371c78a979a2c4b7",
+      "normalizedFile": "react/unit/useClientPoint.test.tsx",
+      "fullName": "axis y",
+      "pristineId": "runtime:f9dd061e4eab6a69",
+      "adaptedId": "runtime:eb98725ba7486a21",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:e6e4c7cb38ef2226",
+      "normalizedFile": "react/unit/useClientPoint.test.tsx",
+      "fullName": "cleans up window listener when closing or disabling",
+      "pristineId": "runtime:783b799640b15c62",
+      "adaptedId": "runtime:d64845c46a68826c",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-effect-scheduling",
+      "divergenceCaseId": "divergence:effect-scheduling:01"
+    },
+    {
+      "id": "crosswalk:5b01829fda9e0971",
+      "normalizedFile": "react/unit/useClientPoint.test.tsx",
+      "fullName": "ignores mouse events when explicit coords are specified",
+      "pristineId": "runtime:884ab03ab16a59cc",
+      "adaptedId": "runtime:deeb5de2f899daa3",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:6d0c47aaab303972",
+      "normalizedFile": "react/unit/useClientPoint.test.tsx",
+      "fullName": "removes window listener when cursor lands on floating element",
+      "pristineId": "runtime:da79ad5cec61f6b9",
+      "adaptedId": "runtime:5194ea3839ba3767",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f05ef2d8d081d99d",
+      "normalizedFile": "react/unit/useClientPoint.test.tsx",
+      "fullName": "renders at explicit client point and can be updated",
+      "pristineId": "runtime:026cd2f1f136287e",
+      "adaptedId": "runtime:c7e3da90e4029875",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:8925e373e700715c",
+      "normalizedFile": "react/unit/useClientPoint.test.tsx",
+      "fullName": "renders at mouse event coords",
+      "pristineId": "runtime:55ad384bac9c14a4",
+      "adaptedId": "runtime:0088a7fddf620d39",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:55fc222e1c2173c0",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles escapeKey false",
+      "pristineId": "runtime:b760055886ec1f7b",
+      "adaptedId": "runtime:1aaea2f9b9c50679",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:787e7bab925dd891",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles escapeKey mixed",
+      "pristineId": "runtime:1f4534c54461a352",
+      "adaptedId": "runtime:8b38099eb83a74b4",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:2eb56154662b251e",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles escapeKey true",
+      "pristineId": "runtime:c5c7d9b2a5e94ab1",
+      "adaptedId": "runtime:028407e238c40aac",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:51d796e0f0891833",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles escapeKey without FloatingTree",
+      "pristineId": "runtime:7741bfc1be648c37",
+      "adaptedId": "runtime:0d78d6c79f6f76a3",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9dfd9adbe4cfc972",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles outsidePress false",
+      "pristineId": "runtime:0f08ddfd319fa177",
+      "adaptedId": "runtime:96a569ccf5e9ae57",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:53c2e9111b7bd162",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles outsidePress mixed",
+      "pristineId": "runtime:4521dc0aa9245dfc",
+      "adaptedId": "runtime:78c7617d4a5c66fd",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:584058b2595ca092",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles outsidePress true",
+      "pristineId": "runtime:c42bbc54277ab10b",
+      "adaptedId": "runtime:888d4d24257fb87f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:99237c6f5acaa894",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles prop resolution false",
+      "pristineId": "runtime:d61ced5b53547301",
+      "adaptedId": "runtime:d173ac922479d9c4",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c8a55d55b25f2eb7",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles prop resolution undefined",
+      "pristineId": "runtime:441769b31d057607",
+      "adaptedId": "runtime:86f29876e54cffbe",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:1183e90667b71165",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles prop resolution { escapeKey: false }",
+      "pristineId": "runtime:bb585f8d3616730b",
+      "adaptedId": "runtime:3e2591a5a661d376",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:fce0f0cebe094952",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles prop resolution { outsidePress: false }",
+      "pristineId": "runtime:4191ada284598b7d",
+      "adaptedId": "runtime:f7409aea329bedd5",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4508e00e3d191cf3",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "bubbles prop resolution {}",
+      "pristineId": "runtime:cade23a72fa89415",
+      "adaptedId": "runtime:0afa4797d6acd561",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c58641547790ccb9",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture escapeKey false",
+      "pristineId": "runtime:2eebec16b268a820",
+      "adaptedId": "runtime:fa54254c8685e5e1",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:54c82484e5f35a88",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture escapeKey true",
+      "pristineId": "runtime:3f890598712584ef",
+      "adaptedId": "runtime:33f93cd57523383a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c2bee7d8498d4887",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture outsidePress false",
+      "pristineId": "runtime:1b15241b24d997ee",
+      "adaptedId": "runtime:07ac327f1b6edc61",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:69b1f1ede957b92c",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture outsidePress true",
+      "pristineId": "runtime:1660b65d26aa24f7",
+      "adaptedId": "runtime:83011b202f92076d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:664cebf4f1da6a6e",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture prop resolution false",
+      "pristineId": "runtime:3446de05eb5d3206",
+      "adaptedId": "runtime:ff3040e590f946e3",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:19fb6c2da1c82cfd",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture prop resolution true",
+      "pristineId": "runtime:bab27e4874a1681f",
+      "adaptedId": "runtime:5cf26905deb4fcbb",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f64c690ce9eef08d",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture prop resolution undefined",
+      "pristineId": "runtime:aad1373cbdefcce0",
+      "adaptedId": "runtime:798da8be7912828f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7d586b4043154ae8",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture prop resolution { escapeKey: true }",
+      "pristineId": "runtime:37e043e64752fd23",
+      "adaptedId": "runtime:24a3b59f96a5259e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:74c39e022585afe5",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture prop resolution { outsidePress: false }",
+      "pristineId": "runtime:41ba5dba8e1243b7",
+      "adaptedId": "runtime:32582c05c458862e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:32dff190c0e30bf4",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "capture prop resolution {}",
+      "pristineId": "runtime:7ecb905abf10ddbf",
+      "adaptedId": "runtime:fb48b45087f8b34a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4d5f5a3e962d958f",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "false dismisses with ancestor scroll",
+      "pristineId": "runtime:7892c4e103e0bb6c",
+      "adaptedId": "runtime:b1bcbba9be889901",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:72ba9d61ad86f953",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "false dismisses with escape key",
+      "pristineId": "runtime:3149f9cdc7d8bc11",
+      "adaptedId": "runtime:4153434e11e0bf63",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b66dc76401345f73",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "false dismisses with outside press",
+      "pristineId": "runtime:e74d7d0dbd282f05",
+      "adaptedId": "runtime:90a6d9257c5aad9f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7225d0ec5ef1d279",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "false dismisses with reference pointer down",
+      "pristineId": "runtime:6cdd3be847555865",
+      "adaptedId": "runtime:02e06b0b37945650",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:216a62e97b7a4e18",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "false does not dismiss when clicking portaled children",
+      "pristineId": "runtime:a71c782929129d9f",
+      "adaptedId": "runtime:57cfd51ba4e3a6c3",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:95f1bd3e510a21cf",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "false outsidePress function guard",
+      "pristineId": "runtime:a205ea10b4301ae9",
+      "adaptedId": "runtime:492e78150d209b12",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:ddb8037d56ff7153",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "nested floating elements with different portal roots",
+      "pristineId": "runtime:e38d1b9cac14e4b0",
+      "adaptedId": "runtime:f22b3d730d5757e4",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:8a6a6d999d25d400",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "outsidePressEvent click dragging inside the floating element does not close",
+      "pristineId": "runtime:9db6ebef57aa5983",
+      "adaptedId": "runtime:02797dca8a8e85e2",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:71d90258860754b5",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "outsidePressEvent click dragging outside the floating element does not close",
+      "pristineId": "runtime:76272b9fd1b5e53d",
+      "adaptedId": "runtime:addf0b3534a1e976",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:2eee253bb98b6c3b",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "outsidePressEvent click dragging outside the floating element then clicking outside closes",
+      "pristineId": "runtime:27801b248637dc0e",
+      "adaptedId": "runtime:935d7d28c9a21c58",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:2ba6cc586c9f2c4b",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "outsidePressEvent click right clicking inside the floating element then clicking outside closes",
+      "pristineId": "runtime:6b33c095e9479615",
+      "adaptedId": "runtime:3257c76f68f5668d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4f942cf92334102d",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "true dismisses with ancestor scroll",
+      "pristineId": "runtime:14ce4ffd59b02462",
+      "adaptedId": "runtime:264211170dbde9fb",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:6714c19a7487f3c4",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "true dismisses with escape key",
+      "pristineId": "runtime:1e5c5fc28769e419",
+      "adaptedId": "runtime:1275d35fde70366d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:e819e5b73f2e2910",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "true dismisses with native click",
+      "pristineId": "runtime:6a724e028cca4955",
+      "adaptedId": "runtime:e2079eb6417b6165",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:d909779787baaf9f",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "true dismisses with outside pointer press",
+      "pristineId": "runtime:dd7b95f6d925437b",
+      "adaptedId": "runtime:2999cc5ac15d016b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:5f8b7f39b0e7715f",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "true dismisses with reference press",
+      "pristineId": "runtime:13e2e7f3d035439b",
+      "adaptedId": "runtime:8f34053ec6456b44",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:354fee64cf77a86f",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "true does not dismiss with escape key if IME is active",
+      "pristineId": "runtime:e3467e9673166847",
+      "adaptedId": "runtime:0b0b37733ec43710",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:15442d897f1df718",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "true outsidePress function guard",
+      "pristineId": "runtime:0a0f7c379dc1438c",
+      "adaptedId": "runtime:55774feae22a7f2d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:6c458489c2f54518",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "true outsidePress ignored for third party elements",
+      "pristineId": "runtime:8eeed159c87a6cd5",
+      "adaptedId": "runtime:8a1a50291d5bf5dc",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:313a011ab4571505",
+      "normalizedFile": "react/unit/useDismiss.test.tsx",
+      "fullName": "true outsidePress not ignored for nested floating elements",
+      "pristineId": "runtime:6e6c83c03bbf7877",
+      "adaptedId": "runtime:6a48b8bf78d0110f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:20efe99b609b0fda",
+      "normalizedFile": "react/unit/useFloating.test.tsx",
+      "fullName": "#2129: interactions.getFloatingProps as a dep does not cause setState loop",
+      "pristineId": "runtime:d92b41a8be2ac55c",
+      "adaptedId": "runtime:c813ca669b16d5d0",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:6e56308d369c0ad2",
+      "normalizedFile": "react/unit/useFloating.test.tsx",
+      "fullName": "domReference refers to externally synchronized `reference`",
+      "pristineId": "runtime:d27efbcdcd43f9a8",
+      "adaptedId": "runtime:d394548e3af96f7c",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c92929b0a3081e11",
+      "normalizedFile": "react/unit/useFloating.test.tsx",
+      "fullName": "onOpenChange is passed an event as second param",
+      "pristineId": "runtime:bd2b773bd1387d25",
+      "adaptedId": "runtime:c2f8a6f062f4f0c8",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:40b67a53620838eb",
+      "normalizedFile": "react/unit/useFloating.test.tsx",
+      "fullName": "positionReference does not error when using `inline` middleware and setting the position reference to a real element",
+      "pristineId": "runtime:e347dfbdb63edeef",
+      "adaptedId": "runtime:f7523aa8df4d45e2",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:803091c2ca9252da",
+      "normalizedFile": "react/unit/useFloating.test.tsx",
+      "fullName": "positionReference handles real virtual element",
+      "pristineId": "runtime:a14eb9d50eb226f7",
+      "adaptedId": "runtime:f650cdb9137fa120",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-ref-scheduling",
+      "divergenceCaseId": "divergence:ref-scheduling:05"
+    },
+    {
+      "id": "crosswalk:ea20c4b217c642b2",
+      "normalizedFile": "react/unit/useFloating.test.tsx",
+      "fullName": "positionReference handles unstable reference prop",
+      "pristineId": "runtime:889f865852423f8d",
+      "adaptedId": "runtime:ebdbe8c83bf6ab1c",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-ref-scheduling",
+      "divergenceCaseId": "divergence:ref-scheduling:04"
+    },
+    {
+      "id": "crosswalk:70a0991f03df9cf4",
+      "normalizedFile": "react/unit/useFloating.test.tsx",
+      "fullName": "positionReference sets separate refs",
+      "pristineId": "runtime:af7ec306e63eb177",
+      "adaptedId": "runtime:bff8a811c90f7d29",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:05226da1c2e4e561",
+      "normalizedFile": "react/unit/useFloating.test.tsx",
+      "fullName": "refs.domReference.current is synchronized with external reference",
+      "pristineId": "runtime:6669730a4dfb11ca",
+      "adaptedId": "runtime:9e9859ed922b5fb6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:14e0b9169da517ca",
+      "normalizedFile": "react/unit/useFloatingRootContext.test.tsx",
+      "fullName": "interaction hooks accept root context",
+      "pristineId": "runtime:8cb3fd3bdea276c0",
+      "adaptedId": "runtime:dd45f4a2cb8face8",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:79708cc13acb4f98",
+      "normalizedFile": "react/unit/useFocus.test.tsx",
+      "fullName": "closes on blur",
+      "pristineId": "runtime:2f956f654907aeb0",
+      "adaptedId": "runtime:7d906ff98a41e3d9",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9679a9e881af834e",
+      "normalizedFile": "react/unit/useFocus.test.tsx",
+      "fullName": "does not open when window blurs then receives focus",
+      "pristineId": "runtime:fbf55ef02ded305f",
+      "adaptedId": "runtime:373b5134284054cb",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:5aa9eb391749ce89",
+      "normalizedFile": "react/unit/useFocus.test.tsx",
+      "fullName": "does not open with a reference pointerDown dismissal",
+      "pristineId": "runtime:66ad6830a4ec2a7c",
+      "adaptedId": "runtime:1408ad922957ba14",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:dbf4c8d283277731",
+      "normalizedFile": "react/unit/useFocus.test.tsx",
+      "fullName": "opens on focus",
+      "pristineId": "runtime:261bae569dab342f",
+      "adaptedId": "runtime:00e2ae00b4b45f82",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:066c258565d8e8a5",
+      "normalizedFile": "react/unit/useFocus.test.tsx",
+      "fullName": "reason string",
+      "pristineId": "runtime:fc91e4f0219a0cef",
+      "adaptedId": "runtime:b5f585f49740b243",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:387cfc71c0c2e821",
+      "normalizedFile": "react/unit/useFocus.test.tsx",
+      "fullName": "visibleOnly prop true",
+      "pristineId": "runtime:b36c3cf36ffd2f1f",
+      "adaptedId": "runtime:18c6997c65ac686d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:623f129b942f32a1",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "cleans up blockPointerEvents if trigger changes",
+      "pristineId": "runtime:68c811fe962afb6d",
+      "adaptedId": "runtime:38fb387690c03c90",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:21ba6a85d242c21d",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "closes on mouseleave",
+      "pristineId": "runtime:3f026e883d81beef",
+      "adaptedId": "runtime:b91bcd81a4a8e40a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:359cb33795d012c5",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "delay close",
+      "pristineId": "runtime:23b33be174d45299",
+      "adaptedId": "runtime:fde6f14a7a30e084",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:184e018eb71993ba",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "delay open",
+      "pristineId": "runtime:885081f6bd4926ff",
+      "adaptedId": "runtime:27f3c36bbcb46597",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c57eb42ef3cbd584",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "delay open with close 0",
+      "pristineId": "runtime:ebd1332c007614e0",
+      "adaptedId": "runtime:cf51886b983695f6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:50e3705474bbc3ec",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "delay restMs + nullish open delay should respect restMs",
+      "pristineId": "runtime:de2912b5dc1d4b81",
+      "adaptedId": "runtime:cb7b38eae69da168",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:632333f73bd4897d",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "delay symmetric number",
+      "pristineId": "runtime:dcadfabf4a96b02f",
+      "adaptedId": "runtime:12508ad136c69d2d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4d94f54e587e7f31",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "does not show after delay if domReference changes",
+      "pristineId": "runtime:c58fba3792a201b3",
+      "adaptedId": "runtime:f71e3fa61b57b0fc",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:47066e3d74447262",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "mouseleave on the floating element closes it (mouse)",
+      "pristineId": "runtime:f97ae2a6308e4556",
+      "adaptedId": "runtime:abbb737a64e3c9ef",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:32b69e06d962d515",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "opens on mouseenter",
+      "pristineId": "runtime:bc0157147bbf8a36",
+      "adaptedId": "runtime:f4d3a1c935ab037b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:6291eb43c45bdb35",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "reason string",
+      "pristineId": "runtime:fdcb0554b4baf8d1",
+      "adaptedId": "runtime:8c70b20c412b1755",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:ec3946a4d126e264",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "restMs",
+      "pristineId": "runtime:86cc5bbf00b1442d",
+      "adaptedId": "runtime:3120bbd144e2303b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:fd34fc5b2a968f14",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "restMs does not cause floating element to open if mouseOnly is true",
+      "pristineId": "runtime:dd45641e9eaa4adb",
+      "adaptedId": "runtime:b9163a278611f1a6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:be0d3062ccc93076",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "restMs does not reset timer for minor mouse movement",
+      "pristineId": "runtime:78b5756718a5a39b",
+      "adaptedId": "runtime:a63ecfba0914f5be",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:1f35ec04f883da5a",
+      "normalizedFile": "react/unit/useHover.test.tsx",
+      "fullName": "restMs is always 0 for touch input",
+      "pristineId": "runtime:dfd826f8ddfb979a",
+      "adaptedId": "runtime:d2da3327b04f204d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b1d0618836d3cda6",
+      "normalizedFile": "react/unit/useId.test.tsx",
+      "fullName": "generates a random string",
+      "pristineId": "runtime:cc8f519abdc97c85",
+      "adaptedId": "runtime:65056e32e7b86486",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:dba7fed01334d82b",
+      "normalizedFile": "react/unit/useInteractions.test.tsx",
+      "fullName": "correctly merges functions",
+      "pristineId": "runtime:6e1765e223f4f831",
+      "adaptedId": "runtime:8ff337ad4becc7a6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:fe663e9999b21b10",
+      "normalizedFile": "react/unit/useInteractions.test.tsx",
+      "fullName": "does not break props that return values",
+      "pristineId": "runtime:f03fe50830d42da9",
+      "adaptedId": "runtime:6719bcbaffefaeac",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:79ce25fa1a0d21e2",
+      "normalizedFile": "react/unit/useInteractions.test.tsx",
+      "fullName": "does not break props that start with `on`",
+      "pristineId": "runtime:4efa1d29b8c9ca40",
+      "adaptedId": "runtime:acc4f61c6940818b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:69669a8d8031afbd",
+      "normalizedFile": "react/unit/useInteractions.test.tsx",
+      "fullName": "does not error with undefined user supplied functions",
+      "pristineId": "runtime:e9fc8f36eb4a6e2b",
+      "adaptedId": "runtime:3702fc6a24dbe812",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:e4ac1fa19b400540",
+      "normalizedFile": "react/unit/useInteractions.test.tsx",
+      "fullName": "prop getters are memoized",
+      "pristineId": "runtime:ae1e5e60bb0dc2d6",
+      "adaptedId": "runtime:7f074767192c483b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:d8e158a95e331163",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "Home or End key press is ignored for typeable combobox reference",
+      "pristineId": "runtime:2f65987885c651bb",
+      "adaptedId": "runtime:38d2fab24bf0e5ff",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:bd0c2e665185011d",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "allowEscape + virtual false",
+      "pristineId": "runtime:f87f7457eaf43aff",
+      "adaptedId": "runtime:4504f83eb24317ba",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:db3bc5ddba6851f9",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "allowEscape + virtual true",
+      "pristineId": "runtime:6e5ea1f30e003923",
+      "adaptedId": "runtime:6ac5740afb34000b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:fdffa4299e158fbe",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "allowEscape + virtual true - onNavigate is called with `null` when escaped",
+      "pristineId": "runtime:6d67d0d9535d3313",
+      "adaptedId": "runtime:e7ac894368c16c70",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:aff59bd789c887e0",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "async selectedIndex",
+      "pristineId": "runtime:b79f772b20e83025",
+      "adaptedId": "runtime:cd911c5d3bd66b00",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:82f7e42872c16c02",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "disabledIndices indices are skipped in focus order",
+      "pristineId": "runtime:e80d7a55d2f118f9",
+      "adaptedId": "runtime:1f37bbeb8024cf25",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:3720a5e6c6ca2f37",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "domReference trigger in nested virtual menu is set as virtual item",
+      "pristineId": "runtime:e2832804e8a5b2c9",
+      "adaptedId": "runtime:e56322041e8b6b2f",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:10"
+    },
+    {
+      "id": "crosswalk:fb9caf3c58194ac7",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "focus management in nested lists",
+      "pristineId": "runtime:608d3a1da3e77c0c",
+      "adaptedId": "runtime:4094ac75872860da",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:06"
+    },
+    {
+      "id": "crosswalk:3bd66b83d7104f5f",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "focusItemOnOpen false click",
+      "pristineId": "runtime:e410cfe284e4ab75",
+      "adaptedId": "runtime:59f9e2cf82dd7a21",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f40586a8fe0def36",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "focusItemOnOpen true click",
+      "pristineId": "runtime:24533c654f49f67c",
+      "adaptedId": "runtime:b96c01eaed60358b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9147429150e0bc91",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "focusOnHover false - does not focus item on hover and does not sync the active index",
+      "pristineId": "runtime:79d3e7e55608b056",
+      "adaptedId": "runtime:f95c4d60604ac3c1",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:97e67af4c162ece7",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "focusOnHover true - focuses item on hover and syncs the active index",
+      "pristineId": "runtime:3d9741ca08450e49",
+      "adaptedId": "runtime:4ef913684d68a26a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:25bac4f631bfe69f",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation ArrowDown focuses first item",
+      "pristineId": "runtime:af95798185935694",
+      "adaptedId": "runtime:fd08b5a384b5d3a8",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:155709fcedf6caa3",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation does not leave row with \"both\" orientation while looping",
+      "pristineId": "runtime:d07da2b2635947a4",
+      "adaptedId": "runtime:49b05661fe99f10a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7ce140ffb87016a0",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation focuses first non-disabled item in grid",
+      "pristineId": "runtime:bfbd6914d02c3264",
+      "adaptedId": "runtime:fba070a1ebca365a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:cd83172e516e5b96",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation focuses next item using ArrowRight key, skipping disabled items",
+      "pristineId": "runtime:52ff10e2dc69f428",
+      "adaptedId": "runtime:988ba47ad6d6d7cf",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:eb584f8e0d6d843e",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation focuses previous item using ArrowLeft key, skipping disabled items",
+      "pristineId": "runtime:8815c796a8338334",
+      "adaptedId": "runtime:909e0286309eb457",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:27f8b0f7bcf8e66c",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation looping works on last row",
+      "pristineId": "runtime:0ef2520d606f7514",
+      "adaptedId": "runtime:074b5311764dc8bb",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:e3346f0ed16c075e",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation loops on the same column with ArrowDown",
+      "pristineId": "runtime:f86f6b9242b03c51",
+      "adaptedId": "runtime:cf8e0bfbf819459a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b04e6128fbfd15ea",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation loops on the same column with ArrowUp",
+      "pristineId": "runtime:bd677dfd38e42c0b",
+      "adaptedId": "runtime:9a23fd433d6a42ec",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:a10592e7ffdf24cd",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation skips row and remains on same column when pressing ArrowDown",
+      "pristineId": "runtime:1f7789a6e94a8e01",
+      "adaptedId": "runtime:c1a4d541c0df9f1b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:38844f9cdc5f4698",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation skips row and remains on same column when pressing ArrowUp",
+      "pristineId": "runtime:70d71f42c759532b",
+      "adaptedId": "runtime:d115c4c48a633f0a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:f791d5c7971a005f",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes focuses first non-disabled item in grid",
+      "pristineId": "runtime:56bd54ad460be0ef",
+      "adaptedId": "runtime:e302505656cfe752",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:95b132f4e8b2f3b2",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl false focuses next item using ArrowRight key, skipping disabled items",
+      "pristineId": "runtime:96a6f1c712c41403",
+      "adaptedId": "runtime:ed953f9c9f5e8bbb",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b0ca877396948459",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl false focuses previous item using ArrowLeft key, skipping disabled items",
+      "pristineId": "runtime:9b794d2d2f91a6a9",
+      "adaptedId": "runtime:f63ebd87ade7a20d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9a7fa4749ad84112",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl false looping works on last row",
+      "pristineId": "runtime:f64e5d63104dd666",
+      "adaptedId": "runtime:9cb7c798bc2fae40",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:617eda26ee81c40c",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl false loops over column with ArrowDown, prefers left side of wide items",
+      "pristineId": "runtime:dc745d9ac8a58e79",
+      "adaptedId": "runtime:a13e61b8e9ae56c6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:e89433376b2a6edf",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl false loops over column with ArrowUp, prefers left side of wide items",
+      "pristineId": "runtime:4d8a67a209717842",
+      "adaptedId": "runtime:54264f7109618cd7",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:80399c542616c095",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl false loops over row with \"both\" orientation, prefers top side of tall items",
+      "pristineId": "runtime:27807d7ca6f261e3",
+      "adaptedId": "runtime:3a547e4200b57fd8",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:49dfe1a9ecfa7f51",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl false moves through rows when pressing ArrowDown, prefers left side of wide items",
+      "pristineId": "runtime:47b1eb1186dca69a",
+      "adaptedId": "runtime:8f04f893205901ea",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:3bf82c973e72039d",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl false moves through rows when pressing ArrowUp, prefers left side of wide items",
+      "pristineId": "runtime:e70d2823e8af80ab",
+      "adaptedId": "runtime:fc5ea6d896e0acc0",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b844602830ffc974",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl true focuses next item using ArrowLeft key, skipping disabled items",
+      "pristineId": "runtime:4be030a4d9ae2447",
+      "adaptedId": "runtime:6817c1b28f87c0f4",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:0fcc8381aa301b74",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl true focuses previous item using ArrowRight key, skipping disabled items",
+      "pristineId": "runtime:4f4ecf459a2556eb",
+      "adaptedId": "runtime:9bc55107e8518f7c",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:76519394c4b340d7",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl true looping works on last row",
+      "pristineId": "runtime:b12bc0cf87d5431c",
+      "adaptedId": "runtime:7f707e311069b293",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7549de9faf453322",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl true loops over column with ArrowDown, prefers right side of wide items",
+      "pristineId": "runtime:1fa0b90ddebf0787",
+      "adaptedId": "runtime:9e5d475895fc2e00",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:cecfa838a54a9357",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl true loops over column with ArrowUp, prefers right side of wide items",
+      "pristineId": "runtime:c261cbb71dd210fa",
+      "adaptedId": "runtime:5ecf65824b45bce6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7fd9c8709965aa3d",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl true loops over row with \"both\" orientation, prefers top side of tall items",
+      "pristineId": "runtime:fb5b215b5e6f6eee",
+      "adaptedId": "runtime:69bfcfa98e680ea6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:38d0a2831101bff7",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl true moves through rows when pressing ArrowDown, prefers right side of wide items",
+      "pristineId": "runtime:8a8a026cd72254e3",
+      "adaptedId": "runtime:6f7283a08d5e9656",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:0cc356059f20ec41",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation when items have different sizes with rtl true moves through rows when pressing ArrowUp, prefers right side of wide items",
+      "pristineId": "runtime:4bc92c73b70a1c27",
+      "adaptedId": "runtime:6ce65f7ed14da427",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c114c2c27b9a0ab7",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation with changing list items",
+      "pristineId": "runtime:ee563b820d5027cc",
+      "adaptedId": "runtime:1338744f490348f1",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-list-registration",
+      "divergenceCaseId": "divergence:list-registration:01"
+    },
+    {
+      "id": "crosswalk:ac14b51f26ee5767",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation with disabled list items",
+      "pristineId": "runtime:133dc65911366c79",
+      "adaptedId": "runtime:a509ae54faed8d27",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-list-registration",
+      "divergenceCaseId": "divergence:list-registration:02"
+    },
+    {
+      "id": "crosswalk:9b648b9c99f55f58",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "keyboard navigation in nested menus lists",
+      "pristineId": "runtime:df7bf175c5b45145",
+      "adaptedId": "runtime:3569d7375dfa3226",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:07"
+    },
+    {
+      "id": "crosswalk:fae78099c035df50",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "keyboard navigation in nested menus with different orientation",
+      "pristineId": "runtime:4f43e6fda5aaac2a",
+      "adaptedId": "runtime:46bdd038719783cb",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:08"
+    },
+    {
+      "id": "crosswalk:f59d554647d74114",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "loop ArrowDown looping",
+      "pristineId": "runtime:03f75260ccf0a29d",
+      "adaptedId": "runtime:f829aaa4a9c0d0e6",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:ba410fc8a86c1bda",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "loop ArrowUp looping",
+      "pristineId": "runtime:6a576fa2c8840eee",
+      "adaptedId": "runtime:0aee5bddade06d8d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4c899bc60e54f883",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "navigates down on ArrowDown",
+      "pristineId": "runtime:bfbea231fbfc7d34",
+      "adaptedId": "runtime:d6df237c04c0d485",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:a6b8074a7c86a14c",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "navigates up on ArrowUp",
+      "pristineId": "runtime:f0080a14d16a1d97",
+      "adaptedId": "runtime:35d73fcf3bb2d577",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:edb096621b121713",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "openOnArrowKeyDown false ArrowDown",
+      "pristineId": "runtime:f1c1ff88235ed043",
+      "adaptedId": "runtime:cf6d455ad3cf64ff",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:3a8abac6c6e3f8bc",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "openOnArrowKeyDown false ArrowUp",
+      "pristineId": "runtime:52572de3bfd00441",
+      "adaptedId": "runtime:db9db533a6105422",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:3b5a1861bc43e7c1",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "openOnArrowKeyDown true ArrowDown",
+      "pristineId": "runtime:19d1deada3227a5f",
+      "adaptedId": "runtime:a6349ccd77a68edb",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c4a2dd402d446d43",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "openOnArrowKeyDown true ArrowUp",
+      "pristineId": "runtime:35ce5b39ecdc3afd",
+      "adaptedId": "runtime:8b7788ccf242dc28",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:1da9d514ced27f97",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "opens on ArrowDown and focuses first item",
+      "pristineId": "runtime:5489ff5346a9612c",
+      "adaptedId": "runtime:1ba7c3cf41fc0a41",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7474f2187ab12bcd",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "opens on ArrowUp and focuses last item",
+      "pristineId": "runtime:01489c01e0d85680",
+      "adaptedId": "runtime:679857612693b424",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b67282d9134e0490",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "orientation navigates down on ArrowRight",
+      "pristineId": "runtime:aba667dee727c6ab",
+      "adaptedId": "runtime:7e76a21df83f5c8e",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:41b73aa7bb70e576",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "orientation navigates up on ArrowLeft",
+      "pristineId": "runtime:0fdf1a7132cd8dad",
+      "adaptedId": "runtime:ddb0f88d2639e6a8",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:bdbb3228f707b6c3",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "resets indexRef to -1 upon close",
+      "pristineId": "runtime:d2e5d0fa87974c02",
+      "adaptedId": "runtime:7df32f972ddceda5",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-effect-scheduling",
+      "divergenceCaseId": "divergence:effect-scheduling:02"
+    },
+    {
+      "id": "crosswalk:d3e5444d06ab13e6",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "rtl navigates down on ArrowLeft",
+      "pristineId": "runtime:7b2ccf81f11920b1",
+      "adaptedId": "runtime:240ad1c913c3c739",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:6be2c3db9472fdad",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "rtl navigates up on ArrowRight",
+      "pristineId": "runtime:714c3c6b9e630aa7",
+      "adaptedId": "runtime:7347465ef1fb3ba7",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:6647cd940782a636",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "scheduled list population",
+      "pristineId": "runtime:ed43b6996ed4725e",
+      "adaptedId": "runtime:3fae64f2b9f3f690",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:0e59ff45a599c9e1",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "selectedIndex changing does not steal focus",
+      "pristineId": "runtime:82e65f770aa94175",
+      "adaptedId": "runtime:0d7c711059a407d7",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:2e5fa56878ce7c77",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "selectedIndex scrollIntoView on open",
+      "pristineId": "runtime:aa6e2ee676ddcab0",
+      "adaptedId": "runtime:a0c86df42e62d2e2",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c021a472a31c488b",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "virtual nested Home or End key press",
+      "pristineId": "runtime:42888723f550cd02",
+      "adaptedId": "runtime:527e0fddd0ba0b33",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:09"
+    },
+    {
+      "id": "crosswalk:b9a12d12f53ab8ff",
+      "normalizedFile": "react/unit/useMergeRefs.test.tsx",
+      "fullName": "calls clean up function if it exists",
+      "pristineId": "runtime:c626c70f8a332ed7",
+      "adaptedId": "runtime:c9dd1832a3eacc31",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:d85f294022f39e93",
+      "normalizedFile": "react/unit/useMergeRefs.test.tsx",
+      "fullName": "conditional refs",
+      "pristineId": "runtime:e5899d181d00a0dd",
+      "adaptedId": "runtime:7404c939d756d07c",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:fff878789e3bf4d3",
+      "normalizedFile": "react/unit/useMergeRefs.test.tsx",
+      "fullName": "merges refs and cleans up",
+      "pristineId": "runtime:f82576c9d444e608",
+      "adaptedId": "runtime:690d4aef001a4dd3",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9559cd9878795f00",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "automatically handles custom id attributes",
+      "pristineId": "runtime:326ad6c183bbd31c",
+      "adaptedId": "runtime:e3de5b1631cb1424",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:76f7622d4d9c2bf9",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "combobox sets correct aria attributes based on the open state",
+      "pristineId": "runtime:26b7aa03d2f0fd09",
+      "adaptedId": "runtime:772c644df787ff50",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:85f7bc090952b510",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "dialog sets correct aria attributes based on the open state",
+      "pristineId": "runtime:efd723a15b572779",
+      "adaptedId": "runtime:5e28423fe580cd9d",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:4460dcb2f079755c",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "dialog sets correct aria attributes with external ref, multiple useRole calls",
+      "pristineId": "runtime:38bce5c358548a5c",
+      "adaptedId": "runtime:2e5040a7742aef5b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:d21a07251cec1346",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "label sets correct aria attributes based on the open state",
+      "pristineId": "runtime:75d6608bbc17d0b9",
+      "adaptedId": "runtime:c1030deacbf26623",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:edb43a3733df1634",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "listbox sets correct aria attributes based on the open state",
+      "pristineId": "runtime:0ba524a31948f1a6",
+      "adaptedId": "runtime:622cfa55c5c9c212",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:764b8c3b244cd71e",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "menu sets correct aria attributes based on the open state",
+      "pristineId": "runtime:c10e10340a38dd91",
+      "adaptedId": "runtime:35db2a5c5f5806f4",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:9558980c4b8942a0",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "select sets correct aria attributes based on the open state",
+      "pristineId": "runtime:ebe5f715dbb3a524",
+      "adaptedId": "runtime:b26b194e8e7ebcd7",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:7db52e7f4b5ba3f3",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "tooltip has correct role",
+      "pristineId": "runtime:df3fd5309582683c",
+      "adaptedId": "runtime:cb26aeafbe9c5d4a",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:b76adaa9d0f7b838",
+      "normalizedFile": "react/unit/useRole.test.tsx",
+      "fullName": "tooltip sets correct aria attributes based on the open state",
+      "pristineId": "runtime:df5182c113539e8b",
+      "adaptedId": "runtime:33fe2433cca0e499",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:bba83ad22c4e02aa",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "Menu - resets once a match is no longer found",
+      "pristineId": "runtime:ee7c0fa8c065f0aa",
+      "adaptedId": "runtime:1d08b71513bdff82",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:12"
+    },
+    {
+      "id": "crosswalk:39755bcb09044276",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "Menu - skips disabled items and opens submenu on space if no match",
+      "pristineId": "runtime:96c5b6390a840c3d",
+      "adaptedId": "runtime:54bee2f3f594ccc4",
+      "disposition": "expected-failure-negative-control",
+      "divergenceId": "floating-ui-dynamic-children",
+      "divergenceCaseId": "divergence:dynamic-children:11"
+    },
+    {
+      "id": "crosswalk:a10f38a0b6c9196e",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "bails out of rapid focus of first letter if the list contains a string that starts with two of the same letter",
+      "pristineId": "runtime:fb01d79388543d1e",
+      "adaptedId": "runtime:5ef51abb3d31d17c",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:c4d9226c32b77296",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "capslock characters continue to match",
+      "pristineId": "runtime:65596f11a61cc100",
+      "adaptedId": "runtime:b64ce8df6d09e0de",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:ff775b651fe16727",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "matches when focus is within floating",
+      "pristineId": "runtime:d46fa64224029e3d",
+      "adaptedId": "runtime:d205177b0edfa3bd",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:20c5d4c49aaece2c",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "matches when focus is within reference",
+      "pristineId": "runtime:21b0d45db40d80ad",
+      "adaptedId": "runtime:54cd53e38c00572b",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:076c1615a7b835e6",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "onTypingChange is called when typing starts or stops",
+      "pristineId": "runtime:727c975adc22bbfc",
+      "adaptedId": "runtime:263c73b872d7711f",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:055b7414e311d81b",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "rapidly focuses list items when they start with the same letter",
+      "pristineId": "runtime:f28c8a42798f3530",
+      "adaptedId": "runtime:060734de2ec9abce",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:d446e6fb5822f5da",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "starts from the current activeIndex and correctly loops",
+      "pristineId": "runtime:32ec53e652f90319",
+      "adaptedId": "runtime:461df01f4c7ac2b0",
+      "disposition": "compatible"
+    },
+    {
+      "id": "crosswalk:a11a846dfb63a586",
+      "normalizedFile": "react/unit/useTypeahead.test.tsx",
+      "fullName": "typing spaces on <div> references does not open the menu",
+      "pristineId": "runtime:eb7b89e60a809428",
+      "adaptedId": "runtime:6b7fd6d8fbf98d19",
+      "disposition": "compatible"
+    }
+  ]
+}

@@ -450,9 +450,7 @@ describe('host with only component children (@if-root components)', () => {
 		// content has landed in the (off-screen) host.
 		expect(m.findAll('.fb').length).toBe(1);
 		expect(m.findAll('.big').length).toBe(0);
-		resolve('A');
-		await nextPaint();
-		await nextPaint();
+		await act(() => resolve('A'));
 		expect(m.findAll('.fb').length).toBe(0);
 		expect(stripComments(m.find('.host').innerHTML)).toBe(
 			'<div class="big">A</div><div class="big">B:0</div>',

@@ -1,0 +1,127 @@
+{
+  "name": "html-react-parser",
+  "version": "6.1.7",
+  "description": "HTML to React parser.",
+  "author": "Mark <mark@remarkablemark.org> (https://remarkabl.org)",
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/remarkablemark"
+    },
+    {
+      "type": "opencollective",
+      "url": "https://opencollective.com/html-react-parser"
+    }
+  ],
+  "main": "./lib/index.js",
+  "module": "./esm/index.mjs",
+  "exports": {
+    ".": {
+      "import": "./esm/index.mjs",
+      "require": "./lib/index.js"
+    },
+    "./lib/*": {
+      "import": "./esm/*.mjs",
+      "default": "./lib/*.js"
+    }
+  },
+  "scripts": {
+    "benchmark": "ts-node --project tsconfig.build.json benchmark",
+    "build": "npm run build:cjs && npm run build:umd",
+    "build:cjs": "tsc --project tsconfig.build.json",
+    "build:umd": "rollup --config --failAfterWarnings",
+    "clean": "rm -rf coverage lib dist",
+    "lint": "eslint .",
+    "lint:fix": "npm run lint -- --fix",
+    "lint:package": "publint",
+    "lint:tsc": "tsc --project tsconfig.test.json",
+    "lint:types": "npx @arethetypeswrong/cli --pack",
+    "prepare": "husky",
+    "prepublishOnly": "npm run build && npm run lint && npm run lint:tsc && npm run lint:package && npm run test:ci",
+    "size-limit": "size-limit",
+    "test": "vitest run --exclude=__tests__/integration/",
+    "test:browser": "npm test -- --config=vitest.config.browser.mts --browser=chromium",
+    "test:ci": "CI=true npm test -- --color",
+    "test:esm": "npm run build:cjs && node --test __tests__/esm/*",
+    "test:integration": "npm run build && vitest run __tests__/integration/ --coverage.enabled=false",
+    "test:watch": "vitest --exclude=__tests__/integration/ --coverage.enabled=false"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/remarkablemark/html-react-parser.git"
+  },
+  "bugs": {
+    "url": "https://github.com/remarkablemark/html-react-parser/issues"
+  },
+  "keywords": [
+    "html-react-parser",
+    "html",
+    "react",
+    "parser",
+    "dom"
+  ],
+  "dependencies": {
+    "domhandler": "6.0.1",
+    "html-dom-parser": "8.0.2",
+    "react-property": "2.0.2",
+    "style-to-js": "2.0.2"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@commitlint/cli": "21.2.2",
+    "@commitlint/config-conventional": "21.2.2",
+    "@eslint/eslintrc": "3.3.6",
+    "@eslint/js": "10.0.1",
+    "@rollup/plugin-commonjs": "29.0.3",
+    "@rollup/plugin-node-resolve": "16.0.3",
+    "@rollup/plugin-terser": "1.0.0",
+    "@rollup/plugin-typescript": "12.3.0",
+    "@size-limit/preset-big-lib": "13.0.3",
+    "@types/benchmark": "2.1.5",
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitest/browser": "4.1.10",
+    "@vitest/browser-playwright": "4.1.10",
+    "@vitest/coverage-v8": "4.1.10",
+    "benchmark": "2.1.4",
+    "eslint": "10.8.1",
+    "eslint-plugin-prettier": "5.5.6",
+    "eslint-plugin-simple-import-sort": "14.0.0",
+    "eslint-plugin-tsdoc": "0.5.2",
+    "globals": "17.11.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.3.0",
+    "playwright": "1.62.1",
+    "preact": "10.29.8",
+    "publint": "0.3.23",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "rollup": "4.62.4",
+    "size-limit": "13.0.3",
+    "ts-node": "10.9.2",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@types/react": "0.14 || 15 || 16 || 17 || 18 || 19",
+    "react": "0.14 || 15 || 16 || 17 || 18 || 19"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    }
+  },
+  "files": [
+    "/dist",
+    "/esm",
+    "/lib",
+    "/src"
+  ],
+  "collective": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/html-react-parser"
+  },
+  "license": "MIT"
+}

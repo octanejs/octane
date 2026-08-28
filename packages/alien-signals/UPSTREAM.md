@@ -21,8 +21,14 @@
 
 The published tarball supplies the built single-entry package. The canonical repository at the
 commit above supplies the TypeScript source, test suite, and MIT license. Those files are vendored
-byte-for-byte under [`upstream/`](./upstream/) and are excluded from the published package by the
-manifest's explicit `files` list.
+byte-for-byte under [`upstream/`](./upstream/), pinned by `audit/upstream.lock.json` (each
+committed file verifies offline against its upstream git blob sha;
+`pnpm react-port:materialize run --check --package-dir packages/alien-signals`), and are excluded
+from the published package by the manifest's explicit `files` list. The pinned `package.json`
+declares no `license` field, so the lock records a reviewed file-only MIT basis: the pinned
+commit's LICENSE is recognizable MIT text (retained byte-exact as `LICENSE.upstream`,
+hash-matched to the lock), and upstream corrected the omission by declaring `license: "MIT"` in
+`react-alien-signals@0.4.0`.
 
 Run `pnpm --dir packages/alien-signals upstream:verify` to reject removed or modified pinned
 evidence. The checksum ledger covers the source, complete upstream test file, and license.

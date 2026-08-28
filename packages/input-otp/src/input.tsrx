@@ -33,6 +33,7 @@ export function OTPInput(props: OTPInputProps) {
 		pasteTransformer,
 		containerClassName,
 		noScriptCSSFallback = NOSCRIPT_CSS_FALLBACK,
+		nonce,
 		render,
 		children,
 		ref,
@@ -44,6 +45,7 @@ export function OTPInput(props: OTPInputProps) {
 		onBlur: consumerOnBlur,
 		autoComplete,
 		defaultValue,
+		spellCheck,
 		...inputProps
 	} = props;
 
@@ -161,7 +163,7 @@ export function OTPInput(props: OTPInputProps) {
 		onDocumentSelectionChange();
 		if (document.activeElement === input) setIsFocused(true);
 
-		const releaseInputStyles = acquireInputStyles();
+		const releaseInputStyles = acquireInputStyles(nonce);
 		const updateRootHeight = () => {
 			container.style.setProperty('--root-height', `${input.clientHeight}px`);
 		};
@@ -248,7 +250,7 @@ export function OTPInput(props: OTPInputProps) {
 			boxShadow: 'none',
 			lineHeight: '1',
 			letterSpacing: '-.5em',
-			fontSize: 'var(--root-height)',
+			fontSize: 'var(--root-height, 16px)',
 			fontFamily: 'monospace',
 			fontVariantNumeric: 'tabular-nums',
 		}),
@@ -308,6 +310,7 @@ export function OTPInput(props: OTPInputProps) {
 		<div
 			ref={containerRef}
 			data-input-otp-container=""
+			translate="no"
 			style={rootStyle}
 			className={containerClassName}
 		>
@@ -325,6 +328,7 @@ export function OTPInput(props: OTPInputProps) {
 					aria-placeholder={placeholder}
 					style={inputStyle}
 					maxLength={maxLength}
+					spellCheck={spellCheck ?? false}
 					suppressHydrationWarning
 					value={value}
 					ref={composedInputRef}
@@ -405,11 +409,16 @@ OTPInput.displayName = 'Input';
 let ownedInputStyle: HTMLStyleElement | null = null;
 let inputStyleUsers = 0;
 
-function acquireInputStyles(): () => void {
+function acquireInputStyles(nonce?: string): () => void {
+	if (ownedInputStyle && !ownedInputStyle.isConnected) {
+		// Forget the removed node so it can be reinstalled, but retain the count:
+		// mounted inputs still own their release callbacks.
+		ownedInputStyle = null;
+	}
 	const existing = document.getElementById('input-otp-style');
 	if (existing && existing !== ownedInputStyle) return () => {};
 	inputStyleUsers++;
-	if (!ownedInputStyle) installInputStyles();
+	if (!ownedInputStyle) installInputStyles(nonce);
 	return () => {
 		inputStyleUsers--;
 		if (inputStyleUsers === 0) {
@@ -419,9 +428,10 @@ function acquireInputStyles(): () => void {
 	};
 }
 
-function installInputStyles(): void {
+function installInputStyles(nonce?: string): void {
 	const style = document.createElement('style');
 	style.id = 'input-otp-style';
+	if (nonce) style.setAttribute('nonce', nonce);
 	document.head.appendChild(style);
 	ownedInputStyle = style;
 	if (!style.sheet) return;
@@ -443,7 +453,7 @@ function safeInsertRule(sheet: CSSStyleSheet, rule: string): void {
 	try {
 		sheet.insertRule(rule);
 	} catch {
-		console.error('input-otp could not insert CSS rule:', rule);
+		console.warn('input-otp could not insert CSS rule:', rule);
 	}
 }
 

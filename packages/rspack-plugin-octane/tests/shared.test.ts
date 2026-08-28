@@ -78,6 +78,27 @@ describe('declarative options', () => {
 		);
 	});
 
+	it('keeps CSS-module proof providers on the class-plugin API', () => {
+		const provider = () => ({ named: { root: 'mapped_root' } });
+		expect(normalizePluginOptions({ cssModuleConstants: true })).toEqual({
+			cssModuleConstants: true,
+		});
+		expect(normalizePluginOptions({ cssModuleConstants: false })).toEqual({
+			cssModuleConstants: false,
+		});
+		expect(normalizePluginOptions({ cssModuleConstants: provider }).cssModuleConstants).toBe(
+			provider,
+		);
+		expect(() => normalizeLoaderOptions({ cssModuleConstants: provider })).toThrow(
+			/unknown option `cssModuleConstants`/,
+		);
+		for (const value of [null, 'yes', {}, []]) {
+			expect(() => normalizePluginOptions({ cssModuleConstants: value })).toThrow(
+				/cssModuleConstants.*boolean or a provider function/,
+			);
+		}
+	});
+
 	it('copies and freezes plugin-only parallel compilation settings', () => {
 		const parallel = { maxWorkers: 2 };
 		const options = normalizePluginOptions({ parallel });

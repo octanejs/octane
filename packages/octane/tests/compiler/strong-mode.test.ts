@@ -6,9 +6,357 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 const RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 const RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
+const RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
+const RETAINED_ROW_MUTATION = 'OCTANE_STRONG_RETAINED_ROW_MUTATION';
+const RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
 const RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
 const EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 const DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
+
+describe('Strong mode immutable render inputs', () => {
+	const component = (
+		setup: string,
+	) => `import { useState, useReducer, useLinkedState } from 'octane';
+export function App(props) @{
+  ${setup}
+  <div />
+}`;
+
+	it.each([
+		['property assignments', 'const [state] = useState({ count: 0 }); state.count = 1;'],
+		['compound assignments', 'const [state] = useState({ count: 0 }); state.count += 1;'],
+		['updates', 'const [state] = useState({ count: 0 }); state.count++;'],
+		['deletions', 'const [state] = useState({ count: 0 }); delete state.count;'],
+		[
+			'destructuring assignment targets',
+			'const [state] = useState({ count: 0 }); [state.count] = [1];',
+		],
+		[
+			'nested property aliases',
+			'const [state] = useState({ nested: { count: 0 } }); const nested = state.nested; const alias = nested; alias.count++;',
+		],
+		[
+			'destructured property aliases',
+			'const [state] = useState({ nested: { count: 0 } }); const { nested } = state; nested.count++;',
+		],
+		[
+			'destructured snapshot properties',
+			'const [{ nested }] = useState({ nested: { count: 0 } }); nested.count++;',
+		],
+		[
+			'aliased tuple index access',
+			'const tuple = useState({ count: 0 }); const pair = tuple; const index = 0 as const; pair[index].count++;',
+		],
+		[
+			'object-pattern tuple access',
+			'const tuple = useState({ count: 0 }); const { 0: state } = tuple; state.count++;',
+		],
+		[
+			'reducer snapshots',
+			'const [state] = useReducer((value) => value, { count: 0 }); state.count++;',
+		],
+		[
+			'linked-state snapshots',
+			'const [state] = useLinkedState(props.value, (value) => ({ count: value })); state.count++;',
+		],
+		[
+			'synchronous helper parameters',
+			'const [state] = useState({ count: 0 }); function mutate(value) { value.count++; } mutate({ count: 0 }); mutate(state);',
+		],
+		[
+			'synchronous tuple parameters',
+			'const tuple = useState({ count: 0 }); function mutate(pair) { pair[0].count++; } mutate(tuple);',
+		],
+		[
+			'immediate callback parameters',
+			'const [state] = useState({ count: 0 }); ((value) => { delete value.count; })(state);',
+		],
+	])('rejects render snapshot mutation through %s', (_label, setup) => {
+		const source = component(setup);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_SNAPSHOT_MUTATION,
+		);
+	});
+
+	it.each([
+		'copyWithin(0, 1)',
+		'fill(3)',
+		'pop()',
+		'push(3)',
+		'reverse()',
+		'shift()',
+		'sort()',
+		'splice(0, 1)',
+		'unshift(3)',
+	])('rejects %s on an array state snapshot during render', (call) => {
+		const source = component(`const [items] = useState([2, 1]); items.${call};`);
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_SNAPSHOT_MUTATION,
+		);
+	});
+
+	it('preserves array snapshot evidence through aliases and synchronous parameters', () => {
+		const source = component(`const tuple = useState([2, 1]);
+  const items = tuple[0];
+  const alias = items;
+  function reorder(values) { values['reverse'](); }
+  reorder(alias);`);
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_SNAPSHOT_MUTATION,
+		);
+	});
+
+	it('allows local copies, shadowed hooks, and snapshot methods without an array proof', () => {
+		const source =
+			component(`const [state] = useState({ count: 0, sort() { return 1; }, set() { return 2; } });
+  const [items] = useState([2, 1]);
+  const copy = { ...state };
+  copy.count++;
+  delete copy.count;
+  const sorted = [...items];
+  sorted.sort();
+  state.sort();
+  state.set();
+  function mutate(value) { value.count++; }
+  mutate({ count: 0 });
+  function replace(value) { value = { count: 0 }; value.count++; }
+  replace(state);
+  {
+    const useState = () => [{ count: 0 }];
+    const [local] = useState();
+    local.count++;
+  }`);
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['scalar updates', 'let index = 0;', 'index++;'],
+		['member updates', 'const cursor = { position: 0 };', 'cursor.position++;'],
+		['destructuring writes', 'let index = 0;', '[index] = [1];'],
+		['known array mutations', 'const labels = [];', 'labels.push(item.label);'],
+		['captured helper writes', 'let index = 0; function next() { index++; }', 'next();'],
+	])(
+		'rejects %s from a keyed row to a binding owned by its outer render scope',
+		(_label, declaration, mutation) => {
+			const source = `
+export function App(props) @{
+  ${declaration}
+  <ul>
+    @for (const item of props.items; key item.id) {
+      ${mutation}
+      <li>{item.label as string}</li>
+    }
+  </ul>
+}`;
+			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+			const strong = `"use strong";${source}`;
+			expect(() => compile(strong, '/src/App.tsrx')).toThrow(RETAINED_ROW_MUTATION);
+			for (const options of [
+				{ mode: 'client', dev: true },
+				{ mode: 'client', dev: false },
+				{ mode: 'server', dev: true },
+				{ mode: 'server', dev: false },
+			] as const) {
+				expect(() => compile(source, '/src/App.tsrx', { ...options, strong: true })).toThrow(
+					RETAINED_ROW_MUTATION,
+				);
+			}
+			expect(compileToVolarMappings(strong, '/src/App.tsrx').diagnostics).toContainEqual(
+				expect.objectContaining({ code: RETAINED_ROW_MUTATION, severity: 'error' }),
+			);
+		},
+	);
+
+	it('allows fresh mutable data in setup and inside one keyed row', () => {
+		const source = `"use strong";
+export function App(props) @{
+  const labels = [];
+  for (const item of props.items) labels.push(item.label);
+  <ul data-labels={labels.join(',')}>
+    @for (const item of props.items; key item.id) {
+      var rowIndex = 0;
+      rowIndex++;
+      const local = { count: 0 };
+      local.count++;
+      <li>{(item.label + local.count + rowIndex) as string}</li>
+    }
+  </ul>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps immutable event updates and local effect work legal', () => {
+		const source = `"use strong";
+import { useState, useEffect } from 'octane';
+export function App() @{
+  const [state, setState] = useState({ count: 0 });
+  useEffect(() => { const local = { count: state.count }; local.count++; }, [state]);
+  <button onClick={() => setState({ count: state.count + 1 })}>{state.count as string}</button>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		{ mode: 'client', dev: true },
+		{ mode: 'client', dev: false },
+		{ mode: 'server', dev: true },
+		{ mode: 'server', dev: false },
+	])('enforces snapshot mutation in $mode compilation with dev=$dev', (options) => {
+		const source = component('const [state] = useState({ count: 0 }); state.count++;');
+		expect(() => compile(source, '/src/App.tsrx', { ...options, strong: true } as any)).toThrow(
+			RENDER_SNAPSHOT_MUTATION,
+		);
+	});
+
+	it('locates snapshot writes in plain modules and editor diagnostics', () => {
+		const setup = 'const [state] = useState({ count: 0 }); delete state.count;';
+		const source = `"use strong";\n${component(setup)}`;
+		const plain = `"use strong"; import { useState } from 'octane'; export function useCounter() { ${setup} return state; }`;
+		const start = source.indexOf('state.count;');
+		expect(() => slotHooks(plain, '/src/useCounter.ts')).toThrow(RENDER_SNAPSHOT_MUTATION);
+		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: RENDER_SNAPSHOT_MUTATION,
+				severity: 'error',
+				start: expect.objectContaining({ offset: start }),
+				end: expect.objectContaining({ offset: start + 'state.count'.length }),
+			}),
+		);
+	});
+});
+
+describe('Strong mode nondeterministic render calls', () => {
+	it.each([
+		[
+			'memo-wrapped arrows',
+			'import { memo } from "octane"; export const App = memo(() => <div>{Date.now()}</div>);',
+		],
+		[
+			'aliased memo imports',
+			'import { memo as cached } from "octane"; export const App = cached(() => <div>{Date.now()}</div>);',
+		],
+		[
+			'memo-wrapped null output',
+			'import { memo } from "octane"; export const App = memo(() => { Date.now(); return null; });',
+		],
+		[
+			'memo-wrapped named callbacks',
+			'import { memo } from "octane"; const render = () => <div>{Date.now()}</div>; export const App = memo(render);',
+		],
+		[
+			'namespace lazy wrappers',
+			'import * as Octane from "octane"; export const App = Octane.lazy(() => <div>{Date.now()}</div>);',
+		],
+		[
+			'wrapped default exports',
+			'import { memo } from "octane"; export default memo(() => <div>{Date.now()}</div>);',
+		],
+		['anonymous default arrows', 'export default () => <div>{Date.now()}</div>;'],
+		[
+			'anonymous default functions',
+			'export default function() { return <div>{Date.now()}</div>; }',
+		],
+	])('enforces nondeterministic render calls in %s', (_label, source) => {
+		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsx')).toThrow(RENDER_IMPURE_CALL);
+	});
+
+	it('does not treat shadowed memo utilities or lazy module loaders as component bodies', () => {
+		const source = `"use strong";
+import { lazy } from 'octane';
+const memo = (callback) => callback;
+const App = memo(() => <div>{Date.now()}</div>);
+const Deferred = lazy(() => { Date.now(); return import('./Deferred'); });
+export function Controls() { return <button onClick={App}>Create preview</button>; }`;
+		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
+	});
+
+	it('keeps uppercase initialization and event helpers outside render', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+function InitialTime() { return Date.now(); }
+function Clock() { this.started = Date.now(); }
+export function App() {
+  const [time] = useState(InitialTime);
+  return <button onClick={() => new Clock()}>{time}</button>;
+}`;
+		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
+	});
+
+	it.each(['Date.now()', 'Math.random()', 'performance.now()', 'new Date()', 'Date()'])(
+		'rejects %s in render without changing compatibility mode',
+		(expression) => {
+			const source = `export function App() @{ const value = ${expression}; <div>{value as string}</div> }`;
+			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+			expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+				RENDER_IMPURE_CALL,
+			);
+		},
+	);
+
+	it('follows synchronous module helpers but leaves event-only helpers legal', () => {
+		const helper = 'function readClock() { return Date["now"](); }';
+		const render = `"use strong"; ${helper} export function App() @{ const value = readClock(); <div>{value as string}</div> }`;
+		const event = `"use strong"; ${helper} export function App() @{ <button onClick={readClock}>Read clock</button> }`;
+		expect(() => compile(render, '/src/App.tsrx')).toThrow(RENDER_IMPURE_CALL);
+		expect(() => compile(event, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('allows diagnostic logging, deterministic dates, and lexically shadowed globals', () => {
+		const source = `"use strong";
+export function App({ Math, Date, performance }) @{
+  const value = Math.random() + Date.now() + performance.now();
+  console.log(value);
+  <div />
+}
+export function Fixed() @{ const date = new Date(0); <div>{date.getTime() as string}</div> }`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('allows standard calls in events, effects, and deferred callbacks', () => {
+		const source = `"use strong";
+import { useEffect } from 'octane';
+export function App() @{
+  useEffect(() => { Date.now(); Math.random(); performance.now(); }, []);
+  setTimeout(() => new Date(), 0);
+  <button onClick={() => Date.now()}>Read clock</button>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('allows time and randomness in lazy state initializers but not memo calculations', () => {
+		// React permits non-idempotent state initialization; ordinary render
+		// calculations still have to be repeatable for the same inputs.
+		// https://react.dev/reference/rules/components-and-hooks-must-be-pure
+		const source = `"use strong";
+import { useState, useReducer, useMemo } from 'octane';
+function initialTime() { return Date.now(); }
+export function App() @{
+  const [date] = useState(() => new Date());
+  const [time] = useState(initialTime);
+  const [seed] = useState(() => Math.random());
+  const [stamp] = useReducer((value) => value, null, () => performance.now());
+  <div />
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		const memo = source.replace(
+			'const [time] = useState(initialTime);',
+			'useMemo(initialTime, []);',
+		);
+		expect(() => compile(memo, '/src/App.tsrx')).toThrow(RENDER_IMPURE_CALL);
+	});
+
+	it('enforces named custom hooks in plain modules and JSX components', () => {
+		const plain = '"use strong"; export function useClock() { return Date.now(); }';
+		const jsx = '"use strong"; export const App = () => <div>{Math.random()}</div>;';
+		expect(() => slotHooks(plain, '/src/useClock.ts')).toThrow(RENDER_IMPURE_CALL);
+		expect(() => compile(jsx, '/src/App.tsx')).toThrow(RENDER_IMPURE_CALL);
+		expect(compileToVolarMappings(jsx, '/src/App.tsx').diagnostics).toContainEqual(
+			expect.objectContaining({ code: RENDER_IMPURE_CALL, severity: 'error' }),
+		);
+	});
+});
 
 function stateComponent(setup: string, imports = 'useState'): string {
 	return `import { ${imports} } from 'octane';
@@ -2671,11 +3019,11 @@ export function App() {
 		expect(() => compile(source, '/src/App.tsx')).toThrow(RENDER_STATE_UPDATE);
 	});
 
-	it('does not ban nondeterministic render values', () => {
+	it('keeps opaque crypto methods outside the bounded purity diagnostics', () => {
 		const source = `"use strong";
 export function App() @{
-  const value = Date.now() + Math.random() + crypto.randomUUID();
-  <p>{value as string}</p>
+	  const value = crypto.randomUUID();
+	  <p>{value as string}</p>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();

@@ -118,6 +118,15 @@ framework-neutral `alien-signals@1.0.4` core. Its focused suite covers external
 store subscriptions, computed values, effect and scope ownership, SSR, and
 hydration rather than the differential DOM harness.
 
+Target #5 has landed as [`@octanejs/xstate`](../packages/xstate) (a port of
+`@xstate/react@6.1.0`), alongside
+[`@octanejs/xstate-store`](../packages/xstate-store) (`@xstate/store-react@2.0.0`),
+which the ranked table did not anticipate. Both carry the full six-lane evidence
+model: the vendored upstream suite run unchanged against React, the same case
+identities re-run on Octane, both type suites, and — for `@octanejs/xstate` — a
+differential lane. `docs/bindings-status.md` is the generated source of truth for
+what is landed; this table stays a record of the original ranking.
+
 - **P0 — Bootstrap (1–2d):** audit existing assets (rig, `_setup.ts` rename mechanics,
   conformance + identity helpers, the two existing store fixtures), add the
   `useDebugValue` shim, decide the binding-alias mechanism, set the citation

@@ -47,6 +47,11 @@
       "reason": "Exercises Octane component integration and is not counted as React parity."
     },
     {
+      "path": "packages/radix/tests/focus-scope.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises deferred FocusScope cleanup across DOM event realms and is not counted as React parity."
+    },
+    {
       "path": "packages/radix/tests/foundation.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane component integration and is not counted as React parity."

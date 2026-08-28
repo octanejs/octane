@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/logic/unsetEmptyArray.test.ts b/tests/upstream/logic/unsetEmptyArray.test.ts
+--- a/tests/upstream/logic/unsetEmptyArray.test.ts
++++ b/tests/upstream/logic/unsetEmptyArray.test.ts
+@@ -7,7 +7,7 @@ vi.mock('../../../src/utils/unset', () => ({
+ }));
+ 
+ describe('unsetEmptyArray', () => {
+-  const mockedUnset = unset as vi.MockedFunction<typeof unset>;
++  const mockedUnset = unset as MockedFunction<typeof unset>;
+ 
+   beforeAll(() => {
+     mockedUnset.mockClear();

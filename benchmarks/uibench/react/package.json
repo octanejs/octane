@@ -1,0 +1,21 @@
+{
+  "name": "react-uibench-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "React Compiler control for the UIbench desktop operation matrix.",
+  "scripts": {
+    "dev": "vite --host --port 5316 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5316 --strictPort"
+  },
+  "dependencies": {
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "catalog:default",
+    "terser": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

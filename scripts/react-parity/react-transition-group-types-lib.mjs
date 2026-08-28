@@ -99,7 +99,7 @@ function assertionGroups(source, fileName) {
 	return groups;
 }
 
-function structuralSource(source, fileName) {
+function structuralSource(source) {
 	let normalized = source
 		.replace(/import \* as React from ['"]react['"];\n?/g, '')
 		.replace(/import \{ type ElementDescriptor, useRef \} from ['"]octane['"];\n?/g, '')
@@ -166,7 +166,7 @@ export function buildTypeInventory(root, config) {
 		if (JSON.stringify(upstreamGroups) !== JSON.stringify(adaptedGroups)) {
 			throw new Error(`${file}: assertion groups differ between pristine and adapted type suites`);
 		}
-		if (structuralSource(upstreamSource, file) !== structuralSource(adaptedSource, file)) {
+		if (structuralSource(upstreamSource) !== structuralSource(adaptedSource)) {
 			throw new Error(
 				`${file}: adapted type test contains a change outside the permitted transformations`,
 			);

@@ -47,6 +47,42 @@ export function ErrorHost(props) @{
 	</ErrorBoundary>
 }
 
+interface SuspendingErrorFallbackProps {
+	promise: Promise<string>;
+	read: () => string;
+	usePromise: boolean;
+	log: string[];
+}
+
+function SuspendingErrorFallback(props: SuspendingErrorFallbackProps) @{
+	const value =
+		props.usePromise ? use(props.promise) : props.read();
+	useLayoutEffect(() => {
+		props.log.push('mount');
+		return () => {
+			props.log.push('unmount');
+		};
+	}, []);
+	<span id="suspended-error-fallback">{value as string}</span>
+}
+
+// Keep the imported literal ErrorBoundary: its compiler lowering uses errorBlock,
+// unlike a dynamic boundary descriptor, which uses the general tryBlock path.
+export function SuspendingErrorFallbackHost(props: SuspendingErrorFallbackProps) @{
+	<Suspense fallback={<span id="outer-error-pending">{'outer loading'}</span>}>
+		<ErrorBoundary
+			fallback={<SuspendingErrorFallback
+				promise={props.promise}
+				read={props.read}
+				usePromise={props.usePromise}
+				log={props.log}
+			/>}
+		>
+			<Thrower bang={true} />
+		</ErrorBoundary>
+	</Suspense>
+}
+
 function ResetThrower(props) @{
 	if (props.state.failed) throw new Error('reset me');
 	<span id="reset-ok">recovered</span>

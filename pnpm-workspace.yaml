@@ -11,6 +11,7 @@ packages:
   - benchmarks/spa-navigation/*
   - benchmarks/signal-favoring
   - benchmarks/signal-favoring/*
+  - benchmarks/scoped-signals
   - benchmarks/dbmon
   - benchmarks/dbmon/*
   - benchmarks/effectful-list
@@ -22,6 +23,7 @@ packages:
   - benchmarks/portal-swarm
   - benchmarks/portal-swarm/*
   - benchmarks/react-hosted-islands
+  - benchmarks/dev-form-diagnostics
   - benchmarks/ssr-throughput
   - benchmarks/ssr-throughput/*
   - benchmarks/streaming-ssr
@@ -48,6 +50,8 @@ packages:
   - benchmarks/streamdown-hosted/*
   - benchmarks/svg-dashboard
   - benchmarks/svg-dashboard/*
+  - benchmarks/uibench
+  - benchmarks/uibench/*
   - benchmarks/tauri-shell
   - benchmarks/tauri-shell/*
   - benchmarks/tanstack-start
@@ -92,6 +96,8 @@ allowBuilds:
   keccak: false
   utf-8-validate: false
   bun: true
+  # Inferno's postinstall only prints OpenCollective funding information.
+  inferno: false
 
 # Variables
 esrap_common: &esrap_common ^2.3.2
@@ -131,6 +137,12 @@ packageExtensions:
       '@rspack/core': 2.1.3
 
 catalogs:
+  # Immer 11's published Iterator global conflicts with TypeScript's ESNext
+  # libraries (immerjs/immer#1273), including 11.1.17. Keep Recharts' private
+  # store on compatible RTK/Immer majors so packed consumers need no patches.
+  recharts-store:
+    '@reduxjs/toolkit': ~2.10.1
+    immer: ^10.2.0
   livestore-react-oracle:
     '@livestore/utils-dev': 0.4.0
     '@opentelemetry/sdk-trace-base': 2.2.0
@@ -159,6 +171,7 @@ catalogs:
     '@rspack/core': 2.1.3
     typescript: 5.9.3
   default:
+    babel-plugin-inferno: 6.8.5
     '@react-rxjs/core': 0.10.8
     '@react-rxjs/utils': 0.9.7
     '@rx-state/core': 0.1.4
@@ -169,6 +182,7 @@ catalogs:
     '@livestore/utils': 0.4.0
     '@opentelemetry/api': 1.9.0
     '@apollo/client': 4.2.6
+    '@opentui/core': 0.5.8
     animejs: 4.5.0
     dexie: 4.4.4
     fake-indexeddb: 6.2.5
@@ -182,12 +196,12 @@ catalogs:
     '@babel/core': 7.29.7
     '@rolldown/plugin-babel': 0.2.3
     babel-plugin-react-compiler: 1.0.0
-    '@changesets/changelog-github': ^0.7.0
     '@changesets/changelog-git': ^0.2.1
     '@changesets/cli': ^2.31.1
     '@floating-ui/dom': ^1.8.0
     '@floating-ui/react': 0.27.19
     '@floating-ui/utils': ^0.2.12
+    '@formisch/react': 1.0.0-rc.0
     '@tanstack/form-core': 1.33.2
     '@tanstack/react-form': 1.33.2
     'aria-hidden': ^1.2.6
@@ -235,8 +249,8 @@ catalogs:
     '@tiptap/react': 3.28.0
     '@tiptap/starter-kit': 3.28.0
     '@playwright/test': ^1.61.1
-    '@ripple-ts/adapter': ^0.3.118
-    '@ripple-ts/vite-plugin': ^0.3.118
+    '@ripple-ts/adapter': ^0.3.125
+    '@ripple-ts/vite-plugin': ^0.3.125
     '@solidjs/web': '2.0.0-beta.20'
     '@stylexjs/babel-plugin': '0.19.0'
     '@stylexjs/stylex': '0.19.0'
@@ -264,18 +278,19 @@ catalogs:
     electron: 43.2.0
     '@testing-library/dom': ^10.4.1
     '@testing-library/jest-dom': ^6.9.1
+    '@testing-library/react': ^16.3.2
     '@vitest/coverage-istanbul': 4.1.10
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.1.58
-    '@tsrx/prettier-plugin': ^0.3.120
-    '@tsrx/typescript-plugin': ^0.3.120
-    '@tsrx/ripple': ^0.1.59
-    '@tsrx/react': ^0.2.58
-    '@tsrx/solid': ^0.1.58
-    '@tsrx/vite-plugin-react': ^0.0.91
-    '@tsrx/vite-plugin-solid': ^0.0.88
+    '@tsrx/core': ^0.1.61
+    '@tsrx/prettier-plugin': ^0.3.126
+    '@tsrx/typescript-plugin': ^0.3.126
+    '@tsrx/ripple': ^0.1.62
+    '@tsrx/react': ^0.2.61
+    '@tsrx/solid': ^0.1.61
+    '@tsrx/vite-plugin-react': ^0.0.94
+    '@tsrx/vite-plugin-solid': ^0.0.91
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -294,6 +309,7 @@ catalogs:
     '@types/d3-time-format': 2.1.0
     '@types/d3-voronoi': ^1.1.12
     '@types/geojson': ^7946.0.16
+    '@types/jsdom': 30.0.0
     '@types/node': ^24.13.3
     '@types/react': ^19.2.17
     '@types/react-dom': ^19.2.3
@@ -329,6 +345,10 @@ catalogs:
     gsap: 3.15.0
     '@gsap/react': 2.1.2
     happy-dom: ^20.11.0
+    inferno: 9.1.0
+    inferno-create-element: 9.1.0
+    inferno-hydrate: 9.1.0
+    inferno-server: 9.1.0
     html-parse-stringify: ^3.0.1
     i18next: 26.3.6
     jsdom: ^30.0.1
@@ -424,7 +444,8 @@ catalogs:
     react-dom: ^19.2.7
     react-i18next: 17.0.9
     react-error-boundary: 6.1.2
-    ripple: ^0.3.118
+    react-resizable-panels: 4.12.2
+    ripple: ^0.3.125
     rxjs: ^7.8.2
     rulesync: ^8.32.0
     solid-js: '2.0.0-beta.20'
@@ -444,6 +465,7 @@ catalogs:
     three: 0.172.0
     type-fest: ^5.8.0
     typescript: ^5.9.3
+    valibot: ^1.4.1
     valtio: ^2.3.2
     vite: ^8.1.5
     astro: ^5.16.0
@@ -528,12 +550,30 @@ catalogs:
     "@types/react-dom": 19.2.3
     react: 19.2.3
     react-dom: 19.2.3
+  xstate-react-oracle:
+    "@testing-library/react": 16.3.1
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    "@xstate/react": 6.1.0
+    react: 19.2.3
+    react-dom: 19.2.3
+    use-isomorphic-layout-effect: 1.2.1
+    use-sync-external-store: 1.6.0
+    xstate: 5.32.5
+  xstate-store-react-oracle:
+    "@testing-library/react": 16.3.1
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    "@xstate/store": 4.2.3
+    "@xstate/store-react": 2.0.0
+    react: 19.2.3
+    react-dom: 19.2.3
 
 # patchedDependencies: the @tsrx/core@0.1.37/0.1.40 JSX parse patches are
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39 || 0.1.42 || 0.1.43 || 0.1.45 || 0.1.46 || 0.1.47 || 0.1.49
   - react-dropzone@20.0.0
   - '@tanstack/db@0.7.0'
   - '@oxc-tsrx/native-darwin-arm64@0.5.0'
@@ -545,36 +585,24 @@ minimumReleaseAgeExclude:
   - '@oxc-tsrx/native-win32-arm64-msvc@0.5.0'
   - '@oxc-tsrx/native-win32-x64-msvc@0.5.0'
   - oxc-tsrx@0.5.0
+  - '@ripple-ts/adapter@0.3.125'
+  - '@ripple-ts/vite-plugin@0.3.125'
+  - '@tsrx/core@0.1.61'
+  - '@tsrx/prettier-plugin@0.3.126'
+  - '@tsrx/react@0.2.61'
+  - '@tsrx/ripple@0.1.62'
+  - '@tsrx/solid@0.1.61'
+  - '@tsrx/typescript-plugin@0.3.126'
+  - '@tsrx/vite-plugin-react@0.0.94'
+  - '@tsrx/vite-plugin-solid@0.0.91'
+  - ripple@0.3.125
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.
 #
-# @tsrx/core 0.1.56/0.1.58: the shared JSX transform hard-throws "TSRX fragments can
-# only have one style tag", which in type-only mode makes tsrx-tsc/editors
-# fall back to the raw source as the virtual TSX — every CSS brace then
-# surfaces as a TSX parse error (TS1381/TS1005). Octane components may split
-# scoped CSS across several <style> blocks under one canonical hash (see
-# packages/octane/src/compiler/compile.js applyCssScoping), so the patch makes
-# the TYPE-ONLY path accept multiple sheets and rebase them onto the first
-# sheet's hash; runtime transforms keep the throw. Remove once @tsrx/core
-# ships the equivalent fix upstream.
-#
-# @tsrx/core 0.1.56/0.1.58: a host element carrying `ref` plus a spread lowers to a
-# generated `let X = __normalize_spread_props_for_ref_attr(…)` that rides on the
-# element's metadata for a later pass to hoist. Only the render-block statement
-# builder and the native-directive path hoist it, so the same element in
-# plain-JS expression position (a ternary arm, a concise arrow body, a
-# declarator init, a callback body, an attribute value, an array element) lost
-# the declaration while the rewritten attributes still referenced the name —
-# TS2304 in the virtual TSX for source that compiles and runs correctly
-# (octanejs/octane#737). Such an element also reached BOTH lowering sites, and
-# the lowering is not idempotent, so it emitted a second binding and a nested
-# ref array. The patch wraps residual declarations in the IIFE the
-# native-directive path already uses and marks an element whose host ref/spread
-# is lowered; both are scoped to the TYPE-ONLY path, so runtime emit for the
-# other platforms sharing this transform is unchanged. Remove once @tsrx/core
-# ships the equivalent fix upstream.
+# The JSX type-only fixes formerly patched into @tsrx/core 0.1.56/0.1.58
+# are published in the required @tsrx/core >= 0.1.60.
 patchedDependencies:
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
-  '@tsrx/core@0.1.56': patches/@tsrx__core@0.1.56-0.1.58.patch
-  '@tsrx/core@0.1.58': patches/@tsrx__core@0.1.56-0.1.58.patch
+  # Temporary until tsrx-org/tsrx#4 is released; remove this patch when that release is adopted.
+  '@tsrx/core@0.1.61': patches/@tsrx__core@0.1.61.patch

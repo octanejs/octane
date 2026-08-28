@@ -1,0 +1,25 @@
+{
+  "upstream": {
+    "package": "use-stick-to-bottom",
+    "version": "1.1.6",
+    "source": "https://github.com/stackblitz/use-stick-to-bottom/tree/8d6a19a0ca6ab632830588073e6a29312a06a088",
+    "license": "MIT"
+  },
+  "surface": "Public runtime surface at use-stick-to-bottom 1.1.6: useStickToBottom, StickToBottom, StickToBottom.Content, useStickToBottomContext, and related types.",
+  "inventory": {
+    "supported": [
+      "useStickToBottom",
+      "StickToBottom",
+      "StickToBottom.Content",
+      "useStickToBottomContext"
+    ],
+    "subpaths": []
+  },
+  "divergences": [
+    "Consumers import from @octanejs/stick-to-bottom instead of use-stick-to-bottom.",
+    "Ref objects are structural { current } / callback refs rather than React.RefObject.",
+    "The plain TypeScript useStickToBottom hook forwards compiler-injected slots; a symbol in the options position is treated as empty options."
+  ],
+  "ssr": "Scroll/resize listeners attach in ref callbacks. Initial isAtBottom follows options.initial. Overflow auto is applied in a layout/effect.",
+  "verified": "2026-08-20"
+}

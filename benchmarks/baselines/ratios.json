@@ -440,6 +440,190 @@
     "note": "Same-run Playwright typing into 512 controlled fields while preserving the input, focus, insertion caret, and latest validation. A verified quick run measured about 1.01x; 2x leaves browser and keyboard-event noise headroom."
   },
   {
+    "suite": "dev-form-diagnostics",
+    "op": "commit_per_1000_hosts",
+    "target": "hosts-32000",
+    "reference": "hosts-4000",
+    "maxRatio": 1.4,
+    "note": "Same-process jsdom development commits over read-only controlled text inputs. Linear diagnostic membership stays roughly flat per host; the benchmark measured the original whole-queue scan at 1.74x per host for 32k versus 4k, while the generation-stamped queue measured 0.94x. The 1.4x ceiling leaves timing headroom while catching the quadratic path."
+  },
+  {
+    "suite": "tsrx-nesting-diagnostics",
+    "op": "compile_per_1000_sites",
+    "target": "sites-2000",
+    "reference": "sites-500",
+    "maxRatio": 1.3,
+    "note": "Same-process development TSRX compilation with every emitted nesting validation parsed and checked. The original repeated serialization and whole-array scan measured 1.59x per invalid site at 2,000 versus 500 sites, while plan-local Set membership measured 1.07x. The 1.3x ceiling leaves timing headroom while catching the quadratic path."
+  },
+  {
+    "suite": "tsrx-renderer-selection",
+    "op": "resolve",
+    "target": "normalized-config",
+    "reference": "raw-config",
+    "maxRatio": 0.5,
+    "note": "Same-process filename classification across ordered renderer rules with exact matching checksums. The parent implementation redundantly normalized and compiled globs for retained normalized input, measuring 1.02x versus raw revalidation. Reusing validated config and compiled matchers measured below 0.1x; the 0.5 ceiling leaves more than 5x timing headroom while catching restoration of either repeated path."
+  },
+  {
+    "suite": "tsrx-native-change-analysis",
+    "op": "analysis",
+    "target": "hostless-4000",
+    "reference": "forced-scan-4000",
+    "maxRatio": 0.15,
+    "note": "Same-byte sources parse to identical ASTs after normalizing one ignored JSX comment. Exact main analyzed the hostless target at 0.85x the conservative forced-scan control; verified native-host source-proof runs measured about 0.05x. The 0.15 ceiling leaves 3x timing headroom while catching restoration of the whole-AST walk."
+  },
+  {
+    "suite": "tsrx-native-change-analysis",
+    "op": "client_compile",
+    "target": "hostless-4000",
+    "reference": "forced-scan-4000",
+    "maxRatio": 1.15,
+    "note": "Paired development client compilation must not make the hostless fast path materially slower than the structurally identical source that conservatively retains analysis. Both outputs have exact matching digests; verified quick runs ranged from 0.99x to 1.04x, and the 1.15 ceiling leaves timing headroom while catching a real regression."
+  },
+  {
+    "suite": "tsrx-native-change-analysis",
+    "op": "server_compile",
+    "target": "hostless-4000",
+    "reference": "forced-scan-4000",
+    "maxRatio": 1.15,
+    "note": "Paired development server compilation must not make the hostless fast path materially slower than the structurally identical source that conservatively retains analysis. Both outputs have exact matching digests; verified quick runs ranged from 1.00x to 1.08x, and the 1.15 ceiling leaves timing headroom while catching a real regression."
+  },
+  {
+    "suite": "behavior-root-events",
+    "op": "resume_per_1000_events",
+    "target": "events-8000",
+    "reference": "events-1000",
+    "maxRatio": 1.6,
+    "note": "Same-page production Chromium resume cost for FIFO queued events whose distinct async adoptions settle one at a time. The rejected per-resume compaction/full-scan path measured 6.05x per event at 8k versus 1k, while amortized compaction and constant-time pending bookkeeping measured 0.93x and 1.14x in verified quick runs. The 1.6x ceiling leaves browser timing headroom."
+  },
+  {
+    "suite": "router-dispatch",
+    "op": "dispatch_per_million_candidates",
+    "target": "static-routes",
+    "reference": "dynamic-routes",
+    "maxRatio": 0.2,
+    "note": "Same-process app-core dispatch through 1,000-route tables with exact route and parameter gates. RegExp matching for every static candidate measured at 0.44x the dynamic control; exact string matching measured at 0.08x. The 0.2 ceiling leaves more than 2x timing headroom while catching loss of the static matcher."
+  },
+  {
+    "suite": "router-dispatch",
+    "op": "dispatch_per_million_candidates",
+    "target": "wrong-method-routes",
+    "reference": "dynamic-routes",
+    "maxRatio": 0.2,
+    "note": "Same-process lowercase method misses through 1,000 server routes, normalized per candidate. Re-normalizing the request method for every route measured at 0.31x the dynamic control; one dispatch-level normalization measured at 0.07x. The 0.2 ceiling leaves timing headroom while catching repeated method normalization."
+  },
+  {
+    "suite": "floating-tree-navigation",
+    "op": "node_reads",
+    "target": "indexed-deep-chain",
+    "reference": "previous-deep-chain",
+    "maxRatio": 0.01,
+    "note": "Deterministic indexed reads for the production deepest-open-node lookup versus the exact previous recursive descendant expansion. The full 16-node chain measured 32 reads versus 1,048,576; the 0.01 ceiling leaves more than 300x headroom while requiring work to remain linear on the virtual-keyboard-navigation path."
+  },
+  {
+    "suite": "floating-tree-navigation",
+    "op": "node_reads",
+    "target": "indexed-equal-depth-fork",
+    "reference": "previous-equal-depth-fork",
+    "maxRatio": 0.05,
+    "note": "Deterministic indexed reads for two equal-depth open branches, with node identity pinned to the first tree-order leaf. The full fixture measured 33 reads versus 17,373; the 0.05 ceiling leaves more than 26x headroom while catching repeated all-descendant expansion."
+  },
+  {
+    "suite": "floating-tree-navigation",
+    "op": "lookup",
+    "target": "indexed-deep-chain",
+    "reference": "previous-deep-chain",
+    "maxRatio": 0.25,
+    "note": "Same-process warmed lookup time for production versus the exact previous algorithm on a 16-node open chain. One full run measured 0.000848 ms versus 7.419794 ms; the deterministic node-read guard is primary, and the 0.25 ceiling leaves broad timing headroom while requiring the indexed traversal's advantage to remain visible."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "batch",
+    "target": "production-standard-representative",
+    "reference": "previous-standard-representative",
+    "maxRatio": 0.35,
+    "note": "Same-process standard Ink renderer over 80 separately materialized equal copies of a fixed 20,000-line frame. Byte and split gates require equivalent output while production removes the previous branch's redundant newline split; the harness also requires at least 10 ms saved."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "batch",
+    "target": "production-incremental-representative",
+    "reference": "previous-incremental-representative",
+    "maxRatio": 0.35,
+    "note": "Same-process incremental Ink renderer over 80 separately materialized equal copies of a fixed 20,000-line frame. Byte and split gates require equivalent output while production removes the previous branch's redundant newline split; the harness also requires at least 10 ms saved."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "cursor_update",
+    "target": "production-standard-scaling-80000",
+    "reference": "production-standard-scaling-20000",
+    "maxRatio": 2,
+    "note": "Production standard cursor-only time per update over a stable 80,000-line stress frame must remain within 2x the stable 20,000-line control. Both batches contain 20,000 writes and the harness requires every sample to exceed 1 ms."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "cursor_update",
+    "target": "production-incremental-scaling-80000",
+    "reference": "production-incremental-scaling-20000",
+    "maxRatio": 2,
+    "note": "Production incremental cursor-only time per update over a stable 80,000-line stress frame must remain within 2x the stable 20,000-line control. Both batches contain 20,000 writes and the harness requires every sample to exceed 1 ms."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "render",
+    "target": "production-standard-initial",
+    "reference": "previous-standard-initial",
+    "maxRatio": 1.25,
+    "note": "Standard initial rendering retains exactly one newline split. The same-process 20,000-line control guards against shifting cursor-only work into initial rendering; the harness also caps the absolute slowdown at 1 ms per render."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "render",
+    "target": "production-incremental-initial",
+    "reference": "previous-incremental-initial",
+    "maxRatio": 1.25,
+    "note": "Incremental initial rendering retains exactly one newline split. The same-process 20,000-line control guards against shifting cursor-only work into initial rendering; the harness also caps the absolute slowdown at 1 ms per render."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "render",
+    "target": "production-standard-changed",
+    "reference": "previous-standard-changed",
+    "maxRatio": 1.25,
+    "note": "Standard content-changing rendering retains exactly one newline split. The same-process 20,000-line control guards against shifting cursor-only work into changed output; the harness also caps the absolute slowdown at 1 ms per render."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "render",
+    "target": "production-incremental-changed",
+    "reference": "previous-incremental-changed",
+    "maxRatio": 1.25,
+    "note": "Incremental content-changing rendering retains exactly one newline split. The same-process 20,000-line control guards against shifting cursor-only work into changed output; the harness also caps the absolute slowdown at 1 ms per render."
+  },
+  {
+    "suite": "vite-client-assets",
+    "op": "asset_map",
+    "target": "routes-1000-deep",
+    "reference": "routes-100-deep",
+    "maxRatio": 6,
+    "note": "Same-process Vite asset mapping over route entries that share one 500-chunk graph and produce the same one-file CSS result. Rewalking the graph for every route measured at 10.16x for 1,000 versus 100 routes; bounded complete-result caching measured at 3.24x. The 6x ceiling leaves timing headroom while catching restoration of the route-count times graph-size traversal."
+  },
+  {
+    "suite": "manifest-cache-invalidation",
+    "op": "invalidate",
+    "target": "ordinary-large-cache",
+    "reference": "ordinary-small-cache",
+    "maxRatio": 1.5,
+    "note": "Same-process shared-compiler source invalidation after 129 versus 5,001 nearest-manifest decisions. The original whole-cache scan measured 34.8x at the large size, while rejecting non-manifest paths before cache traversal measured 1.00x. The 1.5 ceiling leaves timing headroom while catching cache-size-dependent ordinary invalidation."
+  },
+  {
+    "suite": "manifest-cache-invalidation",
+    "op": "invalidate",
+    "target": "ordinary-large-cache",
+    "reference": "manifest-large-cache",
+    "maxRatio": 0.2,
+    "note": "Same-process invalidation across 5,001 cached manifest decisions with identical cache-preservation checks. The original ordinary path measured at parity with the required package-manifest scan, while the manifest-name gate measured at 0.01x. The 0.2 ceiling preserves more than 10x timing headroom while catching loss of the ordinary-source fast path."
+  },
+  {
     "suite": "external-store-fanout",
     "op": "broad_write",
     "target": "octane-tsrx",
@@ -846,6 +1030,14 @@
   {
     "suite": "codegen-size",
     "op": "raw",
+    "target": "component-module-200",
+    "reference": "component-module-100",
+    "maxRatio": 2.1,
+    "note": "Deterministic production output scaling for a module with twice as many memoizable component bodies. Compact collision-free compiler locals measured 2.04x after the fix; the 2.1x ceiling keeps raw intermediate code near linear instead of growing one identifier character per preceding component."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "raw",
     "target": "text-types-inferred",
     "reference": "text-types-explicit",
     "maxRatio": 1.0,
@@ -866,6 +1058,166 @@
     "reference": "text-types-explicit",
     "maxRatio": 1.0,
     "note": "Inferred string children must not exceed the gzipped output of the equivalent explicit-string sentinel."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "raw",
+    "target": "css-modules-client-proven",
+    "reference": "css-modules-client-control",
+    "maxRatio": 0.75,
+    "note": "Proven immutable CSS strings retain an original stylesheet read while removing repeated client class bindings. Both variants use identical source/provider bytes and verify equal CSS and SSR output."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "css-modules-client-proven",
+    "reference": "css-modules-client-control",
+    "maxRatio": 0.84,
+    "note": "The production CSS-module client sentinel must retain a material minified-code reduction with stylesheet ownership preserved."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "css-modules-client-proven",
+    "reference": "css-modules-client-control",
+    "maxRatio": 0.86,
+    "note": "Same-run compressed client bytes guard the CSS proof optimization without depending on a particular Node/zlib version."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "css-modules-client-proven",
+    "reference": "css-modules-client-control",
+    "maxRatio": 0.86,
+    "note": "Same-run Brotli client bytes guard the CSS proof optimization while the stylesheet and public SSR semantics remain equal."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "raw",
+    "target": "css-modules-server-proven",
+    "reference": "css-modules-server-control",
+    "maxRatio": 0.75,
+    "note": "Proven immutable CSS strings remove repeated server class serialization without dropping the stylesheet dependency."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "css-modules-server-proven",
+    "reference": "css-modules-server-control",
+    "maxRatio": 0.84,
+    "note": "The paired production CSS-module server sentinel must retain a material minified-code reduction."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "css-modules-server-proven",
+    "reference": "css-modules-server-control",
+    "maxRatio": 0.96,
+    "note": "Same-run compressed server bytes guard the CSS proof optimization; source, stylesheet, and SSR HTML are identical in the control."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "css-modules-server-proven",
+    "reference": "css-modules-server-control",
+    "maxRatio": 0.96,
+    "note": "Same-run Brotli server bytes retain the CSS proof saving without pinning compressor-specific absolute bytes."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-css-named-client-proven",
+    "reference": "rspack-css-named-client-control",
+    "maxRatio": 0.84,
+    "note": "Real Rspack/CssExtract named-export builds must retain the client CSS-folding benefit; source, emitted CSS, and SSR output are identical."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-css-named-client-proven",
+    "reference": "rspack-css-named-client-control",
+    "maxRatio": 0.88,
+    "note": "Same-run gzip guards actual Rspack graph-proof collection, not only the low-level compiler option."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-css-named-client-proven",
+    "reference": "rspack-css-named-client-control",
+    "maxRatio": 0.9,
+    "note": "The real named-export Rspack adapter must keep a material client Brotli saving with stylesheet ownership intact."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-css-named-server-proven",
+    "reference": "rspack-css-named-server-control",
+    "maxRatio": 0.88,
+    "note": "Named CSS-loader exports must reach production server template folding through the actual Rspack adapter."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-css-named-server-proven",
+    "reference": "rspack-css-named-server-control",
+    "maxRatio": 0.99,
+    "note": "Same-run compressed server bytes retain the measured Rspack named-export saving; full SSR and emitted CSS are checked separately."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-css-named-server-proven",
+    "reference": "rspack-css-named-server-control",
+    "maxRatio": 0.98,
+    "note": "The real Rspack server path must not silently stop folding proven named CSS exports."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-css-default-client-proven",
+    "reference": "rspack-css-default-client-control",
+    "maxRatio": 0.86,
+    "note": "Authenticated immutable default maps must retain a material client-code saving through the Rspack provider callback."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-css-default-client-proven",
+    "reference": "rspack-css-default-client-control",
+    "maxRatio": 0.88,
+    "note": "Same-source immutable-provider Rspack builds guard callback-based client folding with equal CSS and SSR semantics."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-css-default-client-proven",
+    "reference": "rspack-css-default-client-control",
+    "maxRatio": 0.9,
+    "note": "The authenticated-default Rspack client path must keep its compressed-code reduction."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-css-default-server-proven",
+    "reference": "rspack-css-default-server-control",
+    "maxRatio": 0.9,
+    "note": "The actual Rspack server adapter must consume immutable-default provider facts, with the same source and rendered HTML."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-css-default-server-proven",
+    "reference": "rspack-css-default-server-control",
+    "maxRatio": 0.96,
+    "note": "Same-run gzip guards the Rspack immutable-default server saving without pinning compressor-specific absolute bytes."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-css-default-server-proven",
+    "reference": "rspack-css-default-server-control",
+    "maxRatio": 0.96,
+    "note": "Same-run Brotli guards the authenticated-default server path; stylesheet bytes and full SSR checksums must match."
   },
   {
     "suite": "bundle-size",
@@ -1776,6 +2128,14 @@
     "note": "First real native tap after the identical 10,000-row mount. A 21-sample run measured Octane 7.62 ms vs ReactLynx 9.06 ms (0.84x); the guard prevents mount work from moving into the first interaction."
   },
   {
+    "suite": "lynx-render",
+    "op": "drain_ms",
+    "target": "octane-lynx-reentrant-20k",
+    "reference": "octane-lynx-reentrant-10k",
+    "maxRatio": 3.5,
+    "note": "Same-run scaling guard for commits queued synchronously during Element PAPI reentry. Matched 5-sample runs measured the cursor drain at 113.9 / 56.4 = 2.02x; the former front-shift drain measured 249.2 / 56.3 = 4.43x."
+  },
+  {
     "suite": "lynx-bundle-size",
     "op": "bundle_gzip",
     "target": "octane-ifr",
@@ -2621,5 +2981,671 @@
     "reference": "runtime-form",
     "maxRatio": 1.02,
     "note": "Same-run clean tree-shaken application plus Octane runtime: closure-free lowering must stay within 2% gzip of the runtime-form control. No instrumentation contributes to these bytes."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_hideActivityRange",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 1,
+    "note": "One public flush updates 256 retained rows under one hidden Activity. The original runtime scanned its range 256 times; the semantically checked candidate scans once. Keep the boundary walk coalesced per drain."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_rehideActivityAfterDescendantRender",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 1,
+    "note": "The 256 hidden descendant setters share one re-hide pass, not one pass per rendered row. Measured 256 calls before and 1 after; every row's state, visibility, DOM identity and reveal result are verified."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_enforceHiddenDisplay",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 1,
+    "note": "Bounds hidden display enforcement to one visit per affected host: 65,536 calls before, 256 after for 256 rows. This is the deterministic linear-work guard, independent of browser timing."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_stateAttributeWrites",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 1,
+    "minRatio": 1,
+    "note": "All 256 distinct retained state updates must reach their public data-local attributes exactly once. The semantic gate separately checks every row's text/state and the latest reveal."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_styleWrites",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "An already-hidden descendant state batch must not rewrite unchanged display styles. Both Octane and React measured zero style mutations while updating every retained row."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_addedRows",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "Hidden descendant state updates preserve all accepted host rows; the MutationObserver must see no inserted rows. The semantic gate also compares every survivor identity."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_removedRows",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "Hidden descendant state updates must not remove retained host rows. This independent DOM observation prevents a fast remount from masquerading as retained hidden work."
+  },
+  {
+    "suite": "activity",
+    "op": "hide_reveal_styleWrites",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 2,
+    "note": "Eight complete visibility cycles over 256 rows measured 4,096 style writes in both revisions and React. Permit at most one hide and one reveal write per row/cycle, with intermediate visibility and final authored display verified."
+  },
+  {
+    "suite": "activity",
+    "op": "hide_reveal_detachSubtreeRefs",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "This effectful Activity fixture has no refs. The hasRefs gate must keep ref-detachment manifest traversal cold during visibility changes; callback-ref semantics are covered by separate conformance tests."
+  },
+  {
+    "suite": "activity",
+    "op": "hide_reveal_collectVisibleSubtreeRefs",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "A ref-free Activity reveal must not walk subtree ref manifests. The measured candidate performs zero such visits while reconnecting every required layout/passive effect."
+  },
+  {
+    "suite": "activity",
+    "op": "nested_hide_reveal_styleWrites",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 2,
+    "note": "Eight complete visibility cycles over 256 rows measured 4,096 style writes in both revisions and React. Permit at most one hide and one reveal write per row/cycle, with intermediate visibility and final authored display verified."
+  },
+  {
+    "suite": "activity",
+    "op": "nested_hide_reveal_detachSubtreeRefs",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "This effectful Activity fixture has no refs. The hasRefs gate must keep ref-detachment manifest traversal cold during visibility changes; callback-ref semantics are covered by separate conformance tests."
+  },
+  {
+    "suite": "activity",
+    "op": "nested_hide_reveal_collectVisibleSubtreeRefs",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "A ref-free Activity reveal must not walk subtree ref manifests. The measured candidate performs zero such visits while reconnecting every required layout/passive effect."
+  },
+  {
+    "suite": "activity",
+    "op": "hide_reveal_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_burst_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "nested_hide_reveal_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "plain_updates_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "plain_descendant_updates_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "plain_updates_journalForSlot",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "Unchanged keyed membership must not snapshot the chain or key map while updating ordinary row bindings."
+  },
+  {
+    "suite": "activity",
+    "op": "plain_updates_hideActivityRange",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The matched plain-tree control contains no Activity. Its public updates must not enter Activity range hiding; all row state, effects and DOM identities are still verified."
+  },
+  {
+    "suite": "activity",
+    "op": "plain_descendant_updates_hideActivityRange",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The matched plain-tree control contains no Activity. Its public updates must not enter Activity range hiding; all row state, effects and DOM identities are still verified."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_registerActivityRef",
+    "target": "octane-tsrx-refs-cold-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "Before any Activity is rendered, 3,072 ordinary ref replacements through sixteen component layers must not register Activity ownership or scan ancestors. Exact callback attachments/cleanups and live target identities are verified."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_findActivityRefOwners",
+    "target": "octane-tsrx-refs-cold-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "Before any Activity is rendered, 3,072 ordinary ref replacements through sixteen component layers must not register Activity ownership or scan ancestors. Exact callback attachments/cleanups and live target identities are verified."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_registerActivityRef",
+    "target": "octane-tsrx-refs-after-activity-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "After the last Activity unmounts, the optional ref-ownership hook must be cold again. The deep ordinary-tree control measured zero Activity registration/owner searches across 3,072 correct ref replacements."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_findActivityRefOwners",
+    "target": "octane-tsrx-refs-after-activity-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "After the last Activity unmounts, the optional ref-ownership hook must be cold again. The deep ordinary-tree control measured zero Activity registration/owner searches across 3,072 correct ref replacements."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_findActivityRefOwners",
+    "target": "octane-tsrx-refs-live-hidden-activity-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "A separate hidden Activity remains mounted throughout 3,072 ordinary depth-16 ref replacements. Cached negative ownership must avoid repeated ancestor searches; the unrelated hidden root and all ref lifetimes are checked."
+  },
+  {
+    "suite": "activity",
+    "op": "ref_mount_unmount_findActivityRefOwners",
+    "target": "octane-tsrx-refs-live-hidden-activity-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 1,
+    "note": "Fresh ordinary ref-bearing blocks may require one ownership lookup while another root has a live hidden Activity. Eight 256-row mount/unmount cycles measured 2,048 searches for 2,048 new blocks, with balanced ref lifetimes."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-root-static-specialized",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-root-static",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-hooks-state",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-component-owned-effects",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-root-descriptor",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "tsrx-component-graph",
+    "op": "compile",
+    "target": "dependent-first",
+    "reference": "dependency-first",
+    "maxRatio": 1.25,
+    "note": "A 2,400-component live-import chain declared root-first must stay within 25% of the same graph declared leaf-first. Both orders verify every transitive witness and alternate measurement order; whole-module fixed-point rescans were about 2x slower."
+  },
+  {
+    "suite": "tsrx-component-graph",
+    "op": "compile",
+    "target": "warm-dependent-first",
+    "reference": "warm-dependency-first",
+    "maxRatio": 1.08,
+    "note": "A 2,400-component chain ending at an opaque component must stay within 8% of the same graph declared leaf-first. Both orders verify all 2,400 warm plans; whole-module warm-reachability rescans exceeded this ceiling on current main."
+  },
+  {
+    "suite": "tsrx-jsx-return-branches",
+    "op": "client_compile_per_100_components",
+    "target": "eligible-480",
+    "reference": "eligible-120",
+    "maxRatio": 1.5,
+    "note": "Same-process production client compilation with every conditional-return lowering counted. Exact main measured 2.89x per component from 120 to 480 components; one module-scoped use index measured 1.01x."
+  },
+  {
+    "suite": "tsrx-jsx-return-branches",
+    "op": "server_compile_per_100_components",
+    "target": "eligible-480",
+    "reference": "eligible-120",
+    "maxRatio": 1.5,
+    "note": "Same-process production server compilation with every SSR control lowering counted. Exact main measured 3.23x per component from 120 to 480 components; one module-scoped use index measured 0.92x."
+  },
+  {
+    "suite": "tsrx-jsx-return-branches",
+    "op": "bundler_classify",
+    "target": "eligible-480",
+    "reference": "ineligible-480",
+    "maxRatio": 1.5,
+    "note": "Same-sized bundler classification with exact void-export controls. Exact main made the eligible module 5.53x slower than the parse/branch-analysis control; one module-scoped use index measured 1.03x."
+  },
+  {
+    "suite": "text-type-roots",
+    "op": "snapshot",
+    "target": "large-root",
+    "reference": "small-root",
+    "maxRatio": 1.5,
+    "note": "Warm TypeScript text-fact snapshots with 20,002 configured roots must stay within 50% of the identical 34-root control. Both variants return the same string-child evidence and alternate measurement order; rebuilding configured-root membership made the large project about 13x slower."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "stable_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Two 16-row immutable lists receive 32 unrelated visible parent updates. Strong mode must reuse unchanged receiver-method rows, including the fixture with production console logging. Every label and survivor identity is checked."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "insert_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Appending and prepending one row to each of two Strong lists may read only the four inserted rows. Stable keyed survivors have no changed snapshot, method argument, or event capture."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "snapshot_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Replacing one immutable row snapshot in each list may read only those two rows. Both changed labels must update while retaining their keyed DOM nodes."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "argument_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "A changed real method argument reaches all 36 current rows. Full output checks prevent an apparent saving obtained by retaining stale results."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "reorder_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Reversing lists that do not read the item index must preserve order and survivor identity without repeating snapshot receiver calls."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "stable_logs",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "A production diagnostic console.log in a Strong keyed row must not defeat reuse across unrelated parent updates. The externally observed clean fixture still checks every row value and node identity."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "captured_append_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "The control's remove handlers capture the whole rows array, so appending legitimately invalidates survivors. At most 17 reads are needed, and clicking the original remove handler must retain the appended row."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "captured_remove_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Removing the original row after append must preserve all 16 current survivors and their DOM identity, with no duplicate receiver reads."
+  },
+  {
+    "suite": "scheduler-depth",
+    "op": "flush_per_1000_components",
+    "target": "depth-2000",
+    "reference": "depth-500",
+    "maxRatio": 2,
+    "note": "A deepest-first update wave through 2,000 nested components must remain within 2x the per-component cost of the 500-component control. Both targets verify every queued update, the final checksum, and retained leaf DOM identity; repeated full ancestry walks measured about 3.6x."
+  },
+  {
+    "suite": "uibench",
+    "op": "table/[100,4]/render",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.2,
+    "note": "UIbench's largest table mount creates 100 keyed rows with five cells each. Observed 1.38x on the 10-sample introduction run (2026-08-26); the loose ceiling catches a template-clone or row-mount cliff without overfitting a sub-millisecond browser timing."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/render",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.9,
+    "note": "Deep binary mount creates 2,046 keyed nodes across ten recursive levels. Observed 1.21x on the 10-sample introduction run (2026-08-26); this is the mount-path guard with enough same-run headroom for browser noise."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[50,10]/[reverse]",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Reverses 50 keyed containers while preserving their 500 keyed children and every surviving DOM node. Observed 0.88x on the 10-sample introduction run (2026-08-26); the guard protects the common nested-list reorder path."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[500]/[kivi_worst_case]",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.8,
+    "note": "Historical UIbench adversarial case removes both ends and reverses 498 surviving keyed nodes. Observed 0.35x on the 10-sample introduction run (2026-08-26); a move toward 0.8x signals a keyed-reconcile cliff."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[10,10,10,10]/no_change",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.7,
+    "note": "Publishes a fresh but value-identical 11,110-node tree to measure diff/prev-guard overhead. Normal and quick introduction runs ranged from 0.93x to 1.34x (2026-08-26); 1.7x retains noise headroom while guarding the full-tree walk."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/no_change",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.4,
+    "note": "Publishes a fresh but value-identical ten-level binary tree. Observed 0.70x on the 10-sample introduction run and 0.78x quick (2026-08-26); the guard isolates recursive no-change diff cost at a smaller shape."
+  },
+  {
+    "suite": "uibench",
+    "op": "cases",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: both fixtures must pass and publish all 96 desktop cases. Every endpoint is independently serialized against the model before timings are accepted."
+  },
+  {
+    "suite": "uibench",
+    "op": "elements_largest",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the largest endpoint contains exactly 23,331 visible elements in both fixtures; missing work cannot look like a performance win."
+  },
+  {
+    "suite": "uibench",
+    "op": "identity_shared",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: all 32,543 keyed survivors observed across the matrix retain DOM identity in both fixtures. A replacement is a correctness failure before this count is emitted."
+  },
+  {
+    "suite": "uibench",
+    "op": "table/[100,4]/render",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.1,
+    "note": "UIbench's largest table mount creates 100 keyed rows with five cells each. Octane measured 0.59x Solid on the 10-sample Solid introduction run and 0.62x quick (2026-08-26); the ceiling retains broad sub-millisecond noise headroom while catching a mount-path regression."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/render",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 0.9,
+    "note": "Deep binary mount creates 2,046 keyed nodes across ten recursive levels. Octane measured 0.55x Solid on the 10-sample Solid introduction run and 0.54x quick (2026-08-26); this guards recursive mount cost without overfitting either run."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[50,10]/[reverse]",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.2,
+    "note": "Reverses 50 keyed containers while preserving their 500 keyed children and every surviving DOM node. Octane measured 0.65x Solid on the 10-sample Solid introduction run and 0.64x quick (2026-08-26); the loose ceiling protects nested-list reorder performance."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[500]/[kivi_worst_case]",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 0.8,
+    "note": "Historical UIbench adversarial case removes both ends and reverses 498 surviving keyed nodes. Octane measured 0.35x Solid on both Solid introduction runs (2026-08-26); a move toward 0.8x signals a keyed-reconcile cliff."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[10,10,10,10]/no_change",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1,
+    "note": "Publishes a fresh but value-identical 11,110-node tree to compare full-tree prev guards with Solid's keyed store reconciliation. Octane measured 0.56x Solid on the 10-sample introduction run and 0.62x quick (2026-08-26)."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/no_change",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1,
+    "note": "Publishes a fresh but value-identical ten-level binary tree. Octane measured 0.60x Solid on the 10-sample introduction run and 0.66x quick (2026-08-26); the ceiling isolates recursive no-change diff cost at the smaller shape."
+  },
+  {
+    "suite": "uibench",
+    "op": "cases",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: Octane and Solid must pass and publish all 96 desktop cases. Every endpoint is independently serialized against the model before timings are accepted."
+  },
+  {
+    "suite": "uibench",
+    "op": "elements_largest",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the largest endpoint contains exactly 23,331 visible elements in Octane and Solid; missing work cannot look like a performance win."
+  },
+  {
+    "suite": "uibench",
+    "op": "identity_shared",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: all 32,543 keyed survivors observed across the matrix retain DOM identity in Octane and Solid. A replacement is a correctness failure before this count is emitted."
+  },
+  {
+    "suite": "uibench",
+    "op": "table/[100,4]/render",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 2.1,
+    "note": "UIbench's largest table mount creates 100 keyed rows with five cells each. Octane measured 1.36x Preact on both the 10-sample and quick Preact introduction runs (2026-08-26); the ceiling catches a mount-path cliff while retaining broad sub-millisecond noise headroom."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/render",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 1.9,
+    "note": "Deep binary mount creates 2,046 keyed nodes across ten recursive levels. Octane measured 1.24x Preact on the 10-sample introduction run and 1.37x quick (2026-08-26); this is the recursive mount guard with same-run browser-noise headroom."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[50,10]/[reverse]",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 0.8,
+    "note": "Reverses 50 keyed containers while preserving their 500 keyed children and every surviving DOM node. Octane measured 0.22x Preact on the 10-sample introduction run and 0.24x quick (2026-08-26); the ceiling protects the nested-list reorder path."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[500]/[kivi_worst_case]",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 0.6,
+    "note": "Historical UIbench adversarial case removes both ends and reverses 498 surviving keyed nodes. Octane measured 0.17x Preact on the 10-sample introduction run and 0.18x quick (2026-08-26); a move toward 0.6x signals a keyed-reconcile cliff."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[10,10,10,10]/no_change",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 1.5,
+    "note": "Publishes a fresh but value-identical 11,110-node tree while Preact's native queued commit remains inside the timed interval. Octane measured 0.96x Preact on the 10-sample introduction run and 1.04x quick (2026-08-26)."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/no_change",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 1.5,
+    "note": "Publishes a fresh but value-identical ten-level binary tree. Octane measured 0.90x Preact on the 10-sample introduction run and 1.08x quick (2026-08-26); the ceiling isolates recursive no-change diff cost at the smaller shape."
+  },
+  {
+    "suite": "uibench",
+    "op": "cases",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: Octane and Preact must pass and publish all 96 desktop cases. Every endpoint is independently serialized against the model before timings are accepted."
+  },
+  {
+    "suite": "uibench",
+    "op": "elements_largest",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the largest endpoint contains exactly 23,331 visible elements in Octane and Preact; missing work cannot look like a performance win."
+  },
+  {
+    "suite": "uibench",
+    "op": "identity_shared",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: all 32,543 keyed survivors observed across the matrix retain DOM identity in Octane and Preact. A replacement is a correctness failure before this count is emitted."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_stable_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Strong mode is an author assertion of render purity. Stable rows must reuse hook-shaped ordinary functions, local and computed callees, call-produced callees, constructors, tagged templates, and callback-bearing projections without relying on React's hook naming convention."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_insert_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Appending and prepending one Strong row may execute the seven author-asserted pure call shapes only for each inserted snapshot."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_snapshot_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Replacing one immutable Strong row snapshot must execute its seven assumed-pure projections and update that row's retained DOM node."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_argument_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Changing a captured argument must invalidate all 18 Strong rows and execute every assumed-pure call shape, proving the optimization remains conditioned on real inputs."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_reorder_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Reordering index-independent Strong rows must preserve output and DOM identity without repeating any author-asserted pure call shape."
+  },
+  {
+    "suite": "scoped-native-reads",
+    "op": "five_dependency_hit_calls",
+    "target": "current:native",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "An actual compiled component using use() with five stable factory dependencies must reuse its created resource while unrelated props update. Factory calls are counted outside the component AST, and every render checks the visible value."
+  },
+  {
+    "suite": "scoped-native-reads",
+    "op": "five_dependency_miss_calls",
+    "target": "current:native",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Each of 32 changes cycling through all five use() factory dependencies must refresh the resource once and display the new value. This guards generic automatic caching without pinning private compiler helper names."
   }
 ]

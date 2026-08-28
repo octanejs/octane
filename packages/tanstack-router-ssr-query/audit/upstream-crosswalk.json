@@ -39,7 +39,7 @@
   "typeSuite": {
     "disposition": "present",
     "reason": "Upstream test:types compiles the adapter source across TypeScript 5.5–6.0 with no dedicated expectType artifacts. The pristine lane invokes the vendored upstream tsconfig.build.json under typescript55–typescript60 binaries and inventories each compiler result. The adapted lane mirrors the compile with tsrx-tsc (TypeScript 5.9-equivalent); TypeScript 5.5, 5.6, 5.7, 5.8, and 6.0 are explicit adapted-lane incompatibilities because Octane's typecheck toolchain is a single tsrx-tsc version.",
-    "pristineProject": "packages/tanstack-router-ssr-query/upstream/package/tsconfig.build.json",
+    "pristineProject": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json",
     "adaptedProject": "packages/tanstack-router-ssr-query/typetests/adapted/tsconfig.json",
     "pristineCompilers": [
       "typescript55",

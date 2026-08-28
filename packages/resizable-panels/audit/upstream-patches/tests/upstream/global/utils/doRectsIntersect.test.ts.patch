@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/global/utils/doRectsIntersect.test.ts b/tests/upstream/global/utils/doRectsIntersect.test.ts
+--- a/tests/upstream/global/utils/doRectsIntersect.test.ts
++++ b/tests/upstream/global/utils/doRectsIntersect.test.ts
+@@ -1,6 +1,6 @@
+ import { describe, expect, test } from "vitest";
+-import type { Rect } from "../../types";
+-import { doRectsIntersect } from "./doRectsIntersect";
++import type { Rect } from "../../../../src/types";
++import { doRectsIntersect } from "../../../../src/global/utils/doRectsIntersect";
+ 
+ const emptyRect = { x: 0, y: 0, width: 0, height: 0 };
+ const rect = { x: 25, y: 25, width: 50, height: 50 };

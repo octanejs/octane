@@ -96,6 +96,43 @@ describe('production client assets', () => {
 			},
 		});
 	});
+
+	it('preserves route-local CSS order when manifest imports form a cycle', () => {
+		const assets = createClientAssetMap(
+			{
+				'src/Alpha.tsrx': {
+					file: 'assets/Alpha.js',
+					imports: ['_cycle-a.js'],
+				},
+				'src/Beta.tsrx': {
+					file: 'assets/Beta.js',
+					imports: ['_cycle-b.js'],
+				},
+				'_cycle-a.js': {
+					file: 'assets/cycle-a.js',
+					css: ['assets/a.css'],
+					imports: ['_cycle-b.js'],
+				},
+				'_cycle-b.js': {
+					file: 'assets/cycle-b.js',
+					css: ['assets/b.css'],
+					imports: ['_cycle-a.js'],
+				},
+			},
+			['/src/Alpha.tsrx', '/src/Beta.tsrx'],
+		);
+
+		expect(assets).toEqual({
+			'/src/Alpha.tsrx': {
+				js: 'assets/Alpha.js',
+				css: ['assets/a.css', 'assets/b.css'],
+			},
+			'/src/Beta.tsrx': {
+				js: 'assets/Beta.js',
+				css: ['assets/b.css', 'assets/a.css'],
+			},
+		});
+	});
 });
 
 describe('isViteOwnedUrl', () => {
@@ -205,6 +242,44 @@ describe('octane() plugin factory', () => {
 
 			expect(output !== null).toBe(expectsCompilation);
 		}
+	});
+
+	it('forwards immutable CSS-provider facts to the bundled compiler', async () => {
+		const cssId = '/repo/src/panel.module.css';
+		const cssCode = 'export default Object.freeze({root:"_panel_root",label:"_panel_label"});';
+		const cssModule = { id: cssId, code: cssCode, meta: {}, moduleSideEffects: false };
+		const provider = vi.fn(() => ({
+			default: { root: '_panel_root', label: '_panel_label' },
+		}));
+		const [compiler] = octane({ hmr: false, cssModuleConstants: provider });
+		await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+		(compiler.configResolved as (config: unknown) => void)({
+			root: '/repo',
+			command: 'build',
+			build: {},
+			define: {},
+		});
+		const source =
+			'import styles from "./panel.module.css"; ' +
+			'export function Panel() @{ <section class={styles.root}><span class={styles.label}>Ready</span></section> }';
+		const output = await (compiler.transform as any).call(
+			{
+				resolve: async (request: string) =>
+					request === './panel.module.css' ? { id: cssId } : null,
+				load: async () => cssModule,
+				getModuleInfo: (id: string) => (id === cssId ? cssModule : null),
+			},
+			source,
+			'/repo/src/Panel.tsrx',
+		);
+		expect(provider).toHaveBeenCalledWith({
+			id: cssId,
+			code: cssCode,
+			meta: {},
+			environment: 'client',
+		});
+		expect(output.code).toContain('_panel_label');
+		expect(cssModule.moduleSideEffects).toBe(false);
 	});
 
 	it.each([true, false])('forwards strong=%s to the bundled compiler', async (strong) => {

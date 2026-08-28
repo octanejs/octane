@@ -1,4 +1,5 @@
 import type { Ref } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import type { AddSVGProps } from '../types';
 
@@ -9,7 +10,7 @@ interface Point {
 
 export type LineProps = {
 	/** className to apply to line element. */
-	className?: string;
+	className?: Octane.SVGProps<SVGLineElement>['className'];
 	/** reference to line element. */
 	innerRef?: Ref<SVGLineElement>;
 	/** fill color applied to line element. */

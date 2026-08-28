@@ -1,20 +1,27 @@
+import type {
+	MutableRefObject,
+	NativeMouseEvent,
+	OctaneElement,
+	OctaneNode,
+	SVGProps,
+} from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { MouseEvent, MutableRefObject, ReactElement, ReactNode, SVGProps, useRef } from 'octane';
+import { useRef } from 'octane';
 import last from 'es-toolkit/compat/last';
 
 import { clsx } from 'clsx';
 import { interpolate, isNullish, noop } from '../util/DataUtils';
 import { polarToCartesian } from '../util/PolarUtils';
 import { getTooltipNameProp, getValueByDataKey } from '../util/ChartUtils';
-import { Polygon } from '../shape/Polygon';
-import { Layer } from '../container/Layer';
+import { Polygon } from '../shape/Polygon.tsrx';
+import { Layer } from '../container/Layer.tsrx';
 import {
 	CartesianLabelListContextProvider,
 	CartesianLabelListEntry,
 	ImplicitLabelListType,
 	LabelListFromLabelProp,
-} from '../component/LabelList';
-import { Dots } from '../component/Dots';
+} from '../component/LabelList.tsrx';
+import { Dots } from '../component/Dots.tsrx';
 import {
 	ActiveDotType,
 	AnimationDuration,
@@ -27,28 +34,28 @@ import {
 	TooltipType,
 	TrapezoidViewBox,
 } from '../util/types';
-import type { LegendPayload } from '../component/DefaultLegendContent';
-import { ActivePoints } from '../component/ActivePoints';
+import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
+import { ActivePoints } from '../component/ActivePoints.tsrx';
 import { TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
 import { selectRadarPoints } from '../state/selectors/radarSelectors';
 import { useAppSelector } from '../state/hooks';
 import { useIsPanorama } from '../context/PanoramaContext';
 import { SetPolarLegendPayload } from '../state/SetLegendPayload';
-import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId';
+import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import { SetPolarGraphicalItem } from '../state/SetGraphicalItem';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import {
 	AnimatedItems,
 	AnimationInterpolateFn,
 	useAnimationCallbacks,
-} from '../animation/AnimatedItems';
+} from '../animation/AnimatedItems.tsrx';
 import { AnimationMatchByProp, matchAnimationItems, matchByIndex } from '../animation/matchBy';
 import { useAnimationStartSnapshot } from '../animation/useAnimationStartSnapshot';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents';
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { WithIdRequired } from '../util/useUniqueId';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { RechartsScale } from '../util/scale/RechartsScale';
 import { usePolarChartLayout } from '../context/chartLayoutContext';
@@ -130,7 +137,7 @@ interface RadarProps<DataPointType = any, DataValueType = any> extends ZIndexabl
  * - `false`: no dots are drawn;
  * - `true`: renders the dots with default settings;
  * - `object`: the props of the dot. This will be merged with the internal calculated props of each dot;
- * - `ReactElement`: the custom dot element;
+ * - `OctaneElement`: the custom dot element;
  * - `function`: a render function of the custom dot.
  *
  * @defaultValue false
@@ -152,7 +159,7 @@ interface RadarProps<DataPointType = any, DataValueType = any> extends ZIndexabl
  * - `true`: renders default labels;
  * - `false`: no labels are rendered;
  * - `object`: the props of LabelList component;
- * - `ReactElement`: a custom SVG label element, such as `<text>` or `<g>`.
+ * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
  *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
  * - `function`: a render function of custom label.
  *
@@ -172,17 +179,17 @@ interface RadarProps<DataPointType = any, DataValueType = any> extends ZIndexabl
  * The customized event handler of animation start
  */
 	onAnimationStart?: () => void;
-	onMouseEnter?: (props: InternalRadarProps, e: MouseEvent<SVGPolygonElement>) => void;
-	onMouseLeave?: (props: InternalRadarProps, e: MouseEvent<SVGPolygonElement>) => void;
+	onMouseEnter?: (props: InternalRadarProps, e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseLeave?: (props: InternalRadarProps, e: NativeMouseEvent<SVGPathElement>) => void;
 	/**
  * @defaultValue 0
  */
 	radiusAxisId?: string | number;
 	/**
- * If set a ReactElement, the shape of radar can be customized.
+ * If set a OctaneElement, the shape of radar can be customized.
  * If set a function, the function will be called to render customized shape.
  */
-	shape?: ReactElement<SVGElement> | ((props: any) => ReactElement<SVGElement>);
+	shape?: OctaneElement<SVGElement> | ((props: any) => OctaneElement<SVGElement>);
 	tooltipType?: TooltipType;
 	/**
  * @defaultValue 100
@@ -368,7 +375,7 @@ function RadarLabelListProvider({
 }: {
 	showLabels: boolean;
 	points: ReadonlyArray<RadarPoint>;
-	children: ReactNode;
+	children: OctaneNode;
 }) {
 	/*
  * Radar provides a Cartesian label list context. Do we want to also provide a polar label list context?
@@ -433,7 +440,7 @@ function StaticPolygon({
 
 	const { shape, isRange, connectNulls } = props;
 
-	const handleMouseEnter = (e: MouseEvent<SVGPolygonElement>) => {
+	const handleMouseEnter = (e: NativeMouseEvent<SVGPathElement>) => {
 		const { onMouseEnter } = props;
 
 		if (onMouseEnter) {
@@ -441,7 +448,7 @@ function StaticPolygon({
 		}
 	};
 
-	const handleMouseLeave = (e: MouseEvent<SVGPolygonElement>) => {
+	const handleMouseLeave = (e: NativeMouseEvent<SVGPathElement>) => {
 		const { onMouseLeave } = props;
 
 		if (onMouseLeave) {

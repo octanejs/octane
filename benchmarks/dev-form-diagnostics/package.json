@@ -1,0 +1,15 @@
+{
+  "name": "octane-dev-form-diagnostics-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Development-runtime scaling benchmark for controlled-form diagnostics.",
+  "scripts": {
+    "bench": "node run.mjs"
+  },
+  "dependencies": {
+    "jsdom": "catalog:default",
+    "octane": "workspace:*",
+    "vite": "catalog:default"
+  }
+}

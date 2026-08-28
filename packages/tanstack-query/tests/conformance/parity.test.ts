@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { QueryClient, dehydrate } from '@octanejs/tanstack-query';
+import { act } from 'octane';
 import { mount, nextPaint } from '../_helpers';
 import {
 	SuspenseRetryApp,
@@ -50,7 +51,7 @@ describe('suspense error retry loop (clearReset)', () => {
 			return Promise.reject(new Error('boom-' + calls));
 		};
 		const r = mount(SuspenseRetryApp, { client, queryFn });
-		await flush();
+		await act(flush);
 
 		// First failure reaches the boundary.
 		expect(r.find('#sq-msg').textContent).toBe('boom-1');
@@ -58,8 +59,10 @@ describe('suspense error retry loop (clearReset)', () => {
 		// Reset + retry: the refetch fails again — the boundary must re-show the
 		// error. Before the clearReset fix, isReset() stayed true at replay so the
 		// component fell through and rendered undefined data.
-		(r.find('#sq-retry') as HTMLElement).click();
-		await flush();
+		await act(async () => {
+			(r.find('#sq-retry') as HTMLElement).click();
+			await flush();
+		});
 
 		expect(calls).toBeGreaterThanOrEqual(2);
 		expect(r.findAll('#sq-data').length).toBe(0);
@@ -223,8 +226,9 @@ describe('useSuspenseInfiniteQuery', () => {
 			new Promise<string>((res) => setTimeout(() => res('sp' + page), 5));
 		const r = mount(SuspenseInfiniteApp, { client, pageFn });
 		expect(r.findAll('#sinf-loading').length).toBe(1);
-		await flush();
+		await act(flush);
 		expect(r.find('#sinf').textContent).toBe('sp0');
+		expect(r.findAll('#sinf-loading')).toHaveLength(0);
 		r.unmount();
 	});
 });

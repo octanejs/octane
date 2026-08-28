@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "project": "floating-ui-pristine-types",
+  "compiler": "typescript@5.4.2",
+  "files": [
+    {
+      "path": "packages/floating-ui/upstream/packages/react/test/index.test-d.tsx",
+      "sha256": "3ef728075100677da49cc5e7a572ff7c4df4aed58ebbc7b2a9f47af504c2209a",
+      "tsExpectErrorCount": 9,
+      "tsIgnoreCount": 0
+    },
+    {
+      "path": "packages/floating-ui/upstream/packages/react-dom/test/index.test-d.tsx",
+      "sha256": "1e049b30a4e50ba6a1bd8da2243e0f71a5d8405aaccab6fbe524e7fcee230830",
+      "tsExpectErrorCount": 3,
+      "tsIgnoreCount": 0
+    }
+  ]
+}

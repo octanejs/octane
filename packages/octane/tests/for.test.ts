@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
-import { createElement, flushSync, hydrateRoot, use } from '../src/index.js';
+import { createElement, flushSync, hydrateRoot, use, type OctaneNode } from '../src/index.js';
 import { act, mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
 import {
@@ -16,6 +16,7 @@ import {
 	NestedConditionalTransition,
 	PlainCalleeList,
 	KeyedSelectionList,
+	KeyedSelectionProjectionList,
 	KeyedSelectionControlledList,
 	KeyedSelectionRenderableList,
 	KeyedSelectionTransition,
@@ -38,9 +39,36 @@ import {
 	NestedKeyedReorderList,
 	NestedKeyedReorderBoundary,
 	NestedKeyedReorderTransition,
+	HostBindingList,
+	HostMappedBindingList,
 	setExternal,
 	setNestedConditionalActivityMode,
 } from './_fixtures/for.tsrx';
+import {
+	CapturedSnapshotList,
+	StrongAliasedContextRows,
+	StrongCallableDependencies,
+	StrongConstructedResultProp,
+	StrongConstCustomHookContextRows,
+	StrongCustomHookContext,
+	StrongCyclicContextReaders,
+	StrongFactoryReadProp,
+	StrongMapJoinProp,
+	StrongOptionalAliasedContextRows,
+	StrongOptionalNamespaceContextRows,
+	StrongShadowedAssignmentContextRows,
+	StrongSignedZeroConstructedProp,
+	StrongSignedZeroListProjections,
+	StrongSuspenseLayoutEffect,
+	StrongTheme,
+	SnapshotCalculation,
+	SnapshotMethodList,
+	WrappedSnapshotCalculation,
+	type StrongNumberProjectorConstructor,
+	type StrongProjectorConstructor,
+	type SnapshotRow,
+} from './_fixtures/for-strong.tsrx';
+import { SnapshotMappedList } from './_fixtures/for-strong.js';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
 
@@ -205,12 +233,12 @@ describe('forBlock — a plain-callee projection stays reactive to its real inpu
 	});
 });
 
-describe('forBlock — render-time calls defeat the survivor short-circuit', () => {
-	it('a body calling an item method re-runs on every parent render (React parity)', () => {
+describe('forBlock — live methods in compatibility mode', () => {
+	it('keeps live item methods reactive in compatibility mode', () => {
 		// The TanStack Table header pattern: stable item refs whose methods read
 		// mutable state (`header.column.getIsSorted()`). Neither the item ref nor
 		// any dep changes, so a PURE/DEP-PURE skip would freeze the output — the
-		// compiler must classify call-bearing bodies as NORMAL.
+		// compatibility compiler must keep these bodies live.
 		const r = mount(CallBodyList);
 		expect(r.findAll('.cb-row').map((li) => li.textContent)).toEqual(['r1:tick0', 'r2:tick0']);
 
@@ -236,6 +264,501 @@ describe('forBlock — render-time calls defeat the survivor short-circuit', () 
 		]);
 		r.unmount();
 		setExternal('tick0');
+	});
+});
+
+describe('Strong list methods preserve snapshot and event semantics', () => {
+	const row = (id: number, label: string): SnapshotRow => ({
+		id,
+		label,
+		read(prefix) {
+			return prefix + this.label;
+		},
+	});
+
+	it.each([
+		['keyed templates', SnapshotMethodList],
+		['returned JSX', SnapshotMappedList],
+	])('updates snapshots, arguments, and captured callbacks in %s', (_dialect, Component) => {
+		const items = [row(1, 'apple'), row(2, 'banana')];
+		const selected: string[] = [];
+		const onSelect = (item: SnapshotRow) => selected.push('first:' + item.label);
+		const r = mount(Component, { items, prefix: 'old:', onSelect });
+		const original = r.findAll('li');
+		const editor = r.find('input') as HTMLInputElement;
+		editor.value = 'my draft';
+		const text = () => r.findAll('.snapshot-label').map((element) => element.textContent);
+		expect(text()).toEqual(['old:apple', 'old:banana']);
+
+		const appended = [...items, row(3, 'cherry')];
+		r.update(Component, { items: appended, prefix: 'old:', onSelect });
+		expect(text()).toEqual(['old:apple', 'old:banana', 'old:cherry']);
+		expect(r.findAll('li').slice(0, 2)).toEqual(original);
+		expect(r.find('input')).toBe(editor);
+		expect(editor.value).toBe('my draft');
+		r.click('li[data-id="1"] button');
+
+		r.update(Component, { items: appended, prefix: 'new:', onSelect });
+		expect(text()).toEqual(['new:apple', 'new:banana', 'new:cherry']);
+		const latestSelect = (item: SnapshotRow) => selected.push('latest:' + item.label);
+		r.update(Component, { items: appended, prefix: 'new:', onSelect: latestSelect });
+		r.click('li[data-id="1"] button');
+		expect(selected).toEqual(['first:apple', 'latest:apple']);
+
+		const replacement = row(1, 'apricot');
+		const reordered = [appended[2]!, replacement, items[1]!];
+		r.update(Component, { items: reordered, prefix: 'new:', onSelect: latestSelect });
+		expect(text()).toEqual(['new:cherry', 'new:apricot', 'new:banana']);
+		expect(r.findAll('li')[1]).toBe(original[0]);
+		expect(r.findAll('li')[2]).toBe(original[1]);
+		r.click('li[data-id="1"] button');
+		expect(selected).toEqual(['first:apple', 'latest:apple', 'latest:apricot']);
+
+		r.update(Component, { items: [replacement], prefix: 'last:', onSelect: latestSelect });
+		expect(text()).toEqual(['last:apricot']);
+		expect(r.find('li')).toBe(original[0]);
+		r.update(Component, { items: [], prefix: 'last:', onSelect: latestSelect });
+		expect(r.findAll('.snapshot-label')).toHaveLength(0);
+		r.update(Component, { items, prefix: 'restored:', onSelect });
+		expect(text()).toEqual(['restored:apple', 'restored:banana']);
+		r.unmount();
+	});
+
+	it('keeps appended items when an original row removes itself using the captured list', () => {
+		const diagnostic = vi.spyOn(console, 'log').mockImplementation(() => {});
+		const r = mount(CapturedSnapshotList);
+		try {
+			const original = r.findAll('.captured-row');
+			const text = () => r.findAll('.captured-row span').map((element) => element.textContent);
+			r.click('#captured-append');
+			expect(text()).toEqual(['apple', 'banana', 'cherry', 'item 4']);
+			expect(r.findAll('.captured-row').slice(0, 3)).toEqual(original);
+			r.click('.captured-row[data-id="1"] button');
+			expect(text()).toEqual(['banana', 'cherry', 'item 4']);
+
+			r.click('#captured-prepend');
+			r.click('#captured-reverse');
+			expect(text()).toEqual(['item 4', 'cherry', 'banana', 'item 5']);
+			expect(r.findAll('.captured-row')[2]).toBe(original[1]);
+			r.click('.captured-row[data-id="2"] button');
+			expect(text()).toEqual(['item 4', 'cherry', 'item 5']);
+			r.click('#captured-clear');
+			expect(r.find('.captured-empty').textContent).toBe('Empty');
+			r.click('#captured-append');
+			expect(text()).toEqual(['item 6']);
+		} finally {
+			r.unmount();
+			diagnostic.mockRestore();
+		}
+	});
+
+	it.each([
+		['direct methods', SnapshotCalculation],
+		['same-module wrappers', WrappedSnapshotCalculation],
+	])('updates calculations through %s when any input changes', (_shape, Component) => {
+		const first = row(1, 'apple');
+		const formatter = { read: (item: SnapshotRow, prefix: string) => prefix + item.label };
+		const r = mount(Component, { item: first, prefix: 'first:', formatter });
+		expect(r.find('p').textContent).toBe('first:apple');
+		r.update(Component, { item: first, prefix: 'next:', formatter });
+		expect(r.find('p').textContent).toBe('next:apple');
+		const replacement = row(1, 'apricot');
+		r.update(Component, { item: replacement, prefix: 'next:', formatter });
+		expect(r.find('p').textContent).toBe('next:apricot');
+		r.update(Component, {
+			item: replacement,
+			prefix: 'next:',
+			formatter: { read: (item: SnapshotRow) => item.label + '!' },
+		});
+		expect(r.find('p').textContent).toBe('apricot!');
+		r.unmount();
+	});
+
+	it('adopts Strong method rows and preserves edits and current handlers after hydration', () => {
+		const items = [row(1, 'apple'), row(2, 'banana')];
+		const selected: string[] = [];
+		const props = {
+			items,
+			prefix: 'server:',
+			onSelect: (item: SnapshotRow) => selected.push(item.label),
+		};
+		const server = loadServerFixture('packages/octane/tests/_fixtures/for-strong.tsrx', {
+			compileOptions: { hmr: false, dev: false },
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(server.SnapshotMethodList, props).html;
+		const original = Array.from(container.querySelectorAll('li'));
+		const editor = container.querySelector('input')!;
+		editor.value = 'typed before hydration';
+		const root = hydrateRoot(container, SnapshotMethodList, props);
+		flushSync(() => {});
+		expect(Array.from(container.querySelectorAll('li'))).toEqual(original);
+		expect(container.querySelector('input')).toBe(editor);
+		expect(editor.value).toBe('typed before hydration');
+
+		flushSync(() =>
+			root.render(SnapshotMethodList, {
+				...props,
+				items: [row(1, 'apricot'), items[1]!],
+				prefix: 'client:',
+			}),
+		);
+		expect(
+			Array.from(container.querySelectorAll('.snapshot-label')).map((el) => el.textContent),
+		).toEqual(['client:apricot', 'client:banana']);
+		expect(Array.from(container.querySelectorAll('li'))).toEqual(original);
+		(container.querySelector('button') as HTMLButtonElement).click();
+		expect(selected).toEqual(['apricot']);
+		root.unmount();
+		container.remove();
+	});
+});
+
+describe('Strong memoization preserves dependency and setup semantics', () => {
+	it.each([
+		[
+			'member results after a call',
+			StrongMapJoinProp,
+			{ items: ['a', 'b'], project: (value: string) => value.toUpperCase() },
+			'#strong-map-join',
+			'A,B',
+		],
+		[
+			'method results from a factory',
+			StrongFactoryReadProp,
+			{ factory: () => ({ read: (value: string) => `read:${value}` }), value: 'a' },
+			'#strong-factory-read',
+			'read:a',
+		],
+		[
+			'properties of constructed values',
+			StrongConstructedResultProp,
+			{
+				Projector: class {
+					result: string;
+					constructor(value: string) {
+						this.result = `new:${value}`;
+					}
+				} satisfies StrongProjectorConstructor,
+				value: 'a',
+			},
+			'#strong-constructed-result',
+			'new:a',
+		],
+	] as const)(
+		'mounts component props containing %s',
+		(_label, Component, props, selector, value) => {
+			const r = mount(Component as any, props);
+			expect(r.find(selector).textContent).toBe(value);
+			r.unmount();
+		},
+	);
+
+	it('invalidates call helpers and method receivers when their immutable identities change', () => {
+		const make = function (this: { prefix: string }) {
+			const prefix = this.prefix;
+			return (value: string) => prefix + value;
+		};
+		const tag = function (this: { prefix: string }, _strings: TemplateStringsArray, value: string) {
+			return this.prefix + value;
+		};
+		const first = {
+			value: 'value',
+			format: (value: string) => `first:${value}`,
+			tagger: { prefix: 'first:', make },
+			template: { prefix: 'first:', tag },
+		};
+		const second = {
+			value: 'value',
+			format: (value: string) => `second:${value}`,
+			tagger: { prefix: 'second:', make },
+			template: { prefix: 'second:', tag },
+		};
+		const r = mount(StrongCallableDependencies, first);
+		for (const selector of [
+			'#strong-call',
+			'#strong-apply',
+			'#strong-bind',
+			'#strong-produced-callee',
+			'#strong-tag',
+		]) {
+			expect(r.find(selector).textContent).toBe('first:value');
+		}
+
+		r.update(StrongCallableDependencies, second);
+		for (const selector of [
+			'#strong-call',
+			'#strong-apply',
+			'#strong-bind',
+			'#strong-produced-callee',
+			'#strong-tag',
+		]) {
+			expect(r.find(selector).textContent).toBe('second:value');
+		}
+		r.unmount();
+	});
+
+	it.each([
+		[
+			'StrongMapJoinProp',
+			StrongMapJoinProp,
+			{ items: ['a', 'b'], project: (value: string) => value.toUpperCase() },
+			'#strong-map-join',
+			'A,B',
+		],
+		[
+			'StrongFactoryReadProp',
+			StrongFactoryReadProp,
+			{ factory: () => ({ read: (value: string) => `read:${value}` }), value: 'a' },
+			'#strong-factory-read',
+			'read:a',
+		],
+		[
+			'StrongConstructedResultProp',
+			StrongConstructedResultProp,
+			{
+				Projector: class {
+					result: string;
+					constructor(value: string) {
+						this.result = `new:${value}`;
+					}
+				} satisfies StrongProjectorConstructor,
+				value: 'a',
+			},
+			'#strong-constructed-result',
+			'new:a',
+		],
+	] as const)(
+		'hydrates %s component props without replacing the output',
+		(exportName, Component, props, selector, value) => {
+			const server = loadServerFixture('packages/octane/tests/_fixtures/for-strong.tsrx', {
+				compileOptions: { hmr: false, dev: false },
+			});
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = ServerRuntime.renderToString((server as any)[exportName], props).html;
+			const original = container.querySelector(selector);
+			const root = hydrateRoot(container, Component as any, props);
+			flushSync(() => {});
+			expect(container.querySelector(selector)).toBe(original);
+			expect(original?.textContent).toBe(value);
+			root.unmount();
+			container.remove();
+		},
+	);
+
+	it('hydrates and then invalidates changed callable and receiver identities', () => {
+		const make = function (this: { prefix: string }) {
+			const prefix = this.prefix;
+			return (value: string) => prefix + value;
+		};
+		const tag = function (this: { prefix: string }, _strings: TemplateStringsArray, value: string) {
+			return this.prefix + value;
+		};
+		const props = (prefix: string) => ({
+			value: 'value',
+			format: (value: string) => `${prefix}:${value}`,
+			tagger: { prefix: `${prefix}:`, make },
+			template: { prefix: `${prefix}:`, tag },
+		});
+		const first = props('first');
+		const second = props('second');
+		const selectors = [
+			'#strong-call',
+			'#strong-apply',
+			'#strong-bind',
+			'#strong-produced-callee',
+			'#strong-tag',
+		];
+		const server = loadServerFixture('packages/octane/tests/_fixtures/for-strong.tsrx', {
+			compileOptions: { hmr: false, dev: false },
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(
+			server.StrongCallableDependencies,
+			first,
+		).html;
+		const original = selectors.map((selector) => container.querySelector(selector));
+		const root = hydrateRoot(container, StrongCallableDependencies, first);
+		flushSync(() => {});
+		expect(selectors.map((selector) => container.querySelector(selector))).toEqual(original);
+
+		flushSync(() => root.render(StrongCallableDependencies, second));
+		for (const selector of selectors) {
+			expect(container.querySelector(selector)?.textContent).toBe('second:value');
+		}
+		root.unmount();
+		container.remove();
+	});
+
+	it('invalidates a child whose setup custom hook reads context', () => {
+		function ContextHost(props: { value: string }): OctaneNode {
+			return createElement(
+				StrongTheme.Provider,
+				{ value: props.value },
+				createElement(StrongCustomHookContext, { context: StrongTheme }),
+			);
+		}
+		const r = mount(ContextHost, { value: 'first' });
+		expect(r.find('#strong-custom-hook-context').textContent).toBe('first');
+		r.update(ContextHost, { value: 'second' });
+		expect(r.find('#strong-custom-hook-context').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('does not skip an aliased built-in hook in keyed-row setup', () => {
+		const r = mount(StrongAliasedContextRows);
+		expect(r.findAll('.strong-aliased-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		r.click('#strong-aliased-context-update');
+		expect(r.findAll('.strong-aliased-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		r.unmount();
+	});
+
+	it('does not skip a const custom hook in keyed-row setup', () => {
+		const r = mount(StrongConstCustomHookContextRows);
+		expect(r.findAll('.strong-const-hook-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		r.click('#strong-const-hook-context-update');
+		expect(r.findAll('.strong-const-hook-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		r.unmount();
+	});
+
+	it('does not skip an optional aliased built-in hook in keyed-row setup', () => {
+		const r = mount(StrongOptionalAliasedContextRows);
+		expect(r.findAll('.strong-optional-direct-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		expect(r.findAll('.strong-optional-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		expect(r.findAll('.strong-optional-custom-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		expect(
+			r.findAll('.strong-optional-namespace-context-row').map((row) => row.textContent),
+		).toEqual(['first', 'first']);
+		r.click('#strong-optional-context-update');
+		expect(r.findAll('.strong-optional-direct-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		expect(r.findAll('.strong-optional-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		expect(r.findAll('.strong-optional-custom-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		expect(
+			r.findAll('.strong-optional-namespace-context-row').map((row) => row.textContent),
+		).toEqual(['second', 'second']);
+		r.unmount();
+	});
+
+	it('does not skip an optional namespace hook when it is the only keyed-row setup call', () => {
+		const r = mount(StrongOptionalNamespaceContextRows);
+		expect(
+			r.findAll('.strong-optional-namespace-only-context-row').map((row) => row.textContent),
+		).toEqual(['first', 'first']);
+		r.click('#strong-optional-namespace-context-update');
+		expect(
+			r.findAll('.strong-optional-namespace-only-context-row').map((row) => row.textContent),
+		).toEqual(['second', 'second']);
+		r.unmount();
+	});
+
+	it('finds setup hooks through cyclic same-module call graphs independent of declaration order', () => {
+		const r = mount(StrongCyclicContextReaders);
+		expect(r.find('#strong-cycle-reader-a').textContent).toBe('first');
+		expect(r.find('#strong-cycle-reader-c').textContent).toBe('first');
+		r.click('#strong-cycle-context-update');
+		expect(r.find('#strong-cycle-reader-a').textContent).toBe('second');
+		expect(r.find('#strong-cycle-reader-c').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('resolves shadowed assignments by binding when following same-module setup hooks', () => {
+		const r = mount(StrongShadowedAssignmentContextRows);
+		expect(r.find('.strong-shadow-context-row').textContent).toBe('first');
+		r.click('#strong-shadow-context-update');
+		expect(r.find('.strong-shadow-context-row').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('uses SameValue semantics for newly cached constructor inputs', () => {
+		const Projector = class {
+			result: string;
+			constructor(value: number) {
+				this.result = Object.is(value, -0) ? '-0' : '+0';
+			}
+		} satisfies StrongNumberProjectorConstructor;
+		const r = mount(StrongSignedZeroConstructedProp, { Projector, value: 0 });
+		expect(r.find('#strong-signed-zero-constructor').textContent).toBe('+0');
+		r.update(StrongSignedZeroConstructedProp, { Projector, value: -0 });
+		expect(r.find('#strong-signed-zero-constructor').textContent).toBe('-0');
+		r.unmount();
+	});
+
+	it('preserves signed-zero projection inputs through ordinary list caches', () => {
+		const Projector = class {
+			result: string;
+			constructor(value: number) {
+				this.result = Object.is(value, -0) ? '-0' : '+0';
+			}
+		} satisfies StrongNumberProjectorConstructor;
+		const items = [{ id: 1 }];
+		const r = mount(StrongSignedZeroListProjections, { items, Projector, value: 0 });
+		expect(r.find('.strong-signed-zero-list-child').textContent).toBe('+0');
+		expect(r.find('.strong-signed-zero-list-inline').textContent).toBe('+0');
+		r.update(StrongSignedZeroListProjections, { items, Projector, value: -0 });
+		expect(r.find('.strong-signed-zero-list-child').textContent).toBe('-0');
+		expect(r.find('.strong-signed-zero-list-inline').textContent).toBe('-0');
+		r.unmount();
+	});
+
+	it('reconnects cached-child layout effects after a Suspense reveal', async () => {
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const log: string[] = [];
+		let show!: () => void;
+		const r = mount(StrongSuspenseLayoutEffect, {
+			promise,
+			log,
+			bind: (next: () => void) => {
+				show = next;
+			},
+		});
+		await act(() => {});
+		expect(log).toEqual(['create']);
+
+		await act(() => show());
+		expect(r.find('#strong-layout-effect-pending').textContent).toBe('pending');
+		expect(log).toEqual(['create', 'destroy']);
+
+		await act(() => resolve('ready'));
+		expect(r.findAll('#strong-layout-effect-pending')).toHaveLength(0);
+		expect(r.find('#strong-async-child').textContent).toBe('ready');
+		expect(log).toEqual(['create', 'destroy', 'create']);
+		r.unmount();
 	});
 });
 
@@ -515,6 +1038,25 @@ describe('keyed list selection', () => {
 		expect(r.findAll('li.selected')).toHaveLength(0);
 		r.update(KeyedSelectionList, { items: reordered, selected: 0 });
 		expect(r.findAll('li.selected')).toEqual([originalRows[1]]);
+		r.unmount();
+	});
+
+	it('uses SameValue for other captures in a strict-equality selection list', () => {
+		const items = makeRows();
+		const r = mount(KeyedSelectionProjectionList, { items, selected: 1, projection: 0 });
+		expect(r.findAll('li').map((row) => row.getAttribute('data-projection'))).toEqual([
+			'Infinity',
+			'Infinity',
+			'Infinity',
+		]);
+
+		r.update(KeyedSelectionProjectionList, { items, selected: 1, projection: -0 });
+		expect(r.findAll('li').map((row) => row.getAttribute('data-projection'))).toEqual([
+			'-Infinity',
+			'-Infinity',
+			'-Infinity',
+		]);
+		expect(r.find('.selected').textContent).toBe('first');
 		r.unmount();
 	});
 
@@ -1403,5 +1945,179 @@ describe('nested keyed list reordering', () => {
 		r.click('[data-reorder-row="112"] button');
 		expect(picked).toEqual([[1, 112]]);
 		r.unmount();
+	});
+});
+
+describe.each([
+	['@for', HostBindingList],
+	['native map', HostMappedBindingList],
+] as const)('host-row bindings — %s', (_kind, Body) => {
+	function loggedRow(label: string, log: string[], beforeTitleCoercion = () => {}) {
+		const className = ['row', label];
+		const title = {
+			toString() {
+				log.push('coerce-title');
+				beforeTitleCoercion();
+				return label;
+			},
+		};
+		const data = {
+			toString() {
+				log.push('coerce-data');
+				return label;
+			},
+		};
+		return {
+			id: 1,
+			get className() {
+				log.push('class');
+				return className;
+			},
+			get title() {
+				log.push('title');
+				return title as unknown as string;
+			},
+			get data() {
+				log.push('data');
+				return data as unknown as string;
+			},
+			get aria() {
+				log.push('aria');
+				return label;
+			},
+			get hidden() {
+				log.push('hidden');
+				return label === 'second';
+			},
+			get only() {
+				log.push('only');
+				return label;
+			},
+			get mixed() {
+				log.push('mixed');
+				return label;
+			},
+		};
+	}
+	const readAndCoerce = [
+		'class',
+		'title',
+		'coerce-title',
+		'data',
+		'coerce-data',
+		'aria',
+		'hidden',
+		'only',
+		'mixed',
+	];
+
+	it('evaluates bindings once in order and skips coercing unchanged scalar values', () => {
+		const log: string[] = [];
+		const r = mount(Body, { items: [loggedRow('first', log)], version: 0, context: 'inside' });
+		try {
+			const host = r.find('li');
+			expect(log.splice(0)).toEqual(readAndCoerce);
+			const second = loggedRow('second', log);
+			r.update(Body, { items: [second], version: 1, context: 'inside' });
+			expect(log.splice(0)).toEqual(readAndCoerce);
+			expect(r.find('li')).toBe(host);
+			expect(host.className).toBe('row second');
+			expect(host.getAttribute('title')).toBe('second');
+			expect(host.getAttribute('data-value')).toBe('second');
+			expect(host.getAttribute('aria-label')).toBe('second');
+			expect(host.hasAttribute('hidden')).toBe(true);
+			expect(r.find('[data-kind="only"]').textContent).toBe('second');
+			expect(r.find('[data-kind="mixed"]').textContent).toBe('beforesecondafter');
+			r.update(Body, { items: [second], version: 2, context: 'inside' });
+			expect(log).toEqual(['class', 'title', 'data', 'aria', 'hidden', 'only', 'mixed']);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('retries the same scalar value after coercion throws without reading later bindings', () => {
+		const log: string[] = [];
+		const r = mount(Body, { items: [loggedRow('first', log)], version: 0, context: 'inside' });
+		try {
+			log.length = 0;
+			let shouldThrow = true;
+			const second = loggedRow('second', log, () => {
+				if (shouldThrow) throw new Error('title coercion failed');
+			});
+			expect(() => r.update(Body, { items: [second], version: 1, context: 'inside' })).toThrow(
+				'title coercion failed',
+			);
+			expect(log.splice(0)).toEqual(['class', 'title', 'coerce-title']);
+			shouldThrow = false;
+			r.update(Body, { items: [second], version: 2, context: 'inside' });
+			expect(log).toEqual(readAndCoerce);
+			expect(r.find('li').getAttribute('title')).toBe('second');
+			expect(r.find('li').getAttribute('data-value')).toBe('second');
+			expect(r.find('[data-kind="only"]').textContent).toBe('second');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('preserves only-child and mixed-child ownership across primitive and complex updates', () => {
+		const row = { id: 1, className: 'row', title: '', data: '', aria: '', hidden: false };
+		const r = mount(Body, {
+			items: [{ ...row, only: 'first', mixed: 'first' }],
+			version: 0,
+			context: 'initial',
+		});
+		try {
+			const host = r.find('li');
+			const only = r.find('[data-kind="only"]');
+			const mixed = r.find('[data-kind="mixed"]');
+			const onlyText = only.firstChild;
+			const mixedText = Array.from(mixed.childNodes).find(
+				(node) => node.nodeType === Node.TEXT_NODE && node.textContent === 'first',
+			);
+			let version = 0;
+			const update = (content: OctaneNode, text: string, context = 'inside') => {
+				r.update(Body, {
+					items: [{ ...row, only: content, mixed: content }],
+					version: ++version,
+					context,
+				});
+				expect(r.find('li')).toBe(host);
+				expect(r.find('[data-kind="only"]')).toBe(only);
+				expect(r.find('[data-kind="mixed"]')).toBe(mixed);
+				expect(only.textContent).toBe(text);
+				expect(mixed.textContent).toBe(`before${text}after`);
+			};
+			update('second', 'second');
+			expect(only.firstChild).toBe(onlyText);
+			expect(Array.from(mixed.childNodes)).toContain(mixedText);
+			for (const value of [0, -0, false, true, null, undefined, '', NaN]) {
+				update(value, typeof value === 'number' ? String(value) : '');
+			}
+			const clicks: string[] = [];
+			let label = 'function first';
+			const render = () => createElement('button', { onClick: () => clicks.push(label) }, label);
+			update(render, label);
+			const buttons = r.findAll('button');
+			label = 'function second';
+			update(render, label);
+			expect(r.findAll('button')).toEqual(buttons);
+			r.click('[data-kind="only"] button');
+			expect(clicks).toEqual(['function second']);
+			function CurrentContext() {
+				return createElement('b', null, use(FastRowContext));
+			}
+			const descriptor = createElement(CurrentContext, {});
+			update(descriptor, 'context first', 'context first');
+			expect(buttons.every((button) => !button.isConnected)).toBe(true);
+			const consumers = r.findAll('b');
+			update(descriptor, 'context second', 'context second');
+			expect(r.findAll('b')).toEqual(consumers);
+			update([createElement('u', null, 'array'), ' tail'], 'array tail');
+			expect(consumers.every((consumer) => !consumer.isConnected)).toBe(true);
+			update('final', 'final');
+			expect(r.findAll('button, b, u')).toHaveLength(0);
+		} finally {
+			r.unmount();
+		}
 	});
 });

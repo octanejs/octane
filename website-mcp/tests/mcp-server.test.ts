@@ -96,7 +96,7 @@ describe('remote MCP server', () => {
 		expect(diagnostic.error.message).toMatch(/async/);
 	});
 
-	it('octane_bridge_scan flags unsupported APIs with a migration plan', async () => {
+	it('octane_bridge_scan classifies portable rewrites with a migration plan', async () => {
 		const result = await client.callTool({
 			name: 'octane_bridge_scan',
 			arguments: {
@@ -111,7 +111,7 @@ describe('remote MCP server', () => {
 		});
 		const report = JSON.parse(firstText(result));
 		expect(report.classComponents).toBe(true);
-		expect(report.verdict).toBe('needs-rework');
+		expect(report.verdict).toBe('bridgeable-with-rewrites');
 		expect(report.plan.length).toBeGreaterThan(0);
 	});
 

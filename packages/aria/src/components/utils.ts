@@ -37,101 +37,24 @@ interface SlottedValue<T> {
 export type SlottedContextValue<T> = SlottedValue<T> | T | null | undefined;
 export type ContextValue<T, E> = SlottedContextValue<WithRef<T, E>>;
 
-type ProviderValue<T> = [Context<SlottedContextValue<T>>, SlottedContextValue<T>];
-type ProviderValues<A, B, C, D, E, F, G, H, I, J, K, L> =
-	| [ProviderValue<A>]
-	| [ProviderValue<A>, ProviderValue<B>]
-	| [ProviderValue<A>, ProviderValue<B>, ProviderValue<C>]
-	| [ProviderValue<A>, ProviderValue<B>, ProviderValue<C>, ProviderValue<D>]
-	| [ProviderValue<A>, ProviderValue<B>, ProviderValue<C>, ProviderValue<D>, ProviderValue<E>]
-	| [
-			ProviderValue<A>,
-			ProviderValue<B>,
-			ProviderValue<C>,
-			ProviderValue<D>,
-			ProviderValue<E>,
-			ProviderValue<F>,
-	  ]
-	| [
-			ProviderValue<A>,
-			ProviderValue<B>,
-			ProviderValue<C>,
-			ProviderValue<D>,
-			ProviderValue<E>,
-			ProviderValue<F>,
-			ProviderValue<G>,
-	  ]
-	| [
-			ProviderValue<A>,
-			ProviderValue<B>,
-			ProviderValue<C>,
-			ProviderValue<D>,
-			ProviderValue<E>,
-			ProviderValue<F>,
-			ProviderValue<G>,
-			ProviderValue<H>,
-	  ]
-	| [
-			ProviderValue<A>,
-			ProviderValue<B>,
-			ProviderValue<C>,
-			ProviderValue<D>,
-			ProviderValue<E>,
-			ProviderValue<F>,
-			ProviderValue<G>,
-			ProviderValue<H>,
-			ProviderValue<I>,
-	  ]
-	| [
-			ProviderValue<A>,
-			ProviderValue<B>,
-			ProviderValue<C>,
-			ProviderValue<D>,
-			ProviderValue<E>,
-			ProviderValue<F>,
-			ProviderValue<G>,
-			ProviderValue<H>,
-			ProviderValue<I>,
-			ProviderValue<J>,
-	  ]
-	| [
-			ProviderValue<A>,
-			ProviderValue<B>,
-			ProviderValue<C>,
-			ProviderValue<D>,
-			ProviderValue<E>,
-			ProviderValue<F>,
-			ProviderValue<G>,
-			ProviderValue<H>,
-			ProviderValue<I>,
-			ProviderValue<J>,
-			ProviderValue<K>,
-	  ]
-	| [
-			ProviderValue<A>,
-			ProviderValue<B>,
-			ProviderValue<C>,
-			ProviderValue<D>,
-			ProviderValue<E>,
-			ProviderValue<F>,
-			ProviderValue<G>,
-			ProviderValue<H>,
-			ProviderValue<I>,
-			ProviderValue<J>,
-			ProviderValue<K>,
-			ProviderValue<L>,
-	  ];
+type ProviderValue<C extends Context<any>> = readonly [
+	C,
+	C extends Context<infer Value> ? Value : never,
+];
+type ProviderValues<Contexts extends readonly Context<any>[]> = {
+	readonly [Index in keyof Contexts]: ProviderValue<Contexts[Index]>;
+};
 
-interface ProviderProps<A, B, C, D, E, F, G, H, I, J, K, L> {
-	values: ProviderValues<A, B, C, D, E, F, G, H, I, J, K, L>;
+interface ProviderProps<Contexts extends readonly Context<any>[]> {
+	values: ProviderValues<Contexts>;
 	children: ReactNode;
 }
 
 // No hooks (Provider nests plain Context.Provider descriptors), so no slot threading. The
 // descriptor `{ value, children }` shape stays stable per values entry (see aria memory
 // octane-provider-children-shape-flip).
-export function Provider<A, B, C, D, E, F, G, H, I, J, K, L>(
-	props: ProviderProps<A, B, C, D, E, F, G, H, I, J, K, L>,
+export function Provider<const Contexts extends readonly Context<any>[]>(
+	props: ProviderProps<Contexts>,
 ): any {
 	let { values, children } = props;
 	for (let [Context, value] of values) {

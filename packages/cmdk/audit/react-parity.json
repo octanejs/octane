@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "ee4bc14227e7d017e60cb9166ab01ae0dd07a46bd0d3b3b941ebc61072707a08"
+      "lockfileSha256": "5c077d832e5452e1bdafac53ef9691dbc0c5ad6839c5c64352b65c5ae97d1876"
     }
   },
   "lanes": [
@@ -133,22 +133,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
-        },
-        {
-          "path": "packages/cmdk/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "0c781f3a6d214f8820e0761ddd731ee5ddd71fc47d02fb940b7a2bdb0a6963f6"
+          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
         },
         {
           "path": "packages/cmdk/audit/test-classifications.json",
           "role": "support",
           "sha256": "abde0a3a3569ea7c8ff839a92dd206f558a7bb6d6d2d7caadb3e208b543a60e7"
-        },
-        {
-          "path": "packages/cmdk/scripts/check-upstream-ledger.mjs",
-          "role": "support",
-          "sha256": "7e4c48854cbc8b9a67e5859fc414a71c08e3fa4e429efe9e058f2f96115f1ab7"
         },
         {
           "path": "scripts/react-parity/cmdk-controls.test.mjs",
@@ -179,6 +169,11 @@
           "path": "packages/cmdk/src/hooks.tsrx",
           "role": "support",
           "sha256": "c57f03964c409294fc18d2e027544526016eb58198a30963f9fcfc1d897d4e75"
+        },
+        {
+          "path": "packages/cmdk/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "60c744f3e15819f932bb58b6eda4c1e32f4eac788f1dd39b5676d77e3ffdae53"
         }
       ]
     },

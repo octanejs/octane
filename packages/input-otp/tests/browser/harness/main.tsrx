@@ -81,6 +81,21 @@ function NoPasswordManagerPush(_props: {}) @{
 	</OTPInput>
 }
 
+function PwmSpace(_props: {}) @{
+	<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 40 }}>
+		<div data-testid="roomy" style={{ width: 'fit-content' }}>
+			<OTPInput maxLength={6}>
+				<Slots />
+			</OTPInput>
+		</div>
+		<div data-testid="tight" style={{ width: 'fit-content', overflowX: 'auto', padding: 8 }}>
+			<OTPInput maxLength={6}>
+				<Slots />
+			</OTPInput>
+		</div>
+	</div>
+}
+
 function App(_props: {}) @{
 	const path = window.location.pathname;
 	<main data-ready="true" style={{ width: 240 }}>
@@ -94,6 +109,8 @@ function App(_props: {}) @{
 			<PasteTransform />
 		} @else if (path === '/password-manager-none') {
 			<NoPasswordManagerPush />
+		} @else if (path === '/pwm-space') {
+			<PwmSpace />
 		} @else {
 			<Base />
 		}

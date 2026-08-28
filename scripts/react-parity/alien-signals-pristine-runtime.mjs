@@ -16,7 +16,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
-import { verifyAlienSignalsUpstream } from '../../packages/alien-signals/scripts/verify-upstream.mjs';
+import { verifyMaterializedUpstreamEvidence } from './materialized-upstream-lib.mjs';
 
 const packageRoot = resolve(
 	dirname(fileURLToPath(import.meta.url)),
@@ -147,7 +147,7 @@ export function inventoryFromIdentities(identities, project = 'alien-signals-pri
 }
 
 export function runPristineUpstreamSuite({ repoRoot = resolve(packageRoot, '../..') } = {}) {
-	verifyAlienSignalsUpstream(packageRoot);
+	verifyMaterializedUpstreamEvidence(resolve(packageRoot, '../..'), 'packages/alien-signals');
 	const oracleEnvironment = assertPristineOracleEnvironment();
 	const runRoot = mkdtempSync(join(tmpdir(), 'octane-alien-signals-pristine-'));
 	try {

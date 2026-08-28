@@ -55,15 +55,21 @@ Source maps, module layers, compiler metadata, and watched package manifests
 are preserved in both modes. Worker startup has a fixed cost, so very small
 builds may be faster with `parallel: false`.
 
-Set `strong: true` to reject state updates during rendering, state updates from
-effects, and ref writes during rendering in your application code:
+Set `strong: true` to opt application code into Strong mode's immutable
+render-snapshot and pure-render contract. The compiler rejects detectable state,
+ref, Effect Event, snapshot-mutation, and nondeterministic-render violations;
+production client builds condition memoization on the author's assertion that
+every user-authored render operation is pure for its witnessed inputs. Callee
+shape and `use*` spelling do not disable that optimization:
 
 ```js
 new OctaneRspackPlugin({ strong: true });
 ```
 
-Dependencies keep their existing behavior. Any module can opt in on its own by
-putting `"use strong"` before its imports.
+Dependencies keep their existing compatibility behavior. Any module can opt in
+on its own by putting `"use strong"` before its imports. Strong analysis is
+bounded: unknown calls are assumed pure, so live accessors must remain in a
+compatibility-mode consumer or receive an actual snapshot.
 
 The experimental `renderers` option accepts the same declarative registry,
 filename rules, and module/export boundary metadata as `compiler.renderers` in
@@ -83,8 +89,20 @@ new OctaneRspackPlugin({
 });
 ```
 
-Options remain serializable data—there are no renderer callbacks—so the same
+Renderer options remain serializable data—there are no renderer callbacks—so the same
 configuration is safe to reuse across compiler environments and caches.
+
+For one-shot production builds, the experimental class-plugin option
+`cssModuleConstants: true` folds proven named-string exports from JavaScript
+CSS-module providers such as `css-loader` with CSS extraction. An immutable CSS
+provider can instead supply a `cssModuleConstants(module)` callback. It runs on
+the main thread and its facts are checked against the exact completed loader
+source. Ordinary mutable default maps and native `css/module` are left alone.
+Eligible consumers are compiled once more and are not stored in the persistent
+module cache; other modules keep normal caching. The option is disabled by
+default and does not change development, HMR, or watch output. See
+[CSS-module constants](../../docs/compiler-css-module-constants.md) for the
+provider contract and stylesheet-ownership rules.
 
 Rspack layers can compile the same authored module against distinct universal
 renderer graphs. Configure the background graph at the top level, then key

@@ -19,6 +19,7 @@ import {
 	textTypeSourceVersion,
 } from './text-type-facts.js';
 import { compileToVolarMappings } from './volar.js';
+export { validateNativeSignalNames } from './native-read-types.js';
 
 /** @typedef {import('typescript').SourceFile} SourceFile */
 /** @typedef {import('typescript').Program} Program */
@@ -266,6 +267,7 @@ export function createTextTypeProject(options) {
 	let generation = 0;
 	let disposed = false;
 	let config = null;
+	let rootFileNames = null;
 	let service = null;
 	let language = null;
 	let scriptRegistry = null;
@@ -333,9 +335,11 @@ export function createTextTypeProject(options) {
 				errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, '\n')).join('\n'),
 			);
 		}
+		const fileNames = parsed.fileNames.map(normalize);
 		config = {
 			...parsed,
-			fileNames: parsed.fileNames.map(normalize),
+			fileNames,
+			fileNameSet: new Set(fileNames),
 			options: {
 				...parsed.options,
 				jsx: parsed.options.jsx ?? ts.JsxEmit.Preserve,
@@ -349,7 +353,12 @@ export function createTextTypeProject(options) {
 		return config;
 	};
 
-	const roots = () => [...new Set([...loadConfig().fileNames, ...extraRoots])].sort();
+	const roots = () => {
+		if (rootFileNames === null) {
+			rootFileNames = [...new Set([...loadConfig().fileNames, ...extraRoots])].sort();
+		}
+		return rootFileNames;
+	};
 	const clearProofs = () => {
 		factsCache.clear();
 		analyses.clear();
@@ -510,8 +519,9 @@ export function createTextTypeProject(options) {
 		}
 		if (record === undefined)
 			throw new Error(`Cannot read text type source ${JSON.stringify(file)}.`);
-		if (!loadConfig().fileNames.includes(file) && !extraRoots.has(file)) {
+		if (!loadConfig().fileNameSet.has(file) && !extraRoots.has(file)) {
 			extraRoots.add(file);
+			rootFileNames = null;
 			changed(file);
 		}
 		const program = ensureService().getProgram();
@@ -595,6 +605,7 @@ export function createTextTypeProject(options) {
 		// Recreate Volar's host so changed module-resolution options cannot reuse a
 		// cache created for the previous configuration.
 		config = null;
+		rootFileNames = null;
 		disposeService();
 	};
 
@@ -607,6 +618,7 @@ export function createTextTypeProject(options) {
 		virtualSources.clear();
 		extraRoots.clear();
 		config = null;
+		rootFileNames = null;
 	};
 
 	loadConfig();

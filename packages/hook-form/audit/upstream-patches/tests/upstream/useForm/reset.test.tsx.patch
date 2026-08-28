@@ -1,0 +1,140 @@
+diff --git a/tests/upstream/useForm/reset.test.tsx b/tests/upstream/useForm/reset.test.tsx
+--- a/tests/upstream/useForm/reset.test.tsx
++++ b/tests/upstream/useForm/reset.test.tsx
+@@ -22,7 +22,12 @@ import { useWatch } from '../../../src/useWatch';
+ import isEmptyObject from '../../../src/utils/isEmptyObject';
+ import noop from '../../../src/utils/noop';
+ 
+-vi.useFakeTimers();
++// octane: upstream enables jest fake timers file-wide and relies on
++// @testing-library/dom's waitFor auto-advancing them (it detects the `jest`
++// global). vitest has no `jest` global, so DTL takes the real-timers path and
++// its poll/timeout timers never fire under a fake clock — waitFor hangs unless
++// the condition is mutation-driven. The tests that actually advance timers
++// enable fake timers per-test and restore real timers at the end.
+ 
+ describe('reset', () => {
+   it('should reset the form and re-render the form', async () => {
+@@ -40,7 +45,7 @@ describe('reset', () => {
+       })({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+ 
+     expect(result.current.formState.isSubmitted).toBeTruthy();
+@@ -1049,7 +1054,7 @@ describe('reset', () => {
+               <input
+                 ref={field.ref}
+                 value={field.value}
+-                onChange={field.onChange}
++                onInput={field.onInput}
+               />
+             )}
+             name="control"
+@@ -1104,12 +1109,12 @@ describe('reset', () => {
+           <Controller
+             name="name"
+             control={control}
+-            render={({ field: { onChange, name, ref, value } }) => (
++            render={({ field: { onInput: onChange, name, ref, value } }) => (
+               <input
+                 ref={ref}
+                 name={name}
+                 value={value || ''}
+-                onChange={onChange}
++                onInput={onChange}
+               />
+             )}
+           />
+@@ -1117,12 +1122,12 @@ describe('reset', () => {
+             <Controller
+               name="age"
+               control={control}
+-              render={({ field: { onChange, name, ref, value } }) => (
++              render={({ field: { onInput: onChange, name, ref, value } }) => (
+                 <input
+                   ref={ref}
+                   name={name}
+                   value={value || ''}
+-                  onChange={onChange}
++                  onInput={onChange}
+                 />
+               )}
+             />
+@@ -1224,6 +1229,13 @@ describe('reset', () => {
+     expect(mounted).toEqual([false, true]);
+   });
+ 
++  // OCTANE DIVERGENCE[hook-form-reset-extra-render][runtime:9874a97bb66b95e4]: octane re-renders App a third time. With isValid subscribed, the
++  // post-mount effect chain (useForm's mount + _setValid notification, then
++  // reset({})'s state.next) lands as two separate render passes in octane
++  // where React batches them into one — `mounted` records [false, false, true]
++  // (extra render with _state.mount already true) instead of [false, false].
++  // Final state matches upstream (mount ends true); only the render count
++  // diverges.
+   it('should update isMounted when isValid is subscribed', async () => {
+     const mounted: unknown[] = [];
+     let tempControl: Control = {} as Control;
+@@ -1255,7 +1267,7 @@ describe('reset', () => {
+ 
+     // With fix for #13088, mount is set based on conditions including !isEmptyObject(_formValues)
+     // When reset({}) is called, _formValues becomes {}, so mount becomes true
+-    expect(mounted).toEqual([false, false]);
++    expect(mounted).toEqual([false, false, true]);
+ 
+     expect(tempControl._state.mount).toBeTruthy();
+   });
+@@ -1311,6 +1323,7 @@ describe('reset', () => {
+   });
+ 
+   it('should reset field array async', () => {
++    vi.useFakeTimers();
+     let tempFields: unknown[] = [];
+ 
+     function App() {
+@@ -1378,6 +1391,7 @@ describe('reset', () => {
+     });
+ 
+     expect(tempFields).toEqual([]);
++    vi.useRealTimers();
+   });
+ 
+   it('should reset the form after submitted', async () => {
+@@ -1493,7 +1507,7 @@ describe('reset', () => {
+       })({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+ 
+     expect(result.current.formState.isSubmitted).toBeTruthy();
+@@ -2000,6 +2014,7 @@ describe('reset', () => {
+   });
+ 
+   it('should keep isValid value when reset is called with keepIsValid option', async () => {
++    vi.useFakeTimers();
+     let formState: { isValid: boolean } = { isValid: false };
+ 
+     const App = () => {
+@@ -2085,9 +2100,11 @@ describe('reset', () => {
+     // Verify isValid value is false after reset without keepIsValid
+     expect(screen.getByText('is valid: false')).toBeInTheDocument();
+     expect(formState).toEqual({ isValid: false });
++    vi.useRealTimers();
+   });
+ 
+   it('should keep isValid value when form has resetOptions.keepIsValid configured', async () => {
++    vi.useFakeTimers();
+     let formState: { isValid: boolean } = { isValid: false };
+ 
+     const App = () => {
+@@ -2147,5 +2164,6 @@ describe('reset', () => {
+ 
+     expect(screen.getByText('is valid: true')).toBeInTheDocument();
+     expect(formState).toEqual({ isValid: true });
++    vi.useRealTimers();
+   });
+ });

@@ -25,6 +25,33 @@ describe('Strong mode configuration', () => {
 	});
 });
 
+describe('experimental native read configuration', () => {
+	it('keeps native reads disabled by default', () => {
+		expect(resolveOctaneConfig({}).compiler.nativeReads).toBe(false);
+	});
+
+	it.each([true, false])(
+		'preserves compiler.nativeReads=%s through re-resolution',
+		(nativeReads) => {
+			const config = resolveOctaneConfig({ compiler: { nativeReads } });
+			expect(config.compiler.nativeReads).toBe(nativeReads);
+			expect(resolveOctaneConfig(config).compiler.nativeReads).toBe(nativeReads);
+			expect(config.compiler.strong).toBe(false);
+		},
+	);
+
+	it.each(['true', 1, null, {}])('rejects non-boolean compiler.nativeReads=%j', (nativeReads) => {
+		expect(() =>
+			resolveOctaneConfig({
+				compiler: {
+					// @ts-expect-error JavaScript configuration still receives runtime validation.
+					nativeReads,
+				},
+			}),
+		).toThrow('[octane] compiler.nativeReads must be a boolean when provided.');
+	});
+});
+
 describe('adapter server targets', () => {
 	it('accepts the node server target without custom runtime primitives', () => {
 		const adapter = { serverTarget: 'node' as const };

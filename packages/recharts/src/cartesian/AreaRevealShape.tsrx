@@ -1,9 +1,10 @@
+import type { OctaneElement } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
 import { isNumber } from '../util/DataUtils';
-import { Curve, BaseLineType, Props as CurveProps } from '../shape/Curve';
+import { Curve, BaseLineType, Props as CurveProps } from '../shape/Curve.tsrx';
 import { CartesianLayout, LayoutType, ShapeAnimationProps } from '../util/types';
 import { isWellBehavedNumber } from '../util/isWellBehavedNumber';
-import { Layer } from '../container/Layer';
+import { Layer } from '../container/Layer.tsrx';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import { useId } from '../util/useId';
 
@@ -118,7 +119,7 @@ export type AreaRevealShapeProps =
  *
  * @since 3.9
  */
-export function AreaRevealShape(props: AreaRevealShapeProps): React.ReactElement | null {
+export function AreaRevealShape(props: AreaRevealShapeProps): OctaneElement | null {
 	const {
 		animationElapsedTime = 1,
 		isAnimating = false,

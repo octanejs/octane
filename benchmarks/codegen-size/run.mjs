@@ -22,6 +22,8 @@ import { gzipSync, constants as zc } from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { measureCssModules } from './css-modules.mjs';
+import { measureRspackCssModules } from './rspack-css-modules.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '../..');
@@ -79,7 +81,7 @@ for (const rel of CORPUS) {
 
 const val = (bytes) => ({ median: bytes, min: bytes, samples: 1 });
 
-function compiledSize(source, filename, options = {}) {
+function compiledSize(source, filename, options = {}, validate = null) {
 	const { code } = compile(source, filename, {
 		mode: 'client',
 		hmr: false,
@@ -87,11 +89,41 @@ function compiledSize(source, filename, options = {}) {
 		...options,
 	});
 	const min = transformSync(code, { loader: 'js', minify: true }).code;
+	validate?.(code, min);
 	return {
 		raw: val(code.length),
 		minified: val(min.length),
 		gzip: val(gz(min)),
 	};
+}
+
+function componentModuleSource(count) {
+	return Array.from({ length: count }, (_, index) => {
+		const output = index === 0 ? '<span>leaf</span>' : `<Component${index - 1} />`;
+		return `export function Component${index}() @{ ${output} }`;
+	}).join('\n');
+}
+
+function componentModuleSize(count) {
+	return compiledSize(
+		componentModuleSource(count),
+		path.join(REPO, `benchmarks/codegen-size/component-module-${count}.tsrx`),
+		{},
+		(code) => {
+			const exports = code.match(/export const Component\d+\s*=/g)?.length ?? 0;
+			if (exports !== count) {
+				throw new Error(`component-module-${count} emitted ${exports}/${count} exports`);
+			}
+			const expectedRegions = count - 1;
+			const caches = code.match(/let __memoCache[\w$]* =/g)?.length ?? 0;
+			const commits = code.match(/const __memoCommitted[\w$]* =/g)?.length ?? 0;
+			if (caches !== expectedRegions || commits !== expectedRegions) {
+				throw new Error(
+					`component-module-${count} emitted ${caches}/${commits}/${expectedRegions} cache/commit/expected memo regions`,
+				);
+			}
+		},
+	);
 }
 
 // Keep the diagnostic sentinel OUT of the long-lived source/compiled aggregate:
@@ -112,6 +144,8 @@ for (const op of ['raw', 'minified', 'gzip']) {
 		);
 	}
 }
+const componentModule100 = componentModuleSize(100);
+const componentModule200 = componentModuleSize(200);
 
 // Keep the opt-in TypeScript sentinel separate from the fixed corpus. Its
 // reference spells out the same text guarantees with explicit `as string`
@@ -217,6 +251,14 @@ try {
 	textTypeProject.dispose();
 }
 
+// Paired sentinels keep new optimization claims out of the fixed corpus. The
+// CSS control and candidate use identical source/provider bytes and verify both
+// the emitted stylesheet and public SSR output before reporting their sizes.
+const cssModules = await measureCssModules();
+// The real adapter must keep producing the proven input. A low-level compiler
+// sentinel alone would stay green if graph proof collection became a no-op.
+const rspackCssModules = await measureRspackCssModules();
+
 const payload = {
 	suite: 'codegen-size',
 	iterations: 1,
@@ -229,9 +271,21 @@ const payload = {
 		},
 		{ name: 'native-change-control', ops: diagnosticControl },
 		{ name: 'native-change-diagnostic', ops: diagnostic },
+		{
+			name: 'component-module-100',
+			ops: componentModule100,
+			meta: { components: 100 },
+		},
+		{
+			name: 'component-module-200',
+			ops: componentModule200,
+			meta: { components: 200 },
+		},
 		{ name: 'text-types-syntax', ops: textTypes.syntax },
 		{ name: 'text-types-explicit', ops: textTypes.explicit, meta: textTypes.meta },
 		{ name: 'text-types-inferred', ops: textTypes.inferred, meta: textTypes.meta },
+		...cssModules.targets,
+		...rspackCssModules.targets,
 	],
 };
 
@@ -244,8 +298,27 @@ console.log(
 	`native-change production sentinel  raw ${diagnostic.raw.median}  min ${diagnostic.minified.median}  gz ${diagnostic.gzip.median}`,
 );
 console.log(
+	`component modules  100 raw ${componentModule100.raw.median}  200 raw ${componentModule200.raw.median}  scaling ${(componentModule200.raw.median / componentModule100.raw.median).toFixed(2)}x`,
+);
+console.log(
 	`TypeScript text sentinel  inferred ${textTypes.inferred.raw.median}/${textTypes.inferred.minified.median}/${textTypes.inferred.gzip.median}  explicit ${textTypes.explicit.raw.median}/${textTypes.explicit.minified.median}/${textTypes.explicit.gzip.median}  syntax ${textTypes.syntax.raw.median}/${textTypes.syntax.minified.median}/${textTypes.syntax.gzip.median}`,
 );
+for (const mode of ['client', 'server']) {
+	const control = cssModules.summary.modes[`${mode}-control`];
+	const proven = cssModules.summary.modes[`${mode}-proven`];
+	console.log(
+		`CSS-module ${mode} sentinel  min ${control.minified} -> ${proven.minified}  gz ${control.gzip} -> ${proven.gzip}  br ${control.brotli} -> ${proven.brotli}`,
+	);
+}
+
+for (const lane of ['named', 'default']) {
+	for (const mode of ['client', 'server']) {
+		const { control, proven } = rspackCssModules.summary.lanes[lane].modes[mode];
+		console.log(
+			`Rspack CSS-module ${lane} ${mode} sentinel  min ${control.minified} -> ${proven.minified}  gz ${control.gzip} -> ${proven.gzip}  br ${control.brotli} -> ${proven.brotli}`,
+		);
+	}
+}
 
 if (process.env.BENCH_JSON) {
 	fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');

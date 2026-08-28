@@ -14,6 +14,7 @@ import { renderToString as reactRenderToString, renderToPipeableStream } from 'r
 import { PassThrough } from 'node:stream';
 import { join } from 'node:path';
 import { OctaneCompat } from 'octane/react';
+import { act as octaneAct } from 'octane';
 import { OctaneCompat as OctaneCompatServer } from 'octane/react/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import { createLog } from '../_helpers.js';
@@ -256,9 +257,11 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		const mounted = await hydratePage(serverPage, clientPage);
 		expect(mounted.serverHtml).toContain('local pending');
 
-		await reactAct(async () => {
-			clientResource.resolve('client-data');
-			await clientResource.promise;
+		await octaneAct(async () => {
+			await reactAct(async () => {
+				clientResource.resolve('client-data');
+				await clientResource.promise;
+			});
 		});
 		expect(mounted.host().querySelector('.ssr-inner')?.textContent).toBe('value:client-data');
 		await mounted.unmount();

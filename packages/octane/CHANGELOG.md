@@ -1,5 +1,192 @@
 # octane
 
+## 0.1.49
+
+### Patch Changes
+
+- 8adc693: Add an opt-in experimental scoped signal engine backed by Alien Signals 3.2.0, with owned async resources, retained values, ready-state adoption, and native compiler read tracking. Expose the `nativeReads` compiler option through the application and bundler integrations while preserving explicit hook dependency arrays and the external Alien Signals binding.
+
+  The experiment is not a stable API or a release recommendation. Local derived and async hooks remain deferred, and the accompanying evidence distinguishes supplemental compiler, runtime, and browser checks from the acceptance gates for the locked workspace.
+
+  Expose native read ownership and cached activity metadata through the existing DevTools inspector without evaluating signals or retaining a global graph registry. Match the private compiler ABI's CommonJS entry points to the public runtime so native SSR reads use one protocol instance.
+
+  Collect native reads around actual component invocation, including parameter defaults and indirect returns. Track and replay native reads in inferred memos, preserve deferred element inspection and rendering, and revoke live retained results when a contributing data owner retires. Keep held Suspense output, refs, effects, and native subscriptions together until replacement work is accepted.
+
+  Avoid duplicate native collection setup when invocation collection already owns the scope, while preserving independent child retirement, observer restoration, write guards, and stored-value witness replay.
+
+  Preserve nested Suspense ref lifetimes, finish caught deletion cleanup before replacement effects connect, and reveal the latest urgent state when it supersedes every held state update. Register native compiler and server hook diagnostics in the production error catalog and CLI explanations.
+
+- a51c8c6: Skip native text-change diagnostic AST analysis when authored TSRX cannot contain an input or textarea host.
+
+## 0.1.48
+
+### Patch Changes
+
+- 3ca30fc: Cache configured root membership and the sorted language-service root list in TypeScript-backed text inference so repeated warm snapshots no longer scale with unrelated project roots, and expose the regression benchmark through the MCP benchmark runner.
+- efdc8cb: Index component references once when compiling component-heavy modules.
+
+  Component declaration lowering now preserves the same client and server hoisting
+  semantics without repeatedly sanitizing and scanning every growing source prefix.
+
+- 922df8c: Skip manifest-cache scans for ordinary watched source changes while preserving package-manifest, full-reset, and diagnostic invalidation behavior. Expose the accompanying manifest-cache invalidation benchmark through the Octane MCP benchmark tool.
+- 8a8afd8: Cache shared ancestry while ordering batched component updates so deeply nested render waves do not repeatedly walk the same parent chains.
+
+  Expose the scheduler-depth benchmark through the Octane MCP benchmark tool.
+
+- 37a8ca1: Index conditional JSX return value uses once per module so component-heavy
+  TSRX modules no longer repeat a full AST scan for every component.
+- c84edbb: Propagate same-module fetch-tree warm reachability through reverse component
+  edges instead of repeatedly rescanning every component. Deep TSrX component
+  graphs now compile without a declaration-order-dependent fixed-point penalty
+  while preserving opaque descendants, prop ownership, and synchronous cycles.
+- d5175ca: Keep virtual TypeScript generation working for computed object methods and create deferred FocusScope autofocus events in the scope element's DOM realm.
+- 4a4996e: Treat `"use strong"` as an author assertion that every user-authored render call
+  is a pure projection of immutable snapshots and witnessed inputs. Condition
+  local, dynamic, ordinary hook-shaped, callback-bearing, constructed, and tagged
+  call shapes without React hook-name heuristics, while preserving compiler-proven
+  hook setup, compatibility-mode live receivers, and changing event captures.
+  Witness callable and receiver identities alongside explicit inputs, compare
+  memoized component and ordinary-list projection inputs with `Object.is`, and
+  preserve optional, aliased, cyclic, function-valued, or lexically shadowed
+  setup-hook paths. Add
+  bounded diagnostics for detectable state-snapshot mutations, cross-row writes
+  from retained keyed scopes, and impure clock or random reads, and document the
+  assumptions the production memoizer trusts.
+
+  Expose the template-call memoization benchmark through the Octane MCP benchmark
+  tool.
+
+## 0.1.47
+
+### Patch Changes
+
+- af0d999: Drain queued behavior-root interactions with amortized cursor compaction and
+  constant-time pending-adoption bookkeeping so late modules and separately
+  settling async adoptions stay linear while preserving FIFO and reentrant delivery.
+  Expose the accompanying browser benchmark through the Octane MCP benchmark tool.
+- c800a1f: Allow nested TSRX `@{ ... }` child blocks to contain setup statements, hooks,
+  and no rendered JSX. Setup-bearing blocks now compile as scoped child render
+  bodies in client, server, and hydration output, while render-only blocks remain
+  transparent grouping.
+- c1bb057: Keep compiler-generated local names compact in production modules with many components, reducing compile work and intermediate output size.
+- 97b9349: Skip unrelated sibling boundaries when pruning completed streaming SSR segments.
+- 4393bea: Speed up production TSrX compilation for deep same-module component graphs by propagating automatic-memoization witnesses incrementally.
+- 7dfef16: Speed up pure-host keyed-list upgrades and compiler queue walks while preserving adopted keyed nodes across suspended upgrade retries.
+- 7e62361: Speed up development commits with many controlled form hosts by keeping diagnostic queue deduplication linear.
+- 964783a: Keep development TSRX HTML-nesting diagnostics linear by deduplicating them with
+  one identity set per compiled render plan instead of rescanning and serializing
+  every diagnostic already collected for each new authored site.
+- d3dbd78: Skip sorting normalized client and server host props when no later raw alias changes their insertion order.
+
+## 0.1.46
+
+### Patch Changes
+
+- 7e96f71: Reduce streaming server-render work by checkpointing changed Suspense boundaries instead of copying the entire boundary registry for every component. Preserve render-phase retry state, discovery order, hydration seeds, and error handling.
+
+  Avoid general keyed-child bookkeeping for a single owned text node, and avoid reclassifying host subtrees that already require component reconciliation. Keep text identity, foreign DOM ownership, and interrupted-update rollback unchanged.
+
+- d7226ff: Add an experimental client-only Valdi writer compiler target with an explicit
+  application-provided adapter contract, public compiler option types, and
+  self-contained regression tests. Existing DOM and universal targets remain
+  unchanged; no native runtime or application build integration is bundled.
+
+## 0.1.45
+
+### Patch Changes
+
+- 5b1e6a3: Fix missing root `onCaughtError` reports for first-mount and parent-driven error
+  boundary catches in non-suspending renders. Publish inline reports after the
+  fallback's refs and layout effects commit, preserve the original error, and
+  discard abandoned reports without duplicating existing scheduled-error reports.
+- 31abee5: Reduce generated client component code by sharing scalar-binding comparisons and renderable-child text updates through the private compiler runtime. Eligible repeated host rows retain inline comparisons to avoid extra calls and cache writes on unchanged bindings. Hydration avoids repeating attribute mutations when the server already has the final client value, and list-only reconciliation is separate from common text and function children.
+
+  Skip URL regular-expression checks only when the first character proves that the existing unsafe-protocol pattern cannot match. URL policy, controlled form values, authored evaluation order, mismatch recovery, and context propagation through unchanged child descriptors retain their existing behavior.
+
+- fd6ce69: Preserve canonical component wrappers across consecutive Vite hot updates so every save refreshes mounted DOM and universal-renderer components while retaining their own hook state. Keep default exports live and reload when an edit removes or invalidates a refresh boundary.
+- 5f7a457: Retain and retry client roots that suspend without a Suspense boundary. Keep
+  initial roots empty and preserve committed UI, state, refs, and layout/passive
+  effects during suspended updates, including structural replacements and portals.
+  Retry the latest inputs, cancel abandoned work after supersession or unmount,
+  and report actual resource rejections through normal error handling.
+
+  Retain server DOM while initial hydration is suspended, adopting the existing
+  nodes, attaching refs, and running layout/passive effects only when hydration can
+  commit.
+
+  Keep effect-thrown thenables on the error path and tear down roots on unhandled
+  effect errors.
+
+- 5227d7b: Retry incomplete descriptor and memoized subtrees before revealing Suspense
+  content, preserving mounted state and DOM identity. Revisit discarded effect work
+  after interrupted retries, keep descriptor text and props consistent during held
+  transitions, and register deferred Activity effects when a cached hidden child
+  descriptor becomes visible.
+- 6927595: Fix strict browser TypeScript consumption of source-published chart bindings.
+
+  Recharts now publishes authored TypeScript for its chart utilities and state,
+  resolves component imports explicitly, and exports the component implementations'
+  own prop types. Visx supports strict browser source checks without Node globals.
+  Remix Router's published declarations retain native anchor and form ref types.
+  Redux Toolkit's query hooks type their bundler environment without Node globals.
+
+  Fix deferred native chart events, keep imperative and Cell refs off unrelated
+  hosts, and resolve missing radial geometry without dropping data rows.
+
+  Octane accepts optional refs in composed ref arrays and supports nested ref arrays
+  in `useImperativeHandle`, including callback cleanup and primitive handles. Require
+  the published TSRX compiler fix for ref-and-spread expressions rather than relying
+  on a workspace-only patch.
+
+  Publish the Volar compiler with its tested parser/printer dependencies and checked
+  public declarations, preventing newer transitive printers from corrupting typed
+  tuple parameters in installed consumers. Preserve generic Pie props and the
+  native group targets of polar-axis events.
+
+- f1a7802: Match React's Suspense retry timing: share the 300 ms retry-commit budget across boundaries, keep sibling reveals atomic, and retain already-visible transition content indefinitely by default. Explicit finite transition fallback timeouts remain available.
+
+  Support promises thrown by resource readers on the client and server, and fix suspended-render cleanup, initial-state supersession, error reporting, and staged renderer ownership without delaying dependent data requests. Keep deferred hydration notifications and captured clicks behind the actual retry commit.
+
+  Let pending and error fallbacks suspend through an enclosing boundary without losing their state. Defer suspended error-fallback reports until reveal, cancel abandoned reports, and allow a server response to finish without waiting for an obsolete suspending fallback.
+
+## 0.1.44
+
+### Patch Changes
+
+- 9b06e47: Fix duplicated text when hydrating a sole primitive child that the server framed,
+  including spread-bearing hosts and conditional children. Reuse the server Text
+  node while preserving hydration mismatch suppression, native events, and later
+  child updates.
+- 7535acd: Deduplicate binding hook sub-slot derivation behind Octane's shared helper while preserving each binding's slotless and symbol-identity behavior.
+
+## 0.1.43
+
+### Patch Changes
+
+- 4b590bd: Improve Activity parity across compiled JSX, element descriptors, server rendering,
+  hydration, and universal renderers. Hidden boundaries now disconnect public refs,
+  preserve the latest authored styles and text, hide logically owned portals, and
+  contain suspended work without activating an enclosing visible fallback. Retained
+  insertion effects replay safely after suspended hidden renders, including memoized
+  children and nested boundaries.
+
+  Support Activity aliases, namespaces, spreads, children props, and ordered keys
+  without changing the direct mode-only compiler fast path. Integrate Activity
+  visibility changes with ViewTransition enter/exit animations and expose native
+  pseudo-element animations through the transition instance.
+
+  Coalesce hidden descendant visibility scans once per render wave and keep optional
+  Activity implementation and ref tracking off unrelated application paths. Add
+  production browser benchmarks and deterministic work, ref, and bundle controls.
+  Octane's synchronous hidden-work scheduling and existing structural-transaction
+  limitations remain unchanged.
+
+- c0ff085: Keep boolean renderable children empty when updated from text, and correctly
+  reapply anchored child text after a held transition resumes. Explicit string
+  conversion and typed text bindings retain their existing coercion semantics.
+- 6a68a7d: Fold provider-proven immutable CSS-module class strings before template planning. Production Vite builds retain a live class reference in each static subtree so unused and lazy component styles keep their existing delivery boundaries. Mutable default maps remain dynamic unless their CSS provider supplies an explicit immutable-export contract.
+- 6b97f85: Add opt-in CSS-module constant folding to one-shot Rspack and Rsbuild production builds. Authenticate immutable JavaScript CSS exports from the actual module graph, preserve stylesheet ownership, and keep proof callbacks on the main thread when compiler workers are enabled. Native CSS modules and mutable default maps retain their existing behavior.
+
 ## 0.1.42
 
 ### Patch Changes

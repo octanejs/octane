@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/spring",
-  "version": "0.0.8",
+  "version": "0.0.15",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -31,6 +31,7 @@
   "types": "src/index.ts",
   "files": [
     "src",
+    "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md"
   ],

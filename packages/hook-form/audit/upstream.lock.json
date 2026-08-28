@@ -1,0 +1,1704 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-hook-form",
+    "version": "7.81.0",
+    "repository": {
+      "owner": "react-hook-form",
+      "repo": "react-hook-form",
+      "subdirectory": null
+    },
+    "commit": "46b217e034dd92f7aa3cb3a478815556b416b299",
+    "integrity": "sha512-ocbmr2p5KBMoAfj4WCUvped33lVi1Kd5DuDUvQDnB6VEAacOjPI/jMbtDdbhco4y9ct4xUuCmMY0b/C9L0QHjw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "e8eeb472f0a5889c2c51625b86a3f9b8630680adb9f49a125352e2e426392780"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "package.json", "scripts/jest", "src", "tsconfig.json"],
+  "adaptedMappings": [
+    {
+      "fromRoot": "src/__tests__",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "import React, { useEffect, useMemo, useState } from 'react';",
+      "replace": "import * as React from 'octane';\nimport { useEffect, useMemo, useState } from 'octane';"
+    },
+    {
+      "find": "import React, { useEffect, useState } from 'react';",
+      "replace": "import * as React from 'octane';\nimport { useEffect, useState } from 'octane';"
+    },
+    {
+      "find": "import React, { useState } from 'react';",
+      "replace": "import * as React from 'octane';\nimport { useState } from 'octane';"
+    },
+    {
+      "find": "import React from 'react';",
+      "replace": "import * as React from 'octane';"
+    },
+    {
+      "find": "import { renderToString } from 'react-dom/server';",
+      "replace": "import { renderToStaticMarkup } from 'octane/server';"
+    },
+    {
+      "find": "import { flushSync } from 'react-dom';",
+      "replace": "import { flushSync } from 'octane';"
+    },
+    {
+      "find": "from 'react';",
+      "replace": "from 'octane';"
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "from '../';",
+      "replace": "from '../../src';"
+    },
+    {
+      "find": "from '../..';",
+      "replace": "from '../../../src';"
+    },
+    {
+      "find": "'../../logic/iterateFieldsByAction'",
+      "replace": "'../../../src/logic/iterateFieldsByAction'"
+    },
+    {
+      "find": "'../../logic/shouldRenderFormState'",
+      "replace": "'../../../src/logic/shouldRenderFormState'"
+    },
+    {
+      "find": "'../../logic/shouldSubscribeByName'",
+      "replace": "'../../../src/logic/shouldSubscribeByName'"
+    },
+    {
+      "find": "'../../utils/convertToArrayPayload'",
+      "replace": "'../../../src/utils/convertToArrayPayload'"
+    },
+    {
+      "find": "'../../logic/hasPromiseValidation'",
+      "replace": "'../../../src/logic/hasPromiseValidation'"
+    },
+    {
+      "find": "'../../logic/getResolverOptions'",
+      "replace": "'../../../src/logic/getResolverOptions'"
+    },
+    {
+      "find": "'../../logic/getValidationModes'",
+      "replace": "'../../../src/logic/getValidationModes'"
+    },
+    {
+      "find": "'../../logic/getValueAndMessage'",
+      "replace": "'../../../src/logic/getValueAndMessage'"
+    },
+    {
+      "find": "'../../logic/isNameInFieldArray'",
+      "replace": "'../../../src/logic/isNameInFieldArray'"
+    },
+    {
+      "find": "'../../logic/createFormControl'",
+      "replace": "'../../../src/logic/createFormControl'"
+    },
+    {
+      "find": "'../../logic/getFocusFieldName'",
+      "replace": "'../../../src/logic/getFocusFieldName'"
+    },
+    {
+      "find": "'../../logic/getNodeParentName'",
+      "replace": "'../../../src/logic/getNodeParentName'"
+    },
+    {
+      "find": "'../../logic/schemaErrorLookup'",
+      "replace": "'../../../src/logic/schemaErrorLookup'"
+    },
+    {
+      "find": "'../../utils/extractFormValues'",
+      "replace": "'../../../src/utils/extractFormValues'"
+    },
+    {
+      "find": "'../../utils/isNullOrUndefined'",
+      "replace": "'../../../src/utils/isNullOrUndefined'"
+    },
+    {
+      "find": "'../../utils/isRadioOrCheckbox'",
+      "replace": "'../../../src/utils/isRadioOrCheckbox'"
+    },
+    {
+      "find": "'../../utils/objectHasFunction'",
+      "replace": "'../../../src/utils/objectHasFunction'"
+    },
+    {
+      "find": "'../../logic/getCheckboxValue'",
+      "replace": "'../../../src/logic/getCheckboxValue'"
+    },
+    {
+      "find": "'../../logic/getValidateError'",
+      "replace": "'../../../src/logic/getValidateError'"
+    },
+    {
+      "find": "'../../utils/isMultipleSelect'",
+      "replace": "'../../../src/utils/isMultipleSelect'"
+    },
+    {
+      "find": "'../../logic/getFieldValueAs'",
+      "replace": "'../../../src/logic/getFieldValueAs'"
+    },
+    {
+      "find": "'../../logic/unsetEmptyArray'",
+      "replace": "'../../../src/logic/unsetEmptyArray'"
+    },
+    {
+      "find": "'../../utils/isCheckBoxInput'",
+      "replace": "'../../../src/utils/isCheckBoxInput'"
+    },
+    {
+      "find": "'../../logic/getDirtyFields'",
+      "replace": "'../../../src/logic/getDirtyFields'"
+    },
+    {
+      "find": "'../../logic/skipValidation'",
+      "replace": "'../../../src/logic/skipValidation'"
+    },
+    {
+      "find": "'../../utils/fillEmptyArray'",
+      "replace": "'../../../src/utils/fillEmptyArray'"
+    },
+    {
+      "find": "'../../utils/isEmptyObject'",
+      "replace": "'../../../src/utils/isEmptyObject'"
+    },
+    {
+      "find": "'../../logic/getEventValue'",
+      "replace": "'../../../src/logic/getEventValue'"
+    },
+    {
+      "find": "'../../logic/getFieldValue'",
+      "replace": "'../../../src/logic/getFieldValue'"
+    },
+    {
+      "find": "'../../logic/getRadioValue'",
+      "replace": "'../../../src/logic/getRadioValue'"
+    },
+    {
+      "find": "'../../logic/hasValidation'",
+      "replace": "'../../../src/logic/hasValidation'"
+    },
+    {
+      "find": "'../../logic/validateField'",
+      "replace": "'../../../src/logic/validateField'"
+    },
+    {
+      "find": "'../../utils/createSubject'",
+      "replace": "'../../../src/utils/createSubject'"
+    },
+    {
+      "find": "'../../utils/isHTMLElement'",
+      "replace": "'../../../src/utils/isHTMLElement'"
+    },
+    {
+      "find": "'../../logic/appendErrors'",
+      "replace": "'../../../src/logic/appendErrors'"
+    },
+    {
+      "find": "'../../logic/getRuleValue'",
+      "replace": "'../../../src/logic/getRuleValue'"
+    },
+    {
+      "find": "'../../utils/isRadioInput'",
+      "replace": "'../../../src/utils/isRadioInput'"
+    },
+    {
+      "find": "'../../utils/stringToPath'",
+      "replace": "'../../../src/utils/stringToPath'"
+    },
+    {
+      "find": "'../../utils/cloneObject'",
+      "replace": "'../../../src/utils/cloneObject'"
+    },
+    {
+      "find": "'../../utils/isFileInput'",
+      "replace": "'../../../src/utils/isFileInput'"
+    },
+    {
+      "find": "'../../utils/isPrimitive'",
+      "replace": "'../../../src/utils/isPrimitive'"
+    },
+    {
+      "find": "'../../utils/isUndefined'",
+      "replace": "'../../../src/utils/isUndefined'"
+    },
+    {
+      "find": "'../utils/isPlainObject'",
+      "replace": "'../../src/utils/isPlainObject'"
+    },
+    {
+      "find": "'../../logic/generateId'",
+      "replace": "'../../../src/logic/generateId'"
+    },
+    {
+      "find": "'../../utils/isFunction'",
+      "replace": "'../../../src/utils/isFunction'"
+    },
+    {
+      "find": "'../formStateSubscribe'",
+      "replace": "'../../src/formStateSubscribe.tsrx'"
+    },
+    {
+      "find": "'../../logic/isWatched'",
+      "replace": "'../../../src/logic/isWatched'"
+    },
+    {
+      "find": "'../../utils/deepEqual'",
+      "replace": "'../../../src/utils/deepEqual'"
+    },
+    {
+      "find": "'../../utils/deepMerge'",
+      "replace": "'../../../src/utils/deepMerge'"
+    },
+    {
+      "find": "'../../utils/isBoolean'",
+      "replace": "'../../../src/utils/isBoolean'"
+    },
+    {
+      "find": "'../../useFormContext'",
+      "replace": "'../../../src/useFormContext'"
+    },
+    {
+      "find": "'../../utils/isString'",
+      "replace": "'../../../src/utils/isString'"
+    },
+    {
+      "find": "'../../utils/isObject'",
+      "replace": "'../../../src/utils/isObject'"
+    },
+    {
+      "find": "'../../useController'",
+      "replace": "'../../../src/useController'"
+    },
+    {
+      "find": "'../../useFieldArray'",
+      "replace": "'../../../src/useFieldArray'"
+    },
+    {
+      "find": "'../utils/isFunction'",
+      "replace": "'../../src/utils/isFunction'"
+    },
+    {
+      "find": "'../../utils/compact'",
+      "replace": "'../../../src/utils/compact'"
+    },
+    {
+      "find": "'../../utils/flatten'",
+      "replace": "'../../../src/utils/flatten'"
+    },
+    {
+      "find": "'../../utils/isRegex'",
+      "replace": "'../../../src/utils/isRegex'"
+    },
+    {
+      "find": "'../../utils/prepend'",
+      "replace": "'../../../src/utils/prepend'"
+    },
+    {
+      "find": "'../utils/deepEqual'",
+      "replace": "'../../src/utils/deepEqual'"
+    },
+    {
+      "find": "'../utils/isBoolean'",
+      "replace": "'../../src/utils/isBoolean'"
+    },
+    {
+      "find": "'../../useFormState'",
+      "replace": "'../../../src/useFormState'"
+    },
+    {
+      "find": "'../../utils/append'",
+      "replace": "'../../../src/utils/append'"
+    },
+    {
+      "find": "'../../utils/insert'",
+      "replace": "'../../../src/utils/insert'"
+    },
+    {
+      "find": "'../../utils/remove'",
+      "replace": "'../../../src/utils/remove'"
+    },
+    {
+      "find": "'../../utils/update'",
+      "replace": "'../../../src/utils/update'"
+    },
+    {
+      "find": "'../useFormContext'",
+      "replace": "'../../src/useFormContext'"
+    },
+    {
+      "find": "'../../utils/unset'",
+      "replace": "'../../../src/utils/unset'"
+    },
+    {
+      "find": "'../../utils/sleep'",
+      "replace": "'../../../src/utils/sleep'"
+    },
+    {
+      "find": "'../../utils/isKey'",
+      "replace": "'../../../src/utils/isKey'"
+    },
+    {
+      "find": "'../useFieldArray'",
+      "replace": "'../../src/useFieldArray'"
+    },
+    {
+      "find": "'../../utils/noop'",
+      "replace": "'../../../src/utils/noop'"
+    },
+    {
+      "find": "'../useController'",
+      "replace": "'../../src/useController'"
+    },
+    {
+      "find": "'../../controller'",
+      "replace": "'../../../src/controller.tsrx'"
+    },
+    {
+      "find": "'../../utils/live'",
+      "replace": "'../../../src/utils/live'"
+    },
+    {
+      "find": "'../../utils/move'",
+      "replace": "'../../../src/utils/move'"
+    },
+    {
+      "find": "'../../utils/swap'",
+      "replace": "'../../../src/utils/swap'"
+    },
+    {
+      "find": "'../../constants'",
+      "replace": "'../../../src/constants'"
+    },
+    {
+      "find": "'../useFormState'",
+      "replace": "'../../src/useFormState'"
+    },
+    {
+      "find": "'../../utils/get'",
+      "replace": "'../../../src/utils/get'"
+    },
+    {
+      "find": "'../../utils/set'",
+      "replace": "'../../../src/utils/set'"
+    },
+    {
+      "find": "'../utils/sleep'",
+      "replace": "'../../src/utils/sleep'"
+    },
+    {
+      "find": "'../../useWatch'",
+      "replace": "'../../../src/useWatch'"
+    },
+    {
+      "find": "'../controller'",
+      "replace": "'../../src/controller.tsrx'"
+    },
+    {
+      "find": "'../utils/noop'",
+      "replace": "'../../src/utils/noop'"
+    },
+    {
+      "find": "'../../useForm'",
+      "replace": "'../../../src/useForm'"
+    },
+    {
+      "find": "'../constants'",
+      "replace": "'../../src/constants'"
+    },
+    {
+      "find": "'../useWatch'",
+      "replace": "'../../src/useWatch'"
+    },
+    {
+      "find": "'../../types'",
+      "replace": "'../../../src/types'"
+    },
+    {
+      "find": "'../useForm'",
+      "replace": "'../../src/useForm'"
+    },
+    {
+      "find": "'../types'",
+      "replace": "'../../src/types'"
+    },
+    {
+      "find": "'../watch'",
+      "replace": "'../../src/watch.tsrx'"
+    },
+    {
+      "find": "'../form'",
+      "replace": "'../../src/form.tsrx'"
+    },
+    {
+      "find": "'../..'",
+      "replace": "'../../../src'"
+    },
+    {
+      "find": "jest.",
+      "replace": "vi."
+    },
+    {
+      "find": "fireEvent.change(",
+      "replace": "fireEvent.input("
+    },
+    {
+      "find": "fireEvent.focusOut(",
+      "replace": "fireEvent.blur("
+    }
+  ],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "139faf48e1b4926a8743bc7a5bd67287f43f0dd0",
+      "size": 1080
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "37f44a45a5e07ceb57d336d6bf261919f7a7d486",
+      "size": 4537
+    },
+    {
+      "path": "scripts/jest/jest.config.js",
+      "gitBlob": "a9cfe5517ee1e5287e3218df20978ea1eae62483",
+      "size": 1428
+    },
+    {
+      "path": "scripts/jest/setup.ts",
+      "gitBlob": "426ff1a3f3a7448488772bda540d40bf4f45b3ae",
+      "size": 255
+    },
+    {
+      "path": "src/__tests__/__snapshots__/useFieldArray.test.tsx.snap",
+      "gitBlob": "6e3b40c7c7a1b10d28388a481fdbbe8a4aff4737",
+      "size": 5710
+    },
+    {
+      "path": "src/__tests__/__snapshots__/useWatch.test.tsx.snap",
+      "gitBlob": "19a8a6c898e6b407760c7484312f0508ba1720e3",
+      "size": 1150
+    },
+    {
+      "path": "src/__tests__/controller.server.test.tsx",
+      "gitBlob": "c7e703486011119d1e0486bee96b5c490c42a73c",
+      "size": 687
+    },
+    {
+      "path": "src/__tests__/controller.test.tsx",
+      "gitBlob": "e7db81c623b7347159b2cd59e2680f87942f431f",
+      "size": 44449
+    },
+    {
+      "path": "src/__tests__/form.test.tsx",
+      "gitBlob": "62536c3a89b69000378a62fcbb4680c47de1bca1",
+      "size": 8307
+    },
+    {
+      "path": "src/__tests__/formStateSubscribe.server.test.tsx",
+      "gitBlob": "28f436e42facf91270d63f68b6bfbb7458a7b560",
+      "size": 605
+    },
+    {
+      "path": "src/__tests__/formStateSubscribe.test.tsx",
+      "gitBlob": "d90be4be071148db95af73f7b1718738d745f642",
+      "size": 19480
+    },
+    {
+      "path": "src/__tests__/isPlainObject.test.ts",
+      "gitBlob": "ac1737189e9b1d65aecefcbb0b934c6e80d0a9e1",
+      "size": 813
+    },
+    {
+      "path": "src/__tests__/logic/appendErrors.test.ts",
+      "gitBlob": "30f5de100b280426772d37ed19b28b87a9d3ae4b",
+      "size": 2072
+    },
+    {
+      "path": "src/__tests__/logic/createFormControl.test.ts",
+      "gitBlob": "46c54b44da3674266396205862779ee7c36eccb5",
+      "size": 1578
+    },
+    {
+      "path": "src/__tests__/logic/generateId.test.ts",
+      "gitBlob": "0bc9944a9f819ac89554e6d0b0d72d2a0303de69",
+      "size": 698
+    },
+    {
+      "path": "src/__tests__/logic/getCheckboxValue.test.ts",
+      "gitBlob": "c7d93277ad20be89b142a01701fc656a58fbe998",
+      "size": 5627
+    },
+    {
+      "path": "src/__tests__/logic/getDirtyFields.test.ts",
+      "gitBlob": "c1bb6e6b8b13b886f8f9e64c6ae5f2e0a5d7febe",
+      "size": 7674
+    },
+    {
+      "path": "src/__tests__/logic/getEventValue.test.ts",
+      "gitBlob": "aea4b29cdc2a74b7bfa2dbc029b9ca4bb5e37450",
+      "size": 662
+    },
+    {
+      "path": "src/__tests__/logic/getFieldValue.test.ts",
+      "gitBlob": "5442a09fe9e069bc2f0af06ac702271e9bdb35ba",
+      "size": 1740
+    },
+    {
+      "path": "src/__tests__/logic/getFieldValueAs.test.ts",
+      "gitBlob": "f99545f7fff710d22932c9d0581ef8b2d767dc6f",
+      "size": 379
+    },
+    {
+      "path": "src/__tests__/logic/getFocusFieldName.test.ts",
+      "gitBlob": "4fa28f17ec8330d7da544af18b32900ab2e5abfa",
+      "size": 526
+    },
+    {
+      "path": "src/__tests__/logic/getNodeParentName.test.ts",
+      "gitBlob": "85752d09818dc47f4e7d65608e9d0086fbdb07a6",
+      "size": 713
+    },
+    {
+      "path": "src/__tests__/logic/getRadioValue.test.ts",
+      "gitBlob": "0f5fef83ec55468d452f980bf853a7bb1ca4d6be",
+      "size": 1334
+    },
+    {
+      "path": "src/__tests__/logic/getResolverOptions.test.ts",
+      "gitBlob": "3500bfb5267d52e3a64bdb795a8277610c278f80",
+      "size": 1422
+    },
+    {
+      "path": "src/__tests__/logic/getRuleValue.test.ts",
+      "gitBlob": "936ef16421b636dbfa64db7a62b3ddea6b40ac03",
+      "size": 789
+    },
+    {
+      "path": "src/__tests__/logic/getValidateError.test.ts",
+      "gitBlob": "5fa7656427f99ec570f2f9b2aecff0f25a2c5e5c",
+      "size": 953
+    },
+    {
+      "path": "src/__tests__/logic/getValidationModes.test.ts",
+      "gitBlob": "ca3d6ca02731ff72709eeb7753d7512ac5fce04e",
+      "size": 1365
+    },
+    {
+      "path": "src/__tests__/logic/getValueAndMessage.test.ts",
+      "gitBlob": "69101850856e9c8639e03162c256a766b08523ec",
+      "size": 537
+    },
+    {
+      "path": "src/__tests__/logic/hasPromiseValidation.test.ts",
+      "gitBlob": "136be169ba6144e21f7dfa6bda26ab78340aad77",
+      "size": 2046
+    },
+    {
+      "path": "src/__tests__/logic/hasValidation.test.ts",
+      "gitBlob": "b1e2370299278ea0345699992b55abbb2da3f29b",
+      "size": 3340
+    },
+    {
+      "path": "src/__tests__/logic/isNameInFieldArray.test.ts",
+      "gitBlob": "fb45c942dd06663c20b05611d4547fb9ac531416",
+      "size": 1896
+    },
+    {
+      "path": "src/__tests__/logic/isWatched.test.ts",
+      "gitBlob": "696ceef152650d67867b23e07af0afa8509c6e7c",
+      "size": 4338
+    },
+    {
+      "path": "src/__tests__/logic/iterateFieldsByAction.test.ts",
+      "gitBlob": "9d33b430d80e7544fd2336454a310b8c7923a31e",
+      "size": 5056
+    },
+    {
+      "path": "src/__tests__/logic/schemaErrorLookup.test.ts",
+      "gitBlob": "08d6d4a5659590b03796f0628dca095147c5d486",
+      "size": 5453
+    },
+    {
+      "path": "src/__tests__/logic/shouldRenderFormState.test.ts",
+      "gitBlob": "791e5388fb82b64ffc6b7d3ff43822d7fe63bd6c",
+      "size": 3472
+    },
+    {
+      "path": "src/__tests__/logic/shouldSubscribeByName.test.ts",
+      "gitBlob": "5d1c7d9626a224a37e8f94961c19cefea28a60a5",
+      "size": 1684
+    },
+    {
+      "path": "src/__tests__/logic/skipValidation.test.ts",
+      "gitBlob": "0559f56dc4f00433a130ff5fa846c50762d35624",
+      "size": 3704
+    },
+    {
+      "path": "src/__tests__/logic/unsetEmptyArray.test.ts",
+      "gitBlob": "fcfa42497e73799998fa5e1d895b48bde0108804",
+      "size": 740
+    },
+    {
+      "path": "src/__tests__/logic/validateField.test.tsx",
+      "gitBlob": "d46169f01499bbc2229c91b0859c27ac8837892f",
+      "size": 51637
+    },
+    {
+      "path": "src/__tests__/nested-null.test.tsx",
+      "gitBlob": "eb45536435ecf2917a404318f45a81efcbe43e5a",
+      "size": 1682
+    },
+    {
+      "path": "src/__tests__/performance.test.tsx",
+      "gitBlob": "1020377b42a4df9dac65f24a0e46d8bdbc9758b9",
+      "size": 18342
+    },
+    {
+      "path": "src/__tests__/type.test.tsx",
+      "gitBlob": "c3b24b7febcfed423e4acfc2087863fcbc53ed56",
+      "size": 12414
+    },
+    {
+      "path": "src/__tests__/useController.test.tsx",
+      "gitBlob": "9e9c1de76e6ac34eabd021bdda3e2b3721b40486",
+      "size": 44874
+    },
+    {
+      "path": "src/__tests__/useFieldArray.test.tsx",
+      "gitBlob": "2ee45583e491ee175e5817d140467fe376e379de",
+      "size": 138538
+    },
+    {
+      "path": "src/__tests__/useFieldArray/append.test.tsx",
+      "gitBlob": "4e5e6f67d85ae3d4342db220c1984c6dab55aefb",
+      "size": 17207
+    },
+    {
+      "path": "src/__tests__/useFieldArray/dirtyFields.test.tsx",
+      "gitBlob": "ad2717993a433b83a04fc956130fa86db79f7574",
+      "size": 24440
+    },
+    {
+      "path": "src/__tests__/useFieldArray/focus.test.tsx",
+      "gitBlob": "0aabcf78c987854e6fd17987e38b0476d4e28986",
+      "size": 6164
+    },
+    {
+      "path": "src/__tests__/useFieldArray/insert.test.tsx",
+      "gitBlob": "c0e5ac0d94e717919b1113dfc9ac34b60a4c4573",
+      "size": 22848
+    },
+    {
+      "path": "src/__tests__/useFieldArray/move.test.tsx",
+      "gitBlob": "e480bd616d8914fd495b151ae779e5cddd9babc0",
+      "size": 12049
+    },
+    {
+      "path": "src/__tests__/useFieldArray/prepend.test.tsx",
+      "gitBlob": "78a32ced8ad75007ad8030c260dfcd597aed5fe9",
+      "size": 17360
+    },
+    {
+      "path": "src/__tests__/useFieldArray/remove.test.tsx",
+      "gitBlob": "995a94c4ccf9c4067b3e7a527ea2944080cebdfa",
+      "size": 40643
+    },
+    {
+      "path": "src/__tests__/useFieldArray/replace.test.tsx",
+      "gitBlob": "82eee39876597b6056e54378a758ed76a4ac3e44",
+      "size": 9752
+    },
+    {
+      "path": "src/__tests__/useFieldArray/swap.test.tsx",
+      "gitBlob": "aabd5a7dbd3203a9df9f2b4ba390a62a4bb44d09",
+      "size": 12447
+    },
+    {
+      "path": "src/__tests__/useFieldArray/update.test.tsx",
+      "gitBlob": "2714cd5f07bcaf4dc80fddcb1874f073e77281a1",
+      "size": 18002
+    },
+    {
+      "path": "src/__tests__/useForm.server.test.tsx",
+      "gitBlob": "e3d30ec41d1e0736c29ca1f7a74c2b40e829d966",
+      "size": 2934
+    },
+    {
+      "path": "src/__tests__/useForm.test.tsx",
+      "gitBlob": "925cbcb91c5be5c7dfc66a6d95908f74edabe8d8",
+      "size": 86187
+    },
+    {
+      "path": "src/__tests__/useForm/__snapshots__/watch.test.tsx.snap",
+      "gitBlob": "1ae2a1cffeb118028401a1bd1325b470700e94bb",
+      "size": 814
+    },
+    {
+      "path": "src/__tests__/useForm/clearErrors.test.tsx",
+      "gitBlob": "edb73ee45e7fd4876a842762d06a0e31586b1472",
+      "size": 9343
+    },
+    {
+      "path": "src/__tests__/useForm/formState.test.tsx",
+      "gitBlob": "5571230b84dc354426323518f0666ff449bf3e1b",
+      "size": 31626
+    },
+    {
+      "path": "src/__tests__/useForm/getFieldState.test.tsx",
+      "gitBlob": "74968b7492eec22b2a9b35dae49a18b5e7b77a3a",
+      "size": 18242
+    },
+    {
+      "path": "src/__tests__/useForm/getValues.test.tsx",
+      "gitBlob": "c70cc8800ed91cfa0fed5e44a4646718c12a85bd",
+      "size": 7883
+    },
+    {
+      "path": "src/__tests__/useForm/handleSubmit.test.tsx",
+      "gitBlob": "6b8c0e275f1b8cc71a8a81ce0bc36f386f794ef1",
+      "size": 16224
+    },
+    {
+      "path": "src/__tests__/useForm/register.test.tsx",
+      "gitBlob": "d08e021116902459f39d92c34c126721ce0b6aa8",
+      "size": 51839
+    },
+    {
+      "path": "src/__tests__/useForm/reset.test.tsx",
+      "gitBlob": "440bf41fbc6645577f283d8a42c4469bd8397c19",
+      "size": 53824
+    },
+    {
+      "path": "src/__tests__/useForm/resetDefaultValues.test.tsx",
+      "gitBlob": "2b11380d531d69a4afa23f7a259092531d7013a3",
+      "size": 7317
+    },
+    {
+      "path": "src/__tests__/useForm/resetField.test.tsx",
+      "gitBlob": "b12e41b6781a6958b1bdd69f3cd7e8a185b7540b",
+      "size": 11295
+    },
+    {
+      "path": "src/__tests__/useForm/resolver.test.tsx",
+      "gitBlob": "6a3c8099b8ea3055fbf39cf75467e1063c9fdbec",
+      "size": 17253
+    },
+    {
+      "path": "src/__tests__/useForm/setError.test.tsx",
+      "gitBlob": "4e0545920125411a77112698398db30e5a8ecc5f",
+      "size": 7005
+    },
+    {
+      "path": "src/__tests__/useForm/setFocus.test.tsx",
+      "gitBlob": "c740c4f6bb1c362c408d9ee086a29398aa4960c6",
+      "size": 3702
+    },
+    {
+      "path": "src/__tests__/useForm/setValue.test.tsx",
+      "gitBlob": "3a25c1d07319ae59785278c6529d5df4085a0c4e",
+      "size": 40306
+    },
+    {
+      "path": "src/__tests__/useForm/setValues.test.tsx",
+      "gitBlob": "44e533e3d89692d17769fe786c6d3e84e28fb390",
+      "size": 17041
+    },
+    {
+      "path": "src/__tests__/useForm/subscribe.test.tsx",
+      "gitBlob": "e65668832e67de945a39e7a36b142d88cc03ddc9",
+      "size": 17535
+    },
+    {
+      "path": "src/__tests__/useForm/trigger.test.tsx",
+      "gitBlob": "daf5dde8902a2d1f76edb5ec33baa1845d845de4",
+      "size": 28346
+    },
+    {
+      "path": "src/__tests__/useForm/unregister.test.tsx",
+      "gitBlob": "50483607aaace1e47800cf48b0b41242316f17da",
+      "size": 2878
+    },
+    {
+      "path": "src/__tests__/useForm/useFormWithNullValues.test.tsx",
+      "gitBlob": "fe7317d79b9456e034bc3934be0ef68636ca646e",
+      "size": 5761
+    },
+    {
+      "path": "src/__tests__/useForm/watch.test.tsx",
+      "gitBlob": "c4f4e172322827486339d9a9d000f915edce7e97",
+      "size": 19901
+    },
+    {
+      "path": "src/__tests__/useFormContext.server.test.tsx",
+      "gitBlob": "94153b90b4bedee263f3bff127e8c318a438d105",
+      "size": 1404
+    },
+    {
+      "path": "src/__tests__/useFormContext.test.tsx",
+      "gitBlob": "e8aaf2df96e59384bde74fbcf0d9f805d6bac060",
+      "size": 15227
+    },
+    {
+      "path": "src/__tests__/useFormState.test.tsx",
+      "gitBlob": "7c9d253f0b9d31bfd85a9b8ca217da322ca3d66f",
+      "size": 19593
+    },
+    {
+      "path": "src/__tests__/useWatch.test.tsx",
+      "gitBlob": "7cb6d343454bd440257ce5c0d39ac3d5f2b92d35",
+      "size": 50474
+    },
+    {
+      "path": "src/__tests__/utils/__snapshots__/flatten.test.ts.snap",
+      "gitBlob": "7e051acc06b16fc5cfa16a9e5e41a695ce2c43fe",
+      "size": 306
+    },
+    {
+      "path": "src/__tests__/utils/append.test.ts",
+      "gitBlob": "6f0442c6e285dbbc9d294d8347e9459e785583c6",
+      "size": 2158
+    },
+    {
+      "path": "src/__tests__/utils/cloneObject.test.ts",
+      "gitBlob": "f27c698c50b7df9381276d47776074136b6f1194",
+      "size": 4288
+    },
+    {
+      "path": "src/__tests__/utils/compact.test.ts",
+      "gitBlob": "52f39f861000a617076807b65e79334fe7d688d1",
+      "size": 495
+    },
+    {
+      "path": "src/__tests__/utils/convertToArrayPayload.test.ts",
+      "gitBlob": "293899245e72a31320b94025803330a35b923f4c",
+      "size": 588
+    },
+    {
+      "path": "src/__tests__/utils/createSubject.test.ts",
+      "gitBlob": "7ff5db9c0155ee6f4c606802a53bd471e7bb2b12",
+      "size": 1396
+    },
+    {
+      "path": "src/__tests__/utils/deepEqual.test.ts",
+      "gitBlob": "02886fbc576e3f3f924ab23389e4efc98e73f407",
+      "size": 6549
+    },
+    {
+      "path": "src/__tests__/utils/deepMerge.test.ts",
+      "gitBlob": "8e1ab53682ff503eefd80783535b1852dfec5df8",
+      "size": 1947
+    },
+    {
+      "path": "src/__tests__/utils/extractFormValues.test.ts",
+      "gitBlob": "4333893653c5090b5155e1353c69c6f8d88d393f",
+      "size": 764
+    },
+    {
+      "path": "src/__tests__/utils/fillEmptyArray.test.ts",
+      "gitBlob": "a9541d99e3dc4c042c9f75f9c6277588b8365537",
+      "size": 784
+    },
+    {
+      "path": "src/__tests__/utils/flatten.test.ts",
+      "gitBlob": "ceec2a0eec34b2c60ece973d90d3bd73b36790e2",
+      "size": 1079
+    },
+    {
+      "path": "src/__tests__/utils/get.test.ts",
+      "gitBlob": "76c619da45c5a656060fbb8b00c0fad3f2b19df9",
+      "size": 3167
+    },
+    {
+      "path": "src/__tests__/utils/insert.test.ts",
+      "gitBlob": "87930c6d96a8c44486720aaab1a53d81183ef69a",
+      "size": 2039
+    },
+    {
+      "path": "src/__tests__/utils/isBoolean.test.ts",
+      "gitBlob": "30dabe115ae6df1a9626328b0ccdd8787ce8d64e",
+      "size": 669
+    },
+    {
+      "path": "src/__tests__/utils/isCheckBoxInput.test.ts",
+      "gitBlob": "e4d084e1c515a91c8f16077a7cc296265fe73b40",
+      "size": 241
+    },
+    {
+      "path": "src/__tests__/utils/isEmptyObject.test.ts",
+      "gitBlob": "71da4f1c53bcbf87c59430bacf82c49ff35a40aa",
+      "size": 755
+    },
+    {
+      "path": "src/__tests__/utils/isFileInput.test.ts",
+      "gitBlob": "412d5482f9e427aa675a1e966bd885d4053815c0",
+      "size": 217
+    },
+    {
+      "path": "src/__tests__/utils/isFunction.test.ts",
+      "gitBlob": "2c5fecd6d9fea856210a582c7b8b23f9eaa1e459",
+      "size": 696
+    },
+    {
+      "path": "src/__tests__/utils/isHTMLElement.test.ts",
+      "gitBlob": "efb142adcfd4c4aad49c9fe03566bab7df648152",
+      "size": 596
+    },
+    {
+      "path": "src/__tests__/utils/isKey.test.ts",
+      "gitBlob": "69f97eceb80e5db6ca86cfa651271d0ad689938c",
+      "size": 465
+    },
+    {
+      "path": "src/__tests__/utils/isMultipleSelect.test.ts",
+      "gitBlob": "f423c55482dfa5731990f1cbf5c759d3ba4f373a",
+      "size": 272
+    },
+    {
+      "path": "src/__tests__/utils/isNullOrUndefined.test.ts",
+      "gitBlob": "3511f3b685ba784a0d9e729b30b3dd007f23ad78",
+      "size": 650
+    },
+    {
+      "path": "src/__tests__/utils/isObject.test.ts",
+      "gitBlob": "4d03dbfcc7f08122f3538dff5552092fad985b5d",
+      "size": 732
+    },
+    {
+      "path": "src/__tests__/utils/isPrimitive.test.ts",
+      "gitBlob": "7674ded33116780080d4a3cacdaff8da4e2d5545",
+      "size": 967
+    },
+    {
+      "path": "src/__tests__/utils/isRadioInput.test.ts",
+      "gitBlob": "4fd09c9df800eb72451dd9ec169f27aac9fe8529",
+      "size": 223
+    },
+    {
+      "path": "src/__tests__/utils/isRadioOrCheckbox.test.ts",
+      "gitBlob": "c30b7390bad2b4a50055db8b49b9022ec71b5918",
+      "size": 651
+    },
+    {
+      "path": "src/__tests__/utils/isRegex.test.ts",
+      "gitBlob": "8f28e72180ddd585c15845bd5559d34b77e53dc9",
+      "size": 191
+    },
+    {
+      "path": "src/__tests__/utils/isString.test.ts",
+      "gitBlob": "55c9c544047ef6c2d6e0314295007315620435bc",
+      "size": 779
+    },
+    {
+      "path": "src/__tests__/utils/isUndefined.test.ts",
+      "gitBlob": "652acec6d90d2d1f118711bf73dd474f89508381",
+      "size": 541
+    },
+    {
+      "path": "src/__tests__/utils/live.test.ts",
+      "gitBlob": "14b988fe33307d722c122a5c2126c662fbb03751",
+      "size": 985
+    },
+    {
+      "path": "src/__tests__/utils/move.test.ts",
+      "gitBlob": "f0cf6eb939d641839862a2971c05cc5834cfabf5",
+      "size": 1452
+    },
+    {
+      "path": "src/__tests__/utils/noop.test.ts",
+      "gitBlob": "24ff07b63a654289047db8c64d4ca7c65b8d2ab2",
+      "size": 272
+    },
+    {
+      "path": "src/__tests__/utils/objectHasFunction.test.ts",
+      "gitBlob": "8f31bc91b781f9563b7594cd1b55cda6d3089963",
+      "size": 427
+    },
+    {
+      "path": "src/__tests__/utils/prepend.test.ts",
+      "gitBlob": "cfc136646537deeb78bb52754a857a4bccd7b2b3",
+      "size": 1942
+    },
+    {
+      "path": "src/__tests__/utils/remove.test.ts",
+      "gitBlob": "c57f6d17c5e1118fb12cecc5cd90380f6a186c9f",
+      "size": 3600
+    },
+    {
+      "path": "src/__tests__/utils/set.test.ts",
+      "gitBlob": "f9206f2c797c866a6a148a0c768d37c6f19ad215",
+      "size": 1441
+    },
+    {
+      "path": "src/__tests__/utils/stringToPath.test.ts",
+      "gitBlob": "99226061567a93537cfcbc304782f9b311bed65d",
+      "size": 732
+    },
+    {
+      "path": "src/__tests__/utils/swap.test.ts",
+      "gitBlob": "0c8742ebcb10ecc085912ea3cb0e59722703fc10",
+      "size": 1324
+    },
+    {
+      "path": "src/__tests__/utils/unset.test.ts",
+      "gitBlob": "ebcc7a37489f45fcd94185f1a9e0ab52bb1d0e08",
+      "size": 8024
+    },
+    {
+      "path": "src/__tests__/utils/update.test.ts",
+      "gitBlob": "7a5feaf19a246533203b76fd82d26168d7535db5",
+      "size": 1094
+    },
+    {
+      "path": "src/__tests__/utils/validationModeChecker.test.ts",
+      "gitBlob": "26f26c872ddad3238919284667433aa90b9e8f98",
+      "size": 1375
+    },
+    {
+      "path": "src/__tests__/watch.server.test.tsx",
+      "gitBlob": "408b85866bd36f0bf1d1e8b49bc2f3149486c301",
+      "size": 571
+    },
+    {
+      "path": "src/__tests__/watch.test.tsx",
+      "gitBlob": "28a464fd3ff226c3ac40f77fddd774dde092a842",
+      "size": 16471
+    },
+    {
+      "path": "src/__typetest__/__fixtures__/dummy.d.ts",
+      "gitBlob": "20b0803b850a00178fd7e1aed9d0915db697ff20",
+      "size": 45
+    },
+    {
+      "path": "src/__typetest__/__fixtures__/index.ts",
+      "gitBlob": "8a4efdd5f9c648f0009ad8e0abc6b7bf49899149",
+      "size": 138
+    },
+    {
+      "path": "src/__typetest__/__fixtures__/matchers.ts",
+      "gitBlob": "86358944cb6ca7a18683159370b766f566330975",
+      "size": 230
+    },
+    {
+      "path": "src/__typetest__/__fixtures__/pathString.ts",
+      "gitBlob": "9a576101446b23c0be28ee03ad87152b7f925792",
+      "size": 185
+    },
+    {
+      "path": "src/__typetest__/__fixtures__/traversable.ts",
+      "gitBlob": "4ada37b776a39f3d143d5a983ac8bd839072a565",
+      "size": 350
+    },
+    {
+      "path": "src/__typetest__/__fixtures__/tuple.ts",
+      "gitBlob": "f31758f793ed6776ab635265b9c56bca9d770022",
+      "size": 211
+    },
+    {
+      "path": "src/__typetest__/__fixtures__/type.ts",
+      "gitBlob": "47a9f770c923ae11b319b5f1e6c71c3e80ee5344",
+      "size": 310
+    },
+    {
+      "path": "src/__typetest__/errors.test-d.ts",
+      "gitBlob": "f2da3c174a51bc80aef68ab22ec743ddbe9f4013",
+      "size": 2828
+    },
+    {
+      "path": "src/__typetest__/form-state-subscribe.test-d.ts",
+      "gitBlob": "e681b925e4f607ef70f355a88e6a51cbe6b7e630",
+      "size": 5047
+    },
+    {
+      "path": "src/__typetest__/form.test-d.ts",
+      "gitBlob": "e630ce026679477338fa733604d5dbaa60df3467",
+      "size": 5240
+    },
+    {
+      "path": "src/__typetest__/package.json",
+      "gitBlob": "0967ef424bce6791893e9a57bb952f80fd536e93",
+      "size": 3
+    },
+    {
+      "path": "src/__typetest__/path/common.test-d.ts",
+      "gitBlob": "28cb7ffa07ffc3e2546b3c8af3851f97ee261d52",
+      "size": 26564
+    },
+    {
+      "path": "src/__typetest__/path/eager.test-d.ts",
+      "gitBlob": "1dce729bc133c28afae3a0eafd84630f30d2df2a",
+      "size": 4471
+    },
+    {
+      "path": "src/__typetest__/tsconfig.json",
+      "gitBlob": "47df54cf8510ed036d108789cdff2c03680c9825",
+      "size": 484
+    },
+    {
+      "path": "src/__typetest__/use-form-context.test-d.ts",
+      "gitBlob": "eec2a2d5e9c5ecde5c9c545af41f6276e7c80a92",
+      "size": 789
+    },
+    {
+      "path": "src/__typetest__/useController.test-d.ts",
+      "gitBlob": "b370f8ed1d922d67a2e2cd41f8a45fa3109f1c00",
+      "size": 2201
+    },
+    {
+      "path": "src/__typetest__/util.test-d.ts",
+      "gitBlob": "4cd39252d8fbdec5389697a594817892f2c9e7ce",
+      "size": 3444
+    },
+    {
+      "path": "src/__typetest__/watch.test-d.ts",
+      "gitBlob": "fb60cdd361222943a1675971d035822b8c251792",
+      "size": 3108
+    },
+    {
+      "path": "src/constants.ts",
+      "gitBlob": "1f235ffaae0c73afa1a80f3ef432a1ba11a4b2ee",
+      "size": 632
+    },
+    {
+      "path": "src/controller.tsx",
+      "gitBlob": "5f7c9f6aa28b7dedee004cfb31082bc74327714a",
+      "size": 1782
+    },
+    {
+      "path": "src/fieldArray.tsx",
+      "gitBlob": "bf14062d591ae5d5e9275d2a70280dc3eb306bf6",
+      "size": 1112
+    },
+    {
+      "path": "src/form.tsx",
+      "gitBlob": "b5f0855632dcfab43e4e65235099cf9d65f123f4",
+      "size": 3802
+    },
+    {
+      "path": "src/formStateSubscribe.tsx",
+      "gitBlob": "7b635a0397d7e51c016da7652839f3b1c267c056",
+      "size": 708
+    },
+    {
+      "path": "src/index.react-server.ts",
+      "gitBlob": "1aeca1d9f3f2b0b3579e9356346dbefeddb3226a",
+      "size": 50
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "af8392431af0440b9dadcd5f7c0a573ee7ec3b53",
+      "size": 379
+    },
+    {
+      "path": "src/logic/appendErrors.ts",
+      "gitBlob": "ec4b5f25baab7f383e02c8f3fb3d5a7ecaf4d01c",
+      "size": 476
+    },
+    {
+      "path": "src/logic/createFormControl.ts",
+      "gitBlob": "7ddc848d88a8b30b928d49dc1521b4197243f960",
+      "size": 55981
+    },
+    {
+      "path": "src/logic/generateId.ts",
+      "gitBlob": "f15362cffa3ec0ad6d2c16d45316d7a420395775",
+      "size": 406
+    },
+    {
+      "path": "src/logic/generateWatchOutput.ts",
+      "gitBlob": "4178a2a459c942fafbf94b64c103a2571a3a189f",
+      "size": 682
+    },
+    {
+      "path": "src/logic/getCheckboxValue.ts",
+      "gitBlob": "8b0365881811e86076ab70d3b31d8468ec47a8a7",
+      "size": 1042
+    },
+    {
+      "path": "src/logic/getDirtyFields.ts",
+      "gitBlob": "d1db811234972efa3f7abedbc6bae6ac2d42f94a",
+      "size": 2418
+    },
+    {
+      "path": "src/logic/getEventValue.ts",
+      "gitBlob": "abade454de1cef2ba2596a52631ad80536157633",
+      "size": 348
+    },
+    {
+      "path": "src/logic/getFieldValue.ts",
+      "gitBlob": "c27ca3e52a83b3a3e3860a7e22036b28186018de",
+      "size": 903
+    },
+    {
+      "path": "src/logic/getFieldValueAs.ts",
+      "gitBlob": "323466e52c6bb52cc495499a4d338a2318687191",
+      "size": 545
+    },
+    {
+      "path": "src/logic/getFocusFieldName.ts",
+      "gitBlob": "b2ffab28f904d25032b95c80d855821799680e3a",
+      "size": 412
+    },
+    {
+      "path": "src/logic/getNodeParentName.ts",
+      "gitBlob": "97778a55e786bedcb11f2f04aecdc514f921fc41",
+      "size": 130
+    },
+    {
+      "path": "src/logic/getProxyFormState.ts",
+      "gitBlob": "9366b78d01ea60abced1e1a4d30f000e543e0f44",
+      "size": 917
+    },
+    {
+      "path": "src/logic/getRadioValue.ts",
+      "gitBlob": "5d94bb1ed7fdc7ffcff7c512a77be2594457beab",
+      "size": 555
+    },
+    {
+      "path": "src/logic/getResolverOptions.ts",
+      "gitBlob": "d7541bb38f4597d2a37f7890b9069a3ce6fe142d",
+      "size": 737
+    },
+    {
+      "path": "src/logic/getRuleValue.ts",
+      "gitBlob": "17a973cfe651e90276a9b12eb37c7f179e9c5abf",
+      "size": 525
+    },
+    {
+      "path": "src/logic/getValidateError.ts",
+      "gitBlob": "727f3dd57de7e72becf4690e61a306e5ac206b27",
+      "size": 501
+    },
+    {
+      "path": "src/logic/getValidationModes.ts",
+      "gitBlob": "9d5f22b28331210cf78226a5a73e0ab7f61e71b0",
+      "size": 410
+    },
+    {
+      "path": "src/logic/getValueAndMessage.ts",
+      "gitBlob": "0868032123eedcb9be3b153cf6213666e6274437",
+      "size": 328
+    },
+    {
+      "path": "src/logic/hasPromiseValidation.ts",
+      "gitBlob": "c1cf62c184c5f52019556144d52df0c56272440f",
+      "size": 705
+    },
+    {
+      "path": "src/logic/hasValidation.ts",
+      "gitBlob": "61e04c39cbba2d69db9ee8f97410bdac585af0c6",
+      "size": 257
+    },
+    {
+      "path": "src/logic/index.ts",
+      "gitBlob": "c4971a197c483b72d4b84b72781ea583d243acfd",
+      "size": 115
+    },
+    {
+      "path": "src/logic/isNameInFieldArray.ts",
+      "gitBlob": "51435a1274fec4f1b6e405ebfecb132ca0bfc393",
+      "size": 270
+    },
+    {
+      "path": "src/logic/isWatched.ts",
+      "gitBlob": "3cdcf0709f939664d2504d8123ad62774bf40dd6",
+      "size": 408
+    },
+    {
+      "path": "src/logic/iterateFieldsByAction.ts",
+      "gitBlob": "a484ed501c938a11890750fcbb170505318b7397",
+      "size": 1052
+    },
+    {
+      "path": "src/logic/schemaErrorLookup.ts",
+      "gitBlob": "025e8056f7425f8be87bd4402ea780711d7e8d71",
+      "size": 1068
+    },
+    {
+      "path": "src/logic/shouldRenderFormState.ts",
+      "gitBlob": "80b56502973888ed8b9058175e22f0624b4feb65",
+      "size": 784
+    },
+    {
+      "path": "src/logic/shouldSubscribeByName.ts",
+      "gitBlob": "cccc77b5effdf3fd830b32b7b80bd7fc8c020399",
+      "size": 520
+    },
+    {
+      "path": "src/logic/skipValidation.ts",
+      "gitBlob": "4ea77f9375d5eca00b22e87f6a397ae1157737af",
+      "size": 600
+    },
+    {
+      "path": "src/logic/unsetEmptyArray.ts",
+      "gitBlob": "d12c60dac16f75179158185bdd1da19f43544a3a",
+      "size": 208
+    },
+    {
+      "path": "src/logic/updateFieldArrayRootError.ts",
+      "gitBlob": "8fbf4483c232edce6504bb4a4dc07705df764786",
+      "size": 625
+    },
+    {
+      "path": "src/logic/validateField.ts",
+      "gitBlob": "99218ed605cb8f3ad509b64835d7b4d7b516ccf5",
+      "size": 8592
+    },
+    {
+      "path": "src/types/controller.ts",
+      "gitBlob": "40b330a91a19b49c86b8dd62f6fd4903e9a745c9",
+      "size": 2498
+    },
+    {
+      "path": "src/types/errors.ts",
+      "gitBlob": "31e5484b274ea7b4c015f1c547da93750368e89a",
+      "size": 1559
+    },
+    {
+      "path": "src/types/events.ts",
+      "gitBlob": "1bc57f1082b37e428199d9c2b6e598ed5e2d7161",
+      "size": 420
+    },
+    {
+      "path": "src/types/fieldArray.ts",
+      "gitBlob": "5804e460a85d39359de4d2d1bb0ba32d7e1275dd",
+      "size": 8983
+    },
+    {
+      "path": "src/types/fields.ts",
+      "gitBlob": "1beac0d667637a2b2ff6c4b8224dcf2e542b26a4",
+      "size": 1292
+    },
+    {
+      "path": "src/types/form.ts",
+      "gitBlob": "2089f9b9175bd9c673c3ad6bc1ae4b014f55d283",
+      "size": 30806
+    },
+    {
+      "path": "src/types/index.ts",
+      "gitBlob": "74ffe6d62739609bf02c46674eb662a56219a40d",
+      "size": 294
+    },
+    {
+      "path": "src/types/path/common.ts",
+      "gitBlob": "8e519fe0e11a803febb8f3b7aee351d9c8c4a2e4",
+      "size": 12027
+    },
+    {
+      "path": "src/types/path/eager.ts",
+      "gitBlob": "c8a07ab7067fdf09fd5275aafb86fedb5164c5b2",
+      "size": 7380
+    },
+    {
+      "path": "src/types/path/index.ts",
+      "gitBlob": "10191c0c764cbf572940194434eac8530bc0badb",
+      "size": 265
+    },
+    {
+      "path": "src/types/resolvers.ts",
+      "gitBlob": "b20b69b615c85cc5dea93fa2e3a8b9061aa296a0",
+      "size": 1232
+    },
+    {
+      "path": "src/types/utils.ts",
+      "gitBlob": "e367aae93cc2f4885a324d91d35155f5200430c5",
+      "size": 3770
+    },
+    {
+      "path": "src/types/validator.ts",
+      "gitBlob": "ef4506496a864f532607db9b4b3c4a8cc28a2dcb",
+      "size": 2946
+    },
+    {
+      "path": "src/types/watch.ts",
+      "gitBlob": "024e598dd7a5741c212a384076ea6a98404fe0df",
+      "size": 2283
+    },
+    {
+      "path": "src/useController.ts",
+      "gitBlob": "18f33c9b71bb531ea9a1535967152c2c501376f4",
+      "size": 7299
+    },
+    {
+      "path": "src/useFieldArray.ts",
+      "gitBlob": "76204c8626f7e560d0dccb81f4bb8eaa5a4eae2d",
+      "size": 16319
+    },
+    {
+      "path": "src/useForm.ts",
+      "gitBlob": "792f199b2778b7c9164acd88af5afe44f5d6d6a5",
+      "size": 5458
+    },
+    {
+      "path": "src/useFormContext.tsx",
+      "gitBlob": "2e7ce17731663321def7c6e14edb0fe33a300c0d",
+      "size": 3815
+    },
+    {
+      "path": "src/useFormControlContext.ts",
+      "gitBlob": "cd729e410fed0b8cfc48b765084981dbaf0c3def",
+      "size": 760
+    },
+    {
+      "path": "src/useFormState.ts",
+      "gitBlob": "b7a04ff48d69397ce8a9fc8edd881cc5ac85ed33",
+      "size": 3072
+    },
+    {
+      "path": "src/useIsomorphicLayoutEffect.ts",
+      "gitBlob": "b8277c6086176626e2351f4b242395159bbd8c6c",
+      "size": 158
+    },
+    {
+      "path": "src/useWatch.ts",
+      "gitBlob": "ecddd7c4df2b7fcd2d55faf7dc683ea825d06c9c",
+      "size": 10710
+    },
+    {
+      "path": "src/utils/append.ts",
+      "gitBlob": "82b413129de3609ab1e194e20e6ac905f8b0e92b",
+      "size": 167
+    },
+    {
+      "path": "src/utils/cloneObject.ts",
+      "gitBlob": "b95feb82070d077c1d53f14bb284fe0ed7f7c72a",
+      "size": 768
+    },
+    {
+      "path": "src/utils/compact.ts",
+      "gitBlob": "35779202e06dff73c9791a9c26bfd8bff1f90e1c",
+      "size": 97
+    },
+    {
+      "path": "src/utils/convertToArrayPayload.ts",
+      "gitBlob": "f68ec705ed4544b6108be5af5e09cd609b620037",
+      "size": 74
+    },
+    {
+      "path": "src/utils/createSubject.ts",
+      "gitBlob": "a5025c4baa70d04455fc74d5e386dd0fe7f4ccb7",
+      "size": 904
+    },
+    {
+      "path": "src/utils/deepEqual.ts",
+      "gitBlob": "2ae30b4c714a2becebcdc03ecfb2435fa876af54",
+      "size": 1875
+    },
+    {
+      "path": "src/utils/deepMerge.ts",
+      "gitBlob": "fb6c4c9aab240086d57fed018a2368bf4640af83",
+      "size": 663
+    },
+    {
+      "path": "src/utils/extractFormValues.ts",
+      "gitBlob": "a7d731e0f62afeb78accd2b8b5e884f822aab510",
+      "size": 763
+    },
+    {
+      "path": "src/utils/fillEmptyArray.ts",
+      "gitBlob": "094400392c7c70d59839a54bfb7df28d673c7164",
+      "size": 128
+    },
+    {
+      "path": "src/utils/flatten.ts",
+      "gitBlob": "4aa670212dcaa38a6e07c05cb349adb8b0c32076",
+      "size": 596
+    },
+    {
+      "path": "src/utils/get.ts",
+      "gitBlob": "cf66ff6adafe8586ddc8eba68e065d2a929c8e40",
+      "size": 863
+    },
+    {
+      "path": "src/utils/index.ts",
+      "gitBlob": "39e9635312ef0c4cb006af09b3339cc2973b33f1",
+      "size": 80
+    },
+    {
+      "path": "src/utils/insert.ts",
+      "gitBlob": "8ed53248b2ff717b9fd6a8e72a736d34eb19a550",
+      "size": 450
+    },
+    {
+      "path": "src/utils/isBoolean.ts",
+      "gitBlob": "904116f6ccd86d90e75c4b8ef6e6f80a1478acc1",
+      "size": 81
+    },
+    {
+      "path": "src/utils/isCheckBoxInput.ts",
+      "gitBlob": "f5cb3473a2fc9be1522023251fed8374de48c196",
+      "size": 149
+    },
+    {
+      "path": "src/utils/isDateObject.ts",
+      "gitBlob": "75d199b655c5421f0c7fab95960e78ceed90dc32",
+      "size": 73
+    },
+    {
+      "path": "src/utils/isEmptyObject.ts",
+      "gitBlob": "126463f439fed40e6437a59528ab5874a8f491c7",
+      "size": 188
+    },
+    {
+      "path": "src/utils/isFileInput.ts",
+      "gitBlob": "c371e44f50fc8037862a60b539ef87a90b06ee14",
+      "size": 145
+    },
+    {
+      "path": "src/utils/isFunction.ts",
+      "gitBlob": "106057782d3250bb0d94f7fdf08a3f9a66a19ed4",
+      "size": 85
+    },
+    {
+      "path": "src/utils/isHTMLElement.ts",
+      "gitBlob": "5624f7d71b3ac53a3138d9d0c1fe85025a038a31",
+      "size": 327
+    },
+    {
+      "path": "src/utils/isKey.ts",
+      "gitBlob": "b5ab9597ba4f41e6463e9a6b843a032b2ee83346",
+      "size": 85
+    },
+    {
+      "path": "src/utils/isMultipleSelect.ts",
+      "gitBlob": "54174bbe6916ce38ec8b1ab677df38fc6e7bc884",
+      "size": 157
+    },
+    {
+      "path": "src/utils/isNullOrUndefined.ts",
+      "gitBlob": "65e6c1611562268b8a0d76c4e444b103aee339a7",
+      "size": 77
+    },
+    {
+      "path": "src/utils/isObject.ts",
+      "gitBlob": "7d06d2d9dbdbf140b15b8c1f42e2260c630d6416",
+      "size": 364
+    },
+    {
+      "path": "src/utils/isPlainObject.ts",
+      "gitBlob": "b38f5f11ecee4d5b8cee86e715131af61b0d5ece",
+      "size": 262
+    },
+    {
+      "path": "src/utils/isPrimitive.ts",
+      "gitBlob": "bbe6cfa04c83d87b1a693777b8a489acf5cd60a7",
+      "size": 248
+    },
+    {
+      "path": "src/utils/isRadioInput.ts",
+      "gitBlob": "02493cc7c6506a63bf9c2848b46e85aa76f5865b",
+      "size": 146
+    },
+    {
+      "path": "src/utils/isRadioOrCheckbox.ts",
+      "gitBlob": "776a1a03f8103f9773574caa49443c0d6b465aac",
+      "size": 248
+    },
+    {
+      "path": "src/utils/isRegex.ts",
+      "gitBlob": "040a3d85aa908bb934bac925ffab3893f2c314b5",
+      "size": 77
+    },
+    {
+      "path": "src/utils/isString.ts",
+      "gitBlob": "701907e1b89d99ae9fa72166ce99e91fbc94785e",
+      "size": 79
+    },
+    {
+      "path": "src/utils/isUndefined.ts",
+      "gitBlob": "45c6b2cc778489df20f74c6b49ec5eab91844164",
+      "size": 70
+    },
+    {
+      "path": "src/utils/isWeb.ts",
+      "gitBlob": "087a32204f6d0e29f0ccb8f68976300035632d80",
+      "size": 130
+    },
+    {
+      "path": "src/utils/live.ts",
+      "gitBlob": "a8636037f3cfff11209f01b23abe91bdd18f1f6d",
+      "size": 152
+    },
+    {
+      "path": "src/utils/move.ts",
+      "gitBlob": "68171697feac54174eb825e42986b4499999528d",
+      "size": 322
+    },
+    {
+      "path": "src/utils/noop.ts",
+      "gitBlob": "ca6a744710d3ca4435f577fa0dfff4550d0f893f",
+      "size": 34
+    },
+    {
+      "path": "src/utils/objectHasFunction.ts",
+      "gitBlob": "232e50ece9482c5175e586652c88d7f3a4729bdc",
+      "size": 191
+    },
+    {
+      "path": "src/utils/prepend.ts",
+      "gitBlob": "078aeabe8faf15aeb251cb97b1d6833fee7833af",
+      "size": 190
+    },
+    {
+      "path": "src/utils/remove.ts",
+      "gitBlob": "efe2af518d4ef00d1f71b404a95573e199b95164",
+      "size": 580
+    },
+    {
+      "path": "src/utils/set.ts",
+      "gitBlob": "13ddc906663428056e7f313c735944f21c7ff48f",
+      "size": 918
+    },
+    {
+      "path": "src/utils/sleep.ts",
+      "gitBlob": "e1495dcd315614364f895a40b7f5e30297f0cc93",
+      "size": 84
+    },
+    {
+      "path": "src/utils/stringToPath.ts",
+      "gitBlob": "bb9ac6f14a23fe4ef39261037d00d068cfb78c3c",
+      "size": 125
+    },
+    {
+      "path": "src/utils/swap.ts",
+      "gitBlob": "8b685a6fdc514f6a2cbfaaf2f5241c9983db1a0a",
+      "size": 139
+    },
+    {
+      "path": "src/utils/unset.ts",
+      "gitBlob": "48c283a84747c926a0cb2e508ced0ef1eab0bac9",
+      "size": 1664
+    },
+    {
+      "path": "src/utils/update.ts",
+      "gitBlob": "b3ac5f35c93594b5a7ea7df3005966e5b41d5512",
+      "size": 122
+    },
+    {
+      "path": "src/watch.tsx",
+      "gitBlob": "1da2388fa1714f8c46c8b31180ccc0dace9f68aa",
+      "size": 1856
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "99e1c40b8596c536813c5f9398795c4dc2bd36c2",
+      "size": 757
+    }
+  ],
+  "fingerprint": "910a3d1b26cdea4d43d9869e67b41a02e8b809084d040bc8ba336901a4a9206e"
+}

@@ -1,9 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { loadServerFixture } from '../_server-fixture';
 import {
 	BooleanAttrs,
 	ValueAttrs,
@@ -18,6 +17,7 @@ import {
 	StyleShapes,
 	DangerAndSuppress,
 	EnumeratedBooleans,
+	HydratedAttributeValues,
 } from './_fixtures/attr-matrix.tsrx';
 
 // The client template emitter and the SSR emitter each carry their own
@@ -27,18 +27,7 @@ import {
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/attr-matrix.tsrx');
 
-function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'attr-matrix.tsrx', { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:server|internal\/server)['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, {});
-}
-const server = serverModule();
+const server = loadServerFixture(FIXTURE, { id: 'attr-matrix.tsrx' });
 
 const PROPS = [
 	{
@@ -105,6 +94,63 @@ describe('client and SSR attribute policy agree', () => {
 			});
 		}
 	}
+
+	it.each(['matching', 'mismatched'] as const)(
+		'keeps adopted attributes live after %s hydration',
+		(mode) => {
+			const serverProps = { text: 'server', on: true };
+			const clientProps = {
+				text: mode === 'matching' ? 'server' : 'client',
+				on: mode === 'matching',
+			};
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = ServerRT.renderToString(
+				server.HydratedAttributeValues,
+				serverProps,
+			).html;
+			const button = container.querySelector('button')!;
+			const link = container.querySelector('use')!;
+			const custom = container.querySelector('octane-attribute-probe')!;
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			const assertValues = ({ text, on }: { text: string | null; on: boolean }) => {
+				expect(container.querySelector('button')).toBe(button);
+				expect(container.querySelector('use')).toBe(link);
+				expect(container.querySelector('octane-attribute-probe')).toBe(custom);
+				expect(button.getAttribute('title')).toBe(text);
+				expect(button.getAttribute('data-label')).toBe(text);
+				expect(button.disabled).toBe(on);
+				expect(button.getAttribute('aria-expanded')).toBe(String(on));
+				expect(link.getAttributeNS('http://www.w3.org/1999/xlink', 'href')).toBe(text);
+				expect(link.getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang')).toBe(text);
+				expect(custom.getAttribute('customName')).toBe(text);
+				expect(custom.getAttribute('hidden')).toBe(on ? '' : null);
+			};
+			try {
+				root = hydrateRoot(container, HydratedAttributeValues, clientProps);
+				flushSync(() => {});
+				assertValues(clientProps);
+				const mismatch = error.mock.calls.some((args) =>
+					String(args[0]).includes('hydration mismatch'),
+				);
+				expect(mismatch).toBe(
+					mode === 'mismatched' && process.env.OCTANE_TEST_COMPILE_MODE !== 'prod',
+				);
+
+				const updated = { text: 'updated', on: true };
+				flushSync(() => root!.render(HydratedAttributeValues, updated));
+				assertValues(updated);
+				const removed = { text: null, on: false };
+				flushSync(() => root!.render(HydratedAttributeValues, removed));
+				assertValues(removed);
+			} finally {
+				root?.unmount();
+				error.mockRestore();
+				container.remove();
+			}
+		},
+	);
 });
 
 describe('server autofocus survives hydration without stealing focus', () => {

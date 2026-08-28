@@ -1,0 +1,1057 @@
+{
+  "schemaVersion": 1,
+  "project": "formisch-pristine-methods",
+  "roots": ["packages/formisch/upstream/packages/methods/src"],
+  "files": [
+    "packages/formisch/upstream/packages/methods/src/focus/focus.test.ts",
+    "packages/formisch/upstream/packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test.ts",
+    "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+    "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+    "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+    "packages/formisch/upstream/packages/methods/src/getErrors/getErrors.test.ts",
+    "packages/formisch/upstream/packages/methods/src/getInput/getInput.test.ts",
+    "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+    "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+    "packages/formisch/upstream/packages/methods/src/isDirty/isDirty.test.ts",
+    "packages/formisch/upstream/packages/methods/src/isEdited/isEdited.test.ts",
+    "packages/formisch/upstream/packages/methods/src/isTouched/isTouched.test.ts",
+    "packages/formisch/upstream/packages/methods/src/isValid/isValid.test.ts",
+    "packages/formisch/upstream/packages/methods/src/move/move.test.ts",
+    "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+    "packages/formisch/upstream/packages/methods/src/remove/remove.test.ts",
+    "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+    "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+    "packages/formisch/upstream/packages/methods/src/setErrors/setErrors.test.ts",
+    "packages/formisch/upstream/packages/methods/src/setInput/setInput.test.ts",
+    "packages/formisch/upstream/packages/methods/src/submit/submit.test.ts",
+    "packages/formisch/upstream/packages/methods/src/swap/swap.test.ts",
+    "packages/formisch/upstream/packages/methods/src/validate/validate.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:3ceebe2510d60422",
+      "file": "packages/formisch/upstream/packages/methods/src/focus/focus.test.ts",
+      "fullName": "focus should focus first element of field"
+    },
+    {
+      "id": "runtime:84796fc334a4a12a",
+      "file": "packages/formisch/upstream/packages/methods/src/focus/focus.test.ts",
+      "fullName": "focus should focus first element when field has multiple elements"
+    },
+    {
+      "id": "runtime:cb846bb48f6a868a",
+      "file": "packages/formisch/upstream/packages/methods/src/focus/focus.test.ts",
+      "fullName": "focus should focus nested field"
+    },
+    {
+      "id": "runtime:64c126216a5dcd11",
+      "file": "packages/formisch/upstream/packages/methods/src/focus/focus.test.ts",
+      "fullName": "focus should not throw if field has no elements"
+    },
+    {
+      "id": "runtime:68d04271571d1e6f",
+      "file": "packages/formisch/upstream/packages/methods/src/focus/focus.test.ts",
+      "fullName": "focus should skip a detached element and focus the next one"
+    },
+    {
+      "id": "runtime:1e673f6724b0a427",
+      "file": "packages/formisch/upstream/packages/methods/src/focus/focus.test.ts",
+      "fullName": "focus should skip a disabled element and focus the next one"
+    },
+    {
+      "id": "runtime:39faaa6c271e6494",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test.ts",
+      "fullName": "getDeepErrorEntries should include errors on an intermediate object node"
+    },
+    {
+      "id": "runtime:9820c1d99242aff4",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test.ts",
+      "fullName": "getDeepErrorEntries should include form-level errors with an empty path"
+    },
+    {
+      "id": "runtime:f74c2e9c66521d42",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test.ts",
+      "fullName": "getDeepErrorEntries should return empty array when no errors"
+    },
+    {
+      "id": "runtime:002796ff6c933447",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test.ts",
+      "fullName": "getDeepErrorEntries should return entries with nested object paths"
+    },
+    {
+      "id": "runtime:8a08b2ef8f57ada2",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test.ts",
+      "fullName": "getDeepErrorEntries should return entries with numeric array index paths"
+    },
+    {
+      "id": "runtime:591b4d7d446fb7b7",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test.ts",
+      "fullName": "getDeepErrorEntries should return entry for a top-level field"
+    },
+    {
+      "id": "runtime:82ada55601a97e88",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test.ts",
+      "fullName": "getDeepErrorEntries should return only entries under the given path"
+    },
+    {
+      "id": "runtime:1efc1833913e1a01",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+      "fullName": "getDeepErrors should combine errors from multiple fields"
+    },
+    {
+      "id": "runtime:785b377ef85aea4d",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+      "fullName": "getDeepErrors should include form-level errors"
+    },
+    {
+      "id": "runtime:a41a262081dbee17",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+      "fullName": "getDeepErrors should return array item errors"
+    },
+    {
+      "id": "runtime:24f9a6832d7fdee7",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+      "fullName": "getDeepErrors should return field errors as flat array"
+    },
+    {
+      "id": "runtime:3c0fe662c60835ff",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+      "fullName": "getDeepErrors should return multiple errors for same field"
+    },
+    {
+      "id": "runtime:34e92b684cef5a53",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+      "fullName": "getDeepErrors should return nested field errors"
+    },
+    {
+      "id": "runtime:da5d82b3860fdb7d",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+      "fullName": "getDeepErrors should return null when no errors"
+    },
+    {
+      "id": "runtime:feabc8269da78d21",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+      "fullName": "getDeepErrors should return null when no errors exist under the given path"
+    },
+    {
+      "id": "runtime:ba60fe5e3d37b265",
+      "file": "packages/formisch/upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts",
+      "fullName": "getDeepErrors should return only errors under the given path"
+    },
+    {
+      "id": "runtime:2fb90d54372f1f70",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+      "fullName": "getDirtyInput should include dirty leaves under a clean object parent"
+    },
+    {
+      "id": "runtime:668e93f62666f328",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+      "fullName": "getDirtyInput should preserve clean fields of array items when an item is dirty"
+    },
+    {
+      "id": "runtime:1ef89dd2c442543d",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+      "fullName": "getDirtyInput should return only the dirty key from a flat object"
+    },
+    {
+      "id": "runtime:908ac464e55b1d6f",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+      "fullName": "getDirtyInput should return the dirty value for a value path that is dirty"
+    },
+    {
+      "id": "runtime:f886bb531ed75ee3",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+      "fullName": "getDirtyInput should return the full current array when any item is dirty"
+    },
+    {
+      "id": "runtime:2f3b799e501d73a1",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+      "fullName": "getDirtyInput should return undefined for a clean form"
+    },
+    {
+      "id": "runtime:531b49bf29d7c9fe",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+      "fullName": "getDirtyInput should return undefined for a path with a fully clean subtree"
+    },
+    {
+      "id": "runtime:da710dab02e1e358",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+      "fullName": "getDirtyInput should return undefined for a value path that is clean"
+    },
+    {
+      "id": "runtime:808cea28c6964f9e",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts",
+      "fullName": "getDirtyInput should scope the dirty input to the given path"
+    },
+    {
+      "id": "runtime:a2e35d57757988cd",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should emit only the leaf path when both the object and a descendant are dirty"
+    },
+    {
+      "id": "runtime:281c57a2be200971",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return empty array for a clean form"
+    },
+    {
+      "id": "runtime:4da58e30c4eb9a82",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return empty array when scoped to a clean subtree"
+    },
+    {
+      "id": "runtime:c73586b82e694873",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return only the array path when a nested object field inside an array is dirty"
+    },
+    {
+      "id": "runtime:c9b106fc78c0f571",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return path to a dirty top-level value"
+    },
+    {
+      "id": "runtime:5db4baf7520ff246",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return path to a nested dirty value"
+    },
+    {
+      "id": "runtime:89685ae0cb56d76b",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return paths to multiple dirty values"
+    },
+    {
+      "id": "runtime:d2fd2ce1f1684391",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return the array path when any item is dirty"
+    },
+    {
+      "id": "runtime:dd88ea17d849502b",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return the object path when an object transitioned from nullish without a dirty descendant"
+    },
+    {
+      "id": "runtime:2bd1c042fd04d9e2",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return the object path when an object was cleared to null"
+    },
+    {
+      "id": "runtime:d83005e61059f0a2",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return the path when scoped to a dirty value field"
+    },
+    {
+      "id": "runtime:eb390c41ceee03d5",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should return the path when scoped to an array with a dirty item"
+    },
+    {
+      "id": "runtime:59bb2f216de656ed",
+      "file": "packages/formisch/upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts",
+      "fullName": "getDirtyPaths should scope to the given path"
+    },
+    {
+      "id": "runtime:65dc39a1c376e4c8",
+      "file": "packages/formisch/upstream/packages/methods/src/getErrors/getErrors.test.ts",
+      "fullName": "getErrors should return array item errors"
+    },
+    {
+      "id": "runtime:6f7158cb39fb08f1",
+      "file": "packages/formisch/upstream/packages/methods/src/getErrors/getErrors.test.ts",
+      "fullName": "getErrors should return field-level errors"
+    },
+    {
+      "id": "runtime:edb5c2d7e60ef625",
+      "file": "packages/formisch/upstream/packages/methods/src/getErrors/getErrors.test.ts",
+      "fullName": "getErrors should return form-level errors when no path provided"
+    },
+    {
+      "id": "runtime:92aa3a288b6bf5fa",
+      "file": "packages/formisch/upstream/packages/methods/src/getErrors/getErrors.test.ts",
+      "fullName": "getErrors should return nested field errors"
+    },
+    {
+      "id": "runtime:2ec6d14a05445c8b",
+      "file": "packages/formisch/upstream/packages/methods/src/getErrors/getErrors.test.ts",
+      "fullName": "getErrors should return null when field has no errors"
+    },
+    {
+      "id": "runtime:64523ed0541e8225",
+      "file": "packages/formisch/upstream/packages/methods/src/getErrors/getErrors.test.ts",
+      "fullName": "getErrors should return null when form has no errors"
+    },
+    {
+      "id": "runtime:94fa345f6dfed878",
+      "file": "packages/formisch/upstream/packages/methods/src/getInput/getInput.test.ts",
+      "fullName": "getInput should return array item input"
+    },
+    {
+      "id": "runtime:fbea7a8f8055bd8a",
+      "file": "packages/formisch/upstream/packages/methods/src/getInput/getInput.test.ts",
+      "fullName": "getInput should return field input value"
+    },
+    {
+      "id": "runtime:1f282d64270b4ff5",
+      "file": "packages/formisch/upstream/packages/methods/src/getInput/getInput.test.ts",
+      "fullName": "getInput should return full array input"
+    },
+    {
+      "id": "runtime:cd0ea015e42d4dfb",
+      "file": "packages/formisch/upstream/packages/methods/src/getInput/getInput.test.ts",
+      "fullName": "getInput should return full form input when no path provided"
+    },
+    {
+      "id": "runtime:0b0fd71919cbef6b",
+      "file": "packages/formisch/upstream/packages/methods/src/getInput/getInput.test.ts",
+      "fullName": "getInput should return nested field input"
+    },
+    {
+      "id": "runtime:16d15e962743c21e",
+      "file": "packages/formisch/upstream/packages/methods/src/getInput/getInput.test.ts",
+      "fullName": "getInput should return nested object within array"
+    },
+    {
+      "id": "runtime:e0f4faef8a10894e",
+      "file": "packages/formisch/upstream/packages/methods/src/getInput/getInput.test.ts",
+      "fullName": "getInput should return undefined for uninitialized field"
+    },
+    {
+      "id": "runtime:41cbede47f514694",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should call handler with output on valid form"
+    },
+    {
+      "id": "runtime:98f94f84e2399753",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should call handler without event when none provided"
+    },
+    {
+      "id": "runtime:648bd92b8bf52145",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should focus first error field on invalid form"
+    },
+    {
+      "id": "runtime:19ba7638e58ca7bf",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should handle async handler"
+    },
+    {
+      "id": "runtime:28d9c25fcb477ef7",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should not call handler on invalid form"
+    },
+    {
+      "id": "runtime:f6e99cf9a34aa51d",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should reset isSubmitting after error"
+    },
+    {
+      "id": "runtime:db293572f00a0438",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should set form errors when handler throws"
+    },
+    {
+      "id": "runtime:7185ecd615918f98",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should set generic error message for non-Error throws"
+    },
+    {
+      "id": "runtime:7299cf3cb6527495",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should set isSubmitted after form submission"
+    },
+    {
+      "id": "runtime:975a3ce0c57aac36",
+      "file": "packages/formisch/upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts",
+      "fullName": "handleSubmit should set isSubmitting during submission"
+    },
+    {
+      "id": "runtime:41463e1cf37f7f63",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should apply configured empty input to a new item"
+    },
+    {
+      "id": "runtime:ab0ace5c90638ace",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should default a new item without input to its empty input"
+    },
+    {
+      "id": "runtime:ad96cb2e77a2ae6b",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should initialize missing children when inserting item with longer nested array"
+    },
+    {
+      "id": "runtime:bdd0238dce089222",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should insert at middle index without a preinitialized target slot"
+    },
+    {
+      "id": "runtime:20426b2c4a05627e",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should insert into empty array"
+    },
+    {
+      "id": "runtime:ca4b191ff877458d",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should insert into nested array"
+    },
+    {
+      "id": "runtime:fe4a1cc3c224cb0b",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should insert item at end of array"
+    },
+    {
+      "id": "runtime:42addc11b98cd184",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should insert item at specific index and shift children"
+    },
+    {
+      "id": "runtime:4d4b3342a3136e63",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should insert object item"
+    },
+    {
+      "id": "runtime:487f816b7c2c1d14",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should insert object item in the middle without a preinitialized target slot"
+    },
+    {
+      "id": "runtime:20411baad253e8f4",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should mark array as dirty after insert"
+    },
+    {
+      "id": "runtime:660a8ebd5289b8b2",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should mark array as edited after insert"
+    },
+    {
+      "id": "runtime:e4820a4201d5fd58",
+      "file": "packages/formisch/upstream/packages/methods/src/insert/insert.test.ts",
+      "fullName": "insert should reset existing child when inserting at occupied index"
+    },
+    {
+      "id": "runtime:96d9ef675e6ffb3c",
+      "file": "packages/formisch/upstream/packages/methods/src/isDirty/isDirty.test.ts",
+      "fullName": "isDirty should check only the given path"
+    },
+    {
+      "id": "runtime:dc0799432b09af04",
+      "file": "packages/formisch/upstream/packages/methods/src/isDirty/isDirty.test.ts",
+      "fullName": "isDirty should return false when no field is dirty"
+    },
+    {
+      "id": "runtime:d6d8701eed4f8699",
+      "file": "packages/formisch/upstream/packages/methods/src/isDirty/isDirty.test.ts",
+      "fullName": "isDirty should return true for a dirty array item"
+    },
+    {
+      "id": "runtime:5dd4a0cca177ce63",
+      "file": "packages/formisch/upstream/packages/methods/src/isDirty/isDirty.test.ts",
+      "fullName": "isDirty should return true for a nested dirty field"
+    },
+    {
+      "id": "runtime:ab112a69f76578ac",
+      "file": "packages/formisch/upstream/packages/methods/src/isDirty/isDirty.test.ts",
+      "fullName": "isDirty should return true when a field is dirty"
+    },
+    {
+      "id": "runtime:a89c3a95038749b8",
+      "file": "packages/formisch/upstream/packages/methods/src/isEdited/isEdited.test.ts",
+      "fullName": "isEdited should check only the given path"
+    },
+    {
+      "id": "runtime:6d9e32e8eaf4ca40",
+      "file": "packages/formisch/upstream/packages/methods/src/isEdited/isEdited.test.ts",
+      "fullName": "isEdited should return false when no field is edited"
+    },
+    {
+      "id": "runtime:52363beb9a6dc4de",
+      "file": "packages/formisch/upstream/packages/methods/src/isEdited/isEdited.test.ts",
+      "fullName": "isEdited should return true for a nested edited field"
+    },
+    {
+      "id": "runtime:40cddcd982fc2293",
+      "file": "packages/formisch/upstream/packages/methods/src/isEdited/isEdited.test.ts",
+      "fullName": "isEdited should return true for an edited array item"
+    },
+    {
+      "id": "runtime:08764d29febe194d",
+      "file": "packages/formisch/upstream/packages/methods/src/isEdited/isEdited.test.ts",
+      "fullName": "isEdited should return true when a field is edited"
+    },
+    {
+      "id": "runtime:22a0c85882873b61",
+      "file": "packages/formisch/upstream/packages/methods/src/isTouched/isTouched.test.ts",
+      "fullName": "isTouched should check only the given path"
+    },
+    {
+      "id": "runtime:018b84f4ac44850c",
+      "file": "packages/formisch/upstream/packages/methods/src/isTouched/isTouched.test.ts",
+      "fullName": "isTouched should return false when no field is touched"
+    },
+    {
+      "id": "runtime:2403b7a58e027958",
+      "file": "packages/formisch/upstream/packages/methods/src/isTouched/isTouched.test.ts",
+      "fullName": "isTouched should return true for a nested touched field"
+    },
+    {
+      "id": "runtime:b410038eec553625",
+      "file": "packages/formisch/upstream/packages/methods/src/isTouched/isTouched.test.ts",
+      "fullName": "isTouched should return true for a touched array item"
+    },
+    {
+      "id": "runtime:02c1259c73456c2e",
+      "file": "packages/formisch/upstream/packages/methods/src/isTouched/isTouched.test.ts",
+      "fullName": "isTouched should return true when a field is touched"
+    },
+    {
+      "id": "runtime:d03634383e98a8b5",
+      "file": "packages/formisch/upstream/packages/methods/src/isValid/isValid.test.ts",
+      "fullName": "isValid should check only the given path"
+    },
+    {
+      "id": "runtime:1ad616821e55df6c",
+      "file": "packages/formisch/upstream/packages/methods/src/isValid/isValid.test.ts",
+      "fullName": "isValid should return false for array item errors"
+    },
+    {
+      "id": "runtime:9951ac03707df944",
+      "file": "packages/formisch/upstream/packages/methods/src/isValid/isValid.test.ts",
+      "fullName": "isValid should return false for form-level errors"
+    },
+    {
+      "id": "runtime:972cd9b8b1dc7d92",
+      "file": "packages/formisch/upstream/packages/methods/src/isValid/isValid.test.ts",
+      "fullName": "isValid should return false for nested field errors"
+    },
+    {
+      "id": "runtime:4da8992fef01d51c",
+      "file": "packages/formisch/upstream/packages/methods/src/isValid/isValid.test.ts",
+      "fullName": "isValid should return false when a field has errors"
+    },
+    {
+      "id": "runtime:4f40907798199891",
+      "file": "packages/formisch/upstream/packages/methods/src/isValid/isValid.test.ts",
+      "fullName": "isValid should return false when the given path has errors"
+    },
+    {
+      "id": "runtime:9e82670bdb9df8d6",
+      "file": "packages/formisch/upstream/packages/methods/src/isValid/isValid.test.ts",
+      "fullName": "isValid should return true when no errors exist"
+    },
+    {
+      "id": "runtime:0531855f7077f5ff",
+      "file": "packages/formisch/upstream/packages/methods/src/move/move.test.ts",
+      "fullName": "move should mark array as dirty after move"
+    },
+    {
+      "id": "runtime:5b15c94dd1e7efd3",
+      "file": "packages/formisch/upstream/packages/methods/src/move/move.test.ts",
+      "fullName": "move should mark array as edited after move"
+    },
+    {
+      "id": "runtime:e3835f9852ed162e",
+      "file": "packages/formisch/upstream/packages/methods/src/move/move.test.ts",
+      "fullName": "move should mark array as touched after move"
+    },
+    {
+      "id": "runtime:0b675347f60752c7",
+      "file": "packages/formisch/upstream/packages/methods/src/move/move.test.ts",
+      "fullName": "move should move in nested array"
+    },
+    {
+      "id": "runtime:b2293031f3d1545b",
+      "file": "packages/formisch/upstream/packages/methods/src/move/move.test.ts",
+      "fullName": "move should move item backward in array"
+    },
+    {
+      "id": "runtime:98e50d9833795d5e",
+      "file": "packages/formisch/upstream/packages/methods/src/move/move.test.ts",
+      "fullName": "move should move item forward in array"
+    },
+    {
+      "id": "runtime:48f30d2c2f4c9d9e",
+      "file": "packages/formisch/upstream/packages/methods/src/move/move.test.ts",
+      "fullName": "move should move object items correctly"
+    },
+    {
+      "id": "runtime:dc1009322212f3ec",
+      "file": "packages/formisch/upstream/packages/methods/src/move/move.test.ts",
+      "fullName": "move should not change array when from equals to"
+    },
+    {
+      "id": "runtime:b35db383b47d8130",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should include a dirty leaf whose value is undefined"
+    },
+    {
+      "id": "runtime:3a60c06e0634b14b",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should include dirty leaves under a clean object parent"
+    },
+    {
+      "id": "runtime:91811799a9882f15",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should keep an empty object for a nested object whose dirty key is absent"
+    },
+    {
+      "id": "runtime:a1cbd014ab97ed9f",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should pass a diverging value through without throwing when an object is expected"
+    },
+    {
+      "id": "runtime:b5e23f6556cff421",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should pass through an array that was cleared to nullish"
+    },
+    {
+      "id": "runtime:93f8e41bbf6e0cfd",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should pass through the supplied value when an object was cleared to null"
+    },
+    {
+      "id": "runtime:a1c0d449f5ec8609",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should pull values from the supplied value, not the form"
+    },
+    {
+      "id": "runtime:4131fa16622394da",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should return only the dirty key from a flat object"
+    },
+    {
+      "id": "runtime:b76ecb8ff31491c3",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should return the full array atomically when a nested item field is dirty"
+    },
+    {
+      "id": "runtime:fd32380d9c033894",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should return the full current array when any item is dirty"
+    },
+    {
+      "id": "runtime:8729238e1c603076",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should return undefined for a clean form"
+    },
+    {
+      "id": "runtime:4c18f455ab9e67b8",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should return undefined when all dirty keys are absent from the supplied value"
+    },
+    {
+      "id": "runtime:25be80957e8d1273",
+      "file": "packages/formisch/upstream/packages/methods/src/pickDirty/pickDirty.test.ts",
+      "fullName": "pickDirty should skip a dirty key that is absent from the supplied value"
+    },
+    {
+      "id": "runtime:f90adb3b00ff0884",
+      "file": "packages/formisch/upstream/packages/methods/src/remove/remove.test.ts",
+      "fullName": "remove should mark array as dirty after removal"
+    },
+    {
+      "id": "runtime:7414e26690359289",
+      "file": "packages/formisch/upstream/packages/methods/src/remove/remove.test.ts",
+      "fullName": "remove should mark array as edited after removal"
+    },
+    {
+      "id": "runtime:4c9edb08f470af98",
+      "file": "packages/formisch/upstream/packages/methods/src/remove/remove.test.ts",
+      "fullName": "remove should remove first item from array"
+    },
+    {
+      "id": "runtime:3583a2d9988bc128",
+      "file": "packages/formisch/upstream/packages/methods/src/remove/remove.test.ts",
+      "fullName": "remove should remove item from array"
+    },
+    {
+      "id": "runtime:3bc3a0fb33e18eef",
+      "file": "packages/formisch/upstream/packages/methods/src/remove/remove.test.ts",
+      "fullName": "remove should remove item from nested array"
+    },
+    {
+      "id": "runtime:384c02dde71707c6",
+      "file": "packages/formisch/upstream/packages/methods/src/remove/remove.test.ts",
+      "fullName": "remove should remove last item from array"
+    },
+    {
+      "id": "runtime:ffcb18752ab64c1d",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should fully switch variant items including nested arrays (#139)"
+    },
+    {
+      "id": "runtime:bac4b9f3eb90f69e",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should initialize missing children of nested array item"
+    },
+    {
+      "id": "runtime:e7efeeff421167b0",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should keep a nested tuple at its fixed length when its key is omitted"
+    },
+    {
+      "id": "runtime:7cde1e4265e13800",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should keep nested array present and empty when its key is omitted"
+    },
+    {
+      "id": "runtime:2b0e45b738dbffb4",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should mark array as dirty after replace"
+    },
+    {
+      "id": "runtime:876d08803c4743dc",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should mark array as edited after replace"
+    },
+    {
+      "id": "runtime:c2e068cf9d0aad7f",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should not change length when replacing"
+    },
+    {
+      "id": "runtime:4565a16c47bd2862",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should replace first item in array"
+    },
+    {
+      "id": "runtime:2ae430f3b17ea342",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should replace item in array"
+    },
+    {
+      "id": "runtime:f087a2a9ebea8c89",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should replace last item in array"
+    },
+    {
+      "id": "runtime:ba0ceae693bbc88f",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should replace with object item"
+    },
+    {
+      "id": "runtime:569fe5df4833ed49",
+      "file": "packages/formisch/upstream/packages/methods/src/replace/replace.test.ts",
+      "fullName": "replace should reset an omitted required field to its empty input but keep an optional field undefined"
+    },
+    {
+      "id": "runtime:6ab123195919e4b8",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset array field reset should reset array items even with keepInput when lengths match"
+    },
+    {
+      "id": "runtime:0dc06ea2d7e94113",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset array field reset should reset array items to initial state"
+    },
+    {
+      "id": "runtime:76c1776bfc3b6dea",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset array field reset should reset nested array field state"
+    },
+    {
+      "id": "runtime:3502c0de30476f92",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset should reset specific field"
+    },
+    {
+      "id": "runtime:1f07f3ded38be9e5",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset should reset specific field errors"
+    },
+    {
+      "id": "runtime:04419cea51e20af5",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset should reset specific field touched state"
+    },
+    {
+      "id": "runtime:5adde4e0be4bf002",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should keep existing initial input when initialInput key is omitted"
+    },
+    {
+      "id": "runtime:b60e30edba5cd464",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should reset field to empty string initial input"
+    },
+    {
+      "id": "runtime:bc91b5a008e0ca93",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should reset field to false initial input"
+    },
+    {
+      "id": "runtime:fefd23f3a0d03504",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should reset field to its empty input when initialInput is explicitly undefined"
+    },
+    {
+      "id": "runtime:3b90bd4241c3544d",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should reset field to new initial input"
+    },
+    {
+      "id": "runtime:75dd81fcdefa213a",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should reset field to null initial input"
+    },
+    {
+      "id": "runtime:e5e4a6ae0097f452",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should reset field to zero initial input"
+    },
+    {
+      "id": "runtime:b7730e612e3aa552",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should reset nullish array field to new initial input"
+    },
+    {
+      "id": "runtime:aa6e7dbc95562db4",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should reset nullish object field to new initial input"
+    },
+    {
+      "id": "runtime:7450a69e5b8ab92e",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset field reset with initialInput should reset nullish object field to undefined initial input"
+    },
+    {
+      "id": "runtime:ad5514fc9434e743",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset file input reset should reset file input elements"
+    },
+    {
+      "id": "runtime:63374638ff1ec0a6",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset file input reset should reset only file type inputs"
+    },
+    {
+      "id": "runtime:42969d2afb64d37e",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset should reset array field"
+    },
+    {
+      "id": "runtime:3541bb22a7623044",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset should reset field edited state"
+    },
+    {
+      "id": "runtime:551330e005579a34",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset should reset field errors"
+    },
+    {
+      "id": "runtime:113742c118c869ca",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset should reset field input to initial value"
+    },
+    {
+      "id": "runtime:2602c17e511ca997",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset should reset field touched state"
+    },
+    {
+      "id": "runtime:58e31bfd26f047b5",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset should reset file input element"
+    },
+    {
+      "id": "runtime:e6615612abb0fdc1",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset should reset form errors"
+    },
+    {
+      "id": "runtime:065a94c6aa033514",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset should reset form submitted state"
+    },
+    {
+      "id": "runtime:133d936d7a71a7ea",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset should reset nested object field"
+    },
+    {
+      "id": "runtime:25e857d8c3c3ed36",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset with initialInput should reset to new initial input"
+    },
+    {
+      "id": "runtime:aaf888223531fb77",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset with keepEdited should keep edited state"
+    },
+    {
+      "id": "runtime:c2b78948a7d6ae8b",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset with keepErrors should keep field errors"
+    },
+    {
+      "id": "runtime:3e3d7600ebf4f691",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset with keepErrors should keep form errors"
+    },
+    {
+      "id": "runtime:f6715edcff50f2e4",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset with keepInput should keep current input values"
+    },
+    {
+      "id": "runtime:e7c73eeb0c6de323",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset with keepInput should still reset touched and errors"
+    },
+    {
+      "id": "runtime:bb4a2189438c0932",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset with keepSubmitted should keep submitted state"
+    },
+    {
+      "id": "runtime:c9e840db29a2ba7e",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset form reset with keepTouched should keep touched state"
+    },
+    {
+      "id": "runtime:70b4bc02b17bb2ee",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset isDirty edge cases should mark dirty when startInput is null and input is not empty"
+    },
+    {
+      "id": "runtime:509fcb0e2c63b9c0",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset isDirty edge cases should not mark dirty when startInput is null and input is empty string"
+    },
+    {
+      "id": "runtime:3f636bf3ec1a4777",
+      "file": "packages/formisch/upstream/packages/methods/src/reset/reset.test.ts",
+      "fullName": "reset validate on initial mode should validate form when validate mode is initial"
+    },
+    {
+      "id": "runtime:588148968488b52f",
+      "file": "packages/formisch/upstream/packages/methods/src/setErrors/setErrors.test.ts",
+      "fullName": "setErrors should clear field-level errors with null"
+    },
+    {
+      "id": "runtime:e9899618f90cfdc4",
+      "file": "packages/formisch/upstream/packages/methods/src/setErrors/setErrors.test.ts",
+      "fullName": "setErrors should clear form-level errors with null"
+    },
+    {
+      "id": "runtime:7f06b2c12605f4ac",
+      "file": "packages/formisch/upstream/packages/methods/src/setErrors/setErrors.test.ts",
+      "fullName": "setErrors should set array item errors"
+    },
+    {
+      "id": "runtime:50236ef3d65f1545",
+      "file": "packages/formisch/upstream/packages/methods/src/setErrors/setErrors.test.ts",
+      "fullName": "setErrors should set field-level errors"
+    },
+    {
+      "id": "runtime:5497f1253cd43215",
+      "file": "packages/formisch/upstream/packages/methods/src/setErrors/setErrors.test.ts",
+      "fullName": "setErrors should set form-level errors when no path provided"
+    },
+    {
+      "id": "runtime:f5459299573894c6",
+      "file": "packages/formisch/upstream/packages/methods/src/setErrors/setErrors.test.ts",
+      "fullName": "setErrors should set nested field errors"
+    },
+    {
+      "id": "runtime:0a6b4b6f0ca51379",
+      "file": "packages/formisch/upstream/packages/methods/src/setInput/setInput.test.ts",
+      "fullName": "setInput should mark field as dirty when value changes"
+    },
+    {
+      "id": "runtime:cea7becd8021dd22",
+      "file": "packages/formisch/upstream/packages/methods/src/setInput/setInput.test.ts",
+      "fullName": "setInput should not mark field dirty when value same as initial"
+    },
+    {
+      "id": "runtime:d6b6a76819601d17",
+      "file": "packages/formisch/upstream/packages/methods/src/setInput/setInput.test.ts",
+      "fullName": "setInput should set array item input"
+    },
+    {
+      "id": "runtime:7ae70116a43f86f3",
+      "file": "packages/formisch/upstream/packages/methods/src/setInput/setInput.test.ts",
+      "fullName": "setInput should set field input value"
+    },
+    {
+      "id": "runtime:4a081ebd3add0e47",
+      "file": "packages/formisch/upstream/packages/methods/src/setInput/setInput.test.ts",
+      "fullName": "setInput should set full form input"
+    },
+    {
+      "id": "runtime:fa85869cdd3aed57",
+      "file": "packages/formisch/upstream/packages/methods/src/setInput/setInput.test.ts",
+      "fullName": "setInput should set nested field input"
+    },
+    {
+      "id": "runtime:52cd188b91b1708d",
+      "file": "packages/formisch/upstream/packages/methods/src/setInput/setInput.test.ts",
+      "fullName": "setInput should trigger validation when validate option is set"
+    },
+    {
+      "id": "runtime:de9eee74a05f7959",
+      "file": "packages/formisch/upstream/packages/methods/src/submit/submit.test.ts",
+      "fullName": "submit should call requestSubmit on form element"
+    },
+    {
+      "id": "runtime:f28ec3a79c71dca7",
+      "file": "packages/formisch/upstream/packages/methods/src/submit/submit.test.ts",
+      "fullName": "submit should not throw if form element is undefined"
+    },
+    {
+      "id": "runtime:e8b6fd1aad91dff9",
+      "file": "packages/formisch/upstream/packages/methods/src/swap/swap.test.ts",
+      "fullName": "swap should mark array as dirty after swap"
+    },
+    {
+      "id": "runtime:e6e246a41b83ac58",
+      "file": "packages/formisch/upstream/packages/methods/src/swap/swap.test.ts",
+      "fullName": "swap should mark array as edited after swap"
+    },
+    {
+      "id": "runtime:34040a3ddb3a922a",
+      "file": "packages/formisch/upstream/packages/methods/src/swap/swap.test.ts",
+      "fullName": "swap should mark array as touched after swap"
+    },
+    {
+      "id": "runtime:bb952a61c3c7e26c",
+      "file": "packages/formisch/upstream/packages/methods/src/swap/swap.test.ts",
+      "fullName": "swap should not change array when swapping same index"
+    },
+    {
+      "id": "runtime:abcd26e28e640bfd",
+      "file": "packages/formisch/upstream/packages/methods/src/swap/swap.test.ts",
+      "fullName": "swap should swap adjacent items"
+    },
+    {
+      "id": "runtime:559f776e0f5175a5",
+      "file": "packages/formisch/upstream/packages/methods/src/swap/swap.test.ts",
+      "fullName": "swap should swap object items correctly"
+    },
+    {
+      "id": "runtime:d92cd46630cac8a0",
+      "file": "packages/formisch/upstream/packages/methods/src/swap/swap.test.ts",
+      "fullName": "swap should swap two items in array"
+    },
+    {
+      "id": "runtime:4d406c13609e3b33",
+      "file": "packages/formisch/upstream/packages/methods/src/validate/validate.test.ts",
+      "fullName": "validate should focus first error field when shouldFocus is true"
+    },
+    {
+      "id": "runtime:1e0b4e1322011265",
+      "file": "packages/formisch/upstream/packages/methods/src/validate/validate.test.ts",
+      "fullName": "validate should not focus when shouldFocus is false"
+    },
+    {
+      "id": "runtime:65a54f8cda127dc3",
+      "file": "packages/formisch/upstream/packages/methods/src/validate/validate.test.ts",
+      "fullName": "validate should return failure result when validation fails"
+    },
+    {
+      "id": "runtime:cfe0d57edc8eaac7",
+      "file": "packages/formisch/upstream/packages/methods/src/validate/validate.test.ts",
+      "fullName": "validate should validate form and return success result"
+    }
+  ]
+}

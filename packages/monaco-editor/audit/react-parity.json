@@ -8,7 +8,7 @@
     "sourceRoot": "src",
     "testRoot": "src",
     "license": "MIT",
-    "integrity": "sha256:9f083ce5c48af37cc904e49298a5d3338f5ff1f819b44b6cf04686f16f01363f",
+    "integrity": "sha256:46abb7e2335209e445163886b7cd9570d976a5873595e30961f0bee2d28f4974",
     "verification": "verified"
   },
   "upstreamSuites": {
@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "ee4bc14227e7d017e60cb9166ab01ae0dd07a46bd0d3b3b941ebc61072707a08"
+      "lockfileSha256": "5c077d832e5452e1bdafac53ef9691dbc0c5ad6839c5c64352b65c5ae97d1876"
     }
   },
   "lanes": [
@@ -78,9 +78,9 @@
           "sha256": "6920eb5a636adf0f40294e1939b06e8837c673021fc383dbdb7b3ea78f6a165a"
         },
         {
-          "path": "packages/monaco-editor/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "4d3fa183a5b3cf0d4735e9e9a706e68f1f7e4eeb7a8d2bd6db242c66167801dc"
+          "sha256": "c1f88b4b1f29ef55ad11e82275790074e94e4d97dd7331281a67eeb65f9e5a11"
         },
         {
           "path": "packages/monaco-editor/tests/upstream-pristine.vitest.config.ts",
@@ -93,9 +93,9 @@
           "sha256": "91a3c8962a0edcb956206a501d943fe99e1c78c6d4d8b5c9a948a3362c75978c"
         },
         {
-          "path": "packages/monaco-editor/upstream/COMMIT",
+          "path": "packages/monaco-editor/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "c2bc1ce614b25a5289bdc2a2224acd046c6a5680632389874a735b7af64779b7"
+          "sha256": "ce1a8517f4dcd0405ee365ef87691cdae162f9b5c33c39b816fbbbc02a685545"
         }
       ]
     },

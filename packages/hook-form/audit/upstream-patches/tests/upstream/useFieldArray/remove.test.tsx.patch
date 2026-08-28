@@ -1,0 +1,38 @@
+diff --git a/tests/upstream/useFieldArray/remove.test.tsx b/tests/upstream/useFieldArray/remove.test.tsx
+--- a/tests/upstream/useFieldArray/remove.test.tsx
++++ b/tests/upstream/useFieldArray/remove.test.tsx
+@@ -16,10 +16,18 @@ import { useForm } from '../../../src/useForm';
+ import noop from '../../../src/utils/noop';
+ 
+ vi.useFakeTimers();
++// octane: upstream runs this file under jest fake timers; RTL's waitFor only
++// auto-advances a fake clock when it detects a `jest` global (helpers.js
++// jestFakeTimersAreEnabled). Alias it to vi so waitFor drives vitest's fake
++// clock exactly as it drives jest's.
++(globalThis as { jest?: typeof vi }).jest = vi;
+ 
+ let i = 0;
+ 
+-vi.mock('../../../src/logic/generateId', () => () => String(i++));
++// octane: vitest module mock — path resolved from tests/upstream/useFieldArray/, factory returns { default }
++vi.mock('../../../src/logic/generateId', () => ({
++  default: () => String(i++),
++}));
+ 
+ describe('remove', () => {
+   beforeEach(() => {
+@@ -484,6 +492,14 @@ describe('remove', () => {
+     await waitFor(() => expect(isValid).toBeFalsy());
+     expect(screen.getAllByRole('textbox')).toHaveLength(3);
+ 
++    // octane: drain the appends' in-flight async validation before removing.
++    // Upstream's waitFor settles on a jest macrotask that drains the whole
++    // microtask queue; vitest's fake-clock settle is a single microtask hop,
++    // so without this the stale append validation (isValid: false) lands
++    // AFTER remove's re-validation (true) — a last-write-wins inversion the
++    // upstream jest environment never exposes.
++    await act(async () => {});
++
+     fireEvent.click(screen.getByRole('button', { name: 'remove' }));
+     await waitFor(() => expect(isValid).toBe(true));
+   });

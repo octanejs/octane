@@ -22,10 +22,18 @@ describe('@octanejs/tanstack-router-ssr-query parity audit contracts', () => {
 			commit: '8b3659143f634542c455a9d7915a8c7e8fabb65d',
 			verification: 'recorded-unverified',
 		});
-		expect(function runLedger() {
+		// The committed upstream tree verifies offline against
+		// audit/upstream.lock.json (upstream git blob shas at the pinned commit).
+		expect(function runLockCheck() {
 			execFileSync(
 				process.execPath,
-				['packages/tanstack-router-ssr-query/scripts/check-upstream-ledger.mjs'],
+				[
+					'scripts/react-port/materialize.mjs',
+					'run',
+					'--check',
+					'--package-dir',
+					'packages/tanstack-router-ssr-query',
+				],
 				{ cwd: root, stdio: 'pipe' },
 			);
 		}).not.toThrow();
@@ -57,7 +65,8 @@ describe('@octanejs/tanstack-router-ssr-query parity audit contracts', () => {
 		});
 		expect(crosswalk.typeSuite).toMatchObject({
 			disposition: 'present',
-			pristineProject: 'packages/tanstack-router-ssr-query/upstream/package/tsconfig.build.json',
+			pristineProject:
+				'packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json',
 			adaptedCompiler: 'tsrx-tsc',
 		});
 		expect(crosswalk.typeSuite.pristineCompilers).toEqual([
@@ -81,7 +90,7 @@ describe('@octanejs/tanstack-router-ssr-query parity audit contracts', () => {
 		});
 		expect(pristine?.execution?.compilerBins).toHaveLength(6);
 		expect(pristine?.execution?.project).toBe(
-			'packages/tanstack-router-ssr-query/upstream/package/tsconfig.build.json',
+			'packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json',
 		);
 		expect(
 			manifest.lanes.some(function hasPristine(lane) {

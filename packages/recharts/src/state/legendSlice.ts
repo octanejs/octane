@@ -1,0 +1,109 @@
+// Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
+import { createSlice, current, PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
+import { castDraft } from 'immer';
+import { LayoutType, Size } from '../util/types';
+import {
+	HorizontalAlignmentType,
+	LegendPayload,
+	VerticalAlignmentType,
+} from '../component/DefaultLegendContent.tsrx';
+import type { LegendItemSorter } from '../component/Legend.tsrx';
+
+export type LegendSettings = {
+	layout: LayoutType;
+	align: HorizontalAlignmentType;
+	verticalAlign: VerticalAlignmentType;
+	itemSorter: LegendItemSorter | null;
+};
+
+/**
+ * The properties inside this state update independently of each other and quite often.
+ * When selecting, never select the whole state because you are going to get
+ * unnecessary re-renders. Select only the properties you need.
+ *
+ * This is why this state type is not exported - don't use it directly.
+ */
+type LegendState = {
+	settings: LegendSettings;
+	size: Size;
+	/**
+	 * This is a 2D array of LegendPayloads. The first dimension is for each graphical item.
+	 * Some items may have multiple legend items, so the second dimension is for each legend item.
+	 */
+	payload: ReadonlyArray<ReadonlyArray<LegendPayload>>;
+};
+
+const initialState: LegendState = {
+	settings: {
+		layout: 'horizontal',
+		align: 'center',
+		verticalAlign: 'bottom',
+		itemSorter: 'value',
+	},
+	size: {
+		width: 0,
+		height: 0,
+	},
+	payload: [],
+};
+
+const legendSlice = createSlice({
+	name: 'legend',
+	initialState,
+	reducers: {
+		setLegendSize(state, action: PayloadAction<Size>) {
+			state.size.width = action.payload.width;
+			state.size.height = action.payload.height;
+		},
+		setLegendSettings(state, action: PayloadAction<LegendSettings>) {
+			state.settings.align = action.payload.align;
+			state.settings.layout = action.payload.layout;
+			state.settings.verticalAlign = action.payload.verticalAlign;
+			state.settings.itemSorter = action.payload.itemSorter;
+		},
+		addLegendPayload: {
+			reducer(state, action: PayloadAction<ReadonlyArray<LegendPayload>>) {
+				state.payload.push(castDraft(action.payload));
+			},
+			prepare: prepareAutoBatched<ReadonlyArray<LegendPayload>>(),
+		},
+		replaceLegendPayload: {
+			reducer(
+				state,
+				action: PayloadAction<{
+					prev: ReadonlyArray<LegendPayload>;
+					next: ReadonlyArray<LegendPayload>;
+				}>,
+			) {
+				const { prev, next } = action.payload;
+				const index = current(state).payload.indexOf(castDraft(prev));
+				if (index > -1) {
+					state.payload[index] = castDraft(next);
+				}
+			},
+			prepare: prepareAutoBatched<{
+				prev: ReadonlyArray<LegendPayload>;
+				next: ReadonlyArray<LegendPayload>;
+			}>(),
+		},
+		removeLegendPayload: {
+			reducer(state, action: PayloadAction<ReadonlyArray<LegendPayload>>) {
+				const index = current(state).payload.indexOf(castDraft(action.payload));
+				if (index > -1) {
+					state.payload.splice(index, 1);
+				}
+			},
+			prepare: prepareAutoBatched<ReadonlyArray<LegendPayload>>(),
+		},
+	},
+});
+
+export const {
+	setLegendSize,
+	setLegendSettings,
+	addLegendPayload,
+	replaceLegendPayload,
+	removeLegendPayload,
+} = legendSlice.actions;
+
+export const legendReducer = legendSlice.reducer;

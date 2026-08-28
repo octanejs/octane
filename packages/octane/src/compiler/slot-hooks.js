@@ -15,14 +15,30 @@
 
 import { parseModule } from '@tsrx/core';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
+import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 import { METHOD_DEP_IMPORT, annotateHookCalls } from './hook-deps.js';
 import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
+import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
+import { nativeReadActivationIndex } from './native-read-codegen.js';
+
+function importsNativeRenderer(ast) {
+	return ast.body.some(
+		(node) =>
+			node.type === 'ImportDeclaration' &&
+			node.importKind !== 'type' &&
+			['octane', 'octane/server', 'octane/signals/client', 'octane/signals/server'].includes(
+				node.source?.value,
+			) &&
+			(node.specifiers.length === 0 ||
+				node.specifiers.some((specifier) => specifier.importKind !== 'type')),
+	);
+}
 
 // Build a cheap import-presence gate. Precise call identity is annotated by the
 // lexical scope analysis in analyzeHookDependencies below; this gate only avoids
 // doing the surgical edit walk for modules that cannot contain an Octane hook.
-function octaneHookLocals(ast) {
+function octaneHookLocals(ast, nativeReads = false) {
 	const locals = new Map();
 	let importsHook = false;
 	let hasOctaneImport = false;
@@ -34,8 +50,13 @@ function octaneHookLocals(ast) {
 			hasOctaneImport = true;
 			continue;
 		}
-		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
-		hasOctaneImport = true;
+		if (node.type !== 'ImportDeclaration') continue;
+		const native =
+			nativeReads &&
+			(node.source?.value === 'octane/signals/client' ||
+				node.source?.value === 'octane/signals/server');
+		if (node.source?.value !== 'octane' && !native) continue;
+		if (!native) hasOctaneImport = true;
 		for (const sp of node.specifiers || []) {
 			if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
 				locals.set(sp.local.name, '*');
@@ -47,7 +68,12 @@ function octaneHookLocals(ast) {
 			const local = sp.local?.name;
 			if (!imported || !local) continue;
 			locals.set(local, imported);
-			if (HOOK_NAMES.has(imported) || imported === 'use') importsHook = true;
+			if (
+				HOOK_NAMES.has(imported) ||
+				imported === 'use' ||
+				(native && NATIVE_SIGNAL_HOOK_NAMES.has(imported))
+			)
+				importsHook = true;
 		}
 	}
 	return { locals, importsHook, hasOctaneImport };
@@ -776,7 +802,14 @@ function parallelUseCallOfStatement(statement) {
 }
 
 function requireParallelHelper(st, imported) {
-	const request = st.environment === 'server' ? 'octane/server' : 'octane';
+	const request =
+		imported === 'nativePuMemo' || imported === 'enableNativeReadCollection'
+			? st.environment === 'server'
+				? 'octane/internal/server'
+				: 'octane/internal/client'
+			: st.environment === 'server'
+				? 'octane/server'
+				: 'octane';
 	const key = `${request}\0${imported}`;
 	let helper = st.parallelHelpers.get(key);
 	if (helper !== undefined) return helper.local;
@@ -791,7 +824,11 @@ function requireParallelHelper(st, imported) {
 
 function emitParallelUseRun(run, owner, st) {
 	if (run.uses.length === 0) return;
-	const memoName = st.environment === 'server' ? 'puMemo' : 'useMemo';
+	const memoName = st.nativeReads
+		? 'nativePuMemo'
+		: st.environment === 'server'
+			? 'puMemo'
+			: 'useMemo';
 	const batchName = st.environment === 'server' ? 'puBatch' : 'useBatch';
 	const batchHelper = requireParallelHelper(st, batchName);
 	const temps = [];
@@ -935,14 +972,26 @@ function walk(node, owner, st) {
 		node.type === 'FunctionDeclaration' && node.id ? hookOwner(node, node.id.name) : owner;
 
 	if (node.type === 'CallExpression') {
-		const imported = node._octaneImportedHook;
-		if (imported && HOOK_NAMES.has(imported)) {
+		const imported =
+			node._octaneImportedHook ??
+			(st.nativeReads ? node._octaneHookRuntimeImportedHook : undefined);
+		if (
+			imported &&
+			(HOOK_NAMES.has(imported) || (st.nativeReads && NATIVE_SIGNAL_HOOK_NAMES.has(imported)))
+		) {
 			const local =
 				node.callee?.type === 'Identifier'
 					? node.callee.name
 					: `${node.callee?.object?.name || 'octane'}.${imported}`;
 			const sym = allocHookSymbol(st, owner, local, imported, node);
 			const inferred = st.inferred.get(node);
+			if (node._octaneNativeInferredMemo === true) {
+				st.edits.push({
+					pos: node.callee.start,
+					end: node.callee.end,
+					text: requireParallelHelper(st, 'nativePuMemo'),
+				});
+			}
 			if (inferred !== undefined) {
 				// The dependency callback is already the final user argument. Insert
 				// both the generated array and slot in one edit so equal-position edit
@@ -1005,7 +1054,7 @@ function walk(node, owner, st) {
  *
  * @param {string} source raw module text
  * @param {string} id     module id (embedded in the stable Symbol.for key)
- * @param {{ environment?: 'client' | 'server', strong?: boolean, hmr?: boolean, dev?: boolean, profile?: boolean, profileFilename?: string, inlineHookMemo?: boolean, manualSlots?: boolean, universalRuntime?: unknown, renderer?: { target?: string }, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
+ * @param {{ environment?: 'client' | 'server', strong?: boolean, nativeReads?: boolean, hmr?: boolean, dev?: boolean, profile?: boolean, profileFilename?: string, inlineHookMemo?: boolean, manualSlots?: boolean, universalRuntime?: unknown, renderer?: { target?: string }, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
  *   `Symbol.for(stableKey)` so a re-imported module resolves the same hook
  *   slots (state survives HMR); off (ordinary prod builds and SSR) emits
  *   runtime-ranged Symbols. Profiling retains short described Symbols because
@@ -1016,6 +1065,7 @@ function walk(node, owner, st) {
  * @returns {{ code: string, map: any } | null}
  */
 export function slotHooks(source, id, options) {
+	assertNativeReadOptions(options);
 	const environment = options?.environment ?? 'client';
 	if (environment !== 'client' && environment !== 'server') {
 		throw new Error(
@@ -1029,13 +1079,15 @@ export function slotHooks(source, id, options) {
 		return null; // let the normal pipeline surface the parse error
 	}
 	assertStrongMode(ast, source, id, options);
-	const importInfo = octaneHookLocals(ast);
+	assertNativeReadDiagnostics(ast, source, id, options);
+	const importInfo = octaneHookLocals(ast, options?.nativeReads === true);
+	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
 	const canSpecializeRoot =
 		!options?.hmr &&
 		!options?.profile &&
 		typeof options?.isVoidComponentImport === 'function' &&
 		importInfo.hasOctaneImport;
-	if (!importInfo.importsHook && !canSpecializeRoot) {
+	if (!importInfo.importsHook && !canSpecializeRoot && !nativeReadActivation) {
 		return null;
 	}
 	// The parsed tree is never mutated: annotateHookCalls returns a COW-rebuilt
@@ -1047,6 +1099,10 @@ export function slotHooks(source, id, options) {
 		const annotated = annotateHookCalls(ast, {
 			filename: id,
 			onlyImported: true,
+			nativeReads: options?.nativeReads === true,
+			...(options?.nativeReads === true
+				? { hookRuntimeModules: ['octane/signals/client', 'octane/signals/server'] }
+				: null),
 			...(options?.manualSlots === true ? { inferDependencies: false } : null),
 		});
 		ast = annotated.ast;
@@ -1065,16 +1121,22 @@ export function slotHooks(source, id, options) {
 	) {
 		const inlined = inlinePlainHookMemos(ast, source, id, {
 			manualSlots: options?.manualSlots === true,
-			hookNames: HOOK_NAMES,
+			hookNames:
+				options?.nativeReads === true
+					? new Set([...HOOK_NAMES, ...NATIVE_SIGNAL_HOOK_NAMES])
+					: HOOK_NAMES,
+			nativeReads: options?.nativeReads === true,
+			nativeReadActivation,
 			inferred,
 			getterCalls,
 			stateGetterHelpers: STATE_GETTER_HELPERS,
 		});
 		if (inlined !== null) return inlined;
 	}
-	if (options?.manualSlots === true) return null;
+	if (options?.manualSlots === true && !nativeReadActivation) return null;
 
 	const st = {
+		nativeReads: options?.nativeReads === true,
 		locals: importInfo.locals,
 		source,
 		inferred,
@@ -1097,24 +1159,17 @@ export function slotHooks(source, id, options) {
 		voidRootName: null,
 	};
 	if (!st.hmr && !st.profile) st.slotBaseName = allocSlotName(st, '_hs$');
-	if (importInfo.importsHook) {
+	if (importInfo.importsHook && options?.manualSlots !== true) {
 		collectParallelUseEdits(ast, st);
 		for (const node of ast.body || []) walk(node, hookOwner(null, 'module'), st);
 	}
 	if (canSpecializeRoot) {
 		collectVoidRootEdits(ast, st, options.isVoidComponentImport);
 	}
-	if (st.edits.length === 0) return null;
-
-	// Apply insertions right-to-left so earlier offsets stay valid.
-	st.edits.sort((a, b) => b.pos - a.pos);
-	let code = source;
-	for (const edit of st.edits) {
-		code =
-			code.slice(0, edit.pos) +
-			edit.text +
-			code.slice(edit.end === undefined ? edit.pos : edit.end);
-	}
+	if (st.edits.length === 0 && !nativeReadActivation) return null;
+	const activation = nativeReadActivation
+		? requireParallelHelper(st, 'enableNativeReadCollection')
+		: null;
 
 	// APPEND the slot consts (rather than prepend) so every original line number
 	// stays put — this pass emits no source map, so aligned lines are what keep
@@ -1141,13 +1196,16 @@ export function slotHooks(source, id, options) {
 		helperSpecifiers.length === 0
 			? ''
 			: `import { ${helperSpecifiers.join(', ')} } from 'octane';\n`;
-	const serverHelperSpecifiers = [...st.parallelHelpers.values()]
-		.filter((helper) => helper.request === 'octane/server')
-		.map((helper) => `${helper.imported} as ${helper.local}`);
-	const serverHelperImport =
-		serverHelperSpecifiers.length === 0
-			? ''
-			: `import { ${serverHelperSpecifiers.join(', ')} } from 'octane/server';\n`;
+	const otherHelpers = new Map();
+	for (const helper of st.parallelHelpers.values()) {
+		if (helper.request === 'octane') continue;
+		let specifiers = otherHelpers.get(helper.request);
+		if (specifiers === undefined) otherHelpers.set(helper.request, (specifiers = []));
+		specifiers.push(`${helper.imported} as ${helper.local}`);
+	}
+	const otherHelperImports = [...otherHelpers]
+		.map(([request, specifiers]) => `import { ${specifiers.join(', ')} } from '${request}';\n`)
+		.join('');
 	const profileImport = st.profile
 		? "import { __profileHook as _$__profileHook } from 'octane/profiling';\n"
 		: '';
@@ -1156,7 +1214,26 @@ export function slotHooks(source, id, options) {
 			? `const ${st.slotBaseName} = /* @__PURE__ */ ${st.hookSlotsName}(${st.nextId});\n`
 			: '';
 	const block =
-		helperImport + serverHelperImport + profileImport + slotBase + st.decls.join('\n') + '\n';
-	code = code.endsWith('\n') ? code + block : code + '\n' + block;
+		helperImport + otherHelperImports + profileImport + slotBase + st.decls.join('\n') + '\n';
+	if (activation !== null) {
+		// Native plain modules can render a local function during evaluation.
+		// Its slots and invocation collector must already exist at that call.
+		// No newline is inserted, retaining the surgical pass's line mapping.
+		const index = nativeReadActivationIndex(ast.body);
+		st.edits.push({
+			pos: ast.body[index]?.start ?? source.length,
+			text: `;${block.replace(/\n/g, ' ')}${activation}(1); `,
+		});
+	}
+	// Apply insertions right-to-left so earlier offsets stay valid.
+	st.edits.sort((a, b) => b.pos - a.pos);
+	let code = source;
+	for (const edit of st.edits) {
+		code =
+			code.slice(0, edit.pos) +
+			edit.text +
+			code.slice(edit.end === undefined ? edit.pos : edit.end);
+	}
+	if (activation === null) code = code.endsWith('\n') ? code + block : code + '\n' + block;
 	return { code, map: null };
 }

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tauri",
-  "version": "0.0.25",
+  "version": "0.0.32",
   "license": "MIT",
   "type": "module",
   "engines": {
