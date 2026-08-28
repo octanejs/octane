@@ -174,7 +174,7 @@ In scope is the shared legacy collection helper used by Radix primitives, its be
 | Gate | Evidence | Done signal |
 | --- | --- | --- |
 | Targeted Radix behavior | `./node_modules/.bin/vitest run packages/radix/tests/alert-tabs.test.ts packages/radix/tests/menubar.test.ts packages/radix/tests/select.test.ts --reporter=verbose` | Focus, selection, disabled-item, portal, and accessibility scenarios pass. |
-| Radix package regression | `pnpm --filter @octanejs/radix test` | All package tests pass. |
+| Radix package regression | `./node_modules/.bin/vitest run --project radix` | All package tests pass. |
 | Performance quick check | `node benchmarks/bench.mjs --quick --ratios radix-collection-order` | Correctness gates and the R5 ratio pass. |
 | Performance evidence | `node benchmarks/bench.mjs --ratios radix-collection-order` | Repeated normal samples pass with the committed ratio headroom. |
 | Upstream boundary | `node packages/radix/scripts/check-upstream-ledger.mjs` | Vendored hashes, package graph, and export crosswalk remain valid. |

@@ -64,6 +64,27 @@ function verifyEdgeCases(sortProduction) {
 		assert.deepEqual(sort([], []), []);
 		assert.deepEqual(sort([first], [items[3]]), [items[3]]);
 	}
+
+	const positionedNodes = Array.from(
+		{ length: COLLECTION_ORDER_INDEX_THRESHOLD - 2 },
+		(_, index) => ({ index }),
+	);
+	const indexedNodes = [first, second, ...positionedNodes];
+	const indexedItems = [
+		...items,
+		...positionedNodes
+			.slice(0, COLLECTION_ORDER_INDEX_THRESHOLD - items.length)
+			.map((node, index) => ({ id: `positioned-${index}`, ref: { current: node } })),
+	];
+	const indexedExpected = sortWithCurrentComparator(indexedNodes, [...indexedItems]).map(
+		(item) => item.id,
+	);
+	assert.equal(indexedItems.length, COLLECTION_ORDER_INDEX_THRESHOLD);
+	assert.deepEqual(indexedExpected.slice(0, expected.length), expected);
+	assert.deepEqual(
+		sortProduction(indexedNodes, [...indexedItems]).map((item) => item.id),
+		indexedExpected,
+	);
 }
 
 function sample(sort, scenario) {
