@@ -6160,8 +6160,8 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		 *  registering/suspending for the rest of this render so plain use()
 		 *  string-key replay drives progress instead. */
 		batchDisabled?: boolean;
-		/** observeSuspenseWave state — consecutive recreation strikes + the
-		 *  puMemo creation-cache size at the previous observation. */
+		/** Consecutive recreation strikes + the creation-cache size at the
+		 *  initial pending pass, then at each observeSuspenseWave observation. */
 		recreate?: { strikes: number; prevCreated: number };
 		/** Armed by observeSuspenseWave after a first strike: identity-resolved
 		 *  thenables (use() / puBatch resolvedT hits) are recorded here during
@@ -6590,6 +6590,9 @@ async function settleSuspended(
 	signal: AbortSignal | undefined,
 ): Promise<void> {
 	const pu = (resolved as ResolvedMap).pu;
+	// Snapshot the first pass, not an artificial -1: existing creation sites
+	// are not evidence of new work on the first canonical retry.
+	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
 	const settleAll = Promise.all(
 		suspended.map(async ({ promise, key }) => {
 			if (resolved.has(key)) return;
@@ -6638,6 +6641,7 @@ async function settleFirstOfWave(
 	signal: AbortSignal | undefined,
 ): Promise<void> {
 	const pu = (resolved as ResolvedMap).pu;
+	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
 	const recorders: Promise<void>[] = [];
 	for (const { promise, key } of suspended) {
 		if (resolved.has(key)) continue;
@@ -6722,11 +6726,11 @@ function observeSuspenseWave(
 	settled: SuspendedList,
 	next: SuspendedList,
 	boundaryProgress: boolean,
-): void {
+): boolean {
 	const pu = resolved.pu;
 	if (pu.batchDisabled === true) {
 		pu.touched = undefined;
-		return;
+		return false;
 	}
 	let state = pu.recreate;
 	if (state === undefined) state = pu.recreate = { strikes: 0, prevCreated: -1 };
@@ -6734,8 +6738,9 @@ function observeSuspenseWave(
 	state.prevCreated = pu.created.size;
 	const touched = pu.touched;
 	pu.touched = undefined;
-	const reset = (): void => {
+	const reset = (): false => {
 		state.strikes = 0;
+		return false;
 	};
 	if (boundaryProgress || createdGrew) return reset();
 	let prevPu: Set<PromiseLike<unknown>> | null = null;
@@ -6768,9 +6773,14 @@ function observeSuspenseWave(
 	}
 	if (++state.strikes < 2) {
 		pu.touched = new Set(); // arm consumption tracking for the next pass
-		return;
+		return false;
 	}
 	pu.batchDisabled = true;
+	// The immediate retry abandons this pass's registrations. puBatch usually
+	// observes its own promises, but directly thrown resources and speculative
+	// warm work may not have subscribers yet. Observe every outcome without
+	// waiting or recording obsolete string-key results into the replay cache.
+	for (const { promise } of next) Promise.resolve(promise).then(NOOP, NOOP);
 	if (process.env.NODE_ENV !== 'production') {
 		console.error(
 			'octane SSR: use() thenables appear to be re-created on every render pass — ' +
@@ -6781,6 +6791,10 @@ function observeSuspenseWave(
 				'Falling back to per-site replay for the rest of this render.',
 		);
 	}
+	// The caller must recollect suspensions under the new per-site regime.
+	// Waiting for the just-created batch would settle identities that this
+	// canonical retry is about to replace again.
+	return true;
 }
 
 // The await-everything render core. Runs full canonical passes interleaved with
@@ -6816,7 +6830,9 @@ async function runBuffered(
 			throw err;
 		}
 		if (pass.suspended.length === 0) return pass;
-		if (lastSettled !== null) observeSuspenseWave(resolved, lastSettled, pass.suspended, false);
+		if (lastSettled !== null && observeSuspenseWave(resolved, lastSettled, pass.suspended, false)) {
+			continue;
+		}
 		// Between full passes, greedily discover deeper waterfall levels with cheap
 		// SUBTREE re-runs (skipping the static bulk) so the NEXT full pass jumps
 		// straight to canonical. A root-level boundary (job.frame.parent === null)
@@ -8303,6 +8319,10 @@ async function runStream(
 	let pass: FullPassResult;
 	let shellBoundaryKeys: Set<string>;
 	let preShellSuspended: SuspendedList = [];
+	// One-shot retry when batching is disabled. Keep it across shell publication
+	// so the final root retry cannot strand the same obsolete batch in the
+	// boundary loop. Both loops retain their abort checks and attempt bounds.
+	let retryWithoutSettling = false;
 	try {
 		signal?.throwIfAborted();
 		({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
@@ -8323,10 +8343,12 @@ async function runStream(
 				throw new Error(formatServerError(35, MAX_SUSPENSE_PASSES));
 			}
 			const settledWave = pass.suspended;
-			await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			if (!retryWithoutSettling) {
+				await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			}
 			({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
 			preShellSuspended = pass.suspended;
-			observeSuspenseWave(resolved, settledWave, pass.suspended, false);
+			retryWithoutSettling = observeSuspenseWave(resolved, settledWave, pass.suspended, false);
 			signal?.throwIfAborted();
 		}
 		pruneStreamBoundariesAbsentFromShell(stream, shellBoundaryKeys);
@@ -8460,7 +8482,9 @@ async function runStream(
 				throw new Error(formatServerError(48, MAX_SUSPENSE_PASSES));
 			}
 			const settledWave = suspended;
-			await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			if (!retryWithoutSettling) {
+				await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			}
 			pass = renderFullPass().pass;
 			suspended = pass.suspended;
 			reportRecoverableBoundaryErrors();
@@ -8506,7 +8530,7 @@ async function runStream(
 				}
 			}
 			if (madeProgress) attempt = 0; // a boundary completed — this wave was legitimate
-			observeSuspenseWave(resolved, settledWave, suspended, madeProgress);
+			retryWithoutSettling = observeSuspenseWave(resolved, settledWave, suspended, madeProgress);
 
 			// A nested boundary's template may live inside an enclosing boundary's
 			// not-yet-flushed segment. Build a topological emission order: roots and
