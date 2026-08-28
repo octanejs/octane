@@ -331,6 +331,94 @@ async function waitForLocatorText(
 	);
 }
 
+// Exercise the same sample selector after dev and production hydration. The
+// clipboard capture observes the public browser API without OS permissions.
+async function assertHomepageIntegrationSamples(baseUrl: string) {
+	const { page, errors } = await loadRoute(baseUrl, '/', {
+		beforeNavigation: async (page) => {
+			await page.addInitScript(() => {
+				const writes: string[] = [];
+				Object.defineProperty(window, 'integrationClipboardWrites', { value: writes });
+				Object.defineProperty(navigator, 'clipboard', {
+					configurable: true,
+					value: {
+						writeText: async (text: string) => {
+							writes.push(text);
+						},
+					},
+				});
+			});
+		},
+	});
+	try {
+		const choices = page.getByRole('group', { name: 'React integration example' });
+		const reactInOctane = choices.getByRole('button', { name: 'React in Octane', exact: true });
+		const octaneInReact = choices.getByRole('button', { name: 'Octane in React', exact: true });
+		const panel = page.locator('#compat-example');
+		const code = panel.locator('pre code');
+		const copy = panel.getByRole('button', { name: 'Copy the selected integration sample' });
+		const copiedSamples: string[] = [];
+		const pollOptions = { timeout: PLAYWRIGHT_ACTION_TIMEOUT };
+
+		const readSelectedSample = async (reactSelected: boolean) => {
+			await expect
+				.poll(() => reactInOctane.getAttribute('aria-pressed'), pollOptions)
+				.toBe(String(reactSelected));
+			await expect
+				.poll(() => octaneInReact.getAttribute('aria-pressed'), pollOptions)
+				.toBe(String(!reactSelected));
+			await expect
+				.poll(() => panel.locator('.compat-code-name').innerText(), pollOptions)
+				.toBe(reactSelected ? 'App.tsrx' : 'App.tsx');
+			await code.waitFor({ state: 'visible' });
+			const visibleCode = await code.innerText();
+			expect(visibleCode).toContain(reactSelected ? '<ReactCompat>' : '<OctaneCompat>');
+			return visibleCode;
+		};
+		const copySelectedSample = async () => {
+			copiedSamples.push(await code.innerText());
+			await copy.click();
+			await expect
+				.poll(
+					() =>
+						page.evaluate(
+							() =>
+								(window as Window & { integrationClipboardWrites?: string[] })
+									.integrationClipboardWrites,
+						),
+					pollOptions,
+				)
+				.toEqual(copiedSamples);
+			await expect.poll(() => copy.innerText(), pollOptions).toBe('Copied');
+		};
+
+		const reactSample = await readSelectedSample(true);
+		await copySelectedSample();
+		await octaneInReact.click();
+		const octaneSample = await readSelectedSample(false);
+		expect(octaneSample).not.toBe(reactSample);
+		// Once the new code is visible, the old copy status must already be gone;
+		// waiting for it could accidentally accept the previous sample's timer.
+		expect(await copy.innerText()).toBe('Copy');
+		await copySelectedSample();
+
+		// Native buttons must activate from both keyboard gestures, not only a
+		// pointer click. Returning to a sample also starts with fresh copy status.
+		await reactInOctane.focus();
+		await page.keyboard.press('Enter');
+		expect(await readSelectedSample(true)).toBe(reactSample);
+		expect(await copy.innerText()).toBe('Copy');
+		await copySelectedSample();
+		await octaneInReact.focus();
+		await page.keyboard.press('Space');
+		expect(await readSelectedSample(false)).toBe(octaneSample);
+		expect(await copy.innerText()).toBe('Copy');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+}
+
 // The end-to-end contract behind the compiler's exact-origin channel, run
 // against BOTH servers: the dev pipeline and the production build compile the
 // playground through different toolchains, and this has to hold on each.
@@ -833,6 +921,12 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 				await page.close();
 			}
 		},
+	);
+
+	it.concurrent(
+		'the homepage selects and copies the active React integration sample by pointer and keyboard',
+		{ timeout: 45_000 },
+		() => assertHomepageIntegrationSamples(`http://localhost:${DEV_PORT}`),
 	);
 
 	it.concurrent(
@@ -1529,6 +1623,12 @@ describe(
 					await page.close();
 				}
 			},
+		);
+
+		it.concurrent(
+			'the homepage selects and copies the active React integration sample by pointer and keyboard',
+			{ timeout: 45_000 },
+			() => assertHomepageIntegrationSamples(PREVIEW_ORIGIN),
 		);
 
 		it.concurrent(

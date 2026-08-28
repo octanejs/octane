@@ -6,6 +6,11 @@ Structural baseline for **React-hosted Octane compat islands**
 the real compiled Octane runtime; every number is a deterministic structural
 **count**, not a timing.
 
+This suite covers the `OctaneCompat` direction. For `ReactCompat` (React inside
+Octane), see the [opposite-direction benchmark](../octane-hosted-react/README.md).
+The [React compatibility guide](https://octanejs.dev/docs/react-compat) explains
+the public APIs for both directions.
+
 The fixture mounts one React root owning N host elements, then one hosted
 Octane root (bound to a minimal `RendererRegionOwnerBridge` owner) per host —
 the plan's island architecture with no contexts or suspensions, so the counts

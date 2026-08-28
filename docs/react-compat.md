@@ -30,8 +30,11 @@ export function Counter({ start }: { start: number }) {
 
 The built-in **ReactCompat** playground example includes live props, callbacks
 into Octane, an imperative React ref, local Suspense, and unmount/remount controls.
-`OctaneCompat`, from the same entry, supports the opposite direction: Octane
-components inside React.
+`OctaneCompat`, from the same entry, supports the opposite direction: compiled
+Octane components inside React 19. See the
+[two-direction interoperability guide](https://octanejs.dev/docs/react-compat)
+for choosing a boundary and setting up a mixed application. Both boundaries
+have server implementations in `octane/react/server`.
 
 ## Compiler ownership
 
@@ -115,7 +118,9 @@ allows nested React→Octane→React trees to delete safely during a React commi
 ## Context
 
 Map a native Octane context to a real React context once, then pass the mapping
-to the boundary:
+to the boundary. This is specific to `ReactCompat`: in the opposite direction,
+an Octane component inside `OctaneCompat` can already read a real React context
+directly with Octane's `use` or `useContext`.
 
 ```ts
 /** @jsxImportSource octane */
