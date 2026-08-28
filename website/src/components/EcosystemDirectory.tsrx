@@ -21,6 +21,12 @@ interface DirectorySection {
 	entities: EcosystemEntity[];
 }
 
+interface DirectoryState {
+	q: string;
+	kind: string;
+	category: string;
+}
+
 const ENTITIES = ecosystemIndex as EcosystemEntity[];
 const CATEGORIES = BINDING_CATEGORIES.map((category) => {
 	const entity = ENTITIES.find(
@@ -36,6 +42,27 @@ const VALID_CATEGORIES = new Set(CATEGORIES.map((category) => category.id));
 
 function stringParam(value: unknown): string {
 	return typeof value === 'string' ? value : '';
+}
+
+function directoryState(rawSearch: Record<string, unknown>): DirectoryState {
+	const kind =
+		rawSearch.kind === 'binding' || rawSearch.kind === 'integration' ? rawSearch.kind : '';
+	return {
+		q: stringParam(rawSearch.q),
+		kind,
+		category: kind !== 'integration' && typeof rawSearch.category === 'string' &&
+		VALID_CATEGORIES.has(rawSearch.category)
+			? rawSearch.category
+			: '',
+	};
+}
+
+function searchParams(state: DirectoryState): Record<string, string> {
+	const search: Record<string, string> = {};
+	if (state.q) search.q = state.q;
+	if (state.kind) search.kind = state.kind;
+	if (state.category) search.category = state.category;
+	return search;
 }
 
 function directorySections(entities: EcosystemEntity[]): DirectorySection[] {
@@ -61,15 +88,10 @@ function directorySections(entities: EcosystemEntity[]): DirectorySection[] {
 export function EcosystemDirectory() @{
 	const rawSearch = useSearch({ strict: false }) as Record<string, unknown>;
 	const navigate = useNavigate();
-	const query = stringParam(rawSearch.q);
-	const kind =
-		rawSearch.kind === 'binding' || rawSearch.kind === 'integration' ? rawSearch.kind : '';
-	const category =
-		typeof rawSearch.category === 'string' && VALID_CATEGORIES.has(rawSearch.category)
-			? rawSearch.category
-			: '';
+	const { q: query, kind, category } = directoryState(rawSearch);
 	const filters = { kind, category };
 	const searching = query.trim().length >= 2;
+	const queryTooShort = query.trim().length === 1;
 	const visible =
 		searching
 			? searchEcosystem(ENTITIES, query, filters).map((match) => match.entity)
@@ -78,41 +100,31 @@ export function EcosystemDirectory() @{
 	const hasSelection = Boolean(query || kind || category);
 
 	const updateLocation = (
-		next: { q?: string; kind?: string; category?: string },
+		update: (current: DirectoryState) => DirectoryState,
 		replace: boolean,
 	) => {
-		const search: Record<string, string> = {};
-		if (next.q) search.q = next.q;
-		if (next.kind) search.kind = next.kind;
-		if (next.category) search.category = next.category;
 		navigate({
 			to: '/docs/$slug',
 			params: { slug: 'bindings' },
-			search,
+			search: (previous: Record<string, unknown>) => searchParams(update(directoryState(previous))),
 			hash: undefined,
 			replace,
 		});
 	};
 
 	const onQuery = (event: Event) => {
-		updateLocation(
-			{
-				q: (event.currentTarget as HTMLInputElement).value,
-				kind,
-				category,
-			},
-			true,
-		);
+		const q = (event.currentTarget as HTMLInputElement).value;
+		updateLocation((current) => ({ ...current, q }), true);
 	};
 
 	const onKind = (event: Event) => {
 		const nextKind = (event.currentTarget as HTMLSelectElement).value;
 		updateLocation(
-			{
-				q: query,
+			(current) => ({
+				...current,
 				kind: nextKind,
-				category: nextKind === 'integration' ? '' : category,
-			},
+				category: nextKind === 'integration' ? '' : current.category,
+			}),
 			false,
 		);
 	};
@@ -120,14 +132,16 @@ export function EcosystemDirectory() @{
 	const onCategory = (event: Event) => {
 		const nextCategory = (event.currentTarget as HTMLSelectElement).value;
 		updateLocation(
-			{
-				q: query,
-				kind: nextCategory ? 'binding' : kind,
+			(current) => ({
+				...current,
+				kind: nextCategory ? 'binding' : current.kind,
 				category: nextCategory,
-			},
+			}),
 			false,
 		);
 	};
+
+	const reset = () => updateLocation(() => ({ q: '', kind: '', category: '' }), false);
 
 	<div class="ecosystem-directory">
 		<div class="ecosystem-controls" role="search" aria-label="Search integrations and bindings">
@@ -173,13 +187,16 @@ export function EcosystemDirectory() @{
 					<span>{visible.length + (visible.length === 1 ? ' result' : ' results') + ' for “' +
 						query.trim() +
 						'”' as string}</span>
+				} @else if (queryTooShort) {
+					<span>{visible.length + (visible.length === 1 ? ' package' : ' packages') +
+						' · enter at least 2 characters to search' as string}</span>
 				} @else {
 					<span>{visible.length +
 						(visible.length === 1 ? ' package' : ' packages') as string}</span>
 				}
 			</p>
 			@if (hasSelection) {
-				<button type="button" class="ecosystem-reset" onClick={() => updateLocation({}, false)}>
+				<button type="button" class="ecosystem-reset" onClick={reset}>
 					Reset search and filters
 				</button>
 			}
@@ -239,7 +256,7 @@ export function EcosystemDirectory() @{
 			<div class="ecosystem-empty">
 				<strong>No matches</strong>
 				<p>Try a package name, broader job, or reset the active filters.</p>
-				<button type="button" class="ecosystem-reset" onClick={() => updateLocation({}, false)}>
+				<button type="button" class="ecosystem-reset" onClick={reset}>
 					Show the complete directory
 				</button>
 			</div>

@@ -86,6 +86,55 @@ describe('ecosystem directory', () => {
 				category: 'shared-state',
 			}),
 		);
+
+		router.history.back();
+		await waitFor(() => {
+			expect(router.state.location.search).toEqual({ q: 'zustand', kind: 'binding' });
+			expect(category.value).toBe('');
+		});
+		router.history.back();
+		await waitFor(() => {
+			expect(router.state.location.search).toEqual({ q: 'zustand' });
+			expect(search.value).toBe('zustand');
+			expect(kind.value).toBe('');
+		});
+		router.history.forward();
+		await waitFor(() => {
+			expect(router.state.location.search).toEqual({ q: 'zustand', kind: 'binding' });
+			expect(kind.value).toBe('binding');
+		});
+	});
+
+	it('merges rapid query and filter changes into one URL state', async () => {
+		const { container, router } = await renderRoute('/docs/bindings');
+		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
+		const kind = container.querySelector<HTMLSelectElement>('#ecosystem-kind')!;
+
+		fireEvent.input(search, { target: { value: 'astro' } });
+		fireEvent.change(kind, { target: { value: 'integration' } });
+
+		await waitFor(() =>
+			expect(router.state.location.search).toEqual({ q: 'astro', kind: 'integration' }),
+		);
+		expect(container.querySelector('.ecosystem-entity')?.id).toBe('integration-astro');
+	});
+
+	it('explains one-character search and ignores incompatible URL filters', async () => {
+		const { container } = await renderRoute(
+			'/docs/bindings?q=a&kind=integration&category=shared-state',
+		);
+		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
+		const category = container.querySelector<HTMLSelectElement>('#ecosystem-category')!;
+
+		expect(search.value).toBe('a');
+		expect(category.value).toBe('');
+		expect(category.disabled).toBe(true);
+		expect(container.querySelector('.ecosystem-results-summary')?.textContent).toContain(
+			'enter at least 2 characters to search',
+		);
+		expect(container.querySelectorAll('.ecosystem-entity')).toHaveLength(
+			FRAMEWORK_INTEGRATION_COUNT,
+		);
 	});
 
 	it('offers a useful reset when filters have no matches', async () => {

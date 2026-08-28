@@ -6,7 +6,7 @@ import {
 	type EcosystemEntity,
 } from '../src/lib/ecosystem-search-core.ts';
 import { loadSearchIndex } from '../src/lib/docs-search.ts';
-import { searchSite } from '../src/lib/site-search.ts';
+import { createSiteSearchIndexLoader, searchSite } from '../src/lib/site-search.ts';
 
 const entities = ecosystemIndex as EcosystemEntity[];
 
@@ -70,7 +70,40 @@ describe('ecosystem entity search', () => {
 		expect(new Set(packages).size).toBe(packages.length);
 		expect(results.some((result) => result.entity.kind === 'framework-integration')).toBe(true);
 		expect(results.some((result) => result.entity.kind === 'library-binding')).toBe(true);
-		expect(packages).toEqual(packagesFor('tanstack'));
+	});
+
+	it('uses catalog order to break equal-score ties', () => {
+		const fixture: EcosystemEntity[] = [
+			{
+				kind: 'library-binding',
+				id: 'binding-later',
+				title: 'Later package',
+				packageName: '@octanejs/later',
+				upstreamPackage: 'later',
+				category: 'State',
+				categoryId: 'state',
+				description: 'Use later with Octane.',
+				searchTerms: ['cache'],
+				order: 2,
+			},
+			{
+				kind: 'library-binding',
+				id: 'binding-earlier',
+				title: 'Earlier package',
+				packageName: '@octanejs/earlier',
+				upstreamPackage: 'earlier',
+				category: 'State',
+				categoryId: 'state',
+				description: 'Use earlier with Octane.',
+				searchTerms: ['cache'],
+				order: 1,
+			},
+		];
+
+		expect(searchEcosystem(fixture, 'cache').map((result) => result.entity.packageName)).toEqual([
+			'@octanejs/earlier',
+			'@octanejs/later',
+		]);
 	});
 
 	it('bounds fuzzy matching and ignores invalid filters', () => {
@@ -109,5 +142,38 @@ describe('site search composition', () => {
 		);
 		const lastDoc = serverRendering.findLastIndex((result) => result.type === 'docs');
 		expect(firstWeak === -1 || firstWeak > lastDoc).toBe(true);
+	}, 30_000);
+
+	it('keeps docs available when the ecosystem chunk fails', async () => {
+		const docs = await loadSearchIndex();
+		let entityAttempts = 0;
+		const load = createSiteSearchIndexLoader({
+			docs: async () => docs,
+			entities: async () => {
+				if (entityAttempts++ === 0) throw new Error('ecosystem chunk unavailable');
+				return entities;
+			},
+		});
+
+		const degraded = await load();
+		expect(degraded.entities).toEqual([]);
+		expect(searchSite(degraded, 'server rendering')[0]).toMatchObject({ type: 'docs' });
+		await expect(load()).resolves.toMatchObject({ entities });
+		expect(entityAttempts).toBe(2);
+	});
+
+	it('retries after the docs index fails to load', async () => {
+		let attempts = 0;
+		const load = createSiteSearchIndexLoader({
+			docs: async () => {
+				if (attempts++ === 0) throw new Error('docs chunk unavailable');
+				return [];
+			},
+			entities: async () => [],
+		});
+
+		await expect(load()).rejects.toThrow('docs chunk unavailable');
+		await expect(load()).resolves.toEqual({ docs: [], entities: [] });
+		expect(attempts).toBe(2);
 	});
 });

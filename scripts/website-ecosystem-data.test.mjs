@@ -104,6 +104,25 @@ test('binding catalog validation identifies invalid editorial records', () => {
 	}
 });
 
+test('binding category titles produce unique stable ids', () => {
+	const packages = getWorkspacePackages();
+	const source = readJson('website/src/content/bindings.json');
+	const punctuationOnly = structuredClone(source);
+	punctuationOnly[0].title = '!!!';
+	expectCatalogError(punctuationOnly, packages, 'does not produce a stable category id');
+
+	const colliding = structuredClone(source);
+	colliding[0].title = 'AI data and routing';
+	expectCatalogError(colliding, packages, 'duplicates derived category id "ai-data-and-routing"');
+});
+
+function expectCatalogError(catalog, packages, expected) {
+	assert.ok(
+		validateBindingCatalogData(catalog, packages).some((error) => error.includes(expected)),
+		expected,
+	);
+}
+
 test('integration catalog validation requires unique guide metadata', () => {
 	const packages = getWorkspacePackages();
 	const source = readJson('website/src/content/framework-integrations.json');
@@ -160,7 +179,7 @@ test('website ecosystem assembly emits every typed entity in authored order', ()
 		upstreamPackage: '@tanstack/react-router',
 		category: 'AI, data, and routing',
 		categoryId: 'ai-data-and-routing',
-		description: router.description,
+		description: 'Use @tanstack/react-router with Octane.',
 		searchTerms: ['TanStack React Router'],
 		order: router.order,
 	});
@@ -178,6 +197,10 @@ test('website ecosystem assembly emits every typed entity in authored order', ()
 		guideAnchor: 'tanstack-start',
 		order: start.order,
 	});
+	for (const record of records.filter((record) => record.kind === 'library-binding')) {
+		assert.match(record.description, /^Use .+ with Octane\.$/);
+		assert.ok(record.description.length < 120, `${record.packageName} description is too long`);
+	}
 });
 
 test('website ecosystem assembly rejects missing package and status data', () => {

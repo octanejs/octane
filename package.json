@@ -97,7 +97,7 @@
     "cli:data": "node scripts/generate-cli-data.mjs",
     "cli:data:check": "node scripts/generate-cli-data.mjs --check",
     "website:ecosystem-data": "node scripts/generate-website-ecosystem-data.mjs",
-    "website:ecosystem-data:check": "node scripts/generate-website-ecosystem-data.mjs --check",
+    "website:ecosystem-data:check": "node scripts/generate-website-ecosystem-data.mjs --check && node --test scripts/website-ecosystem-data.test.mjs",
     "scaffold:manifest": "node scripts/generate-scaffold-manifest.mjs",
     "scaffold:manifest:check": "node scripts/generate-scaffold-manifest.mjs --check",
     "binding-parity:gaps": "node scripts/generate-binding-parity-gaps.mjs",

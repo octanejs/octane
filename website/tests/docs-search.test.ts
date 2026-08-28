@@ -324,7 +324,10 @@ describe('search dialog', () => {
 
 		fireEvent.keyDown(dialog, { key: 'ArrowDown' });
 		fireEvent.keyDown(dialog, { key: 'ArrowDown' });
-		expect(dialog.querySelector('[data-search-row="2"]')?.classList.contains('active')).toBe(true);
+		const guide = dialog.querySelector<HTMLElement>(
+			'[role="option"][aria-label="Open the TanStack Start integration guide"]',
+		)!;
+		expect(guide.getAttribute('aria-selected')).toBe('true');
 		fireEvent.keyDown(dialog, { key: 'Enter' });
 		await waitFor(() => {
 			if (router.state.location.pathname !== '/docs/framework-integrations') {
@@ -332,6 +335,36 @@ describe('search dialog', () => {
 			}
 		});
 		expect(router.state.location.hash).toBe('tanstack-start');
+	});
+
+	it('uses the focused secondary action when Enter bubbles to the dialog', async () => {
+		const { container } = await renderRoute('/');
+		fireEvent.click(container.querySelector<HTMLButtonElement>('.search-trigger')!);
+		const dialog = await waitFor(() =>
+			document.body.querySelector<HTMLElement>('[role="dialog"]')!,
+		);
+		fireEvent.input(dialog.querySelector<HTMLInputElement>('.search-input')!, {
+			target: { value: 'tanstack start' },
+		});
+		const packageAction = await waitFor(() => {
+			const element = dialog.querySelector<HTMLAnchorElement>(
+				'[role="option"][aria-label="Open the TanStack Start package guide"]',
+			);
+			if (!element) throw new Error('package action did not render');
+			return element;
+		});
+		let activations = 0;
+		packageAction.addEventListener('click', (event) => {
+			event.preventDefault();
+			activations++;
+		});
+
+		fireEvent.focus(packageAction);
+		expect(packageAction.getAttribute('aria-selected')).toBe('true');
+		fireEvent.keyDown(packageAction, { key: 'Enter' });
+
+		expect(activations).toBe(1);
+		expect(document.body.querySelector('[role="dialog"]')).toBe(dialog);
 	});
 
 	it('opens on ⌘K / Ctrl-K and closes on Escape', async () => {

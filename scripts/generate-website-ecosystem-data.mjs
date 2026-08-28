@@ -2,7 +2,14 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { format, resolveConfig } from 'prettier';
-import { getWorkspacePackages, readEcosystemCatalogs, REPO_ROOT } from './workspace-packages.mjs';
+import {
+	ecosystemSlug,
+	getWorkspacePackages,
+	readEcosystemCatalogs,
+	REPO_ROOT,
+} from './workspace-packages.mjs';
+
+export { ecosystemSlug } from './workspace-packages.mjs';
 
 export const WEBSITE_ECOSYSTEM_INDEX_PATH = path.join(
 	REPO_ROOT,
@@ -11,13 +18,6 @@ export const WEBSITE_ECOSYSTEM_INDEX_PATH = path.join(
 
 function readJson(file) {
 	return JSON.parse(readFileSync(file, 'utf8'));
-}
-
-export function ecosystemSlug(value) {
-	return value
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-|-$/g, '');
 }
 
 export function loadWebsiteEcosystemInputs() {
@@ -99,11 +99,6 @@ export function assembleWebsiteEcosystemData({
 					`website ecosystem: packages/${pkg.dir}/status.json needs upstream.package`,
 				);
 			}
-			if (typeof pkg.status.surface !== 'string' || !pkg.status.surface.trim()) {
-				throw new Error(
-					`website ecosystem: packages/${pkg.dir}/status.json needs a non-empty surface`,
-				);
-			}
 			records.push({
 				kind: 'library-binding',
 				id: `binding-${pkg.dir}`,
@@ -112,7 +107,7 @@ export function assembleWebsiteEcosystemData({
 				upstreamPackage: pkg.status.upstream.package,
 				category: category.title,
 				categoryId,
-				description: pkg.status.surface,
+				description: `Use ${pkg.status.upstream.package} with Octane.`,
 				searchTerms: binding.searchTerms ?? [],
 				order: order++,
 			});

@@ -25,7 +25,7 @@ let indexPromise: Promise<SearchRecord[]> | null = null;
 /** Build (once) and return the flat section index. Safe to call repeatedly. */
 export function loadSearchIndex(): Promise<SearchRecord[]> {
 	if (!indexPromise) {
-		indexPromise = import('../content/docs.ts').then(({ docs }) =>
+		const pending = import('../content/docs.ts').then(({ docs }) =>
 			Promise.all(
 				Object.entries(rawDocs).map(async ([path, load]) => {
 					const slug = slugOf(path);
@@ -53,6 +53,10 @@ export function loadSearchIndex(): Promise<SearchRecord[]> {
 				}),
 			).then((groups) => groups.flat()),
 		);
+		indexPromise = pending.catch((error) => {
+			indexPromise = null;
+			throw error;
+		});
 	}
 	return indexPromise;
 }

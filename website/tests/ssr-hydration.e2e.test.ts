@@ -1646,6 +1646,69 @@ describe(
 		);
 
 		it.concurrent(
+			'ecosystem directory preserves rapid edits through browser history',
+			{ timeout: 30_000 },
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/docs/bindings', {
+					waitForNetworkIdle: true,
+				});
+				try {
+					const query = page.locator('#ecosystem-search');
+					const kind = page.locator('#ecosystem-kind');
+					const category = page.locator('#ecosystem-category');
+					const initialHistoryLength = await page.evaluate(() => history.length);
+					await query.fill('zu');
+					await query.fill('zustand');
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('q') === 'zustand',
+					);
+					expect(await page.evaluate(() => history.length)).toBe(initialHistoryLength);
+					await kind.selectOption('binding');
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(await page.evaluate(() => history.length)).toBe(initialHistoryLength + 1);
+					await category.selectOption('shared-state');
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('category') === 'shared-state',
+					);
+					expect(await page.evaluate(() => history.length)).toBe(initialHistoryLength + 2);
+					expect(await page.locator('.ecosystem-entity').first().getAttribute('id')).toBe(
+						'binding-zustand',
+					);
+
+					await page.goBack();
+					await page.waitForFunction(() => !new URL(location.href).searchParams.has('category'));
+					expect(await query.inputValue()).toBe('zustand');
+					expect(await kind.inputValue()).toBe('binding');
+					expect(await category.inputValue()).toBe('');
+
+					await page.goBack();
+					await page.waitForFunction(() => !new URL(location.href).searchParams.has('kind'));
+					expect(await query.inputValue()).toBe('zustand');
+					expect(await kind.inputValue()).toBe('');
+
+					await page.goForward();
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(await kind.inputValue()).toBe('binding');
+
+					await page.getByRole('button', { name: 'Reset search and filters' }).click();
+					await page.waitForFunction(() => new URL(location.href).search === '');
+					await page.goBack();
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(await query.inputValue()).toBe('zustand');
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+		);
+
+		it.concurrent(
 			'keeps both Lynx example panes readable beside the desktop docs sidebar',
 			{ timeout: 30_000 },
 			async () => {

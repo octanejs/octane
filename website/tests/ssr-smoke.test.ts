@@ -20,6 +20,9 @@ import {
 	OCTANE_CARDS,
 	TARGET_CARDS,
 } from '../src/content/benchmarks.ts';
+import ecosystemIndex from '../src/content/ecosystem-index.json';
+import type { EcosystemEntity } from '../src/lib/ecosystem-search-core.ts';
+import { ecosystemPackageGuideHref } from '../src/lib/ecosystem-presentation.ts';
 
 const origin = inject('productionOrigin');
 const outputDir = inject('productionOutputDir');
@@ -149,6 +152,28 @@ describe('built Start server', () => {
 		expect(html).toContain('<h1>');
 		expect(classCount(html, 'prose')).toBeGreaterThan(0);
 		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
+	});
+
+	it('server-renders the complete ecosystem directory without JavaScript', async () => {
+		const { response, html } = await get('/docs/bindings');
+		const entities = ecosystemIndex as EcosystemEntity[];
+		expect(response.status).toBe(200);
+		expect(classCount(html, 'ecosystem-entity')).toBe(entities.length);
+
+		let previousPosition = -1;
+		for (const entity of entities) {
+			const position = html.indexOf(`id="${entity.id}"`);
+			expect(position, entity.id).toBeGreaterThan(previousPosition);
+			previousPosition = position;
+			expect(html, entity.packageName).toContain(
+				`href="${ecosystemPackageGuideHref(entity.packageName)}"`,
+			);
+			if (entity.kind === 'framework-integration') {
+				expect(html, entity.packageName).toContain(
+					`href="/docs/framework-integrations#${entity.guideAnchor}"`,
+				);
+			}
+		}
 	});
 
 	it('server-renders a filtered ecosystem result from its shareable URL', async () => {

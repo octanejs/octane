@@ -123,6 +123,13 @@ function identity(value) {
 	return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
+export function ecosystemSlug(value) {
+	return value
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '');
+}
+
 export function validateBindingCatalogData(catalog, packages = getWorkspacePackages()) {
 	const errors = [];
 	if (!Array.isArray(catalog)) {
@@ -133,6 +140,7 @@ export function validateBindingCatalogData(catalog, packages = getWorkspacePacka
 	const expectedNames = new Set(expected.map((pkg) => pkg.name));
 	const directories = new Map(expected.map((pkg) => [pkg.name, pkg.dir]));
 	const categoryTitles = new Set();
+	const categoryIds = new Set();
 	const packageNames = new Set();
 	const displayTitles = new Set();
 
@@ -148,6 +156,14 @@ export function validateBindingCatalogData(catalog, packages = getWorkspacePacka
 			errors.push(`${label} duplicates category title "${category.title}"`);
 		} else {
 			categoryTitles.add(identity(category.title));
+			const categoryId = ecosystemSlug(category.title);
+			if (!categoryId) {
+				errors.push(`${label} title "${category.title}" does not produce a stable category id`);
+			} else if (categoryIds.has(categoryId)) {
+				errors.push(`${label} duplicates derived category id "${categoryId}"`);
+			} else {
+				categoryIds.add(categoryId);
+			}
 		}
 		if (typeof category.description !== 'string' || !category.description.trim()) {
 			errors.push(`${label} needs a non-empty "description"`);

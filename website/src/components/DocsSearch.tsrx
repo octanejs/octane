@@ -34,6 +34,8 @@ function SearchDialog(props: DialogProps) @{
 	const [query, setQuery] = useState('');
 	const [active, setActive] = useState(0);
 	const [index, setIndex] = useState<SiteSearchIndex | null>(null);
+	const [indexFailed, setIndexFailed] = useState(false);
+	const [loadAttempt, setLoadAttempt] = useState(0);
 	const inputEl = useRef<HTMLInputElement | null>(null);
 	const navigate = useNavigate();
 	const results: SiteSearchResult[] =
@@ -41,15 +43,21 @@ function SearchDialog(props: DialogProps) @{
 
 	useEffect(() => {
 		let live = true;
-		loadSiteSearchIndex().then((loaded) => {
-			if (!live) return;
-			setIndex(loaded);
-		});
+		loadSiteSearchIndex().then(
+			(loaded) => {
+				if (!live) return;
+				setIndex(loaded);
+				setIndexFailed(false);
+			},
+			() => {
+				if (live) setIndexFailed(true);
+			},
+		);
 		inputEl.current?.focus();
 		return () => {
 			live = false;
 		};
-	});
+	}, [loadAttempt]);
 
 	useEffect(() => {
 		const previous = document.body.style.overflow;
@@ -161,6 +169,12 @@ function SearchDialog(props: DialogProps) @{
 		setActive(0);
 	};
 
+	const retryIndex = () => {
+		setIndex(null);
+		setIndexFailed(false);
+		setLoadAttempt((attempt) => attempt + 1);
+	};
+
 	const onKeyDown = (event: KeyboardEvent) => {
 		if (event.key === 'Escape') {
 			props.onClose();
@@ -217,6 +231,7 @@ function SearchDialog(props: DialogProps) @{
 									aria-label={'View ' + card.entity.title + ' in the ecosystem directory'}
 									data-search-row={card.primaryRow}
 									onMouseEnter={() => setActive(card.primaryRow)}
+									onFocus={() => setActive(card.primaryRow)}
 									onClick={() => goToEntity(card.entity)}
 								>
 									<span class="search-type">{ecosystemEntityTypeLabel(card.entity) as string}</span>
@@ -241,6 +256,7 @@ function SearchDialog(props: DialogProps) @{
 										aria-label={'Open the ' + card.entity.title + ' package guide'}
 										data-search-row={card.packageRow}
 										onMouseEnter={() => setActive(card.packageRow)}
+										onFocus={() => setActive(card.packageRow)}
 									>
 										Package guide ↗
 									</a>
@@ -259,6 +275,7 @@ function SearchDialog(props: DialogProps) @{
 											aria-label={'Open the ' + card.entity.title + ' integration guide'}
 											data-search-row={card.guideRow}
 											onMouseEnter={() => setActive(card.guideRow as number)}
+											onFocus={() => setActive(card.guideRow as number)}
 											onClick={(event: Event) => goToIntegrationGuide(card.entity, event)}
 										>
 											Integration guide
@@ -275,6 +292,7 @@ function SearchDialog(props: DialogProps) @{
 									aria-selected={card.headRow === active}
 									data-search-row={card.headRow}
 									onMouseEnter={() => setActive(card.headRow)}
+									onFocus={() => setActive(card.headRow)}
 									onClick={() => goToDocs(card.group)}
 								>
 									<span class="search-crumb">{card.crumb as string}</span>
@@ -294,6 +312,7 @@ function SearchDialog(props: DialogProps) @{
 												aria-selected={line.row === active}
 												data-search-row={line.row}
 												onMouseEnter={() => setActive(line.row)}
+												onFocus={() => setActive(line.row)}
 												onClick={() => goToDocs(card.group)}
 											>
 												@for (const part of line.parts; key part.i) {
@@ -312,8 +331,13 @@ function SearchDialog(props: DialogProps) @{
 					}
 				</div>
 			} @else {
-				<p class="search-empty">
-					@if (!index) {
+				<div class="search-empty">
+					@if (indexFailed) {
+						<>
+							<span>Search could not load.</span>
+							<button type="button" class="search-retry" onClick={retryIndex}>Retry</button>
+						</>
+					} @else if (!index) {
 						<span>Loading the search index…</span>
 					} @else {
 						@if (query.trim().length < 2) {
@@ -322,7 +346,7 @@ function SearchDialog(props: DialogProps) @{
 							<span>{'No matches for “' + query.trim() + '”.'}</span>
 						}
 					}
-				</p>
+				</div>
 			}
 		</div>
 
@@ -538,6 +562,16 @@ function SearchDialog(props: DialogProps) @{
 				color: var(--text-secondary);
 				font-size: 0.9rem;
 				text-align: center;
+			}
+			.search-retry {
+				margin-left: 0.45rem;
+				padding: 0;
+				border: 0;
+				background: transparent;
+				color: var(--accent-text);
+				font: inherit;
+				font-weight: 700;
+				cursor: pointer;
 			}
 			@media (max-width: 520px) {
 				.search-overlay {

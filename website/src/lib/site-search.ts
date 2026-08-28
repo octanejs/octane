@@ -41,16 +41,42 @@ export function searchSite(
 	);
 }
 
-let indexPromise: Promise<SiteSearchIndex> | undefined;
-
-export function loadSiteSearchIndex(): Promise<SiteSearchIndex> {
-	if (!indexPromise) {
-		indexPromise = Promise.all([
-			import('./docs-search.ts').then(({ loadSearchIndex }) => loadSearchIndex()),
-			import('../content/ecosystem-index.json').then(
-				({ default: entities }) => entities as EcosystemEntity[],
-			),
-		]).then(([docs, entities]) => ({ docs, entities }));
-	}
-	return indexPromise;
+interface SiteSearchIndexLoaders {
+	docs: () => Promise<readonly SearchRecord[]>;
+	entities: () => Promise<readonly EcosystemEntity[]>;
 }
+
+export function createSiteSearchIndexLoader(loaders: SiteSearchIndexLoaders) {
+	let indexPromise: Promise<SiteSearchIndex> | undefined;
+	return () => {
+		if (!indexPromise) {
+			let entityLoadFailed = false;
+			const pending = Promise.all([
+				loaders.docs(),
+				loaders.entities().catch(() => {
+					entityLoadFailed = true;
+					return [] as readonly EcosystemEntity[];
+				}),
+			]).then(([docs, entities]) => ({ docs, entities }));
+			indexPromise = pending.then(
+				(index) => {
+					if (entityLoadFailed) indexPromise = undefined;
+					return index;
+				},
+				(error) => {
+					indexPromise = undefined;
+					throw error;
+				},
+			);
+		}
+		return indexPromise;
+	};
+}
+
+export const loadSiteSearchIndex = createSiteSearchIndexLoader({
+	docs: () => import('./docs-search.ts').then(({ loadSearchIndex }) => loadSearchIndex()),
+	entities: () =>
+		import('../content/ecosystem-index.json').then(
+			({ default: entities }) => entities as EcosystemEntity[],
+		),
+});
