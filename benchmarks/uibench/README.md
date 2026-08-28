@@ -3,8 +3,8 @@
 This suite adapts the public desktop workload matrix from Boris Kaul's
 [UIbench](https://github.com/localvoid/uibench) for Octane's unified benchmark
 runner. It measures one synchronous state-to-state commit for each of the 96
-published desktop cases against production React Compiler, native Preact, and
-Solid 2 controls:
+published desktop cases against production React Compiler, native Preact,
+Solid 2, Vue Vapor, Ripple, and Inferno controls:
 
 - four table shapes (`[100,4]`, `[50,4]`, `[100,2]`, `[50,2]`) across render,
   remove-all, two sorts, four sparse filters, and four sparse class updates;
@@ -45,9 +45,9 @@ cases have run:
    table/animation/tree signature and compared with the deterministic model.
 2. Every keyed row, box, and tree node that survives a transition must retain
    its DOM identity.
-3. Octane, React, Preact, and Solid must report the same signatures and element
-   counts for all 96 endpoints. Framework marker comments are reported nowhere
-   in the oracle and cannot make a target pass with missing visible output.
+3. Every target must report the same signatures and element counts for all 96
+   endpoints. Framework marker comments are reported nowhere in the oracle and
+   cannot make a target pass with missing visible output.
 
 `cases`, `elements_largest`, and `identity_shared` are emitted as deterministic
 operations for exact same-run ratio guards. A gate failure or browser error
@@ -63,18 +63,20 @@ forward transition inside each sample, with every reset commit outside its
 inner timer; the harness reports the mean milliseconds per forward commit. The
 case-sized repetition count overcomes Chromium's timer granularity without
 mixing the inverse transition into the result. This matches UIbench's default
-JavaScript-time mode; it does not request style/layout/paint timing. The React
-fixture uses React 19, `flushSync`, and the repository's production React
-Compiler integration. The Preact fixture uses native Preact hooks and keyed
-JSX; its queued microtask commit is awaited inside the timing window. The Solid
-fixture uses the repository's pinned Solid 2 beta production renderer, keyed
-`createStore`/`reconcile`, and `flush()`; private copies of both Solid endpoints
-are prepared outside the timer so reconciliation cannot mutate shared workload
-snapshots. The Octane fixture uses the production `.tsrx` compiler and
-`flushSync`. All four previews send COOP/COEP headers, and
-the harness rejects a page that is not cross-origin isolated, so sub-millisecond
-cases retain the browser's high-resolution timer rather than collapsing to 0.1
-ms buckets.
+JavaScript-time mode; it does not request style/layout/paint timing. React uses
+React 19, `flushSync`, and the repository's production React Compiler
+integration. Preact uses native hooks and keyed JSX; its queued microtask commit
+is awaited inside the timing window. Solid uses the pinned Solid 2 beta
+production renderer, keyed `createStore`/`reconcile`, and `flush()`; private
+copies of both Solid endpoints are prepared outside the timer so reconciliation
+cannot mutate shared workload snapshots. Vue uses the production Vue Vapor 3.6
+renderer, a keyed `v-for`, and an awaited `nextTick()` inside the timing window.
+Ripple uses the production `.tsrx` compiler, a tracked snapshot, keyed `@for`
+blocks, and `flushSync`. Inferno uses its native class state and public
+`rerender()` flush. Octane uses the production `.tsrx` compiler and `flushSync`.
+All seven previews send COOP/COEP headers, and the harness rejects a page that
+is not cross-origin isolated, so sub-millisecond cases retain the browser's
+high-resolution timer rather than collapsing to 0.1 ms buckets.
 
 The suite keeps React Compiler and Preact as distinct VDOM controls and Solid as
 a fine-grained reactive control. Its purpose is a faithful, compact extraction
@@ -96,9 +98,15 @@ pnpm --filter octane-tsrx-uibench-bench build
 pnpm --filter react-uibench-bench build
 pnpm --filter solid-uibench-bench build
 pnpm --filter preact-uibench-bench build
+pnpm --filter vue-vapor-uibench-bench build
+pnpm --filter ripple-uibench-bench build
+pnpm --filter inferno-uibench-bench build
 pnpm --filter octane-tsrx-uibench-bench preview # :5315
 pnpm --filter react-uibench-bench preview       # :5316
 pnpm --filter solid-uibench-bench preview       # :5317
 pnpm --filter preact-uibench-bench preview      # :5318
+pnpm --filter vue-vapor-uibench-bench preview   # :5319
+pnpm --filter ripple-uibench-bench preview      # :5322
+pnpm --filter inferno-uibench-bench preview     # :5325
 node benchmarks/uibench/run.mjs 10
 ```

@@ -155,8 +155,11 @@ async function validateMarkerCensus(browser, target, failures) {
 		if (!retained.shell || !retained.outlet) {
 			failures.push(`${target.name}.nested: navigation replaced its surviving shell or outlet`);
 		}
+		// Root-suspension transactions need an exact replaceable range for the
+		// nested arm: one switch pair in TSRX and one component pair in JSX. The
+		// visible tree and surviving shell/outlet identities remain gated above.
 		const deepCeiling = target.name === 'octane-tsrx' ? 1 : 0;
-		const nestedCeiling = target.name === 'octane-tsrx' ? 2 : 0;
+		const nestedCeiling = target.name === 'octane-tsrx' ? 4 : 2;
 		if (deep.comments > deepCeiling) {
 			failures.push(`${target.name}.comments_deep: ${deep.comments} exceeds ${deepCeiling}`);
 		}

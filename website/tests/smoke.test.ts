@@ -182,13 +182,20 @@ describe('website routes', () => {
 		for (const card of FRAMEWORK_CARDS) {
 			const keys = card.series.map((series) => series.key);
 			if (card.id === 'svg-dashboard') {
-				expect(keys).toEqual(['octane-tsrx', 'react', 'solid', 'svelte']);
+				expect(keys).toEqual(['octane-tsrx', 'react', 'solid', 'svelte', 'inferno']);
 			} else if (card.id === 'spa-navigation') {
-				expect(keys).toEqual(['octane-tsrx', 'octane-jsx', 'react', 'solid', 'vue-vapor']);
+				expect(keys).toEqual([
+					'octane-tsrx',
+					'octane-jsx',
+					'react',
+					'solid',
+					'vue-vapor',
+					'inferno',
+				]);
 			} else {
 				expect(keys, card.id).toContain('preact');
 			}
-			if (card.id === 'streaming-ssr' || card.id === 'spa-navigation') {
+			if (card.id === 'streaming-ssr' || card.id === 'spa-navigation' || card.id === 'uibench') {
 				expect(keys, card.id).not.toContain('svelte');
 			} else {
 				expect(keys, card.id).toContain('svelte');
@@ -198,15 +205,38 @@ describe('website routes', () => {
 				if (card.id !== 'svg-dashboard' && card.id !== 'spa-navigation') {
 					expect(typeof row.preact, `${card.id}/${row.op}/preact`).toBe('number');
 				}
-				if (card.id !== 'streaming-ssr' && card.id !== 'spa-navigation') {
+				if (card.id !== 'streaming-ssr' && card.id !== 'spa-navigation' && card.id !== 'uibench') {
 					expect(typeof row.svelte, `${card.id}/${row.op}/svelte`).toBe('number');
 				}
 			}
 		}
 
 		const summaryKeys = HOME_SUMMARY.series.map((series) => series.key);
-		expect(summaryKeys).toEqual(expect.arrayContaining(['react', 'preact', 'svelte']));
+		expect(summaryKeys).toEqual(expect.arrayContaining(['react', 'preact', 'svelte', 'inferno']));
 		expect(summaryKeys).not.toContain('react-uncompiled');
+
+		const uibench = FRAMEWORK_CARDS.find((card) => card.id === 'uibench')!;
+		expect(uibench.series.map((series) => series.key)).toEqual([
+			'octane-tsrx',
+			'react',
+			'preact',
+			'solid',
+			'ripple',
+			'vue-vapor',
+			'inferno',
+		]);
+		expect(uibench.rows).toHaveLength(96);
+		for (const diagnostic of ['cases', 'elements_largest', 'identity_shared']) {
+			expect(
+				uibench.rows.some((row) => row.op === diagnostic),
+				diagnostic,
+			).toBe(false);
+		}
+		for (const row of uibench.rows) {
+			for (const series of uibench.series) {
+				expect(typeof row[series.key], `${uibench.id}/${row.op}/${series.key}`).toBe('number');
+			}
+		}
 
 		const memoWall = FRAMEWORK_CARDS.find((card) => card.id === 'memo-wall')!;
 		expect(memoWall.series.map((series) => series.key)).toEqual(

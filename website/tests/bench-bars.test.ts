@@ -133,22 +133,25 @@ describe('benchmark card bars', () => {
 	});
 
 	it('renders unmeasured frameworks as muted "—" rows, not bars', async () => {
-		// js-framework-reorder omits Ripple's failing-identity cells, so at least
-		// one operation has fewer measurements than the card has series.
-		const reorder = FRAMEWORK_CARDS.find((c) => c.id === 'js-framework-reorder')!;
-		const gapIndex = reorder.rows.findIndex((row) =>
-			reorder.series.some((series) => typeof row[series.key] !== 'number'),
+		// bundle-size contains both Vue target keys because the weather fixture
+		// uses `vue` while the other fixture bundles use `vue-vapor`. Each row
+		// therefore has one deliberately unmeasured Vue series.
+		const bundleSize = FRAMEWORK_CARDS.find((c) => c.id === 'bundle-size')!;
+		const gapIndex = bundleSize.rows.findIndex((row) =>
+			bundleSize.series.some((series) => typeof row[series.key] !== 'number'),
 		);
 		expect(gapIndex).toBeGreaterThanOrEqual(0);
-		const gapOp = reorder.rows[gapIndex].op as string;
-		const { container, barLabels, opButton } = await mountCard(reorder);
+		const gapOp = bundleSize.rows[gapIndex].op as string;
+		const { container, barLabels, opButton } = await mountCard(bundleSize);
 
 		fireEvent.click(opButton(gapOp));
 
 		await waitFor(() => expect(opButton(gapOp).getAttribute('aria-pressed')).toBe('true'));
-		expect(barLabels()).toHaveLength(numericSeries(reorder, gapIndex).length);
+		expect(barLabels()).toHaveLength(numericSeries(bundleSize, gapIndex).length);
 		const empty = container.querySelectorAll('.bench-row-empty');
-		expect(empty).toHaveLength(reorder.series.length - numericSeries(reorder, gapIndex).length);
+		expect(empty).toHaveLength(
+			bundleSize.series.length - numericSeries(bundleSize, gapIndex).length,
+		);
 		empty.forEach((row) => expect(row.querySelector('.bench-val')!.textContent!.trim()).toBe('—'));
 	});
 

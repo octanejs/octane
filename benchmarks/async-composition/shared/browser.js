@@ -43,7 +43,12 @@ function waitForSignature(target, version, startedAt, validateState) {
 				return;
 			}
 			if (signature !== expected || target.querySelector('[data-fallback]') !== null) {
-				fail(`Dashboard did not remain stable after first reaching v${version}.`);
+				fail(
+					`Dashboard did not remain stable after first reaching v${version}. ` +
+						`Expected: ${expected}. Actual: ${signature}. ` +
+						`Fallback: ${target.querySelector('[data-fallback]') !== null}. ` +
+						`HTML: ${target.innerHTML}.`,
+				);
 				return;
 			}
 			finished = true;
@@ -64,7 +69,10 @@ function waitForSignature(target, version, startedAt, validateState) {
 				}
 				return;
 			}
-			if (signature !== expected) return;
+			// Retry throttling may finish the hidden primary before its fallback is
+			// eligible to leave. Readiness is the first visible complete commit, not
+			// merely the moment hidden DOM happens to carry the final signature.
+			if (signature !== expected || target.querySelector('[data-fallback]') !== null) return;
 			reachedExpected = true;
 			void confirmStable(performance.now() - startedAt);
 		}

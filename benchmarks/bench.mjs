@@ -209,6 +209,8 @@ const SUITES = [
 			{ filter: 'react-uibench-bench', port: 5316 },
 			{ filter: 'solid-uibench-bench', port: 5317 },
 			{ filter: 'preact-uibench-bench', port: 5318 },
+			{ filter: 'vue-vapor-uibench-bench', port: 5319 },
+			{ filter: 'ripple-uibench-bench', port: 5322 },
 			{ filter: 'inferno-uibench-bench', port: 5325 },
 		],
 		iter: { normal: 10, quick: 2 },
