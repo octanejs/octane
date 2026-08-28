@@ -276,6 +276,51 @@ describe('renderer configuration', () => {
 		expect(resolveRendererFromBundler(config, '/src/App.tsrx').id).toBe('dom');
 	});
 
+	it('preserves renderer selection across normalized, cloned, and mutable input', () => {
+		const config = {
+			registry: {
+				object: '@octanejs/object-renderer',
+				three: '@octanejs/three/renderer',
+			},
+			rules: [
+				{
+					include: 'src/scenes/**/*.{tsrx,tsx}',
+					exclude: '**/*.object.tsrx',
+					renderer: 'three',
+				},
+				{ include: '**/*.object.tsrx', renderer: 'object' },
+			],
+		};
+		const normalized = normalizeRendererConfig(config);
+		const cloned = JSON.parse(JSON.stringify(normalized));
+		const filenames = [
+			'/src/scenes/Hero.tsrx',
+			String.raw`\src\scenes\Hero.object.tsrx?raw`,
+			'/src/App.tsrx#client',
+		];
+
+		const expectedIds = ['three', 'object', 'dom'];
+		for (const input of [config, normalized, cloned]) {
+			expect(filenames.map((filename) => resolveRendererForFile(input, filename).id)).toEqual(
+				expectedIds,
+			);
+		}
+		expect(Object.keys(normalized)).toEqual([
+			'default',
+			'registry',
+			'rules',
+			'boundaries',
+			'signature',
+		]);
+
+		config.rules[0].renderer = 'object';
+		expect(resolveRendererForFile(config, '/src/scenes/Hero.tsrx').id).toBe('object');
+		config.rules[0].include = '**/*.{tsrx}';
+		expect(() => resolveRendererForFile(config, '/src/scenes/Hero.tsrx')).toThrow(
+			/braces must contain two or more/,
+		);
+	});
+
 	it('produces a stable cache signature without erasing semantic rule order', () => {
 		const first = normalizeRendererConfig({
 			registry: { three: '@octanejs/three/renderer', object: '/src/object-renderer.js' },

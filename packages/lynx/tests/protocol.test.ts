@@ -51,6 +51,7 @@ import {
 	type LynxTransportCommitMessage,
 } from '../src/core/protocol.js';
 import { createLynxBackgroundTransport } from '../src/core/transport.js';
+import { unwire, wire } from './_fixtures/lynx-wire.js';
 
 class FakeContextProxy implements LynxContextProxy {
 	readonly events: LynxContextProxyEvent[] = [];
@@ -75,7 +76,7 @@ class FakeContextProxy implements LynxContextProxy {
 	}
 
 	sendToBackground(data: unknown): void {
-		this.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data });
+		this.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: wire(data) });
 	}
 }
 
@@ -242,7 +243,7 @@ function installMainHarness(
 	const generations = new Map<number, number>();
 	const types = new Map<number, string>();
 	context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
-		const message = validateLynxBackgroundOutboundMessage(event.data);
+		const message = validateLynxBackgroundOutboundMessage(unwire(event.data));
 		if (message.type === 'main-ready-request') {
 			if (autoReady) {
 				context.sendToBackground({
@@ -785,7 +786,7 @@ describe('@octanejs/lynx transported protocol', () => {
 			const commits: LynxTransportCommitMessage[] = [];
 			const capabilitiesDuringAdoptionReady: boolean[] = [];
 			context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
-				const message = validateLynxBackgroundOutboundMessage(event.data);
+				const message = validateLynxBackgroundOutboundMessage(unwire(event.data));
 				if (message.type === 'adoption-ready') {
 					capabilitiesDuringAdoptionReady.push(driver.capabilities?.templateProgramMount === true);
 					return;
@@ -1710,7 +1711,7 @@ describe('@octanejs/lynx transported protocol', () => {
 			context.events.some(
 				(event) =>
 					event.type === LYNX_BACKGROUND_TO_MAIN_EVENT &&
-					(event.data as { type?: unknown }).type === 'call-main',
+					(unwire(event.data) as { type?: unknown }).type === 'call-main',
 			),
 		).toBe(false);
 
@@ -1733,7 +1734,7 @@ describe('@octanejs/lynx transported protocol', () => {
 		main.acknowledge(mount, 'complete');
 		await mounted;
 		const callMessage = context.events
-			.map((event) => event.data)
+			.map((event) => unwire(event.data))
 			.find(
 				(message): message is ReturnType<typeof validateLynxBackgroundOutboundMessage> =>
 					(message as { type?: unknown }).type === 'call-main' &&
@@ -1765,7 +1766,7 @@ describe('@octanejs/lynx transported protocol', () => {
 		backgroundResult.saved = 'mutated';
 		expect(executed).toContainEqual(['app:save', 'record']);
 		const backgroundMessage = context.events
-			.map((event) => event.data)
+			.map((event) => unwire(event.data))
 			.find(
 				(message) =>
 					(message as { type?: unknown }).type === 'call-background-result' &&
@@ -1776,7 +1777,7 @@ describe('@octanejs/lynx transported protocol', () => {
 
 		const malformedResultCall = transport.callMain({ _wkltId: 'app:malformed-result' }, []);
 		const malformedResultMessage = context.events
-			.map((event) => event.data as { readonly type?: unknown; readonly call?: unknown })
+			.map((event) => unwire(event.data) as { readonly type?: unknown; readonly call?: unknown })
 			.find(
 				(message) =>
 					message.type === 'call-main' &&
@@ -1792,23 +1793,40 @@ describe('@octanejs/lynx transported protocol', () => {
 		await flushMicrotasks();
 		main.acknowledge(main.commits.at(-1)!, 'complete');
 		await updated;
+		// A function cannot reach the wire at all any more. The transport encodes
+		// before it dispatches, so a value JSON would drop is refused at the
+		// sender — the last place that still knows what it was — rather than
+		// arriving as a hostile payload for the receiver to walk.
+		expect(() =>
+			context.sendToBackground({
+				...identity(82, 1),
+				type: 'call-main-result',
+				call: malformedResultMessage.call,
+				value() {},
+			}),
+		).toThrow(/at \$\.value is a function/);
+
+		// What can still arrive is a payload that parses and then fails the
+		// schema, and that has to settle the pending call rather than hang it.
 		context.sendToBackground({
 			...identity(82, 1),
 			type: 'call-main-result',
 			call: malformedResultMessage.call,
-			value() {},
+			value: 'unreadable',
+			unexpected: true,
 		});
-		await expect(malformedResultCall.promise).rejects.toThrow(/non-serializable|clone-safe/);
+		await expect(malformedResultCall.promise).rejects.toThrow(/unknown field "unexpected"/);
 
 		context.sendToBackground({
 			...identity(82, 1),
 			type: 'call-background',
 			call: 20,
 			fn: { _jsFnId: 'app:malformed-call' },
-			args: [() => undefined],
+			args: [],
+			unexpected: true,
 		});
 		const malformedCallError = context.events
-			.map((event) => event.data as { readonly type?: unknown; readonly call?: unknown })
+			.map((event) => unwire(event.data) as { readonly type?: unknown; readonly call?: unknown })
 			.find((message) => message.type === 'call-background-error' && message.call === 20);
 		expect(malformedCallError).toMatchObject({ root: 82, version: 1 });
 
@@ -1866,7 +1884,7 @@ describe('@octanejs/lynx transported protocol', () => {
 
 		expect(executions).toEqual(['app:return', 'app:throw', 'app:pending']);
 		const settlements = context.events
-			.map((event) => event.data as { readonly type?: unknown; readonly call?: unknown })
+			.map((event) => unwire(event.data) as { readonly type?: unknown; readonly call?: unknown })
 			.filter(
 				(message) =>
 					message.type === 'call-background-result' || message.type === 'call-background-error',
@@ -1955,7 +1973,7 @@ describe('@octanejs/lynx transported protocol', () => {
 			context.events.some(
 				(event) =>
 					event.type === LYNX_BACKGROUND_TO_MAIN_EVENT &&
-					(event.data as { readonly type?: unknown }).type === 'terminal-dispose',
+					(unwire(event.data) as { readonly type?: unknown }).type === 'terminal-dispose',
 			),
 		).toBe(true);
 		const nextBatch: UniversalHostBatch = {
@@ -1990,7 +2008,7 @@ describe('@octanejs/lynx transported protocol', () => {
 
 		const terminalAttempts: UniversalTransportIdentity[] = [];
 		context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
-			const message = validateLynxBackgroundOutboundMessage(event.data);
+			const message = validateLynxBackgroundOutboundMessage(unwire(event.data));
 			if (message.type !== 'terminal-dispose') return;
 			terminalAttempts.push(commitIdentity(mount));
 			void Promise.resolve().then(() => {
@@ -2071,7 +2089,7 @@ describe('@octanejs/lynx transported protocol', () => {
 				context.events.filter(
 					(event) =>
 						event.type === LYNX_BACKGROUND_TO_MAIN_EVENT &&
-						(event.data as { readonly type?: unknown }).type === 'terminal-dispose',
+						(unwire(event.data) as { readonly type?: unknown }).type === 'terminal-dispose',
 				),
 			).toHaveLength(0);
 
@@ -2082,7 +2100,7 @@ describe('@octanejs/lynx transported protocol', () => {
 				context.events.filter(
 					(event) =>
 						event.type === LYNX_BACKGROUND_TO_MAIN_EVENT &&
-						(event.data as { readonly type?: unknown }).type === 'terminal-dispose',
+						(unwire(event.data) as { readonly type?: unknown }).type === 'terminal-dispose',
 				),
 			).toHaveLength(1);
 			context.sendToBackground({ ...commitIdentity(mount), type: 'dispose-ack' });
@@ -2142,7 +2160,10 @@ describe('@octanejs/lynx transported protocol', () => {
 		expect(transport.closedReason()).toBe(failure);
 		expect(container.getPublicHandle(1)).toBeNull();
 		expect(
-			context.events.map((event) => [event.type, (event.data as { readonly type?: unknown }).type]),
+			context.events.map((event) => [
+				event.type,
+				(unwire(event.data) as { readonly type?: unknown }).type,
+			]),
 		).toContainEqual([LYNX_BACKGROUND_TO_MAIN_EVENT, 'terminal-dispose']);
 	});
 
@@ -2167,7 +2188,7 @@ describe('@octanejs/lynx transported protocol', () => {
 		await transport.ready;
 		const readiness = context.events
 			.filter((event) => event.type === LYNX_BACKGROUND_TO_MAIN_EVENT)
-			.map((event) => event.data)
+			.map((event) => unwire(event.data))
 			.find((message): message is LynxMainReadyRequest =>
 				Boolean(
 					message !== null &&
@@ -2489,7 +2510,7 @@ describe('@octanejs/lynx transported protocol', () => {
 		};
 		queueAcceptedCall = () => queue('app:batch-accepted');
 		context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
-			const message = validateLynxBackgroundOutboundMessage(event.data);
+			const message = validateLynxBackgroundOutboundMessage(unwire(event.data));
 			if (message.type !== 'call-main') return;
 			delivered.push(message.call);
 			if (message.call === 1) queue('app:reentrant');
@@ -3585,7 +3606,7 @@ describe('@octanejs/lynx transported protocol', () => {
 		expect(directTransport.acceptedIdentity()).toMatchObject(directIdentity);
 		const outbound = directContext.events
 			.filter((entry) => entry.type === LYNX_BACKGROUND_TO_MAIN_EVENT)
-			.map((entry) => (entry.data as { type: string }).type);
+			.map((entry) => (unwire(entry.data) as { type: string }).type);
 		expect(outbound.filter((type) => type === 'commit')).toHaveLength(1);
 		expect(outbound.filter((type) => type === 'abort')).toHaveLength(1);
 
@@ -3600,7 +3621,7 @@ describe('@octanejs/lynx transported protocol', () => {
 		await expect(waitingApply).rejects.toThrow(/was aborted/);
 		const waitingOutbound = waitingContext.events
 			.filter((entry) => entry.type === LYNX_BACKGROUND_TO_MAIN_EVENT)
-			.map((entry) => (entry.data as { type: string }).type);
+			.map((entry) => (unwire(entry.data) as { type: string }).type);
 		expect(waitingOutbound).not.toContain('commit');
 		expect(waitingOutbound).not.toContain('abort');
 		waitingTransport.close();

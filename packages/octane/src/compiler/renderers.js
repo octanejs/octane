@@ -36,6 +36,7 @@ const VALIDATION_KEYS = new Set([
 ]);
 const HOST_NAME = /^[a-z][A-Za-z0-9_$-]*$/;
 const HOST_PROP_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$:.-]*\*?$/;
+const COMPILED_RULES_BY_CONFIG = new WeakMap();
 
 function configError(message) {
 	return new Error(`octane/compiler/renderers: ${message}`);
@@ -404,21 +405,34 @@ function normalizePattern(value, path) {
 		throw configError(`${path} must not traverse outside the project with "..".`);
 	}
 
-	// Parse now so malformed braces/classes fail during config loading rather
-	// than producing a bundler-specific answer later.
-	for (const expanded of expandBraces(pattern, path)) compileGlob(expanded, path);
-	return pattern;
+	// Compile now so malformed braces/classes fail during config loading rather
+	// than producing a bundler-specific answer later. The compiled expressions
+	// stay private because renderer config is serializable public data.
+	return {
+		pattern,
+		matchers: expandBraces(pattern, path).map((expanded) => compileGlob(expanded, path)),
+	};
 }
 
 function normalizePatternList(value, path, optional = false) {
-	if (value === undefined && optional) return [];
+	if (value === undefined && optional) return { patterns: [], matchers: [] };
 	const input = typeof value === 'string' ? [value] : value;
-	if (optional && Array.isArray(input) && input.length === 0) return [];
+	if (optional && Array.isArray(input) && input.length === 0) {
+		return { patterns: [], matchers: [] };
+	}
 	if (!Array.isArray(input) || input.length === 0) {
 		throw configError(`${path} must be a glob string or a non-empty array of glob strings.`);
 	}
-	const patterns = input.map((pattern, index) => normalizePattern(pattern, `${path}[${index}]`));
-	return [...new Set(patterns)].sort();
+	const matchersByPattern = new Map();
+	for (let index = 0; index < input.length; index++) {
+		const { pattern, matchers } = normalizePattern(input[index], `${path}[${index}]`);
+		matchersByPattern.set(pattern, matchers);
+	}
+	const patterns = [...matchersByPattern.keys()].sort();
+	return {
+		patterns,
+		matchers: patterns.flatMap((pattern) => matchersByPattern.get(pattern)),
+	};
 }
 
 function findClosingBrace(pattern, start, path) {
@@ -532,8 +546,11 @@ function normalizeFilename(filename) {
 	return segments.join('/');
 }
 
-function matchesPattern(filename, pattern, path) {
-	return expandBraces(pattern, path).some((expanded) => compileGlob(expanded, path).test(filename));
+function matchesAny(filename, matchers) {
+	for (const matcher of matchers) {
+		if (matcher.test(filename)) return true;
+	}
+	return false;
 }
 
 function stableSignature(value) {
@@ -603,6 +620,7 @@ export function normalizeRendererConfig(input = {}) {
 	if (!Array.isArray(rawRules)) {
 		throw configError('compiler.renderers.rules must be an array.');
 	}
+	const compiledRules = [];
 	const rules = rawRules.map((rawRule, index) => {
 		const path = `compiler.renderers.rules[${index}]`;
 		if (!isRecord(rawRule)) throw configError(`${path} must be an object.`);
@@ -613,10 +631,18 @@ export function normalizeRendererConfig(input = {}) {
 				`${path}.renderer references unknown renderer ${JSON.stringify(renderer)}.`,
 			);
 		}
+		const include = normalizePatternList(rawRule.include, `${path}.include`);
+		const exclude = normalizePatternList(rawRule.exclude, `${path}.exclude`, true);
+		compiledRules.push(
+			Object.freeze({
+				include: Object.freeze(include.matchers),
+				exclude: Object.freeze(exclude.matchers),
+			}),
+		);
 		return Object.freeze({
 			renderer,
-			include: Object.freeze(normalizePatternList(rawRule.include, `${path}.include`)),
-			exclude: Object.freeze(normalizePatternList(rawRule.exclude, `${path}.exclude`, true)),
+			include: Object.freeze(include.patterns),
+			exclude: Object.freeze(exclude.patterns),
 		});
 	});
 
@@ -663,13 +689,15 @@ export function normalizeRendererConfig(input = {}) {
 			),
 		),
 	});
-	return Object.freeze({
+	const normalized = Object.freeze({
 		default: defaultRenderer,
 		registry: Object.freeze(registry),
 		rules: Object.freeze(rules),
 		boundaries,
 		signature,
 	});
+	COMPILED_RULES_BY_CONFIG.set(normalized, Object.freeze(compiledRules));
+	return normalized;
 }
 
 /**
@@ -681,16 +709,20 @@ export function normalizeRendererConfig(input = {}) {
  * @param {string} filename Canonical module ID (for example `/src/App.tsrx`)
  */
 export function resolveRendererForFile(config, filename) {
-	const normalized = normalizeRendererConfig(config);
+	let normalized = config;
+	let compiledRules = COMPILED_RULES_BY_CONFIG.get(config);
+	if (compiledRules === undefined) {
+		normalized = normalizeRendererConfig(config);
+		compiledRules = COMPILED_RULES_BY_CONFIG.get(normalized);
+	}
 	const normalizedFilename = normalizeFilename(filename);
 	let id = normalized.default;
 
 	for (let index = 0; index < normalized.rules.length; index++) {
 		const rule = normalized.rules[index];
-		const path = `compiler.renderers.rules[${index}]`;
-		if (!rule.include.some((pattern) => matchesPattern(normalizedFilename, pattern, path)))
-			continue;
-		if (rule.exclude.some((pattern) => matchesPattern(normalizedFilename, pattern, path))) continue;
+		const matchers = compiledRules[index];
+		if (!matchesAny(normalizedFilename, matchers.include)) continue;
+		if (matchesAny(normalizedFilename, matchers.exclude)) continue;
 		id = rule.renderer;
 		break;
 	}

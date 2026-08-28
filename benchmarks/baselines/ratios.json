@@ -456,6 +456,14 @@
     "note": "Same-process development TSRX compilation with every emitted nesting validation parsed and checked. The original repeated serialization and whole-array scan measured 1.59x per invalid site at 2,000 versus 500 sites, while plan-local Set membership measured 1.07x. The 1.3x ceiling leaves timing headroom while catching the quadratic path."
   },
   {
+    "suite": "tsrx-renderer-selection",
+    "op": "resolve",
+    "target": "normalized-config",
+    "reference": "raw-config",
+    "maxRatio": 0.5,
+    "note": "Same-process filename classification across ordered renderer rules with exact matching checksums. The parent implementation redundantly normalized and compiled globs for retained normalized input, measuring 1.02x versus raw revalidation. Reusing validated config and compiled matchers measured below 0.1x; the 0.5 ceiling leaves more than 5x timing headroom while catching restoration of either repeated path."
+  },
+  {
     "suite": "tsrx-native-change-analysis",
     "op": "analysis",
     "target": "hostless-4000",

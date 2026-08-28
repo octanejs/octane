@@ -11,6 +11,7 @@ import {
 } from '../src/core/protocol.js';
 import { NativeListLifecycleFixture } from './_fixtures/native-list-lifecycle.lynx.tsrx';
 import { NativeListFixture } from './_fixtures/native-list.lynx.tsrx';
+import { unwire } from './_fixtures/lynx-wire.js';
 
 interface NativeListItem {
 	readonly id: string;
@@ -268,7 +269,7 @@ describe.sequential('Lynx recycled list background integration', () => {
 				if (
 					failNextAttachment &&
 					event.type === LYNX_MAIN_TO_BACKGROUND_EVENT &&
-					(event.data as { readonly type?: unknown }).type === 'host-attachment'
+					(unwire(event.data) as { readonly type?: unknown }).type === 'host-attachment'
 				) {
 					failNextAttachment = false;
 					throw failure;

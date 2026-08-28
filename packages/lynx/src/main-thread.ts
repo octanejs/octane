@@ -84,6 +84,12 @@ import {
 import { createLynxElementPAPI, type LynxElementPAPI, type LynxElementRef } from './core/papi.js';
 import { LYNX_PROFILE, lynxWireProfile } from './core/profiling.js';
 import {
+	decodeLynxTransportValue,
+	encodeLynxTransportValue,
+	localizeLynxHostValue,
+	type LynxStructuredValue,
+} from './core/transport-codec.js';
+import {
 	createReplaceableLynxMainThreadWorkletRegistry,
 	createUnavailableLynxMainThreadWorkletRegistry,
 	subscribeLynxMainThreadWorkletFeature,
@@ -242,30 +248,20 @@ function lifecycleTuple(
 			`Octane Lynx engine lifecycle expected ${JSON.stringify(expectedType)}, received ${JSON.stringify(event.type)}.`,
 		);
 	}
-	if (!Array.isArray(event.data) || event.data.length !== length) {
+	// The engine sent this, not Octane's transport, so it is the one inbound
+	// payload nothing has encoded. Materialize it before anything reflects on
+	// it: every read below is written for ordinary local data, and a
+	// host-backed reference answers some of those reads and throws on others.
+	const data = localizeLynxHostValue(event.data);
+	if (!Array.isArray(data) || data.length !== length) {
 		throw new TypeError(`Octane Lynx ${expectedType} data must be an exact ${length}-item tuple.`);
 	}
-	const names = Object.getOwnPropertyNames(event.data);
-	if (names.length !== length + 1 || hasOwnSymbolFields(event.data)) {
-		throw new TypeError(
-			`Octane Lynx ${expectedType} data must be a dense tuple without extra fields.`,
-		);
-	}
-	const tuple: unknown[] = [];
-	for (let index = 0; index < length; index++) {
-		const descriptor = Object.getOwnPropertyDescriptor(event.data, String(index));
-		if (
-			descriptor === undefined ||
-			!descriptor.enumerable ||
-			!Object.prototype.hasOwnProperty.call(descriptor, 'value')
-		) {
-			throw new TypeError(
-				`Octane Lynx ${expectedType} data[${index}] must be an enumerable data property.`,
-			);
-		}
-		tuple.push(descriptor.value);
-	}
-	return tuple;
+	// Materialization is also normalization: JSON output is always a dense
+	// ordinary array with exactly its index properties as plain enumerable data
+	// fields and no symbols, so the structural checks the pre-encoding version
+	// of this function ran here can never fire again. A hole in the raw tuple
+	// arrives as null and is judged by each caller's per-element validation.
+	return data;
 }
 
 function lifecycleBooleanOption(
@@ -654,10 +650,16 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		lifecycleClosed = true;
 		report(value, fallback);
 	};
+	const reportEncodingDiagnostic = (error: Error): void => {
+		report(error);
+	};
 
 	const dispatch = (message: LynxBackgroundInboundMessage): void => {
 		const validated = selfCheckLynxBackgroundInboundMessage(message);
-		context.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: validated });
+		context.dispatchEvent({
+			type: LYNX_MAIN_TO_BACKGROUND_EVENT,
+			data: encodeLynxTransportValue(validated, reportEncodingDiagnostic),
+		});
 	};
 
 	const dispatchLifecycleMessage = (message: LynxLifecycleMessage): void => {
@@ -2479,18 +2481,33 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 
 	function receive(event: LynxContextProxyEvent): void {
 		if (closed) return;
+		// Decode before anything reads the payload. `event.data` is whatever the
+		// host handed across, and on device that can be a native-backed reference
+		// that throws on `Reflect.ownKeys` and answers `Object(v) !== v`; every
+		// read below, including the recovery path, is written for ordinary local
+		// data, so the materialization has to happen first or not at all.
+		const startedDecode = LYNX_PROFILE ? performance.now() : 0;
+		let data: LynxStructuredValue;
+		try {
+			data = decodeLynxTransportValue(event.data);
+			if (LYNX_PROFILE) lynxWireProfile().decodeMs += performance.now() - startedDecode;
+		} catch (error) {
+			// Nothing in an undecodable payload is safe to reflect on, so unlike a
+			// schema failure there is no identity to recover and no pending call to
+			// settle against — it can only be reported and dropped.
+			report(error, 'Octane Lynx received an outbound message it could not decode.');
+			return;
+		}
 		let message: ReturnType<typeof validateLynxBackgroundOutboundMessage>;
 		const startedValidate = LYNX_PROFILE ? performance.now() : 0;
 		try {
-			message = validateLynxBackgroundOutboundMessage(event.data);
+			message = validateLynxBackgroundOutboundMessage(data);
 			if (LYNX_PROFILE) lynxWireProfile().validateMs += performance.now() - startedValidate;
 		} catch (error) {
 			const normalized = report(error, 'Octane Lynx received a malformed outbound message.');
-			const identity = recoverIdentity(event.data);
+			const identity = recoverIdentity(data);
 			const raw =
-				event.data !== null && typeof event.data === 'object'
-					? (event.data as Record<string, unknown>)
-					: null;
+				data !== null && typeof data === 'object' ? (data as Record<string, unknown>) : null;
 			if (
 				identity !== null &&
 				raw !== null &&
