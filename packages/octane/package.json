@@ -237,6 +237,7 @@
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
     "@wagmi/connectors": "catalog:default",
     "@wagmi/core": "catalog:default",
     "esbuild": "catalog:default",

@@ -130,6 +130,7 @@
     "semver": "7.8.5",
     "svelte-check": "catalog:default",
     "typescript": "catalog:default",
+    "vite": "catalog:default",
     "vitest": "catalog:default",
     "jsdom": "catalog:default",
     "happy-dom": "catalog:default",
