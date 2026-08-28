@@ -373,11 +373,11 @@ export const docsMeta: DocMeta[] = [
 	},
 	{
 		slug: 'bindings',
-		title: 'Bindings',
-		description: `Browse all ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
+		title: 'Integrations and bindings',
+		description: `Search ${FRAMEWORK_INTEGRATION_COUNT} framework integrations and ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
 		group: 'Explore',
 		sections: [
-			{ id: 'find-a-binding', title: 'Pick by the job' },
+			{ id: 'find-a-binding', title: 'Find an integration or binding' },
 			{ id: 'install-and-use', title: 'Install it, then change the import' },
 			{ id: 'check-support', title: 'Check the part you plan to use' },
 		],

@@ -1,0 +1,116 @@
+// The ecosystem directory is useful before JavaScript runs and keeps every
+// discovery choice in the URL so header-search links and shared views agree.
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, waitFor } from '@octanejs/testing-library';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
+import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
+import {
+	FRAMEWORK_INTEGRATIONS,
+	FRAMEWORK_INTEGRATION_COUNT,
+} from '../src/content/framework-integrations.ts';
+import { getRouter } from '../src/router.ts';
+
+afterEach(cleanup);
+
+async function renderRoute(url: string) {
+	const router = getRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
+	await router.load();
+	const utils = render(RouterProvider as any, { props: { router } });
+	await waitFor(() => {
+		if (!utils.container.querySelector('#ecosystem-search')) {
+			throw new Error('ecosystem directory did not render');
+		}
+	});
+	return { router, ...utils };
+}
+
+describe('ecosystem directory', () => {
+	it('presents integrations before every categorized library binding', async () => {
+		const { container } = await renderRoute('/docs/bindings');
+		const headings = Array.from(
+			container.querySelectorAll<HTMLElement>('.ecosystem-section-heading'),
+		).map((heading) => heading.textContent?.trim());
+
+		expect(container.querySelector('h1')?.textContent).toBe('Integrations and bindings');
+		expect(container.querySelector('.doc-eyebrow')?.textContent).toBe(
+			`${FRAMEWORK_INTEGRATION_COUNT} integrations · ${BINDING_COUNT} bindings`,
+		);
+		expect(headings).toEqual([
+			'Framework integrations',
+			...BINDING_CATEGORIES.map((category) => category.title),
+		]);
+		expect(container.querySelectorAll('.ecosystem-entity')).toHaveLength(
+			FRAMEWORK_INTEGRATION_COUNT + BINDING_COUNT,
+		);
+		for (const integration of FRAMEWORK_INTEGRATIONS) {
+			expect(container.querySelector(`#integration-${integration.guideAnchor}`)).toBeTruthy();
+		}
+		expect(container.querySelector('#binding-tanstack-router')).toBeTruthy();
+	});
+
+	it('server-selects a clear binding result from a header-search URL', async () => {
+		const { container } = await renderRoute(
+			'/docs/bindings?q=TanStack%20Router&kind=binding#binding-tanstack-router',
+		);
+		await waitFor(() =>
+			expect(container.querySelector<HTMLInputElement>('#ecosystem-search')?.value).toBe(
+				'TanStack Router',
+			),
+		);
+		const cards = container.querySelectorAll<HTMLElement>('.ecosystem-entity');
+		expect(cards[0]?.id).toBe('binding-tanstack-router');
+		expect(cards[0]?.textContent).toContain('@octanejs/tanstack-router');
+		expect(container.querySelector('.ecosystem-results-summary')?.textContent).toContain(
+			'for “TanStack Router”',
+		);
+	});
+
+	it('replaces the URL while typing and pushes explicit filters', async () => {
+		const { container, router } = await renderRoute('/docs/bindings');
+		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
+		const kind = container.querySelector<HTMLSelectElement>('#ecosystem-kind')!;
+		const category = container.querySelector<HTMLSelectElement>('#ecosystem-category')!;
+
+		fireEvent.input(search, { target: { value: 'zustand' } });
+		await waitFor(() => expect(router.state.location.search).toMatchObject({ q: 'zustand' }));
+		expect(container.querySelector('.ecosystem-entity')?.id).toBe('binding-zustand');
+
+		fireEvent.change(kind, { target: { value: 'binding' } });
+		await waitFor(() => expect(router.state.location.search).toMatchObject({ kind: 'binding' }));
+
+		fireEvent.change(category, { target: { value: 'shared-state' } });
+		await waitFor(() =>
+			expect(router.state.location.search).toMatchObject({
+				q: 'zustand',
+				kind: 'binding',
+				category: 'shared-state',
+			}),
+		);
+	});
+
+	it('offers a useful reset when filters have no matches', async () => {
+		const { container, router } = await renderRoute(
+			'/docs/bindings?q=astro&kind=binding&category=shared-state',
+		);
+		expect(container.querySelector('.ecosystem-empty')?.textContent).toContain('No matches');
+
+		fireEvent.click(container.querySelector<HTMLButtonElement>('.ecosystem-reset')!);
+		await waitFor(() => expect(router.state.location.search).toEqual({}));
+		expect(container.querySelectorAll('.ecosystem-entity')).toHaveLength(
+			FRAMEWORK_INTEGRATION_COUNT + BINDING_COUNT,
+		);
+	});
+
+	it('keeps framework packages and their deeper guides as separate actions', async () => {
+		const { container } = await renderRoute('/docs/bindings?q=tanstack%20start');
+		const card = container.querySelector<HTMLElement>('#integration-tanstack-start')!;
+
+		expect(card).toBeTruthy();
+		expect(
+			card.querySelector<HTMLAnchorElement>('.ecosystem-package-link')?.getAttribute('href'),
+		).toContain('/packages/tanstack-start');
+		expect(
+			card.querySelector<HTMLAnchorElement>('.ecosystem-guide-link')?.getAttribute('href'),
+		).toBe('/docs/framework-integrations#tanstack-start');
+	});
+});

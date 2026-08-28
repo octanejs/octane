@@ -612,18 +612,22 @@ describe('website routes', () => {
 		const packages = BINDING_CATEGORIES.flatMap((category) => category.packages);
 
 		const packageLinks = Array.from(
-			container.querySelectorAll<HTMLAnchorElement>('.binding-directory a[href*="/packages/"]'),
+			container.querySelectorAll<HTMLAnchorElement>(
+				'.ecosystem-entity[id^="binding-"] .ecosystem-package-link',
+			),
 		);
 		expect(packageLinks).toHaveLength(BINDING_COUNT);
 		expect(container.querySelector('.doc-eyebrow')?.textContent).toBe(
-			`${BINDING_COUNT} first-party bindings`,
+			`${FRAMEWORK_INTEGRATION_COUNT} integrations · ${BINDING_COUNT} bindings`,
 		);
 		for (const binding of packages) {
 			const packageName = binding.packageName;
 			const directory = packageName.slice('@octanejs/'.length);
 			const href = `https://github.com/octanejs/octane/tree/main/packages/${directory}`;
 			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
-			expect(link?.textContent).toBe(packageName);
+			expect(link?.closest('.ecosystem-entity')?.querySelector('code')?.textContent).toBe(
+				packageName,
+			);
 		}
 	});
 
@@ -644,9 +648,11 @@ describe('website routes', () => {
 			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
 			expect(link?.textContent).toBe(integration.packageName);
 		}
-		expect(findLink(container, '/docs/bindings#find-a-binding')?.textContent).toContain(
-			'TanStack bindings',
+		const tanstackBindings = Array.from(container.querySelectorAll<HTMLAnchorElement>('a')).find(
+			(link) => link.textContent?.includes('TanStack bindings'),
 		);
+		expect(tanstackBindings?.getAttribute('href')).toContain('/docs/bindings?q=TanStack');
+		expect(tanstackBindings?.getAttribute('href')).toContain('kind=binding');
 	});
 
 	it('an unknown route renders the root notFoundComponent inside the layout', async () => {

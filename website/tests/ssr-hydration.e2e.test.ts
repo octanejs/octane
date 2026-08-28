@@ -66,6 +66,7 @@ const ROUTES = [
 	'/docs/profiling',
 	'/docs/browser-support',
 	'/docs/bindings',
+	'/docs/bindings?q=TanStack%20Router&kind=binding#binding-tanstack-router',
 	'/errors',
 	'/errors/3?args%5B%5D=%22quoted%22',
 	'/benchmarks',
