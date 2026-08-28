@@ -1,5 +1,14 @@
 # @octanejs/cmdk
 
+## 0.1.32
+
+### Patch Changes
+
+- Updated dependencies [8adc693]
+- Updated dependencies [a51c8c6]
+  - octane@0.1.49
+  - @octanejs/radix@0.1.48
+
 ## 0.1.31
 
 ### Patch Changes

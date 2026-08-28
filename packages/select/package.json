@@ -1,0 +1,89 @@
+{
+  "name": "@octanejs/select",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "React Select bindings for the Octane renderer.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/select"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./base": "./src/base.ts",
+    "./async": "./src/async.tsrx",
+    "./animated": "./src/animated/index.ts",
+    "./creatable": "./src/creatable.tsrx",
+    "./async-creatable": "./src/async-creatable.tsrx"
+  },
+  "scripts": {
+    "test": "pnpm upstream:verify && pnpm crosswalk:verify && pnpm test:octane && pnpm test:pristine",
+    "test:octane": "vitest run --root ../.. --project select --project select-differential --project select-browser",
+    "test:pristine": "pnpm test:upstream",
+    "test:upstream": "jest --config tests/upstream-jest.config.cjs --rootDir upstream --runInBand --no-watchman",
+    "parity:inventory": "node ../../scripts/react-parity/react-select-runtime-inventory.mjs && node ../../scripts/react-parity/react-select-adaptation.mjs --write",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p tests/browser/tsconfig.json && tsrx-tsc --noEmit -p tests/upstream/tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.local.json && tsrx-tsc --noEmit -p typetests/tsconfig.compat.json && tsc --noEmit -p typetests/tsconfig.upstream.json",
+    "upstream:verify": "node scripts/verify-upstream.mjs",
+    "crosswalk:verify": "node scripts/verify-crosswalk.mjs"
+  },
+  "dependencies": {
+    "@octanejs/transition-group": "workspace:*",
+    "@emotion/cache": "11.9.3",
+    "@emotion/serialize": "1.1.0",
+    "@emotion/utils": "1.2.0",
+    "@floating-ui/dom": "1.8.0",
+    "memoize-one": "6.0.0"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@babel/core": "7.19.6",
+    "@babel/plugin-proposal-class-properties": "7.18.6",
+    "@babel/plugin-proposal-private-methods": "7.18.6",
+    "@babel/plugin-transform-runtime": "7.14.3",
+    "@babel/preset-env": "7.19.4",
+    "@babel/preset-react": "7.18.6",
+    "@babel/preset-typescript": "7.18.6",
+    "@babel/runtime": "7.19.4",
+    "@emotion/babel-plugin": "11.10.2",
+    "@emotion/jest": "11.5.0",
+    "@emotion/react": "11.9.3",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "12.1.4",
+    "@testing-library/user-event": "10.4.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@tsrx/react": "catalog:default",
+    "babel-jest": "25.5.1",
+    "happy-dom": "catalog:default",
+    "jest": "25.5.4",
+    "jest-environment-jsdom": "25.5.0",
+    "jest-in-case": "1.0.2",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-select": "5.10.2",
+    "react-select-pristine-react": "npm:react@16.14.0",
+    "react-select-pristine-react-dom": "npm:react-dom@16.14.0",
+    "use-isomorphic-layout-effect": "1.2.1",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  }
+}

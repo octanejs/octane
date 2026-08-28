@@ -24,6 +24,8 @@ export interface ServerFixtureOptions {
 	id?: string;
 	/** Additional public compiler options; `mode: 'server'` is always enforced. */
 	compileOptions?: Record<string, unknown>;
+	/** Real optional runtime entrypoints used by the authored fixture. */
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
 export interface CompiledFixtureSourceOptions {
@@ -40,6 +42,7 @@ export interface PlainHookFixtureSourceOptions {
 	id: string;
 	inlineHookMemo: boolean;
 	manualSlots?: boolean;
+	nativeReads?: boolean;
 }
 
 export function loadCompiledFixtureSource<T extends CompiledFixtureModule = CompiledFixtureModule>(
@@ -66,6 +69,7 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 		profile: false,
 		inlineHookMemo: options.inlineHookMemo,
 		manualSlots: options.manualSlots,
+		nativeReads: options.nativeReads,
 	});
 	// The plain path deliberately leaves TypeScript to its host toolchain.
 	// Strip it here exactly once, then use the same evaluation boundary as the
@@ -133,14 +137,14 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 	// reassignment of the binding.
 	const functionExports: string[] = [];
 	code = code.replace(
-		/export\s+(async\s+)?function\s+(\w+)/g,
+		/export\s+(async\s+)?function\s+([\w$]+)/g,
 		(_match: string, asyncKeyword: string | undefined, name: string) => {
 			functionExports.push(name);
 			return `${asyncKeyword ?? ''}function ${name}`;
 		},
 	);
 	code = code.replace(
-		/export\s+(const|let|var)\s+(\w+)\s*=/g,
+		/export\s+(const|let|var)\s+([\w$]+)\s*=/g,
 		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
 	);
 	code = code.replace(/export\s+default\s+/g, '__exports.default = ');
@@ -176,5 +180,6 @@ export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixt
 		id: options.id ?? defaultId,
 		mode: 'server',
 		compileOptions: options.compileOptions,
+		runtimeModules: options.runtimeModules,
 	});
 }

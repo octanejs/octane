@@ -1,0 +1,3457 @@
+{
+  "suite": "scoped-signals-bundles",
+  "status": "preliminary",
+  "iterations": 1,
+  "request": [
+    "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+    "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/run-bundles.mjs",
+    "--tooling-root=/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+    "--baseline-ref=cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+    "--baseline-package=/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane"
+  ],
+  "startedAt": "2026-08-27T22:06:28.675Z",
+  "limitations": [
+    "Public source-entry export costs, not compiled .tsrx or application bundles.",
+    "Native client/server hook entries are measured independently; their sizes are not incremental application costs.",
+    "Export loading and a small engine smoke test do not establish DOM, hydration, or async behavior.",
+    "Preliminary while integration source is changing; rerun after the final source freeze."
+  ],
+  "buildOptions": {
+    "bundle": true,
+    "write": false,
+    "metafile": true,
+    "minify": true,
+    "treeShaking": true,
+    "format": "esm",
+    "target": "esnext",
+    "tsconfigRaw": {
+      "compilerOptions": {}
+    },
+    "legalComments": "none",
+    "define": {
+      "__OCTANE_PROFILE_ENABLED__": "false",
+      "process.env.NODE_ENV": "\"production\""
+    }
+  },
+  "compression": {
+    "gzipLevel": 9,
+    "brotliQuality": 11
+  },
+  "targets": [
+    {
+      "name": "baseline/ordinary-client",
+      "ops": {
+        "raw": {
+          "median": 136080,
+          "min": 136080,
+          "samples": 1
+        },
+        "gzip": {
+          "median": 44004,
+          "min": 44004,
+          "samples": 1
+        },
+        "brotli": {
+          "median": 38566,
+          "min": 38566,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "request": "octane",
+        "exports": ["createRoot"],
+        "platform": "browser",
+        "bundleSha256": "e89b234d4cb7dfdd3ab2a2a7f2a17bb1e7b1e180e6145f48a5eb1f925c66fbac",
+        "inputs": [
+          {
+            "path": "packages/octane/src/version.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/version.ts",
+            "sha256": "b9c17315c757b9ad8825f72249dd0a2771f1d12934d3726983abdb0747d2fbf3",
+            "gitBlob": "51ccef3f5e913d5a49f06a9e6aaa391ae8172801",
+            "bytes": 171,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/hydration/interaction-config.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/hydration/interaction-config.ts",
+            "sha256": "8ba375ff87f8a91f9a528b438909952c93eb4939d7906df4ddce9a094f9c0cbd",
+            "gitBlob": "6b99a3c4d1a6aa9f6924ebf78874adcb1ea89ea8",
+            "bytes": 325,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/stream-protocol.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/stream-protocol.ts",
+            "sha256": "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce",
+            "gitBlob": "4eee21416fa51dafda8d91794f39286a27b3e220",
+            "bytes": 3295,
+            "bytesInOutput": 20,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/hydration/event-capture.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/hydration/event-capture.ts",
+            "sha256": "a1c5c824509c079a53a93703e8e8fbc3f86e8d0663d2326d6ea30d6c0258773a",
+            "gitBlob": "31531705edd3b1fa8764ae804223f01675a69175",
+            "bytes": 8953,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/behavior-root.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/behavior-root.ts",
+            "sha256": "b974712331fd8d705a451438e3f174948fafa2b6d3d707e289b641892e7c5617",
+            "gitBlob": "42259f16ff044f927e5f1cc78e150962e3b8117f",
+            "bytes": 31154,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sub-slot.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/sub-slot.ts",
+            "sha256": "9d81f691d524c1938c86c5342096e53b853e8a03b79b33afd860f8b4d84d98db",
+            "gitBlob": "d105cca451c08c20117b1bd29001d0a36060cd0e",
+            "bytes": 3028,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/dom-tables.js",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/dom-tables.js",
+            "sha256": "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d",
+            "gitBlob": "b006e5a5220a784ad2aa5e2fda1808e840188a0f",
+            "bytes": 16957,
+            "bytesInOutput": 5768,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/constants.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/constants.ts",
+            "sha256": "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7",
+            "gitBlob": "a994d5e724ea6f0c920657cd459a4a2d56b8bdcf",
+            "bytes": 11566,
+            "bytesInOutput": 299,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/has-own.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/has-own.ts",
+            "sha256": "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2",
+            "gitBlob": "e5e820fcdfec0ba3c137a2655306a1f5ebe71ac9",
+            "bytes": 59,
+            "bytesInOutput": 39,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/head-ownership.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/head-ownership.ts",
+            "sha256": "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493",
+            "gitBlob": "7fb5bb8e22da4dbd00df371cdc4fc83e15ee353e",
+            "bytes": 1686,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/resource-hint-diagnostics.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/resource-hint-diagnostics.ts",
+            "sha256": "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915",
+            "gitBlob": "88052833f8d1b1a5cdb31f22a3ccea41055a916d",
+            "bytes": 4079,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/aria-diagnostics.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/aria-diagnostics.ts",
+            "sha256": "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48",
+            "gitBlob": "03ced02df7c48544bd7bc979883af21c0c34d45e",
+            "bytes": 3186,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/host-property-diagnostics.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/host-property-diagnostics.ts",
+            "sha256": "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0",
+            "gitBlob": "d837fe23397e45a2711dfcaf21f36b16ebbce6ff",
+            "bytes": 6351,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/shared-value-helpers.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/shared-value-helpers.ts",
+            "sha256": "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908",
+            "gitBlob": "ef8adcab20c84dfcd5a5d1a63c6ab24a543ca3f8",
+            "bytes": 1957,
+            "bytesInOutput": 162,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/profiling.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/profiling.ts",
+            "sha256": "0eb11ae3d569dad7a235ba856195db6b001a868bd772071165cb6c1e2d6881d1",
+            "gitBlob": "f7db70ad42b1c2cb288a9606b7603d6d1b0dbf94",
+            "bytes": 19510,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/devtools-hook.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/devtools-hook.ts",
+            "sha256": "a9974cd69d87b664465a5a78a9ecd3f19fba83bd4c67c3c31f60cf87595b96c0",
+            "gitBlob": "fba4c0a1d978afe3845327fef178c534a33e00e2",
+            "bytes": 10879,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sanitize-url.js",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/sanitize-url.js",
+            "sha256": "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7",
+            "gitBlob": "4e4b9c0b32566174c73f6f845b52870ba7796cca",
+            "bytes": 3249,
+            "bytesInOutput": 742,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/html-tree-validation.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/html-tree-validation.ts",
+            "sha256": "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6",
+            "gitBlob": "beeebfa63907e7327120f39f5e5b6195d78ab92b",
+            "bytes": 8021,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/component-flags.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/component-flags.ts",
+            "sha256": "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a",
+            "gitBlob": "0742abbf83455fcd45db1ef09219d314be0afcf1",
+            "bytes": 1060,
+            "bytesInOutput": 124,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-message.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/error-message.ts",
+            "sha256": "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936",
+            "gitBlob": "b945dfd6a98c250db13fd5db4524b18d5ad8581c",
+            "bytes": 1260,
+            "bytesInOutput": 374,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-codes.client.generated.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/error-codes.client.generated.ts",
+            "sha256": "3fac871a6372981f5ff6da8d64d8990f5128ee3144f73b129c462c2ff6e8063a",
+            "gitBlob": "90aedbcde14a5b1c8b8847116845a4013d4a6134",
+            "bytes": 7500,
+            "bytesInOutput": 35,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/form-diagnostics.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/form-diagnostics.ts",
+            "sha256": "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54",
+            "gitBlob": "8e109ac1a36d1d9e344b809c1f8b9475d9b931a6",
+            "bytes": 4068,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/renderer-bridge.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/renderer-bridge.ts",
+            "sha256": "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824",
+            "gitBlob": "344b066bd22ee07cbd01660f6b0fca4a5f765b7c",
+            "bytes": 2181,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/read-protocol.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/read-protocol.ts",
+            "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+            "gitBlob": "51b00b91437c511882db851e936c36f52a8fe3c8",
+            "bytes": 5327,
+            "bytesInOutput": 358,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-collector.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/native-read-collector.ts",
+            "sha256": "a89c9f39847ae4c30cc11d39f1fe75fb5a156649938620555017b59af868422b",
+            "gitBlob": "1ae5838a2509f72f92f23147f63c799b1899dc96",
+            "bytes": 5263,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-inspection.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/native-read-inspection.ts",
+            "sha256": "83a05cd237aec68a18ce0ae37d265e4ddd5bf68d4e258c0584ab1f2eb9dcd8c2",
+            "gitBlob": "32419fff458c9d8127b4d8904a9d689df1fd831d",
+            "bytes": 1099,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-client.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/native-read-client.ts",
+            "sha256": "60bbe148943897f242f7d0d4682a4d3846a161a9649e78092f8380937c42327b",
+            "gitBlob": "0e12a66420e6dd06eb5caca433f5c95a8099039d",
+            "bytes": 12886,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-retry.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/native-read-retry.ts",
+            "sha256": "40abc7188a0b07a3665b410889bf725fdd0ba82c90b3568456282fe243b95ac7",
+            "gitBlob": "5180e247a26cdd5d5e7ba43530c8b5d524b0ab26",
+            "bytes": 1319,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-events.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/native-read-events.ts",
+            "sha256": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41",
+            "gitBlob": "b33ef6cf00bcaca9a045ebc6eb2f5a2519bbbd24",
+            "bytes": 1912,
+            "bytesInOutput": 574,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-seeds.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/native-read-seeds.ts",
+            "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8",
+            "gitBlob": "b3e7b162d2e9835d19f796e1d9891d20480c4dee",
+            "bytes": 5933,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/css.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/css.ts",
+            "sha256": "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57",
+            "gitBlob": "dda5d74e9536ff6a7d7bcd7ed82cf3fccc863e43",
+            "bytes": 4865,
+            "bytesInOutput": 385,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/runtime.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/runtime.ts",
+            "sha256": "72d8c0efdb97e7763b2cfa7e74a13e8c24bd57a48b2b19aed121f17bd0537d49",
+            "gitBlob": "b69f2bda2340bd1b35915e4b0c4716f15281112c",
+            "bytes": 1331970,
+            "bytesInOutput": 127174,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+            "sha256": "caefdf560562338ffdcb9ee1ba41c604e3d37861317cc6c00eb1a724b18920d8",
+            "bytes": 442,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+            "sha256": "9ab6212801b4c7fa291436174f45049307d0b754ca4e47faf2cd0ca1433ba78a",
+            "bytes": 3822,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+            "sha256": "a4480d4100c439a1ae6cd5200f0d55d66e5ed1a5ab33b5707f39b7770c0d3434",
+            "bytes": 15932,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+            "sha256": "2e86558c043cf82d9e2000ac1f2dc00fcc63902a385ed70355a57cc90a46f338",
+            "bytes": 1792,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+            "sha256": "ab6565f71a21b61d2d8c297d8b27f9494c7a101e293bbbc4bd51e553d5e8ac74",
+            "bytes": 7938,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+            "sha256": "d6367f755c0b16f31194c0304f40cc4ffa963af68b17a8a229b043c401eea2dc",
+            "bytes": 10732,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+            "sha256": "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22",
+            "bytes": 204,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "packages/octane/src/server-rpc-client.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/server-rpc-client.ts",
+            "sha256": "c2c2f9ef0639bd92d7f13fda4756cdafb6a5b386e255a14f3d9e05648089848e",
+            "gitBlob": "c3bd0f094ab43e9d5c8fb5e8b02f114bdc9286bd",
+            "bytes": 1100,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/method-dep.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/method-dep.ts",
+            "sha256": "4a9f35fdabd13fc43b01442c4bab936547d129ee8f19817cda8c4dcef8f50a6f",
+            "gitBlob": "e7ea038eb651e7589e98976ff61d219808dc8e15",
+            "bytes": 2372,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/index.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/index.ts",
+            "sha256": "61248363056932245b73648cb977dc54c9769ffd95879052d3266d6e741434ee",
+            "gitBlob": "f1cc98bdbb526ff3e114574d7d474309d0e8f23c",
+            "bytes": 7515,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "baseline-ordinary-client-public-entry.mjs",
+            "source": "export { createRoot } from \"octane\";\n",
+            "sha256": "0c07b4ef23e1634ea779930e3fc297bf39cc508089360c4d8039f4a2daea704f",
+            "bytes": 37,
+            "bytesInOutput": 0
+          }
+        ],
+        "boundaryChecks": "passed",
+        "exportLoadSmoke": "passed"
+      }
+    },
+    {
+      "name": "candidate/ordinary-client",
+      "ops": {
+        "raw": {
+          "median": 136410,
+          "min": 136410,
+          "samples": 1
+        },
+        "gzip": {
+          "median": 44134,
+          "min": 44134,
+          "samples": 1
+        },
+        "brotli": {
+          "median": 38712,
+          "min": 38712,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "request": "octane",
+        "exports": ["createRoot"],
+        "platform": "browser",
+        "bundleSha256": "891421771b82ba2a3c94f1a16f6b66f685695864cebf96d121c0398523f438d2",
+        "inputs": [
+          {
+            "path": "packages/octane/src/version.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/version.ts",
+            "sha256": "b9c17315c757b9ad8825f72249dd0a2771f1d12934d3726983abdb0747d2fbf3",
+            "bytes": 171,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/hydration/interaction-config.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/hydration/interaction-config.ts",
+            "sha256": "8ba375ff87f8a91f9a528b438909952c93eb4939d7906df4ddce9a094f9c0cbd",
+            "bytes": 325,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/stream-protocol.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/stream-protocol.ts",
+            "sha256": "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce",
+            "bytes": 3295,
+            "bytesInOutput": 20,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/hydration/event-capture.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/hydration/event-capture.ts",
+            "sha256": "a1c5c824509c079a53a93703e8e8fbc3f86e8d0663d2326d6ea30d6c0258773a",
+            "bytes": 8953,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/behavior-root.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/behavior-root.ts",
+            "sha256": "b974712331fd8d705a451438e3f174948fafa2b6d3d707e289b641892e7c5617",
+            "bytes": 31154,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sub-slot.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/sub-slot.ts",
+            "sha256": "9d81f691d524c1938c86c5342096e53b853e8a03b79b33afd860f8b4d84d98db",
+            "bytes": 3028,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/dom-tables.js",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/dom-tables.js",
+            "sha256": "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d",
+            "bytes": 16957,
+            "bytesInOutput": 5768,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/constants.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/constants.ts",
+            "sha256": "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7",
+            "bytes": 11566,
+            "bytesInOutput": 299,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/has-own.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/has-own.ts",
+            "sha256": "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2",
+            "bytes": 59,
+            "bytesInOutput": 39,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/head-ownership.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/head-ownership.ts",
+            "sha256": "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493",
+            "bytes": 1686,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/resource-hint-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/resource-hint-diagnostics.ts",
+            "sha256": "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915",
+            "bytes": 4079,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/aria-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/aria-diagnostics.ts",
+            "sha256": "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48",
+            "bytes": 3186,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/host-property-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/host-property-diagnostics.ts",
+            "sha256": "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0",
+            "bytes": 6351,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/shared-value-helpers.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/shared-value-helpers.ts",
+            "sha256": "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908",
+            "bytes": 1957,
+            "bytesInOutput": 162,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/profiling.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/profiling.ts",
+            "sha256": "0eb11ae3d569dad7a235ba856195db6b001a868bd772071165cb6c1e2d6881d1",
+            "bytes": 19510,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/devtools-hook.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/devtools-hook.ts",
+            "sha256": "a9974cd69d87b664465a5a78a9ecd3f19fba83bd4c67c3c31f60cf87595b96c0",
+            "bytes": 10879,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sanitize-url.js",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/sanitize-url.js",
+            "sha256": "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7",
+            "bytes": 3249,
+            "bytesInOutput": 742,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/html-tree-validation.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/html-tree-validation.ts",
+            "sha256": "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6",
+            "bytes": 8021,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/component-flags.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/component-flags.ts",
+            "sha256": "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a",
+            "bytes": 1060,
+            "bytesInOutput": 124,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-message.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/error-message.ts",
+            "sha256": "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936",
+            "bytes": 1260,
+            "bytesInOutput": 374,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-codes.client.generated.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/error-codes.client.generated.ts",
+            "sha256": "3fac871a6372981f5ff6da8d64d8990f5128ee3144f73b129c462c2ff6e8063a",
+            "bytes": 7500,
+            "bytesInOutput": 35,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/form-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/form-diagnostics.ts",
+            "sha256": "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54",
+            "bytes": 4068,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/renderer-bridge.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/renderer-bridge.ts",
+            "sha256": "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824",
+            "bytes": 2181,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/read-protocol.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/read-protocol.ts",
+            "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+            "bytes": 5327,
+            "bytesInOutput": 358,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-collector.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-collector.ts",
+            "sha256": "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3",
+            "bytes": 5672,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-inspection.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-inspection.ts",
+            "sha256": "83a05cd237aec68a18ce0ae37d265e4ddd5bf68d4e258c0584ab1f2eb9dcd8c2",
+            "bytes": 1099,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-client.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-client.ts",
+            "sha256": "5266fce49bb217e7a3c73aedf5aeed5aff0a8dfda37f001a649181022df01288",
+            "bytes": 13243,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-retry.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-retry.ts",
+            "sha256": "40abc7188a0b07a3665b410889bf725fdd0ba82c90b3568456282fe243b95ac7",
+            "bytes": 1319,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-events.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-events.ts",
+            "sha256": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41",
+            "bytes": 1912,
+            "bytesInOutput": 574,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-seeds.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-seeds.ts",
+            "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8",
+            "bytes": 5933,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/css.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/css.ts",
+            "sha256": "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57",
+            "bytes": 4865,
+            "bytesInOutput": 385,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/runtime.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/runtime.ts",
+            "sha256": "1d0a1656fd63506272e3c875f5221014c5f315d47f0f6831f0ea11983fca0eae",
+            "bytes": 1335044,
+            "bytesInOutput": 127504,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+            "sha256": "caefdf560562338ffdcb9ee1ba41c604e3d37861317cc6c00eb1a724b18920d8",
+            "bytes": 442,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+            "sha256": "9ab6212801b4c7fa291436174f45049307d0b754ca4e47faf2cd0ca1433ba78a",
+            "bytes": 3822,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+            "sha256": "a4480d4100c439a1ae6cd5200f0d55d66e5ed1a5ab33b5707f39b7770c0d3434",
+            "bytes": 15932,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+            "sha256": "2e86558c043cf82d9e2000ac1f2dc00fcc63902a385ed70355a57cc90a46f338",
+            "bytes": 1792,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+            "sha256": "ab6565f71a21b61d2d8c297d8b27f9494c7a101e293bbbc4bd51e553d5e8ac74",
+            "bytes": 7938,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+            "sha256": "d6367f755c0b16f31194c0304f40cc4ffa963af68b17a8a229b043c401eea2dc",
+            "bytes": 10732,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+            "sha256": "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22",
+            "bytes": 204,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "packages/octane/src/server-rpc-client.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/server-rpc-client.ts",
+            "sha256": "c2c2f9ef0639bd92d7f13fda4756cdafb6a5b386e255a14f3d9e05648089848e",
+            "bytes": 1100,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/method-dep.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/method-dep.ts",
+            "sha256": "4a9f35fdabd13fc43b01442c4bab936547d129ee8f19817cda8c4dcef8f50a6f",
+            "bytes": 2372,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/index.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/index.ts",
+            "sha256": "61248363056932245b73648cb977dc54c9769ffd95879052d3266d6e741434ee",
+            "bytes": 7515,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "candidate-ordinary-client-public-entry.mjs",
+            "source": "export { createRoot } from \"octane\";\n",
+            "sha256": "0c07b4ef23e1634ea779930e3fc297bf39cc508089360c4d8039f4a2daea704f",
+            "bytes": 37,
+            "bytesInOutput": 0
+          }
+        ],
+        "boundaryChecks": "passed",
+        "exportLoadSmoke": "passed"
+      }
+    },
+    {
+      "name": "baseline/ordinary-server",
+      "ops": {
+        "raw": {
+          "median": 34222,
+          "min": 34222,
+          "samples": 1
+        },
+        "gzip": {
+          "median": 12246,
+          "min": 12246,
+          "samples": 1
+        },
+        "brotli": {
+          "median": 11066,
+          "min": 11066,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "request": "octane/server",
+        "exports": ["renderToString"],
+        "platform": "node",
+        "bundleSha256": "bd94894a7081e589716ec3b3f0bd7df2a68b7edc33fccdf4e626493f9486c65b",
+        "inputs": [
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+            "sha256": "caefdf560562338ffdcb9ee1ba41c604e3d37861317cc6c00eb1a724b18920d8",
+            "bytes": 442,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+            "sha256": "9ab6212801b4c7fa291436174f45049307d0b754ca4e47faf2cd0ca1433ba78a",
+            "bytes": 3822,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+            "sha256": "a4480d4100c439a1ae6cd5200f0d55d66e5ed1a5ab33b5707f39b7770c0d3434",
+            "bytes": 15932,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+            "sha256": "2e86558c043cf82d9e2000ac1f2dc00fcc63902a385ed70355a57cc90a46f338",
+            "bytes": 1792,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+            "sha256": "ab6565f71a21b61d2d8c297d8b27f9494c7a101e293bbbc4bd51e553d5e8ac74",
+            "bytes": 7938,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+            "sha256": "d6367f755c0b16f31194c0304f40cc4ffa963af68b17a8a229b043c401eea2dc",
+            "bytes": 10732,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+            "sha256": "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22",
+            "bytes": 204,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "packages/octane/src/server/rpc.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/server/rpc.ts",
+            "sha256": "641fc3832cf6f2dc2a352b5fb37543cd45c04115719761c407dc8b0385c2ed23",
+            "gitBlob": "5053268f9bb3f8406279858c9efa1e12c072cec0",
+            "bytes": 1206,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sub-slot.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/sub-slot.ts",
+            "sha256": "9d81f691d524c1938c86c5342096e53b853e8a03b79b33afd860f8b4d84d98db",
+            "gitBlob": "d105cca451c08c20117b1bd29001d0a36060cd0e",
+            "bytes": 3028,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/has-own.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/has-own.ts",
+            "sha256": "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2",
+            "gitBlob": "e5e820fcdfec0ba3c137a2655306a1f5ebe71ac9",
+            "bytes": 59,
+            "bytesInOutput": 38,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/method-dep.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/method-dep.ts",
+            "sha256": "4a9f35fdabd13fc43b01442c4bab936547d129ee8f19817cda8c4dcef8f50a6f",
+            "gitBlob": "e7ea038eb651e7589e98976ff61d219808dc8e15",
+            "bytes": 2372,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/stream-protocol.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/stream-protocol.ts",
+            "sha256": "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce",
+            "gitBlob": "4eee21416fa51dafda8d91794f39286a27b3e220",
+            "bytes": 3295,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/dom-tables.js",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/dom-tables.js",
+            "sha256": "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d",
+            "gitBlob": "b006e5a5220a784ad2aa5e2fda1808e840188a0f",
+            "bytes": 16957,
+            "bytesInOutput": 5801,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/constants.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/constants.ts",
+            "sha256": "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7",
+            "gitBlob": "a994d5e724ea6f0c920657cd459a4a2d56b8bdcf",
+            "bytes": 11566,
+            "bytesInOutput": 349,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/head-ownership.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/head-ownership.ts",
+            "sha256": "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493",
+            "gitBlob": "7fb5bb8e22da4dbd00df371cdc4fc83e15ee353e",
+            "bytes": 1686,
+            "bytesInOutput": 444,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/resource-hint-diagnostics.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/resource-hint-diagnostics.ts",
+            "sha256": "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915",
+            "gitBlob": "88052833f8d1b1a5cdb31f22a3ccea41055a916d",
+            "bytes": 4079,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/aria-diagnostics.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/aria-diagnostics.ts",
+            "sha256": "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48",
+            "gitBlob": "03ced02df7c48544bd7bc979883af21c0c34d45e",
+            "bytes": 3186,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/host-property-diagnostics.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/host-property-diagnostics.ts",
+            "sha256": "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0",
+            "gitBlob": "d837fe23397e45a2711dfcaf21f36b16ebbce6ff",
+            "bytes": 6351,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/shared-value-helpers.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/shared-value-helpers.ts",
+            "sha256": "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908",
+            "gitBlob": "ef8adcab20c84dfcd5a5d1a63c6ab24a543ca3f8",
+            "bytes": 1957,
+            "bytesInOutput": 162,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/css.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/css.ts",
+            "sha256": "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57",
+            "gitBlob": "dda5d74e9536ff6a7d7bcd7ed82cf3fccc863e43",
+            "bytes": 4865,
+            "bytesInOutput": 385,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/html-tree-validation.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/html-tree-validation.ts",
+            "sha256": "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6",
+            "gitBlob": "beeebfa63907e7327120f39f5e5b6195d78ab92b",
+            "bytes": 8021,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sanitize-url.js",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/sanitize-url.js",
+            "sha256": "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7",
+            "gitBlob": "4e4b9c0b32566174c73f6f845b52870ba7796cca",
+            "bytes": 3249,
+            "bytesInOutput": 742,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/component-flags.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/component-flags.ts",
+            "sha256": "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a",
+            "gitBlob": "0742abbf83455fcd45db1ef09219d314be0afcf1",
+            "bytes": 1060,
+            "bytesInOutput": 123,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-message.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/error-message.ts",
+            "sha256": "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936",
+            "gitBlob": "b945dfd6a98c250db13fd5db4524b18d5ad8581c",
+            "bytes": 1260,
+            "bytesInOutput": 374,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-codes.server.generated.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/error-codes.server.generated.ts",
+            "sha256": "68a911785707f93a13c78bd29a6c40c36c6c9b6e1ddf43802b2207dfe7d815aa",
+            "gitBlob": "4c59b8a1147953199c581f8fefc2ea76ce61cc07",
+            "bytes": 5109,
+            "bytesInOutput": 34,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/form-diagnostics.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/form-diagnostics.ts",
+            "sha256": "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54",
+            "gitBlob": "8e109ac1a36d1d9e344b809c1f8b9475d9b931a6",
+            "bytes": 4068,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/renderer-bridge.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/renderer-bridge.ts",
+            "sha256": "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824",
+            "gitBlob": "344b066bd22ee07cbd01660f6b0fca4a5f765b7c",
+            "bytes": 2181,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/read-protocol.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/read-protocol.ts",
+            "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+            "gitBlob": "51b00b91437c511882db851e936c36f52a8fe3c8",
+            "bytes": 5327,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-collector.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/native-read-collector.ts",
+            "sha256": "a89c9f39847ae4c30cc11d39f1fe75fb5a156649938620555017b59af868422b",
+            "gitBlob": "1ae5838a2509f72f92f23147f63c799b1899dc96",
+            "bytes": 5263,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-seeds.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/native-read-seeds.ts",
+            "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8",
+            "gitBlob": "b3e7b162d2e9835d19f796e1d9891d20480c4dee",
+            "bytes": 5933,
+            "bytesInOutput": 36,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-server.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/signals/native-read-server.ts",
+            "sha256": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614",
+            "gitBlob": "1fe0442773ae4d58d90f2bff72e1793911efb4b9",
+            "bytes": 3642,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/runtime.server.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/runtime.server.ts",
+            "sha256": "66d094c2ab47ae21c85a7d62c328edafa4230d8a778afa37a563759029360803",
+            "gitBlob": "9b9981ea66c7aabe3af62aa8ca21b3757f129438",
+            "bytes": 364929,
+            "bytesInOutput": 25704,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/server/index.ts",
+            "physicalPath": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/src/server/index.ts",
+            "sha256": "349d0f1543b59852a2c677b06335f4032d71188d3692eb51354587958edf4ae1",
+            "gitBlob": "35631fc96338beeb134402985da08761740284a7",
+            "bytes": 4848,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "baseline-ordinary-server-public-entry.mjs",
+            "source": "export { renderToString } from \"octane/server\";\n",
+            "sha256": "bffc4032ee688211135c2fb0245d2c7f113743f0fbb16c52f514352fb83ad9d1",
+            "bytes": 48,
+            "bytesInOutput": 0
+          }
+        ],
+        "boundaryChecks": "passed",
+        "exportLoadSmoke": "passed"
+      }
+    },
+    {
+      "name": "candidate/ordinary-server",
+      "ops": {
+        "raw": {
+          "median": 34412,
+          "min": 34412,
+          "samples": 1
+        },
+        "gzip": {
+          "median": 12340,
+          "min": 12340,
+          "samples": 1
+        },
+        "brotli": {
+          "median": 11173,
+          "min": 11173,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "request": "octane/server",
+        "exports": ["renderToString"],
+        "platform": "node",
+        "bundleSha256": "d021adfb825f17e6ba266f9d0aabca98f168283ce929b1d4d058e4aaaac21fff",
+        "inputs": [
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+            "sha256": "caefdf560562338ffdcb9ee1ba41c604e3d37861317cc6c00eb1a724b18920d8",
+            "bytes": 442,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+            "sha256": "9ab6212801b4c7fa291436174f45049307d0b754ca4e47faf2cd0ca1433ba78a",
+            "bytes": 3822,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+            "sha256": "a4480d4100c439a1ae6cd5200f0d55d66e5ed1a5ab33b5707f39b7770c0d3434",
+            "bytes": 15932,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+            "sha256": "2e86558c043cf82d9e2000ac1f2dc00fcc63902a385ed70355a57cc90a46f338",
+            "bytes": 1792,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+            "sha256": "ab6565f71a21b61d2d8c297d8b27f9494c7a101e293bbbc4bd51e553d5e8ac74",
+            "bytes": 7938,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+            "sha256": "d6367f755c0b16f31194c0304f40cc4ffa963af68b17a8a229b043c401eea2dc",
+            "bytes": 10732,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+            "sha256": "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22",
+            "bytes": 204,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "devalue",
+              "version": "5.8.2",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+              "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+            }
+          },
+          {
+            "path": "packages/octane/src/server/rpc.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/server/rpc.ts",
+            "sha256": "641fc3832cf6f2dc2a352b5fb37543cd45c04115719761c407dc8b0385c2ed23",
+            "bytes": 1206,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sub-slot.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/sub-slot.ts",
+            "sha256": "9d81f691d524c1938c86c5342096e53b853e8a03b79b33afd860f8b4d84d98db",
+            "bytes": 3028,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/has-own.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/has-own.ts",
+            "sha256": "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2",
+            "bytes": 59,
+            "bytesInOutput": 38,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/method-dep.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/method-dep.ts",
+            "sha256": "4a9f35fdabd13fc43b01442c4bab936547d129ee8f19817cda8c4dcef8f50a6f",
+            "bytes": 2372,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/stream-protocol.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/stream-protocol.ts",
+            "sha256": "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce",
+            "bytes": 3295,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/dom-tables.js",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/dom-tables.js",
+            "sha256": "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d",
+            "bytes": 16957,
+            "bytesInOutput": 5801,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/constants.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/constants.ts",
+            "sha256": "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7",
+            "bytes": 11566,
+            "bytesInOutput": 349,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/head-ownership.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/head-ownership.ts",
+            "sha256": "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493",
+            "bytes": 1686,
+            "bytesInOutput": 444,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/resource-hint-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/resource-hint-diagnostics.ts",
+            "sha256": "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915",
+            "bytes": 4079,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/aria-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/aria-diagnostics.ts",
+            "sha256": "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48",
+            "bytes": 3186,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/host-property-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/host-property-diagnostics.ts",
+            "sha256": "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0",
+            "bytes": 6351,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/shared-value-helpers.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/shared-value-helpers.ts",
+            "sha256": "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908",
+            "bytes": 1957,
+            "bytesInOutput": 162,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/css.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/css.ts",
+            "sha256": "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57",
+            "bytes": 4865,
+            "bytesInOutput": 385,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/html-tree-validation.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/html-tree-validation.ts",
+            "sha256": "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6",
+            "bytes": 8021,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sanitize-url.js",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/sanitize-url.js",
+            "sha256": "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7",
+            "bytes": 3249,
+            "bytesInOutput": 742,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/component-flags.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/component-flags.ts",
+            "sha256": "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a",
+            "bytes": 1060,
+            "bytesInOutput": 123,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-message.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/error-message.ts",
+            "sha256": "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936",
+            "bytes": 1260,
+            "bytesInOutput": 374,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-codes.server.generated.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/error-codes.server.generated.ts",
+            "sha256": "68a911785707f93a13c78bd29a6c40c36c6c9b6e1ddf43802b2207dfe7d815aa",
+            "bytes": 5109,
+            "bytesInOutput": 34,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/form-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/form-diagnostics.ts",
+            "sha256": "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54",
+            "bytes": 4068,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/renderer-bridge.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/renderer-bridge.ts",
+            "sha256": "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824",
+            "bytes": 2181,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/read-protocol.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/read-protocol.ts",
+            "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+            "bytes": 5327,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-collector.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-collector.ts",
+            "sha256": "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3",
+            "bytes": 5672,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-seeds.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-seeds.ts",
+            "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8",
+            "bytes": 5933,
+            "bytesInOutput": 36,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-server.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-server.ts",
+            "sha256": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614",
+            "bytes": 3642,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/runtime.server.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/runtime.server.ts",
+            "sha256": "2ae910fea1105e32198b44fc883965f5574f1e4436d9695a5cc728232f8fc4c4",
+            "bytes": 365911,
+            "bytesInOutput": 25894,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/server/index.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/server/index.ts",
+            "sha256": "349d0f1543b59852a2c677b06335f4032d71188d3692eb51354587958edf4ae1",
+            "bytes": 4848,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "candidate-ordinary-server-public-entry.mjs",
+            "source": "export { renderToString } from \"octane/server\";\n",
+            "sha256": "bffc4032ee688211135c2fb0245d2c7f113743f0fbb16c52f514352fb83ad9d1",
+            "bytes": 48,
+            "bytesInOutput": 0
+          }
+        ],
+        "boundaryChecks": "passed",
+        "exportLoadSmoke": "passed"
+      }
+    },
+    {
+      "name": "candidate/engine",
+      "ops": {
+        "raw": {
+          "median": 30197,
+          "min": 30197,
+          "samples": 1
+        },
+        "gzip": {
+          "median": 9628,
+          "min": 9628,
+          "samples": 1
+        },
+        "brotli": {
+          "median": 8730,
+          "min": 8730,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "request": "octane/signals",
+        "exports": ["createScope", "query"],
+        "platform": "browser",
+        "bundleSha256": "1db15712f1cc5ddff506d3d8ab4d8ac87ab28f66a7c5e99cd718a730a7589014",
+        "inputs": [
+          {
+            "path": "packages/octane/src/signals/errors.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/errors.ts",
+            "sha256": "6a9a9561a4e37085c76ae714f6ec774f19646d3c6ef0e0f5dbc44ae6e16ee451",
+            "bytes": 843,
+            "bytesInOutput": 569,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/encoding.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/encoding.ts",
+            "sha256": "57625f36035059cca2c473a5ac0e8038b27b4d57eaa422a3bcd185b9dc38d88c",
+            "bytes": 3773,
+            "bytesInOutput": 1882,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+            "sha256": "d6861e6d706a1f5c6de3446353e5424c8e82dd3576e6aac03b850edf51e9a8c5",
+            "bytes": 6620,
+            "bytesInOutput": 1851,
+            "package": {
+              "name": "alien-signals",
+              "version": "3.2.0",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/package.json",
+              "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/read-protocol.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/read-protocol.ts",
+            "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+            "bytes": 5327,
+            "bytesInOutput": 449,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/graph.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/graph.ts",
+            "sha256": "f723fc4c3e8e0ab89f3639d85838cebcf54d6f611510a0ae4fdbeb70724580be",
+            "bytes": 22793,
+            "bytesInOutput": 8482,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/requests.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/requests.ts",
+            "sha256": "79e06c4b5d73ab42fd735be6ebeaecafc74d8726e1a548bcd7e24f64415c3d24",
+            "bytes": 17091,
+            "bytesInOutput": 7231,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/engine.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/engine.ts",
+            "sha256": "a21392b8b8d048d4194eab67b29ccd8a146668aa7f2a55d7fb4001ca290b626f",
+            "bytes": 20836,
+            "bytesInOutput": 9694,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/index.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/index.ts",
+            "sha256": "c4400e3eacea0f52049d3559b26be14dd3485a897135b54ec8cd5f2ad43de17d",
+            "bytes": 619,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "candidate-engine-public-entry.mjs",
+            "source": "export { createScope, query } from \"octane/signals\";\n",
+            "sha256": "48bc3a0539d4e9ec93ea05a9516f16cc1128ce0d492aa09621daeece2410ab70",
+            "bytes": 53,
+            "bytesInOutput": 0
+          }
+        ],
+        "boundaryChecks": "passed",
+        "exportLoadSmoke": "passed"
+      }
+    },
+    {
+      "name": "candidate/native-client",
+      "ops": {
+        "raw": {
+          "median": 31868,
+          "min": 31868,
+          "samples": 1
+        },
+        "gzip": {
+          "median": 10518,
+          "min": 10518,
+          "samples": 1
+        },
+        "brotli": {
+          "median": 9518,
+          "min": 9518,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "request": "octane/signals/client",
+        "exports": ["useSignal$"],
+        "platform": "browser",
+        "bundleSha256": "02aa801d4810595cbf24b1a55d80bc9d2393e939450ab64d4433f16e92ed5501",
+        "inputs": [
+          {
+            "path": "packages/octane/src/stream-protocol.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/stream-protocol.ts",
+            "sha256": "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce",
+            "bytes": 3295,
+            "bytesInOutput": 20,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/dom-tables.js",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/dom-tables.js",
+            "sha256": "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d",
+            "bytes": 16957,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/constants.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/constants.ts",
+            "sha256": "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7",
+            "bytes": 11566,
+            "bytesInOutput": 108,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/has-own.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/has-own.ts",
+            "sha256": "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2",
+            "bytes": 59,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/head-ownership.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/head-ownership.ts",
+            "sha256": "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493",
+            "bytes": 1686,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/resource-hint-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/resource-hint-diagnostics.ts",
+            "sha256": "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915",
+            "bytes": 4079,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/aria-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/aria-diagnostics.ts",
+            "sha256": "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48",
+            "bytes": 3186,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/host-property-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/host-property-diagnostics.ts",
+            "sha256": "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0",
+            "bytes": 6351,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/shared-value-helpers.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/shared-value-helpers.ts",
+            "sha256": "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908",
+            "bytes": 1957,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/profiling.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/profiling.ts",
+            "sha256": "0eb11ae3d569dad7a235ba856195db6b001a868bd772071165cb6c1e2d6881d1",
+            "bytes": 19510,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/devtools-hook.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/devtools-hook.ts",
+            "sha256": "a9974cd69d87b664465a5a78a9ecd3f19fba83bd4c67c3c31f60cf87595b96c0",
+            "bytes": 10879,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/hydration/interaction-config.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/hydration/interaction-config.ts",
+            "sha256": "8ba375ff87f8a91f9a528b438909952c93eb4939d7906df4ddce9a094f9c0cbd",
+            "bytes": 325,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/hydration/event-capture.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/hydration/event-capture.ts",
+            "sha256": "a1c5c824509c079a53a93703e8e8fbc3f86e8d0663d2326d6ea30d6c0258773a",
+            "bytes": 8953,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sanitize-url.js",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/sanitize-url.js",
+            "sha256": "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7",
+            "bytes": 3249,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/html-tree-validation.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/html-tree-validation.ts",
+            "sha256": "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6",
+            "bytes": 8021,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/component-flags.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/component-flags.ts",
+            "sha256": "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a",
+            "bytes": 1060,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-message.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/error-message.ts",
+            "sha256": "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936",
+            "bytes": 1260,
+            "bytesInOutput": 374,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-codes.client.generated.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/error-codes.client.generated.ts",
+            "sha256": "3fac871a6372981f5ff6da8d64d8990f5128ee3144f73b129c462c2ff6e8063a",
+            "bytes": 7500,
+            "bytesInOutput": 35,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/form-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/form-diagnostics.ts",
+            "sha256": "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54",
+            "bytes": 4068,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/renderer-bridge.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/renderer-bridge.ts",
+            "sha256": "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824",
+            "bytes": 2181,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/read-protocol.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/read-protocol.ts",
+            "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+            "bytes": 5327,
+            "bytesInOutput": 448,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-collector.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-collector.ts",
+            "sha256": "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3",
+            "bytes": 5672,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-inspection.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-inspection.ts",
+            "sha256": "83a05cd237aec68a18ce0ae37d265e4ddd5bf68d4e258c0584ab1f2eb9dcd8c2",
+            "bytes": 1099,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-client.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-client.ts",
+            "sha256": "5266fce49bb217e7a3c73aedf5aeed5aff0a8dfda37f001a649181022df01288",
+            "bytes": 13243,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-retry.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-retry.ts",
+            "sha256": "40abc7188a0b07a3665b410889bf725fdd0ba82c90b3568456282fe243b95ac7",
+            "bytes": 1319,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-events.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-events.ts",
+            "sha256": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41",
+            "bytes": 1912,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-seeds.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-seeds.ts",
+            "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8",
+            "bytes": 5933,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/css.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/css.ts",
+            "sha256": "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57",
+            "bytes": 4865,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/runtime.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/runtime.ts",
+            "sha256": "1d0a1656fd63506272e3c875f5221014c5f315d47f0f6831f0ea11983fca0eae",
+            "bytes": 1335044,
+            "bytesInOutput": 1405,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/errors.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/errors.ts",
+            "sha256": "6a9a9561a4e37085c76ae714f6ec774f19646d3c6ef0e0f5dbc44ae6e16ee451",
+            "bytes": 843,
+            "bytesInOutput": 570,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/encoding.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/encoding.ts",
+            "sha256": "57625f36035059cca2c473a5ac0e8038b27b4d57eaa422a3bcd185b9dc38d88c",
+            "bytes": 3773,
+            "bytesInOutput": 1882,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+            "sha256": "d6861e6d706a1f5c6de3446353e5424c8e82dd3576e6aac03b850edf51e9a8c5",
+            "bytes": 6620,
+            "bytesInOutput": 1851,
+            "package": {
+              "name": "alien-signals",
+              "version": "3.2.0",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/package.json",
+              "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/graph.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/graph.ts",
+            "sha256": "f723fc4c3e8e0ab89f3639d85838cebcf54d6f611510a0ae4fdbeb70724580be",
+            "bytes": 22793,
+            "bytesInOutput": 8482,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/requests.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/requests.ts",
+            "sha256": "79e06c4b5d73ab42fd735be6ebeaecafc74d8726e1a548bcd7e24f64415c3d24",
+            "bytes": 17091,
+            "bytesInOutput": 6852,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/engine.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/engine.ts",
+            "sha256": "a21392b8b8d048d4194eab67b29ccd8a146668aa7f2a55d7fb4001ca290b626f",
+            "bytes": 20836,
+            "bytesInOutput": 9618,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/client.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/client.ts",
+            "sha256": "f64cfce5c9d17567cca9e5621c14d7ebd4f09db217bb0b2ce89dd697c684aac5",
+            "bytes": 996,
+            "bytesInOutput": 197,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "candidate-native-client-public-entry.mjs",
+            "source": "export { useSignal$ } from \"octane/signals/client\";\n",
+            "sha256": "c0f6fe3394de129c532d2feb676ea96e3f0653720edcb7b5c25582b8dae1ade0",
+            "bytes": 52,
+            "bytesInOutput": 0
+          }
+        ],
+        "boundaryChecks": "passed",
+        "exportLoadSmoke": "passed"
+      }
+    },
+    {
+      "name": "candidate/native-server",
+      "ops": {
+        "raw": {
+          "median": 30960,
+          "min": 30960,
+          "samples": 1
+        },
+        "gzip": {
+          "median": 10001,
+          "min": 10001,
+          "samples": 1
+        },
+        "brotli": {
+          "median": 9096,
+          "min": 9096,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "request": "octane/signals/server",
+        "exports": ["useSignal$"],
+        "platform": "node",
+        "bundleSha256": "3f385ebe3733f157c147f4ad8961a230ac4a22f558ab2e6f7dbb97d781a8f9fa",
+        "inputs": [
+          {
+            "path": "packages/octane/src/stream-protocol.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/stream-protocol.ts",
+            "sha256": "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce",
+            "bytes": 3295,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/dom-tables.js",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/dom-tables.js",
+            "sha256": "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d",
+            "bytes": 16957,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/constants.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/constants.ts",
+            "sha256": "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7",
+            "bytes": 11566,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/has-own.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/has-own.ts",
+            "sha256": "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2",
+            "bytes": 59,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/head-ownership.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/head-ownership.ts",
+            "sha256": "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493",
+            "bytes": 1686,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/resource-hint-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/resource-hint-diagnostics.ts",
+            "sha256": "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915",
+            "bytes": 4079,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/aria-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/aria-diagnostics.ts",
+            "sha256": "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48",
+            "bytes": 3186,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/host-property-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/host-property-diagnostics.ts",
+            "sha256": "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0",
+            "bytes": 6351,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/shared-value-helpers.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/shared-value-helpers.ts",
+            "sha256": "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908",
+            "bytes": 1957,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/css.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/css.ts",
+            "sha256": "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57",
+            "bytes": 4865,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/html-tree-validation.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/html-tree-validation.ts",
+            "sha256": "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6",
+            "bytes": 8021,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/sanitize-url.js",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/sanitize-url.js",
+            "sha256": "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7",
+            "bytes": 3249,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/component-flags.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/component-flags.ts",
+            "sha256": "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a",
+            "bytes": 1060,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-message.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/error-message.ts",
+            "sha256": "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936",
+            "bytes": 1260,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/error-codes.server.generated.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/error-codes.server.generated.ts",
+            "sha256": "68a911785707f93a13c78bd29a6c40c36c6c9b6e1ddf43802b2207dfe7d815aa",
+            "bytes": 5109,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/form-diagnostics.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/form-diagnostics.ts",
+            "sha256": "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54",
+            "bytes": 4068,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/renderer-bridge.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/renderer-bridge.ts",
+            "sha256": "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824",
+            "bytes": 2181,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/read-protocol.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/read-protocol.ts",
+            "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+            "bytes": 5327,
+            "bytesInOutput": 448,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-collector.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-collector.ts",
+            "sha256": "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3",
+            "bytes": 5672,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-seeds.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-seeds.ts",
+            "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8",
+            "bytes": 5933,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/native-read-server.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-server.ts",
+            "sha256": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614",
+            "bytes": 3642,
+            "bytesInOutput": 0,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/runtime.server.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/runtime.server.ts",
+            "sha256": "2ae910fea1105e32198b44fc883965f5574f1e4436d9695a5cc728232f8fc4c4",
+            "bytes": 365911,
+            "bytesInOutput": 1034,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/errors.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/errors.ts",
+            "sha256": "6a9a9561a4e37085c76ae714f6ec774f19646d3c6ef0e0f5dbc44ae6e16ee451",
+            "bytes": 843,
+            "bytesInOutput": 570,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/encoding.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/encoding.ts",
+            "sha256": "57625f36035059cca2c473a5ac0e8038b27b4d57eaa422a3bcd185b9dc38d88c",
+            "bytes": 3773,
+            "bytesInOutput": 1882,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+            "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+            "sha256": "d6861e6d706a1f5c6de3446353e5424c8e82dd3576e6aac03b850edf51e9a8c5",
+            "bytes": 6620,
+            "bytesInOutput": 1851,
+            "package": {
+              "name": "alien-signals",
+              "version": "3.2.0",
+              "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/package.json",
+              "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/graph.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/graph.ts",
+            "sha256": "f723fc4c3e8e0ab89f3639d85838cebcf54d6f611510a0ae4fdbeb70724580be",
+            "bytes": 22793,
+            "bytesInOutput": 8482,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/requests.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/requests.ts",
+            "sha256": "79e06c4b5d73ab42fd735be6ebeaecafc74d8726e1a548bcd7e24f64415c3d24",
+            "bytes": 17091,
+            "bytesInOutput": 6852,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/engine.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/engine.ts",
+            "sha256": "a21392b8b8d048d4194eab67b29ccd8a146668aa7f2a55d7fb4001ca290b626f",
+            "bytes": 20836,
+            "bytesInOutput": 9618,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "packages/octane/src/signals/server.ts",
+            "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/server.ts",
+            "sha256": "7dfa84a92f00259350fefd7df5e7c866f752e3dad31d2ff8862a709958f681fd",
+            "bytes": 1021,
+            "bytesInOutput": 197,
+            "package": {
+              "name": "octane",
+              "version": "0.1.48",
+              "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+              "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+            }
+          },
+          {
+            "path": "candidate-native-server-public-entry.mjs",
+            "source": "export { useSignal$ } from \"octane/signals/server\";\n",
+            "sha256": "25bda4a2da5a59c7800ef68c8f8218a827470fe1307c630ea5984442727c7ef7",
+            "bytes": 52,
+            "bytesInOutput": 0
+          }
+        ],
+        "boundaryChecks": "passed",
+        "exportLoadSmoke": "passed"
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "scenario": "ordinary-client",
+      "metrics": {
+        "raw": {
+          "baseline": 136080,
+          "candidate": 136410,
+          "delta": 330,
+          "percent": 0.24250440917108484
+        },
+        "gzip": {
+          "baseline": 44004,
+          "candidate": 44134,
+          "delta": 130,
+          "percent": 0.2954276883919693
+        },
+        "brotli": {
+          "baseline": 38566,
+          "candidate": 38712,
+          "delta": 146,
+          "percent": 0.378571798993943
+        }
+      }
+    },
+    {
+      "scenario": "ordinary-server",
+      "metrics": {
+        "raw": {
+          "baseline": 34222,
+          "candidate": 34412,
+          "delta": 190,
+          "percent": 0.5551984103792984
+        },
+        "gzip": {
+          "baseline": 12246,
+          "candidate": 12340,
+          "delta": 94,
+          "percent": 0.7675975828842052
+        },
+        "brotli": {
+          "baseline": 11066,
+          "candidate": 11173,
+          "delta": 107,
+          "percent": 0.9669257184167668
+        }
+      }
+    }
+  ],
+  "environment": {
+    "baselineRef": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+    "candidateRef": "422c2c937784af835c64d6fae5a39162143c7a44",
+    "candidateDirty": true,
+    "baselineArchive": {
+      "path": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/source.tar",
+      "sha256": "df610b31e49a016a512f1ba926b1f07e6700659c6febe4900d99ac0a27e92147"
+    },
+    "baselineLockfileSha256": "8ea32857607beda8b520797b9885fbdb46fa30886edc2a7966186428cf36a912",
+    "candidateLockfileSha256": "8ea32857607beda8b520797b9885fbdb46fa30886edc2a7966186428cf36a912",
+    "packageManifests": {
+      "baseline": {
+        "root": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane",
+        "manifest": "/private/tmp/octane-native-consolidation-baseline-65kce0yk/packages/octane/package.json",
+        "sha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a",
+        "gitBlob": "a1b177dc5a290f01a868b89309b95586dde88684",
+        "exports": {
+          ".": "./src/index.ts",
+          "./jsx-runtime": "./src/jsx-runtime.d.ts",
+          "./jsx-dev-runtime": "./src/jsx-runtime.d.ts",
+          "./tsrx-iterable": "./src/tsrx-iterable.ts",
+          "./tsrx-spread": "./src/tsrx-spread.ts",
+          "./react": "./src/react/index.ts",
+          "./hydration": "./src/hydration/index.ts",
+          "./behavior": "./src/behavior-root.ts",
+          "./react/server": "./src/react/server.ts",
+          "./server": "./src/server/index.ts",
+          "./signals": "./src/signals/index.ts",
+          "./signals/client": "./src/signals/client.ts",
+          "./signals/server": "./src/signals/server.ts",
+          "./internal/client": "./src/internal/client.ts",
+          "./internal/server": "./src/internal/server.ts",
+          "./static": "./src/static/index.ts",
+          "./testing": "./src/testing.ts",
+          "./constants": "./src/constants.ts",
+          "./profiling": "./src/profiling.ts",
+          "./universal": "./src/universal.ts",
+          "./universal/native": "./src/universal-native.ts",
+          "./compiler": {
+            "types": "./src/compiler/index.d.ts",
+            "default": "./src/compiler/index.js"
+          },
+          "./compiler/bundler": "./src/compiler/bundler.js",
+          "./compiler/register": "./src/compiler/register.js",
+          "./compiler/renderers": "./src/compiler/renderers.js",
+          "./compiler/typescript": {
+            "types": "./src/compiler/typescript.d.ts",
+            "default": "./src/compiler/typescript.js"
+          },
+          "./compiler/vite": {
+            "types": "./src/compiler/vite.d.ts",
+            "default": "./src/compiler/vite.js"
+          },
+          "./compiler/volar": "./src/compiler/volar.js"
+        }
+      },
+      "candidate": {
+        "root": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane",
+        "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+        "sha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a",
+        "exports": {
+          ".": "./src/index.ts",
+          "./jsx-runtime": "./src/jsx-runtime.d.ts",
+          "./jsx-dev-runtime": "./src/jsx-runtime.d.ts",
+          "./tsrx-iterable": "./src/tsrx-iterable.ts",
+          "./tsrx-spread": "./src/tsrx-spread.ts",
+          "./react": "./src/react/index.ts",
+          "./hydration": "./src/hydration/index.ts",
+          "./behavior": "./src/behavior-root.ts",
+          "./react/server": "./src/react/server.ts",
+          "./server": "./src/server/index.ts",
+          "./signals": "./src/signals/index.ts",
+          "./signals/client": "./src/signals/client.ts",
+          "./signals/server": "./src/signals/server.ts",
+          "./internal/client": "./src/internal/client.ts",
+          "./internal/server": "./src/internal/server.ts",
+          "./static": "./src/static/index.ts",
+          "./testing": "./src/testing.ts",
+          "./constants": "./src/constants.ts",
+          "./profiling": "./src/profiling.ts",
+          "./universal": "./src/universal.ts",
+          "./universal/native": "./src/universal-native.ts",
+          "./compiler": {
+            "types": "./src/compiler/index.d.ts",
+            "default": "./src/compiler/index.js"
+          },
+          "./compiler/bundler": "./src/compiler/bundler.js",
+          "./compiler/register": "./src/compiler/register.js",
+          "./compiler/renderers": "./src/compiler/renderers.js",
+          "./compiler/typescript": {
+            "types": "./src/compiler/typescript.d.ts",
+            "default": "./src/compiler/typescript.js"
+          },
+          "./compiler/vite": {
+            "types": "./src/compiler/vite.d.ts",
+            "default": "./src/compiler/vite.js"
+          },
+          "./compiler/volar": "./src/compiler/volar.js"
+        }
+      }
+    },
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpu": "Apple M5 Max",
+    "dependencyMode": "explicit-tooling-root",
+    "toolingRoot": "/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+    "dependencies": {
+      "esbuild": {
+        "name": "esbuild",
+        "version": "0.28.1",
+        "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/package.json",
+        "manifestSha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a",
+        "entry": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js",
+        "entrySha256": "8331fe1d8b3a07381f33cc425fcfaa94776e263113653f80ec3ba433e9657e73"
+      },
+      "alien": {
+        "name": "alien-signals",
+        "version": "3.2.0",
+        "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/package.json",
+        "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831",
+        "entry": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/cjs/index.cjs",
+        "entrySha256": "4176a9035b7898debb4601fd0ba8076e279befc470816336260847bd44720299"
+      },
+      "devalue": {
+        "name": "devalue",
+        "version": "5.8.2",
+        "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/package.json",
+        "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569",
+        "entry": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+        "entrySha256": "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22"
+      }
+    },
+    "runnerSha256": "70f8b1477dfa2b39ca208c40ccc56feb11b5eea749b11caa2677f7d92916d717",
+    "fixtureSha256": "428f2df69ec1e1c920c71056651bd42992c2a9b231a85d7a3b66f6c3821c1843"
+  },
+  "changedInputsDuringRun": [],
+  "finishedAt": "2026-08-27T22:06:29.587Z",
+  "parityEvidence": {
+    "classification": "final-corrected-source-bundle-checks",
+    "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/final-bundles/result.json",
+    "rawResultSha256": "9124ea549c9f9bef5c5ac761b3892f52dd2efd6b125870cba38c91aac54ed6ba",
+    "removedMetadata": [],
+    "allTimingAndGcSamplesPreserved": true,
+    "sourceToolchainQualification": "Existing explicitly authorized supplemental public source toolchain; not locked-workspace, canonical CI, or browser performance evidence.",
+    "allSevenBundlesMatch422Evidence": true,
+    "comparisonEvidence": "consolidation-bundles.json"
+  }
+}

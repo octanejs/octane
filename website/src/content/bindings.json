@@ -63,6 +63,7 @@
       "@octanejs/react-error-boundary",
       "@octanejs/resizable-panels",
       "@octanejs/transition-group",
+      "@octanejs/select",
       "@octanejs/day-picker",
       "@octanejs/textarea-autosize",
       "@octanejs/colorful",

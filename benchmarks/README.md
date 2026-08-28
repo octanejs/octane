@@ -221,11 +221,12 @@ internally, get their own baseline and guard namespace.
 | `chat-stream` | chat-stream | Octane + reference frameworks | deterministic token streaming + conversation switches |
 | `streamdown-hosted` | streamdown-hosted | React Streamdown + React-hosted Octane binding | React-hosted compatibility boundary: static mount/replace, fine/coarse Markdown streaming, semantic DOM parity, lifecycle diagnostic, and production bytes |
 | `svg-dashboard` | svg-dashboard | octane-tsrx, react, solid, svelte, inferno | hand-rolled SVG observability dashboard: path-d/transform churn, keyed reconcile inside `<svg>`, foreignObject labels, portal tooltip overlay, createElement icon de-opt; byte-exact Node-replay + cross-flavor DOM-parity gates |
-| `uibench` | uibench | octane-tsrx, react, preact, solid, inferno | fresh implementation of UIbench's 96-case desktop matrix: table/sparse-style updates, flat and nested keyed tree transforms, historical worst cases, large no-change diffs, and semantic/identity gates |
+| `uibench` | uibench | octane-tsrx, react, preact, solid, ripple, vue-vapor, inferno | fresh implementation of UIbench's 96-case desktop matrix: table/sparse-style updates, flat and nested keyed tree transforms, historical worst cases, large no-change diffs, and semantic/identity gates |
 | `dbmon` | dbmon | Octane + reference frameworks | per-cell update churn |
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
 | `spa-navigation` | spa-navigation | octane-tsrx, octane-jsx, react, solid, vue-vapor, inferno | full-page routed-subtree teardown/mount with shell/layout identity and production-work gates |
 | `signal-favoring` | signal-favoring | Octane + reference frameworks | cascade vs targeted |
+| `scoped-signals` | scoped-signals | none (Node-only) | same-version Alien 3.2.0/scoped-engine graphs, intermediate notification/value gates, and continuous partial disposal with unrelated live owners; optional separate heap diagnostics |
 | `news` | news | none (builds) | SSR + hydration, per-target |
 | `hydration-interactivity` | hydration-interactivity | none (builds) | real pre-hydration typing, controlled inputs, native event replay, and 1×/6× Chromium CPU throttling across Octane, React, Preact, Solid 2, Svelte, Vue Vapor, and Inferno |
 | `hydration-stress` | hydration-stress | none (builds) | withheld-chunk hydration, keyboard and pointer Send delivery, DOM adoption, and explicit replay/drop diagnostics at 6× CPU throttling |
@@ -245,6 +246,8 @@ internally, get their own baseline and guard namespace.
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `radix-collection-order` | radix-collection-order | none (Node-only) | production Radix collection ordering versus the prior comparator at 16, 64, 256, and 4,096 items, with missing-ref and stable-order controls |
 | `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
+| `floating-tree-navigation` | floating-tree-navigation | none (Node-only) | Floating UI deepest-open-node lookup on deep chains, equal-depth forks, and a root-only control, with exact previous-behavior and deterministic node-read gates |
+| `ink-cursor-update` | ink-cursor-update | none (Node-only) | Ink standard/incremental cursor-only updates over equal 20,000-line frames, with exact previous branches, byte/split gates, stable-frame stress scaling, and initial/changed-render controls |
 | `manifest-cache-invalidation` | manifest-cache-invalidation | none (Node-only) | shared-compiler source invalidation across 129 and 5,001 cached nearest-manifest decisions, plus a required manifest-scan control |
 | `vite-client-assets` | vite-client-assets | none (Node-only) | route asset mapping across 100 and 1,000 entries sharing a 500-chunk manifest graph, plus a shallow control |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |
@@ -276,6 +279,8 @@ internally, get their own baseline and guard namespace.
 | `tsrx-component-graph` | tsrx-component-graph | none (Node-only) | 2,400-component live-import propagation with dependent-first vs dependency-first declarations |
 | `tsrx-jsx-return-branches` | tsrx-jsx-return-branches | none (Node-only) | client/server compile and bundler classification for 120/480 conditional-return components, with lowering/export controls and a same-sized ineligible parse/print control |
 | `tsrx-nesting-diagnostics` | tsrx-nesting-diagnostics | none (Node-only) | development TSRX compilation at 500 and 2,000 invalid HTML sites, with parsed diagnostic count/order controls and a per-diagnostic scaling guard |
+| `tsrx-renderer-selection` | tsrx-renderer-selection | none (Node-only) | ordered filename-to-renderer classification with semantic checksums, comparing retained normalized config against equivalent raw revalidation |
+| `tsrx-native-change-analysis` | tsrx-native-change-analysis | none (Node-only) | native-onChange analysis plus client/server compilation for 500/4,000 hostless JSX sites, paired with an AST-identical marker control that conservatively forces the scan |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
 | `bundle-reachability` | bundle-size | none (builds and executes in jsdom) | isolated public feature imports, exact production-bundle behavior, forbidden-module reachability, and committed raw/gzip/brotli budgets |
 | `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |

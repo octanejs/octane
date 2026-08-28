@@ -209,6 +209,8 @@ const SUITES = [
 			{ filter: 'react-uibench-bench', port: 5316 },
 			{ filter: 'solid-uibench-bench', port: 5317 },
 			{ filter: 'preact-uibench-bench', port: 5318 },
+			{ filter: 'vue-vapor-uibench-bench', port: 5319 },
+			{ filter: 'ripple-uibench-bench', port: 5322 },
 			{ filter: 'inferno-uibench-bench', port: 5325 },
 		],
 		iter: { normal: 10, quick: 2 },
@@ -266,6 +268,29 @@ const SUITES = [
 		runs: [
 			{ script: 'run.mjs', args: (n) => [String(n)] },
 			{ label: 'work', script: 'work.mjs', args: () => [] },
+		],
+	},
+	{
+		// Renderer-free Alien 3.2.0 versus scoped-engine graphs, plus one
+		// uninterrupted ownership lifetime with repeated partial disposal.
+		name: 'scoped-signals',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n, quick) => [String(n), ...(quick ? ['--quick'] : [])] }],
+	},
+	{
+		// Actual production compilation with ordinary/native read controls,
+		// plus deterministic five-dependency use() creation-cache guards.
+		name: 'scoped-native-reads',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [
+			{
+				script: 'run-native-costs.mjs',
+				args: (n, quick) => [`--samples=${n}`, ...(quick ? ['--quick'] : [])],
+			},
 		],
 	},
 	{
@@ -411,6 +436,24 @@ const SUITES = [
 		// and dynamic route tables with cost normalized per candidate route.
 		name: 'router-dispatch',
 		cwd: 'router-dispatch',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Floating UI's virtual nested-menu routing: exact previous behavior versus
+		// production on deep and branching trees, with deterministic node-read counts.
+		name: 'floating-tree-navigation',
+		cwd: 'floating-tree-navigation',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Ink's cursor-only terminal updates over unchanged large frames: exact
+		// previous branches, byte/split gates, and stable-frame scaling controls.
+		name: 'ink-cursor-update',
+		cwd: 'ink-cursor-update',
 		servers: [],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -858,6 +901,24 @@ const SUITES = [
 		cwd: 'tsrx-nesting-diagnostics',
 		servers: [],
 		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Ordered filename-to-renderer classification with one retained normalized
+		// config versus equivalent raw revalidation in the same process.
+		name: 'tsrx-renderer-selection',
+		cwd: 'tsrx-renderer-selection',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Native onChange analysis on hostless TSRX at two sizes, paired with an
+		// AST-identical large source whose ignored marker conservatively forces the scan.
+		name: 'tsrx-native-change-analysis',
+		cwd: 'tsrx-native-change-analysis',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{

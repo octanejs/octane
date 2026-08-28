@@ -33,6 +33,7 @@ import ssrThroughput from '../../../benchmarks/baselines/local/ssr-throughput.js
 import streamingSsr from '../../../benchmarks/baselines/local/streaming-ssr.json';
 import svgDashboard from '../../../benchmarks/baselines/local/svg-dashboard.json';
 import todoMvc from '../../../benchmarks/baselines/local/todomvc.json';
+import uibench from '../../../benchmarks/baselines/local/uibench.json';
 import asyncComposition from '../../../benchmarks/baselines/local/async-composition.json';
 import ssrHttp from '../../../benchmarks/baselines/local/ssr-http.json';
 import tanstackStart from '../../../benchmarks/baselines/local/tanstack-start.json';
@@ -87,7 +88,7 @@ export interface BenchCard {
 // ---------------------------------------------------------------------------
 // Series identity — fixed hue per framework, everywhere.
 // Validated set: #ff415a #c98500 #1e93b0 #4bafe7 #7478fb #1baf7a #f57547
-// #9085e9 #e06ec4 (dark, on #2b3138). Every color clears 3:1 contrast on the panel;
+// #9085e9 #e06ec4 #c8d1dc (dark, on #2b3138). Every color clears 3:1 contrast on the panel;
 // the palette keeps at least ΔE 10 across protan/deutan/tritan simulations.
 // Preact and Svelte wear accessible indigo/coral variants of their brand hues.
 // Vue can't wear its brand green — it collapses into Solid's under tritan
@@ -103,10 +104,13 @@ const FRAMEWORKS: SeriesDef[] = [
 	{ key: 'solid', label: 'Solid 2.0 beta', color: '#1baf7a' },
 	{ key: 'svelte', label: 'Svelte 5', color: '#f57547' },
 	{ key: 'ripple', label: 'Ripple 0.3', color: '#9085e9' },
-	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 beta', color: '#e06ec4' },
+	{ key: 'vue-vapor', label: 'Vue Vapor 3.6 RC', color: '#e06ec4' },
 	// The weather-app fixtures publish plain `vue` (same 3.6 pin). Color follows
 	// the entity, and the two Vue keys never appear on the same card.
 	{ key: 'vue', label: 'Vue 3.6', color: '#e06ec4' },
+	// Inferno's brand red collapses into Octane's and Svelte's under CVD
+	// simulation, so its field-comparison series wears a neutral blue-gray.
+	{ key: 'inferno', label: 'Inferno 9', color: '#c8d1dc' },
 ];
 
 // Octane-internal variants — ordinal ramp of the brand hue, validated with
@@ -180,6 +184,11 @@ const JS_FRAMEWORK_SHARED_OPS = [
 	'clear',
 ];
 
+const UIBENCH_DIAGNOSTIC_OPS = new Set(['cases', 'elements_largest', 'identity_shared']);
+const UIBENCH_TIMING_OPS = Object.keys((uibench as SuiteBaseline).targets[0].ops).filter(
+	(op) => !UIBENCH_DIAGNOSTIC_OPS.has(op),
+);
+
 // ---------------------------------------------------------------------------
 // Octane vs the field — one card per cross-framework suite.
 // ---------------------------------------------------------------------------
@@ -193,6 +202,14 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		// Keep only shared timings; insertion/fragment diagnostics in Octane's
 		// baseline are not measured by the reference frameworks.
 		JS_FRAMEWORK_SHARED_OPS,
+	),
+	frameworkCard(
+		uibench,
+		'uibench',
+		'UIbench',
+		'UIbench’s 96-case desktop matrix — table mutations, animation updates, keyed tree reorders and published worst cases. Every target must match semantic signatures and survivor identity before its timings are accepted.',
+		undefined,
+		UIBENCH_TIMING_OPS,
 	),
 	frameworkCard(
 		todoMvc,
@@ -307,7 +324,7 @@ export const FRAMEWORK_CARDS: BenchCard[] = [
 		jsFrameworkReorder,
 		'js-framework-reorder',
 		'js-framework-reorder',
-		'The keyed-reorder matrix — reverse, shuffle, rotations, prepends and displacements — stressing the keyed reconciler. Ripple’s prepend and insert-mid cells are omitted because their current identity gates fail; invalid timings are never charted.',
+		'The keyed-reorder matrix — reverse, shuffle, rotations, prepends and displacements — stressing the keyed reconciler. Semantic output and surviving row identity are gated before timings are accepted.',
 	),
 	frameworkCard(
 		dbmon,

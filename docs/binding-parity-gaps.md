@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**29 active pin(s) across 96 binding package(s).**
+**29 active pin(s) across 97 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -70,6 +70,7 @@ surface and evidence.
 | `@octanejs/remix-router` | 0 |
 | `@octanejs/resizable-panels` | 0 |
 | `@octanejs/rxjs` | 0 |
+| `@octanejs/select` | 0 |
 | `@octanejs/shadcn` | 0 |
 | `@octanejs/solana-kit` | 0 |
 | `@octanejs/sonner` | 0 |

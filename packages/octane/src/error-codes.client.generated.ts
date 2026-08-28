@@ -50,6 +50,7 @@ type ClientErrorArguments = {
 	54: [];
 	55: [];
 	56: [];
+	58: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -227,6 +228,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 					'Hydration mismatch: the server rendered more list items than the client; the extra server items were discarded.',
 					args,
 				);
+			case 58:
+				return formatDevErrorMessage('Unsupported native-read compiler/runtime version.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

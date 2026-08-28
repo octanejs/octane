@@ -1,0 +1,8 @@
+{
+  "operation": "One repository-style JSON formatting pass after the final async retention measurement",
+  "formatter": "prettier@3.9.6",
+  "rawOriginalLocalPath": "/private/tmp/octane-scoped-signals-original-reports-20260827/async-retention-final.json",
+  "rawRunSha256": "cfbe62e0c469c283c0815b506577c3ad60e7520c64b29afb74a72e74cf709679",
+  "formattedSha256": "a52ecb3c01a13f0d37d33e92e7dcfad7cbb2248163c6bf2039c3b95a5a78b181",
+  "parsedValuesUnchanged": true
+}

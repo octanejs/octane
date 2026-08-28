@@ -1,0 +1,420 @@
+{
+  "schemaVersion": 1,
+  "project": "select-differential",
+  "roots": ["packages/select/tests"],
+  "files": [
+    "packages/select/tests/async.test.ts",
+    "packages/select/tests/creatable.test.ts",
+    "packages/select/tests/default-styles.test.ts",
+    "packages/select/tests/leaf-components.test.ts",
+    "packages/select/tests/select-ssr.test.ts",
+    "packages/select/tests/state-manager.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:aeec445ce8b1dc95",
+      "file": "packages/select/tests/async.test.ts",
+      "fullName": "useAsync SSR parity matches React initial server state for 0"
+    },
+    {
+      "id": "runtime:89b9e530bf2c6467",
+      "file": "packages/select/tests/async.test.ts",
+      "fullName": "useAsync SSR parity matches React initial server state for 1"
+    },
+    {
+      "id": "runtime:9f657cb7cf1b9777",
+      "file": "packages/select/tests/creatable.test.ts",
+      "fullName": "useCreatable parity matches React create-option value and action metadata"
+    },
+    {
+      "id": "runtime:52a002c7593d493e",
+      "file": "packages/select/tests/creatable.test.ts",
+      "fullName": "useCreatable parity matches React delegated onCreateOption and ordinary changes"
+    },
+    {
+      "id": "runtime:54721bc06230bfe4",
+      "file": "packages/select/tests/creatable.test.ts",
+      "fullName": "useCreatable parity matches React new-option placement: first"
+    },
+    {
+      "id": "runtime:b7e02ccc6fc22eda",
+      "file": "packages/select/tests/creatable.test.ts",
+      "fullName": "useCreatable parity matches React new-option placement: last"
+    },
+    {
+      "id": "runtime:c02c62eafd0f61ad",
+      "file": "packages/select/tests/creatable.test.ts",
+      "fullName": "useCreatable parity matches React suppression for 0"
+    },
+    {
+      "id": "runtime:e684bde3d39af24f",
+      "file": "packages/select/tests/creatable.test.ts",
+      "fullName": "useCreatable parity matches React suppression for 1"
+    },
+    {
+      "id": "runtime:1fcd592dce8d82ce",
+      "file": "packages/select/tests/creatable.test.ts",
+      "fullName": "useCreatable parity matches React suppression for 2"
+    },
+    {
+      "id": "runtime:787c1a40df049dba",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned built-ins matches labels, values, group labels, and disabled coercion"
+    },
+    {
+      "id": "runtime:fc0a51a46f5d3d4d",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry has the exact 22-key upstream registry"
+    },
+    {
+      "id": "runtime:3408183908e134e1",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches clearIndicator in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:2fa27fe62e58fdd2",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches container in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:6bbb099be66010e8",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches control in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:77059e539c12adff",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches dropdownIndicator in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:b6ea22470acd502f",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches group in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:28ffec6871e472ed",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches groupHeading in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:30f3c5670b6796bd",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches indicatorSeparator in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:3cbb9b5494dfaea0",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches indicatorsContainer in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:307521fa90c298f2",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches input in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:10c5f07d3e9868ba",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches loadingIndicator in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:ce0fb299120a47d3",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches loadingMessage in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:23c135abae22fbfc",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches menu in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:1f854ed8e148d17a",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches menuList in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:f7d57729f9e47464",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches menuPortal in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:9f907bf69ec45b60",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches multiValue in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:e9000ab63fa1ae90",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches multiValueLabel in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:1d560cc48b6db809",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches multiValueRemove in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:95640aaf1cc071c9",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches noOptionsMessage in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:e2952a90a5c84a59",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches option in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:410a084eef05cedc",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches placeholder in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:b2aea245405667c2",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches singleValue in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:b489196608854576",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches state-sensitive branches"
+    },
+    {
+      "id": "runtime:f4a681d9def17e15",
+      "file": "packages/select/tests/default-styles.test.ts",
+      "fullName": "pinned default style registry matches valueContainer in styled and unstyled modes"
+    },
+    {
+      "id": "runtime:229645262330e141",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'clearIndicator' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:9d2b1c0cc2ebdc5f",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'control' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:4ce876eed69ef2a2",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'cross' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:0ad67f45e3afe978",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'down' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:855a35a2418f0802",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'dropdownIndicator' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:1df78f7f91178c4e",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'group' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:1c4d6697f53b3c6d",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'groupHeading' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:c37487093baafa32",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'indicatorSeparator' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:d0ad9dbd8bda29a9",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'indicators' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:4a869970648a8e7e",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'input' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:9eeb8c50ca64eb82",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'loadingIndicator' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:f3f693b8f6087a6d",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'loadingMessage' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:032939405e5c14f6",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'menu' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:e456e950ea05cd2a",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'menuList' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:413a76b56285766d",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'multiValue' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:5f28d8f6e0a1e16c",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'multiValueContainer' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:5faf0d9d14dfdffd",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'multiValueRemove' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:53c84e4157b5b4b4",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'noOptionsMessage' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:9b45c869718dd2b6",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'option' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:6463ca5cbb6d0218",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'placeholder' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:f5d037088d70c0e4",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'selectContainer' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:b664a4882ec0b396",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'singleValue' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:c4e2791e7e3c4589",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches 'valueContainer' styled SSR markup and CSS"
+    },
+    {
+      "id": "runtime:b856da8c98a97077",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches control unstyled and alternate state markup/CSS"
+    },
+    {
+      "id": "runtime:2a35e19c27c8a757",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches option unstyled and alternate state markup/CSS"
+    },
+    {
+      "id": "runtime:9545ec3f325c5c78",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches singleValue unstyled and alternate state markup/CSS"
+    },
+    {
+      "id": "runtime:a7e980e7fc771a9c",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit matches valueContainer unstyled and alternate state markup/CSS"
+    },
+    {
+      "id": "runtime:da85c6fed72d7aa6",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit preserves explicit null overrides for nullable slots"
+    },
+    {
+      "id": "runtime:378f058c72ce2883",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit publishes the exact upstream component registry through the root entry point"
+    },
+    {
+      "id": "runtime:d2b2077dda6a69de",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit renders no MenuPortal markup during SSR without a control element"
+    },
+    {
+      "id": "runtime:3b8f708d84aee162",
+      "file": "packages/select/tests/leaf-components.test.ts",
+      "fullName": "first default component unit uses registry identities by default and applies one consumer override"
+    },
+    {
+      "id": "runtime:0d0e1aec351b5453",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'empty closed' SSR"
+    },
+    {
+      "id": "runtime:817a5e940a33a28f",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'empty required field' SSR"
+    },
+    {
+      "id": "runtime:515747201fdb48fa",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'non-searchable dummy input' SSR"
+    },
+    {
+      "id": "runtime:07b23293e29c782e",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'null loading notice' SSR"
+    },
+    {
+      "id": "runtime:5911a7d694c68e96",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'null no-options notice' SSR"
+    },
+    {
+      "id": "runtime:00abfbccd5a16190",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'open flat options' SSR"
+    },
+    {
+      "id": "runtime:a9043c032e85dc4f",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'open grouped options' SSR"
+    },
+    {
+      "id": "runtime:08d60b9ac8ed7703",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'open loading notice' SSR"
+    },
+    {
+      "id": "runtime:6f577d5715527751",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'open no-options notice' SSR"
+    },
+    {
+      "id": "runtime:3fd5e72157310c44",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'selected multi values' SSR"
+    },
+    {
+      "id": "runtime:c247ef1d2af54540",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "Select SSR parity matches pinned 'selected single value and hidden form…' SSR"
+    },
+    {
+      "id": "runtime:a401a2f2ed405e5a",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "composed Select entry-point SSR parity matches the pinned 'async' default wrapper"
+    },
+    {
+      "id": "runtime:e6523814b56e1006",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "composed Select entry-point SSR parity matches the pinned 'async-creatable' default wrapper"
+    },
+    {
+      "id": "runtime:af76094901c5c949",
+      "file": "packages/select/tests/select-ssr.test.ts",
+      "fullName": "composed Select entry-point SSR parity matches the pinned 'creatable' default wrapper"
+    },
+    {
+      "id": "runtime:b8bb58ee699eecbe",
+      "file": "packages/select/tests/state-manager.test.ts",
+      "fullName": "useStateManager SSR parity matches React controlled/default precedence for 0"
+    },
+    {
+      "id": "runtime:8feb160e6b9e0906",
+      "file": "packages/select/tests/state-manager.test.ts",
+      "fullName": "useStateManager SSR parity matches React controlled/default precedence for 1"
+    }
+  ]
+}

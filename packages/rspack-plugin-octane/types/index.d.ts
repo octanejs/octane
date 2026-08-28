@@ -144,6 +144,8 @@ export interface OctaneRspackLoaderOptions {
 	 * @default false
 	 */
 	strong?: boolean;
+	/** Experimental native signal reads in DOM client/server render scopes. */
+	nativeReads?: boolean;
 	/**
 	 * Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. With
 	 * `requireDirective`, excluded paths are exempt from Octane ownership

@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
-import { compileToVolarMappings } from 'octane/compiler/volar';
+import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { bundleVolarCompiler } from '../../scripts/bundle-volar.mjs';
 
 const OBJECT_RENDERERS = {
@@ -86,6 +86,123 @@ describe('compileToVolarMappings', () => {
 		expect(result.code).toContain('props.label');
 		expect(result.errors).toEqual([]);
 	});
+
+	it.each([false, true])(
+		'type-checks authored Suspense alongside pending directives (nativeReads: %s)',
+		(nativeReads) => {
+			const source = `import { Suspense } from 'octane';
+export function Panel(props: { primaryLabel: string; pendingLabel: string }) @{
+	<Suspense fallback={'outer'}>
+		@try {
+			<span>{props.primaryLabel.toUpperCase()}</span>
+		} @pending {
+			<span>{props.pendingLabel.toUpperCase()}</span>
+		} @catch (error) {
+			<span>{String(error)}</span>
+		}
+	</Suspense>
+}
+`;
+			const root = mkdtempSync(join(tmpdir(), 'octane-volar-suspense-'));
+			try {
+				mkdirSync(join(root, 'node_modules'));
+				symlinkSync(
+					fileURLToPath(new URL('../..', import.meta.url)),
+					join(root, 'node_modules/octane'),
+					'dir',
+				);
+				const validSources = [
+					source,
+					source
+						.replaceAll('Suspense', 'Boundary')
+						.replace('import { Boundary }', 'import { Suspense as Boundary }'),
+					`import { Suspense } from 'octane';
+export function Repeated() @{
+	<Suspense fallback={'outer'}>
+		@try {
+			@try { <span>{'inner'}</span> } @pending {}
+		} @pending {}
+		@try { <span>{'sibling'}</span> } @pending { <span>{'waiting'}</span> }
+	</Suspense>
+}
+`,
+					`export function Pending() @{
+	@try { <span>{'ready'}</span> } @pending {}
+}
+`,
+				];
+				const files = validSources.map((input, index) => {
+					const result = compileToVolarMappings(input, `Panel${index}.tsrx`, { nativeReads });
+					expect(result.errors).toEqual([]);
+					expect(result.diagnostics).toEqual([]);
+					if (index === 0) {
+						for (const offset of [input.indexOf('Suspense'), input.indexOf('<Suspense') + 1]) {
+							const mapping = result.mappings.find(
+								(candidate) => candidate.sourceOffsets[0] === offset,
+							);
+							expect(mapping).toBeDefined();
+							expect(
+								result.code.slice(mapping!.generatedOffsets[0], mapping!.generatedOffsets[0] + 8),
+							).toBe('Suspense');
+						}
+					}
+					const file = join(root, `Panel${index}.tsx`);
+					writeFileSync(file, result.code);
+					return file;
+				});
+				const inspectionFile = join(root, 'Inspection.tsx');
+				writeFileSync(inspectionFile, compileTypesInspection(source, 'Inspection.tsrx').code);
+				files.push(inspectionFile);
+				const invalidSource = source.replace('pendingLabel: string', 'pendingLabel: number');
+				const invalid = compileToVolarMappings(invalidSource, 'Invalid.tsrx', { nativeReads });
+				expect(invalid.errors).toEqual([]);
+				const invalidFile = join(root, 'Invalid.tsx');
+				writeFileSync(invalidFile, invalid.code);
+				const program = ts.createProgram({
+					rootNames: [...files, invalidFile],
+					options: {
+						jsx: ts.JsxEmit.Preserve,
+						module: ts.ModuleKind.ESNext,
+						moduleResolution: ts.ModuleResolutionKind.Bundler,
+						noEmit: true,
+						noUnusedLocals: true,
+						skipLibCheck: false,
+						strict: true,
+						target: ts.ScriptTarget.ESNext,
+						types: [],
+					},
+				});
+				// Check the editor's virtual files against the real Octane declarations;
+				// this fixture does not type-check Octane's implementation sources.
+				const diagnostics = [...files, invalidFile].flatMap((file) => {
+					const sourceFile = program.getSourceFile(file)!;
+					return [
+						...program.getSyntacticDiagnostics(sourceFile),
+						...program.getSemanticDiagnostics(sourceFile),
+					];
+				});
+				expect(
+					diagnostics
+						.filter(({ file }) => file?.fileName !== invalidFile)
+						.map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')),
+				).toEqual([]);
+				const invalidDiagnostics = diagnostics.filter(({ file }) => file?.fileName === invalidFile);
+				expect(invalidDiagnostics.map(({ code }) => code)).toEqual([2339]);
+				const authoredError = invalidSource.lastIndexOf('toUpperCase');
+				expect(
+					invalid.mappings.some((mapping) =>
+						mapping.sourceOffsets.some(
+							(offset, index) =>
+								offset === authoredError &&
+								mapping.generatedOffsets[index] === invalidDiagnostics[0].start,
+						),
+					),
+				).toBe(true);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
 
 	it.each([false, true])(
 		'preserves typed tuple parameters and their mappings (loose: %s)',

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, globSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, test } from 'node:test';
@@ -663,21 +663,46 @@ describe('CI workflow aggregation', () => {
 				`${stalePrefix} must not remain in Octane Vitest project names`,
 			);
 		}
+		function selectsFile(project, file) {
+			const includes = project.test?.include ?? [];
+			const excludes = project.test?.exclude ?? [];
+			const matches = (pattern) => path.matchesGlob(file, pattern);
+			return (
+				includes.some((pattern) => !pattern.startsWith('!') && matches(pattern)) &&
+				!includes.some((pattern) => pattern.startsWith('!') && matches(pattern.slice(1))) &&
+				!excludes.some(matches)
+			);
+		}
+		const browserFiles = new Set();
 		for (const browserRoot of discovered) {
-			const owners = [...projects.values()].filter((project) => {
-				const includes = project.testExecution?.include ?? project.test?.include ?? [];
-				return includes.some(
-					(pattern) =>
-						typeof pattern === 'string' &&
-						!pattern.startsWith('!') &&
-						(pattern === browserRoot || pattern.startsWith(`${browserRoot}/`)),
-				);
-			});
-			assert.equal(owners.length, 1, `${browserRoot} must have exactly one Vitest project`);
+			const root = path.join(REPO, browserRoot);
+			const files = statSync(root).isDirectory()
+				? globSync('**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts,tsrx}', {
+						cwd: root,
+						exclude: ['**/node_modules/**', '**/.git/**'],
+					}).map((file) => `${browserRoot}/${file}`)
+				: [browserRoot];
+			assert.ok(files.length > 0, `${browserRoot} must contain browser test files`);
+			for (const file of files) browserFiles.add(file);
+		}
+		// Execution groups can share a discovery root while selecting disjoint files.
+		// Every actual test must still run once, in Chromium, outside the unit shards.
+		for (const file of browserFiles) {
+			const owners = [...projects.values()].filter((project) => selectsFile(project, file));
+			assert.equal(owners.length, 1, `${file} must have exactly one Vitest project`);
 			assert.equal(
 				owners[0].testExecution?.group,
 				'heavy-browser',
-				`${browserRoot} must be omitted from ordinary shards`,
+				`${file} must belong to the heavy browser group`,
+			);
+			assert.ok(
+				(owners[0].testExecution.browsers ?? ['chromium']).includes('chromium'),
+				`${file} must run in Chromium`,
+			);
+			assert.equal(
+				[...shardedProjects.values()].some((project) => selectsFile(project, file)),
+				false,
+				`${file} must be omitted from ordinary shards`,
 			);
 		}
 		assert.deepEqual(projects.get('pdf-feasibility').testExecution, {

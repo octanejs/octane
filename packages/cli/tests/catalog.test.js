@@ -29,7 +29,7 @@ describe('the shipped catalog', () => {
 		expect(resolveBinding('react-syntax-highlighter')?.binding.name).toBe(
 			'@octanejs/syntax-highlighter',
 		);
-		expect(resolveBinding('react-select')).toBe(null);
+		expect(resolveBinding('react-select')?.binding.name).toBe('@octanejs/select');
 	});
 
 	it('gives every binding a category and an upstream or an explicit absence', () => {
@@ -114,12 +114,16 @@ describe('octane add', () => {
 
 	it('says so when nothing ports the package, and suggests near names', async () => {
 		const { root } = fixture();
-		const result = await runCli(['add', 'react-select', '--cwd', root, '--no-install', '--json'], {
-			exec: noExec,
-		});
+		const result = await runCli(
+			['add', 'react-resizable', '--cwd', root, '--no-install', '--json'],
+			{ exec: noExec },
+		);
 
 		expect(result.exitCode).toBe(1);
-		expect(result.json().unavailable[0].requested).toBe('react-select');
+		expect(result.json().unavailable[0]).toMatchObject({
+			requested: 'react-resizable',
+			suggestions: expect.arrayContaining(['@octanejs/resizable-panels']),
+		});
 	});
 
 	it('installs through the project package manager', async () => {
