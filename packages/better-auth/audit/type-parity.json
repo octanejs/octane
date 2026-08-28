@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/better-auth/audit/type-probes",
+  "adaptedRoot": "packages/better-auth/typetests/parity",
+  "inventories": {
+    "upstream": "packages/better-auth/audit/pristine-types.json",
+    "adapted": "packages/better-auth/audit/adapted-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/better-auth/audit/type-probes/tsconfig.json",
+      "sourcePolicy": "Repo-authored declaration probes compiled against better-auth/react@1.6.29."
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/better-auth/typetests/parity/tsconfig.json",
+      "sourcePolicy": "One-for-one probes compiled against the Octane binding after the permitted import-root transformation."
+    }
+  },
+  "permittedTransformations": [
+    {
+      "kind": "import-root",
+      "rule": "Pristine probes import better-auth/react; adapted probes import ../../src/index."
+    }
+  ],
+  "notes": "The paired programs cover session and plugin hooks, plugin and endpoint actions, Better Auth client members, readonly useStore dependencies, and a matching rejection control."
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/better-auth/tests/conformance/client.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane subscription cleanup, store replacement, keyed notifications, endpoint forwarding, and action-shape edge cases beyond the bounded differential lane."
+    },
+    {
+      "path": "packages/better-auth/tests/conformance/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane package entry point rather than a React-equivalent runtime behavior."
+    },
+    {
+      "path": "packages/better-auth/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same session, plugin atom, and plugin action fixture against @octanejs/better-auth and better-auth/react."
+    },
+    {
+      "path": "packages/better-auth/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering and the absence of render-time session fetching."
+    },
+    {
+      "path": "packages/better-auth/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; dedicated manifest type lanes carry parity evidence."
+    },
+    {
+      "path": "packages/better-auth/typetests/parity/public-api.test-d.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adaptation of the pristine public declaration probe with only the documented import-root transformation."
+    }
+  ]
+}

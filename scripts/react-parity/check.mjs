@@ -9,6 +9,8 @@ import { assertPristineOracleEnvironment } from './alien-signals-pristine-runtim
 import { verifyAlienSignalsTestClassifications } from './alien-signals-classifications-lib.mjs';
 import { verifyAlienSignalsRuntimeStructure } from './alien-signals-runtime-lib.mjs';
 import { verifyAlienSignalsTypes } from './alien-signals-types-lib.mjs';
+import { verifyBetterAuthRuntimeInventory } from './better-auth-runtime-lib.mjs';
+import { verifyBetterAuthTypes } from './better-auth-types-lib.mjs';
 import { verifyPortTestClassifications } from './binding-classifications-lib.mjs';
 import {
 	createRequiredNonVitestManifestShardPlan,
@@ -208,6 +210,8 @@ await capture('alien-signals type evidence', () => verifyAlienSignalsTypes(REPO)
 await capture('alien-signals runtime structure evidence', () =>
 	verifyAlienSignalsRuntimeStructure(REPO),
 );
+await capture('better-auth type evidence', () => verifyBetterAuthTypes(REPO));
+await capture('better-auth runtime inventory', () => verifyBetterAuthRuntimeInventory(REPO));
 await capture('alien-signals pristine oracle environment', () =>
 	assertPristineOracleEnvironment({
 		environmentPath: path.join(

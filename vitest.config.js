@@ -699,6 +699,67 @@ export default defineConfig({
 				},
 			},
 			{
+				test: {
+					name: 'better-auth',
+					include: ['packages/better-auth/tests/**/*.test.ts'],
+					exclude: [
+						'packages/better-auth/tests/differential/**/*.test.ts',
+						'packages/better-auth/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/better-auth$/,
+							replacement: resolve(import.meta.dirname, 'packages/better-auth/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'better-auth-differential',
+					include: ['packages/better-auth/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/better-auth/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/better-auth$/,
+							replacement: resolve(import.meta.dirname, 'packages/better-auth/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'better-auth-ssr',
+					include: ['packages/better-auth/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/better-auth$/,
+							replacement: resolve(import.meta.dirname, 'packages/better-auth/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				testExecution: {
 					group: 'react-parity',
 					include: ['packages/valtio/tests/upstream/**/*.test.ts'],
