@@ -14,8 +14,8 @@ import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
 import {
 	FRAMEWORK_INTEGRATIONS,
 	FRAMEWORK_INTEGRATION_COUNT,
-	frameworkIntegrationRepositoryHref,
 } from '../src/content/framework-integrations.ts';
+import { ecosystemPackageGuideHref } from '../src/lib/ecosystem-presentation.ts';
 import {
 	FRAMEWORK_CARDS,
 	HOME_SUMMARY,
@@ -644,7 +644,7 @@ describe('website routes', () => {
 			`${FRAMEWORK_INTEGRATION_COUNT} first-party framework integrations`,
 		);
 		for (const integration of FRAMEWORK_INTEGRATIONS) {
-			const href = frameworkIntegrationRepositoryHref(integration.packageName);
+			const href = ecosystemPackageGuideHref(integration.packageName);
 			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
 			expect(link?.textContent).toBe(integration.packageName);
 		}

@@ -9,6 +9,10 @@ import {
 	searchEcosystem,
 	type EcosystemEntity,
 } from '../lib/ecosystem-search-core.ts';
+import {
+	ecosystemEntityTypeLabel,
+	ecosystemPackageGuideHref,
+} from '../lib/ecosystem-presentation.ts';
 
 interface DirectorySection {
 	id: string;
@@ -29,11 +33,6 @@ const CATEGORIES = BINDING_CATEGORIES.map((category) => {
 	};
 }).filter((category) => category.id);
 const VALID_CATEGORIES = new Set(CATEGORIES.map((category) => category.id));
-
-function packageRepositoryHref(packageName: string): string {
-	return 'https://github.com/octanejs/octane/tree/main/packages/' +
-		packageName.slice('@octanejs/'.length);
-}
 
 function stringParam(value: unknown): string {
 	return typeof value === 'string' ? value : '';
@@ -204,11 +203,7 @@ export function EcosystemDirectory() @{
 							@for (const entity of section.entities; key entity.id) {
 								<article id={entity.id} class="ecosystem-entity">
 									<div class="ecosystem-entity-copy">
-										<span class="ecosystem-type">
-											{entity.kind === 'library-binding'
-												? 'Library binding'
-												: 'Framework integration'}
-										</span>
+										<span class="ecosystem-type">{ecosystemEntityTypeLabel(entity) as string}</span>
 										<h4>{entity.title as string}</h4>
 										<code>{entity.packageName as string}</code>
 										<p>{entity.description as string}</p>
@@ -221,7 +216,7 @@ export function EcosystemDirectory() @{
 									<div class="ecosystem-actions">
 										<a
 											class="ecosystem-package-link"
-											href={packageRepositoryHref(entity.packageName)}
+											href={ecosystemPackageGuideHref(entity.packageName)}
 										>
 											Package guide ↗
 										</a>

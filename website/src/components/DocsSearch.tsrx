@@ -9,16 +9,15 @@ import {
 	type SiteSearchResult,
 } from '../lib/site-search.ts';
 import type { EcosystemEntity } from '../lib/ecosystem-search-core.ts';
+import {
+	ecosystemEntityTypeLabel,
+	ecosystemPackageGuideHref,
+} from '../lib/ecosystem-presentation.ts';
 import type { SearchGroup } from '../lib/docs-search-core.ts';
 import searchUrl from '../assets/search.svg';
 
 interface DialogProps {
 	onClose: () => void;
-}
-
-function packageRepositoryHref(packageName: string): string {
-	return 'https://github.com/octanejs/octane/tree/main/packages/' +
-		packageName.slice('@octanejs/'.length);
 }
 
 function scrollToAnchor(id: string) {
@@ -33,20 +32,18 @@ function scrollToAnchor(id: string) {
 
 function SearchDialog(props: DialogProps) @{
 	const [query, setQuery] = useState('');
-	const [results, setResults] = useState<SiteSearchResult[]>([]);
 	const [active, setActive] = useState(0);
-	const [ready, setReady] = useState(false);
-	const index = useRef<SiteSearchIndex | null>(null);
+	const [index, setIndex] = useState<SiteSearchIndex | null>(null);
 	const inputEl = useRef<HTMLInputElement | null>(null);
 	const navigate = useNavigate();
+	const results: SiteSearchResult[] =
+		index ? searchSite(index, query) : [];
 
 	useEffect(() => {
 		let live = true;
 		loadSiteSearchIndex().then((loaded) => {
 			if (!live) return;
-			index.current = loaded;
-			setReady(true);
-			setResults(searchSite(loaded, inputEl.current?.value ?? ''));
+			setIndex(loaded);
 		});
 		inputEl.current?.focus();
 		return () => {
@@ -62,15 +59,16 @@ function SearchDialog(props: DialogProps) @{
 		};
 	});
 
-	const targets: { key: string }[] = [];
+	let targetCount = 0;
+	const nextRow = () => targetCount++;
 	const board = results.map((result) => {
 		if (result.type === 'docs') {
 			const group = result.group;
-			const headRow = targets.push({ key: group.key + ':head' }) - 1;
+			const headRow = nextRow();
 			const lines = group.lines.map(
 				(line) => ({
 					...line,
-					row: targets.push({ key: line.key }) - 1,
+					row: nextRow(),
 				}),
 			);
 			return {
@@ -85,12 +83,10 @@ function SearchDialog(props: DialogProps) @{
 		}
 
 		const entity = result.match.entity;
-		const primaryRow = targets.push({ key: entity.id + ':primary' }) - 1;
-		const packageRow = targets.push({ key: entity.id + ':package' }) - 1;
+		const primaryRow = nextRow();
+		const packageRow = nextRow();
 		const guideRow =
-			entity.kind === 'framework-integration'
-				? targets.push({ key: entity.id + ':guide' }) - 1
-				: undefined;
+			entity.kind === 'framework-integration' ? nextRow() : undefined;
 		return {
 			type: 'entity' as const,
 			key: 'entity:' + entity.id,
@@ -146,7 +142,7 @@ function SearchDialog(props: DialogProps) @{
 	};
 
 	const step = (delta: number) => {
-		const count = targets.length;
+		const count = targetCount;
 		if (!count) return;
 		setActive((current) => {
 			const next = (current + delta + count) % count;
@@ -162,7 +158,6 @@ function SearchDialog(props: DialogProps) @{
 	const onQuery = (event: Event) => {
 		const value = (event.currentTarget as HTMLInputElement).value;
 		setQuery(value);
-		setResults(index.current ? searchSite(index.current, value) : []);
 		setActive(0);
 	};
 
@@ -175,7 +170,7 @@ function SearchDialog(props: DialogProps) @{
 		} else if (event.key === 'ArrowUp') {
 			event.preventDefault();
 			step(-1);
-		} else if (event.key === 'Enter' && targets[active]) {
+		} else if (event.key === 'Enter' && active < targetCount) {
 			event.preventDefault();
 			activate(active);
 		}
@@ -224,11 +219,7 @@ function SearchDialog(props: DialogProps) @{
 									onMouseEnter={() => setActive(card.primaryRow)}
 									onClick={() => goToEntity(card.entity)}
 								>
-									<span class="search-type">
-										{card.entity.kind === 'library-binding'
-											? 'Library binding'
-											: 'Framework integration'}
-									</span>
+									<span class="search-type">{ecosystemEntityTypeLabel(card.entity) as string}</span>
 									<span class="search-title">{card.entity.title as string}</span>
 									<code class="search-package">{card.entity.packageName as string}</code>
 									<span class="search-context">
@@ -244,7 +235,7 @@ function SearchDialog(props: DialogProps) @{
 											'search-entity-package',
 											card.packageRow === active && 'active',
 										]}
-										href={packageRepositoryHref(card.entity.packageName)}
+										href={ecosystemPackageGuideHref(card.entity.packageName)}
 										role="option"
 										aria-selected={card.packageRow === active}
 										aria-label={'Open the ' + card.entity.title + ' package guide'}
@@ -322,7 +313,7 @@ function SearchDialog(props: DialogProps) @{
 				</div>
 			} @else {
 				<p class="search-empty">
-					@if (!ready) {
+					@if (!index) {
 						<span>Loading the search index…</span>
 					} @else {
 						@if (query.trim().length < 2) {

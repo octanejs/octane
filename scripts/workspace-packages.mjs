@@ -311,8 +311,8 @@ export function readEcosystemCatalogs(packages = getWorkspacePackages()) {
 	const errors = [
 		...bindings.errors,
 		...integrations.errors,
-		...(bindings.value ? validateBindingCatalogData(bindings.value, packages) : []),
-		...(integrations.value
+		...(bindings.value !== undefined ? validateBindingCatalogData(bindings.value, packages) : []),
+		...(integrations.value !== undefined
 			? validateFrameworkIntegrationCatalogData(integrations.value, packages)
 			: []),
 	];

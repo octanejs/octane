@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { format, resolveConfig } from 'prettier';
@@ -27,10 +27,13 @@ export function loadWebsiteEcosystemInputs() {
 		...catalogs,
 		packages: packages.map((pkg) => {
 			let status;
-			if (pkg.role === 'framework binding' && existsSync(pkg.statusPath)) {
+			if (pkg.role === 'framework binding') {
 				try {
 					status = readJson(pkg.statusPath);
 				} catch (error) {
+					if (error.code === 'ENOENT') {
+						throw new Error(`packages/${pkg.dir}/status.json is missing`);
+					}
 					throw new Error(`packages/${pkg.dir}/status.json is not valid JSON: ${error.message}`);
 				}
 			}
@@ -133,7 +136,12 @@ export async function writeWebsiteEcosystemData({
 } = {}) {
 	const records = assembleWebsiteEcosystemData(input);
 	const serialized = await serializeWebsiteEcosystemData(records);
-	const current = existsSync(outputPath) ? readFileSync(outputPath, 'utf8') : '';
+	let current = '';
+	try {
+		current = readFileSync(outputPath, 'utf8');
+	} catch (error) {
+		if (error.code !== 'ENOENT') throw error;
+	}
 	const changed = current !== serialized;
 	if (check && changed) {
 		throw new Error(

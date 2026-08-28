@@ -21,8 +21,3 @@ export const BINDING_COUNT = BINDING_CATEGORIES.reduce(
 	(total, category) => total + category.packages.length,
 	0,
 );
-
-export function bindingRepositoryHref(packageName: string): string {
-	const directory = packageName.slice('@octanejs/'.length);
-	return `https://github.com/octanejs/octane/tree/main/packages/${directory}`;
-}
