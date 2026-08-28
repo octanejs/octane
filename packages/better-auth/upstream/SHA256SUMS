@@ -1,0 +1,7 @@
+7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4  LICENSE.md
+65f313f335071b69d7ddfe2571a55a9e884eb76779e9f620285ec48c28dbd3e8  packages/better-auth/package.json
+294cf99420711510321d6c1f0965ce3089e9e15f6039f8e6e46da88f5e657d69  packages/better-auth/src/client/client-declaration.test.ts
+98d54f2946dc366f1b6ae5a7a1e685e9c00f4f5e38ebece356106653a431cbb8  packages/better-auth/src/client/client.test.ts
+c810c844246199dd618f9df2b39f5bc7303c3ef925c530c25f7f22ba5710e1fe  packages/better-auth/src/client/react/index.ts
+053abbe78138099c101433216d5c5362979e5163664d6233d3dcd7134ddb87bf  packages/better-auth/src/client/react/react-store.ts
+c86a7dc376e7d83f825929445b57345381990aa4e82003459b20c81495ccab66  packages/better-auth/src/plugins/additional-fields/additional-fields.test.ts
