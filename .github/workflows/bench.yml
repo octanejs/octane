@@ -46,6 +46,11 @@ jobs:
       - name: Test UIbench measurement failures
         run: node --test benchmarks/uibench/run.test.mjs
 
+      - name: Verify synthetic workerd app workloads
+        run: |
+          node --test benchmarks/ssr-workerd/app-workloads/verify.test.mjs
+          BENCH_ROUNDS=1 node benchmarks/ssr-workerd/app-workloads/run.mjs 1
+
       - name: Install Playwright Chromium
         run: pnpm --filter octane-js-framework-benchmarks exec playwright install --with-deps chromium
 
