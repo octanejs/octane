@@ -852,6 +852,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Native onChange analysis on hostless TSRX at two sizes, paired with an
+		// AST-identical large source whose ignored marker conservatively forces the scan.
+		name: 'tsrx-native-change-analysis',
+		cwd: 'tsrx-native-change-analysis',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Shipped-bytes comparison (Node-only): production `vite build` of each
 		// js-framework app with ONE normalized minify setting, reporting raw/gzip/
 		// brotli JS bytes per framework. Deterministic; the iteration knob is unused.

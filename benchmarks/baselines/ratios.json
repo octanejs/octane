@@ -456,6 +456,30 @@
     "note": "Same-process development TSRX compilation with every emitted nesting validation parsed and checked. The original repeated serialization and whole-array scan measured 1.59x per invalid site at 2,000 versus 500 sites, while plan-local Set membership measured 1.07x. The 1.3x ceiling leaves timing headroom while catching the quadratic path."
   },
   {
+    "suite": "tsrx-native-change-analysis",
+    "op": "analysis",
+    "target": "hostless-4000",
+    "reference": "forced-scan-4000",
+    "maxRatio": 0.15,
+    "note": "Same-byte sources parse to identical ASTs after normalizing one ignored JSX comment. Exact main analyzed the hostless target at 0.85x the conservative forced-scan control; verified native-host source-proof runs measured about 0.05x. The 0.15 ceiling leaves 3x timing headroom while catching restoration of the whole-AST walk."
+  },
+  {
+    "suite": "tsrx-native-change-analysis",
+    "op": "client_compile",
+    "target": "hostless-4000",
+    "reference": "forced-scan-4000",
+    "maxRatio": 1.15,
+    "note": "Paired development client compilation must not make the hostless fast path materially slower than the structurally identical source that conservatively retains analysis. Both outputs have exact matching digests; verified quick runs ranged from 0.99x to 1.04x, and the 1.15 ceiling leaves timing headroom while catching a real regression."
+  },
+  {
+    "suite": "tsrx-native-change-analysis",
+    "op": "server_compile",
+    "target": "hostless-4000",
+    "reference": "forced-scan-4000",
+    "maxRatio": 1.15,
+    "note": "Paired development server compilation must not make the hostless fast path materially slower than the structurally identical source that conservatively retains analysis. Both outputs have exact matching digests; verified quick runs ranged from 1.00x to 1.08x, and the 1.15 ceiling leaves timing headroom while catching a real regression."
+  },
+  {
     "suite": "behavior-root-events",
     "op": "resume_per_1000_events",
     "target": "events-8000",
