@@ -295,7 +295,7 @@ export function _useSignalsImplementation(
 	);
 	store._start();
 	if (_usage === UNMANAGED) {
-		useIsomorphicLayoutEffect(cleanupTrailingStore, undefined, subSlot(slot, 'cleanup'));
+		useIsomorphicLayoutEffect(cleanupTrailingStore, null, subSlot(slot, 'cleanup'));
 	}
 
 	return store;

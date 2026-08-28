@@ -1,10 +1,14 @@
 import { createElement } from 'octane';
 import { useComputed, useSignal, useSignalEffect } from '../../src/index.ts';
-import { useSignals } from '../../src/runtime/index.ts';
+import { useSignals, type EffectStore } from '../../src/runtime/index.ts';
 import type { Signal } from '@preact/signals-core';
 
-export function ExternalSignalText(props: { count: Signal<number> }) {
-	useSignals();
+export function ExternalSignalText(props: {
+	count: Signal<number>;
+	onStore?: (store: EffectStore) => void;
+}) {
+	const store = useSignals();
+	props.onStore?.(store);
 	return createElement('p', null, String(props.count.value));
 }
 

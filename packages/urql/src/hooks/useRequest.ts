@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'octane';
+import { useLinkedState } from 'octane';
 import type { AnyVariables, DocumentInput, GraphQLRequest } from '@urql/core';
 import { createRequest } from '@urql/core';
 import { splitSlot, subSlot } from '../internal';
@@ -12,22 +12,23 @@ export function useRequest<Data = any, Variables extends AnyVariables = AnyVaria
 	...rest: [slot?: symbol]
 ): GraphQLRequest<Data, Variables> {
 	const [, slot] = splitSlot(rest);
-	const prev = useRef<undefined | GraphQLRequest<Data, Variables>>(
-		undefined,
-		subSlot(slot, 'prev'),
-	);
-
-	return useMemo(
-		function memoRequest() {
-			const request = createRequest<Data, Variables>(query, variables);
-			if (prev.current !== undefined && prev.current.key === request.key) {
-				return prev.current;
-			} else {
-				prev.current = request;
-				return request;
-			}
+	const [request] = useLinkedState<
+		readonly [DocumentInput<Data, Variables>, Variables],
+		GraphQLRequest<Data, Variables>
+	>(
+		[query, variables] as const,
+		function reconcileRequest(source, previous) {
+			const nextRequest = createRequest<Data, Variables>(source[0], source[1]);
+			return previous !== undefined && previous.value.key === nextRequest.key
+				? previous.value
+				: nextRequest;
 		},
-		[query, variables],
-		subSlot(slot, 'memo'),
+		{
+			sourceEqual(previous, next) {
+				return previous[0] === next[0] && previous[1] === next[1];
+			},
+		},
+		subSlot(slot, 'request'),
 	);
+	return request;
 }

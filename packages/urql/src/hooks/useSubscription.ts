@@ -1,5 +1,5 @@
 import { pipe, subscribe, onEnd } from 'wonka';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'octane';
+import { useCallback, useEffect, useLinkedState, useMemo, useRef } from 'octane';
 
 import type {
 	GraphQLRequestParams,
@@ -66,18 +66,26 @@ export function useSubscription<
 	);
 
 	const deps = [client, request, args.context, args.pause] as const;
+	type SubscriptionSource = typeof source;
+	type SubscriptionDeps = typeof deps;
+	type SubscriptionResultState = UseSubscriptionState<any, Variables> & { hasNext: boolean };
+	type SubscriptionState = readonly [SubscriptionSource, SubscriptionResultState, SubscriptionDeps];
+	type SubscriptionLinkedSource = readonly [SubscriptionSource, SubscriptionDeps];
 
-	const [state, setState] = useState(
-		function initState() {
-			return [source, { ...initialState, fetching: !!source }, deps] as const;
+	const [state, setState] = useLinkedState<SubscriptionLinkedSource, SubscriptionState>(
+		[source, deps] as const,
+		function reconcileState(next, previous) {
+			const previousResult: SubscriptionResultState =
+				previous === undefined ? initialState : previous.value[1];
+			return [next[0], computeNextState(previousResult, { fetching: !!next[0] }), next[1]] as const;
+		},
+		{
+			sourceEqual(previous, next) {
+				return previous[0] === next[0] || !hasDepsChanged(previous[1], next[1]);
+			},
 		},
 		subSlot(slot, 'state'),
 	);
-
-	let currentResult = state[1];
-	if (source !== state[0] && hasDepsChanged(state[2], deps)) {
-		setState([source, (currentResult = computeNextState(state[1], { fetching: !!source })), deps]);
-	}
 
 	useEffect(
 		function subscribeSource() {
@@ -124,5 +132,5 @@ export function useSubscription<
 		subSlot(slot, 'execute'),
 	);
 
-	return [currentResult, executeSubscription];
+	return [state[1], executeSubscription];
 }

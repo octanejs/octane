@@ -1,6 +1,6 @@
 import type { Source } from 'wonka';
 import { pipe, subscribe, onEnd, onPush, takeWhile } from 'wonka';
-import { useCallback, useEffect, useMemo, useState } from 'octane';
+import { useCallback, useEffect, useLinkedState, useMemo } from 'octane';
 
 import type {
 	GraphQLRequestParams,
@@ -140,36 +140,34 @@ export function useQuery<Data = any, Variables extends AnyVariables = AnyVariabl
 	);
 
 	const deps = [client, request, args.requestPolicy, args.context, args.pause] as const;
+	type QuerySource = Source<OperationResult<Data, Variables>> | null;
+	type QueryDeps = typeof deps;
+	type QueryState = readonly [QuerySource, UseQueryState<Data, Variables>, QueryDeps];
+	type QueryLinkedSource = readonly [QuerySource, QueryDeps, boolean, typeof getSnapshot];
 
-	const [state, setState] = useState(
-		function initState() {
+	const [state, setState] = useLinkedState<QueryLinkedSource, QueryState>(
+		[source, deps, suspense, getSnapshot] as const,
+		function reconcileState(next, previous) {
+			const previousResult: UseQueryState<Data, Variables> =
+				previous === undefined ? initialState : previous.value[1];
 			return [
-				source,
+				next[0],
 				computeNextState(
-					initialState,
+					previousResult,
 					deferDispatch(function read() {
-						return getSnapshot(source, suspense);
+						return next[3](next[0], next[2]);
 					}),
 				),
-				deps,
+				next[1],
 			] as const;
+		},
+		{
+			sourceEqual(previous, next) {
+				return previous[0] === next[0] || !hasDepsChanged(previous[1], next[1]);
+			},
 		},
 		subSlot(slot, 'state'),
 	);
-
-	let currentResult = state[1];
-	if (source !== state[0] && hasDepsChanged(state[2], deps)) {
-		setState([
-			source,
-			(currentResult = computeNextState(
-				state[1],
-				deferDispatch(function read() {
-					return getSnapshot(source, suspense);
-				}),
-			)),
-			deps,
-		]);
-	}
 
 	useEffect(
 		function subscribeSource() {
@@ -233,5 +231,5 @@ export function useQuery<Data = any, Variables extends AnyVariables = AnyVariabl
 		subSlot(slot, 'execute'),
 	);
 
-	return [currentResult, executeQuery];
+	return [state[1], executeQuery];
 }

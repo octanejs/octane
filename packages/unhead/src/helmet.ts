@@ -141,7 +141,7 @@ export function Helmet(props: HelmetProps): null {
 			if (titleTemplate) {
 				input.titleTemplate = defaultTitle
 					? function resolveTitle(title: string | null | undefined) {
-							return title ? titleTemplate : defaultTitle;
+							return title ? titleTemplate.replace(/%s/g, title) : defaultTitle;
 						}
 					: titleTemplate;
 			}

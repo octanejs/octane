@@ -3,6 +3,7 @@ import { cleanup, render } from '@octanejs/testing-library';
 import { createElement } from 'octane';
 import { Head } from '@octanejs/unhead';
 import { createHead } from '@octanejs/unhead/client';
+import { Helmet } from '@octanejs/unhead/helmet';
 import { renderSSRHead } from '@octanejs/unhead/server';
 import { SimpleHead } from './_fixtures/simple-head';
 import { withHead } from './_helpers';
@@ -104,5 +105,38 @@ describe('simpleHead component', function simpleHeadComponent() {
 		expect(rendered.headTags).toContain('<meta name="fragment-meta" content="nested">');
 		expect(rendered.headTags).toContain('<meta name="fragment-meta-2" content="nested-2">');
 		expect(rendered.headTags).toContain('window.__FRAGMENT_TEST__ = true');
+	});
+
+	it('interpolates a title template without applying it to the default title', async function helmetTitleTemplate() {
+		const titledHead = createHead();
+		render(
+			withHead(
+				titledHead,
+				createElement(Helmet, {
+					defaultTitle: 'Home',
+					titleTemplate: '%s | My Site',
+					title: 'Page',
+				}),
+			),
+		);
+
+		const titled = await renderSSRHead(titledHead);
+		expect(titled.headTags).toContain('<title>Page | My Site</title>');
+
+		cleanup();
+		const fallbackHead = createHead();
+		render(
+			withHead(
+				fallbackHead,
+				createElement(Helmet, {
+					defaultTitle: 'Home',
+					titleTemplate: '%s | My Site',
+				}),
+			),
+		);
+
+		const fallback = await renderSSRHead(fallbackHead);
+		expect(fallback.headTags).toContain('<title>Home</title>');
+		expect(fallback.headTags).not.toContain('<title>Home | My Site</title>');
 	});
 });

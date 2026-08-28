@@ -1,8 +1,9 @@
 // Per packages/signals-react/upstream/canonical/runtime/test/browser/useSignals.test.tsx
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@octanejs/testing-library';
 import { createElement as h } from 'octane';
 import { signal } from '@preact/signals-core';
+import type { EffectStore } from '../src/runtime/index.ts';
 import {
 	ExternalSignalText,
 	UseComputedDouble,
@@ -22,6 +23,24 @@ describe('useSignals', function useSignalsSuite() {
 			count.value = 1;
 		});
 		expect(view.container.querySelector('p')!.textContent).toBe('1');
+	});
+
+	it('finishes unmanaged tracking after every committed render', function finishEveryRender() {
+		const count = signal(0);
+		let store: EffectStore | undefined;
+		const view = render(
+			h(ExternalSignalText, {
+				count,
+				onStore(nextStore) {
+					store = nextStore;
+				},
+			}),
+		);
+		const finish = vi.spyOn(store!, 'f');
+
+		view.rerender(h(ExternalSignalText, { count }));
+
+		expect(finish).toHaveBeenCalledTimes(1);
 	});
 });
 
