@@ -2381,5 +2381,71 @@ describe(
 			},
 			90_000,
 		);
+
+		it.concurrent(
+			'playground runs the ReactCompat Octane-host example end to end',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground', {
+					beforeNavigation: installReactCdnMirror,
+				});
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.selectOption('.pg-select', 'react-compat');
+					await page.locator('.pg-tab', { hasText: 'Counter.react.tsx' }).waitFor();
+					const preview = page.frameLocator('iframe[title="Playground preview"]');
+					await preview.locator('h3', { hasText: 'React island' }).waitFor({ timeout: 30_000 });
+					const note = preview.getByRole('textbox', { name: 'React note' });
+					const originalInput = await note.elementHandle();
+					expect(originalInput).not.toBeNull();
+					await note.fill('kept by React');
+					await preview.getByRole('button', { name: 'React count: 3', exact: true }).click();
+					await waitForLocatorText(preview.locator('.reported'), 'React reported: 4');
+
+					// Host updates carry new props without losing the React state or DOM.
+					await preview.getByRole('button', { name: 'Rename React counter', exact: true }).click();
+					await preview.getByRole('button', { name: 'Renamed count: 4', exact: true }).waitFor();
+					await preview.getByRole('button', { name: 'Next initial count: 3', exact: true }).click();
+					await preview
+						.getByRole('button', { name: 'Next initial count: 4', exact: true })
+						.waitFor();
+					expect(await note.inputValue()).toBe('kept by React');
+					expect(
+						await originalInput!.evaluate(
+							(node) => node === document.querySelector('[aria-label="React note"]'),
+						),
+					).toBe(true);
+
+					// A React 19 ref is usable from the Octane host.
+					await preview.getByRole('button', { name: 'Focus React input', exact: true }).click();
+					expect(await originalInput!.evaluate((node) => node === document.activeElement)).toBe(
+						true,
+					);
+
+					// React-local Suspense leaves the surrounding Octane app interactive.
+					await preview.getByRole('button', { name: 'Load React data', exact: true }).click();
+					await waitForLocatorText(preview.getByRole('status'), 'React loading…');
+					await preview.getByRole('button', { name: 'Rename React counter', exact: true }).click();
+					await preview.getByRole('button', { name: 'React count: 4', exact: true }).waitFor();
+					await waitForLocatorText(preview.getByRole('status'), 'React data ready');
+
+					// Real deletion resets React state on the next mount and reconnects the ref.
+					await preview.getByRole('button', { name: 'Unmount React island', exact: true }).click();
+					await note.waitFor({ state: 'detached' });
+					await preview.getByRole('button', { name: 'Next initial count: 4', exact: true }).click();
+					await preview.getByRole('button', { name: 'Mount React island', exact: true }).click();
+					await preview.getByRole('button', { name: 'React count: 5', exact: true }).waitFor();
+					expect(await note.inputValue()).toBe('React-owned input');
+					await waitForLocatorText(preview.getByRole('status'), 'No request yet');
+					await preview.getByRole('button', { name: 'Focus React input', exact: true }).click();
+					expect(await note.evaluate((node) => node === document.activeElement)).toBe(true);
+					expect(await originalInput!.evaluate((node) => node.isConnected)).toBe(false);
+					await originalInput!.dispose();
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			90_000,
+		);
 	},
 );

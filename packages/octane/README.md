@@ -43,6 +43,12 @@ taking ownership of the existing markup. See the
 For the full story, see the
 [main README](https://github.com/octanejs/octane#readme).
 
+`ReactCompat` from `octane/react` hosts real React components inside Octane:
+`<ReactCompat><Counter start={3} /></ReactCompat>`. The same entry exports
+`OctaneCompat` for the opposite direction. See the
+[ReactCompat guide](https://github.com/octanejs/octane/blob/main/docs/react-compat.md)
+for compiler setup, context mapping, boundaries, SSR, and hydration.
+
 ## Browser compatibility
 
 See the [browser support guide](https://octanejs.dev/docs/browser-support) for

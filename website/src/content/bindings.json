@@ -32,6 +32,7 @@
       "@octanejs/remix-router",
       "@octanejs/inertia",
       "@octanejs/nuqs",
+      "@octanejs/better-auth",
       "@octanejs/wouter"
     ]
   },

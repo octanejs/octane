@@ -19,7 +19,10 @@ import {
 	signalsBrowserTests,
 	signalsRuntimeTests,
 } from './scripts/scoped-signals-projects.mjs';
-import { reactCompatSpikeProjects } from './experiments/react-compat/vitest.config.js';
+import {
+	reactCompatProjects,
+	reactCompatSSRProjects,
+} from './packages/octane/tests/react-compat/vitest.config.js';
 
 // Lock-pinned packages regenerate their adapted tests/upstream suites from the
 // committed pristine tree plus audit/upstream-patches/. Test-file globs resolve
@@ -437,7 +440,8 @@ export default defineConfig({
 		// `--silent=passed-only` overrides this default.
 		silent: true,
 		projects: [
-			...reactCompatSpikeProjects,
+			...reactCompatProjects,
+			...reactCompatSSRProjects,
 			{
 				test: {
 					name: 'octane',
@@ -449,7 +453,8 @@ export default defineConfig({
 						'packages/octane/tests/devtools-runtime.test.tsrx',
 						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
-						'packages/octane/tests/react-compat-spike/**',
+						'packages/octane/tests/react-compat/**',
+						'packages/octane/tests/react-compat-ssr.test.ts',
 					],
 					environment: 'jsdom',
 					// Precompiles every fixture through @tsrx/react + esbuild before any
@@ -536,7 +541,8 @@ export default defineConfig({
 						'packages/octane/tests/devtools-runtime.test.tsrx',
 						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
-						'packages/octane/tests/react-compat-spike/**',
+						'packages/octane/tests/react-compat/**',
+						'packages/octane/tests/react-compat-ssr.test.ts',
 					],
 					environment: 'jsdom',
 					globalSetup: ['packages/octane/tests/differential/_setup.ts'],
@@ -698,6 +704,67 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/rxjs\/utils$/,
 							replacement: resolve(import.meta.dirname, 'packages/rxjs/src/utils/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'better-auth',
+					include: ['packages/better-auth/tests/**/*.test.ts'],
+					exclude: [
+						'packages/better-auth/tests/differential/**/*.test.ts',
+						'packages/better-auth/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/better-auth$/,
+							replacement: resolve(import.meta.dirname, 'packages/better-auth/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'better-auth-differential',
+					include: ['packages/better-auth/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/better-auth/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/better-auth$/,
+							replacement: resolve(import.meta.dirname, 'packages/better-auth/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'better-auth-ssr',
+					include: ['packages/better-auth/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/better-auth$/,
+							replacement: resolve(import.meta.dirname, 'packages/better-auth/src/index.ts'),
 						},
 					],
 				},

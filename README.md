@@ -202,6 +202,8 @@ In this repository:
   [deferred hydration](./docs/deferred-hydration.md): the full references.
 - [Differences from React](./docs/differences-from-react.md): the divergence
   contract.
+- [ReactCompat](./docs/react-compat.md): run real React components inside Octane,
+  with React state, refs, context mapping, and server hydration.
 - [Bindings status](./docs/bindings-status.md): what each `@octanejs/*` package
   ports, its upstream version, and its known divergences.
 

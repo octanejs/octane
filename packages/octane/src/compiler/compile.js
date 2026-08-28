@@ -10170,14 +10170,17 @@ function compileServer(
 			(node.type === 'ImportDeclaration' ||
 				node.type === 'ExportNamedDeclaration' ||
 				node.type === 'ExportAllDeclaration') &&
-			node.source?.value === 'octane/signals/client'
+			(node.source?.value === 'octane/signals/client' || node.source?.value === 'octane/react')
 		) {
 			bodyNodes.push({
 				...node,
 				source: {
 					...node.source,
-					value: 'octane/signals/server',
-					raw: JSON.stringify('octane/signals/server'),
+					value:
+						node.source.value === 'octane/react' ? 'octane/react/server' : 'octane/signals/server',
+					raw: JSON.stringify(
+						node.source.value === 'octane/react' ? 'octane/react/server' : 'octane/signals/server',
+					),
 				},
 			});
 		} else {
@@ -12275,6 +12278,15 @@ function collectDescriptorChildrenBindings(ast, isDescriptorChildrenImport) {
 					: (specifier.imported?.name ?? specifier.imported?.value);
 			if (statement.source.value === 'octane' && imported === 'descriptorChildren') {
 				markerNames.add(specifier.local.name);
+			}
+			// Public transport boundaries work with the standalone compiler too,
+			// where no bundler module-graph metadata is available (the playground).
+			if (
+				imported === 'ReactCompat' &&
+				(statement.source.value === 'octane/react' ||
+					statement.source.value === 'octane/react/server')
+			) {
+				bindings.add(specifier.local.name);
 			}
 			if (
 				typeof imported === 'string' &&

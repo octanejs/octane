@@ -1,5 +1,8 @@
 node_modules
 .pnpm-store/
+# Agent-generated plans are local working artifacts, not repository content.
+/plans/
+/docs/plans/
 dist
 dist-redact
 build
