@@ -67,6 +67,12 @@ introduce a discovery waterfall; the new investigation measures that too.
 
 ## Usage
 
+Two additional, standalone [synthetic app workloads](app-workloads/README.md)
+exercise a provider-heavy workspace bootstrap and a structured record/history
+page with nested streaming boundaries. They use invented data, request-scoped
+deduplication, and zero-delay/delayed/warm-data controls. Run them separately with
+`node app-workloads/run.mjs`; they are not included in the unified suite below.
+
 ```bash
 node run.mjs              # 10 cold iterations, builds first
 node run.mjs 5 --no-build # reuse dist/ + octane-app/dist
