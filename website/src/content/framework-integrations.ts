@@ -8,6 +8,8 @@ export interface FrameworkIntegration {
 	packageName: string;
 	model: string;
 	description: string;
+	searchTerms?: readonly string[];
+	guideAnchor: string;
 }
 
 export const FRAMEWORK_INTEGRATIONS = frameworkIntegrations satisfies FrameworkIntegration[];

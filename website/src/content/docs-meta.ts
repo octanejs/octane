@@ -393,7 +393,11 @@ export const docsMeta: DocMeta[] = [
 		searchTerms: BINDING_CATEGORIES.flatMap((category) => [
 			category.title,
 			category.description,
-			...category.packages,
+			...category.packages.flatMap((binding) => [
+				binding.title,
+				binding.packageName,
+				...(binding.searchTerms ?? []),
+			]),
 		]),
 		sections: [
 			{ id: 'find-a-binding', title: 'Pick by the job' },

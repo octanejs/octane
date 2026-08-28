@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getBindingPackages } from './workspace-packages.mjs';
+import { getBindingPackages, readEcosystemCatalogs } from './workspace-packages.mjs';
 
 // Generates docs/bindings-status.md — the central status table for the
 // @octanejs/* framework bindings. The per-package data lives in a small
@@ -35,7 +35,6 @@ import { getBindingPackages } from './workspace-packages.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(REPO, 'docs/bindings-status.md');
-const WEBSITE_DIRECTORY = path.join(REPO, 'website/src/content/bindings.json');
 const CHECK = process.argv.includes('--check');
 
 const errors = [];
@@ -72,74 +71,10 @@ for (const workspacePackage of getBindingPackages()) {
 	rows.push({ dir, pkg, status });
 }
 
-let websiteCategories;
 try {
-	websiteCategories = JSON.parse(readFileSync(WEBSITE_DIRECTORY, 'utf8'));
+	readEcosystemCatalogs();
 } catch (e) {
-	errors.push(`website/src/content/bindings.json is not valid JSON: ${e.message}`);
-}
-
-if (websiteCategories != null && !Array.isArray(websiteCategories)) {
-	errors.push('website/src/content/bindings.json must be an array of binding categories');
-} else if (websiteCategories) {
-	const websiteBindings = [];
-	const websiteCategoryTitles = new Set();
-	for (const [index, category] of websiteCategories.entries()) {
-		const label = `website/src/content/bindings.json category ${index + 1}`;
-		if (!category || typeof category !== 'object') {
-			errors.push(`${label} must be an object`);
-			continue;
-		}
-		if (typeof category.title !== 'string' || !category.title.trim()) {
-			errors.push(`${label} needs a non-empty "title"`);
-		} else if (websiteCategoryTitles.has(category.title)) {
-			errors.push(
-				`website/src/content/bindings.json uses category title "${category.title}" more than once`,
-			);
-		} else {
-			websiteCategoryTitles.add(category.title);
-		}
-		if (typeof category.description !== 'string' || !category.description.trim())
-			errors.push(`${label} needs a non-empty "description"`);
-		if (!Array.isArray(category.packages) || category.packages.length === 0) {
-			errors.push(`${label} needs a non-empty "packages" array`);
-			continue;
-		}
-		for (const packageName of category.packages) {
-			if (typeof packageName !== 'string') {
-				errors.push(`${label} package names must be strings`);
-				continue;
-			}
-			websiteBindings.push(packageName);
-		}
-	}
-
-	const seenWebsiteBindings = new Set();
-	for (const packageName of websiteBindings) {
-		if (seenWebsiteBindings.has(packageName))
-			errors.push(`website/src/content/bindings.json lists ${packageName} more than once`);
-		seenWebsiteBindings.add(packageName);
-	}
-
-	const bindingPackages = new Set(rows.map(({ pkg }) => pkg.name));
-	const bindingDirectories = new Map(rows.map(({ dir, pkg }) => [pkg.name, dir]));
-	for (const packageName of bindingPackages) {
-		if (!seenWebsiteBindings.has(packageName))
-			errors.push(`website/src/content/bindings.json is missing ${packageName}`);
-	}
-	for (const packageName of seenWebsiteBindings) {
-		if (!bindingPackages.has(packageName)) {
-			errors.push(`website/src/content/bindings.json lists unknown binding ${packageName}`);
-			continue;
-		}
-		const derivedDirectory = packageName.slice('@octanejs/'.length);
-		const workspaceDirectory = bindingDirectories.get(packageName);
-		if (derivedDirectory !== workspaceDirectory) {
-			errors.push(
-				`website binding links derive directory "${derivedDirectory}" from ${packageName}, but its workspace directory is "${workspaceDirectory}"`,
-			);
-		}
-	}
+	errors.push(e.message);
 }
 
 if (errors.length) {

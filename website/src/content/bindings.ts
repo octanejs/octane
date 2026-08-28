@@ -3,10 +3,16 @@
 // editorial grouping and every count derived from it stay in sync with the repo.
 import bindingCategories from './bindings.json';
 
+export interface BindingCatalogEntry {
+	packageName: string;
+	title: string;
+	searchTerms?: readonly string[];
+}
+
 export interface BindingCategory {
 	title: string;
 	description: string;
-	packages: string[];
+	packages: BindingCatalogEntry[];
 }
 
 export const BINDING_CATEGORIES = bindingCategories satisfies BindingCategory[];

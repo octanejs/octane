@@ -17,10 +17,10 @@ export function BindingsDirectory() @{
 					</header>
 					<p class="binding-description">{category.description as string}</p>
 					<ul class="binding-list">
-						@for (const packageName of category.packages; key packageName) {
+						@for (const binding of category.packages; key binding.packageName) {
 							<li>
-								<a class="binding-link" href={bindingRepositoryHref(packageName)}>
-									<code>{packageName as string}</code>
+								<a class="binding-link" href={bindingRepositoryHref(binding.packageName)}>
+									<code>{binding.packageName as string}</code>
 								</a>
 							</li>
 						}

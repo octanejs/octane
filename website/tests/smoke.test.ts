@@ -618,7 +618,8 @@ describe('website routes', () => {
 		expect(container.querySelector('.doc-eyebrow')?.textContent).toBe(
 			`${BINDING_COUNT} first-party bindings`,
 		);
-		for (const packageName of packages) {
+		for (const binding of packages) {
+			const packageName = binding.packageName;
 			const directory = packageName.slice('@octanejs/'.length);
 			const href = `https://github.com/octanejs/octane/tree/main/packages/${directory}`;
 			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
