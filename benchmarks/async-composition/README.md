@@ -59,11 +59,13 @@ and owner-after-project dependency ordering. It also enforces one-way Octane
 ceilings of two waves and eight resource calls for each operation, requires all
 seven independent resources in Octane's first wave, and allows no more than one
 monotonic mixed-version update state. A new owner may never render against the
-previous project, and React must retain its zero-mixed-state control. After first
-reaching the final signature, each target must remain stable for one network-
-latency window plus two animation frames. The transition must never expose the
-initial fallback. A fast or transient result produced by missing work fails the
-harness.
+previous project, and React must retain its zero-mixed-state control. Readiness
+requires both the final signature and removal of the fallback, so a completed
+hidden primary still waiting for the runtime's retry-reveal throttle does not
+stop the clock early. After first reaching that visible final state, each target
+must remain stable for one network-latency window plus two animation frames. The
+transition must never expose the initial fallback. A fast or transient result
+produced by missing work fails the harness.
 
 ## Running
 
