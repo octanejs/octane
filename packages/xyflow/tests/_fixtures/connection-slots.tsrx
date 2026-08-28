@@ -1,5 +1,6 @@
 import {
 	ReactFlowProvider,
+	ReactFlow,
 	experimental_useOnEdgesChangeMiddleware as useExperimentalOnEdgesChangeMiddleware,
 	experimental_useOnNodesChangeMiddleware as useExperimentalOnNodesChangeMiddleware,
 	useHandleConnections,
@@ -44,6 +45,14 @@ export function ConnectionSlotProbe() {
 	return <ReactFlowProvider initialNodes={nodes} initialEdges={edges}>
 		<ConnectionCounts />
 	</ReactFlowProvider>;
+}
+
+export function ColorModeSlotProbe() {
+	return <div style={{ width: '320px', height: '240px' }}>
+		<ReactFlowProvider>
+			<ReactFlow nodes={[]} edges={[]} colorMode="system" />
+		</ReactFlowProvider>
+	</div>;
 }
 
 function ViewportChangeCallbacks() {
