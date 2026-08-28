@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**29 active pin(s) across 97 binding package(s).**
+**29 active pin(s) across 98 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -110,6 +110,7 @@ surface and evidence.
 | `@octanejs/wouter` | 0 |
 | `@octanejs/xstate` | 0 |
 | `@octanejs/xstate-store` | 0 |
+| `@octanejs/xyflow` | 0 |
 | `@octanejs/zag` | 0 |
 | `@octanejs/zustand` | 0 |
 

@@ -74,6 +74,7 @@
       "@octanejs/usehooks-ts",
       "@octanejs/intersection-observer",
       "@octanejs/waypoint",
+      "@octanejs/xyflow",
       "@octanejs/tanstack-hotkeys",
       "@octanejs/tanstack-pacer",
       "@octanejs/stick-to-bottom",

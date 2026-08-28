@@ -311,6 +311,11 @@ describe('KNOWN_BINDINGS', () => {
 		expect(KNOWN_VANILLA_CORES['@tanstack/react-db']).toBe('@tanstack/db');
 	});
 
+	it('maps XYFlow React to the Octane binding and framework-neutral system core', () => {
+		expect(KNOWN_BINDINGS['@xyflow/react']).toBe('@octanejs/xyflow');
+		expect(KNOWN_VANILLA_CORES['@xyflow/react']).toBe('@xyflow/system');
+	});
+
 	it('maps Streamdown and every official plugin package to the consolidated binding', () => {
 		const upstreamPackages = [
 			'streamdown',

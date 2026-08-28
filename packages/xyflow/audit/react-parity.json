@@ -1,0 +1,195 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/xyflow/xyflow.git",
+    "version": "12.11.2",
+    "commit": "dd308ab401d49518f73d1e91c43faf254ff5a4c9",
+    "sourceRoot": "packages/react/src",
+    "testRoot": "packages/react",
+    "license": "MIT",
+    "integrity": "sha256:ddfb74037a3979ed98c8784034071f24040b5a6b7d560254fcb6c6676946da47",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/xyflow/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/xyflow/tests/conformance"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 8,
+    "uniqueIdentities": 8,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "b2ab89e8c1a70c3ec3d617bc1c002a928060b3645429a1381d67da1ff8f70383"
+    }
+  },
+  "lanes": [
+    {
+      "id": "xyflow-adapted-full-suite",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xyflow",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the complete adapted xyflow conformance suite and records every collected test identity, including repeated custom-hook slot isolation.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/xyflow/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/xyflow/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "780ae2b1ae93a494226338af031a85206024e7a023c061245fa0300585680a6d"
+        },
+        {
+          "path": "packages/xyflow/tests/conformance/connection-slots.test.ts",
+          "role": "support",
+          "sha256": "185fbc3b243f72816627ef2e2166e721038a27239727acdf66a9c7cb91679793"
+        },
+        {
+          "path": "packages/xyflow/tests/_fixtures/connection-slots.tsrx",
+          "role": "support",
+          "sha256": "b311e245eb5a3b7b2c76f96ca05350e95f99bc230b2ed40b1bde2f498103c27d"
+        }
+      ]
+    },
+    {
+      "id": "xyflow-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "xyflow-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Nine matched public-surface assertion groups compiled against @xyflow/react 12.11.2 with tsc and pinned React types.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/xyflow/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/xyflow/typetests/pristine/types.test-d.ts",
+          "role": "test",
+          "sha256": "75cccd659ae636f2dabbe6eb9e5958b957b28a2fa598c6b642f1d23b64c39ba5",
+          "cases": [
+            {
+              "id": "types:pristine",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/xyflow/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "cb82e03159b832dd6a70589b26cd2a47d7361981f4b9ff8e7550692c2896b46c"
+        },
+        {
+          "path": "packages/xyflow/typetests/assertions.md",
+          "role": "support",
+          "sha256": "48c5c609584dc67b8c37ec610d719917bb9ec97b84b916355d1ff9f5ae64e247"
+        }
+      ]
+    },
+    {
+      "id": "xyflow-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "xyflow-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "The same nine public-surface assertion groups compiled against @octanejs/xyflow with tsrx-tsc; assertions.md records the permitted package-name-only adaptation.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/xyflow/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/xyflow/typetests/adapted/types.test-d.ts",
+          "role": "test",
+          "sha256": "df2b46f9f932bfb33521db1ccfa33d6ea6b1cf0f8a1560dfbb9ba214f80924e7",
+          "cases": [
+            {
+              "id": "types:adapted",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/xyflow/typetests/adapted/tsconfig.json",
+          "role": "support",
+          "sha256": "333d43cae12465a0aef704f4070ac574de38cdd2e7071ea77424d874bfed1f40"
+        },
+        {
+          "path": "packages/xyflow/typetests/assertions.md",
+          "role": "support",
+          "sha256": "48c5c609584dc67b8c37ec610d719917bb9ec97b84b916355d1ff9f5ae64e247"
+        }
+      ]
+    },
+    {
+      "id": "xyflow-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xyflow-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "The same fixture runs through Octane and real @xyflow/react via the shared differential rig.",
+      "files": [
+        {
+          "path": "packages/xyflow/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "ec1adc6f6e551eba90f1cdb8e3231e31b8293818ad583aaeab83359175ccb7be",
+          "cases": [
+            {
+              "id": "differential:initial-mount",
+              "testName": "matches initial flow mount markup",
+              "fullName": "differential: @octanejs/xyflow vs @xyflow/react matches initial flow mount markup"
+            }
+          ]
+        },
+        {
+          "path": "packages/xyflow/tests/_fixtures/xyflow-diff.tsrx",
+          "role": "support",
+          "sha256": "cb8cdece56eb19d755add9163c3697da264e579eb930e0e74fecef17498e0e39"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+        },
+        {
+          "path": "packages/xyflow/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "897efdd4751f2397fe53003c131f24975710209d886cc64406149b9763432c62"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

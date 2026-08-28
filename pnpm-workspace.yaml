@@ -376,6 +376,8 @@ catalogs:
     picocolors: ^1.1.1
     '@clack/prompts': ^1.7.0
     prettier: ^3.9.6
+    '@xyflow/system': 0.0.79
+    '@xyflow/react': 12.11.2
     preact: ^10.29.8
     preact-render-to-string: ^6.7.0
     proxy-compare: ^3.0.1
@@ -397,6 +399,7 @@ catalogs:
     class-variance-authority: 0.7.1
     classnames: ^2.5.1
     clsx: ^2.1.1
+    classcat: 5.0.5
     cmdk: 1.1.1
     tailwind-merge: 3.6.0
     d3-array: 3.2.1
