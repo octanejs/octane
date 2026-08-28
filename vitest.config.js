@@ -5899,6 +5899,102 @@ export default defineConfig({
 				},
 			},
 			{
+				// Octane-only SSR/verifier/crosswalk coverage stays in the ordinary
+				// shards. Browser and React-parity suites use their dedicated lanes.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/select/tests/upstream/**/*.test.ts'],
+				},
+				test: {
+					name: 'select',
+					include: [
+						'packages/select/tests/**/*.test.ts',
+						'packages/select/tests/**/*.test.mjs',
+						'!packages/select/tests/browser/**/*.test.ts',
+						'!packages/select/tests/async.test.ts',
+						'!packages/select/tests/creatable.test.ts',
+						'!packages/select/tests/default-styles.test.ts',
+						'!packages/select/tests/leaf-components.test.ts',
+						'!packages/select/tests/select-ssr.test.ts',
+						'!packages/select/tests/state-manager.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/select$/,
+							replacement: resolve(import.meta.dirname, 'packages/select/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/select\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/select/src') + '/$1',
+						},
+						{
+							find: /^@octanejs\/transition-group$/,
+							replacement: resolve(import.meta.dirname, 'packages/transition-group/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'select-browser',
+					include: ['packages/select/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'select-differential',
+					include: [
+						'packages/select/tests/async.test.ts',
+						'packages/select/tests/creatable.test.ts',
+						'packages/select/tests/default-styles.test.ts',
+						'packages/select/tests/leaf-components.test.ts',
+						'packages/select/tests/select-ssr.test.ts',
+						'packages/select/tests/state-manager.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/select$/,
+							replacement: resolve(import.meta.dirname, 'packages/select/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/select\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/select/src') + '/$1',
+						},
+						{
+							find: /^@octanejs\/transition-group$/,
+							replacement: resolve(import.meta.dirname, 'packages/transition-group/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				// Ordinary ownership: repo-authored Octane-only smoke stays out of
 				// adaptedRuntimeSummary / react-parity evidence.
 				test: {

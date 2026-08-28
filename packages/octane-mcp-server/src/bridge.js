@@ -67,6 +67,7 @@ export const KNOWN_BINDINGS = {
 	sonner: '@octanejs/sonner',
 	'react-error-boundary': '@octanejs/react-error-boundary',
 	'react-resizable-panels': '@octanejs/resizable-panels',
+	'react-select': '@octanejs/select',
 	'react-transition-group': '@octanejs/transition-group',
 	'react-day-picker': '@octanejs/day-picker',
 	'input-otp': '@octanejs/input-otp',

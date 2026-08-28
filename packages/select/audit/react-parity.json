@@ -1,0 +1,383 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/JedWatson/react-select.git",
+    "version": "5.10.2",
+    "commit": "052e864b4990a67c4ee416851c34d1eb7b58267b",
+    "sourceRoot": "packages/select/src",
+    "testRoot": "packages/select/src/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:afe9505b2eb1fc35eec286aec284a35524eab572bde3946703a2453c343a1b8a",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/select/src", "packages/select/typetests"],
+      "include": ["\\.(?:ts|tsrx|mjs)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/select/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|mjs)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 255,
+    "uniqueIdentities": 253,
+    "duplicateEntriesWithinLanes": 2,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "d5f1d96716871e165f5adf3d3cdfcb5a8390ffba279bf6d014197372b0cc321b"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-select-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-select-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact react-select 5.10.2 Jest suites against the vendored React implementation, verifies all 255 passing identities and five snapshots, and leaves the three canonical upstream skips to adaptation.json not-applicable dispositions.",
+      "execution": {
+        "kind": "jest-full",
+        "config": "packages/select/tests/upstream-jest.config.cjs",
+        "root": "packages/select/upstream",
+        "inventory": "packages/select/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/select/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "69a66bd9c2bff0d2020b484319fdd4ad7ce79ffe7aa29282e1501234f980fe81"
+        },
+        {
+          "path": "scripts/react-parity/react-select-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "3ccba4c004932b6c96b9d96d8a6a771a83fb1eed137453cacb0fc13eb5e1a909"
+        },
+        {
+          "path": "scripts/react-parity/react-select-pristine-runtime.d.mts",
+          "role": "support",
+          "sha256": "0a4b3469c1c64107be9e3e1f6f475fd06b10e84ecc2e9dfad6f5fa767c3b8c22"
+        },
+        {
+          "path": "scripts/react-parity/jest-full-runner.mjs",
+          "role": "support",
+          "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
+        },
+        {
+          "path": "packages/select/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "afe9505b2eb1fc35eec286aec284a35524eab572bde3946703a2453c343a1b8a"
+        },
+        {
+          "path": "packages/select/scripts/verify-upstream.mjs",
+          "role": "support",
+          "sha256": "7ffdf13642702886444dd2646cf11c4ba17d4f0c1a80ea0c3385173109dd672d"
+        },
+        {
+          "path": "packages/select/tests/upstream-jest.config.cjs",
+          "role": "support",
+          "sha256": "01af40b831f03a23dd941a7fed22273c369db07638228f87bc0c5d75b70ac4f6"
+        },
+        {
+          "path": "packages/select/tests/upstream-jest.setup.ts",
+          "role": "support",
+          "sha256": "a46d66851af2c056e805fdd574bf5ec3adb1181c43c5e41f0a1c592e338afe64"
+        },
+        {
+          "path": "packages/select/tests/upstream-jest-transformer.cjs",
+          "role": "support",
+          "sha256": "3fadc0e3e5f5fe6a276f9a6e356807e60228dd65e791fa19d7d133d54c7a56e1"
+        },
+        {
+          "path": "packages/select/tests/upstream-emotion-serializer.cjs",
+          "role": "support",
+          "sha256": "f05297f58037be355c988f4eed0149cacbd1e08fde2039981029fafaaba1de9a"
+        }
+      ]
+    },
+    {
+      "id": "react-select-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "select",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 255 pristine identities one-for-one through the Octane adaptation lane across all five suites, including all upstream snapshots; the three canonical upstream skips are individually justified as not-applicable.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/select/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/select/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "6b0a0c244bae2c5fbaf0f4d71b67897e9d1f8ff1ddc80ff8c5170641f50250d7"
+        },
+        {
+          "path": "packages/select/audit/adaptation.json",
+          "role": "support",
+          "sha256": "5d9f1b233033c251e24e74c66f7c9e1548d4529a157b29e2eae8c5ab99b62df4"
+        },
+        {
+          "path": "packages/select/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "812e39284520942bb16bc98b8af9ebac92c63f506859f8f7da614809335523da"
+        },
+        {
+          "path": "scripts/react-parity/react-select-runtime-inventory.mjs",
+          "role": "support",
+          "sha256": "c43984b91843587e8490b42652c10d0757e8df15ae4295e311f2350ebe30b80f"
+        },
+        {
+          "path": "scripts/react-parity/react-select-adaptation.mjs",
+          "role": "support",
+          "sha256": "3f787d472306fddbfc2c593a2e1cc4787aeebdfd6fb630448975a3810772015a"
+        },
+        {
+          "path": "scripts/react-parity/react-select-adaptation.test.mjs",
+          "role": "support",
+          "sha256": "55e7898ef1e2f703bb1fe649a8f13c0977e23efd8422df035517472ba16d59ca"
+        },
+        {
+          "path": "scripts/react-parity/react-select-classifications-lib.mjs",
+          "role": "support",
+          "sha256": "650c24f8054680208dd41f200d88765ecd3dffa1989a87ece1fddd2308d784c4"
+        },
+        {
+          "path": "scripts/react-parity/react-select-classifications-lib.test.mjs",
+          "role": "support",
+          "sha256": "b9d586cdc6ebbcf56c1cb031d348445fd03daf4c35139d6e521d139de63cf8b4"
+        }
+      ]
+    },
+    {
+      "id": "react-select-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "select-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the bounded React/Octane SSR, state-hook, component, and default-style comparisons under the dedicated differential project.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/select/audit/differential-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/select/audit/differential-runtime.json",
+          "role": "support",
+          "sha256": "b5ff60f3cb89d4888ce6402092f0effb339ca6854b4649c91fb00e18b9e78887"
+        },
+        {
+          "path": "scripts/react-parity/react-select-runtime-inventory.mjs",
+          "role": "support",
+          "sha256": "c43984b91843587e8490b42652c10d0757e8df15ae4295e311f2350ebe30b80f"
+        }
+      ]
+    },
+    {
+      "id": "react-select-local-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-select-local-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles consumer-shaped Octane declarations across all six public entry points after structural assertion-group verification against the paired React fixture.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/select/typetests/tsconfig.local.json"
+      },
+      "files": [
+        {
+          "path": "packages/select/audit/local-types.json",
+          "role": "test",
+          "sha256": "7689627e5af12ff4bed536eab02831dbbfe5937a2a46df4a68613d43e6a0cdac",
+          "cases": [
+            {
+              "id": "types:local-public-surface",
+              "testName": "Octane public type surface",
+              "fullName": "Octane public type surface across all six entry points"
+            }
+          ]
+        },
+        {
+          "path": "packages/select/typetests/tsconfig.local.json",
+          "role": "support",
+          "sha256": "a2b99225ec12fafb420eed9a54c94851bd4b5db181437cccb9145141d9ec0175"
+        },
+        {
+          "path": "packages/select/typetests/local.ts",
+          "role": "support",
+          "sha256": "107d2ef3a1550a9cc931ee767ad5c9a02fa06721fe9755fcc11b1c4167587770"
+        },
+        {
+          "path": "packages/select/tests/browser/tsconfig.json",
+          "role": "support",
+          "sha256": "63d45556d53458cac6d733ab43410f3250865f564ab1b4ebc72c63a5dc2d9afc"
+        },
+        {
+          "path": "packages/select/audit/type-parity.json",
+          "role": "support",
+          "sha256": "822b20dc6e6f3c822cfe6dea57c54ea3cf745e5108f56cc7031687079c411837"
+        },
+        {
+          "path": "scripts/react-parity/react-select-types-lib.mjs",
+          "role": "support",
+          "sha256": "be6efd43545e72fc272af5aa2c6b2b01fc0cf720cf3f77ea103aa6fd14d07ffc"
+        }
+      ]
+    },
+    {
+      "id": "react-select-upstream-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-select-upstream-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the same consumer-shaped fixture against pinned react-select declarations with assertion-group inventory and mutation controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/select/typetests/tsconfig.upstream.json"
+      },
+      "files": [
+        {
+          "path": "packages/select/audit/upstream-types.json",
+          "role": "test",
+          "sha256": "5daf6d8d13f18f3b860a15f16feea5e313f653d400393119a939f1dde3308654",
+          "cases": [
+            {
+              "id": "types:upstream-public-surface",
+              "testName": "pinned React public type surface",
+              "fullName": "pinned React public type surface across all six entry points"
+            }
+          ]
+        },
+        {
+          "path": "packages/select/typetests/tsconfig.upstream.json",
+          "role": "support",
+          "sha256": "1269c874a5a637ff385a2a18e1ab87ca7db02b2d937706685e3eb59205fb4a33"
+        },
+        {
+          "path": "packages/select/typetests/upstream.ts",
+          "role": "support",
+          "sha256": "1d3a88d6a604176219efc33fec3009d0dde78a14db597bac5c3f837163421a49"
+        },
+        {
+          "path": "packages/select/audit/type-parity.json",
+          "role": "support",
+          "sha256": "822b20dc6e6f3c822cfe6dea57c54ea3cf745e5108f56cc7031687079c411837"
+        },
+        {
+          "path": "scripts/react-parity/react-select-types-lib.mjs",
+          "role": "support",
+          "sha256": "be6efd43545e72fc272af5aa2c6b2b01fc0cf720cf3f77ea103aa6fd14d07ffc"
+        }
+      ]
+    },
+    {
+      "id": "react-select-compat-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-select-compat-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Requires exact equality for every framework-neutral declaration and fail-closed key/value inventories for every member across all Props entry points, permitting only the recorded renderer adaptations.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/select/typetests/tsconfig.compat.json"
+      },
+      "files": [
+        {
+          "path": "packages/select/audit/compat-types.json",
+          "role": "test",
+          "sha256": "ed2d2eee5aee9a3ca2da50af978ae59783825b4aaec9efc546d4cdf6bd43564f",
+          "cases": [
+            {
+              "id": "types:cross-environment-compatibility",
+              "testName": "cross-environment structural compatibility",
+              "fullName": "cross-environment structural compatibility for framework-neutral declarations and complete entry-point Props inventories"
+            },
+            {
+              "id": "types:octane-node-adaptation",
+              "testName": "OctaneNode renderer adaptation",
+              "fullName": "OctaneNode replaces ReactNode at renderer-owned type boundaries"
+            },
+            {
+              "id": "types:native-event-adaptation",
+              "testName": "native event adaptation",
+              "fullName": "native DOM events replace React synthetic events at event-bearing type boundaries"
+            },
+            {
+              "id": "types:octane-style-adaptation",
+              "testName": "Octane style adaptation",
+              "fullName": "Octane style objects replace Emotion CSS objects at renderer-owned type boundaries"
+            }
+          ]
+        },
+        {
+          "path": "packages/select/typetests/tsconfig.compat.json",
+          "role": "support",
+          "sha256": "6192bdd932489330e6cae415483fa55cc0ce023b762e1b3190adabe4157a3079"
+        },
+        {
+          "path": "packages/select/typetests/compat.ts",
+          "role": "support",
+          "sha256": "4e8cef1b166dd6f816dbf35ec8da8f5a95c7cb18825c594e5ad288cc2b9e60a6"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "react-select-octane-node",
+      "caseIds": ["types:octane-node-adaptation"],
+      "upstreamResult": "Renderable callbacks and component contracts use ReactNode.",
+      "octaneResult": "Renderable callbacks and component contracts use OctaneNode.",
+      "rationale": "Octane components render Octane nodes without a React runtime dependency.",
+      "classification": "renderer-type",
+      "consumerImpact": "Type annotations that explicitly name ReactNode must use OctaneNode when migrating.",
+      "migrationGuidance": "Replace explicit ReactNode annotations at React Select render boundaries with OctaneNode.",
+      "owner": "@octanejs/select",
+      "reviewCondition": "Review if Octane adopts a framework-neutral public renderable-node type compatible with ReactNode."
+    },
+    {
+      "id": "react-select-native-events",
+      "caseIds": ["types:native-event-adaptation"],
+      "upstreamResult": "Event-bearing contracts expose React synthetic events.",
+      "octaneResult": "Event-bearing contracts expose native DOM events.",
+      "rationale": "Octane delivers native DOM events rather than React synthetic events.",
+      "classification": "event-model",
+      "consumerImpact": "Explicit React synthetic-event annotations must become native DOM event annotations.",
+      "migrationGuidance": "Use the corresponding native DOM event type in callbacks and component overrides.",
+      "owner": "@octanejs/select",
+      "reviewCondition": "Review if Octane introduces a React-compatible synthetic event layer."
+    },
+    {
+      "id": "react-select-octane-styles",
+      "caseIds": ["types:octane-style-adaptation"],
+      "upstreamResult": "Renderer-owned style contracts expose Emotion CSSObjectWithLabel values.",
+      "octaneResult": "Renderer-owned style contracts expose Octane style objects.",
+      "rationale": "Octane owns style serialization and does not require Emotion at runtime.",
+      "classification": "renderer-type",
+      "consumerImpact": "Explicit Emotion CSSObjectWithLabel annotations at style override boundaries must use the Octane style-object contract.",
+      "migrationGuidance": "Remove Emotion-only type annotations and use the inferred Octane style callback types.",
+      "owner": "@octanejs/select",
+      "reviewCondition": "Review if Octane adopts an Emotion-compatible renderer-owned style type."
+    }
+  ]
+}

@@ -288,7 +288,11 @@ const ACTIVE_PU_WARM_PLANS: Array<() => void> = [];
 let CURRENT_PU_WARM_CLAIMS: Set<object> | null = null;
 let ID_COUNTER = 0;
 let ID_PREFIX = '';
-let CSS: Map<string, string> | null = null;
+interface InjectedStyle {
+	css: string;
+	nonce?: string;
+}
+let CSS: Map<string, InjectedStyle> | null = null;
 // Pre-escaped ` nonce="..."` fragment for renderer-owned inline tags emitted
 // during the active pass. Saved/restored with every other ambient so nested or
 // concurrent server renders cannot leak a CSP nonce across requests.
@@ -5809,8 +5813,8 @@ export function isChildrenBlock(value: unknown): boolean {
 // hash) for the RenderResult.css field.
 // ---------------------------------------------------------------------------
 
-export function injectStyle(id: string, css: string): void {
-	if (CSS !== null) CSS.set(id, css);
+export function injectStyle(id: string, css: string, nonce?: string): void {
+	if (CSS !== null) CSS.set(id, nonce === undefined ? { css } : { css, nonce });
 }
 
 // Compiler-emitted for each hoisted `<title>`/`<meta>`/`<link>` (rendered
@@ -6191,7 +6195,7 @@ interface FullPassResult {
 	vtCandidates: boolean;
 	/** Per-hash scoped stylesheets from this pass — the streaming renderer diffs
 	 *  these against what it already flushed to emit late boundaries' styles. */
-	cssEntries: Map<string, string>;
+	cssEntries: Map<string, InjectedStyle>;
 	/** Per-resource Float sheet tags from this pass (see HeadBuffer.sheets) —
 	 *  diffed the same way so late-discovered resources ride the wave chunks. */
 	sheets: Map<string, { precedence: string; html: string }> | null;
@@ -6212,7 +6216,7 @@ interface Ambient {
 	warmClaims: Set<object> | null;
 	id: number;
 	idPrefix: string;
-	css: Map<string, string> | null;
+	css: Map<string, InjectedStyle> | null;
 	nonceAttr: string;
 	markers: boolean;
 	permanentStaticHydrateDepth: number;
@@ -6356,7 +6360,7 @@ function runFullFramedPass(
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
-	const cssMap = (CSS = new Map<string, string>());
+	const cssMap = (CSS = new Map<string, InjectedStyle>());
 	const headBuf = (HEAD = {
 		html: '',
 		charset: '',
@@ -6428,9 +6432,9 @@ function runFullFramedPass(
 			'<style data-octane="' +
 			hash +
 			'"' +
-			nonceAttr +
+			(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
 			'>' +
-			escapeEntireInlineStyleContent(sheet) +
+			escapeEntireInlineStyleContent(sheet.css) +
 			'</style>';
 	}
 	const result: FullPassResult = {
@@ -6988,7 +6992,7 @@ export type HostedAttemptResult =
 			/** Hoisted head output — the host must translate or reject it (§9.2). */
 			head: string;
 			/** Per-hash scoped stylesheets for host-level dedupe (§9.2). */
-			cssEntries: Map<string, string>;
+			cssEntries: Map<string, InjectedStyle>;
 	  }
 	| { status: 'suspended'; stratum: PromiseLike<void> };
 
@@ -8346,9 +8350,9 @@ async function runStream(
 			'<style data-octane="' +
 			hash +
 			'"' +
-			nonceAttr +
+			(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
 			'>' +
-			escapeEntireInlineStyleContent(sheet) +
+			escapeEntireInlineStyleContent(sheet.css) +
 			'</style>';
 	}
 	// Streaming DOCUMENT renders always lead with `<!DOCTYPE html>` — React
@@ -8468,9 +8472,9 @@ async function runStream(
 					'<style data-octane="' +
 					hash +
 					'"' +
-					nonceAttr +
+					(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
 					'>' +
-					escapeEntireInlineStyleContent(sheet) +
+					escapeEntireInlineStyleContent(sheet.css) +
 					'</style>';
 			}
 			// Float sheet resources this pass discovered that are not on the wire

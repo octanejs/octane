@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "types:cross-environment-compatibility",
+      "testName": "cross-environment structural compatibility",
+      "fullName": "cross-environment structural compatibility for pure public types"
+    },
+    {
+      "id": "types:octane-node-adaptation",
+      "testName": "OctaneNode renderer adaptation",
+      "fullName": "OctaneNode replaces ReactNode at renderer-owned type boundaries"
+    },
+    {
+      "id": "types:native-event-adaptation",
+      "testName": "native event adaptation",
+      "fullName": "native DOM events replace React synthetic events at event-bearing type boundaries"
+    },
+    {
+      "id": "types:octane-style-adaptation",
+      "testName": "Octane style adaptation",
+      "fullName": "Octane style objects replace Emotion CSS objects at renderer-owned type boundaries"
+    }
+  ]
+}

@@ -190,4 +190,24 @@ describe('SSR Phase 3 — scoped CSS across the boundary', () => {
 		expect(head.querySelectorAll('style[data-octane="tsrx-dedup"]').length).toBe(1);
 		existing.remove();
 	});
+
+	it('client injectStyle applies an optional per-style CSP nonce', () => {
+		injectStyle('tsrx-client-nonce', '.nonce{color:green}', 'client-csp');
+		const style = document.head.querySelector<HTMLStyleElement>(
+			'style[data-octane="tsrx-client-nonce"]',
+		);
+		expect(style?.nonce).toBe('client-csp');
+		style?.remove();
+	});
+
+	it('server injectStyle applies and escapes a per-style nonce ahead of the render nonce', () => {
+		const PerStyleNonce = () => {
+			RT.injectStyle('tsrx-server-nonce', '.nonce{color:green}', 'style-"csp');
+			return null;
+		};
+		const out = RT.renderToString(PerStyleNonce, undefined, { nonce: 'render-csp' });
+		expect(out.css).toBe(
+			'<style data-octane="tsrx-server-nonce" nonce="style-&quot;csp">.nonce{color:green}</style>',
+		);
+	});
 });

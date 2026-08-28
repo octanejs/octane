@@ -15,6 +15,7 @@ type HydrationBinding =
 	| 'pdf'
 	| 'rainbowkit'
 	| 'react-map-gl'
+	| 'select'
 	| 'solana-kit'
 	| 'testing-library';
 
@@ -115,6 +116,8 @@ function bindingAliases(binding: HydrationBinding) {
 	if (binding === 'react-map-gl') {
 		return [{ find: /^@octanejs\/react-map-gl$/, replacement: resolve(source, 'index.ts') }];
 	}
+
+	if (binding === 'select') return [];
 
 	if (binding === 'testing-library') {
 		// Its hydration fixtures import `octane` and nothing else — the binding

@@ -298,6 +298,10 @@ describe('KNOWN_BINDINGS', () => {
 		expect(KNOWN_BINDINGS['react-textarea-autosize']).toBe('@octanejs/textarea-autosize');
 	});
 
+	it('maps react-select to the exact Octane binding', () => {
+		expect(KNOWN_BINDINGS['react-select']).toBe('@octanejs/select');
+	});
+
 	it('maps react-window to its exact official Octane binding', () => {
 		expect(KNOWN_BINDINGS['react-window']).toBe('@octanejs/window');
 	});
