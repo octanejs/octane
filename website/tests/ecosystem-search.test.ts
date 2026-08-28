@@ -5,10 +5,24 @@ import {
 	searchEcosystem,
 	type EcosystemEntity,
 } from '../src/lib/ecosystem-search-core.ts';
-import { loadSearchIndex } from '../src/lib/docs-search.ts';
+import { recordsFor } from '../src/lib/docs-search-core.ts';
 import { createSiteSearchIndexLoader, searchSite } from '../src/lib/site-search.ts';
 
 const entities = ecosystemIndex as EcosystemEntity[];
+const docRecords = [
+	...recordsFor(
+		'router-guide',
+		'TanStack Router guide',
+		0,
+		'<h2 id="routing">Routing</h2>Configure TanStack Router for an Octane app.',
+	),
+	...recordsFor(
+		'server-rendering',
+		'Server rendering',
+		1,
+		'<h2 id="rendering">Server rendering</h2>Render an Octane application on the server.',
+	),
+];
 
 function packagesFor(query: string) {
 	return searchEcosystem(entities, query).map((result) => result.entity.packageName);
@@ -125,10 +139,9 @@ describe('ecosystem entity search', () => {
 });
 
 describe('site search composition', () => {
-	it('puts strong entities above docs and weak entity metadata below docs', async () => {
-		const docs = await loadSearchIndex();
-		const router = searchSite({ docs, entities }, 'tanstack router');
-		const serverRendering = searchSite({ docs, entities }, 'server rendering');
+	it('puts strong entities above docs and weak entity metadata below docs', () => {
+		const router = searchSite({ docs: docRecords, entities }, 'tanstack router');
+		const serverRendering = searchSite({ docs: docRecords, entities }, 'server rendering');
 
 		expect(router[0]).toMatchObject({
 			type: 'entity',
@@ -145,10 +158,9 @@ describe('site search composition', () => {
 	}, 30_000);
 
 	it('keeps docs available when the ecosystem chunk fails', async () => {
-		const docs = await loadSearchIndex();
 		let entityAttempts = 0;
 		const load = createSiteSearchIndexLoader({
-			docs: async () => docs,
+			docs: async () => docRecords,
 			entities: async () => {
 				if (entityAttempts++ === 0) throw new Error('ecosystem chunk unavailable');
 				return entities;
