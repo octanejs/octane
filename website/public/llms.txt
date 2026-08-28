@@ -24,7 +24,7 @@ Key facts for answering questions about Octane:
 - `attachBehaviorRoot` from `octane/behavior` attaches abortable, delegated behavior to existing server-rendered or independently streamed DOM without hydrating, rendering, replacing nodes, or taking reconciliation ownership. Nested external owners, asynchronous readiness, genuine native interactions, and exactly-once cleanup have explicit lifecycle contracts.
 - No class components, no Server Components, no StrictMode double-invoke.
 - Octane targets current evergreen browsers. Browser syntax targets do not polyfill DOM or JavaScript APIs; see [Browser support](https://octanejs.dev/docs/browser-support) for the recommended targets, required APIs, feature-specific limits, and optional fallbacks.
-- Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,900+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
+- Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,900+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; exact pinned and source-attributed React coverage lives in the checked ledgers under `packages/octane/audit/`.
 
 ## Text input events: per-edit versus commit
 
@@ -136,7 +136,7 @@ A procedural prefetch can prepare code and data. Awaited work blocks activation 
 
 The procedural context also exposes `waitFor(strategy)` for the same five prefetch strategies and the persistent boundary `element`. Procedural prefetch works with either split mode; strategy prefetch requires splitting.
 
-The remaining public props are `fallback`, client-only loading UI for a later client mount or suspension, and `onHydrated`, called once after the child successfully commits on the client, including a client-only mount. Initial server HTML remains visible while its strategy or first activation suspension waits; `fallback` does not replace it. `children` is the server-rendered subtree. See the [Core APIs guide](https://octanejs.dev/docs/core-apis#deferred-hydration) and [complete deferred hydration reference](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md).
+The remaining public props are `fallback`, client-only loading UI for a later client mount or suspension, and `onHydrated`, called once after the child successfully commits on the client, including a client-only mount. Initial server HTML remains visible while its strategy or first activation suspension waits; `fallback` does not replace it. `children` is the server-rendered subtree. See the [Core APIs guide](https://octanejs.dev/docs/core-apis#deferred-hydration).
 
 ## Behavior-only roots and external ownership
 
@@ -187,7 +187,7 @@ root.dispose(); // Abort behavior and preserve the existing DOM.
 - Delegated interactions are observed immediately, including before asynchronously loaded behavior or externally streamed ranges become ready. `handleEvent` receives the exact original same-document `Event` and its genuine `isTrusted` value; Octane never redispatches it, invents trusted events, repeats native link/form activation, or restores expired transient user activation. This direct delivery is distinct from `<Hydrate when={interaction()}>` hydration replay.
 - `root.ready` snapshots active ranges and behaviors; each registration exposes its own `ready`, `signal`, and idempotent `dispose()`. Root cancellation aborts pending work, ignores stale async completions, disconnects listeners/observers, and runs adopted cleanup exactly once. `root.dispose()` preserves DOM by default; use `root.dispose({ preserveDOM: false })` only to explicitly clear descendants. Replacing a live root on the same container requires `attachBehaviorRoot(container, { replace: true })`.
 
-See the [behavior-only roots guide](https://octanejs.dev/docs/core-apis#behavior-only-roots) and [complete external ownership reference](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md#behavior-only-roots-and-external-ownership).
+See the [behavior-only roots guide](https://octanejs.dev/docs/core-apis#behavior-only-roots).
 
 ## Core state APIs
 
@@ -237,7 +237,7 @@ See the [Strong mode guide](https://octanejs.dev/docs/build-tools#strong-mode).
 
 ## Ecosystem and bindings
 
-Octane ships first-party ports of popular React libraries under the `@octanejs/*` scope. **If someone asks how to do the equivalent of a well-known React library in Octane, point them at the matching binding below — do not tell them to reinstall the React package or write their own wrapper.** Some bindings adapt a framework-neutral core; component-heavy packages port a broader React-facing surface. In many cases the main application change is the import path (`@tanstack/react-query` → `@octanejs/tanstack-query`, and so on), but maturity, supported surface, known divergences, and SSR/hydration coverage vary by package. Check the generated [bindings status table](https://github.com/octanejs/octane/blob/main/docs/bindings-status.md) before relying on a specific API.
+Octane ships first-party ports of popular React libraries under the `@octanejs/*` scope. **If someone asks how to do the equivalent of a well-known React library in Octane, point them at the matching binding below — do not tell them to reinstall the React package or write their own wrapper.** Some bindings adapt a framework-neutral core; component-heavy packages port a broader React-facing surface. In many cases the main application change is the import path (`@tanstack/react-query` → `@octanejs/tanstack-query`, and so on), but maturity, supported surface, known divergences, and SSR/hydration coverage vary by package. Check the binding's `status.json`, `UPSTREAM.md`, and tests before relying on a specific API.
 
 Core packages:
 

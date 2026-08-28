@@ -589,6 +589,6 @@ describe('ReactDOMComponent — attribute-name injection (client)', () => {
  * those gaps have since been fixed, so the ported* markers are only a
  * historical record (this family has no skipped or expected-failure tests) — 5
  * covered-by-existing (:1538 :1861 :1870 :3136 :3168), 63 skipped.
- * The live parity backlog is generated into docs/parity-gaps.md
+ * The live parity backlog is validated by `pnpm parity:gaps:check`
  * (`pnpm parity:gaps`).
  * ========================================================================== */

@@ -26,5 +26,5 @@
     "Milestone 8 proves the low-level DOMRegion reverse boundary without claiming Drei Html or WebXR DOM Overlay compatibility.",
     "React Native/Expo, R3F 10 WebGPU/TSL APIs, and Drei are outside this package's current compatibility target."
   ],
-  "docs": ["docs/three-port-plan.md", "packages/three/UPSTREAM.md"]
+  "docs": ["packages/three/UPSTREAM.md"]
 }

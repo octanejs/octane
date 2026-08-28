@@ -69,8 +69,8 @@ layout, per TanStack's fuzzy/root boundary rules), plus the full
 types). The typed route factories, route-bound hooks, and `Link` surface preserve
 TanStack Router's registered-route inference.
 
-The 2026-07-06 gap-closure sweep (see `docs/tanstack-parity-audit.md`) additionally
-landed the full Match pipeline (per-route Suspense/CatchBoundary/CatchNotFound,
+The 2026-07-06 gap-closure sweep additionally landed the full Match pipeline
+(per-route Suspense/CatchBoundary/CatchNotFound,
 pending/error/redirected/notFound statuses), router lifecycle events, `useBlocker`/
 `Block`, the complete read-hook family (`useMatch`, `useRouteContext`,
 `useLoaderDeps`, `useParentMatches`/`useChildMatches`, …), `getRouteApi`/
@@ -107,9 +107,8 @@ by `@octanejs/tanstack-start`.
 createRoute({ path: 'item/$id', component: lazyRouteComponent(() => import('./Item')) })
 ```
 
-Current scope, divergences, and verification status are tracked in the generated
-[bindings status table](../../docs/bindings-status.md) (sourced from this
-package's `status.json`).
+Current scope, divergences, and verification status are tracked in this package's
+checked [`status.json`](./status.json).
 
 ## Divergences from `@tanstack/react-router`
 

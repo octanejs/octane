@@ -414,8 +414,8 @@
       "octaneReferences": [
         {
           "kind": "documentation",
-          "file": "docs/project-analysis-concerns.md",
-          "note": "Distinguishes current source-backed claims from historical plans."
+          "file": "CONTRIBUTING.md",
+          "note": "Defines the checked-source and generated-report policy."
         },
         {
           "kind": "documentation",
@@ -453,7 +453,7 @@
       "octaneReferences": [
         {
           "kind": "documentation",
-          "file": "docs/differences-from-react.md",
+          "file": "website/src/content/docs/differences-from-react.mdx",
           "note": "Octane deliberately uses onInput per edit and native change on commit."
         },
         {
@@ -866,7 +866,7 @@
       ],
       "nextAction": {
         "kind": "decision",
-        "targets": ["packages/octane/src/runtime.ts", "docs/ssr.md"],
+        "targets": ["packages/octane/src/runtime.ts", "website/src/content/docs/core-apis.mdx"],
         "acceptance": "Choose and document console-only diagnostics versus recoverable/caught/uncaught root callbacks, including exact deduplication and production behavior, before adding an API."
       },
       "rationale": "Redact's callback surface should not be copied implicitly; frameworks need a deliberate Octane contract if error callbacks become public."
@@ -1295,7 +1295,7 @@
       "octaneReferences": [
         {
           "kind": "documentation",
-          "file": "docs/differences-from-react.md",
+          "file": "website/src/content/docs/differences-from-react.mdx",
           "note": "Records unsupported React-only surfaces."
         }
       ],
@@ -2050,7 +2050,7 @@
         },
         {
           "kind": "documentation",
-          "file": "docs/ssr.md",
+          "file": "website/src/content/docs/core-apis.mdx",
           "note": "Bootstrap modules/import maps remain a metaframework concern rather than a core renderer option."
         }
       ],
@@ -2131,7 +2131,7 @@
       "octaneReferences": [
         {
           "kind": "documentation",
-          "file": "docs/ssr.md",
+          "file": "website/src/content/docs/core-apis.mdx",
           "note": "Documents streaming-only doctype ownership and buffered framework composition."
         },
         {

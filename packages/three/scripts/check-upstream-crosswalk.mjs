@@ -111,7 +111,7 @@ function assertAllowedClassification(entry, label) {
 	assertNonEmptyString(entry.reason, `${label}.reason`, 32);
 	assertNonEmptyString(entry.evidenceTarget, `${label}.evidenceTarget`);
 	if (entry.classification === 'not-applicable') {
-		if (entry.evidenceTarget !== 'docs/three-port-plan.md#intentional-exclusions-or-adaptations') {
+		if (entry.evidenceTarget !== 'packages/three/UPSTREAM.md#source-boundary') {
 			fail(`${label} is not-applicable without the durable exclusions evidence target.`);
 		}
 	} else if (!entry.evidenceTarget.startsWith('packages/three/')) {

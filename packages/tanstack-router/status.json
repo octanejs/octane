@@ -13,5 +13,5 @@
     "The TSRX-aware generator plugin is exported from `@octanejs/tanstack-router/generator-plugin` for `@octanejs/tanstack-start`'s package-owned generator.",
     "React parity provenance is still recorded-unverified until pristine-upstream and one-for-one adapted suite lanes are fetched from the pinned tag; differential harness evidence is landed separately."
   ],
-  "docs": ["docs/tanstack-parity-audit.md"]
+  "docs": []
 }

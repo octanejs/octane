@@ -1,8 +1,8 @@
 /**
  * @octanejs/mdx — the runtime provider layer.
  *
- * Strategy (docs/react-library-compat-plan.md §2): @mdx-js/mdx's core is
- * framework-agnostic (the compile pipeline lives in `./compile` + `./vite`);
+ * Strategy: @mdx-js/mdx's core is framework-agnostic (the compile pipeline
+ * lives in `./compile` + `./vite`);
  * only @mdx-js/react's thin React layer is ported here, onto octane context.
  * `MDXProvider` / `useMDXComponents` are a port of @mdx-js/react/lib/index.js
  * (v3): the same context, the same function-vs-object `components` merge, the

@@ -38,5 +38,5 @@
     "Bounded unit, behavioral (jsdom), hydration, SSR, and differential evidence is available. The canonical upstream Playwright suite is vendored and inventoried but has not been adapted case by case, so the binding remains recorded-unverified.",
     "`--cmdk-list-height` is written only where ResizeObserver exists (browsers); it is skipped during SSR and in jsdom, where the property is simply never set."
   ],
-  "docs": ["docs/cmdk-port-plan.md"]
+  "docs": []
 }

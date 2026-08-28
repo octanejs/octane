@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderReport, validateIdRegistryCompatibility, validateLedger } from './ledger-lib.mjs';
@@ -81,14 +81,9 @@ if (compatibilityBase !== undefined) {
 
 const report = renderReport(ledger);
 if (CHECK) {
-	if (!existsSync(REPORT_PATH) || readFileSync(REPORT_PATH, 'utf8') !== report) {
-		console.error(
-			'docs/redact-adversarial-audit.md is stale — run `pnpm redact-audit:generate` and commit the result.',
-		);
-		process.exit(1);
-	}
-	console.log(`Redact adversarial audit is current (${ledger.entries.length} entries).`);
+	console.log(`Redact adversarial audit inputs are valid (${ledger.entries.length} entries).`);
 } else {
+	mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
 	writeFileSync(REPORT_PATH, report);
 	console.log(`wrote docs/redact-adversarial-audit.md (${ledger.entries.length} entries).`);
 }

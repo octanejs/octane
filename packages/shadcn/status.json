@@ -34,5 +34,5 @@
     "RAC collections (Tabs, Breadcrumbs, ListBox, Table, Menu) walk their children as element DESCRIPTORS, so a consumer authoring them from a `@{ … }` body gets an EMPTY collection, silently. Author collection-backed families with `return <jsx>`. The hooks-tier CollectionBuilder throws a descriptive error for this; the RAC tier should too.",
     "Consumers importing by subpath rather than installing through the registry must add the package sources to their Tailwind content scan (`@source`), or components render unstyled — Tailwind never sees the class strings."
   ],
-  "docs": ["docs/shadcn-port-plan.md"]
+  "docs": []
 }

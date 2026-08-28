@@ -162,11 +162,10 @@ separates cue from content, not priority. The cue's storage (`slotRef.isPending`
 rollback; only its rendered bindings revert, and an urgent re-render with the content cells
 reverted re-publishes exactly those bindings (everything else no-ops on its bag guard). The
 actual prerequisite is extending the async-Action staging batch to held synchronous
-transitions. Design and phases: [docs/transition-deferred-commit-plan.md](../../docs/transition-deferred-commit-plan.md).
+transitions.
 
 Single-origin synchronous state staging subsequently shipped with cell rollback and an
-old-input pending-cue render; see
-[P1 landed](../../../docs/transition-deferred-commit-plan.md#p1-landed-2026-07-30-design-a--harvest).
+old-input pending-cue render, covered by `tests/transition-held-audit.test.ts`.
 Root-owned holds in #10 now use that staging contract too. This is not a general
 multi-origin or external-store work-in-progress tree. Fallback-visible retries are
 capture-safe and never had this limitation.

@@ -16,7 +16,7 @@ Use this when asked to prepare a branch and pull request for an Octane change.
    git status --short --branch
    git diff --stat
    ```
-2. Read `AGENTS.md` and `docs/packages.md`.
+2. Read `AGENTS.md` and the relevant package manifests or READMEs.
 3. For a new task, fetch the remote default branch and create a dedicated new
    worktree and non-default branch from it. For an existing pull request, use
    its already-dedicated worktree.

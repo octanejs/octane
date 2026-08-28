@@ -8,5 +8,5 @@
   "ssr": "Supported and tested — the upstream `*.server.test.tsx` suite runs via `octane/server` with byte-identical markup.",
   "verified": "2026-08-01",
   "parityEvidence": "packages/hook-form/audit/react-parity.json",
-  "docs": ["docs/octanejs-hook-form-plan.md"]
+  "docs": []
 }

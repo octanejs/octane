@@ -17,5 +17,5 @@
     "`pnpm --filter @octanejs/aria exports:check` compares the installed pinned React Aria Components declarations with the Octane components barrel in both directions.",
     "The Aria client project passes 45 files / 370 tests, including calendar selection, localized date segments, native color input, file/drop-zone wiring, list-data mutation, toast ordering, virtualized layout geometry, and real drag-and-drop hook composition."
   ],
-  "docs": ["packages/aria/UPSTREAM.md", "docs/aria-migration-plan.md"]
+  "docs": ["packages/aria/UPSTREAM.md"]
 }

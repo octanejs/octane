@@ -45,7 +45,6 @@
     "Milestone 9's package/API review keeps @octanejs/lynx and @octanejs/rspeedy-plugin at private version 0.0.0 and leaves the universal renderer ABI experimental. Public stabilization still requires a framework-neutral native string-event receiver and reconstructing-reload contract; native verification of context, delivery, ordering, and payload completeness for the source-integrated typed data and page/background-destroy paths; a working Web transport; minimum/current toolchain execution on native engines plus automated Explorer interaction and Android/iOS execution; identity adoption; worklet/ref/call, list lifecycle/allocation, lazy-chunk, portal, Native Module/custom-element, source-map, and reconstructing-reload proof; and comparable native semantic performance baselines. The private packages are not a technical preview."
   ],
   "docs": [
-    "docs/lynx-native-renderer-plan.md",
     "packages/lynx/UPSTREAM.md",
     "packages/lynx/audit/upstream-runner-cases.json",
     "packages/lynx/audit/framework-contracts.md",

@@ -53,5 +53,4 @@ The generated export, alias, and dynamic-name surfaces are checked against
 `lucide-react@1.24.0`. Differential tests render shared `.tsrx` fixtures through
 both libraries and compare the SVG DOM.
 
-See the [port plan](../../docs/lucide-port-plan.md) and generated
-[bindings status](../../docs/bindings-status.md) for scope and evidence.
+See the checked [`status.json`](./status.json) for scope and evidence.

@@ -14,7 +14,7 @@ import { LLMS_TXT, LLMS_FULL_TXT } from '../src/content/llms.ts';
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 
 describe('docs snapshot', () => {
-	it('carries every website doc plus the repo deep dives', async () => {
+	it('carries every website doc exactly once', async () => {
 		const websiteDocs = (await readdir(join(repoRoot, 'website/src/content/docs'))).map((file) =>
 			file.replace(/\.mdx$/, ''),
 		);
@@ -22,9 +22,7 @@ describe('docs snapshot', () => {
 			(doc) => doc.slug,
 		);
 		expect(new Set(snapshotWebsiteSlugs)).toEqual(new Set(websiteDocs));
-		expect(DOC_SLUGS).toContain('deferred-hydration-reference');
-		expect(DOC_SLUGS).toContain('ssr');
-		expect(DOC_SLUGS).toContain('differences-from-react-reference');
+		expect(DOC_SLUGS).toHaveLength(websiteDocs.length);
 	});
 
 	it('serves substantial markdown with frontmatter stripped', () => {
@@ -35,14 +33,12 @@ describe('docs snapshot', () => {
 		}
 	});
 
-	it('sections the repo markdown docs by their ## headings', () => {
-		const deferredHydration = docBySlug('deferred-hydration-reference')!;
-		const ssr = docBySlug('ssr')!;
-		const reference = docBySlug('differences-from-react-reference')!;
-		expect(deferredHydration.sections.length).toBeGreaterThanOrEqual(3);
-		expect(ssr.sections.length).toBeGreaterThanOrEqual(5);
-		expect(reference.sections.length).toBeGreaterThanOrEqual(15);
-		for (const section of [...deferredHydration.sections, ...ssr.sections, ...reference.sections]) {
+	it('preserves the registered sections for canonical guides', () => {
+		const coreApis = docBySlug('core-apis')!;
+		const differences = docBySlug('differences-from-react')!;
+		expect(coreApis.sections.length).toBeGreaterThanOrEqual(15);
+		expect(differences.sections.length).toBeGreaterThanOrEqual(6);
+		for (const section of [...coreApis.sections, ...differences.sections]) {
 			expect(section.id).toMatch(/^[a-z0-9][a-z0-9-]*$/);
 		}
 	});

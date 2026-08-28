@@ -17,14 +17,12 @@ wiring to Octane (native events, ref-as-prop, `useId`), and building on
 > A differential suite runs the same fixture through this port and the published
 > `cmdk@1.1.1` on React and asserts byte-equal HTML for its declared cases. The
 > canonical upstream Playwright suite is vendored but not yet adapted
-> exhaustively, so parity remains recorded-unverified. See [`UPSTREAM.md`](./UPSTREAM.md),
-> [`docs/cmdk-port-plan.md`](../../docs/cmdk-port-plan.md) and the authoritative
-> [`docs/bindings-status.md`](../../docs/bindings-status.md).
+> exhaustively, so parity remains recorded-unverified. See [`UPSTREAM.md`](./UPSTREAM.md)
+> and the checked [`status.json`](./status.json).
 
 ## Divergences from React cmdk
 
-Standard Octane binding adaptations (see
-[`docs/react-parity-migration-plan.md`](../../docs/react-parity-migration-plan.md)):
+Standard Octane binding adaptations:
 
 - `Command.Input` drives search from the native `onInput` event; the public
   `onValueChange(search)` API is unchanged.

@@ -141,8 +141,7 @@ when using the unified runner; an explicit `--octane-revision` takes precedence.
 
 ### Audit environment
 
-The [Activity parity audit](../../docs/activity-audit.md) records the findings
-and limits of the initial run. That worktree could not install the locked native
+The initial audit worktree could not install the locked native
 `oxc-tsrx` parser because the registry returned HTTP 403. Its ignored
 `dist/use-js-parser.mjs` Node loader redirects `#octane/compiler-parser` to the
 selected compiler's supported sibling `parser.browser.js` and sets

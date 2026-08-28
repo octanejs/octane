@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -307,19 +307,13 @@ function runCli() {
 
 	const expected = renderWorkspaceInventory(packages);
 	if (process.argv.includes('--check')) {
-		const current = existsSync(INVENTORY_PATH) ? readFileSync(INVENTORY_PATH, 'utf8') : '';
-		if (current !== expected) {
-			console.error(
-				'docs/packages.md is stale — run `pnpm packages:inventory` and commit the result.',
-			);
-			process.exit(1);
-		}
 		console.log(
-			`package inventory is current (${packages.filter((pkg) => !pkg.private).length} publishable package(s)).`,
+			`package inventory inputs are valid (${packages.filter((pkg) => !pkg.private).length} publishable package(s)).`,
 		);
 		return;
 	}
 
+	mkdirSync(path.dirname(INVENTORY_PATH), { recursive: true });
 	writeFileSync(INVENTORY_PATH, expected);
 	console.log(`wrote ${path.relative(REPO_ROOT, INVENTORY_PATH)}`);
 }

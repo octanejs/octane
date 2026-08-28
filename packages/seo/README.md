@@ -176,7 +176,7 @@ const { html, css, head } = await prerender(App, props, { headChannel: 'separate
 ```
 
 Streaming uses `onHeadReady(head)`, which fires before the shell is written. See
-`docs/ssr.md`.
+the [server-rendering guide](https://octanejs.dev/docs/core-apis#server-rendering).
 
 Two caveats worth knowing:
 

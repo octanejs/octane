@@ -1,8 +1,8 @@
 /**
  * @octanejs/testing-library — the side-effect-free core (`…/pure` entry).
  *
- * Strategy (docs/react-library-compat-plan.md §2): `@testing-library/dom` is
- * framework-agnostic, so it is depended on VERBATIM and re-exported wholesale
+ * Strategy: `@testing-library/dom` is framework-agnostic, so it is depended on
+ * VERBATIM and re-exported wholesale
  * (queries, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, …). Only
  * react-testing-library's thin React layer is ported here, onto octane:
  *

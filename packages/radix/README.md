@@ -26,8 +26,7 @@ The React binding layer maps onto octane cleanly: `forwardRef` → octane's ref-
 `composeRefs` → `composeRefs`/`useComposedRefs`, and Radix's `Slot`/`asChild`
 (`Children.only` + `cloneElement` + prop/ref merge) → octane's runtime `Children` /
 `cloneElement` / `isValidElement`. Popper/focus/dismiss behavior reuses the already-ported
-[`@octanejs/floating-ui`](../floating-ui). See
-[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md) for the full plan.
+[`@octanejs/floating-ui`](../floating-ui).
 
 ### `asChild` takes a descriptor
 
@@ -94,14 +93,12 @@ unit suites. The exact transitive source and test boundary is authenticated in
 [`UPSTREAM.md`](./UPSTREAM.md). The 16-case differential is not exhaustive verification of the
 complete canonical suite, so status remains `recorded-unverified`.
 
-Remaining (documented in
-[`docs/radix-migration-plan.md`](../../docs/radix-migration-plan.md)): SSR/hydration
-coverage for the overlay/portal components and Phase-5 polish. The port surfaced —
+Remaining: SSR/hydration coverage for the overlay/portal components and Phase-5
+polish. The port surfaced —
 and fixed, in octane itself — fourteen runtime/compiler parity bugs along the way;
 each is pinned by an octane regression test and a changeset.
 
 ## Status
 
-Current scope, known divergences, and verification status are tracked in the
-generated [bindings status table](../../docs/bindings-status.md), sourced from
-this package's [`status.json`](./status.json).
+Current scope, known divergences, and verification status are tracked in this
+package's checked [`status.json`](./status.json).

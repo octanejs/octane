@@ -6,5 +6,5 @@
   ],
   "ssr": "Full SSR + hydration coverage — server-compiled documents render via `renderToString` and hydrate byte-for-byte (`ssr.test.ts`, `hydration.test.ts`).",
   "verified": "2026-07-17",
-  "docs": ["docs/mdx-migration-plan.md"]
+  "docs": []
 }

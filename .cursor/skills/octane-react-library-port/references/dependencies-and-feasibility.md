@@ -12,7 +12,7 @@ It fingerprints and reads:
 - `KNOWN_BINDINGS`, `KNOWN_VANILLA_CORES`, and `REACT_API_MAP` from the MCP bridge;
 - live binding manifests, exports, upstream versions, `status.json`, and
   verification state;
-- Octane public exports and `docs/differences-from-react.md`.
+- Octane public exports and `website/src/content/docs/differences-from-react.mdx`.
 
 An existing binding is reusable only when its registered upstream package,
 version lane, complete verification, and required package subpaths cover the
@@ -82,7 +82,7 @@ implementation or documented rewrite. It, a truncated scan, or a nonempty
 primitive becomes a blocker only after it is tied to specific required public
 behavior and an owning repair. Treat `forwardRef`, refs, host events, SSR entry
 points, and partial descriptor APIs according to the live bridge notes and
-`docs/differences-from-react.md`.
+`website/src/content/docs/differences-from-react.mdx`.
 
 ## Read the graph
 

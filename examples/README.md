@@ -7,8 +7,7 @@ consumer-visible regressions that are too broad for an isolated unit test.
 The machine-readable [`catalog.json`](catalog.json) is generated from each
 application's `example.json`. It records rendering modes, dialects, bindings,
 framework features, commands, browser journeys, and deterministic fault
-scenarios. See the [product examples roadmap](../docs/examples-roadmap.md) for
-the delivery waves and the distinct regression responsibility of each app.
+scenarios, including the distinct regression responsibility of each app.
 
 ## Current applications
 
@@ -87,9 +86,8 @@ When an example uncovers an Octane or binding bug, retain the meaningful app
 journey and add the smallest realistic behavioral regression to the owning
 package. Fix the owning package rather than hiding the failure behind an
 example-only workaround. Record the provenance in the
-[product example regression ledger](../docs/product-example-regressions.md),
-including the consumer symptom, classification, package regression, retained
-journey, fixing change, and status.
+owning package regression and retained journey, including the consumer symptom,
+classification, fixing change, and status.
 
 The same ledger requirement applies when investigation shows that the defect is
 application-owned. A temporary compatibility workaround is acceptable only when

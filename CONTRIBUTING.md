@@ -9,7 +9,7 @@ core fixes are all welcome.
 
 Octane is React-shaped and deliberately different in specific places, so
 behavior that looks like a bug is sometimes the contract. Read
-[docs/differences-from-react.md](./docs/differences-from-react.md) before
+[the Differences from React guide](./website/src/content/docs/differences-from-react.mdx) before
 "fixing" any of these:
 
 - Hooks are keyed by a compiler-assigned call-site slot, not call order, so a
@@ -47,13 +47,13 @@ pnpm test
 - [`packages/app-core`](./packages/app-core) plus the Vite, Rspack, Rsbuild, and
   deployment-adapter packages are the app and build layer.
 - The `@octanejs/*` binding packages are ports of React ecosystem libraries, one
-  package each. [`docs/bindings-status.md`](./docs/bindings-status.md) is the
-  generated per-package status table.
+  package each. Each package's `status.json` records its supported surface and
+  verification state.
 - [`examples/`](./examples) are runnable apps and Playwright regression
   fixtures, [`playground/`](./playground) is the scratch app,
   [`benchmarks/`](./benchmarks) holds the deterministic benchmark suites, and
   [`website/`](./website) is octanejs.dev, built with Octane itself.
-- [`docs/packages.md`](./docs/packages.md) is the full generated inventory.
+- Workspace manifests under [`packages/`](./packages) are the package inventory.
 
 The playground is the quickest way to poke at the runtime by hand, and the
 example apps double as Playwright regression fixtures:
@@ -146,9 +146,9 @@ own implementation will not think to check.
 
 ### Configure parity execution
 
-Follow [the React parity test-execution contract](./docs/react-parity-testing.md)
-when a binding adds executable parity lanes. Keep the complete local project in
-`vitest.config.js`, then declare which work belongs to the generic parity runner:
+Follow the `octane-react-library-port` skill when a binding adds executable
+parity lanes. Keep the complete local project in `vitest.config.js`, then
+declare which work belongs to the generic parity runner:
 
 ```js
 testExecution: {
@@ -204,18 +204,16 @@ run the generator instead of hand-editing the output:
 | Output | Source | Command |
 | --- | --- | --- |
 | `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/`, `.github/`, `.cursor/`, `.gemini/` | `.rulesync/rules/*` and `.rulesync/skills/*` | `pnpm rules:generate` |
-| `docs/packages.md` | workspace manifests | `pnpm packages:inventory` |
-| `docs/bindings-status.md` | each binding's `status.json` | `pnpm bindings:status` |
-| `docs/parity-gaps.md` | test pins | `pnpm parity:gaps` |
-| `docs/binding-parity-gaps.md` | binding parity data | `pnpm binding-parity:gaps` |
-| `docs/react-parity-coverage.md` | the React parity ledger | `pnpm react-parity:generate` |
 | Production error catalog and formatters | `octane` error-code sources | `pnpm error-codes:generate` |
 | `@octanejs/cli` data snapshot | binding and error-code catalogs | `pnpm cli:data` |
 | Lucide and Phosphor icon sources | upstream icon sets | `pnpm lucide:generate`, `pnpm phosphor-icons:generate` |
 | shadcn registry | `packages/shadcn` sources | `pnpm shadcn:registry` |
 
-Each has a `:check` counterpart that CI runs, so a stale output fails the lint
-job.
+Each checked-in artifact has a `:check` counterpart that CI runs, so a stale
+output fails the lint job. The package inventory, binding status, parity-gap,
+React-parity, and Redact audit commands can also write local reports under the
+ignored root `docs/` directory. Their `:check` commands validate the checked-in
+source data without requiring those reports to be committed.
 
 ## Before you push
 

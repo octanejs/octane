@@ -60,8 +60,8 @@ DOM against the real react-hook-form. See
 source inventory, export crosswalk, and test dispositions. The root Vitest
 project declares upstream and differential files as `react-parity` execution
 group ownership; the generic sharded config derives the remaining local
-conformance suite according to the
-[React parity test-execution contract](../../docs/react-parity-testing.md).
+conformance suite according to the checked
+[porting workflow](../../.rulesync/skills/octane-react-library-port/references/implementation-and-evidence.md).
 
 ## License
 
@@ -71,6 +71,5 @@ MIT — contains source derived from
 
 ## Status
 
-Current scope, known divergences, and verification status are tracked in the
-generated [bindings status table](../../docs/bindings-status.md), sourced from
-this package's [`status.json`](./status.json).
+Current scope, known divergences, and verification status are tracked in this
+package's checked [`status.json`](./status.json).

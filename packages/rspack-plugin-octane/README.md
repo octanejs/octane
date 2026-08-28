@@ -100,9 +100,7 @@ the main thread and its facts are checked against the exact completed loader
 source. Ordinary mutable default maps and native `css/module` are left alone.
 Eligible consumers are compiled once more and are not stored in the persistent
 module cache; other modules keep normal caching. The option is disabled by
-default and does not change development, HMR, or watch output. See
-[CSS-module constants](../../docs/compiler-css-module-constants.md) for the
-provider contract and stylesheet-ownership rules.
+default and does not change development, HMR, or watch output.
 
 Rspack layers can compile the same authored module against distinct universal
 renderer graphs. Configure the background graph at the top level, then key

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectFailsPins } from './parity-gaps-lib.mjs';
@@ -48,16 +48,9 @@ for (const [file, pins] of [...byFile.entries()].sort(([a], [b]) => a.localeComp
 }
 
 if (CHECK) {
-	const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
-	if (current !== md) {
-		console.error(
-			'docs/parity-gaps.md is stale — the set of executable it.fails pins changed.\n' +
-				'Run `pnpm parity:gaps` and commit the result.',
-		);
-		process.exit(1);
-	}
-	console.log(`parity-gaps index is current (${total} pin(s)).`);
+	console.log(`parity-gap inputs are valid (${total} pin(s)).`);
 } else {
+	mkdirSync(path.dirname(OUT), { recursive: true });
 	writeFileSync(OUT, md);
 	console.log(`wrote docs/parity-gaps.md (${total} pin(s) across ${byFile.size} file(s)).`);
 }

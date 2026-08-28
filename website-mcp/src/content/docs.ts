@@ -7,9 +7,6 @@
 // route handlers, and it must stay on built-in Vite features (?raw, glob,
 // JSON) — never import compiled .mdx/.tsrx from here.
 import { docsMeta } from '../../../website/src/content/docs-meta.ts';
-import ssrMd from '../../../docs/ssr.md?raw';
-import reactDifferencesMd from '../../../docs/differences-from-react.md?raw';
-import deferredHydrationMd from '../../../docs/deferred-hydration.md?raw';
 
 export interface McpDocSection {
 	id: string;
@@ -22,8 +19,7 @@ export interface McpDoc {
 	title: string;
 	description: string;
 	group: string;
-	/** 'website' = octanejs.dev/docs page (MDX); 'repo' = docs/*.md deep dive. */
-	source: 'website' | 'repo';
+	source: 'website';
 	/** Canonical human-readable home of this document. */
 	url: string;
 	sections: readonly McpDocSection[];
@@ -45,30 +41,6 @@ function slugOf(path: string): string {
 
 function stripFrontmatter(source: string): string {
 	return source.replace(/^---[\s\S]*?---\n*/, '');
-}
-
-/** Approximate GitHub's heading slugger so repo-doc anchors deep link. */
-function githubSlug(heading: string): string {
-	return heading
-		.toLowerCase()
-		.replace(/`/g, '')
-		.replace(/[^\w\- ]/g, '')
-		.trim()
-		.replace(/ /g, '-');
-}
-
-/** One section per `## ` markdown heading (fenced code blocks skipped). */
-function markdownSections(markdown: string): McpDocSection[] {
-	const sections: McpDocSection[] = [];
-	let inFence = false;
-	for (const line of markdown.split('\n')) {
-		if (line.trimStart().startsWith('```')) inFence = !inFence;
-		else if (!inFence && line.startsWith('## ')) {
-			const title = line.slice(3).replace(/`/g, '').trim();
-			sections.push({ id: githubSlug(line.slice(3)), title });
-		}
-	}
-	return sections;
 }
 
 const websiteDocs: McpDoc[] = docsMeta.map((meta) => {
@@ -101,45 +73,7 @@ const websiteDocs: McpDoc[] = docsMeta.map((meta) => {
 	}
 }
 
-// Deep-dive documents that only exist in the repository use a '-reference'
-// suffix when their subject also appears in a reader-friendly website guide.
-const repoDocs: McpDoc[] = [
-	{
-		slug: 'deferred-hydration-reference',
-		title: 'Deferred hydration (full reference)',
-		description:
-			'The complete Hydrate reference: activation strategies, compiler splitting, prefetching, fallbacks, and nesting behavior.',
-		group: 'Explore',
-		source: 'repo',
-		url: 'https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md',
-		sections: markdownSections(deferredHydrationMd),
-		markdown: deferredHydrationMd,
-	},
-	{
-		slug: 'ssr',
-		title: 'Server-side rendering (deep dive)',
-		description:
-			'The complete SSR + hydration pipeline: renderToString, streaming, prerender, and how hydration adopts server DOM.',
-		group: 'Explore',
-		source: 'repo',
-		url: 'https://github.com/octanejs/octane/blob/main/docs/ssr.md',
-		sections: markdownSections(ssrMd),
-		markdown: ssrMd,
-	},
-	{
-		slug: 'differences-from-react-reference',
-		title: 'Differences from React (full reference)',
-		description:
-			'The exhaustive divergence reference: every deliberate behavioral difference from React, with rationale.',
-		group: 'Explore',
-		source: 'repo',
-		url: 'https://github.com/octanejs/octane/blob/main/docs/differences-from-react.md',
-		sections: markdownSections(reactDifferencesMd),
-		markdown: reactDifferencesMd,
-	},
-];
-
-export const DOCS: readonly McpDoc[] = [...websiteDocs, ...repoDocs];
+export const DOCS: readonly McpDoc[] = websiteDocs;
 
 export const DOC_SLUGS = DOCS.map((doc) => doc.slug) as [string, ...string[]];
 

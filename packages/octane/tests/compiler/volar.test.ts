@@ -598,7 +598,7 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 
 	/**
 	 * `ref` plus a spread on a HOST element is ordinary authoring — nothing in
-	 * docs/differences-from-react.md or the tsrx-authoring rule restricts where
+	 * website/src/content/docs/differences-from-react.mdx or the tsrx-authoring rule restricts where
 	 * such an element may sit. The type-only lowering rewrites the spread to a
 	 * generated binding and reads the composed ref back off it, so the binding
 	 * must be declared wherever the element appears, and it must be produced
@@ -987,7 +987,7 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 	});
 
 	it('lowers `module server` blocks to checkable TS with types flowing across the boundary', () => {
-		// The documented dialect (docs/ssr.md) puts a static import INSIDE the
+		// The documented dialect (website/src/content/docs/core-apis.mdx) puts a static import INSIDE the
 		// server block. Verbatim that can never typecheck (TS1147 for the
 		// in-block import, TS2307 for `from 'server'`), so the Volar path must
 		// lower the block to plain TS: hoisted imports + a namespace-valued

@@ -138,8 +138,6 @@ jobs:
                 return !(
                   file.filename.endsWith("/CHANGELOG.md") ||
                   file.filename.endsWith("/package.json") ||
-                  file.filename === "docs/bindings-status.md" ||
-                  file.filename === "docs/packages.md" ||
                   file.filename === "packages/octane/src/version.ts" ||
                   file.filename.startsWith("packages/shadcn/registry/") ||
                   file.filename === "packages/cli/src/data/octane-data.json" ||
@@ -828,8 +826,8 @@ jobs:
       - name: Check always-loaded agent context is within budget
         run: pnpm context:budget:check
 
-      # docs/parity-gaps.md audits executable expected-failure pins and should
-      # remain at zero under the committed-test policy above.
+      # Audit executable expected-failure pins and keep them at zero under the
+      # committed-test policy above.
       - name: Check parity-gap index is current
         run: pnpm parity:gaps:check
 
@@ -858,8 +856,8 @@ jobs:
         run: pnpm error-codes:check
 
       # Package discovery is shared by every package-wide repository check.
-      # This generated inventory catches unreviewed package additions and stale
-      # hard-coded package counts before they spread to docs and tooling.
+      # This inventory check catches unreviewed package additions and stale
+      # hard-coded package counts before they spread to tooling.
       - name: Check package inventory is current
         run: pnpm packages:inventory:check
 
@@ -880,10 +878,10 @@ jobs:
       - name: Check scaffold file manifest is current
         run: pnpm scaffold:manifest:check
 
-      # docs/bindings-status.md is generated from the per-package status.json
-      # blocks in the @octanejs/* binding packages. Changing a binding's scope
-      # means updating its status.json and regenerating in the same change.
-      - name: Check bindings-status table is current
+      # Validate the per-package status.json blocks in the @octanejs/* binding
+      # packages. Changing a binding's scope means updating its checked source
+      # metadata in the same change.
+      - name: Check binding status metadata
         run: pnpm bindings:status:check
 
       - name: Check Lucide generated sources are current

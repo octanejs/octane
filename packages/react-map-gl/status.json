@@ -16,5 +16,5 @@
     "Upstream's seven component specs need a live Mapbox token and real WebGL under puppeteer, so they are ported against a port-authored double. A differential lane runs six fixtures through the published @vis.gl/react-mapbox 8.1.2 on React with that same double — map shell and overlays, Source/Layer add-update-remove, in-place popup option edits with control add/remove, reaching the map by id from outside it to fly the camera, useControl called straight from a consumer module, and a marker choosing between the default pin and a custom element — which is what licenses it as evidence.",
     "Not covered: real WebGL, tile loading, pointer interaction, reuseMaps/recycle, external gl contexts, and RTL text plugin loading. A token-gated real-map lane is open work."
   ],
-  "docs": ["docs/react-map-gl-port-plan.md", "packages/react-map-gl/UPSTREAM.md"]
+  "docs": ["packages/react-map-gl/UPSTREAM.md"]
 }

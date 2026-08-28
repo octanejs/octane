@@ -239,9 +239,7 @@ describe('@octanejs/mcp-server helpers', () => {
 		}
 	});
 
-	it('serves the project map from both generated, CI-gated sources', async () => {
-		// A hand-written map is the copy free to drift, which is why the old one
-		// did. Both halves here are regenerated and checked by CI.
+	it('serves the RuleSync-generated project map', async () => {
 		const server = createServer({ repoRoot: resolve(PACKAGE_ROOT, '../..') });
 		const client = new Client({ name: 'octane-mcp-test', version: '1.0.0' });
 		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -251,8 +249,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			const map = (await client.callTool({ name: 'octane_project_map', arguments: {} })).content[0]
 				.text;
 			expect(map).toContain('Your React instincts are the main failure mode here');
-			expect(map).toContain('Package inventory (generated)');
-			expect(map).toContain('framework binding');
+			expect(map).toContain('packages/octane/src/runtime.ts');
 		} finally {
 			await client.close();
 			await server.close();

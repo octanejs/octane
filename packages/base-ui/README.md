@@ -6,8 +6,7 @@ UI primitives.
 
 Alpha, in progress. Ported at full fidelity from the pinned `mui/base-ui` source
 (`v1.6.0`), proven by differential parity tests against the real
-`@base-ui/react`. See `docs/base-ui-migration-plan.md` for the phased plan
-and progress.
+`@base-ui/react`.
 
 ## API
 
@@ -34,6 +33,5 @@ Every component takes Base UI's universal composition props — `render` (a JSX 
 
 ## Status
 
-Current scope, known divergences, and verification status are tracked in the
-generated [bindings status table](../../docs/bindings-status.md), sourced from
-this package's [`status.json`](./status.json).
+Current scope, known divergences, and verification status are tracked in this
+package's checked [`status.json`](./status.json).

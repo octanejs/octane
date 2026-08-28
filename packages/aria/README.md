@@ -19,9 +19,8 @@ package, with no missing or extra names. Existing families retain differential
 tests against React; calendar/date, color, drag and drop, file, data, toast, and
 layout additions have focused public-behavior coverage.
 
-Status, supported surface, and known divergences: `status.json` (rendered into
-`docs/bindings-status.md`). Source provenance and refresh instructions:
-`UPSTREAM.md`.
+Status, supported surface, and known divergences: [`status.json`](./status.json).
+Source provenance and refresh instructions: [`UPSTREAM.md`](./UPSTREAM.md).
 
 Verify the pinned public surface with:
 

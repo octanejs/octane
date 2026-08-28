@@ -19,5 +19,5 @@
     "The manifest registers two bounded runtime differential cases; the pinned upstream runtime suite remains unvendored and unadapted one-for-one, and the React package has no separate executable type-test suite.",
     "Every pinned upstream test artifact and public entry-point family is dispositioned in UPSTREAM.md."
   ],
-  "docs": ["docs/lucide-port-plan.md"]
+  "docs": []
 }

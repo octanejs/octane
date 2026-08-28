@@ -56,9 +56,9 @@ authority.
 ## Workflow
 
 1. **Inventory the repository.** Read `AGENTS.md`,
-   `docs/react-parity-testing.md`, `docs/differences-from-react.md`, the closest
-   completed binding, and `git status --short`. Do not clean, reset, or reformat
-   unrelated changes.
+   `website/src/content/docs/differences-from-react.mdx`, the closest completed
+   binding, and `git status --short`. Do not clean, reset, or reformat unrelated
+   changes.
 
 2. **Preflight every input.** Read
    [intake-and-license.md](references/intake-and-license.md), preserve the user's

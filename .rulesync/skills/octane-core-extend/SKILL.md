@@ -13,7 +13,7 @@ Use this when changing core runtime, compiler, AST/TSRX transforms, SSR, hydrati
 - `AGENTS.md`
 - `.rulesync/rules/core-engineering.md`
 - `README.md`
-- `docs/differences-from-react.md`
+- `website/src/content/docs/differences-from-react.mdx`
 - Owning source comments and nearby tests
 
 ## Required preflight

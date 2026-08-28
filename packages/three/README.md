@@ -315,5 +315,4 @@ pnpm add -D @types/three@0.156.0
 React Native/Expo, R3F 10's WebGPU/TSL APIs, and Drei are separate follow-on
 efforts.
 
-See [`docs/three-port-plan.md`](../../docs/three-port-plan.md) for the delivery
-phases and [`UPSTREAM.md`](./UPSTREAM.md) for source and license provenance.
+See [`UPSTREAM.md`](./UPSTREAM.md) for source and license provenance.

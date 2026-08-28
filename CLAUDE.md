@@ -9,12 +9,11 @@ Trust the source over any summary, this file included:
 
 - `packages/octane/src/runtime.ts`: the client runtime. It is long and heavily
   commented, and those comments are the design spec.
-- `packages/octane/src/runtime.server.ts` and `src/server/`: SSR. `docs/ssr.md`
-  documents the public surface.
+- `packages/octane/src/runtime.server.ts` and `src/server/`: SSR; public APIs are
+  in `website/src/content/docs/core-apis.mdx`.
 - `packages/octane/src/compiler/`: the `.tsrx` compiler.
 - `packages/octane/src/index.ts` and `constants.ts`: the public client API.
-- `docs/differences-from-react.md`: the divergence contract.
-- `docs/packages.md`: the generated package inventory, checked by CI.
+- `website/src/content/docs/differences-from-react.mdx`: the divergence contract.
 
 Fix defects in the package that owns the behavior and add the regression there.
 Do not hide framework defects behind app workarounds, weak tests, generated
@@ -55,7 +54,7 @@ green CI. Preserve `<!-- CURSOR_SUMMARY -->`…`<!-- /CURSOR_SUMMARY -->`; see
 ## Your React instincts are the main failure mode here
 
 Octane looks like React but differs deliberately. Check
-`docs/differences-from-react.md` before changing any of these:
+`website/src/content/docs/differences-from-react.mdx` before changing any of these:
 
 - Hooks are keyed by compiler-assigned call-site slot, not call order, so a hook
   may sit behind a condition or after an early return. A slot-keyed hook in a
@@ -143,8 +142,7 @@ scripts. Root config uses `silent: true`. While diagnosing, pass
 `--silent=false` for all console output or `--silent=passed-only` for failing
 tests. CLI options override the config.
 
-For binding parity test setup, follow `docs/react-parity-testing.md` and the
-`octane-react-library-port` skill.
+For binding parity setup, follow `octane-react-library-port` and `vitest.config.js`.
 
 Add a changeset for user-facing package changes; stay on the `patch` track while
 Octane is 0.x. Runtime, compiler, scheduler, reconciler, SSR/hydration, and build

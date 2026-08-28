@@ -7,5 +7,5 @@
   ],
   "ssr": "SSR/hydration coverage for the overlay/portal components is still open (tracked in the migration plan).",
   "verified": "2026-08-03",
-  "docs": ["docs/radix-migration-plan.md"]
+  "docs": []
 }

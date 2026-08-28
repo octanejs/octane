@@ -10,7 +10,7 @@ Use this to find, reproduce, minimize, and fix a suspected Octane bug.
 
 - `AGENTS.md`
 - Owning source and nearby tests
-- `docs/differences-from-react.md` before assuming React mismatch is a bug
+- `website/src/content/docs/differences-from-react.mdx` before assuming React mismatch is a bug
 
 ## Workflow
 

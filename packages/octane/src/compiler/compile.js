@@ -4752,7 +4752,7 @@ function isHookCalleeName(name) {
  *
  *   - an IMPORTED binding. Its body is across a module boundary we cannot read,
  *     so this is the same pure-projection assumption React Compiler makes for
- *     any imported helper. Documented in docs/differences-from-react.md.
+ *     any imported helper. Documented in website/src/content/docs/differences-from-react.mdx.
  *   - a same-module `function` declaration that is never reassigned AND whose
  *     own body is a pure projection (see moduleHelperIsPureProjection). Because
  *     we CAN read that body, we check it: `function sortIcon(h) { return

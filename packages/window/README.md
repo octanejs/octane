@@ -84,6 +84,5 @@ adapted for Octane.
 
 ## Status
 
-Current scope and verification status are tracked in the generated
-[bindings status table](../../docs/bindings-status.md), sourced from
+Current scope and verification status are tracked in the checked
 [`status.json`](./status.json).

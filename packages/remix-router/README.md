@@ -21,9 +21,7 @@ works by changing the import.
 `createSession`, `createCookieSessionStorage`, …). Framework mode
 (`Meta`/`Links`/`Scripts`, `createRequestHandler`) and RSC are permanently out
 of scope — those names exist as throwing stubs so
-`tests/conformance/parity.test.ts` pins the surface at exact parity
-([docs/remix-router-port-plan.md](../../docs/remix-router-port-plan.md) has
-the scope policy).
+`tests/conformance/parity.test.ts` pins the surface at exact parity.
 
 ```tsx
 // before
@@ -99,6 +97,5 @@ function User() @{
 
 ## Status
 
-Current scope, known divergences, and verification status are tracked in the
-generated [bindings status table](../../docs/bindings-status.md), sourced from
-this package's [`status.json`](./status.json).
+Current scope, known divergences, and verification status are tracked in this
+package's checked [`status.json`](./status.json).

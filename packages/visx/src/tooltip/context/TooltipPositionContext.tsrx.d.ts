@@ -10,7 +10,7 @@ export declare const TooltipPositionProvider: import("octane").ComponentBody<{
 }, any>;
 /**
  * Octane deliberately has no render-prop `Context.Consumer` (see
- * docs/differences-from-react.md); reading `.Consumer` returns `undefined` and
+ * website/src/content/docs/differences-from-react.mdx); reading `.Consumer` returns `undefined` and
  * warns in development. Keep upstream's render-prop API by reading the context
  * with `useContext` instead.
  */

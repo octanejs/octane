@@ -57,7 +57,7 @@ import {
  *   - `validation.requireUseServerForAwait: false` — no server-component
  *     concept in octane (no top-level await validation gates).
  *   - `serverModule` — octane's `module server { … }` dialect plus its
- *     boundary `import { fn } from 'server'` (docs/ssr.md). The shared
+ *     boundary `import { fn } from 'server'` (website/src/content/docs/core-apis.mdx). The shared
  *     type-only transform lowers it to plain checkable TS (hoisted block
  *     imports + a namespace-valued binding); verbatim it can never
  *     typecheck (TS1147 in-block import, TS2307 boundary import). The

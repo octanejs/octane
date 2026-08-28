@@ -39,8 +39,8 @@ export function Counter() @{
 **Your React knowledge transfers.** `useState`, `useEffect`, `memo`, context,
 portals, Suspense, transitions: same API, same mental model, checked case by case
 against a large behavioral suite. React-derived coverage is tracked in the
-generated [parity report](./docs/react-parity-coverage.md) rather than inferred
-from the size of the suite.
+checked source-attributed ledgers under `packages/octane/audit/` rather than
+inferred from the size of the suite.
 
 **Standard JSX works, `.tsrx` gives you more.** Paste a component from the React
 docs into a `.tsx` file and it runs. Or author in `.tsrx`, the spiritual
@@ -154,9 +154,9 @@ const root = createRoot(document.getElementById('root')!);
 root.render(App, { title: 'Hello world!' });
 ```
 
-Rspack and Rsbuild are supported too. [Getting started](./docs/getting-started.md)
-covers all three build tools, server rendering, hydration, streaming, deferred
-hydration, and profiling.
+Rspack and Rsbuild are supported too. The [quick start](https://octanejs.dev/docs/quick-start)
+and [build tools guide](https://octanejs.dev/docs/build-tools) cover all three
+integrations, server rendering, hydration, streaming, and production builds.
 
 ## Status
 
@@ -169,7 +169,7 @@ project reruns the normal suite against the production compiler path, which is
 valuable mode coverage but is not counted again as unique tests. This is an
 Octane suite count, not a claim that every test was ported from React; the pinned
 snapshot and source-attributed React counts live in the
-[coverage ledger and report](./docs/react-parity-coverage.md).
+checked ledgers under [`packages/octane/audit/`](./packages/octane/audit).
 
 ## Documentation
 
@@ -192,29 +192,17 @@ Octane itself. Good places to start:
 - [Framework integrations](https://octanejs.dev/docs/framework-integrations):
   use Octane with Astro, Docusaurus, or TanStack Start.
 
-In this repository:
-
-- [Getting started](./docs/getting-started.md): install, build tools, mount, SSR,
-  streaming, deferred hydration, profiling.
-- [TSRX basics](./docs/tsrx-basics.md): components, hooks, control flow, class
-  composition, text input events, strong mode.
-- [Server rendering](./docs/ssr.md) and
-  [deferred hydration](./docs/deferred-hydration.md): the full references.
-- [Differences from React](./docs/differences-from-react.md): the divergence
-  contract.
-- [Bindings status](./docs/bindings-status.md): what each `@octanejs/*` package
-  ports, its upstream version, and its known divergences.
-
 ## Packages
 
-This is a pnpm monorepo. [`docs/packages.md`](./docs/packages.md) is the
-generated inventory; the shape of it is:
+This is a pnpm monorepo. Workspace manifests are the package inventory; the
+shape of it is:
 
 - [`octane`](./packages/octane) is the runtime and the compiler together:
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
   and the compiler itself, exposed at `octane/compiler` with bundler adapters at
   `octane/compiler/vite` and `octane/compiler/bundler`. Custom Node build pipelines
-  can opt into [type-aware text compilation](./docs/compiler-text-inference.md).
+  can opt into project-aware text compilation through
+  `octane/compiler/typescript`.
 - The app layer: [`@octanejs/app-core`](./packages/app-core) holds the
   bundler-neutral config, routing, SSR, hydration codegen, and production
   handler, and the [Vite](./packages/vite-plugin-octane),
@@ -239,10 +227,10 @@ generated inventory; the shape of it is:
   (three), Web3 (wagmi, rainbowkit), and more.
 
 Parity varies by package. Some are behaviorally complete, others are explicitly
-partial or alpha, and
-[`docs/bindings-status.md`](./docs/bindings-status.md) is the generated table of
-record: upstream version, supported surface, known divergences, SSR/hydration
-coverage, and when the evidence was last checked.
+partial or alpha. Each binding's `status.json` records its upstream version,
+supported surface, known divergences, SSR/hydration coverage, and verification
+date; the [bindings guide](https://octanejs.dev/docs/bindings) is the public
+catalog.
 
 ## Sponsors
 
