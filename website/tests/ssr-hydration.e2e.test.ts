@@ -423,7 +423,10 @@ async function assertHomepageIntegrationSamples(baseUrl: string) {
 		await page.keyboard.press('Space');
 		expect(await readSelectedSample(false)).toBe(octaneSample);
 		expect(await copy.innerText()).toBe('Copy');
-		expect(errors).toEqual([]);
+		// Match the adjacent interactive homepage checks: browser resource-load
+		// diagnostics are separate from runtime, hydration, and page errors.
+		const real = errors.filter((error) => !error.startsWith('Failed to load resource:'));
+		expect(real).toEqual([]);
 	} finally {
 		await page.close();
 	}
