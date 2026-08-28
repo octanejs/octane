@@ -6,6 +6,5 @@
   ],
   "ssr": "Deterministic server rendering and live hydration adoption are covered by dedicated executable projects.",
   "verified": "2026-08-02",
-  "parityEvidence": "packages/resizable-panels/audit/react-parity.json",
-  "docs": ["docs/plans/2026-08-02-004-feat-react-resizable-panels-binding-plan.md"]
+  "parityEvidence": "packages/resizable-panels/audit/react-parity.json"
 }

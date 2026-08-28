@@ -631,9 +631,9 @@ tests.
   curates: `differences-from-react.md`, `ssr.md`, `deferred-hydration.md`, plus
   `packages.md`, `bindings-status.md`, `parity-gaps.md`, `devtools.md`,
   `decallback-memo.md`.
-- `docs/plans/`, the ~35 historical `*-plan.md` / `*-audit.md` files. They stay
-  valuable as archaeology; they should not be in an agent's search path by
-  default.
+- `docs/plans/`, the historical agent-authored implementation plans. These are
+  local working artifacts and remain ignored; use issue and pull-request history
+  when archaeological context is needed.
 - `docs/README.md`: a real index: one line per durable doc, stating **when to
   read it**, not what it contains.
 

@@ -11,6 +11,5 @@
     "Browser U5 evidence is blocked on draft PR #548; executable require() parity is blocked on draft PR #550. This binding must remain draft and provisional until those shared runners merge and the branch consumes them."
   ],
   "verified": "2026-08-03",
-  "parityEvidence": "packages/window/audit/react-parity.json",
-  "docs": ["docs/plans/2026-08-03-001-feat-react-window-binding-plan.md"]
+  "parityEvidence": "packages/window/audit/react-parity.json"
 }
