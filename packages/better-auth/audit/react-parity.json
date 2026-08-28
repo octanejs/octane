@@ -1,0 +1,181 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/better-auth/better-auth.git",
+    "version": "1.6.29",
+    "commit": "58c49eb97f04ff18aa823318a3856a013353fdc2",
+    "sourceRoot": "packages/better-auth/src/client/react",
+    "testRoot": "packages/better-auth/src/client",
+    "license": "MIT",
+    "integrity": "sha256:c766aa76100632cccb49c2943a786da9b3bada35836275e5b0e149770616b689",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "insufficient",
+    "types": "insufficient"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/better-auth/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/better-auth/tests/differential"],
+      "include": ["parity\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "92493176ab5d79af45348db6facebf26e3bf84d9a0d1b973535084e3e8ef1fad"
+    }
+  },
+  "lanes": [
+    {
+      "id": "better-auth-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "better-auth-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the same session, plugin atom, and plugin action scenario against better-auth/react@1.6.29 and the Octane binding.",
+      "files": [
+        {
+          "path": "packages/better-auth/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "c8b2373e0eb92a9b27fcac251d69b618818db0f1ab64ec7ff44f091a6fa3d70e",
+          "cases": [
+            {
+              "id": "differential:better-auth-client-surface",
+              "testName": "matches session, plugin atom, and plugin action behavior",
+              "fullName": "differential: @octanejs/better-auth vs better-auth/react matches session, plugin atom, and plugin action behavior"
+            }
+          ]
+        },
+        {
+          "path": "packages/better-auth/tests/differential/auth-diff.tsrx",
+          "role": "support",
+          "sha256": "3861408cee2a1538e6756667cd9e86e52b0c1a3916d498fc95a17a2bb1bf70ca"
+        },
+        {
+          "path": "packages/better-auth/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "d0589c6638d85df77b0ccf8e105570e1a08c220dd9aef9ef4924dd3f73223765"
+        },
+        {
+          "path": "packages/better-auth/tests/differential/fixture-compiler.ts",
+          "role": "support",
+          "sha256": "1108d0d7f3a852252f86627b5763991be1f4a9df228b3862656ac2321f9f6bc5"
+        },
+        {
+          "path": "packages/better-auth/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "b3167b32e42cc7d908d270a61de7932dedb28737dba6342cb4163517fc12c655"
+        },
+        {
+          "path": "scripts/react-parity/better-auth-runtime-lib.mjs",
+          "role": "support",
+          "sha256": "94a681a7ec85a7f7e41481df9cda11690cc0ba56f351a5d593f88f15930bf048"
+        }
+      ]
+    },
+    {
+      "id": "better-auth-pristine-type-probes",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "better-auth-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/better-auth/audit/type-probes/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/better-auth/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "0f0910328a31dfbf2d844c3e74dd5d7de64530c9622315fa45298a187dea464e",
+          "cases": [
+            {
+              "id": "types:better-auth-pristine",
+              "testName": "pinned React declaration probes",
+              "fullName": "pinned React declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/better-auth/audit/type-probes/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "e5de01a91b2001ec2ef8f9949ef6147162398dbb0dfe39f1125ecfa67bc236c3"
+        },
+        {
+          "path": "packages/better-auth/audit/type-probes/tsconfig.json",
+          "role": "support",
+          "sha256": "acba9679d4ed848bd9869785d5169e35c626c98fe32e8cedc59c91b352f2610a"
+        },
+        {
+          "path": "packages/better-auth/audit/type-parity.json",
+          "role": "support",
+          "sha256": "feb1bae8596e37021203aa5be89221ad8af4eab49bc6e16fe03af1a8187cb670"
+        }
+      ]
+    },
+    {
+      "id": "better-auth-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "better-auth-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/better-auth/typetests/parity/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/better-auth/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "df9c376ecd8a4017d172f0c209870c546111401ca933a62283716232420a017d",
+          "cases": [
+            {
+              "id": "types:better-auth-adapted",
+              "testName": "adapted Octane declaration probes",
+              "fullName": "adapted Octane declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/better-auth/typetests/parity/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "c5c694a50151c58c3d6878476f27c3ba3c7fff488129523641581e352e29cd5a"
+        },
+        {
+          "path": "packages/better-auth/typetests/parity/tsconfig.json",
+          "role": "support",
+          "sha256": "7c9a7cd32b2d677bd7f570ad62a31fb7767d39eaf28ca35d3418ea13de400159"
+        },
+        {
+          "path": "packages/better-auth/audit/type-parity.json",
+          "role": "support",
+          "sha256": "feb1bae8596e37021203aa5be89221ad8af4eab49bc6e16fe03af1a8187cb670"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

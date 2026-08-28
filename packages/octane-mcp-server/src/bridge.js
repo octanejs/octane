@@ -61,6 +61,7 @@ export const KNOWN_BINDINGS = {
 	'react-stately': '@octanejs/aria',
 	'radix-ui': '@octanejs/radix',
 	'react-hook-form': '@octanejs/hook-form',
+	'better-auth/react': '@octanejs/better-auth',
 	'@base-ui-components/react': '@octanejs/base-ui',
 	'@dnd-kit/react': '@octanejs/dnd-kit',
 	'embla-carousel-react': '@octanejs/embla-carousel',
