@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.2.22
+
+### Patch Changes
+
+- 8adc693: Expose the scoped signals and native reads benchmark suites through the benchmark tool schema.
+
 ## 0.2.21
 
 ### Patch Changes

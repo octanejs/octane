@@ -1,5 +1,14 @@
 # @octanejs/floating-ui
 
+## 0.1.48
+
+### Patch Changes
+
+- 3bcc1d3: Make virtual nested-menu navigation find the deepest open node with one indexed tree traversal.
+- Updated dependencies [8adc693]
+- Updated dependencies [a51c8c6]
+  - octane@0.1.49
+
 ## 0.1.47
 
 ### Patch Changes
