@@ -176,14 +176,9 @@ describe('docs search ranking', () => {
 		expect(top.id).toBe('install');
 	});
 
-	it('finds packages supplied by the curated bindings directory', async () => {
+	it('does not attach package identities to the generic bindings document', async () => {
 		const index = await loadSearchIndex();
-		const [top] = searchDocs(index, '@octanejs/dexie');
-		const snippets = top.lines.map((line) => line.parts.map((part) => part.text).join(''));
-
-		expect(top.slug).toBe('bindings');
-		expect(top.id).toBe('find-a-binding');
-		expect(snippets.join(' ')).toContain('@octanejs/dexie');
+		expect(searchDocs(index, '@octanejs/dexie')).toEqual([]);
 	});
 
 	it('finds Astro in the framework integrations guide', async () => {

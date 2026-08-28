@@ -4,8 +4,8 @@
 // site; the remote MCP server (mcp/) imports only this file plus the raw
 // .mdx sources, so it never pulls compiled components into its bundle.
 // Its import chain must stay MDX-free (the imported catalogs are JSON-backed).
-import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
-import { FRAMEWORK_INTEGRATIONS, FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
+import { BINDING_COUNT } from './bindings.ts';
+import { FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
 
 export interface DocSection {
 	id: string;
@@ -78,20 +78,6 @@ export const docsMeta: DocMeta[] = [
 		title: 'Framework integrations',
 		description: `Use Octane with ${FRAMEWORK_INTEGRATION_COUNT} app frameworks through first-party integrations.`,
 		group: 'Start here',
-		searchTerms: FRAMEWORK_INTEGRATIONS.flatMap((integration) => [
-			integration.title,
-			integration.packageName,
-			integration.model,
-			integration.description,
-			...(integration.packageName === '@octanejs/tanstack-start'
-				? [
-						'@octanejs/tanstack-router',
-						'@octanejs/tanstack-query',
-						'@octanejs/tanstack-form',
-						'TanStack bindings',
-					]
-				: []),
-		]),
 		sections: [
 			{ id: 'choose-a-framework', title: 'Find the right integration' },
 			{ id: 'astro', title: 'Astro islands' },
@@ -390,15 +376,6 @@ export const docsMeta: DocMeta[] = [
 		title: 'Bindings',
 		description: `Browse all ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
 		group: 'Explore',
-		searchTerms: BINDING_CATEGORIES.flatMap((category) => [
-			category.title,
-			category.description,
-			...category.packages.flatMap((binding) => [
-				binding.title,
-				binding.packageName,
-				...(binding.searchTerms ?? []),
-			]),
-		]),
 		sections: [
 			{ id: 'find-a-binding', title: 'Pick by the job' },
 			{ id: 'install-and-use', title: 'Install it, then change the import' },
