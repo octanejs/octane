@@ -335,6 +335,9 @@ async function waitForLocatorText(
 // clipboard capture observes the public browser API without OS permissions.
 async function assertHomepageIntegrationSamples(baseUrl: string) {
 	const { page, errors } = await loadRoute(baseUrl, '/', {
+		// The sample is already visible in SSR HTML. Let the hydration entry's
+		// dynamic imports settle before the first single-shot interaction.
+		waitForNetworkIdle: true,
 		beforeNavigation: async (page) => {
 			await page.addInitScript(() => {
 				const writes: string[] = [];
@@ -391,6 +394,13 @@ async function assertHomepageIntegrationSamples(baseUrl: string) {
 				.toEqual(copiedSamples);
 			await expect.poll(() => copy.innerText(), pollOptions).toBe('Copied');
 		};
+
+		// The hero's visible console line is emitted by its mount effect, so it
+		// proves this non-deferred homepage has committed instead of merely
+		// displaying server markup. Do not retry the copy or selection actions.
+		await expect
+			.poll(() => page.getByRole('log').innerText(), pollOptions)
+			.toContain('count is now 0');
 
 		const reactSample = await readSelectedSample(true);
 		await copySelectedSample();
