@@ -828,7 +828,7 @@ jobs:
 
       # Audit executable expected-failure pins and keep them at zero under the
       # committed-test policy above.
-      - name: Check parity-gap index is current
+      - name: Disallow executable parity-gap pins
         run: pnpm parity:gaps:check
 
       # Keep metadata, generated coverage, public claims, and the parity
@@ -861,7 +861,7 @@ jobs:
       - name: Check package inventory is current
         run: pnpm packages:inventory:check
 
-      - name: Check binding parity-gap index is current
+      - name: Validate binding parity-gap evidence
         run: pnpm binding-parity:gaps:check
 
       # @octanejs/cli ships a snapshot of the binding and error-code catalogs

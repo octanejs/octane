@@ -4,7 +4,20 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { collectBindingParityGaps } from './parity-gaps-lib.mjs';
+import { collectBindingParityGaps, formatZeroPinPolicyViolation } from './parity-gaps-lib.mjs';
+
+test('enforces the zero-pin repository policy without a generated report', () => {
+	assert.equal(formatZeroPinPolicyViolation({ byFile: new Map(), total: 0 }), null);
+
+	const violation = formatZeroPinPolicyViolation({
+		byFile: new Map([
+			['packages/octane/tests/example.test.ts', [{ line: 12, title: 'still fails', gap: null }]],
+		]),
+		total: 1,
+	});
+	assert.match(violation, /requires zero executable parity-gap pins; found 1/);
+	assert.match(violation, /packages\/octane\/tests\/example\.test\.ts:12 — still fails/);
+});
 
 test('collects failure pins from materialized binding evidence on a clean checkout', () => {
 	const repo = mkdtempSync(path.join(tmpdir(), 'binding-parity-gaps-'));

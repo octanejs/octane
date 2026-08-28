@@ -71,6 +71,18 @@ export function collectFailsPins(root, repoRoot) {
 	return { byFile, total };
 }
 
+export function formatZeroPinPolicyViolation({ byFile, total }) {
+	if (total === 0) return null;
+
+	const locations = [...byFile.entries()]
+		.flatMap(([file, pins]) => pins.map((pin) => `${file}:${pin.line} — ${pin.title}`))
+		.slice(0, 5);
+	return [
+		`Repository policy requires zero executable parity-gap pins; found ${total}.`,
+		...locations.map((location) => `  - ${location}`),
+	].join('\n');
+}
+
 export function collectBindingParityGaps(
 	packages,
 	repoRoot,
