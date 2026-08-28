@@ -389,13 +389,13 @@ let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
 
 /** @internal Enable invocation collection before an opted-in module renders. */
 export function enableNativeReadCollection(abi = 1): void {
-	if (abi !== 1) throw new Error('Unsupported native-read compiler/runtime version.');
+	if (abi !== 1) throw new Error(formatClientError(58));
 	ensureNativeReadDriver();
 }
 
 /** @internal Compiler/runtime native-read capability version 1. */
 export function beginNativeReadScope(scope: Scope | undefined, abi = 1): number {
-	if (abi !== 1) throw new Error('Unsupported native-read compiler/runtime version.');
+	if (abi !== 1) throw new Error(formatClientError(58));
 	const block = CURRENT_BLOCK;
 	const owner = scope ?? CURRENT_SCOPE;
 	if (block === null || owner === null) return -1;
@@ -1788,11 +1788,26 @@ function heldSyncCellsIntact(state: TrySlot): boolean {
 	return true;
 }
 
-/** Write the held transition forward and schedule its transition renders. */
+/** Write the held transition forward, returning whether a render was scheduled. */
 function promoteHeldSyncTransition(): boolean {
 	const held = HELD_SYNC_TRANSITION;
 	if (held === null) return false;
 	HELD_SYNC_TRANSITION = null;
+	const promoted: Array<TransitionActionUpdate<any>> = [];
+	for (let i = 0; i < held.entries.length; i++) {
+		const entry = held.entries[i];
+		// A cell an urgent write superseded keeps the urgent value.
+		if (!Object.is(entry.slot.value, entry.baseValue)) continue;
+		entry.slot.value = entry.value;
+		if (!entry.block.disposed) promoted.push(entry);
+	}
+	if (promoted.length === 0) {
+		// There is no promoted render to resume these boundaries or consume its
+		// memo entries. Keep the latest urgent inputs and use the normal reveal.
+		PROMOTED_MEMO_SWAPS = null;
+		PROMOTED_WARM_HARVEST = null;
+		return false;
+	}
 	// Swap the attempt's memo entries forward BEFORE the renders run,
 	// so the promoted pass dep-hits everything the attempt already started.
 	const memoSwaps = held.memoSwaps;
@@ -1804,27 +1819,16 @@ function promoteHeldSyncTransition(): boolean {
 	// The harvest stays adoptable for this round's renders and, via the
 	// carrier, for the round after a re-suspend.
 	PROMOTED_WARM_HARVEST = held.warmHarvest;
-	const promoted: Array<TransitionActionUpdate<any>> = [];
 	TRANSITION_DEPTH++;
 	try {
-		for (let i = 0; i < held.entries.length; i++) {
-			const entry = held.entries[i];
-			// A cell an urgent write superseded keeps the urgent value — the
-			// pinned synchronous discard semantics.
-			if (!Object.is(entry.slot.value, entry.baseValue)) continue;
-			entry.slot.value = entry.value;
-			if (!entry.block.disposed) {
-				promoted.push(entry);
-				scheduleRender(entry.block);
-			}
-		}
+		for (let i = 0; i < promoted.length; i++) scheduleRender(promoted[i].block);
 	} finally {
 		TRANSITION_DEPTH--;
 	}
 	// The promoted round is itself an attempt: if it suspends on a LATER
 	// dependency, the hold must revert these same cells back to the
 	// still-committed old screen (baseValue is untouched) and go around again.
-	if (promoted.length > 0) FLUSHED_TRANSITION_UPDATES.push(promoted);
+	FLUSHED_TRANSITION_UPDATES.push(promoted);
 	return true;
 }
 
@@ -24855,7 +24859,10 @@ function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFram
 function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
 	if (frame === null) return;
 	endRootRender(frame);
-	if (!inFlush && ROOT_RENDER_TRANSACTION === null) commitRootRenders();
+	// A catch reached from deletion cleanup can open a new transaction during
+	// the flush. Finish its teardown before the interrupted commit publishes refs
+	// or effects from the now-abandoned replacement.
+	if (ROOT_RENDER_TRANSACTION === null) commitRootRenders();
 	// A timeout or passive error can enter without any scheduled Block. Its
 	// captured ref/effect work still needs the existing commit drain to run.
 	if (!syncFlush && !scheduled) {
@@ -26064,7 +26071,15 @@ function hideTryContentAndMountPendingInner(
 		// write schedules the next transaction. The capture also drops this action
 		// if an enclosing render is abandoned before any lifecycle work runs.
 		const action = () => deactivateSuspensePrimary(state, persistent, uncommittedRefs);
-		(WIP_CAPTURE?.eventActions ?? effectEventCommitActions).push(action);
+		if (WIP_CAPTURE === null) effectEventCommitActions.push(action);
+		else {
+			// A later sibling can suspend after this nested fallback was selected.
+			// Its body's Effect Event rollback must not erase the hide that the
+			// enclosing capture still commits. An abandoned capture drops it instead.
+			(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
+				if (!discarded) effectEventCommitActions.push(action);
+			});
+		}
 	}
 	if (!mountPendingBody(state)) return false;
 	if (state.parentBlock.disposed || state.branch !== 2) return false;

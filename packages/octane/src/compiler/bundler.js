@@ -1254,15 +1254,20 @@ class OctaneBundlerCompiler {
 				renderer.target === 'dom' &&
 				universalRuntime === undefined;
 			if (manualSlots && !inlinePlainMemo) {
+				const authoredSource = code;
 				if (nativeReads || nativeHookImport)
-					assertNativeReadDiagnostics(parseModule(code, filename), code, filename, {
-						nativeReads,
-						renderer,
-					});
+					assertNativeReadDiagnostics(
+						parseModule(authoredSource, filename),
+						authoredSource,
+						filename,
+						{
+							nativeReads,
+							renderer,
+						},
+					);
 				// Hand-slotted bindings still own their authored policy. Opting one
 				// module in must not require changing its established slot ABI.
 				if (strong || code.includes('use strong')) {
-					const authoredSource = code;
 					assertStrongMode(parseModule(authoredSource, filename), authoredSource, filename, {
 						strong,
 					});

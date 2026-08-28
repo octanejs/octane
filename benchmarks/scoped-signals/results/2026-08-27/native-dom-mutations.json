@@ -35,9 +35,7 @@
       "expectedNonzeroExit": true,
       "total": 27,
       "passed": 26,
-      "failedTests": [
-        "SSR rejects equal seeds from distinct scopes with the same scope key"
-      ],
+      "failedTests": ["SSR rejects equal seeds from distinct scopes with the same scope key"],
       "changedInputs": [],
       "rawReport": "/private/tmp/octane-native-server-identity-mutation.json"
     }

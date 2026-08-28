@@ -120,9 +120,12 @@ also measures the current `createScope`/`query` engine export and the optional
 `useSignal$` client/server exports independently. These are source-entry export
 costs, not compiled `.tsrx` applications or incremental hook costs in an app.
 
-Prepare an archive containing `packages/octane/src` and
-`packages/octane/package.json` from the exact baseline revision. Pass its
-extracted package directory and the same revision:
+Prepare an archive containing `packages/octane/src`,
+`packages/octane/package.json`, and the root `package.json`,
+`pnpm-workspace.yaml`, and `pnpm-lock.yaml` from the exact baseline revision.
+Preserving the package topology also keeps compiler-based checks from treating
+an isolated monorepo package as a consumer application. Pass its extracted
+package directory and the same revision:
 
 ```bash
 BENCH_JSON=/private/tmp/scoped-signals-bundles.json node benchmarks/scoped-signals/run-bundles.mjs \
@@ -219,8 +222,8 @@ BENCH_JSON=/private/tmp/scoped-native-costs.json node benchmarks/scoped-signals/
   --baseline-ref=<git-commit>
 ```
 
-The baseline must contain `packages/octane/src`, its package manifest, and the
-source from the stated revision. As in the graph runner, every consumed
+The baseline must preserve that root/workspace/package topology and contain
+`packages/octane/src` from the stated revision. As in the graph runner, every consumed
 baseline source is checked against its Git blob. `run.mjs` accepts the analogous
 `--source-root` and `--source-ref` options for measuring an archived engine.
 Neither runner installs or reconstructs a workspace dependency. A separately
@@ -281,6 +284,9 @@ The [performance follow-up](results/2026-08-27/parity-performance.md) records
 the original temporary harness separately from this reproducible runner,
 including helper/loop equivalence, exact bundle hashes, and all noisy or rejected
 runs. It does not establish a wall-time speedup or zero overhead.
+
+The [CI repair follow-up](results/2026-08-28/ci-repair.md) records the subsequent
+runtime corrections and final-source verification separately.
 
 ## Retained foreign success after a branch change
 

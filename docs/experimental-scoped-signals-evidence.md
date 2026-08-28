@@ -1,16 +1,17 @@
 # Experimental scoped signals: implementation evidence
 
-This remains an implementation experiment and a draft pull request, not a
+This remains an implementation experiment, not a
 release or merge recommendation. The [API guide](experimental-scoped-signals.md)
 describes the consolidated contract; the
 [accepted plan](plans/2026-08-27-experimental-scoped-async-signals-plan.md)
-records the broader acceptance gates. Required checks skipped because the PR is
-a draft are not validation. No packages have been published.
+records the broader acceptance gates. The author has marked
+[PR 877](https://github.com/octanejs/octane/pull/877) ready so required CI can run.
+No packages have been published.
 
 The performance follow-up starts from
 `422c2c937784af835c64d6fae5a39162143c7a44`, the consolidated draft, and also
 compares with its predecessor `cd9ed33754bfc3eeb144ba256dc9b437614e3e92`.
-New reports use the `parity-` prefix and record their tested source hashes.
+Those reports use the `parity-` prefix and record their tested source hashes.
 The `consolidation-` reports and older files named `*-final` retain their
 original inputs. Their timings and expanded model runs are not silently
 attributed to changed source. The primary checkout was not modified.
@@ -20,6 +21,21 @@ After the earlier consolidation measurements, upstream
 the website homepage and its smoke test; that integration did not change the
 measured runtime, compiler, dependency, or workload hashes. The performance
 follow-up starts after that integration.
+
+## CI repair verification
+
+The first CI run after leaving draft exposed defects in nested Suspense ref
+cleanup, caught deletion cleanup, and urgent state that superseded every held
+transition update. The fixes preserve host identity, disconnect hidden refs
+once, prevent abandoned replacement effects from connecting, and reveal the
+latest state without showing a fallback. New public regressions failed before
+the fixes; the original integration assertions remain intact.
+
+The [CI repair report](../benchmarks/scoped-signals/results/2026-08-28/ci-repair.md)
+records final-source checks and measurements, generated catalog and corpus
+repairs, and the local locked-toolchain limitation. It supersedes the current
+status claims in the earlier reports below. Historical measurements are not
+retagged as measurements of the repaired runtime.
 
 ## Consolidated contract
 
@@ -64,7 +80,9 @@ and cross-root atomic reveal remain outside this experiment.
 
 ## Validation environment
 
-The local environment is macOS arm64, Node 26.4.0, and pnpm 11.15.1. The
+The local environment is macOS arm64 and pnpm 11.15.1. Individual reports record
+their selected Node version: the focused error-bundle check uses Node 22.22.3;
+the broader CI repair tests, timing runs, and generator helper use Node 26.4.0. The
 configured registry denied the locked `@tsrx` npm payloads with HTTP 403,
 including the approved retry outside the sandbox. Locked package versions were
 not changed to make installation pass. The previously recorded frozen offline
@@ -85,7 +103,7 @@ npm tarball integrity, an SRI match, or a complete locked workspace. The
 contains the supplemental setup's provenance, exact local harness hashes, its configuration and resolver
 text with path placeholders, assertion names, and raw report hashes. Repeating
 that supplemental setup elsewhere requires equivalent staging; ordinary
-repository commands remain the intended acceptance gates. The current
+repository commands remain the intended acceptance gates. The pre-CI
 [correctness report](../benchmarks/scoped-signals/results/2026-08-27/parity-correctness.json)
 records the follow-up's source snapshots, commands, results, and controlled
 faults against that same setup.
@@ -96,8 +114,10 @@ verification setting to avoid another automatic full install. Version
 artifacts, Playwright fixtures, parity fingerprints, binding status/gaps, and
 package inventory ran. CLI data generation stopped because
 `@tsrx/prettier-plugin` was unavailable to its Prettier resolver. Generated
-changes are included. Complete sync and canonical repository checks remain
-unmet; the supplemental formatter is recorded separately.
+changes are included. During the CI repair, the remaining canonical generators
+were also executed against identical source copies with the available
+dependencies. They passed and generated the new CLI error explanations. This
+does not turn the interrupted local command into a completed locked sync.
 
 The [fresh workspace gate attempts](../benchmarks/scoped-signals/results/2026-08-27/parity-workspace-gates.json)
 record the follow-up's failed sync and scoped formatting, typecheck, and Vitest
@@ -106,7 +126,7 @@ commands cannot find the `prettier`, `tsrx-tsc`, and `vitest` executables.
 This sync attempt produced no additional generated diff, and the audited
 source hashes remained unchanged. These failures are not supplemental passes.
 
-## Current correctness evidence
+## Recorded pre-CI correctness evidence
 
 The primary integration path is authored TSRX `@{}` components and their compiled templates. Ordinary returned-element syntax is secondary compatibility coverage. The final audited source run covers these assertions:
 
@@ -189,11 +209,11 @@ fixed in the owning Volar transform; both new regression cases fail on the
 baseline and pass on the candidate. The nearby Volar/AST run passes 31 of 33
 cases; two supplemental dependency/type-resolution failures remain explicit.
 
-The current correctness report also records a fresh successful scoped
+The pre-CI correctness report also records a successful scoped
 `tsrx-tsc --noEmit` run for the preservation fixtures and unchanged source
 snapshots. It has the same tagged-toolchain limitations.
 
-The current [publication smoke report](../benchmarks/scoped-signals/results/2026-08-27/parity-package-smoke.json)
+The pre-CI [publication smoke report](../benchmarks/scoped-signals/results/2026-08-27/parity-package-smoke.json)
 passes per-file ESM and CommonJS public imports, native activation before
 server parameter evaluation, SSR seed capture, local-hook retirement, and a
 strict declaration consumer with type-error controls. It uses the real package
@@ -206,9 +226,9 @@ implementation. The current engine lane does rerun its 50 seeded operation
 models with 100 actions each. The earlier 100,000-operation expanded run retains
 its original source hashes and is not counted as current coverage.
 
-## Performance and retention evidence
+## Recorded pre-CI performance and retention evidence
 
-The [current performance report](../benchmarks/scoped-signals/results/2026-08-27/parity-performance.md)
+The [pre-CI performance report](../benchmarks/scoped-signals/results/2026-08-27/parity-performance.md)
 starts with authored `.tsrx` compiled `@{}` components. The previous
 [consolidation run](../benchmarks/scoped-signals/results/2026-08-27/consolidation-performance.md)
 reported a one-signal prop update of 1.591 versus 2.045 microseconds (+28.6%).
@@ -320,5 +340,6 @@ only the measured workloads, not the absence of every leak.
   fixture does not replace those workloads or measure browser paint.
 - Historical-frame, native DOM, and DevTools heap diagnostics beyond the
   recorded engine ownership and cancellation-ignoring producer workloads.
-- Successful required and relevant CI on the current pushed head. The PR
-  remains draft as requested; skipped jobs cannot satisfy this gate.
+- Successful required and relevant CI on the current pushed head. The live
+  [PR checks](https://github.com/octanejs/octane/pull/877/checks) are authoritative;
+  skipped jobs cannot satisfy this gate.

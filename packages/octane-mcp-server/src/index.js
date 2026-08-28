@@ -54,6 +54,8 @@ export const BENCHMARK_SUITES = [
 	'dbmon',
 	'recursive-context',
 	'spa-navigation',
+	'scoped-signals',
+	'scoped-native-reads',
 	'signal-favoring',
 	'news',
 	'hydration-interactivity',

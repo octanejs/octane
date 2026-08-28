@@ -206,13 +206,13 @@ let NATIVE_LOCAL_HOOK_DISPOSES: Array<() => void> | null = null;
 
 /** @internal Enable invocation collection before an opted-in module renders. */
 export function enableNativeReadCollection(abi = 1): void {
-	if (abi !== 1) throw new Error('Unsupported native-read compiler/runtime version.');
+	if (abi !== 1) throw new Error(formatServerError(58));
 	ensureNativeServerReadCollector();
 }
 
 /** @internal Compiler/runtime native-read capability version 1. */
 export function beginNativeReadScope(scope: SSRScope | undefined, abi = 1): number {
-	if (abi !== 1) throw new Error('Unsupported native-read compiler/runtime version.');
+	if (abi !== 1) throw new Error(formatServerError(58));
 	const owner = scope ?? CURRENT_SCOPE;
 	if (owner === null) return -1;
 	ensureNativeServerReadCollector();
@@ -3308,8 +3308,7 @@ export function nativeLocalHook<T>(
 	dispose: (value: T) => void,
 	slot?: ServerHookSlot,
 ): T {
-	if (CURRENT_SCOPE === null || HOOK_PASS === null)
-		throw new Error(name + ' requires an active server component.');
+	if (CURRENT_SCOPE === null || HOOK_PASS === null) throw new Error(formatServerError(59, name));
 	const { list, index } = hookPosition(slot)!;
 	let record = list[index] as NativeLocalHookRec | undefined;
 	if (record === undefined) {

@@ -82,6 +82,52 @@ function setup(shape: 'same' | 'swap' = 'swap') {
 	return { root, pending, portalTarget, store, log, renderLog, refLog, controls: () => controls };
 }
 
+function setupNestedPortal(onDetach?: (mounted: ReturnType<typeof mount>) => void) {
+	const inner = deferred<string>();
+	const outer = deferred<string>();
+	const portalTarget = document.createElement('div');
+	document.body.appendChild(portalTarget);
+	const store = makeStore();
+	const log: string[] = [];
+	let mounted!: ReturnType<typeof mount>;
+	const portalRef = vi.fn((node: Element | null) => {
+		if (node === null) onDetach?.(mounted);
+	});
+	const common = { portalTarget, store, log, portalRef };
+	mounted = mount(NestedPortalPreservation, {
+		...common,
+		innerPromise: fulfilled('inner-a'),
+		outerPromise: fulfilled('outer-a'),
+	});
+	const portal = portalTarget.querySelector('#preserved-portal') as HTMLElement;
+	expect(portal).toBeTruthy();
+	expect(portalRef.mock.calls.map(([node]) => node)).toEqual([portal]);
+	return {
+		mounted,
+		inner,
+		outer,
+		portal,
+		portalTarget,
+		portalRef,
+		store,
+		hide() {
+			mounted.update(NestedPortalPreservation, {
+				...common,
+				innerPromise: inner.promise,
+				outerPromise: outer.promise,
+			});
+		},
+		dispose() {
+			onDetach = undefined;
+			try {
+				mounted.unmount();
+			} finally {
+				portalTarget.remove();
+			}
+		},
+	};
+}
+
 describe('Suspense preserves committed host DOM', () => {
 	async function expectPreservedHosts(shape: 'same' | 'swap'): Promise<void> {
 		const t = setup(shape);
@@ -302,6 +348,73 @@ describe('Suspense preserves committed host DOM', () => {
 		root.unmount();
 		portalTarget.remove();
 	});
+
+	it('keeps a nested portal hidden when the outer boundary resolves first', async () => {
+		const t = setupNestedPortal();
+		try {
+			t.hide();
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+			await act(() => t.outer.resolve('outer-b'));
+			expect(t.mounted.findAll('#outer-fallback')).toHaveLength(0);
+			expect(t.mounted.find('#inner-fallback')).toBeTruthy();
+			expect(t.portalTarget.querySelector('#preserved-portal')).toBe(t.portal);
+			expect(t.portal.style.display).toBe('none');
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+			await act(() => t.inner.resolve('inner-b'));
+			expect(t.mounted.findAll('#inner-fallback')).toHaveLength(0);
+			expect(t.portalTarget.querySelector('#preserved-portal')).toBe(t.portal);
+			expect(t.portal.style.display).toBe('');
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null, t.portal]);
+		} finally {
+			t.dispose();
+		}
+	});
+
+	it('reconnects a nested portal once when both hidden boundaries resolve together', async () => {
+		const t = setupNestedPortal();
+		try {
+			t.hide();
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+			await act(() => {
+				t.inner.resolve('inner-b');
+				t.outer.resolve('outer-b');
+			});
+			expect(t.mounted.findAll('#outer-fallback')).toHaveLength(0);
+			expect(t.mounted.findAll('#inner-fallback')).toHaveLength(0);
+			expect(t.portalTarget.querySelector('#preserved-portal')).toBe(t.portal);
+			expect(t.portal.style.display).toBe('');
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null, t.portal]);
+		} finally {
+			t.dispose();
+		}
+	});
+
+	it.each(['unmount', 'replace'] as const)(
+		'stops nested publication when the portal detach callback requests %s',
+		async (request) => {
+			const Replacement = () => 'replacement';
+			const t = setupNestedPortal((mounted) => {
+				if (request === 'unmount') mounted.root.unmount();
+				else mounted.root.render(Replacement);
+			});
+			try {
+				expect(() => t.hide()).not.toThrow();
+				expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+				expect(t.portalTarget.childNodes).toHaveLength(0);
+				expect(t.mounted.container.textContent).toBe(request === 'replace' ? 'replacement' : '');
+				await act(() => {
+					t.inner.resolve('inner-b');
+					t.outer.resolve('outer-b');
+				});
+				expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+				expect(t.portalTarget.childNodes).toHaveLength(0);
+				expect(t.mounted.container.textContent).toBe(request === 'replace' ? 'replacement' : '');
+				expect(t.store.listenerCount()).toBe(0);
+			} finally {
+				t.dispose();
+			}
+		},
+	);
 
 	it('does not detach a hidden primary ref again when its retry enters catch', async () => {
 		const rejected = deferred<string>();

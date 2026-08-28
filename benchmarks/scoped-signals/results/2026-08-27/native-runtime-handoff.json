@@ -111,10 +111,7 @@
     "formatting": {
       "version": "3.9.6",
       "files": 17,
-      "parsers": [
-        "typescript",
-        "babel"
-      ],
+      "parsers": ["typescript", "babel"],
       "tsrxParserUsed": false
     }
   },

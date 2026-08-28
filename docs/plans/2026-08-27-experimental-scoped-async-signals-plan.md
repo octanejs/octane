@@ -2,7 +2,7 @@
 title: Experimental scoped async signals
 type: experiment
 date: 2026-08-27
-status: draft-experiment
+status: experimental-implementation
 branch: codex/experimental-scoped-async-signals
 base: c84edbb271c19488922f3d9941e374f022ead516
 ---
@@ -11,7 +11,7 @@ base: c84edbb271c19488922f3d9941e374f022ead516
 
 Build an opt-in implementation of [RFC 2](https://github.com/octanejs/RFCs/discussions/2) over Alien Signals, then measure whether its ownership, async coordination, and native Octane integration remain correct and economical as graph size, consumer count, and application lifetime grow.
 
-The plan was accepted for implementation on 2026-08-27. Work is isolated in the worktree below and is published in [draft PR 877](https://github.com/octanejs/octane/pull/877). The API remains experimental; source changes and supplemental checks do not establish that every compiler, browser, package, or performance gate has passed.
+The plan was accepted for implementation on 2026-08-27. Work is isolated in the worktree below and is published in [PR 877](https://github.com/octanejs/octane/pull/877), initially as a draft. The author has since marked it ready to enable CI. The API remains experimental; source changes and supplemental checks do not establish that every compiler, browser, package, or performance gate has passed.
 
 The first prototype incorporated upstream `69a56855c21b71f824bdf1064d03e86b0a203eb9`, which added unrelated Inferno benchmark targets. The consolidation later incorporated `f036bad8d1e0e095694b8bbc71e95d13e01a7330`, which changes only the website homepage and its smoke test. Neither integration changes the measured runtime/compiler sources; reports preserve their original inputs.
 
@@ -44,7 +44,7 @@ The first optimization exposed a resolver assumption that a negative cleanup tok
 
 The focused benchmark keeps compiled roots mounted, alternates baseline/candidate blocks, and preserves all samples from two independent runs against each prior draft. The final one-signal prop-update point ratios against the pre-consolidation draft are 0.962 and 0.998; against the consolidated draft they are 0.997 and 0.965. All corresponding 95% intervals include parity. This supports near-parity point estimates, not a proven speedup, exact zero overhead, or removal of a reproducible 28.6% regression. Rejected intermediate timings remain labeled as such. The original mount/update/SSR/collector harness, public-entry bundles, and foreign-owner retention remain separate checks; none of these replaces the larger application, locked-workspace, or CI gates below.
 
-Current commands, source hashes, results, and limitations are linked from the [evidence report](../experimental-scoped-signals-evidence.md). The PR remains draft as requested.
+Current commands, source hashes, results, and limitations are linked from the [evidence report](../experimental-scoped-signals-evidence.md). The author subsequently marked the PR ready to enable required CI; its follow-up report separates repairs and final-source measurements from this earlier evidence.
 
 ## Baseline and authority
 
@@ -101,7 +101,7 @@ Other explicit exclusions: deep property stores; async `derived` callbacks; pend
 
 Local hook decision, 2026-08-27: this implementation includes `useSignal$` and defers `useDerived$` under the speculative-closure proof gate above. A stable facade over an attempt-owned derived node does not make a cached shared derived, or a memoized child holding its witness, see a newly staged prop closure. Invalidating or replacing the live node during staging would expose speculative state to committed readers. A complete solution needs graph evaluation that respects the rendering attempt, including transitive caches and escaped handles; that is not an adapter-only change. Keep `scope.derived$` as the supported synchronous derived API and do not register or export a partial local derived hook.
 
-Do not publish packages or merge as part of this experiment. Keep the requested PR in draft. This experiment does not change the existing `@octanejs/alien-signals` binding or rename existing Octane APIs.
+Do not publish packages or merge as part of this experiment. The PR began in draft as requested and stays ready after the author enabled CI. This experiment does not change the existing `@octanejs/alien-signals` binding or rename existing Octane APIs.
 
 ## Proposed architecture
 
@@ -376,7 +376,7 @@ Run the first command against the pinned baseline before runtime/compiler edits,
 
 Add explicit registration for new benchmark suites and the profile/Node test lanes where the current configuration uses allowlists. Typecheck TSRX programs with `tsrx-tsc --noEmit`, never plain `tsc`, and do not introduce an ambient `declare module '*.tsrx'`.
 
-For a broad core change, run the relevant complete local test/typecheck/build/package checks before handoff; document baseline failures separately from regressions. A PR containing user-facing implementation changes requires patch changesets, `pnpm sync` before any push, the repository's PR provenance, and green current-head CI. The user's explicit draft request takes precedence over the normal mark-ready step; skipped draft jobs are not correctness or performance evidence. No release is part of this work.
+For a broad core change, run the relevant complete local test/typecheck/build/package checks before handoff; document baseline failures separately from regressions. A PR containing user-facing implementation changes requires patch changesets, `pnpm sync` before any push, the repository's PR provenance, and green current-head CI. The author has enabled CI by marking the PR ready; the earlier skipped draft jobs are not correctness or performance evidence. No release is part of this work.
 
 ## Deliverables
 

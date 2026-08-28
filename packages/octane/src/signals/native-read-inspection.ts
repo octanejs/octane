@@ -28,6 +28,8 @@ export function inspectNativeReadSource(
 export function inspectNativeReadWitness(witness: NativeReadWitness): NativeReadAttemptInspection {
 	return {
 		mixed: witness.mixed,
-		reads: Array.from(witness.reads, ([source, version]) => inspectNativeReadSource(source, version)),
+		reads: Array.from(witness.reads, ([source, version]) =>
+			inspectNativeReadSource(source, version),
+		),
 	};
 }
