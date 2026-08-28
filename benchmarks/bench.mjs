@@ -441,6 +441,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Ink's cursor-only terminal updates over unchanged large frames: exact
+		// previous branches, byte/split gates, and stable-frame scaling controls.
+		name: 'ink-cursor-update',
+		cwd: 'ink-cursor-update',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Shared-compiler watched-path invalidation after nearest-package
 		// decisions have been cached for small and large source trees.
 		name: 'manifest-cache-invalidation',

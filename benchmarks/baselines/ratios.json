@@ -536,6 +536,70 @@
     "note": "Same-process warmed lookup time for production versus the exact previous algorithm on a 16-node open chain. One full run measured 0.000848 ms versus 7.419794 ms; the deterministic node-read guard is primary, and the 0.25 ceiling leaves broad timing headroom while requiring the indexed traversal's advantage to remain visible."
   },
   {
+    "suite": "ink-cursor-update",
+    "op": "batch",
+    "target": "production-standard-representative",
+    "reference": "previous-standard-representative",
+    "maxRatio": 0.35,
+    "note": "Same-process standard Ink renderer over 80 separately materialized equal copies of a fixed 20,000-line frame. Byte and split gates require equivalent output while production removes the previous branch's redundant newline split; the harness also requires at least 10 ms saved."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "batch",
+    "target": "production-incremental-representative",
+    "reference": "previous-incremental-representative",
+    "maxRatio": 0.35,
+    "note": "Same-process incremental Ink renderer over 80 separately materialized equal copies of a fixed 20,000-line frame. Byte and split gates require equivalent output while production removes the previous branch's redundant newline split; the harness also requires at least 10 ms saved."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "cursor_update",
+    "target": "production-standard-scaling-80000",
+    "reference": "production-standard-scaling-20000",
+    "maxRatio": 2,
+    "note": "Production standard cursor-only time per update over a stable 80,000-line stress frame must remain within 2x the stable 20,000-line control. Both batches contain 20,000 writes and the harness requires every sample to exceed 1 ms."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "cursor_update",
+    "target": "production-incremental-scaling-80000",
+    "reference": "production-incremental-scaling-20000",
+    "maxRatio": 2,
+    "note": "Production incremental cursor-only time per update over a stable 80,000-line stress frame must remain within 2x the stable 20,000-line control. Both batches contain 20,000 writes and the harness requires every sample to exceed 1 ms."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "render",
+    "target": "production-standard-initial",
+    "reference": "previous-standard-initial",
+    "maxRatio": 1.25,
+    "note": "Standard initial rendering retains exactly one newline split. The same-process 20,000-line control guards against shifting cursor-only work into initial rendering; the harness also caps the absolute slowdown at 1 ms per render."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "render",
+    "target": "production-incremental-initial",
+    "reference": "previous-incremental-initial",
+    "maxRatio": 1.25,
+    "note": "Incremental initial rendering retains exactly one newline split. The same-process 20,000-line control guards against shifting cursor-only work into initial rendering; the harness also caps the absolute slowdown at 1 ms per render."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "render",
+    "target": "production-standard-changed",
+    "reference": "previous-standard-changed",
+    "maxRatio": 1.25,
+    "note": "Standard content-changing rendering retains exactly one newline split. The same-process 20,000-line control guards against shifting cursor-only work into changed output; the harness also caps the absolute slowdown at 1 ms per render."
+  },
+  {
+    "suite": "ink-cursor-update",
+    "op": "render",
+    "target": "production-incremental-changed",
+    "reference": "previous-incremental-changed",
+    "maxRatio": 1.25,
+    "note": "Incremental content-changing rendering retains exactly one newline split. The same-process 20,000-line control guards against shifting cursor-only work into changed output; the harness also caps the absolute slowdown at 1 ms per render."
+  },
+  {
     "suite": "vite-client-assets",
     "op": "asset_map",
     "target": "routes-1000-deep",

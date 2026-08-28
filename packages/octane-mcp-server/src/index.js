@@ -74,6 +74,7 @@ export const BENCHMARK_SUITES = [
 	'behavior-root-events',
 	'router-dispatch',
 	'floating-tree-navigation',
+	'ink-cursor-update',
 	'manifest-cache-invalidation',
 	'vite-client-assets',
 	'store-selector-fanout',
