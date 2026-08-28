@@ -423,6 +423,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Node-only Radix collection ordering against the exact prior indexOf
+		// comparator, with small-path controls and indexed 256/4,096-item rows.
+		name: 'radix-collection-order',
+		cwd: 'radix-collection-order',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Node-only app-core route matching across large static, method-miss,
 		// and dynamic route tables with cost normalized per candidate route.
 		name: 'router-dispatch',

@@ -72,6 +72,7 @@ export const BENCHMARK_SUITES = [
 	'dev-form-diagnostics',
 	'scheduler-depth',
 	'behavior-root-events',
+	'radix-collection-order',
 	'router-dispatch',
 	'floating-tree-navigation',
 	'ink-cursor-update',
