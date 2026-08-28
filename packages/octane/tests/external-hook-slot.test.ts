@@ -768,6 +768,7 @@ describe('manifest-declared manual hook slots', () => {
 			'wouter',
 			'xstate',
 			'xstate-store',
+			'xyflow',
 			'zag',
 			'zustand',
 		]);

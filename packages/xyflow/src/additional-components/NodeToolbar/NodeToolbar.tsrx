@@ -1,0 +1,141 @@
+import { useCallback } from 'octane';
+import type { CSSProperties } from '../../react-shim.js';
+import cc from 'classcat';
+import { shallow } from '@octanejs/zustand/shallow';
+import {
+	Position,
+	getNodeToolbarTransform,
+	getInternalNodesBounds,
+	NodeLookup,
+} from '@xyflow/system';
+
+import { InternalNode, ReactFlowState } from '../../types';
+import { useStore } from '../../hooks/useStore';
+import { useNodeId } from '../../contexts/NodeIdContext';
+import { NodeToolbarPortal } from './NodeToolbarPortal.tsrx';
+import type { NodeToolbarProps } from './types';
+
+const nodeEqualityFn = (a?: InternalNode, b?: InternalNode) =>
+	a?.internals.positionAbsolute.x !== b?.internals.positionAbsolute.x ||
+		a?.internals.positionAbsolute.y !== b?.internals.positionAbsolute.y ||
+		a?.measured.width !== b?.measured.width ||
+		a?.measured.height !== b?.measured.height ||
+		a?.selected !== b?.selected ||
+		a?.internals.z !== b?.internals.z;
+
+const nodesEqualityFn = (a: NodeLookup, b: NodeLookup) => {
+	if (a.size !== b.size) {
+		return false;
+	}
+
+	for (const [key, node] of a) {
+		if (nodeEqualityFn(node, b.get(key))) {
+			return false;
+		}
+	}
+
+	return true;
+};
+
+const storeSelector = (state: ReactFlowState) => ({
+	x: state.transform[0],
+	y: state.transform[1],
+	zoom: state.transform[2],
+	selectedNodesCount: state.nodes.filter((node) => node.selected).length,
+});
+
+/**
+ * This component can render a toolbar or tooltip to one side of a custom node. This
+ * toolbar doesn't scale with the viewport so that the content is always visible.
+ *
+ * @public
+ * @example
+ * ```jsx
+ *import { memo } from 'octane';
+ *import { Handle, Position, NodeToolbar } from '@xyflow/react';
+ *
+ *function CustomNode({ data }) {
+ *  return (
+ *    <>
+ *      <NodeToolbar isVisible={data.toolbarVisible} position={data.toolbarPosition}>
+ *        <button>delete</button>
+ *        <button>copy</button>
+ *        <button>expand</button>
+ *      </NodeToolbar>
+ *
+ *      <div style={{ padding: '10px 20px' }}>
+ *        {data.label}
+ *      </div>
+ *
+ *      <Handle type="target" position={Position.Left} />
+ *      <Handle type="source" position={Position.Right} />
+ *    </>
+ *  );
+ *};
+ *
+ *export default memo(CustomNode);
+ *```
+ * @remarks By default, the toolbar is only visible when a node is selected. If multiple
+ * nodes are selected it will not be visible to prevent overlapping toolbars or
+ * clutter. You can override this behavior by setting the `isVisible` prop to `true`.
+ */
+export function NodeToolbar({
+	nodeId,
+	children,
+	className,
+	style,
+	isVisible,
+	position = Position.Top,
+	offset = 10,
+	align = 'center',
+	...rest
+}: NodeToolbarProps) {
+	const contextNodeId = useNodeId();
+
+	const nodesSelector = useCallback((state: ReactFlowState): NodeLookup => {
+		const nodeIds = Array.isArray(nodeId) ? nodeId : [nodeId || contextNodeId || ''];
+		const internalNodes = nodeIds.reduce<NodeLookup>((res, id) => {
+			const node = state.nodeLookup.get(id);
+			if (node) {
+				res.set(node.id, node);
+			}
+
+			return res;
+		}, new Map());
+
+		return internalNodes;
+	}, [nodeId, contextNodeId]);
+	const nodes = useStore(nodesSelector, nodesEqualityFn);
+	const { x, y, zoom, selectedNodesCount } = useStore(storeSelector, shallow);
+
+	// if isVisible is not set, we show the toolbar only if its node is selected and no other node is selected
+	const isActive =
+		typeof isVisible === 'boolean'
+			? isVisible
+			: nodes.size === 1 && nodes.values().next().value?.selected && selectedNodesCount === 1;
+
+	if (!isActive || !nodes.size) {
+		return null;
+	}
+
+	const nodeRect = getInternalNodesBounds(nodes);
+	const nodesArray = Array.from(nodes.values());
+	const zIndex = Math.max(...nodesArray.map((node) => node.internals.z + 1));
+
+	const wrapperStyle: CSSProperties = {
+		position: 'absolute',
+		transform: getNodeToolbarTransform(nodeRect, { x, y, zoom }, position, offset, align),
+		zIndex,
+		...style,
+	};
+
+	return <NodeToolbarPortal>
+		<div
+			style={wrapperStyle}
+			className={cc(['react-flow__node-toolbar', className])}
+			{...rest}
+			// @todo: check if we could only do this for non-prod envs
+			data-id={nodesArray.reduce((acc, node) => `${acc}${node.id} `, '').trim()}
+		>{children}</div>
+	</NodeToolbarPortal>;
+}

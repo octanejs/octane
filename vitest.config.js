@@ -4518,6 +4518,99 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'xyflow',
+					include: ['packages/xyflow/tests/**/*.test.ts'],
+					exclude: [...configDefaults.exclude, 'packages/xyflow/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					testTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/xyflow$/,
+							replacement: resolve(import.meta.dirname, 'packages/xyflow/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/xyflow\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/xyflow/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/zustand$/,
+							replacement: resolve(import.meta.dirname, 'packages/zustand/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/zustand\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/zustand/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/dnd-kit$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/hooks$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/hooks/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/sortable$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/sortable/index.ts'),
+						},
+						{
+							find: /^@octanejs\/dnd-kit\/utilities$/,
+							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/utilities/index.ts'),
+						},
+						{
+							find: /^@octanejs\/lucide$/,
+							replacement: resolve(import.meta.dirname, 'packages/lucide/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/lucide\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/lucide/src') + '/$1.ts',
+						},
+						{
+							find: /^@octanejs\/tanstack-pacer$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-pacer\/(.*)$/,
+							replacement:
+								resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
+						},
+						{
+							find: /^@octanejs\/tanstack-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'xyflow-differential',
+					include: ['packages/xyflow/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					testTimeout: 30_000,
+					globalSetup: ['packages/xyflow/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/xyflow$/,
+							replacement: resolve(import.meta.dirname, 'packages/xyflow/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/xyflow\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/xyflow/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'cmdk',
 					include: [
