@@ -10,7 +10,7 @@ import {
 	useLayoutEffect,
 	useState,
 	type OctaneNode,
-} from 'octane';
+} from '../index.js';
 import {
 	getRendererOwnerVisibility,
 	readContextFromScope,

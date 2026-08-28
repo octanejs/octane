@@ -72,7 +72,7 @@ React/React DOM 19.2.7, esbuild 0.28.1. It records the candidate Git head and di
 paths, generated artifact hashes, aggregate input-source hashes, and contributing
 modules. It describes that worktree snapshot, not an assertion that later source
 changes have been measured. The client measurements were refreshed after the
-Suspense overlap and Activity cleanup-error fixes.
+Suspense overlap, Activity cleanup-error, and distribution import fixes.
 
 | Bundle control | Raw bytes | Gzip bytes | Brotli bytes |
 | --- | ---: | ---: | ---: |
@@ -91,12 +91,12 @@ lane's sample mean. The JSON also contains medians and the full distributions.
 
 | Islands | Lane | Mount | Local update | Parent update | Unmount |
 | ---: | --- | ---: | ---: | ---: | ---: |
-| 1 | Direct React roots | 0.072 ± 6.3% | 0.025 ± 7.8% | 0.014 ± 9.2% | 0.013 ± 12.1% |
-| 1 | ReactCompat | 0.154 ± 8.9% | 0.031 ± 7.8% | 0.043 ± 8.3% | 0.023 ± 9.3% |
-| 100 | Direct React roots | 2.201 ± 5.2% | 0.448 ± 3.6% | 0.956 ± 10.7% | 0.186 ± 8.8% |
-| 100 | ReactCompat | 3.174 ± 4.2% | 0.558 ± 3.1% | 1.184 ± 6.4% | 0.285 ± 3.7% |
-| 1,000 | Direct React roots | 30.891 ± 3.9% | 5.133 ± 3.4% | 53.213 ± 3.1% | 5.398 ± 2.5% |
-| 1,000 | ReactCompat | 45.420 ± 6.1% | 7.026 ± 6.3% | 57.935 ± 3.6% | 7.041 ± 2.4% |
+| 1 | Direct React roots | 0.089 ± 15.6% | 0.029 ± 8.1% | 0.015 ± 11.4% | 0.014 ± 8.7% |
+| 1 | ReactCompat | 0.166 ± 6.6% | 0.034 ± 7.5% | 0.050 ± 8.8% | 0.025 ± 11.9% |
+| 100 | Direct React roots | 2.583 ± 5.0% | 0.521 ± 2.4% | 1.003 ± 10.0% | 0.213 ± 5.3% |
+| 100 | ReactCompat | 3.855 ± 14.2% | 0.674 ± 7.5% | 1.482 ± 11.7% | 0.348 ± 4.8% |
+| 1,000 | Direct React roots | 36.120 ± 6.3% | 7.520 ± 32.2% | 67.334 ± 8.9% | 6.258 ± 5.2% |
+| 1,000 | ReactCompat | 54.455 ± 8.6% | 8.436 ± 6.7% | 67.906 ± 7.1% | 8.083 ± 5.1% |
 
 The boundary adds measurable mount, update, and teardown cost. A thousand
 independent roots is expensive in both lanes and should not be treated as a
