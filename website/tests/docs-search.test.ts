@@ -214,6 +214,14 @@ describe('docs search ranking', () => {
 });
 
 describe('search dialog', () => {
+	it('advertises site-wide search from the familiar header trigger', async () => {
+		const { container } = await renderRoute('/');
+		const trigger = container.querySelector<HTMLButtonElement>('.search-trigger');
+
+		expect(trigger?.getAttribute('aria-label')).toBe('Search docs, packages, and integrations');
+		expect(trigger?.textContent).toContain('Search Octane');
+	});
+
 	it('is reachable from the header, and navigates to the hit on Enter', async () => {
 		const { container, router } = await renderRoute('/');
 
@@ -259,8 +267,76 @@ describe('search dialog', () => {
 		expect(document.body.style.overflow).not.toBe('hidden');
 	});
 
+	it('ranks TanStack Router as a binding and opens its canonical directory state', async () => {
+		const { container, router } = await renderRoute('/');
+		const trigger = container.querySelector<HTMLButtonElement>('.search-trigger')!;
+		fireEvent.click(trigger);
+		const dialog = await waitFor(() =>
+			document.body.querySelector<HTMLElement>('[role="dialog"]')!,
+		);
+		const input = dialog.querySelector<HTMLInputElement>('.search-input')!;
+
+		fireEvent.input(input, { target: { value: 'tanstack router' } });
+		const card = await waitFor(() => {
+			const element = dialog.querySelector<HTMLElement>('.search-entity');
+			if (!element) throw new Error('entity result did not render');
+			return element;
+		});
+		expect(card.querySelector('.search-type')?.textContent).toBe('Library binding');
+		expect(card.querySelector('.search-title')?.textContent).toBe('TanStack Router');
+		expect(card.querySelector('.search-package')?.textContent).toBe('@octanejs/tanstack-router');
+
+		fireEvent.keyDown(dialog, { key: 'Enter' });
+		await waitFor(() => {
+			if (router.state.location.pathname !== '/docs/bindings') {
+				throw new Error('binding destination did not open');
+			}
+		});
+		expect(router.state.location.search).toMatchObject({
+			q: 'TanStack Router',
+			kind: 'binding',
+		});
+		expect(router.state.location.hash).toBe('binding-tanstack-router');
+	});
+
+	it('keeps TanStack Start primary, package, and guide actions independent', async () => {
+		const { container, router } = await renderRoute('/');
+		fireEvent.click(container.querySelector<HTMLButtonElement>('.search-trigger')!);
+		const dialog = await waitFor(() =>
+			document.body.querySelector<HTMLElement>('[role="dialog"]')!,
+		);
+		fireEvent.input(dialog.querySelector<HTMLInputElement>('.search-input')!, {
+			target: { value: 'tanstack start' },
+		});
+		const card = await waitFor(() => {
+			const element = dialog.querySelector<HTMLElement>('.search-entity');
+			if (!element) throw new Error('integration result did not render');
+			return element;
+		});
+
+		expect(card.querySelector('.search-type')?.textContent).toBe('Framework integration');
+		expect(card.querySelector<HTMLAnchorElement>('.search-entity-package')?.href).toContain(
+			'/packages/tanstack-start',
+		);
+		expect(
+			card.querySelector<HTMLAnchorElement>('.search-entity-guide')?.getAttribute('href'),
+		).toBe('/docs/framework-integrations#tanstack-start');
+
+		fireEvent.keyDown(dialog, { key: 'ArrowDown' });
+		fireEvent.keyDown(dialog, { key: 'ArrowDown' });
+		expect(dialog.querySelector('[data-search-row="2"]')?.classList.contains('active')).toBe(true);
+		fireEvent.keyDown(dialog, { key: 'Enter' });
+		await waitFor(() => {
+			if (router.state.location.pathname !== '/docs/framework-integrations') {
+				throw new Error('integration guide did not open');
+			}
+		});
+		expect(router.state.location.hash).toBe('tanstack-start');
+	});
+
 	it('opens on ⌘K / Ctrl-K and closes on Escape', async () => {
-		await renderRoute('/');
+		const { container } = await renderRoute('/');
+		const trigger = container.querySelector<HTMLButtonElement>('.search-trigger')!;
 
 		fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
 		const dialog = await waitFor(() => {
@@ -273,5 +349,20 @@ describe('search dialog', () => {
 		await waitFor(() => {
 			if (document.body.querySelector('[role="dialog"]')) throw new Error('dialog still open');
 		});
+		await waitFor(() => {
+			if (document.activeElement !== trigger) throw new Error('focus did not return to trigger');
+		});
+	});
+
+	it('does not open on slash from an editable surface', async () => {
+		await renderRoute('/');
+		const editable = document.createElement('div');
+		editable.contentEditable = 'true';
+		document.body.append(editable);
+		editable.focus();
+
+		fireEvent.keyDown(editable, { key: '/' });
+		expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+		editable.remove();
 	});
 });
