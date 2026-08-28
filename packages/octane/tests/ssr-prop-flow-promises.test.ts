@@ -436,4 +436,248 @@ describe('streaming SSR — promises created in an ancestor, unwrapped via props
 			errorSpy.mockRestore();
 		}
 	});
+
+	it('re-reads a stable mutable receiver during suspension instead of caching its snapshot', async () => {
+		const mod = evalServer(
+			`
+			export function Data(p) @{
+				<output>{p.data.label as string}</output>
+			}
+			export function Gate(p) @{
+				const value = use(p.promise);
+				<i>{value as string}</i>
+			}
+			export function Page(p) @{
+				const data = p.receiver.read();
+				<main><Data data={data} /><Gate promise={p.gate} /></main>
+			}
+			`,
+			'prop-flow-live-receiver.tsrx',
+		);
+		const receiver = {
+			label: 'before',
+			read() {
+				return { label: this.label };
+			},
+		};
+		let resume!: (value: string) => void;
+		const gate = new Promise<string>((resolve) => {
+			resume = resolve;
+		});
+		const rendered = prerender(mod.Page, { receiver, gate });
+		// The receiver and method keep their identities; only the live interior
+		// changes. A canonical retry must take a fresh ordinary call snapshot.
+		receiver.label = 'after';
+		resume('ready');
+		const { html } = await rendered;
+		expect(html).toContain('<output>after</output>');
+		expect(html).toContain('<i>ready</i>');
+	});
+
+	it('observes rejected replacement promises abandoned when recreation fallback begins', async () => {
+		const mod = evalServer(LOCAL_PROP_FLOW, 'prop-flow-abandoned-rejection.tsrx');
+		const reason = new Error('abandoned replacement');
+		const unhandled: unknown[] = [];
+		const onUnhandled = (error: unknown) => unhandled.push(error);
+		let abandon!: () => void;
+		const makeCards = () => [
+			{
+				id: 0,
+				promise: new Promise<string>((resolve, reject) => {
+					const timer = setTimeout(() => resolve('ready card'), 2);
+					abandon = () => {
+						clearTimeout(timer);
+						reject(reason);
+					};
+				}),
+			},
+		];
+		process.on('unhandledRejection', onUnhandled);
+		// The development diagnostic synchronizes with the fallback transition;
+		// assertions observe output and rejection handling, not retry counts.
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation((message) => {
+			if (String(message).includes('re-created on every render pass')) abandon();
+		});
+		try {
+			const { ended, errors } = collect(mod.Page, { makeCards });
+			const html = await ended;
+			expect(html).toContain('ready card');
+			expect(errors).toEqual([]);
+			expect(errorSpy).toHaveBeenCalled();
+			// Rejection observation remains required even if the fallback no
+			// longer waits for a batch that the next pass will replace.
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(unhandled).toEqual([]);
+		} finally {
+			errorSpy.mockRestore();
+			process.off('unhandledRejection', onUnhandled);
+		}
+	});
+
+	it('observes a directly thrown thenable abandoned beside recreated use() promises', async () => {
+		const mod = evalServer(
+			CARD_AND_LIST +
+				`
+				export function Reader(p) @{
+					const label = p.read();
+					<b>{label as string}</b>
+				}
+				export function Page(p) @{
+					const cards = p.makeCards();
+					<main>
+						<List cards={cards} />
+						@try { <Reader read={p.read} /> } @pending { <i>reading</i> }
+					</main>
+				}
+				`,
+			'prop-flow-abandoned-throw.tsrx',
+		);
+		const { makeCards } = timedCardsFactory();
+		const reason = new Error('abandoned thrown replacement');
+		const unhandled: unknown[] = [];
+		const onUnhandled = (error: unknown) => unhandled.push(error);
+		let ready = false;
+		let rejectThrown!: (reason: unknown) => void;
+		const read = () => {
+			if (ready) return 'reader ready';
+			throw new Promise<string>((_resolve, reject) => {
+				rejectThrown = reject;
+			});
+		};
+		process.on('unhandledRejection', onUnhandled);
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation((message) => {
+			if (String(message).includes('re-created on every render pass')) {
+				ready = true;
+				rejectThrown(reason);
+			}
+		});
+		try {
+			const { ended, errors } = collect(mod.Page, { makeCards, read });
+			const html = await ended;
+			expect(html).toContain('reader ready');
+			expect(html).toContain('card-2');
+			expect(errors).toEqual([]);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(unhandled).toEqual([]);
+		} finally {
+			errorSpy.mockRestore();
+			process.off('unhandledRejection', onUnhandled);
+		}
+	});
+
+	it('observes speculative child work abandoned when recreation fallback begins', async () => {
+		const mod = evalServer(
+			CARD_AND_LIST +
+				`
+				export function Child(p) @{
+					const label = use(p.load(p.id));
+					<b>{label as string}</b>
+				}
+				export function Parent(p) @{
+					const label = use(p.gate);
+					<section><Child load={p.load} id={p.id} />{label as string}</section>
+				}
+				export function Page(p) @{
+					const cards = p.makeCards();
+					const id = p.nextId();
+					<main>
+						<List cards={cards} />
+						@try {
+							<Parent gate={p.gate} load={p.load} id={id} />
+						} @pending { <i>parent pending</i> }
+					</main>
+				}
+				`,
+			'prop-flow-abandoned-warm.tsrx',
+		);
+		const { makeCards } = timedCardsFactory();
+		const reason = new Error('abandoned speculative replacement');
+		const unhandled: unknown[] = [];
+		const onUnhandled = (error: unknown) => unhandled.push(error);
+		let ready = false;
+		let id = 0;
+		let rejectWarm!: (reason: unknown) => void;
+		let releaseParent!: (label: string) => void;
+		const gate = new Promise<string>((resolve) => {
+			releaseParent = resolve;
+		});
+		const load = (_id: number) =>
+			ready
+				? Promise.resolve('child ready')
+				: new Promise<string>((_resolve, reject) => {
+						rejectWarm = reject;
+					});
+		process.on('unhandledRejection', onUnhandled);
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation((message) => {
+			if (String(message).includes('re-created on every render pass')) {
+				// Parent has never unwrapped its gate, so the child's request was
+				// started speculatively rather than by the child's ordinary body.
+				ready = true;
+				rejectWarm(reason);
+				releaseParent('parent ready');
+			}
+		});
+		try {
+			const { ended, errors } = collect(mod.Page, { makeCards, gate, load, nextId: () => ++id });
+			const html = await ended;
+			expect(html).toContain('parent ready');
+			expect(html).toContain('child ready');
+			expect(html).toContain('card-2');
+			expect(errors).toEqual([]);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(unhandled).toEqual([]);
+		} finally {
+			errorSpy.mockRestore();
+			process.off('unhandledRejection', onUnhandled);
+		}
+	});
+
+	it('aborts at recreation fallback without leaking replay state into the next request', async () => {
+		const mod = evalServer(
+			CARD_AND_LIST +
+				`
+				export function Page(p) @{
+					const promise = p.load();
+					<main><Card promise={promise} /></main>
+				}
+				`,
+			'prop-flow-abort-retry.tsrx',
+		);
+		const controller = new AbortController();
+		const reason = new Error('cancelled recreated request');
+		let nextPromise: Promise<string> | null = null;
+		const props = {
+			load: () => nextPromise ?? Promise.resolve('abandoned request'),
+		};
+		const firstErrors: unknown[] = [];
+		// Use the development diagnostic to abort exactly at the transition,
+		// then verify the public stream/allReady lifecycle and next-request output.
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation((message) => {
+			if (String(message).includes('re-created on every render pass')) controller.abort(reason);
+		});
+		try {
+			const first = await RT.renderToReadableStream(mod.Page, props, {
+				signal: controller.signal,
+				onError: (error) => firstErrors.push(error),
+			});
+			const firstBody = await new Response(first).text();
+			await expect(first.allReady).rejects.toBe(reason);
+			expect(firstBody).toContain('loading');
+			expect(firstBody).not.toContain('abandoned request');
+			expect(firstErrors).toEqual([reason]);
+
+			nextPromise = Promise.resolve('next request');
+			const nextErrors: unknown[] = [];
+			const next = await RT.renderToReadableStream(mod.Page, props, {
+				onError: (error) => nextErrors.push(error),
+			});
+			const nextBody = await new Response(next).text();
+			await next.allReady;
+			expect(nextBody).toContain('next request');
+			expect(nextBody).not.toContain('abandoned request');
+			expect(nextErrors).toEqual([]);
+		} finally {
+			errorSpy.mockRestore();
+		}
+	});
 });

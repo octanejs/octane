@@ -8,12 +8,13 @@ import {
 } from '../../../streaming-ssr/octane/src/data';
 
 // The streaming-ssr page re-authored for the RenderRoute shape: per-request
-// data creation happens AT the use() site, the canonical octane pattern — the
-// compiler memoizes the creation across streaming re-passes (puMemo), so each
-// card's timer starts once per request. Creating the promises in an ANCESTOR
-// and passing them down as data is NOT cross-pass stable (see data.ts's
-// warning on makeCards): every re-pass would restart the timers and the wave
-// loop livelocks into SSR error #37. The markup below mirrors
+// data creation happens at the use() site, so the compiler caches creation
+// across streaming re-passes (puMemo) and each card's timer starts once per
+// request. Per-card boundaries let those loads start together. Eligible inline
+// prop creations are also cached; opaque parent-local creations can still
+// duplicate work, although the runtime guard now prevents the old livelock.
+// See ../../fetch-patterns/README.md for the measured current behavior.
+// The markup below mirrors
 // ../../streaming-ssr/octane/src/App.tsrx element-for-element so the
 // octane-app vs octane-tsrx delta stays the metaframework layer, not the page.
 function loadCard(scenario: Scenario, i: number): Promise<CardData> {
