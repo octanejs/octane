@@ -70,6 +70,7 @@ export const BENCHMARK_SUITES = [
 	'dev-form-diagnostics',
 	'scheduler-depth',
 	'behavior-root-events',
+	'radix-collection-order',
 	'router-dispatch',
 	'manifest-cache-invalidation',
 	'vite-client-assets',
