@@ -1,5 +1,13 @@
 # @octanejs/sonner
 
+## 0.1.44
+
+### Patch Changes
+
+- Updated dependencies [8adc693]
+- Updated dependencies [a51c8c6]
+  - octane@0.1.49
+
 ## 0.1.43
 
 ### Patch Changes
