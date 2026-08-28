@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Chromium pointer/keyboard/ResizeObserver interaction coverage for the Octane binding; not adapted upstream-suite identities and not React-parity ownership."
+    },
+    {
+      "path": "packages/resizable-panels/tests/conformance/persistence.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane persistence/storage framework contracts unpaired against the upstream React suite; not React-parity ownership."
+    },
+    {
+      "path": "packages/resizable-panels/tests/differential/useDefaultLayout.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs shared useDefaultLayout restore/save scenarios against pinned react-resizable-panels 4.12.2 and @octanejs/resizable-panels through the differential rig."
+    },
+    {
+      "path": "packages/resizable-panels/tests/hydration/persistence.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Hydration adoption of server markup plus live storage saves is an Octane framework contract, not adapted upstream-suite evidence."
+    },
+    {
+      "path": "packages/resizable-panels/tests/ssr/persistence.server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "SSR/server rendering contract for the Octane binding; not React-parity ownership."
+    },
+    {
+      "path": "packages/resizable-panels/tests/support/userEvent.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Observable native-event coverage for the Octane-specific user-event adapter used by adapted upstream tests; not React-suite identity evidence."
+    },
+    {
+      "path": "packages/resizable-panels/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the byte-exact pinned react-resizable-panels 4.12.2 Vitest suite against React through vitest.pristine.config.ts after vendored-byte verification."
+    },
+    {
+      "path": "scripts/react-parity/react-resizable-panels-classifications-lib.test.mjs",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Executable audit coverage for port-authored and adapted-upstream classification ownership; not React-suite identity evidence."
+    },
+    {
+      "path": "scripts/react-parity/react-resizable-panels-runtime-lib.test.mjs",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Executable audit coverage for provenance/runtime export checkpoints; not React-suite identity evidence."
+    },
+    {
+      "path": "scripts/react-parity/react-resizable-panels-types-lib.test.mjs",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Executable audit coverage for type-probe inventory and permitted transforms; not React-suite identity evidence."
+    },
+    {
+      "path": "scripts/react-parity/react-resizable-panels-upstream-lib.test.mjs",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Executable audit coverage for pristine-to-adapted case ledger mapping; not React-suite identity evidence."
+    }
+  ]
+}

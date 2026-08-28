@@ -1,15 +1,12 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { collectFailsPins } from './parity-gaps-lib.mjs';
+import { collectBindingParityGaps } from './parity-gaps-lib.mjs';
 import { getBindingPackages, REPO_ROOT } from './workspace-packages.mjs';
 
 const OUT = path.join(REPO_ROOT, 'docs/binding-parity-gaps.md');
 const CHECK = process.argv.includes('--check');
 const packages = getBindingPackages();
-const rows = packages.map((pkg) => ({
-	...pkg,
-	...collectFailsPins(path.join(pkg.directory, 'tests'), REPO_ROOT),
-}));
+const rows = collectBindingParityGaps(packages, REPO_ROOT);
 const total = rows.reduce((sum, row) => sum + row.total, 0);
 
 let md = `# Binding parity gaps (generated)

@@ -7,7 +7,7 @@
     "sourceRoot": "src",
     "testRoot": "test",
     "license": "MIT",
-    "integrity": "sha256:a95445810caa946472b2693d52b59281e2e6350f45a06067d7c42b277b257813",
+    "integrity": "sha256:d062e21bae0c864c3559707c0451edabc0aac32a22eda239064a3faa7c9f1b21",
     "verification": "recorded-unverified"
   },
   "upstreamSuites": {
@@ -43,7 +43,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "6830765118b3351edbbc4250689e3335cba6a20e7a4e16ce0db438849e1d92a4"
+      "lockfileSha256": "05a8ae0b0bce356ae47316619baee63bee8d1410861282283770cdfe9d2a185e"
     }
   },
   "lanes": [
@@ -80,17 +80,17 @@
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "75cb27835a432945b7eaa5730b34dc55d18c7aa190373d80743d6e917356b493"
+          "sha256": "20701aea9b5e5f5249a2559f847aac79cb28f9e0bb5d24d3ef50b06101205a02"
         },
         {
-          "path": "packages/vaul/scripts/verify-upstream.mjs",
+          "path": "packages/vaul/audit/provenance.json",
           "role": "support",
-          "sha256": "498bb78691d55687bb6afb6d79b2a5ce6cf376aa9b6689c2daa71aab2ec116fe"
+          "sha256": "5295e18d84cb0128e47ba66d105355bb98c4b3c653432c8054bc1a519affba72"
         },
         {
-          "path": "packages/vaul/upstream/SHA256SUMS",
+          "path": "packages/vaul/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "a95445810caa946472b2693d52b59281e2e6350f45a06067d7c42b277b257813"
+          "sha256": "7aacac5e86c6971f51420a1e93d6fa3ff13c9b5232a13cc5475571d89fc88003"
         }
       ]
     },
@@ -204,9 +204,9 @@
           "sha256": "af996cc31b548bbf85b090e3a52015c91b98f0170bd0d10faee78daa4841e84f"
         },
         {
-          "path": "packages/vaul/upstream/SHA256SUMS",
+          "path": "packages/vaul/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "a95445810caa946472b2693d52b59281e2e6350f45a06067d7c42b277b257813"
+          "sha256": "7aacac5e86c6971f51420a1e93d6fa3ff13c9b5232a13cc5475571d89fc88003"
         }
       ]
     },
@@ -231,7 +231,7 @@
         {
           "path": "packages/vaul/tests/differential/react-oracle.test.ts",
           "role": "test",
-          "sha256": "f40b9bbfdb226f925216f80e3e3d43c7c07396d2ccaf66fc631e78e29cbc91ea",
+          "sha256": "2904cc15a1b01da5d05cb283c7858e5e96423124d0100fda834e7aa987bf31d9",
           "cases": [
             {
               "id": "runtime:a739226076100d42",

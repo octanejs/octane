@@ -2,7 +2,7 @@
 
 A large "news site" document (header + a feed of article cards, lorem ipsum) that
 measures, per target (**octane-tsrx**, **octane-jsx**, **React 19**, **Preact**,
-**Ripple**, **Solid 2.0**, **Svelte 5**, **Vue 3.6 Vapor**):
+**Ripple**, **Solid 2.0**, **Svelte 5**, **Vue 3.6 Vapor**, **Inferno 9**):
 
 - **SSR render time** — the built `renderApp()` → HTML string, in Node, warm.
 - **Hydration time** — the SYNCHRONOUS hydration work in a headless browser, on a
@@ -79,11 +79,12 @@ node benchmarks/news/run.mjs react 20        # React 19
 node benchmarks/news/run.mjs preact 20       # Preact
 node benchmarks/news/run.mjs svelte 20       # Svelte 5
 node benchmarks/news/run.mjs vue-vapor 20    # Vue 3.6 Vapor
+node benchmarks/news/run.mjs inferno 20      # Inferno 9
 node benchmarks/news/run.mjs react 20 --no-build   # reuse the existing dist/ (skip rebuild)
 ```
 
 `run.mjs [target] [iterations] [--no-build]` — `target` ∈
-`{octane-tsrx, octane-jsx, react, preact, ripple, solid, svelte, vue-vapor}` (default `octane-tsrx`; a bare
+`{octane-tsrx, octane-jsx, react, preact, ripple, solid, svelte, vue-vapor, inferno}` (default `octane-tsrx`; a bare
 number is treated as iterations for back-compat). Each run rebuilds the target's
 production client + SSR bundles unless `--no-build` is passed. Build output goes to
 `<target>/dist/` (git-ignored). `octane-tsrx` and `octane-jsx` are the same app

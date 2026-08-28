@@ -127,7 +127,7 @@ export function OctaneCompat(
 	}
 
 	const children: React.ReactNode[] = [];
-	for (const [hash, css] of attempt.cssEntries) {
+	for (const [hash, sheet] of attempt.cssEntries) {
 		// React 19 style resources: Fizz hoists and dedupes by href across
 		// islands. React serializes the href as `data-href="octane-<hash>"`
 		// (and drops any other attribute), which octane hydration's style
@@ -135,8 +135,13 @@ export function OctaneCompat(
 		children.push(
 			React.createElement(
 				'style',
-				{ key: `css-${hash}`, href: `octane-${hash}`, precedence: 'octane' },
-				css,
+				{
+					key: `css-${hash}`,
+					href: `octane-${hash}`,
+					precedence: 'octane',
+					nonce: sheet.nonce,
+				},
+				sheet.css,
 			),
 		);
 	}

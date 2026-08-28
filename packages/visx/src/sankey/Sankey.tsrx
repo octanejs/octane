@@ -1,5 +1,5 @@
-import type { SVGAttributes } from 'react';
 import type { OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { SankeyExtraProperties, SankeyGraph, SankeyLink, SankeyNode } from 'd3-sankey';
@@ -9,13 +9,13 @@ import type { Link } from 'd3-shape';
 const DEFAULT_COLOR = '#000';
 
 type NodeProps =
-	Pick<SVGAttributes<SVGRectElement>, | 'stroke'
+	Pick<Octane.SVGProps<SVGRectElement>, | 'stroke'
 	| 'strokeOpacity'
 	| 'strokeWidth'
 	| 'fill'
 	| 'fillOpacity'>;
 type LinkProps =
-	Pick<SVGAttributes<SVGPathElement>, | 'fill'
+	Pick<Octane.SVGProps<SVGPathElement>, | 'fill'
 	| 'fillOpacity'
 	| 'stroke'
 	| 'strokeOpacity'
@@ -113,8 +113,12 @@ export default function Sankey<NodeDatum extends SankeyExtraProperties, LinkDatu
 	if (extent) sankey.extent(extent);
 	if (size) sankey.size(size);
 	if (iterations) sankey.iterations(iterations);
-	if (nodeSort) sankey.nodeSort(nodeSort);
-	if (linkSort) sankey.linkSort(linkSort);
+	if (nodeSort) {
+		sankey.nodeSort(nodeSort as (a: SankeyNode<NodeDatum, LinkDatum>, b: SankeyNode<NodeDatum, LinkDatum>) => number);
+	}
+	if (linkSort) {
+		sankey.linkSort(linkSort as (a: SankeyLink<NodeDatum, LinkDatum>, b: SankeyLink<NodeDatum, LinkDatum>) => number);
+	}
 
 	const graph = sankey(root);
 	const createPath = sankeyLinkHorizontal<NodeDatum, LinkDatum>();

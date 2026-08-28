@@ -1,0 +1,348 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-27T20:20:02.006Z",
+  "evidenceKind": "local public-source correctness and controlled-fault checks",
+  "scope": "Scoped signal ownership and deferred native JSX contracts.",
+  "limitations": [
+    "These are local correctness checks, not performance measurements or CI results.",
+    "Commands record the exact local staging paths used. Harness hashes identify those temporary configurations; the staging environment must be recreated to rerun elsewhere.",
+    "No raw heap snapshots, private comparison material, credentials, or third-party private source are included.",
+    "The engine fault-focused subset has 112 tests. Deferred JSX has 14 tests repeated under development, production, and strong compiler modes for the positive run; each fault runs the 14 development cases.",
+    "Compiler-only metadata and directive roots retain their existing compiled-fragment descriptor ABI; the ordinary host tests protect inspectable authored type and props."
+  ],
+  "environment": {
+    "node": "v26.4.0",
+    "engineToolDependencies": {
+      "@tanstack/devtools-event-bus": "0.4.2",
+      "@tanstack/devtools-event-client": "0.5.0",
+      "@types/node": "26.1.1",
+      "alien-signals": "3.2.0",
+      "devalue": "5.8.2",
+      "esbuild": "0.28.1",
+      "jsdom": "30.0.1",
+      "rulesync": "8.32.0",
+      "semver": "7.8.5",
+      "typescript": "5.9.3",
+      "vitest": "4.1.10"
+    },
+    "compilerPublicDependencyProvenanceSha256": "c2a7a3413da743b296371698a87160f184869767d4dd568540445fd055b86e09"
+  },
+  "engine": {
+    "generatedAt": "2026-08-27T19:49:43.631Z",
+    "baselineCommit": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+    "workingDirectory": "/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+    "configurationSha256": "66d6610148235fc249ce82414b6f4cdeebf93a8690d5818170571bf00b082548",
+    "sources": [
+      {
+        "path": "packages/octane/src/signals/engine.ts",
+        "baseline": "18eb70cbf0e4e44affa31adbf61d4adbfdfb1965aa975803e14f2ee3df2ac729",
+        "candidate": "a21392b8b8d048d4194eab67b29ccd8a146668aa7f2a55d7fb4001ca290b626f"
+      },
+      {
+        "path": "packages/octane/src/signals/graph.ts",
+        "baseline": "719371959354ca916d11a76bb162eac93fb4efacf056d14290d5768bfe9dc3a5",
+        "candidate": "f723fc4c3e8e0ab89f3639d85838cebcf54d6f611510a0ae4fdbeb70724580be"
+      },
+      {
+        "path": "packages/octane/src/signals/requests.ts",
+        "baseline": "71c13917b62d698b96fd74fbe23ac60fa8eae2c4515bb72b804c89693efd4a2a",
+        "candidate": "79e06c4b5d73ab42fd735be6ebeaecafc74d8726e1a548bcd7e24f64415c3d24"
+      }
+    ],
+    "tests": [
+      {
+        "path": "packages/octane/tests/signals-state.test.ts",
+        "candidate": "92d614a8d6a222579aa3ac42fe9fab2c7264af3255e659b902390de6167faf7c"
+      },
+      {
+        "path": "packages/octane/tests/signals-async.test.ts",
+        "candidate": "b6c873d937375f911a0f16e5f3378135b3ca5bbd00fef4e475b82073844a3579"
+      },
+      {
+        "path": "packages/octane/tests/signals-serialization.test.ts",
+        "candidate": "a8a2ed51e7e936140a11abc8afa32d807acdf23360e489f7ecd17c832e30903e"
+      }
+    ],
+    "runs": [
+      {
+        "mode": "current",
+        "passed": 112,
+        "failed": 0,
+        "skipped": 0,
+        "failureNames": [],
+        "reportSha256": "19a306e05264c9d10fe1f48cf73b463936ec87ec3ecd48c37152032d49ac024e",
+        "command": "env SIGNAL_FAULT=none node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/current.json",
+        "injectedBehavior": "Unmodified candidate engine control."
+      },
+      {
+        "mode": "baseline",
+        "passed": 103,
+        "failed": 9,
+        "skipped": 0,
+        "failureNames": [
+          "scoped promise resources rejects cached foreign reads before cancellation callbacks finish owner retirement",
+          "scoped promise resources revokes an old foreign result without canceling a valid replacement request",
+          "scoped signal serialization and adoption does not serialize a ready foreign value from the retiring owner cancellation callback",
+          "scoped signal serialization and adoption does not serialize a retained foreign value from the retiring owner cancellation callback",
+          "scoped synchronous signals revokes a retained foreign value after a 'pending' branch stops reading it (indirect=false)",
+          "scoped synchronous signals revokes a retained foreign value after a 'error' branch stops reading it (indirect=false)",
+          "scoped synchronous signals revokes a retained foreign value after a 'pending' branch stops reading it (indirect=true)",
+          "scoped synchronous signals revokes a retained foreign value after a 'error' branch stops reading it (indirect=true)",
+          "scoped synchronous signals carries revocation through a ready projection that samples a retained foreign value"
+        ],
+        "reportSha256": "433d5dcd352a1d6403760ab0a8fe45a89d7042655e463e2da9d968e71d944c66",
+        "command": "env SIGNAL_FAULT=baseline node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/baseline.json",
+        "injectedBehavior": "Run current public regression tests against the unchanged baseline engine."
+      },
+      {
+        "mode": "activity-is-pending",
+        "passed": 110,
+        "failed": 2,
+        "skipped": 0,
+        "failureNames": [
+          "scoped promise resources applies shared retries to every selector with pending=false",
+          "scoped promise resources checks the availability of fallback projections separately from request activity"
+        ],
+        "reportSha256": "d56eded170a83be7e088008c19091069dc3098ae0e5b150322495ed8d0f6ae13",
+        "command": "env SIGNAL_FAULT=activity-is-pending node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/activity-is-pending.json",
+        "injectedBehavior": "Treat any active owner request as pending even when the authored expression can supply a fallback or retained value."
+      },
+      {
+        "mode": "idle-cache",
+        "passed": 105,
+        "failed": 7,
+        "skipped": 0,
+        "failureNames": [
+          "scoped promise resources publishes only the selected A→B→A attempt in completion order 0,1,2",
+          "scoped promise resources publishes only the selected A→B→A attempt in completion order 0,2,1",
+          "scoped promise resources publishes only the selected A→B→A attempt in completion order 1,0,2",
+          "scoped promise resources publishes only the selected A→B→A attempt in completion order 1,2,0",
+          "scoped promise resources publishes only the selected A→B→A attempt in completion order 2,0,1",
+          "scoped promise resources publishes only the selected A→B→A attempt in completion order 2,1,0",
+          "scoped promise resources loads a fresh answer when returning to a request no resource still owns"
+        ],
+        "reportSha256": "1cbbd230db25888f3ab35404aeff20e45310e75c8778170a4441254ae9aa11bc",
+        "command": "env SIGNAL_FAULT=idle-cache node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/idle-cache.json",
+        "injectedBehavior": "Retain a request entry after its final consumer leaves, allowing a later selection to reuse idle work."
+      },
+      {
+        "mode": "drop-latest",
+        "passed": 93,
+        "failed": 19,
+        "skipped": 0,
+        "failureNames": [
+          "scoped promise resources applies shared retries to every selector with pending=true",
+          "scoped promise resources checks the availability of fallback projections separately from request activity",
+          "scoped promise resources loads a fresh answer when returning to a request no resource still owns",
+          "scoped promise resources retains the displayed identity and action with the whole successful card",
+          "scoped promise resources revokes an old foreign result without canceling a valid replacement request",
+          "scoped promise resources releases retained ownership when switching to a different query family",
+          "scoped promise resources retains a whole successful projection across partial replacement and failure",
+          "scoped promise resources keeps refresh errors separate from retained data and requires an explicit retry",
+          "scoped signal serialization and adoption does not expose retained request metadata through an editable serialized seed",
+          "scoped signal serialization and adoption does not serialize a retained foreign value from the retiring owner cancellation callback",
+          "scoped signal serialization and adoption retains the whole old resource result and its argument while a new selection is pending",
+          "scoped signal serialization and adoption preserves a retained derived computation as a whole during a pending refresh",
+          "scoped synchronous signals retains a whole successful result through errors but exposes the error separately",
+          "scoped synchronous signals revokes a retained foreign value after a 'pending' branch stops reading it (indirect=false)",
+          "scoped synchronous signals revokes a retained foreign value after a 'error' branch stops reading it (indirect=false)",
+          "scoped synchronous signals revokes a retained foreign value after a 'pending' branch stops reading it (indirect=true)",
+          "scoped synchronous signals revokes a retained foreign value after a 'error' branch stops reading it (indirect=true)",
+          "scoped synchronous signals releases an old foreign lifetime after a whole replacement succeeds",
+          "scoped synchronous signals carries revocation through a ready projection that samples a retained foreign value"
+        ],
+        "reportSha256": "f891d4da88607784d226db88aa6da72ce0b49dde323fbfdb4a350f70184383ca",
+        "command": "env SIGNAL_FAULT=drop-latest node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/drop-latest.json",
+        "injectedBehavior": "Discard the last complete result when reading latest through nonready work."
+      },
+      {
+        "mode": "equal-owners",
+        "passed": 111,
+        "failed": 1,
+        "skipped": 0,
+        "failureNames": [
+          "scoped synchronous signals updates foreign lifetime ownership even when a replacement value compares equal"
+        ],
+        "reportSha256": "7836914de0e36ac27b7cf8b93cf6810792b8583e2a46c734549272892e7cc381",
+        "command": "env SIGNAL_FAULT=equal-owners node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/equal-owners.json",
+        "injectedBehavior": "Treat equal values as equivalent without checking which foreign owners contributed them."
+      },
+      {
+        "mode": "unbatched-action",
+        "passed": 107,
+        "failed": 5,
+        "skipped": 0,
+        "failureNames": [
+          "scoped synchronous signals groups nested actions, preserves this and arguments, and does not roll back on throw",
+          "scoped synchronous signals ends an action batch at its synchronous boundary, not across await",
+          "scoped synchronous signals applies a delayed draft only when its captured edit revision is current: 'new text'",
+          "scoped synchronous signals applies a delayed draft only when its captured edit revision is current: ''",
+          "scoped synchronous signals applies a delayed draft only when its captured edit revision is current: undefined"
+        ],
+        "reportSha256": "1894f8fd5327ae4b7e76a2bac7ae4f150bec4f0403cef43612422fd0b4be56f3",
+        "command": "env SIGNAL_FAULT=unbatched-action node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/unbatched-action.json",
+        "injectedBehavior": "Run an action body without its synchronous batch."
+      },
+      {
+        "mode": "no-retirement",
+        "passed": 0,
+        "failed": 4,
+        "skipped": 108,
+        "failureNames": [
+          "scoped signal serialization and adoption revokes all historical and retained reads when the data owner is retired",
+          "scoped signal serialization and adoption owns copied historical values through the adopting scope and its leases (wireRoundTrip=false)",
+          "scoped signal serialization and adoption owns copied historical values through the adopting scope and its leases (wireRoundTrip=true)",
+          "scoped synchronous signals hands a draft snapshot to a new owner without transferring the old restore operation"
+        ],
+        "reportSha256": "7feba258898e08b66e2f45db766e6d0c636a61f70e90a67f768a243a58196098",
+        "command": "env SIGNAL_FAULT=no-retirement node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs -t 'hands a draft snapshot|owns copied historical|revokes all historical' --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/no-retirement.json",
+        "injectedBehavior": "Turn scope disposal into a no-op; run only the explicit disposal and ownership handoff controls."
+      },
+      {
+        "mode": "no-wakeup",
+        "passed": 111,
+        "failed": 1,
+        "skipped": 0,
+        "failureNames": [
+          "scoped promise resources revokes an old foreign result without canceling a valid replacement request"
+        ],
+        "reportSha256": "5638c6a9f081028dc29f431695f5746653a3cadc5fc4eaff160ebbe026124a72",
+        "command": "env SIGNAL_FAULT=no-wakeup node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/no-wakeup.json",
+        "injectedBehavior": "Omit the wakeup when a retained foreign result is revoked while replacement work remains valid."
+      },
+      {
+        "mode": "serialize-retired-owner",
+        "passed": 110,
+        "failed": 2,
+        "skipped": 0,
+        "failureNames": [
+          "scoped signal serialization and adoption does not serialize a ready foreign value from the retiring owner cancellation callback",
+          "scoped signal serialization and adoption does not serialize a retained foreign value from the retiring owner cancellation callback"
+        ],
+        "reportSha256": "1254c338d611bd2632ccce70178a46bbaefc7fd7b0620a35440239a5d495c9f3",
+        "command": "env SIGNAL_FAULT=serialize-retired-owner node node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/vitest.config.mjs --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/serialize-retired-owner.json",
+        "injectedBehavior": "Permit cached foreign data to serialize during that owner cancellation callback without checking its lifetime."
+      }
+    ]
+  },
+  "deferred": {
+    "generatedAt": "2026-08-27T20:17:10.120Z",
+    "workingDirectory": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+    "sourceFile": "packages/octane/src/compiler/compile.js",
+    "compilerSha256": "9c0f6445561faa82c44aee82d62a90c4dc15f99058bb270f12ee597ecaa8a43d",
+    "testInputs": {
+      "packages/octane/tests/signals-deferred-values.test.ts": "f7cc9e75513d4a4efde89a01ea8532d39b531c0ce203949e3605178c4f37c148",
+      "packages/octane/tests/_fixtures/signals-deferred-values.tsrx": "1b50f731abc272aed84abe8ae3a5c592e87a8ef66b82e577663b5b2e0fd882f9"
+    },
+    "faultHarness": {
+      "deferred-fault.mjs": "3a004172f41c1ddde500514251840eeadd170a78ecde53608b0eb2c82cb60600",
+      "deferred-fault-register.mjs": "f9905db0f68db00935704e7486cff6ddba00be2f0aaf514ec309f8f3a5e344c3",
+      "deferred-vitest.config.mjs": "842f8acbadbddbccff52b78a75ef5ac95b7291d19e0c88fe712d808855d7bc34"
+    },
+    "publicDependencyProvenanceSha256": "c2a7a3413da743b296371698a87160f184869767d4dd568540445fd055b86e09",
+    "positive": {
+      "directory": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T20-12-39.758Z-nn1Otg",
+      "resultSha256": "34842bc12e78c8b04a2643121e50db77a4643e95aa22469736f11f416c8a50b8",
+      "passed": 42,
+      "failed": 0,
+      "sourceChangedDuringRun": []
+    },
+    "sourceChangesSincePositive": [
+      "packages/octane/src/compiler/volar.js",
+      "packages/octane/tests/compiler/volar.test.ts"
+    ],
+    "afterSourceSnapshotSha256": "c56cd1a90d1815ee96d5e3805ad033d510969a58f2984b351f7b663ce6eeb40c",
+    "limitation": "Faults change compiler source only in isolated Node/Vite module loads. Original repository sources were not mutated. Input hashes cover available sources, not an assertion that every file was loaded.",
+    "runs": [
+      {
+        "mode": "client-eager-host",
+        "passed": 5,
+        "failed": 9,
+        "skipped": 0,
+        "failureNames": [
+          "native reads in deferred JSX values keeps a hookless function callable outside render with ordinary data dependencies",
+          "native reads in deferred JSX values refreshes a shared descriptor after external inspection and unchanged parent props",
+          "native reads in deferred JSX values keeps a private factory result inspectable and cloneable on both renderers",
+          "native reads in deferred JSX values keeps a default factory result inspectable and cloneable on both renderers",
+          "native reads in deferred JSX values inspects a factory result in the caller scope and renders it in its represented provider",
+          "native reads in deferred JSX values hydrates a stored descriptor from the presented value and keeps its host through live updates",
+          "native reads in deferred JSX values keeps styled static fragments inspectable and hydrates their existing hosts",
+          "native reads in deferred JSX values keeps empty styled fragments inspectable and their global CSS local to the server render",
+          "native reads in deferred JSX values defers stored metadata until its renderer collects the current head and body values"
+        ],
+        "transformedCompilerSha256": "ceca069b8c7ecd4d199363831b95daaa02cda0db537950278465a5f3769ca372",
+        "reportSha256": "04b9733ad133834ea38e3cd733061f9fc14ffd496d7727ccedbdcc0d777e8917",
+        "command": "env NODE_OPTIONS='--import=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-fault-register.mjs --import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs' DEFERRED_FAULT=client-eager-host node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/deferred-vitest.config.mjs --project source-octane-signals packages/octane/tests/signals-deferred-values.test.ts --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-client-eager-host.json",
+        "injectedBehavior": "Restore eager compiled-fragment lowering for native client ordinary returned JSX."
+      },
+      {
+        "mode": "server-raw-output",
+        "passed": 2,
+        "failed": 12,
+        "skipped": 0,
+        "failureNames": [
+          "native reads in deferred JSX values keeps a hookless function callable outside render with ordinary data dependencies",
+          "native reads in deferred JSX values serializes reads made by a deferred server descriptor",
+          "native reads in deferred JSX values keeps a private factory result inspectable and cloneable on both renderers",
+          "native reads in deferred JSX values keeps a default factory result inspectable and cloneable on both renderers",
+          "native reads in deferred JSX values inspects a factory result in the caller scope and renders it in its represented provider",
+          "native reads in deferred JSX values defers a strict resource read until its stored Suspense boundary renders",
+          "native reads in deferred JSX values hydrates a stored descriptor from the presented value and keeps its host through live updates",
+          "native reads in deferred JSX values collects scoped styles when stored JSX renders without leaking them into unrelated server output",
+          "native reads in deferred JSX values keeps styled static fragments inspectable and hydrates their existing hosts",
+          "native reads in deferred JSX values keeps empty styled fragments inspectable and their global CSS local to the server render",
+          "native reads in deferred JSX values keeps returned component metadata in the document head and separate server head output",
+          "native reads in deferred JSX values defers stored metadata until its renderer collects the current head and body values"
+        ],
+        "transformedCompilerSha256": "057151756b012400b69df158a59966a11f7d589ba681cfd7d0302327a2e956f1",
+        "reportSha256": "b510bce52440520fdaf2d9b02111e020edc93fd75f8b182ed17bc4a9ed77736f",
+        "command": "env NODE_OPTIONS='--import=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-fault-register.mjs --import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs' DEFERRED_FAULT=server-raw-output node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/deferred-vitest.config.mjs --project source-octane-signals packages/octane/tests/signals-deferred-values.test.ts --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-server-raw-output.json",
+        "injectedBehavior": "Restore server component lowering that returns raw HTML for ordinary JSX functions."
+      },
+      {
+        "mode": "factory-time-css",
+        "passed": 11,
+        "failed": 3,
+        "skipped": 0,
+        "failureNames": [
+          "native reads in deferred JSX values collects scoped styles when stored JSX renders without leaking them into unrelated server output",
+          "native reads in deferred JSX values keeps styled static fragments inspectable and hydrates their existing hosts",
+          "native reads in deferred JSX values keeps empty styled fragments inspectable and their global CSS local to the server render"
+        ],
+        "transformedCompilerSha256": "ad92b9d4a9f7dddee62d5b53ac9159508355efe30ca95b506039864be60e80b5",
+        "reportSha256": "0531d2e1efe2828c8bfd87e0e6c5da6f344c03a7071e22703f6c8ccefddc1ab9",
+        "command": "env NODE_OPTIONS='--import=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-fault-register.mjs --import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs' DEFERRED_FAULT=factory-time-css node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/deferred-vitest.config.mjs --project source-octane-signals packages/octane/tests/signals-deferred-values.test.ts --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-factory-time-css.json",
+        "injectedBehavior": "Register styles only when the factory runs, omitting registration when its deferred result is interpreted."
+      },
+      {
+        "mode": "static-style-array",
+        "passed": 11,
+        "failed": 3,
+        "skipped": 0,
+        "failureNames": [
+          "native reads in deferred JSX values collects scoped styles when stored JSX renders without leaking them into unrelated server output",
+          "native reads in deferred JSX values keeps styled static fragments inspectable and hydrates their existing hosts",
+          "native reads in deferred JSX values keeps empty styled fragments inspectable and their global CSS local to the server render"
+        ],
+        "transformedCompilerSha256": "e33570a61b12af1dc3ef1877829e3bbeb92443e328e7c5836c00fa86b7fb3003",
+        "reportSha256": "64b10333748a23a8aa291e1277b2af23249fe155c7b39223b40142cd18e2fbce",
+        "command": "env NODE_OPTIONS='--import=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-fault-register.mjs --import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs' DEFERRED_FAULT=static-style-array node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/deferred-vitest.config.mjs --project source-octane-signals packages/octane/tests/signals-deferred-values.test.ts --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-static-style-array.json",
+        "injectedBehavior": "Leave styled returned fragments as arrays without the required deferred Fragment record."
+      },
+      {
+        "mode": "skip-normalization",
+        "passed": 12,
+        "failed": 2,
+        "skipped": 0,
+        "failureNames": [
+          "native reads in deferred JSX values keeps returned component metadata in the document head and separate server head output",
+          "native reads in deferred JSX values defers stored metadata until its renderer collects the current head and body values"
+        ],
+        "transformedCompilerSha256": "6a53b2adc18ad257be4b107e8579b0917354e6e260b9f2ac74afbe1042bf08ae",
+        "reportSha256": "cd9683060f63694856a5f0c68b38a7f43917f223a6e4bf4d254587187a1fff95",
+        "command": "env NODE_OPTIONS='--import=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-fault-register.mjs --import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs' DEFERRED_FAULT=skip-normalization node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-consolidation-faults.fYtPq7/deferred-vitest.config.mjs --project source-octane-signals packages/octane/tests/signals-deferred-values.test.ts --reporter=json --outputFile=/private/tmp/octane-consolidation-faults.fYtPq7/deferred-skip-normalization.json",
+        "injectedBehavior": "Skip existing template normalization for native returned metadata and other compiler-owned syntax."
+      }
+    ]
+  }
+}

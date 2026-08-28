@@ -34,7 +34,7 @@ invoked as a child process at 50 and then 500 cards, each target's SSR bundle
 built entry is self-contained — and vue-vapor `vue/server-renderer`
 `renderToString` — on the server a vapor SFC compiles to
 the regular `ssrRender` string codegen, so this measures Vue's standard
-compiled SSR) is `vite build`-t with
+compiled SSR — plus Inferno's native `renderToString`) is `vite build`-t with
 an outDir override into `dist/news-{50,500}/<target>` here — **nothing under
 `benchmarks/news/` is modified** (its `src/data.js` is regenerated back to the
 tracked count-50 dataset afterwards; the generator is seeded, so the bytes are

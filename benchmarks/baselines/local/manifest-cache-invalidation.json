@@ -1,0 +1,88 @@
+{
+  "suite": "manifest-cache-invalidation",
+  "iterations": 8,
+  "targets": [
+    {
+      "name": "ordinary-small-cache",
+      "ops": {
+        "invalidate": {
+          "score": 0.0005589624999999956,
+          "median": 0.0005549164999999902,
+          "min": 0.0005411459999999977,
+          "mean": 0.0005536328124999948,
+          "p95": 0.0005633750000000078,
+          "sd": 0.000008351460714559248,
+          "rme": 1.2613243278589408,
+          "scoreRme": 0.8937399310613884,
+          "warmupRatio": 0.9848751928796654,
+          "samples": 8,
+          "p99": 0.0005633750000000078
+        }
+      },
+      "meta": {
+        "directories": 128,
+        "cacheEntries": 129,
+        "invalidationsPerSample": 2000,
+        "classification": "none",
+        "dependencies": 1,
+        "missingDependencies": 1,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "ordinary-large-cache",
+      "ops": {
+        "invalidate": {
+          "score": 0.0005599291999999877,
+          "median": 0.0005650210000000016,
+          "min": 0.0005402919999999938,
+          "mean": 0.000560651124999989,
+          "p95": 0.0005802499999999781,
+          "sd": 0.000013942861744449817,
+          "rme": 2.0794351201605563,
+          "scoreRme": 2.5773541422221617,
+          "warmupRatio": 1.000134124099972,
+          "samples": 8,
+          "p99": 0.0005802499999999781
+        }
+      },
+      "meta": {
+        "directories": 5000,
+        "cacheEntries": 5001,
+        "invalidationsPerSample": 2000,
+        "classification": "none",
+        "dependencies": 1,
+        "missingDependencies": 1,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "manifest-large-cache",
+      "ops": {
+        "invalidate": {
+          "score": 0.049195637400000006,
+          "median": 0.04920847900000001,
+          "min": 0.04547291649999997,
+          "mean": 0.048596335812499995,
+          "p95": 0.04921549999999996,
+          "sd": 0.0013189077801943738,
+          "rme": 2.269326879504432,
+          "scoreRme": 0.05867209947987396,
+          "warmupRatio": 0.9806417448714665,
+          "samples": 8,
+          "p99": 0.04921549999999996
+        }
+      },
+      "meta": {
+        "directories": 5000,
+        "cacheEntries": 5001,
+        "invalidationsPerSample": 2000,
+        "classification": "none",
+        "dependencies": 1,
+        "missingDependencies": 1,
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

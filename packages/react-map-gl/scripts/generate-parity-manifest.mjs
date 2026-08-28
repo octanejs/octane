@@ -181,7 +181,6 @@ const sharedSupport = [
 	supportFile('packages/react-map-gl/tests/_helpers.ts'),
 	supportFile('packages/react-map-gl/tests/_mocks/mapbox-gl.ts'),
 	supportFile('packages/react-map-gl/tests/_fixtures/upstream-apps.tsrx'),
-	supportFile('vitest.config.js'),
 ];
 
 const upstreamUtilLane = (lane, project) => ({
@@ -202,10 +201,12 @@ const upstreamUtilLane = (lane, project) => ({
 	files: [
 		testFile(`packages/react-map-gl/tests/upstream-util/${lane}.test.ts`, `upstream-util-${lane}`),
 		// The vendored spec files stay byte-exact, so they are hashed here rather
-		// than annotated: the wrapper above declares their cases.
+		// than annotated: the wrapper above declares their cases. The whole
+		// vendored tree additionally verifies offline against the upstream git
+		// blob shas in the lock.
+		supportFile('packages/react-map-gl/audit/upstream.lock.json'),
 		...UPSTREAM_UTIL_SPECS.map(supportFile),
 		supportFile('packages/react-map-gl/tests/_harness/tape-adapter.ts'),
-		supportFile('vitest.config.js'),
 	],
 });
 
@@ -401,7 +402,6 @@ const manifest = {
 				supportFile('packages/react-map-gl/tests/_fixtures/differential/use-control-diff.tsrx'),
 				supportFile('packages/react-map-gl/tests/_fixtures/differential/marker-children-diff.tsrx'),
 				supportFile('packages/react-map-gl/tests/_mocks/mapbox-gl.ts'),
-				supportFile('vitest.config.js'),
 			],
 		},
 	],

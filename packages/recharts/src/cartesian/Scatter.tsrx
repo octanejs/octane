@@ -1,16 +1,25 @@
+import type { RegisteredCell } from '../context/CellsContext.ts';
+import type { CellPropsFor } from '../component/Cell.ts';
+
+import type {
+	MutableRefObject,
+	NativeMouseEvent,
+	OctaneElement,
+	OctaneNode,
+} from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { MutableRefObject, ReactElement, ReactNode, useMemo, useRef } from 'octane';
+import { useMemo, useRef } from 'octane';
 
 import { clsx } from 'clsx';
-import { Layer } from '../container/Layer';
+import { Layer } from '../container/Layer.tsrx';
 import {
 	CartesianLabelListContextProvider,
 	CartesianLabelListEntry,
 	ImplicitLabelListType,
 	LabelListFromLabelProp,
-} from '../component/LabelList';
-import { Curve, CurveType, Props as CurveProps } from '../shape/Curve';
-import { ErrorBarDataItem, ErrorBarDataPointFormatter, ErrorBarDirection } from './ErrorBar';
+} from '../component/LabelList.tsrx';
+import { Curve, CurveType, Props as CurveProps } from '../shape/Curve.tsrx';
+import { ErrorBarDataItem, ErrorBarDataPointFormatter, ErrorBarDirection } from './ErrorBar.tsrx';
 import { getLinearRegression, interpolate, isNullish } from '../util/DataUtils';
 import { getCateCoordinateOfLine, getTooltipNameProp, getValueByDataKey } from '../util/ChartUtils';
 import {
@@ -33,10 +42,10 @@ import {
 	TrapezoidViewBox,
 	CartesianLayout,
 } from '../util/types';
-import { Formatter, TooltipType } from '../component/DefaultTooltipContent';
-import { ScatterShapeProps, ScatterSymbol } from '../util/ScatterUtils';
-import { InnerSymbolsProp } from '../shape/Symbols';
-import type { LegendPayload } from '../component/DefaultLegendContent';
+import { Formatter, TooltipType } from '../component/DefaultTooltipContent.tsrx';
+import { ScatterShapeProps, ScatterSymbol } from '../util/ScatterUtils.tsrx';
+import { InnerSymbolsProp } from '../shape/Symbols.tsrx';
+import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
 import {
 	useMouseClickItemDispatch,
 	useMouseEnterItemDispatch,
@@ -48,9 +57,9 @@ import {
 	TooltipPayloadEntry,
 } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { SetErrorBarContext } from '../context/ErrorBarContext';
+import { SetErrorBarContext } from '../context/ErrorBarContext.tsrx';
 import { AxisId } from '../state/cartesianAxisSlice';
-import { GraphicalItemClipPath, useNeedsClip } from './GraphicalItemClipPath';
+import { GraphicalItemClipPath, useNeedsClip } from './GraphicalItemClipPath.tsrx';
 import { selectScatterPoints } from '../state/selectors/scatterSelectors';
 import { useAppSelector } from '../state/hooks';
 import { RechartsRootState } from '../state/store';
@@ -60,7 +69,7 @@ import { selectActiveTooltipIndex } from '../state/selectors/tooltipSelectors';
 import { SetLegendPayload } from '../state/SetLegendPayload';
 import { DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME } from '../util/Constants';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
-import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId';
+import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import type { ScatterSettings } from '../state/types/ScatterSettings';
 import { SetCartesianGraphicalItem } from '../state/SetGraphicalItem';
 import {
@@ -72,11 +81,11 @@ import {
 	AnimatedItems,
 	AnimationInterpolateFn,
 	useAnimationCallbacks,
-} from '../animation/AnimatedItems';
+} from '../animation/AnimatedItems.tsrx';
 import { AnimationMatchByProp, matchAppend } from '../animation/matchBy';
 import { WithIdRequired, WithoutId } from '../util/useUniqueId';
 import { GraphicalItemId } from '../state/graphicalItemsSlice';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { propsAreEqual } from '../util/propsAreEqual';
 import { ChartData } from '../state/chartDataSlice';
@@ -99,11 +108,11 @@ export interface ScatterPointItem {
 	/**
  * The x coordinate of the point center in pixels.
  */
-	cx: number | undefined;
+	cx: number | null | undefined;
 	/**
  * The y coordinate of the point center in pixels.
  */
-	cy: number | undefined;
+	cy: number | null | undefined;
 	/**
  * The x coordinate (in pixels) of the top-left corner of the rectangle that wraps the point.
  */
@@ -117,7 +126,7 @@ export interface ScatterPointItem {
  * It's not the radius itself, but rather a value that is used to calculate the radius.
  * Interacts with the zAxis range.
  */
-	size: number;
+	size: number | undefined;
 	/**
  * Width of the point in pixels.
  */
@@ -129,11 +138,12 @@ export interface ScatterPointItem {
 	node: ScatterPointNode;
 	payload?: any;
 	tooltipPayload?: TooltipPayload;
-	tooltipPosition: Coordinate;
+	tooltipPosition: Coordinate | undefined;
 }
 
 export type ScatterCustomizedShape =
-	ActiveShape<ScatterShapeProps & InnerSymbolsProp, SVGPathElement> | SymbolType;
+	| ActiveShape<ScatterShapeProps & Omit<InnerSymbolsProp, keyof ScatterShapeProps>, SVGPathElement>
+	| SymbolType;
 
 /**
  * Internal props, combination of external props + defaultProps + private Recharts state
@@ -144,10 +154,7 @@ interface ScatterInternalProps extends ZIndexable {
 	yAxisId: string | number;
 	zAxisId: string | number;
 	dataKey?: DataKey<any>;
-	line?: | ReactElement<SVGElement>
-	| ((props: any) => ReactElement<SVGElement>)
-	| CurveProps
-	| boolean;
+	line?: OctaneElement<CurveProps> | ((props: CurveProps) => OctaneNode) | CurveProps | boolean;
 	lineType: 'fitting' | 'joint';
 	lineJointType: CurveType;
 	legendType: LegendType;
@@ -170,7 +177,7 @@ interface ScatterInternalProps extends ZIndexable {
 	onAnimationEnd?: () => void;
 	needClip: boolean;
 	id: GraphicalItemId;
-	children?: ReactNode;
+	children?: OctaneNode;
 }
 
 /**
@@ -211,7 +218,7 @@ interface ScatterProps<DataPointType = any, DataValueType = any> extends DataPro
  * Options:
  * - `false`: no line is drawn.
  * - `true`: a default line is drawn.
- * - `ReactElement`: the option is the custom line element.
+ * - `OctaneElement`: the option is the custom line element.
  * - `function`: the function will be called to render customized line.
  * - `object`: the option is the props of Curve element.
  *
@@ -224,10 +231,7 @@ interface ScatterProps<DataPointType = any, DataValueType = any> extends DataPro
  *
  * @see {@link https://recharts.github.io/en-US/examples/JointLineScatterChart/ Scatter chart with joint line}
  */
-	line?: | ReactElement<SVGElement>
-	| ((props: any) => ReactElement<SVGElement>)
-	| CurveProps
-	| boolean;
+	line?: OctaneElement<CurveProps> | ((props: CurveProps) => OctaneNode) | CurveProps | boolean;
 	/**
  * Determines calculation method of the line if the `line` prop is set.
  * Options:
@@ -283,7 +287,7 @@ interface ScatterProps<DataPointType = any, DataValueType = any> extends DataPro
 	/**
  * Determines the shape of individual data points.
  * - Can be one of the predefined shapes as a string, which will be passed to {@link Symbols} component.
- * - If set a ReactElement, the shape of point can be customized.
+ * - If set a OctaneElement, the shape of point can be customized.
  * - If set a function, the function will be called to render customized shape.
  * - During animations, the function shape also receives `animationElapsedTime`, `isAnimating`, and `isEntrance`.
  * @defaultValue circle
@@ -310,7 +314,7 @@ interface ScatterProps<DataPointType = any, DataValueType = any> extends DataPro
  * - `true`: renders default labels;
  * - `false`: no labels are rendered;
  * - `object`: the props of LabelList component;
- * - `ReactElement`: a custom SVG label element, such as `<text>` or `<g>`.
+ * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
  *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
  * - `function`: a render function of custom label.
  *
@@ -389,7 +393,7 @@ interface ScatterProps<DataPointType = any, DataValueType = any> extends DataPro
  * @see {@link https://recharts.github.io/en-US/guide/zIndex/ Z-Index and layers guide}
  */
 	zIndex?: number;
-	children?: ReactNode;
+	children?: OctaneNode;
 }
 
 /**
@@ -488,7 +492,7 @@ function ScatterLine({
 
 	const scatterProps = svgPropertiesNoEvents(props);
 	const customLineProps = svgPropertiesNoEventsFromUnknown(line);
-	let linePoints: ReadonlyArray<NullableCoordinate>, lineItem: ReactNode;
+	let linePoints: ReadonlyArray<NullableCoordinate> | undefined, lineItem: OctaneNode;
 
 	if (lineType === 'joint') {
 		linePoints = points.map((entry) => ({ x: entry.cx ?? null, y: entry.cy ?? null }));
@@ -503,17 +507,14 @@ function ScatterLine({
 
 	const lineProps: CurveProps = {
 		...scatterProps,
-		// @ts-expect-error customLineProps is contributing unknown props
 		fill: 'none',
-		// @ts-expect-error customLineProps is contributing unknown props
 		stroke: scatterProps && scatterProps.fill,
 		...customLineProps,
-		// @ts-expect-error linePoints is used before it is assigned (???)
 		points: linePoints,
 	};
 
-	if (React.isValidElement(line)) {
-		lineItem = React.cloneElement(line as any, lineProps);
+	if (React.isValidElement<CurveProps>(line)) {
+		lineItem = React.cloneElement(line, lineProps);
 	} else if (typeof line === 'function') {
 		lineItem = line(lineProps);
 	} else {
@@ -530,7 +531,7 @@ function ScatterLabelListProvider({
 }: {
 	showLabels: boolean;
 	points: ReadonlyArray<ScatterPointItem>;
-	children: ReactNode;
+	children: OctaneNode;
 }) {
 	const chartViewBox = useViewBox();
 	const labelListEntries: ReadonlyArray<CartesianLabelListEntry> = useMemo(() => {
@@ -610,16 +611,16 @@ function ScatterPoint({
 	baseProps: ReturnType<typeof svgPropertiesNoEvents>;
 	id: GraphicalItemId;
 	restOfAllOtherProps: InternalProps;
-	onMouseEnterFromContext: (data: ScatterPointItem, index: number) => (event: React.MouseEvent<
+	onMouseEnterFromContext: (data: ScatterPointItem, index: number) => (event: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
-	onMouseLeaveFromContext: (data: ScatterPointItem, index: number) => (event: React.MouseEvent<
+	onMouseLeaveFromContext: (data: ScatterPointItem, index: number) => (event: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
-	onClickFromContext: (data: ScatterPointItem, index: number) => (event: React.MouseEvent<
+	onClickFromContext: (data: ScatterPointItem, index: number) => (event: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
-}): React.ReactElement {
+}): OctaneElement {
 	const hasActiveShape = activeShape != null && activeShape !== false;
 	const selectIsActive = useMemo(() => {
 		const strIndex = String(index);
@@ -813,7 +814,7 @@ export function computeScatterPoints({
 	scatterSettings: ScatterSettings;
 	xAxisTicks: ReadonlyArray<TickItem> | undefined;
 	yAxisTicks: ReadonlyArray<TickItem> | undefined;
-	cells: ReadonlyArray<ReactElement> | undefined;
+	cells: ReadonlyArray<RegisteredCell> | undefined;
 }): ReadonlyArray<ScatterPointItem> {
 	const xAxisDataKey = isNullish(xAxis.dataKey) ? scatterSettings.dataKey : xAxis.dataKey;
 	const yAxisDataKey = isNullish(yAxis.dataKey) ? scatterSettings.dataKey : yAxis.dataKey;
@@ -825,17 +826,16 @@ export function computeScatterPoints({
 	const yBandSize =
 		yAxis.scale.bandwidth ? yAxis.scale.bandwidth() : 0;
 	return displayedData.map((entry: unknown, index): ScatterPointItem => {
-		const x: unknown = getValueByDataKey(entry, xAxisDataKey);
-		const y: unknown = getValueByDataKey(entry, yAxisDataKey);
-		const z: unknown = isNullish(zAxisDataKey)
+		const x = getValueByDataKey<unknown, number | string>(entry, xAxisDataKey);
+		const y = getValueByDataKey<unknown, number | string>(entry, yAxisDataKey);
+		const z: number | string = isNullish(zAxisDataKey)
 			? '-'
-			: getValueByDataKey(entry, zAxisDataKey) ?? '-';
+			: getValueByDataKey<unknown, number | string>(entry, zAxisDataKey) ?? '-';
 
 		const tooltipPayload: Array<TooltipPayloadEntry> = [
 			{
 				name: isNullish(xAxis.dataKey) ? scatterSettings.name : xAxis.name || String(xAxis.dataKey),
 				unit: xAxis.unit || '',
-				// @ts-expect-error getValueByDataKey does not validate the output type
 				value: x,
 				payload: entry,
 				dataKey: xAxisDataKey,
@@ -845,7 +845,6 @@ export function computeScatterPoints({
 			{
 				name: isNullish(yAxis.dataKey) ? scatterSettings.name : yAxis.name || String(yAxis.dataKey),
 				unit: yAxis.unit || '',
-				// @ts-expect-error getValueByDataKey does not validate the output type
 				value: y,
 				payload: entry,
 				dataKey: yAxisDataKey,
@@ -856,10 +855,8 @@ export function computeScatterPoints({
 
 		if (z !== '-' && zAxis != null) {
 			tooltipPayload.push({
-				// @ts-expect-error name prop should not have dataKey in it
-				name: zAxis.name || zAxis.dataKey,
+				name: zAxis.name || String(zAxis.dataKey),
 				unit: zAxis.unit || '',
-				// @ts-expect-error getValueByDataKey does not validate the output type
 				value: z,
 				payload: entry,
 				dataKey: zAxisDataKey,
@@ -890,8 +887,7 @@ export function computeScatterPoints({
 			size == null ? 0 : Math.sqrt(Math.max(size, 0) / Math.PI);
 
 		return {
-			// @ts-expect-error can't spread unknown
-			...entry,
+			...entry as Record<string, unknown>,
 			cx,
 			cy,
 			x: cx == null ? undefined : cx - radius,
@@ -901,9 +897,9 @@ export function computeScatterPoints({
 			size,
 			node: { x, y, z },
 			tooltipPayload,
-			tooltipPosition: { x: cx, y: cy },
+			tooltipPosition: cx == null || cy == null ? undefined : { x: cx, y: cy },
 			payload: entry,
-			...cells && cells[index] && cells[index].props,
+			...cells && cells[index] && cells[index].props as CellPropsFor<SVGPathElement>,
 		};
 	});
 }
@@ -917,8 +913,7 @@ const errorBarDataPointFormatter: ErrorBarDataPointFormatter<ScatterPointItem> =
 		x: dataPoint.cx,
 		y: dataPoint.cy,
 		value: direction === 'x' ? Number(dataPoint.node.x) : Number(dataPoint.node.y),
-		// @ts-expect-error getValueByDataKey does not validate the output type
-		errorVal: getValueByDataKey(dataPoint, dataKey),
+		errorVal: getValueByDataKey<unknown, ErrorBarDataItem['errorVal']>(dataPoint, dataKey),
 	};
 };
 
@@ -1037,7 +1032,9 @@ function ScatterImpl(props: WithIdRequired<Props>) {
 	</CellsContext.Provider>;
 }
 
-function ScatterFn(outsideProps: Props) {
+function ScatterFn<DataPointType = any, ValueAxisType = any>(
+	outsideProps: Props<DataPointType, ValueAxisType>,
+) {
 	const props = resolveDefaultProps(outsideProps, defaultScatterProps);
 	const isPanorama = useIsPanorama();
 	return <RegisterGraphicalItemId id={props.id} type="scatter">
@@ -1067,10 +1064,8 @@ function ScatterFn(outsideProps: Props) {
  * @provides CellReader
  * @consumes CartesianChartContext
  */
-export const Scatter = React.memo(ScatterFn, propsAreEqual) as (props: Props<
-	DataPointType,
-	ValueAxisType
->) => ReactElement;
-// @ts-expect-error we need to set the displayName for debugging purposes
-
+export const Scatter = React.memo(ScatterFn, propsAreEqual) as
+	typeof ScatterFn & {
+		displayName?: string;
+	};
 Scatter.displayName = 'Scatter';

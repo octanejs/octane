@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startBridge } from '../src/bridge';
-import { OctaneDevtoolsEventClient } from '../src/client';
+import { OctaneDevtoolsEventClient, type NodeDetail } from '../src/client';
 
 type Listener = () => void;
 
@@ -9,7 +9,7 @@ type Listener = () => void;
 // hook is covered by packages/octane/tests/devtools-hook.test.ts.
 function installFakeHook() {
 	const subs = new Set<Listener>();
-	const detail = {
+	const detail: NodeDetail = {
 		id: 1,
 		name: 'App',
 		hooks: [{ kind: 'state', value: 0 }],
@@ -36,6 +36,67 @@ afterEach(() => {
 });
 
 describe('bridge', () => {
+	it('refreshes selected native reads and clears a retired selection without resending an unchanged tree', async () => {
+		vi.useFakeTimers();
+		try {
+			const { hook, detail } = installFakeHook();
+			let current: NodeDetail | null = {
+				...detail,
+				nativeReads: {
+					ownerId: 1,
+					committed: {
+						mixed: false,
+						reads: [{ observedVersion: 1, currentVersion: 1, source: null }],
+					},
+					pending: [],
+					retry: [],
+				},
+			};
+			hook.inspect = () => current;
+			const app = new OctaneDevtoolsEventClient();
+			const panel = new OctaneDevtoolsEventClient();
+			const received = vi.fn();
+			const cleared = vi.fn();
+			const offInspect = panel.on('inspect', (event) => received(event.payload));
+			const offClear = panel.on('inspect-clear', (event) => cleared(event.payload));
+			const stop = startBridge(app);
+			try {
+				const emitted = vi.spyOn(app, 'emit');
+				panel.emit('inspect-request', { id: 1 });
+				await Promise.resolve();
+				expect(received).toHaveBeenLastCalledWith(current);
+				current = {
+					...current!,
+					nativeReads: {
+						...current!.nativeReads!,
+						committed: {
+							mixed: false,
+							reads: [{ observedVersion: 2, currentVersion: 2, source: null }],
+						},
+					},
+				};
+				hook._fire();
+				await vi.advanceTimersByTimeAsync(400);
+				expect(received).toHaveBeenCalledTimes(2);
+				expect(received).toHaveBeenLastCalledWith(current);
+				expect(emitted.mock.calls.filter(([event]) => event === 'tree')).toHaveLength(0);
+				hook._fire();
+				await vi.advanceTimersByTimeAsync(400);
+				expect(received).toHaveBeenCalledTimes(2);
+				current = null;
+				hook._fire();
+				await vi.advanceTimersByTimeAsync(400);
+				expect(cleared).toHaveBeenCalledExactlyOnceWith({ id: 1 });
+			} finally {
+				stop();
+				offInspect();
+				offClear();
+			}
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('coalesces bursts of flushes into one throttled emit and dedupes unchanged data', async () => {
 		vi.useFakeTimers();
 		try {

@@ -1181,7 +1181,7 @@ describe('useTransition — the old screen stays whole', () => {
 		r.unmount();
 	});
 
-	it('a slot leaving array mode tears down inline, and the hold re-asserts the screen', async () => {
+	it('keeps array content mounted until a suspended text replacement is ready', async () => {
 		const fulfilled = {
 			status: 'fulfilled',
 			value: 'zero',
@@ -1190,42 +1190,47 @@ describe('useTransition — the old screen stays whole', () => {
 		const d1 = deferred<string>();
 		const load = (step: number) => (step === 0 ? fulfilled : d1.promise);
 		const log = createLog();
+		const rowRefs: Record<string, { current: HTMLLIElement | null }> = {
+			a: { current: null },
+			b: { current: null },
+		};
 
-		const r = mount(TransitionArrayModeExit, { load, log: log.push });
-		await act(() => {});
-		expect(r.findAll('#host li').map((li) => li.id)).toEqual(['row-a', 'row-b']);
-		expect(log.drain()).toEqual(['render:tail:0', 'mount:a', 'mount:b']);
+		const r = mount(TransitionArrayModeExit, { load, log: log.push, rowRefs });
+		try {
+			await act(() => {});
+			const rows = r.findAll('#host li');
+			const inputs = rows.map((row) => row.querySelector('input')!);
+			expect(rows.map((li) => li.id)).toEqual(['row-a', 'row-b']);
+			expect(log.drain()).toEqual(['mount:a', 'mount:b']);
+			inputs[0].value = 'edited a';
+			inputs[1].value = 'edited b';
 
-		// The flip discards the slot itself, so its teardown runs inline with the
-		// attempt — layout cleanups before the tail's render. The hold then
-		// re-asserts the whole old screen: the rows come back as fresh mounts.
-		// Their state does not survive (the flip destroyed it, and a kind flip is
-		// not journaled), but the held screen is whole, which the old plain-text
-		// tear never was.
-		r.click('#bump');
-		expect(r.findAll('#fallback')).toHaveLength(0);
-		expect(log.drain()).toEqual([
-			'cleanup:a',
-			'cleanup:b',
-			'render:tail:1',
-			'render:tail:0',
-			'mount:a',
-			'mount:b',
-		]);
-		expect(r.find('#host').textContent).toBe('ab');
-		expect(r.find('#value').textContent).toBe('zero');
+			r.click('#bump');
+			expect(r.findAll('#fallback')).toHaveLength(0);
+			await act(() => {});
+			expect(log.drain()).toEqual([]);
+			for (let index = 0; index < rows.length; index++) {
+				expect(r.findAll('#host li')[index]).toBe(rows[index]);
+				expect(rows[index].querySelector('input')).toBe(inputs[index]);
+			}
+			expect(inputs.map((input) => input.value)).toEqual(['edited a', 'edited b']);
+			expect(rowRefs.a.current).toBe(rows[0]);
+			expect(rowRefs.b.current).toBe(rows[1]);
+			expect(r.find('#host').textContent).toBe('ab');
+			expect(r.find('#value').textContent).toBe('zero');
 
-		await act(() => {
-			d1.resolve('one');
-		});
-		// The promotion replays the flip for real: same inline teardown order.
-		expect(r.find('#host').textContent).toBe('plain');
-		expect(r.find('#value').textContent).toBe('one');
-		expect(log.drain()).toEqual(['cleanup:a', 'cleanup:b', 'render:tail:1']);
-
-		// Every mount above has exactly one matching cleanup; nothing left over.
-		r.unmount();
-		await act(() => {});
+			await act(() => {
+				d1.resolve('one');
+			});
+			expect(r.find('#host').textContent).toBe('plain');
+			expect(r.find('#value').textContent).toBe('one');
+			expect(rowRefs.a.current).toBeNull();
+			expect(rowRefs.b.current).toBeNull();
+			expect(log.drain().sort()).toEqual(['cleanup:a', 'cleanup:b']);
+		} finally {
+			r.unmount();
+			await act(() => {});
+		}
 		expect(log.drain()).toEqual([]);
 	});
 

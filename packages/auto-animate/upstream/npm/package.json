@@ -1,0 +1,65 @@
+{
+  "name": "@formkit/auto-animate",
+  "version": "0.10.0",
+  "description": "Add motion to your apps with a single line of code.",
+  "keywords": [
+    "animation",
+    "transition",
+    "react",
+    "preact",
+    "vue",
+    "angular",
+    "svelte",
+    "solid",
+    "marko"
+  ],
+  "type": "module",
+  "main": "index.mjs",
+  "module": "index.mjs",
+  "types": "index.d.ts",
+  "repository": "https://github.com/formkit/auto-animate.git",
+  "author": "Justin Schroeder <justin@formkit.com>",
+  "license": "MIT",
+  "exports": {
+    "./vue": {
+      "types": "./vue/index.d.ts",
+      "import": "./vue/index.mjs",
+      "default": "./vue/index.mjs"
+    },
+    "./preact": {
+      "types": "./preact/index.d.ts",
+      "import": "./preact/index.mjs",
+      "default": "./preact/index.mjs"
+    },
+    "./react": {
+      "types": "./react/index.d.ts",
+      "import": "./react/index.mjs",
+      "default": "./react/index.mjs"
+    },
+    "./solid": {
+      "types": "./solid/index.d.ts",
+      "import": "./solid/index.mjs",
+      "default": "./solid/index.mjs"
+    },
+    "./marko": {
+      "default": "./tags/auto-animate.marko"
+    },
+    "./angular": {
+      "types": "./angular/index.d.ts",
+      "import": "./angular/index.mjs",
+      "default": "./angular/index.mjs"
+    },
+    "./nuxt": {
+      "types": "./nuxt/module.d.ts",
+      "import": "./nuxt/module.mjs",
+      "require": "./nuxt/module.cjs",
+      "default": "./nuxt/module.mjs"
+    },
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs",
+      "default": "./index.mjs"
+    }
+  },
+  "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"
+}

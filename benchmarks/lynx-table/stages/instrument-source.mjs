@@ -48,7 +48,7 @@ export function instrumentLynxStageSources(repositoryRoot) {
 			return replaceOnce(
 				next,
 				`\tprofile.commands += record.batch?.commands?.length ?? 0;
-\ttry {
+\tprofile.bytes += encoded.length;
 `,
 				`\tconst commands = record.batch?.commands ?? [];
 \tprofile.commands += commands.length;
@@ -80,7 +80,7 @@ export function instrumentLynxStageSources(repositoryRoot) {
 \t\t\tmeasured.publicHandleCommands = (measured.publicHandleCommands ?? 0) + 1;
 \t\t}
 \t}
-\ttry {
+\tprofile.bytes += encoded.length;
 `,
 				file,
 			);
@@ -98,7 +98,9 @@ export function instrumentLynxStageSources(repositoryRoot) {
 \t\tcommands: 0,
 \t\tbytes: 0,
 \t\tselfcheckMs: 0,
+\t\tencodeMs: 0,
 \t\tdispatchMs: 0,
+\t\tdecodeMs: 0,
 \t\tvalidateMs: 0,
 \t\tprepareMs: 0,
 \t\tprepareCheckMs: 0,
@@ -260,7 +262,9 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 \t\t\t\t\tcommands: 0,
 \t\t\t\t\tbytes: 0,
 \t\t\t\t\tselfcheckMs: 0,
+\t\t\t\t\tencodeMs: 0,
 \t\t\t\t\tdispatchMs: 0,
+\t\t\t\t\tdecodeMs: 0,
 \t\t\t\t\tvalidateMs: 0,
 \t\t\t\t\tprepareMs: 0,
 \t\t\t\t\tprepareCheckMs: 0,
@@ -309,7 +313,9 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 \t\tcommands: 0,
 \t\tbytes: 0,
 \t\tselfcheckMs: 0,
+\t\tencodeMs: 0,
 \t\tdispatchMs: 0,
+\t\tdecodeMs: 0,
 \t\tvalidateMs: 0,
 \t\tprepareMs: 0,
 \t\tprepareCheckMs: 0,
@@ -452,12 +458,12 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 			);
 			next = replaceOnce(
 				next,
-				`\t\t\tprofile.selfcheckMs += startedDispatch - startedSelfCheck;
-\t\t\tprofileOutboundMessage(profile, message);
+				`\t\t\tprofile.selfcheckMs += startedEncode - startedSelfCheck;
+\t\t\tprofileOutboundMessage(profile, message, encoded);
 \t\t\treturn;
 `,
-				`\t\t\tprofile.selfcheckMs += startedDispatch - startedSelfCheck;
-\t\t\tprofileOutboundMessage(profile, message);
+				`\t\t\tprofile.selfcheckMs += startedEncode - startedSelfCheck;
+\t\t\tprofileOutboundMessage(profile, message, encoded);
 \t\t\tif ((message as { readonly type?: unknown }).type === 'commit' && replayStartedAt !== null) {
 \t\t\t\tprofile.bgReplayMs = (profile.bgReplayMs ?? 0) + startedSelfCheck - replayStartedAt;
 \t\t\t\treplayStartedAt = null;

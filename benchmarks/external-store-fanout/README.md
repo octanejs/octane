@@ -2,10 +2,11 @@
 
 This benchmark connects 512 independently rendered subscribers to the same
 observable external store in production-built Octane, React, Preact, Solid 2,
-Svelte, and Vue Vapor applications.
+Svelte, Vue Vapor, and Inferno applications.
 
-Octane, React, and Preact use `useSyncExternalStore`; the signal-based renderers
-use their native lifecycle and reactive primitives. Real Chromium verifies that
+Octane, React, and Preact use `useSyncExternalStore`; Inferno and the
+signal-based renderers use their native lifecycle and subscription primitives.
+Real Chromium verifies that
 a narrow write changes only its intended visible subscriber, a broad write
 updates all 512 subscribers consistently, rapid consecutive writes do not tear,
 and teardown balances subscription acquisition/removal without retaining listeners. Snapshot calls,

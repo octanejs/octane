@@ -501,10 +501,10 @@ const manifest = {
 				fileEntry(pristineRuntimeRel, 'support'),
 				fileEntry('packages/monaco-editor/tests/upstream-original.test.ts', 'support'),
 				fileEntry('scripts/react-parity/monaco-editor-pristine-runtime.mjs', 'support'),
-				fileEntry('packages/monaco-editor/scripts/run-pristine-upstream.mjs', 'support'),
+				fileEntry('scripts/react-parity/run-pristine.mjs', 'support'),
 				fileEntry('packages/monaco-editor/tests/upstream-pristine.vitest.config.ts', 'support'),
 				fileEntry('packages/monaco-editor/tests/_harness/pristine-setup.ts', 'support'),
-				fileEntry('packages/monaco-editor/upstream/COMMIT', 'support'),
+				fileEntry('packages/monaco-editor/audit/upstream.lock.json', 'support'),
 			],
 		},
 		{

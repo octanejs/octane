@@ -18,6 +18,7 @@ const TARGETS = [
 	{ name: 'react', directory: 'react' },
 	{ name: 'preact', directory: 'preact' },
 	{ name: 'solid', directory: 'solid' },
+	{ name: 'inferno', directory: 'inferno' },
 ];
 const iterations = Number.parseInt(process.argv[2] ?? '5', 10);
 
@@ -26,7 +27,9 @@ if (!Number.isSafeInteger(iterations) || iterations < 1) {
 }
 
 async function loadTarget(target) {
-	const directory = path.join(HERE, 'dist', target.name);
+	// Keep built entries under the fixture workspace so externalized framework
+	// packages resolve through streaming-ssr's declared dependencies.
+	const directory = path.join(FIXTURES, 'dist', 'backpressure', target.name);
 	await build({
 		root: path.join(FIXTURES, target.directory),
 		logLevel: 'warn',

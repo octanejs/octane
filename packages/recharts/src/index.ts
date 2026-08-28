@@ -3,15 +3,12 @@
 // Recharts 3 splits cleanly along the same seam as the other octane bindings:
 // its chart STATE is framework-agnostic (Redux Toolkit slices + reselect
 // selectors; d3 math via victory-vendor; es-toolkit utilities) and its React
-// layer is components + hooks over an isolated redux store. This package
-// MIRRORS upstream's file layout under src/: framework-agnostic modules are
-// vendored verbatim (`.js`, marked with a "Vendored verbatim" header) and the
-// React layer is re-implemented on octane (`.ts`/`.tsrx`) at the same paths —
-// so upstream's relative imports resolve unchanged, vendored or ported.
-// The store runs through @octanejs/redux.
-//
-// Port status: Phase 1 (static BarChart + LineChart pipeline) — see
-// docs/recharts-port-plan.md for the phase map.
+// layer is components + hooks over an isolated redux store. The authored
+// TypeScript modules retain the reviewed upstream layout and native Octane
+// component contracts. The store runs through @octanejs/redux, and consumers
+// typecheck and compile the same .ts/.tsrx source that is executed.
+import type { Props as NativeAreaProps } from './cartesian/Area.tsrx';
+import type { Props as NativePieProps } from './polar/Pie.tsrx';
 export { Surface } from './container/Surface.tsrx';
 export { Layer } from './container/Layer.tsrx';
 export { Cell } from './component/Cell';
@@ -71,34 +68,37 @@ export { PolarRadiusAxis } from './polar/PolarRadiusAxis.tsrx';
 export { Sankey } from './chart/Sankey.tsrx';
 export { SunburstChart } from './chart/SunburstChart.tsrx';
 
-// Public prop contracts used by component-library wrappers. The runtime port
-// accepts the same prop bags as Recharts; keep these structural while the
-// generated declaration surface is expanded component by component.
-export type AreaProps<DataPointType = any, ValueAxisType = any> = Record<string, any>;
-export type BarProps = Record<string, any>;
-export type BarShapeProps = Record<string, any>;
-export type BrushProps = Record<string, any>;
-export type CartesianGridProps = Record<string, any>;
-export type DotProps = Record<string, any>;
-export type FunnelProps = Record<string, any>;
-export type LabelListProps = Record<string, any>;
-export type LabelProps = Record<string, any>;
-export type LineProps = Record<string, any>;
-export type PieLabel = (props: Record<string, any>) => unknown;
-export type PieProps<DataPointType = any, DataValueType = any> = Record<string, any>;
-export type PolarAngleAxisProps = Record<string, any>;
-export type PolarGridProps = Record<string, any>;
-export type PolarRadiusAxisProps = Record<string, any>;
-export type RadarProps = Record<string, any>;
-export type RadialBarProps = Record<string, any>;
-export type ReferenceLineProps = Record<string, any>;
-export type SankeyProps = Record<string, any>;
-export type ScatterProps = Record<string, any>;
-export type SunburstChartProps = Record<string, any>;
-export type TreemapProps = Record<string, any>;
-export type XAxisProps = Record<string, any>;
-export type YAxisProps = Record<string, any>;
-export type ZAxisProps = Record<string, any>;
+// Public aliases come from each component's implementation, not a parallel
+// declaration facade. Keep the previously defaulted Area/Pie generic aliases.
+export type AreaProps<DataPointType = unknown, ValueAxisType = unknown> = NativeAreaProps<
+	DataPointType,
+	ValueAxisType
+>;
+export type PieProps<DataPointType = unknown, DataValueType = unknown> = NativePieProps<
+	DataPointType,
+	DataValueType
+>;
+export type { Props as BarProps, BarShapeProps } from './cartesian/Bar.tsrx';
+export type { Props as CartesianGridProps } from './cartesian/CartesianGrid.tsrx';
+export type { Props as DotProps } from './shape/Dot.tsrx';
+export type { Props as FunnelProps } from './cartesian/Funnel.tsrx';
+export type { Props as LabelListProps } from './component/LabelList.tsrx';
+export type { Props as LabelProps } from './component/Label.tsrx';
+export type { Props as LineProps } from './cartesian/Line.tsrx';
+export type { PieLabel, PieLabelRenderProps } from './polar/Pie.tsrx';
+export type { Props as PolarAngleAxisProps } from './polar/PolarAngleAxis.tsrx';
+export type { Props as PolarGridProps } from './polar/PolarGrid.tsrx';
+export type { Props as PolarRadiusAxisProps } from './polar/PolarRadiusAxis.tsrx';
+export type { Props as RadarProps } from './polar/Radar.tsrx';
+export type { RadialBarProps } from './polar/RadialBar.tsrx';
+export type { Props as ReferenceLineProps } from './cartesian/ReferenceLine.tsrx';
+export type { Props as SankeyProps } from './chart/Sankey.tsrx';
+export type { Props as ScatterProps } from './cartesian/Scatter.tsrx';
+export type { SunburstChartProps } from './chart/SunburstChart.tsrx';
+export type { Props as XAxisProps } from './cartesian/XAxis.tsrx';
+export type { Props as YAxisProps } from './cartesian/YAxis.tsrx';
+export type { Props as ZAxisProps } from './cartesian/ZAxis.tsrx';
+export type { RechartsProps, BrushProps, TreemapProps } from './legacy-props';
 export { CartesianAxis } from './cartesian/CartesianAxis.tsrx';
 export { BarStack } from './cartesian/BarStack.tsrx';
 export { LineDrawShape } from './cartesian/LineDrawShape.tsrx';

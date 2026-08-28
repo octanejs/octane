@@ -46,6 +46,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'vue-vapor', url: 'http://localhost:5180/', ready: '#run' },
 			{ name: 'preact', url: 'http://localhost:5260/', ready: '#run' },
 			{ name: 'svelte', url: 'http://localhost:5271/', ready: '#run' },
+			{ name: 'inferno', url: 'http://localhost:5320/', ready: '#run' },
 		];
 
 const OPS = [
@@ -301,9 +302,14 @@ async function countProductionMountCalls(target) {
 		});
 		const coverage = await cdp.send('Profiler.takePreciseCoverage');
 		let calls = 0;
+		const functions = [];
 		for (const script of coverage.result) {
 			if (!script.url.includes('/assets/')) continue;
-			for (const fn of script.functions) calls += fn.ranges[0]?.count || 0;
+			for (const fn of script.functions) {
+				const count = fn.ranges[0]?.count || 0;
+				calls += count;
+				if (count > 0) functions.push({ name: fn.functionName || '(anonymous)', count });
+			}
 		}
 		if (calls === 0) throw new Error('mount gate: no production asset call coverage');
 
@@ -325,7 +331,8 @@ async function countProductionMountCalls(target) {
 				throw new Error('mount gate: profiled row event or selection failed');
 			}
 		}, ROW_COUNT);
-		return calls;
+		functions.sort((a, b) => b.count - a.count);
+		return { calls, functions: functions.slice(0, 12) };
 	} finally {
 		if (profiling) {
 			await cdp.send('Profiler.stopPreciseCoverage').catch(() => {});
@@ -395,10 +402,18 @@ async function runTarget(t) {
 			results[`fragment_commits_${operation.name}`] = deterministicCount(work.fragmentCommits);
 		}
 
-		const calls = await countProductionMountCalls(t);
-		const ceiling = t.name === 'octane-tsrx' ? 25000 : 39000;
+		const production = await countProductionMountCalls(t);
+		const calls = production.calls;
+		// Root-suspension transactions make a fresh root mount rollback-safe even
+		// without an enclosing boundary. Their accepted ordinary-path cost is
+		// recorded in packages/octane/audit/root-suspension-performance.md; keep
+		// narrow headroom over the post-#833 production-call observations here.
+		const ceiling = t.name === 'octane-tsrx' ? 35000 : 50000;
 		if (calls > ceiling) {
-			throw new Error(`mount gate: ${t.name} made ${calls} production calls (maximum ${ceiling})`);
+			throw new Error(
+				`mount gate: ${t.name} made ${calls} production calls (maximum ${ceiling}); ` +
+					`top functions: ${production.functions.map(({ name, count }) => `${name}=${count}`).join(', ')}`,
+			);
 		}
 		results.production_calls_1k = deterministicCount(calls);
 	}

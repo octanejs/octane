@@ -1,10 +1,7 @@
 // @octanejs/aria/components — the react-aria-components surface, ported onto octane.
-// Exports mirror the upstream index (.react-spectrum/packages/react-aria-components/
-// exports/index.ts): the Phase-4 foundation (collections engine, plumbing,
-// non-collection components) plus the Phase-5 collection components (Autocomplete,
-// ListBox, Menu, Select, ComboBox, Tabs, TagGroup, GridList, Breadcrumbs, and the
-// inert DragAndDrop context layer). Tree/Table, date/color families, and the
-// drag-and-drop engine arrive in later phases — see docs/aria-migration-plan.md.
+// Exports mirror the pinned react-aria-components 1.19.0 index. Octane refs remain
+// ordinary props and DOM handlers receive native events, but the public component,
+// hook, state, layout, and type names stay aligned with upstream.
 
 // plumbing
 export {
@@ -301,7 +298,6 @@ export type { VisuallyHiddenProps } from '../visually-hidden/VisuallyHidden';
 // 'react-aria/Focusable'` — the same component the hooks surface already
 // exports, published under both entry points.
 export { Focusable } from '../interactions/useFocusable';
-export type { FocusableProps } from '../interactions/useFocusable';
 export type { Placement } from '../overlays/useOverlayPosition';
 export { useFilter } from '../i18n/useFilter';
 export type { Filter } from '../i18n/useFilter';
@@ -344,6 +340,260 @@ export {
 	TableColumnResizeStateContext,
 	TableFooter,
 } from './Table';
+
+// calendar and date/time
+export {
+	Calendar,
+	CalendarGrid,
+	CalendarGridHeader,
+	CalendarGridBody,
+	CalendarHeaderCell,
+	CalendarCell,
+	RangeCalendar,
+	CalendarContext,
+	RangeCalendarContext,
+	CalendarStateContext,
+	RangeCalendarStateContext,
+	CalendarMonthPicker,
+	CalendarYearPicker,
+	CalendarHeading,
+} from './Calendar';
+export type {
+	CalendarCellProps,
+	CalendarProps,
+	CalendarRenderProps,
+	CalendarGridProps,
+	CalendarGridHeaderProps,
+	CalendarGridBodyProps,
+	CalendarHeaderCellProps,
+	CalendarCellRenderProps,
+	RangeCalendarProps,
+	RangeCalendarRenderProps,
+	CalendarMonthPickerProps,
+	CalendarYearPickerProps,
+	CalendarHeadingProps,
+} from './Calendar';
+export {
+	DateField,
+	DateInput,
+	DateSegment,
+	TimeField,
+	DateFieldContext,
+	TimeFieldContext,
+	DateFieldStateContext,
+	TimeFieldStateContext,
+} from './DateField';
+export type {
+	DateFieldProps,
+	DateFieldRenderProps,
+	DateInputProps,
+	DateInputRenderProps,
+	DateSegmentProps,
+	DateSegmentRenderProps,
+	TimeFieldProps,
+} from './DateField';
+export {
+	DatePicker,
+	DateRangePicker,
+	DatePickerContext,
+	DateRangePickerContext,
+	DatePickerStateContext,
+	DateRangePickerStateContext,
+} from './DatePicker';
+export type {
+	DatePickerProps,
+	DatePickerRenderProps,
+	DateRangePickerProps,
+	DateRangePickerRenderProps,
+} from './DatePicker';
+
+// color
+export { ColorArea, ColorAreaContext, ColorAreaStateContext } from './ColorArea';
+export type { ColorAreaProps, ColorAreaRenderProps } from './ColorArea';
+export { ColorField, ColorFieldContext, ColorFieldStateContext } from './ColorField';
+export type { ColorFieldProps, ColorFieldRenderProps } from './ColorField';
+export { ColorPicker, ColorPickerContext, ColorPickerStateContext } from './ColorPicker';
+export type { ColorPickerProps, ColorPickerRenderProps } from './ColorPicker';
+export { ColorSlider, ColorSliderContext, ColorSliderStateContext } from './ColorSlider';
+export type { ColorSliderProps, ColorSliderRenderProps } from './ColorSlider';
+export { ColorSwatch, ColorSwatchContext } from './ColorSwatch';
+export type { ColorSwatchProps, ColorSwatchRenderProps } from './ColorSwatch';
+export {
+	ColorSwatchPicker,
+	ColorSwatchPickerItem,
+	ColorSwatchPickerContext,
+} from './ColorSwatchPicker';
+export type {
+	ColorSwatchPickerProps,
+	ColorSwatchPickerRenderProps,
+	ColorSwatchPickerItemProps,
+	ColorSwatchPickerItemRenderProps,
+} from './ColorSwatchPicker';
+export { ColorThumb } from './ColorThumb';
+export type { ColorThumbProps, ColorThumbRenderProps } from './ColorThumb';
+export {
+	ColorWheel,
+	ColorWheelContext,
+	ColorWheelTrack,
+	ColorWheelTrackContext,
+	ColorWheelStateContext,
+} from './ColorWheel';
+export type {
+	ColorWheelProps,
+	ColorWheelRenderProps,
+	ColorWheelTrackProps,
+	ColorWheelTrackRenderProps,
+} from './ColorWheel';
+
+// drag and drop, files, toasts, and virtualized layouts
+export { DropZone, DropZoneContext } from './DropZone';
+export type { DropZoneProps, DropZoneRenderProps } from './DropZone';
+export { FileTrigger } from './FileTrigger';
+export type { FileTriggerProps } from './FileTrigger';
+export {
+	UNSTABLE_Toast,
+	UNSTABLE_ToastList,
+	UNSTABLE_ToastRegion,
+	UNSTABLE_ToastContent,
+	UNSTABLE_ToastStateContext,
+} from './Toast';
+export type {
+	ToastRegionProps,
+	ToastListProps,
+	ToastRegionRenderProps,
+	ToastProps,
+	ToastRenderProps,
+} from './Toast';
+export { Virtualizer } from './Virtualizer';
+export type { VirtualizerProps } from './Virtualizer';
+export { GridLayout } from './GridLayout';
+export { TableLayout } from './TableLayout';
+
+// upstream runtime re-exports
+export { useDrag } from '../dnd/useDrag';
+export { useDrop } from '../dnd/useDrop';
+export {
+	DIRECTORY_DRAG_TYPE,
+	isDirectoryDropItem,
+	isFileDropItem,
+	isTextDropItem,
+} from '../dnd/utils';
+export { SSRProvider } from '../ssr/SSRProvider';
+export { RouterProvider } from '../utils/openLink';
+export { I18nProvider, useLocale } from '../i18n/I18nProvider';
+export { isRTL } from '../i18n/utils';
+export { Pressable } from '../interactions/Pressable';
+export { FormValidationContext } from '../stately/form/useFormValidationState';
+export { parseColor, getColorChannels } from '../stately/color/Color';
+export { ToastQueue as UNSTABLE_ToastQueue } from '../stately/toast/useToastState';
+export { useListData } from '../stately/data/useListData';
+export { useTreeData } from '../stately/data/useTreeData';
+export { useAsyncList } from '../stately/data/useAsyncList';
+export { ListLayout } from '../stately/layout/ListLayout';
+export { WaterfallLayout } from '../stately/layout/WaterfallLayout';
+export { Layout } from '../stately/virtualizer/Layout';
+export { LayoutInfo } from '../stately/virtualizer/LayoutInfo';
+export { Size } from '../stately/virtualizer/Size';
+export { Rect } from '../stately/virtualizer/Rect';
+export { Point } from '../stately/virtualizer/Point';
+
+// upstream public state and shared types
+export type { DragOptions, DragResult } from '../dnd/useDrag';
+export type { I18nProviderProps, Locale } from '../i18n/I18nProvider';
+export type {
+	DateValue,
+	DateFieldState,
+} from '../upstream-exports/react-stately/useDateFieldState';
+export type {
+	DateRange,
+	DateRangePickerState,
+} from '../upstream-exports/react-stately/useDateRangePickerState';
+export type {
+	TimeValue,
+	TimeFieldState,
+} from '../upstream-exports/react-stately/useTimeFieldState';
+export type { DatePickerState } from '../stately/datepicker/useDatePickerState';
+export type { CalendarState } from '../upstream-exports/react-stately/useCalendarState';
+export type { RangeCalendarState } from '../upstream-exports/react-stately/useRangeCalendarState';
+export type {
+	ColorSpace,
+	ColorChannel,
+	Color,
+	ColorFormat,
+	ColorAxes,
+	ColorChannelRange,
+} from '../upstream-exports/react-stately/Color';
+export type { ColorAreaState } from '../stately/color/useColorAreaState';
+export type { ColorFieldState } from '../stately/color/useColorFieldState';
+export type { ColorPickerState } from '../stately/color/useColorPickerState';
+export type { ColorSliderState } from '../stately/color/useColorSliderState';
+export type { ColorWheelState } from '../stately/color/useColorWheelState';
+export type { QueuedToast, ToastOptions, ToastState } from '../stately/toast/useToastState';
+export type { ListOptions as ListDataOptions, ListData } from '../stately/data/useListData';
+export type { TreeOptions as TreeDataOptions, TreeData } from '../stately/data/useTreeData';
+export type {
+	AsyncListOptions,
+	AsyncListData,
+	AsyncListLoadFunction,
+	AsyncListLoadOptions,
+	AsyncListStateUpdate,
+} from '../stately/data/useAsyncList';
+export type { ListLayoutOptions } from '../stately/layout/ListLayout';
+export type { GridLayoutOptions } from '../stately/layout/GridLayout';
+export type { TableLayoutProps } from '../stately/layout/TableLayout';
+export type { WaterfallLayoutOptions } from '../stately/layout/WaterfallLayout';
+export type { ComboBoxState } from '../stately/combobox/useComboBoxState';
+export type { DisclosureState } from '../stately/disclosure/useDisclosureState';
+export type { DisclosureGroupState } from '../stately/disclosure/useDisclosureGroupState';
+export type { ListState } from '../stately/list/useListState';
+export type { NumberFieldState } from '../stately/numberfield/useNumberFieldState';
+export type { OverlayTriggerState } from '../stately/overlays/useOverlayTriggerState';
+export type { RadioGroupState } from '../stately/radio/useRadioGroupState';
+export type { RootMenuTriggerState } from '../stately/menu/useMenuTriggerState';
+export type { SearchFieldState } from '../stately/searchfield/useSearchFieldState';
+export type { SelectState } from '../stately/select/useSelectState';
+export type { SliderState } from '../stately/slider/useSliderState';
+export type { TableState } from '../stately/table/useTableState';
+export type { TabListState } from '../stately/tabs/useTabListState';
+export type { ToggleGroupState } from '../stately/toggle/useToggleGroupState';
+export type { ToggleState } from '../stately/toggle/useToggleState';
+export type { TooltipTriggerState } from '../stately/tooltip/useTooltipTriggerState';
+export type { TreeState } from '../stately/tree/useTreeState';
+export type { CheckboxGroupState } from '../stately/checkbox/useCheckboxGroupState';
+export type { AutocompleteState } from '../stately/autocomplete/useAutocompleteState';
+export type {
+	Key,
+	Selection,
+	SortDescriptor,
+	SortDirection,
+	SelectionMode,
+	DirectoryDropItem,
+	DraggableCollectionEndEvent,
+	DraggableCollectionMoveEvent,
+	DraggableCollectionStartEvent,
+	DragPreviewRenderer,
+	DragTypes,
+	DropItem,
+	DropOperation,
+	DroppableCollectionDropEvent,
+	DroppableCollectionEnterEvent,
+	DroppableCollectionExitEvent,
+	DroppableCollectionInsertDropEvent,
+	DroppableCollectionMoveEvent,
+	DroppableCollectionOnItemDropEvent,
+	DroppableCollectionReorderEvent,
+	DroppableCollectionRootDropEvent,
+	DropPosition,
+	DropTarget,
+	FileDropItem,
+	ItemDropTarget,
+	RootDropTarget,
+	TextDropItem,
+	PressEvent,
+	RangeValue,
+	ValidationResult,
+	RouterConfig,
+} from '@react-types/shared';
 export type {
 	TableProps,
 	TableRenderProps,

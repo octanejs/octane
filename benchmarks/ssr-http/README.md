@@ -1,7 +1,7 @@
 # ssr-http — raw streaming API over real HTTP (cold + warm)
 
-Measures Octane's `renderToPipeableStream` (`octane/server`) against React 19
-Fizz (`react-dom/server`) through **real HTTP servers**, including **cold
+Measures Octane's `renderToPipeableStream` (`octane/server`), React 19 Fizz
+(`react-dom/server`), and Inferno's ordered queue stream through **real HTTP servers**, including **cold
 start**: process spawn → TCP listen → first body byte. It reuses the
 [streaming-ssr](../streaming-ssr/README.md) fixtures (identical page, identical
 data schedules) behind one identical ~20-line `node:http` host per target

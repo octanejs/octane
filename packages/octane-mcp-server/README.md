@@ -121,7 +121,7 @@ Returns a skill by name. Bundled skills (shipped with this package):
 - `setup-ssr`: server rendering and hydration setup.
 
 When running inside the octane monorepo, the skills from `.rulesync/skills` are
-also available: `authoring-tsrx`, `react-library-port`, `bug-hunter`,
+also available: `authoring-tsrx`, `octane-react-library-port`, `bug-hunter`,
 `create-a-pr`, `handle-issue`, `octane-core-extend`, `triage`,
 `performance-audit`. A test compares this map against the directory in both
 directions, so a new skill cannot stay unreachable here. This tool reads the RuleSync source, and
@@ -162,9 +162,11 @@ one manifest suite by name (`js-framework`, `todomvc`, `weather-app`,
 `hydration-interactivity`, `hydration-stress`, `lifecycle-memory`,
 `controlled-form`, `external-store-fanout`, `external-store-integrations`,
 `scheduler-responsiveness`, `suspense-recovery`, `event-delegation`,
-`application-composition`, `scaling-curves`, `streaming-ssr`,
-`streaming-backpressure`, `compiler-throughput`, `codegen-size`, `hook-memo`,
-`bundle-size`, `bundle-reachability`, `three-renderer`, `three-bundle-size`, …)
+`application-composition`, `scaling-curves`, `dev-form-diagnostics`,
+`behavior-root-events`, `router-dispatch`, `floating-tree-navigation`, `manifest-cache-invalidation`, `vite-client-assets`, `activity`, `streaming-ssr`, `streaming-backpressure`,
+`compiler-throughput`, `tsrx-component-graph`, `codegen-size`, `hook-memo`,
+`template-call-memo`, `tsrx-renderer-selection`, `bundle-size`, `bundle-reachability`, `three-renderer`,
+`three-bundle-size`, …)
 or every suite with `all`; `quick` selects the reduced-iteration smoke pass. The
 suite list mirrors the runner manifest and `node benchmarks/bench.mjs --list`.
 

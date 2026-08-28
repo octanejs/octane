@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "upstreamEntrypoint": "packages/radix/upstream/repository/packages/react/radix-ui/src/index.ts",
+  "upstreamEntrypoint": "packages/radix/upstream/packages/react/radix-ui/src/index.ts",
   "octaneEntrypoint": "packages/radix/src/index.ts",
   "exports": [
     {

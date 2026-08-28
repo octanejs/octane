@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "requiredFiles": [
+    "audit/adapted-runtime.json",
+    "audit/adapted-types.json",
+    "audit/adapted-wrapper-runtime.json",
+    "audit/expected-failures.json",
+    "audit/pristine-suite.json",
+    "audit/pristine-runtime.json",
+    "audit/pristine-types.json",
+    "audit/pristine-wrapper-runtime.json",
+    "audit/runtime-crosswalk.json",
+    "audit/test-classifications.json",
+    "audit/type-parity.json",
+    "audit/upstream.lock.json",
+    "audit/upstream-skips.json",
+    "scripts/generate-parity-evidence.mjs",
+    "tests/adapted-original.test.ts",
+    "tests/adapted-vitest.config.ts",
+    "tests/differential/fixtures.ts",
+    "tests/upstream-original.test.ts",
+    "tests/upstream-vitest.config.ts",
+    "typetests/tsconfig.adapted.json",
+    "typetests/tsconfig.pristine.json",
+    "typetests/upstream-globals.d.ts"
+  ],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream/LICENSE"
+    },
+    {
+      "path": "LICENSE.react.upstream",
+      "equalsPath": "upstream/packages/react/LICENSE"
+    },
+    {
+      "path": "LICENSE.react.upstream",
+      "equalsPath": "upstream/packages/react-dom/LICENSE"
+    }
+  ],
+  "filesInclude": [
+    {
+      "path": "LICENSE",
+      "includes": ["MIT License", "Dominic Gannaway"]
+    },
+    {
+      "path": "LICENSE.upstream",
+      "includes": ["MIT License", "Floating UI contributors"]
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream/packages/react/package.json",
+    "name": "@floating-ui/react",
+    "version": "0.27.19",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream"]
+}

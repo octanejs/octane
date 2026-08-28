@@ -24,6 +24,8 @@ export interface ServerFixtureOptions {
 	id?: string;
 	/** Additional public compiler options; `mode: 'server'` is always enforced. */
 	compileOptions?: Record<string, unknown>;
+	/** Real optional runtime entrypoints used by the authored fixture. */
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
 export interface CompiledFixtureSourceOptions {
@@ -32,12 +34,15 @@ export interface CompiledFixtureSourceOptions {
 	mode: 'client' | 'server';
 	/** Additional public compiler options; `mode` is always enforced. */
 	compileOptions?: Record<string, unknown>;
+	/** Self-contained external modules used by custom-renderer fixtures. */
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
 export interface PlainHookFixtureSourceOptions {
 	id: string;
 	inlineHookMemo: boolean;
 	manualSlots?: boolean;
+	nativeReads?: boolean;
 }
 
 export function loadCompiledFixtureSource<T extends CompiledFixtureModule = CompiledFixtureModule>(
@@ -49,7 +54,7 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 		...options.compileOptions,
 		mode,
 	});
-	return evaluateCompiledFixtureCode<T>(code, id, mode);
+	return evaluateCompiledFixtureCode<T>(code, id, mode, options.runtimeModules);
 }
 
 /** Execute the public plain-module transform through the shared module loader. */
@@ -64,6 +69,7 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 		profile: false,
 		inlineHookMemo: options.inlineHookMemo,
 		manualSlots: options.manualSlots,
+		nativeReads: options.nativeReads,
 	});
 	// The plain path deliberately leaves TypeScript to its host toolchain.
 	// Strip it here exactly once, then use the same evaluation boundary as the
@@ -76,13 +82,14 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 			verbatimModuleSyntax: true,
 		},
 	});
-	return evaluateCompiledFixtureCode<T>(outputText, options.id, 'client');
+	return evaluateCompiledFixtureCode<T>(outputText, options.id, 'client', undefined);
 }
 
 function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 	code: string,
 	id: string,
 	mode: 'client' | 'server',
+	runtimeModules: Readonly<Record<string, CompiledFixtureModule>> | undefined,
 ): T {
 	const runtime = mode === 'server' ? ServerRuntime : ClientRuntime;
 	const internalRuntime = mode === 'server' ? InternalServerRuntime : InternalClientRuntime;
@@ -108,6 +115,18 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 		(_match: string, names: string) =>
 			`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`,
 	);
+	code = code.replace(
+		/import\s+(\*\s+as\s+[\w$]+|\{[^}]*\}|[\w$]+)\s+from\s*['"]([^'"]+)['"];?/g,
+		(match: string, binding: string, request: string) => {
+			if (runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)) return match;
+			const module = `__runtimeModules[${JSON.stringify(request)}]`;
+			if (binding.startsWith('*'))
+				return `const ${binding.replace(/^\*\s+as\s+/, '')} = ${module};`;
+			if (binding.startsWith('{'))
+				return `const ${binding.replace(/\s+as\s+/g, ': ')} = ${module};`;
+			return `const ${binding} = ${module}.default;`;
+		},
+	);
 
 	// `export function X` must stay a real function *declaration*: compiled
 	// modules reference exported components by name after the declaration (the
@@ -118,14 +137,14 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 	// reassignment of the binding.
 	const functionExports: string[] = [];
 	code = code.replace(
-		/export\s+(async\s+)?function\s+(\w+)/g,
+		/export\s+(async\s+)?function\s+([\w$]+)/g,
 		(_match: string, asyncKeyword: string | undefined, name: string) => {
 			functionExports.push(name);
 			return `${asyncKeyword ?? ''}function ${name}`;
 		},
 	);
 	code = code.replace(
-		/export\s+(const|let|var)\s+(\w+)\s*=/g,
+		/export\s+(const|let|var)\s+([\w$]+)\s*=/g,
 		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
 	);
 	code = code.replace(/export\s+default\s+/g, '__exports.default = ');
@@ -144,10 +163,11 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 		'__runtime',
 		'__internalRuntime',
 		'__hydrationRuntime',
+		'__runtimeModules',
 		'__exports',
 		`'use strict';\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
 	);
-	return evaluate(runtime, internalRuntime, HydrationRuntime, {}) as T;
+	return evaluate(runtime, internalRuntime, HydrationRuntime, runtimeModules, {}) as T;
 }
 
 export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixtureModule>(
@@ -160,5 +180,6 @@ export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixt
 		id: options.id ?? defaultId,
 		mode: 'server',
 		compileOptions: options.compileOptions,
+		runtimeModules: options.runtimeModules,
 	});
 }

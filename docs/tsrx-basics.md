@@ -50,6 +50,36 @@ function Label(props) {
 }
 ```
 
+### Nested child scopes
+
+Inside JSX, a nested `@{ … }` block owns a child render scope at that exact
+sibling position. Its setup runs when the child renders, may use hooks and
+capture parent locals, and keeps its hook state across parent updates. The final
+JSX node is optional: a code-only block runs its setup and renders no element.
+
+```jsx
+export function AccountRow(props: {
+	name: string;
+	observe: (name: string) => void;
+}) @{
+	<li>
+		<span>{props.name as string}</span>
+		@{
+			const [expanded, setExpanded] = useState(false);
+			<button onClick={() => setExpanded(!expanded)}>
+				{expanded ? 'Hide details' : 'Show details'}
+			</button>
+		}
+		@{
+			props.observe(props.name);
+		}
+	</li>
+}
+```
+
+An empty child block disappears. A child block containing only a JSX node is
+transparent grouping and does not create an extra render scope.
+
 Dynamic text needs a cast, `{expr as string}`, unless the expression is provably
 a string. A bare `{expr}` is a renderable hole, not text.
 
@@ -364,7 +394,10 @@ JavaScript. Only inject source you trust.
 
 ## Strong mode
 
-Strong mode is an optional compiler check for state, refs, and Effect Events.
+Strong mode is an optional immutable render-snapshot contract with compiler
+checks for state, refs, Effect Events, and detectable impure render calls. It is
+also an author assertion that rendering is pure, which production memoization
+is allowed to trust without proving every call body.
 Start with one module by putting `"use strong"` before its imports:
 
 ```tsx
@@ -405,6 +438,15 @@ These patterns become compile errors:
   (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
 - Including a statically known Effect Event in an explicit hook dependency list
   (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
+- Mutating a provable state snapshot during render, including supported aliases
+  and array mutations on state initialized with an array literal
+  (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).
+- Mutating a binding declared outside a retained keyed `@for` row from that row
+  (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh scratch data built in ordinary
+  setup or owned entirely by one row remains valid.
+- Calling unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`,
+  or `new Date()` without arguments during render
+  (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
 
 The checks follow provable synchronous calls through local helpers,
 `useCallback` and `useEffectEvent` results, and functions returned by analyzable
@@ -421,8 +463,47 @@ or externally produced array is unchanged.
 Update state in event handlers instead. When state should reset or adjust after
 an input changes, use `useLinkedState`. Effects that connect to external systems,
 genuinely deferred callbacks, effect cleanup, and refs used for DOM elements,
-timers, or event callbacks remain valid. Strong mode does not restrict
-`Date.now()`, `Math.random()`, or similar values.
+timers, or event callbacks remain valid. Obtain changing timestamps or random
+values in events or effects and put them in state. A lazy state initializer such
+as `useState(() => new Date())` may also capture the initial value.
+
+For every user-authored operation evaluated to produce render output, Strong
+asserts all of the following:
+
+- The same witnessed props, state, context, receiver, arguments, and captured
+  values produce the same result.
+- Calls, computed methods, call-produced callees, constructors, tagged
+  templates, and synchronously invoked callbacks have no application-visible
+  render side effects.
+- Results do not depend on changing `ref.current` contents, state getters,
+  mutable module or global state, external live stores, clocks, randomness, or
+  hook state hidden behind a stable value.
+- Code does not rely on how often a render expression is evaluated. Development,
+  production, HMR, profiling, server rendering, hydration, retries, and aborted
+  work can evaluate it different numbers of times.
+
+Production client builds may condition every eligible call shape on those
+witnessed inputs. A `use*`-shaped ordinary function is treated like any other
+projection; Strong does not require React's hook naming convention to establish
+purity. Actual hooks still belong in component or custom-hook setup and retain
+their compiler-owned behavior. Built-in hook provenance, including optional
+calls, and lexically resolved same-module custom-hook declarations keep context,
+state, suspension, and effect lifecycle handling even through aliases or cyclic
+call graphs. Projection guards witness both a method/callable and its receiver,
+plus explicit arguments; derived receivers are witnessed through the operation
+and inputs that produce them rather than their transient result identity. Guard
+equality at component and ordinary-list projection boundaries is `Object.is`,
+including its `NaN` and signed-zero behavior; a certified keyed-selection
+operand retains authored strict equality.
+
+The diagnostics above are bounded; they do not prove arbitrary imported code or
+method bodies pure, and an unknown call does not make memoization fall back. A
+Strong caller is asserting that its use of an imported API is snapshot-safe. Keep
+live-accessor consumers in compatibility mode, or pass actual snapshots to a
+Strong component. See
+[Automatic memoization and calls in templates](./differences-from-react.md#automatic-memoization-and-calls-in-templates)
+for the exact boundary and why changing event captures still invalidates keyed
+rows.
 
 `"use strong"` only affects its own module. Put it at the top of the file, before
 imports or other code; comments and other directives may come first. In files

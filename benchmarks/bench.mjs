@@ -80,6 +80,7 @@ const SUITES = [
 			{ filter: 'vue-vapor-jsbench', port: 5180 },
 			{ filter: 'preact-jsbench', port: 5260 },
 			{ filter: 'svelte-jsbench', port: 5271 },
+			{ filter: 'inferno-jsbench', port: 5320 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -96,6 +97,7 @@ const SUITES = [
 			{ filter: 'vue-vapor-jsbench', port: 5180 },
 			{ filter: 'preact-jsbench', port: 5260 },
 			{ filter: 'svelte-jsbench', port: 5271 },
+			{ filter: 'inferno-jsbench', port: 5320 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run-reorder.mjs', args: (n) => [String(n)] }],
@@ -111,6 +113,7 @@ const SUITES = [
 			{ filter: 'vue-vapor-todomvc', port: 5244 },
 			{ filter: 'preact-todomvc', port: 5261 },
 			{ filter: 'svelte-todomvc', port: 5272 },
+			{ filter: 'inferno-todomvc', port: 5321 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -125,6 +128,7 @@ const SUITES = [
 			{ filter: 'solid-weather-app-bench', port: 5295 },
 			{ filter: 'svelte-weather-app-bench', port: 5296 },
 			{ filter: 'vue-weather-app-bench', port: 5297 },
+			{ filter: 'inferno-weather-app-bench', port: 5335 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -139,6 +143,7 @@ const SUITES = [
 			{ filter: 'solid-weather-app-bench', port: 5295 },
 			{ filter: 'svelte-weather-app-bench', port: 5296 },
 			{ filter: 'vue-weather-app-bench', port: 5297 },
+			{ filter: 'inferno-weather-app-bench', port: 5335 },
 		],
 		iter: { normal: 5, quick: 3 },
 		runs: [{ script: 'lighthouse.mjs', args: (n) => [String(n)] }],
@@ -154,6 +159,7 @@ const SUITES = [
 			{ filter: 'vue-vapor-chat-stream', port: 5254 },
 			{ filter: 'preact-chat-stream', port: 5262 },
 			{ filter: 'svelte-chat-stream', port: 5273 },
+			{ filter: 'inferno-chat-stream', port: 5323 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -186,8 +192,28 @@ const SUITES = [
 			{ filter: 'react-svg-dashboard-bench', port: 5303 },
 			{ filter: 'solid-svg-dashboard-bench', port: 5304 },
 			{ filter: 'svelte-svg-dashboard-bench', port: 5305 },
+			{ filter: 'inferno-svg-dashboard-bench', port: 5324 },
 		],
 		iter: { normal: 20, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Fresh implementation of localvoid/UIbench's complete 96-case desktop
+		// matrix: tables, sparse animation updates, keyed flat/deep tree
+		// transforms, historical worst cases, and large no-change diffs. Every
+		// endpoint and surviving node identity is correctness-gated before timing.
+		name: 'uibench',
+		cwd: 'uibench',
+		servers: [
+			{ filter: 'octane-tsrx-uibench-bench', port: 5315 },
+			{ filter: 'react-uibench-bench', port: 5316 },
+			{ filter: 'solid-uibench-bench', port: 5317 },
+			{ filter: 'preact-uibench-bench', port: 5318 },
+			{ filter: 'vue-vapor-uibench-bench', port: 5319 },
+			{ filter: 'ripple-uibench-bench', port: 5322 },
+			{ filter: 'inferno-uibench-bench', port: 5325 },
+		],
+		iter: { normal: 10, quick: 2 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
@@ -202,6 +228,7 @@ const SUITES = [
 			{ filter: 'vue-vapor-dbmon-bench', port: 5220 },
 			{ filter: 'preact-dbmon-bench', port: 5263 },
 			{ filter: 'svelte-dbmon-bench', port: 5274 },
+			{ filter: 'inferno-dbmon-bench', port: 5326 },
 		],
 		iter: { normal: 30, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -218,6 +245,7 @@ const SUITES = [
 			{ filter: 'vue-vapor-recursive-bench', port: 5189 },
 			{ filter: 'preact-recursive-bench', port: 5264 },
 			{ filter: 'svelte-recursive-bench', port: 5275 },
+			{ filter: 'inferno-recursive-bench', port: 5327 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [
@@ -234,11 +262,35 @@ const SUITES = [
 			{ filter: 'react-spa-navigation-bench', port: 5312 },
 			{ filter: 'solid-spa-navigation-bench', port: 5313 },
 			{ filter: 'vue-vapor-spa-navigation-bench', port: 5314 },
+			{ filter: 'inferno-spa-navigation-bench', port: 5328 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [
 			{ script: 'run.mjs', args: (n) => [String(n)] },
 			{ label: 'work', script: 'work.mjs', args: () => [] },
+		],
+	},
+	{
+		// Renderer-free Alien 3.2.0 versus scoped-engine graphs, plus one
+		// uninterrupted ownership lifetime with repeated partial disposal.
+		name: 'scoped-signals',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n, quick) => [String(n), ...(quick ? ['--quick'] : [])] }],
+	},
+	{
+		// Actual production compilation with ordinary/native read controls,
+		// plus deterministic five-dependency use() creation-cache guards.
+		name: 'scoped-native-reads',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [
+			{
+				script: 'run-native-costs.mjs',
+				args: (n, quick) => [`--samples=${n}`, ...(quick ? ['--quick'] : [])],
+			},
 		],
 	},
 	{
@@ -253,6 +305,7 @@ const SUITES = [
 			{ filter: 'vue-vapor-signal-bench', port: 5183 },
 			{ filter: 'preact-signal-bench', port: 5265 },
 			{ filter: 'svelte-signal-bench', port: 5276 },
+			{ filter: 'inferno-signal-bench', port: 5329 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [
@@ -277,6 +330,7 @@ const SUITES = [
 			'solid',
 			'svelte',
 			'vue-vapor',
+			'inferno',
 		].map((target) => ({
 			label: target,
 			script: 'run.mjs',
@@ -285,29 +339,33 @@ const SUITES = [
 	},
 	{
 		// Real pre-hydration typing against a withheld production client chunk,
-		// measured with Chromium CDP CPU throttling. The six target apps reuse
+		// measured with Chromium CDP CPU throttling. The seven target apps reuse
 		// news's existing SSR toolchains, including Solid 2 and Vue Vapor; Octane's
 		// real early-capture bootstrap additionally proves exactly-once replay.
 		name: 'hydration-interactivity',
 		cwd: 'hydration-interactivity',
 		servers: [],
 		iter: { normal: 5, quick: 2 },
-		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
-			label: target,
-			script: 'run.mjs',
-			args: (n) => [target, String(n)],
-		})),
+		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor', 'inferno'].map(
+			(target) => ({
+				label: target,
+				script: 'run.mjs',
+				args: (n) => [target, String(n)],
+			}),
+		),
 	},
 	{
 		name: 'hydration-stress',
 		cwd: 'hydration-stress',
 		servers: [],
 		iter: { normal: 5, quick: 2 },
-		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
-			label: target,
-			script: 'run.mjs',
-			args: (n) => [target, String(n)],
-		})),
+		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor', 'inferno'].map(
+			(target) => ({
+				label: target,
+				script: 'run.mjs',
+				args: (n) => [target, String(n)],
+			}),
+		),
 	},
 	...[
 		'lifecycle-memory',
@@ -325,16 +383,90 @@ const SUITES = [
 		servers: [],
 		iter: name === 'lifecycle-memory' ? { normal: 84, quick: 2 } : { normal: 8, quick: 2 },
 		runs: [
-			...['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
-				label: target,
-				script: 'run.mjs',
-				args: (n) => [target, String(n)],
-			})),
+			...['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor', 'inferno'].map(
+				(target) => ({
+					label: target,
+					script: 'run.mjs',
+					args: (n) => [target, String(n)],
+				}),
+			),
 			...(name === 'event-delegation' || name === 'external-store-fanout'
 				? [{ label: 'work', script: 'work.mjs', args: () => [] }]
 				: []),
 		],
 	})),
+	{
+		// Node/jsdom development-runtime scaling: the same controlled-value commit
+		// at 4k and 32k hosts, normalized per host for a same-process ratio guard.
+		name: 'dev-form-diagnostics',
+		cwd: 'dev-form-diagnostics',
+		servers: [],
+		iter: { normal: 8, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Production client scheduler scaling for deepest-first state updates across
+		// a nested component chain, normalized per queued component.
+		name: 'scheduler-depth',
+		cwd: 'scheduler-depth',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Headless-Chromium production scaling for late behavior events whose
+		// distinct asynchronous adoptions settle one at a time.
+		name: 'behavior-root-events',
+		cwd: 'behavior-root-events',
+		servers: [],
+		iter: { normal: 8, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Node-only app-core route matching across large static, method-miss,
+		// and dynamic route tables with cost normalized per candidate route.
+		name: 'router-dispatch',
+		cwd: 'router-dispatch',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Floating UI's virtual nested-menu routing: exact previous behavior versus
+		// production on deep and branching trees, with deterministic node-read counts.
+		name: 'floating-tree-navigation',
+		cwd: 'floating-tree-navigation',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Ink's cursor-only terminal updates over unchanged large frames: exact
+		// previous branches, byte/split gates, and stable-frame scaling controls.
+		name: 'ink-cursor-update',
+		cwd: 'ink-cursor-update',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Shared-compiler watched-path invalidation after nearest-package
+		// decisions have been cached for small and large source trees.
+		name: 'manifest-cache-invalidation',
+		cwd: 'manifest-cache-invalidation',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Node-only Vite manifest traversal across many routes that converge on
+		// one deep shared chunk graph, plus a shallow-graph control.
+		name: 'vite-client-assets',
+		cwd: 'vite-client-assets',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
 	{
 		// Selector-based fan-out: 512 subscribers read one store through a
 		// selector, then the parent re-renders 20 times with the store untouched.
@@ -344,11 +476,13 @@ const SUITES = [
 		cwd: 'store-selector-fanout',
 		servers: [],
 		iter: { normal: 8, quick: 2 },
-		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
-			label: target,
-			script: 'run.mjs',
-			args: (n) => [target, String(n)],
-		})),
+		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor', 'inferno'].map(
+			(target) => ({
+				label: target,
+				script: 'run.mjs',
+				args: (n) => [target, String(n)],
+			}),
+		),
 	},
 	{
 		// Matched direct/nested callback work plus the shipped store bindings.
@@ -364,6 +498,21 @@ const SUITES = [
 		],
 	},
 	{
+		// Public Activity lifecycle and hidden descendant work. The paired fixture
+		// builds itself, and a separate production-work pass defends the range walk.
+		name: 'activity',
+		cwd: 'activity',
+		servers: [],
+		iter: { normal: 8, quick: 2 },
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'work', script: 'work.mjs', args: () => [] },
+			{ label: 'refs', script: 'refs.mjs', args: (n) => [String(n)] },
+			{ label: 'refs-work', script: 'refs-work.mjs', args: () => [] },
+			{ label: 'bundle', script: 'bundle.mjs', args: () => [] },
+		],
+	},
+	{
 		name: 'effectful-list',
 		cwd: 'effectful-list',
 		servers: [
@@ -375,6 +524,7 @@ const SUITES = [
 			{ filter: 'vue-vapor-effectful-list-bench', port: 5221 },
 			{ filter: 'preact-effectful-list-bench', port: 5266 },
 			{ filter: 'svelte-effectful-list-bench', port: 5277 },
+			{ filter: 'inferno-effectful-list-bench', port: 5330 },
 		],
 		iter: { normal: 30, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -417,6 +567,7 @@ const SUITES = [
 			{ filter: 'vue-vapor-portal-swarm-bench', port: 5181 },
 			{ filter: 'preact-portal-swarm-bench', port: 5268 },
 			{ filter: 'svelte-portal-swarm-bench', port: 5279 },
+			{ filter: 'inferno-portal-swarm-bench', port: 5332 },
 		],
 		iter: { normal: 20, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -570,6 +721,7 @@ const SUITES = [
 			{ filter: 'ripple-async-bench', port: 5219 },
 			{ filter: 'preact-async-bench', port: 5269 },
 			{ filter: 'svelte-async-bench', port: 5280 },
+			{ filter: 'inferno-async-bench', port: 5333 },
 		],
 		iter: { normal: 10, quick: 2 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -583,6 +735,7 @@ const SUITES = [
 		servers: [
 			{ filter: 'octane-tsrx-async-composition-bench', port: 5282 },
 			{ filter: 'react-async-composition-bench', port: 5284 },
+			{ filter: 'inferno-async-composition-bench', port: 5334 },
 		],
 		iter: { normal: 10, quick: 2 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -692,10 +845,71 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: () => [] }],
 	},
 	{
+		// Strong-mode keyed row reuse, with receiver calls observed outside the
+		// compiled source and DOM/event controls for every dependency change.
+		name: 'template-call-memo',
+		cwd: 'template-call-memo',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		name: 'compiler-throughput',
 		cwd: 'compiler-throughput',
 		servers: [],
 		iter: { normal: 5, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		name: 'tsrx-component-graph',
+		cwd: 'tsrx-component-graph',
+		servers: [],
+		iter: { normal: 8, quick: 4 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Conditional JSX return analysis at two component counts plus a
+		// same-sized structurally ineligible parse/print control.
+		name: 'tsrx-jsx-return-branches',
+		cwd: 'tsrx-jsx-return-branches',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Optional TypeScript text-inference scaling: repeated warm snapshots of
+		// one target with either 32 or 20,000 unrelated configured roots.
+		name: 'text-type-roots',
+		cwd: 'text-type-roots',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Development TSRX compiler scaling: distinct authored HTML-nesting
+		// diagnostics at two sizes, normalized per invalid site in one process.
+		name: 'tsrx-nesting-diagnostics',
+		cwd: 'tsrx-nesting-diagnostics',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Ordered filename-to-renderer classification with one retained normalized
+		// config versus equivalent raw revalidation in the same process.
+		name: 'tsrx-renderer-selection',
+		cwd: 'tsrx-renderer-selection',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Native onChange analysis on hostless TSRX at two sizes, paired with an
+		// AST-identical large source whose ignored marker conservatively forces the scan.
+		name: 'tsrx-native-change-analysis',
+		cwd: 'tsrx-native-change-analysis',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{

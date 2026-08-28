@@ -102,7 +102,21 @@ import {
 import { formatServerError } from './error-codes.server.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
 import { isRendererContext, registerServerRendererContextProvider } from './renderer-bridge.js';
+import {
+	validateNativeReadWitness,
+	type NativeReadWitness,
+} from './signals/native-read-collector.js';
+import { createNativeServerReadDriver } from './signals/native-read-server.js';
+import {
+	NATIVE_SIGNAL_SEED_ATTR,
+	NATIVE_SIGNAL_FRESH_COMMENT,
+	mergeNativeSeedReads,
+	type NativeSeedReads,
+	type NativeSignalManifest,
+} from './signals/native-read-seeds.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
+export { validateNativeReadWitness };
+export type { NativeSignalManifest };
 
 const NATIVE_ARRAY_MAP = Array.prototype.map;
 const NATIVE_REFLECT_APPLY = Reflect.apply;
@@ -182,6 +196,91 @@ type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
 export type ServerEntryComponent = ServerComponent | ((props: any) => unknown);
 
 let CURRENT_SCOPE: SSRScope | null = null;
+// Server helpers use the same synchronous read/witness ABI without importing
+// the client renderer or attaching a subscription to any shared producer.
+let NATIVE_READ_COLLECTOR: ReturnType<typeof createNativeServerReadDriver> | null = null;
+let NATIVE_SERVER_PASS = -1;
+let NATIVE_SERVER_READS: NativeSeedReads | null = null;
+let NATIVE_SERVER_FAILURES = 0;
+let NATIVE_LOCAL_HOOK_DISPOSES: Array<() => void> | null = null;
+
+/** @internal Enable invocation collection before an opted-in module renders. */
+export function enableNativeReadCollection(abi = 1): void {
+	if (abi !== 1) throw new Error(formatServerError(58));
+	ensureNativeServerReadCollector();
+}
+
+/** @internal Compiler/runtime native-read capability version 1. */
+export function beginNativeReadScope(scope: SSRScope | undefined, abi = 1): number {
+	if (abi !== 1) throw new Error(formatServerError(58));
+	const owner = scope ?? CURRENT_SCOPE;
+	if (owner === null) return -1;
+	ensureNativeServerReadCollector();
+	return beginActiveNativeReadScope(owner);
+}
+
+// Internal invocation scopes must not retain the collector factory in ordinary
+// server entries. Late activation still needs the same pass/detached handling.
+function beginActiveNativeReadScope(owner: SSRScope): number {
+	const collector = NATIVE_READ_COLLECTOR!;
+	if (NATIVE_SERVER_PASS < 0 && !collector.isDetached()) NATIVE_SERVER_PASS = collector.beginPass();
+	return collector.beginScope(owner);
+}
+
+function ensureNativeServerReadCollector() {
+	return (NATIVE_READ_COLLECTOR ??= createNativeServerReadDriver(
+		(reads) => {
+			NATIVE_SERVER_READS = mergeNativeSeedReads(NATIVE_SERVER_READS, reads);
+		},
+		() => {
+			NATIVE_SERVER_FAILURES++;
+		},
+	));
+}
+
+function finishNativeSeedCapture(
+	token: number,
+	previous: NativeSeedReads | null,
+	merge: boolean,
+): NativeSeedReads | null {
+	if (token >= 0) return NATIVE_READ_COLLECTOR!.finishCapture(token, merge);
+	// The first native component may install its collector inside an otherwise
+	// ordinary boundary. Before installation no enclosing native scope exists,
+	// so the existing pass-local collection is the capture in that case.
+	const reads = NATIVE_SERVER_READS;
+	NATIVE_SERVER_READS = previous;
+	if (merge && reads !== null) NATIVE_SERVER_READS = NATIVE_READ_COLLECTOR!.merge(previous, reads);
+	return reads;
+}
+
+function appendNativeSeedReads(reads: NativeSeedReads | null): void {
+	if (reads !== null) NATIVE_READ_COLLECTOR!.append(reads);
+}
+
+/** @internal Native read context never survives an asynchronous server gap. */
+export function endNativeReadScope(token: number, completed: boolean): void {
+	if (token >= 0) NATIVE_READ_COLLECTOR!.endScope(token, completed);
+}
+
+/** @internal Shared automatic-cache witness ABI. */
+export function beginNativeReadWitness(detached = false): number {
+	return detached
+		? ensureNativeServerReadCollector().beginWitness(true)
+		: (NATIVE_READ_COLLECTOR?.beginWitness() ?? -1);
+}
+
+/** @internal Shared automatic-cache witness ABI. */
+export function finishNativeReadWitness(
+	token: number,
+	completed: boolean,
+): NativeReadWitness | null {
+	return token < 0 ? null : NATIVE_READ_COLLECTOR!.finishWitness(token, completed);
+}
+
+/** @internal Shared automatic-cache witness ABI. */
+export function replayNativeReadWitness(witness: NativeReadWitness | null | undefined): void {
+	NATIVE_READ_COLLECTOR?.replay(witness);
+}
 // Empty compiler batches register child-only warm plans for the synchronous
 // component call stack. A pending descendant batch activates the live plans;
 // invokeComponentBody checkpoints keep nested renders and retries isolated.
@@ -189,7 +288,11 @@ const ACTIVE_PU_WARM_PLANS: Array<() => void> = [];
 let CURRENT_PU_WARM_CLAIMS: Set<object> | null = null;
 let ID_COUNTER = 0;
 let ID_PREFIX = '';
-let CSS: Map<string, string> | null = null;
+interface InjectedStyle {
+	css: string;
+	nonce?: string;
+}
+let CSS: Map<string, InjectedStyle> | null = null;
 // Pre-escaped ` nonce="..."` fragment for renderer-owned inline tags emitted
 // during the active pass. Saved/restored with every other ambient so nested or
 // concurrent server renders cannot leak a CSP nonce across requests.
@@ -552,18 +655,23 @@ const PORTAL_TAG = Symbol.for('octane.portal');
 export const Fragment: unique symbol = Symbol.for('octane.Fragment');
 
 /**
- * React-19 `<Activity>` sentinel. Server-compiled template sites lower directly
- * to `ssrActivity`; this export keeps `import { Activity } from 'octane'`
- * resolvable after the server compiler retargets it to `octane/server`.
+ * React-19 `<Activity>` sentinel. Direct template sites lower to `ssrActivity`;
+ * generic component and descriptor sites dispatch by this same symbol identity.
+ * Its public type is component-shaped so aliases and JSX values type-check.
  */
-export const Activity: unique symbol = Symbol.for('octane.Activity');
+export const Activity = Symbol.for('octane.Activity') as unknown as (props: {
+	mode?: 'visible' | 'hidden';
+	children?: unknown;
+	name?: string;
+	key?: string | number | bigint | null | undefined;
+}) => unknown;
 
 interface ElementDescriptor {
 	$$kind: typeof ELEMENT_TAG;
 	// A server ComponentBody (component-value form, e.g. `{<Comp/>}`) OR a host tag
 	// string (`'li'`), produced when host JSX appears at a VALUE position (a
 	// `.map(...)` callback, a render-prop arrow body, an array literal).
-	type: ServerComponent | string | typeof Fragment;
+	type: ServerComponent | string | typeof Fragment | typeof Activity;
 	props: any;
 	// React-style `key`, lifted out of props (consulted by the client's de-opt list
 	// path on hydration; the server only renders it into markup).
@@ -615,6 +723,47 @@ function finalizeElementDescriptor(descriptor: ElementDescriptor): ElementDescri
 	return descriptor;
 }
 
+function createNativeServerScopedResolver<T>(read: () => T): () => T {
+	let resolved = false;
+	let resolvedScope: SSRScope | null = null;
+	let resolvedWitness: NativeReadWitness | null | undefined;
+	let resolvedValue: T;
+	return (): T => {
+		const scope = CURRENT_SCOPE;
+		const token = beginNativeReadScope(undefined);
+		let completed = false;
+		try {
+			if (
+				!resolved ||
+				resolvedScope !== scope ||
+				(token >= 0 && resolvedWitness === undefined) ||
+				!validateNativeReadWitness(resolvedWitness)
+			) {
+				const witnessToken = beginNativeReadWitness();
+				let readCompleted = false;
+				let next: T;
+				let nextWitness: NativeReadWitness | null;
+				try {
+					next = read();
+					readCompleted = true;
+				} finally {
+					nextWitness = finishNativeReadWitness(witnessToken, readCompleted);
+				}
+				resolvedScope = scope;
+				resolvedWitness = token < 0 ? undefined : nextWitness;
+				resolvedValue = next;
+				resolved = true;
+			} else if (token >= 0) {
+				replayNativeReadWitness(resolvedWitness);
+			}
+			completed = true;
+			return resolvedValue;
+		} finally {
+			endNativeReadScope(token, completed);
+		}
+	};
+}
+
 /** Server twin of the compiler-only complete JSX-record deferral helper. */
 export function createScopedValue(readElement: () => ElementDescriptor): ElementDescriptor {
 	let resolved: ElementDescriptor | undefined;
@@ -629,7 +778,15 @@ export function createScopedValue(readElement: () => ElementDescriptor): Element
 		}
 		return resolved;
 	};
+	return scopedValueDescriptor(resolve);
+}
 
+/** @internal Native complete-record deferral with request-local evidence. */
+export function nativeCreateScopedValue(readElement: () => ElementDescriptor): ElementDescriptor {
+	return scopedValueDescriptor(createNativeServerScopedResolver(readElement));
+}
+
+function scopedValueDescriptor(resolve: () => ElementDescriptor): ElementDescriptor {
 	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		get type() {
@@ -654,7 +811,7 @@ export function createScopedValue(readElement: () => ElementDescriptor): Element
 
 /** Server twin of the compiler-only scope-preserving JSX descriptor factory. */
 export function createScopedElement(
-	type: ServerComponent | string | typeof Fragment,
+	type: ServerComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
 ): ElementDescriptor {
@@ -676,6 +833,33 @@ export function createScopedElement(
 		}
 		return resolvedChildren;
 	};
+	return scopedElementDescriptor(type, copiedProps, key, children);
+}
+
+/** @internal Native child deferral with evidence on every resolving scope. */
+export function nativeCreateScopedElement(
+	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	props: any,
+	readChildren: () => unknown,
+): ElementDescriptor {
+	const src = (props ?? null) as any;
+	const key = hasElementConfigKey(src) ? '' + src.key : null;
+	const copiedProps = copyElementConfig(src);
+	applyElementDefaultProps(type, copiedProps);
+	return scopedElementDescriptor(
+		type,
+		copiedProps,
+		key,
+		createNativeServerScopedResolver(readChildren),
+	);
+}
+
+function scopedElementDescriptor(
+	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	copiedProps: any,
+	key: string | null,
+	children: () => unknown,
+): ElementDescriptor {
 	const childProperty = { configurable: true, enumerable: true, get: children };
 	Object.defineProperty(copiedProps, 'children', childProperty);
 	SCOPED_ELEMENT_PROPS.add(copiedProps);
@@ -697,7 +881,7 @@ export function createScopedElement(
 // literal) to this call in BOTH modes, so the same lowered call resolves to the
 // client-or-server `createElement` per build, and `ssrChild` renders the result.
 export function createElement(
-	type: ServerComponent | string | typeof Fragment,
+	type: ServerComponent | string | typeof Fragment | typeof Activity,
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
@@ -1601,9 +1785,9 @@ function serverDescNeedsBlocks(v: unknown): boolean {
 	if (!isElementDescriptor(v) && childrenIterator(v) !== null) return true;
 	const d = v as ElementDescriptor;
 	if (d.$$kind === ELEMENT_TAG) {
-		// A Fragment below a host descriptor is reconciled by childSlot's
-		// fragment-aware list path, including when all of its leaves are pure hosts.
-		if (d.type === Fragment) return true;
+		// Fragment and Activity descriptors own reconcilable boundaries even when
+		// all of their descendants are pure hosts/text.
+		if (d.type === Fragment || d.type === Activity) return true;
 		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
 	}
 	return false;
@@ -1713,6 +1897,16 @@ export function ssrFragmentMarker(open: boolean, _ref?: unknown): string {
  */
 export function ssrActivity(mode: string, render: () => string): string {
 	return ssrBlock(mode === 'hidden' ? '' : render());
+}
+
+/** Cold twin of the client's generic Activity body and its ordinary child slot. */
+function renderActivityDescriptor(
+	props: { mode?: 'visible' | 'hidden'; children?: unknown },
+	scope: SSRScope,
+): string {
+	// Keep the accessor inside the visibility branch: scoped JSX children may
+	// start data work or throw, and hidden server Activities must evaluate neither.
+	return ssrActivity(props.mode ?? 'visible', () => ssrChild(props.children, scope));
 }
 
 /**
@@ -2346,6 +2540,7 @@ export function ssrAttrs(
 		string,
 		readonly [name: string, value: unknown, firstOrder: number, lastOrder: number]
 	>();
+	let needsWinningOrderSort = false;
 	for (const writer of props.values()) {
 		const { rawName, value, firstOrder, lastOrder } = writer;
 		if (
@@ -2370,20 +2565,25 @@ export function ssrAttrs(
 		// SVG/MathML retain their case-sensitive qualified names.
 		const identity = namespace === 'html' ? name.toLowerCase() : name;
 		const previous = resolved.get(identity);
-		if (previous === undefined || previous[3] < lastOrder) {
-			resolved.set(identity, [
-				process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
-					? rawName
-					: name,
-				value,
-				firstOrder,
-				lastOrder,
-			]);
+		if (previous !== undefined) {
+			if (previous[3] >= lastOrder) continue;
+			// Map order already matches firstOrder unless a later raw alias replaces
+			// an earlier normalized identity without moving its Map entry.
+			needsWinningOrderSort = true;
 		}
+		resolved.set(identity, [
+			process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
+				? rawName
+				: name,
+			value,
+			firstOrder,
+			lastOrder,
+		]);
 	}
 
 	let out = '';
-	const ordered = [...resolved.values()].sort((a, b) => a[2] - b[2]);
+	const ordered = [...resolved.values()];
+	if (needsWinningOrderSort) ordered.sort((a, b) => a[2] - b[2]);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrAriaProps(
 			ordered.map(([name]) => name),
@@ -3016,7 +3216,10 @@ interface MemoHookRec {
 interface RefHookRec {
 	ref: { current: unknown };
 }
-type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec;
+interface NativeLocalHookRec {
+	nativeValue: unknown;
+}
+type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec | NativeLocalHookRec;
 type ServerHookSlot = symbol | string | number;
 
 // Server twin of the client helper/custom-hook ABI. Modules reserve a range
@@ -3100,6 +3303,24 @@ function hookPosition(slot: unknown): {
 	let list = hp.hooks.get(key);
 	if (list === undefined) hp.hooks.set(key, (list = []));
 	return { hp, list, index };
+}
+
+/** @internal Server local hooks live only for this synchronous rendering pass. */
+export function nativeLocalHook<T>(
+	name: string,
+	initialize: () => T,
+	dispose: (value: T) => void,
+	slot?: ServerHookSlot,
+): T {
+	if (CURRENT_SCOPE === null || HOOK_PASS === null) throw new Error(formatServerError(59, name));
+	const { list, index } = hookPosition(slot)!;
+	let record = list[index] as NativeLocalHookRec | undefined;
+	if (record === undefined) {
+		const value = initialize();
+		list[index] = record = { nativeValue: value };
+		(NATIVE_LOCAL_HOOK_DISPOSES ??= []).push(() => dispose(value));
+	}
+	return record.nativeValue as T;
 }
 
 // The shared useState/useReducer server cell. Getter-free hooks keep Fizz's lean
@@ -3197,6 +3418,11 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 	const stream = STREAM;
 	return {
 		id: ID_COUNTER,
+		native: NATIVE_READ_COLLECTOR?.checkpoint() ?? null,
+		nativeReads: NATIVE_SERVER_READS,
+		nativeReadCount: NATIVE_SERVER_READS?.reads.size ?? 0,
+		nativeMixed: NATIVE_SERVER_READS?.mixed ?? false,
+		nativeFailures: NATIVE_SERVER_FAILURES,
 		css,
 		cssEntries: css === null ? null : new Map(css),
 		head,
@@ -3224,27 +3450,9 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		streamNextId: stream?.nextId ?? 0,
 		streamActiveTryKeys: stream?.activeTryKeys.slice() ?? [],
 		streamActiveOwnerKeys: stream?.activeOwnerKeys.slice() ?? [],
-		streamPassBoundaryKeys:
-			stream?.activePassBoundaryKeys === null || stream?.activePassBoundaryKeys === undefined
-				? null
-				: new Set(stream.activePassBoundaryKeys),
+		streamPassBoundaryCount: stream?.activePassBoundaryKeys?.size ?? 0,
 		asyncScope: ASYNC_SCOPE,
-		streamBoundaries:
-			stream === null
-				? null
-				: Array.from(stream.boundaries, ([key, entry]) => ({
-						key,
-						entry,
-						id: entry.id,
-						order: entry.order,
-						state: entry.state,
-						html: entry.html,
-						seeds: entry.seeds.slice(),
-						pendingIdOffset: entry.pendingIdOffset,
-						ancestors: entry.ancestors.slice(),
-						owners: entry.owners.slice(),
-						namespace: entry.namespace,
-					})),
+		streamReplayCheckpoint: stream?.replay?.length ?? 0,
 		frameDeferred: frame?.deferred ?? false,
 		frameNextChild: frame?.nextChild ?? 0,
 		frameScopedChildren:
@@ -3261,6 +3469,14 @@ function rewindComponentReplayState(
 	frame: Frame | null,
 ): void {
 	ID_COUNTER = snapshot.id;
+	if (snapshot.native !== null) NATIVE_READ_COLLECTOR!.rewind(snapshot.native);
+	NATIVE_SERVER_READS = snapshot.nativeReads;
+	NATIVE_READ_COLLECTOR?.rewindReads(
+		NATIVE_SERVER_READS,
+		snapshot.nativeReadCount,
+		snapshot.nativeMixed,
+	);
+	NATIVE_SERVER_FAILURES = snapshot.nativeFailures;
 	ASYNC_SCOPE = snapshot.asyncScope;
 	if (snapshot.css !== null && snapshot.cssEntries !== null) {
 		snapshot.css.clear();
@@ -3304,30 +3520,21 @@ function rewindComponentReplayState(
 		VT_SSR_STACK.push(entry.candidate);
 	}
 	const stream = snapshot.stream;
-	if (stream !== null && snapshot.streamBoundaries !== null) {
+	if (stream !== null) {
 		stream.nextId = snapshot.streamNextId;
-		if (stream.activePassBoundaryKeys !== null && snapshot.streamPassBoundaryKeys !== null) {
-			stream.activePassBoundaryKeys.clear();
-			for (const key of snapshot.streamPassBoundaryKeys) stream.activePassBoundaryKeys.add(key);
+		if (stream.activePassBoundaryKeys !== null) {
+			// Discovery only appends during a pass. Trim the discarded suffix on
+			// the rare retry instead of copying the growing set for every component.
+			let index = 0;
+			for (const key of stream.activePassBoundaryKeys) {
+				if (index++ >= snapshot.streamPassBoundaryCount) stream.activePassBoundaryKeys.delete(key);
+			}
 		}
 		stream.activeTryKeys.length = 0;
 		stream.activeTryKeys.push(...snapshot.streamActiveTryKeys);
 		stream.activeOwnerKeys.length = 0;
 		stream.activeOwnerKeys.push(...snapshot.streamActiveOwnerKeys);
-		stream.boundaries.clear();
-		for (const saved of snapshot.streamBoundaries) {
-			const entry = saved.entry;
-			entry.id = saved.id;
-			entry.order = saved.order;
-			entry.state = saved.state;
-			entry.html = saved.html;
-			entry.seeds = saved.seeds.slice();
-			entry.pendingIdOffset = saved.pendingIdOffset;
-			entry.ancestors = saved.ancestors.slice();
-			entry.owners = saved.owners.slice();
-			entry.namespace = saved.namespace;
-			stream.boundaries.set(saved.key, entry);
-		}
+		rewindStreamBoundaryReplay(stream, snapshot.streamReplayCheckpoint);
 	}
 	scope.$$ctxValues = snapshot.context;
 	if (frame !== null) {
@@ -3389,6 +3596,8 @@ function invokeComponentBody(
 			out = replayUpdatedComponentBody(comp, props, scope, frame, hp, snapshot, warmPlanCheckpoint);
 		}
 		return out;
+	} catch (error) {
+		throw normalizeThrownServerThenable(error);
 	} finally {
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		HOOK_PASS = prevHP;
@@ -3425,6 +3634,8 @@ function renderComponentFramed(
 	CURRENT_PROPS = props;
 	CURRENT_PARENT_SCOPE = parentScope;
 	ASYNC_SCOPE = frame.asyncScope;
+	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(scope);
+	let nativeCompleted = false;
 	try {
 		// The compiled body normally returns its HTML string, but a component that
 		// early-returns non-template JSX (the de-opt path — e.g. a `.tsx` `if (…)
@@ -3469,8 +3680,12 @@ function renderComponentFramed(
 		// `renderToStaticMarkup` sets MARKERS=false — no hydration, so no markers.
 		// An inherit-range site (M3) skips the wrap: the parent's own pair bounds
 		// this output, and the client borrows it instead of adopting.
+		nativeCompleted = true;
 		return MARKERS && !inherit ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
+	} catch (error) {
+		throw normalizeThrownServerThenable(error);
 	} finally {
+		if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativeCompleted);
 		CURRENT_SCOPE = prevScope;
 		FRAME = prevFrame;
 		CURRENT_COMP = prevComp;
@@ -3489,12 +3704,21 @@ function renderComponentFramed(
  */
 export function ssrComponent(
 	parent: SSRScope,
-	comp: ServerComponent | string,
+	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	inherit?: boolean,
 	key?: unknown,
 	identityScoped?: boolean,
 ): string {
+	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
+	// original identity for async keys, then use the stable cold body below. A
+	// spread-only key has not been split into the compiler's explicit key argument.
+	// Unlike the client cold registration, SSR must also accept a public
+	// `octane` Activity descriptor when this server export was tree-shaken away.
+	// The shared Symbol.for identity keeps that mixed-entry path working; retaining
+	// this small string-rendering wrapper does not retain the client Activity engine.
+	const activity = comp === Activity;
+	if (activity && key === undefined) key = props?.key;
 	// Component recursion is one of SSR's hottest and deepest paths. Install the
 	// same async-identity membrane inline instead of recursing back through
 	// ssrComponent from two wrapper callbacks. Besides avoiding callback overhead,
@@ -3508,6 +3732,12 @@ export function ssrComponent(
 	try {
 		const explicitNamespace = NEXT_COMPONENT_NAMESPACE;
 		NEXT_COMPONENT_NAMESPACE = null;
+		if (activity) {
+			comp = renderActivityDescriptor;
+			// The generic component and inner Activity both own hydratable ranges.
+			// This mirrors the client even for a sole-root dynamic Activity tag.
+			inherit = false;
+		}
 		// Boundary builtins decline inherit through their component capability bit —
 		// mirrors componentSlot's
 		// client-side decline exactly (member/aliased/dynamic tags resolving to
@@ -3526,9 +3756,10 @@ export function ssrComponent(
 		// value-position call site (ssrHostElement's content path handles those), or
 		// a render FUNCTION from a template one.
 		if (typeof comp === 'string') {
+			const tag = comp;
 			const inheritedNamespace = explicitNamespace ?? FRAME?.namespace ?? 'html';
 			const childNamespace = parserNamespacesForTag(
-				comp.toLowerCase(),
+				tag.toLowerCase(),
 				inheritedNamespace,
 			).childrenNamespace;
 			return ssrInNamespace(childNamespace, () => {
@@ -3546,10 +3777,10 @@ export function ssrComponent(
 					// like renderComponentFramed normalizes a de-opt body's return.
 					const out = (kids as any)(undefined, parent);
 					const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, parent);
-					const html = ssrHostElement(comp, props, null, parent, inner);
+					const html = ssrHostElement(tag, props, null, parent, inner);
 					return inherit ? html : ssrBlock(html);
 				}
-				const html = ssrHostElement(comp, props, kids, parent);
+				const html = ssrHostElement(tag, props, kids, parent);
 				return inherit ? html : ssrBlock(html);
 			});
 		}
@@ -3585,7 +3816,7 @@ export function ssrComponent(
 		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the
 		// next component frame through ssrComponentNS.
 		frame.namespace = explicitNamespace ?? pf?.namespace;
-		return renderComponentFramed(comp, props, parent, frame, inherit);
+		return renderComponentFramed(comp as ServerComponent, props, parent, frame, inherit);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
 	}
@@ -3596,7 +3827,7 @@ let NEXT_COMPONENT_NAMESPACE: 'html' | 'svg' | 'mathml' | null = null;
 /** Compiler ABI for a component call whose output is parsed in foreign content. */
 export function ssrComponentNS(
 	parent: SSRScope,
-	comp: ServerComponent | string,
+	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	namespace: 'html' | 'svg' | 'mathml',
 	inherit?: boolean,
@@ -3673,6 +3904,7 @@ function ssrHydrateAttrs(
 			name === HYDRATE_ID_COUNT_ATTR ||
 			name === HYDRATE_STREAM_TOKEN_ATTR ||
 			name === HYDRATE_SEED_ATTR ||
+			name === NATIVE_SIGNAL_SEED_ATTR ||
 			!VALID_ATTR_NAME.test(name)
 		)
 			continue;
@@ -3699,6 +3931,9 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 		// reserved by the client-side paired private range marker.
 		useId();
 		const inheritedPermanentStatic = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
+		const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+		const previousNativeReads = NATIVE_SERVER_READS;
+		if (nativeCapture < 0) NATIVE_SERVER_READS = null;
 		PERMANENT_STATIC_HYDRATE_DEPTH++;
 		try {
 			// The outer static range already erases this client subtree and reserves
@@ -3727,6 +3962,9 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 				`<!--${HYDRATE_STATIC_END}${endToken}-->`
 			);
 		} finally {
+			// The compiler erases this client subtree. Its data cannot be borrowed
+			// by a hydratable sibling that happens to use the same scope key.
+			finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 			PERMANENT_STATIC_HYDRATE_DEPTH--;
 		}
 	},
@@ -3752,20 +3990,29 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 
 					const childIdStart = ID_COUNTER;
 					const serialStart = SERIAL?.length ?? 0;
+					const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+					const previousNativeReads = NATIVE_SERVER_READS;
+					if (nativeCapture < 0) NATIVE_SERVER_READS = null;
 					// The outer range belongs to Hydrate itself. ssrTry supplies the nested
 					// Suspense slot/content ranges and makes a suspending child a real stream
 					// boundary. `fallback` remains client-only, so the server pending arm is
 					// intentionally empty.
-					const children = ssrBlock(
-						ssrTry(
-							scope,
-							'jsx-hydrate',
-							(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
-							null,
-							null,
-							'html',
-						),
-					);
+					let children: string;
+					let nativeReads: NativeSeedReads | null = null;
+					try {
+						children = ssrBlock(
+							ssrTry(
+								scope,
+								'jsx-hydrate',
+								(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+								null,
+								null,
+								'html',
+							),
+						);
+					} finally {
+						nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
+					}
 					const idCount = ID_COUNTER - childIdStart;
 					const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
 					const permanentStaticAncestor = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
@@ -3789,8 +4036,13 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 								'>' +
 								seedJson +
 								'</script>';
+					const nativeSeeds = permanentStaticAncestor
+						? undefined
+						: NATIVE_READ_COLLECTOR?.serialize(nativeReads);
+					const nativeSidecar =
+						nativeSeeds === undefined ? '' : serializeNativeSignalSeeds(nativeSeeds, NONCE_ATTR);
 
-					return '<div' + attrs + '>' + children + seedSidecar + '</div>';
+					return '<div' + attrs + '>' + children + seedSidecar + nativeSidecar + '</div>';
 				}),
 			'html',
 		);
@@ -4059,6 +4311,7 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 						ssrBlock(ssrChildrenHtml(props.children, scope)),
 					);
 				} catch (e) {
+					e = normalizeThrownServerThenable(e);
 					if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
 					const fb =
 						typeof props.fallback === 'function'
@@ -4155,6 +4408,34 @@ export function useContext<T>(ctx: Context<T>): T {
 const SSR_SUSPENSE = Symbol('octane.ssr.suspense');
 export function ssrIsSuspense(err: unknown): boolean {
 	return err === SSR_SUSPENSE;
+}
+
+function normalizeThrownServerThenable(error: unknown): unknown {
+	if (error === null || typeof error !== 'object') return error;
+	try {
+		if (typeof (error as PromiseLike<unknown>).then !== 'function') return error;
+	} catch {
+		// An opaque rejection reason need not permit property access. Preserve it
+		// for the application's catch arm instead of replacing it with a probe error.
+		return error;
+	}
+	// Resource readers own their resolved values. Register only retry work, not
+	// a synthetic use() occurrence or hydration seed. Each throw gets a fresh
+	// registration because the same reader can discover another pending resource.
+	if (SUSPENDED !== null) {
+		SUSPENDED.push({ promise: error as PromiseLike<unknown>, key: '|throw#' + PU_ID++ });
+	}
+	const frame = FRAME;
+	if (DEFERRED !== null && CURRENT_COMP !== null && frame !== null && !frame.deferred) {
+		frame.deferred = true;
+		DEFERRED.push({
+			comp: CURRENT_COMP,
+			props: CURRENT_PROPS,
+			parentScope: CURRENT_PARENT_SCOPE,
+			frame,
+		});
+	}
+	return SSR_SUSPENSE;
 }
 
 type HydrationRejectionPayload =
@@ -4572,6 +4853,39 @@ function serverDepsEqual(a: readonly unknown[], b: readonly unknown[]): boolean 
 // unique so the settle loops' per-key dedupe doesn't conflate entries.
 let PU_ID = 0;
 
+interface ServerPuCreation {
+	deps: unknown[];
+	value: unknown;
+	site: ServerHookSlot | undefined;
+	frame: Frame | null;
+	nativeWitness?: NativeReadWitness | null;
+}
+
+interface ServerWarmEntry {
+	deps: unknown[];
+	value: unknown;
+	available: boolean;
+	nativeWitness?: NativeReadWitness | null;
+}
+
+type ServerMemoEvidence = ServerPuCreation | ServerWarmEntry;
+
+interface NativeServerMemoMode {
+	accept: (entry: ServerMemoEvidence) => boolean;
+	replay: (entry: ServerMemoEvidence) => void;
+	create: (
+		compute: () => unknown,
+		deps: unknown[],
+		site: ServerHookSlot | undefined,
+		frame: Frame | null,
+	) => ServerPuCreation;
+}
+
+interface NativeServerWarmMode {
+	accept: (entry: ServerMemoEvidence) => boolean;
+	create: (compute: () => unknown, deps: unknown[]) => ServerWarmEntry;
+}
+
 /**
  * Cross-pass creation cache. Keyed like use(): frame path + compiler site key
  * + per-frame occurrence, so the key is identical between the pass a boundary
@@ -4580,7 +4894,12 @@ let PU_ID = 0;
  * the same in-flight/settled promise instance, which is what lets puBatch and
  * use() resolve by identity and what stops re-runs duplicating network calls.
  */
-export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot): T {
+export function puMemo<T>(
+	fn: () => T,
+	deps: unknown[],
+	siteKey?: ServerHookSlot,
+	native?: NativeServerMemoMode,
+): T {
 	const res = RESOLVED as ResolvedMap | null;
 	if (res === null) return fn();
 	const resolvedSiteKey = siteKey === undefined ? undefined : resolveHookSlot(siteKey);
@@ -4599,7 +4918,14 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
 	}
 	const key = prefix + '|' + base + '#' + n;
 	const hit = res.pu.created.get(key);
-	if (hit !== undefined && serverDepsEqual(hit.deps, deps)) return hit.value as T;
+	if (
+		hit !== undefined &&
+		serverDepsEqual(hit.deps, deps) &&
+		(native === undefined || native.accept(hit))
+	) {
+		if (native !== undefined) native.replay(hit);
+		return hit.value as T;
+	}
 	// Warm adoption: a parent's warm walk may have prefetched this creation
 	// (keyed by the shared slot symbol). Deps must match — a drift between the
 	// warm-time and render-time props is a clean miss (the orphaned entry dies
@@ -4609,24 +4935,71 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
 		const wlist = res.pu.warm.get(siteKey);
 		if (wlist !== undefined) {
 			for (let i = 0; i < wlist.length; i++) {
-				if (serverDepsEqual(wlist[i].deps, deps)) {
-					if (!wlist[i].available) continue;
-					wlist[i].available = false;
-					const value = wlist[i].value;
-					res.pu.created.set(key, {
+				const warmed = wlist[i];
+				if (serverDepsEqual(warmed.deps, deps)) {
+					if (!warmed.available || (native !== undefined && !native.accept(warmed))) continue;
+					warmed.available = false;
+					const value = warmed.value;
+					const creation: ServerPuCreation = {
 						deps,
 						value,
 						site: resolvedSiteKey,
 						frame,
-					});
+					};
+					if (native !== undefined) {
+						creation.nativeWitness = warmed.nativeWitness;
+						native.replay(creation);
+					}
+					res.pu.created.set(key, creation);
 					return value as T;
 				}
 			}
 		}
 	}
-	const value = fn();
-	res.pu.created.set(key, { deps, value, site: resolvedSiteKey, frame });
-	return value;
+	const creation =
+		native === undefined
+			? { deps, value: fn(), site: resolvedSiteKey, frame }
+			: native.create(fn, deps, resolvedSiteKey, frame);
+	res.pu.created.set(key, creation);
+	return creation.value as T;
+}
+
+function nativeServerMemoEvidenceValid(entry: ServerMemoEvidence): boolean {
+	return entry.nativeWitness !== undefined && validateNativeReadWitness(entry.nativeWitness);
+}
+
+function replayNativeServerMemo(entry: ServerMemoEvidence): void {
+	replayNativeReadWitness(entry.nativeWitness);
+}
+
+function createNativeServerMemo(
+	compute: () => unknown,
+	deps: unknown[],
+	site: ServerHookSlot | undefined,
+	frame: Frame | null,
+): ServerPuCreation {
+	const token = beginNativeReadWitness();
+	let completed = false;
+	let value: unknown;
+	let nativeWitness: NativeReadWitness | null;
+	try {
+		value = compute();
+		completed = true;
+	} finally {
+		nativeWitness = finishNativeReadWitness(token, completed);
+	}
+	return { deps, value, site, frame, nativeWitness };
+}
+
+const NATIVE_SERVER_MEMO_MODE: NativeServerMemoMode = {
+	accept: nativeServerMemoEvidenceValid,
+	replay: replayNativeServerMemo,
+	create: createNativeServerMemo,
+};
+
+/** @internal Native evidence shares the existing cross-pass creation cache. */
+export function nativePuMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot): T {
+	return puMemo(fn, deps, siteKey, NATIVE_SERVER_MEMO_MODE);
 }
 
 /**
@@ -4780,7 +5153,12 @@ const WARM_DEPTH_CAP = 64;
  * re-evaluating its creation (undefined when nothing could be claimed or
  * created — the descent then just prefetches less).
  */
-export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHookSlot): unknown {
+export function warmMemo(
+	compute: () => unknown,
+	deps: unknown[],
+	slot: ServerHookSlot,
+	native?: NativeServerWarmMode,
+): unknown {
 	const res = RESOLVED;
 	if (res === null) return undefined;
 	const warm = res.pu.warm;
@@ -4788,7 +5166,12 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 	if (list !== undefined) {
 		for (let i = 0; i < list.length; i++) {
 			const entry = list[i];
-			if (!serverDepsEqual(entry.deps, deps) || CURRENT_PU_WARM_CLAIMS?.has(entry)) continue;
+			if (
+				!serverDepsEqual(entry.deps, deps) ||
+				CURRENT_PU_WARM_CLAIMS?.has(entry) ||
+				(native !== undefined && !native.accept(entry))
+			)
+				continue;
 			CURRENT_PU_WARM_CLAIMS?.add(entry);
 			return entry.value; // this concrete occurrence already ran or warmed
 		}
@@ -4796,14 +5179,13 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 	// A parent plan recurses through the currently-rendering source component as
 	// well as earlier siblings. Claim every matching created occurrence across
 	// the current render request, not only frame ancestors, before speculating.
-	let activeCreation:
-		| { deps: unknown[]; value: unknown; site: ServerHookSlot | undefined; frame: Frame | null }
-		| undefined;
+	let activeCreation: ServerPuCreation | undefined;
 	for (const created of res.pu.created.values()) {
 		if (
 			created.site === slot &&
 			serverDepsEqual(created.deps, deps) &&
-			!CURRENT_PU_WARM_CLAIMS?.has(created)
+			!CURRENT_PU_WARM_CLAIMS?.has(created) &&
+			(native === undefined || native.accept(created))
 		) {
 			activeCreation = created;
 			break;
@@ -4818,22 +5200,26 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 		// available:false — the render pass owns this creation under its own
 		// frame key; the tombstone only blocks a later speculative refetch. The
 		// value still rides along so warm-plan PROP claims can hand it onward.
-		const entry = { deps, value: activeCreation.value, available: false };
+		const entry: ServerWarmEntry = { deps, value: activeCreation.value, available: false };
+		if (native !== undefined) entry.nativeWitness = activeCreation.nativeWitness;
 		list.push(entry);
 		CURRENT_PU_WARM_CLAIMS?.add(entry);
 		return activeCreation.value;
 	}
-	let value: unknown;
+	let entry: ServerWarmEntry;
 	try {
-		value = compute();
+		entry =
+			native === undefined
+				? { deps, value: compute(), available: true }
+				: native.create(compute, deps);
 	} catch {
 		return undefined;
 	}
+	const value = entry.value;
 	if (list === undefined) {
 		list = [];
 		warm.set(slot, list);
 	}
-	const entry = { deps, value, available: true };
 	list.push(entry);
 	CURRENT_PU_WARM_CLAIMS?.add(entry);
 	if (
@@ -4845,6 +5231,34 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 			SUSPENDED.push({ promise: value as PromiseLike<unknown>, key: '|pu#' + PU_ID++ });
 	}
 	return value;
+}
+
+function createNativeServerWarm(compute: () => unknown, deps: unknown[]): ServerWarmEntry {
+	const token = beginNativeReadWitness(true);
+	let completed = false;
+	let value: unknown;
+	let nativeWitness: NativeReadWitness | null;
+	try {
+		value = compute();
+		completed = true;
+	} finally {
+		nativeWitness = finishNativeReadWitness(token, completed);
+	}
+	return { deps, value, available: true, nativeWitness };
+}
+
+const NATIVE_SERVER_WARM_MODE: NativeServerWarmMode = {
+	accept: nativeServerMemoEvidenceValid,
+	create: createNativeServerWarm,
+};
+
+/** @internal Warmed reads become request-owned only when the real body adopts them. */
+export function nativeWarmMemo(
+	compute: () => unknown,
+	deps: unknown[],
+	slot: ServerHookSlot,
+): unknown {
+	return warmMemo(compute, deps, slot, NATIVE_SERVER_WARM_MODE);
 }
 
 /**
@@ -5399,8 +5813,8 @@ export function isChildrenBlock(value: unknown): boolean {
 // hash) for the RenderResult.css field.
 // ---------------------------------------------------------------------------
 
-export function injectStyle(id: string, css: string): void {
-	if (CSS !== null) CSS.set(id, css);
+export function injectStyle(id: string, css: string, nonce?: string): void {
+	if (CSS !== null) CSS.set(id, nonce === undefined ? { css } : { css, nonce });
 }
 
 // Compiler-emitted for each hoisted `<title>`/`<meta>`/`<link>` (rendered
@@ -5529,6 +5943,8 @@ export interface RenderResult {
 	html: string;
 	css: string;
 	head?: string;
+	/** Ready native values represented by this result's own HTML. */
+	signals?: NativeSignalManifest;
 }
 
 /** Options accepted by the buffered render entry points (React-shaped subset). */
@@ -5679,6 +6095,21 @@ function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
 	);
 }
 
+function serializeNativeSignalSeeds(signals: NativeSignalManifest, nonceAttr: string): string {
+	// Native values already have an unambiguous tagged JSON grammar. Apply the
+	// same script-text '<' escaping as use() seeds, without their positional
+	// undefined/string-prefix wire encoding.
+	const json = JSON.stringify(signals).replace(/</g, '\\u003c');
+	return (
+		'<script type="application/json" ' +
+		NATIVE_SIGNAL_SEED_ATTR +
+		nonceAttr +
+		'>' +
+		json +
+		'</script>'
+	);
+}
+
 /**
  * The buffered render pipeline (`renderToString` / `renderToStaticMarkup` /
  * `prerender`). Hoisted document-head markup (`<title>`/`<meta>`/`<link>`
@@ -5719,15 +6150,12 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	/** Lazily allocated DEV SSR invalid-nesting warnings reported by this render. */
 	nestingWarnings?: Set<string>;
 	pu: {
-		created: Map<
-			string,
-			{ deps: unknown[]; value: unknown; site: ServerHookSlot | undefined; frame: Frame | null }
-		>;
+		created: Map<string, ServerPuCreation>;
 		resolvedT: Map<PromiseLike<unknown>, SuspenseResult>;
 		// Warm-walk prefetches (warmMemo), keyed by the creation's SLOT symbol —
 		// a value is adoptable once, while its retained tombstone prevents a later
 		// dependency stratum from speculatively recreating the same request.
-		warm: Map<ServerHookSlot, { deps: unknown[]; value: unknown; available: boolean }[]>;
+		warm: Map<ServerHookSlot, ServerWarmEntry[]>;
 		/** Livelock guard tripped (see observeSuspenseWave): puBatch stops
 		 *  registering/suspending for the rest of this render so plain use()
 		 *  string-key replay drives progress instead. */
@@ -5767,10 +6195,11 @@ interface FullPassResult {
 	vtCandidates: boolean;
 	/** Per-hash scoped stylesheets from this pass — the streaming renderer diffs
 	 *  these against what it already flushed to emit late boundaries' styles. */
-	cssEntries: Map<string, string>;
+	cssEntries: Map<string, InjectedStyle>;
 	/** Per-resource Float sheet tags from this pass (see HeadBuffer.sheets) —
 	 *  diffed the same way so late-discovered resources ride the wave chunks. */
 	sheets: Map<string, { precedence: string; html: string }> | null;
+	signals?: NativeSignalManifest;
 }
 
 // Snapshot / install / restore the module globals around ONE synchronous pass
@@ -5779,11 +6208,15 @@ interface FullPassResult {
 // in-flight pass — the globals are always restored before we yield the tick.
 interface Ambient {
 	scope: SSRScope | null;
+	nativePass: number;
+	nativeReads: NativeSeedReads | null;
+	nativeFailures: number;
+	nativeLocalDisposes: Array<() => void> | null;
 	warmPlans: Array<() => void>;
 	warmClaims: Set<object> | null;
 	id: number;
 	idPrefix: string;
-	css: Map<string, string> | null;
+	css: Map<string, InjectedStyle> | null;
 	nonceAttr: string;
 	markers: boolean;
 	permanentStaticHydrateDepth: number;
@@ -5807,6 +6240,10 @@ interface Ambient {
 function saveAmbient(): Ambient {
 	return {
 		scope: CURRENT_SCOPE,
+		nativePass: NATIVE_SERVER_PASS,
+		nativeReads: NATIVE_SERVER_READS,
+		nativeFailures: NATIVE_SERVER_FAILURES,
+		nativeLocalDisposes: NATIVE_LOCAL_HOOK_DISPOSES,
 		warmPlans: ACTIVE_PU_WARM_PLANS.slice(),
 		warmClaims: CURRENT_PU_WARM_CLAIMS,
 		id: ID_COUNTER,
@@ -5834,6 +6271,29 @@ function saveAmbient(): Ambient {
 	};
 }
 function restoreAmbient(a: Ambient): void {
+	let disposalError: { value: unknown } | undefined;
+	if (NATIVE_LOCAL_HOOK_DISPOSES !== null) {
+		const disposes = NATIVE_LOCAL_HOOK_DISPOSES;
+		NATIVE_LOCAL_HOOK_DISPOSES = null;
+		const collector = NATIVE_READ_COLLECTOR;
+		const token = collector?.pauseLifecycle() ?? -1;
+		try {
+			for (let i = disposes.length - 1; i >= 0; i--) {
+				try {
+					disposes[i]();
+				} catch (error) {
+					disposalError ??= { value: error };
+				}
+			}
+		} finally {
+			if (token >= 0) collector!.resumeLifecycle(token);
+		}
+	}
+	if (NATIVE_SERVER_PASS >= 0) NATIVE_READ_COLLECTOR!.endPass(NATIVE_SERVER_PASS);
+	NATIVE_SERVER_PASS = a.nativePass;
+	NATIVE_SERVER_READS = a.nativeReads;
+	NATIVE_SERVER_FAILURES = a.nativeFailures;
+	NATIVE_LOCAL_HOOK_DISPOSES = a.nativeLocalDisposes;
 	CURRENT_SCOPE = a.scope;
 	ACTIVE_PU_WARM_PLANS.length = 0;
 	ACTIVE_PU_WARM_PLANS.push(...a.warmPlans);
@@ -5864,6 +6324,7 @@ function restoreAmbient(a: Ambient): void {
 		snapshot.candidate.consumed = snapshot.consumed;
 		VT_SSR_STACK.push(snapshot.candidate);
 	}
+	if (disposalError !== undefined) throw disposalError.value;
 }
 
 // Run ONE full canonical pass over the whole tree, synchronously within this
@@ -5884,6 +6345,10 @@ function runFullFramedPass(
 	markers: boolean = true,
 ): FullPassResult {
 	const saved = saveAmbient();
+	NATIVE_SERVER_PASS = NATIVE_READ_COLLECTOR?.beginPass() ?? -1;
+	NATIVE_SERVER_READS = null;
+	NATIVE_SERVER_FAILURES = 0;
+	NATIVE_LOCAL_HOOK_DISPOSES = null;
 	ACTIVE_PU_WARM_PLANS.length = 0;
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
@@ -5895,7 +6360,7 @@ function runFullFramedPass(
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
-	const cssMap = (CSS = new Map<string, string>());
+	const cssMap = (CSS = new Map<string, InjectedStyle>());
 	const headBuf = (HEAD = {
 		html: '',
 		charset: '',
@@ -5933,6 +6398,9 @@ function runFullFramedPass(
 	let body = '';
 	let vtCandidates = false;
 	let rootSuspended = false;
+	let signals: NativeSignalManifest | undefined;
+	let nativePassCompleted = false;
+	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(root);
 	try {
 		// Normalize the root's return the same way ssrComponent normalizes child
 		// components: a compiled component returns its HTML string, but a plain
@@ -5940,7 +6408,9 @@ function runFullFramedPass(
 		// createElement descriptor that must render through ssrChild.
 		const out = invokeComponentBody(component, props, root, FRAME);
 		body = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, root);
+		nativePassCompleted = true;
 	} catch (err) {
+		err = normalizeThrownServerThenable(err);
 		// A suspension with no enclosing @try unwinds to here; its thenable is
 		// already in `suspended`, so fall through to the await + retry. Any other
 		// throw is a genuine render failure — propagate it (the finally restores).
@@ -5948,7 +6418,13 @@ function runFullFramedPass(
 		rootSuspended = true;
 	} finally {
 		vtCandidates = VT_SSR_HAS_CANDIDATES;
-		restoreAmbient(saved);
+		try {
+			if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativePassCompleted);
+			if (markers && nativePassCompleted)
+				signals = NATIVE_READ_COLLECTOR?.serialize(NATIVE_SERVER_READS);
+		} finally {
+			restoreAmbient(saved);
+		}
 	}
 	let css = '';
 	for (const [hash, sheet] of cssMap) {
@@ -5956,12 +6432,12 @@ function runFullFramedPass(
 			'<style data-octane="' +
 			hash +
 			'"' +
-			nonceAttr +
+			(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
 			'>' +
-			escapeEntireInlineStyleContent(sheet) +
+			escapeEntireInlineStyleContent(sheet.css) +
 			'</style>';
 	}
-	return {
+	const result: FullPassResult = {
 		body,
 		head: headHtmlWithSheets(headBuf),
 		css,
@@ -5973,6 +6449,8 @@ function runFullFramedPass(
 		cssEntries: cssMap,
 		sheets: headBuf.sheets,
 	};
+	if (signals !== undefined) result.signals = signals;
+	return result;
 }
 
 // Re-run a set of discovery jobs (each an innermost suspending COMPONENT) in
@@ -5987,6 +6465,10 @@ function runDiscoveryRound(
 	identifierPrefix: string,
 ): { suspended: SuspendedList; deferred: Job[] } {
 	const saved = saveAmbient();
+	NATIVE_SERVER_PASS = NATIVE_READ_COLLECTOR?.beginPass() ?? -1;
+	NATIVE_SERVER_READS = null;
+	NATIVE_SERVER_FAILURES = 0;
+	NATIVE_LOCAL_HOOK_DISPOSES = null;
 	ACTIVE_PU_WARM_PLANS.length = 0;
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
@@ -6376,19 +6858,24 @@ function passToResult(
 ): RenderResult {
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
 	// Unclaimed view-transition arm candidates strip at emission (see vtSsrStrip).
 	// Stripping the two channels separately equals stripping the folded string -
 	// no match spans the join, which is what keeps `head + html` byte-identical
 	// to the folded `html`.
+	let result: RenderResult;
 	if (separateHead) {
-		return {
+		result = {
 			html: pass.vtCandidates ? vtSsrStrip(body) : body,
 			css: pass.css,
 			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
 		};
+	} else {
+		const html = spliceHead(body, pass.head);
+		result = { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
 	}
-	const html = spliceHead(body, pass.head);
-	return { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
+	if (pass.signals !== undefined) result.signals = pass.signals;
+	return result;
 }
 
 /**
@@ -6505,7 +6992,7 @@ export type HostedAttemptResult =
 			/** Hoisted head output — the host must translate or reject it (§9.2). */
 			head: string;
 			/** Per-hash scoped stylesheets for host-level dedupe (§9.2). */
-			cssEntries: Map<string, string>;
+			cssEntries: Map<string, InjectedStyle>;
 	  }
 	| { status: 'suspended'; stratum: PromiseLike<void> };
 
@@ -6586,6 +7073,7 @@ export function renderHostedAttempt(
 	}
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
 	if (pass.vtCandidates) body = vtSsrStrip(body);
 	return { status: 'complete', html: body, head: pass.head, cssEntries: pass.cssEntries };
 }
@@ -6732,6 +7220,8 @@ interface StreamBoundary {
 	html: string;
 	/** This boundary's `use()` seed slice from the resolving pass. */
 	seeds: unknown[];
+	/** Ready native values captured with this exact accepted segment. */
+	signals?: NativeSignalManifest;
 	/** Number of boundary-local useIds consumed before the shell suspended. */
 	pendingIdOffset: number;
 	/** Namespace inherited by this boundary's content arm. */
@@ -6744,6 +7234,8 @@ interface StreamBoundary {
 
 interface StreamState {
 	boundaries: Map<string, StreamBoundary>;
+	/** Conservative index of registered boundary owners; stale entries only cost a scan. */
+	boundaryOwnerKeys: Set<string>;
 	nextId: number;
 	token: string;
 	/** Boundary positions reached by the active full-tree pass, when tracked. */
@@ -6752,6 +7244,62 @@ interface StreamState {
 	activeTryKeys: string[];
 	/** All arm owners (content/catch/fallback) while walking nested `ssrTry` calls. */
 	activeOwnerKeys: string[];
+	/** Undo log scoped to one synchronous full pass; null between passes. */
+	replay: StreamBoundaryReplayEntry[] | null;
+}
+
+interface StreamBoundaryReplayEntry {
+	key: string;
+	boundary: StreamBoundary | undefined;
+	value: StreamBoundary | undefined;
+}
+
+// Render-phase retries need the stream registry as it stood on entry to the
+// component. Copying every boundary at EVERY component multiplies a full wave's
+// work by the already-discovered boundary count. Checkpoint this pass-local log
+// instead, recording only actual registry mutations. Boundary arrays are replaced,
+// never mutated, so their previous references are sufficient for rollback.
+function recordStreamBoundaryMutation(stream: StreamState, key: string): void {
+	if (stream.replay === null) return;
+	const boundary = stream.boundaries.get(key);
+	stream.replay.push({
+		key,
+		boundary,
+		value: boundary === undefined ? undefined : { ...boundary },
+	});
+}
+
+function rewindStreamBoundaryReplay(stream: StreamState, checkpoint: number): void {
+	const replay = stream.replay;
+	if (replay === null) return;
+	let restoredDeletion = false;
+	while (replay.length > checkpoint) {
+		const saved = replay.pop()!;
+		if (saved.boundary === undefined) {
+			stream.boundaries.delete(saved.key);
+		} else {
+			const boundary = saved.boundary;
+			const value = saved.value!;
+			Object.assign(boundary, value);
+			// These optional fields can be introduced by the discarded pass.
+			boundary.error = value.error;
+			boundary.errorReported = value.errorReported;
+			boundary.errorFlushed = value.errorFlushed;
+			if (!stream.boundaries.has(saved.key)) restoredDeletion = true;
+			stream.boundaries.set(saved.key, boundary);
+		}
+	}
+	if (restoredDeletion) {
+		// Restoring a pruned boundary appends it to Map. Re-establish discovery
+		// order only on this rare path, including recoverable-error report order.
+		const ordered = [...stream.boundaries].sort((a, b) => a[1].order - b[1].order);
+		stream.boundaries.clear();
+		for (const [key, boundary] of ordered) stream.boundaries.set(key, boundary);
+	}
+}
+
+function recordStreamBoundaryOwners(stream: StreamState, owners: string[]): void {
+	for (const owner of owners) stream.boundaryOwnerKeys.add(owner);
 }
 
 // Every boundary id includes a render-unique token. The counter proves
@@ -6794,6 +7342,9 @@ function pruneUnrepresentedStreamDescendants(
 	ownerKey: string,
 	ownerHtml: string,
 ): void {
+	// Independent siblings are the common case. Without this guard every
+	// completed sibling scans every other registered sibling in the wave.
+	if (!stream.boundaryOwnerKeys.has(ownerKey)) return;
 	let removed = true;
 	while (removed) {
 		removed = false;
@@ -6809,6 +7360,7 @@ function pruneUnrepresentedStreamDescendants(
 			}
 			if (nearestOwner !== ownerKey) continue;
 			if (ownerHtml.includes(STREAM_BOUNDARY_ATTR + '="' + child.id + '"')) continue;
+			recordStreamBoundaryMutation(stream, childKey);
 			stream.boundaries.delete(childKey);
 			removed = true;
 		}
@@ -6877,7 +7429,7 @@ export function ssrTry(
 	const outerAsyncScope = ASYNC_SCOPE;
 	const armScope = outerAsyncScope + '|@arm:' + siteKey + '#' + occurrence.toString(36) + ':';
 	let entry: StreamBoundary | undefined;
-	let serialStart = 0;
+	const serialStart = SERIAL?.length ?? 0;
 	let ancestorKeys: string[] = [];
 	let ownerKeys: string[] = [];
 	if (stream !== null) {
@@ -6885,12 +7437,15 @@ export function ssrTry(
 		ancestorKeys = stream.activeTryKeys.slice();
 		ownerKeys = stream.activeOwnerKeys.slice();
 		entry = stream.boundaries.get(key);
-		if (entry !== undefined) entry.namespace = namespace;
+		if (entry !== undefined) {
+			recordStreamBoundaryMutation(stream, key);
+			if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
+			entry.namespace = namespace;
+		}
 		if (entry !== undefined && entry.state === 'pending') {
 			entry.ancestors = ancestorKeys;
 			entry.owners = ownerKeys;
 		}
-		serialStart = SERIAL !== null ? SERIAL.length : 0;
 	}
 	const withArmScope = <T>(arm: 'content' | 'pending' | 'catch', fn: () => T): T => {
 		const prev = ASYNC_SCOPE;
@@ -6960,13 +7515,41 @@ export function ssrTry(
 		boundaryIds = false;
 	};
 	if (entry !== undefined) enterBoundaryIds(0);
+	let nativeFresh = false;
+	const nativeFailureStart = NATIVE_SERVER_FAILURES;
+	const nativeFreshArm = (inner: string): string => {
+		if (!MARKERS || !nativeFresh) return inner;
+		// This body cannot be replayed from ready values alone. Remove its
+		// positional seeds too; the fresh client body must not shift a sibling's
+		// use() cursor. Its original useId range remains reserved by the marker.
+		if (SERIAL !== null) SERIAL.length = serialStart;
+		const idCount = Math.max(0, ID_COUNTER - (boundaryIds ? 0 : outerIdCounter));
+		return '<!--' + NATIVE_SIGNAL_FRESH_COMMENT + idCount + '-->' + inner;
+	};
 	const pendingForm = (): string => {
 		// A ViewTransition at the top of the FALLBACK arm exits when the boundary
 		// reveals — claim its vt-exit candidate (see vtSsrClaimArm).
-		const renderFallback = (): string =>
-			withPendingArm(() =>
-				pendFn !== null ? vtSsrClaimArm(ssrBlock(pendFn(undefined, scope)), 'exit') : '',
-			);
+		const renderFallback = (): string => {
+			const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+			const previousNativeReads = NATIVE_SERVER_READS;
+			if (nativeCapture < 0) NATIVE_SERVER_READS = null;
+			let completed = false;
+			try {
+				const fallback = withPendingArm(() =>
+					pendFn !== null ? vtSsrClaimArm(ssrBlock(pendFn(undefined, scope)), 'exit') : '',
+				);
+				completed = true;
+				return fallback;
+			} finally {
+				// A stream placeholder is always replaced or mounted fresh by the
+				// client. Its reads never seed the root or the later content segment.
+				finishNativeSeedCapture(
+					nativeCapture,
+					previousNativeReads,
+					completed && entry === undefined && !nativeFresh,
+				);
+			}
+		};
 		// Once this boundary has final content, any fallback-only descendants are
 		// doomed. Render the placeholder shape without registering new stream work.
 		let fallback: string;
@@ -6977,6 +7560,9 @@ export function ssrTry(
 			// `finally`: a nested @try may catch its own suspension and return normally,
 			// so cleanup cannot live only in the outer-suspension catch path.
 			const suspendedStart = SUSPENDED?.length ?? 0;
+			const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+			const previousNativeReads = NATIVE_SERVER_READS;
+			if (nativeCapture < 0) NATIVE_SERVER_READS = null;
 			const deferredStart = DEFERRED?.length ?? 0;
 			const serialStart = SERIAL?.length ?? 0;
 			const css = CSS;
@@ -7001,9 +7587,13 @@ export function ssrTry(
 			} catch (error) {
 				// A direct suspension has no nested pending arm whose HTML can be kept.
 				// The outer template remains balanced with an empty fallback range.
+				// Inline resource reads can throw before a component normalizes them;
+				// the finally below discards their registration along with use() work.
+				error = normalizeThrownServerThenable(error);
 				if (!ssrIsSuspense(error)) throw error;
 				fallback = '';
 			} finally {
+				finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 				if (SUSPENDED !== null) SUSPENDED.length = suspendedStart;
 				if (DEFERRED !== null) DEFERRED.length = deferredStart;
 				if (SERIAL !== null) SERIAL.length = serialStart;
@@ -7052,18 +7642,29 @@ export function ssrTry(
 				'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + fallback,
 			);
 		}
-		return ssrBlock(pendFn !== null ? fallback : '');
+		return ssrBlock(nativeFreshArm(pendFn !== null ? fallback : ''));
 	};
 	try {
 		try {
 			// A ViewTransition at the top of the CONTENT arm enters when the content
 			// streams in — claim its vt-enter candidate.
-			const inner = vtSsrClaimArm(ssrBlock(withContentArm(() => tryFn(undefined, scope))), 'enter');
+			const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+			const previousNativeReads = NATIVE_SERVER_READS;
+			if (nativeCapture < 0) NATIVE_SERVER_READS = null;
+			let nativeReads: NativeSeedReads | null = null;
+			let inner: string;
+			try {
+				inner = vtSsrClaimArm(ssrBlock(withContentArm(() => tryFn(undefined, scope))), 'enter');
+			} finally {
+				nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
+			}
 			if (entry !== undefined) {
 				// Registered (was pending in an earlier pass): capture the content +
 				// this boundary's seed slice for its segment; the surrounding pass
 				// keeps seeing the pending form so the shell shape stays stable.
 				if (entry.state === 'pending') {
+					if (!entry.serverOwnedStatic)
+						entry.signals = NATIVE_READ_COLLECTOR?.serialize(nativeReads);
 					entry.state = 'done';
 					entry.html =
 						vtOuter !== null
@@ -7085,8 +7686,11 @@ export function ssrTry(
 				ID_COUNTER = entry.pendingIdOffset;
 				return pendingForm();
 			}
+			appendNativeSeedReads(nativeReads);
 			return ssrBlock(inner);
 		} catch (e) {
+			nativeFresh = NATIVE_SERVER_FAILURES !== nativeFailureStart;
+			e = normalizeThrownServerThenable(e);
 			if (ssrIsSuspense(e)) {
 				if (propagateSuspense) throw e;
 				if (stream !== null) {
@@ -7109,7 +7713,9 @@ export function ssrTry(
 							ancestors: ancestorKeys,
 							owners: ownerKeys,
 						};
+						recordStreamBoundaryMutation(stream, key);
 						stream.boundaries.set(key, entry);
+						if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
 						enterBoundaryIds(pendingIdOffset);
 					} else {
 						ID_COUNTER = entry.pendingIdOffset;
@@ -7127,9 +7733,21 @@ export function ssrTry(
 						? SERIAL.slice(serialStart)
 						: [];
 				if (entry !== undefined && SERIAL !== null) SERIAL.length = serialStart;
-				const inner = ssrBlock(withCatchArm(() => catchFn(e, scope, NOOP)));
+				const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+				const previousNativeReads = NATIVE_SERVER_READS;
+				if (nativeCapture < 0) NATIVE_SERVER_READS = null;
+				let catchReads: NativeSeedReads | null = null;
+				let inner: string;
+				try {
+					inner = ssrBlock(withCatchArm(() => catchFn(e, scope, NOOP)));
+				} finally {
+					catchReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
+				}
+				inner = nativeFreshArm(inner);
 				if (entry !== undefined) {
 					if (entry.state !== 'done') {
+						if (!entry.serverOwnedStatic && !nativeFresh)
+							entry.signals = NATIVE_READ_COLLECTOR?.serialize(catchReads);
 						if (SERIAL !== null) {
 							if (!entry.serverOwnedStatic) {
 								caughtSeeds.push(...SERIAL.slice(serialStart));
@@ -7138,7 +7756,7 @@ export function ssrTry(
 						}
 						entry.state = 'done';
 						entry.html = inner;
-						entry.seeds = caughtSeeds;
+						entry.seeds = nativeFresh ? [] : caughtSeeds;
 						pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
 					} else if (SERIAL !== null) {
 						SERIAL.length = serialStart;
@@ -7146,6 +7764,7 @@ export function ssrTry(
 					ID_COUNTER = entry.pendingIdOffset;
 					return pendingForm();
 				}
+				if (!nativeFresh) appendNativeSeedReads(catchReads);
 				return ssrBlock(inner);
 			}
 			if (stream !== null) {
@@ -7172,7 +7791,9 @@ export function ssrTry(
 						ancestors: ancestorKeys,
 						owners: ownerKeys,
 					};
+					recordStreamBoundaryMutation(stream, key);
 					stream.boundaries.set(key, entry);
+					if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
 					enterBoundaryIds(pendingIdOffset);
 				} else if (entry.state === 'pending') {
 					entry.state = 'errored';
@@ -7227,6 +7848,10 @@ function streamRuntimeJs(): string {
 		STREAM_SEED_ATTR +
 		']");' +
 		'if(sd){S[id]=sd.textContent;sd.parentNode.removeChild(sd);}' +
+		'var ns=c.firstElementChild;while(ns&&!(ns.localName==="script"&&ns.hasAttribute("' +
+		NATIVE_SIGNAL_SEED_ATTR +
+		'")))ns=ns.nextElementSibling;' +
+		'if(ns){S[id+"$signals"]=ns.textContent;ns.parentNode.removeChild(ns);}' +
 		'if(nc)c=c.firstElementChild;' +
 		'var n=t.nextSibling,depth=1;' +
 		'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
@@ -7421,6 +8046,7 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 				'</script>';
 		}
 	}
+	if (b.signals !== undefined) seedScript += serializeNativeSignalSeeds(b.signals, nonceAttr);
 	// ViewTransition arm candidates are renderer-only staging attributes. Strip
 	// them while this is still markup: once the parsing-safe carrier below turns
 	// the segment into a JSON string, vtSsrStrip can no longer recognize quoted
@@ -7513,11 +8139,13 @@ async function runStream(
 	const resolved: ResolvedMap = newResolvedMap();
 	const stream: StreamState = {
 		boundaries: new Map(),
+		boundaryOwnerKeys: new Set(),
 		nextId: 0,
 		token: createStreamToken(),
 		activePassBoundaryKeys: null,
 		activeTryKeys: [],
 		activeOwnerKeys: [],
+		replay: null,
 	};
 	const renderFullPass = (): {
 		pass: FullPassResult;
@@ -7525,7 +8153,9 @@ async function runStream(
 	} => {
 		const boundaryKeys = new Set<string>();
 		const previousBoundaryKeys = stream.activePassBoundaryKeys;
+		const previousReplay = stream.replay;
 		stream.activePassBoundaryKeys = boundaryKeys;
+		stream.replay = [];
 		try {
 			return {
 				pass: withStream(stream, () =>
@@ -7535,6 +8165,7 @@ async function runStream(
 			};
 		} finally {
 			stream.activePassBoundaryKeys = previousBoundaryKeys;
+			stream.replay = previousReplay;
 		}
 	};
 	// ── External injection (cold path: every hook below no-ops when absent) ──
@@ -7719,9 +8350,9 @@ async function runStream(
 			'<style data-octane="' +
 			hash +
 			'"' +
-			nonceAttr +
+			(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
 			'>' +
-			escapeEntireInlineStyleContent(sheet) +
+			escapeEntireInlineStyleContent(sheet.css) +
 			'</style>';
 	}
 	// Streaming DOCUMENT renders always lead with `<!DOCTYPE html>` — React
@@ -7768,6 +8399,7 @@ async function runStream(
 		shell += leadingStyles + shellHead + pass.body;
 	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	if (pass.signals !== undefined) shell += serializeNativeSignalSeeds(pass.signals, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending)
 		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + streamRuntimeJs() + '</script>';
@@ -7840,9 +8472,9 @@ async function runStream(
 					'<style data-octane="' +
 					hash +
 					'"' +
-					nonceAttr +
+					(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
 					'>' +
-					escapeEntireInlineStyleContent(sheet) +
+					escapeEntireInlineStyleContent(sheet.css) +
 					'</style>';
 			}
 			// Float sheet resources this pass discovered that are not on the wire

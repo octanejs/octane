@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/formisch/upstream",
+  "adaptedRoot": "packages/formisch/typetests/upstream",
+  "inventories": {
+    "upstream": "packages/formisch/audit/upstream-types.json",
+    "adapted": "packages/formisch/audit/adapted-types.json"
+  },
+  "pristineOverlays": [
+    {
+      "upstream": "packages/formisch/upstream/frameworks/react/src/hooks/useField/useField.test-d.ts",
+      "overlay": "packages/formisch/audit/pristine-react/frameworks/react/src/hooks/useField/useField.test-d.ts"
+    },
+    {
+      "upstream": "packages/formisch/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test-d.ts",
+      "overlay": "packages/formisch/audit/pristine-react/frameworks/react/src/hooks/useFieldArray/useFieldArray.test-d.ts"
+    },
+    {
+      "upstream": "packages/formisch/upstream/frameworks/react/src/hooks/useForm/useForm.test-d.ts",
+      "overlay": "packages/formisch/audit/pristine-react/frameworks/react/src/hooks/useForm/useForm.test-d.ts"
+    }
+  ],
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "projects": [
+        "packages/formisch/audit/tsconfig.pristine-types.json",
+        "packages/formisch/audit/tsconfig.pristine-react.json"
+      ],
+      "sourcePolicy": "byte-exact pinned core and methods tests compile against vendored source; byte-exact React test overlays compile against adjacent shims that re-export the pinned @formisch/react declarations"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "projects": [
+        "packages/formisch/typetests/tsconfig.json",
+        "packages/formisch/typetests/tsconfig.exact.json"
+      ],
+      "sourcePolicy": "structurally equivalent after the declared import maps"
+    }
+  },
+  "permittedTransformations": [
+    {
+      "kind": "import-map",
+      "file": "frameworks/react/src/hooks/useField/useField.test-d.ts",
+      "from": "../../types/index.ts",
+      "to": "@octanejs/formisch"
+    },
+    {
+      "kind": "import-map",
+      "file": "frameworks/react/src/hooks/useField/useField.test-d.ts",
+      "from": "../useForm/index.ts",
+      "to": "@octanejs/formisch"
+    },
+    {
+      "kind": "import-map",
+      "file": "frameworks/react/src/hooks/useField/useField.test-d.ts",
+      "from": "./useField.ts",
+      "to": "@octanejs/formisch"
+    },
+    {
+      "kind": "import-map",
+      "file": "frameworks/react/src/hooks/useFieldArray/useFieldArray.test-d.ts",
+      "from": "../../types/index.ts",
+      "to": "@octanejs/formisch"
+    },
+    {
+      "kind": "import-map",
+      "file": "frameworks/react/src/hooks/useFieldArray/useFieldArray.test-d.ts",
+      "from": "../useForm/index.ts",
+      "to": "@octanejs/formisch"
+    },
+    {
+      "kind": "import-map",
+      "file": "frameworks/react/src/hooks/useFieldArray/useFieldArray.test-d.ts",
+      "from": "./useFieldArray.ts",
+      "to": "@octanejs/formisch"
+    },
+    {
+      "kind": "import-map",
+      "file": "frameworks/react/src/hooks/useForm/useForm.test-d.ts",
+      "from": "../../types/index.ts",
+      "to": "@octanejs/formisch"
+    },
+    {
+      "kind": "import-map",
+      "file": "frameworks/react/src/hooks/useForm/useForm.test-d.ts",
+      "from": "./useForm.ts",
+      "to": "@octanejs/formisch"
+    },
+    {
+      "kind": "import-map",
+      "file": "packages/core/src/types/path/path.test-d.ts",
+      "from": "./path.ts",
+      "to": "../../../../../../../src/core/types/path/path.ts"
+    },
+    {
+      "kind": "import-map",
+      "file": "packages/core/src/types/schema/schema.test-d.ts",
+      "from": "./schema.ts",
+      "to": "../../../../../../../src/core/types/schema/schema.ts"
+    },
+    {
+      "kind": "import-map",
+      "file": "packages/core/src/types/utils/utils.test-d.ts",
+      "from": "./utils.ts",
+      "to": "../../../../../../../src/core/types/utils/utils.ts"
+    },
+    {
+      "kind": "import-map",
+      "file": "packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test-d.ts",
+      "from": "@formisch/core",
+      "to": "../../../../../../src/core/index.ts"
+    },
+    {
+      "kind": "import-map",
+      "file": "packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test-d.ts",
+      "from": "./getDeepErrorEntries.ts",
+      "to": "../../../../../../src/methods/getDeepErrorEntries/getDeepErrorEntries.ts"
+    },
+    {
+      "kind": "import-map",
+      "file": "packages/methods/src/pickDirty/pickDirty.test-d.ts",
+      "from": "@formisch/core",
+      "to": "../../../../../../src/core/index.ts"
+    },
+    {
+      "kind": "import-map",
+      "file": "packages/methods/src/pickDirty/pickDirty.test-d.ts",
+      "from": "./pickDirty.ts",
+      "to": "../../../../../../src/methods/pickDirty/pickDirty.ts"
+    }
+  ],
+  "divergences": []
+}

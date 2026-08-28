@@ -1,0 +1,73 @@
+{
+  "suite": "router-dispatch",
+  "iterations": 8,
+  "targets": [
+    {
+      "name": "static-routes",
+      "ops": {
+        "dispatch_per_million_candidates": {
+          "score": 4.812541700000009,
+          "median": 4.792771000000016,
+          "min": 4.650374999999997,
+          "mean": 4.781546875000003,
+          "p95": 5.085125000000005,
+          "sd": 0.1390775286449359,
+          "rme": 2.43206231718327,
+          "scoreRme": 4.362483912916121,
+          "warmupRatio": 0.9782391288162742,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "routes": 1000,
+        "matchesPerSample": 2000,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "wrong-method-routes",
+      "ops": {
+        "dispatch_per_million_candidates": {
+          "score": 4.736533199999985,
+          "median": 4.7157080000000065,
+          "min": 4.576333499999919,
+          "mean": 4.727505124999989,
+          "p95": 4.957166499999971,
+          "sd": 0.1087274584318761,
+          "rme": 1.9230624130684284,
+          "scoreRme": 3.602716858090871,
+          "warmupRatio": 0.9952778542753629,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "routes": 1000,
+        "matchesPerSample": 2000,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "dynamic-routes",
+      "ops": {
+        "dispatch_per_million_candidates": {
+          "score": 65.01424580000003,
+          "median": 62.73302100000001,
+          "min": 57.64897900000002,
+          "mean": 66.91575518750003,
+          "p95": 91.08739600000001,
+          "sd": 10.849515590143366,
+          "rme": 13.557141101410519,
+          "scoreRme": 9.859193844709381,
+          "warmupRatio": 0.9461845514479534,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "routes": 1000,
+        "matchesPerSample": 2000,
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

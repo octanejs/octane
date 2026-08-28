@@ -1,5 +1,120 @@
 # @octanejs/vite-plugin
 
+## 0.1.49
+
+### Patch Changes
+
+- 8adc693: Add an opt-in experimental scoped signal engine backed by Alien Signals 3.2.0, with owned async resources, retained values, ready-state adoption, and native compiler read tracking. Expose the `nativeReads` compiler option through the application and bundler integrations while preserving explicit hook dependency arrays and the external Alien Signals binding.
+
+  The experiment is not a stable API or a release recommendation. Local derived and async hooks remain deferred, and the accompanying evidence distinguishes supplemental compiler, runtime, and browser checks from the acceptance gates for the locked workspace.
+
+  Expose native read ownership and cached activity metadata through the existing DevTools inspector without evaluating signals or retaining a global graph registry. Match the private compiler ABI's CommonJS entry points to the public runtime so native SSR reads use one protocol instance.
+
+  Collect native reads around actual component invocation, including parameter defaults and indirect returns. Track and replay native reads in inferred memos, preserve deferred element inspection and rendering, and revoke live retained results when a contributing data owner retires. Keep held Suspense output, refs, effects, and native subscriptions together until replacement work is accepted.
+
+  Avoid duplicate native collection setup when invocation collection already owns the scope, while preserving independent child retirement, observer restoration, write guards, and stored-value witness replay.
+
+  Preserve nested Suspense ref lifetimes, finish caught deletion cleanup before replacement effects connect, and reveal the latest urgent state when it supersedes every held state update. Register native compiler and server hook diagnostics in the production error catalog and CLI explanations.
+
+- Updated dependencies [8adc693]
+- Updated dependencies [a51c8c6]
+  - octane@0.1.49
+  - @octanejs/app-core@0.0.45
+
+## 0.1.48
+
+### Patch Changes
+
+- bba4cd0: Cache small complete CSS results while mapping routes through a shared Vite
+  manifest graph. Expose the accompanying client-asset benchmark through the
+  Octane MCP benchmark tool.
+- Updated dependencies [3ca30fc]
+- Updated dependencies [efdc8cb]
+- Updated dependencies [922df8c]
+- Updated dependencies [9dda682]
+- Updated dependencies [8a8afd8]
+- Updated dependencies [37a8ca1]
+- Updated dependencies [c84edbb]
+- Updated dependencies [d5175ca]
+- Updated dependencies [4a4996e]
+  - octane@0.1.48
+  - @octanejs/app-core@0.0.44
+
+## 0.1.47
+
+### Patch Changes
+
+- Updated dependencies [60581f4]
+- Updated dependencies [7a639fd]
+- Updated dependencies [af0d999]
+- Updated dependencies [c800a1f]
+- Updated dependencies [c1bb057]
+- Updated dependencies [97b9349]
+- Updated dependencies [4393bea]
+- Updated dependencies [7dfef16]
+- Updated dependencies [7e62361]
+- Updated dependencies [964783a]
+- Updated dependencies [d3dbd78]
+  - @octanejs/app-core@0.0.43
+  - octane@0.1.47
+
+## 0.1.46
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+  - @octanejs/app-core@0.0.42
+
+## 0.1.45
+
+### Patch Changes
+
+- Updated dependencies [5b1e6a3]
+- Updated dependencies [31abee5]
+- Updated dependencies [fd6ce69]
+- Updated dependencies [5f7a457]
+- Updated dependencies [5227d7b]
+- Updated dependencies [6927595]
+- Updated dependencies [f1a7802]
+  - octane@0.1.45
+  - @octanejs/app-core@0.0.41
+
+## 0.1.44
+
+### Patch Changes
+
+- Updated dependencies [9b06e47]
+- Updated dependencies [7535acd]
+  - octane@0.1.44
+  - @octanejs/app-core@0.0.40
+
+## 0.1.43
+
+### Patch Changes
+
+- 6a68a7d: Fold provider-proven immutable CSS-module class strings before template planning. Production Vite builds retain a live class reference in each static subtree so unused and lazy component styles keep their existing delivery boundaries. Mutable default maps remain dynamic unless their CSS provider supplies an explicit immutable-export contract.
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+  - @octanejs/app-core@0.0.39
+
+## 0.1.42
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+  - @octanejs/app-core@0.0.38
+
 ## 0.1.41
 
 ### Patch Changes

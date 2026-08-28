@@ -1,4 +1,13 @@
-import { use, useState, useEffect, useLayoutEffect, useMemo, useDeferredValue } from 'octane';
+import {
+	use,
+	useState,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useDeferredValue,
+	Suspense as ResourceSuspense,
+	ErrorBoundary as ResourceErrorBoundary,
+} from 'octane';
 
 // ---------------------------------------------------------------------------
 // Basic Suspense flow — try/pending/catch with a use(promise) inside try.
@@ -10,6 +19,57 @@ export function BasicSuspense(props) @{
 			<div class="resolved">{value as string}</div>
 		} @pending {
 			<div class="fallback">{'loading'}</div>
+		}
+	</>
+}
+
+interface ResourceReaderProps {
+	read: () => string;
+	log: string[];
+}
+
+function ResourceReader(props: ResourceReaderProps) @{
+	const value = props.read();
+	useLayoutEffect(() => {
+		props.log.push('mounted:' + value);
+		return () => {
+			props.log.push('cleanup:' + value);
+		};
+	}, [props.log, value]);
+	<div class="resolved">{value as string}</div>
+}
+
+export function ThrownResourceSuspense(props: ResourceReaderProps) @{
+	<>
+		@try {
+			<ResourceReader read={props.read} log={props.log} />
+		} @pending {
+			<div class="fallback">loading</div>
+		} @catch (err: unknown, _reset: () => void) {
+			<div class="error">{String(err)}</div>
+		}
+	</>
+}
+
+export function ThrownResourceJsxSuspense(props: ResourceReaderProps) @{
+	<ResourceErrorBoundary fallback={(err: unknown) => <div class="error">{String(err)}</div>}>
+		<ResourceSuspense fallback={<div class="fallback">loading</div>}>
+			<ResourceReader read={props.read} log={props.log} />
+		</ResourceSuspense>
+	</ResourceErrorBoundary>
+}
+
+export function PromiseThrownFromLayout(props: { promise: Promise<unknown> }) @{
+	<>
+		@try {
+			useLayoutEffect(() => {
+				throw props.promise;
+			}, [props.promise]);
+			<div class="resolved">content</div>
+		} @pending {
+			<div class="fallback">loading</div>
+		} @catch (err: unknown, _reset: () => void) {
+			<div class="error">{String(err)}</div>
 		}
 	</>
 }

@@ -13,7 +13,9 @@ describe('octane/compiler browser bundle', () => {
 			stdin: {
 				contents:
 					"import { compile } from 'octane/compiler';\n" +
-					"compile(`export function App() @{ <p>{'browser compiler'}</p> }`, 'App.tsrx');\n",
+					"compile(`export function App() @{ <p>{'browser compiler'}</p> }`, 'App.tsrx');\n" +
+					'compile(`export function Scene() @{ <label value="writer" /> }`, \'Scene.tsrx\', {' +
+					"hmr: false, renderer: { id: 'native', module: '@test/valdi-writer', target: 'valdi' } });\n",
 				resolveDir: OCTANE_PACKAGE_ROOT,
 				sourcefile: 'browser-compiler-entry.js',
 			},

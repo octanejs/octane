@@ -12,8 +12,10 @@ This port targets the immutable `@react-three/drei@10.7.7` release:
 ## Source and evidence boundary
 
 `upstream/` is a byte-exact development-only snapshot of the release's `src/`,
-`test/`, package manifest, TypeScript configuration, and MIT license. It is not
-included in the published package. The registry artifact supplies the executable
+`test/`, package manifest, TypeScript configuration, and MIT license; every file
+verifies offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`, and the pinned license is republished at the package
+root as `LICENSE.upstream`. It is not included in the published package. The registry artifact supplies the executable
 React oracle and declaration surface; the tagged repository supplies authored
 source, stories, test configuration, and the sole upstream end-to-end suite.
 

@@ -43,6 +43,7 @@ const DEVTOOLS_OWN_COMPONENTS = new Set([
 	'TransitionsTab',
 	'PerfModelTab',
 	'TreeRow',
+	'NativeReadRows',
 	'DevtoolsPortal',
 	'TanStackDevtools',
 ]);
@@ -114,6 +115,24 @@ export function startBridge(
 	let lastTree = '';
 	let lastProfile = '';
 	let lastTransition = '';
+	let selectedId: number | null = null;
+	let lastInspect = '';
+
+	const emitInspect = (force = false) => {
+		if (selectedId === null) return;
+		const detail = hook.inspect(selectedId);
+		if (detail === null) {
+			client.emit('inspect-clear', { id: selectedId });
+			selectedId = null;
+			lastInspect = '';
+			return;
+		}
+		const serialized = JSON.stringify(detail);
+		if (force || serialized !== lastInspect) {
+			lastInspect = serialized;
+			client.emit('inspect', detail);
+		}
+	};
 
 	const emitNow = () => {
 		if (trailing !== null) {
@@ -144,6 +163,9 @@ export function startBridge(
 				client.emit('transition', transition);
 			}
 		}
+		// Detail remains lazy: refresh only the selected Scope, even when its
+		// native revisions change without changing the component tree shape.
+		emitInspect();
 	};
 
 	const schedule = () => {
@@ -156,8 +178,8 @@ export function startBridge(
 	const offFlush = hook.subscribe(schedule);
 
 	const offRequest = client.on('inspect-request', (e) => {
-		const detail = hook.inspect(e.payload.id);
-		if (detail) client.emit('inspect', detail);
+		selectedId = e.payload.id;
+		emitInspect(true);
 	});
 
 	// The panel asks for a fresh snapshot when it mounts; force a full re-emit
@@ -167,6 +189,7 @@ export function startBridge(
 		lastTree = '';
 		lastProfile = '';
 		lastTransition = '';
+		lastInspect = '';
 		emitNow();
 	});
 

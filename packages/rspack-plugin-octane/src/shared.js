@@ -41,13 +41,20 @@ const LOADER_OPTION_KEYS = new Set([
 	'dev',
 	'profile',
 	'strong',
+	'nativeReads',
 	'exclude',
 	'renderers',
 	'requireDirective',
 	'universalRuntime',
 	'layerSpecializations',
 ]);
-const PLUGIN_OPTION_KEYS = new Set([...LOADER_OPTION_KEYS, 'parallel', 'runtime', 'transpile']);
+const PLUGIN_OPTION_KEYS = new Set([
+	...LOADER_OPTION_KEYS,
+	'parallel',
+	'runtime',
+	'transpile',
+	'cssModuleConstants',
+]);
 const LAYER_SPECIALIZATION_KEYS = new Set(['runtime', 'renderers', 'universalRuntime']);
 
 function normalizeRuntimeRequest(value, label = 'runtime') {
@@ -202,6 +209,7 @@ function normalizeOptions(value, plugin) {
 	assertBooleanOption(options, 'dev');
 	assertBooleanOption(options, 'profile');
 	assertBooleanOption(options, 'strong');
+	assertBooleanOption(options, 'nativeReads');
 	assertBooleanOption(options, 'requireDirective');
 	if (
 		options.exclude !== undefined &&
@@ -210,6 +218,16 @@ function normalizeOptions(value, plugin) {
 		throw new TypeError('@octanejs/rspack-plugin: `exclude` must be an array of path strings.');
 	}
 	if (plugin) assertBooleanOption(options, 'transpile');
+	if (
+		plugin &&
+		options.cssModuleConstants !== undefined &&
+		typeof options.cssModuleConstants !== 'boolean' &&
+		typeof options.cssModuleConstants !== 'function'
+	) {
+		throw new TypeError(
+			'@octanejs/rspack-plugin: `cssModuleConstants` must be a boolean or a provider function.',
+		);
+	}
 	const parallel = plugin ? normalizeParallelOption(options.parallel) : undefined;
 	const renderers =
 		options.renderers === undefined ? undefined : normalizeRendererConfig(options.renderers);
@@ -223,6 +241,7 @@ function normalizeOptions(value, plugin) {
 		...(options.dev === undefined ? null : { dev: options.dev }),
 		...(options.profile === undefined ? null : { profile: options.profile }),
 		...(options.strong === undefined ? null : { strong: options.strong }),
+		...(options.nativeReads === undefined ? null : { nativeReads: options.nativeReads }),
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
 		...(renderers === undefined ? null : { renderers }),
 		...(universalRuntime === undefined ? null : { universalRuntime }),
@@ -233,6 +252,9 @@ function normalizeOptions(value, plugin) {
 		...(plugin && parallel !== undefined ? { parallel } : null),
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
 		...(plugin && options.runtime !== undefined ? { runtime: options.runtime } : null),
+		...(plugin && options.cssModuleConstants !== undefined
+			? { cssModuleConstants: options.cssModuleConstants }
+			: null),
 	};
 	if (normalized.exclude) Object.freeze(normalized.exclude);
 	return Object.freeze(normalized);

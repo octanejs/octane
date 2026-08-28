@@ -32,6 +32,11 @@
       "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
     },
     {
+      "path": "packages/aria/tests/dnd-native-lifecycle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins Octane's native pointer, drag, and drop lifecycle behavior; it is not counted as React parity evidence."
+    },
+    {
       "path": "packages/aria/tests/differential/parity-collections.test.ts",
       "disposition": "react-octane-differential",
       "oracle": "The same fixture is compiled for Octane and the pinned React Aria oracle and compared after identical interactions."
@@ -127,6 +132,11 @@
       "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
     },
     {
+      "path": "packages/aria/tests/rac-advanced.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises advanced React Aria Components through Octane's compiler and DOM integration; it is not counted as React parity evidence."
+    },
+    {
       "path": "packages/aria/tests/rac-autocomplete.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
@@ -135,6 +145,11 @@
       "path": "packages/aria/tests/rac-checkable.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-color-native-input.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins Octane's native range-input event contract for ColorWheel and ColorArea; it is not counted as React parity evidence."
     },
     {
       "path": "packages/aria/tests/rac-fields.test.ts",
@@ -200,6 +215,11 @@
       "path": "packages/aria/tests/rac-utils.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/react-aria-components-exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane package namespace against the pinned React Aria Components runtime and type exports; it is not used as React-parity execution evidence."
     },
     {
       "path": "packages/aria/tests/select.test.ts",

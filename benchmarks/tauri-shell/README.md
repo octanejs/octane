@@ -1,6 +1,6 @@
 # tauri-shell
 
-Octane vs React **inside a real Tauri window**, not in a headless browser.
+Octane, React, and Inferno **inside a real Tauri window**, not in a headless browser.
 
 ## Why this is not just another browser suite
 
@@ -45,7 +45,7 @@ next to the reported commit count. React auto-batches updates arriving from a
 Tauri event callback and collapses all 4000 into a **single** commit, so it
 finishes sooner by never rendering an intermediate line: a log tail on React
 looks frozen and then jumps to its final state. `stream_sync_ms` is the
-comparable number, because there both targets commit 4000 times. Octane reads
+comparable number, because there all targets commit 4000 times. Octane reads
 almost the same on both, since it already commits per event either way.
 
 Any op whose median lands at or below 2ms is printed as `~Nx (clock floor)`.
@@ -59,18 +59,18 @@ variance of a whole process start. Treat it as indicative, and raise
 
 ## Fairness
 
-- The Rust host is the same source for both targets, rebuilt once per target.
+- The Rust host is the same source for all targets, rebuilt once per target.
   `generate_context!` **embeds** `frontendDist` into the executable, so swapping
   the directory after a build measures whichever frontend was compiled in; the
   `result.target` assertion in `run.mjs` exists because that failure is
   otherwise invisible. Only the host crate recompiles, never its dependencies.
-- Both targets talk to Tauri through raw `@tauri-apps/api`, **not** through
+- All targets talk to Tauri through raw `@tauri-apps/api`, **not** through
   `@octanejs/tauri`. The binding is a ref write plus a teardown guard; putting it
   on one side only would fold its cost into the framework column.
 - React runs without `StrictMode`. Its double-invoke is a development aid and
   Octane has no equivalent, so enabling it would compare different amounts of
   work.
-- Both build with the same normalized Vite settings (`esnext`, terser, 2 passes,
+- All targets build with the same normalized Vite settings (`esnext`, terser, 2 passes,
   toplevel mangling).
 - Row labels are derived from the index, never randomized: a benchmark that
   cannot be re-run to the same numbers cannot catch a regression.
@@ -78,7 +78,7 @@ variance of a whole process start. Treat it as indicative, and raise
   first launch per target is a discarded warmup, because it pays for OS caches
   that later runs reuse.
 - The window runs `incognito`, so WKWebView keeps no URL cache between
-  processes. Without it the second target boots the first one's cached
+  processes. Without it a later target can boot the previous target's cached
   `index.html` and reports under the wrong name; `run.mjs` asserts the reported
   target to keep that from ever passing silently.
 

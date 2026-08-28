@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mount, nextPaint } from './_helpers';
-import { flushSync } from '../src/index.js';
+import { createRoot, flushSync, hydrateRoot } from '../src/index.js';
+import { renderToString } from 'octane/server';
+import { loadServerFixture } from './_server-fixture.js';
 import {
 	PersistsAcrossRenders,
 	MutationDoesNotRerender,
@@ -12,6 +14,7 @@ import {
 	DomRefCleanup,
 	DomRefObjectCleanup,
 	ImperativeOwner,
+	ImperativeValue,
 	LazyInit,
 } from './_fixtures/useref.tsrx';
 import { ArrayRefsOneEl } from './_fixtures/useref-multi.tsrx';
@@ -170,6 +173,131 @@ describe('useRef — DOM ref attribute', () => {
 });
 
 describe('useImperativeHandle', () => {
+	it('shares one handle across nested refs and detaches the previous owners before a ref swap', () => {
+		type Handle = { bump(): void; reset(): void };
+		const objectRef: { current: Handle | null } = { current: null };
+		const calls: Array<Handle | null | string> = [];
+		const legacyRef = (value: Handle | null) => {
+			calls.push(value);
+		};
+		const cleanupRef = (value: Handle | null) => {
+			calls.push(value);
+			return () => {
+				calls.push('cleanup');
+			};
+		};
+		const refs = Object.freeze([
+			objectRef,
+			Object.freeze([null, legacyRef, undefined, cleanupRef]),
+		]);
+		const r = mount(ImperativeOwner, { handle: refs });
+		const handle = objectRef.current!;
+		expect(calls).toEqual([handle, handle]);
+		flushSync(() => handle.bump());
+		expect(r.find('.counter').textContent).toBe('1');
+
+		const nextRef = (value: Handle | null) => {
+			calls.push(value === null ? 'next null' : 'next');
+		};
+		r.update(ImperativeOwner, { handle: [nextRef] });
+		expect(objectRef.current).toBeNull();
+		expect(calls).toEqual([handle, handle, null, 'cleanup', 'next']);
+		r.unmount();
+		expect(calls.at(-1)).toBe('next null');
+	});
+
+	it('supports primitive handles and skips factories for nullish or empty ref arrays', () => {
+		const factory = vi.fn(() => 42);
+		const objectRef: { current: number | null } = { current: null };
+		const callback = vi.fn();
+		const r = mount(ImperativeValue, { handle: [null, [undefined, []]], factory, label: 'empty' });
+		expect(factory).not.toHaveBeenCalled();
+		r.update(ImperativeValue, { handle: [objectRef, callback], factory, label: 'attached' });
+		expect(factory).toHaveBeenCalledTimes(1);
+		expect(objectRef.current).toBe(42);
+		expect(callback).toHaveBeenCalledWith(42);
+		r.unmount();
+		expect(objectRef.current).toBeNull();
+		expect(callback).toHaveBeenLastCalledWith(null);
+	});
+
+	it('detaches the attached owners after a caller mutates a ref array in place', () => {
+		const calls: Array<number | null> = [];
+		const original = (value: number | null) => {
+			calls.push(value);
+		};
+		const replacement = vi.fn();
+		const refs = [original];
+		const factory = vi.fn(() => 42);
+		const r = mount(ImperativeValue, { handle: refs, factory, label: 'original' });
+		expect(calls).toEqual([42]);
+
+		refs[0] = replacement;
+		r.update(ImperativeValue, { handle: refs, factory, label: 'mutated' });
+		expect(factory).toHaveBeenCalledTimes(1);
+		expect(replacement).not.toHaveBeenCalled();
+		r.unmount();
+		expect(calls).toEqual([42, null]);
+		expect(replacement).not.toHaveBeenCalled();
+	});
+
+	it.each(['attach', 'detach'] as const)(
+		'releases other array owners when a callback throws on %s',
+		(phase) => {
+			const failure = new Error(`ref ${phase}`);
+			const objectRef: { current: number | null } = { current: null };
+			const errors: unknown[] = [];
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			const root = createRoot(container, { onUncaughtError: (error) => errors.push(error) });
+			const throwingRef = () => {
+				if (phase === 'attach') throw failure;
+				return () => {
+					throw failure;
+				};
+			};
+			const handle = phase === 'attach' ? [objectRef, throwingRef] : [throwingRef, objectRef];
+			try {
+				root.render(ImperativeValue, { handle, factory: () => 7, label: phase });
+				flushSync(() => {});
+				if (phase === 'detach') expect(objectRef.current).toBe(7);
+				root.unmount();
+				expect(objectRef.current).toBeNull();
+				expect(errors).toEqual([failure]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it('leaves refs untouched during SSR and attaches them when hydrating the server markup', () => {
+		const server = loadServerFixture('packages/octane/tests/_fixtures/useref.tsrx');
+		const objectRef: { current: number | null } = { current: null };
+		const callback = vi.fn();
+		const factory = vi.fn(() => 19);
+		const props = { handle: [objectRef, [callback]], factory, label: 'hydrated' };
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = renderToString(server.ImperativeValue, props).html;
+		expect(objectRef.current).toBeNull();
+		expect(factory).not.toHaveBeenCalled();
+		expect(callback).not.toHaveBeenCalled();
+		const span = container.querySelector('span');
+		const root = hydrateRoot(container, ImperativeValue, props);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('span')).toBe(span);
+			expect(objectRef.current).toBe(19);
+			expect(callback).toHaveBeenCalledWith(19);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+		expect(objectRef.current).toBeNull();
+		expect(callback).toHaveBeenLastCalledWith(null);
+	});
+
 	it('child exposes an imperative API via the ref the parent passes in', async () => {
 		const handle: { current: any } = { current: null };
 		const r = mount(ImperativeOwner, { handle });

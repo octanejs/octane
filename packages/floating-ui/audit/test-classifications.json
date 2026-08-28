@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Fail-closed executable controls bind every disclosed adapted negative control to its source and one-for-one runtime crosswalk entry."
+    },
+    {
+      "path": "packages/floating-ui/tests/adapted-original.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Runs the one-for-one adapted suite with the pinned Vitest 3.0.9 toolchain and checks all 301 registered identities."
+    },
+    {
+      "path": "packages/floating-ui/tests/browser/positioning.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Real-Chromium positioning and autoUpdate observation for the Octane binding; supplemental environment evidence, not an upstream-suite identity."
+    },
+    {
+      "path": "packages/floating-ui/tests/components.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Port-authored component, portal, focus, composite, and transition coverage under Octane."
+    },
+    {
+      "path": "packages/floating-ui/tests/nodes.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Port-authored floating-tree navigation coverage for the Octane binding's internal helper behavior."
+    },
+    {
+      "path": "packages/floating-ui/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the TwoTooltips fixture against pinned @floating-ui/react@0.27.19 and @octanejs/floating-ui."
+    },
+    {
+      "path": "packages/floating-ui/tests/differential/setup.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Fail-closed setup coverage for the exact declared differential fixture."
+    },
+    {
+      "path": "packages/floating-ui/tests/package-boundary.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Published package metadata and tree-shaking boundary coverage."
+    },
+    {
+      "path": "packages/floating-ui/tests/positioning.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Port-authored positioning and interaction contracts under Octane scheduling."
+    },
+    {
+      "path": "packages/floating-ui/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the lock-pinned byte-exact React and React-DOM suites and checks all 301 passed identities."
+    },
+    {
+      "path": "packages/floating-ui/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Port-authored Octane public API probes that predate the one-for-one upstream declaration programs; supplemental type conformance, not upstream-suite identity evidence."
+    }
+  ]
+}

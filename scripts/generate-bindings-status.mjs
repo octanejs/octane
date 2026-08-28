@@ -174,7 +174,7 @@ supported surface and known test coverage described for that package.
 | --- | --- | --- | --- | --- | --- |
 `;
 
-for (const { dir, pkg, status } of rows) {
+for (const { pkg, status } of rows) {
 	const divergences = status.divergences.length
 		? status.divergences.map((d) => cell(d).replace(/\.$/, '')).join('; ')
 		: 'none known';

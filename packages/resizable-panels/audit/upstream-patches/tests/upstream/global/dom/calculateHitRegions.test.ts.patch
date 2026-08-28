@@ -1,0 +1,24 @@
+diff --git a/tests/upstream/global/dom/calculateHitRegions.test.ts b/tests/upstream/global/dom/calculateHitRegions.test.ts
+--- a/tests/upstream/global/dom/calculateHitRegions.test.ts
++++ b/tests/upstream/global/dom/calculateHitRegions.test.ts
+@@ -1,6 +1,17 @@
+-import { describe, expect, test } from "vitest";
+-import { mockGroup, type MockGroup } from "../test/mockGroup";
+-import { calculateHitRegions } from "./calculateHitRegions";
++// Fidelity: exact upstream assertions and test identities; only module paths and DOM mocking are adapted.
++import { afterEach, beforeEach, describe, expect, test } from "vitest";
++import { mockGroup, resetMockGroupIdCounter, type MockGroup } from "../test/mockGroup";
++import { calculateHitRegions } from "../../../../src/global/dom/calculateHitRegions";
++import {
++  mockBoundingClientRect,
++  unmockBoundingClientRect
++} from "../../utils/test/mockBoundingClientRect";
++
++beforeEach(mockBoundingClientRect);
++afterEach(() => {
++  resetMockGroupIdCounter();
++  unmockBoundingClientRect();
++});
+ 
+ describe("calculateHitRegions", () => {
+   function serialize(group: MockGroup) {

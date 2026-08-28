@@ -55,6 +55,7 @@ const callbackRef: OTPInputProps = {
 	pasteTransformer: (pasted) => pasted.replaceAll('-', ''),
 	textAlign: 'center',
 	noScriptCSSFallback: null,
+	nonce: 'style-nonce',
 };
 
 expectType<OTPInputProps>(controlled);

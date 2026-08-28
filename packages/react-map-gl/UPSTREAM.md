@@ -39,7 +39,13 @@ own settings through `upstream/`. Everything the port authors is fully strict.
 
 `upstream/tsconfig.json` is deliberately not vendored: it is vis.gl monorepo
 build config, excluded from the published package by its own `files` field, and
-its `extends` path does not resolve outside that repository.
+its `extends` path does not resolve outside that repository. The lock's scopes
+(`package.json`, `src`, `test`) record that exclusion.
+
+Every vendored file under `upstream/` verifies offline against the upstream git
+blob shas recorded in `audit/upstream.lock.json` (pinned to the tag commit
+above). The pinned upstream MIT license is republished at the package root as
+`LICENSE.upstream`, hash-matched to the lock's license evidence.
 
 Everything else is re-implemented against Octane hooks.
 

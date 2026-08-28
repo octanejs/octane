@@ -23,22 +23,22 @@
       "oracle": "Spawns the pinned upstream Vitest suite unchanged, captures the child JSON report, and requires the exact 41 declared identities to pass once."
     },
     {
-      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkey.test.ts",
+      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkey.test.tsx",
       "disposition": "adapted-upstream-suite",
       "oracle": "Adapted port of packages/react-hotkeys/tests/useHotkey.test.tsx."
     },
     {
-      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkeyRegistrations.test.ts",
+      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkeyRegistrations.test.tsx",
       "disposition": "adapted-upstream-suite",
       "oracle": "Adapted port of packages/react-hotkeys/tests/useHotkeyRegistrations.test.tsx."
     },
     {
-      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkeySequences.test.ts",
+      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkeySequences.test.tsx",
       "disposition": "adapted-upstream-suite",
       "oracle": "Adapted port of packages/react-hotkeys/tests/useHotkeySequences.test.tsx."
     },
     {
-      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkeys.test.ts",
+      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkeys.test.tsx",
       "disposition": "adapted-upstream-suite",
       "oracle": "Adapted port of packages/react-hotkeys/tests/useHotkeys.test.tsx."
     }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
-import { flushSync, hydrateRoot } from '../../src/index.js';
+import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import { loadServerFixture } from '../_server-fixture.js';
 import {
 	activateStreamedMarkup,
@@ -54,9 +54,7 @@ async function revealServerBoundary(component: any, text: string): Promise<HTMLD
 }
 
 async function flushResolution(): Promise<void> {
-	await Promise.resolve();
-	await Promise.resolve();
-	flushSync(() => {});
+	await act(() => {});
 }
 
 afterEach(() => {

@@ -1,0 +1,149 @@
+diff --git a/tests/upstream/useForm/register.test.tsx b/tests/upstream/useForm/register.test.tsx
+--- a/tests/upstream/useForm/register.test.tsx
++++ b/tests/upstream/useForm/register.test.tsx
+@@ -50,7 +50,7 @@ describe('register', () => {
+       })({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+   });
+ 
+@@ -265,13 +265,13 @@ describe('register', () => {
+         <form>
+           <input
+             placeholder={'inputA'}
+-            onChange={({ target: { value } }) =>
++            onInput={({ target: { value } }) =>
+               setValue('a', value, { shouldDirty: true, shouldValidate: true })
+             }
+           />
+           <input
+             placeholder={'inputB'}
+-            onChange={({ target: { value } }) =>
++            onInput={({ target: { value } }) =>
+               setValue('b', value, { shouldDirty: true, shouldValidate: true })
+             }
+           />
+@@ -1029,7 +1029,7 @@ describe('register', () => {
+           isValidValue = isValid;
+         }, [isValid]);
+ 
+-        const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
++        const handleChange = (event: Event & { currentTarget: HTMLInputElement }) => {
+           setDisableFirstName(event.currentTarget.checked);
+         };
+ 
+@@ -1051,7 +1051,7 @@ describe('register', () => {
+             <input
+               id="disable"
+               type="checkbox"
+-              onChange={handleChange}
++              onInput={handleChange}
+               data-testid="toggle-disabled"
+             />
+             <p data-testid="isValid">{isValid ? 'valid' : 'invalid'}</p>
+@@ -1500,7 +1500,7 @@ describe('register', () => {
+           setError,
+           formState: { errors },
+         } = useForm<{ firstName: string }>();
+-        const { name, ref, onBlur, onChange } = register('firstName');
++        const { name, ref, onBlur, onInput } = register('firstName'); // octane: register exposes onInput
+ 
+         return (
+           <form
+@@ -1516,7 +1516,7 @@ describe('register', () => {
+               name={name}
+               ref={ref}
+               onBlur={onBlur}
+-              onChange={onChange}
++              onInput={onInput}
+             />
+             {errors.firstName && <div>{errors.firstName.message}</div>}
+             <input type="submit" />
+@@ -1558,7 +1558,7 @@ describe('register', () => {
+           {value.map((_, index) => (
+             <input
+               key={index}
+-              onChange={(e) => {
++              onInput={(e) => {
+                 const updatedValue = checkboxValue.map((item, i) => {
+                   if (index === i) {
+                     return e.target.checked;
+@@ -1592,7 +1592,9 @@ describe('register', () => {
+             name="test"
+             control={control}
+             render={({ field }) => (
+-              <Checkboxes onChange={field.onChange} value={field.value} />
++              // octane: `onChange` here is the Checkboxes component's own prop
++              // (not a DOM event); the field handler it receives is onInput.
++              <Checkboxes onChange={field.onInput} value={field.value} />
+             )}
+           />
+           <input type="submit" />
+@@ -1731,7 +1733,8 @@ describe('register', () => {
+   it('should be able to register input/textarea/select when embedded deeply', async () => {
+     let submitData: unknown;
+ 
+-    const Select = React.forwardRef<HTMLDivElement>((_, ref) => {
++    // octane: ref-as-prop (no forwardRef)
++    const Select = ({ ref }: { ref?: (node: HTMLDivElement | null) => void }) => {
+       return (
+         <div ref={ref}>
+           <select data-testid="select">
+@@ -1740,29 +1743,25 @@ describe('register', () => {
+           </select>
+         </div>
+       );
+-    });
+-
+-    Select.displayName = 'Select';
++    };
+ 
+-    const Input = React.forwardRef<HTMLDivElement>((_, ref) => {
++    // octane: ref-as-prop (no forwardRef)
++    const Input = ({ ref }: { ref?: (node: HTMLDivElement | null) => void }) => {
+       return (
+         <div ref={ref}>
+           <input data-testid="input" />
+         </div>
+       );
+-    });
+-
+-    Input.displayName = 'Input';
++    };
+ 
+-    const Textarea = React.forwardRef<HTMLDivElement>((_, ref) => {
++    // octane: ref-as-prop (no forwardRef)
++    const Textarea = ({ ref }: { ref?: (node: HTMLDivElement | null) => void }) => {
+       return (
+         <div ref={ref}>
+           <textarea data-testid="textarea" />
+         </div>
+       );
+-    });
+-
+-    Textarea.displayName = 'Textarea';
++    };
+ 
+     const App = () => {
+       const { register, handleSubmit } = useForm({
+@@ -1961,7 +1960,7 @@ describe('register', () => {
+         bubbles: true,
+         cancelable: false,
+         currentTarget: null,
+-        type: 'change',
++        type: 'input', // octane: native event type (no synthetic change)
+       }),
+     );
+   });
+@@ -1994,7 +1993,7 @@ describe('register', () => {
+     expect(onBlur).toHaveBeenCalledTimes(1);
+     expect(onBlur).toHaveBeenCalledWith(
+       expect.objectContaining({
+-        bubbles: true,
++        bubbles: false, // octane: native blur does not bubble (no synthetic event layer)
+         cancelable: false,
+         currentTarget: null,
+         type: 'blur',

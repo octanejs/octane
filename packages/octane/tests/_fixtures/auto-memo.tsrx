@@ -5,8 +5,27 @@ import {
 	AutoMemoCustomChild,
 	AutoMemoOpaqueChild,
 	AutoMemoOpaqueReturned,
+	autoMemoOpaqueVersion,
 	bumpAutoMemoOpaqueVersions,
 } from './auto-memo-child.tsrx';
+
+// Parent-first declarations force the compiler's same-module graph proof to
+// carry the leaf's live import through more than one dependency hop.
+function TransitiveLiveOuter() @{
+	<div>
+		<TransitiveLiveMiddle />
+	</div>
+}
+
+function TransitiveLiveMiddle() @{
+	<div>
+		<TransitiveLiveLeaf />
+	</div>
+}
+
+function TransitiveLiveLeaf() @{
+	<span id="auto-transitive-live">{'transitive ' + autoMemoOpaqueVersion}</span>
+}
 
 // A pure, same-module component region. Production compilation caches callers
 // the whole list by the `items` capture and reuse its full Block on equal deps.
@@ -102,5 +121,6 @@ export function AutoMemoApp() @{
 		<CustomRows />
 		<OpaqueRows />
 		<ReturnedOpaque />
+		<TransitiveLiveOuter />
 	</div>
 }

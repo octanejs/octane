@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { ensureMaterializedUpstream } from './react-port/ensure-materialized.mjs';
 
 const TEST_FILE = /\.(?:test|spec)\.(?:[cm]?[jt]s|[jt]sx|tsrx)$/;
 
@@ -68,4 +69,19 @@ export function collectFailsPins(root, repoRoot) {
 		total += pins.length;
 	}
 	return { byFile, total };
+}
+
+export function collectBindingParityGaps(
+	packages,
+	repoRoot,
+	{ ensureEvidence = ensureMaterializedUpstream } = {},
+) {
+	// Some bindings keep byte-pinned adapted tests in ignored, regenerated
+	// directories. Make this generator own that observation boundary instead of
+	// depending on an earlier parity command having populated those directories.
+	ensureEvidence(repoRoot);
+	return packages.map((pkg) => ({
+		...pkg,
+		...collectFailsPins(path.join(pkg.directory, 'tests'), repoRoot),
+	}));
 }

@@ -166,7 +166,7 @@ describe('bridgeReport', () => {
 		expect(report.plan.join('\n')).toContain('octane/server');
 	});
 
-	it('reports class components as needs-rework', async () => {
+	it('reports class components as bridgeable with mandatory rewrites', async () => {
 		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
 		await writeFakePackage(root, 'classy', {
 			'index.js': `
@@ -176,6 +176,20 @@ describe('bridgeReport', () => {
 		});
 		const report = await bridgeReport({ packageName: 'classy', projectRoot: root });
 		expect(report.classComponents).toBe(true);
+		expect(report.apis.find((row) => row.name === 'Component').status).toBe('rewrite');
+		expect(report.verdict).toBe('bridgeable-with-rewrites');
+	});
+
+	it('reserves needs-rework for a public React API with no Octane rewrite', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
+		await writeFakePackage(root, 'profiler-lib', {
+			'index.js': `
+				import { Profiler } from 'react';
+				export { Profiler };
+			`,
+		});
+		const report = await bridgeReport({ packageName: 'profiler-lib', projectRoot: root });
+		expect(report.apis.find((row) => row.name === 'Profiler').status).toBe('unsupported');
 		expect(report.verdict).toBe('needs-rework');
 	});
 
@@ -234,13 +248,13 @@ describe('bridgeReportFromSource', () => {
 		expect(report.plan.join('\n')).toContain('forwardRef');
 	});
 
-	it('reports class components as needs-rework', () => {
+	it('reports class components as bridgeable with mandatory rewrites', () => {
 		const report = bridgeReportFromSource(`
 			import React from 'react';
 			export class Panel extends React.Component { render() { return null; } }
 		`);
 		expect(report.classComponents).toBe(true);
-		expect(report.verdict).toBe('needs-rework');
+		expect(report.verdict).toBe('bridgeable-with-rewrites');
 		expect(report.plan.join('\n')).toContain('function component');
 	});
 
@@ -282,6 +296,10 @@ describe('KNOWN_BINDINGS', () => {
 
 	it('maps react-textarea-autosize to the exact Octane binding', () => {
 		expect(KNOWN_BINDINGS['react-textarea-autosize']).toBe('@octanejs/textarea-autosize');
+	});
+
+	it('maps react-select to the exact Octane binding', () => {
+		expect(KNOWN_BINDINGS['react-select']).toBe('@octanejs/select');
 	});
 
 	it('maps react-window to its exact official Octane binding', () => {

@@ -1,0 +1,388 @@
+{
+  "schemaVersion": 1,
+  "project": "xstate",
+  "roots": ["packages/xstate/tests/conformance"],
+  "files": [
+    "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+    "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+    "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+    "packages/xstate/tests/conformance/upstream-useSelector.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:6709a34f68b940de",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext input can be passed to the provider"
+    },
+    {
+      "id": "runtime:05a399d79799d914",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext options can be passed to the provider"
+    },
+    {
+      "id": "runtime:cf13de45adc01ef6",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext should be able to pass interpreter options to the provider"
+    },
+    {
+      "id": "runtime:ccc00d1c6884066c",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext should merge createActorContext options with options passed to the provider"
+    },
+    {
+      "id": "runtime:c500538298ae84df",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext should preserve machine's identity when swapping options using in-render `.provide`"
+    },
+    {
+      "id": "runtime:49667fa4fbc7c644",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext should work with a provided machine"
+    },
+    {
+      "id": "runtime:5a7e4e08e2c73aed",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext should work with other types of logic"
+    },
+    {
+      "id": "runtime:5c206c8e858f91a2",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext should work with useActorRef"
+    },
+    {
+      "id": "runtime:366582f5a35dcb60",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext should work with useSelector"
+    },
+    {
+      "id": "runtime:dd1996fba9ab69be",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext should work with useSelector and a custom comparator"
+    },
+    {
+      "id": "runtime:06dfa933baa92142",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext the actor should be able to receive events"
+    },
+    {
+      "id": "runtime:e1ddaf3df43d90e1",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext useActorRef should throw when the actor was not provided"
+    },
+    {
+      "id": "runtime:96ad6419fa4b27d0",
+      "file": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "fullName": "createActorContext useSelector should throw when the actor was not provided"
+    },
+    {
+      "id": "runtime:89a8f54035b83a0f",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) actions should not use stale data in a builtin entry action"
+    },
+    {
+      "id": "runtime:d2aa8b31f59df618",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) actions should not use stale data in a builtin transition action"
+    },
+    {
+      "id": "runtime:6d1c9e280e9f4854",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) actions should not use stale data in a custom entry action"
+    },
+    {
+      "id": "runtime:64d5d432c672134e",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) child component should be able to send an event to a parent immediately in an effect"
+    },
+    {
+      "id": "runtime:a2ff343e3e11e8f7",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) custom data should be available right away for the invoked actor"
+    },
+    {
+      "id": "runtime:c0c5f5ad448a6c90",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) delayed transitions should work when initializing from a rehydrated state"
+    },
+    {
+      "id": "runtime:712c59959aff7d92",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should accept input and provide it to the context factory"
+    },
+    {
+      "id": "runtime:59e849bac01d2b04",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should be able to use a delay provided outside of React"
+    },
+    {
+      "id": "runtime:e96f0e6109c9b589",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should be able to use a guard provided outside of React"
+    },
+    {
+      "id": "runtime:6a91678fd6975024",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should be able to use a service provided outside of React"
+    },
+    {
+      "id": "runtime:f4cb6405453ed650",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should be able to use an action provided outside of React"
+    },
+    {
+      "id": "runtime:9dced4e1a8f9faff",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should deliver messages sent from an effect to an actor registered in the system"
+    },
+    {
+      "id": "runtime:4d89441e397098e7",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should execute a delayed transition of the initial state"
+    },
+    {
+      "id": "runtime:b8c2efc4596d561a",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should maintain the same reference for objects created when resolving initial state"
+    },
+    {
+      "id": "runtime:933b862fcca1bd9e",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should not invoke initial services more than once"
+    },
+    {
+      "id": "runtime:18d7c9752a96afec",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should not miss initial synchronous updates"
+    },
+    {
+      "id": "runtime:0ec5b3a63ef77e24",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should not spawn actors until service is started"
+    },
+    {
+      "id": "runtime:bd0bae8a2ecc4cee",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should not use stale data in a guard"
+    },
+    {
+      "id": "runtime:7da379d6545503d7",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should only render once when initial microsteps are involved"
+    },
+    {
+      "id": "runtime:9b52b7f73aa63d9a",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should provide the service"
+    },
+    {
+      "id": "runtime:6318823774d9c88e",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should successfully spawn actors from the lazily declared context"
+    },
+    {
+      "id": "runtime:c8ad212ab76dd248",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should throw an error to an error boundary when the actor reaches an error state"
+    },
+    {
+      "id": "runtime:b6765a6e0c32dfdd",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should work with `onSnapshot`"
+    },
+    {
+      "id": "runtime:630b86a727d450f0",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should work with the useActor hook"
+    },
+    {
+      "id": "runtime:ff7f9736285c1a8c",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should work with the useActor hook (rehydrated state)"
+    },
+    {
+      "id": "runtime:d3962a52fa5dbf29",
+      "file": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "fullName": "useActor (non-strict) should work with the useMachine hook (rehydrated state config)"
+    },
+    {
+      "id": "runtime:7b1dae050fce6efd",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) actions created by a layout effect should access the latest closure values"
+    },
+    {
+      "id": "runtime:5623921c1c74f297",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) all commits should be consistent - a value derived in render should be derived from the latest source"
+    },
+    {
+      "id": "runtime:2667d914c9aaa0b1",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) all renders should be consistent - a value derived in render should be derived from the latest source"
+    },
+    {
+      "id": "runtime:d8531289427f6047",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) invoked actor should be able to receive (deferred) events that it replays when active"
+    },
+    {
+      "id": "runtime:bbe88e24647d934a",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) observer should be called with next state"
+    },
+    {
+      "id": "runtime:8743449bcc746264",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should be able to rehydrate an incoming new machine using the persisted state of the previous one"
+    },
+    {
+      "id": "runtime:55807083e51d678d",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should be able to rehydrate an inline actor when changing machines"
+    },
+    {
+      "id": "runtime:eabe206394dcd041",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should be able to rerender with a new machine"
+    },
+    {
+      "id": "runtime:a43c824ea421d95c",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should change state when started"
+    },
+    {
+      "id": "runtime:b686b336ae2b5273",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should change state when started (useMachine)"
+    },
+    {
+      "id": "runtime:39cfa9e6cab042bc",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should deliver messages sent from an effect to the root actor registered in the system"
+    },
+    {
+      "id": "runtime:08f3c3bde1f2f11c",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should execute action bound to a specific machine's instance when the action is provided in render"
+    },
+    {
+      "id": "runtime:9aacff4d0626d799",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should execute an initial entry action once"
+    },
+    {
+      "id": "runtime:5ee1e1c2cff92517",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should not create extra rerenders when recreating the actor on the machine change"
+    },
+    {
+      "id": "runtime:a1ffd4547dcd26e3",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should rerender OK when only the provided machine implementations have changed"
+    },
+    {
+      "id": "runtime:4f146a7947fe5af1",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should work with a promise actor"
+    },
+    {
+      "id": "runtime:6452ffe4f5be788b",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) should work with a transition actor"
+    },
+    {
+      "id": "runtime:d915250c0dd222c1",
+      "file": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "fullName": "useActorRef (non-strict) spawned actor should be able to receive (deferred) events that it replays when active"
+    },
+    {
+      "id": "runtime:49defa86bf9c3a40",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) only rerenders for selected values"
+    },
+    {
+      "id": "runtime:3cb21605bc787047",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should compute a stable snapshot internally when selecting from uninitialized service"
+    },
+    {
+      "id": "runtime:300d5fa2743b4f5f",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should immediately render snapshot of initially spawned custom actor"
+    },
+    {
+      "id": "runtime:e5eede51478aa45e",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should keep rendering a new selected value after selector change when the actor doesn't emit"
+    },
+    {
+      "id": "runtime:f9943f8b7a245163",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should not log any spurious errors when used with a not-started actor"
+    },
+    {
+      "id": "runtime:757041935aacbe96",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should only rerender once when the selected value changes"
+    },
+    {
+      "id": "runtime:63efc4a3b140b283",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should render snapshot state when actor changes"
+    },
+    {
+      "id": "runtime:b714da5e71147bb0",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should render snapshot value when actor doesn't emit anything"
+    },
+    {
+      "id": "runtime:45dd1a9c4607cdb4",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should rerender with a new value when the selector changes"
+    },
+    {
+      "id": "runtime:c848611ff2bdc188",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should throw an error to an error boundary when the actor reaches an error state"
+    },
+    {
+      "id": "runtime:9a6ad97cea9601d2",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should use a fresh selector for subscription updates after selector change"
+    },
+    {
+      "id": "runtime:eab6135a4529b697",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should work with a custom comparison function"
+    },
+    {
+      "id": "runtime:2b7fbac8bcd419ad",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should work with an optional actor"
+    },
+    {
+      "id": "runtime:7fdb70b2df386c01",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should work with initially deferred actors spawned in lazy context"
+    },
+    {
+      "id": "runtime:37240f304064cdec",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should work with selecting values from initially invoked actors"
+    },
+    {
+      "id": "runtime:07a17a4a95459fdd",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should work with selecting values from initially spawned actors"
+    },
+    {
+      "id": "runtime:edab29254fad7b40",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) should work with the shallowEqual comparison function"
+    },
+    {
+      "id": "runtime:a19261bfac19722e",
+      "file": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "fullName": "useSelector (non-strict) shouldn't interfere with spawning actors that are part of the initial state of an actor"
+    }
+  ]
+}

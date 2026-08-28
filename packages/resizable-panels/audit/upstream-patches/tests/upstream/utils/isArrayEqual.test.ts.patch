@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/utils/isArrayEqual.test.ts b/tests/upstream/utils/isArrayEqual.test.ts
+--- a/tests/upstream/utils/isArrayEqual.test.ts
++++ b/tests/upstream/utils/isArrayEqual.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, test } from "vitest";
+-import { isArrayEqual } from "./isArrayEqual";
++import { isArrayEqual } from "../../../src/utils/isArrayEqual";
+ 
+ describe("isArrayEqual", () => {
+   test("should work", () => {

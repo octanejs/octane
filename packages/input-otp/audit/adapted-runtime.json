@@ -35,25 +35,30 @@
     {
       "id": "runtime:input-otp:0006",
       "file": "packages/input-otp/tests/conformance/input.test.ts",
-      "fullName": "@octanejs/input-otp component state and projection projects placeholder, focus, active slot, fake caret, and hover state"
+      "fullName": "@octanejs/input-otp component state and projection keeps shared styles while mounted inputs still use them"
     },
     {
       "id": "runtime:input-otp:0007",
       "file": "packages/input-otp/tests/conformance/input.test.ts",
-      "fullName": "@octanejs/input-otp component state and projection renders one real input with upstream attributes and context slots"
+      "fullName": "@octanejs/input-otp component state and projection projects placeholder, focus, active slot, fake caret, and hover state"
     },
     {
       "id": "runtime:input-otp:0008",
       "file": "packages/input-otp/tests/conformance/input.test.ts",
-      "fullName": "@octanejs/input-otp component state and projection updates uncontrolled state through native input and rejects pattern-invalid edits"
+      "fullName": "@octanejs/input-otp component state and projection renders one real input with upstream attributes and context slots"
     },
     {
       "id": "runtime:input-otp:0009",
+      "file": "packages/input-otp/tests/conformance/input.test.ts",
+      "fullName": "@octanejs/input-otp component state and projection updates uncontrolled state through native input and rejects pattern-invalid edits"
+    },
+    {
+      "id": "runtime:input-otp:0010",
       "file": "packages/input-otp/tests/hydration/input.test.ts",
       "fullName": "@octanejs/input-otp hydration and cleanup adopts the server input and remains editable"
     },
     {
-      "id": "runtime:input-otp:0010",
+      "id": "runtime:input-otp:0011",
       "file": "packages/input-otp/tests/hydration/input.test.ts",
       "fullName": "@octanejs/input-otp hydration and cleanup removes selection listeners, disconnects observers, and clears timers on unmount"
     }

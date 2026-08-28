@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "react-resizable-panels-pristine",
+  "roots": ["packages/resizable-panels/tests"],
+  "files": ["packages/resizable-panels/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:2cb643f328a90f0e",
+      "file": "packages/resizable-panels/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned react-resizable-panels 4.12.2 suite unchanged"
+    }
+  ]
+}

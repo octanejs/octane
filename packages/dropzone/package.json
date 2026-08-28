@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/dropzone",
-  "version": "0.0.7",
+  "version": "0.0.15",
   "description": "The exact react-dropzone 20.0.0 file-acquisition contract, ported to Octane with drag, click, paste, validation, async processing, and programmatic-open support.",
   "author": {
     "name": "Dominic Gannaway",
@@ -35,7 +35,8 @@
     "src",
     "README.md",
     "UPSTREAM.md",
-    "LICENSE"
+    "LICENSE",
+    "LICENSE.upstream"
   ],
   "scripts": {
     "test": "pnpm upstream:verify && pnpm test:u2-parity && pnpm test:u3-parity && pnpm test:u4-parity && pnpm test:u5-parity && pnpm test:adoption && pnpm test:packed",

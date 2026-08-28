@@ -937,6 +937,29 @@ export default interface ErasedShape { value: string }
 		}
 	});
 
+	it('keeps mixed conditional-return reference positions conservatively classified', () => {
+		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const source =
+			"import { lazy as defer, memo as cache } from 'octane';\n" +
+			'export function Allowed(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export const AllowedMemo = cache(Allowed);\n' +
+			'const AllowedLazy = defer(Allowed);\n' +
+			'export function Direct(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export function PropValue(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export function Receiver(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export function Ambiguous(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'function shadow(Ambiguous) { return Ambiguous; }\n' +
+			'function Sink(p) { return <div>{p.item}</div>; }\n' +
+			'export function Host(p) { const called = Direct(p); const kind = Receiver.kind; return <section data-kind={kind}><Allowed flip={p.flip} /><AllowedLazy flip={p.flip} /><Sink item={PropValue} />{called}</section>; }\n';
+
+		const result = compiler.transform(source, '/project/src/Mixed.tsrx', {
+			collectVoidComponentExports: true,
+		});
+
+		expect(result?.voidComponentExports).toEqual(['Allowed', 'AllowedMemo']);
+		expect(result?.code.match(/_\$ifBlock\(/g)).toHaveLength(1);
+	});
+
 	it('lowers statically compilable ErrorBoundary JSX without retaining the builtin', () => {
 		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
 		const source = `
@@ -1284,7 +1307,9 @@ export const Indirect = indirect(Host);
 			// Cached nearest-manifest decisions are stable until the bundler reports
 			// a watched change.
 			expect(compiler.transform(HOOK, id)?.kind).toBe('slots');
-			compiler.invalidate(sourceManifest);
+			compiler.invalidate(id);
+			expect(compiler.transform(HOOK, id)?.kind).toBe('slots');
+			compiler.invalidate(sourceManifest + '?watch=1#created');
 			const refreshed = compiler.transform(HOOK, id);
 			expect(refreshed?.kind).toBe('none');
 			expect(refreshed?.dependencies).toContain(sourceManifest);
@@ -1340,7 +1365,8 @@ export const Indirect = indirect(Host);
 			);
 			writeFileSync(join(packageRoot, 'index.js'), 'export const value = 1;\n');
 
-			const discovered = createOctaneCompiler({ root }).discoverSourceDependencies();
+			const compiler = createOctaneCompiler({ root });
+			const discovered = compiler.discoverSourceDependencies();
 			const resolvedPackageRoot = realpathSync(packageRoot);
 			expect(discovered.packages).toEqual(['raw-octane']);
 			expect(discovered.viteOptimizeDepsExclusions).toEqual([
@@ -1357,6 +1383,11 @@ export const Indirect = indirect(Host);
 			expect(discovered.missingDependencies).toContain(
 				join(realpathSync(root), 'node_modules/missing-child/package.json'),
 			);
+
+			writeFileSync(projectManifest, JSON.stringify({ name: 'app', private: true }));
+			expect(compiler.discoverSourceDependencies().packages).toEqual(['raw-octane']);
+			compiler.invalidate();
+			expect(compiler.discoverSourceDependencies().packages).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

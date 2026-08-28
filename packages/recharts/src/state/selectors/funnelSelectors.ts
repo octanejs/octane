@@ -1,12 +1,12 @@
+import type { RegisteredCell } from '../../context/CellsContext';
 import { createSelector } from 'reselect';
-import { ReactElement } from 'octane';
-import { computeFunnelTrapezoids, FunnelTrapezoidItem } from '../../cartesian/Funnel';
+
+import { computeFunnelTrapezoids, FunnelTrapezoidItem } from '../../cartesian/Funnel.tsrx';
 import { ChartData } from '../chartDataSlice';
 import { RechartsRootState } from '../store';
 import { selectChartOffsetInternal } from './selectChartOffsetInternal';
 import { selectChartDataAndAlwaysIgnoreIndexes } from './dataSelectors';
 import { ChartOffsetInternal, DataKey, TooltipType } from '../../util/types';
-import { CellProps } from '../..';
 import { GraphicalItemId } from '../graphicalItemsSlice';
 
 export type ResolvedFunnelSettings = {
@@ -17,7 +17,7 @@ export type ResolvedFunnelSettings = {
 	lastShapeType?: 'triangle' | 'rectangle';
 	reversed?: boolean;
 	customWidth?: string | number;
-	cells: ReadonlyArray<ReactElement>;
+	cells: ReadonlyArray<RegisteredCell> | undefined;
 	presentationProps: Record<string, any> | null;
 	id: GraphicalItemId;
 };
@@ -63,7 +63,7 @@ export const selectFunnelTrapezoids: (
 				...(cells && cells[index] && cells[index].props),
 			}));
 		} else if (cells && cells.length) {
-			displayedData = cells.map((cell: ReactElement<CellProps>) => ({
+			displayedData = cells.map((cell: RegisteredCell) => ({
 				...presentationProps,
 				...cell.props,
 			}));

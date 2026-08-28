@@ -26,15 +26,18 @@ are also recorded under `release.oracleVersions` in
 
 ## Vendored boundary
 
-`upstream/npm/` is the complete unpacked npm artifact: all 26 published files,
+`upstream-artifact/` is the complete unpacked npm artifact: all 26 published files,
 including the exact CJS/ESM runtime, declaration files, source maps, web build,
-metadata, README, changelog, and license. `upstream/tag/` contains the relevant
+metadata, README, changelog, and license. `upstream/` contains the relevant
 byte-exact repository boundary: all ten `lib/` source modules; all `test/`
 files and fixtures; the `typings/` consumer program; package metadata; compiler,
-build, and Vitest configuration; and the license.
+build, and Vitest configuration; and the license. Every file under `upstream/`
+verifies offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`, and the pinned license is republished at the package
+root as `LICENSE.upstream`, hash-matched to the lock's license evidence.
 
 Vendored evidence is development-only. The binding's `files` allowlist excludes
-`upstream/`, `audit/`, and `tests/audit/`.
+`upstream/`, `upstream-artifact/`, `audit/`, and `tests/audit/`.
 
 ## Public surface
 

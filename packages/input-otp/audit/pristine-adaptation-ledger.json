@@ -12,21 +12,21 @@
       1,
       "9628b6fce470df1e041825bda8883ecb7e28986ff5ac8b9f3a01cc110283e3e5",
       1,
-      "d3184baaaa3edca4a19ed56acbb46a240fd29571155c70d4ae7dd23fa7ee3465"
+      "749a9b26a7b19efe90dd2adaa8da79c44a9e008d13edcf86e82d611876af9046"
     ],
     [
       "base.delete-word.spec.ts",
       2,
-      "b314a78e75eff8c8f0664502b2d48dbe405cef5270efe87b96e43a0036565f30",
+      "a00db4f4e1d11a07298098da7e1b18bbb2a4460e47080fe3afa656007a356019",
       2,
-      "0bbe3336611f79978f81c48a15754d481e4647478bf0eee119ec703ce0a6dfa9"
+      "b744b90883ca447a5cf244dbc97244d2fd90ffa7e235253d42a5dbc5ee824af1"
     ],
     [
       "base.delete-word.spec.ts",
       3,
-      "1173e6bc82a285a052a1a45f8d61e6527ed6c4489f1305b9c3a2e61687562638",
+      "8b632728ab32929c1883bf95a1583c34db79dc58424deccde5b9e9276fbff85f",
       3,
-      "198b185f273bb350eb3f8558af48f8c13851d1bc1be2808bb76c06488fc4c838"
+      "f9e515d2d320b235c03b4a61633d64589accb68737985ca1ce9430901eabfc24"
     ],
     [
       "base.props.spec.ts",
@@ -54,62 +54,90 @@
       1,
       "1e71db9075bb915559ca8a8cce85cd07f7b25d246501c1f05d23facc595a29f6",
       7,
-      "9efeadaa0eb4d06cc885aeabdd47e2dacc244fe01d01204741ba6d481cc8d0f4"
+      "9b9ed1ad98f07a181ebb9229f071afb27ad01dd23c1a8f3f14cf10274e1a0898"
     ],
     [
       "base.selections.spec.ts",
       2,
-      "c5dd89d4cc68fcec0ae9a551a1abd40603a7d91a86523902490201865547d214",
+      "3684f133d492b043e7681b8200e059e95c49bf747ef39ffc56c32f10bf84f1e3",
       8,
-      "ba5ccb39f3d850c83da96719c39a3b9ae338eccfe3369266e84c3e5431d81f05"
+      "0cdf6452138b4aa602dfc5292f33e714d06bcb4f13d7231044bbfd328a25c507"
     ],
     [
       "base.selections.spec.ts",
       3,
-      "75300d311b5746eab4ac3493bc1c16964393e0b63859ec80680eb6a0748d9618",
+      "6f157fcf269b68b3f1f7c073d39143606180660657e1a80f4957e9de30f7e9ad",
       9,
-      "4eb4c4ca22e5f5ba546f32ae07f9089d68101a3b03c5eed483b274e9095c77e3"
+      "2bfe1947c4b36ad23f7270dec0f377f59f5defcecd5f1c24d0e8f4643c1c3682"
+    ],
+    [
+      "base.selections.spec.ts",
+      4,
+      "ad601f6759adac4231b2de49009782a0eff6244d97ef87517750fe099424e41d",
+      10,
+      "3e71191c59755cd13574476e03213b9b16ece29ee3b651f4143863eeeb7ec763"
+    ],
+    [
+      "base.selections.spec.ts",
+      5,
+      "8b499ac279ab3333ff7d41aa88730a4bfa6d57f06227f03549b52795def5d8fb",
+      11,
+      "32149dd4d7c5be770e43875cf65424cfe17c2b8ef526b5be8a86a9f591814333"
     ],
     [
       "base.slot.spec.ts",
       1,
       "85f330a7bdf71c26098dbb6518b6a6e934d7bddbf34de0e680af8328fa551097",
-      10,
+      12,
       "cc09d2617b0738490d0c54a57dde5aa3263f11abdbf954637271071caa440567"
     ],
     [
       "base.typing.spec.ts",
       1,
       "32e5be855b196cb33207bef76d601bab5dfa2bc132811769843f5f2f21781453",
-      11,
+      13,
       "a5a6a38731b79a444e26ab1eafe7c24cf1caed27adb3ff484ac1fc173bd1ca12"
     ],
     [
       "base.typing.spec.ts",
       2,
       "a69ea740fabd9fd07d368e5e6605296442bcfc36564c434589ff9e11a356c17d",
-      12,
-      "e8c4b3411db759a219a02aa62bd6e455edc7dd2f7261c188d6279bb33b00c23c"
+      14,
+      "eecf2f1dc5fcc487ee6d32faf068ab17eafe8b3460fb2a3230a1e6a02fe396e9"
     ],
     [
       "base.typing.spec.ts",
       3,
-      "720903e3911f3350e61810908108f7551472c0349db1af4479bb270dcbf9944f",
-      13,
-      "4d94bd8858858bcb56c3b254b9c74f9f932f6985f848e4707917aefc9b08b9d4"
+      "11530deae0d002c41f786b32976e49b9a8db6ebf31b5fd74556da2aaf3e012b1",
+      15,
+      "80396eaa2468ecb9b128cb2c1b4b79f5aae43fc839f89028a81e9fb06c30f401"
+    ],
+    [
+      "pwm-space.spec.ts",
+      1,
+      "1ff4c615a3f223ff7b448e3f8e4b939ea718cf3f9e8d6ca5b61363c58c0d2c93",
+      16,
+      "67a069f097f7c8b7362bd516224fdfbf966e691f7e287112ed196c54c5694aa5"
+    ],
+    [
+      "pwm-space.spec.ts",
+      2,
+      "d4f79c9e107e376e5772796b031bae3636a742eb2ad10da0b01eec40c0e917ca",
+      17,
+      "cee55a4141fc96cbd1c54c49ae01fd75eedbb759c115e3e28728eee8a2cd4cf2"
     ],
     [
       "with-autofocus.spec.ts",
       1,
       "fa610cc8a5b9cc400d6a0ad52626c6e118f067c549f26b8c70bd094f432ea380",
-      14,
+      18,
       "936df6e6795a5749ba70f4ac5f35866fd0cbe52c00fa680e4e660c914a953819"
     ],
     [
       "with-on-complete.spec.ts",
       1,
       "8cdd3968f8c504ab81d27ca476ca40ae3c2cb6468789fea30d75f44a12ece151",
-      15,
+      19,
       "3cf346e5b6b8cd742bd494f47e1d52f2b3e10e50eb552cbb0eb4d557b2611e99"
     ]
   ]

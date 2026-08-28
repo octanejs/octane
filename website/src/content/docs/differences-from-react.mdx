@@ -97,8 +97,8 @@ valid.
 
 <h2 id="strong-mode">Strong mode is optional</h2>
 
-Strong mode helps catch state and ref patterns that React applications sometimes
-use as workarounds. Enable it for a single module with `"use strong"` before its
+Strong mode opts into immutable render snapshots and helps catch detectable
+state, ref, and purity violations. Enable it for a single module with `"use strong"` before its
 imports, or across your application with `compiler: { strong: true }` in
 `octane.config.ts`.
 
@@ -114,6 +114,72 @@ Use `useLinkedState` when editable state should follow a changing prop. Event
 handlers, genuinely deferred callbacks, effect cleanup, effects that synchronize
 external systems, and normal DOM or timer refs remain supported. Installed
 dependencies keep their existing behavior unless they opt in themselves.
+
+Strong also rejects render-time mutations of provable state snapshots and
+direct reads of known clocks or random sources, such as `Date.now()` and
+`Math.random()`. Events, effects, and lazy state initializers may obtain these
+values. The checks follow supported aliases and synchronous helpers, but cannot
+prove arbitrary imported code pure.
+
+Default compatibility mode conservatively reevaluates method calls: a stable
+receiver can hide changing state. React Compiler also identifies APIs with
+interior mutability, including TanStack Table v8, as
+[incompatible with memoization](https://react.dev/reference/eslint-plugin-react-hooks/lints/incompatible-library).
+React Compiler lint results and option-sensitive transforms are comparison
+evidence, not Octane controls. Outlining options, debug hooks, and React's memo
+directives do not change Octane's compatibility/Strong contract.
+
+In a Strong module, the author asserts that all rendering is referentially
+transparent: the same witnessed inputs produce the same result and render work
+has no application-visible side effects. Production client builds apply that
+assertion to every user-authored render operation—local, imported, static or
+computed member, call-produced, callback-bearing, constructed, or tagged—and can
+then reuse eligible regions and keyed rows. A `use*` name is not a purity oracle
+and does not reintroduce Rules of Hooks; actual hook calls stay in normal
+component or custom-hook setup and use compiler-assigned slots. Built-ins are
+recognized by import provenance, including optional calls, and same-module
+custom-hook declarations or function-valued module bindings are resolved by
+lexical binding to a transitive fixed point, so aliases and cycles retain
+context, state, suspension, and effect lifecycle behavior. Projection guards
+witness a method/callable, its receiver, and its explicit arguments; derived
+receivers are witnessed through the
+operations and inputs that produce them rather than transient result identities.
+Component and ordinary-list projection witnesses use `Object.is`, distinguishing
+signed zero while stabilizing `NaN`; a certified keyed-selection operand retains
+authored strict equality.
+
+Strong diagnostics catch violations the compiler can prove. The analysis is
+bounded, so an unknown call is assumed pure rather than making memoization fall
+back. A call that hides ref contents, a state getter, a mutable module or global,
+a live external store, a clock, randomness, mutation, or any other changing
+source violates the contract. Keep live accessors in a compatibility-mode
+consumer, or pass an actual snapshot into a separate Strong component; opting in
+does not make a library's live objects immutable.
+
+Compatibility keeps a live method call reevaluating only when its containing
+subscribed render scope runs; it creates no subscription and does not make the
+same live object safe across an unchanged child, `memo`, or Strong boundary. A
+compatibility consumer should subscribe, select a primitive or immutable value,
+and pass that value into the Strong component. Passing the same row/header,
+shallow-copying its live methods, or forcing an unrelated render without reading
+the selected value is not a snapshot handoff.
+
+Fresh local mutation that completes during ordinary setup remains valid—for
+example, filling a new array in a plain JavaScript loop before rendering it. A
+keyed `@for` row is independently retained, so Strong rejects writes from that
+row to an outer binding with `OCTANE_STRONG_RETAINED_ROW_MUTATION`. Keep scratch
+data inside one row, build the full result before `@for`, or use
+`@for (...; index position; key item.id)`. Compatibility accepts cross-row
+writes but does not promise retained-row evaluation order, so rendered output
+must not depend on them.
+
+Keys preserve surviving DOM nodes, not an exact evaluation count. A diagnostic
+`console.log` no longer disqualifies an otherwise eligible Strong row, but a
+handler such as `() => setItems(items.filter(...))` still captures `items`.
+Appending changes that capture, so the row must receive its current handler.
+Strong mode preserves those closure semantics. Logging can therefore differ
+across production, development, HMR, and profiling builds and is not a commit
+counter.
 
 <h2 id="events-and-dom">Events come from the browser</h2>
 

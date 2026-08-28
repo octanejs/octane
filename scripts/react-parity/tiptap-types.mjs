@@ -3,11 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import {
-	TYPE_PARITY_CONFIG,
-	renderTypeInventories,
-	verifyTiptapTypes,
-} from './tiptap-types-lib.mjs';
+import { renderTypeInventories, verifyTiptapTypes } from './tiptap-types-lib.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const write = process.argv.includes('--write');

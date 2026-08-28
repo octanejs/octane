@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/formisch/tests/conformance/core.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the integrated core surface through the Octane package boundary."
+    },
+    {
+      "path": "packages/formisch/tests/conformance/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the published Octane namespace and absence of a React runtime dependency."
+    },
+    {
+      "path": "packages/formisch/tests/conformance/form.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins native input/change delivery and Octane component lifecycle behavior."
+    },
+    {
+      "path": "packages/formisch/tests/conformance/methods-engine.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises the integrated methods engine through the Octane package boundary."
+    },
+    {
+      "path": "packages/formisch/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "reason": "Runs the same observable scenario against pinned React and Octane implementations.",
+      "oracle": "Pinned @formisch/react supplies the byte-for-byte reference snapshots."
+    },
+    {
+      "path": "packages/formisch/tests/hydration/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins Octane SSR hydration adoption and post-hydration native events."
+    },
+    {
+      "path": "packages/formisch/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins Octane server rendering and request isolation."
+    },
+    {
+      "path": "packages/formisch/tests/upstream/frameworks/react/src/components/Field/Field.test.tsrx",
+      "disposition": "adapted-upstream"
+    },
+    {
+      "path": "packages/formisch/tests/upstream/frameworks/react/src/components/FieldArray/FieldArray.test.tsrx",
+      "disposition": "adapted-upstream"
+    },
+    {
+      "path": "packages/formisch/tests/upstream/frameworks/react/src/components/Form/Form.test.tsrx",
+      "disposition": "adapted-upstream"
+    },
+    {
+      "path": "packages/formisch/tests/upstream/frameworks/react/src/hooks/useField/useField.test.tsrx",
+      "disposition": "adapted-upstream"
+    },
+    {
+      "path": "packages/formisch/tests/upstream/frameworks/react/src/hooks/useFieldArray/useFieldArray.test.tsrx",
+      "disposition": "adapted-upstream"
+    },
+    {
+      "path": "packages/formisch/tests/upstream/frameworks/react/src/hooks/useForm/useForm.test.tsrx",
+      "disposition": "adapted-upstream"
+    },
+    {
+      "path": "packages/formisch/tests/upstream/frameworks/react/src/hooks/useSignals/useSignals.test.tsrx",
+      "disposition": "adapted-upstream-with-divergence",
+      "reason": "The StrictMode replay identity is retained as an executable Octane divergence.",
+      "divergenceId": "formisch-no-strictmode-replay"
+    }
+  ]
+}

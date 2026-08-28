@@ -111,8 +111,8 @@ export function setExternal(v: string) {
 // A render-time call through a MEMBER callee defeats the survivor short-circuit
 // entirely: `item.read()` reads mutable state through a STABLE item ref (the
 // TanStack Table header pattern — `header.column.getIsSorted()` flips while the
-// header object stays memoized), so the body must re-run on every parent render,
-// React-parity. Contrast DepPureList below: a bare module-var READ stays
+// header object stays memoized), so compatibility mode re-runs the body on parent
+// renders, like ordinary React without its compiler. Contrast DepPureList: a bare module-var READ stays
 // eligible (documented at-your-own-risk), and so does a call through a plain
 // identifier callee (PlainCalleeList) — the receiver is what carries the hazard.
 const callItems = [
@@ -269,6 +269,23 @@ export function KeyedSelectionList(props: {
 			<li
 				class={selected === row.id ? 'selected' : ''}
 				data-prefix={prefix}
+			>{row.label as string}</li>
+		}
+	</ul>
+}
+
+export function KeyedSelectionProjectionList(props: {
+	items: SelectionRow[];
+	selected: number | null;
+	projection: number;
+}) @{
+	const selected = props.selected;
+	const projection = props.projection;
+	<ul id="keyed-selection-projection-list">
+		@for (const row of props.items; key row.id) {
+			<li
+				class={selected === row.id ? 'selected' : ''}
+				data-projection={1 / projection}
 			>{row.label as string}</li>
 		}
 	</ul>
@@ -683,4 +700,70 @@ export function NestedKeyedReorderTransition(props: {
 			<span id="nested-reorder-transition-pending">{'loading'}</span>
 		}
 	</div>
+}
+
+interface HostBindingRow {
+	id: number;
+	className: string | string[];
+	title: string;
+	data: string;
+	aria: string;
+	hidden: boolean;
+	only: OctaneNode;
+	mixed: OctaneNode;
+}
+
+interface HostBindingListProps {
+	items: HostBindingRow[];
+	version: number;
+	context: string;
+}
+
+export function HostBindingList(props: HostBindingListProps) @{
+	const version = props.version;
+	<FastRowContext.Provider value={props.context}>
+		<ul>
+			@for (const row of props.items; key row.id) {
+				<li
+					class={row.className}
+					title={row.title}
+					data-value={row.data as string}
+					aria-label={row.aria}
+					hidden={row.hidden}
+					data-version={version}
+				>
+					<span data-kind="only">{row.only}</span>
+					<span data-kind="mixed">
+						<i>before</i>
+						{row.mixed}
+						<i>after</i>
+					</span>
+				</li>
+			}
+		</ul>
+	</FastRowContext.Provider>
+}
+
+export function HostMappedBindingList(props: HostBindingListProps) @{
+	const version = props.version;
+	<FastRowContext.Provider value={props.context}>
+		<ul>{props.items.map(
+			(row) => <li
+				key={row.id}
+				class={row.className}
+				title={row.title}
+				data-value={row.data as string}
+				aria-label={row.aria}
+				hidden={row.hidden}
+				data-version={version}
+			>
+				<span data-kind="only">{row.only}</span>
+				<span data-kind="mixed">
+					<i>before</i>
+					{row.mixed}
+					<i>after</i>
+				</span>
+			</li>,
+		)}</ul>
+	</FastRowContext.Provider>
 }

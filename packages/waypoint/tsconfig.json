@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noErrorTruncation": true
+  },
+  "include": ["./src/"],
+  "exclude": ["node_modules", "dist", "tests"],
+  "reactPortEvidence": { "gate": "authored-source-types" }
+}

@@ -39,6 +39,7 @@ of bridging by hand:
 | `@streamdown/mermaid` | `@octanejs/streamdown/mermaid` |
 | `@streamdown/cjk` | `@octanejs/streamdown/cjk` |
 | `recharts` | `@octanejs/recharts` |
+| `react-resizable-panels` | `@octanejs/resizable-panels` |
 | `@react-three/fiber` | `@octanejs/three` |
 | `@visx/*` | `@octanejs/visx` |
 | `react-redux` | `@octanejs/redux` |
@@ -128,11 +129,7 @@ So a bridge never means "run the React package unchanged". It means:
    the official bindings:
 
    ```ts
-   import { useMemo, useRef } from 'octane';
-
-   export function subSlot(slot: symbol | undefined, tag: string) {
-   	return slot !== undefined ? Symbol.for((slot.description ?? '') + ':' + tag) : undefined;
-   }
+   import { subSlot, useMemo, useRef } from 'octane';
 
    export function useControllableState(opts, slot?: symbol) {
    	const valueRef = useRef(opts.defaultValue, subSlot(slot, 'value'));

@@ -1,3 +1,19 @@
+import type { ActiveDotProps, ActiveDotType, DataKey } from '../util/types';
+import type { ZIndexable } from '../zIndex/ZIndexLayer.tsrx';
+
+export interface PointType {
+	readonly x: number | null;
+	readonly y: number | null;
+	readonly value?: any;
+	readonly payload?: any;
+}
+interface ActivePointsProps extends ZIndexable {
+	points: ReadonlyArray<PointType>;
+	mainColor: string | undefined;
+	itemDataKey: DataKey<any> | undefined;
+	activeDot: ActiveDotType;
+	clipPath?: string;
+}
 // Port of component/ActivePoints.tsx — the highlighted dot on the active
 // tooltip data point (Line/Area/Scatter).
 import { cloneElement, isValidElement } from 'octane';
@@ -12,12 +28,19 @@ import { svgPropertiesNoEventsFromUnknown } from '../util/svgPropertiesNoEvents'
 import { ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 
-function ActivePoint(activePointProps) {
+function ActivePoint(activePointProps: {
+	point: PointType;
+	activeDot: ActiveDotType;
+	childIndex: number;
+	dataKey: DataKey<any> | undefined;
+	mainColor: string | undefined;
+	clipPath?: string;
+}) {
 	const { point, childIndex, mainColor, activeDot, dataKey, clipPath } = activePointProps;
 	if (activeDot === false || point.x == null || point.y == null) {
 		return null;
 	}
-	const dotPropsTyped = {
+	const dotPropsTyped: ActiveDotProps = {
 		index: childIndex,
 		dataKey,
 		cx: point.x,
@@ -29,7 +52,7 @@ function ActivePoint(activePointProps) {
 		payload: point.payload,
 		value: point.value,
 	};
-	const dotProps = {
+	const dotProps: ActiveDotProps = {
 		...dotPropsTyped,
 		...svgPropertiesNoEventsFromUnknown(activeDot),
 		...adaptEventHandlers(activeDot),
@@ -45,7 +68,7 @@ function ActivePoint(activePointProps) {
 	return <Layer className="recharts-active-dot" clipPath={clipPath}>{dot}</Layer>;
 }
 
-export function ActivePoints(props) {
+export function ActivePoints(props: ActivePointsProps) {
 	const {
 		points,
 		mainColor,
@@ -59,7 +82,9 @@ export function ActivePoints(props) {
 	if (points == null || activeDataPoints == null) {
 		return null;
 	}
-	const activePoint = points.find((p) => activeDataPoints.includes(p.payload));
+	const activePoint: PointType | undefined = points.find(
+		(p) => activeDataPoints.includes(p.payload),
+	);
 	if (isNullish(activePoint)) {
 		return null;
 	}

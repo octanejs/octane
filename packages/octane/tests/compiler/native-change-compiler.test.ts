@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { parseModule } from '@tsrx/core';
 import { compile } from '../../src/compiler/compile.js';
 import { createOctaneCompiler } from '../../src/compiler/bundler.js';
+import { analyzeNativeChangeDiagnostics } from '../../src/compiler/native-change-diagnostics.js';
 import { octane } from '../../src/compiler/vite.js';
 import { compileToVolarMappings } from '../../src/compiler/volar.js';
 import { normalizeRendererConfig } from '../../src/compiler/renderers.js';
@@ -16,6 +18,42 @@ function diagnostics(source: string, options: Record<string, unknown> = {}) {
 }
 
 describe('native text onChange compiler diagnostic', () => {
+	it('returns independent empty analyses when authored source has no native text-entry host', () => {
+		const source = component('<main><Input {...props} /><custom-field {...props} /></main>');
+		const ast = parseModule(source, '/src/App.tsrx');
+		const first = analyzeNativeChangeDiagnostics(ast, source, '/src/App.tsrx');
+		const second = analyzeNativeChangeDiagnostics(ast, source, '/src/App.tsrx');
+
+		expect(first).toEqual({ diagnostics: [], classifications: new Map() });
+		expect(second).toEqual(first);
+		expect(second.diagnostics).not.toBe(first.diagnostics);
+		expect(second.classifications).not.toBe(first.classifications);
+
+		const spreadSource = component('<input {...props} />');
+		const spread = analyzeNativeChangeDiagnostics(
+			parseModule(spreadSource, '/src/App.tsrx'),
+			spreadSource,
+			'/src/App.tsrx',
+		);
+		expect([...spread.classifications.values()]).toEqual(['runtime-check']);
+	});
+
+	it('retains analysis for recovered and escaped native host spellings', () => {
+		for (const host of [
+			'< input onChange={() => {}} />',
+			'<\ntextarea onChange={() => {}} />',
+			'<\\u0069nput onChange={() => {}} />',
+		]) {
+			const source = component(host);
+			const result = analyzeNativeChangeDiagnostics(
+				parseModule(source, '/src/App.tsrx'),
+				source,
+				'/src/App.tsrx',
+			);
+			expect(result.diagnostics, host).toHaveLength(1);
+		}
+	});
+
 	it('publishes a stable warning range and phase-preserving suggestions', () => {
 		const source = component(
 			'<input value={props.value} onChange={() => {}} onChangeCapture={() => {}} />',

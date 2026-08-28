@@ -2724,32 +2724,32 @@
         [
           "AsyncListData",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports AsyncListData with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "AsyncListLoadFunction",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports AsyncListLoadFunction with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "AsyncListLoadOptions",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports AsyncListLoadOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "AsyncListOptions",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports AsyncListOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "AsyncListStateUpdate",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports AsyncListStateUpdate with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Autocomplete",
@@ -2772,8 +2772,8 @@
         [
           "AutocompleteState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports AutocompleteState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "AutocompleteStateContext",
@@ -2844,140 +2844,140 @@
         [
           "Calendar",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Calendar with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarCell",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarCell with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarCellProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarCellProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarCellRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarCellRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarGrid",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarGrid with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarGridBody",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarGridBody with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarGridBodyProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarGridBodyProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarGridHeader",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarGridHeader with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarGridHeaderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarGridHeaderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarGridProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarGridProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarHeaderCell",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarHeaderCell with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarHeaderCellProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarHeaderCellProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarHeading",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarHeading with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarHeadingProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarHeadingProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarMonthPicker",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarMonthPicker with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarMonthPickerProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarMonthPickerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarYearPicker",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarYearPicker with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CalendarYearPickerProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CalendarYearPickerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Cell",
@@ -3078,8 +3078,8 @@
         [
           "CheckboxGroupState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports CheckboxGroupState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "CheckboxGroupStateContext",
@@ -3132,326 +3132,326 @@
         [
           "Color",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Color with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorArea",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorArea with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorAreaContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorAreaContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorAreaProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorAreaProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorAreaRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorAreaRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorAreaState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorAreaState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorAreaStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorAreaStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorAxes",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorAxes with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorChannel",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorChannel with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorChannelRange",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorChannelRange with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorField",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorField with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorFieldContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorFieldContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorFieldProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorFieldProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorFieldRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorFieldRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorFieldState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorFieldState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorFieldStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorFieldStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorFormat",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorFormat with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorPicker",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorPicker with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorPickerContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorPickerContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorPickerProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorPickerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorPickerRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorPickerRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorPickerState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorPickerState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorPickerStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorPickerStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSlider",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSlider with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSliderContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSliderContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSliderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSliderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSliderRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSliderRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSliderState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSliderState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSliderStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSliderStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSpace",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSpace with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatch",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatch with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchPicker",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchPicker with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchPickerContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchPickerContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchPickerItem",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchPickerItem with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchPickerItemProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchPickerItemProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchPickerItemRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchPickerItemRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchPickerProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchPickerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchPickerRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchPickerRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorSwatchRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorSwatchRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorThumb",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorThumb with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorThumbProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorThumbProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorThumbRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorThumbRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheel",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheel with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheelContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheelContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheelProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheelProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheelRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheelRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheelState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheelState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheelStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheelStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheelTrack",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheelTrack with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheelTrackContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheelTrackContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheelTrackProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheelTrackProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ColorWheelTrackRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ColorWheelTrackRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Column",
@@ -3516,8 +3516,8 @@
         [
           "ComboBoxState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ComboBoxState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ComboBoxStateContext",
@@ -3576,158 +3576,158 @@
         [
           "DateField",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateField with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateFieldContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateFieldContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateFieldProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateFieldProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateFieldRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateFieldRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateFieldState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateFieldState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateFieldStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateFieldStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateInput",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateInput with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateInputProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateInputProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateInputRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateInputRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DatePicker",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DatePicker with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DatePickerContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DatePickerContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DatePickerProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DatePickerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DatePickerRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DatePickerRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DatePickerState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DatePickerState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DatePickerStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DatePickerStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateRange",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateRange with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateRangePicker",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateRangePicker with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateRangePickerContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateRangePickerContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateRangePickerProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateRangePickerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateRangePickerRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateRangePickerRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateRangePickerState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateRangePickerState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateRangePickerStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateRangePickerStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateSegment",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateSegment with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateSegmentProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateSegmentProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateSegmentRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateSegmentRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DateValue",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DateValue with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DEFAULT_SLOT",
@@ -3780,14 +3780,14 @@
         [
           "DIRECTORY_DRAG_TYPE",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DIRECTORY_DRAG_TYPE with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DirectoryDropItem",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DirectoryDropItem with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Disclosure",
@@ -3822,8 +3822,8 @@
         [
           "DisclosureGroupState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DisclosureGroupState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DisclosureGroupStateContext",
@@ -3864,8 +3864,8 @@
         [
           "DisclosureState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DisclosureState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DisclosureStateContext",
@@ -3894,44 +3894,44 @@
         [
           "DraggableCollectionEndEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DraggableCollectionEndEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DraggableCollectionMoveEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DraggableCollectionMoveEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DraggableCollectionStartEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DraggableCollectionStartEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DragOptions",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DragOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DragPreviewRenderer",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DragPreviewRenderer with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DragResult",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DragResult with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DragTypes",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DragTypes with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DropIndicator",
@@ -3960,98 +3960,98 @@
         [
           "DropItem",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DropItem with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DropOperation",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DropOperation with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DroppableCollectionDropEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DroppableCollectionDropEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DroppableCollectionEnterEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DroppableCollectionEnterEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DroppableCollectionExitEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DroppableCollectionExitEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DroppableCollectionInsertDropEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DroppableCollectionInsertDropEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DroppableCollectionMoveEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DroppableCollectionMoveEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DroppableCollectionOnItemDropEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DroppableCollectionOnItemDropEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DroppableCollectionReorderEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DroppableCollectionReorderEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DroppableCollectionRootDropEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DroppableCollectionRootDropEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DropPosition",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DropPosition with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DropTarget",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DropTarget with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DropZone",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DropZone with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DropZoneContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DropZoneContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DropZoneProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DropZoneProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "DropZoneRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DropZoneRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "FieldError",
@@ -4086,20 +4086,20 @@
         [
           "FileDropItem",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports FileDropItem with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "FileTrigger",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports FileTrigger with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "FileTriggerProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports FileTriggerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Filter",
@@ -4134,26 +4134,26 @@
         [
           "FormValidationContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports FormValidationContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "getColorChannels",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports getColorChannels with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "GridLayout",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports GridLayout with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "GridLayoutOptions",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports GridLayoutOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "GridList",
@@ -4296,14 +4296,14 @@
         [
           "I18nProvider",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports I18nProvider with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "I18nProviderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports I18nProviderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Input",
@@ -4332,38 +4332,38 @@
         [
           "isDirectoryDropItem",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports isDirectoryDropItem with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "isFileDropItem",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports isFileDropItem with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "isRTL",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports isRTL with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "isTextDropItem",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports isTextDropItem with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ItemDropTarget",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ItemDropTarget with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Key",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Key with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Keyboard",
@@ -4398,14 +4398,14 @@
         [
           "Layout",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Layout with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "LayoutInfo",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports LayoutInfo with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Link",
@@ -4500,32 +4500,32 @@
         [
           "ListData",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ListData with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ListDataOptions",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ListDataOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ListLayout",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ListLayout with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ListLayoutOptions",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ListLayoutOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ListState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ListState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ListStateContext",
@@ -4536,8 +4536,8 @@
         [
           "Locale",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Locale with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Menu",
@@ -4686,8 +4686,8 @@
         [
           "NumberFieldState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports NumberFieldState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "NumberFieldStateContext",
@@ -4716,8 +4716,8 @@
         [
           "OverlayTriggerState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports OverlayTriggerState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "OverlayTriggerStateContext",
@@ -4728,8 +4728,8 @@
         [
           "parseColor",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports parseColor with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Placement",
@@ -4740,8 +4740,8 @@
         [
           "Point",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Point with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Popover",
@@ -4770,14 +4770,14 @@
         [
           "Pressable",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Pressable with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "PressEvent",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports PressEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ProgressBar",
@@ -4812,8 +4812,8 @@
         [
           "QueuedToast",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports QueuedToast with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Radio",
@@ -4896,8 +4896,8 @@
         [
           "RadioGroupState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RadioGroupState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RadioGroupStateContext",
@@ -4920,50 +4920,50 @@
         [
           "RangeCalendar",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RangeCalendar with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RangeCalendarContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RangeCalendarContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RangeCalendarProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RangeCalendarProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RangeCalendarRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RangeCalendarRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RangeCalendarState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RangeCalendarState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RangeCalendarStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RangeCalendarStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RangeValue",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RangeValue with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Rect",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Rect with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RenderProps",
@@ -4986,14 +4986,14 @@
         [
           "RootDropTarget",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RootDropTarget with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RootMenuTriggerState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RootMenuTriggerState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RootMenuTriggerStateContext",
@@ -5004,14 +5004,14 @@
         [
           "RouterConfig",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RouterConfig with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "RouterProvider",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports RouterProvider with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Row",
@@ -5058,8 +5058,8 @@
         [
           "SearchFieldState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports SearchFieldState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Section",
@@ -5100,8 +5100,8 @@
         [
           "Selection",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Selection with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "SelectionIndicator",
@@ -5124,8 +5124,8 @@
         [
           "SelectionMode",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports SelectionMode with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "SelectProps",
@@ -5142,8 +5142,8 @@
         [
           "SelectState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports SelectState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "SelectStateContext",
@@ -5226,8 +5226,8 @@
         [
           "Size",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Size with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Slider",
@@ -5298,8 +5298,8 @@
         [
           "SliderState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports SliderState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "SliderStateContext",
@@ -5358,20 +5358,20 @@
         [
           "SortDescriptor",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports SortDescriptor with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "SortDirection",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports SortDirection with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "SSRProvider",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports SSRProvider with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "StyleRenderProps",
@@ -5526,14 +5526,14 @@
         [
           "TableLayout",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TableLayout with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TableLayoutProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TableLayoutProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TableLoadMoreItem",
@@ -5562,8 +5562,8 @@
         [
           "TableState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TableState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TableStateContext",
@@ -5592,8 +5592,8 @@
         [
           "TabListState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TabListState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TabListStateContext",
@@ -5760,8 +5760,8 @@
         [
           "TextDropItem",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TextDropItem with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TextField",
@@ -5796,80 +5796,80 @@
         [
           "TimeField",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TimeField with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TimeFieldContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TimeFieldContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TimeFieldProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TimeFieldProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TimeFieldState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TimeFieldState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TimeFieldStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TimeFieldStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TimeValue",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TimeValue with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToastListProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ToastListProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToastOptions",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ToastOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToastProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ToastProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToastRegionProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ToastRegionProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToastRegionRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ToastRegionRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToastRenderProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ToastRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToastState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ToastState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToggleButton",
@@ -5922,8 +5922,8 @@
         [
           "ToggleGroupState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ToggleGroupState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToggleGroupStateContext",
@@ -5934,8 +5934,8 @@
         [
           "ToggleState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ToggleState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Toolbar",
@@ -6000,8 +6000,8 @@
         [
           "TooltipTriggerState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TooltipTriggerState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TooltipTriggerStateContext",
@@ -6024,14 +6024,14 @@
         [
           "TreeData",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TreeData with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TreeDataOptions",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TreeDataOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TreeEmptyStateRenderProps",
@@ -6120,8 +6120,8 @@
         [
           "TreeState",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TreeState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TreeStateContext",
@@ -6132,44 +6132,44 @@
         [
           "UNSTABLE_Toast",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports UNSTABLE_Toast with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "UNSTABLE_ToastContent",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports UNSTABLE_ToastContent with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "UNSTABLE_ToastList",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports UNSTABLE_ToastList with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "UNSTABLE_ToastQueue",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports UNSTABLE_ToastQueue with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "UNSTABLE_ToastRegion",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports UNSTABLE_ToastRegion with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "UNSTABLE_ToastStateContext",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports UNSTABLE_ToastStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "useAsyncList",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports useAsyncList with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "useContextProps",
@@ -6180,8 +6180,8 @@
         [
           "useDrag",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports useDrag with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "useDragAndDrop",
@@ -6192,8 +6192,8 @@
         [
           "useDrop",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports useDrop with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "useFilter",
@@ -6204,14 +6204,14 @@
         [
           "useListData",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports useListData with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "useLocale",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports useLocale with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "useRenderProps",
@@ -6234,26 +6234,26 @@
         [
           "useTreeData",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports useTreeData with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ValidationResult",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ValidationResult with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Virtualizer",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Virtualizer with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "VirtualizerProps",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports VirtualizerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "VisuallyHidden",
@@ -6270,14 +6270,14 @@
         [
           "WaterfallLayout",
           "runtime",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports WaterfallLayout with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "WaterfallLayoutOptions",
           "type",
-          "gap",
-          "Not exported by packages/aria/src/components/index.ts at this pin."
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports WaterfallLayoutOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ]
       ]
     },
@@ -7862,8 +7862,8 @@
   ],
   "summary": {
     "exports": 1294,
-    "surfacePresentUnverifiedExports": 767,
-    "gapExports": 527,
+    "surfacePresentUnverifiedExports": 998,
+    "gapExports": 296,
     "upstreamArtifacts": 185,
     "runtimeTests": 177,
     "typeTests": 1,

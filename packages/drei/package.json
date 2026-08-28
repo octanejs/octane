@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/drei",
-  "version": "0.0.7",
+  "version": "0.0.15",
   "description": "Octane port of @react-three/drei",
   "type": "module",
   "sideEffects": false,
@@ -21,6 +21,7 @@
     "README.md",
     "UPSTREAM.md",
     "LICENSE",
+    "LICENSE.upstream",
     "status.json"
   ],
   "scripts": {

@@ -103,10 +103,11 @@ export function FocusScope(props: any): any {
 		() => {
 			if (!container) return;
 			focusScopesStack.add(focusScope);
+			const OwnerCustomEvent = container.ownerDocument.defaultView?.CustomEvent ?? CustomEvent;
 			const previouslyFocusedElement = document.activeElement as HTMLElement | null;
 			const hasFocusedCandidate = container.contains(previouslyFocusedElement);
 			if (!hasFocusedCandidate) {
-				const mountEvent = new CustomEvent(AUTOFOCUS_ON_MOUNT, EVENT_OPTIONS);
+				const mountEvent = new OwnerCustomEvent(AUTOFOCUS_ON_MOUNT, EVENT_OPTIONS);
 				container.addEventListener(AUTOFOCUS_ON_MOUNT, onMountAutoFocus);
 				container.dispatchEvent(mountEvent);
 				if (!mountEvent.defaultPrevented) {
@@ -119,7 +120,7 @@ export function FocusScope(props: any): any {
 			return () => {
 				container.removeEventListener(AUTOFOCUS_ON_MOUNT, onMountAutoFocus);
 				setTimeout(() => {
-					const unmountEvent = new CustomEvent(AUTOFOCUS_ON_UNMOUNT, EVENT_OPTIONS);
+					const unmountEvent = new OwnerCustomEvent(AUTOFOCUS_ON_UNMOUNT, EVENT_OPTIONS);
 					container.addEventListener(AUTOFOCUS_ON_UNMOUNT, onUnmountAutoFocus);
 					container.dispatchEvent(unmountEvent);
 					if (!unmountEvent.defaultPrevented) {

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/draggable');
-const upstreamTag = join(packageRoot, 'upstream/tag');
+const upstreamTag = join(packageRoot, 'upstream');
 
 export function pristineTestIdentities(report, repoRoot = resolve(packageRoot, '../..')) {
 	const identities = [];
@@ -18,7 +18,7 @@ export function pristineTestIdentities(report, repoRoot = resolve(packageRoot, '
 		const portable = relativeFile.includes('/.pristine-upstream-')
 			? relativeFile.replace(
 					/^packages\/draggable\/\.pristine-upstream-[^/]+\//u,
-					'packages/draggable/upstream/tag/',
+					'packages/draggable/upstream/',
 				)
 			: relativeFile;
 		for (const test of suite.assertionResults ?? []) {
