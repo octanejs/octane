@@ -120,13 +120,16 @@ waiting interval nor cancellation.
 ## Native SSR control
 
 ```sh
+REACT_COMPAT_BASE=96c86fcd97f4fe8a158e360a6c6af6b4411ed32c \
 BENCH_JSON=/tmp/octane-hosted-react-ssr.json \
   node benchmarks/octane-hosted-react/ssr-run.mjs
 ```
 
 The separate Node runner bundles the public `octane/server` `renderToString`
-and `octane/static` `prerender` exports against the same fixed baseline above
-and the candidate sources. It checks identical 20-row static HTML and empty CSS
+and `octane/static` `prerender` exports against main commit
+`96c86fcd97f4fe8a158e360a6c6af6b4411ed32c` and the candidate sources. This refresh
+includes the base branch's SSR retry optimization in both lanes. It checks
+identical 20-row static HTML and empty CSS
 before timing and after every batch. This isolates native request setup and
 teardown; it does not measure React SSR, Suspense, streaming, hydration, dynamic
 component work, or retained memory. It uses 10,000 warmup calls per operation
@@ -135,18 +138,18 @@ with `REACT_COMPAT_SSR_WARMUP`, `REACT_COMPAT_SSR_ROUNDS`, and
 `REACT_COMPAT_SSR_ITERATIONS`; `REACT_COMPAT_BASE` selects the baseline.
 
 The final [ssr-results.json](./ssr-results.json) records all batch durations,
-statistics, source and executable hashes, contributing modules, and the dirty
-worktree snapshot on the same shared Apple M5 Max machine. Both bundles retain
-no React, React DOM, or React compatibility modules. The native SSR bundle grows
-from 37,188 to 37,526 raw bytes and 13,222 to 13,337 gzip bytes: **338 raw / 115
-gzip bytes** for request cleanup support. An earlier direct-runtime entry
-measured 117 extra gzip bytes; this public-entry fixture is the reproducible
-measurement. Both use identical bundler options for baseline and candidate.
+statistics, source and executable hashes, contributing modules, and the clean
+merged worktree snapshot on the same shared Apple M5 Max machine. Both bundles
+retain no React, React DOM, or React compatibility modules. The native SSR bundle grows
+from 37,326 to 37,664 raw bytes and 13,256 to 13,368 gzip bytes: **338 raw / 112
+gzip bytes** for request cleanup support. The earlier public-entry measurement
+against `8741786` added 338 raw / 115 gzip bytes; this refresh isolates the
+adapter against the updated SSR base. Both lanes use identical bundler options.
 
 | Operation | Baseline mean, µs | Candidate mean, µs |
 | --- | ---: | ---: |
-| `renderToString` | 0.371 ± 8.1% | 0.399 ± 13.7% |
-| `prerender` | 0.529 ± 12.5% | 0.493 ± 8.0% |
+| `renderToString` | 0.359 ± 5.8% | 0.370 ± 6.9% |
+| `prerender` | 0.428 ± 3.7% | 0.441 ± 2.7% |
 
 The percentages are 95% relative margins of error over all seven rounds; no
 samples are dropped. These tiny timings on a noisy shared machine have

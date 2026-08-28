@@ -1,10 +1,10 @@
 {
   "suite": "octane-hosted-react-native-ssr",
-  "createdAt": "2026-08-28T20:35:58.904Z",
+  "createdAt": "2026-08-28T22:45:28.628Z",
   "command": "node benchmarks/octane-hosted-react/ssr-run.mjs",
-  "baseline": "874178645e8b3398e8898359f0537f7345b62234",
-  "candidateHead": "b2d963394a8d4466bdd20993d26c0aaeae0f9f7a",
-  "dirty": "A  .changeset/react-islands-in-octane.md\nM  .prettierignore\nM  README.md\nA  benchmarks/octane-hosted-react/README.md\nAM benchmarks/octane-hosted-react/results.json\nA  benchmarks/octane-hosted-react/run.mjs\nA  benchmarks/octane-hosted-react/src/browser.ts\nA  benchmarks/octane-hosted-react/src/counter.ts\nA  benchmarks/octane-hosted-react/src/native-control.ts\nA  benchmarks/octane-hosted-react/src/octane-compat-control.ts\nA  benchmarks/octane-hosted-react/src/octane-compat-verify.ts\nA  benchmarks/octane-hosted-react/src/shell.tsrx\nD  docs/octane-hosted-react-compat-plan.md\nAM docs/react-compat.md\nD  experiments/react-compat/README.md\nD  experiments/react-compat/browser-probes.test.ts\nD  experiments/react-compat/candidate-probes.test.ts\nD  experiments/react-compat/candidate-probes.tsx\nD  experiments/react-compat/candidate.html\nD  experiments/react-compat/evidence/candidate.json\nD  experiments/react-compat/evidence/stock-roots.json\nD  experiments/react-compat/evidence/summary.json\nD  experiments/react-compat/index.html\nD  experiments/react-compat/patch/.gitignore\nD  experiments/react-compat/patch/README.md\nD  experiments/react-compat/patch/commit-admission.inc.js\nD  experiments/react-compat/patch/materialize.mjs\nD  experiments/react-compat/patch/materialize.test.ts\nD  experiments/react-compat/patch/provenance.json\nD  experiments/react-compat/stock-react-root-probes.tsx\nD  experiments/react-compat/vitest.config.js\nM  package.json\nM  packages/octane/README.md\nM  packages/octane/package.json\nM  packages/octane/src/compiler/compile.js\nM  packages/octane/src/compiler/runtime-requests.js\nM  packages/octane/src/jsx-runtime.d.ts\nM  packages/octane/src/react/index.ts\nA  packages/octane/src/react/react-compat-envelope.ts\nA  packages/octane/src/react/react-compat-server.ts\nA  packages/octane/src/react/react-compat-shared.ts\nA  packages/octane/src/react/react-compat.ts\nM  packages/octane/src/react/server.ts\nM  packages/octane/src/runtime.server.ts\nM  packages/octane/src/runtime.ts\nA  packages/octane/tests/browser/react-compat.e2e.test.ts\nA  packages/octane/tests/browser/react-compat/App.tsrx\nA  packages/octane/tests/browser/react-compat/Island.react.tsx\nA  packages/octane/tests/browser/react-compat/index.html\nA  packages/octane/tests/browser/react-compat/main.ts\nA  packages/octane/tests/browser/react-compat/shared.ts\nM  packages/octane/tests/compiler/bundler-compiler.test.ts\nM  packages/octane/tests/compiler/ssr-tsx-children.test.ts\nD  packages/octane/tests/react-compat-spike/authoring.test.ts\nD  packages/octane/tests/react-compat-spike/authoring.tsrx\nD  packages/octane/tests/react-compat-spike/bridge-barrel.ts\nD  packages/octane/tests/react-compat-spike/react-components.tsx\nD  packages/octane/tests/react-compat-spike/stock-root-bridge.ts\nA  packages/octane/tests/react-compat-ssr.test.ts\nA  packages/octane/tests/react-compat/components.react.tsx\nAM packages/octane/tests/react-compat/contexts.ts\nA  packages/octane/tests/react-compat/fixtures.tsrx\nA  packages/octane/tests/react-compat/nested-types.ts\nA  packages/octane/tests/react-compat/nested.react.tsx\nA  packages/octane/tests/react-compat/nested.test.ts\nA  packages/octane/tests/react-compat/nested.tsrx\nA  packages/octane/tests/react-compat/react-compat.test.ts\nA  packages/octane/tests/react-compat/vitest.config.js\nA  packages/octane/typetests/react-compat-components.react.tsx\nA  packages/octane/typetests/react-compat-server.test-d.ts\nA  packages/octane/typetests/react-compat.test-d.tsx\nA  packages/octane/typetests/react-compat/primary.test-d.tsrx\nA  packages/octane/typetests/react-compat/tsconfig.json\nM  pnpm-lock.yaml\nM  vitest.config.js\nM  website/src/lib/playground-examples.ts\nM  website/tests/ssr-hydration.e2e.test.ts\n?? benchmarks/octane-hosted-react/ssr-run.mjs",
+  "baseline": "96c86fcd97f4fe8a158e360a6c6af6b4411ed32c",
+  "candidateHead": "5e84da7edb0da4b02b8272a4013eb5b2c6a33e66",
+  "dirty": "",
   "parameters": {
     "iterations": 20000,
     "warmup": 10000,
@@ -33,7 +33,7 @@
     "cpus": "Apple M5 Max",
     "logicalCpus": 18,
     "esbuild": "0.28.1",
-    "loadAverageAtStart": [11.44775390625, 10.0517578125, 12.31689453125],
+    "loadAverageAtStart": [8.88427734375, 9.3994140625, 9.69970703125],
     "machineIsolation": "none; shared local machine"
   },
   "semantic": {
@@ -44,11 +44,11 @@
   "bundles": {
     "baseline": {
       "name": "baseline",
-      "raw": 37188,
-      "gzip": 13222,
-      "brotli": 11960,
-      "sha256": "95b4750559835a01ed6a4c5e8d5bbffb8cdc1e6249425c852cb9aac8eaa424a3",
-      "sourceSha256": "80bf66f7a9814988c678acd4311af21bc08f82277cf1da199dc0d2ba79f07aa7",
+      "raw": 37326,
+      "gzip": 13256,
+      "brotli": 12005,
+      "sha256": "72bce84ad0fe90ecaaaa9f92482af1257cdba07fb75bed12113b0f38d99cec90",
+      "sourceSha256": "952ea4193f1f2fd9d97a3559fac42eb137a88a2503c478438c1d7ab31af7416d",
       "sources": [
         [
           "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
@@ -144,7 +144,7 @@
         ],
         [
           "packages/octane/src/runtime.server.ts",
-          "49dd03f67a0216a69a552ef3815b845f2ea16ee8a4ca0d8d3f20284adbc828d3"
+          "948b04feb9773d784425f4af3b99dffb3f16753636a154b4bacadce85e0e1394"
         ],
         [
           "packages/octane/src/sanitize-url.js",
@@ -238,18 +238,18 @@
         },
         {
           "module": "packages/octane/src/runtime.server.ts",
-          "bytes": 28654
+          "bytes": 28792
         }
       ],
       "imports": []
     },
     "candidate": {
       "name": "candidate",
-      "raw": 37526,
-      "gzip": 13337,
-      "brotli": 12034,
-      "sha256": "ead66ad0c0f5c8a7df30752de62653941b95b9af4a43db2f316311cf30d96960",
-      "sourceSha256": "af7cd7f6e56e38217cf97a6b2eb923b21503ac3c90adba4bb9235d310bdf4a4e",
+      "raw": 37664,
+      "gzip": 13368,
+      "brotli": 12077,
+      "sha256": "bf96eb98de2463d88aada18dd3bff931e48b1b951925afe184b727036a60b6c3",
+      "sourceSha256": "a9d47a8e36c75f4c05e3913a01a15d4db1aa879ec3e0cc07eddb60c04bc2ab88",
       "sources": [
         [
           "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
@@ -345,7 +345,7 @@
         ],
         [
           "packages/octane/src/runtime.server.ts",
-          "ce99443099ea7010b7576cc990011cf23d87033e1612a88b5e06a896c0ffde0f"
+          "a46115d82dc2ad98f0721f87cb646028a369c67d92f6876a20d8fb48da2dcf72"
         ],
         [
           "packages/octane/src/sanitize-url.js",
@@ -439,7 +439,7 @@
         },
         {
           "module": "packages/octane/src/runtime.server.ts",
-          "bytes": 28992
+          "bytes": 29130
         }
       ],
       "imports": []
@@ -449,34 +449,34 @@
     "renderToString": {
       "stats": {
         "baseline": {
-          "score": 0.37059433571428796,
-          "median": 0.35963960000001405,
-          "min": 0.3395291499999985,
-          "mean": 0.37059433571428796,
-          "p95": 0.43218329999999694,
-          "sd": 0.032359469030070066,
-          "rme": 8.07583726756657,
-          "scoreRme": 8.07583726756657,
+          "score": 0.3585699571428588,
+          "median": 0.3485917000000086,
+          "min": 0.34034584999999995,
+          "mean": 0.3585699571428588,
+          "p95": 0.4012646000000018,
+          "sd": 0.022388944569518645,
+          "rme": 5.774902698191871,
+          "scoreRme": 5.774902698191871,
           "warmupRatio": 1,
           "samples": 7,
-          "p99": 0.43218329999999694
+          "p99": 0.4012646000000018
         },
         "candidate": {
-          "score": 0.3994544571428605,
-          "median": 0.36958334999999354,
-          "min": 0.35491455000001226,
-          "mean": 0.3994544571428605,
-          "p95": 0.5167104000000109,
-          "sd": 0.05935700743426588,
-          "rme": 13.743257230521094,
-          "scoreRme": 13.743257230521094,
+          "score": 0.3697535642857125,
+          "median": 0.3569874999999968,
+          "min": 0.3480603999999971,
+          "mean": 0.3697535642857125,
+          "p95": 0.42401664999999866,
+          "sd": 0.02757478030419639,
+          "rme": 6.897387747187804,
+          "scoreRme": 6.897387747187804,
           "warmupRatio": 1,
           "samples": 7,
-          "p99": 0.5167104000000109
+          "p99": 0.42401664999999866
         }
       },
-      "candidateOverBaselineMean": 1.077875236201188,
-      "candidateOverBaselineMedian": 1.0276492077067685,
+      "candidateOverBaselineMean": 1.0311894706181366,
+      "candidateOverBaselineMedian": 1.0240849107996202,
       "order": [
         ["baseline", "candidate"],
         ["candidate", "baseline"],
@@ -489,62 +489,62 @@
       "rawSamples": {
         "baseline": [
           {
-            "elapsedMs": 8.64366599999994,
-            "microsecondsPerRender": 0.43218329999999694
+            "elapsedMs": 8.025292000000036,
+            "microsecondsPerRender": 0.4012646000000018
           },
           {
-            "elapsedMs": 7.492291000000023,
-            "microsecondsPerRender": 0.37461455000000116
+            "elapsedMs": 6.8069169999999986,
+            "microsecondsPerRender": 0.34034584999999995
           },
           {
-            "elapsedMs": 7.797500000000127,
-            "microsecondsPerRender": 0.38987500000000636
+            "elapsedMs": 7.1336670000000595,
+            "microsecondsPerRender": 0.35668335000000295
           },
           {
-            "elapsedMs": 7.192792000000281,
-            "microsecondsPerRender": 0.35963960000001405
+            "elapsedMs": 7.511833999999908,
+            "microsecondsPerRender": 0.3755916999999954
           },
           {
-            "elapsedMs": 6.79058299999997,
-            "microsecondsPerRender": 0.3395291499999985
+            "elapsedMs": 6.810500000000047,
+            "microsecondsPerRender": 0.34052500000000235
           },
           {
-            "elapsedMs": 7.123000000000047,
-            "microsecondsPerRender": 0.35615000000000235
+            "elapsedMs": 6.971834000000172,
+            "microsecondsPerRender": 0.3485917000000086
           },
           {
-            "elapsedMs": 6.843374999999924,
-            "microsecondsPerRender": 0.3421687499999962
+            "elapsedMs": 6.939750000000004,
+            "microsecondsPerRender": 0.34698750000000017
           }
         ],
         "candidate": [
           {
-            "elapsedMs": 8.844375000000127,
-            "microsecondsPerRender": 0.4422187500000064
+            "elapsedMs": 8.480332999999973,
+            "microsecondsPerRender": 0.42401664999999866
           },
           {
-            "elapsedMs": 10.334208000000217,
-            "microsecondsPerRender": 0.5167104000000109
+            "elapsedMs": 7.139749999999935,
+            "microsecondsPerRender": 0.3569874999999968
           },
           {
-            "elapsedMs": 7.098291000000245,
-            "microsecondsPerRender": 0.35491455000001226
+            "elapsedMs": 7.095708000000059,
+            "microsecondsPerRender": 0.3547854000000029
           },
           {
-            "elapsedMs": 7.288250000000062,
-            "microsecondsPerRender": 0.3644125000000031
+            "elapsedMs": 7.7982909999998355,
+            "microsecondsPerRender": 0.38991454999999176
           },
           {
-            "elapsedMs": 7.39166699999987,
-            "microsecondsPerRender": 0.36958334999999354
+            "elapsedMs": 7.235916999999972,
+            "microsecondsPerRender": 0.3617958499999986
           },
           {
-            "elapsedMs": 7.6727499999997235,
-            "microsecondsPerRender": 0.3836374999999862
+            "elapsedMs": 7.054292000000032,
+            "microsecondsPerRender": 0.3527146000000016
           },
           {
-            "elapsedMs": 7.294083000000228,
-            "microsecondsPerRender": 0.3647041500000114
+            "elapsedMs": 6.961207999999942,
+            "microsecondsPerRender": 0.3480603999999971
           }
         ]
       }
@@ -552,34 +552,34 @@
     "prerender": {
       "stats": {
         "baseline": {
-          "score": 0.5292104214285733,
-          "median": 0.5497667000000093,
-          "min": 0.445118750000006,
-          "mean": 0.5292104214285733,
-          "p95": 0.6013271000000031,
-          "sd": 0.0713192175082084,
-          "rme": 12.46416332086065,
-          "scoreRme": 12.46416332086065,
+          "score": 0.4284883857142859,
+          "median": 0.424087499999996,
+          "min": 0.41179584999999863,
+          "mean": 0.4284883857142859,
+          "p95": 0.45818540000000213,
+          "sd": 0.017026126629482368,
+          "rme": 3.675037319650957,
+          "scoreRme": 3.675037319650957,
           "warmupRatio": 1,
           "samples": 7,
-          "p99": 0.6013271000000031
+          "p99": 0.45818540000000213
         },
         "candidate": {
-          "score": 0.49308244285714725,
-          "median": 0.4796520999999984,
-          "min": 0.45121874999999817,
-          "mean": 0.49308244285714725,
-          "p95": 0.5672666500000105,
-          "sd": 0.04273042788655661,
-          "rme": 8.014983859727419,
-          "scoreRme": 8.014983859727419,
+          "score": 0.4408333357142851,
+          "median": 0.4417291499999919,
+          "min": 0.4278187499999945,
+          "mean": 0.4408333357142851,
+          "p95": 0.46103335000000245,
+          "sd": 0.01300845075398823,
+          "rme": 2.729204622616218,
+          "scoreRme": 2.729204622616218,
           "warmupRatio": 1,
           "samples": 7,
-          "p99": 0.5672666500000105
+          "p99": 0.46103335000000245
         }
       },
-      "candidateOverBaselineMean": 0.9317322994624696,
-      "candidateOverBaselineMedian": 0.8724648109825319,
+      "candidateOverBaselineMean": 1.0288104658412627,
+      "candidateOverBaselineMedian": 1.0415990803784503,
       "order": [
         ["baseline", "candidate"],
         ["candidate", "baseline"],
@@ -592,62 +592,62 @@
       "rawSamples": {
         "baseline": [
           {
-            "elapsedMs": 8.90237500000012,
-            "microsecondsPerRender": 0.445118750000006
+            "elapsedMs": 8.860041000000138,
+            "microsecondsPerRender": 0.44300205000000686
           },
           {
-            "elapsedMs": 12.026542000000063,
-            "microsecondsPerRender": 0.6013271000000031
+            "elapsedMs": 9.163708000000042,
+            "microsecondsPerRender": 0.45818540000000213
           },
           {
-            "elapsedMs": 10.995334000000184,
-            "microsecondsPerRender": 0.5497667000000093
+            "elapsedMs": 8.48174999999992,
+            "microsecondsPerRender": 0.424087499999996
           },
           {
-            "elapsedMs": 9.317000000000007,
-            "microsecondsPerRender": 0.4658500000000004
+            "elapsedMs": 8.621499999999969,
+            "microsecondsPerRender": 0.43107499999999843
           },
           {
-            "elapsedMs": 9.102583000000322,
-            "microsecondsPerRender": 0.45512915000001614
+            "elapsedMs": 8.361167000000023,
+            "microsecondsPerRender": 0.41805835000000113
           },
           {
-            "elapsedMs": 11.933999999999742,
-            "microsecondsPerRender": 0.5966999999999871
+            "elapsedMs": 8.264290999999957,
+            "microsecondsPerRender": 0.41321454999999785
           },
           {
-            "elapsedMs": 11.811624999999822,
-            "microsecondsPerRender": 0.5905812499999911
+            "elapsedMs": 8.235916999999972,
+            "microsecondsPerRender": 0.41179584999999863
           }
         ],
         "candidate": [
           {
-            "elapsedMs": 10.13787500000035,
-            "microsecondsPerRender": 0.5068937500000175
+            "elapsedMs": 9.220667000000049,
+            "microsecondsPerRender": 0.46103335000000245
           },
           {
-            "elapsedMs": 10.52475000000004,
-            "microsecondsPerRender": 0.526237500000002
+            "elapsedMs": 9.057332999999971,
+            "microsecondsPerRender": 0.4528666499999986
           },
           {
-            "elapsedMs": 9.024374999999964,
-            "microsecondsPerRender": 0.45121874999999817
+            "elapsedMs": 8.834582999999839,
+            "microsecondsPerRender": 0.4417291499999919
           },
           {
-            "elapsedMs": 9.313125000000127,
-            "microsecondsPerRender": 0.4656562500000064
+            "elapsedMs": 8.887459000000035,
+            "microsecondsPerRender": 0.44437295000000177
           },
           {
-            "elapsedMs": 9.093041999999969,
-            "microsecondsPerRender": 0.45465209999999845
+            "elapsedMs": 8.578958000000057,
+            "microsecondsPerRender": 0.4289479000000028
           },
           {
-            "elapsedMs": 9.593041999999969,
-            "microsecondsPerRender": 0.4796520999999984
+            "elapsedMs": 8.556374999999889,
+            "microsecondsPerRender": 0.4278187499999945
           },
           {
-            "elapsedMs": 11.34533300000021,
-            "microsecondsPerRender": 0.5672666500000105
+            "elapsedMs": 8.581292000000076,
+            "microsecondsPerRender": 0.4290646000000038
           }
         ]
       }
@@ -655,7 +655,7 @@
   },
   "bundleDelta": {
     "raw": 338,
-    "gzip": 115,
-    "brotli": 74
+    "gzip": 112,
+    "brotli": 72
   }
 }
