@@ -206,4 +206,24 @@ describe('pause', function () {
 
 		expect(mockClient.executeQuery).toBeCalledTimes(1);
 	});
+
+	it('drops an executed source when paused inputs change', function () {
+		const initialProps = { ...props, pause: true };
+		const view = render(createElement(QueryUser, initialProps));
+
+		act(function executeWhilePaused() {
+			execute?.();
+		});
+		expect(state).toHaveProperty('fetching', true);
+
+		view.rerender(
+			createElement(QueryUser, {
+				...initialProps,
+				variables: { myVar: 5678 },
+			}),
+		);
+
+		expect(mockClient.executeQuery).toBeCalledTimes(1);
+		expect(state).toHaveProperty('fetching', false);
+	});
 });

@@ -163,7 +163,7 @@ export function useQuery<Data = any, Variables extends AnyVariables = AnyVariabl
 		},
 		{
 			sourceEqual(previous, next) {
-				return previous[0] === next[0] || !hasDepsChanged(previous[1], next[1]);
+				return previous[0] === next[0] && !hasDepsChanged(previous[1], next[1]);
 			},
 		},
 		subSlot(slot, 'state'),

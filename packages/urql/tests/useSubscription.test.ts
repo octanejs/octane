@@ -2,7 +2,7 @@
 import { vi, expect, it, beforeEach, describe } from 'vitest';
 import { createElement, type OctaneNode } from 'octane';
 import { act, render } from '@octanejs/testing-library';
-import { merge, fromValue, never } from 'wonka';
+import { merge, fromValue, never, onEnd, pipe } from 'wonka';
 import type { OperationContext } from '@urql/core';
 
 import { useSubscription, type UseSubscriptionState } from '../src/hooks/useSubscription';
@@ -116,6 +116,28 @@ describe('pause', function () {
 		view.rerender(createElement(SubscriptionUser, { ...props, pause: true }));
 		view.rerender(createElement(SubscriptionUser, { ...props, pause: true }));
 		expect(mockClient.executeSubscription).toBeCalledTimes(1);
+		expect(state).toMatchObject({ fetching: false });
+	});
+
+	it('drops an executed source when paused inputs change', function () {
+		const unsubscribe = vi.fn();
+		mockClient.executeSubscription.mockReturnValue(pipe(never, onEnd(unsubscribe)));
+		const view = render(createElement(SubscriptionUser, { ...props, pause: true }));
+
+		act(function executeWhilePaused() {
+			execute?.();
+		});
+		expect(unsubscribe).not.toHaveBeenCalled();
+
+		view.rerender(
+			createElement(SubscriptionUser, {
+				q: 'subscription Changed { changed }',
+				pause: true,
+			}),
+		);
+
+		expect(mockClient.executeSubscription).toBeCalledTimes(1);
+		expect(unsubscribe).toHaveBeenCalledTimes(1);
 		expect(state).toMatchObject({ fetching: false });
 	});
 });

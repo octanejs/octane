@@ -81,7 +81,7 @@ export function useSubscription<
 		},
 		{
 			sourceEqual(previous, next) {
-				return previous[0] === next[0] || !hasDepsChanged(previous[1], next[1]);
+				return previous[0] === next[0] && !hasDepsChanged(previous[1], next[1]);
 			},
 		},
 		subSlot(slot, 'state'),
