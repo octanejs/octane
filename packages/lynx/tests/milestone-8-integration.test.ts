@@ -19,6 +19,7 @@ import { createLynxRoot, type LynxPublicHandle, type LynxRoot } from '../src/ind
 import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
 import * as firstScreen from '../src/main-renderer.js';
 import { LYNX_BACKGROUND_TO_MAIN_EVENT, type LynxContextProxy } from '../src/core/protocol.js';
+import { unwire, wire } from './_fixtures/lynx-wire.js';
 
 interface Deferred<Value> {
 	readonly promise: Promise<Value>;
@@ -524,7 +525,7 @@ describe.sequential('Lynx Milestone 8 retained integration', () => {
 					},
 					addEventListener(type, listener) {
 						const wrapped = (event: { readonly data: unknown }) => {
-							const message = event.data as {
+							const message = unwire(event.data) as {
 								readonly type?: unknown;
 								readonly batch?: {
 									readonly commands?: readonly Record<string, unknown>[];
@@ -537,10 +538,12 @@ describe.sequential('Lynx Milestone 8 retained integration', () => {
 								Array.isArray(message.batch?.commands)
 							) {
 								rejectNextCommit = false;
+								// The rewritten message goes back on the wire encoded,
+								// because that is the only form the receiver reads now.
 								listener({
 									...event,
-									data: {
-										...(event.data as Record<string, unknown>),
+									data: wire({
+										...(message as Record<string, unknown>),
 										batch: {
 											...(message.batch as Record<string, unknown>),
 											commands: [
@@ -548,7 +551,7 @@ describe.sequential('Lynx Milestone 8 retained integration', () => {
 												{ op: 'update', id: 999_999, props: { id: 'invalid' } },
 											],
 										},
-									},
+									}),
 								});
 								return;
 							}

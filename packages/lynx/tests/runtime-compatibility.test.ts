@@ -112,6 +112,10 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/core/profiling.ts',
 				'src/core/protocol.ts',
 				'src/core/renderer-id.ts',
+				// Issue #156 slice 1: the codec is in both graphs by design. Each
+				// thread encodes what it sends and decodes what it receives, so
+				// shared ownership of the encoding is the point rather than a leak.
+				'src/core/transport-codec.ts',
 				'src/core/transport.ts',
 				'src/core/worklets.ts',
 				'src/resource.ts',
@@ -138,6 +142,8 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/core/profiling.ts',
 				'src/core/protocol.ts',
 				'src/core/renderer-id.ts',
+				// Issue #156 slice 1: the other half of the shared codec above.
+				'src/core/transport-codec.ts',
 				'src/core/worklets.ts',
 				'src/main-renderer.ts',
 				'src/main-thread.ts',

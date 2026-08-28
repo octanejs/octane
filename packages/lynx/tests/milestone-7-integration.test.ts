@@ -30,6 +30,7 @@ import * as mainRenderer from '../src/main-renderer.js';
 import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
 import * as backgroundRenderer from '../src/renderer.js';
 import type { LynxRoot } from '../src/root.js';
+import { unwire, wire } from './_fixtures/lynx-wire.js';
 
 const THREAD_SOURCE = `
 import { runOnMainThread, useMainThreadRef } from '@octanejs/lynx';
@@ -350,10 +351,10 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		const outbound: LynxBackgroundOutboundMessage[] = [];
 		environment.context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
-			outbound.push(event.data as LynxBackgroundOutboundMessage);
+			outbound.push(unwire(event.data) as LynxBackgroundOutboundMessage);
 		});
 		environment.context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 		backgroundRoot = rootApi.createLynxRoot();
 		expect(environment.background.setupCapturedDeclaration()).toBe(9);
@@ -513,7 +514,7 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 		const environment = installEnvironment();
 		const outbound: LynxBackgroundOutboundMessage[] = [];
 		environment.context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
-			outbound.push(event.data as LynxBackgroundOutboundMessage);
+			outbound.push(unwire(event.data) as LynxBackgroundOutboundMessage);
 		});
 		backgroundRoot = rootApi.createLynxRoot();
 		await backgroundRoot.render(environment.background.StateRefScene, {});
@@ -527,7 +528,7 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 
 		environment.context.dispatchEvent({
 			type: LYNX_MAIN_TO_BACKGROUND_EVENT,
-			data: {
+			data: wire({
 				protocol: commit!.protocol,
 				renderer: commit!.renderer,
 				root: commit!.root,
@@ -537,7 +538,7 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 					name: 'Error',
 					message: 'Octane Lynx background transport was closed.',
 				},
-			},
+			}),
 		});
 		await flushMicrotasks();
 		await expect(backgroundRoot.unmount()).resolves.toBeUndefined();
@@ -565,10 +566,10 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 		const backgroundOutbound: LynxBackgroundOutboundMessage[] = [];
 		const mainOutbound: LynxBackgroundInboundMessage[] = [];
 		environment.context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
-			backgroundOutbound.push(event.data as LynxBackgroundOutboundMessage);
+			backgroundOutbound.push(unwire(event.data) as LynxBackgroundOutboundMessage);
 		});
 		environment.context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			mainOutbound.push(event.data as LynxBackgroundInboundMessage);
+			mainOutbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 		backgroundRoot = rootApi.createLynxRoot();
 
@@ -606,10 +607,10 @@ describe.sequential('Lynx Milestone 7 compiler/runtime integration', () => {
 		const backgroundOutbound: LynxBackgroundOutboundMessage[] = [];
 		const mainOutbound: LynxBackgroundInboundMessage[] = [];
 		environment.context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
-			backgroundOutbound.push(event.data as LynxBackgroundOutboundMessage);
+			backgroundOutbound.push(unwire(event.data) as LynxBackgroundOutboundMessage);
 		});
 		environment.context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			mainOutbound.push(event.data as LynxBackgroundInboundMessage);
+			mainOutbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 		backgroundRoot = rootApi.createLynxRoot();
 

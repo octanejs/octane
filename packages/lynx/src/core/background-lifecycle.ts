@@ -10,6 +10,7 @@ import {
 	type LynxContextProxyEvent,
 	type LynxDataLifecycleMessage,
 } from './protocol.js';
+import { decodeLynxTransportValue, type LynxStructuredValue } from './transport-codec.js';
 
 const MAX_QUEUED_LIFECYCLE_MESSAGES = 128;
 
@@ -219,10 +220,25 @@ export function prepareLynxBackgroundLifecycleReceiver(
 
 	let state!: BackgroundLifecycleState;
 	const receive = (event: LynxContextProxyEvent): void => {
-		if (!state.active || lifecycleMessageType(event.data) === null) return;
+		if (!state.active) return;
+		// This listener shares `LYNX_MAIN_TO_BACKGROUND_EVENT` with the transport's
+		// own receiver, so both decode the same payload independently. That is a
+		// second `JSON.parse` per inbound message rather than per node: the heavy
+		// direction is background-to-main, which has a single receiver, and this
+		// one carries acknowledgements and native events.
+		let data: LynxStructuredValue;
+		try {
+			data = decodeLynxTransportValue(event.data);
+		} catch {
+			// The transport's own receiver shares this event and reports the failure.
+			// This listener only wants lifecycle messages; reporting here as well
+			// would double every diagnostic on the channel.
+			return;
+		}
+		if (lifecycleMessageType(data) === null) return;
 		let message;
 		try {
-			message = validateLynxBackgroundInboundMessage(event.data);
+			message = validateLynxBackgroundInboundMessage(data);
 		} catch (error) {
 			report(state, error, 'Octane Lynx received malformed background lifecycle data.');
 			return;

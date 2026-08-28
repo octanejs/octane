@@ -12,6 +12,11 @@ import {
 } from 'octane/universal/native';
 import { LYNX_PROFILE, lynxWireProfile, profileOutboundMessage } from './profiling.js';
 import {
+	decodeLynxTransportValue,
+	encodeLynxTransportValue,
+	type LynxStructuredValue,
+} from './transport-codec.js';
+import {
 	applyLynxHostAttachments,
 	invalidateLynxClientContainer,
 	isLynxClientEventTarget,
@@ -323,6 +328,9 @@ export function createLynxBackgroundTransport(
 			report(error, 'Octane Lynx could not finalize background worklet lifetimes.');
 		}
 	};
+	const reportEncodingDiagnostic = (error: Error): void => {
+		report(error);
+	};
 
 	const dispatch = (message: Parameters<typeof validateLynxBackgroundOutboundMessage>[0]) => {
 		if (closedError !== null) throw closedError;
@@ -330,15 +338,21 @@ export function createLynxBackgroundTransport(
 			const profile = lynxWireProfile();
 			const startedSelfCheck = performance.now();
 			const validated = selfCheckLynxBackgroundOutboundMessage(message);
+			const startedEncode = performance.now();
+			const encoded = encodeLynxTransportValue(validated, reportEncodingDiagnostic);
 			const startedDispatch = performance.now();
-			context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: validated });
+			context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: encoded });
 			profile.dispatchMs += performance.now() - startedDispatch;
-			profile.selfcheckMs += startedDispatch - startedSelfCheck;
-			profileOutboundMessage(profile, message);
+			profile.encodeMs += startedDispatch - startedEncode;
+			profile.selfcheckMs += startedEncode - startedSelfCheck;
+			profileOutboundMessage(profile, message, encoded);
 			return;
 		}
 		const validated = selfCheckLynxBackgroundOutboundMessage(message);
-		context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: validated });
+		context.dispatchEvent({
+			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+			data: encodeLynxTransportValue(validated, reportEncodingDiagnostic),
+		});
 	};
 
 	const wireError = (value: unknown, fallback: string) => {
@@ -665,7 +679,10 @@ export function createLynxBackgroundTransport(
 				...identity,
 				type: 'terminal-dispose',
 			});
-			context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: message });
+			context.dispatchEvent({
+				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+				data: encodeLynxTransportValue(message, reportEncodingDiagnostic),
+			});
 		} catch (disposeError) {
 			queueTerminalDisposeRetry(
 				report(
@@ -1321,14 +1338,30 @@ export function createLynxBackgroundTransport(
 	};
 
 	function receive(event: LynxContextProxyEvent): void {
-		if (isRootIndependentDataMessage(event.data)) return;
+		// Decode before anything reads the payload. `event.data` is whatever the
+		// host handed across, and on device that can be a native-backed reference
+		// that throws on `Reflect.ownKeys` and answers `Object(v) !== v`; every
+		// read below is written for ordinary local data, so the materialization
+		// has to happen first or not at all.
+		let data: LynxStructuredValue;
+		try {
+			data = decodeLynxTransportValue(event.data);
+		} catch (error) {
+			if (closedError !== null && terminalDisposeIdentity === null) return;
+			// Nothing in an undecodable payload is safe to reflect on, so unlike a
+			// schema failure there is no identity to recover and no pending call to
+			// reject against — it can only be reported and dropped.
+			report(error, 'Octane Lynx received an inbound message it could not decode.');
+			return;
+		}
+		if (isRootIndependentDataMessage(data)) return;
 		if (closedError !== null && terminalDisposeIdentity === null) return;
 		let message: LynxBackgroundInboundMessage;
 		try {
-			message = validateLynxBackgroundInboundMessage(event.data);
+			message = validateLynxBackgroundInboundMessage(data);
 		} catch (error) {
 			const normalized = report(error, 'Octane Lynx received a malformed inbound message.');
-			rejectExpectedMalformed(event.data, normalized);
+			rejectExpectedMalformed(data, normalized);
 			return;
 		}
 		if (message.type === 'page-destroy') {
