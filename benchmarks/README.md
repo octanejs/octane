@@ -244,6 +244,7 @@ internally, get their own baseline and guard namespace.
 | `behavior-root-events` | behavior-root-events | none (headless Chromium) | queued events across 1,000 and 8,000 distinct async behavior adoptions, with FIFO/exactly-once gates |
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
+| `radix-collection-order` | radix-collection-order | none (Node-only) | production Radix collection ordering versus the prior comparator at 16, 64, 256, and 4,096 items, with missing-ref and stable-order controls |
 | `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
 | `floating-tree-navigation` | floating-tree-navigation | none (Node-only) | Floating UI deepest-open-node lookup on deep chains, equal-depth forks, and a root-only control, with exact previous-behavior and deterministic node-read gates |
 | `ink-cursor-update` | ink-cursor-update | none (Node-only) | Ink standard/incremental cursor-only updates over equal 20,000-line frames, with exact previous branches, byte/split gates, stable-frame stress scaling, and initial/changed-render controls |
