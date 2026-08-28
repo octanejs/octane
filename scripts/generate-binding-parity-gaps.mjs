@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { collectBindingParityGaps } from './parity-gaps-lib.mjs';
 import { getBindingPackages, REPO_ROOT } from './workspace-packages.mjs';
@@ -42,9 +42,15 @@ for (const row of rows.filter((entry) => entry.total > 0)) {
 }
 
 if (CHECK) {
-	console.log(`binding parity-gap inputs are valid (${total} pin(s)).`);
+	const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
+	if (current !== md) {
+		console.error(
+			'docs/binding-parity-gaps.md is stale — run `pnpm binding-parity:gaps` and commit the result.',
+		);
+		process.exit(1);
+	}
+	console.log(`binding parity-gap index is current (${total} pin(s)).`);
 } else {
-	mkdirSync(path.dirname(OUT), { recursive: true });
 	writeFileSync(OUT, md);
 	console.log(`wrote docs/binding-parity-gaps.md (${total} pin(s)).`);
 }

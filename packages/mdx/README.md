@@ -4,8 +4,8 @@
 UI framework — documentation stays in `.mdx`/`.md` and renders as **compiled octane
 components**.
 
-The split follows the framework-neutral-core policy: **@mdx-js/mdx's compiler is
-reused verbatim** — with `jsx: true` it
+The split mirrors `docs/react-library-compat-plan.md` §2: **@mdx-js/mdx's
+compiler is framework-agnostic and reused verbatim** — with `jsx: true` it
 emits the compiled document as classic JSX *source*, which is exactly the
 React-style `.tsx` dialect octane's own compiler handles. The pipeline is
 
@@ -140,5 +140,6 @@ async — it works in the vite plugin and `compileMdx`, not `compileMdxSync`.
 
 ## Status
 
-Current scope, known divergences, and verification status are tracked in this
-package's checked [`status.json`](./status.json).
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

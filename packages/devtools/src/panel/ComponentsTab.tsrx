@@ -1,7 +1,7 @@
 // The Components tab: subscribes to the app-side bridge's `tree`/`inspect` events
 // (startBridge) and renders the live component tree plus a selected-node state
 // inspector. Read-only — selecting a node only asks the app to describe it
-// (`inspect-request`); it never mutates app state.
+// (`inspect-request`); it never mutates app state (see docs/devtools.md P1 scope).
 import { useEffect, useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import {

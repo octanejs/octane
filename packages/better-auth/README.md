@@ -53,6 +53,6 @@ helpers that explicitly import React framework packages, such as
 
 ## Status
 
-Current scope, divergences, and verification are tracked in this package's
-[`status.json`](./status.json) and published in the
-[bindings catalog](https://octanejs.dev/docs/bindings).
+Current scope, divergences, and verification are tracked in the generated
+[bindings status table](../../docs/bindings-status.md), sourced from this
+package's [`status.json`](./status.json).

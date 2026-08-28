@@ -1,0 +1,457 @@
+# Server-side rendering
+
+Octane ships a complete string SSR + hydration pipeline. This doc covers the
+public API, how the pieces fit, and what is intentionally not built yet.
+
+The entry points mirror React: `octane/server` is the request-time renderer
+(`react-dom/server`) and `octane/static` is the static-generation renderer
+(`react-dom/static`).
+
+## Quick start
+
+```ts
+// entry-server.ts
+import { prerender } from 'octane/static'; // async; awaits all Suspense data
+import { App } from './App.tsrx';
+
+export async function renderApp() {
+	const { html, css } = await prerender(App, { title: 'Hi' });
+	return `<!doctype html>
+<html>
+<head>${css}</head>
+<body><div id="app">${html}</div></body>
+</html>`;
+}
+```
+
+```ts
+// entry-client.ts
+import { hydrateRoot } from 'octane';
+import { App } from './App.tsrx';
+
+hydrateRoot(document.getElementById('app')!, App, { title: 'Hi' });
+```
+
+The server build must compile components with the Octane compiler in
+`mode: 'server'` (`@octanejs/vite-plugin` handles this automatically; SSR module
+loading through Vite picks the server transform automatically).
+
+If another renderer or an independent stream owns part of the server-rendered
+DOM, use a permanent-static `<Hydrate split={false} when={never()}>` boundary to
+preserve that range and `attachBehaviorRoot` from `octane/behavior` to attach
+behavior without claiming reconciliation ownership. The
+[behavior-only roots and external ownership guide](./deferred-hydration.md#behavior-only-roots-and-external-ownership)
+covers range readiness, nested owners, delegated native interactions, and
+disposal.
+
+### Run an SSG script directly
+
+When a server or SSG entry runs outside Vite, preload Octane's compiler before
+the entry point:
+
+**Node**
+
+```sh
+node --import octane/compiler/register entry-server.ts
+```
+
+**Bun**
+
+```sh
+bun --preload octane/compiler/register entry-server.ts
+```
+
+The preload is a server-only compiler pipeline. It compiles imported `.tsrx`
+and `.tsx` components, assigns hook slots in imported plain `.ts`/`.js` custom
+hooks, and resolves extensionless local imports such as `./App` under Node. Node
+uses synchronous `node:module.registerHooks`; Bun uses an equivalent native
+runtime plugin. Node 22.22.2 or newer is required, and Bun 1.3.14 is covered by
+the integration suite.
+
+Every bare `octane` runtime import in the loaded server graph targets
+`octane/server`, including authored source dependencies that keep their manual
+hook slots and otherwise pass through unchanged.
+
+Do not use this preload for a browser entry: Vite, Rsbuild, or another Octane
+build integration must produce the client compilation and bundle instead.
+
+## API
+
+The three buffered renderers return `RenderResult = { html, css }`:
+
+- `html` — the rendered markup, including hydration markers and, when anything
+  resolved, an inline `<script type="application/json" data-octane-suspense>`
+  seed that hydration consumes. Hoisted `<title>`/`<meta>`/`<link>` (rendered
+  anywhere in the tree, each preceded by an adoption marker comment) are folded
+  in by default — spliced into `<head>` when the render produced a document, else
+  prepended (React-19 resource hoisting). `headChannel: 'separate'` withholds
+  them and returns them as `head` instead.
+- `head` — the hoisted metadata on its own, present **only** under
+  `headChannel: 'separate'` (see `RenderOptions`).
+- `css` — deduped `<style data-octane="hash">` tags collected from scoped
+  `<style>` components. Place inside `<head>`. The client skips re-injecting any
+  hash already present. (Kept as its own field because Octane has scoped CSS
+  that React core does not.)
+
+### `renderToString(component, props?, options?) => RenderResult` — `octane/server`
+
+A single **synchronous** pass, no awaiting. A Suspense boundary that suspends
+renders its `@pending` fallback; synchronously-resolved `use()` still seeds. Use
+`prerender` when you need the data awaited.
+
+### `renderToStaticMarkup(component, props?, options?) => RenderResult` — `octane/server`
+
+Like `renderToString` but produces clean, **non-hydratable** HTML: no
+`<!--[-->`/`<!--]-->` block markers, no head-adoption markers, no suspense seed
+script. For static pages / email.
+
+### `prerender(component, props?, options?) => Promise<RenderResult>` — `octane/static`
+
+Awaits **all** data: every `use(thenable)` resolves and Suspense boundaries
+render their success arm (or route rejection to `@catch`). Use for SSG or any
+place that wants fully-resolved HTML with no client fallback.
+
+### `renderToPipeableStream(component, props?, options?)` — `octane/server`
+
+Streaming SSR over Node-style streams (React `react-dom/server` parity, Octane
+argument convention). Returns `{ pipe, abort }`; chunks buffer until
+`pipe(destination)` is called. The **shell** — the full page with `@pending`
+fallbacks for anything still suspended — flushes immediately; each Suspense
+boundary then streams **out of order** as a hidden segment plus an inline
+`$OCTRC` swap script when its data settles. A shell whose root renders
+`<html>` leads the response with `<!DOCTYPE html>` (React Fizz parity —
+streaming only; the buffered renderers stay doctype-free, also matching
+React). Scoped styles flush with the shell
+(before the body markup) and per-wave with their segment; hoisted head elements
+render with the shell only. `hydrateRoot` on the client adopts the swapped-in
+DOM byte-for-byte, including per-boundary `use()` value or rejection seeds (a
+rejected boundary hydrates directly into its server-rendered `@catch` arm). Node
+destinations honor `write(false)`/`drain`; destination errors or an early close
+cancel the render.
+
+A Promise or Context may also be rendered directly as a React-19-style Usable
+node; nested Usables are unwrapped recursively. A pending Usable outside a
+Suspense boundary delays the shell until it resolves. Streamed replacements are
+parsed in their real HTML, table/select, SVG, or MathML context, so revealing a
+boundary preserves both valid structure and namespace identity.
+
+Synchronous iterable children, including generators, are materialized once and
+use the same keyed hydration ranges as arrays. A thenable that settles while it
+is first subscribed is unwrapped in that render without publishing a fallback.
+
+`StreamOptions` extends `RenderOptions` with `onShellReady()`,
+`onShellError(err)`, `onAllReady()`, `onHeadReady(head)`, and `injection`.
+`onHeadReady` fires only under `headChannel: 'separate'`, once, **before** the
+shell is written and therefore before `onShellReady` and before
+`renderToReadableStream`'s promise resolves, so a host still has time to place
+the metadata in a template prefix it writes ahead of the render stream. It
+carries the shell's metadata only; head elements hoisted inside a boundary that
+streams later are still re-created client-side, while late-discovered Float
+sheet resources ride the stream itself (see "Not built yet"). A recoverable error in
+Suspense content reaches `onError`, preserves the emitted fallback, and marks
+only that boundary for client rendering. Calling `abort(reason)` reports the
+reason for each abandoned pending task, preserves emitted fallbacks for client
+recovery, closes the destination, and invokes `onAllReady` once as the terminal
+readiness notification; an unpublished shell still fails only once through
+`onShellError`.
+
+#### `injection?: StreamInjectionSource` (Octane extension)
+
+Merge a live stream of externally-produced HTML — typically framework data
+`<script>` tags materializing as loaders settle (e.g. TanStack Start's data
+stream) — into the response natively, instead of re-parsing the emitted HTML
+for safe insertion points. The source is
+`{ take(): string; subscribe(notify) => unsubscribe; done: Promise<void>; renderComplete?() }`:
+the renderer `take()`s queued HTML and emits it verbatim, in push order, each
+drain as its own transport chunk strictly **between** renderer chunks (every
+such boundary is tag-complete by construction) — never before the shell.
+`renderComplete()` fires exactly once when the renderer has finished producing
+markup — after the last boundary segment on success, or on the abort/error
+path before degraded terminal output — so a source can finalize asynchronous
+serialization and then settle `done`.
+
+When the shell is a document (`… </body></html>`), **document mode** engages:
+renderer-owned leading scoped styles and the hoisted-head buffer fold inside
+the authored `<head>` instead of preceding `<html>`, and the closing tail is
+split out and written **last** — injected chunks and streamed Suspense
+segments land inside `<body>`, and the stream (tail included) closes only
+once rendering is complete **and** `done` has settled, so late data scripts
+are never dropped. (The `<!DOCTYPE html>` preamble is not injection-gated:
+every streamed document render leads with it, see above.) `subscribe`
+notifications drain promptly even while the render is idle awaiting `done`;
+bound the wait with `signal` (a source that never settles `done` holds the
+response open). A `done` rejection fails the stream through the same degraded
+terminal path as `abort`. Without `injection`, streamed output is unchanged
+apart from that doctype preamble (measured flat on the streaming-ssr
+benchmark).
+
+### `renderToReadableStream(component, props?, options?)` — `octane/server`
+
+The same streaming engine over web streams: resolves with a
+`ReadableStream<Uint8Array>` once the shell is ready (rejects on a shell error).
+Output is pull-driven and bounded by consumer backpressure; cancelling the
+reader cancels the render. The stream's `allReady` promise settles when every
+boundary chunk has been accepted by the consumer, so consume the stream
+concurrently rather than awaiting `allReady` before reading. Same
+`StreamOptions`.
+
+### `RenderOptions`
+
+- `nonce?: string` — CSP nonce stamped on every inline tag the renderer emits
+  (style, suspense seed, swap-runtime, and recovery scripts). Applies to every
+  buffered and streaming renderer.
+- `onError?: (error) => void` — called with any error thrown during the render,
+  before it propagates.
+- `identifierPrefix?: string` — namespaces root-local `useId` values. Pass the
+  same value to `hydrateRoot` and use distinct prefixes for sibling roots.
+- `signal?: AbortSignal` — abort a suspended async/streaming render when the
+  request dies; pending promises reject with `signal.reason` and streams cancel.
+- `timeoutMs?: number` — per-render override of the suspense settle deadline;
+  `0` disables it. Async renders only.
+- `headChannel?: 'fold' | 'separate'` — where hoisted `<title>`/`<meta>`/`<link>`
+  go. `'fold'` (default) keeps React's resource-hoisting shape described above.
+  `'separate'` withholds the metadata from `html`/the streamed shell and hands it
+  over on its own: `RenderResult.head` for the buffered renderers,
+  `StreamOptions.onHeadReady` for the streaming ones. A host that renders into a
+  `<head>`-bearing template it owns, rather than rendering the document itself,
+  needs `'separate'`: a body-only render has no `</head>` for the fold to target,
+  so folding prepends the metadata into the body, where a `<title>` loses to the
+  template's and a canonical or description is ignored. Nothing but the position
+  of the metadata changes: `head + html` under `'separate'` is byte-identical to
+  `html` under `'fold'`.
+
+### `setSsrSuspenseTimeout(ms)` / `getSsrSuspenseTimeout()`
+
+Global default for the suspense settle deadline (10s initially). A
+`use(thenable)` that never settles fails the render with a clear error instead
+of hanging the request.
+
+### `executeServerFunction(fn, body)` — `octane/server`
+
+The metaframework's RPC executor for `module server` functions. The wire format
+is devalue on both sides (so Dates/Maps/Sets/undefined/cycles round-trip): a
+devalue-encoded argument array in, a devalue-encoded `{ value }` envelope out.
+The Vite plugin loads it via `ssrLoadModule('octane/server')` so the executor
+and the resolved server function share one SSR runtime.
+
+Server-function requests accept only JSON `POST` bodies, require the browser's
+origin to match the application, and default to a one-mebibyte encoded body
+limit. Global Octane middleware runs before each action, so authentication and
+authorization policies apply to server functions as well as ordinary routes.
+Invalid requests never invoke the action, and internal exception messages are
+not exposed in HTTP responses.
+
+Configure larger bodies or explicitly trusted additional origins in
+`octane.config.ts`:
+
+```ts
+import { defineConfig } from '@octanejs/vite-plugin';
+
+export default defineConfig({
+	server: {
+		rpc: {
+			maxBodyBytes: 2 * 1024 * 1024,
+			allowedOrigins: ['https://admin.example.com'],
+		},
+	},
+});
+```
+
+Origins must be complete HTTP or HTTPS origins, never wildcard, path, or
+credential-bearing values. Explicitly allowed origins receive the browser's
+required `POST` preflight and exact-origin CORS response headers; preflight
+requests never execute authorization middleware or server actions. Forwarded
+origin headers are used only when
+`server.trustProxy` is explicitly enabled behind a trusted proxy. The same
+policy applies to Vite, Rsbuild, and generated Node or Web Worker servers.
+
+## How it works
+
+- Server-compiled components are string emitters: static HTML interleaved with
+  helper calls for dynamic holes, wrapped in `<!--[-->`/`<!--]-->` hydration
+  markers that the client cursor walks during `hydrateRoot`.
+- `<Activity mode="visible">` renders its children normally. A hidden Activity
+  does not evaluate or serialize its children on the server; hydratable output
+  retains only an empty internal range so `hydrateRoot` can build the preserved
+  hidden client tree without disturbing neighboring server DOM. Static markup
+  emits nothing for the hidden Activity.
+- Suspense: an unresolved `use(thenable)` renders the nearest `@pending`
+  fallback and suspends the pass. `prerender` awaits what suspended, caches the
+  resolved values, and re-renders. To avoid re-serializing the whole static bulk
+  on every level of a waterfall, it re-runs only the suspending **subtrees**
+  between canonical full passes (a deep waterfall costs ~2 full passes + cheap
+  subtree re-runs, not D+1 full passes). The emitted HTML always comes from a
+  full pass, so hydration byte-format is identical either way. Resolved values
+  and versioned rejection metadata are serialized into the seed script so
+  hydration does not re-fetch, re-suspend, or replace a server `@catch` arm.
+  Compiler-owned request factories consult their matching server-provided seed
+  before running, while existing promises, contexts, and externally owned
+  hydration promises retain their original ownership.
+  Rejection records preserve primitive and JSON-safe plain-object reasons plus
+  Error names, messages, and enumerable custom fields. Cyclic fields are
+  bounded and marked, while hostile or opaque values degrade to fixed safe
+  markers instead of breaking the response. Rejection metadata lives outside
+  fulfilled values, and the undefined wire encoding escapes its string prefix,
+  so sentinel-shaped user data remains ordinary data.
+- `useId` counters are root-local. Server output is hydration-stable when the
+  client passes the same `identifierPrefix`; distinct sibling roots should use
+  distinct prefixes.
+- Server hooks are render-only: state and reducers process bounded render-phase
+  updates and expose the same current-state getter as the client, effects never
+  run, and `useSyncExternalStore` reads `getServerSnapshot`.
+- Renders are concurrency-safe: each pass saves and restores the ambient module
+  state around its synchronous run, so overlapping requests cannot observe each
+  other.
+- Deep function-component trees retain bounded hook replay. Replay snapshots
+  live outside the recursive invocation frame to reduce stack pressure; the
+  conformance suite exercises a 1,000-level cold tree.
+
+## SSR via the Vite plugin
+
+`@octanejs/vite-plugin` gives file-based routing plus dev-server SSR: it matches
+a route from `octane.config.ts`, loads the page module through Vite's SSR
+pipeline, renders it with `renderToReadableStream()` — the shell flushes as soon
+as it is ready and suspended boundaries stream in behind it — into `index.html`
+around `<!--ssr-body-->` (`<!--ssr-head-->` receives the hydration data script
+and the shell's hoisted `<title>`/`<meta>`/`<link>`; styles ride the stream), and
+injects the hydration entry. The route renders into the template's
+`<div id="root">` rather than as a document, so both dev and production request
+`headChannel: 'separate'` and splice the metadata at `<!--ssr-head-->`: authored
+metadata therefore lands in the real `<head>`, and hydration adopts those
+elements from `document.head` instead of appending duplicates. Core's default
+fold would instead prepend them inside `#root`. Note that core does not dedupe:
+a `<title>` in the template and one in a component both ship, and the template's
+wins by document order, so let the component own it. Route components
+receive `{ params, url }`, and `router.preHydrate` names a client module whose
+default export is awaited before `hydrateRoot` (e.g. an app router committing
+its match tree). `module server` functions are executed through
+`executeServerFunction`. For a custom server (see `examples/hacker-news`), write
+your own `entry-server.ts` around `prerender()` or the streaming renderers and
+serialize any app data (for example a dehydrated query-client cache) into your
+own inline script.
+
+Development SSR validates native HTML element nesting while it renders,
+including relationships that cross component boundaries. When the browser
+would repair a placement before hydration (for example, a `<div>` inside a
+`<p>`), Octane reports both authored locations in the server console. The check
+targets parser repairs rather than the complete HTML content model, never adds
+diagnostics to returned markup, and is removed from production compilation.
+
+On the server, page and layout props also receive `state`, the same
+request-scoped `Context.state` Map middleware populated. It is deliberately not
+serialized; browser hydration receives only `{ params, url }`.
+
+In production, `vite build` emits both bundles: hashed client assets in
+`dist/client` and a self-contained SSR server at `dist/server/entry.js`
+(exports `handler`/`nodeHandler`, auto-boots under `node`; preview with
+`octane-preview`). The production handler streams through the same engine and
+emits the same hydratable shape as dev — `server.render: 'buffered'` switches
+it to the await-everything `prerender`. A deploy adapter prepares the output for
+its host. `adapter: vercel()` from `@octanejs/adapter-vercel` emits Vercel's
+Build Output API under `.vercel/output`. `adapter: cloudflare()` from
+`@octanejs/adapter-cloudflare` switches the server bundle to a Worker target and
+emits `dist/server/worker.js`; point a user-owned `wrangler.jsonc` at that entry
+and configure Workers Static Assets with `directory: "./dist/client"`. Keep
+Cloudflare's asset-first default, leave `assets.not_found_handling` unset or
+`"none"` (both `"single-page-application"` and `"404-page"` can bypass SSR),
+and enable `nodejs_compat`. The Worker passes `{ env, ctx }` through
+`Context.platform` for bindings and `waitUntil`. Request abort signals reach both render modes;
+the built-in Node bridge also waits for `drain` and cancels the render when the
+response socket closes. Its HTTP transport negotiates streaming gzip for
+eligible SSR and static text responses while preserving HEAD, partial,
+pre-encoded, `no-transform`, and non-compressible responses.
+
+### Root boundaries, server functions, and CSP
+
+`rootBoundary` uses importable component entries so the same pending/error UI
+can be loaded by dev SSR, the production server bundle, and the browser hydrate
+entry. A string selects a module's default (or first PascalCase) export; use an
+`[exportName, path]` tuple for an explicit named export:
+
+```ts
+export default defineConfig({
+  rootBoundary: {
+    pending: '/src/RootPending.tsrx',
+    catch: ['RootCatch', '/src/RootCatch.tsrx'],
+  },
+  // ...router
+});
+```
+
+The catch component receives `{ error, reset }`; the pending component receives
+no props. When both are configured, the catch boundary is closest to the route
+and the pending boundary wraps it, so route errors reach the catch UI while
+suspensions still select the pending UI. Paths must be Vite-root paths. `index.html` must contain exactly one
+`<!--ssr-head-->` marker, one `<!--ssr-body-->` marker, and one closing `</body>`
+tag; builds now fail with an actionable error when that hydration contract is
+malformed.
+
+Server functions are declared and imported in the same full-compiled `.tsrx` or
+`.tsx` file. The client compiler replaces the local import with an RPC stub; dev
+registers it in Vite's SSR module graph, while production adds a static server
+import:
+
+```tsrx
+module server {
+  import { database } from './database.js';
+
+  export async function saveName(name: string) {
+    return database.users.save({ name });
+  }
+}
+
+import { saveName } from 'server';
+```
+
+Only named imports/exports are supported. Arguments and results use devalue, so
+Dates, Maps, Sets, `undefined`, and cyclic values survive the round trip.
+
+For a strict CSP, middleware can set the documented `Context.state` key. The
+raw nonce is passed to the core renderer and safely attribute-escaped on the
+hydration-data and hydrate-module scripts in both dev and production:
+
+```ts
+import { OCTANE_NONCE_STATE_KEY } from '@octanejs/vite-plugin';
+
+const cspNonce = async (context, next) => {
+  context.state.set(OCTANE_NONCE_STATE_KEY, crypto.randomUUID());
+  return next();
+};
+```
+
+## Not built yet
+
+These are the known gaps between Octane SSR and a full streaming SSR stack:
+
+- **Selective / progressive hydration**: `hydrateRoot` adopts the whole tree in
+  one synchronous pass (and there is no synthetic event replay, by design).
+- **Streamed head hoisting**: head elements and resource hints hoisted from
+  INSIDE a streamed Suspense boundary don't ship in the stream (the shell
+  already flushed); the client re-creates them on hydration. Float **sheet
+  resources** (`<link rel="stylesheet" href precedence>` and
+  `<style href precedence>`) are the exception: sheets discovered after the
+  shell ride the wave chunks as real tags and the inline stream runtime hoists
+  them into `document.head` with the client's precedence grouping, so late
+  content is styled before hydration and no-JS consumers still get the CSS.
+- **Framework-level data serialization**: only suspense seeds cross the boundary
+  automatically; loader-style data APIs are app code today.
+- **Error digests**: `onError` and the shell callbacks exist, but there are no
+  React-style error digests. Recoverable Suspense errors retain their fallback
+  and mark that boundary for client rendering; a fatal post-shell error ends the
+  stream with every still-pending boundary marked for client rendering.
+- **Document orchestration beyond the streaming doctype**: a streamed `<html>`
+  root gets the core-owned doctype described above, but core does not own
+  arbitrary preamble insertion, bootstrap script/module lists, import-map
+  construction, response headers, or `onHeaders`. Compose those concerns around
+  the returned stream in the Vite plugin, adapter, or application server.
+- ~~`prerenderToNodeStream`~~ — implemented: it resolves after the
+  await-everything render completes and `prelude` streams the complete document
+  bytes (scoped-style tags, then folded html). The buffered `prerender` keeps
+  its `{ html, css }` shape.
+- **Partial pre-rendering** (`resume`, `resumeToPipeableStream`,
+  `resumeAndPrerender`, and React's postpone/prelude protocol): a documented
+  non-goal — that request protocol is not part of Octane's public SSR surface.
+- **Chunk-size and namespace options**: `progressiveChunkSize` does not exist
+  (Octane flushes per resolution wave, not by byte thresholds) and
+  `namespaceURI` is inferred from the rendered root rather than accepted as an
+  option.

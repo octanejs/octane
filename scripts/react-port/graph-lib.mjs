@@ -116,9 +116,7 @@ export function readRepositoryCapabilityInventory(repoRoot = REPO_ROOT) {
 		knownVanillaCores: KNOWN_VANILLA_CORES,
 		reactApiMap: REACT_API_MAP,
 		octanePublicSourceSha256: hashFile(path.join(repoRoot, 'packages/octane/src/index.ts')),
-		differencesSha256: hashFile(
-			path.join(repoRoot, 'website/src/content/docs/differences-from-react.mdx'),
-		),
+		differencesSha256: hashFile(path.join(repoRoot, 'docs/differences-from-react.md')),
 	});
 }
 

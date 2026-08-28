@@ -46,7 +46,8 @@ SSR, and hydration match the pinned 1.5.0 contract. Octane's native `input` even
 drives edits internally; the public callback remains `onChange(newValue)`.
 
 See [UPSTREAM.md](./UPSTREAM.md) for provenance and test inventory details. Current
-verification status is tracked in the checked [`status.json`](./status.json).
+verification status is generated from [status.json](./status.json) into the repository's
+[bindings status](../../docs/bindings-status.md).
 
 ## License
 

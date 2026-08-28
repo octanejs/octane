@@ -44,3 +44,6 @@ hotspots, and a recent commit self-time trend.
 
 Only include the devtools in development, e.g. behind an `import.meta.env.DEV`
 check or via `lazy()`.
+
+See [`docs/devtools.md`](../../docs/devtools.md) for the full setup guide,
+guarantees, and known caveats.

@@ -3,7 +3,8 @@
 [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
 for the [octane](https://github.com/octanejs/octane) UI framework.
 
-The split mirrors RTL's own architecture: **`@testing-library/dom` is
+The split mirrors RTL's own architecture (and
+`docs/react-library-compat-plan.md` §2): **`@testing-library/dom` is
 framework-agnostic and reused verbatim** — every query, `screen`, `within`,
 `waitFor`/`waitForElementToBeRemoved`, `findBy*`, `fireEvent`, `prettyDOM`,
 `configure` — while only react-testing-library's thin React layer is ported to
@@ -139,5 +140,6 @@ text commit on `tab()`, checkbox click ordering, `keyboard()`).
 
 ## Status
 
-Current scope, known divergences, and verification status are tracked in this
-package's checked [`status.json`](./status.json).
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

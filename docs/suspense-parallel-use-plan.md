@@ -1,0 +1,697 @@
+# Parallel `use()`: killing suspense waterfalls with the compiler
+
+> Produced 2026-07-08 from a three-track research pass (runtime deep-dive of
+> `useThenable`/`handleSuspense`/`attachResume`, compiler deep-dive of the hook-slot
+> and free-identifier machinery, and a primary-source prior-art survey of React
+> `main`, Solid 2.0, Ripple, Svelte async, Vue, Qwik, Marko, Relay, and userland
+> patterns). Line references are against the 2026-07-08 working tree and will
+> drift; function names are the stable anchors.
+>
+> **Status: EXECUTED 2026-07-09 (Phases 0–4 + Phase 5 minus the SSR mirror),
+> and the pipeline is always enabled. The temporary rollout gate was removed
+> 2026-07-16; serial React-style start timing is not a compiler mode.** See the
+> execution record below for where the implementation deviated from this plan.
+> Result on `benchmarks/async-waterfall`: octane 174.8ms → **20.1ms init /
+> 19.1ms update (1.2–1.3× the 16ms parallel floor, Solid 2.0/Ripple
+> territory)** vs React 307.3/190.1ms, ratio-guarded both ways (≤0.25× React,
+> ≤1.5× solid/ripple).
+>
+> **Composition follow-up LANDED 2026-07-17.**
+> `benchmarks/async-composition` now covers imported plain-TypeScript custom
+> hooks, adjacent async siblings, nested async children, and one true data
+> dependency. Octane reaches the honest **2-wave / 8-call** floor (about 105ms
+> at 50ms simulated latency), versus the original 6 waves / 23 calls.
+
+## Execution record (2026-07-09)
+
+What shipped, and where it deviates from the phases as written:
+
+- **Pipeline** in `compile.js` (`parallelUseMemoizePass` → `parallelUseWalkJsx`
+  → `buildWarmArtifacts` → `rewriteParallelUse`) runs for every client and
+  server compile. The whole octane test suite (both vitest projects, 3,871
+  tests) was the initial rollout soak; the async-waterfall bench pins the
+  resulting behavior.
+- **Phase 1 deviation — none.** Memoized creations emit `_$useMemo(() =>
+  expr, [member-path deps], _h$N)`; trivial args (identifiers/member reads)
+  pass through; loops/nested functions never entered.
+- **Phase 3 deviation — no TrySlot pending-set refcount.** `_$useBatch` throws
+  ONE SuspenseException carrying a combined all-fulfilled-or-first-rejected
+  thenable; `attachResume`'s existing supersession handles staleness. Two
+  hard-won semantics: a batch with exactly ONE pending member throws that
+  thenable directly (identical microtask hops to plain `use()`), and a
+  REJECTED member ends the batch scan at its position (earlier pendings still
+  gate; later ones must not, or the rejection never reaches its unwrap/@catch).
+- **Phase 4 deviations.** Warm-safety v1 is TIGHTER than planned: expressions
+  may reference only params + module scope (no ghost `useState` initializers,
+  no context reads — Decision point 7 deferred); JSX-containing expressions
+  are excluded; directive-arm locals are tracked so `id={a.id}` under a
+  suspended `a` correctly cuts the edge. The warm cache is a per-block map on
+  the warming block, with `runWarm` reusing the NEAREST ANCESTOR cache
+  (mid-cascade re-warms must dedup against the ancestor walk or fetches
+  double). Adoption happens inside `useMemo` on miss (transfer semantics),
+  gated by a global `WARM_EVER` flag. `__warm` attaches to the INNER function
+  via `Object.assign` (the self-reference inside a component body resolves to
+  the function-expression name, not the module const) and `hmr()` forwards it
+  to its wrapper.
+- **Unplanned fix the tests forced — thenable-slot episode lifecycle.**
+  `block.__thenables` entries now die on (a) any non-replay render and (b) the
+  render after a COMPLETED body (`__thenableDone`, React's
+  thenableState-cleared-by-finishRenderingHooks). Without (b), a resume replay
+  re-rendering a child whose entries date from a previously COMMITTED episode
+  reused the stale promise and froze the child on old data. This hardening is
+  unconditional, as are the replay-reuse leniency + "uncached
+  promise" dev warning and the replay-discovered-waterfall dev warning (both
+  gated on dev-compiled output via `__s.locs`/`locFile`).
+- **Phase 5 partial.** Dev diagnostics, docs (`differences-from-react.md`),
+  bench guards/baseline/README, and the changeset shipped. **SSR mirror
+  DEFERRED**: `runtime.server.ts` already parallelizes within a discovery
+  round (all thenables of a round awaited together) and its discovery-job
+  system makes deep waterfalls ~2 full passes + D cheap subtree re-runs — the
+  remaining gap is that nested chains stay round-serial at the NETWORK level.
+  Mirroring memoize/hoist/batch/warm into `compileServer` is its own project.
+- **SSR mirror LANDED 2026-07-09.** The same Pass A (memoize) + Pass B
+  (hoist/batch) run in `ssrCompileBody` — top bodies AND every synthetic sub
+  (@try/@if arms), before `rewriteHookCalls` so the rewritten `use(__pu$N)`
+  unwraps get their server site keys like hand-written calls — emitting the
+  server twins `_$puMemo`/`_$puBatch`:
+  - `puMemo`: keyed CROSS-PASS creation cache (frame path + site + per-frame
+    occurrence, hung off the render-local ResolvedMap as `resolved.pu` so
+    every existing threading path carries it) — re-runs and the final
+    canonical pass reuse the SAME thenable instance; the discovery suite's
+    D=3 waterfall creator count dropped 3 → 1.
+  - `puBatch`: registers every unresolved thenable of a hoisted run with the
+    render loop (synthetic `|pu#N` keys) and suspends ONCE — a K-independent
+    body stratum costs ONE network round. Measured by the new
+    `ssr-throughput` `parallel-k4/k8` ops: p50 ~4.7ms FLAT across k (one
+    ~4ms-latency round), where serial registration costs ~k×4ms.
+  - Unwraps resolve batch-registered thenables by INSTANCE IDENTITY
+    (`resolved.pu.resolvedT`, written by both settle loops for `|pu#` keys
+    only). Two sharp edges found and pinned: (1) the identity check must run
+    AFTER the per-frame occurrence bump, or a hit desyncs occ and shifts
+    every later same-base site onto its predecessor's key (@for iterations
+    share the frame — caught by the @for keying test as crossed values);
+    (2) still-pending thenables must RE-REGISTER on streaming re-passes
+    (the wave loop awaits each pass's SUSPENDED list — a dedupe guard
+    starved boundaries; caught by the streaming wave test).
+  - Seed order (use()-call order), rejection routing to @catch,
+    renderToString single-pass @pending, and true-dependency sequencing are
+    pinned in `tests/ssr-parallel-use.test.ts`.
+- **SSR warm walk LANDED 2026-07-09** (same day, completing the mirror): the
+  server pipeline now mirrors the client's warm architecture verbatim — TOP
+  bodies run Pass A + the WalkJsx transform (arm statements memoize there;
+  the transformed nodes flow into ssrEmitNodes, so ssrCompileSub receives
+  arms PRE-memoized and runs Pass B only, exactly the client's sub-body
+  contract) + `buildWarmArtifacts`, attaching `Comp.__warm` to server
+  components and threading the warm thunk into the first in-body `puBatch`.
+  Runtime: `warmMemo` caches prefetches on `resolved.pu.warm` (slot-keyed,
+  deps-matched, FIFO-capped) AND registers each thenable with the render
+  loop so the CURRENT round awaits it; `warmChild` recurses child plans
+  (depth-capped); `puMemo` adopts warm entries by slot + deps with TRANSFER
+  semantics before computing. Depth collapses to true dependency depth:
+  `parallel-nested-d4/d8` p50 ~4.6ms FLAT (one ~4ms round; serial would be
+  depth×4ms), and the depth-4 test pins every fetch in flight during pass 1
+  with each creation fired exactly once. Warm-unsafe edges (child props
+  reading suspended data) are cut — pinned. Client-parity limitation shared
+  deliberately: warm thunks fire on TOP-BODY batches only; a component whose
+  only use() lives inside its own @try arm warms its descendants only via
+  its parent's plan (same as the client).
+- **Enabled by default 2026-07-09** (same day, after the full-suite soak), then
+  made unconditional 2026-07-16 by removing the rollout gate and inactive
+  compiler/plugin branches. The homepage "Compiled templates" copy and the
+  RuleSync intentional-divergence entry (AGENTS/CLAUDE/etc.) shipped with the
+  original default flip.
+- **Real-world composition follow-up LANDED 2026-07-17.** Plain `.ts`/`.js`
+  modules now apply the same memoize/stratify/batch transform to lexically
+  imported `use()` calls (including aliases), with client `useMemo`/`useBatch`
+  and server `puMemo`/`puBatch` twins. The first direct batch carries its warm
+  thunk; once setup reaches the final output, child-only plans register through
+  an empty compiler batch and stay lazy until a descendant batch actually
+  suspends. Components with setup early returns conservatively publish no
+  descendant plan. Every live ancestor plan warms into an episode-scoped cache
+  owned above adjacent siblings. Warmable creation slots use globally
+  composable Symbols (scope-local integers collide across sibling components),
+  while occurrence-aware claims give repeated instances with equal dependencies
+  separate entries. Consumed entries and real-memo tombstones prevent later
+  true-dependency strata or siblings from refetching prior work. Client, SSR,
+  production, and universal-renderer regressions pin distinct and repeated
+  same-dependency siblings plus exactly-once creation.
+- **Prop-flow creations + uncached-recreation guard LANDED 2026-07-20.** The
+  React-trained "uncached promise" shape — per-request promises created in an
+  ancestor's render and passed down through props to descendant `use()` sites —
+  livelocked streaming SSR: every wave re-pass re-ran the ancestor, the fresh
+  instances could never resolve by identity (`resolvedT`), and `puBatch` threw
+  before the unwraps could record their stable string keys, so the render
+  burned MAX_SUSPENSE_PASSES and served only @pending fallbacks (on CPU-metered
+  hosts this presented as ~50 full render passes of billed CPU per request).
+  Two-layer fix:
+  - Server Pass A now also memoizes INLINE creations in component-prop
+    position (`<Kid p={make(x)}/>` → `p: _$puMemo(() => make(x), deps, slot)`),
+    deps-keyed like a use()-site memo. Inline-only by design: the value has no
+    other binding, so cross-pass caching cannot observe an escape or a
+    mutation. Warm plans print the SAME slot through the now value-returning
+    `warmMemo`, so the warm walk claims the render's creation (and vice versa)
+    instead of racing a second one — creation runs exactly once per request.
+    Hook-shaped calls and JSX-bearing expressions are excluded; @for/@switch
+    arms remain excluded (v1 rule).
+  - Shapes the compiler cannot see (locals flowing into props, spreads,
+    foreign bodies) hit a runtime livelock guard (`observeSuspenseWave`, wired
+    into the streaming wave, pre-shell root, and buffered loops — all off the
+    hot path): two consecutive no-progress cycles whose settled wave was
+    entirely batch-registered and whose next pass registers only fresh
+    identities — while `pu.created` didn't grow and no plain string key
+    recorded — cannot be a legitimate waterfall level, so batching is disabled
+    for the rest of the request. `puBatch` then keeps its status probes but
+    stops registering/suspending; the first unresolved `use()` suspends under
+    its stable frame-scoped string key and key replay completes the render
+    (degraded but correct — matching what un-batched `use()` always did for
+    per-pass creations). A dev-only console.error names the pattern; the
+    MAX-pass errors (retired 33/37 → 47/48) now hint at the cause. Pinned in
+    `tests/ssr-prop-flow-promises.test.ts` (streaming + prerender + bare-root,
+    exactly-once creation for the memoized shape).
+- **Bounded keyed-child discovery LANDED 2026-08-10.** The client compiler can
+  statically unroll a keyed `@for` into its parent's existing child warm plan
+  when its iterable is a private, unescaped module-level string-literal array with
+  at most 16 distinct entries, its sole use is that iterable, and its explicit
+  key is the item itself. Only pure, statically selected branches and safe
+  component props participate. The warm plan never evaluates the iterable,
+  item indexes, or keys, and never puts hooks in the loop; each real child
+  still owns its existing keyed component scope. Dynamic, dependent, mutated,
+  aliased, duplicate-key, and over-limit lists remain excluded, as do `@switch`
+  arms. Server and universal compilation are unchanged. The existing
+  composition dashboard's two keyed async panels return from four discovery
+  waves to two, restoring all seven independent first-wave requests while
+  preserving its current eight initial and 13 transition-update creators.
+- **Decision points resolved:** (1) unconditional, with no serial-timing mode;
+  (2) loops excluded — mandatory (Phase 0); (3) member-path deps; (4)
+  AbortSignal not shipped; (5)
+  `useBatch`/`warmMemo`/`warmChild` exported tier 2; (6) depth cap 64; (7)
+  ghost-hook scope v1 = none (params+module only).
+>
+> **Measurement harness exists (2026-07-08):** `benchmarks/async-waterfall` —
+> 10 nested `use()` levels, init + transition update, vs React 19 / Solid 2.0 /
+> ripple. Recorded: octane 10.9× the 16ms latency floor (React 19.1× on init),
+> solid/ripple ≈1.1× (parallel by model). That ~10× is the number this plan
+> exists to close; when it lands, add octane-vs-solid/ripple ratio guards so
+> the win can't regress (only octane-vs-react is guarded today).
+
+## The problem
+
+```tsx
+const a = use(fetchA(id)); // throws SuspenseException while pending
+const b = use(fetchB(id)); // ← never reached in this attempt
+```
+
+Octane inherits React's `use()` contract: a pending read throws, the throw aborts
+the component function, and the body is replayed from the top when the promise
+settles. That structure has two distinct costs:
+
+1. **Network waterfall (the killer).** When the promise is *created* in the body,
+   the second fetch does not even start until the first resolves. Latency becomes
+   the *sum* of the fetches instead of the *max*. This is pinned today by the
+   `WaterfallBody` regression test in `tests/suspense.test.ts` ("WITHOUT useMemo,
+   sequential use() inside one body waterfalls") — documented there as a pin of
+   the current sequential-replay strategy, **not** a React-canonical contract.
+2. **Replay churn.** Even when both promises pre-exist (props/module scope — so
+   both are in flight), `attachResume` wires the retry to the *first* thenable
+   only. A resolves → replay → suspend on B → B resolves → replay again. N
+   independent `use()` calls cost up to N replays and N suspend/retry cycles per
+   suspension episode, on mount and on every update that swaps the promises.
+
+Both costs bite hardest **on updates**, where new promises arrive via changed
+props/state and the boundary re-suspends.
+
+3. **Nested-component waterfalls (the typical real-world shape — and what
+   `benchmarks/async-waterfall` actually measures).** Routes render layouts
+   render cards, each with its own `use()`. A parent's suspension aborts its
+   render *before the child slot is created*, so the child — whose props are
+   often provably independent of the parent's data (`<Level level={level + 1}
+   version={version}/>` in the bench fixture) — never mounts and never starts
+   fetching. Costs 1–2 are intra-body; this one crosses component boundaries,
+   and no intra-body transform touches it: Phases 1–3 alone leave the bench at
+   ~10.9× the latency floor. Phase 4 exists to close it.
+
+## Current mechanics (what the fix must integrate with)
+
+Runtime (`packages/octane/src/runtime.ts`):
+
+- `use()` (~2663) dispatches Context vs thenable; `useThenable()` (~2782) indexes
+  thenables by **dynamic call order** (`block.__thenableIdx` into
+  `block.__thenables`), tags `status`/`value`/`reason` on the thenable itself,
+  and returns synchronously on replay when `stored === thenable`. Note the
+  identity requirement: Octane has **no** React-style "reuse the stored thenable,
+  drop the fresh one" leniency — a fresh promise at a replayed slot re-suspends
+  (refetch-storm hazard for uncached creations).
+- `SuspenseException` unwinds synchronously to the enclosing `tryBlock`'s
+  `__suspenseHandler` (~8654) → `handleSuspense()` (~8741). No sibling
+  prerendering: the rest of the body is simply not reached.
+- `handleSuspense` keeps already-visible content during a suspended transition
+  with no fallback timeout by default. A finite timeout is an explicit Octane
+  extension; the earlier five-second-default description is superseded by the
+  [current shell-retention contract](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#8-transition-shell-retention--no-fallback-timeout-by-default).
+- `attachResume()` (~9147) stores a **single** `state.pendingThenable` and wires
+  `thenable.then(retry, retry)`; `commitResume()` (~8961) replays the try body
+  (`renderBlock` with `__thenableIdx` reset) and re-enters `handleSuspense` if the
+  replay suspends again.
+- Precedent for batched wakeups exists at boundary granularity:
+  `HELD_TRANSITIONS`/`STAGED_REVEALS` (~505, ~9125) commit all entangled
+  boundaries of a transition atomically. Nothing batches *within* a boundary.
+- Hydration: SSR-seeded `use()` values are adopted in **`use()` call order**
+  (`hydrationSeeds`/`hydrationSeedCursor` in `useThenable`).
+
+Compiler (`packages/octane/src/compiler/compile.js`):
+
+- `rewriteHookCalls()` (~3204) appends a stable per-call-site symbol
+  (`allocHookSymbol`, ~3965; `Symbol.for('octane:<file>:<comp>.<hook>#<n>')`) to
+  built-in hooks and wraps custom hooks in `withSlot`. Client-mode `use` is NOT
+  slot-wrapped today; server-mode `use` is (SSR suspense-cache key).
+- `collectFreeIdentifiers()` (~841) does scope-aware binding resolution — it can
+  answer "does expression E reference binding X" directly.
+- Setup-statement transform passes already exist: the autoCallback pass
+  (`computeStableLocals` + `rewriteAutoCallback`, ~3098) and early-exit rewriting
+  (`rewriteEarlyExits`, ~7242). The insertion point for a new pass is
+  `compileFunctionBody()` (~3056), after autoCallback, before `rewriteHookCalls`.
+- Hook slots are symbol-keyed, not position-keyed — the conditional-hooks
+  guarantee does not depend on statement order, so a reordering pass does not
+  fight it.
+
+## Prior art (why this design)
+
+Primary-source findings; URLs carry the claims. (Quotes were machine-extracted;
+spot-check before quoting them anywhere formal.)
+
+- **React (verified against `facebook/react@main`).** The waterfall is
+  structural: `use(pending)` throws the opaque `SuspenseException`
+  (ReactFiberThenable.js); replay re-executes the whole body with index-keyed
+  thenable memoization ("components are idempotent" — fresh promise at a replayed
+  slot is dropped in favor of the stored one, with the dev warning "A component
+  was suspended by an uncached promise…"). The `use` RFC
+  (https://github.com/reactjs/rfcs/pull/229) never addresses intra-component
+  waterfalls; the official answer is caching + "create promises before render"
+  (https://react.dev/reference/react/use). React 19's sibling **pre-warming**
+  (PR #30800, after the June-2024 #29898 regression controversy) speculatively
+  renders skipped *sibling components* off-screen after the fallback commits — it
+  never re-attempts past a suspended `use` within one component, and its extra
+  speculative passes caused double-fetch complaints downstream (TanStack
+  QueryStrictMode RFC, https://github.com/TanStack/query/discussions/8064).
+- **Solid 2.0.** Fetches start eagerly at `createAsync` *creation* during
+  run-once setup; a pending *read* throws `NotReadyError` at fine-grained node
+  granularity and pending-ness propagates through the graph (each derived
+  registers the dep, becomes pending itself). Two async reads in one scope →
+  both fetches already in flight; the throw only delays *subscription*, and the
+  replay scope is one tiny derived node. True A→B dependencies suspend/resume
+  that one computation ("the primary async goal of Solid 2.0",
+  https://github.com/solidjs/solid-router/discussions/375;
+  https://dev.to/playfulprogramming/async-derivations-in-reactivity-ec5).
+- **Ripple.** Two paths: plain body `await` compiles to a **real continuation**
+  (suspend at the await, resume, no replay) — and is *sequential by design*;
+  parallelism goes through `trackAsync`, which runs the fetcher eagerly in a
+  `pre_effect` at creation and returns a `SUSPENSE_PENDING`-sentinel Tracked.
+  Reading a pending Tracked throws and pauses only that fine-grained block. The
+  `@try/@pending` boundary is a **request refcounter** (`pending_count`,
+  `begin_request`/`complete_request`, re-render once at zero) with an
+  `active_requests` set ignoring stale resolutions and
+  `abort_controller.abort(TRACKED_UPDATED)` cancelling superseded fetches.
+  Parallelism is test-proven (`tests/client/async-suspend.test.tsrx`: two
+  `trackAsync`s go in-flight in the same render).
+  (https://github.com/trueadm/ripple — `runtime/internal/client/try.js`,
+  `runtime.js`.)
+- **Svelte async** (`await` in `$derived`/templates, 5.36+ behind
+  `experimental.async`; https://github.com/sveltejs/svelte/discussions/15845).
+  Sequential template `await`s run in parallel because each `await`-bearing
+  expression compiles to its own async derivation ("an async derived is really
+  just an effect and a source signal in a trenchcoat") under an assumed purity of
+  template expressions. Even Svelte does **no static dependency analysis**:
+  script-level sequential awaits waterfall on first run, and the documented fix
+  is manually splitting creation from awaiting. Ships a runtime
+  `await_waterfall` dev warning.
+- **Userland.** TanStack `useSuspenseQueries` ("with suspense, all your Queries
+  inside one component are fetched in serial" — the plural hook is the fix,
+  https://github.com/TanStack/query/discussions/5946); Apollo splits
+  initiate/read (`useBackgroundQuery`/`useReadQuery`); `use(Promise.all([...]))`
+  couples readiness and errors all-or-nothing.
+
+**Synthesis.** Every shipped solution decouples *fetch start* (eager, at
+creation) from *fetch read* (fine-grained, suspendable). Nobody parallelizes via
+static dependency analysis — Solid/Ripple get it from run-once setup + eager
+primitives, Svelte from graph concurrency under a purity assumption. Octane's
+compiler can reconstruct the same property for React-shaped `use()` code by
+*proving* independence instead of asking the developer to switch primitives.
+That transform is genuinely novel, and it rests on the same idempotence
+assumption React already bakes into `use()` replay.
+
+## Options considered and rejected
+
+| Option | Verdict |
+|---|---|
+| Runtime-only speculative execution past the throw (poisoned sentinel, arbitrary user code re-run blindly) | Rejected. Crom-style speculation; unsound without purity proofs; React's far weaker prewarming already caused ecosystem double-fetch pain. The *proof-carrying* variant — compiler-sliced warm functions that never run arbitrary user code — IS viable and is Phase 4. Blind speculation for unprovable cases stays parked (Phase 6). |
+| Full speculative render of suspended subtrees (render children into detached blocks, adopt on resume) | Rejected. Needs adoption/teardown machinery, effect suppression, and re-imports React-prewarm double-execution hazards. Warming only needs fetches *started*, not DOM built — the sliced warm plan gets the same network behavior with none of the commit risk. |
+| Ripple-style continuation compilation of `@try` bodies | Rejected for this problem. Continuations fix *replay cost*, not waterfalls — Ripple's own body-`await` is sequential by design and routes parallelism through eager creation. Would be a major departure (hook/effect timing, sync-render guarantees, hydration) for no waterfall benefit. |
+| `useAll([...])` / `use(Promise.all(...))` sugar | Rejected as the mechanism (all-or-nothing readiness, coupled rejection, per-value reveal lost). The runtime wakeup below borrows the shape while keeping per-value unwrapping. |
+| Compiler preload transform + batched boundary wakeup + compiler-sliced cross-component warming | **Chosen.** Phases below. |
+
+## The plan
+
+### Phase 0 — Groundwork (EXECUTED 2026-07-09)
+
+- **Compiler pass plumbing** calls `rewriteParallelUse()` at the agreed
+  insertion point in `compileFunctionBody` (after autoCallback, before
+  `rewriteHookCalls`; runs on every function body including hoisted `@try`
+  sub-bodies, where `use()` actually lives). The original rollout gate was
+  useful while the later phases soaked, but has since been removed; compiled
+  Suspense fixtures cover the transform as the only supported behavior.
+- **Replay-churn pin** (`ReplayChurnBody` fixture + "replay churn" test in
+  `tests/suspense.test.ts`): two pre-existing promises cost three body
+  attempts on mount and three more on a promise-swapping update (one attempt
+  per pending thenable). This is the Phase 3 flip-target: batched unwrap cuts
+  each episode to two attempts.
+- **Decision point 2 resolved empirically** (loop slots): the compiler does
+  NOT reject hooks in loops (the `withSlot` comment in runtime.ts claiming it
+  does is wrong — flagged separately). A slot-keyed hook in a loop reuses ONE
+  symbol across all iterations: `useState` shares one state slot; `useMemo`
+  recomputes every iteration (deps always mismatch the previous iteration's
+  stored entry) and keeps only the last. Bare `use()` is loop-safe today
+  (indexed by dynamic call order, not the symbol) — but wrapping it in a
+  slot-keyed memo would mint a fresh promise every render and re-suspend
+  forever. **Phase 1's loop exclusion is therefore mandatory, not
+  precautionary**: the pass must not touch any `use()` inside
+  for/for-of/for-in/while/do-while.
+
+### Phase 1 — Auto-memoize `use()` argument creations
+
+Compile `use(<expr>)` where `<expr>` is a call/new/template of a non-trivial
+expression into a slot-keyed memo of the creation, in place:
+
+```js
+// const a = use(fetchA(id));
+const __p0 = useMemo(() => fetchA(id), [fetchA, id], _h$0);
+const a = use(__p0);
+```
+
+- Dep arrays from the free variables of the expression (same oracle style as the
+  autoCallback pass; see Decision point 3 for member-path granularity).
+- Skip trivial arguments (identifiers, member reads): `use(props.promise)` and
+  `use(SomeContext)` pass through untouched — this also sidesteps the
+  cannot-statically-distinguish-Context problem.
+- Skip `use()` calls inside loops — mandatory, per the Phase 0 finding: loop
+  iterations share one slot symbol, so a slot-keyed memo would mint a fresh
+  promise every render and re-suspend forever.
+- Effect: refetch happens exactly when deps change; replays can never mint fresh
+  promises; updates get stable identity for free.
+
+**Runtime safety net (React parity), independent of the transform:** mark the
+block as replaying during `commitResume` → `renderBlock`; in `useThenable`, if a
+replay presents a *fresh* thenable at a slot with a stored one, reuse the stored
+thenable, drop the fresh one, and emit React's "suspended by an uncached
+promise" warning in dev. Closes the refetch-storm hazard for un-memoized code
+(hand-written `use(fetch(...))` in bindings or pre-transform output).
+
+### Phase 2 — Parallel-start transform (the waterfall killer)
+
+Within a single statement block (never across `@if`/plain-`if`/`@for`/loop
+boundaries), find maximal runs of `use()` statements and hoist every
+*independent* memoized creation above the first unwrap:
+
+```js
+// const a = use(fetchA(id));
+// const b = use(fetchB(id));
+// const c = use(fetchC(a.ref));        ← depends on a
+const __p0 = useMemo(() => fetchA(id), [fetchA, id], _h$0);
+const __p1 = useMemo(() => fetchB(id), [fetchB, id], _h$1);
+const a = use(__p0);
+const b = use(__p1);
+const c = use(useMemo(() => fetchC(a.ref), [fetchC, a], _h$2)); // stays put
+```
+
+- **Legality:** a creation may hoist past `use(pA)` iff `collectFreeIdentifiers`
+  shows it references neither `a` nor any intervening binding (transitively)
+  derived from `a`.
+- **Conservative intervening-statement rule (v1):** a run may span interleaved
+  `const`/`let` declarations only when those declarations are themselves
+  hoist-independent of the earlier `use` results; any other statement kind
+  (calls, assignments, control flow, try/catch) terminates the run. Loosen
+  later with a purity oracle if real code demands it.
+- **Unwrap order is untouched** — only creation order changes. Hydration-seed
+  adoption walks `use()` call order, so seed order is preserved by construction.
+- **Semantic license:** evaluating `fetchB(id)` before A's unwrap reorders
+  user-visible side effects of render code. This is the same idempotence
+  assumption React states in `trackUsedThenable` and Svelte applies to template
+  expressions. Document as an intentional divergence (see Phase 5): *Octane
+  starts independent `use()` fetches in parallel; React waterfalls.*
+- Multi-level chains shrink to their true dependency depth: each replay
+  discovers (and batch-starts) the next *stratum* of creations, so a
+  3-statement body with one real dependency costs 2 suspension rounds, not 3.
+
+### Phase 3 — Batched unwrap: one replay per settled stratum
+
+With creations hoisted, emit a batch marker before the unwraps:
+
+```js
+_$useBatch([__p0, __p1]);
+const a = use(__p0);
+const b = use(__p1);
+```
+
+Runtime semantics, shaped after Ripple's boundary refcounter rather than a
+single composite promise:
+
+- Generalize `TrySlot.pendingThenable` (single) to a **pending set with
+  supersession**: each suspension episode owns a request-generation token;
+  members are the still-pending thenables the boundary is waiting on; stale
+  resolutions from a superseded generation are ignored (Ripple's
+  `active_requests` shape). `attachResume`'s dedup and
+  `HELD_TRANSITIONS`/`STAGED_REVEALS` entanglement keep working — the boundary
+  becomes "ready" when its pending set drains (all fulfilled) or any member
+  rejects, which is when the single retry fires.
+- `_$useBatch(thenables)` pre-tags each entry's `status` (skipping non-thenables
+  and Contexts via the `$$kind` check), and if any are pending, throws one
+  `SuspenseException` that enrolls the whole pending set. All settled → no-op;
+  the following `use()` calls unwrap synchronously from cache.
+- **Rejection ordering matches sequential observation:** the replay unwraps in
+  textual order, so the first-in-order rejection throws to `@catch`. The
+  wake-on-first-rejection rule means a later-rejects-while-earlier-pending race
+  costs one extra (correct) suspend cycle on the error path — acceptable.
+- A replay that discovers a *new* pending `use()` (an unhoistable dependent
+  creation) **joins the current pending set** instead of replacing a single
+  `pendingThenable` — dependent chains no longer thrash the retry wiring.
+- This phase alone fixes replay churn for the pre-existing-promises case
+  (`use(ThingPromise); use(OtherThingPromise)`): one retry, one replay.
+
+### Phase 4 — Cross-component fetch-tree warming (closes the benchmark)
+
+The headline phase: extract, at compile time, each component's **fetch tree**
+and walk it ahead of rendering, so a nested chain's fetches all start in the
+first render tick. Conceptually this is Relay's "parallel data tree" — but
+*derived automatically from component code* instead of authored as colocated
+GraphQL fragments.
+
+**Emit.** Alongside each compiled component, the compiler emits a warm
+function containing only the compiler-sliced *fetch plan*:
+
+```js
+// function Level({ level, version }) @{
+//   const data = use(fetchData(level, version));
+//   ... @if (level < LEVELS - 1) { <Level level={level+1} version={version}/> } ...
+Level.__warm = (props, w) => {
+	_$warmMemo(w, () => fetchData(props.level, props.version),
+		[fetchData, props.level, props.version], _h$0);
+	if (props.level < LEVELS - 1) {
+		_$warmChild(w, Level, { level: props.level + 1, version: props.version }, _h$c0);
+	}
+};
+```
+
+The parent's compiled body invokes warm calls for provably-reachable child
+component slots **before its first unwrap** (alongside the Phase 2 hoists), and
+`_$warmChild` recurses — the entire descendant fetch tree is walked
+synchronously in the initial attempt. Warming is therefore not triggered *by*
+suspension; it happens whether or not the parent suspends, and on transition
+updates it re-runs with the new props, so `update` parallelizes identically.
+
+**Slicing rules (what may appear in a warm function).** The slice for a
+component includes only the statements transitively needed to compute
+(a) memoized `use()` creations, (b) child-slot reachability conditions, and
+(c) child prop expressions — and only when every ingredient is *warm-safe*:
+
+- expression evaluation, `const`/`let` declarations, ternaries/logical ops;
+- **ghost hooks**: `useMemo` creations execute into the warm cache; `useState`
+  resolves to its *initializer value only* (no state registered — the real
+  mount owns state); `use(Context)`/`useContext` reads resolve against the
+  live parent scope (warming runs under the real parent block, so providers
+  are visible);
+- a child slot enters the plan only when its reachability condition AND all
+  its prop expressions are independent of every not-yet-unwrapped `use()`
+  result on the path (same `collectFreeIdentifiers` legality as Phase 2).
+
+Anything outside this set (assignments to outer scope, arbitrary calls other
+than the fetch creations themselves, refs, effect-dependent values,
+unprovable conditions) **cuts the slice at that edge at compile time**. The
+plan is best-effort and always sound: warm less = slower but never wrong.
+No DOM is created, no effects run, no state registers, nothing commits —
+mis-speculation can only ever waste a fetch, never corrupt behavior.
+
+**Warm cache.** A per-root map keyed by (call-site slot symbol path, dep
+values). `_$warmMemo` dedups on that key, so re-warming (a second render
+attempt before resume) never double-starts a fetch. When the real child
+mounts, its `useMemo` initializer consults the warm cache first and *adopts*
+the entry into the real hook slot (transfer, not copy). Dep mismatch (props
+drifted between warm time and mount) is a plain miss: the real mount fetches
+fresh — a wasted prefetch, correct behavior; the orphan is evicted on
+boundary commit (and aborted, if the Phase 5 AbortSignal lands).
+
+**Recursion and lists.** Reachability conditions in the plan are evaluable at
+warm time (they were proven independent), so recursive components terminate
+exactly where the real render would (`level < LEVELS - 1`). A runtime depth
+cap (Decision point 6) plus a dev warning backstops chains the compiler
+cannot prove finite. `@for` child slots enter the plan only when the list
+source itself is warm-available (not gated behind a pending `use()` in the
+same body — often it IS the suspended data, in which case that edge cuts,
+correctly: those children are data-dependent, a true waterfall).
+
+**SSR.** The same warm walk in `runtime.server.ts` collapses server-side
+nested-fetch depth to true dependency depth — directly measurable today via
+`ssr-throughput`'s `waterfall-d1/d2/d4` ops, in addition to the client suite.
+
+**Result on `benchmarks/async-waterfall`:** all 10 levels' fetches start in
+the first tick; init and update land near the parallel floor (~1.1–1.3×,
+solid/ripple territory) instead of 10.9×. Ship-time: tighten `ratios.json` —
+keep octane-vs-react ≤1.2, add octane-vs-solid and octane-vs-ripple ceilings
+(~1.5× to absorb replay overhead) so the win cannot regress.
+
+**Cost to watch:** warm functions are extra compiled output. The
+`codegen-size` and `bundle-size` suites guard this — emit warm functions only
+for components that (transitively) contain `use()` creations or async
+descendants, and skip emit entirely for leaf/sync components so the tax is
+proportional to actual async surface.
+
+### Phase 5 — Diagnostics, SSR, docs, tests
+
+- **Dev waterfall warning** (à la Svelte's `await_waterfall`): when a replay
+  reaches a `use()` at a new index whose creation could not be hoisted, log the
+  binding-level dependency chain (`c depends on a via a.ref`) so intentional
+  chains are visible and accidental ones get fixed. Dev-only, once per site.
+- **SSR mirror:** apply the same memoize+hoist+batch emit in `compileServer` so
+  `render()` starts independent fetches in parallel; verify the server unwrap
+  loop and the SSR suspense-cache keying (server-mode `use` slots) are
+  compatible with hoisted creations.
+- **Docs:** new intentional-divergence entry in
+  `docs/react-parity-migration-plan.md` and `docs/differences-from-react.md`
+  (fetch-start timing + single-replay batching); README note under the `.tsrx`
+  authoring section ("you do not need to pre-create promises; the compiler
+  parallelizes independent `use()` calls").
+- **Website:** update the homepage "Compiled templates" feature block
+  (`website/src/pages/Home.tsrx`) to call out waterfall removal, once the
+  transform is unconditional (do not advertise before it ships). Draft copy,
+  replacing the current body:
+
+  > Components compile ahead of time to template clones and direct DOM
+  > writes — no virtual DOM, no diffing. The compiler even removes suspense
+  > waterfalls, proving which `use()` fetches are independent and starting
+  > them together.
+- **Changeset:** patch (0.x alpha track), covering compiler + runtime.
+- Optional nice-to-have (separate decision): expose an `AbortSignal` to
+  memoized creations so superseded in-flight fetches can be cancelled on dep
+  change (Ripple's `abort(TRACKED_UPDATED)` analogue). API-surface decision —
+  not core to this plan.
+
+### Phase 6 (research, optional) — Blind speculative discovery
+
+For the residue Phase 4's proofs cannot reach (a `use()` or child slot gated
+on a condition that genuinely reads an earlier result, fetch args flowing
+through un-sliceable code), a *blind* speculative pass could re-run user code
+with placeholder values to discover fetches. Prior art says the edges are
+sharp (React prewarming double-fetches; Crom,
+https://www.usenix.org/legacy/event/nsdi10/tech/full_papers/mickens-crom.pdf).
+Park until Phases 1–4 ship and real-world gaps justify it — the expectation
+is that Phase 4's coverage makes this unnecessary.
+
+## Edge cases and rules
+
+| Case | Rule |
+|---|---|
+| `use(context)` | Untouched: trivial args skip Phase 1; `_$useBatch` skips `$$kind === CONTEXT_TAG` entries at runtime. |
+| `use()` behind `@if` / plain `if` / early-return guard | Batched only within its own block; slot symbols are already conditional-safe. Never lift a creation out of its guarding condition. |
+| `use()` in loops | Excluded from Phases 1–2 (RESOLVED, Phase 0): loop iterations share one slot symbol, so `useMemo` thrashes one entry and a memoized creation would fresh-promise every render → infinite re-suspend. Bare `use()` stays loop-safe (call-order indexed). |
+| Async component children of a keyed `@for` | Client warming statically unrolls only private, nonescaping string-literal arrays with at most 16 distinct explicit item keys; children keep their separate component scopes and no hook is inserted into the loop. All other keyed lists remain opaque. |
+| Dependent creations (`use(f(a))`) | Not hoisted; on replay they join the pending set (Phase 3); dev warning explains the chain (Phase 5). |
+| Interleaved non-declaration statements | Terminate the batch run (v1 conservatism). |
+| Child props depend on suspended data (`<Detail item={data.first}/>`) | Correctly excluded from the warm plan — a true data dependency; that child's fetches start on resume (dependency-depth behavior). |
+| Recursive warm chains | Reachability conditions evaluated at warm time bound the walk; runtime depth cap + dev warning backstops unprovable recursion (Decision point 6). |
+| Warm/mount prop drift (state changed between warm and commit) | Dep-keyed warm cache misses → real mount fetches fresh; orphan evicted on boundary commit. A stale warm entry can never be adopted. |
+| Re-warm before resume (second update while pending) | `_$warmMemo` dedups on (slot path, deps) — no double-started fetches; superseded generation's orphans evicted. |
+| Component identity at warm time (`<Dynamic is={X}/>`, component from suspended data) | Warm requires a statically-resolvable component binding with a `__warm` emit; dynamic/component-valued props cut the edge. |
+| Warm emit size | Emit `__warm` only for components with `use()` creations or async descendants; guarded by `codegen-size`/`bundle-size` suites. |
+| Hydration | Seed adoption is keyed to `use()` call order, which the transform preserves. Add an explicit hydration test with a batched pair. |
+| Transitions | The pending set replaces the single `pendingThenable` inside the existing `handleSuspense`/`STAGED_REVEALS` flow; entangled-boundary commit barriers unchanged. Add a transition test with a batched pair inside one boundary plus a sibling boundary. |
+| Rejection while batch partially pending | Wake on first rejection; replay unwraps in textual order; earlier-pending members re-enroll. |
+| Differential suite (`tests/differential/`) | Compares final `innerHTML` only — unaffected by fetch-start timing. Do NOT add a differential fixture that asserts fetch counts against React; that comparison now intentionally diverges. |
+| Conformance suite | Any port covering React's waterfall timing is a plain passing test of Octane's deliberate parallel behavior, annotated as an intentional divergence rather than a gap. |
+| `WaterfallBody` pin (`tests/suspense.test.ts`) | Flips by design: `bStarts === 1` at mount. Rewrite as the positive assertion of parallel starts; true data dependencies retain a separate sequential-behavior pin. |
+
+## Test plan
+
+New/updated fixtures in `packages/octane/tests/_fixtures/suspense.tsrx` + suites
+in `tests/suspense.test.ts` (and a server twin):
+
+1. Independent pair → both fetches start in the first attempt; **one** replay;
+   fallback shows once (mount) / prior DOM held once (transition update).
+2. Dependent chain (a → c) → two suspension rounds exactly; dev warning fired
+   once with the right chain.
+3. Mixed batch (2 independent + 1 dependent) → strata of sizes 2 then 1.
+4. Update with changed deps → old generation superseded (stale resolution
+   ignored), new fetches batched, single replay.
+5. Update with unchanged deps → no refetch (memo hit), no suspension.
+6. Rejection: first-in-order rejects → `@catch` with that reason; later-in-order
+   rejects while earlier pending → still correct arm, extra cycle tolerated.
+7. Conditional `use()` batch inside a guard that opens on a later render.
+8. Un-memoized fresh promise on replay (transform off / hand-written) → stored
+   thenable reused + dev warning (Phase 1 safety net).
+9. Hydration: SSR-seeded batched pair adopts in order, no client refetch.
+10. Transition entanglement: batched boundary + sibling boundary commit
+    atomically.
+11. Compiler-output assertions for the emit shape (memo wrap, hoist order,
+    `_$useBatch` placement, `__warm` slicing), in the existing compiler-test
+    style.
+12. Nested chain (3-level `Level`-style fixture): all levels' fetch counters
+    hit 1 in the first attempt; init resolves in ~1 latency unit, not 3; same
+    via a transition update.
+13. Warm-cache adoption: real mount's `useMemo` adopts the warmed promise
+    (same instance, fetch counter stays 1); prop drift between warm and mount
+    → miss, fresh fetch, orphan evicted.
+14. Warm exclusion: child whose props read suspended data does NOT prefetch;
+    ghost `useState` sees initializer only; dynamic component slot cuts the
+    warm edge.
+15. Bench: `async-waterfall` init/update land near the parallel floor;
+    tighten `ratios.json` (keep react ≤1.2, add solid/ripple ceilings) and
+    re-record; `ssr-throughput` `waterfall-d*` ops improve with the SSR warm
+    walk.
+
+Gates per phase: full `pnpm test`, `pnpm typecheck`, `pnpm format:check`;
+`tests/differential/` + `tests/conformance/` after Phases 2–4;
+`node benchmarks/bench.mjs async-waterfall --compare` after Phase 4.
+
+## Decision points (maintainer input wanted before executing)
+
+1. **Unconditional semantics — RESOLVED (2026-07-16).** The temporary rollout
+   gate used during the test cycle was removed. The transform is part of every
+   compile; tests pin parallel starts and use true data dependencies to cover
+   intentional sequencing.
+2. **Loop slots — RESOLVED (Phase 0, 2026-07-09).** Symbol-keyed hooks in a
+   loop share one slot across iterations (no compiler rejection exists,
+   contrary to the `withSlot` comment in runtime.ts). Phases 1–2 exclude
+   loops permanently; bare `use()` in loops keeps working (call-order
+   indexed). The comment/docs drift is tracked as a separate task.
+3. **Dep-array granularity** for auto-memoized creations: free-variable deps
+   (autoCallback-style, e.g. `[props]`) vs member-path deps (`[props.id]`).
+   Member-path avoids over-refetching on unrelated prop changes;
+   recommendation: member-path where the analysis is certain, falling back to
+   the base identifier.
+4. **AbortSignal for superseded fetches** (Phase 5 nice-to-have): worth an API
+   surface now, or wait for demand?
+5. **`_$useBatch`/`_$warmMemo`/`_$warmChild` visibility tier**: semi-public
+   compiler-emit (index.ts tier 2) per the established convention — confirm.
+6. **Warm depth cap** for recursion the compiler can't prove finite:
+   recommend 64 with a dev warning naming the component chain.
+7. **Ghost-hook scope in warm slices**: v1 = `useMemo` creations + `useState`
+   initializer values + context reads. Anything more (e.g. evaluating custom
+   hooks' pure prefixes) expands coverage but multiplies proof surface —
+   recommend deferring until real components show the need.

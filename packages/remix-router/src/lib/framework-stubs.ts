@@ -2,8 +2,8 @@
 // mode (Meta/Links/Scripts, createRequestHandler over a @react-router/dev
 // ServerBuild, fog-of-war route discovery, turbo-stream single fetch) and the
 // RSC integration require the framework compiler/runtime, which is
-// permanently out of scope for this port. Each export exists so the export
-// surface reaches full parity honestly:
+// permanently out of scope for this port (see docs/remix-router-port-plan.md
+// §1). Each export exists so the export surface reaches full parity honestly:
 // importing is safe; CALLING (or rendering) throws with a pointer to the
 // scope policy instead of failing somewhere deep inside.
 import { createContext } from 'octane';
@@ -13,8 +13,8 @@ function frameworkStub(name: string): never {
 		`${name} is part of react-router's FRAMEWORK mode (it requires the ` +
 			`@react-router/dev compiler/runtime), which @octanejs/remix-router does ` +
 			`not support. Library mode (data routers, declarative routers, Form/` +
-			`fetchers, static SSR) is fully supported — see the package README ` +
-			`and status.json for the scope policy.`,
+			`fetchers, static SSR) is fully supported — see ` +
+			`docs/remix-router-port-plan.md for the scope policy.`,
 	);
 }
 
@@ -22,7 +22,7 @@ function rscStub(name: string): never {
 	throw new Error(
 		`${name} is part of react-router's RSC integration, which ` +
 			`@octanejs/remix-router does not support (octane has no RSC runtime). ` +
-			`See the package README and status.json for the scope policy.`,
+			`See docs/remix-router-port-plan.md for the scope policy.`,
 	);
 }
 

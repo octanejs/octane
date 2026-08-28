@@ -18,23 +18,27 @@ parameter to a supported hook. This package ships both the runtime and compiler,
 with the compiler exposed at `octane/compiler`.
 
 Custom Node build pipelines can opt into project-aware string-child inference
-through `octane/compiler/typescript`.
+through `octane/compiler/typescript`. See the
+[type-aware text compilation guide](https://github.com/octanejs/octane/blob/main/docs/compiler-text-inference.md).
 
 Vite builds can fold proven immutable CSS-module class strings into templates.
+See the [CSS-module constants guide](https://github.com/octanejs/octane/blob/main/docs/compiler-css-module-constants.md)
+for the provider contract and stylesheet-loading guarantees.
 
-Custom native integrations can opt into the experimental Valdi writer compiler.
+Custom native integrations can opt into the experimental
+[Valdi writer compiler](https://github.com/octanejs/octane/blob/main/docs/valdi-compiler.md).
 It requires an application-provided adapter; Octane does not bundle a Valdi
 runtime or native build integration.
 
 Direct Node or Bun server scripts can preload `octane/compiler/register` to
 compile imported Octane components without going through Vite. See the
-[server-rendering guide](https://octanejs.dev/docs/core-apis#server-rendering).
+[SSR guide](https://github.com/octanejs/octane/blob/main/docs/ssr.md#run-an-ssg-script-directly).
 
 Applications that stream or update their own server-rendered DOM can import
 `attachBehaviorRoot` from `octane/behavior`. Behavior-only roots attach native
 interactions and disposable behavior without creating a component root or
 taking ownership of the existing markup. See the
-[external ownership guide](https://octanejs.dev/docs/core-apis#behavior-only-roots).
+[external ownership guide](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md#behavior-only-roots-and-external-ownership).
 
 For the full story, see the
 [main README](https://github.com/octanejs/octane#readme).

@@ -1,8 +1,8 @@
 /**
  * @octanejs/mdx — the compile pipeline (`…/compile` entry).
  *
- * Strategy: @mdx-js/mdx's compiler is framework-agnostic — with `jsx: true` it
- * emits the compiled document as
+ * Strategy (docs/react-library-compat-plan.md §2): @mdx-js/mdx's compiler is
+ * framework-agnostic — with `jsx: true` it emits the compiled document as
  * CLASSIC JSX SOURCE instead of framework runtime calls. That emitted program
  * is exactly the React-style `.tsx` dialect octane's compiler already handles,
  * so the pipeline is

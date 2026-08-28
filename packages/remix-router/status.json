@@ -13,7 +13,7 @@
     "Pinned runtime export completeness: tests/conformance/parity.test.ts pins EXPECTED_MISSING at []. Framework mode (needs @react-router/dev) and RSC are permanently out of scope — those names are throwing stubs with scope-policy messages. The cookie/session server runtime is vendored (adds the `cookie-es` dependency, as upstream). React Router 8 removes react-router-dom, makes middleware unconditional, and removes hasErrorBoundary plus the v8 future flags.",
     "The complete pinned upstream runtime suite is inventoried but not vendored or executed one-for-one. The required nine-case client differential, five-case SSR differential, and all local tests are explicitly classified."
   ],
-  "docs": [],
+  "docs": ["docs/remix-router-port-plan.md"],
   "provenance": {
     "source": "https://github.com/remix-run/react-router/tree/05180441b118d26da4df94bacc2211923d87e4c1",
     "license": "MIT",

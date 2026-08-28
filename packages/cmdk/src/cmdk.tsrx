@@ -6,7 +6,7 @@
 // The store/registration hooks live in ./hooks.tsrx, the contexts in
 // ./context.tsrx, and the DOM constants/helpers in ./lib.
 //
-// Octane adaptations:
+// octane adaptations (see docs/react-parity-migration-plan.md):
 // - No forwardRef: every component takes `ref` as a normal prop; composeRefs
 //   becomes octane's multi-ref `ref={[a, b]}`.
 // - Input drives search from native `onInput`; the public `onValueChange` API

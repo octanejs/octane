@@ -28,8 +28,7 @@ package/output boundary and keep its evidence independently reviewable.
   edits and retain the real binding scenario as end-to-end evidence.
 
 Load `authoring-tsrx` before writing `.tsrx`. Read a nearby authored file and
-`website/src/content/docs/differences-from-react.mdx`; React-shaped intuition is
-not enough here.
+`docs/differences-from-react.md`; React-shaped intuition is not enough here.
 Treat the graph's `feasibility.plan` as required work. A
 `bridgeable-with-rewrites` verdict, class-component architecture,
 `createElement`, or `Children` traversal does not reduce the surface that must be

@@ -37,7 +37,7 @@ driver and existing runtime instrumentation. No `react`, `react-reconciler`,
 | `testRender` | Adapted to accept an Octane component plus props and execute against `@opentui/core/testing` | `src/test-utils.ts`, native integration tests |
 | `./renderer` | Ported as the renderer/runtime surface plus the OpenTUI host driver | `src/renderer.ts` |
 | `./jsx-runtime`, `./jsx-dev-runtime` | Replaced by the compiler-facing `./intrinsics` and `./intrinsics/jsx-runtime` entries | `src/intrinsics.ts`, config tests |
-| `createElement` | Intentional divergence: Octane component trees are authored in `.opentui.tsrx`; nested runtime element construction is not supported | `README.md`, `website/src/content/docs/differences-from-react.mdx` |
+| `createElement` | Intentional divergence: Octane component trees are authored in `.opentui.tsrx`; nested runtime element construction is not supported | `README.md`, `docs/differences-from-react.md` |
 | React runtime-plugin support entries | Inapplicable: applications configure the Octane compiler with `opentuiRenderers`; no runtime JSX rewrite is needed | `src/config.ts`, config tests |
 | React Reconciler and React DevTools internals | Reimplemented by Octane's universal host driver and runtime instrumentation; these are not binding public exports | `src/driver.ts`, native lifecycle and identity tests |
 

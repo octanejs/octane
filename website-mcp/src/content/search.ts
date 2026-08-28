@@ -12,8 +12,31 @@ import { DOCS } from './docs.ts';
 
 export type { SearchGroup, SearchRecord };
 
+/**
+ * The core sectionizer keys on the `<h2 id="…">` anchors the website MDX
+ * authors by hand. Repo docs are plain markdown, so their `## ` headings are
+ * pre-lifted into the same shape (fenced code blocks left alone).
+ */
+function liftMarkdownHeadings(markdown: string, sections: readonly { id: string }[]): string {
+	let at = 0;
+	let inFence = false;
+	return markdown
+		.split('\n')
+		.map((line) => {
+			if (line.trimStart().startsWith('```')) inFence = !inFence;
+			else if (!inFence && line.startsWith('## ') && at < sections.length) {
+				const title = line.slice(3).replace(/`/g, '').trim();
+				return `<h2 id="${sections[at++].id}">${title}</h2>`;
+			}
+			return line;
+		})
+		.join('\n');
+}
+
 export const SEARCH_INDEX: readonly SearchRecord[] = DOCS.flatMap((doc, order) => {
-	const records = recordsFor(doc.slug, doc.title, order, doc.markdown);
+	const source =
+		doc.source === 'repo' ? liftMarkdownHeadings(doc.markdown, doc.sections) : doc.markdown;
+	const records = recordsFor(doc.slug, doc.title, order, source);
 	// Extra ranking hints (the bindings catalog names every package) attach to
 	// the doc's first section — mirrors the website's loadSearchIndex.
 	addSearchTerms(

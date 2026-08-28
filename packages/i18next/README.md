@@ -143,8 +143,9 @@ ref-as-prop semantics, so `withTranslation({ withRef: true })` does not use
 `forwardRef`. Class components are not supported.
 
 The Babel/React-specific `icu.macro` subpath is intentionally not included; use
-the runtime `IcuTrans` APIs. See the checked [`status.json`](./status.json) for
-the current compatibility record.
+the runtime `IcuTrans` APIs. See the generated
+[bindings status](../../docs/bindings-status.md) for the current compatibility
+record.
 
 This package is derived from react-i18next and is distributed under the MIT
 license.

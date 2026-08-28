@@ -1,7 +1,8 @@
 # react-hosted-islands
 
-Structural baseline for **React-hosted Octane compat islands**, recorded by the
-initial compatibility phase. Node-only, jsdom, production React 19 plus
+Structural baseline for **React-hosted Octane compat islands**
+([docs/react-hosted-octane-compat-plan.md](../../docs/react-hosted-octane-compat-plan.md)
+§8.1/§11/§13, recorded by Phase 0). Node-only, jsdom, production React 19 plus
 the real compiled Octane runtime; every number is a deterministic structural
 **count**, not a timing.
 

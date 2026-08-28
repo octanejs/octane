@@ -69,7 +69,8 @@ Everything else intentionally follows published `sonner@2.0.7`, including its
 DOM attributes and stylesheet. Differential tests run the same `.tsrx` fixture
 through this package and real Sonner on React and compare the resulting DOM.
 
-See the checked [`status.json`](./status.json) for scope and evidence.
+See the [port plan](../../docs/sonner-port-plan.md) and generated
+[bindings status](../../docs/bindings-status.md) for scope and evidence.
 
 Sonner is Copyright (c) Emil Kowalski and contributors and distributed under
 the MIT license.

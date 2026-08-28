@@ -54,5 +54,6 @@ the normal way and use `Provider` from `@octanejs/redux`.
 
 ## Status
 
-Current scope, known divergences, and verification status are tracked in this
-package's checked [`status.json`](./status.json).
+Current scope, known divergences, and verification status are tracked in the
+generated [bindings status table](../../docs/bindings-status.md), sourced from
+this package's [`status.json`](./status.json).

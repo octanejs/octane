@@ -167,7 +167,7 @@ export function releaseStateErrors(state) {
 		errors.push(
 			`npm packages require one-time bootstrap before trusted publishing:\n${state.unbootstrapped
 				.map((pkg) => `  - ${identity(pkg)}`)
-				.join('\n')}\nBootstrap the listed packages, then rerun this workflow.`,
+				.join('\n')}\nFollow docs/releases.md, then rerun this workflow.`,
 		);
 	}
 	for (const pkg of state.invalid) {

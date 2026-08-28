@@ -51,7 +51,7 @@
       },
       "classification": "not-applicable",
       "reason": "The underscore-prefixed React reconciler root registry is internal state and is replaced by Octane root ownership.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "export:act",
@@ -819,7 +819,7 @@
       },
       "classification": "not-applicable",
       "reason": "The exported React reconciler instance is an implementation escape hatch replaced by Octane universal roots.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "export:ReconcilerRoot",
@@ -1133,7 +1133,7 @@
       },
       "classification": "not-applicable",
       "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:canvas-native:20",
@@ -1145,7 +1145,7 @@
       },
       "classification": "not-applicable",
       "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:canvas-native:34",
@@ -1157,7 +1157,7 @@
       },
       "classification": "not-applicable",
       "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:canvas-native:56",
@@ -1169,7 +1169,7 @@
       },
       "classification": "not-applicable",
       "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:canvas:6",
@@ -1517,7 +1517,7 @@
       },
       "classification": "not-applicable",
       "reason": "This guards forwarding of future React hook tags through React reconciler; Octane uses compiler-assigned hook slots instead.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:index:39",
@@ -1745,7 +1745,7 @@
       },
       "classification": "not-applicable",
       "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:polyfills:17",
@@ -1757,7 +1757,7 @@
       },
       "classification": "not-applicable",
       "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:polyfills:22",
@@ -1769,7 +1769,7 @@
       },
       "classification": "not-applicable",
       "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:polyfills:27",
@@ -1781,7 +1781,7 @@
       },
       "classification": "not-applicable",
       "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:polyfills:33",
@@ -1793,7 +1793,7 @@
       },
       "classification": "not-applicable",
       "reason": "React Native and Expo integration are explicit scope exclusions; a future native or Lynx renderer is a separate target.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:reconciler:25",
@@ -1805,7 +1805,7 @@
       },
       "classification": "not-applicable",
       "reason": "This case verifies React reconciler development and production integration, which Octane replaces with its compiler and universal root.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:fiber:renderer:47",
@@ -2729,7 +2729,7 @@
       },
       "classification": "not-applicable",
       "reason": "The asserted test-renderer subject relies on React class components, which are an explicit Octane exclusion.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:test-renderer:rttr-core:105",
@@ -2741,7 +2741,7 @@
       },
       "classification": "not-applicable",
       "reason": "The asserted test-renderer subject relies on React class components, which are an explicit Octane exclusion.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:test-renderer:rttr-core:146",
@@ -2765,7 +2765,7 @@
       },
       "classification": "not-applicable",
       "reason": "The asserted test-renderer subject relies on React class components, which are an explicit Octane exclusion.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:test-renderer:rttr-core:205",
@@ -2789,7 +2789,7 @@
       },
       "classification": "not-applicable",
       "reason": "The asserted test-renderer subject relies on React class components, which are an explicit Octane exclusion.",
-      "evidenceTarget": "packages/three/UPSTREAM.md#source-boundary"
+      "evidenceTarget": "docs/three-port-plan.md#intentional-exclusions-or-adaptations"
     },
     {
       "id": "test:test-renderer:rttr-core:272",

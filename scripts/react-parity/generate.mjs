@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
@@ -74,7 +74,6 @@ if (allInventoriesCurrent) {
 }
 
 if (allInventoriesCurrent) {
-	mkdirSync(path.dirname(REPORT_PATH), { recursive: true });
 	writeFileSync(REPORT_PATH, renderCoverageReport({ upstreams, inventories, ledger }));
 }
 

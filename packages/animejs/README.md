@@ -54,5 +54,6 @@ Three root's `invalidate()` from Anime.js `onRender`. With
 
 ## Status
 
-Current scope and verification evidence are tracked in this package's checked
-[`status.json`](./status.json).
+Current scope and verification evidence are tracked in the generated
+[bindings status table](../../docs/bindings-status.md), sourced from this
+package's [`status.json`](./status.json).

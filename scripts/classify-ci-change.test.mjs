@@ -20,7 +20,7 @@ function classify(files, beforeRootPackage, afterRootPackage) {
 
 describe('classifyCiChange', () => {
 	test('keeps documentation and release metadata on the lightweight path', () => {
-		assert.equal(classify(['README.md', '.changeset/friendly-dogs.md']), false);
+		assert.equal(classify(['docs/ssr.md', '.changeset/friendly-dogs.md']), false);
 		assert.equal(classify(['AGENTS.md', '.rulesync/rules/root.md']), false);
 		assert.equal(classify(['benchmarks/baselines/local/dbmon.json']), false);
 		assert.equal(
@@ -33,7 +33,7 @@ describe('classifyCiChange', () => {
 	});
 
 	test('runs full CI when any executable file changes', () => {
-		assert.equal(classify(['README.md', 'packages/octane/src/runtime.ts']), true);
+		assert.equal(classify(['docs/ssr.md', 'packages/octane/src/runtime.ts']), true);
 		assert.equal(classify([]), true);
 	});
 

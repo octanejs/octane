@@ -15,5 +15,5 @@
   "notes": [
     "Known gaps: `Brush` and `Treemap`; SSR text measurement still reports zero dimensions."
   ],
-  "docs": []
+  "docs": ["docs/recharts-port-plan.md"]
 }

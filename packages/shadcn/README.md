@@ -204,5 +204,6 @@ Behavioral (jsdom), SSR, hydration-adoption, and differential suites — the
 differential rig byte-compares fixtures against the vendored pinned upstream
 React sources running real `radix-ui`. The full ledger (supported surface,
 divergences, SSR status, flavor migration state) lives in
-[status.json](./status.json); source provenance and refresh instructions live in
-[UPSTREAM.md](./UPSTREAM.md).
+[status.json](./status.json) and the generated
+[bindings status table](../../docs/bindings-status.md); scope and phase history
+in [docs/shadcn-port-plan.md](../../docs/shadcn-port-plan.md).

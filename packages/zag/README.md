@@ -54,5 +54,6 @@ differential test runs the same machine through this package and
 `@zag-js/react@1.42.0` and compares the state/context trace. Published source
 and dependency checks ensure React is development-only.
 
-Current scope and verification status are tracked in this package's checked
-[`status.json`](./status.json).
+Current scope and verification status are tracked in the generated
+[bindings status table](../../docs/bindings-status.md), sourced from this
+package's [`status.json`](./status.json).

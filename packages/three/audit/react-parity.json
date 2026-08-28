@@ -235,12 +235,12 @@
         {
           "path": "packages/three/audit/upstream-crosswalk.json",
           "role": "support",
-          "sha256": "e5da65632aba97428cc066931bb88c3c60fe9ba66ec8bcb2d26cff3e779ca859"
+          "sha256": "e4b3f8d54e576fde8b7cc681b0318ca6d03772eb7f61d550542f01a22d419cae"
         },
         {
           "path": "packages/three/scripts/check-upstream-crosswalk.mjs",
           "role": "support",
-          "sha256": "a967a182e4c7c06ce3f05e64097c3ace6971537d8005a6299ce5a6cc2a16f691"
+          "sha256": "21c7a37a3dc63ec04973884283abcad15a3f440b1bc34d2a152934e39fbc4853"
         }
       ]
     },

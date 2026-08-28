@@ -100,7 +100,7 @@ In the root Vitest project, `testExecution.group: react-parity` owns the adapted
 upstream and differential test patterns. The ordinary sharded config derives
 their complement, so the package-authored conformance cases still run without
 repeating manifest-owned parity work. This follows the repository-wide
-[porting workflow](../../.rulesync/skills/octane-react-library-port/references/implementation-and-evidence.md); the
+[React parity test-execution contract](../../docs/react-parity-testing.md); the
 workflow does not enumerate this package.
 
 The pristine lane runs all 1,193 tests and eight snapshots in the original Jest

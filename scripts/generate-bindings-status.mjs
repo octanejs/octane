@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getBindingPackages } from './workspace-packages.mjs';
@@ -203,9 +203,16 @@ for (const { dir, pkg, status } of rows) {
 }
 
 if (CHECK) {
-	console.log(`bindings-status inputs are valid (${rows.length} binding(s)).`);
+	const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
+	if (current !== md) {
+		console.error(
+			'docs/bindings-status.md is stale — a status.json or binding package changed.\n' +
+				'Run `pnpm bindings:status` and commit the result.',
+		);
+		process.exit(1);
+	}
+	console.log(`bindings-status table is current (${rows.length} binding(s)).`);
 } else {
-	mkdirSync(path.dirname(OUT), { recursive: true });
 	writeFileSync(OUT, md);
 	console.log(`wrote docs/bindings-status.md (${rows.length} binding(s)).`);
 }

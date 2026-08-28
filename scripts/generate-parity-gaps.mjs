@@ -1,7 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectFailsPins, formatZeroPinPolicyViolation } from './parity-gaps-lib.mjs';
+import { collectFailsPins } from './parity-gaps-lib.mjs';
 
 // Generates docs/parity-gaps.md — the index of executable `it.fails(...)` and
 // `test.fails(...)`
@@ -11,7 +11,7 @@ import { collectFailsPins, formatZeroPinPolicyViolation } from './parity-gaps-li
 // the index so unrelated edits to a test file don't churn it.
 //
 //   node scripts/generate-parity-gaps.mjs           # (re)write the index
-//   node scripts/generate-parity-gaps.mjs --check   # exit 1 if any pins exist
+//   node scripts/generate-parity-gaps.mjs --check   # exit 1 if index is stale
 //
 // Wired as `pnpm parity:gaps` / `pnpm parity:gaps:check` (the latter runs in
 // CI alongside the zero-marker policy check).
@@ -48,15 +48,16 @@ for (const [file, pins] of [...byFile.entries()].sort(([a], [b]) => a.localeComp
 }
 
 if (CHECK) {
-	const violation = formatZeroPinPolicyViolation({ byFile, total });
-	if (violation) {
-		console.error(violation);
-		process.exitCode = 1;
-	} else {
-		console.log('parity-gap policy passed (0 pins).');
+	const current = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
+	if (current !== md) {
+		console.error(
+			'docs/parity-gaps.md is stale — the set of executable it.fails pins changed.\n' +
+				'Run `pnpm parity:gaps` and commit the result.',
+		);
+		process.exit(1);
 	}
+	console.log(`parity-gaps index is current (${total} pin(s)).`);
 } else {
-	mkdirSync(path.dirname(OUT), { recursive: true });
 	writeFileSync(OUT, md);
 	console.log(`wrote docs/parity-gaps.md (${total} pin(s) across ${byFile.size} file(s)).`);
 }

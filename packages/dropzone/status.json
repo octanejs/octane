@@ -7,6 +7,5 @@
   ],
   "ssr": "Supported and tested — server rendering and hydration preserve the hidden input and getter-provided root contract without browser-global access during render.",
   "verified": "2026-08-02",
-  "parityEvidence": "packages/dropzone/audit/react-parity.json",
-  "docs": []
+  "parityEvidence": "packages/dropzone/audit/react-parity.json"
 }

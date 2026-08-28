@@ -27,8 +27,8 @@ Use this to inspect an issue, triage it, propose a solution, and optionally impl
    - severity and likely user impact.
 
 3. **Check project rules**
-   - Read `AGENTS.md`, the relevant package manifests or READMEs, and nearby source.
-   - For React-behavior issues, check `website/src/content/docs/differences-from-react.mdx` and classify intentional divergence vs bug.
+   - Read `AGENTS.md`, `docs/packages.md`, and relevant docs.
+   - For React-behavior issues, check `docs/differences-from-react.md` and classify intentional divergence vs bug.
 
 4. **Reproduce or validate claim**
    - Prefer a minimal failing test or fixture.

@@ -11,5 +11,5 @@
   ],
   "ssr": "Supported at the binding boundary: server rendering reads existing synchronous state without running passive subscriptions or browser-only store work; client Suspense and hydration are covered separately.",
   "verified": "2026-08-02",
-  "docs": ["packages/livestore/UPSTREAM.md"]
+  "docs": ["docs/livestore-port.md", "packages/livestore/UPSTREAM.md"]
 }

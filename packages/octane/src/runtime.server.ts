@@ -7961,7 +7961,7 @@ export interface StreamOptions extends RenderOptions {
 	 * Only the shell's metadata: head elements hoisted from inside a Suspense
 	 * boundary that streams later are re-created client-side on hydration,
 	 * while late-discovered Float sheet resources ride the stream itself (see
-	 * website/src/content/docs/core-apis.mdx).
+	 * docs/ssr.md).
 	 */
 	onHeadReady?: (head: string) => void;
 	/** Merge externally-produced HTML into the stream (see StreamInjectionSource). */

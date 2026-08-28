@@ -96,7 +96,8 @@ immutable CSS-export contract to both build environments. Use
 proven strings from Rsbuild's CSS-loader pipeline. Mutable default maps require
 an explicit immutable-provider callback. This is disabled by default, adds a
 bounded extra compile for eligible consumers, and leaves native `css/module`,
-development, HMR, and watch output unchanged.
+development, HMR, and watch output unchanged. See
+[CSS-module constants](../../docs/compiler-css-module-constants.md).
 
 Enable Strong mode for the whole app in `octane.config.ts`:
 

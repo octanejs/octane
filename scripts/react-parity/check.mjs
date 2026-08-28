@@ -34,7 +34,12 @@ import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
 import { verifyIntersectionObserverTestClassifications } from './intersection-observer-classifications-lib.mjs';
 import { verifyIntersectionObserverTypes } from './intersection-observer-types-lib.mjs';
 import { verifyIntersectionObserverUpstream } from './intersection-observer-upstream-lib.mjs';
-import { validateInventory, validateLedger, validateUpstreams } from './inventory-lib.mjs';
+import {
+	renderCoverageReport,
+	validateInventory,
+	validateLedger,
+	validateUpstreams,
+} from './inventory-lib.mjs';
 import { verifyLivestoreTestClassifications } from './livestore-classifications-lib.mjs';
 import { verifyLivestoreTypes } from './livestore-types-lib.mjs';
 import { verifyMotionTypes } from './motion-types-lib.mjs';
@@ -97,6 +102,7 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const AUDIT = path.join(REPO, 'packages/octane/audit');
 const UPSTREAMS_PATH = path.join(AUDIT, 'react-upstreams.json');
 const LEDGER_PATH = path.join(AUDIT, 'react-conformance-ledger.json');
+const REPORT_PATH = path.join(REPO, 'docs/react-parity-coverage.md');
 const args = process.argv.slice(2);
 let validateOnly = false;
 let shardValue = '1/1';
@@ -329,7 +335,7 @@ function listTsrxFiles(relativeDir) {
 
 const CLAIM_FILES = [
 	'README.md',
-	'website/src/content/docs/differences-from-react.mdx',
+	'docs/differences-from-react.md',
 	'website/public/llms.txt',
 	...listTsrxFiles('website/src/pages/home'),
 	...listTsrxFiles('website/src/components'),
@@ -371,6 +377,14 @@ const loadedInventories = inventories.flatMap(({ baseline, inventory }) => {
 });
 if (ledger && loadedInventories.length === 2) {
 	errors.push(...validateLedger(ledger, loadedInventories, REPO, upstreams));
+	const expectedReport = renderCoverageReport({
+		upstreams,
+		inventories: loadedInventories,
+		ledger,
+	});
+	if (!existsSync(REPORT_PATH)) errors.push('Generated React parity coverage report is missing.');
+	else if (readFileSync(REPORT_PATH, 'utf8') !== expectedReport)
+		errors.push('docs/react-parity-coverage.md is stale; run react-parity:generate.');
 }
 for (const relativeFile of CLAIM_FILES) {
 	const source = readFileSync(path.join(REPO, relativeFile), 'utf8');

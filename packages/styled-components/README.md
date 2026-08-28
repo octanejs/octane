@@ -95,7 +95,8 @@ dynamic styles never use that shortcut.
 
 ## Status
 
-See this package's checked [status.json](./status.json) for the verified surface and the
+See the generated [bindings status table](../../docs/bindings-status.md) and
+this package's [status.json](./status.json) for the verified surface and the
 full divergence list.
 
 Ported from [styled-components](https://github.com/styled-components/styled-components)

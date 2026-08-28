@@ -34,7 +34,8 @@ itself always tracks the commit the deployment was built from.
 
 Everything the server serves is snapshotted at **build time** via Vite `?raw`
 and `import.meta.glob` imports (`src/content/`): the website docs MDX
-(`website/src/content/docs/*.mdx` + the `docs-meta.ts` registry), every binding's
+(`website/src/content/docs/*.mdx` + the `docs-meta.ts` registry), the repo
+deep dives (`docs/ssr.md`, `docs/differences-from-react.md`), every binding's
 `status.json`, the `@octanejs/mcp-server` skills, and `llms.txt`. The deployed
 function does zero filesystem reads; search runs on the same
 sectionizer/ranking as the website's search dialog

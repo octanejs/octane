@@ -53,8 +53,8 @@ an unshadowed built-in `String(value)` call, or a local `const`/param the compil
 tracks back to a string. Use `String(value)` when conversion is intended;
 asserting a number `as string` can produce a TypeScript error. Custom Node build
 pipelines can also supply project-aware string proofs through
-`octane/compiler/typescript`. Without such a proof, retain the explicit string
-assertion for text intent.
+`octane/compiler/typescript`; see `docs/compiler-text-inference.md`. Without
+such a proof, retain the explicit string assertion for text intent.
 
 A bare `{expr}` that is not provably a string is a renderable hole: a component,
 an element descriptor, or a coerced primitive.

@@ -11,7 +11,7 @@ export function Proven() @{
 					'includes reruns in different compiler modes. The core suite has 3,900+ ' +
 					'distinct cases. '}
 				<a
-					href="https://github.com/octanejs/octane/blob/main/packages/octane/audit/react-conformance-ledger.json"
+					href="https://github.com/octanejs/octane/blob/main/docs/react-parity-coverage.md"
 					target="_blank"
 					rel="noreferrer"
 				>React-derived coverage is tracked case by case</a>

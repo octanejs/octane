@@ -87,5 +87,6 @@ observable behavior as nuqs on React, including:
 
 ## Status
 
-Alpha, like octane itself. See the checked [`status.json`](./status.json) for the
-verified surface, divergences, and last evidence check.
+Alpha, like octane itself. See [`status.json`](./status.json) and the generated
+[bindings status table](../../docs/bindings-status.md) for the verified surface,
+divergences, and last evidence check.

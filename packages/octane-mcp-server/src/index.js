@@ -542,12 +542,19 @@ function registerRepoTools(server, repoRoot) {
 		{
 			title: 'Octane project map',
 			description:
-				'Call when you need Octane repo orientation: what the framework is, which source owns which behavior, the intentional divergences from React, and the validation commands.',
+				'Call when you need Octane repo orientation: what the framework is, which source owns which behavior, the intentional divergences from React, the validation commands, and the full package inventory.',
 			inputSchema: {},
 		},
 		async () => {
-			const rootRule = await readFile(resolve(repoRoot, 'AGENTS.md'), 'utf8');
-			return text(rootRule.trimEnd());
+			// Composed from the two generated sources rather than a hand-written
+			// summary, because both are CI-gated: AGENTS.md against .rulesync/rules,
+			// and packages.md against the workspace manifests. A third restatement
+			// would be the one free to drift.
+			const [rootRule, packages] = await Promise.all([
+				readFile(resolve(repoRoot, 'AGENTS.md'), 'utf8'),
+				readFile(resolve(repoRoot, 'docs/packages.md'), 'utf8'),
+			]);
+			return text(`${rootRule.trimEnd()}\n\n---\n\n${packages.trimStart()}`);
 		},
 	);
 
