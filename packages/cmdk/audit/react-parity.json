@@ -163,7 +163,7 @@
         {
           "path": "packages/cmdk/src/cmdk.tsrx",
           "role": "support",
-          "sha256": "f35554387d79b75d3cdfdcbb3d42155ef307d2661b6533ec7200588a449fe068"
+			"sha256": "57a401a4c2bc41f9423aeb45299545f5ae6d141319a5b1246ce3eb25c282d18d"
         },
         {
           "path": "packages/cmdk/src/hooks.tsrx",
