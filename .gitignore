@@ -97,3 +97,6 @@ packages/spring/.pristine-vite-cache/
 !packages/resizable-panels/upstream-artifact/dist/**
 # Pristine vitest cache for monaco-editor upstream suite
 packages/monaco-editor/.vite-pristine/
+
+# Local product ideation artifacts are working notes, not repository content.
+docs/ideation/
