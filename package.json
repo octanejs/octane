@@ -110,7 +110,6 @@
   },
   "devDependencies": {
     "@babel/core": "catalog:default",
-    "@changesets/changelog-github": "catalog:default",
     "@changesets/changelog-git": "catalog:default",
     "@changesets/cli": "catalog:default",
     "@octanejs/rainbowkit": "workspace:*",
