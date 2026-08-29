@@ -20,6 +20,7 @@ import {
 	OCTANE_CARDS,
 	TARGET_CARDS,
 } from '../src/content/benchmarks.ts';
+import { BINDING_CATEGORIES } from '../src/content/bindings.ts';
 import ecosystemIndex from '../src/content/ecosystem-index.json';
 import type { EcosystemEntity } from '../src/lib/ecosystem-search-core.ts';
 import { ecosystemPackageGuideHref } from '../src/lib/ecosystem-presentation.ts';
@@ -157,11 +158,25 @@ describe('built Start server', () => {
 	it('server-renders the complete ecosystem directory without JavaScript', async () => {
 		const { response, html } = await get('/docs/bindings');
 		const entities = ecosystemIndex as EcosystemEntity[];
+		const bindingsByPackage = new Map(
+			entities
+				.filter((entity) => entity.kind === 'library-binding')
+				.map((entity) => [entity.packageName, entity]),
+		);
+		const orderedEntities = [
+			...entities.filter((entity) => entity.kind === 'framework-integration'),
+			...BINDING_CATEGORIES.flatMap((category) =>
+				[...category.packages]
+					.sort((left, right) => left.title.localeCompare(right.title))
+					.map(({ packageName }) => bindingsByPackage.get(packageName)!),
+			),
+		];
 		expect(response.status).toBe(200);
 		expect(classCount(html, 'ecosystem-entity')).toBe(entities.length);
+		expect(orderedEntities).toHaveLength(entities.length);
 
 		let previousPosition = -1;
-		for (const entity of entities) {
+		for (const entity of orderedEntities) {
 			const position = html.indexOf(`id="${entity.id}"`);
 			expect(position, entity.id).toBeGreaterThan(previousPosition);
 			previousPosition = position;
