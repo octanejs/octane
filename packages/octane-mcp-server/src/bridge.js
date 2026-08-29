@@ -16,6 +16,7 @@ export const KNOWN_BINDINGS = {
 	'mobx-react-lite': '@octanejs/mobx',
 	'mobx-react': '@octanejs/mobx',
 	'@apollo/client': '@octanejs/apollo-client',
+	urql: '@octanejs/urql',
 	'@solana/react': '@octanejs/solana-kit',
 	'@tanstack/ai-react': '@octanejs/tanstack-ai',
 	'@tanstack/react-db': '@octanejs/tanstack-db',
@@ -61,11 +62,13 @@ export const KNOWN_BINDINGS = {
 	'react-stately': '@octanejs/aria',
 	'radix-ui': '@octanejs/radix',
 	'react-hook-form': '@octanejs/hook-form',
+	'react-oidc-context': '@octanejs/oidc-context',
 	'better-auth/react': '@octanejs/better-auth',
 	'@base-ui-components/react': '@octanejs/base-ui',
 	'@dnd-kit/react': '@octanejs/dnd-kit',
 	'embla-carousel-react': '@octanejs/embla-carousel',
 	'react-dropzone': '@octanejs/dropzone',
+	'react-filepond': '@octanejs/filepond',
 	sonner: '@octanejs/sonner',
 	'react-error-boundary': '@octanejs/react-error-boundary',
 	'react-resizable-panels': '@octanejs/resizable-panels',
@@ -85,6 +88,8 @@ export const KNOWN_BINDINGS = {
 	'react-to-print': '@octanejs/to-print',
 	'react-calendar': '@octanejs/calendar',
 	'@formkit/auto-animate': '@octanejs/auto-animate',
+	'overlayscrollbars-react': '@octanejs/overlayscrollbars',
+	'@rive-app/react-canvas': '@octanejs/rive',
 	streamdown: '@octanejs/streamdown',
 	'react-syntax-highlighter': '@octanejs/syntax-highlighter',
 	// The official plugins are consolidated as subpaths of the same package.
@@ -96,6 +101,7 @@ export const KNOWN_BINDINGS = {
 	shadcn: '@octanejs/shadcn',
 	recharts: '@octanejs/recharts',
 	'react-alien-signals': '@octanejs/alien-signals',
+	'@preact/signals-react': '@octanejs/signals-react',
 	// react-map-gl@8 is a re-export shell; the binding covers the package its
 	// ./mapbox subpath resolves to, so both specifiers map here.
 	'react-map-gl': '@octanejs/react-map-gl',
@@ -160,12 +166,14 @@ export const KNOWN_BINDINGS = {
 	'@react-rxjs/utils': '@octanejs/rxjs',
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
+	'@lingui/react': '@octanejs/lingui',
 	'html-react-parser': '@octanejs/html-react-parser',
 	'@inertiajs/react': '@octanejs/inertia',
 	ink: '@octanejs/ink',
 	'@mdx-js/react': '@octanejs/mdx',
 	'dexie-react-hooks': '@octanejs/dexie',
 	'@livestore/react': '@octanejs/livestore',
+	'@unhead/react': '@octanejs/unhead',
 	wouter: '@octanejs/wouter',
 };
 
@@ -189,6 +197,7 @@ export const KNOWN_BINDING_PACKAGE_DIRS = new Set(
 
 export const KNOWN_VANILLA_CORES = {
 	'@apollo/client': '@apollo/client',
+	urql: '@urql/core',
 	'@solana/react': '@solana/kit',
 	'@tanstack/react-db': '@tanstack/db',
 	'@tanstack/react-query': '@tanstack/query-core',
@@ -207,8 +216,13 @@ export const KNOWN_VANILLA_CORES = {
 	'@reduxjs/toolkit': 'redux',
 	'react-i18next': 'i18next',
 	'react-hook-form': null,
+	'react-oidc-context': 'oidc-client-ts',
 	'@formkit/auto-animate': '@formkit/auto-animate',
+	'react-filepond': 'filepond',
+	'overlayscrollbars-react': 'overlayscrollbars',
+	'@rive-app/react-canvas': '@rive-app/canvas',
 	'react-alien-signals': 'alien-signals',
+	'@preact/signals-react': '@preact/signals-core',
 	zustand: 'zustand/vanilla',
 	valtio: 'valtio/vanilla',
 	jotai: 'jotai/vanilla',
@@ -216,6 +230,8 @@ export const KNOWN_VANILLA_CORES = {
 	'@tiptap/react': '@tiptap/core',
 	'@monaco-editor/react': 'monaco-editor',
 	'@livestore/react': '@livestore/livestore',
+	'@lingui/react': '@lingui/core',
+	'@unhead/react': 'unhead',
 };
 
 export const REACT_API_MAP = {

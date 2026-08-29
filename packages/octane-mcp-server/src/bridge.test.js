@@ -289,6 +289,24 @@ describe('bridgeReportFromSource', () => {
 });
 
 describe('KNOWN_BINDINGS', () => {
+	it('maps the small UI binding group to its exact upstream packages and cores', () => {
+		const expected = {
+			'react-filepond': ['@octanejs/filepond', 'filepond'],
+			'@lingui/react': ['@octanejs/lingui', '@lingui/core'],
+			'react-oidc-context': ['@octanejs/oidc-context', 'oidc-client-ts'],
+			'overlayscrollbars-react': ['@octanejs/overlayscrollbars', 'overlayscrollbars'],
+			'@rive-app/react-canvas': ['@octanejs/rive', '@rive-app/canvas'],
+			'@preact/signals-react': ['@octanejs/signals-react', '@preact/signals-core'],
+			'@unhead/react': ['@octanejs/unhead', 'unhead'],
+			urql: ['@octanejs/urql', '@urql/core'],
+		};
+
+		for (const [upstream, [binding, core]] of Object.entries(expected)) {
+			expect(KNOWN_BINDINGS[upstream]).toBe(binding);
+			expect(KNOWN_VANILLA_CORES[upstream]).toBe(core);
+		}
+	});
+
 	it('maps react-alien-signals to the Octane binding and vanilla core', () => {
 		expect(KNOWN_BINDINGS['react-alien-signals']).toBe('@octanejs/alien-signals');
 		expect(KNOWN_VANILLA_CORES['react-alien-signals']).toBe('alien-signals');
