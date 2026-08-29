@@ -163,8 +163,8 @@ export declare const tanstackStartViteOptionsSchema: z.ZodPrefault<
 												z.ZodOptional<
 													z.ZodArray<
 														z.ZodCustom<
-															import('#tanstack-start/router-generator').GeneratorPlugin,
-															import('#tanstack-start/router-generator').GeneratorPlugin
+															import('@octanejs/tanstack-router/router-generator').GeneratorPlugin,
+															import('@octanejs/tanstack-router/router-generator').GeneratorPlugin
 														>
 													>
 												>
@@ -177,8 +177,8 @@ export declare const tanstackStartViteOptionsSchema: z.ZodPrefault<
 											codeSplittingOptions: z.ZodOptional<
 												z.ZodOptional<
 													z.ZodCustom<
-														import('#tanstack-start/router-plugin').CodeSplittingOptions,
-														import('#tanstack-start/router-plugin').CodeSplittingOptions
+														import('@octanejs/tanstack-router/router-plugin').CodeSplittingOptions,
+														import('@octanejs/tanstack-router/router-plugin').CodeSplittingOptions
 													>
 												>
 											>;
@@ -1768,9 +1768,10 @@ export declare function parseStartConfig(
 					enableCodeSplitting?: boolean | undefined;
 			  }
 			| undefined;
-		plugins?: import('#tanstack-start/router-generator').GeneratorPlugin[] | undefined;
+		plugins?: import('@octanejs/tanstack-router/router-generator').GeneratorPlugin[] | undefined;
 		enableRouteGeneration?: boolean | undefined;
-		codeSplittingOptions?: import('#tanstack-start/router-plugin').CodeSplittingOptions | undefined;
+		codeSplittingOptions?:
+			import('@octanejs/tanstack-router/router-plugin').CodeSplittingOptions | undefined;
 		plugin?:
 			| {
 					hmr?:

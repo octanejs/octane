@@ -1,6 +1,6 @@
 import { tssHydrate } from '../../hydration-constants.js';
 import { getCssAssetSource } from '../../start-manifest-plugin/inlineCss.js';
-import { tsrSplit } from '#tanstack-start/router-plugin';
+import { tsrSplit } from '@octanejs/tanstack-router/router-plugin';
 //#region src/vite/start-manifest-plugin/normalized-client-build.ts
 function normalizeViteClientChunk(chunk) {
 	return {

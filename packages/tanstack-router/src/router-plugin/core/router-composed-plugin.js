@@ -2,7 +2,7 @@ import { createRouterPluginContext } from './router-plugin-context.js';
 import { createRouterCodeSplitterPlugin } from './router-code-splitter-plugin.js';
 import { createRouterGeneratorPlugin } from './router-generator-plugin.js';
 import { createRouterHmrPlugin } from './router-hmr-plugin.js';
-import { getConfig } from '#tanstack-start/router-generator';
+import { getConfig } from '../../router-generator/index.js';
 //#region src/core/router-composed-plugin.ts
 var INLINE_CSS_DEFAULT_DEFINES = {
 	'process.env.TSS_INLINE_CSS_ENABLED': JSON.stringify('false'),

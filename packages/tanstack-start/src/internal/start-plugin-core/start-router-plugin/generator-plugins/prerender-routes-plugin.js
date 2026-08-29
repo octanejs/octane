@@ -1,4 +1,4 @@
-import { inferFullPath } from '#tanstack-start/router-generator';
+import { inferFullPath } from '@octanejs/tanstack-router/router-generator';
 //#region src/start-router-plugin/generator-plugins/prerender-routes-plugin.ts
 /**
  * this plugin gets the prerenderable paths and stores it on globalThis

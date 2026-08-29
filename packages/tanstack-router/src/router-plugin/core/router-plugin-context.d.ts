@@ -1,4 +1,4 @@
-import { GetRoutesByFileMapResult } from '#tanstack-start/router-generator';
+import { GetRoutesByFileMapResult } from '../../router-generator/index.js';
 export type RouterPluginContext = {
 	routesByFile: GetRoutesByFileMapResult;
 };

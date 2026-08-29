@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { configSchema, getConfig } from '#tanstack-start/router-generator';
+import { configSchema, getConfig } from '../../router-generator/index.js';
 //#region src/core/config.ts
 var splitGroupingsSchema = z
 	.array(

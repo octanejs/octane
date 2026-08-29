@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { z } from 'zod';
-import { configSchema, getConfig } from '#tanstack-start/router-plugin';
+import { configSchema, getConfig } from '@octanejs/tanstack-router/router-plugin';
 //#region src/schema.ts
 var tsrConfig = configSchema
 	.omit({

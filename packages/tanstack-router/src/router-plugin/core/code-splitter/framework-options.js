@@ -1,4 +1,4 @@
-import { OCTANE_ROUTER_PACKAGE } from '#tanstack-start/package-names';
+import { OCTANE_ROUTER_PACKAGE } from '../../../package-names.js';
 //#region src/core/code-splitter/framework-options.ts
 var frameworkOptions = {
 	react: {

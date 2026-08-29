@@ -1,7 +1,7 @@
 import { tssHydrate } from '../hydration-constants.js';
 import { getCssAssetSource } from '../start-manifest-plugin/inlineCss.js';
 import { RSBUILD_ENVIRONMENT_NAMES } from './planning.js';
-import { tsrSplit } from '#tanstack-start/router-plugin';
+import { tsrSplit } from '@octanejs/tanstack-router/router-plugin';
 //#region src/rsbuild/normalized-client-build.ts
 /**
  * Extract route file paths from rspack module identifiers.

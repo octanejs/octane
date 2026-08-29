@@ -7,11 +7,11 @@ import '../../start-router-plugin/constants.js';
 import { pruneServerOnlySubtrees } from '../../start-router-plugin/pruneServerOnlySubtrees.js';
 import path from 'pathe';
 import { normalizePath } from 'vite';
-import { createRouterPluginContext } from '#tanstack-start/router-plugin/context';
+import { createRouterPluginContext } from '@octanejs/tanstack-router/router-plugin/context';
 import {
 	tanStackRouterCodeSplitter,
 	tanstackRouterGenerator,
-} from '#tanstack-start/router-plugin/vite';
+} from '@octanejs/tanstack-router/router-plugin/vite';
 //#region src/vite/start-router-plugin/plugin.ts
 function isServerOnlyNode(node) {
 	if (!node?.createFileRouteProps) return false;

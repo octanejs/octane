@@ -1,7 +1,7 @@
 import { getConfig as getConfig$1 } from './config.js';
 import { createRouterPluginContext } from './router-plugin-context.js';
 import { validateFrameworkPluginOrder } from './framework-plugin-order.js';
-import { Generator, resolveConfigPath } from '#tanstack-start/router-generator';
+import { Generator, resolveConfigPath } from '../../router-generator/index.js';
 import { isAbsolute, join, normalize } from 'node:path';
 //#region src/core/router-generator-plugin.ts
 var PLUGIN_NAME = 'unplugin:router-generator';

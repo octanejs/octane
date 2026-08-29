@@ -1,7 +1,7 @@
 import MagicString from 'magic-string';
 import * as t from '@babel/types';
 import { parseAst } from '@tanstack/router-utils';
-import { getRouterPackage } from '#tanstack-start/package-names';
+import { getRouterPackage } from '../../package-names.js';
 //#region src/transform/transform.ts
 var routeConstructors = ['createFileRoute', 'createLazyFileRoute'];
 function transform({ ctx, source, parseSource, filename, node }) {

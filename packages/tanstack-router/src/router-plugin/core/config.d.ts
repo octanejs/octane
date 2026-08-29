@@ -179,8 +179,8 @@ export declare const configSchema: z.ZodObject<
 		plugins: z.ZodOptional<
 			z.ZodArray<
 				z.ZodCustom<
-					import('#tanstack-start/router-generator').GeneratorPlugin,
-					import('#tanstack-start/router-generator').GeneratorPlugin
+					import('../../router-generator/index.js').GeneratorPlugin,
+					import('../../router-generator/index.js').GeneratorPlugin
 				>
 			>
 		>;
@@ -268,7 +268,7 @@ export declare const getConfig: (
 				enableCodeSplitting?: boolean | undefined;
 		  }
 		| undefined;
-	plugins?: import('#tanstack-start/router-generator').GeneratorPlugin[] | undefined;
+	plugins?: import('../../router-generator/index.js').GeneratorPlugin[] | undefined;
 	enableRouteGeneration?: boolean | undefined;
 	codeSplittingOptions?: CodeSplittingOptions | undefined;
 	plugin?:

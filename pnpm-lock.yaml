@@ -1263,7 +1263,7 @@ importers:
         version: 0.3.126(prettier@3.9.6)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.3.126(@tsrx/react@0.2.61(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.61(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@packages+octane)(typescript@5.9.3)
+        version: 0.3.126(@tsrx/react@0.2.61(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.61(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.49(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -8479,18 +8479,51 @@ importers:
 
   packages/tanstack-router:
     dependencies:
+      '@babel/core':
+        specifier: catalog:default
+        version: 7.29.7(supports-color@10.2.2)
+      '@babel/template':
+        specifier: ^7.27.2
+        version: 7.29.7
+      '@babel/types':
+        specifier: ^7.28.5
+        version: 7.29.7
       '@tanstack/history':
         specifier: catalog:default
         version: 1.162.0
       '@tanstack/router-core':
         specifier: catalog:default
         version: 1.171.15
+      '@tanstack/router-utils':
+        specifier: 1.162.2
+        version: 1.162.2(supports-color@10.2.2)
       '@tanstack/store':
         specifier: catalog:default
         version: 0.9.3
+      '@tanstack/virtual-file-routes':
+        specifier: 1.162.0
+        version: 1.162.0
+      chokidar:
+        specifier: ^5.0.0
+        version: 5.0.0
       isbot:
         specifier: ^5.1.22
         version: 5.2.1
+      jiti:
+        specifier: ^2.7.0
+        version: 2.7.0
+      magic-string:
+        specifier: ^0.30.21
+        version: 0.30.21
+      prettier:
+        specifier: catalog:default
+        version: 3.9.6
+      unplugin:
+        specifier: ^3.0.0
+        version: 3.3.0(@rspack/core@2.1.4(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@tanstack/react-router':
         specifier: catalog:default
@@ -8498,6 +8531,9 @@ importers:
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.61(react@19.2.7)
+      '@types/babel__core':
+        specifier: catalog:default
+        version: 7.20.5
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -8510,6 +8546,9 @@ importers:
       react-dom:
         specifier: catalog:default
         version: 19.2.7(react@19.2.7)
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -8586,9 +8625,6 @@ importers:
       '@babel/core':
         specifier: catalog:default
         version: 7.29.7(supports-color@10.2.2)
-      '@babel/template':
-        specifier: ^7.27.2
-        version: 7.29.7
       '@babel/types':
         specifier: ^7.28.5
         version: 7.29.7
@@ -8610,18 +8646,9 @@ importers:
       '@tanstack/start-server-core':
         specifier: 1.169.17
         version: 1.169.17(crossws@0.4.10(srvx@0.11.22))
-      '@tanstack/virtual-file-routes':
-        specifier: 1.162.0
-        version: 1.162.0
-      chokidar:
-        specifier: ^5.0.0
-        version: 5.0.0
       exsolve:
         specifier: ^1.0.7
         version: 1.1.0
-      jiti:
-        specifier: ^2.7.0
-        version: 2.7.0
       lightningcss:
         specifier: ^1.32.0
         version: 1.33.0
@@ -8634,9 +8661,6 @@ importers:
       picomatch:
         specifier: ^4.0.3
         version: 4.0.5
-      prettier:
-        specifier: catalog:default
-        version: 3.9.6
       seroval:
         specifier: ^1.5.4
         version: 1.5.6
@@ -8652,9 +8676,6 @@ importers:
       ufo:
         specifier: ^1.5.4
         version: 1.6.4
-      unplugin:
-        specifier: ^3.0.0
-        version: 3.3.0(@rspack/core@2.1.4(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       vitefu:
         specifier: ^1.1.1
         version: 1.1.3(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -27437,6 +27458,24 @@ packages:
   ocache@0.1.5:
     resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
 
+  octane@0.1.49:
+    resolution: {integrity: sha512-8mT+CJJAs2xN0X2JmoGbP3396D2MIg0G+Nw75n69/xDw0A65saRYBa1dfaz9+irk+0sywop09t+goeEbRZSaOA==}
+    engines: {node: '>=22.22.2'}
+    peerDependencies:
+      react: ^19.0.0
+      react-dom: ^19.0.0
+      typescript: ^5.9.3
+      vite: ^8.0.16
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
+      typescript:
+        optional: true
+      vite:
+        optional: true
+
   ofetch@1.5.1:
     resolution: {integrity: sha512-2W4oUZlVaqAPAil6FUg/difl6YhqhUR7x2eZY4bQCko22UXg3hptq9KLQdqFClV+Wu85UX7hNtdGTngi/1BxcA==}
 
@@ -46041,6 +46080,17 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
+  '@tsrx/typescript-plugin@0.3.126(@tsrx/react@0.2.61(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.61(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.49(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
+    dependencies:
+      '@volar/language-core': 2.4.28
+      '@volar/typescript': 2.4.28
+      typescript: 5.9.3
+    optionalDependencies:
+      '@tsrx/react': 0.2.61(react@19.2.8)
+      '@tsrx/ripple': 0.1.62
+      '@tsrx/solid': 0.1.61(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)
+      octane: 0.1.49(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
   '@tsrx/typescript-plugin@0.3.126(@tsrx/react@0.2.61(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.61(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@packages+octane)(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
@@ -58180,6 +58230,28 @@ snapshots:
     dependencies:
       ohash: 2.0.11
 
+  octane@0.1.49(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+    dependencies:
+      '@tsrx/core': 0.1.61(patch_hash=ea262e9df859e27aaa504e0a45ab0696431b437c41e2be4c5d9ad8ec4dd7214d)
+      '@types/react': 19.2.17
+      '@volar/language-core': 2.4.28
+      '@volar/typescript': 2.4.28
+      alien-signals: 3.2.0
+      devalue: 5.8.2
+      es-module-lexer: 1.7.0
+      esrap: 2.3.2
+      oxc-tsrx: 0.5.0(svelte@5.56.7)
+    optionalDependencies:
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+      typescript: 5.9.3
+      vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+    transitivePeerDependencies:
+      - '@typescript-eslint/types'
+      - svelte
+      - vite-plus
+    optional: true
+
   ofetch@1.5.1:
     dependencies:
       destr: 2.0.5
@@ -63126,19 +63198,6 @@ snapshots:
       rollup: 4.62.3
       vite: 8.1.5(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
       webpack: 5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.27.7)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)
-
-  unplugin@3.3.0(@rspack/core@2.1.4(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)):
-    dependencies:
-      '@jridgewell/remapping': 2.3.5
-      picomatch: 4.0.5
-      webpack-virtual-modules: 0.6.2
-    optionalDependencies:
-      '@rspack/core': 2.1.4(@swc/helpers@0.5.23)
-      esbuild: 0.28.1
-      rolldown: 1.2.0
-      rollup: 4.62.3
-      vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-      webpack: 5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)
 
   unplugin@3.3.0(@rspack/core@2.1.4(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.2.0)(rollup@4.62.3)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)):
     dependencies:

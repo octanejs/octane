@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { octaneRouteGeneratorPlugin } from '@octanejs/tanstack-router/generator-plugin';
-import { Generator, getConfig } from '#tanstack-start/router-generator';
+import { Generator, getConfig } from '@octanejs/tanstack-router/router-generator';
 import { buildRouteTreeFileFooterFromConfig } from '#tanstack-start/plugin-core/start-router-plugin/route-tree-footer';
 
 let fixtureRoot: string | undefined;

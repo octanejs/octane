@@ -1,5 +1,5 @@
 import { GeneratorResult } from '@tanstack/router-utils';
-import { GeneratorPlugin } from '#tanstack-start/router-generator';
+import { GeneratorPlugin } from '@octanejs/tanstack-router/router-generator';
 import { TanStackStartOutputConfig } from './schema.js';
 import type * as babel from '@babel/core';
 import type * as t from '@babel/types';

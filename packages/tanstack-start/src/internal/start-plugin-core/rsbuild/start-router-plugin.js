@@ -3,11 +3,11 @@ import { prerenderRoutesPlugin } from '../start-router-plugin/generator-plugins/
 import { buildRouteTreeFileFooterFromConfig } from '../start-router-plugin/route-tree-footer.js';
 import { RSBUILD_ENVIRONMENT_NAMES } from './planning.js';
 import path from 'pathe';
-import { createRouterPluginContext } from '#tanstack-start/router-plugin/context';
+import { createRouterPluginContext } from '@octanejs/tanstack-router/router-plugin/context';
 import {
 	TanStackRouterCodeSplitterRspack,
 	TanStackRouterGeneratorRspack,
-} from '#tanstack-start/router-plugin/rspack';
+} from '@octanejs/tanstack-router/router-plugin/rspack';
 //#region src/rsbuild/start-router-plugin.ts
 /**
  * Registers the TanStack Router generator and code-splitter plugins

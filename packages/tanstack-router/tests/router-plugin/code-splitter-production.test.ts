@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRouterCodeSplitterPlugin } from '../src/internal/router-plugin/core/router-code-splitter-plugin.js';
-import { createRouterPluginContext } from '../src/internal/router-plugin/core/router-plugin-context.js';
-import { normalizePath } from '../src/internal/router-plugin/core/utils.js';
+import { createRouterCodeSplitterPlugin } from '../../src/router-plugin/core/router-code-splitter-plugin.js';
+import { createRouterPluginContext } from '../../src/router-plugin/core/router-plugin-context.js';
+import { normalizePath } from '../../src/router-plugin/core/utils.js';
 import type { TransformResult, UnpluginOptions } from 'unplugin';
 
 const referencePluginName = 'tanstack-router:code-splitter:compile-reference-file';

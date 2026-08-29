@@ -1,4 +1,4 @@
-import { HandleNodeAccumulator, RouteNode } from '#tanstack-start/router-generator';
+import { HandleNodeAccumulator, RouteNode } from '@octanejs/tanstack-router/router-generator';
 export declare function pruneServerOnlySubtrees({
 	rootRouteNode,
 	acc,

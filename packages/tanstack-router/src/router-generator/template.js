@@ -1,5 +1,5 @@
 import { format } from './utils.js';
-import { OCTANE_ROUTER_PACKAGE } from '#tanstack-start/package-names';
+import { OCTANE_ROUTER_PACKAGE } from '../package-names.js';
 //#region src/template.ts
 function fillTemplate(config, template, values, formatter) {
 	const replaced = template.replace(/%%(\w+)%%/g, (_, key) => values[key] || '');

@@ -80,10 +80,28 @@ validation/middleware, and full `Link` parity (preloading, masking,
 `@tanstack/react-router`.
 
 File routing is supported through `createFileRoute` and `createLazyFileRoute`.
-`@octanejs/tanstack-start` consumes the exported
-`@octanejs/tanstack-router/generator-plugin` from its package-owned generator; the
-integration masks native `.tsrx` template bodies without changing source offsets,
-so generated route-tree edits preserve authored Octane route modules.
+`@octanejs/tanstack-router/vite` is a standalone Vite plugin — file-based route
+generation plus route-level code splitting, the octane counterpart to upstream
+`@tanstack/router-plugin/vite` — usable without `@octanejs/tanstack-start`:
+
+```ts
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+import { tanstackRouter } from '@octanejs/tanstack-router/vite';
+
+export default defineConfig({
+  // octane() must come first: it lowers `.tsrx` syntax before the router
+  // plugin analyzes route modules.
+  plugins: [octane(), tanstackRouter()],
+});
+```
+
+`.tsrx` route files work with no extra configuration: `octaneRouteGeneratorPlugin()`
+(`@octanejs/tanstack-router/generator-plugin`) masks native `.tsrx` template bodies
+without changing source offsets, so generated route-tree edits preserve authored
+Octane route modules, and it's wired in by default. `@octanejs/tanstack-start`
+composes the same `./router-generator` and `./router-plugin` implementation
+alongside its own SSR/manifest/server-function plugins.
 
 The `@octanejs/tanstack-router/ssr/server` and `/ssr/client` entries provide
 `RouterServer`, `RouterClient`, buffered rendering, and readable-stream rendering.
