@@ -107,17 +107,17 @@ function SearchDialog(props: DialogProps) @{
 
 	const goToDocs = (group: SearchGroup) => {
 		props.onClose();
-		navigate({
+		const navigation = navigate({
 			to: '/docs/$slug',
 			params: { slug: group.slug },
 			hash: group.id || undefined,
 		});
-		if (group.id) scrollToAnchor(group.id);
+		if (group.id) void navigation.then(() => scrollToAnchor(group.id));
 	};
 
 	const goToEntity = (entity: EcosystemEntity) => {
 		props.onClose();
-		navigate({
+		void navigate({
 			to: '/docs/$slug',
 			params: { slug: 'bindings' },
 			search: {
@@ -125,20 +125,18 @@ function SearchDialog(props: DialogProps) @{
 				kind: entity.kind === 'library-binding' ? 'binding' : 'integration',
 			},
 			hash: entity.id,
-		});
-		scrollToAnchor(entity.id);
+		}).then(() => scrollToAnchor(entity.id));
 	};
 
 	const goToIntegrationGuide = (entity: EcosystemEntity, event: Event) => {
 		event.preventDefault();
 		if (entity.kind !== 'framework-integration') return;
 		props.onClose();
-		navigate({
+		void navigate({
 			to: '/docs/$slug',
 			params: { slug: 'framework-integrations' },
 			hash: entity.guideAnchor,
-		});
-		scrollToAnchor(entity.guideAnchor);
+		}).then(() => scrollToAnchor(entity.guideAnchor));
 	};
 
 	const reveal = (row: number) => {

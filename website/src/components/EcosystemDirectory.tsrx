@@ -122,7 +122,7 @@ export function EcosystemDirectory() @{
 			to: '/docs/$slug',
 			params: { slug: 'bindings' },
 			search: (previous: Record<string, unknown>) => searchParams(update(directoryState(previous))),
-			hash: undefined,
+			hash: () => '',
 			replace,
 		});
 	};

@@ -299,6 +299,51 @@ describe('search dialog', () => {
 		expect(router.state.location.hash).toBe('binding-tanstack-router');
 	});
 
+	it('waits for the filtered directory before scrolling to a binding result', async () => {
+		const { container, router } = await renderRoute('/docs/bindings');
+		const originalNavigate = router.navigate.bind(router);
+		let releaseNavigation!: () => void;
+		const navigationGate = new Promise<void>((resolve) => {
+			releaseNavigation = resolve;
+		});
+		(router as any).navigate = async (options: any) => {
+			await navigationGate;
+			await originalNavigate(options);
+		};
+
+		const scrolledWithQueries: string[] = [];
+		const originalScrollIntoView = Element.prototype.scrollIntoView;
+		Element.prototype.scrollIntoView = function () {
+			scrolledWithQueries.push(
+				container.querySelector<HTMLInputElement>('#ecosystem-search')?.value ?? '',
+			);
+		};
+
+		try {
+			fireEvent.click(container.querySelector<HTMLButtonElement>('.search-trigger')!);
+			const dialog = await waitFor(() =>
+				document.body.querySelector<HTMLElement>('[role="dialog"]')!,
+			);
+			fireEvent.input(dialog.querySelector<HTMLInputElement>('.search-input')!, {
+				target: { value: 'tanstack router' },
+			});
+			await waitFor(() => {
+				if (!dialog.querySelector('.search-entity'))
+					throw new Error('entity result did not render');
+			});
+
+			fireEvent.keyDown(dialog, { key: 'Enter' });
+			await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+			expect(scrolledWithQueries).toEqual([]);
+
+			releaseNavigation();
+			await waitFor(() => expect(router.state.location.pathname).toBe('/docs/bindings'));
+			await waitFor(() => expect(scrolledWithQueries).toEqual(['TanStack Router']));
+		} finally {
+			Element.prototype.scrollIntoView = originalScrollIntoView;
+		}
+	});
+
 	it('keeps TanStack Start primary, package, and guide actions independent', async () => {
 		const { container, router } = await renderRoute('/');
 		fireEvent.click(container.querySelector<HTMLButtonElement>('.search-trigger')!);

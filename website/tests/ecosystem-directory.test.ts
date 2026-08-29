@@ -157,6 +157,16 @@ describe('ecosystem directory', () => {
 		});
 	});
 
+	it('clears a directory anchor when search state changes', async () => {
+		const { container, router } = await renderRoute('/docs/bindings#binding-zustand');
+		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
+
+		fireEvent.input(search, { target: { value: 'zustand' } });
+
+		await waitFor(() => expect(router.state.location.search).toMatchObject({ q: 'zustand' }));
+		expect(router.state.location.hash).toBe('');
+	});
+
 	it('merges rapid query and filter changes into one URL state', async () => {
 		const { container, router } = await renderRoute('/docs/bindings');
 		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
