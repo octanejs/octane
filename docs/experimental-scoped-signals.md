@@ -1,6 +1,6 @@
 # Experimental scoped async signals
 
-This branch implements an opt-in experiment for [RFC 2](https://github.com/octanejs/RFCs/discussions/2), using the public Alien Signals 3.2.0 system API. It is not a stable API or a release recommendation. The [implementation plan](plans/2026-08-27-experimental-scoped-async-signals-plan.md) records the scope and acceptance gates; the [evidence report](experimental-scoped-signals-evidence.md) separates current validation and costs from the earlier prototype measurements.
+This branch implements an opt-in scoped async signals experiment using the public Alien Signals 3.2.0 system API. It is not a stable API or a release recommendation. The [implementation plan](plans/2026-08-27-experimental-scoped-async-signals-plan.md) records the scope and acceptance gates; the [evidence report](experimental-scoped-signals-evidence.md) separates current validation and costs from the earlier prototype measurements.
 
 `octane/signals` is a renderer-independent data engine. Native component reads require `nativeReads: true`. Option validation and forwarding are implemented in the compiler, app configuration, and Vite, Rspack, and Rsbuild wrappers, but these build integrations have not been executed with the locked toolchain in this environment. The compiler's Vite configuration is:
 
