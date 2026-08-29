@@ -427,6 +427,7 @@ function SearchDialog(props: DialogProps) @{
 			.search-entity {
 				display: flex;
 				flex-direction: column;
+				flex-shrink: 0;
 				min-width: 0;
 			}
 			.search-entity {

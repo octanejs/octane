@@ -938,6 +938,46 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 	);
 
 	it.concurrent(
+		'keeps command-palette results readable in a constrained viewport',
+		{ timeout: 30_000 },
+		async () => {
+			const context = await browser.newContext({ viewport: { width: 746, height: 374 } });
+			const page = await context.newPage();
+			const errors: string[] = [];
+			page.on('console', (message) => {
+				if (message.type() === 'error') errors.push(message.text());
+			});
+			page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+			try {
+				await page.goto(`http://localhost:${DEV_PORT}/docs/bindings`, {
+					waitUntil: 'networkidle',
+				});
+				await page.keyboard.press('Control+K');
+				await page.locator('.search-input').fill('tanstack');
+				const firstResult = page.locator('.search-entity').first();
+				await firstResult.waitFor();
+
+				const geometry = await firstResult.evaluate((card) => {
+					const cardBox = card.getBoundingClientRect();
+					const contentBox = card.querySelector('.search-entity-primary')!.getBoundingClientRect();
+					const board = card.parentElement!;
+					return {
+						boardIsScrollable: board.scrollHeight > board.clientHeight,
+						cardBottom: cardBox.bottom,
+						contentBottom: contentBox.bottom,
+					};
+				});
+
+				expect(geometry.boardIsScrollable).toBe(true);
+				expect(geometry.cardBottom).toBeGreaterThanOrEqual(geometry.contentBottom);
+				expect(errors.filter((error) => !error.includes('Failed to load resource'))).toEqual([]);
+			} finally {
+				await context.close();
+			}
+		},
+	);
+
+	it.concurrent(
 		'the homepage selects and copies the active React integration sample by pointer and keyboard',
 		{ timeout: 45_000 },
 		() => assertHomepageIntegrationSamples(`http://localhost:${DEV_PORT}`),
