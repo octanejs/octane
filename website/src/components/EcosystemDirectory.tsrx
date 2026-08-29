@@ -11,10 +11,7 @@ import {
 	type FrameworkIntegrationEntity,
 	type LibraryBindingEntity,
 } from '../lib/ecosystem-search-core.ts';
-import {
-	ecosystemEntityTypeLabel,
-	ecosystemPackageGuideHref,
-} from '../lib/ecosystem-presentation.ts';
+import { ecosystemPackageGuideHref } from '../lib/ecosystem-presentation.ts';
 
 interface DirectorySection {
 	id: string;
@@ -291,13 +288,10 @@ export function EcosystemDirectory() @{
 								@for (const entity of integrationEntities(section.entities); key entity.id) {
 									<article id={entity.id} class="ecosystem-entity ecosystem-integration-card">
 										<div class="ecosystem-entity-copy">
-											<span class="ecosystem-type">{ecosystemEntityTypeLabel(
-												entity,
-											) as string}</span>
+											<span class="ecosystem-type">{entity.model as string}</span>
 											<h4>{entity.title as string}</h4>
 											<code>{entity.packageName as string}</code>
 											<p>{entity.description as string}</p>
-											<span class="ecosystem-context">{entity.model as string}</span>
 										</div>
 										<div class="ecosystem-actions">
 											<a
@@ -336,13 +330,10 @@ export function EcosystemDirectory() @{
 									} @else {
 										<article id={entity.id} class="ecosystem-entity ecosystem-integration-card">
 											<div class="ecosystem-entity-copy">
-												<span class="ecosystem-type">{ecosystemEntityTypeLabel(
-													entity,
-												) as string}</span>
+												<span class="ecosystem-type">{entity.model as string}</span>
 												<h4>{entity.title as string}</h4>
 												<code>{entity.packageName as string}</code>
 												<p>{entity.description as string}</p>
-												<span class="ecosystem-context">{entity.model as string}</span>
 											</div>
 											<div class="ecosystem-actions">
 												<a
@@ -621,11 +612,6 @@ export function EcosystemDirectory() @{
 				font-size: 0.78rem;
 				line-height: 1.5;
 			}
-			.ecosystem-context {
-				display: block;
-				color: var(--text-secondary);
-				font-size: 0.7rem;
-			}
 			.ecosystem-actions {
 				display: flex;
 				flex-wrap: wrap;
@@ -671,13 +657,9 @@ export function EcosystemDirectory() @{
 				}
 				.ecosystem-collection--cards .ecosystem-integration-card .ecosystem-entity-copy p {
 					grid-column: 2;
-					grid-row: 1 / span 2;
+					grid-row: 1 / span 3;
+					align-self: center;
 					margin: 0;
-				}
-				.ecosystem-collection--cards .ecosystem-context {
-					grid-column: 2;
-					grid-row: 3;
-					align-self: end;
 				}
 				.ecosystem-collection--cards .ecosystem-actions {
 					flex-direction: column;

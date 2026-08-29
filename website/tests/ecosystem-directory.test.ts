@@ -43,7 +43,10 @@ describe('ecosystem directory', () => {
 			FRAMEWORK_INTEGRATION_COUNT + BINDING_COUNT,
 		);
 		for (const integration of FRAMEWORK_INTEGRATIONS) {
-			expect(container.querySelector(`#integration-${integration.guideAnchor}`)).toBeTruthy();
+			const row = container.querySelector<HTMLElement>(`#integration-${integration.guideAnchor}`);
+			expect(row).toBeTruthy();
+			expect(row?.querySelector('.ecosystem-type')?.textContent).toBe(integration.model);
+			expect(row?.querySelector('.ecosystem-context')).toBeNull();
 		}
 		expect(container.querySelector('#binding-tanstack-router')).toBeTruthy();
 
@@ -95,6 +98,9 @@ describe('ecosystem directory', () => {
 		expect(search.container.querySelector('.ecosystem-category-jumps')).toBeNull();
 		expect(search.container.querySelector('.ecosystem-entity')?.id).toBe(
 			'integration-tanstack-start',
+		);
+		expect(search.container.querySelector('.ecosystem-type')?.textContent).toBe(
+			'Full-stack framework',
 		);
 	});
 
