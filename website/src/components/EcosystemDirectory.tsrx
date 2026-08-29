@@ -564,7 +564,7 @@ export function EcosystemDirectory() @{
 				background: var(--surface-subtle);
 				overflow: hidden;
 			}
-			.ecosystem-binding-link {
+			.ecosystem-directory .ecosystem-binding-link {
 				display: grid;
 				grid-template-columns: minmax(8rem, 0.7fr) minmax(0, 1.3fr) auto;
 				align-items: center;
@@ -574,10 +574,11 @@ export function EcosystemDirectory() @{
 				color: var(--text);
 				text-decoration: none;
 			}
-			.ecosystem-binding-link:hover {
+			.ecosystem-directory .ecosystem-binding-link:hover {
 				background: rgba(255, 65, 90, 0.07);
+				text-decoration: none;
 			}
-			.ecosystem-binding-link:focus-visible {
+			.ecosystem-directory .ecosystem-binding-link:focus-visible {
 				outline: 2px solid var(--accent);
 				outline-offset: -2px;
 			}
