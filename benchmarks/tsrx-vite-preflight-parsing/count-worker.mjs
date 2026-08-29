@@ -3,10 +3,10 @@ import { createTransformCase, rootIdsFor } from './harness.mjs';
 
 const COUNTER_KEY = Symbol.for('octane.tsrx-vite-preflight-parsing.parse-counts');
 const cases = [
-	{ mode: 'production-client', expected: { adapter: 3, authoritative: 1 } },
-	{ mode: 'production-server', expected: { adapter: 3, authoritative: 1 } },
-	{ mode: 'dev-client', expected: { adapter: 2, authoritative: 1 } },
-	{ mode: 'production-client', css: true, expected: { adapter: 4, authoritative: 1 } },
+	{ mode: 'production-client', expected: { adapter: 1, authoritative: 1 } },
+	{ mode: 'production-server', expected: { adapter: 1, authoritative: 1 } },
+	{ mode: 'dev-client', expected: { adapter: 1, authoritative: 1 } },
+	{ mode: 'production-client', css: true, expected: { adapter: 1, authoritative: 1 } },
 ];
 
 const results = [];

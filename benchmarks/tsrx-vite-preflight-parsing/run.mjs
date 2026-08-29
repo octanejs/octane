@@ -75,7 +75,7 @@ try {
 	parseCounts = characterizeParses();
 	assert.deepEqual(
 		parseCounts.map((entry) => entry.total),
-		[4, 4, 3, 5],
+		[2, 2, 2, 2],
 		'valid-source Vite parse-count matrix changed',
 	);
 

@@ -1,0 +1,195 @@
+{
+  "suite": "tsrx-vite-preflight-parsing",
+  "iterations": 7,
+  "targets": [
+    {
+      "name": "integrated-small-client",
+      "ops": {
+        "transform": {
+          "score": 2.86108320000003,
+          "median": 2.7842909999999392,
+          "min": 2.7192080000004353,
+          "mean": 2.9391011428571283,
+          "p95": 3.4960829999999987,
+          "sd": 0.28248135628941773,
+          "rme": 8.8891494410785,
+          "scoreRme": 7.204105571913281,
+          "warmupRatio": 1.053461779790211,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "components": 8,
+        "sourceBytes": 1336,
+        "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+        "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mapChecksum": "e67a4369b63c7e78b58ee246ae4b3f1f13cfb921572b1667082af4cc3468eb06",
+        "metaChecksum": "53ef55f5268975a6866e7f243448e04966f0eb4203cf55e282c370f83d751290",
+        "outputChecksum": "93238123d0842036fe88ba75a1e35596315b8178e80f37bd7f47fe6e384d5b33",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "integrated-large-client",
+      "ops": {
+        "transform": {
+          "score": 149.3219000000002,
+          "median": 148.76020900000003,
+          "min": 143.46870799999988,
+          "mean": 150.23323228571448,
+          "p95": 165.47404200000074,
+          "sd": 7.757441426696458,
+          "rme": 4.775704461572802,
+          "scoreRme": 7.699481686489033,
+          "warmupRatio": 1.0215863647596235,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "components": 256,
+        "sourceBytes": 36270,
+        "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+        "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mapChecksum": "80a5fa37c09ac1531aaa25f8db511033bb918ddbede7ee600fafbfc74f911802",
+        "metaChecksum": "c0da157a88aaf3a0bc05ebb1052ee022d4f7ed9bfbee684d63de904e28574f89",
+        "outputChecksum": "6ea330ac2c3b05365cd6e160dbd03ae5014d33bf08f926b80d65c6ee2e6380bf",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "integrated-small-server",
+      "ops": {
+        "transform": {
+          "score": 1.803466600000047,
+          "median": 1.8477920000000267,
+          "min": 1.6628749999999854,
+          "mean": 1.9303035714285994,
+          "p95": 2.3411670000000413,
+          "sd": 0.2409151570565653,
+          "rme": 11.543126615425225,
+          "scoreRme": 7.628367561781873,
+          "warmupRatio": 1.1146635041646837,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "components": 8,
+        "sourceBytes": 1336,
+        "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+        "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mapChecksum": "233172eb37e0ca3af53bc79cb40e2968bc54a7327f6cddc143d360a5d28d8ce2",
+        "metaChecksum": "5bf423bb6c4f34fa39cf0accedbba2a9428c78ba4f82563f8136f9f1a8996499",
+        "outputChecksum": "2e6177f086934322b4676f8e3ceda6fc54d16304aada8661c74f732319d2d05e",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "integrated-large-server",
+      "ops": {
+        "transform": {
+          "score": 119.3451581999997,
+          "median": 120.95316600000024,
+          "min": 116.49662499999977,
+          "mean": 120.32497014285698,
+          "p95": 124.5958340000002,
+          "sd": 3.0663574543969347,
+          "rme": 2.3569586706750667,
+          "scoreRme": 2.986939682542307,
+          "warmupRatio": 1.0166070834367567,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "components": 256,
+        "sourceBytes": 36270,
+        "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+        "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mapChecksum": "142fccad5e4fd5d1c909dd61a22976367d4d75c6d9f22f0956505029c1d35228",
+        "metaChecksum": "5bf423bb6c4f34fa39cf0accedbba2a9428c78ba4f82563f8136f9f1a8996499",
+        "outputChecksum": "902cf76f14918388cf04ff5557fa279230cae2ba3cb83941183e958c17b5b612",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "classification-reparsed",
+      "ops": {
+        "classify": {
+          "score": 209.8720165999999,
+          "median": 209.59054200000082,
+          "min": 208.66045799999984,
+          "mean": 210.69089871428565,
+          "p95": 216.8157500000002,
+          "sd": 2.863080698322773,
+          "rme": 1.2568190732215057,
+          "scoreRme": 0.6057130708941205,
+          "warmupRatio": 1.0062132704546574,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "classifications": ["descriptor-children-imports", "descriptor-children-exports"],
+        "classificationChecksum": "ce336f36e31d0df9ab509e0e526bf8e588bbb732a507b2fff6990d04b99dd607",
+        "sourceBytes": 36270,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "classification-shared-ast",
+      "ops": {
+        "classify": {
+          "score": 105.77469979999987,
+          "median": 105.2602079999997,
+          "min": 104.95762500000001,
+          "mean": 105.85074985714274,
+          "p95": 108.23791599999913,
+          "sd": 1.190560423326731,
+          "rme": 1.0402613237776146,
+          "scoreRme": 1.622370268711018,
+          "warmupRatio": 1.0036918091068878,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "classifications": ["descriptor-children-imports", "descriptor-children-exports"],
+        "classificationChecksum": "ce336f36e31d0df9ab509e0e526bf8e588bbb732a507b2fff6990d04b99dd607",
+        "sourceBytes": 36270,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "parse-count-matrix",
+      "ops": {},
+      "meta": {
+        "cases": [
+          {
+            "name": "production-client",
+            "adapter": 1,
+            "authoritative": 1,
+            "total": 2
+          },
+          {
+            "name": "production-server",
+            "adapter": 1,
+            "authoritative": 1,
+            "total": 2
+          },
+          {
+            "name": "dev-client",
+            "adapter": 1,
+            "authoritative": 1,
+            "total": 2
+          },
+          {
+            "name": "production-client-css",
+            "adapter": 1,
+            "authoritative": 1,
+            "total": 2
+          }
+        ],
+        "matrixChecksum": "2e646777e90ba1c25a143aefd466fb166c61c15d1913969cfb45f5cdb4013878",
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}
