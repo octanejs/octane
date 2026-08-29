@@ -119,6 +119,17 @@ describe('ecosystem directory', () => {
 		expect(container.querySelector('.ecosystem-entity')?.id).toBe('integration-astro');
 	});
 
+	it('keeps JSON-like query prefixes as text while typing', async () => {
+		const { container, router } = await renderRoute('/docs/bindings');
+		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
+
+		for (const query of ['3', '3d', 'true', 'null']) {
+			fireEvent.input(search, { target: { value: query } });
+			await waitFor(() => expect(router.state.location.search).toMatchObject({ q: query }));
+			expect(search.value).toBe(query);
+		}
+	});
+
 	it('explains one-character search and ignores incompatible URL filters', async () => {
 		const { container } = await renderRoute(
 			'/docs/bindings?q=a&kind=integration&category=shared-state',
