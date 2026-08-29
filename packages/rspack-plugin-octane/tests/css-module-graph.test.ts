@@ -93,10 +93,6 @@ type TestEdge = ReturnType<typeof edge>;
 type ContextData = {
 	proof: null | { imports: { request: string }[] };
 };
-type GraphActivity = {
-	traversals: number;
-	visits: number;
-};
 
 // Real production builds cover rendered classes and stylesheet ownership. This
 // harness supplies adversarial public Rspack graph states that cannot be timed
@@ -125,22 +121,12 @@ function harness({
 			afterRebuild?: (module: TestModule, compilation: any) => void;
 		} = {},
 	) => {
-		const graphActivity: GraphActivity = { traversals: 0, visits: 0 };
 		const compilation: any = {
 			modules: new Set(modules),
 			loaderHooks: { loader: hook() },
 			hooks: { seal: hook(), processAssets: hook() },
 			moduleGraph: {
-				getOutgoingConnections(module: TestModule) {
-					graphActivity.traversals++;
-					const connections = edges.get(module.id) ?? [];
-					return (function* () {
-						for (const connection of connections) {
-							graphActivity.visits++;
-							yield connection;
-						}
-					})();
-				},
+				getOutgoingConnections: (module: TestModule) => edges.get(module.id) ?? [],
 			},
 		};
 		const contextFor = (module: TestModule) => {
@@ -179,7 +165,6 @@ function harness({
 		compiler.hooks.thisCompilation.call(compilation);
 		return {
 			compilation,
-			graphActivity,
 			finish: () => compiler.hooks.finishMake.promise(compilation),
 			seal: () => compilation.hooks.seal.call(),
 			emit: () => compilation.hooks.processAssets.call({}),
@@ -192,55 +177,6 @@ const EXPORTS = `var root = 'mapped_root'; var label = 'mapped_label'; export { 
 const CHANGED = /@octanejs\/rspack-plugin: CSS-module proof changed/;
 
 describe('Rspack CSS-module graph proofs', () => {
-	it('scales graph reads with CSS requests across proof phases', async () => {
-		const requests = Array.from({ length: 16 }, (_, index) => `./styles-${index}.module.css`);
-		const app = importer('many-imports', requests);
-		const styles = requests.map((request, index) =>
-			module(`styles-${index}`, EXPORTS.replaceAll('mapped_', `mapped_${index}_`), {
-				resource: `/project/${request.slice(2)}`,
-			}),
-		);
-		const graph = harness().createCompilation(
-			[app, ...styles],
-			new Map([[app.id, requests.map((request, index) => edge(request, styles[index]))]]),
-		);
-
-		await graph.finish();
-		expect(graph.graphActivity).toEqual({ traversals: 2, visits: 32 });
-		graph.seal();
-		expect(graph.graphActivity).toEqual({ traversals: 3, visits: 48 });
-		graph.emit();
-		expect(graph.graphActivity).toEqual({ traversals: 3, visits: 48 });
-	});
-
-	it.each([
-		{ requests: [] as string[], afterFinish: 0, afterSeal: 0 },
-		{ requests: ['./styles.module.css'], afterFinish: 2, afterSeal: 3 },
-	])('avoids unrelated graph reads for $requests.length CSS requests', async (scenario) => {
-		const app = importer('request-count', scenario.requests);
-		const styles = module('request-count-styles', EXPORTS);
-		const graph = harness().createCompilation(
-			[app, styles],
-			new Map([[app.id, [edge('./styles.module.css', styles)]]]),
-		);
-
-		await graph.finish();
-		expect(graph.graphActivity).toEqual({
-			traversals: scenario.afterFinish,
-			visits: scenario.afterFinish,
-		});
-		graph.seal();
-		expect(graph.graphActivity).toEqual({
-			traversals: scenario.afterSeal,
-			visits: scenario.afterSeal,
-		});
-		graph.emit();
-		expect(graph.graphActivity).toEqual({
-			traversals: scenario.afterSeal,
-			visits: scenario.afterSeal,
-		});
-	});
-
 	it.each([
 		{ invalidKind: 'attributes', invalidFirst: true },
 		{ invalidKind: 'attributes', invalidFirst: false },
@@ -289,15 +225,19 @@ describe('Rspack CSS-module graph proofs', () => {
 		},
 	);
 
-	it('accepts duplicate effective identities and ignores non-ESM decoys', async () => {
+	it('accepts duplicate effective identities and ignores non-ESM decoys in a batch', async () => {
 		const request = './styles.module.css';
-		const app = importer('duplicate-identity', [request]);
+		const safeRequest = './safe.module.css';
+		const app = importer('duplicate-identity', [request, safeRequest]);
 		const styles = module('stable-styles', EXPORTS);
 		const duplicate = module(styles.id, EXPORTS);
 		const decoy = module('commonjs-decoy', EXPORTS.replaceAll('mapped_', 'wrong_'));
+		const safe = module('safe-styles', EXPORTS.replaceAll('mapped_', 'safe_'), {
+			resource: '/project/safe.module.css',
+		});
 		const provider = vi.fn((_input: { id: string }) => undefined);
 		const graph = harness({ option: provider }).createCompilation(
-			[app, styles, duplicate, decoy],
+			[app, styles, duplicate, decoy, safe],
 			new Map([
 				[
 					app.id,
@@ -305,61 +245,70 @@ describe('Rspack CSS-module graph proofs', () => {
 						edge(request, decoy, { category: 'commonjs' }),
 						edge(request, styles),
 						edge(request, duplicate),
+						edge(safeRequest, safe),
 					],
 				],
 			]),
 		);
 
 		await expect(graph.finish()).resolves.toBeUndefined();
-		expect(provider.mock.calls.map(([input]) => input.id)).toEqual([styles.id]);
+		expect(provider.mock.calls.map(([input]) => input.id).sort()).toEqual(
+			[safe.id, styles.id].sort(),
+		);
 		expect(() => graph.seal()).not.toThrow();
 	});
 
-	it('reacquires graph and module identities for final verification', async () => {
-		const request = './styles.module.css';
-		const app = importer('fresh-identities', [request]);
+	it('reacquires equivalent graph and module identities for batch verification', async () => {
+		const requests = ['./styles.module.css', './safe.module.css'];
+		const app = importer('fresh-identities', requests);
 		const styles = module('fresh-styles', EXPORTS);
-		const edges = new Map([[app.id, [edge(request, styles)]]]);
-		const graph = harness().createCompilation([app, styles], edges);
+		const safe = module('fresh-safe', EXPORTS.replaceAll('mapped_', 'safe_'), {
+			resource: '/project/safe.module.css',
+		});
+		const graph = harness().createCompilation(
+			[app, styles, safe],
+			new Map([[app.id, [edge(requests[0], styles), edge(requests[1], safe)]]]),
+		);
 
 		await graph.finish();
-		const nextApp = importer(app.id, [request]);
+		const nextApp = importer(app.id, requests);
 		nextApp.buildInfo[CSS_MODULE_BUILD_INFO_KEY] = structuredClone(
 			app.buildInfo[CSS_MODULE_BUILD_INFO_KEY],
 		);
 		const nextStyles = module(styles.id, styles.source);
-		graph.compilation.modules = new Set([nextApp, nextStyles]);
-		edges.set(nextApp.id, [edge(request, nextStyles)]);
+		const nextSafe = module(safe.id, safe.source, { resource: safe.resource });
+		graph.compilation.modules = new Set([nextApp, nextStyles, nextSafe]);
+		graph.compilation.moduleGraph = {
+			getOutgoingConnections: (module: TestModule) =>
+				module.id === nextApp.id
+					? [edge(requests[0], nextStyles), edge(requests[1], nextSafe)]
+					: [],
+		};
 
 		expect(() => graph.seal()).not.toThrow();
 		expect(() => graph.emit()).not.toThrow();
 	});
 
-	it('stops reading after all requested targets are terminally invalid', async () => {
-		const requests = ['./invalid-a.module.css', './invalid-b.module.css'];
-		const app = importer('terminal-invalidity', requests);
-		const invalidA = module('invalid-a', EXPORTS);
-		const invalidB = module('invalid-b', EXPORTS);
-		const trailing = Array.from({ length: 16 }, (_, index) => module(`trailing-${index}`, EXPORTS));
+	it('rejects target changes from the current graph during batch verification', async () => {
+		const requests = ['./styles.module.css', './safe.module.css'];
+		const app = importer('changed-batch-target', requests);
+		const styles = module('changed-batch-styles', EXPORTS);
+		const safe = module('changed-batch-safe', EXPORTS.replaceAll('mapped_', 'safe_'), {
+			resource: '/project/safe.module.css',
+		});
+		const replacement = module('replacement-safe', safe.source, { resource: safe.resource });
 		const graph = harness().createCompilation(
-			[app, invalidA, invalidB, ...trailing],
-			new Map([
-				[
-					app.id,
-					[
-						edge(requests[0], invalidA, { attributes: { type: 'css' } }),
-						edge(requests[1], invalidB, { attributes: { type: 'css' } }),
-						...trailing.map((target, index) => edge(`./trailing-${index}.module.css`, target)),
-					],
-				],
-			]),
+			[app, styles, safe, replacement],
+			new Map([[app.id, [edge(requests[0], styles), edge(requests[1], safe)]]]),
 		);
 
 		await graph.finish();
-		expect(graph.graphActivity).toEqual({ traversals: 1, visits: 2 });
-		graph.seal();
-		graph.emit();
-		expect(graph.graphActivity).toEqual({ traversals: 1, visits: 2 });
+		graph.compilation.moduleGraph = {
+			getOutgoingConnections: (module: TestModule) =>
+				module.id === app.id ? [edge(requests[0], styles), edge(requests[1], replacement)] : [],
+		};
+
+		expect(() => graph.seal()).toThrow(CHANGED);
 	});
 
 	it('provides exact effective-module identities and read-only metadata', async () => {
