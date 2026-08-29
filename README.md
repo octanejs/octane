@@ -73,9 +73,9 @@ the browser.
 **No virtual DOM.** Components re-render like React, but a compiled render path
 and an LIS-based keyed reconciler keep the runtime overhead minimal.
 
-Octane is deliberately narrow where React has grown wide: no class components, no
-Server Components, no synthetic event system. Those are choices, not gaps, and
-they are written down in
+Octane's native renderer is deliberately narrow where React has grown wide: no
+class components, no Server Components, no synthetic event system. Those are
+choices, not gaps, and they are written down in
 [Differences from React](https://octanejs.dev/docs/differences-from-react).
 
 ## Also in the box
@@ -96,6 +96,9 @@ they are written down in
 - **Behavior-only roots for externally owned DOM.** Attach abortable behavior
   and delegated native events to server-rendered or independently streamed
   markup without rendering it or taking reconciliation ownership.
+- **React interoperability in both directions.** Keep real React components
+  inside Octane with `ReactCompat`, or add Octane components to a React app with
+  `OctaneCompat`. Both are available from `octane/react`.
 - **Optional immutable render snapshots.** Add `"use strong"` to one module, or
   enable Strong mode for an application, to assert pure renders, catch
   detectable violations, and let production memoization condition every
@@ -158,6 +161,56 @@ Rspack and Rsbuild are supported too. [Getting started](./docs/getting-started.m
 covers all three build tools, server rendering, hydration, streaming, deferred
 hydration, and profiling.
 
+## React interoperability
+
+`octane/react` lets each renderer keep ownership of its own components:
+
+| Boundary       | What it renders                               | React version                                             |
+| -------------- | --------------------------------------------- | --------------------------------------------------------- |
+| `ReactCompat`  | Real React components inside an Octane app    | Matching React and React DOM 19.2+ in the React 19 series |
+| `OctaneCompat` | Compiled Octane components inside a React app | React 19                                                  |
+
+For a React component in an Octane template:
+
+```tsrx
+// App.tsrx — compiled by Octane.
+import { ReactCompat } from 'octane/react';
+import { Counter } from './Counter.react';
+
+export function App() @{
+	<ReactCompat><Counter start={3} /></ReactCompat>
+}
+```
+
+```tsx
+/** @jsxImportSource react */
+// Counter.react.tsx — compiled by React's JSX transform.
+import { useState } from 'react';
+
+export function Counter({ start }: { start: number }) {
+	const [count, setCount] = useState(start);
+	return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+Keep native Octane components in `.tsrx` and React components under React's JSX
+transform. Mixed builds use `requireDirective: true` with both compilers; do not
+alias React to Octane. The [React interoperability guide](./docs/react-compat.md)
+includes compiler setup and the `component`/`props` form.
+
+`ReactCompat` preserves React state, events, and refs. Map native context into
+React explicitly with `bridgeReactContext(OctaneContext, ReactContext)` and the
+boundary's `contexts` prop. In the opposite direction, an Octane component
+inside `OctaneCompat` can read a real React context with Octane's `use` or
+`useContext`.
+
+Both boundaries have server implementations in `octane/react/server`. Octane's
+server compiler retargets the import automatically; React-owned server entries
+that bypass it must select the server entry explicitly. `ReactCompat` starts or
+updates React work after Octane commits, so Octane transitions and `flushSync()`
+do not synchronously commit the React root. See the guide for pending updates,
+SSR buffering, hydration, and nesting limits.
+
 ## Status
 
 Octane is in alpha. The runtime, compiler, and SSR/hydration paths all work, but
@@ -191,6 +244,8 @@ Octane itself. Good places to start:
   React ecosystem.
 - [Framework integrations](https://octanejs.dev/docs/framework-integrations):
   use Octane with Astro, Docusaurus, or TanStack Start.
+- [React interoperability](https://octanejs.dev/docs/react-compat): use
+  `ReactCompat` for React inside Octane, or `OctaneCompat` for Octane inside React.
 
 In this repository:
 
@@ -202,6 +257,9 @@ In this repository:
   [deferred hydration](./docs/deferred-hydration.md): the full references.
 - [Differences from React](./docs/differences-from-react.md): the divergence
   contract.
+- [ReactCompat](./docs/react-compat.md): React inside Octane, including compiler
+  ownership, context mapping, boundaries, SSR, and hydration; links to the
+  opposite `OctaneCompat` direction.
 - [Bindings status](./docs/bindings-status.md): what each `@octanejs/*` package
   ports, its upstream version, and its known divergences.
 

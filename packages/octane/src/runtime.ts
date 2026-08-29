@@ -10667,6 +10667,25 @@ export function readContextFromScope<T>(scope: Scope, context: Context<T>): T {
 	return readContextFrom(scope, scope.block, context);
 }
 
+/** @internal Cold adapter query; native render and hide paths pay no extra work. */
+export function getRendererOwnerVisibility(scope: Scope): 'visible' | 'suspense' | 'activity' {
+	if (findHiddenActivity(scope.block) !== null) return 'activity';
+	return findSuspenseHiddenTry(scope.block) !== null ? 'suspense' : 'visible';
+}
+
+/** @internal Route a deferred foreign-renderer cleanup fault to a surviving owner. */
+export function reportRendererOwnerError(scope: Scope, error: unknown): void {
+	const origin = scope.block;
+	let owner: Block | null = origin;
+	while (owner !== null && blockSubtreeDisposed(owner)) owner = owner.parentBlock;
+	const handler = findTryHandler(owner);
+	if (handler !== null) reportCaughtError(owner, error, handler(error));
+	else if (!reportUncaughtError(origin, error)) {
+		if (typeof reportError === 'function') reportError(error);
+		else console.error(error);
+	}
+}
+
 function useContextInternal<T>(context: Context<T>): T {
 	// Record the context dependency on every enclosing memo() block, with the
 	// version read. The push-cascade re-renders a Provider's subtree top-down;

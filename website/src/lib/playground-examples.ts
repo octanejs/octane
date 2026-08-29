@@ -5,8 +5,8 @@
 //
 // File kinds are derived from the file name (see playground-modules.ts):
 // `.tsrx` / `.tsx` compile with the octane compiler; `.react.tsx` marks a
-// React-HOST file (sucrase react-jsx transform) used by the OctaneCompat
-// example, where real react-dom from esm.sh renders the entry.
+// React-owned file (sucrase react-jsx transform). Real react-dom from esm.sh
+// renders those components, either as a host or inside a ReactCompat island.
 import type { PlaygroundLang } from './playground.ts';
 import type { PlaygroundFile } from './playground-modules.ts';
 
@@ -1267,6 +1267,136 @@ export function Island(props: { start: number }) @{
 }
 `;
 
+const REACT_COMPAT_HOST = `import { useRef, useState } from 'octane';
+import { ReactCompat } from 'octane/react';
+import { Counter } from './Counter.react.tsx';
+
+// Octane owns this app; Counter.react.tsx stays on React's own toolchain.
+// ReactCompat transports one component element without invoking it in Octane.
+export default function App() @{
+	const [mounted, setMounted] = useState(true);
+	const [label, setLabel] = useState('React count');
+	const [start, setStart] = useState(3);
+	const [reported, setReported] = useState('No count reported yet');
+	const input = useRef<HTMLInputElement | null>(null);
+
+	<main class="demo">
+		<h2>Octane host</h2>
+		<p class="hint">The React island keeps its state when Octane updates its props.</p>
+		<p class="reported">{reported as string}</p>
+
+		<div class="controls">
+			<button onClick={() => setLabel(label === 'React count' ? 'Renamed count' : 'React count')}>
+				Rename React counter
+			</button>
+			<button onClick={() => setStart(start + 1)}>{'Next initial count: ' + start}</button>
+			<button disabled={!mounted} onClick={() => input.current?.focus()}>Focus React input</button>
+			<button onClick={() => setMounted(!mounted)}>
+				{mounted ? 'Unmount React island' : 'Mount React island'}
+			</button>
+		</div>
+
+		@if (mounted) {
+			<ReactCompat>
+				<Counter
+					label={label}
+					start={start}
+					ref={input}
+					onCount={(count: number) => setReported('React reported: ' + count)}
+				/>
+			</ReactCompat>
+		}
+
+		<p class="hint">The initial count changes on the next mount. Loading stays inside React Suspense.</p>
+
+		<style>
+			.demo {
+				display: grid;
+				gap: 0.75rem;
+				justify-items: start;
+			}
+			h2,
+			p {
+				margin: 0;
+			}
+			.controls {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+			}
+			button {
+				padding: 0.4rem 0.7rem;
+				border: 1px solid #8886;
+				border-radius: 8px;
+				background: transparent;
+				color: inherit;
+				cursor: pointer;
+			}
+			.hint {
+				opacity: 0.7;
+			}
+		</style>
+	</main>
+}
+`;
+
+const REACT_COMPAT_COUNTER = `import { Suspense, use, useState, type Ref } from 'react';
+
+interface CounterProps {
+	label: string;
+	start: number;
+	ref?: Ref<HTMLInputElement>;
+	onCount: (count: number) => void;
+}
+
+function Message({ request }: { request: Promise<string> }) {
+	return <p role="status">{use(request)}</p>;
+}
+
+// This is an ordinary React 19 component: real hooks, JSX, refs, and Suspense.
+export function Counter({ label, start, ref, onCount }: CounterProps) {
+	const [count, setCount] = useState(start);
+	const [request, setRequest] = useState<Promise<string> | null>(null);
+
+	return (
+		<section
+			style={{
+				display: 'grid',
+				gap: '0.75rem',
+				padding: '1rem',
+				border: '1px dashed #ff5d72',
+				borderRadius: 10,
+			}}
+		>
+			<h3 style={{ margin: 0 }}>React island</h3>
+			<button
+				onClick={() => {
+					const next = count + 1;
+					setCount(next);
+					onCount(next);
+				}}
+			>
+				{label + ': ' + count}
+			</button>
+			<input ref={ref} aria-label="React note" defaultValue="React-owned input" />
+			<button
+				onClick={() => {
+					// Create the promise in an event, not on each render.
+					setRequest(new Promise((resolve) => {
+						setTimeout(() => resolve('React data ready'), 700);
+					}));
+				}}
+			>
+				Load React data
+			</button>
+			<Suspense fallback={<p role="status">React loading…</p>}>
+				{request ? <Message request={request} /> : <p role="status">No request yet</p>}
+			</Suspense>
+		</section>
+	);
+}
+`;
+
 // ── Catalogue ───────────────────────────────────────────────────────────────
 
 export const CUSTOM_EXAMPLE_ID = 'custom';
@@ -1399,6 +1529,17 @@ export const EXAMPLES: PlaygroundExample[] = [
 				],
 				'App.react.tsx',
 			),
+		},
+	},
+	{
+		id: 'react-compat',
+		label: 'ReactCompat in Octane (multi-file)',
+		group: 'Ecosystem',
+		variants: {
+			tsrx: workspace([
+				{ name: 'App.tsrx', source: REACT_COMPAT_HOST },
+				{ name: 'Counter.react.tsx', source: REACT_COMPAT_COUNTER },
+			]),
 		},
 	},
 ];

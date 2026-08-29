@@ -440,8 +440,6 @@ SSR / hydration: Supported and tested — server rendering and hydration preserv
 
 Scope/evidence last checked: 2026-08-02.
 
-See also: [`docs/plans/2026-08-02-001-feat-react-dropzone-binding-plan.md`](plans/2026-08-02-001-feat-react-dropzone-binding-plan.md)
-
 ## @octanejs/electron
 
 [`packages/electron`](../packages/electron) `0.0.27` — ports `electron@43.2.0`. Status data: [`packages/electron/status.json`](../packages/electron/status.json).
@@ -608,8 +606,6 @@ SSR / hydration: The framework-neutral Inertia server entry is exposed. Hook ini
 
 Scope/evidence last checked: 2026-07-30.
 
-See also: [`docs/plans/2026-07-30-001-feat-inertia-binding-plan.md`](plans/2026-07-30-001-feat-inertia-binding-plan.md)
-
 ## @octanejs/ink
 
 [`packages/ink`](../packages/ink) `0.0.12` — ports `ink@7.1.1`. Status data: [`packages/ink/status.json`](../packages/ink/status.json).
@@ -640,8 +636,6 @@ Known divergences:
 SSR / hydration: Supported and tested — rendering is deterministic and browser-global-free; hydration adopts the server input and cleanup removes owned listeners, observers, timers, and styles.
 
 Scope/evidence last checked: 2026-08-20.
-
-See also: [`docs/plans/2026-08-02-005-feat-input-otp-binding-plan.md`](plans/2026-08-02-005-feat-input-otp-binding-plan.md)
 
 ## @octanejs/intersection-observer
 
@@ -1092,8 +1086,6 @@ SSR / hydration: Deterministic server rendering and live hydration adoption are 
 
 Scope/evidence last checked: 2026-08-02.
 
-See also: [`docs/plans/2026-08-02-004-feat-react-resizable-panels-binding-plan.md`](plans/2026-08-02-004-feat-react-resizable-panels-binding-plan.md)
-
 ## @octanejs/rxjs
 
 [`packages/rxjs`](../packages/rxjs) `0.1.28` — ports `@react-rxjs/core + @react-rxjs/utils@0.10.8 / 0.9.7`. Status data: [`packages/rxjs/status.json`](../packages/rxjs/status.json).
@@ -1316,8 +1308,6 @@ Known divergences:
 SSR / hydration: Supported and tested: browser-global-free server condition exports, deterministic fallback output, Octane streaming/hydration architecture gates, and pinned fallback/preload revalidation semantics.
 
 Scope/evidence last checked: .
-
-See also: [`docs/plans/2026-08-02-001-feat-swr-binding-plan.md`](plans/2026-08-02-001-feat-swr-binding-plan.md)
 
 ## @octanejs/syntax-highlighter
 
@@ -1830,8 +1820,6 @@ Scope/evidence last checked: 2026-08-03.
 
 - Targets react-window v2.3.0 only. Legacy v1 FixedSizeList, VariableSizeList, FixedSizeGrid, and VariableSizeGrid names are not part of the pinned upstream package and are intentionally absent.
 - Browser U5 evidence is blocked on draft PR #548; executable require() parity is blocked on draft PR #550. This binding must remain draft and provisional until those shared runners merge and the branch consumes them.
-
-See also: [`docs/plans/2026-08-03-001-feat-react-window-binding-plan.md`](plans/2026-08-03-001-feat-react-window-binding-plan.md)
 
 ## @octanejs/wouter
 

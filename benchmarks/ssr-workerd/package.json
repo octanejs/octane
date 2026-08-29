@@ -6,7 +6,10 @@
   "description": "Streaming SSR inside real workerd (Cloudflare Workers runtime) via miniflare: cold isolate start, warm streaming TTFB, and worker-script bytes for octane renderToReadableStream vs React Fizz edge, sharing the streaming-ssr fixtures.",
   "scripts": {
     "bench": "node run.mjs",
-    "bench:smoke": "node run.mjs 3"
+    "bench:smoke": "node run.mjs 3",
+    "bench:app-workloads": "node app-workloads/run.mjs",
+    "bench:app-workloads:smoke": "BENCH_ROUNDS=1 node app-workloads/run.mjs 1",
+    "test:app-workloads": "node --test app-workloads/verify.test.mjs"
   },
   "dependencies": {
     "miniflare": "catalog:default",

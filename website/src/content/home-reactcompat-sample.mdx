@@ -1,0 +1,17 @@
+```tsrx
+// App.tsrx — your Octane app
+import { ReactCompat } from 'octane/react';
+import { Counter } from './Counter.react.tsx';
+
+export function App() @{
+	<section class="dashboard">
+		<h1>Keep your React components</h1>
+
+		{/* Counter is a real React component. React owns its
+    hooks, events, refs, and DOM inside this boundary. */}
+		<ReactCompat>
+			<Counter start={3} />
+		</ReactCompat>
+	</section>
+}
+```

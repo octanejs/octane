@@ -1,8 +1,19 @@
 'use client';
 
+export { ReactCompat } from './react-compat.js';
+export { bridgeReactContext } from './react-compat-shared.js';
+export type {
+	ReactCompatProps,
+	ReactCompatComponentProps,
+	ReactCompatClassComponentProps,
+	ReactHostedComponent,
+	ReactContextBridge,
+} from './react-compat-shared.js';
+
 /**
- * `octane/react` — host a compiled Octane subtree inside a real React 19 tree
- * through one compatibility component:
+ * `octane/react` — both directions of DOM interoperability. ReactCompat hosts
+ * real React components inside Octane (docs/react-compat.md). OctaneCompat
+ * hosts a compiled Octane subtree inside a real React 19 tree:
  *
  * ```tsx
  * import { OctaneCompat } from 'octane/react';
@@ -33,13 +44,10 @@
  * read whose default only React may supply), the §6.3 HostContextRequest
  * handshake retries with the authoritative value before paint.
  *
- * Phase status (§14): Phases 1–2 shipped (client shell + escape protocol +
- * transparent context). Not yet implemented:
- * - server rendering/hydration of islands (Phase 4) — under React SSR the
- *   host renders empty and the island mounts on the client;
- * - selective per-island event delegation (Phase 5) — hosted roots currently
- *   pay the normal `createRoot` delegation cost (see
- *   benchmarks/react-hosted-islands).
+ * The explicit `octane/react/server` entry renders either direction on the
+ * server; these client adapters hydrate its opaque hosts. Hosted roots pay
+ * normal createRoot delegation costs (benchmarks/react-hosted-islands and
+ * benchmarks/octane-hosted-react).
  */
 
 import * as React from 'react';
