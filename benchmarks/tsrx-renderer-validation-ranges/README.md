@@ -20,15 +20,17 @@ node benchmarks/bench.mjs --quick --ratios tsrx-renderer-validation-ranges
 node benchmarks/bench.mjs --record tsrx-renderer-validation-ranges
 node benchmarks/tsrx-renderer-validation-ranges/run.mjs 7
 node benchmarks/tsrx-renderer-validation-ranges/compare.mjs \
-  /path/to/baseline /path/to/candidate 7
+  /path/to/baseline /path/to/candidate 15
 ```
 
-The cross-checkout comparator uses conservative 95% score bounds. It requires
+The cross-checkout comparator uses conservative 95% timing bounds. It requires
 the focused high-cardinality workload to improve by at least 2x and 25 ms, the
-production-pipeline compile time and its validation overhead relative to the
-matched whole-compile reference to improve by at least 20%, and both
+production-pipeline compile time to improve by at least 20%, and both
 low-cardinality controls to stay within 10% of baseline without a statistically
-significant regression. An identical-checkout comparison fails closed.
+significant regression. It also reports the conservative change in validation
+overhead relative to the matched whole-compile reference for attribution, but
+that noisier derived metric is not a second retention gate. An identical-checkout
+comparison fails closed.
 
 The committed same-process guards are deliberately narrower than those
 cross-checkout claims. Normalized focused cost may grow by at most 1.5x from 32

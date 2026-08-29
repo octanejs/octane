@@ -42,11 +42,7 @@ const childRenderer = {
 	validation,
 };
 
-function focusedFixture(count) {
-	const source = Array.from(
-		{ length: count },
-		(_, index) => `const value${index} = <view id={${index}} />;`,
-	).join('\n');
+function focusedSourceFixture(source) {
 	const authoredAst = parseModule(source, '/src/Focused.object.tsrx');
 	const validationRanges = authoredAst.body.map(({ start, end }) => ({ start, end }));
 	const regionAst = parseModule(
@@ -56,6 +52,15 @@ function focusedFixture(count) {
 	const regionExpression = regionAst.body[0]?.declarations?.[0]?.init;
 	if (!regionExpression) throw new Error('focused renderer-validation region did not parse');
 	return { authoredAst, regionExpression, source, validationRanges };
+}
+
+function focusedFixture(count) {
+	return focusedSourceFixture(
+		Array.from(
+			{ length: count },
+			(_, index) => `const value${index} = <view id={${index}} />;`,
+		).join('\n'),
+	);
 }
 
 function pipelineSource(count) {
@@ -101,6 +106,14 @@ function mixChecksum(checksum, value) {
 	return Math.imul(checksum ^ value, 16_777_619) >>> 0;
 }
 
+function checksumString(value) {
+	let checksum = 2_166_136_261;
+	for (let index = 0; index < value.length; index++) {
+		checksum = mixChecksum(checksum, value.charCodeAt(index));
+	}
+	return checksum;
+}
+
 function measureFocused(fixture, renderer = childRenderer) {
 	const started = performance.now();
 	const lowered = lowerUniversalRendererRegionAst(
@@ -130,8 +143,9 @@ function measurePipeline(source, options) {
 	const elapsed = performance.now() - started;
 	assert.equal(result.diagnostics.length, 0, 'renderer-validation fixture emitted diagnostics');
 	return {
-		checksum: mixChecksum(2_166_136_261, result.code.length),
+		checksum: checksumString(result.code),
 		elapsed,
+		output: result.code,
 		outputBytes: Buffer.byteLength(result.code),
 	};
 }
@@ -139,15 +153,34 @@ function measurePipeline(source, options) {
 function repeatMeasurement(measure, repetitions) {
 	let checksum;
 	let elapsed = 0;
+	let output;
 	let outputBytes;
 	for (let repetition = 0; repetition < repetitions; repetition++) {
 		const sample = measure();
 		checksum ??= sample.checksum;
 		assert.equal(sample.checksum, checksum, 'repeated semantic checksum changed');
+		output ??= sample.output;
 		elapsed += sample.elapsed;
 		outputBytes = sample.outputBytes;
 	}
-	return { checksum, elapsed: elapsed / repetitions, outputBytes };
+	return { checksum, elapsed: elapsed / repetitions, output, outputBytes };
+}
+
+function verifyValidationSentinels() {
+	const focusedInvalid = focusedSourceFixture(
+		'const selected = <view onClick={() => undefined} />;',
+	);
+	assert.throws(() => measureFocused(focusedInvalid), {
+		message:
+			'Octane universal compiler: renderer "object" does not allow static attribute "onClick" on <view>. at /src/Focused.object.tsrx:1:23',
+	});
+
+	const pipelineInvalid = `import { Native } from '@scene/bridge';
+export function Scene() @{ <group><Native><view onClick={() => undefined} /></Native></group> }`;
+	assert.throws(() => compile(pipelineInvalid, '/src/Boundary.native.tsrx', validatedOptions), {
+		message:
+			'Octane universal compiler: renderer "inner" does not allow static attribute "onClick" on <view>. at /src/Boundary.native.tsrx:2:48',
+	});
 }
 
 const focusedHigh = focusedFixture(FOCUSED_HIGH_RANGES);
@@ -207,22 +240,39 @@ const targets = [
 
 let failure;
 try {
+	verifyValidationSentinels();
 	const expectedChecksums = new Map();
+	const expectedOutputs = new Map();
 	for (const target of targets) {
 		const first = target.measure();
 		expectedChecksums.set(target.name, first.checksum);
-		target.meta = { ...target.meta, checksum: first.checksum, outputBytes: first.outputBytes };
+		expectedOutputs.set(target.name, first.output);
+		target.meta = {
+			...target.meta,
+			checksum: expectedChecksums.get(target.name),
+			outputBytes: first.outputBytes,
+		};
 	}
 	assert.equal(
-		expectedChecksums.get('pipeline-validated-high'),
-		expectedChecksums.get('pipeline-reference-high'),
+		expectedOutputs.get('pipeline-validated-high'),
+		expectedOutputs.get('pipeline-reference-high'),
 		'high-cardinality validation changed compiler output',
 	);
 	assert.equal(
-		expectedChecksums.get('pipeline-validated-low'),
-		expectedChecksums.get('pipeline-reference-low'),
+		expectedOutputs.get('pipeline-validated-low'),
+		expectedOutputs.get('pipeline-reference-low'),
 		'low-cardinality validation changed compiler output',
 	);
+	for (let warmup = 1; warmup < 3; warmup++) {
+		for (const target of warmup % 2 === 0 ? targets : targets.toReversed()) {
+			const sample = target.measure();
+			assert.equal(
+				sample.checksum,
+				expectedChecksums.get(target.name),
+				`${target.name} warmup semantic checksum changed`,
+			);
+		}
+	}
 
 	for (let iteration = 0; iteration < iterations; iteration++) {
 		for (const target of iteration % 2 === 0 ? targets : targets.toReversed()) {

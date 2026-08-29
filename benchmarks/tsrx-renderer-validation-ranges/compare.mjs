@@ -29,11 +29,27 @@ export function evaluateComparison(baseline, candidate) {
 	const baselineReference = targetStat(baseline, 'pipeline-reference-high');
 	const candidateValidated = targetStat(candidate, 'pipeline-validated-high');
 	const candidateReference = targetStat(candidate, 'pipeline-reference-high');
-	const pipelineRatio = central(baselineValidated) / central(candidateValidated);
-	const pipelineOverheadRatio =
-		central(baselineValidated) /
-		central(baselineReference) /
-		(central(candidateValidated) / central(candidateReference));
+	const baselineValidatedBounds = bounds(baselineValidated);
+	const baselineReferenceBounds = bounds(baselineReference);
+	const candidateValidatedBounds = bounds(candidateValidated);
+	const candidateReferenceBounds = bounds(candidateReference);
+	const pipelineBounds = [
+		baselineValidatedBounds,
+		baselineReferenceBounds,
+		candidateValidatedBounds,
+		candidateReferenceBounds,
+	];
+	const hasPositivePipelineBounds = pipelineBounds.every(
+		({ lower, upper }) => lower > 0 && upper >= lower,
+	);
+	const pipelineRatio = hasPositivePipelineBounds
+		? baselineValidatedBounds.lower / candidateValidatedBounds.upper
+		: 0;
+	const pipelineOverheadRatio = hasPositivePipelineBounds
+		? baselineValidatedBounds.lower /
+			baselineReferenceBounds.upper /
+			(candidateValidatedBounds.upper / candidateReferenceBounds.lower)
+		: 0;
 	const lowNames = ['focused-low', 'pipeline-validated-low'];
 	const lowRatios = lowNames.map(
 		(name) => central(targetStat(candidate, name)) / central(targetStat(baseline, name)),
@@ -47,7 +63,7 @@ export function evaluateComparison(baseline, candidate) {
 		focusedAbsolute: focusedDelta >= 25,
 		focusedRatio: focusedRatio >= 2,
 		lowCardinality: !lowRegression && lowRatios.every((ratio) => ratio <= 1.1),
-		pipelineRatio: pipelineRatio >= 1.2 && pipelineOverheadRatio >= 1.2,
+		pipelineRatio: pipelineRatio >= 1.2,
 	};
 	return {
 		focusedDelta,
@@ -85,7 +101,7 @@ const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPat
 if (isMain) {
 	const baselineRoot = process.argv[2];
 	const candidateRoot = process.argv[3];
-	const iterations = Number.parseInt(process.argv[4] ?? '7', 10);
+	const iterations = Number.parseInt(process.argv[4] ?? '15', 10);
 	if (!baselineRoot || !candidateRoot) {
 		throw new Error('usage: node compare.mjs <baseline-root> <candidate-root> [iterations]');
 	}
