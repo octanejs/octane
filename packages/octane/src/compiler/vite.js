@@ -759,9 +759,10 @@ export function octane(options = {}) {
 			// adapter concern, then let the AST fall out of scope before any graph
 			// loading begins. Compilation keeps its independent authoritative parser.
 			const preflight = (() => {
+				const authoredSource = code;
 				let ast;
 				try {
-					ast = parseModule(code, id);
+					ast = parseModule(authoredSource, id);
 				} catch {
 					// Every adapter classifier uses this exact parser/source/id and would
 					// return an empty result after repeating the same failed parse. Preserve
