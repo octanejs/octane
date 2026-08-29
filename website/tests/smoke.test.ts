@@ -613,7 +613,7 @@ describe('website routes', () => {
 
 		const packageLinks = Array.from(
 			container.querySelectorAll<HTMLAnchorElement>(
-				'.ecosystem-entity[id^="binding-"] .ecosystem-package-link',
+				'.ecosystem-entity[id^="binding-"] a[href*="/packages/"]',
 			),
 		);
 		expect(packageLinks).toHaveLength(BINDING_COUNT);
@@ -625,9 +625,7 @@ describe('website routes', () => {
 			const directory = packageName.slice('@octanejs/'.length);
 			const href = `https://github.com/octanejs/octane/tree/main/packages/${directory}`;
 			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
-			expect(link?.closest('.ecosystem-entity')?.querySelector('code')?.textContent).toBe(
-				packageName,
-			);
+			expect(link?.textContent).toContain(packageName);
 		}
 	});
 
