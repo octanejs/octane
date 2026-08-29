@@ -318,59 +318,48 @@ export function EcosystemDirectory() @{
 							</div>
 						} @else {
 							<div class="ecosystem-collection ecosystem-collection--mixed">
-								@for (const entity of integrationEntities(section.entities); key entity.id) {
-									<article id={entity.id} class="ecosystem-entity ecosystem-integration-card">
-										<div class="ecosystem-entity-copy">
-											<span class="ecosystem-type">{ecosystemEntityTypeLabel(
-												entity,
-											) as string}</span>
-											<h4>{entity.title as string}</h4>
-											<code>{entity.packageName as string}</code>
-											<p>{entity.description as string}</p>
-											<span class="ecosystem-context">{entity.model as string}</span>
-										</div>
-										<div class="ecosystem-actions">
+								@for (const entity of section.entities; key entity.id) {
+									@if (entity.kind === 'library-binding') {
+										<article
+											id={entity.id}
+											class="ecosystem-entity ecosystem-binding-item"
+											data-binding-title={entity.title}
+										>
 											<a
-												class="ecosystem-package-link"
+												class="binding-link"
 												href={ecosystemPackageGuideHref(entity.packageName)}
+												aria-label={'Open the ' + entity.title + ' package guide'}
 											>
-												Package guide ↗
+												<code>{entity.packageName as string}</code>
 											</a>
-											<a
-												class="ecosystem-guide-link"
-												href={'/docs/framework-integrations#' + entity.guideAnchor}
-											>
-												Integration guide
-											</a>
-										</div>
-									</article>
-								}
-								@if (bindingEntities(section.entities).length > 0) {
-									<div class="binding-card ecosystem-search-bindings">
-										<header class="binding-card-head">
-											<h4>Library bindings</h4>
-											<span class="ecosystem-count">{bindingCount(
-												bindingEntities(section.entities).length,
-											) as string}</span>
-										</header>
-										<ul class="binding-list">
-											@for (const entity of bindingEntities(section.entities); key entity.id) {
-												<li
-													id={entity.id}
-													class="ecosystem-entity ecosystem-binding-item"
-													data-binding-title={entity.title}
+										</article>
+									} @else {
+										<article id={entity.id} class="ecosystem-entity ecosystem-integration-card">
+											<div class="ecosystem-entity-copy">
+												<span class="ecosystem-type">{ecosystemEntityTypeLabel(
+													entity,
+												) as string}</span>
+												<h4>{entity.title as string}</h4>
+												<code>{entity.packageName as string}</code>
+												<p>{entity.description as string}</p>
+												<span class="ecosystem-context">{entity.model as string}</span>
+											</div>
+											<div class="ecosystem-actions">
+												<a
+													class="ecosystem-package-link"
+													href={ecosystemPackageGuideHref(entity.packageName)}
 												>
-													<a
-														class="binding-link"
-														href={ecosystemPackageGuideHref(entity.packageName)}
-														aria-label={'Open the ' + entity.title + ' package guide'}
-													>
-														<code>{entity.packageName as string}</code>
-													</a>
-												</li>
-											}
-										</ul>
-									</div>
+													Package guide ↗
+												</a>
+												<a
+													class="ecosystem-guide-link"
+													href={'/docs/framework-integrations#' + entity.guideAnchor}
+												>
+													Integration guide
+												</a>
+											</div>
+										</article>
+									}
 								}
 							</div>
 						}
@@ -522,15 +511,13 @@ export function EcosystemDirectory() @{
 			.ecosystem-section--cards {
 				margin-bottom: 1.15rem;
 			}
-			.ecosystem-section--binding-card,
-			.binding-card {
+			.ecosystem-section--binding-card {
 				padding: 1.1rem;
 				border: 1px solid var(--border);
 				border-radius: 0.9rem;
 				background: var(--surface-subtle);
 			}
-			.ecosystem-section--binding-card .ecosystem-section-header,
-			.binding-card-head {
+			.ecosystem-section--binding-card .ecosystem-section-header {
 				align-items: baseline;
 				margin-bottom: 0.55rem;
 			}
@@ -541,15 +528,6 @@ export function EcosystemDirectory() @{
 				margin: 0.55rem 0 0;
 				font-size: 0.82rem;
 				line-height: 1.45;
-			}
-			.binding-card-head {
-				display: flex;
-				justify-content: space-between;
-				gap: 0.75rem;
-			}
-			.binding-card-head h4 {
-				margin: 0;
-				font-size: 1rem;
 			}
 			.ecosystem-section-header .ecosystem-section-heading {
 				margin: 0;
@@ -580,8 +558,12 @@ export function EcosystemDirectory() @{
 			}
 			.ecosystem-collection--mixed {
 				display: flex;
-				flex-direction: column;
-				gap: 0.7rem;
+				align-items: flex-start;
+				flex-wrap: wrap;
+				gap: 0.45rem;
+			}
+			.ecosystem-collection--mixed .ecosystem-integration-card {
+				flex: 1 0 100%;
 			}
 			.ecosystem-entity {
 				scroll-margin-top: 5.5rem;
@@ -751,9 +733,6 @@ export function EcosystemDirectory() @{
 				font-size: 0.75rem;
 				text-overflow: ellipsis;
 				white-space: nowrap;
-			}
-			.ecosystem-search-bindings {
-				width: 100%;
 			}
 			.ecosystem-empty {
 				padding: 2rem 1rem;

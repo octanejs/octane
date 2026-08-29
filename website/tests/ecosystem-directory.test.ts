@@ -115,6 +115,18 @@ describe('ecosystem directory', () => {
 		);
 	});
 
+	it('keeps mixed integration and binding results in relevance order', async () => {
+		const { container } = await renderRoute('/docs/bindings?q=vite');
+		const results = Array.from(container.querySelectorAll<HTMLElement>('.ecosystem-entity')).map(
+			(entity) => entity.id,
+		);
+
+		expect(results).toEqual(['binding-mobx', 'integration-tanstack-start']);
+		expect(container.querySelector('.ecosystem-entity')?.classList).toContain(
+			'ecosystem-binding-item',
+		);
+	});
+
 	it('replaces the URL while typing and pushes explicit filters', async () => {
 		const { container, router } = await renderRoute('/docs/bindings');
 		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
