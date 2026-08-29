@@ -461,8 +461,8 @@ export function EcosystemDirectory() @{
 				text-align: center;
 			}
 			.ecosystem-collection--cards {
-				display: grid;
-				grid-template-columns: repeat(2, minmax(0, 1fr));
+				display: flex;
+				flex-direction: column;
 				gap: 0.7rem;
 			}
 			.ecosystem-collection--rows {
@@ -555,6 +555,49 @@ export function EcosystemDirectory() @{
 			.ecosystem-actions a:hover {
 				background: rgba(255, 65, 90, 0.1);
 			}
+			@media (min-width: 761px) {
+				.ecosystem-collection--cards .ecosystem-integration-card {
+					display: grid;
+					grid-template-columns: minmax(0, 1fr) 10.5rem;
+				}
+				.ecosystem-collection--cards .ecosystem-entity-copy {
+					display: grid;
+					grid-template-columns: minmax(11rem, 0.7fr) minmax(0, 1.3fr);
+					grid-template-rows: auto auto auto;
+					column-gap: 1.35rem;
+				}
+				.ecosystem-collection--cards .ecosystem-type {
+					grid-column: 1;
+					grid-row: 1;
+					justify-self: start;
+				}
+				.ecosystem-collection--cards .ecosystem-integration-card h4 {
+					grid-column: 1;
+					grid-row: 2;
+				}
+				.ecosystem-collection--cards .ecosystem-integration-card code {
+					grid-column: 1;
+					grid-row: 3;
+					align-self: end;
+				}
+				.ecosystem-collection--cards .ecosystem-integration-card .ecosystem-entity-copy p {
+					grid-column: 2;
+					grid-row: 1 / span 2;
+					margin: 0;
+				}
+				.ecosystem-collection--cards .ecosystem-context {
+					grid-column: 2;
+					grid-row: 3;
+					align-self: end;
+				}
+				.ecosystem-collection--cards .ecosystem-actions {
+					flex-direction: column;
+					justify-content: center;
+					padding: 0.75rem;
+					border-top: 0;
+					border-left: 1px solid var(--border);
+				}
+			}
 			.ecosystem-collection--rows .ecosystem-binding-row + .ecosystem-binding-row {
 				border-top: 1px solid var(--border);
 			}
@@ -646,8 +689,7 @@ export function EcosystemDirectory() @{
 				}
 			}
 			@media (max-width: 600px) {
-				.ecosystem-controls,
-				.ecosystem-collection--cards {
+				.ecosystem-controls {
 					grid-template-columns: 1fr;
 				}
 				.ecosystem-search-field {
