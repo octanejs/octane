@@ -656,7 +656,7 @@ export function EcosystemDirectory() @{
 				.ecosystem-entity {
 					scroll-margin-top: 9rem;
 				}
-				.ecosystem-binding-link {
+				.ecosystem-directory .ecosystem-binding-link {
 					grid-template-columns: minmax(0, 1fr) auto;
 					gap: 0.25rem 0.75rem;
 				}
