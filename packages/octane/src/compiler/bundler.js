@@ -75,6 +75,21 @@ export const OCTANE_RUNTIME_REQUESTS = Object.freeze({
 	server: 'octane/server',
 });
 
+// Vite can classify descriptor exports from its transform-local preflight AST,
+// but the neutral compiler must never trust caller-supplied facts or a naked
+// authored AST. Only opaque objects registered here can bypass the established
+// string classifier, and each proof is consumed once for its exact source/id.
+const descriptorChildrenExportProofs = new WeakMap();
+const descriptorChildrenExportAuthorities = new WeakMap();
+
+function consumeDescriptorChildrenExportProof(proof, source, id) {
+	if (proof === null || typeof proof !== 'object') return null;
+	const prepared = descriptorChildrenExportProofs.get(proof);
+	descriptorChildrenExportProofs.delete(proof);
+	if (prepared?.source !== source || prepared.id !== id) return null;
+	return prepared.exports;
+}
+
 /** Strip bundler query/hash suffixes without changing the underlying path. */
 export function cleanModuleId(id) {
 	const query = id.indexOf('?');
@@ -518,6 +533,7 @@ class OctaneBundlerCompiler {
 			if (renderer.intrinsics !== undefined) this.pragmaOwnedModules.add(renderer.intrinsics);
 		}
 		this.warn = typeof options.warn === 'function' ? options.warn : null;
+		descriptorChildrenExportAuthorities.set(this, options._descriptorPreflightAuthority ?? null);
 		this.warnedOwnership = new Set();
 		this.warnedCompileDiagnostics = new Set();
 		// Deliberately instance-scoped: separate projects/build environments must
@@ -933,8 +949,30 @@ class OctaneBundlerCompiler {
 		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
 	}
 
+	/** @internal Create a one-transform descriptor-export proof from a read-only AST. */
+	_prepareDescriptorChildrenExports(authority, source, id, ast) {
+		if (
+			authority === null ||
+			authority !== descriptorChildrenExportAuthorities.get(this) ||
+			typeof source !== 'string' ||
+			typeof id !== 'string' ||
+			ast === null ||
+			typeof ast !== 'object' ||
+			ast.type !== 'Program'
+		) {
+			throw new TypeError('Invalid descriptor-children preflight input.');
+		}
+		const proof = Object.freeze({});
+		descriptorChildrenExportProofs.set(proof, {
+			source,
+			id,
+			exports: Object.freeze(findDescriptorChildrenExports(ast, id)),
+		});
+		return proof;
+	}
+
 	/** CSS proof discovery uses the same ownership gate as the eventual compile. */
-	findCssModuleImportRequests(code, id, environment = 'client') {
+	findCssModuleImportRequests(code, id, environment = 'client', parsedAst = null) {
 		if (typeof code !== 'string' || !code.includes('.module.')) return [];
 		// The live-read witness currently follows DOM host ownership only. Even
 		// a DOM-owned module can delegate a JSX-valued prop to another renderer.
@@ -956,7 +994,7 @@ class OctaneBundlerCompiler {
 		) {
 			return [];
 		}
-		return findCssModuleImportRequests(code, filename);
+		return findCssModuleImportRequests(parsedAst ?? code, filename);
 	}
 
 	/**
@@ -1014,6 +1052,11 @@ class OctaneBundlerCompiler {
 
 	transform(code, id, options = {}) {
 		assertNativeReadOptions(options);
+		const preparedDescriptorChildrenExports = consumeDescriptorChildrenExportProof(
+			options._descriptorChildrenExportsProof,
+			code,
+			id,
+		);
 		const file = cleanModuleId(id);
 		const hydrateBoundaryPath = hydrateBoundaryPathFromId(id);
 		const collected = {
@@ -1199,7 +1242,10 @@ class OctaneBundlerCompiler {
 							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
 				...(cssModuleConstantImports === undefined ? null : { cssModuleConstantImports }),
-				descriptorChildrenExports: findDescriptorChildrenExports(code, filename),
+				descriptorChildrenExports:
+					preparedDescriptorChildrenExports === null
+						? findDescriptorChildrenExports(code, filename)
+						: [...preparedDescriptorChildrenExports],
 				...finishMetadata(collected),
 			};
 		}
