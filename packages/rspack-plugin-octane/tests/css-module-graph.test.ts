@@ -271,7 +271,7 @@ describe('Rspack CSS-module graph proofs', () => {
 				edge(safeRequest, safe),
 			];
 			const consumed = vi.fn(() => [safeRequest]);
-			const provider = vi.fn(() => undefined);
+			const provider = vi.fn((_input: { id: string }) => undefined);
 			const graph = harness({ option: provider }).createCompilation(
 				[app, invalid, otherwiseValid, safe],
 				new Map([[app.id, connections]]),
@@ -295,7 +295,7 @@ describe('Rspack CSS-module graph proofs', () => {
 		const styles = module('stable-styles', EXPORTS);
 		const duplicate = module(styles.id, EXPORTS);
 		const decoy = module('commonjs-decoy', EXPORTS.replaceAll('mapped_', 'wrong_'));
-		const provider = vi.fn(() => undefined);
+		const provider = vi.fn((_input: { id: string }) => undefined);
 		const graph = harness({ option: provider }).createCompilation(
 			[app, styles, duplicate, decoy],
 			new Map([
