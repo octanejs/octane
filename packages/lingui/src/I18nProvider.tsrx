@@ -2,6 +2,9 @@ import { createContext, useContext, useMemo, useSyncExternalStore, type OctaneNo
 import type { I18n } from '@lingui/core';
 import type { TransRenderProps } from './TransNoContext.tsrx';
 
+// Consumer bundlers replace this expression without requiring Node ambient types.
+declare const process: { env: { NODE_ENV?: string } };
+
 export type I18nDefaultComponent = (props: TransRenderProps) => OctaneNode;
 
 export type I18nContext = {

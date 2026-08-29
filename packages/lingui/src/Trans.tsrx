@@ -2,6 +2,9 @@ import { useLinguiInternal } from './I18nProvider.tsrx';
 import { TransNoContext, type TransProps } from './TransNoContext.tsrx';
 import type { OctaneNode } from 'octane';
 
+// Consumer bundlers replace this expression without requiring Node ambient types.
+declare const process: { env: { NODE_ENV?: string } };
+
 export function Trans(props: TransProps): OctaneNode {
 	let errMessage = undefined;
 	if (process.env.NODE_ENV !== 'production') {

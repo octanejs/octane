@@ -11,7 +11,6 @@
     "allowSyntheticDefaultImports": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "types": ["node"],
     "strict": true,
     "paths": {
       "@rive-app/canvas": ["./tests/_stubs/rive-app-canvas.ts"]

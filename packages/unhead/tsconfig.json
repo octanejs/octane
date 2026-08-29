@@ -10,7 +10,6 @@
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"],
     "strict": true,
     "jsx": "react-jsx",
     "jsxImportSource": "octane",
