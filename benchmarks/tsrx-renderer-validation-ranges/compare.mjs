@@ -10,10 +10,14 @@ function targetStat(payload, name) {
 	return stat;
 }
 
+function central(stat) {
+	return Number.isFinite(stat.mean) ? stat.mean : stat.score;
+}
+
 function bounds(stat) {
-	const rme = Number.isFinite(stat.scoreRme) ? stat.scoreRme : stat.rme;
-	const margin = stat.score * ((Number.isFinite(rme) ? rme : 0) / 100);
-	return { lower: stat.score - margin, upper: stat.score + margin };
+	const value = central(stat);
+	const margin = value * ((Number.isFinite(stat.rme) ? stat.rme : 0) / 100);
+	return { lower: value - margin, upper: value + margin };
 }
 
 export function evaluateComparison(baseline, candidate) {
@@ -21,19 +25,29 @@ export function evaluateComparison(baseline, candidate) {
 	const candidateFocused = bounds(targetStat(candidate, 'focused-high'));
 	const focusedRatio = baselineFocused.lower / candidateFocused.upper;
 	const focusedDelta = baselineFocused.lower - candidateFocused.upper;
-	const baselinePipeline = bounds(targetStat(baseline, 'pipeline-validated-high'));
-	const candidatePipeline = bounds(targetStat(candidate, 'pipeline-validated-high'));
-	const pipelineRatio = baselinePipeline.lower / candidatePipeline.upper;
-	const lowRatios = ['focused-low', 'pipeline-validated-low'].map((name) => {
+	const baselineValidated = targetStat(baseline, 'pipeline-validated-high');
+	const baselineReference = targetStat(baseline, 'pipeline-reference-high');
+	const candidateValidated = targetStat(candidate, 'pipeline-validated-high');
+	const candidateReference = targetStat(candidate, 'pipeline-reference-high');
+	const pipelineRatio = central(baselineValidated) / central(candidateValidated);
+	const pipelineOverheadRatio =
+		central(baselineValidated) /
+		central(baselineReference) /
+		(central(candidateValidated) / central(candidateReference));
+	const lowNames = ['focused-low', 'pipeline-validated-low'];
+	const lowRatios = lowNames.map(
+		(name) => central(targetStat(candidate, name)) / central(targetStat(baseline, name)),
+	);
+	const lowRegression = lowNames.some((name) => {
 		const baselineLow = bounds(targetStat(baseline, name));
 		const candidateLow = bounds(targetStat(candidate, name));
-		return candidateLow.upper / baselineLow.lower;
+		return candidateLow.lower > baselineLow.upper * 1.1;
 	});
 	const gates = {
 		focusedAbsolute: focusedDelta >= 25,
 		focusedRatio: focusedRatio >= 2,
-		lowCardinality: lowRatios.every((ratio) => ratio <= 1.1),
-		pipelineRatio: pipelineRatio >= 1.2,
+		lowCardinality: !lowRegression && lowRatios.every((ratio) => ratio <= 1.1),
+		pipelineRatio: pipelineRatio >= 1.2 && pipelineOverheadRatio >= 1.2,
 	};
 	return {
 		focusedDelta,
@@ -41,6 +55,7 @@ export function evaluateComparison(baseline, candidate) {
 		gates,
 		lowRatios,
 		pass: Object.values(gates).every(Boolean),
+		pipelineOverheadRatio,
 		pipelineRatio,
 	};
 }

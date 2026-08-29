@@ -101,13 +101,13 @@ function mixChecksum(checksum, value) {
 	return Math.imul(checksum ^ value, 16_777_619) >>> 0;
 }
 
-function measureFocused(fixture) {
+function measureFocused(fixture, renderer = childRenderer) {
 	const started = performance.now();
 	const lowered = lowerUniversalRendererRegionAst(
 		fixture.regionExpression,
 		'/src/Focused.object.tsrx',
 		ownerRenderer,
-		childRenderer,
+		renderer,
 		0,
 		{
 			authoredAst: fixture.authoredAst,
@@ -136,6 +136,20 @@ function measurePipeline(source, options) {
 	};
 }
 
+function repeatMeasurement(measure, repetitions) {
+	let checksum;
+	let elapsed = 0;
+	let outputBytes;
+	for (let repetition = 0; repetition < repetitions; repetition++) {
+		const sample = measure();
+		checksum ??= sample.checksum;
+		assert.equal(sample.checksum, checksum, 'repeated semantic checksum changed');
+		elapsed += sample.elapsed;
+		outputBytes = sample.outputBytes;
+	}
+	return { checksum, elapsed: elapsed / repetitions, outputBytes };
+}
+
 const focusedHigh = focusedFixture(FOCUSED_HIGH_RANGES);
 const focusedLow = focusedFixture(FOCUSED_LOW_RANGES);
 const pipelineHigh = pipelineSource(PIPELINE_HIGH_COMPONENTS);
@@ -151,8 +165,8 @@ const targets = [
 	},
 	{
 		name: 'focused-low',
-		measure: () => measureFocused(focusedLow),
-		meta: { ranges: FOCUSED_LOW_RANGES, path: 'focused' },
+		measure: () => repeatMeasurement(() => measureFocused(focusedLow), 64),
+		meta: { compilesPerSample: 64, ranges: FOCUSED_LOW_RANGES, path: 'focused' },
 		samples: [],
 	},
 	{
@@ -169,14 +183,24 @@ const targets = [
 	},
 	{
 		name: 'pipeline-validated-low',
-		measure: () => measurePipeline(pipelineLow, validatedOptions),
-		meta: { components: PIPELINE_LOW_COMPONENTS, path: 'compiler', validation: true },
+		measure: () => repeatMeasurement(() => measurePipeline(pipelineLow, validatedOptions), 4),
+		meta: {
+			compilesPerSample: 4,
+			components: PIPELINE_LOW_COMPONENTS,
+			path: 'compiler',
+			validation: true,
+		},
 		samples: [],
 	},
 	{
 		name: 'pipeline-reference-low',
-		measure: () => measurePipeline(pipelineLow, referenceOptions),
-		meta: { components: PIPELINE_LOW_COMPONENTS, path: 'compiler', validation: false },
+		measure: () => repeatMeasurement(() => measurePipeline(pipelineLow, referenceOptions), 4),
+		meta: {
+			compilesPerSample: 4,
+			components: PIPELINE_LOW_COMPONENTS,
+			path: 'compiler',
+			validation: false,
+		},
 		samples: [],
 	},
 ];
@@ -216,14 +240,23 @@ try {
 	console.error(`FAIL tsrx-renderer-validation-ranges/${failure}`);
 }
 
-const rows = targets.map((target) => ({
-	name: target.name,
-	ops:
+const rows = targets.map((target) => {
+	const ops =
 		target.samples.length === 0
 			? {}
-			: { compile: timingStatForJson(summarizeSamples(target.samples), { p99: true }) },
-	meta: { ...target.meta, correctness: failure ? 'fail' : 'pass' },
-}));
+			: { compile: timingStatForJson(summarizeSamples(target.samples), { p99: true }) };
+	if (target.samples.length !== 0 && target.meta.ranges) {
+		ops.compile_per_1000_ranges = timingStatForJson(
+			summarizeSamples(target.samples.map((elapsed) => (elapsed * 1_000) / target.meta.ranges)),
+			{ p99: true },
+		);
+	}
+	return {
+		name: target.name,
+		ops,
+		meta: { ...target.meta, correctness: failure ? 'fail' : 'pass' },
+	};
+});
 
 if (!failure) {
 	for (const target of rows) {
