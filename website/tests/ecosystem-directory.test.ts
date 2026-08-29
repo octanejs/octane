@@ -48,33 +48,31 @@ describe('ecosystem directory', () => {
 		expect(container.querySelector('#binding-tanstack-router')).toBeTruthy();
 
 		const bindingGroups = Array.from(
-			container.querySelectorAll<HTMLElement>('.ecosystem-collection--rows'),
+			container.querySelectorAll<HTMLElement>('.ecosystem-section--binding-card'),
 		);
 		expect(bindingGroups).toHaveLength(BINDING_CATEGORIES.length);
 		for (const [index, group] of bindingGroups.entries()) {
-			const titles = Array.from(group.querySelectorAll<HTMLElement>('.ecosystem-binding-name')).map(
-				(title) => title.textContent?.trim(),
+			const titles = Array.from(group.querySelectorAll<HTMLElement>('.ecosystem-binding-item')).map(
+				(item) => item.dataset.bindingTitle,
 			);
 			expect(titles).toHaveLength(BINDING_CATEGORIES[index]!.packages.length);
 			expect(titles).toEqual([...titles].sort((left, right) => left!.localeCompare(right!)));
 		}
 	});
 
-	it('keeps integrations as cards and renders bindings as package rows', async () => {
+	it('keeps integrations as rows and restores the original binding category cards', async () => {
 		const { container } = await renderRoute('/docs/bindings');
 		const integrations = container.querySelectorAll('.ecosystem-integration-card');
-		const bindings = container.querySelectorAll('.ecosystem-binding-row');
+		const bindingCards = container.querySelectorAll('.ecosystem-section--binding-card');
+		const bindings = container.querySelectorAll('.ecosystem-binding-item');
 		const zustand = container.querySelector<HTMLElement>('#binding-zustand')!;
 
 		expect(integrations).toHaveLength(FRAMEWORK_INTEGRATION_COUNT);
+		expect(bindingCards).toHaveLength(BINDING_CATEGORIES.length);
 		expect(bindings).toHaveLength(BINDING_COUNT);
-		expect(container.querySelectorAll('.ecosystem-binding-row h4')).toHaveLength(BINDING_COUNT);
+		expect(container.querySelectorAll('.ecosystem-binding-item h4')).toHaveLength(0);
 		expect(zustand.querySelector('.ecosystem-type')).toBeNull();
-		expect(
-			Array.from(zustand.querySelectorAll('.ecosystem-binding-packages code')).map(
-				(packageName) => packageName.textContent,
-			),
-		).toEqual(['zustand', '@octanejs/zustand']);
+		expect(zustand.querySelector('code')?.textContent).toBe('@octanejs/zustand');
 		expect(zustand.querySelector<HTMLAnchorElement>('a')?.getAttribute('href')).toContain(
 			'/packages/zustand',
 		);

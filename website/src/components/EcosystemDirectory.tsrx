@@ -8,6 +8,8 @@ import {
 	filterEcosystemEntities,
 	searchEcosystem,
 	type EcosystemEntity,
+	type FrameworkIntegrationEntity,
+	type LibraryBindingEntity,
 } from '../lib/ecosystem-search-core.ts';
 import {
 	ecosystemEntityTypeLabel,
@@ -19,7 +21,7 @@ interface DirectorySection {
 	title: string;
 	description: string;
 	entities: EcosystemEntity[];
-	layout: 'cards' | 'rows' | 'mixed';
+	layout: 'cards' | 'binding-card' | 'mixed';
 }
 
 interface DirectoryState {
@@ -95,9 +97,25 @@ function directorySections(entities: EcosystemEntity[], searching: boolean): Dir
 		const bindings = entities.filter(
 			(entity) => entity.kind === 'library-binding' && entity.categoryId === category.id,
 		).sort((left, right) => left.title.localeCompare(right.title));
-		if (bindings.length) sections.push({ ...category, entities: bindings, layout: 'rows' });
+		if (bindings.length) sections.push({ ...category, entities: bindings, layout: 'binding-card' });
 	}
 	return sections;
+}
+
+function bindingEntities(entities: EcosystemEntity[]): LibraryBindingEntity[] {
+	return entities.filter(
+		(entity): entity is LibraryBindingEntity => entity.kind === 'library-binding',
+	);
+}
+
+function integrationEntities(entities: EcosystemEntity[]): FrameworkIntegrationEntity[] {
+	return entities.filter(
+		(entity): entity is FrameworkIntegrationEntity => entity.kind === 'framework-integration',
+	);
+}
+
+function bindingCount(count: number): string {
+	return count + (count === 1 ? ' binding' : ' bindings');
 }
 
 export function EcosystemDirectory() @{
@@ -234,7 +252,10 @@ export function EcosystemDirectory() @{
 		@if (sections.length > 0) {
 			<div class="ecosystem-sections">
 				@for (const section of sections; key section.id) {
-					<section class="ecosystem-section" aria-labelledby={'ecosystem-section-' + section.id}>
+					<section
+						class={'ecosystem-section ecosystem-section--' + section.layout}
+						aria-labelledby={'ecosystem-section-' + section.id}
+					>
 						<header class="ecosystem-section-header">
 							<div>
 								<h3
@@ -243,32 +264,31 @@ export function EcosystemDirectory() @{
 								>{section.title as string}</h3>
 								<p>{section.description as string}</p>
 							</div>
-							<span class="ecosystem-count">{section.entities.length + '' as string}</span>
+							<span class="ecosystem-count">{(section.layout === 'binding-card'
+								? bindingCount(section.entities.length)
+								: section.entities.length + '') as string}</span>
 						</header>
-						<div class={'ecosystem-collection ecosystem-collection--' + section.layout}>
-							@for (const entity of section.entities; key entity.id) {
-								@if (entity.kind === 'library-binding') {
-									<article id={entity.id} class="ecosystem-entity ecosystem-binding-row">
+						@if (section.layout === 'binding-card') {
+							<ul class="binding-list">
+								@for (const entity of bindingEntities(section.entities); key entity.id) {
+									<li
+										id={entity.id}
+										class="ecosystem-entity ecosystem-binding-item"
+										data-binding-title={entity.title}
+									>
 										<a
-											class="ecosystem-binding-link"
+											class="binding-link"
 											href={ecosystemPackageGuideHref(entity.packageName)}
 											aria-label={'Open the ' + entity.title + ' package guide'}
 										>
-											<span class="ecosystem-binding-primary">
-												<h4 class="ecosystem-binding-name">{entity.title as string}</h4>
-												@if (searching) {
-													<small>{entity.category as string}</small>
-												}
-											</span>
-											<span class="ecosystem-binding-packages">
-												<code>{entity.upstreamPackage as string}</code>
-												<span aria-hidden="true">→</span>
-												<code>{entity.packageName as string}</code>
-											</span>
-											<span class="ecosystem-row-arrow" aria-hidden="true">↗</span>
+											<code>{entity.packageName as string}</code>
 										</a>
-									</article>
-								} @else {
+									</li>
+								}
+							</ul>
+						} @else if (section.layout === 'cards') {
+							<div class="ecosystem-collection ecosystem-collection--cards">
+								@for (const entity of integrationEntities(section.entities); key entity.id) {
 									<article id={entity.id} class="ecosystem-entity ecosystem-integration-card">
 										<div class="ecosystem-entity-copy">
 											<span class="ecosystem-type">{ecosystemEntityTypeLabel(
@@ -295,8 +315,65 @@ export function EcosystemDirectory() @{
 										</div>
 									</article>
 								}
-							}
-						</div>
+							</div>
+						} @else {
+							<div class="ecosystem-collection ecosystem-collection--mixed">
+								@for (const entity of integrationEntities(section.entities); key entity.id) {
+									<article id={entity.id} class="ecosystem-entity ecosystem-integration-card">
+										<div class="ecosystem-entity-copy">
+											<span class="ecosystem-type">{ecosystemEntityTypeLabel(
+												entity,
+											) as string}</span>
+											<h4>{entity.title as string}</h4>
+											<code>{entity.packageName as string}</code>
+											<p>{entity.description as string}</p>
+											<span class="ecosystem-context">{entity.model as string}</span>
+										</div>
+										<div class="ecosystem-actions">
+											<a
+												class="ecosystem-package-link"
+												href={ecosystemPackageGuideHref(entity.packageName)}
+											>
+												Package guide ↗
+											</a>
+											<a
+												class="ecosystem-guide-link"
+												href={'/docs/framework-integrations#' + entity.guideAnchor}
+											>
+												Integration guide
+											</a>
+										</div>
+									</article>
+								}
+								@if (bindingEntities(section.entities).length > 0) {
+									<div class="binding-card ecosystem-search-bindings">
+										<header class="binding-card-head">
+											<h4>Library bindings</h4>
+											<span class="ecosystem-count">{bindingCount(
+												bindingEntities(section.entities).length,
+											) as string}</span>
+										</header>
+										<ul class="binding-list">
+											@for (const entity of bindingEntities(section.entities); key entity.id) {
+												<li
+													id={entity.id}
+													class="ecosystem-entity ecosystem-binding-item"
+													data-binding-title={entity.title}
+												>
+													<a
+														class="binding-link"
+														href={ecosystemPackageGuideHref(entity.packageName)}
+														aria-label={'Open the ' + entity.title + ' package guide'}
+													>
+														<code>{entity.packageName as string}</code>
+													</a>
+												</li>
+											}
+										</ul>
+									</div>
+								}
+							</div>
+						}
 					</section>
 				}
 			</div>
@@ -385,9 +462,9 @@ export function EcosystemDirectory() @{
 				text-underline-offset: 0.18em;
 			}
 			.ecosystem-sections {
-				display: flex;
-				flex-direction: column;
-				gap: 2rem;
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 0.85rem;
 			}
 			.ecosystem-category-jumps {
 				display: flex;
@@ -438,6 +515,42 @@ export function EcosystemDirectory() @{
 				gap: 1rem;
 				margin-bottom: 0.75rem;
 			}
+			.ecosystem-section--cards,
+			.ecosystem-section--mixed {
+				grid-column: 1 / -1;
+			}
+			.ecosystem-section--cards {
+				margin-bottom: 1.15rem;
+			}
+			.ecosystem-section--binding-card,
+			.binding-card {
+				padding: 1.1rem;
+				border: 1px solid var(--border);
+				border-radius: 0.9rem;
+				background: var(--surface-subtle);
+			}
+			.ecosystem-section--binding-card .ecosystem-section-header,
+			.binding-card-head {
+				align-items: baseline;
+				margin-bottom: 0.55rem;
+			}
+			.ecosystem-section--binding-card .ecosystem-section-header > div {
+				min-width: 0;
+			}
+			.ecosystem-section--binding-card .ecosystem-section-header p {
+				margin: 0.55rem 0 0;
+				font-size: 0.82rem;
+				line-height: 1.45;
+			}
+			.binding-card-head {
+				display: flex;
+				justify-content: space-between;
+				gap: 0.75rem;
+			}
+			.binding-card-head h4 {
+				margin: 0;
+				font-size: 1rem;
+			}
 			.ecosystem-section-header .ecosystem-section-heading {
 				margin: 0;
 				font-size: 1.05rem;
@@ -465,16 +578,10 @@ export function EcosystemDirectory() @{
 				flex-direction: column;
 				gap: 0.7rem;
 			}
-			.ecosystem-collection--rows {
-				border: 1px solid var(--border);
-				border-radius: 0.8rem;
-				background: var(--surface-subtle);
-				overflow: hidden;
-			}
 			.ecosystem-collection--mixed {
 				display: flex;
 				flex-direction: column;
-				gap: 0.45rem;
+				gap: 0.7rem;
 			}
 			.ecosystem-entity {
 				scroll-margin-top: 5.5rem;
@@ -488,7 +595,7 @@ export function EcosystemDirectory() @{
 				background: var(--surface-subtle);
 				overflow: hidden;
 			}
-			.ecosystem-entity:target {
+			.ecosystem-integration-card:target {
 				border-color: var(--accent);
 				box-shadow: 0 0 0 3px rgba(255, 65, 90, 0.14);
 			}
@@ -598,73 +705,55 @@ export function EcosystemDirectory() @{
 					border-left: 1px solid var(--border);
 				}
 			}
-			.ecosystem-collection--rows .ecosystem-binding-row + .ecosystem-binding-row {
-				border-top: 1px solid var(--border);
-			}
-			.ecosystem-collection--mixed .ecosystem-binding-row {
-				border: 1px solid var(--border);
-				border-radius: 0.7rem;
-				background: var(--surface-subtle);
-				overflow: hidden;
-			}
-			.ecosystem-directory .ecosystem-binding-link {
-				display: grid;
-				grid-template-columns: minmax(8rem, 0.7fr) minmax(0, 1.3fr) auto;
-				align-items: center;
-				gap: 0.8rem;
-				min-height: 3.9rem;
-				padding: 0.65rem 0.85rem;
-				color: var(--text);
-				text-decoration: none;
-			}
-			.ecosystem-directory .ecosystem-binding-link:hover {
-				background: rgba(255, 65, 90, 0.07);
-				text-decoration: none;
-			}
-			.ecosystem-directory .ecosystem-binding-link:focus-visible {
-				outline: 2px solid var(--accent);
-				outline-offset: -2px;
-			}
-			.ecosystem-binding-primary {
+			.binding-list {
 				display: flex;
-				flex-direction: column;
-				min-width: 0;
-			}
-			.ecosystem-binding-name {
-				overflow: hidden;
-				margin: 0;
-				font-size: 0.86rem;
-				text-overflow: ellipsis;
-				white-space: nowrap;
-			}
-			.ecosystem-binding-primary small {
-				margin-top: 0.12rem;
-				color: var(--text-secondary);
-				font-size: 0.66rem;
-			}
-			.ecosystem-binding-packages {
-				display: flex;
-				align-items: center;
+				flex-wrap: wrap;
 				gap: 0.45rem;
-				min-width: 0;
-				color: var(--text-secondary);
-			}
-			.ecosystem-binding-packages code {
-				overflow: hidden;
+				list-style: none;
+				margin: 0;
 				padding: 0;
+			}
+			.binding-list li {
+				margin: 0;
+				padding: 0;
+			}
+			.binding-link {
+				display: inline-flex;
+				max-width: 100%;
+				border: 1px solid var(--border);
+				border-radius: 0.5rem;
+				background: var(--code-bg);
+				text-decoration: none;
+				transition:
+					border-color 0.15s,
+					background 0.15s;
+			}
+			.binding-link:hover {
+				border-color: rgba(255, 93, 114, 0.55);
+				background: rgba(255, 65, 90, 0.08);
+				text-decoration: none;
+			}
+			.binding-link:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.ecosystem-binding-item:target .binding-link {
+				border-color: var(--accent);
+				box-shadow: 0 0 0 3px rgba(255, 65, 90, 0.14);
+			}
+			.ecosystem-directory .binding-link code {
+				overflow: hidden;
+				max-width: 100%;
+				padding: 0.35rem 0.5rem;
 				border: 0;
 				background: transparent;
-				color: inherit;
-				font-size: 0.7rem;
+				color: var(--accent-text);
+				font-size: 0.75rem;
 				text-overflow: ellipsis;
 				white-space: nowrap;
 			}
-			.ecosystem-binding-packages code:last-child {
-				color: var(--accent-text);
-			}
-			.ecosystem-row-arrow {
-				color: var(--accent-text);
-				font-size: 0.85rem;
+			.ecosystem-search-bindings {
+				width: 100%;
 			}
 			.ecosystem-empty {
 				padding: 2rem 1rem;
@@ -677,6 +766,9 @@ export function EcosystemDirectory() @{
 				color: var(--text-secondary);
 			}
 			@media (max-width: 760px) {
+				.ecosystem-sections {
+					grid-template-columns: 1fr;
+				}
 				.ecosystem-controls {
 					grid-template-columns: 1fr 1fr;
 				}
@@ -697,23 +789,6 @@ export function EcosystemDirectory() @{
 				}
 				.ecosystem-entity {
 					scroll-margin-top: 9rem;
-				}
-				.ecosystem-directory .ecosystem-binding-link {
-					grid-template-columns: minmax(0, 1fr) auto;
-					gap: 0.25rem 0.75rem;
-				}
-				.ecosystem-binding-packages {
-					grid-column: 1 / -1;
-					flex-wrap: wrap;
-					row-gap: 0.15rem;
-				}
-				.ecosystem-binding-packages code {
-					flex: none;
-					max-width: 100%;
-				}
-				.ecosystem-row-arrow {
-					grid-column: 2;
-					grid-row: 1;
 				}
 			}
 		</style>
