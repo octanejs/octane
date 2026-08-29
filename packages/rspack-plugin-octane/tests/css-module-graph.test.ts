@@ -93,6 +93,10 @@ type TestEdge = ReturnType<typeof edge>;
 type ContextData = {
 	proof: null | { imports: { request: string }[] };
 };
+type GraphActivity = {
+	traversals: number;
+	visits: number;
+};
 
 // Real production builds cover rendered classes and stylesheet ownership. This
 // harness supplies adversarial public Rspack graph states that cannot be timed
@@ -121,12 +125,22 @@ function harness({
 			afterRebuild?: (module: TestModule, compilation: any) => void;
 		} = {},
 	) => {
+		const graphActivity: GraphActivity = { traversals: 0, visits: 0 };
 		const compilation: any = {
 			modules: new Set(modules),
 			loaderHooks: { loader: hook() },
 			hooks: { seal: hook(), processAssets: hook() },
 			moduleGraph: {
-				getOutgoingConnections: (module: TestModule) => edges.get(module.id) ?? [],
+				getOutgoingConnections(module: TestModule) {
+					graphActivity.traversals++;
+					const connections = edges.get(module.id) ?? [];
+					return (function* () {
+						for (const connection of connections) {
+							graphActivity.visits++;
+							yield connection;
+						}
+					})();
+				},
 			},
 		};
 		const contextFor = (module: TestModule) => {
@@ -165,6 +179,7 @@ function harness({
 		compiler.hooks.thisCompilation.call(compilation);
 		return {
 			compilation,
+			graphActivity,
 			finish: () => compiler.hooks.finishMake.promise(compilation),
 			seal: () => compilation.hooks.seal.call(),
 			emit: () => compilation.hooks.processAssets.call({}),
@@ -177,6 +192,176 @@ const EXPORTS = `var root = 'mapped_root'; var label = 'mapped_label'; export { 
 const CHANGED = /@octanejs\/rspack-plugin: CSS-module proof changed/;
 
 describe('Rspack CSS-module graph proofs', () => {
+	it('scales graph reads with CSS requests across proof phases', async () => {
+		const requests = Array.from({ length: 16 }, (_, index) => `./styles-${index}.module.css`);
+		const app = importer('many-imports', requests);
+		const styles = requests.map((request, index) =>
+			module(`styles-${index}`, EXPORTS.replaceAll('mapped_', `mapped_${index}_`), {
+				resource: `/project/${request.slice(2)}`,
+			}),
+		);
+		const graph = harness().createCompilation(
+			[app, ...styles],
+			new Map([[app.id, requests.map((request, index) => edge(request, styles[index]))]]),
+		);
+
+		await graph.finish();
+		expect(graph.graphActivity).toEqual({ traversals: 2, visits: 32 });
+		graph.seal();
+		expect(graph.graphActivity).toEqual({ traversals: 3, visits: 48 });
+		graph.emit();
+		expect(graph.graphActivity).toEqual({ traversals: 3, visits: 48 });
+	});
+
+	it.each([
+		{ requests: [] as string[], afterFinish: 0, afterSeal: 0 },
+		{ requests: ['./styles.module.css'], afterFinish: 2, afterSeal: 3 },
+	])('avoids unrelated graph reads for $requests.length CSS requests', async (scenario) => {
+		const app = importer('request-count', scenario.requests);
+		const styles = module('request-count-styles', EXPORTS);
+		const graph = harness().createCompilation(
+			[app, styles],
+			new Map([[app.id, [edge('./styles.module.css', styles)]]]),
+		);
+
+		await graph.finish();
+		expect(graph.graphActivity).toEqual({
+			traversals: scenario.afterFinish,
+			visits: scenario.afterFinish,
+		});
+		graph.seal();
+		expect(graph.graphActivity).toEqual({
+			traversals: scenario.afterSeal,
+			visits: scenario.afterSeal,
+		});
+		graph.emit();
+		expect(graph.graphActivity).toEqual({
+			traversals: scenario.afterSeal,
+			visits: scenario.afterSeal,
+		});
+	});
+
+	it.each([
+		{ invalidKind: 'attributes', invalidFirst: true },
+		{ invalidKind: 'attributes', invalidFirst: false },
+		{ invalidKind: 'unidentifiable', invalidFirst: true },
+		{ invalidKind: 'unidentifiable', invalidFirst: false },
+	] as const)(
+		'declines $invalidKind targets without poisoning safe peers when invalidFirst=$invalidFirst',
+		async ({ invalidKind, invalidFirst }) => {
+			const invalidRequest = './invalid.module.css';
+			const safeRequest = './safe.module.css';
+			const app = importer('request-local-invalidity', [invalidRequest, safeRequest]);
+			const invalid = module('invalid', EXPORTS, {
+				resource: '/project/invalid.module.css',
+			});
+			if (invalidKind === 'unidentifiable') invalid.identifier = undefined as any;
+			const otherwiseValid = module('otherwise-valid', EXPORTS, {
+				resource: '/project/invalid.module.css',
+			});
+			const safe = module('safe', EXPORTS, { resource: '/project/safe.module.css' });
+			const invalidEdge = edge(
+				invalidRequest,
+				invalid,
+				invalidKind === 'attributes' ? { attributes: { type: 'css' } } : {},
+			);
+			const validEdge = edge(invalidRequest, otherwiseValid);
+			const connections = [
+				...(invalidFirst ? [invalidEdge, validEdge] : [validEdge, invalidEdge]),
+				edge(safeRequest, safe),
+			];
+			const consumed = vi.fn(() => [safeRequest]);
+			const provider = vi.fn(() => undefined);
+			const graph = harness({ option: provider }).createCompilation(
+				[app, invalid, otherwiseValid, safe],
+				new Map([[app.id, connections]]),
+				{ consume: consumed },
+			);
+
+			await expect(graph.finish()).resolves.toBeUndefined();
+			expect(consumed).toHaveBeenCalledWith(
+				app,
+				expect.objectContaining({ imports: [expect.objectContaining({ request: safeRequest })] }),
+			);
+			expect(provider.mock.calls.map(([input]) => input.id)).toEqual([safe.id]);
+			expect(() => graph.seal()).not.toThrow();
+			expect(() => graph.emit()).not.toThrow();
+		},
+	);
+
+	it('accepts duplicate effective identities and ignores non-ESM decoys', async () => {
+		const request = './styles.module.css';
+		const app = importer('duplicate-identity', [request]);
+		const styles = module('stable-styles', EXPORTS);
+		const duplicate = module(styles.id, EXPORTS);
+		const decoy = module('commonjs-decoy', EXPORTS.replaceAll('mapped_', 'wrong_'));
+		const provider = vi.fn(() => undefined);
+		const graph = harness({ option: provider }).createCompilation(
+			[app, styles, duplicate, decoy],
+			new Map([
+				[
+					app.id,
+					[
+						edge(request, decoy, { category: 'commonjs' }),
+						edge(request, styles),
+						edge(request, duplicate),
+					],
+				],
+			]),
+		);
+
+		await expect(graph.finish()).resolves.toBeUndefined();
+		expect(provider.mock.calls.map(([input]) => input.id)).toEqual([styles.id]);
+		expect(() => graph.seal()).not.toThrow();
+	});
+
+	it('reacquires graph and module identities for final verification', async () => {
+		const request = './styles.module.css';
+		const app = importer('fresh-identities', [request]);
+		const styles = module('fresh-styles', EXPORTS);
+		const edges = new Map([[app.id, [edge(request, styles)]]]);
+		const graph = harness().createCompilation([app, styles], edges);
+
+		await graph.finish();
+		const nextApp = importer(app.id, [request]);
+		nextApp.buildInfo[CSS_MODULE_BUILD_INFO_KEY] = structuredClone(
+			app.buildInfo[CSS_MODULE_BUILD_INFO_KEY],
+		);
+		const nextStyles = module(styles.id, styles.source);
+		graph.compilation.modules = new Set([nextApp, nextStyles]);
+		edges.set(nextApp.id, [edge(request, nextStyles)]);
+
+		expect(() => graph.seal()).not.toThrow();
+		expect(() => graph.emit()).not.toThrow();
+	});
+
+	it('stops reading after all requested targets are terminally invalid', async () => {
+		const requests = ['./invalid-a.module.css', './invalid-b.module.css'];
+		const app = importer('terminal-invalidity', requests);
+		const invalidA = module('invalid-a', EXPORTS);
+		const invalidB = module('invalid-b', EXPORTS);
+		const trailing = Array.from({ length: 16 }, (_, index) => module(`trailing-${index}`, EXPORTS));
+		const graph = harness().createCompilation(
+			[app, invalidA, invalidB, ...trailing],
+			new Map([
+				[
+					app.id,
+					[
+						edge(requests[0], invalidA, { attributes: { type: 'css' } }),
+						edge(requests[1], invalidB, { attributes: { type: 'css' } }),
+						...trailing.map((target, index) => edge(`./trailing-${index}.module.css`, target)),
+					],
+				],
+			]),
+		);
+
+		await graph.finish();
+		expect(graph.graphActivity).toEqual({ traversals: 1, visits: 2 });
+		graph.seal();
+		graph.emit();
+		expect(graph.graphActivity).toEqual({ traversals: 1, visits: 2 });
+	});
+
 	it('provides exact effective-module identities and read-only metadata', async () => {
 		const a = importer('app-alpha', ['./styles.module.css?theme=one']);
 		const b = importer('app-beta', ['./styles.module.css?theme=two']);
