@@ -80,6 +80,36 @@ describe('useRive', function useRiveContracts() {
 });
 
 describe('Rive Component', function riveComponentContracts() {
+	it('mounts with inherited MediaQueryList event methods', function inheritedMediaQueryListeners() {
+		const originalMatchMedia = window.matchMedia;
+		const mediaQueryPrototype = {
+			addEventListener: function addEventListener() {},
+			removeEventListener: function removeEventListener() {},
+		};
+		window.matchMedia = function matchMedia(query: string) {
+			return Object.assign(Object.create(mediaQueryPrototype), {
+				matches: false,
+				media: query,
+				onchange: null,
+				dispatchEvent: function dispatchEvent() {
+					return false;
+				},
+			}) as MediaQueryList;
+		};
+
+		try {
+			const view = render(Rive, {
+				props: {
+					src: 'foo.riv',
+					'aria-label': 'Inherited listener',
+				},
+			});
+			expect(view.getByLabelText('Inherited listener').tagName).toBe('CANVAS');
+		} finally {
+			window.matchMedia = originalMatchMedia;
+		}
+	});
+
 	// Per packages/rive/upstream/canonical/test/Rive.test.tsx
 	it('renders the component as a canvas and a div wrapper', function wrapperAndCanvas() {
 		const view = render(Rive, {

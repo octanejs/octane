@@ -61,6 +61,76 @@ describe('FilePond', function filePondSuite() {
 		}
 	});
 
+	it('applies non-file options after an internal file update', async function updatesOptionsAfterFiles() {
+		const ref: { current: FilePondHandle | null } = { current: null };
+		const files: [] = [];
+		const view = render(
+			createElement(FilePond, {
+				ref,
+				files,
+				allowMultiple: false,
+				instantUpload: false,
+				onupdatefiles: function onupdatefiles() {},
+			}),
+		);
+
+		expect(supported()).toBe(true);
+		const pond = ref.current!.pond!;
+		await pond.addFile(new File(['hello'], 'hello.txt', { type: 'text/plain' }));
+
+		view.rerender(
+			createElement(FilePond, {
+				ref,
+				files,
+				allowMultiple: true,
+				instantUpload: false,
+				onupdatefiles: function onupdatefiles() {},
+			}),
+		);
+
+		expect(pond.allowMultiple).toBe(true);
+		expect(pond.getFiles()).toHaveLength(1);
+	});
+
+	it('retains internal files across unrelated rerenders', async function retainsInternalFiles() {
+		const ref: { current: FilePondHandle | null } = { current: null };
+		const files: [] = [];
+		const view = render(
+			createElement(FilePond, {
+				ref,
+				files,
+				allowMultiple: false,
+				instantUpload: false,
+				onupdatefiles: function onupdatefiles() {},
+			}),
+		);
+
+		expect(supported()).toBe(true);
+		const pond = ref.current!.pond!;
+		await pond.addFile(new File(['hello'], 'hello.txt', { type: 'text/plain' }));
+
+		view.rerender(
+			createElement(FilePond, {
+				ref,
+				files,
+				allowMultiple: true,
+				instantUpload: false,
+				onupdatefiles: function onupdatefiles() {},
+			}),
+		);
+		view.rerender(
+			createElement(FilePond, {
+				ref,
+				files,
+				allowMultiple: false,
+				instantUpload: false,
+				onupdatefiles: function onupdatefiles() {},
+			}),
+		);
+
+		expect(pond.getFiles()).toHaveLength(1);
+	});
+
 	it('destroys on unmount', function destroysOnUnmount() {
 		const ref: { current: FilePondHandle | null } = { current: null };
 		const { unmount } = render(createElement(FilePond, { ref, name: 'files' }));

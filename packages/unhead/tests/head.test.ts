@@ -139,4 +139,21 @@ describe('simpleHead component', function simpleHeadComponent() {
 		expect(fallback.headTags).toContain('<title>Home</title>');
 		expect(fallback.headTags).not.toContain('<title>Home | My Site</title>');
 	});
+
+	it('inserts title text literally into a title template', async function helmetLiteralTitle() {
+		const head = createHead();
+		render(
+			withHead(
+				head,
+				createElement(Helmet, {
+					defaultTitle: 'Home',
+					titleTemplate: '%s | Store',
+					title: 'Save $$ on $&',
+				}),
+			),
+		);
+
+		const rendered = await renderSSRHead(head);
+		expect(rendered.headTags).toContain('<title>Save $$ on $&amp; | Store</title>');
+	});
 });

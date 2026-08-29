@@ -66,6 +66,8 @@ export function FilePond(props: FilePondProps) @{
 	const pondRef = useRef<Pond | undefined>(undefined);
 	const inputCloneRef = useRef<HTMLInputElement | null>(null);
 	const allowFilesSyncRef = useRef(true);
+	const hasCommittedOptionsRef = useRef(false);
+	const syncedFilesRef = useRef(props.files);
 	const handleRef = useRef<FilePondHandle>({ pond: null });
 
 	useLayoutEffect(function createPond() {
@@ -112,12 +114,18 @@ export function FilePond(props: FilePondProps) @{
 
 	useLayoutEffect(function syncPondOptions() {
 		if (!pondRef.current) return;
-		if (!allowFilesSyncRef.current) {
-			allowFilesSyncRef.current = true;
+		if (!hasCommittedOptionsRef.current) {
+			hasCommittedOptionsRef.current = true;
 			return;
 		}
 		const options = pondOptionsFromProps(props);
 		delete (options as { onupdatefiles?: unknown }).onupdatefiles;
+		const shouldSyncFiles = allowFilesSyncRef.current && props.files !== syncedFilesRef.current;
+		allowFilesSyncRef.current = true;
+		syncedFilesRef.current = props.files;
+		if (!shouldSyncFiles) {
+			delete (options as { files?: unknown }).files;
+		}
 		pondRef.current.setOptions(options);
 	}, null);
 

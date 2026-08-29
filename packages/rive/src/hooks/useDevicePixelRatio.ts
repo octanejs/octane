@@ -31,14 +31,14 @@ export default function useDevicePixelRatio(...rawArgs: unknown[]) {
 				setCurrentDpr(newDpr);
 			}
 			const mediaMatcher = window.matchMedia(`screen and (resolution: ${currentDpr}dppx)`);
-			if (Object.prototype.hasOwnProperty.call(mediaMatcher, 'addEventListener')) {
+			if (typeof mediaMatcher.addEventListener === 'function') {
 				mediaMatcher.addEventListener('change', updateDpr);
 			} else {
 				mediaMatcher.addListener(updateDpr);
 			}
 
 			return function cleanup() {
-				if (Object.prototype.hasOwnProperty.call(mediaMatcher, 'removeEventListener')) {
+				if (typeof mediaMatcher.removeEventListener === 'function') {
 					mediaMatcher.removeEventListener('change', updateDpr);
 				} else {
 					mediaMatcher.removeListener(updateDpr);
