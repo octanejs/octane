@@ -759,31 +759,32 @@ export function octane(options = {}) {
 			// adapter concern, then let the AST fall out of scope before any graph
 			// loading begins. Compilation keeps its independent authoritative parser.
 			const preflight = (() => {
+				let ast;
 				try {
-					const ast = parseModule(code, id);
-					return {
-						cssRequests: specializeCssModuleConstants
-							? compiler.findCssModuleImportRequests(code, id, environment, ast)
-							: [],
-						descriptorExportsProof: compiler._prepareDescriptorChildrenExports(
-							DESCRIPTOR_PREFLIGHT_AUTHORITY,
-							code,
-							id,
-							ast,
-						),
-						descriptorImports: findDescriptorChildrenImports(ast, id),
-						serverImportRequests: server ? compiler.findServerImportRequests(ast, id) : [],
-						voidImports:
-							specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
-								? findVoidComponentImports(ast, id)
-								: [],
-					};
+					ast = parseModule(code, id);
 				} catch {
 					// Classification never owns syntax diagnostics. If the preflight parser
 					// disagrees with the compiler parser, preserve every established string
 					// path and let authoritative compilation decide the result.
 					return null;
 				}
+				return {
+					cssRequests: specializeCssModuleConstants
+						? compiler.findCssModuleImportRequests(code, id, environment, ast)
+						: [],
+					descriptorExportsProof: compiler._prepareDescriptorChildrenExports(
+						DESCRIPTOR_PREFLIGHT_AUTHORITY,
+						code,
+						id,
+						ast,
+					),
+					descriptorImports: findDescriptorChildrenImports(ast, id),
+					serverImportRequests: server ? compiler.findServerImportRequests(ast, id) : [],
+					voidImports:
+						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
+							? findVoidComponentImports(ast, id)
+							: [],
+				};
 			})();
 			const cssRequests =
 				preflight?.cssRequests ??

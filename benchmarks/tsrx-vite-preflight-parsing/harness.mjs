@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
+const HERE = import.meta.dirname;
 export const SOURCE_ROOT = process.env.OCTANE_TSRX_VITE_PREFLIGHT_ROOT
 	? path.resolve(process.env.OCTANE_TSRX_VITE_PREFLIGHT_ROOT)
 	: path.resolve(HERE, '../..');
@@ -46,9 +46,7 @@ function valueDigest(value) {
 }
 
 function orderedCandidates(values) {
-	return values
-		.map((value) => ({ ...value }))
-		.sort((left, right) => stableJson(left).localeCompare(stableJson(right)));
+	return values.toSorted((left, right) => stableJson(left).localeCompare(stableJson(right)));
 }
 
 export function sourceFor(componentCount, css = false) {
