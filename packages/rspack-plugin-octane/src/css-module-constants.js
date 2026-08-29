@@ -229,24 +229,18 @@ function verifyGraph(compilation, state) {
 	for (const [id, receipt] of state.receipts) {
 		const importer = modules.get(id);
 		const info = candidateInfo(importer);
+		const requests = receipt.imports.map((entry) => entry.request);
 		if (
 			info === null ||
 			info.sourceHash !== receipt.sourceHash ||
-			!sameStrings(
-				info.consumed,
-				receipt.imports.map((entry) => entry.request),
-			)
+			!sameStrings(info.consumed, requests)
 		) {
 			changed(id, undefined, 'the authored importer or committed-use receipt differs');
 		}
 		if (receipt.imports.length === 1) {
 			verifyTarget(compilation, importer, receipt.imports[0]);
 		} else {
-			const targets = targetsForRequests(
-				compilation,
-				importer,
-				receipt.imports.map((entry) => entry.request),
-			);
+			const targets = targetsForRequests(compilation, importer, requests);
 			for (const entry of receipt.imports) {
 				verifyResolvedTarget(importer, entry, targets.get(entry.request));
 			}
