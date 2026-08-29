@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -25,6 +26,11 @@ const VOID_META = 'octane:void-component-exports';
 const DESCRIPTOR_META = 'octane:descriptor-children-exports';
 const CSS_SOURCE = `export const root = 'preflight_root';
 export default { root };`;
+const SEMANTIC_MANIFEST = JSON.parse(
+	readFileSync(new URL('./semantic-manifest.json', import.meta.url), 'utf8'),
+);
+
+export const EXPECTED_CLASSIFICATION_CHECKSUM = SEMANTIC_MANIFEST.classificationChecksum;
 
 function digest(value) {
 	return createHash('sha256').update(value).digest('hex');
@@ -191,14 +197,23 @@ function semanticSnapshot(result, watched, classificationChecksum) {
 	};
 }
 
-export function createTransformCase({ componentCount, css = false, mode }) {
+export function createTransformCase({
+	componentCount,
+	css = false,
+	mode,
+	source: sourceOverride,
+	verifySemantic = true,
+}) {
 	const name = `${mode}-${css ? 'css-' : ''}${componentCount}`;
 	const id = path.join(HERE, 'generated', `${name}.tsrx`);
-	const source = sourceFor(componentCount, css);
+	const source = sourceOverride ?? sourceFor(componentCount, css);
 	const classificationValue = classification(source, id);
 	const classificationChecksum = valueDigest(classificationValue);
 	const { plugin, server } = configurePlugin(mode);
-	let expectedSnapshot;
+	const expectedSnapshot = SEMANTIC_MANIFEST.integrated[name];
+	if (verifySemantic && expectedSnapshot === undefined) {
+		throw new Error(`Missing semantic manifest entry for ${name}`);
+	}
 
 	return {
 		name,
@@ -214,10 +229,12 @@ export function createTransformCase({ componentCount, css = false, mode }) {
 			const started = performance.now();
 			const result = await plugin.transform.call(context, source, id, { ssr: server });
 			const elapsed = performance.now() - started;
+			if (result === null || result === undefined) {
+				throw new Error(`${name} unexpectedly passed through without output`);
+			}
 			const snapshot = semanticSnapshot(result, watched, classificationChecksum);
-			if (expectedSnapshot === undefined) expectedSnapshot = snapshot;
-			else if (stableJson(snapshot) !== stableJson(expectedSnapshot)) {
-				throw new Error(`${name} changed its semantic snapshot between samples`);
+			if (verifySemantic && stableJson(snapshot) !== stableJson(expectedSnapshot)) {
+				throw new Error(`${name} changed its committed semantic snapshot`);
 			}
 			return { elapsed, snapshot };
 		},

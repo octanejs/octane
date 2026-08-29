@@ -19,9 +19,12 @@ The expected valid-source totals are:
 | production server | 1 | 1 | 2 |
 | development client | 1 | 1 | 2 |
 | production client with CSS-module preflight | 1 | 1 | 2 |
+| parser disagreement, development client | 2 | 1 | 3 |
+| parser disagreement, production server | 2 | 1 | 3 |
 
 Every integrated timing sample checks emitted code, source map, Vite metadata,
-watch dependencies, and raw-source classification checksums. The isolated
+watch dependencies, and raw-source classification checksums against
+`semantic-manifest.json`. The isolated
 control runs the descriptor-import and descriptor-export classifiers either on
 the source string twice or on one explicitly shared `@tsrx/core` AST, requiring
 identical classification checksums before publishing timings.
@@ -39,16 +42,19 @@ suite's reported timing scores in milliseconds; lower is better.
 
 | Target | Untouched | Final | Change | Final score RME |
 | --- | ---: | ---: | ---: | ---: |
-| 8-component production client | 3.503 | 2.861 | -18.3% | 7.2% |
-| 256-component production client | 331.244 | 149.322 | -54.9% | 7.7% |
-| 8-component production server | 2.709 | 1.803 | -33.4% | 7.6% |
-| 256-component production server | 305.424 | 119.345 | -60.9% | 3.0% |
-| 256-component reparsed classification | 216.844 | 209.872 | -3.2% | 0.6% |
-| 256-component shared-AST classification | 107.781 | 105.775 | -1.9% | 1.6% |
+| 8-component production client | 3.503 | 2.837 | -19.0% | 7.0% |
+| 256-component production client | 331.244 | 146.315 | -55.8% | 5.0% |
+| 8-component production server | 2.709 | 1.787 | -34.0% | 6.6% |
+| 256-component production server | 305.424 | 117.916 | -61.4% | 3.2% |
+| 256-component reparsed classification | 216.844 | 209.627 | -3.3% | 2.0% |
+| 256-component shared-AST classification | 107.781 | 105.083 | -2.5% | 0.9% |
 
-The adapter/authoritative/total parse matrix changed from `3/1/4`, `3/1/4`,
-`2/1/3`, and `4/1/5` to `1/1/2` in all four modes. The final isolated ratio is
-`105.775 / 209.872 = 0.5040`, below the committed `0.65` ceiling. Both isolated
+The valid-source adapter/authoritative/total parse matrix changed from `3/1/4`,
+`3/1/4`, `2/1/3`, and `4/1/5` to `1/1/2` in all four modes. Parser disagreement
+now stops after one failed adapter preflight plus the compiler-owned descriptor
+fallback, for `2/1/3` in development client and production server transforms.
+The final isolated ratio is
+`105.083 / 209.627 = 0.5013`, below the committed `0.65` ceiling. Both isolated
 targets must publish classification checksum
 `ce336f36e31d0df9ab509e0e526bf8e588bbb732a507b2fff6990d04b99dd607`
 before the ratio is accepted.

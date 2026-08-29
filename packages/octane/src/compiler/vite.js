@@ -763,10 +763,18 @@ export function octane(options = {}) {
 				try {
 					ast = parseModule(code, id);
 				} catch {
-					// Classification never owns syntax diagnostics. If the preflight parser
-					// disagrees with the compiler parser, preserve every established string
-					// path and let authoritative compilation decide the result.
-					return null;
+					// Every adapter classifier uses this exact parser/source/id and would
+					// return an empty result after repeating the same failed parse. Preserve
+					// those facts without the retries. The compiler receives no descriptor
+					// proof, so its canonical-id fallback and authoritative diagnostics stay
+					// unchanged.
+					return {
+						cssRequests: [],
+						descriptorExportsProof: null,
+						descriptorImports: [],
+						serverImportRequests: [],
+						voidImports: [],
+					};
 				}
 				return {
 					cssRequests: specializeCssModuleConstants
@@ -786,11 +794,7 @@ export function octane(options = {}) {
 							: [],
 				};
 			})();
-			const cssRequests =
-				preflight?.cssRequests ??
-				(specializeCssModuleConstants
-					? compiler.findCssModuleImportRequests(code, id, environment)
-					: []);
+			const cssRequests = preflight.cssRequests;
 			const loadCssImports = () =>
 				loadCssModuleImports(
 					this,
@@ -810,7 +814,7 @@ export function octane(options = {}) {
 					.filter((key) => key.startsWith('export\0'))
 					.map((key) => key.slice('export\0'.length));
 				const result = compiler.transform(code, id, {
-					...(preflight === null
+					...(preflight.descriptorExportsProof === null
 						? null
 						: { _descriptorChildrenExportsProof: preflight.descriptorExportsProof }),
 					environment,
@@ -888,18 +892,11 @@ export function octane(options = {}) {
 			};
 
 			if (server) {
-				const descriptorImports = (
-					preflight?.descriptorImports ?? findDescriptorChildrenImports(code, id)
-				).filter(
+				const descriptorImports = preflight.descriptorImports.filter(
 					(candidate) => candidate.local !== undefined || !nodeFs.existsSync(cleanModuleId(id)),
 				);
 				return Promise.all([
-					loadClientOnlyImports(
-						this,
-						compiler,
-						preflight?.serverImportRequests ?? compiler.findServerImportRequests(code, id),
-						id,
-					),
+					loadClientOnlyImports(this, compiler, preflight.serverImportRequests, id),
 					loadDescriptorChildrenImports(
 						this,
 						descriptorImports,
@@ -917,11 +914,9 @@ export function octane(options = {}) {
 
 			const voidImports =
 				specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
-					? (preflight?.voidImports ?? findVoidComponentImports(code, id))
+					? preflight.voidImports
 					: [];
-			const descriptorImports = (
-				preflight?.descriptorImports ?? findDescriptorChildrenImports(code, id)
-			).filter(
+			const descriptorImports = preflight.descriptorImports.filter(
 				(candidate) => candidate.local !== undefined || !nodeFs.existsSync(cleanModuleId(id)),
 			);
 			if (voidImports.length === 0 && descriptorImports.length === 0 && cssRequests.length === 0) {

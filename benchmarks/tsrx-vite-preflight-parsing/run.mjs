@@ -7,6 +7,7 @@ import {
 	createTransformCase,
 	descriptorClassificationFromSharedAst,
 	descriptorClassificationFromStrings,
+	EXPECTED_CLASSIFICATION_CHECKSUM,
 	sourceFor,
 	valueDigest,
 } from './harness.mjs';
@@ -59,7 +60,7 @@ function measureClassification(kind) {
 			: descriptorClassificationFromSharedAst(classificationSource, classificationId);
 	const elapsed = performance.now() - started;
 	const checksum = valueDigest(value);
-	classificationChecksum ??= checksum;
+	classificationChecksum ??= EXPECTED_CLASSIFICATION_CHECKSUM;
 	assert.equal(checksum, classificationChecksum, `${kind} descriptor classification changed`);
 	return elapsed;
 }
@@ -74,8 +75,8 @@ try {
 	parseCounts = characterizeParses();
 	assert.deepEqual(
 		parseCounts.map((entry) => entry.total),
-		[2, 2, 2, 2],
-		'valid-source Vite parse-count matrix changed',
+		[2, 2, 2, 2, 3, 3],
+		'Vite parse-count matrix changed',
 	);
 
 	for (let warmup = 0; warmup < 2; warmup++) {

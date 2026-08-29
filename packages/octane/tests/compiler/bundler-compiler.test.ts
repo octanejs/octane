@@ -95,6 +95,21 @@ describe('bundler-neutral compiler integration', () => {
 		// preflight parser, so string fallback returns no descriptor fact. It makes
 		// an id-mismatched proof observably distinct from an incorrectly reused one.
 		const parserDisagreement = `${marked}\nconst unicodeSets = /[a&&b]/v;`;
+		const oneShotProof = (compiler as any)._prepareDescriptorChildrenExports(
+			authority,
+			parserDisagreement,
+			id,
+			parseCompilerModule(parserDisagreement, id),
+		);
+		const firstUse = compiler.transform(parserDisagreement, id, {
+			_descriptorChildrenExportsProof: oneShotProof,
+		} as any);
+		expect(firstUse?.descriptorChildrenExports).toEqual(['Marked']);
+		const reused = compiler.transform(parserDisagreement, id, {
+			_descriptorChildrenExportsProof: oneShotProof,
+		} as any);
+		expect(reused?.descriptorChildrenExports).toEqual([]);
+
 		const idProof = (compiler as any)._prepareDescriptorChildrenExports(
 			authority,
 			parserDisagreement,
