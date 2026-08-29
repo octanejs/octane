@@ -496,6 +496,38 @@
     "note": "Same-page production Chromium resume cost for FIFO queued events whose distinct async adoptions settle one at a time. The rejected per-resume compaction/full-scan path measured 6.05x per event at 8k versus 1k, while amortized compaction and constant-time pending bookkeeping measured 0.93x and 1.14x in verified quick runs. The 1.6x ceiling leaves browser timing headroom."
   },
   {
+    "suite": "radix-collection-order",
+    "op": "order",
+    "target": "production-16",
+    "reference": "reference-16",
+    "maxRatio": 1.15,
+    "note": "Same-process 16-item Radix collection ordering through the unchanged indexOf comparator. Verified normal runs measured at parity; the 1.15 ceiling protects the common small-list path from indexed-map allocation."
+  },
+  {
+    "suite": "radix-collection-order",
+    "op": "order",
+    "target": "production-64",
+    "reference": "reference-64",
+    "maxRatio": 1.15,
+    "note": "Same-process 64-item Radix collection ordering through the unchanged indexOf comparator. Verified normal runs measured at parity; the 1.15 ceiling protects the small-list path while allowing timing noise."
+  },
+  {
+    "suite": "radix-collection-order",
+    "op": "order",
+    "target": "production-256",
+    "reference": "reference-256",
+    "maxRatio": 0.8,
+    "note": "Same-process deterministic 256-item collection ordering with identical order and checksum gates. The first indexed size measured at 0.28x the prior comparator; the 0.8 ceiling enforces the measured crossover without tuning to one machine."
+  },
+  {
+    "suite": "radix-collection-order",
+    "op": "order",
+    "target": "production-4096",
+    "reference": "reference-4096",
+    "maxRatio": 0.15,
+    "note": "Same-process deterministic 4,096-item collection ordering, including node-index construction. The indexed helper measured at 0.06x the repeated indexOf comparator; the 0.15 ceiling leaves over 2x timing headroom while catching restoration of repeated scans."
+  },
+  {
     "suite": "router-dispatch",
     "op": "dispatch_per_million_candidates",
     "target": "static-routes",

@@ -1,0 +1,1867 @@
+{
+  "suite": "octane-hosted-react",
+  "iterations": 30,
+  "environment": {
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpus": "Apple M5 Max",
+    "chromium": "149.0.7827.55",
+    "esbuild": "0.28.1",
+    "react": "19.2.7",
+    "reactDOM": "19.2.7",
+    "crossOriginIsolated": true
+  },
+  "evidence": {
+    "baseline": "874178645e8b3398e8898359f0537f7345b62234",
+    "candidateHead": "3fe0c2c96a77750f757b7b1db327c6010f60f22e",
+    "dirty": "M packages/octane/src/react/react-compat.ts",
+    "nativeBefore": {
+      "name": "native-before",
+      "raw": 141428,
+      "gzip": 45886,
+      "brotli": 40164,
+      "sha256": "baff62c799a5167fa859c1f1f5b4411d4076ecf91ae2da7f4a1a3e94f5b06a9b",
+      "modules": [
+        {
+          "module": "packages/octane/src/stream-protocol.ts",
+          "bytes": 20
+        },
+        {
+          "module": "packages/octane/src/constants.ts",
+          "bytes": 299
+        },
+        {
+          "module": "packages/octane/src/dom-tables.js",
+          "bytes": 5768
+        },
+        {
+          "module": "packages/octane/src/has-own.ts",
+          "bytes": 39
+        },
+        {
+          "module": "packages/octane/src/shared-value-helpers.ts",
+          "bytes": 254
+        },
+        {
+          "module": "packages/octane/src/sanitize-url.js",
+          "bytes": 742
+        },
+        {
+          "module": "packages/octane/src/component-flags.ts",
+          "bytes": 124
+        },
+        {
+          "module": "packages/octane/src/error-message.ts",
+          "bytes": 374
+        },
+        {
+          "module": "packages/octane/src/error-codes.client.generated.ts",
+          "bytes": 35
+        },
+        {
+          "module": "packages/octane/src/renderer-bridge.ts",
+          "bytes": 88
+        },
+        {
+          "module": "packages/octane/src/signals/read-protocol.ts",
+          "bytes": 358
+        },
+        {
+          "module": "packages/octane/src/signals/native-read-events.ts",
+          "bytes": 574
+        },
+        {
+          "module": "packages/octane/src/css.ts",
+          "bytes": 385
+        },
+        {
+          "module": "packages/octane/src/runtime.ts",
+          "bytes": 131488
+        },
+        {
+          "module": "benchmarks/octane-hosted-react/src/native-control.ts",
+          "bytes": 848
+        }
+      ],
+      "imports": [],
+      "sourceSha256": "6a26074fea236088b9cf26f0283d409ee2631e299acdb70293127efe8e173afc",
+      "semantic": {
+        "mount": "before:0",
+        "local": "before:1",
+        "update": "after:1",
+        "setups": 1,
+        "cleanups": 1
+      }
+    },
+    "nativeAfter": {
+      "name": "native-after",
+      "raw": 141428,
+      "gzip": 45886,
+      "brotli": 40164,
+      "sha256": "baff62c799a5167fa859c1f1f5b4411d4076ecf91ae2da7f4a1a3e94f5b06a9b",
+      "modules": [
+        {
+          "module": "packages/octane/src/stream-protocol.ts",
+          "bytes": 20
+        },
+        {
+          "module": "packages/octane/src/constants.ts",
+          "bytes": 299
+        },
+        {
+          "module": "packages/octane/src/dom-tables.js",
+          "bytes": 5768
+        },
+        {
+          "module": "packages/octane/src/has-own.ts",
+          "bytes": 39
+        },
+        {
+          "module": "packages/octane/src/shared-value-helpers.ts",
+          "bytes": 254
+        },
+        {
+          "module": "packages/octane/src/sanitize-url.js",
+          "bytes": 742
+        },
+        {
+          "module": "packages/octane/src/component-flags.ts",
+          "bytes": 124
+        },
+        {
+          "module": "packages/octane/src/error-message.ts",
+          "bytes": 374
+        },
+        {
+          "module": "packages/octane/src/error-codes.client.generated.ts",
+          "bytes": 35
+        },
+        {
+          "module": "packages/octane/src/renderer-bridge.ts",
+          "bytes": 88
+        },
+        {
+          "module": "packages/octane/src/signals/read-protocol.ts",
+          "bytes": 358
+        },
+        {
+          "module": "packages/octane/src/signals/native-read-events.ts",
+          "bytes": 574
+        },
+        {
+          "module": "packages/octane/src/css.ts",
+          "bytes": 385
+        },
+        {
+          "module": "packages/octane/src/runtime.ts",
+          "bytes": 131488
+        },
+        {
+          "module": "benchmarks/octane-hosted-react/src/native-control.ts",
+          "bytes": 848
+        }
+      ],
+      "imports": [],
+      "sourceSha256": "0f0cd17441f53732990f57c348ed3fffdb6e7dc65df4295a30558205ac4427c9",
+      "semantic": {
+        "mount": "before:0",
+        "local": "before:1",
+        "update": "after:1",
+        "setups": 1,
+        "cleanups": 1
+      }
+    },
+    "nativeDelta": {
+      "raw": 0,
+      "gzip": 0,
+      "brotli": 0
+    },
+    "octaneCompatOnly": {
+      "name": "octane-compat-only",
+      "raw": 167781,
+      "gzip": 54491,
+      "brotli": 47503,
+      "sha256": "5fd55c6135b9007b4c835310122550a8b80fd39c58a1e62237058dbbb96e200c",
+      "modules": [
+        {
+          "module": "benchmarks/octane-hosted-react/src/octane-compat-control.ts",
+          "bytes": 218
+        },
+        {
+          "module": "packages/octane/src/stream-protocol.ts",
+          "bytes": 20
+        },
+        {
+          "module": "packages/octane/src/constants.ts",
+          "bytes": 452
+        },
+        {
+          "module": "packages/octane/src/dom-tables.js",
+          "bytes": 5768
+        },
+        {
+          "module": "packages/octane/src/has-own.ts",
+          "bytes": 39
+        },
+        {
+          "module": "packages/octane/src/shared-value-helpers.ts",
+          "bytes": 254
+        },
+        {
+          "module": "packages/octane/src/sanitize-url.js",
+          "bytes": 742
+        },
+        {
+          "module": "packages/octane/src/component-flags.ts",
+          "bytes": 124
+        },
+        {
+          "module": "packages/octane/src/error-message.ts",
+          "bytes": 374
+        },
+        {
+          "module": "packages/octane/src/error-codes.client.generated.ts",
+          "bytes": 34
+        },
+        {
+          "module": "packages/octane/src/renderer-bridge.ts",
+          "bytes": 88
+        },
+        {
+          "module": "packages/octane/src/signals/read-protocol.ts",
+          "bytes": 404
+        },
+        {
+          "module": "packages/octane/src/signals/native-read-events.ts",
+          "bytes": 574
+        },
+        {
+          "module": "packages/octane/src/signals/native-read-seeds.ts",
+          "bytes": 1029
+        },
+        {
+          "module": "packages/octane/src/css.ts",
+          "bytes": 385
+        },
+        {
+          "module": "packages/octane/src/runtime.ts",
+          "bytes": 150067
+        },
+        {
+          "module": "packages/octane/src/react/index.ts",
+          "bytes": 5158
+        },
+        {
+          "module": "packages/octane/src/react/shared.ts",
+          "bytes": 1316
+        },
+        {
+          "module": "packages/octane/src/react/fiber-adapter.ts",
+          "bytes": 696
+        }
+      ],
+      "imports": ["react", "react", "react"],
+      "sourceSha256": "468667c029125a2a044b175a80fb7c63decdf7529534adb97f1f5630cc46506d",
+      "semantic": {
+        "mount": "before",
+        "update": "after",
+        "identityPreserved": true,
+        "cleanups": 1
+      }
+    },
+    "workload": {
+      "name": "browser",
+      "raw": 351778,
+      "gzip": 111265,
+      "brotli": 94790,
+      "sha256": "986ae338d7b4432e4b3b5a477df9d9b07ff40e2cfd80c0659d609d1d04b699ae",
+      "modules": [
+        {
+          "module": "node_modules/.pnpm/react@19.2.7/node_modules/react/cjs/react.production.js",
+          "bytes": 7616
+        },
+        {
+          "module": "node_modules/.pnpm/react@19.2.7/node_modules/react/index.js",
+          "bytes": 51
+        },
+        {
+          "module": "node_modules/.pnpm/scheduler@0.27.0/node_modules/scheduler/cjs/scheduler.production.js",
+          "bytes": 3662
+        },
+        {
+          "module": "node_modules/.pnpm/scheduler@0.27.0/node_modules/scheduler/index.js",
+          "bytes": 51
+        },
+        {
+          "module": "node_modules/.pnpm/react-dom@19.2.7_react@19.2.7/node_modules/react-dom/cjs/react-dom.production.js",
+          "bytes": 3343
+        },
+        {
+          "module": "node_modules/.pnpm/react-dom@19.2.7_react@19.2.7/node_modules/react-dom/index.js",
+          "bytes": 253
+        },
+        {
+          "module": "node_modules/.pnpm/react-dom@19.2.7_react@19.2.7/node_modules/react-dom/cjs/react-dom-client.production.js",
+          "bytes": 176576
+        },
+        {
+          "module": "node_modules/.pnpm/react-dom@19.2.7_react@19.2.7/node_modules/react-dom/client.js",
+          "bytes": 253
+        },
+        {
+          "module": "benchmarks/octane-hosted-react/src/browser.ts",
+          "bytes": 2324
+        },
+        {
+          "module": "packages/octane/src/stream-protocol.ts",
+          "bytes": 20
+        },
+        {
+          "module": "packages/octane/src/constants.ts",
+          "bytes": 299
+        },
+        {
+          "module": "packages/octane/src/dom-tables.js",
+          "bytes": 5768
+        },
+        {
+          "module": "packages/octane/src/has-own.ts",
+          "bytes": 39
+        },
+        {
+          "module": "packages/octane/src/shared-value-helpers.ts",
+          "bytes": 254
+        },
+        {
+          "module": "packages/octane/src/sanitize-url.js",
+          "bytes": 742
+        },
+        {
+          "module": "packages/octane/src/component-flags.ts",
+          "bytes": 124
+        },
+        {
+          "module": "packages/octane/src/error-message.ts",
+          "bytes": 374
+        },
+        {
+          "module": "packages/octane/src/error-codes.client.generated.ts",
+          "bytes": 35
+        },
+        {
+          "module": "packages/octane/src/renderer-bridge.ts",
+          "bytes": 88
+        },
+        {
+          "module": "packages/octane/src/signals/read-protocol.ts",
+          "bytes": 358
+        },
+        {
+          "module": "packages/octane/src/signals/native-read-events.ts",
+          "bytes": 574
+        },
+        {
+          "module": "packages/octane/src/css.ts",
+          "bytes": 385
+        },
+        {
+          "module": "packages/octane/src/runtime.ts",
+          "bytes": 138373
+        },
+        {
+          "module": "benchmarks/octane-hosted-react/src/counter.ts",
+          "bytes": 514
+        },
+        {
+          "module": "packages/octane/src/react/react-compat.ts",
+          "bytes": 3675
+        },
+        {
+          "module": "packages/octane/src/react/react-compat-envelope.ts",
+          "bytes": 1204
+        },
+        {
+          "module": "packages/octane/src/react/react-compat-shared.ts",
+          "bytes": 2158
+        },
+        {
+          "module": "packages/octane/src/react/index.ts",
+          "bytes": 16
+        },
+        {
+          "module": "benchmarks/octane-hosted-react/src/shell.tsrx",
+          "bytes": 830
+        }
+      ],
+      "imports": [],
+      "sourceSha256": "d58ac5274549316d680a6a9d38415552474b0f044b6837a60d52efa44cbd25ff"
+    }
+  },
+  "targets": [
+    {
+      "name": "direct-react-roots-1",
+      "ops": {
+        "mount": {
+          "score": 0.08883333802223206,
+          "median": 0.08499997854232788,
+          "min": 0.05500000715255737,
+          "mean": 0.08883333802223206,
+          "p95": 0.13999998569488525,
+          "sd": 0.03710850064318574,
+          "rme": 15.59660633789659,
+          "scoreRme": 15.59660633789659,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.26500004529953003
+        },
+        "local_update": {
+          "score": 0.029166662693023683,
+          "median": 0.029999971389770508,
+          "min": 0.019999980926513672,
+          "mean": 0.029166662693023683,
+          "p95": 0.04000002145767212,
+          "sd": 0.006308636777084631,
+          "rme": 8.075724025919344,
+          "scoreRme": 8.075724025919344,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.04000002145767212
+        },
+        "parent_update": {
+          "score": 0.015166676044464112,
+          "median": 0.014999985694885254,
+          "min": 0.009999990463256836,
+          "mean": 0.015166676044464112,
+          "p95": 0.025000035762786865,
+          "sd": 0.004639293265144433,
+          "rme": 11.420736224420521,
+          "scoreRme": 11.420736224420521,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.025000035762786865
+        },
+        "unmount": {
+          "score": 0.01366666356722514,
+          "median": 0.014999985694885254,
+          "min": 0.009999990463256836,
+          "mean": 0.01366666356722514,
+          "p95": 0.020000040531158447,
+          "sd": 0.003198423596671986,
+          "rme": 8.737881734245468,
+          "scoreRme": 8.737881734245468,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.020000040531158447
+        }
+      },
+      "meta": {
+        "count": 1,
+        "warmup": 5,
+        "rawSamples": [
+          {
+            "mount": 0.09000003337860107,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.01500004529953003,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.06000000238418579,
+            "local_update": 0.019999980926513672,
+            "parent_update": 0.014999985694885254,
+            "unmount": 0.010000050067901611
+          },
+          {
+            "mount": 0.13999998569488525,
+            "local_update": 0.04000002145767212,
+            "parent_update": 0.019999980926513672,
+            "unmount": 0.019999980926513672
+          },
+          {
+            "mount": 0.11000001430511475,
+            "local_update": 0.04000002145767212,
+            "parent_update": 0.019999980926513672,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.07999998331069946,
+            "local_update": 0.04000002145767212,
+            "parent_update": 0.014999985694885254,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.08500003814697266,
+            "local_update": 0.034999966621398926,
+            "parent_update": 0.01500004529953003,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.09000003337860107,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.014999985694885254,
+            "unmount": 0.020000040531158447
+          },
+          {
+            "mount": 0.06999999284744263,
+            "local_update": 0.025000035762786865,
+            "parent_update": 0.02499997615814209,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.07999998331069946,
+            "local_update": 0.030000030994415283,
+            "parent_update": 0.009999990463256836,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.26500004529953003,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.025000035762786865,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.07999998331069946,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.01500004529953003,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.06000000238418579,
+            "local_update": 0.02499997615814209,
+            "parent_update": 0.009999990463256836,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.08500003814697266,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.01500004529953003,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.07999998331069946,
+            "local_update": 0.034999966621398926,
+            "parent_update": 0.020000040531158447,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.08500003814697266,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.020000040531158447,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.05500000715255737,
+            "local_update": 0.020000040531158447,
+            "parent_update": 0.009999990463256836,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.07499998807907104,
+            "local_update": 0.019999980926513672,
+            "parent_update": 0.01500004529953003,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.07999998331069946,
+            "local_update": 0.02499997615814209,
+            "parent_update": 0.01500004529953003,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.10000002384185791,
+            "local_update": 0.04000002145767212,
+            "parent_update": 0.014999985694885254,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.06499999761581421,
+            "local_update": 0.020000040531158447,
+            "parent_update": 0.009999990463256836,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.09500002861022949,
+            "local_update": 0.02499997615814209,
+            "parent_update": 0.014999985694885254,
+            "unmount": 0.01500004529953003
+          },
+          {
+            "mount": 0.08499997854232788,
+            "local_update": 0.025000035762786865,
+            "parent_update": 0.014999985694885254,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.06499999761581421,
+            "local_update": 0.02499997615814209,
+            "parent_update": 0.010000050067901611,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.08499997854232788,
+            "local_update": 0.030000030994415283,
+            "parent_update": 0.009999990463256836,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.07499998807907104,
+            "local_update": 0.02499997615814209,
+            "parent_update": 0.009999990463256836,
+            "unmount": 0.01500004529953003
+          },
+          {
+            "mount": 0.07500004768371582,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.014999985694885254,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.10000002384185791,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.025000035762786865,
+            "unmount": 0.009999990463256836
+          },
+          {
+            "mount": 0.07499998807907104,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.009999990463256836,
+            "unmount": 0.020000040531158447
+          },
+          {
+            "mount": 0.08499997854232788,
+            "local_update": 0.019999980926513672,
+            "parent_update": 0.01500004529953003,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.0899999737739563,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.009999990463256836,
+            "unmount": 0.014999985694885254
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "react-compat-1",
+      "ops": {
+        "mount": {
+          "score": 0.16616666913032532,
+          "median": 0.1600000262260437,
+          "min": 0.12000000476837158,
+          "mean": 0.16616666913032532,
+          "p95": 0.2250000238418579,
+          "sd": 0.029439690121056353,
+          "rme": 6.614880531205977,
+          "scoreRme": 6.614880531205977,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.23000001907348633
+        },
+        "local_update": {
+          "score": 0.03416666984558105,
+          "median": 0.0350000262260437,
+          "min": 0.019999980926513672,
+          "mean": 0.03416666984558105,
+          "p95": 0.04500001668930054,
+          "sd": 0.00683340291864808,
+          "rme": 7.467359546854066,
+          "scoreRme": 7.467359546854066,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.050000011920928955
+        },
+        "parent_update": {
+          "score": 0.049833327531814575,
+          "median": 0.04500001668930054,
+          "min": 0.0350000262260437,
+          "mean": 0.049833327531814575,
+          "p95": 0.07999998331069946,
+          "sd": 0.01170642006064641,
+          "rme": 8.770753418911639,
+          "scoreRme": 8.770753418911639,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.08500003814697266
+        },
+        "unmount": {
+          "score": 0.024833337465922038,
+          "median": 0.025000035762786865,
+          "min": 0.014999985694885254,
+          "mean": 0.024833337465922038,
+          "p95": 0.034999966621398926,
+          "sd": 0.007931096471044008,
+          "rme": 11.924243258353522,
+          "scoreRme": 11.924243258353522,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.05500000715255737
+        }
+      },
+      "meta": {
+        "count": 1,
+        "warmup": 5,
+        "rawSamples": [
+          {
+            "mount": 0.2250000238418579,
+            "local_update": 0.034999966621398926,
+            "parent_update": 0.05500000715255737,
+            "unmount": 0.020000040531158447
+          },
+          {
+            "mount": 0.20499998331069946,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.07999998331069946,
+            "unmount": 0.034999966621398926
+          },
+          {
+            "mount": 0.19999998807907104,
+            "local_update": 0.04500001668930054,
+            "parent_update": 0.06999999284744263,
+            "unmount": 0.05500000715255737
+          },
+          {
+            "mount": 0.23000001907348633,
+            "local_update": 0.034999966621398926,
+            "parent_update": 0.08500003814697266,
+            "unmount": 0.034999966621398926
+          },
+          {
+            "mount": 0.19999998807907104,
+            "local_update": 0.030000030994415283,
+            "parent_update": 0.06499999761581421,
+            "unmount": 0.029999971389770508
+          },
+          {
+            "mount": 0.15000003576278687,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.04500001668930054,
+            "unmount": 0.019999980926513672
+          },
+          {
+            "mount": 0.13499999046325684,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.04000002145767212,
+            "unmount": 0.02499997615814209
+          },
+          {
+            "mount": 0.1499999761581421,
+            "local_update": 0.04500001668930054,
+            "parent_update": 0.04499995708465576,
+            "unmount": 0.025000035762786865
+          },
+          {
+            "mount": 0.16500002145767212,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.04999995231628418,
+            "unmount": 0.030000030994415283
+          },
+          {
+            "mount": 0.16500002145767212,
+            "local_update": 0.034999966621398926,
+            "parent_update": 0.050000011920928955,
+            "unmount": 0.025000035762786865
+          },
+          {
+            "mount": 0.1600000262260437,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.05500000715255737,
+            "unmount": 0.019999980926513672
+          },
+          {
+            "mount": 0.13999998569488525,
+            "local_update": 0.019999980926513672,
+            "parent_update": 0.050000011920928955,
+            "unmount": 0.025000035762786865
+          },
+          {
+            "mount": 0.14499998092651367,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.04500001668930054,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.14499998092651367,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.039999961853027344,
+            "unmount": 0.01500004529953003
+          },
+          {
+            "mount": 0.15000003576278687,
+            "local_update": 0.039999961853027344,
+            "parent_update": 0.04500001668930054,
+            "unmount": 0.025000035762786865
+          },
+          {
+            "mount": 0.21999996900558472,
+            "local_update": 0.04000002145767212,
+            "parent_update": 0.04500001668930054,
+            "unmount": 0.02499997615814209
+          },
+          {
+            "mount": 0.1350000500679016,
+            "local_update": 0.029999971389770508,
+            "parent_update": 0.04000002145767212,
+            "unmount": 0.019999980926513672
+          },
+          {
+            "mount": 0.1549999713897705,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.04000002145767212,
+            "unmount": 0.019999980926513672
+          },
+          {
+            "mount": 0.16500002145767212,
+            "local_update": 0.050000011920928955,
+            "parent_update": 0.0549999475479126,
+            "unmount": 0.025000035762786865
+          },
+          {
+            "mount": 0.1850000023841858,
+            "local_update": 0.030000030994415283,
+            "parent_update": 0.04499995708465576,
+            "unmount": 0.030000030994415283
+          },
+          {
+            "mount": 0.13999998569488525,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.04000002145767212,
+            "unmount": 0.019999980926513672
+          },
+          {
+            "mount": 0.1549999713897705,
+            "local_update": 0.025000035762786865,
+            "parent_update": 0.04499995708465576,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.13499999046325684,
+            "local_update": 0.025000035762786865,
+            "parent_update": 0.039999961853027344,
+            "unmount": 0.014999985694885254
+          },
+          {
+            "mount": 0.1899999976158142,
+            "local_update": 0.04000002145767212,
+            "parent_update": 0.05500000715255737,
+            "unmount": 0.029999971389770508
+          },
+          {
+            "mount": 0.1600000262260437,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.04999995231628418,
+            "unmount": 0.030000030994415283
+          },
+          {
+            "mount": 0.19499999284744263,
+            "local_update": 0.04499995708465576,
+            "parent_update": 0.050000011920928955,
+            "unmount": 0.025000035762786865
+          },
+          {
+            "mount": 0.13999998569488525,
+            "local_update": 0.02499997615814209,
+            "parent_update": 0.0350000262260437,
+            "unmount": 0.019999980926513672
+          },
+          {
+            "mount": 0.16500002145767212,
+            "local_update": 0.0350000262260437,
+            "parent_update": 0.04999995231628418,
+            "unmount": 0.025000035762786865
+          },
+          {
+            "mount": 0.12000000476837158,
+            "local_update": 0.025000035762786865,
+            "parent_update": 0.039999961853027344,
+            "unmount": 0.020000040531158447
+          },
+          {
+            "mount": 0.1600000262260437,
+            "local_update": 0.034999966621398926,
+            "parent_update": 0.04500001668930054,
+            "unmount": 0.02499997615814209
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "direct-react-roots-100",
+      "ops": {
+        "mount": {
+          "score": 2.5831666628519696,
+          "median": 2.6800000071525574,
+          "min": 2.149999976158142,
+          "mean": 2.5831666628519696,
+          "p95": 3.225000023841858,
+          "sd": 0.3460154703863778,
+          "rme": 5.001217870211509,
+          "scoreRme": 5.001217870211509,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 3.3950000405311584
+        },
+        "local_update": {
+          "score": 0.5211666623751322,
+          "median": 0.5199999809265137,
+          "min": 0.48000001907348633,
+          "mean": 0.5211666623751322,
+          "p95": 0.5950000286102295,
+          "sd": 0.033494298966030484,
+          "rme": 2.3995342328802356,
+          "scoreRme": 2.3995342328802356,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.625
+        },
+        "parent_update": {
+          "score": 1.0025000015894572,
+          "median": 0.8849999904632568,
+          "min": 0.824999988079071,
+          "mean": 1.0025000015894572,
+          "p95": 1.5949999690055847,
+          "sd": 0.26775165433817,
+          "rme": 9.971958578395633,
+          "scoreRme": 9.971958578395633,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 1.6550000309944153
+        },
+        "unmount": {
+          "score": 0.2131666640440623,
+          "median": 0.20499998331069946,
+          "min": 0.17000001668930054,
+          "mean": 0.2131666640440623,
+          "p95": 0.2749999761581421,
+          "sd": 0.03012854908219945,
+          "rme": 5.277054917546244,
+          "scoreRme": 5.277054917546244,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.2749999761581421
+        }
+      },
+      "meta": {
+        "count": 100,
+        "warmup": 5,
+        "rawSamples": [
+          {
+            "mount": 3.225000023841858,
+            "local_update": 0.5699999928474426,
+            "parent_update": 0.9299999475479126,
+            "unmount": 0.21500003337860107
+          },
+          {
+            "mount": 2.3799999952316284,
+            "local_update": 0.5350000262260437,
+            "parent_update": 1.5949999690055847,
+            "unmount": 0.2749999761581421
+          },
+          {
+            "mount": 2.6800000071525574,
+            "local_update": 0.5200000405311584,
+            "parent_update": 0.9399999976158142,
+            "unmount": 0.2149999737739563
+          },
+          {
+            "mount": 3.3950000405311584,
+            "local_update": 0.625,
+            "parent_update": 0.925000011920929,
+            "unmount": 0.24500000476837158
+          },
+          {
+            "mount": 2.7399999499320984,
+            "local_update": 0.5049999952316284,
+            "parent_update": 0.9100000262260437,
+            "unmount": 0.20999997854232788
+          },
+          {
+            "mount": 2.459999978542328,
+            "local_update": 0.5199999809265137,
+            "parent_update": 0.8600000143051147,
+            "unmount": 0.20499998331069946
+          },
+          {
+            "mount": 2.2649999856948853,
+            "local_update": 0.4899999499320984,
+            "parent_update": 0.8600000143051147,
+            "unmount": 0.1899999976158142
+          },
+          {
+            "mount": 2.6949999928474426,
+            "local_update": 0.5300000309944153,
+            "parent_update": 0.8849999904632568,
+            "unmount": 0.1899999976158142
+          },
+          {
+            "mount": 2.290000021457672,
+            "local_update": 0.49000000953674316,
+            "parent_update": 1.5699999928474426,
+            "unmount": 0.2749999761581421
+          },
+          {
+            "mount": 2.189999997615814,
+            "local_update": 0.550000011920929,
+            "parent_update": 0.9750000238418579,
+            "unmount": 0.22999995946884155
+          },
+          {
+            "mount": 2.8600000143051147,
+            "local_update": 0.550000011920929,
+            "parent_update": 0.875,
+            "unmount": 0.21500003337860107
+          },
+          {
+            "mount": 2.2049999833106995,
+            "local_update": 0.4950000047683716,
+            "parent_update": 0.8849999904632568,
+            "unmount": 0.18000000715255737
+          },
+          {
+            "mount": 2.824999988079071,
+            "local_update": 0.4899999499320984,
+            "parent_update": 0.8400000333786011,
+            "unmount": 0.19999998807907104
+          },
+          {
+            "mount": 2.159999966621399,
+            "local_update": 0.4899999499320984,
+            "parent_update": 1.5649999976158142,
+            "unmount": 0.2549999952316284
+          },
+          {
+            "mount": 2.8200000524520874,
+            "local_update": 0.5,
+            "parent_update": 0.8799999952316284,
+            "unmount": 0.19499999284744263
+          },
+          {
+            "mount": 2.7049999833106995,
+            "local_update": 0.48500001430511475,
+            "parent_update": 0.9049999713897705,
+            "unmount": 0.25999999046325684
+          },
+          {
+            "mount": 2.2450000047683716,
+            "local_update": 0.5199999809265137,
+            "parent_update": 0.8799999952316284,
+            "unmount": 0.1899999976158142
+          },
+          {
+            "mount": 3.150000035762787,
+            "local_update": 0.5950000286102295,
+            "parent_update": 0.8799999952316284,
+            "unmount": 0.21500003337860107
+          },
+          {
+            "mount": 2.774999976158142,
+            "local_update": 0.5299999713897705,
+            "parent_update": 0.8849999904632568,
+            "unmount": 0.1950000524520874
+          },
+          {
+            "mount": 2.4149999618530273,
+            "local_update": 0.49000000953674316,
+            "parent_update": 0.8549999594688416,
+            "unmount": 0.1850000023841858
+          },
+          {
+            "mount": 2.2799999713897705,
+            "local_update": 0.5049999952316284,
+            "parent_update": 0.8499999642372131,
+            "unmount": 0.1899999976158142
+          },
+          {
+            "mount": 2.7899999618530273,
+            "local_update": 0.5399999618530273,
+            "parent_update": 0.9050000309944153,
+            "unmount": 0.1850000023841858
+          },
+          {
+            "mount": 2.299999952316284,
+            "local_update": 0.5099999904632568,
+            "parent_update": 1.6550000309944153,
+            "unmount": 0.2549999952316284
+          },
+          {
+            "mount": 2.1949999928474426,
+            "local_update": 0.5,
+            "parent_update": 0.8700000047683716,
+            "unmount": 0.17000001668930054
+          },
+          {
+            "mount": 2.7450000047683716,
+            "local_update": 0.5449999570846558,
+            "parent_update": 0.8450000286102295,
+            "unmount": 0.20499998331069946
+          },
+          {
+            "mount": 2.149999976158142,
+            "local_update": 0.48000001907348633,
+            "parent_update": 0.824999988079071,
+            "unmount": 0.18000000715255737
+          },
+          {
+            "mount": 3.090000033378601,
+            "local_update": 0.5199999809265137,
+            "parent_update": 0.8850000500679016,
+            "unmount": 0.19499999284744263
+          },
+          {
+            "mount": 2.3949999809265137,
+            "local_update": 0.5250000357627869,
+            "parent_update": 1.5450000166893005,
+            "unmount": 0.25999999046325684
+          },
+          {
+            "mount": 2.6950000524520874,
+            "local_update": 0.4950000047683716,
+            "parent_update": 0.8700000047683716,
+            "unmount": 0.21999996900558472
+          },
+          {
+            "mount": 2.375,
+            "local_update": 0.5349999666213989,
+            "parent_update": 0.925000011920929,
+            "unmount": 0.19499999284744263
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "react-compat-100",
+      "ops": {
+        "mount": {
+          "score": 3.8553333361943563,
+          "median": 3.5850000381469727,
+          "min": 3.084999978542328,
+          "mean": 3.8553333361943563,
+          "p95": 4.230000019073486,
+          "sd": 1.4638982778223197,
+          "rme": 14.176912251298768,
+          "scoreRme": 14.176912251298768,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 11.4200000166893
+        },
+        "local_update": {
+          "score": 0.6744999965031941,
+          "median": 0.6500000357627869,
+          "min": 0.5249999761581421,
+          "mean": 0.6744999965031941,
+          "p95": 0.7999999523162842,
+          "sd": 0.1354962089767667,
+          "rme": 7.500286922061529,
+          "scoreRme": 7.500286922061529,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 1.3299999833106995
+        },
+        "parent_update": {
+          "score": 1.481666672229767,
+          "median": 1.2649999856948853,
+          "min": 1.1500000357627869,
+          "mean": 1.481666672229767,
+          "p95": 2.134999990463257,
+          "sd": 0.4656610665528708,
+          "rme": 11.734162582927452,
+          "scoreRme": 11.734162582927452,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 3.2450000047683716
+        },
+        "unmount": {
+          "score": 0.3475000003973643,
+          "median": 0.3399999737739563,
+          "min": 0.2749999761581421,
+          "mean": 0.3475000003973643,
+          "p95": 0.42500001192092896,
+          "sd": 0.045062219135132815,
+          "rme": 4.841617217401408,
+          "scoreRme": 4.841617217401408,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 0.5099999904632568
+        }
+      },
+      "meta": {
+        "count": 100,
+        "warmup": 5,
+        "rawSamples": [
+          {
+            "mount": 3.4200000166893005,
+            "local_update": 0.7199999690055847,
+            "parent_update": 3.2450000047683716,
+            "unmount": 0.42500001192092896
+          },
+          {
+            "mount": 3.3799999952316284,
+            "local_update": 0.675000011920929,
+            "parent_update": 1.3600000143051147,
+            "unmount": 0.3399999737739563
+          },
+          {
+            "mount": 3.439999997615814,
+            "local_update": 0.7099999785423279,
+            "parent_update": 1.3950000405311584,
+            "unmount": 0.3349999785423279
+          },
+          {
+            "mount": 4.230000019073486,
+            "local_update": 0.7999999523162842,
+            "parent_update": 1.3450000286102295,
+            "unmount": 0.3700000047683716
+          },
+          {
+            "mount": 3.284999966621399,
+            "local_update": 0.6499999761581421,
+            "parent_update": 2.134999990463257,
+            "unmount": 0.39000004529953003
+          },
+          {
+            "mount": 3.7299999594688416,
+            "local_update": 0.6399999856948853,
+            "parent_update": 1.2200000286102295,
+            "unmount": 0.3700000047683716
+          },
+          {
+            "mount": 3.215000033378601,
+            "local_update": 0.64000004529953,
+            "parent_update": 1.9649999737739563,
+            "unmount": 0.3500000238418579
+          },
+          {
+            "mount": 3.8050000071525574,
+            "local_update": 0.6600000262260437,
+            "parent_update": 1.184999942779541,
+            "unmount": 0.3149999976158142
+          },
+          {
+            "mount": 3.699999988079071,
+            "local_update": 0.6949999928474426,
+            "parent_update": 1.2700000405311584,
+            "unmount": 0.35999995470046997
+          },
+          {
+            "mount": 4.165000021457672,
+            "local_update": 0.6699999570846558,
+            "parent_update": 1.1850000023841858,
+            "unmount": 0.3100000023841858
+          },
+          {
+            "mount": 3.8299999833106995,
+            "local_update": 0.6100000143051147,
+            "parent_update": 1.2049999833106995,
+            "unmount": 0.35500001907348633
+          },
+          {
+            "mount": 3.8700000047683716,
+            "local_update": 0.7149999737739563,
+            "parent_update": 1.300000011920929,
+            "unmount": 0.36500000953674316
+          },
+          {
+            "mount": 4.185000002384186,
+            "local_update": 0.6650000214576721,
+            "parent_update": 1.2200000286102295,
+            "unmount": 0.3050000071525574
+          },
+          {
+            "mount": 3.3450000286102295,
+            "local_update": 0.699999988079071,
+            "parent_update": 1.25,
+            "unmount": 0.3149999976158142
+          },
+          {
+            "mount": 3.564999997615814,
+            "local_update": 0.6100000143051147,
+            "parent_update": 1.3199999928474426,
+            "unmount": 0.33000004291534424
+          },
+          {
+            "mount": 3.380000054836273,
+            "local_update": 0.6299999952316284,
+            "parent_update": 2.025000035762787,
+            "unmount": 0.3349999785423279
+          },
+          {
+            "mount": 3.2199999690055847,
+            "local_update": 0.6050000190734863,
+            "parent_update": 1.2099999785423279,
+            "unmount": 0.3050000071525574
+          },
+          {
+            "mount": 3.314999997615814,
+            "local_update": 0.6500000357627869,
+            "parent_update": 2.009999990463257,
+            "unmount": 0.35500001907348633
+          },
+          {
+            "mount": 3.1800000071525574,
+            "local_update": 0.6299999952316284,
+            "parent_update": 1.9900000095367432,
+            "unmount": 0.38499999046325684
+          },
+          {
+            "mount": 3.909999966621399,
+            "local_update": 0.6499999761581421,
+            "parent_update": 1.175000011920929,
+            "unmount": 0.3149999976158142
+          },
+          {
+            "mount": 3.175000011920929,
+            "local_update": 0.6200000047683716,
+            "parent_update": 2,
+            "unmount": 0.3700000047683716
+          },
+          {
+            "mount": 3.7300000190734863,
+            "local_update": 0.5850000381469727,
+            "parent_update": 1.159999966621399,
+            "unmount": 0.32499998807907104
+          },
+          {
+            "mount": 3.7899999618530273,
+            "local_update": 0.7350000143051147,
+            "parent_update": 1.2350000143051147,
+            "unmount": 0.39499998092651367
+          },
+          {
+            "mount": 3.939999997615814,
+            "local_update": 0.6650000214576721,
+            "parent_update": 1.2649999856948853,
+            "unmount": 0.3050000071525574
+          },
+          {
+            "mount": 3.4700000286102295,
+            "local_update": 0.6649999618530273,
+            "parent_update": 1.175000011920929,
+            "unmount": 0.32999998331069946
+          },
+          {
+            "mount": 3.4300000071525574,
+            "local_update": 0.5949999690055847,
+            "parent_update": 1.2400000095367432,
+            "unmount": 0.35500001907348633
+          },
+          {
+            "mount": 11.4200000166893,
+            "local_update": 1.3299999833106995,
+            "parent_update": 1.7400000095367432,
+            "unmount": 0.5099999904632568
+          },
+          {
+            "mount": 3.5850000381469727,
+            "local_update": 0.5550000071525574,
+            "parent_update": 1.2649999856948853,
+            "unmount": 0.3149999976158142
+          },
+          {
+            "mount": 3.084999978542328,
+            "local_update": 0.5249999761581421,
+            "parent_update": 1.1500000357627869,
+            "unmount": 0.2749999761581421
+          },
+          {
+            "mount": 3.865000009536743,
+            "local_update": 0.6349999904632568,
+            "parent_update": 1.2100000381469727,
+            "unmount": 0.3149999976158142
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "direct-react-roots-1000",
+      "ops": {
+        "mount": {
+          "score": 36.11966666181882,
+          "median": 34.299999952316284,
+          "min": 29.49500000476837,
+          "mean": 36.11966666181882,
+          "p95": 48.60499995946884,
+          "sd": 6.088783629071655,
+          "rme": 6.293894988049228,
+          "scoreRme": 6.293894988049228,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 48.625
+        },
+        "local_update": {
+          "score": 7.519666663805643,
+          "median": 6.319999992847443,
+          "min": 5.144999980926514,
+          "mean": 7.519666663805643,
+          "p95": 9.274999976158142,
+          "sd": 6.484866857767621,
+          "rme": 32.19846437039019,
+          "scoreRme": 32.19846437039019,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 41.435000002384186
+        },
+        "parent_update": {
+          "score": 67.3341666618983,
+          "median": 61.67500001192093,
+          "min": 50.48499995470047,
+          "mean": 67.3341666618983,
+          "p95": 100.46499997377396,
+          "sd": 15.985017826879895,
+          "rme": 8.86360350052217,
+          "scoreRme": 8.86360350052217,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 107.05500000715256
+        },
+        "unmount": {
+          "score": 6.257666665315628,
+          "median": 6.0200000405311584,
+          "min": 5.300000011920929,
+          "mean": 6.257666665315628,
+          "p95": 7.789999961853027,
+          "sd": 0.8707445537535636,
+          "rme": 5.195304733223067,
+          "scoreRme": 5.195304733223067,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 7.860000014305115
+        }
+      },
+      "meta": {
+        "count": 1000,
+        "warmup": 5,
+        "rawSamples": [
+          {
+            "mount": 30.040000021457672,
+            "local_update": 7.25,
+            "parent_update": 50.714999973773956,
+            "unmount": 5.564999997615814
+          },
+          {
+            "mount": 30.094999969005585,
+            "local_update": 5.2950000166893005,
+            "parent_update": 52.91500002145767,
+            "unmount": 5.620000004768372
+          },
+          {
+            "mount": 30.040000021457672,
+            "local_update": 5.525000035762787,
+            "parent_update": 50.48499995470047,
+            "unmount": 5.300000011920929
+          },
+          {
+            "mount": 32.625,
+            "local_update": 5.384999990463257,
+            "parent_update": 50.87000000476837,
+            "unmount": 5.370000004768372
+          },
+          {
+            "mount": 33.85499995946884,
+            "local_update": 5.535000026226044,
+            "parent_update": 57.64999997615814,
+            "unmount": 5.774999976158142
+          },
+          {
+            "mount": 34.424999952316284,
+            "local_update": 5.865000009536743,
+            "parent_update": 62.94499999284744,
+            "unmount": 5.560000002384186
+          },
+          {
+            "mount": 37.55000001192093,
+            "local_update": 5.98499995470047,
+            "parent_update": 61.67500001192093,
+            "unmount": 6.125
+          },
+          {
+            "mount": 37.31999999284744,
+            "local_update": 6.319999992847443,
+            "parent_update": 63.139999985694885,
+            "unmount": 6.319999992847443
+          },
+          {
+            "mount": 42.68000000715256,
+            "local_update": 9.274999976158142,
+            "parent_update": 68.06999999284744,
+            "unmount": 6.9549999833106995
+          },
+          {
+            "mount": 37.80500000715256,
+            "local_update": 6.385000050067902,
+            "parent_update": 78.28999996185303,
+            "unmount": 6.534999966621399
+          },
+          {
+            "mount": 42.8649999499321,
+            "local_update": 7.3299999833106995,
+            "parent_update": 107.05500000715256,
+            "unmount": 7.644999980926514
+          },
+          {
+            "mount": 44.875,
+            "local_update": 7.175000011920929,
+            "parent_update": 94.25499999523163,
+            "unmount": 7.504999995231628
+          },
+          {
+            "mount": 39.314999997615814,
+            "local_update": 6.790000021457672,
+            "parent_update": 100.46499997377396,
+            "unmount": 6.860000014305115
+          },
+          {
+            "mount": 39.0900000333786,
+            "local_update": 6.754999995231628,
+            "parent_update": 70.11500000953674,
+            "unmount": 6.844999969005585
+          },
+          {
+            "mount": 48.625,
+            "local_update": 7.555000007152557,
+            "parent_update": 78.67500001192093,
+            "unmount": 7.789999961853027
+          },
+          {
+            "mount": 48.60499995946884,
+            "local_update": 41.435000002384186,
+            "parent_update": 75.58999997377396,
+            "unmount": 7.75
+          },
+          {
+            "mount": 43.94999998807907,
+            "local_update": 7.375,
+            "parent_update": 92.92500001192093,
+            "unmount": 7.769999980926514
+          },
+          {
+            "mount": 47.14500004053116,
+            "local_update": 7.254999995231628,
+            "parent_update": 83.60999995470047,
+            "unmount": 7.860000014305115
+          },
+          {
+            "mount": 35.99500000476837,
+            "local_update": 8.104999959468842,
+            "parent_update": 56.85000002384186,
+            "unmount": 5.785000026226044
+          },
+          {
+            "mount": 31.894999980926514,
+            "local_update": 5.819999992847443,
+            "parent_update": 69.31000000238419,
+            "unmount": 6.0200000405311584
+          },
+          {
+            "mount": 31.724999964237213,
+            "local_update": 5.224999964237213,
+            "parent_update": 85.49000000953674,
+            "unmount": 6.0299999713897705
+          },
+          {
+            "mount": 31.3299999833107,
+            "local_update": 6.370000004768372,
+            "parent_update": 61,
+            "unmount": 6.274999976158142
+          },
+          {
+            "mount": 34.299999952316284,
+            "local_update": 5.824999988079071,
+            "parent_update": 54.905000030994415,
+            "unmount": 5.730000019073486
+          },
+          {
+            "mount": 33.92500001192093,
+            "local_update": 5.819999992847443,
+            "parent_update": 55.77999997138977,
+            "unmount": 5.615000009536743
+          },
+          {
+            "mount": 29.49500000476837,
+            "local_update": 5.144999980926514,
+            "parent_update": 60.34500002861023,
+            "unmount": 5.775000035762787
+          },
+          {
+            "mount": 29.955000042915344,
+            "local_update": 5.625,
+            "parent_update": 56.280000030994415,
+            "unmount": 5.439999997615814
+          },
+          {
+            "mount": 31.48499995470047,
+            "local_update": 5.26500004529953,
+            "parent_update": 54.73499995470047,
+            "unmount": 5.485000014305115
+          },
+          {
+            "mount": 30.275000035762787,
+            "local_update": 5.3299999833106995,
+            "parent_update": 54.62999999523163,
+            "unmount": 5.319999992847443
+          },
+          {
+            "mount": 29.759999990463257,
+            "local_update": 5.334999978542328,
+            "parent_update": 59.269999980926514,
+            "unmount": 5.355000019073486
+          },
+          {
+            "mount": 32.5450000166893,
+            "local_update": 7.23499995470047,
+            "parent_update": 51.985000014305115,
+            "unmount": 5.75
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "react-compat-1000",
+      "ops": {
+        "mount": {
+          "score": 54.45500000317892,
+          "median": 51.644999980926514,
+          "min": 39.689999997615814,
+          "mean": 54.45500000317892,
+          "p95": 81.22499996423721,
+          "sd": 12.50061232716557,
+          "rme": 8.57089568668551,
+          "scoreRme": 8.57089568668551,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 86.62000000476837
+        },
+        "local_update": {
+          "score": 8.436166669925054,
+          "median": 8.125,
+          "min": 6.759999990463257,
+          "mean": 8.436166669925054,
+          "p95": 10.785000026226044,
+          "sd": 1.5058590655158568,
+          "rme": 6.66456582017582,
+          "scoreRme": 6.66456582017582,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 13.225000023841858
+        },
+        "parent_update": {
+          "score": 67.90566666324933,
+          "median": 64.02000004053116,
+          "min": 52.91499996185303,
+          "mean": 67.90566666324933,
+          "p95": 89.08500003814697,
+          "sd": 12.824562355259731,
+          "rme": 7.051300470300663,
+          "scoreRme": 7.051300470300663,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 102.66499996185303
+        },
+        "unmount": {
+          "score": 8.083000002304713,
+          "median": 7.509999990463257,
+          "min": 6.675000011920929,
+          "mean": 8.083000002304713,
+          "p95": 10.2049999833107,
+          "sd": 1.1063512574150731,
+          "rme": 5.110379353280595,
+          "scoreRme": 5.110379353280595,
+          "warmupRatio": 1,
+          "samples": 30,
+          "p99": 10.290000021457672
+        }
+      },
+      "meta": {
+        "count": 1000,
+        "warmup": 5,
+        "rawSamples": [
+          {
+            "mount": 68.41500002145767,
+            "local_update": 7.100000023841858,
+            "parent_update": 53.12000000476837,
+            "unmount": 6.875
+          },
+          {
+            "mount": 52.719999969005585,
+            "local_update": 10.785000026226044,
+            "parent_update": 52.91499996185303,
+            "unmount": 6.675000011920929
+          },
+          {
+            "mount": 45.264999985694885,
+            "local_update": 7.625,
+            "parent_update": 54.10499995946884,
+            "unmount": 7.490000009536743
+          },
+          {
+            "mount": 42.535000026226044,
+            "local_update": 7.175000011920929,
+            "parent_update": 60.939999997615814,
+            "unmount": 7.1549999713897705
+          },
+          {
+            "mount": 39.689999997615814,
+            "local_update": 6.774999976158142,
+            "parent_update": 56.75,
+            "unmount": 7.225000023841858
+          },
+          {
+            "mount": 40.59500002861023,
+            "local_update": 7.969999969005585,
+            "parent_update": 60.00999999046326,
+            "unmount": 7.430000007152557
+          },
+          {
+            "mount": 44.189999997615814,
+            "local_update": 7.300000011920929,
+            "parent_update": 75.22500002384186,
+            "unmount": 7.480000019073486
+          },
+          {
+            "mount": 50.97500002384186,
+            "local_update": 8.870000004768372,
+            "parent_update": 85.93500000238419,
+            "unmount": 10.2049999833107
+          },
+          {
+            "mount": 86.62000000476837,
+            "local_update": 8.995000004768372,
+            "parent_update": 72.0799999833107,
+            "unmount": 8.905000030994415
+          },
+          {
+            "mount": 47.10999995470047,
+            "local_update": 10.524999976158142,
+            "parent_update": 64.02000004053116,
+            "unmount": 8.069999992847443
+          },
+          {
+            "mount": 51.644999980926514,
+            "local_update": 8.0450000166893,
+            "parent_update": 74.23000001907349,
+            "unmount": 8.805000007152557
+          },
+          {
+            "mount": 62.814999997615814,
+            "local_update": 9.7950000166893,
+            "parent_update": 84.30000001192093,
+            "unmount": 9.939999997615814
+          },
+          {
+            "mount": 60.7150000333786,
+            "local_update": 9.599999964237213,
+            "parent_update": 74.68500000238419,
+            "unmount": 8.810000002384186
+          },
+          {
+            "mount": 58.62999999523163,
+            "local_update": 9.415000021457672,
+            "parent_update": 80.02499997615814,
+            "unmount": 9.149999976158142
+          },
+          {
+            "mount": 69.25,
+            "local_update": 13.225000023841858,
+            "parent_update": 85.33999997377396,
+            "unmount": 9.844999969005585
+          },
+          {
+            "mount": 59.105000019073486,
+            "local_update": 9.324999988079071,
+            "parent_update": 89.08500003814697,
+            "unmount": 10.290000021457672
+          },
+          {
+            "mount": 59.1700000166893,
+            "local_update": 9.4200000166893,
+            "parent_update": 102.66499996185303,
+            "unmount": 9.51500004529953
+          },
+          {
+            "mount": 57.07499998807907,
+            "local_update": 8.125,
+            "parent_update": 80.74500000476837,
+            "unmount": 8.840000033378601
+          },
+          {
+            "mount": 77.37999999523163,
+            "local_update": 8.290000021457672,
+            "parent_update": 64.82499998807907,
+            "unmount": 8.02999997138977
+          },
+          {
+            "mount": 44.46000003814697,
+            "local_update": 10.394999980926514,
+            "parent_update": 57.13499999046326,
+            "unmount": 7.504999995231628
+          },
+          {
+            "mount": 44.99000000953674,
+            "local_update": 6.990000009536743,
+            "parent_update": 59.72999995946884,
+            "unmount": 7.509999990463257
+          },
+          {
+            "mount": 50.88499999046326,
+            "local_update": 8.569999992847443,
+            "parent_update": 67.55000001192093,
+            "unmount": 8.985000014305115
+          },
+          {
+            "mount": 53.02500003576279,
+            "local_update": 8.740000009536743,
+            "parent_update": 63.02999997138977,
+            "unmount": 7.694999992847443
+          },
+          {
+            "mount": 81.22499996423721,
+            "local_update": 7.185000002384186,
+            "parent_update": 58.480000019073486,
+            "unmount": 7.245000004768372
+          },
+          {
+            "mount": 44.00499999523163,
+            "local_update": 7.139999985694885,
+            "parent_update": 58.22500002384186,
+            "unmount": 7.189999997615814
+          },
+          {
+            "mount": 41.12999999523163,
+            "local_update": 7.100000023841858,
+            "parent_update": 70.43000000715256,
+            "unmount": 7.060000002384186
+          },
+          {
+            "mount": 44.105000019073486,
+            "local_update": 6.759999990463257,
+            "parent_update": 58.935000002384186,
+            "unmount": 7.3299999833106995
+          },
+          {
+            "mount": 64.11500000953674,
+            "local_update": 7.14000004529953,
+            "parent_update": 53.560000002384186,
+            "unmount": 6.830000042915344
+          },
+          {
+            "mount": 44,
+            "local_update": 7.194999992847443,
+            "parent_update": 55.60999995470047,
+            "unmount": 7.064999997615814
+          },
+          {
+            "mount": 47.810000002384186,
+            "local_update": 7.509999990463257,
+            "parent_update": 63.485000014305115,
+            "unmount": 7.339999973773956
+          }
+        ],
+        "correctness": "pass"
+      }
+    }
+  ]
+}

@@ -671,7 +671,7 @@ interface ElementDescriptor {
 	// A server ComponentBody (component-value form, e.g. `{<Comp/>}`) OR a host tag
 	// string (`'li'`), produced when host JSX appears at a VALUE position (a
 	// `.map(...)` callback, a render-prop arrow body, an array literal).
-	type: ServerComponent | string | typeof Fragment | typeof Activity;
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity;
 	props: any;
 	// React-style `key`, lifted out of props (consulted by the client's de-opt list
 	// path on hydration; the server only renders it into markup).
@@ -811,7 +811,7 @@ function scopedValueDescriptor(resolve: () => ElementDescriptor): ElementDescrip
 
 /** Server twin of the compiler-only scope-preserving JSX descriptor factory. */
 export function createScopedElement(
-	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
 ): ElementDescriptor {
@@ -838,7 +838,7 @@ export function createScopedElement(
 
 /** @internal Native child deferral with evidence on every resolving scope. */
 export function nativeCreateScopedElement(
-	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
 ): ElementDescriptor {
@@ -855,7 +855,7 @@ export function nativeCreateScopedElement(
 }
 
 function scopedElementDescriptor(
-	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	copiedProps: any,
 	key: string | null,
 	children: () => unknown,
@@ -881,7 +881,7 @@ function scopedElementDescriptor(
 // literal) to this call in BOTH modes, so the same lowered call resolves to the
 // client-or-server `createElement` per build, and `ssrChild` renders the result.
 export function createElement(
-	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
@@ -6142,6 +6142,10 @@ type SuspenseOutcome = SuspenseResult & {
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
+	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
+	resourceOptions?: RenderOptions | null;
+	/** Optional renderer resources; allocated only by a participating adapter. */
+	resources?: ServerRenderResources;
 	/** Render-local stable ids for non-primitive and long string control/list keys. */
 	asyncIdentities: Map<unknown, number>;
 	/** Cross-pass fallback ids for transient object keys at one lexical position. */
@@ -6160,8 +6164,8 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		 *  registering/suspending for the rest of this render so plain use()
 		 *  string-key replay drives progress instead. */
 		batchDisabled?: boolean;
-		/** observeSuspenseWave state — consecutive recreation strikes + the
-		 *  puMemo creation-cache size at the previous observation. */
+		/** Consecutive recreation strikes + the creation-cache size at the
+		 *  initial pending pass, then at each observeSuspenseWave observation. */
 		recreate?: { strikes: number; prevCreated: number };
 		/** Armed by observeSuspenseWave after a first strike: identity-resolved
 		 *  thenables (use() / puBatch resolvedT hits) are recorded here during
@@ -6172,13 +6176,82 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		touched?: Set<PromiseLike<unknown>>;
 	};
 };
-function newResolvedMap(): ResolvedMap {
+function newResolvedMap(resourceOptions?: RenderOptions | null): ResolvedMap {
 	const m = new Map() as ResolvedMap;
+	if (resourceOptions !== undefined) m.resourceOptions = resourceOptions;
 	m.asyncIdentities = new Map();
 	m.asyncPositionIdentities = new Map();
 	m.nextAsyncIdentity = 0;
 	m.pu = { created: new Map(), resolvedT: new Map(), warm: new Map() };
 	return m;
+}
+
+/** @internal Request lifetime for an optional renderer's asynchronous server work. */
+export interface ServerRenderResourceContext {
+	readonly signal: AbortSignal | undefined;
+	readonly nonce: string | undefined;
+	readonly timeoutMs: number;
+	/** Release unfinished work on success, failure, cancellation, or a synchronous shell return. */
+	registerCleanup(cleanup: () => void): () => void;
+}
+
+interface ServerRenderResources extends ServerRenderResourceContext {
+	finished: boolean;
+	cleanups: Map<() => void, () => void>;
+}
+
+/**
+ * Only an owned Octane request can retain foreign work between server passes.
+ * A hosted pass has no authority to observe its external renderer's completion
+ * or cancellation; return null so its adapter can reject before starting work.
+ */
+export function getServerRenderResourceContext(): ServerRenderResourceContext | null {
+	const resolved = RESOLVED;
+	if (resolved === null || resolved.resourceOptions === undefined) return null;
+	if (resolved.resources !== undefined) return resolved.resources;
+	const options = resolved.resourceOptions;
+	const resources: ServerRenderResources = {
+		signal: options?.signal,
+		nonce: options?.nonce,
+		timeoutMs: options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS,
+		finished: false,
+		cleanups: new Map(),
+		registerCleanup(cleanup) {
+			if (resources.finished) {
+				cleanup();
+				return NOOP;
+			}
+			// Registration identity, not callback identity, owns the resource.
+			// Two islands may intentionally use the same cleanup function.
+			const release = () => {
+				resources.cleanups.delete(release);
+			};
+			resources.cleanups.set(release, cleanup);
+			return release;
+		},
+	};
+	resolved.resources = resources;
+	return resources;
+}
+
+function releaseServerRenderResources(resolved: ResolvedMap): void {
+	const resources = resolved.resources;
+	// Native thenable settlement callbacks can retain this cache after an abort.
+	// They must not also keep a completed request's options or foreign resources.
+	resolved.resourceOptions = undefined;
+	if (resources !== undefined) resolved.resources = undefined;
+	if (resources === undefined || resources.finished) return;
+	resources.finished = true;
+	let failure: { error: unknown } | undefined;
+	for (const [release, cleanup] of resources.cleanups) {
+		resources.cleanups.delete(release);
+		try {
+			cleanup();
+		} catch (error) {
+			failure ??= { error };
+		}
+	}
+	if (failure !== undefined) throw failure.error;
 }
 
 interface FullPassResult {
@@ -6590,6 +6663,9 @@ async function settleSuspended(
 	signal: AbortSignal | undefined,
 ): Promise<void> {
 	const pu = (resolved as ResolvedMap).pu;
+	// Snapshot the first pass, not an artificial -1: existing creation sites
+	// are not evidence of new work on the first canonical retry.
+	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
 	const settleAll = Promise.all(
 		suspended.map(async ({ promise, key }) => {
 			if (resolved.has(key)) return;
@@ -6638,6 +6714,7 @@ async function settleFirstOfWave(
 	signal: AbortSignal | undefined,
 ): Promise<void> {
 	const pu = (resolved as ResolvedMap).pu;
+	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
 	const recorders: Promise<void>[] = [];
 	for (const { promise, key } of suspended) {
 		if (resolved.has(key)) continue;
@@ -6722,11 +6799,11 @@ function observeSuspenseWave(
 	settled: SuspendedList,
 	next: SuspendedList,
 	boundaryProgress: boolean,
-): void {
+): boolean {
 	const pu = resolved.pu;
 	if (pu.batchDisabled === true) {
 		pu.touched = undefined;
-		return;
+		return false;
 	}
 	let state = pu.recreate;
 	if (state === undefined) state = pu.recreate = { strikes: 0, prevCreated: -1 };
@@ -6734,8 +6811,9 @@ function observeSuspenseWave(
 	state.prevCreated = pu.created.size;
 	const touched = pu.touched;
 	pu.touched = undefined;
-	const reset = (): void => {
+	const reset = (): false => {
 		state.strikes = 0;
+		return false;
 	};
 	if (boundaryProgress || createdGrew) return reset();
 	let prevPu: Set<PromiseLike<unknown>> | null = null;
@@ -6768,9 +6846,14 @@ function observeSuspenseWave(
 	}
 	if (++state.strikes < 2) {
 		pu.touched = new Set(); // arm consumption tracking for the next pass
-		return;
+		return false;
 	}
 	pu.batchDisabled = true;
+	// The immediate retry abandons this pass's registrations. puBatch usually
+	// observes its own promises, but directly thrown resources and speculative
+	// warm work may not have subscribers yet. Observe every outcome without
+	// waiting or recording obsolete string-key results into the replay cache.
+	for (const { promise } of next) Promise.resolve(promise).then(NOOP, NOOP);
 	if (process.env.NODE_ENV !== 'production') {
 		console.error(
 			'octane SSR: use() thenables appear to be re-created on every render pass — ' +
@@ -6781,6 +6864,10 @@ function observeSuspenseWave(
 				'Falling back to per-site replay for the rest of this render.',
 		);
 	}
+	// The caller must recollect suspensions under the new per-site regime.
+	// Waiting for the just-created batch would settle identities that this
+	// canonical retry is about to replace again.
+	return true;
 }
 
 // The await-everything render core. Runs full canonical passes interleaved with
@@ -6792,13 +6879,11 @@ async function runBuffered(
 	props: any,
 	options: RenderOptions | undefined,
 	nonceAttr: string,
+	resolved: ResolvedMap,
 ): Promise<FullPassResult> {
 	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
 	const signal = options?.signal;
 	const identifierPrefix = options?.identifierPrefix ?? '';
-	// The suspense cache persists across this render's passes; it is render-local
-	// (never a module global) so concurrent renders can't share it.
-	const resolved: ResolvedMap = newResolvedMap();
 	let attempt = 0;
 	let lastSettled: SuspendedList | null = null;
 	for (;;) {
@@ -6816,7 +6901,9 @@ async function runBuffered(
 			throw err;
 		}
 		if (pass.suspended.length === 0) return pass;
-		if (lastSettled !== null) observeSuspenseWave(resolved, lastSettled, pass.suspended, false);
+		if (lastSettled !== null && observeSuspenseWave(resolved, lastSettled, pass.suspended, false)) {
+			continue;
+		}
 		// Between full passes, greedily discover deeper waterfall levels with cheap
 		// SUBTREE re-runs (skipping the static bulk) so the NEXT full pass jumps
 		// straight to canonical. A root-level boundary (job.frame.parent === null)
@@ -6891,11 +6978,16 @@ export async function prerender(
 ): Promise<RenderResult> {
 	const component = entryComponent as ServerComponent;
 	const nonceAttr = nonceAttrOf(options);
-	return passToResult(
-		await runBuffered(component, props, options, nonceAttr),
-		nonceAttr,
-		options?.headChannel === 'separate',
-	);
+	const resolved = newResolvedMap(options ?? null);
+	try {
+		return passToResult(
+			await runBuffered(component, props, options, nonceAttr, resolved),
+			nonceAttr,
+			options?.headChannel === 'separate',
+		);
+	} finally {
+		releaseServerRenderResources(resolved);
+	}
 }
 
 /**
@@ -7093,7 +7185,7 @@ export function renderToString(
 	const component = entryComponent as ServerComponent;
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
-	const resolved: ResolvedMap = newResolvedMap();
+	const resolved: ResolvedMap = newResolvedMap(options ?? null);
 	let pass: FullPassResult;
 	try {
 		pass = withStream(null, () =>
@@ -7102,6 +7194,8 @@ export function renderToString(
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
+	} finally {
+		releaseServerRenderResources(resolved);
 	}
 	return passToResult(pass, nonceAttr, options?.headChannel === 'separate');
 }
@@ -7119,7 +7213,7 @@ export function renderToStaticMarkup(
 	const component = entryComponent as ServerComponent;
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
-	const resolved: ResolvedMap = newResolvedMap();
+	const resolved: ResolvedMap = newResolvedMap(options ?? null);
 	let pass: FullPassResult;
 	try {
 		pass = withStream(null, () =>
@@ -7135,6 +7229,8 @@ export function renderToStaticMarkup(
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
+	} finally {
+		releaseServerRenderResources(resolved);
 	}
 	// No seeds (non-hydratable). Head is folded in without adoption markers, or
 	// handed over on its own under `headChannel: 'separate'`.
@@ -8131,12 +8227,12 @@ async function runStream(
 	props: any,
 	options: StreamOptions | undefined,
 	sink: StreamSink,
+	resolved: ResolvedMap,
 ): Promise<void> {
 	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
 	const signal = options?.signal;
 	const nonceAttr = nonceAttrOf(options);
 	const identifierPrefix = options?.identifierPrefix ?? '';
-	const resolved: ResolvedMap = newResolvedMap();
 	const stream: StreamState = {
 		boundaries: new Map(),
 		boundaryOwnerKeys: new Set(),
@@ -8303,6 +8399,10 @@ async function runStream(
 	let pass: FullPassResult;
 	let shellBoundaryKeys: Set<string>;
 	let preShellSuspended: SuspendedList = [];
+	// One-shot retry when batching is disabled. Keep it across shell publication
+	// so the final root retry cannot strand the same obsolete batch in the
+	// boundary loop. Both loops retain their abort checks and attempt bounds.
+	let retryWithoutSettling = false;
 	try {
 		signal?.throwIfAborted();
 		({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
@@ -8323,10 +8423,12 @@ async function runStream(
 				throw new Error(formatServerError(35, MAX_SUSPENSE_PASSES));
 			}
 			const settledWave = pass.suspended;
-			await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			if (!retryWithoutSettling) {
+				await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			}
 			({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
 			preShellSuspended = pass.suspended;
-			observeSuspenseWave(resolved, settledWave, pass.suspended, false);
+			retryWithoutSettling = observeSuspenseWave(resolved, settledWave, pass.suspended, false);
 			signal?.throwIfAborted();
 		}
 		pruneStreamBoundariesAbsentFromShell(stream, shellBoundaryKeys);
@@ -8460,7 +8562,9 @@ async function runStream(
 				throw new Error(formatServerError(48, MAX_SUSPENSE_PASSES));
 			}
 			const settledWave = suspended;
-			await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			if (!retryWithoutSettling) {
+				await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			}
 			pass = renderFullPass().pass;
 			suspended = pass.suspended;
 			reportRecoverableBoundaryErrors();
@@ -8506,7 +8610,7 @@ async function runStream(
 				}
 			}
 			if (madeProgress) attempt = 0; // a boundary completed — this wave was legitimate
-			observeSuspenseWave(resolved, settledWave, suspended, madeProgress);
+			retryWithoutSettling = observeSuspenseWave(resolved, settledWave, suspended, madeProgress);
 
 			// A nested boundary's template may live inside an enclosing boundary's
 			// not-yet-flushed segment. Build a topological emission order: roots and
@@ -8808,10 +8912,12 @@ export function renderToPipeableStream(
 	const startRender = (): void => {
 		if (started) return;
 		started = true;
+		const renderOptions = { ...options, signal: controller.signal };
+		const resolved = newResolvedMap(renderOptions);
 		void runStream(
 			component,
 			props,
-			{ ...options, signal: controller.signal },
+			renderOptions,
 			{
 				write(chunk, terminal) {
 					return queueWrite(chunk, terminal);
@@ -8820,14 +8926,17 @@ export function renderToPipeableStream(
 					options?.onShellReady?.();
 				},
 				shellError(err) {
+					releaseServerRenderResources(resolved);
 					options?.onShellError?.(err);
 					flushEnd();
 				},
 				allReady() {
+					releaseServerRenderResources(resolved);
 					options?.onAllReady?.();
 					flushEnd();
 				},
 				fatal() {
+					releaseServerRenderResources(resolved);
 					// Once the shell exists, abort/error degradation is a terminal
 					// completion of the pipeable request. Fizz fires onAllReady after its
 					// recovery instructions have been accepted even though onError also
@@ -8837,7 +8946,9 @@ export function renderToPipeableStream(
 					flushEnd();
 				},
 			},
+			resolved,
 		).catch((err) => {
+			releaseServerRenderResources(resolved);
 			options?.onError?.(err);
 			flushEnd();
 		});
@@ -9007,10 +9118,12 @@ export function renderToReadableStream(
 			}
 		};
 
+		const renderOptions = { ...options, signal: renderController.signal };
+		const resolved = newResolvedMap(renderOptions);
 		runStream(
 			component,
 			props,
-			{ ...options, signal: renderController.signal },
+			renderOptions,
 			{
 				write(chunk, terminal) {
 					return writeReadable(chunk, terminal);
@@ -9021,22 +9134,27 @@ export function renderToReadableStream(
 					resolveShell(stream);
 				},
 				shellError(err) {
+					releaseServerRenderResources(resolved);
 					options?.onShellError?.(err);
 					if (!shellDone) rejectShell(err);
 					allReadyReject(err);
 					closeReadable();
 				},
 				allReady() {
+					releaseServerRenderResources(resolved);
 					options?.onAllReady?.();
 					allReadyResolve();
 					closeReadable();
 				},
 				fatal(err) {
+					releaseServerRenderResources(resolved);
 					allReadyReject(err);
 					closeReadable();
 				},
 			},
+			resolved,
 		).catch((err) => {
+			releaseServerRenderResources(resolved);
 			options?.onError?.(err);
 			if (!shellDone) rejectShell(err);
 			allReadyReject(err);

@@ -1111,6 +1111,9 @@ export const Indirect = indirect(Host);
 			`export type { OctaneNode } from 'octane';`,
 			`const runtime = import('octane');`,
 			`const untouched = 'octane';`,
+			`export { ReactCompat } from 'octane/react';`,
+			`const compat = import('octane/react');`,
+			`const compatText = 'octane/react';`,
 		].join('\n');
 		const compiler = createOctaneCompiler({ root: '/project' });
 
@@ -1131,6 +1134,9 @@ export const Indirect = indirect(Host);
 		expect(server?.code).toContain(`export type { OctaneNode } from 'octane';`);
 		expect(server?.code).toContain(`const runtime = import('octane/server');`);
 		expect(server?.code).toContain(`const untouched = 'octane';`);
+		expect(server?.code).toContain(`export { ReactCompat } from 'octane/react/server';`);
+		expect(server?.code).toContain(`const compat = import('octane/react/server');`);
+		expect(server?.code).toContain(`const compatText = 'octane/react';`);
 	});
 
 	it('returns manifest watch metadata for transforms and pass-through decisions', () => {
