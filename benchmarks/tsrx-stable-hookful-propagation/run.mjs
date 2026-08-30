@@ -318,7 +318,13 @@ const targets = variants.map((variant) => ({
 	ops:
 		variant.samples.length === 0
 			? {}
-			: { compile: timingStatForJson(summarizeSamples(variant.samples), { p99: true }) },
+			: {
+					compile: timingStatForJson(summarizeSamples(variant.samples), { p99: true }),
+					compile_per_100_components: timingStatForJson(
+						summarizeSamples(variant.samples.map((sample) => (sample * 100) / variant.components)),
+						{ p99: true },
+					),
+				},
 	meta: variant.meta ?? { correctness: 'fail' },
 	...(includeRawSamples ? { rawSamples: { compile: variant.samples } } : {}),
 }));
