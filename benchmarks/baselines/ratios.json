@@ -3296,6 +3296,14 @@
     "note": "A 2,400-component chain ending at an opaque component must stay within 8% of the same graph declared leaf-first. Both orders verify all 2,400 warm plans; whole-module warm-reachability rescans exceeded this ceiling on current main."
   },
   {
+    "suite": "tsrx-component-graph",
+    "op": "compile",
+    "target": "anchorless-dependent-first-9600",
+    "reference": "anchorless-dependency-first-9600",
+    "maxRatio": 1.25,
+    "note": "A 9,600-component anchorless-safety chain declared root-first must stay within 25% of the same graph declared leaf-first. Exact pinned main measured 2.130x while the linear candidate's paired result measured 0.976x; both orders retain the same semantic controls and output witnesses."
+  },
+  {
     "suite": "tsrx-jsx-return-branches",
     "op": "client_compile_per_100_components",
     "target": "eligible-480",
