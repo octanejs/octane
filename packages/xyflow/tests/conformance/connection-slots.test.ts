@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { flushSync } from 'octane';
 import { flushEffects, mount } from '../../../octane/tests/_helpers';
 import {
+	ColorModeSlotProbe,
 	ConnectionSlotProbe,
 	MiddlewareSlotProbe,
 	NodesEdgesStateSlotProbe,
@@ -15,6 +17,44 @@ describe('@octanejs/xyflow — manual hook slots', () => {
 		root?.unmount();
 		root = undefined;
 		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+	});
+
+	it('keeps color mode state and subscription in distinct slots', () => {
+		let matches = false;
+		let listener: EventListener | undefined;
+		const mediaQuery = {
+			get matches() {
+				return matches;
+			},
+			media: '(prefers-color-scheme: dark)',
+			onchange: null,
+			addEventListener(_type: string, next: EventListenerOrEventListenerObject) {
+				listener = typeof next === 'function' ? next : next.handleEvent.bind(next);
+			},
+			removeEventListener() {},
+			addListener() {},
+			removeListener() {},
+			dispatchEvent() {
+				return true;
+			},
+		} as MediaQueryList;
+		vi.stubGlobal(
+			'matchMedia',
+			vi.fn(() => mediaQuery),
+		);
+
+		root = mount(ColorModeSlotProbe);
+		flushEffects();
+
+		const flow = root.container.querySelector('.react-flow');
+		expect(flow?.classList.contains('light')).toBe(true);
+
+		matches = true;
+		flushSync(function dispatchColorModeChange() {
+			listener?.(new Event('change'));
+		});
+		expect(flow?.classList.contains('dark')).toBe(true);
 	});
 
 	it('keeps repeated connection hook calls independent', () => {
