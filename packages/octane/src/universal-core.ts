@@ -10829,10 +10829,26 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			let nodes = previousNodes;
 			const committedEvents: CommittedCollapsedTemplateEvent[] = [];
 			let changed = false;
+			let previousEventCursor = 0;
 			for (let index = 0; index < nextNodes.length; index++) {
 				const source = nextNodes[index];
 				const accepted = previousNodes[index];
 				const acceptedId = accepted.id ?? previous.firstId! + index;
+				// Mounts and fallback updates append committed events in node order, so
+				// each node can consume its prior range without rescanning the template.
+				while (
+					previousEventCursor < previous.events.length &&
+					previous.events[previousEventCursor].index < index
+				) {
+					previousEventCursor++;
+				}
+				const previousEventStart = previousEventCursor;
+				while (
+					previousEventCursor < previous.events.length &&
+					previous.events[previousEventCursor].index === index
+				) {
+					previousEventCursor++;
+				}
 				const propsChanged = !shallowPropsEqual(accepted.props, source.props);
 				let recreatedNode = false;
 				if (propsChanged) {
@@ -10873,9 +10889,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				const events = source.events;
 				if (events === undefined) continue;
 				for (const event of events) {
-					const prior = previous.events.find(
-						(candidate) => candidate.index === index && candidate.event.type === event.type,
-					)?.event;
+					let prior: CommittedEvent | undefined;
+					for (
+						let previousEventIndex = previousEventStart;
+						previousEventIndex < previousEventCursor;
+						previousEventIndex++
+					) {
+						const candidate = previous.events[previousEventIndex].event;
+						if (candidate.type === event.type) {
+							prior = candidate;
+							break;
+						}
+					}
 					const listener = prior?.listener ?? nextListener++;
 					const committed = { ...event, listener };
 					committedEvents.push({ index, event: committed });

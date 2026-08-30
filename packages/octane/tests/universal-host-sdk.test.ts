@@ -1176,6 +1176,97 @@ describe('universal prepared host SDK', () => {
 		expect(container.instanceCount).toBe(0);
 	});
 
+	it('keeps fallback template handlers atomic across many native event sites', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createTemplateObjectDriver(true));
+		const calls: string[] = [];
+		const sites = 32;
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			children: Array.from({ length: sites }, (_, index) => ({
+				kind: 'host' as const,
+				type: 'action',
+				props: { index },
+				bindings: [['onSelect', index * 2] as const, ['onPress', index * 2 + 1] as const],
+			})),
+		});
+		const Scene = defineUniversalComponent(
+			'object',
+			({ version, inactive }: { version: string; inactive: ReadonlySet<number> }) =>
+				universalValue(
+					plan,
+					Array.from({ length: sites * 2 }, (_, slot) => {
+						const index = slot >> 1;
+						const type = slot % 2 === 0 ? 'select' : 'press';
+						if (type === 'select' && inactive.has(index)) return null;
+						return () => calls.push(`${version}:${index}:${type}`);
+					}),
+				),
+		);
+		const noInactiveSites = new Set<number>();
+		const sampled = [0, 15, 31];
+
+		root.render(Scene, { version: 'accepted', inactive: noInactiveSites });
+		const row = container.children[0];
+		const actions = [...row.children];
+		for (const index of sampled) {
+			container.dispatchEvent(actions[index], 'select', undefined);
+			container.dispatchEvent(actions[index], 'press', undefined);
+		}
+		expect(calls).toEqual(
+			sampled.flatMap((index) => [`accepted:${index}:select`, `accepted:${index}:press`]),
+		);
+
+		const abandoned = root.prepare(Scene, {
+			version: 'abandoned',
+			inactive: noInactiveSites,
+		});
+		if (abandoned.status !== 'prepared') throw new Error('Expected a prepared transaction.');
+		abandoned.abort();
+		container.dispatchEvent(actions[0], 'select', undefined);
+		container.dispatchEvent(actions[15], 'press', undefined);
+		expect(calls.slice(-2)).toEqual(['accepted:0:select', 'accepted:15:press']);
+
+		const inactive = new Set(sampled);
+		root.render(Scene, { version: 'next', inactive });
+		expect(container.children[0]).toBe(row);
+		expect(row.children).toEqual(actions);
+		for (const index of sampled) {
+			expect(() => container.dispatchEvent(actions[index], 'select', undefined)).toThrow(
+				/no "select" listener/,
+			);
+			container.dispatchEvent(actions[index], 'press', undefined);
+		}
+		for (const index of [1, 16, 30]) {
+			container.dispatchEvent(actions[index], 'select', undefined);
+		}
+		expect(calls.slice(-6)).toEqual([
+			'next:0:press',
+			'next:15:press',
+			'next:31:press',
+			'next:1:select',
+			'next:16:select',
+			'next:30:select',
+		]);
+
+		root.render(Scene, { version: 'restored', inactive: noInactiveSites });
+		for (const index of sampled) {
+			container.dispatchEvent(actions[index], 'select', undefined);
+			container.dispatchEvent(actions[index], 'press', undefined);
+		}
+		expect(calls.slice(-6)).toEqual(
+			sampled.flatMap((index) => [`restored:${index}:select`, `restored:${index}:press`]),
+		);
+
+		root.unmount();
+		expect(container.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+		expect(() => container.dispatchEvent(actions[0], 'select', undefined)).toThrow(
+			/Object driver: unknown event target/,
+		);
+	});
+
 	it('shares immutable intrinsic programs while preserving keyed events, updates, and anchors', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createTemplateObjectDriver(true, true));
