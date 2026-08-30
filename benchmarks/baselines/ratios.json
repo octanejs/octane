@@ -560,6 +560,14 @@
     "note": "Same-process lowercase method misses through 1,000 server routes, normalized per candidate. Re-normalizing the request method for every route measured at 0.31x the dynamic control; one dispatch-level normalization measured at 0.07x. The 0.2 ceiling leaves timing headroom while catching repeated method normalization."
   },
   {
+    "suite": "rspack-css-graph",
+    "op": "graph_traversals",
+    "target": "sixteen-requests",
+    "reference": "one-request",
+    "maxRatio": 1,
+    "note": "Deterministic public module-graph traversals through collection, post-rebuild verification, and seal. The repeated resolver performed 48 traversals for sixteen requests versus 3 for one request; the phase-local batch performs 3 for both, so the exact 1x ceiling catches restoration of request-by-connection graph scans."
+  },
+  {
     "suite": "floating-tree-navigation",
     "op": "node_reads",
     "target": "indexed-deep-chain",

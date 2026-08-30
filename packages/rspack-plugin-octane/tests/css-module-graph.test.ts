@@ -177,6 +177,140 @@ const EXPORTS = `var root = 'mapped_root'; var label = 'mapped_label'; export { 
 const CHANGED = /@octanejs\/rspack-plugin: CSS-module proof changed/;
 
 describe('Rspack CSS-module graph proofs', () => {
+	it.each([
+		{ invalidKind: 'attributes', invalidFirst: true },
+		{ invalidKind: 'attributes', invalidFirst: false },
+		{ invalidKind: 'unidentifiable', invalidFirst: true },
+		{ invalidKind: 'unidentifiable', invalidFirst: false },
+	] as const)(
+		'declines $invalidKind targets without poisoning safe peers when invalidFirst=$invalidFirst',
+		async ({ invalidKind, invalidFirst }) => {
+			const invalidRequest = './invalid.module.css';
+			const safeRequest = './safe.module.css';
+			const app = importer('request-local-invalidity', [invalidRequest, safeRequest]);
+			const invalid = module('invalid', EXPORTS, {
+				resource: '/project/invalid.module.css',
+			});
+			if (invalidKind === 'unidentifiable') invalid.identifier = undefined as any;
+			const otherwiseValid = module('otherwise-valid', EXPORTS, {
+				resource: '/project/invalid.module.css',
+			});
+			const safe = module('safe', EXPORTS, { resource: '/project/safe.module.css' });
+			const invalidEdge = edge(
+				invalidRequest,
+				invalid,
+				invalidKind === 'attributes' ? { attributes: { type: 'css' } } : {},
+			);
+			const validEdge = edge(invalidRequest, otherwiseValid);
+			const connections = [
+				...(invalidFirst ? [invalidEdge, validEdge] : [validEdge, invalidEdge]),
+				edge(safeRequest, safe),
+			];
+			const consumed = vi.fn(() => [safeRequest]);
+			const provider = vi.fn((_input: { id: string }) => undefined);
+			const graph = harness({ option: provider }).createCompilation(
+				[app, invalid, otherwiseValid, safe],
+				new Map([[app.id, connections]]),
+				{ consume: consumed },
+			);
+
+			await expect(graph.finish()).resolves.toBeUndefined();
+			expect(consumed).toHaveBeenCalledWith(
+				app,
+				expect.objectContaining({ imports: [expect.objectContaining({ request: safeRequest })] }),
+			);
+			expect(provider.mock.calls.map(([input]) => input.id)).toEqual([safe.id]);
+			expect(() => graph.seal()).not.toThrow();
+			expect(() => graph.emit()).not.toThrow();
+		},
+	);
+
+	it('accepts duplicate effective identities and ignores non-ESM decoys in a batch', async () => {
+		const request = './styles.module.css';
+		const safeRequest = './safe.module.css';
+		const app = importer('duplicate-identity', [request, safeRequest]);
+		const styles = module('stable-styles', EXPORTS);
+		const duplicate = module(styles.id, EXPORTS);
+		const decoy = module('commonjs-decoy', EXPORTS.replaceAll('mapped_', 'wrong_'));
+		const safe = module('safe-styles', EXPORTS.replaceAll('mapped_', 'safe_'), {
+			resource: '/project/safe.module.css',
+		});
+		const provider = vi.fn((_input: { id: string }) => undefined);
+		const graph = harness({ option: provider }).createCompilation(
+			[app, styles, duplicate, decoy, safe],
+			new Map([
+				[
+					app.id,
+					[
+						edge(request, decoy, { category: 'commonjs' }),
+						edge(request, styles),
+						edge(request, duplicate),
+						edge(safeRequest, safe),
+					],
+				],
+			]),
+		);
+
+		await expect(graph.finish()).resolves.toBeUndefined();
+		expect(provider.mock.calls.map(([input]) => input.id).sort()).toEqual(
+			[safe.id, styles.id].sort(),
+		);
+		expect(() => graph.seal()).not.toThrow();
+	});
+
+	it('reacquires equivalent graph and module identities for batch verification', async () => {
+		const requests = ['./styles.module.css', './safe.module.css'];
+		const app = importer('fresh-identities', requests);
+		const styles = module('fresh-styles', EXPORTS);
+		const safe = module('fresh-safe', EXPORTS.replaceAll('mapped_', 'safe_'), {
+			resource: '/project/safe.module.css',
+		});
+		const graph = harness().createCompilation(
+			[app, styles, safe],
+			new Map([[app.id, [edge(requests[0], styles), edge(requests[1], safe)]]]),
+		);
+
+		await graph.finish();
+		const nextApp = importer(app.id, requests);
+		nextApp.buildInfo[CSS_MODULE_BUILD_INFO_KEY] = structuredClone(
+			app.buildInfo[CSS_MODULE_BUILD_INFO_KEY],
+		);
+		const nextStyles = module(styles.id, styles.source);
+		const nextSafe = module(safe.id, safe.source, { resource: safe.resource });
+		graph.compilation.modules = new Set([nextApp, nextStyles, nextSafe]);
+		graph.compilation.moduleGraph = {
+			getOutgoingConnections: (module: TestModule) =>
+				module.id === nextApp.id
+					? [edge(requests[0], nextStyles), edge(requests[1], nextSafe)]
+					: [],
+		};
+
+		expect(() => graph.seal()).not.toThrow();
+		expect(() => graph.emit()).not.toThrow();
+	});
+
+	it('rejects target changes from the current graph during batch verification', async () => {
+		const requests = ['./styles.module.css', './safe.module.css'];
+		const app = importer('changed-batch-target', requests);
+		const styles = module('changed-batch-styles', EXPORTS);
+		const safe = module('changed-batch-safe', EXPORTS.replaceAll('mapped_', 'safe_'), {
+			resource: '/project/safe.module.css',
+		});
+		const replacement = module('replacement-safe', safe.source, { resource: safe.resource });
+		const graph = harness().createCompilation(
+			[app, styles, safe, replacement],
+			new Map([[app.id, [edge(requests[0], styles), edge(requests[1], safe)]]]),
+		);
+
+		await graph.finish();
+		graph.compilation.moduleGraph = {
+			getOutgoingConnections: (module: TestModule) =>
+				module.id === app.id ? [edge(requests[0], styles), edge(requests[1], replacement)] : [],
+		};
+
+		expect(() => graph.seal()).toThrow(CHANGED);
+	});
+
 	it('provides exact effective-module identities and read-only metadata', async () => {
 		const a = importer('app-alpha', ['./styles.module.css?theme=one']);
 		const b = importer('app-beta', ['./styles.module.css?theme=two']);

@@ -450,6 +450,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Node-only Rspack CSS-module proof collection and verification with
+		// deterministic graph traversal and yielded-connection counts.
+		name: 'rspack-css-graph',
+		cwd: 'rspack-css-graph',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Floating UI's virtual nested-menu routing: exact previous behavior versus
 		// production on deep and branching trees, with deterministic node-read counts.
 		name: 'floating-tree-navigation',

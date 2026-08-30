@@ -94,6 +94,39 @@ function targetForRequest(compilation, importer, request) {
 	return targets.size === 1 ? targets.values().next().value : null;
 }
 
+/** Resolve several exact requests with one fresh walk of the current graph. */
+function targetsForRequests(compilation, importer, requests) {
+	const states = new Map();
+	for (const request of requests) {
+		states.set(request, { id: null, target: null, invalid: false });
+	}
+	let invalid = 0;
+	for (const connection of compilation.moduleGraph.getOutgoingConnections(importer)) {
+		const dependency = connection.dependency;
+		if (dependency?.category !== 'esm') continue;
+		const state = states.get(dependency.request);
+		if (state === undefined || state.invalid) continue;
+		const target = connection.module;
+		const id =
+			dependency.attributes != null && Object.keys(dependency.attributes).length > 0
+				? null
+				: identifier(target);
+		if (id === null || (state.id !== null && state.id !== id)) {
+			state.invalid = true;
+			state.target = null;
+			invalid++;
+			if (invalid === states.size) break;
+			continue;
+		}
+		state.id = id;
+		state.target = target;
+	}
+	for (const [request, state] of states) {
+		states.set(request, state.invalid ? null : state.target);
+	}
+	return states;
+}
+
 function sortedStrings(values) {
 	return [...new Set([...iterable(values)].filter((value) => typeof value === 'string'))].sort();
 }
@@ -175,8 +208,7 @@ function sameStrings(left, right) {
 	return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
-function verifyTarget(compilation, importer, entry) {
-	const target = targetForRequest(compilation, importer, entry.request);
+function verifyResolvedTarget(importer, entry, target) {
 	if (identifier(target) !== entry.id)
 		changed(identifier(importer), entry.request, 'the effective module identity differs');
 	if (!JAVASCRIPT_TYPES.has(target.type))
@@ -187,23 +219,32 @@ function verifyTarget(compilation, importer, entry) {
 	}
 }
 
+function verifyTarget(compilation, importer, entry) {
+	verifyResolvedTarget(importer, entry, targetForRequest(compilation, importer, entry.request));
+}
+
 function verifyGraph(compilation, state) {
 	if (state.receipts.size === 0) return;
 	const modules = currentModules(compilation.modules);
 	for (const [id, receipt] of state.receipts) {
 		const importer = modules.get(id);
 		const info = candidateInfo(importer);
+		const requests = receipt.imports.map((entry) => entry.request);
 		if (
 			info === null ||
 			info.sourceHash !== receipt.sourceHash ||
-			!sameStrings(
-				info.consumed,
-				receipt.imports.map((entry) => entry.request),
-			)
+			!sameStrings(info.consumed, requests)
 		) {
 			changed(id, undefined, 'the authored importer or committed-use receipt differs');
 		}
-		for (const entry of receipt.imports) verifyTarget(compilation, importer, entry);
+		if (receipt.imports.length === 1) {
+			verifyTarget(compilation, importer, receipt.imports[0]);
+		} else {
+			const targets = targetsForRequests(compilation, importer, requests);
+			for (const entry of receipt.imports) {
+				verifyResolvedTarget(importer, entry, targets.get(entry.request));
+			}
+		}
 	}
 }
 
@@ -251,8 +292,14 @@ async function collectAndRebuild(compilation, state, option, environment) {
 			const importer = modules.get(id);
 			const info = candidateInfo(importer);
 			const imports = [];
-			for (const request of [...new Set(info.requests)].sort()) {
-				const target = targetForRequest(compilation, importer, request);
+			const requests = [...new Set(info.requests)].sort();
+			const targets =
+				requests.length === 1 ? null : targetsForRequests(compilation, importer, requests);
+			for (const request of requests) {
+				const target =
+					targets === null
+						? targetForRequest(compilation, importer, request)
+						: targets.get(request);
 				if (target === null) continue;
 				const proof = readTargetProof(target, option, environment, cache);
 				if (proof !== null) imports.push({ request, ...proof });
