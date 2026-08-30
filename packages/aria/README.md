@@ -5,6 +5,13 @@ faithful port of Adobe's [React Aria](https://react-spectrum.adobe.com/react-ari
 (`react-aria`, `react-stately`, and `react-aria-components`) onto
 octane's hooks and native event system.
 
+## Installation
+
+```sh
+npm install @octanejs/aria
+pnpm add @octanejs/aria
+```
+
 - `@octanejs/aria` — the `react-aria` behavior-hook surface.
 - `@octanejs/aria/stately` — the `react-stately` state-hook surface.
 - `@octanejs/aria/components` — the complete public export surface of

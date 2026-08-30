@@ -2,6 +2,13 @@
 
 The Octane migration target for `vaul@1.1.2`.
 
+## Installation
+
+```sh
+npm install @octanejs/vaul
+pnpm add @octanejs/vaul
+```
+
 ```ts
 import { Drawer } from '@octanejs/vaul';
 import '@octanejs/vaul/style.css';

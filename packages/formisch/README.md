@@ -18,6 +18,7 @@ native `onChange`.
 ## Install
 
 ```sh
+npm install @octanejs/formisch valibot
 pnpm add @octanejs/formisch valibot
 ```
 

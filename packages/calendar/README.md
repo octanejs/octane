@@ -3,6 +3,13 @@
 An Octane port of
 [`react-calendar@6.0.1`](https://github.com/wojtekmaj/react-calendar/tree/dc73f86f68239cb694650b66e0795a2f7f9323ed/packages/react-calendar).
 
+## Installation
+
+```sh
+npm install @octanejs/calendar
+pnpm add @octanejs/calendar
+```
+
 ```tsrx
 import { useState } from 'octane';
 import Calendar from '@octanejs/calendar';

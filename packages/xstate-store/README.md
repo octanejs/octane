@@ -8,6 +8,7 @@ React binding is ported. See [`UPSTREAM.md`](./UPSTREAM.md) for the pin, the
 export crosswalk, and the disposition of every upstream test.
 
 ```bash
+npm install @octanejs/xstate-store
 pnpm add @octanejs/xstate-store
 ```
 

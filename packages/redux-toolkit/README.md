@@ -3,6 +3,13 @@
 [Redux Toolkit](https://redux-toolkit.js.org) and RTK Query for the
 [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/redux-toolkit
+pnpm add @octanejs/redux-toolkit
+```
+
 Redux Toolkit's store, reducer, middleware, selector, and RTK Query cache core
 are framework-agnostic, so this package re-exports the real
 `@reduxjs/toolkit@2.12.0` implementation. The React-specific RTK Query hooks,

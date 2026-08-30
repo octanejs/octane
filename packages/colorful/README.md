@@ -5,6 +5,7 @@ Exact Octane binding for [`react-colorful@5.8.0`](https://github.com/omgovich/re
 ## Install
 
 ```sh
+npm install @octanejs/colorful
 pnpm add @octanejs/colorful
 ```
 

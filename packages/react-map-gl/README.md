@@ -5,6 +5,7 @@ Mapbox GL JS bindings for Octane — a port of
 package `react-map-gl/mapbox` re-exports.
 
 ```bash
+npm install @octanejs/react-map-gl mapbox-gl
 pnpm add @octanejs/react-map-gl mapbox-gl
 ```
 

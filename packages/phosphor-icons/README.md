@@ -8,6 +8,7 @@ track the icon surface of `@phosphor-icons/react@2.1.10`.
 ## Install
 
 ```bash
+npm install @octanejs/phosphor-icons
 pnpm add @octanejs/phosphor-icons
 ```
 

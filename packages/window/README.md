@@ -5,6 +5,13 @@ the [Octane](https://github.com/octanejs/octane) renderer. Change the package
 import and keep the current v2 `List`, `Grid`, sizing, callback, ref, and
 imperative-scrolling contracts.
 
+## Installation
+
+```sh
+npm install @octanejs/window
+pnpm add @octanejs/window
+```
+
 ```diff
 -import { List } from 'react-window';
 +import { List } from '@octanejs/window';

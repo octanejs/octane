@@ -5,6 +5,13 @@ supports click and keyboard selection, drag and drop, paste, File System Access,
 accepted/rejected files, synchronous or asynchronous validators, superseding
 stale async work, and programmatic dialog opening. It never uploads files.
 
+## Installation
+
+```sh
+npm install @octanejs/dropzone
+pnpm add @octanejs/dropzone
+```
+
 ```tsrx
 import { useDropzone } from '@octanejs/dropzone';
 

@@ -8,6 +8,7 @@ open is the lifecycle glue between Tauri's promise/callback IPC and Octane's
 render model, which is all this package is.
 
 ```bash
+npm install @octanejs/tauri @tauri-apps/api
 pnpm add @octanejs/tauri @tauri-apps/api
 ```
 

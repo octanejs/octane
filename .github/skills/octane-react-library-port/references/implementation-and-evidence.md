@@ -227,8 +227,12 @@ A completed publishable binding normally has:
 - exact workspace `octane` peer and dev dependencies, never a regular runtime
   `octane` dependency;
 - source and public type exports with no published `declare module '*.tsrx'`;
-- README, `status.json`, tests, and strict authored/public/packed-consumer type
-  programs;
+- README with an installation section near the start containing copy-paste
+  `npm install @octanejs/<name> ...` and `pnpm add @octanejs/<name> ...`
+  commands. Include every non-optional external peer so either command is
+  sufficient in an existing Octane application; the package inventory check
+  enforces the binding and required-peer closure in both commands. Also include
+  `status.json`, tests, and strict authored/public/packed-consumer type programs;
 - a committed byte-exact `upstream/` pristine tree pinned by
   `audit/upstream.lock.json` (offline-verified against upstream git blob shas),
   plus `audit/upstream-patches/` divergence patches and `.skip` rationales for

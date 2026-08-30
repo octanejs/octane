@@ -2,6 +2,13 @@
 
 Octane binding for [`react-to-print@3.3.0`](https://github.com/MatthewHerbst/react-to-print).
 
+## Installation
+
+```sh
+npm install @octanejs/to-print
+pnpm add @octanejs/to-print
+```
+
 ```tsrx
 import { useRef } from 'octane';
 import { useReactToPrint } from '@octanejs/to-print';

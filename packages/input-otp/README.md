@@ -5,6 +5,13 @@ renderer, ported from [`input-otp@1.5.0`](https://github.com/guilhermerodz/input
 It keeps one native input for keyboard, screen-reader, paste, and mobile autofill
 behavior while projecting the value into individually styled slots.
 
+## Installation
+
+```sh
+npm install @octanejs/input-otp
+pnpm add @octanejs/input-otp
+```
+
 ```tsx
 import { useContext, useState } from 'octane';
 import { OTPInput, OTPInputContext, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';

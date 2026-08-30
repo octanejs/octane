@@ -8,6 +8,7 @@ ported. See [`UPSTREAM.md`](./UPSTREAM.md) for the pin, the module and export
 crosswalk, and the disposition of every upstream test.
 
 ```bash
+npm install @octanejs/xstate xstate
 pnpm add @octanejs/xstate xstate
 ```
 

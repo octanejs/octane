@@ -2,6 +2,13 @@
 
 [react-router](https://reactrouter.com) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/remix-router
+pnpm add @octanejs/remix-router
+```
+
 react-router v8 ships as a single package, so this port **vendors the
 framework-agnostic router core byte-close** (loaders, actions, redirects,
 matching, history — validated by 161 ported upstream router tests plus four

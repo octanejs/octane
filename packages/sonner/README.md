@@ -9,6 +9,7 @@ colors, stacking, timers, keyboard focus, and swipe dismissal.
 ## Install
 
 ```bash
+npm install @octanejs/sonner
 pnpm add @octanejs/sonner
 ```
 

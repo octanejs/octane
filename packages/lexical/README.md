@@ -2,6 +2,13 @@
 
 [Lexical](https://lexical.dev) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/lexical
+pnpm add @octanejs/lexical
+```
+
 Lexical is an extensible rich-text editor framework. This package reuses Lexical's
 framework-agnostic core (`lexical`, `@lexical/rich-text`, `@lexical/history`,
 `@lexical/list`, …) and reimplements the [`@lexical/react`](https://www.npmjs.com/package/@lexical/react)

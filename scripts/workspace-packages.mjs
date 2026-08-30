@@ -56,6 +56,23 @@ function readJson(file) {
 	return JSON.parse(readFileSync(file, 'utf8'));
 }
 
+function bindingInstallCommandPackages(readme, command, packageName) {
+	for (const line of readme.split(/\r?\n/)) {
+		const tokens = line.trim().split(/\s+/);
+		const packages = tokens.slice(2);
+		if (`${tokens[0]} ${tokens[1]}` === command && commandIncludesPackage(packages, packageName)) {
+			return packages;
+		}
+	}
+	return [];
+}
+
+function commandIncludesPackage(packages, packageName) {
+	return packages.some((token) => {
+		return token === packageName || token.startsWith(`${packageName}@`);
+	});
+}
+
 function roleFor(manifest) {
 	const special = SPECIAL_ROLES.get(manifest.name);
 	if (special) return special;
@@ -393,6 +410,34 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 
 		if (pkg.role === 'framework binding' && !existsSync(pkg.statusPath)) {
 			errors.push(`${label} (${pkg.name}) is a binding but has no status.json`);
+		}
+		if (!pkg.private && pkg.role === 'framework binding') {
+			const readmePath = path.join(pkg.directory, 'README.md');
+			if (!existsSync(readmePath)) {
+				errors.push(`${label} (${pkg.name}) is a binding but has no README.md`);
+			} else {
+				const readme = readFileSync(readmePath, 'utf8');
+				const optionalPeers = pkg.manifest.peerDependenciesMeta ?? {};
+				const requiredPeers = Object.keys(pkg.manifest.peerDependencies ?? {}).filter((name) => {
+					return name !== 'octane' && optionalPeers[name]?.optional !== true;
+				});
+				for (const command of ['npm install', 'pnpm add']) {
+					const commandPackages = bindingInstallCommandPackages(readme, command, pkg.name);
+					if (!commandIncludesPackage(commandPackages, pkg.name)) {
+						errors.push(
+							`${label}/README.md must include a copy-paste \`${command} ${pkg.name}\` command`,
+						);
+						continue;
+					}
+					for (const peer of requiredPeers) {
+						if (!commandIncludesPackage(commandPackages, peer)) {
+							errors.push(
+								`${label}/README.md \`${command}\` command must include required peer ${peer}`,
+							);
+						}
+					}
+				}
+			}
 		}
 
 		// Hook state is module-global within one Octane runtime instance. Bindings

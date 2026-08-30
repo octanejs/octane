@@ -2,6 +2,13 @@
 
 An Octane binding for [`react-intersection-observer`](https://github.com/thebuilder/react-intersection-observer), pinned to version 10.1.0.
 
+## Installation
+
+```sh
+npm install @octanejs/intersection-observer
+pnpm add @octanejs/intersection-observer
+```
+
 ```tsrx
 import { useInView } from '@octanejs/intersection-observer';
 

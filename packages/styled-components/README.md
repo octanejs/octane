@@ -18,6 +18,7 @@ component selectors, `styled(Styled)` folding, transient `$` props, and
 ## Install
 
 ```bash
+npm install @octanejs/styled-components
 pnpm add @octanejs/styled-components
 ```
 

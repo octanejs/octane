@@ -2,6 +2,13 @@
 
 [Recharts](https://recharts.org) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/recharts
+pnpm add @octanejs/recharts
+```
+
 A port of recharts 3.9.2 that reuses the framework-agnostic modules (the
 Redux/RTK chart state layer, reselect, d3) and reimplements the React layer on
 octane's hooks. Currently **partial**: phases 0–1 of the port plan — the static

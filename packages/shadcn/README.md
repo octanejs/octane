@@ -5,6 +5,13 @@ of the **Radix base** of [shadcn-ui/ui](https://github.com/shadcn-ui/ui) onto
 octane's hooks and native events, built on
 [`@octanejs/radix`](../radix).
 
+## Installation
+
+```sh
+npm install @octanejs/shadcn
+pnpm add @octanejs/shadcn
+```
+
 Upstream pin: `shadcn-ui/ui@4baadbc6` + CLI `shadcn@4.14.1`.
 
 ## What ships

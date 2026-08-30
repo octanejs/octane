@@ -7,3 +7,10 @@ upstream hook family (`useDebouncer`/`useDebouncedState`/`useDebouncedValue`/
 `useDebouncedCallback`, throttler, rate-limiter, queuer, batcher, and the
 async families) plus `PacerProvider` on Octane hooks, with store
 subscriptions via `@octanejs/tanstack-store`.
+
+## Installation
+
+```sh
+npm install @octanejs/tanstack-pacer @octanejs/tanstack-store
+pnpm add @octanejs/tanstack-pacer @octanejs/tanstack-store
+```

@@ -4,6 +4,7 @@ GSAP lifecycle integration for Octane. It mirrors the official `@gsap/react`
 `useGSAP` contract while using compiler-selected Octane hook slots.
 
 ```bash
+npm install @octanejs/gsap gsap
 pnpm add @octanejs/gsap gsap
 ```
 

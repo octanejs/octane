@@ -3,6 +3,13 @@
 [cmdk](https://github.com/dip/cmdk) — the fast, composable command menu — ported
 to the [Octane](https://github.com/octanejs/octane) renderer.
 
+## Installation
+
+```sh
+npm install @octanejs/cmdk
+pnpm add @octanejs/cmdk
+```
+
 This is an Octane port of `cmdk@1.1.1`. It preserves cmdk's public API (the
 `Command` namespace, `useCommandState`, `defaultFilter`) and its
 DOM-authoritative filter/selection model, adapting only the React-renderer

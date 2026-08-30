@@ -12,6 +12,7 @@ vendored byte-for-byte under `upstream/`; [UPSTREAM.md](./UPSTREAM.md) records
 the export and test crosswalk.
 
 ```sh
+npm install @octanejs/livestore @livestore/adapter-web
 pnpm add @octanejs/livestore @livestore/adapter-web
 ```
 

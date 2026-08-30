@@ -4,6 +4,13 @@ The Octane binding for `react-syntax-highlighter@16.1.1`. It preserves the
 default, Light, Prism, async, language, style, renderer, and deep-import
 surfaces without adding React to the runtime graph.
 
+## Installation
+
+```sh
+npm install @octanejs/syntax-highlighter
+pnpm add @octanejs/syntax-highlighter
+```
+
 ```tsrx
 import { Prism } from '@octanejs/syntax-highlighter';
 import vscDarkPlus from '@octanejs/syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus';

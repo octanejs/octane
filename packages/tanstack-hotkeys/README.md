@@ -7,3 +7,10 @@ held-key tracking, and shortcut recording. Re-exports the framework-agnostic
 `useHotkeySequence`, `useHotkeySequences`, `useHotkeyRecorder`,
 `useHotkeySequenceRecorder`, `useHotkeyRegistrations`) plus `HotkeysProvider`
 on Octane hooks, with store subscriptions via `@octanejs/tanstack-store`.
+
+## Installation
+
+```sh
+npm install @octanejs/tanstack-hotkeys @octanejs/tanstack-store
+pnpm add @octanejs/tanstack-hotkeys @octanejs/tanstack-store
+```

@@ -2,6 +2,13 @@
 
 [StyleX](https://stylexjs.com) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/stylex
+pnpm add @octanejs/stylex
+```
+
 StyleX is a **build-time** CSS-in-JS system: a compiler turns `stylex.create({...})`
 into atomic class names and extracts the CSS, and `stylex.props(...)` merges those at
 runtime into the props you spread onto an element. So — unlike the zustand/motion

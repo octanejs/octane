@@ -2,6 +2,13 @@
 
 Inertia.js 3 bindings for Octane.
 
+## Installation
+
+```sh
+npm install @octanejs/inertia
+pnpm add @octanejs/inertia
+```
+
 The package reuses `@inertiajs/core` unchanged and ports the renderer-specific
 `@inertiajs/react` adapter to Octane. It does not install or emulate React.
 

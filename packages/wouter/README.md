@@ -3,6 +3,13 @@
 An Octane port of [`wouter`](https://github.com/molefrog/wouter), pinned to
 `wouter@3.10.0`.
 
+## Installation
+
+```sh
+npm install @octanejs/wouter
+pnpm add @octanejs/wouter
+```
+
 ```tsrx
 import { Link, Route, Router } from "@octanejs/wouter";
 import { memoryLocation } from "@octanejs/wouter/memory-location";

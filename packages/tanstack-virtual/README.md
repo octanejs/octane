@@ -2,6 +2,13 @@
 
 [TanStack Virtual](https://tanstack.com/virtual) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/tanstack-virtual
+pnpm add @octanejs/tanstack-virtual
+```
+
 TanStack Virtual separates a framework-agnostic core (`@tanstack/virtual-core`:
 the `Virtualizer` + scroll/rect observers + all windowing math) from a small
 React adapter (`useVirtualizer`, `useWindowVirtualizer`). This package reuses

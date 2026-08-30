@@ -4,6 +4,13 @@ Mantine hooks for Octane. This package ports the complete
 `@mantine/hooks@9.5.0` runtime surface to Octane hooks while preserving Mantine's
 public names, arguments, return values, and browser behavior.
 
+## Installation
+
+```sh
+npm install @octanejs/mantine-hooks
+pnpm add @octanejs/mantine-hooks
+```
+
 ```tsrx
 import { useCounter, useDisclosure } from '@octanejs/mantine-hooks';
 

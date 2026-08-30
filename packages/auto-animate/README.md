@@ -2,6 +2,13 @@
 
 Octane binding for [`@formkit/auto-animate@0.10.0`](https://github.com/formkit/auto-animate). The vanilla `autoAnimate` core is reused unchanged. The React hook is ported at `@octanejs/auto-animate/react`.
 
+## Installation
+
+```sh
+npm install @octanejs/auto-animate
+pnpm add @octanejs/auto-animate
+```
+
 ```tsrx
 import { useAutoAnimate } from '@octanejs/auto-animate/react';
 

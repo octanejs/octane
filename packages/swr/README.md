@@ -4,6 +4,13 @@ SWR 2.4.2 for [Octane](https://github.com/octanejs/octane). The binding preserve
 the root API plus `infinite`, `immutable`, `mutation`, `subscription`, `_internal`,
 and the upstream package's conditional server entry points.
 
+## Installation
+
+```sh
+npm install @octanejs/swr
+pnpm add @octanejs/swr
+```
+
 ```tsx
 import useSWR, { mutate } from '@octanejs/swr'
 

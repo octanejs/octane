@@ -2,6 +2,13 @@
 
 Octane-native Solana client, Wallet Standard, TanStack Query, and transaction integration for the exactly aligned `@solana/kit@7.0.0` family.
 
+## Installation
+
+```sh
+npm install @octanejs/solana-kit
+pnpm add @octanejs/solana-kit
+```
+
 Use `@solana/kit` directly for addresses, codecs, RPC, signers, transaction messages, submission, and confirmation. This package is the reactive UI seam; it does not wrap or re-export Kit.
 
 ## Supported

@@ -4,6 +4,13 @@
 [octane](https://github.com/octanejs/octane) UI framework — headless, accessible, unstyled
 UI primitives.
 
+## Installation
+
+```sh
+npm install @octanejs/base-ui
+pnpm add @octanejs/base-ui
+```
+
 Alpha, in progress. Ported at full fidelity from the pinned `mui/base-ui` source
 (`v1.6.0`), proven by differential parity tests against the real
 `@base-ui/react`. See `docs/base-ui-migration-plan.md` for the phased plan

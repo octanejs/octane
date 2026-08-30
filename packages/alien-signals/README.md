@@ -5,6 +5,13 @@
 `react-alien-signals@0.3.0` API over the unchanged `alien-signals@1.0.4` core,
 without React or React types.
 
+## Installation
+
+```sh
+npm install @octanejs/alien-signals
+pnpm add @octanejs/alien-signals
+```
+
 ```tsx
 import {
   createComputed,

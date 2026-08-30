@@ -23,6 +23,7 @@ TypeScript consumers.
 ## Install
 
 ```bash
+npm install @octanejs/tanstack-ai @tanstack/ai @tanstack/ai-client octane
 pnpm add @octanejs/tanstack-ai @tanstack/ai @tanstack/ai-client octane
 ```
 
