@@ -1893,7 +1893,8 @@ function validateRendererSourceRanges(ast, state, ranges, exclusions = []) {
 	const validation = state.renderer.validation;
 	if (validation === undefined) return;
 	const selected = createSourceRangeContainmentIndex(ranges);
-	const excluded = createSourceRangeContainmentIndex(exclusions);
+	const excluded =
+		exclusions.length === 0 ? undefined : createSourceRangeContainmentIndex(exclusions);
 	const staticModuleSources = new WeakSet();
 	for (const statement of ast.body ?? []) {
 		const source =
@@ -1903,7 +1904,8 @@ function validateRendererSourceRanges(ast, state, ranges, exclusions = []) {
 		if (source && typeof source === 'object') staticModuleSources.add(source);
 	}
 	const isSelected = (node) =>
-		sourceRangeIndexContains(selected, node) && !sourceRangeIndexContains(excluded, node);
+		sourceRangeIndexContains(selected, node) &&
+		(excluded === undefined || !sourceRangeIndexContains(excluded, node));
 	const isAuthored = (node) => isSelected(node) && !staticModuleSources.has(node);
 	const needsLexicalAnalysis =
 		(validation.forbiddenImports?.length ?? 0) > 0 ||
