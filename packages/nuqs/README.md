@@ -3,6 +3,13 @@
 [nuqs](https://nuqs.dev) for the [octane](https://github.com/octanejs/octane) UI
 framework — type-safe search-params state as octane hooks.
 
+## Installation
+
+```sh
+npm install @octanejs/nuqs
+pnpm add @octanejs/nuqs
+```
+
 nuqs cleanly separates a **framework-agnostic core** (the `parseAs*` parsers,
 `createParser`, `createSerializer`, `createLoader`, `createStandardSchemaV1`, and
 the throttle/debounce update queues) from a small **React binding**

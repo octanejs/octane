@@ -13,6 +13,7 @@ OpenTUI 0.5.8 requires either Bun 1.3 or newer, or Node.js 26.4 or newer with
 OpenTUI's native Zig renderer.
 
 ```sh
+npm install @octanejs/opentui @opentui/core
 pnpm add @octanejs/opentui @opentui/core
 ```
 

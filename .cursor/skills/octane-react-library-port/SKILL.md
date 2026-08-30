@@ -131,8 +131,13 @@ authority.
    consumers. Run the applicable matrix commands and fix discovery or command
    failures. Add the complete package contract, `UPSTREAM.md`, exact
    license/notices, README, `status.json`, generated catalogs, and a patch
-   changeset for user-facing behavior. Re-audit actual shipped imports and
-   copied/adapted paths. Then run:
+   changeset for user-facing behavior. Put an installation section near the
+   start of the README with copy-paste `npm install @octanejs/<name> ...` and
+   `pnpm add @octanejs/<name> ...` commands. Include required external peer
+   dependencies so either command is sufficient in an existing Octane
+   application; the package inventory check enforces that both commands name
+   the binding package and every non-optional external peer. Re-audit actual
+   shipped imports and copied/adapted paths. Then run:
 
    ```bash
    pnpm react-port:evidence verify --batch <id> --node pkg:<name> \

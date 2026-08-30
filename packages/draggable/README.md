@@ -5,6 +5,13 @@ default `Draggable` component, named `DraggableCore`, controlled and
 uncontrolled positioning, bounds, grids, axis restrictions, mouse and touch
 gestures, and the upstream public TypeScript surface without a React runtime.
 
+## Installation
+
+```sh
+npm install @octanejs/draggable
+pnpm add @octanejs/draggable
+```
+
 ```tsrx
 import Draggable from '@octanejs/draggable';
 import { useRef } from 'octane';

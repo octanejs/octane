@@ -5,6 +5,13 @@ the complete react-hook-form 7.81.0 source ported onto octane's hooks:
 performant, flexible forms with native-event validation, field arrays, schema
 resolvers, `Controller`/`FormProvider`, and SSR.
 
+## Installation
+
+```sh
+npm install @octanejs/hook-form
+pnpm add @octanejs/hook-form
+```
+
 ```tsx
 import { useForm } from '@octanejs/hook-form';
 

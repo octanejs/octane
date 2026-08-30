@@ -2,6 +2,13 @@
 
 The Octane port of `react-image-crop@11.1.2`.
 
+## Installation
+
+```sh
+npm install @octanejs/image-crop
+pnpm add @octanejs/image-crop
+```
+
 ```tsrx
 import { useState } from 'octane';
 import ReactCrop, { type Crop } from '@octanejs/image-crop';

@@ -5,6 +5,13 @@ terminal renderer, Yoga layout, components, hooks, input handling, static
 output, accessibility mode, and alternate-screen support without a React or
 `react-reconciler` runtime dependency.
 
+## Installation
+
+```sh
+npm install @octanejs/ink
+pnpm add @octanejs/ink
+```
+
 ```tsrx
 /** @jsxImportSource @octanejs/ink/intrinsics */
 import {Box, Text, render} from '@octanejs/ink';

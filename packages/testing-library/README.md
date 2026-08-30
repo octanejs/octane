@@ -3,6 +3,13 @@
 [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
 for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/testing-library
+pnpm add @octanejs/testing-library
+```
+
 The split mirrors RTL's own architecture (and
 `docs/react-library-compat-plan.md` §2): **`@testing-library/dom` is
 framework-agnostic and reused verbatim** — every query, `screen`, `within`,

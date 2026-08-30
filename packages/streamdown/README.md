@@ -3,6 +3,13 @@
 Octane bindings for [Streamdown](https://streamdown.ai), the streaming Markdown
 renderer for AI applications.
 
+## Installation
+
+```sh
+npm install @octanejs/streamdown
+pnpm add @octanejs/streamdown
+```
+
 ```tsrx
 import { Streamdown } from '@octanejs/streamdown';
 import { code } from '@octanejs/streamdown/code';
