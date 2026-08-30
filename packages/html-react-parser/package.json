@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/html-react-parser",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Octane binding for html-react-parser 6.1.7.",
   "license": "MIT",
   "type": "module",

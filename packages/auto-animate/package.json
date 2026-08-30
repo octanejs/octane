@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/auto-animate",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Octane binding for @formkit/auto-animate 0.10.0: vanilla core reused, React useAutoAnimate ported.",
   "license": "MIT",
   "type": "module",

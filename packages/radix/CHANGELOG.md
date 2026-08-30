@@ -1,5 +1,21 @@
 # @octanejs/radix
 
+## 0.1.49
+
+### Patch Changes
+
+- a6ffaef: Speed up DOM-order reads for large Radix collections by indexing each node's position once per
+  read instead of repeatedly scanning the ordered node list while sorting.
+- Updated dependencies [157543f]
+- Updated dependencies [4d13159]
+- Updated dependencies [a944ff3]
+- Updated dependencies [f9f0d23]
+- Updated dependencies [edf2b9d]
+- Updated dependencies [9779569]
+- Updated dependencies [96c86fc]
+  - octane@0.1.50
+  - @octanejs/floating-ui@0.1.49
+
 ## 0.1.48
 
 ### Patch Changes

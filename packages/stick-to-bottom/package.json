@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/stick-to-bottom",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Octane binding for use-stick-to-bottom 1.1.6.",
   "license": "MIT",
   "type": "module",

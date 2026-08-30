@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-pacer",
-  "version": "0.0.38",
+  "version": "0.0.39",
   "license": "MIT",
   "type": "module",
   "engines": {

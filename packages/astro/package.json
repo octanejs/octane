@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/astro",
-  "version": "0.0.28",
+  "version": "0.0.29",
   "license": "MIT",
   "type": "module",
   "engines": {

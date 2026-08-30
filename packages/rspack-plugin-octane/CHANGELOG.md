@@ -1,5 +1,19 @@
 # @octanejs/rspack-plugin
 
+## 0.1.45
+
+### Patch Changes
+
+- e2ad89c: Resolve multiple CSS-module constant-folding proofs by scanning the current Rspack module graph once per compilation phase instead of once per CSS request.
+- Updated dependencies [157543f]
+- Updated dependencies [4d13159]
+- Updated dependencies [a944ff3]
+- Updated dependencies [f9f0d23]
+- Updated dependencies [edf2b9d]
+- Updated dependencies [9779569]
+- Updated dependencies [96c86fc]
+  - octane@0.1.50
+
 ## 0.1.44
 
 ### Patch Changes

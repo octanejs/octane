@@ -12,6 +12,6 @@
     }
   ],
   "dependencies": [
-    "@octanejs/aria@0.0.43"
+    "@octanejs/aria@0.0.44"
   ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/calendar",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "react-calendar for Octane.",
   "license": "MIT",
   "type": "module",

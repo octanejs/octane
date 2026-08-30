@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/xstate",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "XState tools for Octane — reuses the framework-agnostic xstate actor core unchanged and ports the @xstate/react 6.1.0 binding onto Octane hooks.",
   "author": {
     "name": "Dominic Gannaway",
