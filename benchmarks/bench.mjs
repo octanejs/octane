@@ -414,6 +414,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production SSR hydration of coextensive wrapper chains, normalized per
+		// wrapper to catch repeated post-adoption range bookkeeping.
+		name: 'hydration-range-compaction',
+		cwd: 'hydration-range-compaction',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Headless-Chromium production scaling for late behavior events whose
 		// distinct asynchronous adoptions settle one at a time.
 		name: 'behavior-root-events',

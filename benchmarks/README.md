@@ -234,6 +234,7 @@ internally, get their own baseline and guard namespace.
 | `controlled-form` | controlled-form | none (builds) | 512 controlled fields, real typing, DOM identity, focus and caret, validation cancellation, complete submit/reset, and native select/checkbox/radio correctness |
 | `dev-form-diagnostics` | dev-form-diagnostics | none (Node/jsdom) | development-only controlled-form diagnostic commit scaling at 4,000 and 32,000 hosts |
 | `scheduler-depth` | scheduler-depth | none (Node/jsdom) | production client scheduler ordering across 500 and 2,000 deeply nested queued components |
+| `hydration-range-compaction` | hydration-range-compaction | none (Node/jsdom) | production SSR hydration range compaction across 64 and 512 coextensive wrappers, with adoption, interaction, marker-depth, and unmount gates |
 | `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, deterministic 100-notification work guards, and balanced subscription removal |
 | `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and seven-framework cleanup gates |
 | `store-selector-fanout` | store-selector-fanout | none (builds) | 512 subscribers reading one store through a `with-selector`-shaped selector, 20 unrelated parent re-renders with the store untouched, and deterministic selector-invocation counts beside render and snapshot counts |

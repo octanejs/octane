@@ -12393,6 +12393,8 @@ class HydrationCapability {
 	private abandoned = false;
 	private readonly freshNodes = new WeakSet<Node>();
 	private readonly unframedRootRanges = new WeakMap<Node, Node>();
+	/** Pairs discovered while matching an outer range; released with this hydration pass. */
+	private matchingCloses: WeakMap<Node, Comment> | null = null;
 	/** First unclaimed root sibling after a compiled root clone; undefined until known. */
 	private rootRemainder: Node | null | undefined;
 	private rootCleanupBoundary: Node | null = null;
@@ -12441,7 +12443,9 @@ class HydrationCapability {
 	}
 
 	close(open: Node): Comment {
-		const found = findMatchingClose(open);
+		const known = this.matchingCloses?.get(open);
+		const found =
+			known ?? findMatchingClose(open, (this.matchingCloses ??= new WeakMap<Node, Comment>()));
 		if (
 			!this.hasAdjacentRangePair &&
 			isBlockOpen(open.previousSibling) &&
@@ -13387,8 +13391,8 @@ function isTextSeparator(node: Node | null): node is Comment {
  * genuine fresh client mount, e.g. the server rendered the slot empty).
  */
 /** From a block-open `<!--[-->`, the matching `<!--]-->` (depth-tracked). */
-function findMatchingClose(open: Node): Comment {
-	let depth = 0;
+function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment {
+	let nested: Comment[] | null = null;
 	let node: Node = getNextSibling(open) as Node;
 	for (;;) {
 		if (node.nodeType === 8) {
@@ -13404,12 +13408,14 @@ function findMatchingClose(open: Node): Comment {
 				}
 			}
 			if (close) {
-				if (depth === 0) {
-					return node as Comment;
+				const found = node as Comment;
+				if (nested === null || nested.length === 0) {
+					matches.set(open, found);
+					return found;
 				}
-				depth -= 1;
+				matches.set(nested.pop()!, found);
 			} else if (nestedOpen) {
-				depth += 1;
+				(nested ??= []).push(node as Comment);
 			}
 		}
 		node = getNextSibling(node) as Node;
@@ -31522,6 +31528,8 @@ interface HydrationRangeGroup {
 	end: Comment;
 	/** Number of logical hydration ranges represented by this physical pair. */
 	depth: number;
+	/** Surviving exact-range group; null while this pair remains canonical. */
+	parent: HydrationRangeGroup | null;
 	blocks: Block[];
 	liteScopes: Scope[];
 	owners: CoalescedRangeOwner[];
@@ -31553,8 +31561,22 @@ function coalesceHydratedRanges(
 	const blockGroups = new WeakMap<Block, HydrationRangeGroup>();
 	const scopeGroups = new WeakMap<Scope, HydrationRangeGroup>();
 	const ownerGroups = new WeakMap<object, HydrationRangeGroup>();
+	const groups: HydrationRangeGroup[] = [];
 	const seenBlocks = new WeakSet<Block>();
 	const seenScopes = new WeakSet<Scope>();
+	let redundantMarkers: Set<Comment> | null = null;
+	let removalRange: Range | null = null;
+
+	function canonicalGroup(group: HydrationRangeGroup): HydrationRangeGroup {
+		let canonical = group;
+		while (canonical.parent !== null) canonical = canonical.parent;
+		while (group.parent !== null && group.parent !== canonical) {
+			const parent = group.parent;
+			group.parent = canonical;
+			group = parent;
+		}
+		return canonical;
+	}
 
 	function makeGroup(
 		startNode: Node | null,
@@ -31572,26 +31594,16 @@ function coalesceHydratedRanges(
 			start: startNode,
 			end: endNode,
 			depth: openDepth,
+			parent: null,
 			blocks: block === undefined ? [] : [block],
 			liteScopes: liteScope === undefined ? [] : [liteScope],
 			owners: owner === undefined ? [] : [owner],
 		};
+		groups.push(group);
 		if (block !== undefined) blockGroups.set(block, group);
 		if (liteScope !== undefined) scopeGroups.set(liteScope, group);
 		if (owner !== undefined) ownerGroups.set(owner, group);
 		return group;
-	}
-
-	function appendUnique<T>(target: T[], source: T[]): void {
-		for (let i = 0; i < source.length; i++) {
-			if (target.indexOf(source[i]) === -1) target.push(source[i]);
-		}
-	}
-
-	function remapGroup(from: HydrationRangeGroup, to: HydrationRangeGroup): void {
-		for (let i = 0; i < from.blocks.length; i++) blockGroups.set(from.blocks[i], to);
-		for (let i = 0; i < from.liteScopes.length; i++) scopeGroups.set(from.liteScopes[i], to);
-		for (let i = 0; i < from.owners.length; i++) ownerGroups.set(from.owners[i], to);
 	}
 
 	function writeMultiplicity(group: HydrationRangeGroup): void {
@@ -31599,17 +31611,38 @@ function coalesceHydratedRanges(
 		group.end.data = group.depth === 1 ? HYDRATION_END : HYDRATION_END + String(group.depth);
 	}
 
+	function removeRedundantMarkerRun(anchor: Comment, after: boolean): void {
+		if (redundantMarkers === null) return;
+		const adjacent = after ? anchor.nextSibling : anchor.previousSibling;
+		if (
+			adjacent === null ||
+			adjacent.nodeType !== 8 ||
+			!redundantMarkers.has(adjacent as Comment)
+		) {
+			return;
+		}
+		let edge = adjacent;
+		for (;;) {
+			const next = after ? edge.nextSibling : edge.previousSibling;
+			if (next === null || next.nodeType !== 8 || !redundantMarkers.has(next as Comment)) break;
+			edge = next;
+		}
+		const range = (removalRange ??= anchor.ownerDocument!.createRange());
+		range.setStartBefore(after ? adjacent : edge);
+		range.setEndAfter(after ? edge : adjacent);
+		range.deleteContents();
+	}
+
 	/** Merge bookkeeping for two runtime owners that already share one pair. */
 	function unifySharedPair(
 		outer: HydrationRangeGroup,
 		inner: HydrationRangeGroup,
 	): HydrationRangeGroup {
+		outer = canonicalGroup(outer);
+		inner = canonicalGroup(inner);
 		if (outer === inner) return outer;
 		outer.depth = Math.max(outer.depth, inner.depth);
-		appendUnique(outer.blocks, inner.blocks);
-		appendUnique(outer.liteScopes, inner.liteScopes);
-		appendUnique(outer.owners, inner.owners);
-		remapGroup(inner, outer);
+		inner.parent = outer;
 		writeMultiplicity(outer);
 		return outer;
 	}
@@ -31625,8 +31658,8 @@ function coalesceHydratedRanges(
 		);
 	}
 
-	/** Redirect every inner runtime owner before removing its redundant pair. */
-	function borrowInnerRange(outer: HydrationRangeGroup, inner: HydrationRangeGroup): void {
+	/** Redirect one group's direct runtime owners after all exact pairs are known. */
+	function borrowGroupMembers(outer: HydrationRangeGroup, inner: HydrationRangeGroup): void {
 		for (let i = 0; i < inner.blocks.length; i++) {
 			const block = inner.blocks[i];
 			block.startMarker = outer.start;
@@ -31658,6 +31691,8 @@ function coalesceHydratedRanges(
 		outer: HydrationRangeGroup,
 		inner: HydrationRangeGroup,
 	): HydrationRangeGroup {
+		outer = canonicalGroup(outer);
+		inner = canonicalGroup(inner);
 		if (outer === inner) return outer;
 		if (outer.start === inner.start && outer.end === inner.end) {
 			return unifySharedPair(outer, inner);
@@ -31667,20 +31702,16 @@ function coalesceHydratedRanges(
 		// Both inputs were decoded as safe integers, but their sum may not be. Keep
 		// both physical pairs rather than minting metadata the protocol cannot parse.
 		if (!Number.isSafeInteger(mergedDepth)) return outer;
-		borrowInnerRange(outer, inner);
-		inner.start.remove();
-		inner.end.remove();
+		(redundantMarkers ??= new Set<Comment>()).add(inner.start).add(inner.end);
 		outer.depth = mergedDepth;
-		appendUnique(outer.blocks, inner.blocks);
-		appendUnique(outer.liteScopes, inner.liteScopes);
-		appendUnique(outer.owners, inner.owners);
-		remapGroup(inner, outer);
+		inner.parent = outer;
 		writeMultiplicity(outer);
 		return outer;
 	}
 
 	function attachOwner(group: HydrationRangeGroup | null, owner: CoalescedRangeOwner): void {
 		if (group === null) return;
+		group = canonicalGroup(group);
 		if (group.owners.indexOf(owner) === -1) group.owners.push(owner);
 		ownerGroups.set(owner, group);
 	}
@@ -31720,7 +31751,8 @@ function coalesceHydratedRanges(
 
 	function mappedGroup(value: any): HydrationRangeGroup | undefined {
 		if (value === null || typeof value !== 'object') return undefined;
-		return ownerGroups.get(value) ?? scopeGroups.get(value as Scope);
+		const group = ownerGroups.get(value) ?? scopeGroups.get(value as Scope);
+		return group === undefined ? undefined : canonicalGroup(group);
 	}
 
 	/**
@@ -31752,7 +31784,8 @@ function coalesceHydratedRanges(
 			(registered[0] as ChildSlot).compactable &&
 			mayBorrowCandidate(registered[0])
 		) {
-			return ownerGroups.get(registered[0]) ?? null;
+			const group = ownerGroups.get(registered[0]);
+			return group === undefined ? null : canonicalGroup(group);
 		}
 		return null;
 	}
@@ -31846,6 +31879,27 @@ function coalesceHydratedRanges(
 	}
 
 	visitBlock(rootBlock);
+	// Weak lookup tables make traversal cheap but cannot drive finalization. The
+	// ordered group list visits each directly registered member once, after path
+	// compression resolves any chain of removed marker pairs to its survivor.
+	for (let i = 0; i < groups.length; i++) {
+		const group = groups[i];
+		const canonical = canonicalGroup(group);
+		if (group.start !== canonical.start || group.end !== canonical.end) {
+			borrowGroupMembers(canonical, group);
+		}
+	}
+	// Exact nesting leaves the redundant opens and closes in two contiguous
+	// runs. Delete each run as one DOM mutation instead of repeatedly repairing
+	// sibling links and live collections for every wrapper layer.
+	if (redundantMarkers !== null) {
+		for (let i = 0; i < groups.length; i++) {
+			const group = groups[i];
+			if (group.parent !== null) continue;
+			removeRedundantMarkerRun(group.start, true);
+			removeRedundantMarkerRun(group.end, false);
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

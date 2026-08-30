@@ -3687,5 +3687,13 @@
     "reference": "work-model",
     "maxRatio": 1,
     "note": "Each of 32 changes cycling through all five use() factory dependencies must refresh the resource once and display the new value. This guards generic automatic caching without pinning private compiler helper names."
+  },
+  {
+    "suite": "hydration-range-compaction",
+    "op": "hydrate_per_100_wrappers",
+    "target": "wrappers-512",
+    "reference": "wrappers-64",
+    "maxRatio": 1.5,
+    "note": "Production SSR hydration of 8x more coextensive component wrappers must retain near-linear normalized range-adoption cost. The introduction runs measured 0.99x-1.05x on 2026-08-29; the harness separately gates server-node adoption, delegated interaction, logical marker multiplicity, physical compaction, and clean unmount."
   }
 ]
