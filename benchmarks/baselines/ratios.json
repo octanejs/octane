@@ -464,6 +464,14 @@
     "note": "Same-process development TSRX compilation with every emitted nesting validation parsed and checked. The original repeated serialization and whole-array scan measured 1.59x per invalid site at 2,000 versus 500 sites, while plan-local Set membership measured 1.07x. The 1.3x ceiling leaves timing headroom while catching the quadratic path."
   },
   {
+    "suite": "tsrx-hydrate-module-slicing",
+    "op": "compile_per_1000_boundaries",
+    "target": "focused-movable-high",
+    "reference": "focused-movable-low",
+    "maxRatio": 1.5,
+    "note": "Same-process hydrate preparation normalizes 2,400 and 150 sibling split boundaries by boundary count. Exact pinned main measured about 3.3x more CPU per boundary at the large size, while the indexed/direct-selection path measured about 1.1x; the 1.5x ceiling catches restoration of module-wide Set copies, synthetic child modules, or boundary/declaration cross-products."
+  },
+  {
     "suite": "tsrx-renderer-validation-ranges",
     "op": "compile_per_1000_ranges",
     "target": "focused-high",
