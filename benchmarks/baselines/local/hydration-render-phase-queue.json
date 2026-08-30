@@ -1,0 +1,83 @@
+{
+  "suite": "hydration-render-phase-queue",
+  "iterations": 9,
+  "targets": [
+    {
+      "name": "rows-128",
+      "ops": {
+        "hydrate": {
+          "score": 0.7190335999999661,
+          "median": 0.7446669999999358,
+          "min": 0.6813329999999951,
+          "mean": 0.7854677777777902,
+          "p95": 1.0602080000003298,
+          "sd": 0.11655136683762493,
+          "rme": 11.405833972716563,
+          "scoreRme": 5.874723950508972,
+          "warmupRatio": 1.17988255347184,
+          "samples": 9
+        },
+        "hydrate_per_100_rows": {
+          "score": 0.5617449999999735,
+          "median": 0.5817710937499498,
+          "min": 0.5322914062499962,
+          "mean": 0.6136467013888987,
+          "p95": 0.8282875000002576,
+          "sd": 0.09105575534189449,
+          "rme": 11.405833972716561,
+          "scoreRme": 5.874723950508972,
+          "warmupRatio": 1.1798825534718398,
+          "samples": 9
+        }
+      },
+      "meta": {
+        "correctness": "pass",
+        "foreignRows": 128,
+        "foreignWorkPreserved": true,
+        "interactionHandled": true,
+        "serverNodesAdopted": true,
+        "targetRows": 128,
+        "unmountClean": true
+      }
+    },
+    {
+      "name": "rows-1024",
+      "ops": {
+        "hydrate": {
+          "score": 6.4314918000001855,
+          "median": 6.3586669999999685,
+          "min": 5.589166000000205,
+          "mean": 6.650648333333468,
+          "p95": 8.696584000000257,
+          "sd": 1.0225967492773071,
+          "rme": 11.818938473584518,
+          "scoreRme": 24.853008318545722,
+          "warmupRatio": 1.035142173391235,
+          "samples": 9
+        },
+        "hydrate_per_100_rows": {
+          "score": 0.6280753710937681,
+          "median": 0.6209635742187469,
+          "min": 0.54581699218752,
+          "mean": 0.6494773763020965,
+          "p95": 0.8492757812500251,
+          "sd": 0.09986296379661203,
+          "rme": 11.81893847358452,
+          "scoreRme": 24.853008318545722,
+          "warmupRatio": 1.035142173391235,
+          "samples": 9
+        }
+      },
+      "meta": {
+        "correctness": "pass",
+        "foreignRows": 1024,
+        "foreignWorkPreserved": true,
+        "interactionHandled": true,
+        "serverNodesAdopted": true,
+        "targetRows": 1024,
+        "unmountClean": true
+      }
+    }
+  ],
+  "harnessExit": 0
+}

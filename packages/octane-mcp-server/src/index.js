@@ -72,6 +72,7 @@ export const BENCHMARK_SUITES = [
 	'dev-form-diagnostics',
 	'scheduler-depth',
 	'hydration-range-compaction',
+	'hydration-render-phase-queue',
 	'behavior-root-events',
 	'radix-collection-order',
 	'router-dispatch',
