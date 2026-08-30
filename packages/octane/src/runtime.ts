@@ -7302,6 +7302,7 @@ type LinkedStateTuple<Value> = [Value, StateSetter<Value>, () => Value];
 interface HiddenRevealAction {
 	action: EffectEventCommitAction;
 	active: boolean;
+	queue: HiddenRevealActionQueue;
 }
 
 interface HiddenRevealActionQueue {
@@ -7316,21 +7317,22 @@ function deferHiddenRevealAction(
 	action: EffectEventCommitAction,
 ): HiddenRevealAction {
 	const deferred = (HIDDEN_REVEAL_ACTIONS ??= new WeakMap());
-	const queue = deferred.get(boundary);
-	const entry = { action, active: true };
-	if (queue === undefined) deferred.set(boundary, { entries: [entry], live: 1 });
-	else {
-		queue.entries.push(entry);
-		queue.live++;
+	let queue = deferred.get(boundary);
+	if (queue === undefined) {
+		queue = { entries: [], live: 0 };
+		deferred.set(boundary, queue);
 	}
+	const entry = { action, active: true, queue };
+	queue.entries.push(entry);
+	queue.live++;
 	return entry;
 }
 
 function claimHiddenRevealAction(
 	boundary: ScheduledVisibilityOwner,
-	queue: HiddenRevealActionQueue,
 	entry: HiddenRevealAction,
 ): EffectEventCommitAction | null {
+	const queue = entry.queue;
 	if (HIDDEN_REVEAL_ACTIONS?.get(boundary) !== queue) return null;
 	if (!entry.active) return null;
 	entry.active = false;
@@ -7340,10 +7342,10 @@ function claimHiddenRevealAction(
 
 function cancelHiddenRevealAction(
 	boundary: ScheduledVisibilityOwner,
-	queue: HiddenRevealActionQueue,
 	entry: HiddenRevealAction,
 ): void {
-	if (claimHiddenRevealAction(boundary, queue, entry) === null || queue.live === 0) return;
+	const queue = entry.queue;
+	if (claimHiddenRevealAction(boundary, entry) === null || queue.live === 0) return;
 	// Cancellation is cold and may happen repeatedly while an owner stays hidden.
 	// Compact here so dead entries do not make a later reveal scan historical work.
 	if (queue.entries.length > queue.live * 2) {
@@ -7366,7 +7368,7 @@ function publishHiddenRevealActions(boundary: ScheduledVisibilityOwner): void {
 			const entry = entries[i];
 			if (!entry.active) continue;
 			enqueueEffectEventCommitAction(() => {
-				const claimed = claimHiddenRevealAction(boundary, queue, entry);
+				const claimed = claimHiddenRevealAction(boundary, entry);
 				if (claimed === null) return;
 				return claimed();
 			});
@@ -32173,8 +32175,7 @@ function enqueueInlineCaughtError(state: TrySlot | ErrorSlot): void {
 					const pending = parked;
 					parked = null;
 					if (pending === null) return;
-					const queue = HIDDEN_REVEAL_ACTIONS?.get(pending.owner);
-					if (queue !== undefined) cancelHiddenRevealAction(pending.owner, queue, pending.entry);
+					cancelHiddenRevealAction(pending.owner, pending.entry);
 				});
 			}
 			parked = { owner: hidden, entry: deferHiddenRevealAction(hidden, action) };

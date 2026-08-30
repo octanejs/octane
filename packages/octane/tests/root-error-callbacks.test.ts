@@ -42,9 +42,11 @@ import {
 	CaughtRenderFallback,
 	LayoutResetCaughtHost,
 	HiddenInlineCaughtHost,
+	SuspenseReparkCaughtHost,
 	InterruptedActivityCaughtHost,
 	type ParentErrorProps,
 	type HiddenCaughtActions,
+	type ReparkCaughtActions,
 	triggerRenderThrow,
 	triggerEffectThrow,
 	triggerCleanupThrowerRemoval,
@@ -348,6 +350,59 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 				);
 			});
 			expect(onCaughtError.mock.calls.map(([error]) => error)).toEqual(survivors);
+			expect(onUncaughtError).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('does not let stale cleanup cancel a later Suspense queue generation', async () => {
+		const firstError = new Error('first-generation');
+		const secondError = new Error('second-generation');
+		let resolveInitial!: (value: string) => void;
+		const initial = new Promise<string>((resolve) => {
+			resolveInitial = resolve;
+		});
+		let resolvePending!: (value: string) => void;
+		const pending = new Promise<string>((resolve) => {
+			resolvePending = resolve;
+		});
+		const api: ReparkCaughtActions = { wait() {}, replace() {} };
+		const onCaughtError = vi.fn();
+		const onUncaughtError = vi.fn();
+		let reparked = false;
+		const onFallbackLayout = vi.fn(() => {
+			if (reparked) return;
+			reparked = true;
+			// First hide the owner, then replace its catch while that new queue
+			// generation is live and the first reveal action has not run yet.
+			flushSync(() => api.wait());
+			flushSync(() => api.replace());
+		});
+		const root = createRoot(container, { onCaughtError, onUncaughtError });
+		try {
+			await act(() => {
+				root.render(SuspenseReparkCaughtHost, {
+					api,
+					firstError,
+					secondError,
+					initial,
+					pending,
+					onFallbackLayout,
+				});
+			});
+			expect(visibleText(container)).toBe('outer loading');
+			expect(onCaughtError).not.toHaveBeenCalled();
+
+			// The first reveal deletes its queue, then its layout effect replaces
+			// the caught subtree and suspends the same owner again before reports run.
+			await act(() => resolveInitial('initial ready'));
+			expect(visibleText(container)).toBe('outer loading');
+			expect(onCaughtError).not.toHaveBeenCalled();
+
+			await act(() => resolvePending('second ready'));
+			expect(visibleText(container)).toBe('caught:second-generation|second ready');
+			expect(onCaughtError.mock.calls.map(([error]) => error)).toEqual([secondError]);
 			expect(onUncaughtError).not.toHaveBeenCalled();
 		} finally {
 			root.unmount();
