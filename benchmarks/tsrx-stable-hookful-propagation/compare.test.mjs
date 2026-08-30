@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { aggregateProcesses, assertReferenceState, evaluateGates } from './compare.mjs';
+import {
+	aggregateProcesses,
+	assertEquivalentOutputs,
+	assertReferenceState,
+	evaluateGates,
+} from './compare.mjs';
 
 function measuredProcess(implementation, measurements) {
 	return {
@@ -79,5 +84,20 @@ test('reference state must match the requested revision and be clean', () => {
 		() =>
 			assertReferenceState({ head: revision, dirty: true, changes: ['?? compiler.js'] }, revision),
 		/has changes/,
+	);
+});
+
+test('rejects output drift in semantic controls as well as timed targets', () => {
+	const process = (implementation) => ({
+		implementation,
+		outputHashes: { 'dependent-first-high-1000': 'target-hash' },
+		semanticControlHashes: { 'safe-cycle': 'control-hash' },
+	});
+	const processes = [process('main'), process('candidate')];
+	assert.doesNotThrow(() => assertEquivalentOutputs(processes));
+	processes[1].semanticControlHashes['safe-cycle'] = 'changed-control-hash';
+	assert.throws(
+		() => assertEquivalentOutputs(processes),
+		/semantic control safe-cycle emitted different code/,
 	);
 });

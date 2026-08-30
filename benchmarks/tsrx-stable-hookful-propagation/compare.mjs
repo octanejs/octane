@@ -131,6 +131,18 @@ function runProcess(kind, root, iterations, position, temporaryDirectory) {
 	) {
 		throw new Error(`${kind} runner did not pass semantic controls`);
 	}
+	const semanticControlHashes = {};
+	for (const control of payload.semanticControls) {
+		if (
+			typeof control.name !== 'string' ||
+			Object.hasOwn(semanticControlHashes, control.name) ||
+			typeof control.outputHash !== 'string' ||
+			control.outputHash.length === 0
+		) {
+			throw new Error(`${kind} runner emitted invalid semantic control hashes`);
+		}
+		semanticControlHashes[control.name] = control.outputHash;
+	}
 	const targets = {};
 	for (const name of TARGETS) {
 		const target = payload.targets?.find((entry) => entry.name === name);
@@ -153,6 +165,7 @@ function runProcess(kind, root, iterations, position, temporaryDirectory) {
 		outputHashes: Object.fromEntries(
 			payload.targets.map((target) => [target.name, target.meta?.outputHash]),
 		),
+		semanticControlHashes,
 	};
 }
 
@@ -165,6 +178,24 @@ export function aggregateProcesses(processes, kind) {
 			confidenceStat(matching.flatMap((process) => process.targets[name])),
 		]),
 	);
+}
+
+function assertMatchingHashes(processes, property, label) {
+	const names = new Set(processes.flatMap((process) => Object.keys(process[property] ?? {})));
+	for (const name of names) {
+		const hashes = processes.map((process) => process[property]?.[name]);
+		if (
+			hashes.some((hash) => typeof hash !== 'string' || hash.length === 0) ||
+			new Set(hashes).size !== 1
+		) {
+			throw new Error(`${label} ${name} emitted different code across main and candidate`);
+		}
+	}
+}
+
+export function assertEquivalentOutputs(processes) {
+	assertMatchingHashes(processes, 'outputHashes', 'target');
+	assertMatchingHashes(processes, 'semanticControlHashes', 'semantic control');
 }
 
 function bounds(stat) {
@@ -215,12 +246,7 @@ function collectAttempt(config, iterations) {
 		const processes = PROCESS_ORDER.map((kind, position) =>
 			runProcess(kind, roots[kind], iterations, position, temporaryDirectory),
 		);
-		for (const name of TARGETS) {
-			const hashes = new Set(processes.map((process) => process.outputHashes[name]));
-			if (hashes.has(undefined) || hashes.size !== 1) {
-				throw new Error(`${name} emitted different code across main and candidate`);
-			}
-		}
+		assertEquivalentOutputs(processes);
 		const aggregate = {
 			main: aggregateProcesses(processes, 'main'),
 			candidate: aggregateProcesses(processes, 'candidate'),
