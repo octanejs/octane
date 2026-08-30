@@ -27,20 +27,28 @@ function countRowRender(): void {
 }
 
 // -- storms: N sequential state→render→DOM ticks from one click --------------
-// Each tick runs in its own macrotask (MessageChannel avoids the nested
-// setTimeout 4ms clamp) so every mutation goes through a full render cycle
-// instead of batching. Mirrors the Vue and React apps.
+// Each tick runs in its own task so every mutation goes through a full render
+// cycle instead of batching. Lynx for Web provides MessageChannel; Native may
+// not, so it falls back to the runtime's timer task queue. Mirrors the Vue and
+// React apps.
 const STORM_UPDATE_TICKS = 50;
 const STORM_SELECT_TICKS = 30;
 
-const _stormChannel = new MessageChannel();
+const _stormChannel =
+	typeof MessageChannel === 'function' ? new MessageChannel() : null;
 let _stormPending: (() => void) | null = null;
-_stormChannel.port1.onmessage = () => {
-	const cb = _stormPending;
-	_stormPending = null;
-	if (cb) cb();
-};
+if (_stormChannel !== null) {
+	_stormChannel.port1.onmessage = () => {
+		const cb = _stormPending;
+		_stormPending = null;
+		if (cb) cb();
+	};
+}
 function nextMacrotask(cb: () => void) {
+	if (_stormChannel === null) {
+		setTimeout(cb, 0);
+		return;
+	}
 	_stormPending = cb;
 	_stormChannel.port2.postMessage(0);
 }
@@ -74,6 +82,33 @@ function Row(props: RowProps) @{
 export function App() @{
 	const [rows, setRows] = useState<RowData[]>(INITIAL_ROWS);
 	const [selected, setSelected] = useState<number | undefined>(undefined);
+	const rowsRef = useRef<RowData[]>(rows);
+	rowsRef.current = rows;
+	const selectedRef = useRef<number | undefined>(selected);
+	selectedRef.current = selected;
+	(globalThis as
+		typeof globalThis & {
+			__LYNX_BENCH_SNAPSHOT__?: () => {
+				readonly rowCount: number;
+				readonly firstId: number | null;
+				readonly secondId: number | null;
+				readonly thirdId: number | null;
+				readonly row998Id: number | null;
+				readonly firstLabel: string | null;
+				readonly selectedId: number | null;
+			};
+		}).__LYNX_BENCH_SNAPSHOT__ = () => {
+		const current = rowsRef.current;
+		return {
+			rowCount: current.length,
+			firstId: current[0]?.id ?? null,
+			secondId: current[1]?.id ?? null,
+			thirdId: current[2]?.id ?? null,
+			row998Id: current[998]?.id ?? null,
+			firstLabel: current[0]?.label ?? null,
+			selectedId: selectedRef.current ?? null,
+		};
+	};
 
 	const run = useCallback(() => {
 		setRows(buildData());
