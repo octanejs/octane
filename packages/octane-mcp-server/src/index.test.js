@@ -77,6 +77,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			.map((line) => line.trim())
 			.filter((line) => line && line !== 'Available suites:');
 		expect(suites).toContain('tsrx-renderer-validation-ranges');
+		expect(suites).toContain('tsrx-local-component-name-catalog');
 		expect(suites).toEqual(BENCHMARK_SUITES);
 
 		// The public MCP schema must accept every runner suite, not just keep

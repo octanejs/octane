@@ -111,6 +111,7 @@ export const BENCHMARK_SUITES = [
 	'compiler-throughput',
 	'tsrx-component-graph',
 	'tsrx-renderer-validation-ranges',
+	'tsrx-local-component-name-catalog',
 	'tsrx-jsx-return-branches',
 	'text-type-roots',
 	'tsrx-nesting-diagnostics',

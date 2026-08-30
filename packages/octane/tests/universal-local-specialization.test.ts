@@ -298,6 +298,32 @@ export function App() @{ <Canvas><Scene /></Canvas> }
 		expect(result.code).toContain('__octaneRendererRegion0WithSlot');
 	});
 
+	it('keeps separate local component graphs scoped to each renderer boundary', () => {
+		const source = `
+import { Canvas } from '${CANVAS_MODULE}';
+function LeafA() @{ <mesh graph="a" /> }
+function GraphA() @{ <LeafA /> }
+function LeafB() @{ <mesh graph="b" /> }
+function GraphB() @{ <LeafB /> }
+export function App() @{
+  <>
+    <Canvas><GraphA /></Canvas>
+    <Canvas><GraphB /></Canvas>
+  </>
+}`;
+		const result = compileDomBoundary(source);
+
+		expect(result.code).toContain('function __octaneRendererRegion0GraphA');
+		expect(result.code).toContain('function __octaneRendererRegion0LeafA');
+		expect(result.code).not.toContain('__octaneRendererRegion0GraphB');
+		expect(result.code).not.toContain('__octaneRendererRegion0LeafB');
+		expect(result.code).toContain('function __octaneRendererRegion1GraphB');
+		expect(result.code).toContain('function __octaneRendererRegion1LeafB');
+		expect(result.code).not.toContain('__octaneRendererRegion1GraphA');
+		expect(result.code).not.toContain('__octaneRendererRegion1LeafA');
+		expect(result.map.sourcesContent).toEqual([source]);
+	});
+
 	it('infers omitted dependencies in a cloned local custom hook', () => {
 		const result = compileDomBoundary(`
 import { useMemo as useRendererMemo } from 'octane/universal';
