@@ -863,6 +863,11 @@ jobs:
       - name: Check package inventory is current
         run: pnpm packages:inventory:check
 
+      # Header and directory search consume one compact browser-safe snapshot
+      # assembled from the authored catalogs, package manifests, and statuses.
+      - name: Check website ecosystem index is current
+        run: pnpm website:ecosystem-data:check
+
       - name: Check binding parity-gap index is current
         run: pnpm binding-parity:gaps:check
 

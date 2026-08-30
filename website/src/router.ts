@@ -9,13 +9,15 @@ import './app/stale-chunk-reload.ts';
 
 type WebsiteSearch = Record<string, unknown>;
 
-// Error decoder arguments are opaque diagnostic text. TanStack Router's default
-// codec JSON-parses values such as `null`, `true`, and `"quoted"`. Preserve only
-// repeated `args[]` values as text; all other website search parameters retain
-// the router's normal JSON-compatible semantics.
+// Search queries and error decoder arguments are opaque user-authored text.
+// TanStack Router's default codec JSON-parses values such as `null`, `true`,
+// and `"quoted"`, so preserve these keys as text while all other website search
+// parameters retain the router's normal JSON-compatible semantics.
 export function parseWebsiteSearch(search: string): WebsiteSearch {
 	const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
 	const parsed = defaultParseSearch(search) as WebsiteSearch;
+	const query = params.get('q');
+	if (query !== null) parsed.q = query;
 	const arguments_ = params.getAll('args[]');
 	if (arguments_.length === 1) {
 		parsed['args[]'] = arguments_[0];
@@ -26,11 +28,14 @@ export function parseWebsiteSearch(search: string): WebsiteSearch {
 }
 
 export function stringifyWebsiteSearch(search: Record<string, unknown>): string {
-	const { ['args[]']: arguments_, ...rest } = search;
+	const { q: query, ['args[]']: arguments_, ...rest } = search;
 	const regularSearch = defaultStringifySearch(rest);
-	const params = new URLSearchParams(
+	const regularParams = new URLSearchParams(
 		regularSearch.startsWith('?') ? regularSearch.slice(1) : regularSearch,
 	);
+	const params = new URLSearchParams();
+	if (query !== undefined) params.append('q', String(query));
+	for (const [key, value] of regularParams) params.append(key, value);
 	if (Array.isArray(arguments_)) {
 		for (const argument of arguments_) {
 			if (argument !== undefined) params.append('args[]', String(argument));

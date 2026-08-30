@@ -1,17 +1,20 @@
 ---
-title: Bindings
+title: Integrations and bindings
 ---
 
-import { BindingsDirectory } from '../../components/BindingsDirectory.tsrx';
+import { EcosystemDirectory } from '../../components/EcosystemDirectory.tsrx';
 import { BINDING_COUNT } from '../bindings.ts';
+import { FRAMEWORK_INTEGRATION_COUNT } from '../framework-integrations.ts';
 import { PackageInstall } from '../../components/PackageInstall.tsrx';
 
 <div className="doc-hero">
-	<p className="doc-eyebrow">{BINDING_COUNT + ' first-party bindings'}</p>
-	<h1>Bindings</h1>
+	<p className="doc-eyebrow">
+		{FRAMEWORK_INTEGRATION_COUNT + ' integrations · ' + BINDING_COUNT + ' bindings'}
+	</p>
+	<h1>Integrations and bindings</h1>
 	<p className="doc-lede">
 		{
-			'Keep the APIs you know across state, data, routing, UI, forms, charts, 3D, and more. Each binding replaces a library’s React-facing layer with one built for Octane.'
+			'Find the first-party package that connects Octane to your app framework or replaces a library’s React-facing layer.'
 		}
 	</p>
 </div>
@@ -25,17 +28,18 @@ import { PackageInstall } from '../../components/PackageInstall.tsrx';
 	</p>
 </aside>
 
-<h2 id="find-a-binding">Pick by the job</h2>
+<h2 id="find-a-binding">Find an integration or binding</h2>
 
-Moving an existing app? Start with the libraries it already uses. Starting fresh? Pick
-the group that matches the problem, then learn the library itself from its upstream
-documentation. The directory covers every first-party binding in the repository.
+Start with the framework that runs your app, or search for the React library you already
+use. Framework integrations cover app setup, routing, server rendering, hydration, and
+builds. Library bindings preserve familiar hooks and components across state, data,
+routing, UI, forms, charts, 3D, and more.
 
-<BindingsDirectory />
+<EcosystemDirectory />
 
-Maturity ranges from complete ports to scoped, partial, and technical-preview bindings.
-Follow each package link for its README, then use the status table below for the exact
-supported surface and SSR coverage.
+The directory is server-rendered and its search and filters stay in the URL, so a result
+from the site search opens the same focused view. Follow a package link for its README.
+Framework cards also link to the deeper setup guide.
 
 <h2 id="install-and-use">Install it, then change the import</h2>
 
@@ -82,7 +86,7 @@ in CI.
 		}
 		<a href="/docs/build-tools">Build tools guide</a>
 		{
-			' compares all three; bindings are the library adapters you add afterwards. Astro, Docusaurus, and TanStack Start live in the '
+			' compares all three; bindings are the library adapters you add afterwards. For framework-specific installation and examples, open the '
 		}
 		<a href="/docs/framework-integrations">Framework integrations guide</a>
 		{'.'}
