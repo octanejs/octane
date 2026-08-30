@@ -886,6 +886,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Authored renderer-validation range membership at two scales plus matched
+		// whole-pipeline compiles with and without validation in the same process.
+		name: 'tsrx-renderer-validation-ranges',
+		cwd: 'tsrx-renderer-validation-ranges',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Conditional JSX return analysis at two component counts plus a
 		// same-sized structurally ineligible parse/print control.
 		name: 'tsrx-jsx-return-branches',

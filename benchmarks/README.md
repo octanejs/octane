@@ -83,7 +83,8 @@ the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
 **universal-external-store**,
-**lynx-render**, and **lynx-bundle-size** are Node-only,
+**lynx-render**, **lynx-bundle-size**, and **tsrx-renderer-validation-ranges**
+are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
 servers per sample — that spawn/listen/first-byte cycle IS the measurement —
 and **codegen-size** / **bundle-size** / **bundle-reachability** /
@@ -278,6 +279,7 @@ internally, get their own baseline and guard namespace.
 | `template-call-memo` | template-call-memo | none (Node-only) | production Strong/compatibility receiver-call counts, immutable keyed rows, real dependency changes, current event captures, and survivor identity |
 | `compiler-throughput` | compiler-throughput | none (Node-only) | seven real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |
 | `tsrx-component-graph` | tsrx-component-graph | none (Node-only) | 2,400-component live-import propagation with dependent-first vs dependency-first declarations |
+| `tsrx-renderer-validation-ranges` | tsrx-renderer-validation-ranges | none (Node-only) | authored renderer-validation range membership at 32/3,200 ranges plus matched 100/1,600-component whole-pipeline compiles with and without validation |
 | `tsrx-jsx-return-branches` | tsrx-jsx-return-branches | none (Node-only) | client/server compile and bundler classification for 120/480 conditional-return components, with lowering/export controls and a same-sized ineligible parse/print control |
 | `tsrx-nesting-diagnostics` | tsrx-nesting-diagnostics | none (Node-only) | development TSRX compilation at 500 and 2,000 invalid HTML sites, with parsed diagnostic count/order controls and a per-diagnostic scaling guard |
 | `tsrx-renderer-selection` | tsrx-renderer-selection | none (Node-only) | ordered filename-to-renderer classification with semantic checksums, comparing retained normalized config against equivalent raw revalidation |
