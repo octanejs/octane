@@ -17,7 +17,7 @@ async function renderRoute(url: string) {
 	await router.load();
 	const utils = render(RouterProvider as any, { props: { router } });
 	await waitFor(() => {
-		if (!utils.container.querySelector('#ecosystem-search')) {
+		if (!utils.container.querySelector('.ecosystem-directory')) {
 			throw new Error('ecosystem directory did not render');
 		}
 	});
@@ -25,7 +25,7 @@ async function renderRoute(url: string) {
 }
 
 describe('ecosystem directory', () => {
-	it('presents integrations before alphabetized binding categories', async () => {
+	it('presents integrations before curated binding categories', async () => {
 		const { container } = await renderRoute('/docs/bindings');
 		const headings = Array.from(
 			container.querySelectorAll<HTMLElement>('.ecosystem-section-heading'),
@@ -65,6 +65,31 @@ describe('ecosystem directory', () => {
 		}
 	});
 
+	it('uses focused primary categories and controlled discovery tags', () => {
+		const titles = BINDING_CATEGORIES.map((category) => category.title);
+		const terminal = BINDING_CATEGORIES.find((category) => category.title === 'Terminal Apps');
+
+		expect(titles).toEqual(
+			expect.arrayContaining([
+				'UI Libraries',
+				'State Management',
+				'Desktop Apps',
+				'Terminal Apps',
+				'Animation',
+				'Tables',
+				'Forms',
+			]),
+		);
+		expect(titles.every((title) => !title.includes(',') && !/\band\b/i.test(title))).toBe(true);
+		expect(Math.max(...BINDING_CATEGORIES.map((category) => category.packages.length))).toBe(15);
+		expect(terminal?.packages.map((entry) => entry.title)).toEqual(['Ink', 'OpenTUI']);
+		expect(
+			BINDING_CATEGORIES.every((category) =>
+				category.packages.every((entry) => entry.tags && entry.tags.length > 0),
+			),
+		).toBe(true);
+	});
+
 	it('uses the binding category card design for framework integrations', async () => {
 		const { container } = await renderRoute('/docs/bindings');
 		const integrationGroup = container.querySelector<HTMLElement>(
@@ -99,7 +124,7 @@ describe('ecosystem directory', () => {
 			'.ecosystem-category-jumps a',
 		);
 		expect(jumps).toHaveLength(BINDING_CATEGORIES.length);
-		expect(jumps[0]?.getAttribute('href')).toBe('#ecosystem-section-shared-state');
+		expect(jumps[0]?.getAttribute('href')).toBe('#ecosystem-section-state-management');
 		cleanup();
 
 		const search = await renderRoute('/docs/bindings?q=tanstack');
@@ -120,17 +145,28 @@ describe('ecosystem directory', () => {
 		const { container } = await renderRoute(
 			'/docs/bindings?q=TanStack%20Router&kind=binding#binding-tanstack-router',
 		);
-		await waitFor(() =>
-			expect(container.querySelector<HTMLInputElement>('#ecosystem-search')?.value).toBe(
-				'TanStack Router',
-			),
-		);
 		const cards = container.querySelectorAll<HTMLElement>('.ecosystem-entity');
 		expect(cards[0]?.id).toBe('binding-tanstack-router');
 		expect(cards[0]?.textContent).toContain('@octanejs/tanstack-router');
 		expect(container.querySelector('.ecosystem-results-summary')?.textContent).toContain(
 			'for “TanStack Router”',
 		);
+	});
+
+	it('opens the global docs search instead of rendering a second search input', async () => {
+		const { container } = await renderRoute('/docs/bindings');
+		const trigger = container.querySelector<HTMLButtonElement>('.ecosystem-global-search button')!;
+		expect(container.querySelector('#ecosystem-search')).toBeNull();
+		expect(container.querySelector('.ecosystem-global-search')?.textContent).toContain(
+			'Looking for a specific package?',
+		);
+
+		fireEvent.click(trigger);
+		const dialog = await waitFor(() =>
+			document.body.querySelector<HTMLElement>('[role="dialog"]')!,
+		);
+		fireEvent.keyDown(dialog, { key: 'Escape' });
+		await waitFor(() => expect(document.activeElement).toBe(trigger));
 	});
 
 	it('keeps mixed integration and binding results in relevance order', async () => {
@@ -145,89 +181,56 @@ describe('ecosystem directory', () => {
 		);
 	});
 
-	it('replaces the URL while typing and pushes explicit filters', async () => {
+	it('pushes explicit filters and restores them through browser history', async () => {
 		const { container, router } = await renderRoute('/docs/bindings');
-		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
 		const kind = container.querySelector<HTMLSelectElement>('#ecosystem-kind')!;
 		const category = container.querySelector<HTMLSelectElement>('#ecosystem-category')!;
-
-		fireEvent.input(search, { target: { value: 'zustand' } });
-		await waitFor(() => expect(router.state.location.search).toMatchObject({ q: 'zustand' }));
-		expect(container.querySelector('.ecosystem-entity')?.id).toBe('binding-zustand');
 
 		fireEvent.change(kind, { target: { value: 'binding' } });
 		await waitFor(() => expect(router.state.location.search).toMatchObject({ kind: 'binding' }));
 
-		fireEvent.change(category, { target: { value: 'shared-state' } });
+		fireEvent.change(category, { target: { value: 'state-management' } });
 		await waitFor(() =>
 			expect(router.state.location.search).toMatchObject({
-				q: 'zustand',
 				kind: 'binding',
-				category: 'shared-state',
+				category: 'state-management',
 			}),
 		);
+		expect(container.querySelector('#binding-zustand')).toBeTruthy();
 
 		router.history.back();
 		await waitFor(() => {
-			expect(router.state.location.search).toEqual({ q: 'zustand', kind: 'binding' });
+			expect(router.state.location.search).toEqual({ kind: 'binding' });
 			expect(category.value).toBe('');
 		});
 		router.history.back();
 		await waitFor(() => {
-			expect(router.state.location.search).toEqual({ q: 'zustand' });
-			expect(search.value).toBe('zustand');
+			expect(router.state.location.search).toEqual({});
 			expect(kind.value).toBe('');
 		});
 		router.history.forward();
 		await waitFor(() => {
-			expect(router.state.location.search).toEqual({ q: 'zustand', kind: 'binding' });
+			expect(router.state.location.search).toEqual({ kind: 'binding' });
 			expect(kind.value).toBe('binding');
 		});
 	});
 
-	it('clears a directory anchor when search state changes', async () => {
+	it('clears a directory anchor when filter state changes', async () => {
 		const { container, router } = await renderRoute('/docs/bindings#binding-zustand');
-		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
-
-		fireEvent.input(search, { target: { value: 'zustand' } });
-
-		await waitFor(() => expect(router.state.location.search).toMatchObject({ q: 'zustand' }));
-		expect(router.state.location.hash).toBe('');
-	});
-
-	it('merges rapid query and filter changes into one URL state', async () => {
-		const { container, router } = await renderRoute('/docs/bindings');
-		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
 		const kind = container.querySelector<HTMLSelectElement>('#ecosystem-kind')!;
 
-		fireEvent.input(search, { target: { value: 'astro' } });
-		fireEvent.change(kind, { target: { value: 'integration' } });
+		fireEvent.change(kind, { target: { value: 'binding' } });
 
-		await waitFor(() =>
-			expect(router.state.location.search).toEqual({ q: 'astro', kind: 'integration' }),
-		);
-		expect(container.querySelector('.ecosystem-entity')?.id).toBe('integration-astro');
-	});
-
-	it('keeps JSON-like query prefixes as text while typing', async () => {
-		const { container, router } = await renderRoute('/docs/bindings');
-		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
-
-		for (const query of ['3', '3d', 'true', 'null']) {
-			fireEvent.input(search, { target: { value: query } });
-			await waitFor(() => expect(router.state.location.search).toMatchObject({ q: query }));
-			expect(search.value).toBe(query);
-		}
+		await waitFor(() => expect(router.state.location.search).toMatchObject({ kind: 'binding' }));
+		expect(router.state.location.hash).toBe('');
 	});
 
 	it('explains one-character search and ignores incompatible URL filters', async () => {
 		const { container } = await renderRoute(
-			'/docs/bindings?q=a&kind=integration&category=shared-state',
+			'/docs/bindings?q=a&kind=integration&category=state-management',
 		);
-		const search = container.querySelector<HTMLInputElement>('#ecosystem-search')!;
 		const category = container.querySelector<HTMLSelectElement>('#ecosystem-category')!;
 
-		expect(search.value).toBe('a');
 		expect(category.value).toBe('');
 		expect(category.disabled).toBe(true);
 		expect(container.querySelector('.ecosystem-results-summary')?.textContent).toContain(
@@ -240,7 +243,7 @@ describe('ecosystem directory', () => {
 
 	it('offers a useful reset when filters have no matches', async () => {
 		const { container, router } = await renderRoute(
-			'/docs/bindings?q=astro&kind=binding&category=shared-state',
+			'/docs/bindings?q=astro&kind=binding&category=state-management',
 		);
 		expect(container.querySelector('.ecosystem-empty')?.textContent).toContain('No matches');
 

@@ -190,7 +190,8 @@ describe('built Start server', () => {
 		const { response, html } = await get('/docs/bindings?q=TanStack%20Router&kind=binding');
 		expect(response.status).toBe(200);
 		expect(classCount(html, 'ecosystem-directory')).toBe(1);
-		expect(html).toContain('value="TanStack Router"');
+		expect(html).toContain('for “TanStack Router”');
+		expect(html).not.toContain('id="ecosystem-search"');
 		expect(html).toContain('id="binding-tanstack-router"');
 		expect(html).toContain('id="binding-tanstack-router-ssr-query"');
 		expect(html.indexOf('id="binding-tanstack-router"')).toBeLessThan(

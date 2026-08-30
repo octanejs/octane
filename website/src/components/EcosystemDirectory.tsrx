@@ -10,6 +10,7 @@ import {
 	type EcosystemEntity,
 } from '../lib/ecosystem-search-core.ts';
 import { ecosystemPackageGuideHref } from '../lib/ecosystem-presentation.ts';
+import { openDocsSearch } from '../lib/docs-search-events.ts';
 
 interface DirectorySection {
 	id: string;
@@ -139,11 +140,6 @@ export function EcosystemDirectory() @{
 		});
 	};
 
-	const onQuery = (event: Event) => {
-		const q = (event.currentTarget as HTMLInputElement).value;
-		updateLocation((current) => ({ ...current, q }), true);
-	};
-
 	const onKind = (event: Event) => {
 		const nextKind = (event.currentTarget as HTMLSelectElement).value;
 		updateLocation(
@@ -171,19 +167,17 @@ export function EcosystemDirectory() @{
 	const reset = () => updateLocation(() => ({ q: '', kind: '', category: '' }), false);
 
 	<div class="ecosystem-directory">
-		<div class="ecosystem-controls" role="search" aria-label="Search integrations and bindings">
-			<label class="ecosystem-search-field" for="ecosystem-search">
-				<span class="ecosystem-control-label">Search packages</span>
-				<input
-					id="ecosystem-search"
-					type="search"
-					placeholder="Try “TanStack Router”, “charts”, or “Astro”"
-					value={query}
-					autoComplete="off"
-					spellCheck={false}
-					onInput={onQuery}
-				/>
-			</label>
+		<div class="ecosystem-controls" role="group" aria-label="Filter integrations and bindings">
+			<div class="ecosystem-global-search">
+				<p>
+					<strong>Looking for a specific package?</strong>
+					<span>Search docs, bindings, and integrations from one place.</span>
+				</p>
+				<button type="button" onClick={openDocsSearch}>
+					Search Octane
+					<kbd>⌘/Ctrl K</kbd>
+				</button>
+			</div>
 			<label class="ecosystem-select-field" for="ecosystem-kind">
 				<span class="ecosystem-control-label">Type</span>
 				<select id="ecosystem-kind" value={kind} onChange={onKind}>
@@ -346,14 +340,13 @@ export function EcosystemDirectory() @{
 			}
 			.ecosystem-controls {
 				display: grid;
-				grid-template-columns: minmax(0, 1fr) 12rem 13rem;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
 				gap: 0.65rem;
 				padding: 0.85rem;
 				border: 1px solid var(--border);
 				border-radius: 0.9rem;
 				background: var(--surface-subtle);
 			}
-			.ecosystem-search-field,
 			.ecosystem-select-field {
 				display: flex;
 				flex-direction: column;
@@ -367,7 +360,60 @@ export function EcosystemDirectory() @{
 				letter-spacing: 0.04em;
 				text-transform: uppercase;
 			}
-			.ecosystem-controls input,
+			.ecosystem-global-search {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.75rem;
+				grid-column: 1 / -1;
+				min-width: 0;
+				padding-bottom: 0.75rem;
+				border-bottom: 1px solid var(--border);
+			}
+			.ecosystem-global-search p {
+				margin: 0;
+				color: var(--text-secondary);
+				font-size: 0.8rem;
+				line-height: 1.35;
+			}
+			.ecosystem-global-search strong {
+				color: var(--text);
+			}
+			.ecosystem-global-search p span {
+				margin-left: 0.25rem;
+			}
+			.ecosystem-global-search button {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				flex: none;
+				height: 2.6rem;
+				padding: 0 0.75rem;
+				border: 1px solid var(--border);
+				border-radius: 0.6rem;
+				background: var(--panel);
+				color: var(--text);
+				font: inherit;
+				font-size: 0.82rem;
+				font-weight: 700;
+				cursor: pointer;
+			}
+			.ecosystem-global-search button:hover {
+				border-color: rgba(255, 93, 114, 0.55);
+				background: rgba(255, 65, 90, 0.08);
+			}
+			.ecosystem-global-search button:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
+			}
+			.ecosystem-global-search kbd {
+				padding: 0.1rem 0.3rem;
+				border: 1px solid var(--border);
+				border-radius: 0.3rem;
+				color: var(--text-secondary);
+				font-family: inherit;
+				font-size: 0.65rem;
+			}
 			.ecosystem-controls select {
 				width: 100%;
 				height: 2.6rem;
@@ -379,7 +425,6 @@ export function EcosystemDirectory() @{
 				font: inherit;
 				font-size: 0.85rem;
 			}
-			.ecosystem-controls input:focus,
 			.ecosystem-controls select:focus {
 				border-color: var(--accent);
 				outline: 2px solid rgba(255, 65, 90, 0.2);
@@ -659,9 +704,6 @@ export function EcosystemDirectory() @{
 				.ecosystem-controls {
 					grid-template-columns: 1fr 1fr;
 				}
-				.ecosystem-search-field {
-					grid-column: 1 / -1;
-				}
 				.ecosystem-category-jumps {
 					flex-direction: column;
 					gap: 0.45rem;
@@ -671,8 +713,13 @@ export function EcosystemDirectory() @{
 				.ecosystem-controls {
 					grid-template-columns: 1fr;
 				}
-				.ecosystem-search-field {
-					grid-column: auto;
+				.ecosystem-global-search {
+					align-items: flex-start;
+					flex-direction: column;
+				}
+				.ecosystem-global-search button {
+					width: 100%;
+					justify-content: space-between;
 				}
 				.ecosystem-entity {
 					scroll-margin-top: 9rem;

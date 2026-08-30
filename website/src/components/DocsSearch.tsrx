@@ -15,6 +15,7 @@ import {
 } from '../lib/ecosystem-presentation.ts';
 import type { SearchGroup } from '../lib/docs-search-core.ts';
 import searchUrl from '../assets/search.svg';
+import { DOCS_SEARCH_OPEN_EVENT, type DocsSearchOpenDetail } from '../lib/docs-search-events.ts';
 
 interface DialogProps {
 	onClose: () => void;
@@ -587,13 +588,24 @@ function SearchDialog(props: DialogProps) @{
 export function DocsSearch() @{
 	const [open, setOpen] = useState(false);
 	const triggerEl = useRef<HTMLButtonElement | null>(null);
+	const returnFocusEl = useRef<HTMLElement | null>(null);
 
 	const close = () => {
 		setOpen(false);
-		triggerEl.current?.focus();
+		(returnFocusEl.current ?? triggerEl.current)?.focus();
+		returnFocusEl.current = null;
+	};
+
+	const openSearch = (returnFocusTo: HTMLElement | null) => {
+		returnFocusEl.current = returnFocusTo ?? triggerEl.current;
+		setOpen(true);
 	};
 
 	useEffect(() => {
+		const onOpen = (event: Event) => {
+			const detail = (event as CustomEvent<DocsSearchOpenDetail>).detail;
+			openSearch(detail?.returnFocusTo ?? null);
+		};
 		const onKey = (event: KeyboardEvent) => {
 			const target = event.target;
 			const typing =
@@ -604,14 +616,18 @@ export function DocsSearch() @{
 			if ((event.key === 'k' || event.key === 'K') && (event.metaKey || event.ctrlKey)) {
 				event.preventDefault();
 				if (open) close();
-				else setOpen(true);
+				else openSearch(triggerEl.current);
 			} else if (event.key === '/' && !typing) {
 				event.preventDefault();
-				setOpen(true);
+				openSearch(triggerEl.current);
 			}
 		};
+		document.addEventListener(DOCS_SEARCH_OPEN_EVENT, onOpen);
 		document.addEventListener('keydown', onKey);
-		return () => document.removeEventListener('keydown', onKey);
+		return () => {
+			document.removeEventListener(DOCS_SEARCH_OPEN_EVENT, onOpen);
+			document.removeEventListener('keydown', onKey);
+		};
 	});
 
 	<>
@@ -620,7 +636,7 @@ export function DocsSearch() @{
 			type="button"
 			class="search-trigger"
 			aria-label="Search docs, packages, and integrations"
-			onClick={() => setOpen(true)}
+			onClick={() => openSearch(triggerEl.current)}
 		>
 			<span
 				class="search-trigger-icon"
