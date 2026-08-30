@@ -185,6 +185,7 @@ interface RunningBackgroundCall {
 }
 
 let NEXT_READY_REQUEST = 1;
+const READINESS_SIGNAL_DELAY_MS = 16;
 const MAX_DISPOSE_ATTEMPTS = 3;
 const MAX_QUEUED_THREAD_CALLS = 128;
 
@@ -286,7 +287,7 @@ export function createLynxBackgroundTransport(
 	let lazyPublicInstances = false;
 	let postFirstTreeLazyPublicInstances = false;
 	let deferredFirstTreeCapabilities: LynxMainThreadCapabilities | undefined;
-	let readinessRetrySent = false;
+	let readinessSignal: ReturnType<typeof setTimeout> | null = null;
 	let disposeDeferred: Deferred<void> | null = null;
 	let disposeIdentity: UniversalTransportIdentity | null = null;
 	let disposeAttempts = 0;
@@ -598,12 +599,19 @@ export function createLynxBackgroundTransport(
 		runningBackgroundCalls.clear();
 	};
 
+	const stopReadinessSignal = (): void => {
+		if (readinessSignal === null) return;
+		clearTimeout(readinessSignal);
+		readinessSignal = null;
+	};
+
 	const closeClientState = (
 		error: Error,
 		preserveDisposeResolution: boolean,
 		notifyMain = true,
 	): boolean => {
 		if (closedError !== null) return false;
+		stopReadinessSignal();
 		closeThreadCalls(error, notifyMain);
 		// Nothing will acknowledge a held native event once the transport closes.
 		dropDeferredNativeEvents();
@@ -622,6 +630,34 @@ export function createLynxBackgroundTransport(
 	const closeInternal = (error: Error, preserveDisposeResolution: boolean) => {
 		if (!closeClientState(error, preserveDisposeResolution)) return;
 		detachReceiver();
+	};
+
+	const sendReadinessSignal = (): void => {
+		readinessSignal = null;
+		if (closedError !== null || readyReceived || readyDeferred.settled) {
+			return;
+		}
+		try {
+			dispatch(readinessRequest);
+		} catch (error) {
+			closeInternal(report(error, 'Octane Lynx failed to signal main readiness.'), false);
+			return;
+		}
+		if (closedError === null && !readyReceived && !readyDeferred.settled) {
+			readinessSignal = setTimeout(sendReadinessSignal, READINESS_SIGNAL_DELAY_MS);
+		}
+	};
+
+	const startReadinessSignal = (): void => {
+		if (
+			closedError !== null ||
+			readyReceived ||
+			readyDeferred.settled ||
+			readinessSignal !== null
+		) {
+			return;
+		}
+		sendReadinessSignal();
 	};
 
 	const queuePageDestroyHandler = (): void => {
@@ -749,15 +785,11 @@ export function createLynxBackgroundTransport(
 
 	const handleReady = (message: LynxMainReadyReply) => {
 		if (message.request === LYNX_READY_ANNOUNCEMENT_REQUEST) {
-			if (readyReceived || readyDeferred.settled || readinessRetrySent) return;
+			if (readyReceived || readyDeferred.settled) return;
 			// Request 0 is only an availability hint. Re-send this transport's
 			// correlation ID so main can order queued page data before the reply.
-			readinessRetrySent = true;
-			try {
-				dispatch(readinessRequest);
-			} catch (error) {
-				closeInternal(report(error, 'Octane Lynx failed to retry main readiness.'), false);
-			}
+			stopReadinessSignal();
+			startReadinessSignal();
 			return;
 		}
 		if (message.request !== readyRequest) {
@@ -782,6 +814,7 @@ export function createLynxBackgroundTransport(
 		lazyPublicInstances = capabilities?.lazyPublicInstances === 1;
 		setLynxClientCapabilities(container, capabilities);
 		readyReceived = true;
+		stopReadinessSignal();
 		readyDeferred.resolve(undefined);
 	};
 
@@ -1440,12 +1473,8 @@ export function createLynxBackgroundTransport(
 	}
 	if (pageDestroyedBeforeReady) {
 		handlePageDestroy();
-	} else if (closedError === null && !readyReceived && !readinessRetrySent) {
-		try {
-			dispatch(readinessRequest);
-		} catch (error) {
-			closeInternal(report(error, 'Octane Lynx failed to request main readiness.'), false);
-		}
+	} else {
+		startReadinessSignal();
 	}
 
 	const transport: LynxBackgroundTransport = {
