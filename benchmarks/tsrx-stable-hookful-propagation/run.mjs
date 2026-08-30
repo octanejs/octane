@@ -15,6 +15,7 @@ const { compile } = await import(
 
 const HIGH_COMPONENTS = 1_000;
 const LOW_COMPONENTS = 40;
+const LOW_SAMPLE_BATCH = 10;
 const args = process.argv.slice(2);
 const positional = args.filter((argument) => !argument.startsWith('--'));
 const flags = new Set(args.filter((argument) => argument.startsWith('--')));
@@ -44,7 +45,7 @@ function chainSource(components, reverse) {
 	<span>{live + value as string}</span>
 }`;
 		}
-		return `function StableNode${index}() @{ <StableNode${index + 1} /> }`;
+		return `function StableNode${index}() @{ <div><StableNode${index + 1} /></div> }`;
 	});
 	if (reverse) declarations.reverse();
 	return `import { useState } from 'octane';
@@ -254,9 +255,13 @@ const variants = [
 ];
 
 function measureVariant(variant) {
+	const batchSize = variant.components === LOW_COMPONENTS ? LOW_SAMPLE_BATCH : 1;
+	let result;
 	const started = performance.now();
-	const result = compile(variant.source, `${variant.name}.tsrx`, options);
-	const elapsed = performance.now() - started;
+	for (let index = 0; index < batchSize; index++) {
+		result = compile(variant.source, `${variant.name}.tsrx`, options);
+	}
+	const elapsed = (performance.now() - started) / batchSize;
 	assert.equal(result.diagnostics.length, 0, `${variant.name} emitted compiler diagnostics`);
 	const analysis = analyzeOutput(result.code, ['leafSetter']);
 	assert.deepEqual(
@@ -282,6 +287,7 @@ try {
 		variant.expectedHash = first.hash;
 		variant.meta = {
 			...first.analysis,
+			batchSize: variant.components === LOW_COMPONENTS ? LOW_SAMPLE_BATCH : 1,
 			components: variant.components,
 			callEdges: variant.components - 1,
 			outputBytes: first.outputBytes,
