@@ -1,0 +1,15 @@
+{
+  "package": "react-dom",
+  "version": "19.2.7",
+  "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d",
+  "tarball": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.7.tgz",
+  "integrity": "sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==",
+  "tarballSha256": "e47bae602149b38b90b452c89e53d2d60639fee09361d90374983a6aac62739e",
+  "verifiedAgainstTarball": "2026-08-28",
+  "files": {
+    "LICENSE": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+    "package.json": "447acd72cdb6a966d9db967729e286e7cbb4a09ea61fddd45e12c2a97fd4cfb6",
+    "cjs/react-dom-client.development.js": "638fcb800207eaf4c5b2427f13fb82362b8e06df51e65d92fa350fbfeaa8fd89",
+    "cjs/react-dom-client.production.js": "9d2de2ee4a588c5d0b8580ff3467f796b8d9bbc45bdc35b257f7d1380e686c56"
+  }
+}
