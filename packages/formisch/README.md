@@ -2,6 +2,13 @@
 
 Clean-room Formisch binding for Octane.
 
+## Installation
+
+```sh
+npm install @octanejs/formisch valibot
+pnpm add @octanejs/formisch valibot
+```
+
 ```tsrx
 import { Field, Form, useForm } from '@octanejs/formisch';
 import * as v from 'valibot';

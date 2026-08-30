@@ -2,6 +2,13 @@
 
 Clean-room Octane binding for Boneyard skeleton screens.
 
+## Installation
+
+```sh
+npm install @octanejs/boneyard
+pnpm add @octanejs/boneyard
+```
+
 ```tsrx
 import { Skeleton } from '@octanejs/boneyard';
 import bones from './profile.bones.json';
