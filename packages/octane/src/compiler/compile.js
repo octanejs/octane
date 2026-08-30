@@ -5346,12 +5346,15 @@ function classifyStableHookfulChildCalls(moduleBody, ctx) {
 		let invalid = false;
 		for (const edge of candidate.dependencies) {
 			const childName = tagBindingName(edge);
+			if (!candidates.has(childName)) {
+				invalid = true;
+				continue;
+			}
 			let childDependents = dependents.get(childName);
 			if (childDependents === undefined) {
 				dependents.set(childName, (childDependents = []));
 			}
 			childDependents.push(name);
-			if (!candidates.has(childName)) invalid = true;
 		}
 		if (invalid) removalQueue.push(name);
 	}
