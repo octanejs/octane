@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/react-error-boundary",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "license": "MIT",
   "type": "module",
   "engines": {
