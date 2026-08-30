@@ -626,7 +626,8 @@ export function EcosystemDirectory() @{
 				outline: 2px solid var(--accent);
 				outline-offset: 2px;
 			}
-			.ecosystem-binding-item:target .binding-link {
+			.ecosystem-binding-item:target .binding-link,
+			.ecosystem-integration-item:target .binding-link {
 				border-color: var(--accent);
 				box-shadow: 0 0 0 3px rgba(255, 65, 90, 0.14);
 			}
