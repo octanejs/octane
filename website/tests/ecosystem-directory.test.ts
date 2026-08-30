@@ -45,16 +45,18 @@ describe('ecosystem directory', () => {
 		for (const integration of FRAMEWORK_INTEGRATIONS) {
 			const row = container.querySelector<HTMLElement>(`#integration-${integration.guideAnchor}`);
 			expect(row).toBeTruthy();
-			expect(row?.querySelector('.ecosystem-type')?.textContent).toBe(integration.model);
-			expect(row?.querySelector('.ecosystem-context')).toBeNull();
+			expect(row?.querySelector('code')?.textContent).toBe(integration.packageName);
+			expect(row?.querySelector<HTMLAnchorElement>('a')?.getAttribute('href')).toContain(
+				`/packages/${integration.packageName.replace('@octanejs/', '')}`,
+			);
 		}
 		expect(container.querySelector('#binding-tanstack-router')).toBeTruthy();
 
-		const bindingGroups = Array.from(
+		const categoryCards = Array.from(
 			container.querySelectorAll<HTMLElement>('.ecosystem-section--binding-card'),
 		);
-		expect(bindingGroups).toHaveLength(BINDING_CATEGORIES.length);
-		for (const [index, group] of bindingGroups.entries()) {
+		expect(categoryCards).toHaveLength(BINDING_CATEGORIES.length + 1);
+		for (const [index, group] of categoryCards.slice(1).entries()) {
 			const titles = Array.from(group.querySelectorAll<HTMLElement>('.ecosystem-binding-item')).map(
 				(item) => item.dataset.bindingTitle,
 			);
@@ -63,15 +65,25 @@ describe('ecosystem directory', () => {
 		}
 	});
 
-	it('keeps integrations as rows and restores the original binding category cards', async () => {
+	it('uses the binding category card design for framework integrations', async () => {
 		const { container } = await renderRoute('/docs/bindings');
-		const integrations = container.querySelectorAll('.ecosystem-integration-card');
-		const bindingCards = container.querySelectorAll('.ecosystem-section--binding-card');
+		const integrationGroup = container.querySelector<HTMLElement>(
+			'[aria-labelledby="ecosystem-section-framework-integrations"]',
+		)!;
+		const integrations = integrationGroup.querySelectorAll('.ecosystem-integration-item');
+		const categoryCards = container.querySelectorAll('.ecosystem-section--binding-card');
 		const bindings = container.querySelectorAll('.ecosystem-binding-item');
 		const zustand = container.querySelector<HTMLElement>('#binding-zustand')!;
 
 		expect(integrations).toHaveLength(FRAMEWORK_INTEGRATION_COUNT);
-		expect(bindingCards).toHaveLength(BINDING_CATEGORIES.length);
+		expect(categoryCards).toHaveLength(BINDING_CATEGORIES.length + 1);
+		expect(integrationGroup.querySelector('.ecosystem-count')?.textContent).toBe(
+			`${FRAMEWORK_INTEGRATION_COUNT} integrations`,
+		);
+		expect(integrationGroup.querySelector('.ecosystem-integration-card')).toBeNull();
+		expect(integrationGroup.querySelectorAll('.binding-link')).toHaveLength(
+			FRAMEWORK_INTEGRATION_COUNT,
+		);
 		expect(bindings).toHaveLength(BINDING_COUNT);
 		expect(container.querySelectorAll('.ecosystem-binding-item h4')).toHaveLength(0);
 		expect(zustand.querySelector('.ecosystem-type')).toBeNull();

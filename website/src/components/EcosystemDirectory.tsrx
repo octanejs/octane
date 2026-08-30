@@ -8,8 +8,6 @@ import {
 	filterEcosystemEntities,
 	searchEcosystem,
 	type EcosystemEntity,
-	type FrameworkIntegrationEntity,
-	type LibraryBindingEntity,
 } from '../lib/ecosystem-search-core.ts';
 import { ecosystemPackageGuideHref } from '../lib/ecosystem-presentation.ts';
 
@@ -18,7 +16,7 @@ interface DirectorySection {
 	title: string;
 	description: string;
 	entities: EcosystemEntity[];
-	layout: 'cards' | 'binding-card' | 'mixed';
+	layout: 'binding-card' | 'mixed';
 }
 
 interface DirectoryState {
@@ -86,8 +84,8 @@ function directorySections(entities: EcosystemEntity[], searching: boolean): Dir
 			id: 'framework-integrations',
 			title: 'Framework integrations',
 			description: 'Connect Octane to the app framework that owns routing, rendering, and production builds.',
-			entities: integrations,
-			layout: 'cards',
+			entities: integrations.sort((left, right) => left.title.localeCompare(right.title)),
+			layout: 'binding-card',
 		});
 	}
 	for (const category of CATEGORIES) {
@@ -99,20 +97,19 @@ function directorySections(entities: EcosystemEntity[], searching: boolean): Dir
 	return sections;
 }
 
-function bindingEntities(entities: EcosystemEntity[]): LibraryBindingEntity[] {
-	return entities.filter(
-		(entity): entity is LibraryBindingEntity => entity.kind === 'library-binding',
-	);
-}
-
-function integrationEntities(entities: EcosystemEntity[]): FrameworkIntegrationEntity[] {
-	return entities.filter(
-		(entity): entity is FrameworkIntegrationEntity => entity.kind === 'framework-integration',
-	);
-}
-
 function bindingCount(count: number): string {
 	return count + (count === 1 ? ' binding' : ' bindings');
+}
+
+function integrationCount(count: number): string {
+	return count + (count === 1 ? ' integration' : ' integrations');
+}
+
+function sectionCount(section: DirectorySection): string {
+	if (section.layout === 'mixed') return section.entities.length + '';
+	return section.entities[0]?.kind === 'framework-integration'
+		? integrationCount(section.entities.length)
+		: bindingCount(section.entities.length);
 }
 
 export function EcosystemDirectory() @{
@@ -261,17 +258,20 @@ export function EcosystemDirectory() @{
 								>{section.title as string}</h3>
 								<p>{section.description as string}</p>
 							</div>
-							<span class="ecosystem-count">{(section.layout === 'binding-card'
-								? bindingCount(section.entities.length)
-								: section.entities.length + '') as string}</span>
+							<span class="ecosystem-count">{sectionCount(section) as string}</span>
 						</header>
 						@if (section.layout === 'binding-card') {
 							<ul class="binding-list">
-								@for (const entity of bindingEntities(section.entities); key entity.id) {
+								@for (const entity of section.entities; key entity.id) {
 									<li
 										id={entity.id}
-										class="ecosystem-entity ecosystem-binding-item"
-										data-binding-title={entity.title}
+										class={'ecosystem-entity ' +
+											(entity.kind === 'library-binding'
+												? 'ecosystem-binding-item'
+												: 'ecosystem-integration-item')}
+										data-binding-title={entity.kind === 'library-binding'
+											? entity.title
+											: undefined}
 									>
 										<a
 											class="binding-link"
@@ -283,33 +283,6 @@ export function EcosystemDirectory() @{
 									</li>
 								}
 							</ul>
-						} @else if (section.layout === 'cards') {
-							<div class="ecosystem-collection ecosystem-collection--cards">
-								@for (const entity of integrationEntities(section.entities); key entity.id) {
-									<article id={entity.id} class="ecosystem-entity ecosystem-integration-card">
-										<div class="ecosystem-entity-copy">
-											<span class="ecosystem-type">{entity.model as string}</span>
-											<h4>{entity.title as string}</h4>
-											<code>{entity.packageName as string}</code>
-											<p>{entity.description as string}</p>
-										</div>
-										<div class="ecosystem-actions">
-											<a
-												class="ecosystem-package-link"
-												href={ecosystemPackageGuideHref(entity.packageName)}
-											>
-												Package guide ↗
-											</a>
-											<a
-												class="ecosystem-guide-link"
-												href={'/docs/framework-integrations#' + entity.guideAnchor}
-											>
-												Integration guide
-											</a>
-										</div>
-									</article>
-								}
-							</div>
 						} @else {
 							<div class="ecosystem-collection ecosystem-collection--mixed">
 								@for (const entity of section.entities; key entity.id) {
@@ -495,12 +468,8 @@ export function EcosystemDirectory() @{
 				gap: 1rem;
 				margin-bottom: 0.75rem;
 			}
-			.ecosystem-section--cards,
 			.ecosystem-section--mixed {
 				grid-column: 1 / -1;
-			}
-			.ecosystem-section--cards {
-				margin-bottom: 1.15rem;
 			}
 			.ecosystem-section--binding-card {
 				padding: 1.1rem;
@@ -541,11 +510,6 @@ export function EcosystemDirectory() @{
 				font-size: 0.7rem;
 				font-weight: 750;
 				text-align: center;
-			}
-			.ecosystem-collection--cards {
-				display: flex;
-				flex-direction: column;
-				gap: 0.7rem;
 			}
 			.ecosystem-collection--mixed {
 				display: flex;
@@ -629,45 +593,6 @@ export function EcosystemDirectory() @{
 			}
 			.ecosystem-actions a:hover {
 				background: rgba(255, 65, 90, 0.1);
-			}
-			@media (min-width: 761px) {
-				.ecosystem-collection--cards .ecosystem-integration-card {
-					display: grid;
-					grid-template-columns: minmax(0, 1fr) 10.5rem;
-				}
-				.ecosystem-collection--cards .ecosystem-entity-copy {
-					display: grid;
-					grid-template-columns: minmax(11rem, 0.7fr) minmax(0, 1.3fr);
-					grid-template-rows: auto auto auto;
-					column-gap: 1.35rem;
-				}
-				.ecosystem-collection--cards .ecosystem-type {
-					grid-column: 1;
-					grid-row: 1;
-					justify-self: start;
-				}
-				.ecosystem-collection--cards .ecosystem-integration-card h4 {
-					grid-column: 1;
-					grid-row: 2;
-				}
-				.ecosystem-collection--cards .ecosystem-integration-card code {
-					grid-column: 1;
-					grid-row: 3;
-					align-self: end;
-				}
-				.ecosystem-collection--cards .ecosystem-integration-card .ecosystem-entity-copy p {
-					grid-column: 2;
-					grid-row: 1 / span 3;
-					align-self: center;
-					margin: 0;
-				}
-				.ecosystem-collection--cards .ecosystem-actions {
-					flex-direction: column;
-					justify-content: center;
-					padding: 0.75rem;
-					border-top: 0;
-					border-left: 1px solid var(--border);
-				}
 			}
 			.binding-list {
 				display: flex;
