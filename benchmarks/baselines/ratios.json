@@ -3727,5 +3727,13 @@
     "reference": "wrappers-64",
     "maxRatio": 1.5,
     "note": "Production SSR hydration of 8x more coextensive component wrappers must retain near-linear normalized range-adoption cost. The introduction runs measured 0.99x-1.05x on 2026-08-29; the harness separately gates server-node adoption, delegated interaction, logical marker multiplicity, physical compaction, and clean unmount."
+  },
+  {
+    "suite": "hydration-render-phase-queue",
+    "op": "hydrate_per_100_rows",
+    "target": "rows-1024",
+    "reference": "rows-128",
+    "maxRatio": 1.5,
+    "note": "Production multi-root hydration with an equal-width foreign update wave already queued must retain near-linear normalized cost per row. Exact origin/main measured 2.43x per row before the single-pass drain; the harness separately gates synchronous convergence, adoption of every server node, cross-root isolation and later completion, delegated interaction, and clean unmount."
   }
 ]

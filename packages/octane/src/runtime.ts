@@ -1203,6 +1203,9 @@ function runEffectCleanupCallback(callback: Cleanup): void {
 // ---------------------------------------------------------------------------
 
 const QUEUE: Block[] = [];
+// Destructive drains compact or clear QUEUE while user render code may re-enter
+// another drain. Readers use this epoch to discard cursors into the old layout.
+let QUEUE_REINDEX_EPOCH = 0;
 let scheduled = false;
 let syncFlush = false; // flushSync sets this to drain the queue synchronously
 // True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
@@ -3921,28 +3924,48 @@ function belongsToBlockTree(block: Block, root: Block): boolean {
  */
 function drainHydrationRenderPhaseUpdates(root: Block): void {
 	let renders: Map<Block, number> | null = null;
-	for (;;) {
-		let index = -1;
-		for (let i = 0; i < QUEUE.length; i++) {
-			if (belongsToBlockTree(QUEUE[i], root)) {
-				index = i;
-				break;
+	let read = 0;
+	let write = 0;
+	let reindexEpoch = QUEUE_REINDEX_EPOCH;
+	try {
+		// Partition in place while reading the live length: target renders can
+		// append more target (or foreign) work, which belongs to this same pass.
+		while (read < QUEUE.length) {
+			const block = QUEUE[read++];
+			if (!belongsToBlockTree(block, root)) {
+				QUEUE[write++] = block;
+				continue;
+			}
+			if (!block.pending || block.disposed) continue;
+
+			const seen = (renders ??= new Map()).get(block) ?? 0;
+			if (seen >= RENDER_PHASE_UPDATE_LIMIT) {
+				throw new Error(formatClientError(9));
+			}
+			renders.set(block, seen + 1);
+			block.crossRenderUpdate = false;
+			try {
+				renderBlock(block);
+			} catch (error) {
+				handleRenderError(block, error);
+			}
+			// User render code can synchronously enter another hydration or flushSync.
+			// Its dense queue layout supersedes every cursor from this traversal.
+			if (reindexEpoch !== QUEUE_REINDEX_EPOCH) {
+				reindexEpoch = QUEUE_REINDEX_EPOCH;
+				read = 0;
+				write = 0;
 			}
 		}
-		if (index === -1) return;
-		const block = QUEUE.splice(index, 1)[0];
-		if (!block.pending || block.disposed) continue;
-
-		const seen = (renders ??= new Map()).get(block) ?? 0;
-		if (seen >= RENDER_PHASE_UPDATE_LIMIT) {
-			throw new Error(formatClientError(9));
-		}
-		renders.set(block, seen + 1);
-		block.crossRenderUpdate = false;
-		try {
-			renderBlock(block);
-		} catch (error) {
-			handleRenderError(block, error);
+	} finally {
+		if (reindexEpoch === QUEUE_REINDEX_EPOCH) {
+			// If rendering aborts, keep the unread suffix after the foreign entries
+			// already retained. Both groups preserve their original relative order.
+			while (read < QUEUE.length) {
+				QUEUE[write++] = QUEUE[read++];
+			}
+			QUEUE.length = write;
+			QUEUE_REINDEX_EPOCH++;
 		}
 	}
 }
@@ -4157,6 +4180,7 @@ function drainQueue(): { err: any } | null {
 		}
 	}
 	QUEUE.length = 0;
+	QUEUE_REINDEX_EPOCH++;
 	// Several sibling setters can share one hidden range. Re-scan it once after
 	// the complete render wave, before refs or layout effects can observe it.
 	// No Activity update means no collection/allocation on the ordinary path.

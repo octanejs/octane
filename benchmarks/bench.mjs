@@ -423,6 +423,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production multi-root hydration with a same-width foreign update wave
+		// already queued, normalized per row to catch repeated queue prefix scans.
+		name: 'hydration-render-phase-queue',
+		cwd: 'hydration-render-phase-queue',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Headless-Chromium production scaling for late behavior events whose
 		// distinct asynchronous adoptions settle one at a time.
 		name: 'behavior-root-events',
