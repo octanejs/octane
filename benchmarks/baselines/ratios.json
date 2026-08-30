@@ -384,6 +384,14 @@
     "note": "Compact leaf rows driven by their list component's selection state replay only that component (its 100 rows), so unrelated siblings must not change the cost. Rejects the compact-range bail that forced list selection through a whole-root replay."
   },
   {
+    "suite": "universal-template-events",
+    "op": "event_update_ms",
+    "target": "events-1024",
+    "reference": "events-128",
+    "maxRatio": 12,
+    "note": "Eight times as many retained fallback collapsed-template event sites should take no more than 1.5 times linear growth. The optimized node-local cursor measures about 7-8x; the former whole-template search measures about 26x on the same fixture."
+  },
+  {
     "suite": "universal-external-store",
     "op": "lifetime_subscribe_calls",
     "target": "stable-getter",

@@ -787,6 +787,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Universal fallback collapsed-template events (Node-only): handler-only
+		// updates across 128 and 1,024 retained native event sites.
+		name: 'universal-template-events',
+		cwd: 'universal-template-events',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Native universal external-store hooks: stable subscription lifetimes and
 		// bounded state-projection work across parent renders and notification bursts.
 		name: 'universal-external-store',
