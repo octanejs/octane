@@ -477,7 +477,7 @@
     "target": "components-high",
     "reference": "components-low",
     "maxRatio": 3,
-    "note": "Same-process renderer-boundary preparation holds 1,000 sibling boundaries constant while varying unrelated local components from 1,000 to 10,000. The guard retains one catalog construction while rejecting reconstruction of the full component-name Set for every boundary."
+    "note": "Same-process renderer-boundary preparation holds 1,000 sibling boundaries constant while varying unrelated local components from 1,000 to 10,000. The guard retains the component Map collected during analysis while rejecting reconstruction of a full component-name Set for every boundary. Seven-sample checks measured 3.44x on exact main and 2.38x after Map reuse."
   },
   {
     "suite": "tsrx-renderer-selection",

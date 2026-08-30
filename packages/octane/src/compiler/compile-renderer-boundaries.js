@@ -486,7 +486,7 @@ function collectLocalSpecializationInfo(source, filename, parsedAst = null) {
 			if (statement.declaration?.type === 'Identifier') exported.add(statement.declaration.name);
 		}
 	}
-	return { ast, componentNames: new Set(components.keys()), components, exported, runtime };
+	return { ast, components, exported, runtime };
 }
 
 function owningComponentForReference(components, node) {
@@ -499,7 +499,7 @@ function owningComponentForReference(components, node) {
 }
 
 function ownerReachableComponentsAst(ast, localSpecializations) {
-	const localNames = localSpecializations.componentNames;
+	const localNames = localSpecializations.components;
 	const dependencies = new Map();
 	const reachable = new Set(
 		[...localSpecializations.exported].filter((name) => localNames.has(name)),
@@ -702,7 +702,7 @@ function collectSpecializationAstReplacements(node, cloneNames, runtime, aliases
 }
 
 function specializeLocalComponentsAst(region, index, state) {
-	const localNames = state.localSpecializations.componentNames;
+	const localNames = state.localSpecializations.components;
 	const selected = new Set([
 		...jsxComponentReferences(region, localNames),
 		...localCallReferences(region, localNames),

@@ -909,7 +909,7 @@ const SUITES = [
 		name: 'tsrx-local-component-name-catalog',
 		cwd: 'tsrx-local-component-name-catalog',
 		servers: [],
-		iter: { normal: 9, quick: 3 },
+		iter: { normal: 9, quick: 7 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{

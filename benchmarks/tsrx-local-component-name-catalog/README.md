@@ -13,8 +13,8 @@ node benchmarks/tsrx-local-component-name-catalog/compare.mjs \
   /path/to/baseline /path/to/candidate 9
 ```
 
-The same-process ratio guard retains the cost of constructing the catalog once
-but rejects rebuilding all 10,000 names for every boundary. The comparator loads
+The same-process ratio guard retains the cost of collecting the component Map
+once but rejects copying all 10,000 names for every boundary. The comparator loads
 exact baseline and candidate compilers together, checks byte-identical public
 output on a bounded control, alternates execution order, and requires at least a
 10% and 50 ms win at the conservative 20th percentile of paired high-cardinality
