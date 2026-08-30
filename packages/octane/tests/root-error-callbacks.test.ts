@@ -317,6 +317,43 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 		},
 	);
 
+	it('cancels hidden Activity catches and publishes live siblings once in order', async () => {
+		const errors = Array.from({ length: 32 }, (_, index) => new Error(`activity-${index}`));
+		const survivors = errors.filter((_, index) => index % 4 === 0);
+		const onCaughtError = vi.fn();
+		const onUncaughtError = vi.fn();
+		const renderCaughtChildren = (current: readonly Error[]) =>
+			current.map((error) =>
+				createElement(DescriptorCaughtParentError, { key: error.message, error }),
+			);
+		const root = createRoot(container, { onCaughtError, onUncaughtError });
+		try {
+			await act(() => {
+				root.render(
+					createElement(Activity, { mode: 'hidden', children: renderCaughtChildren(errors) }),
+				);
+			});
+			expect(onCaughtError).not.toHaveBeenCalled();
+
+			await act(() => {
+				root.render(
+					createElement(Activity, { mode: 'hidden', children: renderCaughtChildren(survivors) }),
+				);
+			});
+			expect(onCaughtError).not.toHaveBeenCalled();
+
+			await act(() => {
+				root.render(
+					createElement(Activity, { mode: 'visible', children: renderCaughtChildren(survivors) }),
+				);
+			});
+			expect(onCaughtError.mock.calls.map(([error]) => error)).toEqual(survivors);
+			expect(onUncaughtError).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it.each([
 		['reveal', 'same update'],
 		['replacement', 'same update'],
