@@ -7,6 +7,7 @@ export interface BindingCatalogEntry {
 	packageName: string;
 	title: string;
 	searchTerms?: readonly string[];
+	tags: readonly string[];
 }
 
 export interface BindingCategory {

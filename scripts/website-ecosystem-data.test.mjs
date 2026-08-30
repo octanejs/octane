@@ -37,6 +37,7 @@ test('the authored ecosystem catalogs carry display and search metadata', () => 
 				binding.searchTerms === undefined || Array.isArray(binding.searchTerms),
 				`${binding.packageName} searchTerms must be an array`,
 			);
+			assert.ok(Array.isArray(binding.tags) && binding.tags.length > 0);
 		}
 	}
 
@@ -60,8 +61,8 @@ test('the normalized catalogs preserve workspace counts and binding categories',
 
 	assert.equal(categorized.size, getBindingPackages().length);
 	assert.equal(frameworkIntegrations.length, getFrameworkIntegrationPackages().length);
-	assert.equal(categorized.get('@octanejs/tanstack-router'), 'AI, data, and routing');
-	assert.equal(categorized.get('@octanejs/hook-form'), 'Forms and content');
+	assert.equal(categorized.get('@octanejs/tanstack-router'), 'Routing');
+	assert.equal(categorized.get('@octanejs/hook-form'), 'Forms');
 });
 
 test('binding catalog validation identifies invalid editorial records', () => {
@@ -79,6 +80,18 @@ test('binding catalog validation identifies invalid editorial records', () => {
 				catalog[0].packages[0].searchTerms = 'signals';
 			},
 			expected: 'category 1 binding 1 "searchTerms" must be an array',
+		},
+		{
+			mutate(catalog) {
+				catalog[0].packages[0].tags = ['Signals'];
+			},
+			expected: 'category 1 binding 1 tags entry 1 must be a trimmed lowercase string',
+		},
+		{
+			mutate(catalog) {
+				catalog[0].packages[0].tags = [' signals '];
+			},
+			expected: 'category 1 binding 1 tags entry 1 must be a trimmed lowercase string',
 		},
 		{
 			mutate(catalog) {
@@ -112,8 +125,12 @@ test('binding category titles produce unique stable ids', () => {
 	expectCatalogError(punctuationOnly, packages, 'does not produce a stable category id');
 
 	const colliding = structuredClone(source);
-	colliding[0].title = 'AI data and routing';
-	expectCatalogError(colliding, packages, 'duplicates derived category id "ai-data-and-routing"');
+	colliding[1].title = 'State--Management';
+	expectCatalogError(colliding, packages, 'duplicates derived category id "state-management"');
+
+	const compound = structuredClone(source);
+	compound[0].title = 'State and signals';
+	expectCatalogError(compound, packages, 'title must not contain commas or the word "and"');
 });
 
 function expectCatalogError(catalog, packages, expected) {
@@ -177,10 +194,11 @@ test('website ecosystem assembly emits every typed entity in authored order', ()
 		title: 'TanStack Router',
 		packageName: '@octanejs/tanstack-router',
 		upstreamPackage: '@tanstack/react-router',
-		category: 'AI, data, and routing',
-		categoryId: 'ai-data-and-routing',
+		category: 'Routing',
+		categoryId: 'routing',
 		description: 'Use @tanstack/react-router with Octane.',
 		searchTerms: ['TanStack React Router'],
+		tags: ['routing', 'type safe'],
 		order: router.order,
 	});
 

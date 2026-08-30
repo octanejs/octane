@@ -8,6 +8,7 @@ export interface LibraryBindingEntity {
 	categoryId: string;
 	description: string;
 	searchTerms: readonly string[];
+	tags: readonly string[];
 	order: number;
 }
 
@@ -98,7 +99,7 @@ function identityValues(entity: EcosystemEntity): string[] {
 
 function metadataValues(entity: EcosystemEntity): string[] {
 	return entity.kind === 'library-binding'
-		? [entity.category, entity.description]
+		? [entity.category, entity.description, ...entity.tags]
 		: [entity.model, entity.description];
 }
 

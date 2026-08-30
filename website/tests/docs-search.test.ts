@@ -314,9 +314,8 @@ describe('search dialog', () => {
 		const scrolledWithQueries: string[] = [];
 		const originalScrollIntoView = Element.prototype.scrollIntoView;
 		Element.prototype.scrollIntoView = function () {
-			scrolledWithQueries.push(
-				container.querySelector<HTMLInputElement>('#ecosystem-search')?.value ?? '',
-			);
+			const search = router.state.location.search as Record<string, unknown>;
+			scrolledWithQueries.push(String(search.q ?? ''));
 		};
 
 		try {
