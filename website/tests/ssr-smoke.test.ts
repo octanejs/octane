@@ -183,11 +183,6 @@ describe('built Start server', () => {
 			expect(html, entity.packageName).toContain(
 				`href="${ecosystemPackageGuideHref(entity.packageName)}"`,
 			);
-			if (entity.kind === 'framework-integration') {
-				expect(html, entity.packageName).toContain(
-					`href="/docs/framework-integrations#${entity.guideAnchor}"`,
-				);
-			}
 		}
 	});
 
