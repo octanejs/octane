@@ -293,6 +293,9 @@ declare namespace Octane {
 			children: {};
 		}
 		interface IntrinsicAttributes extends Octane.Attributes {}
+		// Foreign React class elements may be transported through ReactCompat.
+		// React owns these refs; Octane still does not execute class components.
+		interface IntrinsicClassAttributes<T> extends React.ClassAttributes<T> {}
 		interface IntrinsicElements {
 			a: Octane.DetailedHTMLProps<
 				Octane.AnchorHTMLAttributes<HTMLAnchorElement>,

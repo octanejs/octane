@@ -4,6 +4,13 @@ The complete current Airbnb Visx 4.x visualization toolkit for Octane. The
 package keeps the upstream aggregate API and exposes every public feature package
 as a subpath:
 
+## Installation
+
+```sh
+npm install @octanejs/visx
+pnpm add @octanejs/visx
+```
+
 ```tsrx
 import { AxisBottom, AxisLeft } from '@octanejs/visx/axis';
 import { scaleBand, scaleLinear } from '@octanejs/visx/scale';

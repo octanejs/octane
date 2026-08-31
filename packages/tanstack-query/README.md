@@ -2,6 +2,13 @@
 
 [TanStack Query](https://tanstack.com/query) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/tanstack-query
+pnpm add @octanejs/tanstack-query
+```
+
 TanStack Query separates a framework-agnostic core (`@tanstack/query-core` — the
 `QueryClient`, observers, and caches) from a React binding (`@tanstack/react-query`)
 built on `useSyncExternalStore` + context. This package reuses the core verbatim and

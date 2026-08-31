@@ -3,6 +3,13 @@
 Octane binding for
 [`react-content-loader@7.1.2`](https://github.com/danilowoz/react-content-loader).
 
+## Installation
+
+```sh
+npm install @octanejs/content-loader
+pnpm add @octanejs/content-loader
+```
+
 ```tsrx
 import ContentLoader, { Code } from '@octanejs/content-loader';
 

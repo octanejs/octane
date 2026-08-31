@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-hotkeys",
-  "version": "0.0.38",
+  "version": "0.0.39",
   "license": "MIT",
   "type": "module",
   "engines": {

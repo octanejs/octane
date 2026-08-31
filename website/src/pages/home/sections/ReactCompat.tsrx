@@ -1,74 +1,65 @@
-// The React-interop section: the "you don't have to rewrite" pitch, sitting
-// between the "why" prose and the 3D flame demo. It shows the whole migration
-// story in one snippet — a real React app hosting a compiled Octane island
-// through `<OctaneCompat>` (octane/react) — and points at the full guide. The
-// code panel mirrors the hero's bespoke window chrome (rather than the docs
-// CodeBlock) so the two panels on the home page read as the same editor; the
-// sample itself is an .mdx module on the shared Shiki pipeline, so there is no
-// second copy of the source to drift.
-import { useRef } from 'octane';
+// Both public React integration directions, using the same Shiki code pipeline
+// as the docs. The selected panel owns its copy state so changing examples
+// cannot leave a stale "Copied" message on the new sample.
+import { useRef, useState } from 'octane';
 import { Link } from '@octanejs/tanstack-router';
-import CodeSample from '../../../content/home-octanecompat-sample.mdx';
+import OctaneSample from '../../../content/home-octanecompat-sample.mdx';
+import ReactSample from '../../../content/home-reactcompat-sample.mdx';
 import { useCopyToClipboard } from '../../../hooks/use-copy.ts';
 import copyUrl from '../../../assets/copy.svg';
 import checkUrl from '../../../assets/check.svg';
 
+type Direction = 'react-in-octane' | 'octane-in-react';
+
 export function ReactCompat() @{
-	// Copy the sample straight off the rendered Shiki block — no second copy of
-	// the source to drift out of sync with the .mdx module.
-	const sampleEl = useRef<HTMLDivElement | null>(null);
-	const { copied, copy } = useCopyToClipboard();
-	const copySample = () => copy(sampleEl.current?.innerText ?? '');
+	const [direction, setDirection] = useState<Direction>('react-in-octane');
 
 	<section class="compat" aria-labelledby="compat-heading">
 		<div class="compat-body">
 			<div class="compat-copy">
 				<h2 id="compat-heading" class="compat-title">
-					{'Add Octane to a React app. '}
-					<span class="compat-accent">One component at a time.</span>
+					{'Use React and Octane together. '}
+					<span class="compat-accent">In either direction.</span>
 				</h2>
 				<p class="compat-lead">
-					{'OctaneCompat lets a React 19 app render compiled Octane components. Events ' +
-						'inside each island stay native and delegated. Octane components can read your ' +
-						'React context with '}
-					<code>use()</code>
-					{', and they render on the server and hydrate in the browser. You can migrate ' +
-						'one component at a time instead of rewriting the app.'}
+					<code>ReactCompat</code>
+					{' lets an Octane app keep using real React components. '}
+					<code>OctaneCompat</code>
+					{' lets a React app adopt compiled Octane components, one island at a time. ' +
+						'Choose the boundary that fits your app.'}
 				</p>
 				<p class="compat-note">
-					{'React Server Components are the one exception. Hooks, Suspense, context and ' +
-						'SSR carry over.'}
+					{'Both directions support SSR and hydration. Each renderer keeps its own ' +
+						'events, and parent updates cross the boundary after commit. The guide ' +
+						'covers context sharing, Suspense, and the limits.'}
 				</p>
 				<Link to="/docs/$slug" params={{ slug: 'react-compat' }} class="compat-link">
-					See how OctaneCompat works →
+					Explore both React integrations →
 				</Link>
 			</div>
 
-			<div class="compat-code">
-				<div class="compat-code-bar">
-					<span class="compat-dot compat-dot-r"></span>
-					<span class="compat-dot compat-dot-y"></span>
-					<span class="compat-dot compat-dot-g"></span>
-					<span class="compat-code-name">App.tsx</span>
+			<div class="compat-preview">
+				<div class="compat-choices" role="group" aria-label="React integration example">
 					<button
 						type="button"
-						class="compat-code-copy"
-						aria-label="Copy the sample to the clipboard"
-						onClick={copySample}
+						class="compat-choice"
+						aria-pressed={direction === 'react-in-octane'}
+						aria-controls="compat-example"
+						onClick={() => setDirection('react-in-octane')}
 					>
-						<span
-							class="compat-code-copy-icon"
-							style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
-							aria-hidden="true"
-						></span>
-						<span>
-							{copied ? 'Copied' : 'Copy'}
-						</span>
+						React in Octane
+					</button>
+					<button
+						type="button"
+						class="compat-choice"
+						aria-pressed={direction === 'octane-in-react'}
+						aria-controls="compat-example"
+						onClick={() => setDirection('octane-in-react')}
+					>
+						Octane in React
 					</button>
 				</div>
-				<div class="compat-code-body" ref={sampleEl}>
-					<CodeSample />
-				</div>
+				<CompatCode key={direction} direction={direction} />
 			</div>
 		</div>
 
@@ -126,11 +117,102 @@ export function ReactCompat() @{
 				text-underline-offset: 0.16em;
 				white-space: nowrap;
 			}
+			.compat-preview {
+				margin-top: 2.5rem;
+				min-width: 0;
+			}
+			.compat-choices {
+				display: flex;
+				gap: 0.5rem;
+				margin-bottom: 0.75rem;
+			}
+			.compat-choice {
+				flex: 1;
+				padding: 0.65rem 0.75rem;
+				border: 1px solid var(--border);
+				border-radius: 0.6rem;
+				background: transparent;
+				color: var(--text-secondary);
+				font: inherit;
+				font-size: 0.85rem;
+				cursor: pointer;
+			}
+			.compat-choice[aria-pressed='true'] {
+				background: var(--surface);
+				border-color: var(--accent);
+				color: var(--text);
+			}
+			.compat-choice:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 3px;
+			}
+			@media (min-width: 1000px) {
+				.compat-body {
+					max-width: none;
+					display: grid;
+					grid-template-columns: minmax(0, 30rem) minmax(0, 1fr);
+					gap: 3.5rem;
+					align-items: center;
+				}
+				.compat-preview {
+					margin-top: 0;
+				}
+			}
+			@media (max-width: 560px) {
+				.compat {
+					padding: 3rem 0;
+				}
+				.compat-title {
+					font-size: 2rem;
+				}
+			}
+		</style>
+	</section>
+}
+
+function CompatCode(props: { direction: Direction }) @{
+	const sampleEl = useRef<HTMLDivElement | null>(null);
+	const { copied, copy } = useCopyToClipboard();
+	const copySample = () => copy(sampleEl.current?.innerText ?? '');
+	const reactInOctane = props.direction === 'react-in-octane';
+
+	<div id="compat-example" class="compat-code">
+		<div class="compat-code-bar">
+			<span class="compat-dot compat-dot-r"></span>
+			<span class="compat-dot compat-dot-y"></span>
+			<span class="compat-dot compat-dot-g"></span>
+			<span class="compat-code-name">
+				{reactInOctane ? 'App.tsrx' : 'App.tsx'}
+			</span>
+			<button
+				type="button"
+				class="compat-code-copy"
+				aria-label="Copy the selected integration sample"
+				onClick={copySample}
+			>
+				<span
+					class="compat-code-copy-icon"
+					style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
+					aria-hidden="true"
+				></span>
+				<span>
+					{copied ? 'Copied' : 'Copy'}
+				</span>
+			</button>
+		</div>
+		<div class="compat-code-body" ref={sampleEl}>
+			@if (reactInOctane) {
+				<ReactSample />
+			} @else {
+				<OctaneSample />
+			}
+		</div>
+
+		<style>
 			/* The code panel is the hero's window chrome verbatim, so both editors on
 			   the home page share the same frame, bar height, and traffic-light
 			   placement. */
 			.compat-code {
-				margin-top: 2.5rem;
 				background: var(--code-bg);
 				border: 1px solid var(--border);
 				border-radius: 1rem;
@@ -206,26 +288,6 @@ export function ReactCompat() @{
 				font-size: 0.8rem;
 				line-height: 1.5;
 			}
-			@media (min-width: 1000px) {
-				.compat-body {
-					max-width: none;
-					display: grid;
-					grid-template-columns: minmax(0, 30rem) minmax(0, 1fr);
-					gap: 3.5rem;
-					align-items: center;
-				}
-				.compat-code {
-					margin-top: 0;
-				}
-			}
-			@media (max-width: 560px) {
-				.compat {
-					padding: 3rem 0;
-				}
-				.compat-title {
-					font-size: 2rem;
-				}
-			}
 		</style>
-	</section>
+	</div>
 }

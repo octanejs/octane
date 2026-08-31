@@ -22,21 +22,30 @@ import { PackageInstall } from '../../components/PackageInstall.tsrx';
 
 Choose the package for the framework that runs your app. It covers more than
 compilation, including routes, server rendering, hydration, and content. If you only
-need compiler support, see [Build tools](/docs/build-tools). For React library ports,
-see [Bindings](/docs/bindings).
+need compiler support, see [Build tools](/docs/build-tools). To browse these packages
+alongside React library ports, see [Integrations and bindings](/docs/bindings).
 
 <FrameworkIntegrationsDirectory />
 
 <aside className="doc-callout note">
-	<p className="doc-callout-title">Already have a React app?</p>
+	<p className="doc-callout-title">Mixing React and Octane?</p>
 	<p>
-		{
-			'React isn’t in the list above because it’s a UI library, not a full app framework. If you already have a React 19 app, '
-		}
+		{'React isn’t in the list above because it’s a UI library, not a full app framework. '}
+		<code>OctaneCompat</code>
+		{' hosts compiled Octane components inside React, and '}
+		<code>ReactCompat</code>
+		{' hosts real React components inside Octane. Both come from '}
 		<code>octane/react</code>
-		{' lets you add compiled Octane components one at a time. '}
+		{'. '}
 		<a href="/docs/react-compat">Read the React compatibility guide</a>
 		{'.'}
+	</p>
+	<p>
+		{'In the '}
+		<a href="/playground">Playground</a>
+		{
+			', choose “OctaneCompat in React (multi-file)” or “ReactCompat in Octane (multi-file)” to try each direction.'
+		}
 	</p>
 </aside>
 
@@ -140,4 +149,4 @@ See the
 for the client, server, RPC, hydration, and Vite entry points. TanStack Start is the
 framework. Query, Form, Store, Table, Virtual, Router, and the other TanStack packages are
 libraries; you’ll find their Octane ports in the
-[TanStack bindings directory](/docs/bindings#find-a-binding).
+[TanStack bindings directory](/docs/bindings?q=TanStack&kind=binding#find-a-binding).

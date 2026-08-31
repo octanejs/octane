@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
 import { KNOWN_BINDINGS } from '../packages/octane-mcp-server/src/bridge.js';
+import { readEcosystemCatalogs } from './workspace-packages.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT = path.join(REPO, 'packages/cli/src/data/octane-data.json');
@@ -25,8 +26,8 @@ const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 
 function buildBindings() {
 	const categories = new Map();
-	for (const group of readJson(path.join(REPO, 'website/src/content/bindings.json'))) {
-		for (const name of group.packages) categories.set(name, group.title);
+	for (const group of readEcosystemCatalogs().bindingCategories) {
+		for (const binding of group.packages) categories.set(binding.packageName, group.title);
 	}
 
 	const bindings = [];

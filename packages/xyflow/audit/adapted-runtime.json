@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "project": "xyflow",
+  "roots": ["packages/xyflow/tests/conformance"],
+  "files": [
+    "packages/xyflow/tests/conformance/connection-slots.test.ts",
+    "packages/xyflow/tests/conformance/exports.test.ts",
+    "packages/xyflow/tests/conformance/native-events.test.ts",
+    "packages/xyflow/tests/conformance/render.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:606c7503a21606ac",
+      "file": "packages/xyflow/tests/conformance/connection-slots.test.ts",
+      "fullName": "@octanejs/xyflow — manual hook slots combines general and viewport helpers in useReactFlow"
+    },
+    {
+      "id": "runtime:b1cfd919f323ecbc",
+      "file": "packages/xyflow/tests/conformance/connection-slots.test.ts",
+      "fullName": "@octanejs/xyflow — manual hook slots keeps color mode state and subscription in distinct slots"
+    },
+    {
+      "id": "runtime:e7a43d130a00df47",
+      "file": "packages/xyflow/tests/conformance/connection-slots.test.ts",
+      "fullName": "@octanejs/xyflow — manual hook slots keeps node and edge state callbacks independent"
+    },
+    {
+      "id": "runtime:e01e7c42a3c6901d",
+      "file": "packages/xyflow/tests/conformance/connection-slots.test.ts",
+      "fullName": "@octanejs/xyflow — manual hook slots keeps repeated connection hook calls independent"
+    },
+    {
+      "id": "runtime:20348207a6d2078a",
+      "file": "packages/xyflow/tests/conformance/connection-slots.test.ts",
+      "fullName": "@octanejs/xyflow — manual hook slots registers every viewport change phase"
+    },
+    {
+      "id": "runtime:13bb8844839a65a4",
+      "file": "packages/xyflow/tests/conformance/connection-slots.test.ts",
+      "fullName": "@octanejs/xyflow — manual hook slots registers node and edge change middleware independently"
+    },
+    {
+      "id": "runtime:7f5773c75a52d719",
+      "file": "packages/xyflow/tests/conformance/exports.test.ts",
+      "fullName": "@octanejs/xyflow — exports matches core upstream runtime exports"
+    },
+    {
+      "id": "runtime:f35b5a6dbe45cb61",
+      "file": "packages/xyflow/tests/conformance/native-events.test.ts",
+      "fullName": "@octanejs/xyflow — native DOM events starts a click connection from the native click event"
+    },
+    {
+      "id": "runtime:359ec7a6ddb250ee",
+      "file": "packages/xyflow/tests/conformance/render.test.ts",
+      "fullName": "@octanejs/xyflow — render contract renders nodes inside the flow viewport"
+    }
+  ]
+}

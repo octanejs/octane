@@ -66,6 +66,7 @@ const ROUTES = [
 	'/docs/profiling',
 	'/docs/browser-support',
 	'/docs/bindings',
+	'/docs/bindings?q=TanStack%20Router&kind=binding#binding-tanstack-router',
 	'/errors',
 	'/errors/3?args%5B%5D=%22quoted%22',
 	'/benchmarks',
@@ -329,6 +330,107 @@ async function waitForLocatorText(
 		`locator did not reach text ${JSON.stringify(expected)} within ${timeoutMs}ms ` +
 			`(last observed: ${JSON.stringify(last)})`,
 	);
+}
+
+// Exercise the same sample selector after dev and production hydration. The
+// clipboard capture observes the public browser API without OS permissions.
+async function assertHomepageIntegrationSamples(baseUrl: string) {
+	const { page, errors } = await loadRoute(baseUrl, '/', {
+		// The sample is already visible in SSR HTML. Let the hydration entry's
+		// dynamic imports settle before the first single-shot interaction.
+		waitForNetworkIdle: true,
+		beforeNavigation: async (page) => {
+			await page.addInitScript(() => {
+				const writes: string[] = [];
+				Object.defineProperty(window, 'integrationClipboardWrites', { value: writes });
+				Object.defineProperty(navigator, 'clipboard', {
+					configurable: true,
+					value: {
+						writeText: async (text: string) => {
+							writes.push(text);
+						},
+					},
+				});
+			});
+		},
+	});
+	try {
+		const choices = page.getByRole('group', { name: 'React integration example' });
+		const reactInOctane = choices.getByRole('button', { name: 'React in Octane', exact: true });
+		const octaneInReact = choices.getByRole('button', { name: 'Octane in React', exact: true });
+		const panel = page.locator('#compat-example');
+		const code = panel.locator('pre code');
+		const copy = panel.getByRole('button', { name: 'Copy the selected integration sample' });
+		const copiedSamples: string[] = [];
+		const pollOptions = { timeout: PLAYWRIGHT_ACTION_TIMEOUT };
+
+		const readSelectedSample = async (reactSelected: boolean) => {
+			await expect
+				.poll(() => reactInOctane.getAttribute('aria-pressed'), pollOptions)
+				.toBe(String(reactSelected));
+			await expect
+				.poll(() => octaneInReact.getAttribute('aria-pressed'), pollOptions)
+				.toBe(String(!reactSelected));
+			await expect
+				.poll(() => panel.locator('.compat-code-name').innerText(), pollOptions)
+				.toBe(reactSelected ? 'App.tsrx' : 'App.tsx');
+			await code.waitFor({ state: 'visible' });
+			const visibleCode = await code.innerText();
+			expect(visibleCode).toContain(reactSelected ? '<ReactCompat>' : '<OctaneCompat>');
+			return visibleCode;
+		};
+		const copySelectedSample = async () => {
+			copiedSamples.push(await code.innerText());
+			await copy.click();
+			await expect
+				.poll(
+					() =>
+						page.evaluate(
+							() =>
+								(window as Window & { integrationClipboardWrites?: string[] })
+									.integrationClipboardWrites,
+						),
+					pollOptions,
+				)
+				.toEqual(copiedSamples);
+			await expect.poll(() => copy.innerText(), pollOptions).toBe('Copied');
+		};
+
+		// The hero's visible console line is emitted by its mount effect, so it
+		// proves this non-deferred homepage has committed instead of merely
+		// displaying server markup. Do not retry the copy or selection actions.
+		await expect
+			.poll(() => page.getByRole('log').innerText(), pollOptions)
+			.toContain('count is now 0');
+
+		const reactSample = await readSelectedSample(true);
+		await copySelectedSample();
+		await octaneInReact.click();
+		const octaneSample = await readSelectedSample(false);
+		expect(octaneSample).not.toBe(reactSample);
+		// Once the new code is visible, the old copy status must already be gone;
+		// waiting for it could accidentally accept the previous sample's timer.
+		expect(await copy.innerText()).toBe('Copy');
+		await copySelectedSample();
+
+		// Native buttons must activate from both keyboard gestures, not only a
+		// pointer click. Returning to a sample also starts with fresh copy status.
+		await reactInOctane.focus();
+		await page.keyboard.press('Enter');
+		expect(await readSelectedSample(true)).toBe(reactSample);
+		expect(await copy.innerText()).toBe('Copy');
+		await copySelectedSample();
+		await octaneInReact.focus();
+		await page.keyboard.press('Space');
+		expect(await readSelectedSample(false)).toBe(octaneSample);
+		expect(await copy.innerText()).toBe('Copy');
+		// Match the adjacent interactive homepage checks: browser resource-load
+		// diagnostics are separate from runtime, hydration, and page errors.
+		const real = errors.filter((error) => !error.startsWith('Failed to load resource:'));
+		expect(real).toEqual([]);
+	} finally {
+		await page.close();
+	}
 }
 
 // The end-to-end contract behind the compiler's exact-origin channel, run
@@ -833,6 +935,52 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 				await page.close();
 			}
 		},
+	);
+
+	it.concurrent(
+		'keeps command-palette results readable in a constrained viewport',
+		{ timeout: 30_000 },
+		async () => {
+			const context = await browser.newContext({ viewport: { width: 746, height: 374 } });
+			const page = await context.newPage();
+			const errors: string[] = [];
+			page.on('console', (message) => {
+				if (message.type() === 'error') errors.push(message.text());
+			});
+			page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+			try {
+				await page.goto(`http://localhost:${DEV_PORT}/docs/bindings`, {
+					waitUntil: 'networkidle',
+				});
+				await page.keyboard.press('Control+K');
+				await page.locator('.search-input').fill('tanstack');
+				const firstResult = page.locator('.search-entity').first();
+				await firstResult.waitFor();
+
+				const geometry = await firstResult.evaluate((card) => {
+					const cardBox = card.getBoundingClientRect();
+					const contentBox = card.querySelector('.search-entity-primary')!.getBoundingClientRect();
+					const board = card.parentElement!;
+					return {
+						boardIsScrollable: board.scrollHeight > board.clientHeight,
+						cardBottom: cardBox.bottom,
+						contentBottom: contentBox.bottom,
+					};
+				});
+
+				expect(geometry.boardIsScrollable).toBe(true);
+				expect(geometry.cardBottom).toBeGreaterThanOrEqual(geometry.contentBottom);
+				expect(errors.filter((error) => !error.includes('Failed to load resource'))).toEqual([]);
+			} finally {
+				await context.close();
+			}
+		},
+	);
+
+	it.concurrent(
+		'the homepage selects and copies the active React integration sample by pointer and keyboard',
+		{ timeout: 45_000 },
+		() => assertHomepageIntegrationSamples(`http://localhost:${DEV_PORT}`),
 	);
 
 	it.concurrent(
@@ -1525,6 +1673,63 @@ describe(
 				try {
 					expect(errors).toEqual([]);
 					expect(main.length).toBeGreaterThan(0);
+				} finally {
+					await page.close();
+				}
+			},
+		);
+
+		it.concurrent(
+			'the homepage selects and copies the active React integration sample by pointer and keyboard',
+			{ timeout: 45_000 },
+			() => assertHomepageIntegrationSamples(PREVIEW_ORIGIN),
+		);
+
+		it.concurrent(
+			'ecosystem directory preserves filter edits through browser history',
+			{ timeout: 30_000 },
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/docs/bindings', {
+					waitForNetworkIdle: true,
+				});
+				try {
+					const kind = page.locator('#ecosystem-kind');
+					const category = page.locator('#ecosystem-category');
+					const initialHistoryLength = await page.evaluate(() => history.length);
+					await kind.selectOption('binding');
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(await page.evaluate(() => history.length)).toBe(initialHistoryLength + 1);
+					await category.selectOption('state-management');
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('category') === 'state-management',
+					);
+					expect(await page.evaluate(() => history.length)).toBe(initialHistoryLength + 2);
+					expect(await page.locator('#binding-zustand').count()).toBe(1);
+
+					await page.goBack();
+					await page.waitForFunction(() => !new URL(location.href).searchParams.has('category'));
+					expect(await kind.inputValue()).toBe('binding');
+					expect(await category.inputValue()).toBe('');
+
+					await page.goBack();
+					await page.waitForFunction(() => !new URL(location.href).searchParams.has('kind'));
+					expect(await kind.inputValue()).toBe('');
+
+					await page.goForward();
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(await kind.inputValue()).toBe('binding');
+
+					await page.getByRole('button', { name: 'Reset search and filters' }).click();
+					await page.waitForFunction(() => new URL(location.href).search === '');
+					await page.goBack();
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(errors).toEqual([]);
 				} finally {
 					await page.close();
 				}
@@ -2374,6 +2579,72 @@ describe(
 					await preview
 						.getByRole('button', { name: 'clicks: 4' })
 						.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			90_000,
+		);
+
+		it.concurrent(
+			'playground runs the ReactCompat Octane-host example end to end',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground', {
+					beforeNavigation: installReactCdnMirror,
+				});
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.selectOption('.pg-select', 'react-compat');
+					await page.locator('.pg-tab', { hasText: 'Counter.react.tsx' }).waitFor();
+					const preview = page.frameLocator('iframe[title="Playground preview"]');
+					await preview.locator('h3', { hasText: 'React island' }).waitFor({ timeout: 30_000 });
+					const note = preview.getByRole('textbox', { name: 'React note' });
+					const originalInput = await note.elementHandle();
+					expect(originalInput).not.toBeNull();
+					await note.fill('kept by React');
+					await preview.getByRole('button', { name: 'React count: 3', exact: true }).click();
+					await waitForLocatorText(preview.locator('.reported'), 'React reported: 4');
+
+					// Host updates carry new props without losing the React state or DOM.
+					await preview.getByRole('button', { name: 'Rename React counter', exact: true }).click();
+					await preview.getByRole('button', { name: 'Renamed count: 4', exact: true }).waitFor();
+					await preview.getByRole('button', { name: 'Next initial count: 3', exact: true }).click();
+					await preview
+						.getByRole('button', { name: 'Next initial count: 4', exact: true })
+						.waitFor();
+					expect(await note.inputValue()).toBe('kept by React');
+					expect(
+						await originalInput!.evaluate(
+							(node) => node === document.querySelector('[aria-label="React note"]'),
+						),
+					).toBe(true);
+
+					// A React 19 ref is usable from the Octane host.
+					await preview.getByRole('button', { name: 'Focus React input', exact: true }).click();
+					expect(await originalInput!.evaluate((node) => node === document.activeElement)).toBe(
+						true,
+					);
+
+					// React-local Suspense leaves the surrounding Octane app interactive.
+					await preview.getByRole('button', { name: 'Load React data', exact: true }).click();
+					await waitForLocatorText(preview.getByRole('status'), 'React loading…');
+					await preview.getByRole('button', { name: 'Rename React counter', exact: true }).click();
+					await preview.getByRole('button', { name: 'React count: 4', exact: true }).waitFor();
+					await waitForLocatorText(preview.getByRole('status'), 'React data ready');
+
+					// Real deletion resets React state on the next mount and reconnects the ref.
+					await preview.getByRole('button', { name: 'Unmount React island', exact: true }).click();
+					await note.waitFor({ state: 'detached' });
+					await preview.getByRole('button', { name: 'Next initial count: 4', exact: true }).click();
+					await preview.getByRole('button', { name: 'Mount React island', exact: true }).click();
+					await preview.getByRole('button', { name: 'React count: 5', exact: true }).waitFor();
+					expect(await note.inputValue()).toBe('React-owned input');
+					await waitForLocatorText(preview.getByRole('status'), 'No request yet');
+					await preview.getByRole('button', { name: 'Focus React input', exact: true }).click();
+					expect(await note.evaluate((node) => node === document.activeElement)).toBe(true);
+					expect(await originalInput!.evaluate((node) => node.isConnected)).toBe(false);
+					await originalInput!.dispose();
 					expect(errors).toEqual([]);
 				} finally {
 					await page.close();

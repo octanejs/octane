@@ -717,6 +717,7 @@ describe('manifest-declared manual hook slots', () => {
 			'animejs',
 			'aria',
 			'base-ui',
+			'better-auth',
 			'devtools',
 			'dexie',
 			'dnd-kit',
@@ -768,6 +769,7 @@ describe('manifest-declared manual hook slots', () => {
 			'wouter',
 			'xstate',
 			'xstate-store',
+			'xyflow',
 			'zag',
 			'zustand',
 		]);

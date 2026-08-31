@@ -76,6 +76,8 @@ describe('@octanejs/mcp-server helpers', () => {
 			.split('\n')
 			.map((line) => line.trim())
 			.filter((line) => line && line !== 'Available suites:');
+		expect(suites).toContain('tsrx-hydrate-module-slicing');
+		expect(suites).toContain('tsrx-renderer-validation-ranges');
 		expect(suites).toEqual(BENCHMARK_SUITES);
 
 		// The public MCP schema must accept every runner suite, not just keep

@@ -1,0 +1,69 @@
+{
+  "name": "@octanejs/xyflow",
+  "version": "0.1.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "React Flow for the octane renderer — an Octane binding for @xyflow/react node-based graphs and flow editors.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/xyflow"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "sideEffects": [
+    "./src/styles/base.css",
+    "./src/styles/style.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./dist/base.css": "./src/styles/base.css",
+    "./dist/style.css": "./src/styles/style.css"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project xyflow --project xyflow-differential",
+    "port:upstream": "node ./scripts/port-upstream.mjs"
+  },
+  "dependencies": {
+    "@octanejs/zustand": "workspace:*",
+    "@xyflow/system": "catalog:default",
+    "classcat": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/zustand": "workspace:*",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@xyflow/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

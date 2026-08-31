@@ -4,8 +4,8 @@
 // site; the remote MCP server (mcp/) imports only this file plus the raw
 // .mdx sources, so it never pulls compiled components into its bundle.
 // Its import chain must stay MDX-free (the imported catalogs are JSON-backed).
-import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
-import { FRAMEWORK_INTEGRATIONS, FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
+import { BINDING_COUNT } from './bindings.ts';
+import { FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
 
 export interface DocSection {
 	id: string;
@@ -78,20 +78,6 @@ export const docsMeta: DocMeta[] = [
 		title: 'Framework integrations',
 		description: `Use Octane with ${FRAMEWORK_INTEGRATION_COUNT} app frameworks through first-party integrations.`,
 		group: 'Start here',
-		searchTerms: FRAMEWORK_INTEGRATIONS.flatMap((integration) => [
-			integration.title,
-			integration.packageName,
-			integration.model,
-			integration.description,
-			...(integration.packageName === '@octanejs/tanstack-start'
-				? [
-						'@octanejs/tanstack-router',
-						'@octanejs/tanstack-query',
-						'@octanejs/tanstack-form',
-						'TanStack bindings',
-					]
-				: []),
-		]),
 		sections: [
 			{ id: 'choose-a-framework', title: 'Find the right integration' },
 			{ id: 'astro', title: 'Astro islands' },
@@ -278,16 +264,45 @@ export const docsMeta: DocMeta[] = [
 	{
 		slug: 'react-compat',
 		title: 'React compatibility',
-		description: 'Host compiled Octane islands inside an existing React 19 app with OctaneCompat.',
+		description:
+			'Use OctaneCompat for Octane components inside React, or ReactCompat for real React components inside Octane.',
 		group: 'Explore',
-		searchTerms: ['OctaneCompat', 'octane/react', 'islands', 'migrate', 'interop', 'React 19'],
+		searchTerms: [
+			'OctaneCompat',
+			'ReactCompat',
+			'bridgeReactContext',
+			'octane/react',
+			'octane/react/server',
+			'islands',
+			'migrate',
+			'interop',
+			'React 19',
+			'React 19.2',
+		],
 		sections: [
-			{ id: 'what-is-octanecompat', title: 'What OctaneCompat is' },
+			{ id: 'what-is-octanecompat', title: 'Choose a direction' },
 			{ id: 'set-up', title: 'Set up the toolchain' },
-			{ id: 'render-an-island', title: 'Render an island' },
-			{ id: 'react-context', title: 'Share React context' },
+			{
+				id: 'render-an-island',
+				title: 'Render Octane in React',
+				searchTerms: ['OctaneCompat', 'Octane in React'],
+			},
+			{
+				id: 'render-react-in-octane',
+				title: 'Render React in Octane',
+				searchTerms: ['ReactCompat', 'React in Octane', 'React components', 'React libraries'],
+			},
+			{
+				id: 'react-context',
+				title: 'Share context',
+				searchTerms: ['bridgeReactContext', 'ReactContextBridge', 'context mappings'],
+			},
+			{ id: 'react-context-in-octane', title: 'React context in an Octane island', level: 3 },
+			{ id: 'octane-context-in-react', title: 'Octane context in a React island', level: 3 },
+			{ id: 'state-refs-and-events', title: 'State, refs, and events' },
+			{ id: 'suspense-and-visibility', title: 'Suspense, errors, and visibility' },
 			{ id: 'server-rendering', title: 'Server rendering and hydration' },
-			{ id: 'not-supported', title: "What isn't supported" },
+			{ id: 'not-supported', title: 'Limits' },
 			{ id: 'editor-and-type-checking', title: 'Editor and type checking' },
 			{ id: 'next', title: 'Next' },
 		],
@@ -358,16 +373,11 @@ export const docsMeta: DocMeta[] = [
 	},
 	{
 		slug: 'bindings',
-		title: 'Bindings',
-		description: `Browse all ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
+		title: 'Integrations and bindings',
+		description: `Search ${FRAMEWORK_INTEGRATION_COUNT} framework integrations and ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
 		group: 'Explore',
-		searchTerms: BINDING_CATEGORIES.flatMap((category) => [
-			category.title,
-			category.description,
-			...category.packages,
-		]),
 		sections: [
-			{ id: 'find-a-binding', title: 'Pick by the job' },
+			{ id: 'find-a-binding', title: 'Find an integration or binding' },
 			{ id: 'install-and-use', title: 'Install it, then change the import' },
 			{ id: 'check-support', title: 'Check the part you plan to use' },
 		],

@@ -1,7 +1,5 @@
-import {
-	FRAMEWORK_INTEGRATIONS,
-	frameworkIntegrationRepositoryHref,
-} from '../content/framework-integrations.ts';
+import { FRAMEWORK_INTEGRATIONS } from '../content/framework-integrations.ts';
+import { ecosystemPackageGuideHref } from '../lib/ecosystem-presentation.ts';
 
 export function FrameworkIntegrationsDirectory() @{
 	<div class="framework-integration-directory">
@@ -14,7 +12,7 @@ export function FrameworkIntegrationsDirectory() @{
 				<p>{integration.description as string}</p>
 				<a
 					class="framework-integration-link"
-					href={frameworkIntegrationRepositoryHref(integration.packageName)}
+					href={ecosystemPackageGuideHref(integration.packageName)}
 				>
 					<code>{integration.packageName as string}</code>
 				</a>

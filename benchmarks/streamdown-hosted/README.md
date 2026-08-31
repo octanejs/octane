@@ -6,6 +6,12 @@ This suite measures the React-hosted Streamdown replacement boundary:
 - `octane-streamdown`: the same React 19 host renders
   `@octanejs/streamdown` through `OctaneCompat`.
 
+This is specifically an `OctaneCompat` comparison. The separate
+[`ReactCompat` benchmark](../octane-hosted-react/README.md) measures a generic
+React counter inside Octane; it does not measure Streamdown in that direction.
+See the [React compatibility guide](https://octanejs.dev/docs/react-compat) for
+both integration APIs.
+
 Both production Vite builds receive the same Markdown, props, plugin
 configuration, and synchronous host update sequence. The timed operations are:
 

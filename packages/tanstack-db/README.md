@@ -2,6 +2,13 @@
 
 Octane live-query hooks for [TanStack DB](https://github.com/TanStack/db).
 
+## Installation
+
+```sh
+npm install @octanejs/tanstack-db
+pnpm add @octanejs/tanstack-db
+```
+
 Re-exports [`@tanstack/db`](https://tanstack.com/db) unchanged and implements its
 live-query binding surface on Octane hooks:
 

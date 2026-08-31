@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>ReactCompat commit admission candidate</title>
+		<style>
+			body {
+				font-family: system-ui, sans-serif;
+				margin: 2rem;
+				max-width: 72rem;
+			}
+			button {
+				margin: 0 0.5rem 0.5rem 0;
+			}
+			#candidate-arena > section {
+				border: 1px solid #aaa;
+				margin: 1rem 0;
+				padding: 1rem;
+			}
+			output {
+				display: block;
+				margin: 0.5rem 0;
+			}
+			pre {
+				background: #eee;
+				padding: 1rem;
+				white-space: pre-wrap;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>React commit admission candidate</h1>
+		<p>
+			Experimental controls for the pinned ReactDOM patch. Holding a completed root commit is not a
+			cross-renderer transaction: the two-root probe records that limitation explicitly.
+		</p>
+		<div id="candidate-controls"></div>
+		<p id="candidate-status" role="status">Loading candidate probes…</p>
+		<div id="candidate-arena"></div>
+		<pre id="candidate-results" aria-label="Candidate probe results"></pre>
+		<script type="module" src="./candidate-probes.tsx"></script>
+	</body>
+</html>

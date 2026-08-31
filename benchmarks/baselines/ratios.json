@@ -384,6 +384,22 @@
     "note": "Compact leaf rows driven by their list component's selection state replay only that component (its 100 rows), so unrelated siblings must not change the cost. Rejects the compact-range bail that forced list selection through a whole-root replay."
   },
   {
+    "suite": "universal-object-teardown",
+    "op": "unmount_ms",
+    "target": "siblings-16384",
+    "reference": "siblings-4096",
+    "maxRatio": 8,
+    "note": "Four times as many flat object-driver siblings should stay within twice linear growth. Transaction-local detach sets measure about 4-5x; per-child indexOf/splice during both simulation and apply grows about 19x."
+  },
+  {
+    "suite": "universal-template-events",
+    "op": "event_update_ms",
+    "target": "events-1024",
+    "reference": "events-128",
+    "maxRatio": 12,
+    "note": "Eight times as many retained fallback collapsed-template event sites should take no more than 1.5 times linear growth. The optimized node-local cursor measures about 7-8x; the former whole-template search measures about 26x on the same fixture."
+  },
+  {
     "suite": "universal-external-store",
     "op": "lifetime_subscribe_calls",
     "target": "stable-getter",
@@ -456,6 +472,30 @@
     "note": "Same-process development TSRX compilation with every emitted nesting validation parsed and checked. The original repeated serialization and whole-array scan measured 1.59x per invalid site at 2,000 versus 500 sites, while plan-local Set membership measured 1.07x. The 1.3x ceiling leaves timing headroom while catching the quadratic path."
   },
   {
+    "suite": "tsrx-hydrate-module-slicing",
+    "op": "compile_per_1000_boundaries",
+    "target": "focused-movable-high",
+    "reference": "focused-movable-low",
+    "maxRatio": 1.5,
+    "note": "Same-process hydrate preparation normalizes 2,400 and 150 sibling split boundaries by boundary count. Exact pinned main measured about 3.3x more CPU per boundary at the large size, while the indexed/direct-selection path measured about 1.1x; the 1.5x ceiling catches restoration of module-wide Set copies, synthetic child modules, or boundary/declaration cross-products."
+  },
+  {
+    "suite": "tsrx-renderer-validation-ranges",
+    "op": "compile_per_1000_ranges",
+    "target": "focused-high",
+    "reference": "focused-low",
+    "maxRatio": 1.5,
+    "note": "Same-process universal lowering normalizes the validated AST walk by selected-range count. Exact main's repeated range-by-node scan measured about 3.3x more time per range at 3,200 versus 32 ranges, while verified indexed runs measured about 0.6x to 1.2x; the 1.5x ceiling leaves timing headroom while catching the quadratic path."
+  },
+  {
+    "suite": "tsrx-renderer-validation-ranges",
+    "op": "compile",
+    "target": "pipeline-validated-high",
+    "reference": "pipeline-reference-high",
+    "maxRatio": 1.3,
+    "note": "Same-process production compilation of 1,600 local renderer components differs only by whether the child renderer validates authored ranges, and both targets require byte-identical output. Verified indexed runs measured 0.99x to 1.15x the no-validation reference; the 1.3x ceiling retains timing headroom while catching restoration of repeated linear range scans."
+  },
+  {
     "suite": "tsrx-renderer-selection",
     "op": "resolve",
     "target": "normalized-config",
@@ -496,6 +536,38 @@
     "note": "Same-page production Chromium resume cost for FIFO queued events whose distinct async adoptions settle one at a time. The rejected per-resume compaction/full-scan path measured 6.05x per event at 8k versus 1k, while amortized compaction and constant-time pending bookkeeping measured 0.93x and 1.14x in verified quick runs. The 1.6x ceiling leaves browser timing headroom."
   },
   {
+    "suite": "radix-collection-order",
+    "op": "order",
+    "target": "production-16",
+    "reference": "reference-16",
+    "maxRatio": 1.15,
+    "note": "Same-process 16-item Radix collection ordering through the unchanged indexOf comparator. Verified normal runs measured at parity; the 1.15 ceiling protects the common small-list path from indexed-map allocation."
+  },
+  {
+    "suite": "radix-collection-order",
+    "op": "order",
+    "target": "production-64",
+    "reference": "reference-64",
+    "maxRatio": 1.15,
+    "note": "Same-process 64-item Radix collection ordering through the unchanged indexOf comparator. Verified normal runs measured at parity; the 1.15 ceiling protects the small-list path while allowing timing noise."
+  },
+  {
+    "suite": "radix-collection-order",
+    "op": "order",
+    "target": "production-256",
+    "reference": "reference-256",
+    "maxRatio": 0.8,
+    "note": "Same-process deterministic 256-item collection ordering with identical order and checksum gates. The first indexed size measured at 0.28x the prior comparator; the 0.8 ceiling enforces the measured crossover without tuning to one machine."
+  },
+  {
+    "suite": "radix-collection-order",
+    "op": "order",
+    "target": "production-4096",
+    "reference": "reference-4096",
+    "maxRatio": 0.15,
+    "note": "Same-process deterministic 4,096-item collection ordering, including node-index construction. The indexed helper measured at 0.06x the repeated indexOf comparator; the 0.15 ceiling leaves over 2x timing headroom while catching restoration of repeated scans."
+  },
+  {
     "suite": "router-dispatch",
     "op": "dispatch_per_million_candidates",
     "target": "static-routes",
@@ -510,6 +582,14 @@
     "reference": "dynamic-routes",
     "maxRatio": 0.2,
     "note": "Same-process lowercase method misses through 1,000 server routes, normalized per candidate. Re-normalizing the request method for every route measured at 0.31x the dynamic control; one dispatch-level normalization measured at 0.07x. The 0.2 ceiling leaves timing headroom while catching repeated method normalization."
+  },
+  {
+    "suite": "rspack-css-graph",
+    "op": "graph_traversals",
+    "target": "sixteen-requests",
+    "reference": "one-request",
+    "maxRatio": 1,
+    "note": "Deterministic public module-graph traversals through collection, post-rebuild verification, and seal. The repeated resolver performed 48 traversals for sixteen requests versus 3 for one request; the phase-local batch performs 3 for both, so the exact 1x ceiling catches restoration of request-by-connection graph scans."
   },
   {
     "suite": "floating-tree-navigation",
@@ -3264,6 +3344,14 @@
     "note": "A 2,400-component chain ending at an opaque component must stay within 8% of the same graph declared leaf-first. Both orders verify all 2,400 warm plans; whole-module warm-reachability rescans exceeded this ceiling on current main."
   },
   {
+    "suite": "tsrx-component-graph",
+    "op": "compile",
+    "target": "anchorless-dependent-first-9600",
+    "reference": "anchorless-dependency-first-9600",
+    "maxRatio": 1.25,
+    "note": "A 9,600-component anchorless-safety chain declared root-first must stay within 25% of the same graph declared leaf-first. Exact pinned main measured 2.130x while the linear candidate's paired result measured 0.976x; both orders retain the same semantic controls and output witnesses."
+  },
+  {
     "suite": "tsrx-jsx-return-branches",
     "op": "client_compile_per_100_components",
     "target": "eligible-480",
@@ -3655,5 +3743,29 @@
     "reference": "work-model",
     "maxRatio": 1,
     "note": "Each of 32 changes cycling through all five use() factory dependencies must refresh the resource once and display the new value. This guards generic automatic caching without pinning private compiler helper names."
+  },
+  {
+    "suite": "hydration-range-compaction",
+    "op": "hydrate_per_100_wrappers",
+    "target": "wrappers-512",
+    "reference": "wrappers-64",
+    "maxRatio": 1.5,
+    "note": "Production SSR hydration of 8x more coextensive component wrappers must retain near-linear normalized range-adoption cost. The introduction runs measured 0.99x-1.05x on 2026-08-29; the harness separately gates server-node adoption, delegated interaction, logical marker multiplicity, physical compaction, and clean unmount."
+  },
+  {
+    "suite": "hydration-render-phase-queue",
+    "op": "hydrate_per_100_rows",
+    "target": "rows-1024",
+    "reference": "rows-128",
+    "maxRatio": 1.5,
+    "note": "Production multi-root hydration with an equal-width foreign update wave already queued must retain near-linear normalized cost per row. Exact origin/main measured 2.43x per row before the single-pass drain; the harness separately gates synchronous convergence, adoption of every server node, cross-root isolation and later completion, delegated interaction, and clean unmount."
+  },
+  {
+    "suite": "activity",
+    "op": "reports",
+    "target": "octane-tsrx-caught-reveal-large-normalized",
+    "reference": "octane-tsrx-caught-reveal-small",
+    "maxRatio": 1.35,
+    "note": "Revealing 4,096 hidden caught-error reports, normalized to the 512-report work count, must remain near-linear. Exact origin/main measured 2.00x before direct queue-entry claims; every sample separately gates hidden deferral, FIFO exactly-once reporting, retained output identity, visible text, and clean unmount."
   }
 ]

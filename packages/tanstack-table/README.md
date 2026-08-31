@@ -2,6 +2,13 @@
 
 [TanStack Table v9](https://tanstack.com/table) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/tanstack-table
+pnpm add @octanejs/tanstack-table
+```
+
 TanStack Table v9 separates a framework-agnostic core (`@tanstack/table-core`:
 `constructTable` plus tree-shakeable features — sorting, filtering, pagination,
 selection, visibility, expanding, grouping, faceting, …) from a thin framework

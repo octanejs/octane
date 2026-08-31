@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/xstate-store",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "XState Store for Octane — re-exports the framework-agnostic @xstate/store core unchanged and ports the @xstate/store-react 2.0.0 binding onto Octane hooks.",
   "author": {
     "name": "Dominic Gannaway",

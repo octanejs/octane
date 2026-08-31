@@ -2,6 +2,13 @@
 
 An Octane binding for [`react-waypoint`](https://github.com/brigade/react-waypoint), pinned to version 6.0.0.
 
+## Installation
+
+```sh
+npm install @octanejs/waypoint
+pnpm add @octanejs/waypoint
+```
+
 ```tsrx
 import { Waypoint } from '@octanejs/waypoint';
 

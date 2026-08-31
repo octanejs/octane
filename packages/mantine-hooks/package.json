@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/mantine-hooks",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

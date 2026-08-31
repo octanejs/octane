@@ -1,5 +1,12 @@
 # React-hosted Octane compatibility plan
 
+Scope note (2026-08-28): this document preserves the design and phase history for
+React hosting Octane through `OctaneCompat`. `octane/react` also exports
+`ReactCompat` for React components inside Octane. For current usage in both
+directions, see the [React compatibility guide](https://octanejs.dev/docs/react-compat)
+and the [ReactCompat contract](./react-compat.md). The historical goals and
+evidence below remain specific to `OctaneCompat`.
+
 Status: **Phases 0–4 landed (client + SSR/hydration)** (2026-07-17). Phase 0's committed evidence lives
 in `packages/octane/tests/react-hosted/`, `packages/octane/typetests/`
 (react-hosted-jsx.test-d.tsx), and `benchmarks/react-hosted-islands/`; measured
