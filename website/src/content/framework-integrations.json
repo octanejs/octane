@@ -3,18 +3,24 @@
     "title": "Astro",
     "packageName": "@octanejs/astro",
     "model": "Islands renderer",
-    "description": "Render Octane components as Astro islands with server rendering, client directives, and mixed-framework source ownership."
+    "description": "Render Octane components as Astro islands with server rendering, client directives, and mixed-framework source ownership.",
+    "searchTerms": ["Astro.js", "islands"],
+    "guideAnchor": "astro"
   },
   {
     "title": "Docusaurus",
     "packageName": "@octanejs/docusaurus",
     "model": "Content framework bridge",
-    "description": "Adopt Docusaurus content, routes, MDX, and plugin data with an Octane-native renderer and theme layer."
+    "description": "Adopt Docusaurus content, routes, MDX, and plugin data with an Octane-native renderer and theme layer.",
+    "searchTerms": ["content sites", "documentation framework"],
+    "guideAnchor": "docusaurus"
   },
   {
     "title": "TanStack Start",
     "packageName": "@octanejs/tanstack-start",
     "model": "Full-stack framework",
-    "description": "Build file-routed Octane applications with server functions, streaming SSR, hydration, and Vite development and production builds."
+    "description": "Build file-routed Octane applications with server functions, streaming SSR, hydration, and Vite development and production builds.",
+    "searchTerms": ["TanStack Start", "full stack", "file routing"],
+    "guideAnchor": "tanstack-start"
   }
 ]

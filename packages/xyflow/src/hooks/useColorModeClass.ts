@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'octane';
-import { resolveHookSlot } from './slot';
+import { resolveHookSlot, subSlot } from './slot';
 import type { ColorMode, ColorModeClass } from '@xyflow/system';
 
 function getMediaQuery() {
@@ -20,7 +20,7 @@ export function useColorModeClass(colorMode: ColorMode, ...rest: [slot?: symbol]
 	const slot = resolveHookSlot(rest);
 	const [colorModeClass, setColorModeClass] = useState<ColorModeClass | null>(
 		colorMode === 'system' ? null : colorMode,
-		slot,
+		subSlot(slot, 'state'),
 	);
 
 	useEffect(
@@ -43,7 +43,7 @@ export function useColorModeClass(colorMode: ColorMode, ...rest: [slot?: symbol]
 			};
 		},
 		[colorMode],
-		slot,
+		subSlot(slot, 'effect'),
 	);
 
 	return colorModeClass !== null ? colorModeClass : getMediaQuery()?.matches ? 'dark' : 'light';

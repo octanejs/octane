@@ -83,7 +83,8 @@ the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
 **universal-external-store**,
-**lynx-render**, and **lynx-bundle-size** are Node-only,
+**lynx-render**, **lynx-bundle-size**, and **tsrx-renderer-validation-ranges**
+are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
 servers per sample — that spawn/listen/first-byte cycle IS the measurement —
 and **codegen-size** / **bundle-size** / **bundle-reachability** /
@@ -234,6 +235,7 @@ internally, get their own baseline and guard namespace.
 | `controlled-form` | controlled-form | none (builds) | 512 controlled fields, real typing, DOM identity, focus and caret, validation cancellation, complete submit/reset, and native select/checkbox/radio correctness |
 | `dev-form-diagnostics` | dev-form-diagnostics | none (Node/jsdom) | development-only controlled-form diagnostic commit scaling at 4,000 and 32,000 hosts |
 | `scheduler-depth` | scheduler-depth | none (Node/jsdom) | production client scheduler ordering across 500 and 2,000 deeply nested queued components |
+| `hydration-range-compaction` | hydration-range-compaction | none (Node/jsdom) | production SSR hydration range compaction across 64 and 512 coextensive wrappers, with adoption, interaction, marker-depth, and unmount gates |
 | `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, deterministic 100-notification work guards, and balanced subscription removal |
 | `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and seven-framework cleanup gates |
 | `store-selector-fanout` | store-selector-fanout | none (builds) | 512 subscribers reading one store through a `with-selector`-shaped selector, 20 unrelated parent re-renders with the store untouched, and deterministic selector-invocation counts beside render and snapshot counts |
@@ -246,6 +248,7 @@ internally, get their own baseline and guard namespace.
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `radix-collection-order` | radix-collection-order | none (Node-only) | production Radix collection ordering versus the prior comparator at 16, 64, 256, and 4,096 items, with missing-ref and stable-order controls |
 | `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
+| `rspack-css-graph` | rspack-css-graph | none (Node-only) | CSS-module proof collection and verification across zero, one, and sixteen requests, with deterministic module-graph traversal and connection-visit guards |
 | `floating-tree-navigation` | floating-tree-navigation | none (Node-only) | Floating UI deepest-open-node lookup on deep chains, equal-depth forks, and a root-only control, with exact previous-behavior and deterministic node-read gates |
 | `ink-cursor-update` | ink-cursor-update | none (Node-only) | Ink standard/incremental cursor-only updates over equal 20,000-line frames, with exact previous branches, byte/split gates, stable-frame stress scaling, and initial/changed-render controls |
 | `manifest-cache-invalidation` | manifest-cache-invalidation | none (Node-only) | shared-compiler source invalidation across 129 and 5,001 cached nearest-manifest decisions, plus a required manifest-scan control |
@@ -277,6 +280,7 @@ internally, get their own baseline and guard namespace.
 | `template-call-memo` | template-call-memo | none (Node-only) | production Strong/compatibility receiver-call counts, immutable keyed rows, real dependency changes, current event captures, and survivor identity |
 | `compiler-throughput` | compiler-throughput | none (Node-only) | seven real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |
 | `tsrx-component-graph` | tsrx-component-graph | none (Node-only) | 2,400-component live-import propagation with dependent-first vs dependency-first declarations |
+| `tsrx-renderer-validation-ranges` | tsrx-renderer-validation-ranges | none (Node-only) | authored renderer-validation range membership at 32/3,200 ranges plus matched 100/1,600-component whole-pipeline compiles with and without validation |
 | `tsrx-jsx-return-branches` | tsrx-jsx-return-branches | none (Node-only) | client/server compile and bundler classification for 120/480 conditional-return components, with lowering/export controls and a same-sized ineligible parse/print control |
 | `tsrx-nesting-diagnostics` | tsrx-nesting-diagnostics | none (Node-only) | development TSRX compilation at 500 and 2,000 invalid HTML sites, with parsed diagnostic count/order controls and a per-diagnostic scaling guard |
 | `tsrx-renderer-selection` | tsrx-renderer-selection | none (Node-only) | ordered filename-to-renderer classification with semantic checksums, comparing retained normalized config against equivalent raw revalidation |

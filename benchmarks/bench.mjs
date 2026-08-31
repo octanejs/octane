@@ -414,6 +414,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production SSR hydration of coextensive wrapper chains, normalized per
+		// wrapper to catch repeated post-adoption range bookkeeping.
+		name: 'hydration-range-compaction',
+		cwd: 'hydration-range-compaction',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Headless-Chromium production scaling for late behavior events whose
 		// distinct asynchronous adoptions settle one at a time.
 		name: 'behavior-root-events',
@@ -436,6 +445,15 @@ const SUITES = [
 		// and dynamic route tables with cost normalized per candidate route.
 		name: 'router-dispatch',
 		cwd: 'router-dispatch',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Node-only Rspack CSS-module proof collection and verification with
+		// deterministic graph traversal and yielded-connection counts.
+		name: 'rspack-css-graph',
+		cwd: 'rspack-css-graph',
 		servers: [],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -874,6 +892,15 @@ const SUITES = [
 		cwd: 'tsrx-component-graph',
 		servers: [],
 		iter: { normal: 8, quick: 4 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Authored renderer-validation range membership at two scales plus matched
+		// whole-pipeline compiles with and without validation in the same process.
+		name: 'tsrx-renderer-validation-ranges',
+		cwd: 'tsrx-renderer-validation-ranges',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{

@@ -7,6 +7,8 @@ pnpm-workspace.yaml
 
 # Build outputs
 packages/shadcn/registry/
+# Private, hash-recorded React DOM experiment output (never authored source).
+experiments/react-compat/patch/generated/
 # Vendored pinned upstream sources a port is written against (byte-exact
 # provenance; do not reformat)
 packages/*/upstream/
