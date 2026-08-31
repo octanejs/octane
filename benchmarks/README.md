@@ -82,6 +82,7 @@ Some suites need no preview servers: **news**, **hydration-interactivity**, and
 the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
+**universal-object-teardown**,
 **universal-template-events**, **universal-external-store**,
 **lynx-render**, **lynx-bundle-size**, and **tsrx-renderer-validation-ranges**
 are Node-only,
@@ -270,6 +271,7 @@ internally, get their own baseline and guard namespace.
 | `async-composition` | async-composition | octane-tsrx, react, inferno | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `lynx-list` | lynx-list | none (Node-only) | deterministic 1,000-row native-list physical allocation, reuse, and teardown through a fake Element PAPI |
 | `universal-leaf-update` | universal-leaf-update | none (Node-only) | universal update locality beside 0–4,000 unrelated component siblings through the compiler and native object driver: plain leaf `setState`, keyed `@for` item state, a leaf under an idle `@try`, a structural (insert/remove) update, and compact-row list selection |
+| `universal-object-teardown` | universal-object-teardown | none (Node-only) | transactional object-driver unmount scaling at 2, 4,096, and 16,384 flat siblings, with exact remove/destroy and empty-driver controls |
 | `universal-template-events` | universal-template-events | none (Node-only) | shape-stable handler updates across 128 and 1,024 retained native event sites through the fallback collapsed-template host capability, with host identity, latest-handler dispatch, and redundant-command controls |
 | `universal-external-store` | universal-external-store | none (Node-only) | 128 native universal store subscribers, getter/subscribe identity controls, notification bursts, and deterministic subscription-lifetime and state-projection guards |
 | `lynx-render` | lynx-render | none (Node-only) | dual-thread Lynx render CPU: empty startup, create 1,000 and 10,000 keyed rows through the real background root, transport, and main receiver over a cheap fake Element PAPI, plus a gate that a native tap reaches its background handler via the engine `publishEvent` receiver |

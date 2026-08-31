@@ -796,6 +796,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Universal object-driver teardown (Node-only): wide sibling unmounts through
+		// transactional simulation and apply, with exact remove/destroy controls.
+		name: 'universal-object-teardown',
+		cwd: 'universal-object-teardown',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Universal fallback collapsed-template events (Node-only): handler-only
 		// updates across 128 and 1,024 retained native event sites.
 		name: 'universal-template-events',

@@ -101,6 +101,7 @@ export const BENCHMARK_SUITES = [
 	'async-composition',
 	'lynx-list',
 	'universal-leaf-update',
+	'universal-object-teardown',
 	'universal-template-events',
 	'universal-external-store',
 	'lynx-render',

@@ -384,6 +384,14 @@
     "note": "Compact leaf rows driven by their list component's selection state replay only that component (its 100 rows), so unrelated siblings must not change the cost. Rejects the compact-range bail that forced list selection through a whole-root replay."
   },
   {
+    "suite": "universal-object-teardown",
+    "op": "unmount_ms",
+    "target": "siblings-16384",
+    "reference": "siblings-4096",
+    "maxRatio": 8,
+    "note": "Four times as many flat object-driver siblings should stay within twice linear growth. Transaction-local detach sets measure about 4-5x; per-child indexOf/splice during both simulation and apply grows about 19x."
+  },
+  {
     "suite": "universal-template-events",
     "op": "event_update_ms",
     "target": "events-1024",
