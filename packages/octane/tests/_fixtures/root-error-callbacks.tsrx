@@ -174,6 +174,49 @@ export function HiddenInlineCaughtHost(props: HiddenCaughtProps) @{
 	}
 }
 
+export interface ReparkCaughtActions {
+	wait: () => void;
+	replace: () => void;
+}
+
+interface SuspenseReparkCaughtProps extends CaughtFallbackOptions {
+	api: ReparkCaughtActions;
+	firstError: Error;
+	secondError: Error;
+	initial: Promise<string>;
+	pending: Promise<string>;
+}
+
+function ReparkPendingSibling(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<span>{'|' + value as string}</span>
+}
+
+export function SuspenseReparkCaughtHost(props: SuspenseReparkCaughtProps) @{
+	const [second, setSecond] = useState(false);
+	const [promise, setPromise] = useState(props.initial);
+	props.api.wait = () => setPromise(props.pending);
+	props.api.replace = () => setSecond(true);
+	<CaughtSuspense fallback={<span>outer loading</span>}>
+		<main>
+			@if (second) {
+				<DescriptorCaughtParentError
+					error={props.secondError}
+					fallbackRef={props.fallbackRef}
+					onFallbackLayout={props.onFallbackLayout}
+				/>
+			} @else {
+				<DescriptorCaughtParentError
+					error={props.firstError}
+					fallbackRef={props.fallbackRef}
+					onFallbackLayout={props.onFallbackLayout}
+				/>
+			}
+			<ReparkPendingSibling promise={promise} />
+		</main>
+	</CaughtSuspense>
+}
+
 interface InterruptedActivityCaughtProps extends ParentErrorProps {
 	mode: 'hidden' | 'visible';
 	promise: Promise<string> | null;

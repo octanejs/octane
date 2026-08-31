@@ -38,18 +38,29 @@ export function packageVersion(resolver, name) {
 function hashFixture(scenario) {
 	const hash = createHash('sha256');
 	const files =
-		scenario === 'refs'
+		scenario === 'caught-reveal'
 			? [
-					'RefControl.tsrx',
-					'ref-browser.ts',
-					'ref-contract.mjs',
-					'ref-model.ts',
+					'HiddenCaughtReveal.tsrx',
+					'caught-reveal-browser.ts',
+					'caught-reveal-contract.mjs',
+					'caught-reveal-model.ts',
 					'contract.mjs',
 					'model.ts',
-					'octane-refs.ts',
-					'react-refs.ts',
+					'octane-caught-reveal.html',
+					'octane-caught-reveal.ts',
 				]
-			: ['App.tsrx', 'browser.ts', 'contract.mjs', 'model.ts', 'octane.ts', 'react.ts'];
+			: scenario === 'refs'
+				? [
+						'RefControl.tsrx',
+						'ref-browser.ts',
+						'ref-contract.mjs',
+						'ref-model.ts',
+						'contract.mjs',
+						'model.ts',
+						'octane-refs.ts',
+						'react-refs.ts',
+					]
+				: ['App.tsrx', 'browser.ts', 'contract.mjs', 'model.ts', 'octane.ts', 'react.ts'];
 	for (const file of files) {
 		hash
 			.update(file)
@@ -173,8 +184,11 @@ export async function startFixture({
 	scenario = 'activity',
 } = {}) {
 	if (!TARGETS.includes(target)) throw new Error(`Unknown Activity target: ${target}`);
-	if (scenario !== 'activity' && scenario !== 'refs') {
+	if (scenario !== 'activity' && scenario !== 'refs' && scenario !== 'caught-reveal') {
 		throw new Error(`Unknown Activity fixture scenario: ${scenario}`);
+	}
+	if (scenario === 'caught-reveal' && target !== 'octane-tsrx') {
+		throw new Error('The caught-reveal Activity fixture is Octane-only');
 	}
 	process.env.NODE_ENV = 'production';
 	const source = octanePackageAt(revision);
@@ -218,9 +232,11 @@ export async function startFixture({
 		const { reactCompiler } = await import('../react-compiler.mjs');
 		compilerPlugins = [tsrxReact(), reactCompiler()];
 	}
-	const entry = `${target === 'octane-tsrx' ? 'octane' : 'react'}${scenario === 'refs' ? '-refs' : ''}.html`;
+	const scenarioSuffix =
+		scenario === 'refs' ? '-refs' : scenario === 'caught-reveal' ? '-caught-reveal' : '';
+	const entry = `${target === 'octane-tsrx' ? 'octane' : 'react'}${scenarioSuffix}.html`;
 	const buildIdentity = revision ? source.revision : 'working';
-	const buildKind = `${work ? 'work' : 'timing'}${scenario === 'refs' ? '-refs' : ''}`;
+	const buildKind = `${work ? 'work' : 'timing'}${scenarioSuffix}`;
 	const outDir = path.join(HERE, 'dist/builds', buildIdentity, target, buildKind);
 	const inputs = {
 		octaneRevision: source.revision,

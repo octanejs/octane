@@ -546,6 +546,7 @@ const SUITES = [
 			{ label: 'refs', script: 'refs.mjs', args: (n) => [String(n)] },
 			{ label: 'refs-work', script: 'refs-work.mjs', args: () => [] },
 			{ label: 'bundle', script: 'bundle.mjs', args: () => [] },
+			{ label: 'caught-reveal', script: 'caught-reveal-run.mjs', args: (n) => [String(n)] },
 		],
 	},
 	{

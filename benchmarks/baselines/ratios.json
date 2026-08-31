@@ -3751,5 +3751,13 @@
     "reference": "rows-128",
     "maxRatio": 1.5,
     "note": "Production multi-root hydration with an equal-width foreign update wave already queued must retain near-linear normalized cost per row. Exact origin/main measured 2.43x per row before the single-pass drain; the harness separately gates synchronous convergence, adoption of every server node, cross-root isolation and later completion, delegated interaction, and clean unmount."
+  },
+  {
+    "suite": "activity",
+    "op": "reports",
+    "target": "octane-tsrx-caught-reveal-large-normalized",
+    "reference": "octane-tsrx-caught-reveal-small",
+    "maxRatio": 1.35,
+    "note": "Revealing 4,096 hidden caught-error reports, normalized to the 512-report work count, must remain near-linear. Exact origin/main measured 2.00x before direct queue-entry claims; every sample separately gates hidden deferral, FIFO exactly-once reporting, retained output identity, visible text, and clean unmount."
   }
 ]

@@ -7299,41 +7299,87 @@ type LinkedStateTuple<Value> = [Value, StateSetter<Value>, () => Value];
 // A sibling may finish before another sibling suspends their shared boundary.
 // Keep linked-state publication and caught-error reports with their hidden owner
 // (Suspense or Activity): completed bodies may bail when that owner reveals.
-let HIDDEN_REVEAL_ACTIONS: WeakMap<ScheduledVisibilityOwner, EffectEventCommitAction[]> | null =
-	null;
+interface HiddenRevealAction {
+	action: EffectEventCommitAction;
+	active: boolean;
+	queue: HiddenRevealActionQueue;
+}
+
+interface HiddenRevealActionQueue {
+	entries: HiddenRevealAction[];
+	live: number;
+}
+
+let HIDDEN_REVEAL_ACTIONS: WeakMap<ScheduledVisibilityOwner, HiddenRevealActionQueue> | null = null;
 
 function deferHiddenRevealAction(
 	boundary: ScheduledVisibilityOwner,
 	action: EffectEventCommitAction,
-): void {
+): HiddenRevealAction {
 	const deferred = (HIDDEN_REVEAL_ACTIONS ??= new WeakMap());
-	const actions = deferred.get(boundary);
-	if (actions === undefined) deferred.set(boundary, [action]);
-	else actions.push(action);
+	let queue = deferred.get(boundary);
+	if (queue === undefined) {
+		queue = { entries: [], live: 0 };
+		deferred.set(boundary, queue);
+	}
+	const entry = { action, active: true, queue };
+	queue.entries.push(entry);
+	queue.live++;
+	return entry;
+}
+
+function claimHiddenRevealAction(
+	boundary: ScheduledVisibilityOwner,
+	entry: HiddenRevealAction,
+): EffectEventCommitAction | null {
+	const queue = entry.queue;
+	if (HIDDEN_REVEAL_ACTIONS?.get(boundary) !== queue) return null;
+	if (!entry.active) return null;
+	entry.active = false;
+	if (--queue.live === 0) HIDDEN_REVEAL_ACTIONS!.delete(boundary);
+	return entry.action;
+}
+
+function cancelHiddenRevealAction(
+	boundary: ScheduledVisibilityOwner,
+	entry: HiddenRevealAction,
+): void {
+	const queue = entry.queue;
+	if (claimHiddenRevealAction(boundary, entry) === null || queue.live === 0) return;
+	// Cancellation is cold and may happen repeatedly while an owner stays hidden.
+	// Compact here so dead entries do not make a later reveal scan historical work.
+	if (queue.entries.length > queue.live * 2) {
+		queue.entries = queue.entries.filter((candidate) => candidate.active);
+	}
 }
 
 function publishHiddenRevealActions(boundary: ScheduledVisibilityOwner): void {
-	const actions = HIDDEN_REVEAL_ACTIONS?.get(boundary);
-	if (actions === undefined) return;
+	const queue = HIDDEN_REVEAL_ACTIONS?.get(boundary);
+	if (queue === undefined) return;
+	const entries = queue.entries;
 	if (boundary.__kind === 'activityBlockSlot') {
 		// A visible Activity render can still be discarded by an outer Suspense.
 		// Keep its parked work until a surviving commit consumes it; a retry may
 		// already see visible mode even though the first reveal never committed.
-		for (let i = 0; i < actions.length; i++) {
-			const action = actions[i];
+		// Claim the snapshotted entry directly so a large surviving commit does not
+		// repeatedly search and compact the remaining queue.
+		const end = entries.length;
+		for (let i = 0; i < end; i++) {
+			const entry = entries[i];
+			if (!entry.active) continue;
 			enqueueEffectEventCommitAction(() => {
-				if (HIDDEN_REVEAL_ACTIONS?.get(boundary) !== actions) return;
-				const index = actions.indexOf(action);
-				if (index === -1) return;
-				actions.splice(index, 1);
-				if (actions.length === 0) HIDDEN_REVEAL_ACTIONS!.delete(boundary);
-				return action();
+				const claimed = claimHiddenRevealAction(boundary, entry);
+				if (claimed === null) return;
+				return claimed();
 			});
 		}
 		return;
 	}
 	HIDDEN_REVEAL_ACTIONS!.delete(boundary);
-	for (let i = 0; i < actions.length; i++) enqueueEffectEventCommitAction(actions[i]);
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i];
+		if (entry.active) enqueueEffectEventCommitAction(entry.action);
+	}
 }
 
 /**
@@ -32111,33 +32157,28 @@ function enqueueInlineCaughtError(state: TrySlot | ErrorSlot): void {
 	const handler = rootErrorHandlersFor(block)?.onCaughtError;
 	if (handler === undefined) return;
 	const error = state.err;
-	let parkedOwner: ScheduledVisibilityOwner | null = null;
+	let parked: { owner: ScheduledVisibilityOwner; entry: HiddenRevealAction } | null = null;
 	let cleanupRegistered = false;
 	// Reuse render/WIP rollback: a later sibling can still abandon this catch.
 	// The returned record belongs to one commit's local list, so a nested commit
 	// during another action cannot publish it before this fallback's refs/layout.
 	const action = (owner?: ScheduledVisibilityOwner): InlineCaughtErrorReport | void => {
-		parkedOwner = null;
+		parked = null;
 		if (block.disposed || state.block !== block) return;
 		const hidden = owner ?? findScheduledVisibilityOwner(block, true);
 		if (hidden !== null) {
-			parkedOwner = hidden;
 			if (!cleanupRegistered) {
 				cleanupRegistered = true;
 				// A child can be replaced while its hidden owner stays alive. Release
 				// this report then, rather than retaining it until a future reveal.
 				(block.cleanups ??= []).push(() => {
-					const owner = parkedOwner;
-					parkedOwner = null;
-					if (owner === null) return;
-					const actions = HIDDEN_REVEAL_ACTIONS?.get(owner);
-					if (actions === undefined) return;
-					const index = actions.indexOf(action);
-					if (index !== -1) actions.splice(index, 1);
-					if (actions.length === 0) HIDDEN_REVEAL_ACTIONS!.delete(owner);
+					const pending = parked;
+					parked = null;
+					if (pending === null) return;
+					cancelHiddenRevealAction(pending.owner, pending.entry);
 				});
 			}
-			deferHiddenRevealAction(hidden, action);
+			parked = { owner: hidden, entry: deferHiddenRevealAction(hidden, action) };
 			return;
 		}
 		return { state, block, error, handler, resume: action };
