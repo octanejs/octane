@@ -9010,7 +9010,8 @@ interface HydrateSlot {
 	prefetchPromise: Promise<void> | null;
 	preloadPromise: Promise<void> | null;
 	loadedBody: ComponentBody | null;
-	hydrationWaiters: Set<(reason: HydrationPrefetchWaitReason) => void>;
+	/** Allocated only when procedural prefetch subscribes through waitFor(). */
+	hydrationWaiters: Set<(reason: HydrationPrefetchWaitReason) => void> | null;
 	/** Invalidates async completions from an earlier hydration request. */
 	activationGeneration: number;
 	activationRequested: boolean;
@@ -9281,10 +9282,10 @@ function beginHydratePreload(state: HydrateSlot): Promise<void> | null {
 }
 
 function resolveHydrateWaiters(state: HydrateSlot, reason: HydrationPrefetchWaitReason): void {
-	if (state.hydrationWaiters.size === 0) return;
-	const waiters = [...state.hydrationWaiters];
-	state.hydrationWaiters.clear();
-	for (let i = 0; i < waiters.length; i++) waiters[i](reason);
+	const waiters = state.hydrationWaiters;
+	if (waiters === null) return;
+	state.hydrationWaiters = null;
+	for (const waiter of waiters) waiter(reason);
 }
 
 function waitForHydratePrefetchStrategy(
@@ -9306,13 +9307,13 @@ function waitForHydratePrefetchStrategy(
 			if (settled) return;
 			settled = true;
 			cleanup?.();
-			state.hydrationWaiters.delete(onHydrate);
+			state.hydrationWaiters?.delete(onHydrate);
 			signal.removeEventListener('abort', onAbort);
 			resolve(reason);
 		};
 		const onHydrate = () => finish('hydrate');
 		const onAbort = () => finish('abort');
-		state.hydrationWaiters.add(onHydrate);
+		(state.hydrationWaiters ??= new Set()).add(onHydrate);
 		signal.addEventListener('abort', onAbort, { once: true });
 		cleanup = strategy._s?.({
 			element: state.wrapper,
@@ -9824,7 +9825,7 @@ function createHydrateSlot(
 		prefetchPromise: null,
 		preloadPromise: null,
 		loadedBody: null,
-		hydrationWaiters: new Set(),
+		hydrationWaiters: null,
 		activationGeneration: 0,
 		activationRequested: !serverPreserved,
 		activationReady: !serverPreserved,
