@@ -233,6 +233,11 @@
         "tags": ["animation", "springs"]
       },
       {
+        "packageName": "@octanejs/thinking-orbs",
+        "title": "Thinking Orbs",
+        "tags": ["animation", "loading", "ai"]
+      },
+      {
         "packageName": "@octanejs/transition-group",
         "title": "React Transition Group",
         "tags": ["animation", "transitions"]
@@ -398,6 +403,36 @@
         "tags": ["markdown", "streaming", "ai"]
       },
       { "packageName": "@octanejs/tiptap", "title": "Tiptap", "tags": ["editor", "rich text"] }
+    ]
+  },
+  {
+    "title": "Sanity Content",
+    "description": "Portable Text rendering, Sanity query loading and Live Mode, icons, and brand marks.",
+    "packages": [
+      {
+        "packageName": "@octanejs/portabletext",
+        "title": "Portable Text",
+        "searchTerms": ["@portabletext/react"],
+        "tags": ["content", "rich text", "sanity"]
+      },
+      {
+        "packageName": "@octanejs/sanity-loader",
+        "title": "Sanity Loader",
+        "searchTerms": ["@sanity/react-loader"],
+        "tags": ["sanity", "data fetching", "live content"]
+      },
+      {
+        "packageName": "@octanejs/sanity-icons",
+        "title": "Sanity Icons",
+        "searchTerms": ["@sanity/icons"],
+        "tags": ["sanity", "icons", "components"]
+      },
+      {
+        "packageName": "@octanejs/sanity-logos",
+        "title": "Sanity Logos",
+        "searchTerms": ["@sanity/logos"],
+        "tags": ["sanity", "logos", "branding"]
+      }
     ]
   },
   {

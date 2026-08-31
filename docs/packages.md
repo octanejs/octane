@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**113 publishable package(s), including 99 framework binding(s) and 3 framework integration(s).**
+**118 publishable package(s), including 104 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -65,6 +65,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/pdf` | [`packages/pdf`](../packages/pdf) | framework binding | `0.0.16` | 3 |
 | `@octanejs/phosphor-icons` | [`packages/phosphor-icons`](../packages/phosphor-icons) | framework binding | `0.0.30` | 2 |
 | `@octanejs/popper` | [`packages/popper`](../packages/popper) | framework binding | `0.0.16` | 2 |
+| `@octanejs/portabletext` | [`packages/portabletext`](../packages/portabletext) | framework binding | `0.1.0` | 2 |
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.49` | 1 |
 | `@octanejs/rainbowkit` | [`packages/rainbowkit`](../packages/rainbowkit) | framework binding | `0.0.30` | 2 |
 | `@octanejs/react-error-boundary` | [`packages/react-error-boundary`](../packages/react-error-boundary) | framework binding | `0.1.31` | 2 |
@@ -77,6 +78,9 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/rsbuild-plugin` | [`packages/rsbuild-plugin-octane`](../packages/rsbuild-plugin-octane) | metaframework | `0.1.45` | 3 |
 | `@octanejs/rspack-plugin` | [`packages/rspack-plugin-octane`](../packages/rspack-plugin-octane) | compiler integration | `0.1.45` | 2 |
 | `@octanejs/rxjs` | [`packages/rxjs`](../packages/rxjs) | framework binding | `0.1.29` | 2 |
+| `@octanejs/sanity-icons` | [`packages/sanity-icons`](../packages/sanity-icons) | framework binding | `0.1.0` | 238 |
+| `@octanejs/sanity-loader` | [`packages/sanity-loader`](../packages/sanity-loader) | framework binding | `0.1.0` | 3 |
+| `@octanejs/sanity-logos` | [`packages/sanity-logos`](../packages/sanity-logos) | framework binding | `0.1.0` | 2 |
 | `@octanejs/select` | [`packages/select`](../packages/select) | framework binding | `0.1.1` | 6 |
 | `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.35` | 1 |
 | `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.35` | 121 |
@@ -105,6 +109,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/tauri` | [`packages/tauri`](../packages/tauri) | framework binding | `0.0.33` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.47` | 2 |
 | `@octanejs/textarea-autosize` | [`packages/textarea-autosize`](../packages/textarea-autosize) | framework binding | `0.0.16` | 2 |
+| `@octanejs/thinking-orbs` | [`packages/thinking-orbs`](../packages/thinking-orbs) | framework binding | `0.1.0` | 1 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.43` | 7 |
 | `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.44` | 2 |
 | `@octanejs/to-print` | [`packages/to-print`](../packages/to-print) | framework binding | `0.0.6` | 2 |
@@ -128,6 +133,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
 ## Private packages
 
+- `@octanejs/blocknote` ([`packages/blocknote`](../packages/blocknote))
 - `@octanejs/evals` ([`packages/octane-evals`](../packages/octane-evals))
 - `@octanejs/lynx` ([`packages/lynx`](../packages/lynx))
+- `@octanejs/puck` ([`packages/puck`](../packages/puck))
 - `@octanejs/rspeedy-plugin` ([`packages/rspeedy-plugin-octane`](../packages/rspeedy-plugin-octane))

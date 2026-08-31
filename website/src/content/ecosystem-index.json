@@ -658,6 +658,19 @@
   },
   {
     "kind": "library-binding",
+    "id": "binding-thinking-orbs",
+    "title": "Thinking Orbs",
+    "packageName": "@octanejs/thinking-orbs",
+    "upstreamPackage": "thinking-orbs",
+    "category": "Animation",
+    "categoryId": "animation",
+    "description": "Use thinking-orbs with Octane.",
+    "searchTerms": [],
+    "tags": ["animation", "loading", "ai"],
+    "order": 51
+  },
+  {
+    "kind": "library-binding",
     "id": "binding-transition-group",
     "title": "React Transition Group",
     "packageName": "@octanejs/transition-group",
@@ -667,7 +680,7 @@
     "description": "Use react-transition-group with Octane.",
     "searchTerms": [],
     "tags": ["animation", "transitions"],
-    "order": 51
+    "order": 52
   },
   {
     "kind": "library-binding",
@@ -680,7 +693,7 @@
     "description": "Use @dnd-kit/react with Octane.",
     "searchTerms": [],
     "tags": ["drag drop", "interaction"],
-    "order": 52
+    "order": 53
   },
   {
     "kind": "library-binding",
@@ -693,7 +706,7 @@
     "description": "Use @floating-ui/react with Octane.",
     "searchTerms": [],
     "tags": ["positioning", "popovers", "tooltips"],
-    "order": 53
+    "order": 54
   },
   {
     "kind": "library-binding",
@@ -706,7 +719,7 @@
     "description": "Use react-image-crop with Octane.",
     "searchTerms": [],
     "tags": ["images", "media"],
-    "order": 54
+    "order": 55
   },
   {
     "kind": "library-binding",
@@ -719,7 +732,7 @@
     "description": "Use @mantine/hooks with Octane.",
     "searchTerms": [],
     "tags": ["hooks", "browser"],
-    "order": 55
+    "order": 56
   },
   {
     "kind": "library-binding",
@@ -732,7 +745,7 @@
     "description": "Use react-popper with Octane.",
     "searchTerms": [],
     "tags": ["positioning", "popovers", "tooltips"],
-    "order": 56
+    "order": 57
   },
   {
     "kind": "library-binding",
@@ -745,7 +758,7 @@
     "description": "Use react-draggable with Octane.",
     "searchTerms": [],
     "tags": ["drag drop", "interaction"],
-    "order": 57
+    "order": 58
   },
   {
     "kind": "library-binding",
@@ -758,7 +771,7 @@
     "description": "Use react-error-boundary with Octane.",
     "searchTerms": [],
     "tags": ["errors", "recovery"],
-    "order": 58
+    "order": 59
   },
   {
     "kind": "library-binding",
@@ -771,7 +784,7 @@
     "description": "Use react-intersection-observer with Octane.",
     "searchTerms": [],
     "tags": ["visibility", "scroll", "browser"],
-    "order": 59
+    "order": 60
   },
   {
     "kind": "library-binding",
@@ -784,7 +797,7 @@
     "description": "Use react-resizable-panels with Octane.",
     "searchTerms": [],
     "tags": ["layout", "panels"],
-    "order": 60
+    "order": 61
   },
   {
     "kind": "library-binding",
@@ -797,7 +810,7 @@
     "description": "Use react-to-print with Octane.",
     "searchTerms": [],
     "tags": ["printing", "browser"],
-    "order": 61
+    "order": 62
   },
   {
     "kind": "library-binding",
@@ -810,7 +823,7 @@
     "description": "Use react-waypoint with Octane.",
     "searchTerms": [],
     "tags": ["visibility", "scroll", "browser"],
-    "order": 62
+    "order": 63
   },
   {
     "kind": "library-binding",
@@ -823,7 +836,7 @@
     "description": "Use use-stick-to-bottom with Octane.",
     "searchTerms": [],
     "tags": ["scroll", "chat"],
-    "order": 63
+    "order": 64
   },
   {
     "kind": "library-binding",
@@ -836,7 +849,7 @@
     "description": "Use @tanstack/react-hotkeys with Octane.",
     "searchTerms": [],
     "tags": ["keyboard", "shortcuts"],
-    "order": 64
+    "order": 65
   },
   {
     "kind": "library-binding",
@@ -849,7 +862,7 @@
     "description": "Use @tanstack/react-pacer with Octane.",
     "searchTerms": [],
     "tags": ["debounce", "throttle", "events"],
-    "order": 65
+    "order": 66
   },
   {
     "kind": "library-binding",
@@ -862,7 +875,7 @@
     "description": "Use usehooks-ts with Octane.",
     "searchTerms": [],
     "tags": ["hooks", "browser"],
-    "order": 66
+    "order": 67
   },
   {
     "kind": "library-binding",
@@ -875,7 +888,7 @@
     "description": "Use lucide-react with Octane.",
     "searchTerms": [],
     "tags": ["icons", "components"],
-    "order": 67
+    "order": 68
   },
   {
     "kind": "library-binding",
@@ -888,7 +901,7 @@
     "description": "Use @phosphor-icons/react with Octane.",
     "searchTerms": [],
     "tags": ["icons", "components"],
-    "order": 68
+    "order": 69
   },
   {
     "kind": "library-binding",
@@ -901,7 +914,7 @@
     "description": "Use @formisch/react with Octane.",
     "searchTerms": [],
     "tags": ["forms", "validation"],
-    "order": 69
+    "order": 70
   },
   {
     "kind": "library-binding",
@@ -914,7 +927,7 @@
     "description": "Use input-otp with Octane.",
     "searchTerms": [],
     "tags": ["forms", "authentication"],
-    "order": 70
+    "order": 71
   },
   {
     "kind": "library-binding",
@@ -927,7 +940,7 @@
     "description": "Use react-dropzone with Octane.",
     "searchTerms": [],
     "tags": ["forms", "file upload"],
-    "order": 71
+    "order": 72
   },
   {
     "kind": "library-binding",
@@ -940,7 +953,7 @@
     "description": "Use react-hook-form with Octane.",
     "searchTerms": ["React Hook Form"],
     "tags": ["forms", "validation"],
-    "order": 72
+    "order": 73
   },
   {
     "kind": "library-binding",
@@ -953,7 +966,7 @@
     "description": "Use @tanstack/react-form with Octane.",
     "searchTerms": [],
     "tags": ["forms", "validation"],
-    "order": 73
+    "order": 74
   },
   {
     "kind": "library-binding",
@@ -966,7 +979,7 @@
     "description": "Use html-react-parser with Octane.",
     "searchTerms": [],
     "tags": ["html", "rendering"],
-    "order": 74
+    "order": 75
   },
   {
     "kind": "library-binding",
@@ -979,7 +992,7 @@
     "description": "Use react-i18next with Octane.",
     "searchTerms": [],
     "tags": ["localization", "translations", "i18n"],
-    "order": 75
+    "order": 76
   },
   {
     "kind": "library-binding",
@@ -992,7 +1005,7 @@
     "description": "Use @lexical/react with Octane.",
     "searchTerms": [],
     "tags": ["editor", "rich text"],
-    "order": 76
+    "order": 77
   },
   {
     "kind": "library-binding",
@@ -1005,7 +1018,7 @@
     "description": "Use @mdx-js/mdx with Octane.",
     "searchTerms": [],
     "tags": ["markdown", "content"],
-    "order": 77
+    "order": 78
   },
   {
     "kind": "library-binding",
@@ -1018,7 +1031,7 @@
     "description": "Use @monaco-editor/react with Octane.",
     "searchTerms": [],
     "tags": ["editor", "code"],
-    "order": 78
+    "order": 79
   },
   {
     "kind": "library-binding",
@@ -1031,7 +1044,7 @@
     "description": "Use react-markdown with Octane.",
     "searchTerms": [],
     "tags": ["markdown", "rendering"],
-    "order": 79
+    "order": 80
   },
   {
     "kind": "library-binding",
@@ -1044,7 +1057,7 @@
     "description": "Use react-pdf with Octane.",
     "searchTerms": [],
     "tags": ["pdf", "documents"],
-    "order": 80
+    "order": 81
   },
   {
     "kind": "library-binding",
@@ -1057,7 +1070,7 @@
     "description": "Use react-syntax-highlighter with Octane.",
     "searchTerms": [],
     "tags": ["code", "highlighting"],
-    "order": 81
+    "order": 82
   },
   {
     "kind": "library-binding",
@@ -1070,7 +1083,7 @@
     "description": "Use streamdown with Octane.",
     "searchTerms": [],
     "tags": ["markdown", "streaming", "ai"],
-    "order": 82
+    "order": 83
   },
   {
     "kind": "library-binding",
@@ -1083,7 +1096,59 @@
     "description": "Use @tiptap/react with Octane.",
     "searchTerms": [],
     "tags": ["editor", "rich text"],
-    "order": 83
+    "order": 84
+  },
+  {
+    "kind": "library-binding",
+    "id": "binding-portabletext",
+    "title": "Portable Text",
+    "packageName": "@octanejs/portabletext",
+    "upstreamPackage": "@portabletext/react",
+    "category": "Sanity Content",
+    "categoryId": "sanity-content",
+    "description": "Use @portabletext/react with Octane.",
+    "searchTerms": ["@portabletext/react"],
+    "tags": ["content", "rich text", "sanity"],
+    "order": 85
+  },
+  {
+    "kind": "library-binding",
+    "id": "binding-sanity-loader",
+    "title": "Sanity Loader",
+    "packageName": "@octanejs/sanity-loader",
+    "upstreamPackage": "@sanity/react-loader",
+    "category": "Sanity Content",
+    "categoryId": "sanity-content",
+    "description": "Use @sanity/react-loader with Octane.",
+    "searchTerms": ["@sanity/react-loader"],
+    "tags": ["sanity", "data fetching", "live content"],
+    "order": 86
+  },
+  {
+    "kind": "library-binding",
+    "id": "binding-sanity-icons",
+    "title": "Sanity Icons",
+    "packageName": "@octanejs/sanity-icons",
+    "upstreamPackage": "@sanity/icons",
+    "category": "Sanity Content",
+    "categoryId": "sanity-content",
+    "description": "Use @sanity/icons with Octane.",
+    "searchTerms": ["@sanity/icons"],
+    "tags": ["sanity", "icons", "components"],
+    "order": 87
+  },
+  {
+    "kind": "library-binding",
+    "id": "binding-sanity-logos",
+    "title": "Sanity Logos",
+    "packageName": "@octanejs/sanity-logos",
+    "upstreamPackage": "@sanity/logos",
+    "category": "Sanity Content",
+    "categoryId": "sanity-content",
+    "description": "Use @sanity/logos with Octane.",
+    "searchTerms": ["@sanity/logos"],
+    "tags": ["sanity", "logos", "branding"],
+    "order": 88
   },
   {
     "kind": "library-binding",
@@ -1096,7 +1161,7 @@
     "description": "Use react-window with Octane.",
     "searchTerms": [],
     "tags": ["virtualization", "lists", "performance"],
-    "order": 84
+    "order": 89
   },
   {
     "kind": "library-binding",
@@ -1109,7 +1174,7 @@
     "description": "Use @tanstack/react-table with Octane.",
     "searchTerms": [],
     "tags": ["tables", "data grid"],
-    "order": 85
+    "order": 90
   },
   {
     "kind": "library-binding",
@@ -1122,7 +1187,7 @@
     "description": "Use @tanstack/react-virtual with Octane.",
     "searchTerms": [],
     "tags": ["virtualization", "lists", "performance"],
-    "order": 86
+    "order": 91
   },
   {
     "kind": "library-binding",
@@ -1135,7 +1200,7 @@
     "description": "Use @xyflow/react with Octane.",
     "searchTerms": ["React Flow", "xy flow"],
     "tags": ["diagrams", "nodes", "graphs"],
-    "order": 87
+    "order": 92
   },
   {
     "kind": "library-binding",
@@ -1148,7 +1213,7 @@
     "description": "Use @vis.gl/react-mapbox with Octane.",
     "searchTerms": ["Mapbox", "MapLibre"],
     "tags": ["maps", "geospatial"],
-    "order": 88
+    "order": 93
   },
   {
     "kind": "library-binding",
@@ -1161,7 +1226,7 @@
     "description": "Use recharts with Octane.",
     "searchTerms": [],
     "tags": ["charts", "data visualization"],
-    "order": 89
+    "order": 94
   },
   {
     "kind": "library-binding",
@@ -1174,7 +1239,7 @@
     "description": "Use @visx/visx with Octane.",
     "searchTerms": [],
     "tags": ["charts", "data visualization"],
-    "order": 90
+    "order": 95
   },
   {
     "kind": "library-binding",
@@ -1187,7 +1252,7 @@
     "description": "Use @react-three/drei with Octane.",
     "searchTerms": [],
     "tags": ["three.js", "3d", "helpers"],
-    "order": 91
+    "order": 96
   },
   {
     "kind": "library-binding",
@@ -1200,7 +1265,7 @@
     "description": "Use @react-three/fiber with Octane.",
     "searchTerms": ["R3F", "React Three Fiber"],
     "tags": ["three.js", "3d", "webgl"],
-    "order": 92
+    "order": 97
   },
   {
     "kind": "library-binding",
@@ -1213,7 +1278,7 @@
     "description": "Use ink with Octane.",
     "searchTerms": [],
     "tags": ["terminal", "cli", "universal renderer"],
-    "order": 93
+    "order": 98
   },
   {
     "kind": "library-binding",
@@ -1226,7 +1291,7 @@
     "description": "Use @opentui/react with Octane.",
     "searchTerms": ["Open TUI"],
     "tags": ["terminal", "cli", "universal renderer"],
-    "order": 94
+    "order": 99
   },
   {
     "kind": "library-binding",
@@ -1239,7 +1304,7 @@
     "description": "Use electron with Octane.",
     "searchTerms": [],
     "tags": ["desktop", "native apps"],
-    "order": 95
+    "order": 100
   },
   {
     "kind": "library-binding",
@@ -1252,7 +1317,7 @@
     "description": "Use @tauri-apps/api with Octane.",
     "searchTerms": [],
     "tags": ["desktop", "native apps"],
-    "order": 96
+    "order": 101
   },
   {
     "kind": "library-binding",
@@ -1265,7 +1330,7 @@
     "description": "Use styled-components with Octane.",
     "searchTerms": [],
     "tags": ["css", "css in js"],
-    "order": 97
+    "order": 102
   },
   {
     "kind": "library-binding",
@@ -1278,7 +1343,7 @@
     "description": "Use @stylexjs/stylex with Octane.",
     "searchTerms": ["Style X"],
     "tags": ["css", "css in js"],
-    "order": 98
+    "order": 103
   },
   {
     "kind": "library-binding",
@@ -1291,7 +1356,7 @@
     "description": "Use @testing-library/react with Octane.",
     "searchTerms": ["React Testing Library"],
     "tags": ["testing", "components", "dom"],
-    "order": 99
+    "order": 104
   },
   {
     "kind": "library-binding",
@@ -1304,7 +1369,7 @@
     "description": "Use octane with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 100
+    "order": 105
   },
   {
     "kind": "library-binding",
@@ -1317,6 +1382,6 @@
     "description": "Use @tanstack/react-devtools with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 101
+    "order": 106
   }
 ]
