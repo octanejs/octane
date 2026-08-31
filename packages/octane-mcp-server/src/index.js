@@ -55,6 +55,7 @@ export const BENCHMARK_SUITES = [
 	'recursive-context',
 	'spa-navigation',
 	'scoped-signals',
+	'scoped-signals-trace',
 	'scoped-native-reads',
 	'signal-favoring',
 	'news',

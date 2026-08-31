@@ -48,6 +48,23 @@ workspace installation and record the actual dependency paths, versions, entry
 and manifest hashes, runner hash, and hashes of every bundled input. This is a
 dependency-resolution override, not a substitute engine or an installation step.
 
+### Bounded trace retention
+
+The renderer-free trace workload measures the production scope's trace-event retention
+with tracing disabled, before a maximum-size trace fills, and after small and
+maximum-size traces wrap. Setup, inspection, and exact retained-sequence checks stay
+outside timed intervals so unrelated signal graph work does not hide retention cost.
+
+```bash
+node benchmarks/scoped-signals/run-trace.mjs 8
+node benchmarks/bench.mjs --quick scoped-signals-trace
+node benchmarks/bench.mjs --quick --ratios scoped-signals-trace
+```
+
+The timing is normalized to nanoseconds per retained event. Same-run ratios compare the
+wrapped maximum budget with the unfilled maximum-budget control; they do not claim
+renderer or application-wide gains.
+
 ## Graphs and timing
 
 - Independent: one source and one derived output per row; a sparse write has

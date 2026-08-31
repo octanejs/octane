@@ -441,11 +441,18 @@ export class ScopeImpl implements Scope, GraphOwner {
 			type,
 			...(node ? { key: node.key, revision: node.revision } : {}),
 		};
-		if (this.events.length === this.traceLimit) this.events.shift();
-		this.events.push(event);
+		if (this.events.length === this.traceLimit) {
+			this.events[(event.sequence - 1) % this.traceLimit] = event;
+		} else {
+			this.events.push(event);
+		}
 	}
 
 	inspect(): ScopeInspection {
+		const traceStart =
+			this.traceLimit && this.events.length === this.traceLimit
+				? this.sequence % this.traceLimit
+				: 0;
 		return {
 			scopeKey: this.scopeKey,
 			epoch: this.epoch,
@@ -474,7 +481,9 @@ export class ScopeImpl implements Scope, GraphOwner {
 					dependencies,
 				};
 			}),
-			trace: this.events.map((event) => ({ ...event })),
+			trace: this.events.map((event, index) => ({
+				...(traceStart ? this.events[(traceStart + index) % this.events.length]! : event),
+			})),
 		};
 	}
 

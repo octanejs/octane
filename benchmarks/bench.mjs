@@ -280,6 +280,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n, quick) => [String(n), ...(quick ? ['--quick'] : [])] }],
 	},
 	{
+		// Renderer-free production trace-event retention before and after the
+		// bounded history fills, with exact chronological sequence controls.
+		name: 'scoped-signals-trace',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run-trace.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Actual production compilation with ordinary/native read controls,
 		// plus deterministic five-dependency use() creation-cache guards.
 		name: 'scoped-native-reads',
