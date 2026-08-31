@@ -5,6 +5,13 @@
 React binding over the unchanged `unhead@3.3.2` core, without React or React
 types.
 
+## Installation
+
+```sh
+npm install @octanejs/unhead
+pnpm add @octanejs/unhead
+```
+
 ```tsx
 import { createElement } from 'octane';
 import { useHead } from '@octanejs/unhead';

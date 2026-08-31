@@ -2,6 +2,13 @@
 
 Octane binding for [`urql@5.0.3`](https://github.com/urql-graphql/urql). Re-exports `@urql/core@6.0.3` and ports the React hooks and render-prop components.
 
+## Installation
+
+```sh
+npm install @octanejs/urql graphql
+pnpm add @octanejs/urql graphql
+```
+
 ```ts
 import { createElement } from 'octane';
 import { Client, Provider, cacheExchange, fetchExchange, useQuery, gql } from '@octanejs/urql';

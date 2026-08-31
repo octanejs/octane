@@ -2,6 +2,13 @@
 
 Octane binding for `react-resizable-panels@4.12.2`.
 
+## Installation
+
+```sh
+npm install @octanejs/resizable-panels
+pnpm add @octanejs/resizable-panels
+```
+
 Install `@octanejs/resizable-panels` and replace the React package import;
 the public `Group`, `Panel`, `Separator`, persistence hooks, refs, and imperative
 handles retain the pinned upstream contract.

@@ -2,6 +2,13 @@
 
 Octane binding for [`@preact/signals-react@3.12.0`](https://github.com/preactjs/signals). The framework-neutral `@preact/signals-core` runtime is reused.
 
+## Installation
+
+```sh
+npm install @octanejs/signals-react
+pnpm add @octanejs/signals-react
+```
+
 ```ts
 import { signal } from '@octanejs/signals-react';
 import { useSignals } from '@octanejs/signals-react/runtime';

@@ -6,6 +6,13 @@
 This is the official canvas wrapper only. It reuses `@rive-app/canvas@2.40.0`
 unchanged and re-exports that package's runtime surface.
 
+## Installation
+
+```sh
+npm install @octanejs/rive
+pnpm add @octanejs/rive
+```
+
 ```ts
 import Rive, { useRive, useStateMachineInput } from '@octanejs/rive';
 

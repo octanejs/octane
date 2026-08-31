@@ -2,6 +2,13 @@
 
 Octane binding for [`@lingui/react@6.6.0`](https://github.com/lingui/js-lingui). The framework-neutral `@lingui/core` catalog runtime is reused. `I18nProvider`, `useLingui`, and `Trans` are ported onto Octane hooks and `OctaneNode`.
 
+## Installation
+
+```sh
+npm install @octanejs/lingui
+pnpm add @octanejs/lingui
+```
+
 ```tsrx
 import { setupI18n } from '@lingui/core';
 import { I18nProvider, Trans, useLingui } from '@octanejs/lingui';

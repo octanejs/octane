@@ -109,6 +109,7 @@ export function assembleWebsiteEcosystemData({
 				categoryId,
 				description: `Use ${pkg.status.upstream.package} with Octane.`,
 				searchTerms: binding.searchTerms ?? [],
+				tags: binding.tags ?? [],
 				order: order++,
 			});
 		}

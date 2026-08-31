@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/xyflow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "React Flow for the octane renderer \u2014 an Octane binding for @xyflow/react node-based graphs and flow editors.",
+  "description": "React Flow for the octane renderer — an Octane binding for @xyflow/react node-based graphs and flow editors.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"

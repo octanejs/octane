@@ -2,6 +2,13 @@
 
 [Floating UI](https://floating-ui.com) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/floating-ui
+pnpm add @octanejs/floating-ui
+```
+
 A port of `@floating-ui/react` 0.27.19 — positioning (`useFloating`, the
 ref-aware `arrow`, the `@floating-ui/dom` middleware re-exports, the floating
 tree), the full interaction-hook set (`useInteractions`, `useHover` +

@@ -2,6 +2,13 @@
 
 Octane binding for [`overlayscrollbars-react@0.5.6`](https://github.com/KingSora/OverlayScrollbars). The vanilla `overlayscrollbars` core is a peer dependency.
 
+## Installation
+
+```sh
+npm install @octanejs/overlayscrollbars overlayscrollbars
+pnpm add @octanejs/overlayscrollbars overlayscrollbars
+```
+
 ```ts
 import { OverlayScrollbarsComponent, useOverlayScrollbars } from '@octanejs/overlayscrollbars';
 

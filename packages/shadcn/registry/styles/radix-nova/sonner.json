@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/lucide@0.1.44",
-    "@octanejs/sonner@0.1.44"
+    "@octanejs/lucide@0.1.45",
+    "@octanejs/sonner@0.1.45"
   ]
 }

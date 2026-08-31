@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/valtio",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "license": "MIT",
   "type": "module",
   "engines": {

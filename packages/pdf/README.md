@@ -2,6 +2,13 @@
 
 Octane binding for the public `react-pdf@10.4.1` root contract.
 
+## Installation
+
+```sh
+npm install @octanejs/pdf
+pnpm add @octanejs/pdf
+```
+
 ```tsx
 import { Document, Page, pdfjs } from '@octanejs/pdf';
 

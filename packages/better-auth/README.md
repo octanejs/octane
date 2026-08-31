@@ -3,6 +3,13 @@
 [Better Auth](https://github.com/better-auth/better-auth) client bindings for the
 [Octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/better-auth
+pnpm add @octanejs/better-auth
+```
+
 Better Auth keeps its authentication client and session state framework-agnostic.
 This package reuses that public vanilla client unchanged and adapts its Nanostores
 atoms to Octane's `useSyncExternalStore`. Endpoint actions, plugins, `$fetch`,
