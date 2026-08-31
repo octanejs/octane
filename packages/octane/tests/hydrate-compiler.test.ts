@@ -92,6 +92,18 @@ function runtimeExports(code: string): Set<string> {
 	return names;
 }
 
+function topLevelRuntimeBindings(code: string): string[] {
+	const names: string[] = [];
+	for (const node of parseModule(code, 'compiled.js').body as any[]) {
+		const declaration = node.type === 'ExportNamedDeclaration' ? node.declaration : node;
+		if (declaration?.id?.name) names.push(declaration.id.name);
+		for (const item of declaration?.declarations ?? []) {
+			if (item.id?.type === 'Identifier') names.push(item.id.name);
+		}
+	}
+	return names;
+}
+
 function hasReExport(code: string, request: string): boolean {
 	return (parseModule(code, 'compiled.js').body as any[]).some(
 		(node) => node.type === 'ExportNamedDeclaration' && node.source?.value === request,
@@ -350,6 +362,70 @@ export function App(props) @{
 		})!;
 		expect(staticImportLocals(child.code, './review-data.js')).toEqual(['reviewPrefix']);
 		expect(child.code).toContain('reviewPrefix + label');
+	});
+
+	it('keeps sibling split declarations isolated and dependency-ordered', () => {
+		const source = `
+import { Hydrate } from 'octane';
+const firstPrefix = 'first:';
+const firstLabel = firstPrefix + 'item';
+function First() @{ <span>{firstLabel}</span> }
+const secondPrefix = 'second:';
+const secondLabel = secondPrefix + 'item';
+function Second() @{ <span>{secondLabel}</span> }
+export function App() @{
+  <>
+    <Hydrate when={gate}><First /></Hydrate>
+    <Hydrate when={gate}><Second /></Hydrate>
+  </>
+}
+`;
+		const instance = compiler();
+		const root = instance.transform(source, FILE, { environment: 'client' })!;
+		expect(root.code).not.toContain("'first:'");
+		expect(root.code).not.toContain("'second:'");
+
+		const first = instance.transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		expect(first.code).toContain("'first:'");
+		expect(first.code).not.toContain("'second:'");
+		const firstBindings = topLevelRuntimeBindings(first.code);
+		expect(firstBindings.indexOf('firstPrefix')).toBeLessThan(firstBindings.indexOf('firstLabel'));
+		expect(firstBindings.indexOf('firstLabel')).toBeLessThan(firstBindings.indexOf('First'));
+
+		const second = instance.transform(source, `${FILE}?octane-hydrate=1`, {
+			environment: 'client',
+		})!;
+		expect(second.code).toContain("'second:'");
+		expect(second.code).not.toContain("'first:'");
+		const secondBindings = topLevelRuntimeBindings(second.code);
+		expect(secondBindings.indexOf('secondPrefix')).toBeLessThan(
+			secondBindings.indexOf('secondLabel'),
+		);
+		expect(secondBindings.indexOf('secondLabel')).toBeLessThan(secondBindings.indexOf('Second'));
+
+		const server = instance.transform(source, FILE, { environment: 'server' })!;
+		expect(server.code).toContain("'first:'");
+		expect(server.code).toContain("'second:'");
+	});
+
+	it('keeps a module declaration eager when an ancestor binding shadows it', () => {
+		const source = `
+import { Hydrate } from 'octane';
+const label = setupLabel();
+export function App(label) @{
+  <Hydrate when={true}><span>{label}</span></Hydrate>
+}
+`;
+		const instance = compiler();
+		const root = instance.transform(source, FILE, { environment: 'client' })!;
+		expect(root.code).toContain('setupLabel()');
+
+		const child = instance.transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		expect(child.code).not.toContain('setupLabel()');
 	});
 
 	it('keeps a same-module child eager when retained output also references it', () => {

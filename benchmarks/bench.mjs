@@ -913,6 +913,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Hydrate module-slicing selection at 150 and 2,400 sibling boundaries,
+		// with retained declarations and whole-compiler targets as controls.
+		name: 'tsrx-hydrate-module-slicing',
+		cwd: 'tsrx-hydrate-module-slicing',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Authored renderer-validation range membership at two scales plus matched
 		// whole-pipeline compiles with and without validation in the same process.
 		name: 'tsrx-renderer-validation-ranges',
