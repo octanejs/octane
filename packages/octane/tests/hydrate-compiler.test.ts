@@ -410,6 +410,24 @@ export function App() @{
 		expect(server.code).toContain("'second:'");
 	});
 
+	it('keeps a module declaration eager when an ancestor binding shadows it', () => {
+		const source = `
+import { Hydrate } from 'octane';
+const label = setupLabel();
+export function App(label) @{
+  <Hydrate when={true}><span>{label}</span></Hydrate>
+}
+`;
+		const instance = compiler();
+		const root = instance.transform(source, FILE, { environment: 'client' })!;
+		expect(root.code).toContain('setupLabel()');
+
+		const child = instance.transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		expect(child.code).not.toContain('setupLabel()');
+	});
+
 	it('keeps a same-module child eager when retained output also references it', () => {
 		const source = `
 import { Hydrate } from 'octane';

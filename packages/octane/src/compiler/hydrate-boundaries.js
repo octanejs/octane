@@ -1326,8 +1326,12 @@ function extractedModuleAst(
 function moduleReferencesForBoundary(analysis, boundary, request, moduleBindingsByPath) {
 	assertDirectChildren(boundary, boundary.filename);
 	validateBoundary(boundary, boundary.filename, analysis.imports.hookNames);
+	const collectModuleReferences = (nodes) =>
+		collectCaptures(nodes, analysis.imports.importBindings).filter(
+			(name) => !boundary.shadowedImports.has(name),
+		);
 	if (boundary.children.length === 0) {
-		return collectCaptures(boundary.node.children, analysis.imports.importBindings);
+		return collectModuleReferences(boundary.node.children);
 	}
 	const nestedAnalysis = {
 		...analysis,
@@ -1344,7 +1348,7 @@ function moduleReferencesForBoundary(analysis, boundary, request, moduleBindings
 		request,
 		moduleBindingsByPath,
 	);
-	return collectCaptures(fragment.body, analysis.imports.importBindings);
+	return collectModuleReferences(fragment.body);
 }
 
 function createModuleMovePlanAst(analysis, request) {
