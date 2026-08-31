@@ -432,6 +432,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production deferred-boundary adoption at 1 and 2,048 boundaries, with a
+		// deterministic per-boundary Set-allocation slope and plain-mount control.
+		name: 'deferred-hydration-boundaries',
+		cwd: 'deferred-hydration-boundaries',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Production multi-root hydration with a same-width foreign update wave
 		// already queued, normalized per row to catch repeated queue prefix scans.
 		name: 'hydration-render-phase-queue',
