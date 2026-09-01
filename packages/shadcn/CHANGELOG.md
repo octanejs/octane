@@ -1,5 +1,17 @@
 # @octanejs/shadcn
 
+## 0.0.37
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/aria@0.0.46
+  - @octanejs/base-ui@0.1.50
+  - @octanejs/lucide@0.1.47
+  - @octanejs/radix@0.1.51
+  - @octanejs/sonner@0.1.47
+
 ## 0.0.36
 
 ### Patch Changes

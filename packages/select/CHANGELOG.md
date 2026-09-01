@@ -1,5 +1,13 @@
 # @octanejs/select
 
+## 0.1.3
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/transition-group@0.0.18
+
 ## 0.1.2
 
 ### Patch Changes

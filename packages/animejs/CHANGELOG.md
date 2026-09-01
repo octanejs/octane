@@ -1,5 +1,11 @@
 # @octanejs/animejs
 
+## 0.0.22
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
 ## 0.0.21
 
 ### Patch Changes

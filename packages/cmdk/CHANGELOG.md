@@ -1,5 +1,13 @@
 # @octanejs/cmdk
 
+## 0.1.35
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/radix@0.1.51
+
 ## 0.1.34
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @octanejs/tanstack-db
 
+## 0.0.15
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
 ## 0.0.14
 
 ### Patch Changes

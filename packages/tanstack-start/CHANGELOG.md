@@ -1,5 +1,14 @@
 # @octanejs/tanstack-start
 
+## 0.1.41
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/rspack-plugin@0.1.47
+  - @octanejs/tanstack-router@0.1.51
+
 ## 0.1.40
 
 ### Patch Changes
