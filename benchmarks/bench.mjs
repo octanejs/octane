@@ -815,6 +815,16 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Exact compact-handle retirement preparation (Node-only): proves a small
+		// run does not scan unrelated materialized handles and the inverse large
+		// compact range does not walk unmaterialized IDs.
+		name: 'lynx-handle-retirement',
+		cwd: 'lynx-handle-retirement',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Universal renderer update locality (Node-only): compiles the public issue
 		// fixture and measures one stateful leaf beside up to 4,000 unrelated owners.
 		name: 'universal-leaf-update',

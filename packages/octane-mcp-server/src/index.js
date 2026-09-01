@@ -103,6 +103,7 @@ export const BENCHMARK_SUITES = [
 	'async-waterfall',
 	'async-composition',
 	'lynx-list',
+	'lynx-handle-retirement',
 	'universal-leaf-update',
 	'universal-object-teardown',
 	'universal-template-events',

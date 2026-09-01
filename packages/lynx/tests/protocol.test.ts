@@ -2860,6 +2860,48 @@ describe('@octanejs/lynx transported protocol', () => {
 		prepareLynxCompactHandleDeltas(container, templateBatch(count), count, identity(97, 1)).apply();
 		const observed = container.getPublicHandle(2)!;
 		expect(observed.active).toBe(true);
+		const rightSurvivor = container.getPublicHandle(8)!;
+		const firstRemoved = container.getPublicHandle(4)!;
+		const lastRemoved = container.getPublicHandle(6)!;
+		const firstRemovedSnapshot = firstRemoved.snapshot;
+		const lastRemovedSnapshot = lastRemoved.snapshot;
+		const rightSurvivorSnapshot = rightSurvivor.snapshot;
+
+		const partialBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 2,
+			commands: [{ op: 'destroy-run', parent: null, firstId: 4, count: 3, width: 1 }],
+		};
+		const partialRemoval = prepareLynxHandleDeltas(
+			container,
+			partialBatch,
+			[{ op: 'remove-run', firstId: 4, hostCount: 3, generation: 1 }],
+			identity(97, 2),
+		);
+		partialRemoval.apply();
+		expect(firstRemoved.active).toBe(false);
+		expect(lastRemoved.active).toBe(false);
+		expect(container.getPublicHandle(4)).toBeNull();
+		expect(container.getPublicHandle(5)).toBeNull();
+		expect(container.getPublicHandle(6)).toBeNull();
+		expect(container.getPublicHandle(2)).toBe(observed);
+		expect(observed.active).toBe(true);
+		expect(container.getPublicHandle(8)).toBe(rightSurvivor);
+		expect(rightSurvivor.active).toBe(true);
+		expect(rightSurvivor.snapshot).toBe(rightSurvivorSnapshot);
+
+		partialRemoval.rollback();
+		expect(container.getPublicHandle(2)).toBe(observed);
+		expect(container.getPublicHandle(4)).toBe(firstRemoved);
+		expect(container.getPublicHandle(6)).toBe(lastRemoved);
+		expect(container.getPublicHandle(8)).toBe(rightSurvivor);
+		expect(firstRemoved.active).toBe(true);
+		expect(firstRemoved.attached).toBe(true);
+		expect(firstRemoved.snapshot).toBe(firstRemovedSnapshot);
+		expect(lastRemoved.active).toBe(true);
+		expect(lastRemoved.attached).toBe(true);
+		expect(lastRemoved.snapshot).toBe(lastRemovedSnapshot);
+		expect(container.getPublicHandle(5)?.active).toBe(true);
 
 		const runBatch: UniversalHostBatch = {
 			renderer: LYNX_TRANSPORT_RENDERER,
