@@ -2,6 +2,8 @@
 // cannot affect the first-party package inventory, counts, or status surfaces.
 import { COMMUNITY_BINDING_GROUPS } from '../content/community-bindings.ts';
 
+const COMMUNITY_BINDING_SEARCH_URL = 'https://github.com/search?q=%2F%28%22octane%22%5Cs*%3A%7C%22name%22%5Cs*%3A%5Cs*%22%5B%5E%22%5D*octane%5B%5E%22%5D*%22%29%2F%20path%3A%2Fpackage%5C.json%24%2F%20NOT%20org%3Aoctanejs%20NOT%20is%3Afork&type=code';
+
 export function CommunityBindingsDirectory() @{
 	<div class="community-binding-directory">
 		@for (const group of COMMUNITY_BINDING_GROUPS; key group.id) {
@@ -27,6 +29,17 @@ export function CommunityBindingsDirectory() @{
 				</ul>
 			</section>
 		}
+		<p class="community-binding-discovery-row">
+			<a
+				class="community-binding-discovery"
+				href={COMMUNITY_BINDING_SEARCH_URL}
+				target="_blank"
+				rel="noreferrer"
+				aria-label="Explore more community bindings on GitHub in a new tab"
+			>
+				Explore more community bindings
+			</a>
+		</p>
 
 		<style>
 			.community-binding-directory {
@@ -88,6 +101,11 @@ export function CommunityBindingsDirectory() @{
 				font-size: 0.75rem;
 				text-overflow: ellipsis;
 				white-space: nowrap;
+			}
+			.community-binding-discovery-row {
+				grid-column: 1 / -1;
+				margin: 0.15rem 0 0;
+				font-size: 0.875rem;
 			}
 		</style>
 	</div>

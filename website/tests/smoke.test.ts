@@ -664,7 +664,15 @@ describe('website routes', () => {
 				expect(link.rel).toBe('noreferrer');
 			}
 		}
-		expect(container.querySelector('.community-binding-discovery')).toBeNull();
+		const discoveryLink = container.querySelector<HTMLAnchorElement>(
+			'a.community-binding-discovery',
+		)!;
+		expect(discoveryLink.textContent?.trim()).toBe('Explore more community bindings');
+		expect(discoveryLink.getAttribute('href')).toBe(
+			'https://github.com/search?q=%2F%28%22octane%22%5Cs*%3A%7C%22name%22%5Cs*%3A%5Cs*%22%5B%5E%22%5D*octane%5B%5E%22%5D*%22%29%2F%20path%3A%2Fpackage%5C.json%24%2F%20NOT%20org%3Aoctanejs%20NOT%20is%3Afork&type=code',
+		);
+		expect(discoveryLink.target).toBe('_blank');
+		expect(discoveryLink.rel).toBe('noreferrer');
 	});
 
 	it('/docs/framework-integrations links every first-party framework integration', async () => {
