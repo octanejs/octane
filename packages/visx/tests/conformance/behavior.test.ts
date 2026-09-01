@@ -5,6 +5,7 @@ import {
 	AccessibilityFixture,
 	BoundsFixture,
 	BrushFixture,
+	CategoricalScaleFixture,
 	HookFamiliesFixture,
 	ResponsiveEnhancersFixture,
 	ResponsiveFixture,
@@ -32,6 +33,87 @@ afterEach(() => {
 });
 
 describe('@octanejs/visx stateful behavior', () => {
+	it('preserves first-match categorical colors, palette wrapping, and missing-key fallbacks', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const domain = Array.from({ length: 64 }, (_, index) => `key-${index}`);
+		domain[0] = 'alpha';
+		domain[1] = 'beta';
+		domain[3] = 'gamma';
+		domain[62] = 'alpha';
+		const view = render(CategoricalScaleFixture, {
+			domain,
+			keys: ['alpha', 'beta', 'gamma', 'missing'],
+			range: ['red', 'green', 'blue'],
+		});
+		const probe = view.find('#categorical-scale-probe');
+		const categorical = probe.getAttribute('data-categorical')?.split('|');
+
+		expect(probe.getAttribute('data-color')).toBe('red|green|red|red');
+		expect(categorical).toHaveLength(4);
+		expect(categorical?.[0]).toBe(categorical?.[3]);
+		expect(categorical?.[1]).not.toBe(categorical?.[0]);
+		expect(categorical?.[2]).not.toBe(categorical?.[0]);
+		expect(warn).toHaveBeenCalledTimes(2);
+		expect(warn).toHaveBeenNthCalledWith(
+			1,
+			'[@octanejs/visx/theme] useCategoricalScale received "missing" outside its domain; using index 0.',
+		);
+		expect(warn).toHaveBeenNthCalledWith(
+			2,
+			'[@octanejs/visx/theme] useColorScale received "missing" outside its domain; using index 0.',
+		);
+	});
+
+	it('rebuilds categorical scales when domain, range, or theme inputs change', () => {
+		const view = render(CategoricalScaleFixture, {
+			domain: ['alpha', 'beta'],
+			keys: ['beta'],
+			range: ['red', 'green'],
+		});
+		const probe = view.find('#categorical-scale-probe');
+		const initialCategorical = probe.getAttribute('data-categorical');
+
+		expect(probe.getAttribute('data-color')).toBe('green');
+
+		view.update(CategoricalScaleFixture, {
+			domain: ['beta', 'alpha'],
+			keys: ['beta'],
+			range: ['red', 'green'],
+		});
+
+		expect(probe.getAttribute('data-color')).toBe('red');
+		expect(probe.getAttribute('data-categorical')).not.toBe(initialCategorical);
+		const domainCategorical = probe.getAttribute('data-categorical');
+
+		view.update(CategoricalScaleFixture, {
+			domain: ['beta', 'alpha'],
+			keys: ['beta'],
+			range: ['blue', 'orange'],
+		});
+
+		expect(probe.getAttribute('data-color')).toBe('blue');
+		expect(probe.getAttribute('data-categorical')).toBe(domainCategorical);
+
+		const themedView = render(CategoricalScaleFixture, {
+			domain: ['alpha', 'beta'],
+			keys: ['beta'],
+			range: ['red', 'green'],
+			theme: 'light',
+		});
+		const themedProbe = themedView.find('#categorical-scale-probe');
+		const lightCategorical = themedProbe.getAttribute('data-categorical');
+
+		themedView.update(CategoricalScaleFixture, {
+			domain: ['alpha', 'beta'],
+			keys: ['beta'],
+			range: ['red', 'green'],
+			theme: 'dark',
+		});
+
+		expect(themedProbe.getAttribute('data-color')).toBe('green');
+		expect(themedProbe.getAttribute('data-categorical')).not.toBe(lightCategorical);
+	});
+
 	it('attaches native wheel and pointer listeners for Zoom', () => {
 		const view = render(ZoomFixture);
 		const target = view.find('#zoom-target');

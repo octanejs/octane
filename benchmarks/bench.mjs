@@ -477,6 +477,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Node-only repeated categorical lookup through the production Visx
+		// helper and the prior linear scan at small and large domain sizes.
+		name: 'visx-categorical-scale',
+		cwd: 'visx-categorical-scale',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Node-only Rspack CSS-module proof collection and verification with
 		// deterministic graph traversal and yielded-connection counts.
 		name: 'rspack-css-graph',

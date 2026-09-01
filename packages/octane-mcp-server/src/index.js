@@ -78,6 +78,7 @@ export const BENCHMARK_SUITES = [
 	'behavior-root-events',
 	'radix-collection-order',
 	'router-dispatch',
+	'visx-categorical-scale',
 	'rspack-css-graph',
 	'floating-tree-navigation',
 	'ink-cursor-update',

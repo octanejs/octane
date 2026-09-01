@@ -11,7 +11,12 @@ import { useStableId } from '@octanejs/visx/kernel';
 import { useScale } from '@octanejs/visx/scale/react';
 import { scaleLinear } from '@octanejs/visx/scale';
 import { usePie } from '@octanejs/visx/shape/react';
-import { ThemeProvider, useTheme } from '@octanejs/visx/theme/react';
+import {
+	ThemeProvider,
+	useCategoricalScale,
+	useColorScale,
+	useTheme,
+} from '@octanejs/visx/theme/react';
 import { useTooltip, useTooltipInPortal } from '@octanejs/visx/tooltip';
 import { useFloatingTooltip } from '@octanejs/visx/tooltip/floating';
 import { useVoronoi } from '@octanejs/visx/voronoi/react';
@@ -215,6 +220,22 @@ export function AccessibilityFixture() {
 function ThemeProbe() {
 	const theme = useTheme();
 	return <output id="theme-probe">{`${theme.name}:${theme.colors.textPrimary}`}</output>;
+}
+
+function CategoricalScaleProbe({ domain, keys, range }) {
+	const categoricalScale = useCategoricalScale(domain);
+	const colorScale = useColorScale(domain, { range });
+
+	return <output
+		id="categorical-scale-probe"
+		data-categorical={keys.map(categoricalScale).join('|')}
+		data-color={keys.map(colorScale).join('|')}
+	/>;
+}
+
+export function CategoricalScaleFixture({ domain, keys, range, theme }) {
+	const probe = <CategoricalScaleProbe domain={domain} keys={keys} range={range} />;
+	return theme === undefined ? probe : <ThemeProvider theme={theme}>{probe}</ThemeProvider>;
 }
 
 export function HookFamiliesFixture() {

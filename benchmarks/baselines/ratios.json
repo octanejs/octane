@@ -592,6 +592,14 @@
     "note": "Same-process lowercase method misses through 1,000 server routes, normalized per candidate. Re-normalizing the request method for every route measured at 0.31x the dynamic control; one dispatch-level normalization measured at 0.07x. The 0.2 ceiling leaves timing headroom while catching repeated method normalization."
   },
   {
+    "suite": "visx-categorical-scale",
+    "op": "lookup_per_1000",
+    "target": "indexed-4096",
+    "reference": "scan-4096",
+    "maxRatio": 0.08,
+    "note": "Same-process categorical color lookup across 4,096 domain keys, with index construction included in every sample and first-match duplicate and missing-key gates. Repeated linear scans measured 1.59ms per 1,000 lookups while the first-occurrence index measured 0.04ms, a 0.02x ratio across three normal runs. The 0.08 ceiling leaves more than 3x timing headroom while catching restoration of quadratic lookup work."
+  },
+  {
     "suite": "rspack-css-graph",
     "op": "graph_traversals",
     "target": "sixteen-requests",
