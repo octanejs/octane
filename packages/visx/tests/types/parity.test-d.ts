@@ -31,8 +31,8 @@ type IsRenderable<T> = IsUnknown<T> extends true ? true : Equal<T, import('react
 // OCTANE DIVERGENCE: components whose rest props spread an octane attribute
 // bag (`Octane.SVGProps` / `Octane.HTMLAttributes`, e.g. via `AddSVGProps`)
 // diverge from upstream exactly where octane's JSX surface diverges from
-// React's: `on*` handlers receive NATIVE DOM events (octane has no synthetic
-// event layer; the handler NAMES are identical), `className` composes
+// React's: shared `on*` handlers receive NATIVE DOM events (octane has no
+// synthetic event layer), `className` composes
 // clsx-style (`ClassValue`), `style` additionally accepts a plain string,
 // `ref` accepts (nested) ref arrays, and octane adds the native `class` /
 // `for` attribute aliases. Compare those components' props with the bag
@@ -95,11 +95,11 @@ type AttributeBagNormalizedPropsExtends<LocalComponent, UpstreamComponent> = Ext
 // element type, not a renderable hole, so the bag inside its type argument is
 // unreachable. Like Drag, whose divergence is the native event union rather
 // than a bag, their props surface is pinned key-for-key. Such a pin must also
-// ignore what a TOP-LEVEL bag contributes to the key set: octane's bags add
-// exactly `class`, `for`, `hidden`, and `tabindex` beside React's canonical
-// camelCase props and drop nothing, so those keys are excluded from both
-// sides. They are optional, which is why the member-by-member comparisons
-// above tolerate them without listing them.
+// ignore the common TOP-LEVEL bag additions `class`, `for`, `hidden`, and
+// `tabindex` beside React's canonical camelCase props. Host-specific additions
+// are listed only for the affected component below. These additions are
+// optional, which is why the member-by-member comparisons above tolerate them
+// without listing them.
 type OctaneOnlyAttributeSurfaceKeys = OctaneOnlyAttributeKeys | 'hidden' | 'tabindex';
 type PropsShapeEqual<
 	LocalComponent,
@@ -490,11 +490,32 @@ type _Point = Assert<Equal<Local['Point'], Upstream['Point']>>;
 // ParentSize spreads `Octane.HTMLAttributes` — see the attribute-bag
 // carve-out above (`style` stays `CSSProperties` locally because ParentSize
 // merges style objects; it collapses with the bag members either way).
-// Octane also supports the native xmlns attribute on HTML hosts, whereas
-// React includes it only in SVG props. Normalize that extra key only here.
+// Octane also supports xmlns and both phases of native dialog lifecycle events
+// on HTML ancestors; React restricts xmlns to SVG and these handlers to dialogs.
+// Normalize only those extra keys here, then pin the native handler surface.
+type ParentSizeDialogLifecycleKeys = 'onCancel' | 'onCancelCapture' | 'onClose' | 'onCloseCapture';
 type _ResponsiveParentSizeProps = Assert<
-	PropsShapeEqual<Local['Responsive']['ParentSize'], Upstream['Responsive']['ParentSize'], 'xmlns'>
+	PropsShapeEqual<
+		Local['Responsive']['ParentSize'],
+		Upstream['Responsive']['ParentSize'],
+		'xmlns' | ParentSizeDialogLifecycleKeys
+	>
 >;
+type _ResponsiveParentSizeNativeDialogEvents = Assert<
+	Equal<
+		Pick<ComponentProps<Local['Responsive']['ParentSize']>, ParentSizeDialogLifecycleKeys>,
+		{
+			[K in ParentSizeDialogLifecycleKeys]?: (
+				event: Event & { currentTarget: HTMLDivElement },
+			) => void;
+		}
+	>
+>;
+type ParentSizeDialogLifecycleEvent = Parameters<
+	NonNullable<ComponentProps<Local['Responsive']['ParentSize']>[ParentSizeDialogLifecycleKeys]>
+>[0];
+// @ts-expect-error Dialog lifecycle handlers receive native events, not synthetic wrappers or any.
+type _ResponsiveParentSizeDialogEventHasNoWrapper = ParentSizeDialogLifecycleEvent['nativeEvent'];
 type _ResponsiveScaleSvg = Assert<
 	Extends<Local['Responsive']['ScaleSVG'], Upstream['Responsive']['ScaleSVG']>
 >;

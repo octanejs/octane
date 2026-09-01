@@ -556,10 +556,39 @@ JavaScript evaluation semantics.
 
 ## Native event objects, no synthetic event layer
 
-Event propagation itself matches React and is **not a divergence**. Ordinary
-bubbling and capture, `stopPropagation`, logical propagation through portals,
-and native non-bubbling families (`toggle`, dialog `close`/`cancel`, media,
-`load`/`error`) all reach the same logical ancestors React does.
+Delegated capture and bubbling are scoped to each root's portion of the event
+path. Native listeners between nested roots run before the next root's handlers,
+and can prevent the event from reaching that root. Shadow roots and distributed
+slots use the browser's composed path without replacing its retargeted `target`
+or `relatedTarget`. Portals still propagate through their logical ancestors.
+A portal rendered into a closed shadow root physically inside its own outer
+root is a known interop limit: the outer listener cannot see the hidden portal
+boundary, so shared outer ancestors can receive both deliveries. React also
+exhibits duplicate delivery in this topology.
+Native non-bubbling families (`toggle`, dialog `close`/`cancel`, media,
+`load`/`error`) emulate logical bubbling from a root capture listener; their
+interleaving with direct native listeners is not identical to React's event
+plugins.
+
+Within a delegated phase, propagation cancellation follows React's separation
+between its framework queue and native dispatch, while keeping a native event:
+
+- `event.stopPropagation()` in an Octane handler stops the remaining handlers
+  in that logical phase and calls the browser's native method.
+- An earlier external listener on the same root calling native
+  `stopPropagation()` does not truncate Octane's handler queue. An external
+  listener below the root can still prevent that queue from receiving the event.
+- `event.stopImmediatePropagation()` stops later native listeners on the same
+  node, but does not truncate the logical phase already running. This corresponds
+  to React's `event.nativeEvent.stopImmediatePropagation()`. Call both stop
+  methods to stop both queues. Neither method cancels the default action; use
+  `preventDefault()` for that.
+
+The native `cancelBubble` flag remains visible; it is not cleared to continue a
+logical queue. Calling a native prototype method directly or setting that flag
+operates on native propagation, not the separate framework queue. An immutable,
+non-configurable own stop method also remains native-only: Octane does not
+replace it or change the identity of the event.
 
 What differs is the event API and synthesis layer:
 

@@ -7080,6 +7080,7 @@ function unmountSlot(val: any, detachDom: boolean): void {
 		const childDetach = k === 'portalSlotSlot' ? true : detachDom;
 		if (val.block) unmountBlock(val.block, childDetach);
 		if (k === 'portalSlotSlot' && val.target) {
+			unregisterPortalEventRange(val.target, val);
 			unregisterDelegationTarget(val.target);
 		}
 	}
@@ -16297,11 +16298,88 @@ const _delegated = new Set<string>();
 // portals are currently rendering into it so we detach only when the last
 // one unmounts. createRoot containers have refcount 1 for their lifetime.
 const _delegationTargets = new Map<Node, number>();
+// Portal descendants can add their first host during a later local update,
+// without rerendering the portal itself. Resolve those hosts from the portal's
+// live owned range, paying this bookkeeping only for applications using portals.
+const _portalEventRanges = new WeakMap<Node, Set<PortalSlot>>();
+let portalEventTargetCount = 0;
+const PORTAL_EVENT_PATH_LENGTH = /* @__PURE__ */ Symbol('octane.portalPathLength');
+// Public roots end a logical event branch; portal targets do not. Keep this
+// production ownership separate from the development-only duplicate-root guard.
+interface EventRootMembership {
+	count: number;
+	since: number;
+	previous: EventRootMembership | undefined;
+}
+const _eventRoots = new WeakMap<Node, EventRootMembership>();
+let eventRootEpoch = 0;
+const EVENT_ROOT_EPOCH = /* @__PURE__ */ Symbol('octane.rootEpoch');
 
-// Event names with capture-phase handlers (`onXxxCapture`). These get a SEPARATE
-// capture-phase listener (`dispatchDelegatedCapture`) on every delegation target,
-// independent of the bubble-phase `_delegated` set — an event type can have both
-// (`onClick` + `onClickCapture`).
+function changeEventRootMembership(target: Node, delta: number): void {
+	const previous = _eventRoots.get(target);
+	_eventRoots.set(target, {
+		count: (previous?.count || 0) + delta,
+		since: ++eventRootEpoch,
+		previous,
+	});
+	if (previous !== undefined) {
+		// A native event keeps its original route even if a handler unmounts or
+		// remounts a root. Retain membership history through this native delivery,
+		// then release it. Only root lifecycle changes allocate/schedule here;
+		// events retain a number, never a snapshot holding root DOM nodes alive.
+		setTimeout(() => {
+			const current = _eventRoots.get(target);
+			if (current !== undefined) current.previous = undefined;
+		}, 0);
+	}
+}
+
+function isEventRoot(node: Node, epoch: number): boolean {
+	let membership = _eventRoots.get(node);
+	while (membership !== undefined && membership.since > epoch) membership = membership.previous;
+	return membership !== undefined && membership.count > 0;
+}
+
+function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] {
+	const path = event.composedPath();
+	// Every delegated type has a root capture observer, even without an authored
+	// capture handler. The outermost observer starts a fresh native delivery, so
+	// synchronously redispatching the same Event never inherits an old root epoch.
+	if (_delegationTargets.size === 1) {
+		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
+		if (portalEventTargetCount !== 0) {
+			preparePortalEventOwners(path, eventRootEpoch);
+			(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+		}
+		return path;
+	}
+	for (let i = path.length - 1; i >= 0; i--) {
+		if (_delegationTargets.has(path[i] as Node)) {
+			if (path[i] === listener) {
+				(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
+				if (portalEventTargetCount !== 0) {
+					preparePortalEventOwners(path, eventRootEpoch);
+					(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+				}
+			} else if (
+				portalEventTargetCount !== 0 &&
+				path.length > ((event as any)[PORTAL_EVENT_PATH_LENGTH] || 0)
+			) {
+				// A closed shadow root reveals additional nodes only to its inner
+				// listener. Keep just a length on the Event, never a retained DOM path.
+				preparePortalEventOwners(path, (event as any)[EVENT_ROOT_EPOCH] ?? eventRootEpoch);
+				(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+			}
+			break;
+		}
+	}
+	return path;
+}
+
+// Event names with authored capture-phase handlers (`onXxxCapture`). Ordinary
+// bubbling types always have a capture observer to snapshot root membership;
+// only these names also run a logical capture queue. Non-bubbling families share
+// one native capture callback for their capture and emulated bubble queues.
 const _delegatedCapture = new Set<string>();
 
 // Non-bubbling events must be delegated in the CAPTURE phase so the single root
@@ -16412,11 +16490,19 @@ export function delegateEvents(eventNames: string[]): void {
 		// back-attach the listener to every active target so handlers stamped on
 		// their DOM via `el.$$click = …` still receive events.
 		for (const target of _delegationTargets.keys()) {
+			if (delegatedCapture(name) && _delegatedCapture.has(name)) continue;
 			target.addEventListener(
 				name,
 				dispatchDelegated,
 				delegatedListenerOptions(name, delegatedCapture(name)),
 			);
+			if (!delegatedCapture(name)) {
+				target.addEventListener(
+					name,
+					dispatchDelegatedCapture,
+					delegatedListenerOptions(name, true),
+				);
+			}
 		}
 	}
 }
@@ -16436,7 +16522,12 @@ export function delegateCaptureEvents(eventNames: string[]): void {
 		// `$$capture:<type>` along the built path).
 		if (canSeed) seedExpando(Element.prototype, CAPTURE_PREFIX + name);
 		for (const target of _delegationTargets.keys()) {
-			target.addEventListener(name, dispatchDelegatedCapture, delegatedListenerOptions(name, true));
+			if (_delegated.has(name)) continue;
+			target.addEventListener(
+				name,
+				delegatedCapture(name) ? dispatchDelegated : dispatchDelegatedCapture,
+				delegatedListenerOptions(name, true),
+			);
 		}
 	}
 }
@@ -16447,8 +16538,9 @@ export function delegateCaptureEvents(eventNames: string[]): void {
  * attaches all known delegated event listeners, subsequent registrations
  * just bump the refcount.
  */
-function registerDelegationTarget(target: Node): void {
+function registerDelegationTarget(target: Node, root = false): void {
 	initDomOperations();
+	if (root) changeEventRootMembership(target, 1);
 	const prev = _delegationTargets.get(target) || 0;
 	_delegationTargets.set(target, prev + 1);
 	if (prev === 0) {
@@ -16465,9 +16557,21 @@ function registerDelegationTarget(target: Node): void {
 				dispatchDelegated,
 				delegatedListenerOptions(name, delegatedCapture(name)),
 			);
+			if (!delegatedCapture(name)) {
+				target.addEventListener(
+					name,
+					dispatchDelegatedCapture,
+					delegatedListenerOptions(name, true),
+				);
+			}
 		}
 		for (const name of _delegatedCapture) {
-			target.addEventListener(name, dispatchDelegatedCapture, delegatedListenerOptions(name, true));
+			if (_delegated.has(name)) continue;
+			target.addEventListener(
+				name,
+				delegatedCapture(name) ? dispatchDelegated : dispatchDelegatedCapture,
+				delegatedListenerOptions(name, true),
+			);
 		}
 	}
 }
@@ -16475,16 +16579,22 @@ function registerDelegationTarget(target: Node): void {
 /**
  * Inverse of `registerDelegationTarget`. Last referent detaches all listeners.
  */
-function unregisterDelegationTarget(target: Node): void {
+function unregisterDelegationTarget(target: Node, root = false): void {
+	if (root) changeEventRootMembership(target, -1);
 	const prev = _delegationTargets.get(target);
 	if (!prev) return;
 	if (prev === 1) {
 		_delegationTargets.delete(target);
 		for (const name of _delegated) {
 			target.removeEventListener(name, dispatchDelegated, delegatedCapture(name));
+			if (!delegatedCapture(name)) target.removeEventListener(name, dispatchDelegatedCapture, true);
 		}
 		for (const name of _delegatedCapture) {
-			target.removeEventListener(name, dispatchDelegatedCapture, true);
+			target.removeEventListener(
+				name,
+				delegatedCapture(name) ? dispatchDelegated : dispatchDelegatedCapture,
+				true,
+			);
 		}
 	} else {
 		_delegationTargets.set(target, prev - 1);
@@ -16566,21 +16676,96 @@ const DISCRETE_EVENTS = new Set<string>([
  */
 let _dispatchDepth = 0;
 
-// Capture and bubble delegation use separate native root listeners, but a
-// bubbling event is one discrete update window. When the capture listener can
-// hand off to a registered bubble listener, that listener owns controlled
-// restoration and the synchronous flush. A task fallback handles a descendant
-// native listener stopping propagation before the event returns to the root.
-const CAPTURE_FLUSH_FALLBACK = /* @__PURE__ */ Symbol('octane.capture.flushFallback');
+// A bubble version closes capture-only flush fallbacks without retaining a DOM
+// path or a dispatch-completed flag on the Event. The same Event may be dispatched
+// again synchronously; every native delivery must start a fresh logical walk.
+const DELEGATED_BUBBLE_VERSION = /* @__PURE__ */ Symbol('octane.bubbleVersion');
 
-// Stamps marking a native event whose delegated walk has already run, per phase. A
-// single native event can reach more than one delegation listener when targets nest —
-// a portal target inside a root, nested roots, or overlapping portal targets. Each
-// listener walks the full logical tree, so without this guard the shared portion of
-// the chain would fire its handlers once per nested listener. Capture and bubble are
-// independent phases, so each carries its own stamp.
-const DELEGATED_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched');
-const CAPTURE_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched.capture');
+// Keep framework propagation distinct from the browser's native stop flags.
+// An earlier listener on this same root may already have set cancelBubble, and
+// native stopImmediatePropagation must not abort an already-running logical queue.
+// These temporary methods still operate on the original browser Event, and the
+// exact prior own descriptors are restored before control returns to native code.
+const PROPAGATION_FLAGS = /* @__PURE__ */ Symbol('octane.propagationFlags');
+const NATIVE_STOP_PROPAGATION = /* @__PURE__ */ Symbol('octane.stopPropagation');
+const NATIVE_STOP_IMMEDIATE = /* @__PURE__ */ Symbol('octane.stopImmediatePropagation');
+function stopDelegatedPropagation(this: Event): void {
+	if ((this as any)[PROPAGATION_FLAGS] !== undefined) (this as any)[PROPAGATION_FLAGS] |= 1;
+	const stop = (this as any)[NATIVE_STOP_PROPAGATION] || this.stopPropagation;
+	// A consumer may retain the method and call it after native dispatch. The
+	// temporary dispatch state is gone then, but the restored native method lives on.
+	(stop === stopDelegatedPropagation ? Event.prototype.stopPropagation : stop).call(this);
+}
+function stopImmediateNativePropagation(this: Event): void {
+	if ((this as any)[PROPAGATION_FLAGS] !== undefined) (this as any)[PROPAGATION_FLAGS] |= 2;
+	const stop = (this as any)[NATIVE_STOP_IMMEDIATE] || this.stopImmediatePropagation;
+	(stop === stopImmediateNativePropagation ? Event.prototype.stopImmediatePropagation : stop).call(
+		this,
+	);
+}
+const STOP_PROPAGATION_DESCRIPTOR: PropertyDescriptor = {
+	configurable: true,
+	writable: true,
+	value: stopDelegatedPropagation,
+};
+const STOP_IMMEDIATE_DESCRIPTOR: PropertyDescriptor = {
+	configurable: true,
+	writable: true,
+	value: stopImmediateNativePropagation,
+};
+
+function installPropagationMethod(
+	event: Event,
+	name: 'stopPropagation' | 'stopImmediatePropagation',
+	previous: PropertyDescriptor | undefined,
+	descriptor: PropertyDescriptor,
+): void {
+	if (previous?.configurable === false) {
+		// An immutable own method cannot be interposed while preserving the native
+		// Event. Leave it native-only, like calling Event.prototype's method directly.
+		if (previous.writable) Object.defineProperty(event, name, { value: descriptor.value });
+	} else {
+		Object.defineProperty(event, name, descriptor);
+	}
+}
+
+function beginDelegatedPropagation(
+	event: Event,
+	stop: PropertyDescriptor | undefined,
+	immediate: PropertyDescriptor | undefined | null,
+): void {
+	(event as any)[PROPAGATION_FLAGS] = 0;
+	(event as any)[NATIVE_STOP_PROPAGATION] = event.stopPropagation;
+	installPropagationMethod(event, 'stopPropagation', stop, STOP_PROPAGATION_DESCRIPTOR);
+	// Only emulated bubbling needs to distinguish a native immediate stop before
+	// starting another logical phase. Ordinary browser phases leave it untouched.
+	if (immediate !== null) {
+		(event as any)[NATIVE_STOP_IMMEDIATE] = event.stopImmediatePropagation;
+		installPropagationMethod(
+			event,
+			'stopImmediatePropagation',
+			immediate,
+			STOP_IMMEDIATE_DESCRIPTOR,
+		);
+	}
+}
+
+function endDelegatedPropagation(
+	event: Event,
+	stop: PropertyDescriptor | undefined,
+	immediate: PropertyDescriptor | undefined | null,
+): void {
+	if (stop === undefined) delete (event as any).stopPropagation;
+	else Object.defineProperty(event, 'stopPropagation', stop);
+	if (immediate !== null) {
+		if (immediate === undefined) delete (event as any).stopImmediatePropagation;
+		else Object.defineProperty(event, 'stopImmediatePropagation', immediate);
+		delete (event as any)[NATIVE_STOP_IMMEDIATE];
+	}
+	delete (event as any)[PROPAGATION_FLAGS];
+	delete (event as any)[NATIVE_STOP_PROPAGATION];
+}
+
 // A receiver-specific target lets one accessor survive nested native dispatch.
 const CURRENT_TARGET_NODE = /* @__PURE__ */ Symbol('octane.currentTarget');
 const CURRENT_TARGET_DESCRIPTOR: PropertyDescriptor = {
@@ -16589,8 +16774,208 @@ const CURRENT_TARGET_DESCRIPTOR: PropertyDescriptor = {
 		return (this as any)[CURRENT_TARGET_NODE] as EventTarget | null;
 	},
 };
-// Synchronous nested capture walks borrow disjoint frames from this one stack.
+// Synchronous nested delegated walks borrow disjoint frames from this one stack.
 const CAPTURE_PATH: any[] = [];
+
+type DelegatedNode = Node & {
+	$$portalParent?: Node;
+	$$portalContainer?: Node;
+};
+
+type PortalEventBoundary = Node & {
+	$$portalEventRange?: PortalSlot;
+	$$portalEventStart?: PortalEventBoundary;
+};
+
+function resolvePortalEventOwner(node: DelegatedNode): void {
+	if (node.$$portalParent != null || node.parentNode === null) return;
+	// assignedSlot/composedPath can put a <slot> next, but a portal range belongs
+	// to the direct child's actual DOM container, not the slot it projects into.
+	const target = node.parentNode;
+	const ranges = _portalEventRanges.get(target);
+	if (ranges === undefined) return;
+	let owner: PortalSlot | undefined;
+	let previous = node.previousSibling as PortalEventBoundary | null;
+	let remainingSkips = ranges.size;
+	while (previous !== null) {
+		const closedStart = previous.$$portalEventStart;
+		const closedRange = closedStart?.$$portalEventRange;
+		if (
+			remainingSkips !== 0 &&
+			closedStart !== undefined &&
+			closedRange !== undefined &&
+			ranges.has(closedRange) &&
+			closedRange.start === closedStart &&
+			closedRange.end === previous &&
+			closedStart.parentNode === target
+		) {
+			// Skip a completed foreign range, including all its content. A valid
+			// backward walk skips each active range at most once. Bounding jumps
+			// also prevents cycles if external DOM code reverses a marker pair;
+			// after that bound, ordinary previousSibling steps always make progress.
+			remainingSkips--;
+			previous = closedStart.previousSibling as PortalEventBoundary | null;
+			continue;
+		}
+		const range = previous.$$portalEventRange;
+		const end = range?.end;
+		if (
+			range !== undefined &&
+			ranges.has(range) &&
+			range.start === previous &&
+			end != null &&
+			end.parentNode === target &&
+			(previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 &&
+			(node.compareDocumentPosition(end) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+		) {
+			// The first enclosing start encountered backwards is the innermost
+			// active owner, including foreign ranges interleaved in a Fragment.
+			owner = range;
+			break;
+		}
+		previous = previous.previousSibling as PortalEventBoundary | null;
+	}
+	if (owner === undefined) return;
+	if (ROOT_RENDER_TRANSACTION !== null) {
+		journalRootProperty(node, '$$portalParent');
+		journalRootProperty(node, '$$portalContainer');
+	}
+	node.$$portalParent = owner.host;
+	node.$$portalContainer = target;
+}
+
+function preparePortalEventOwners(path: EventTarget[], epoch: number): void {
+	for (let i = 0; i < path.length; i++) {
+		const node = eventPathNode(path[i]);
+		if (node === null) continue;
+		resolvePortalEventOwner(node);
+		// A nested portal's logical host need not occur on the native path.
+		// Resolve that branch too, before native target listeners can move nodes.
+		let logical = node.$$portalParent as DelegatedNode | undefined;
+		while (logical != null && !isEventRoot(logical, epoch) && path.indexOf(logical) < 0) {
+			resolvePortalEventOwner(logical);
+			logical = (logical.$$portalParent || logical.parentNode) as DelegatedNode | undefined;
+		}
+	}
+}
+
+function eventPathNode(target: EventTarget | null | undefined): DelegatedNode | null {
+	return target != null && typeof (target as Node).nodeType === 'number'
+		? (target as DelegatedNode)
+		: null;
+}
+
+/**
+ * Append the listener's logical target-to-root branch, excluding its owning
+ * public root container. Returns the appended count; zero also means no route.
+ *
+ * Root containers themselves belong to the enclosing root when rebasing across
+ * a foreign public root. Portal containers are routing boundaries, not ordinary
+ * root boundaries: merely registering a portal target does not truncate children
+ * that are not in a portal-owned range.
+ */
+function buildDelegatedPath(event: Event, listener: Node, path = event.composedPath()): number {
+	const output = CAPTURE_PATH;
+	const base = output.length;
+	const epoch = (event as any)[EVENT_ROOT_EPOCH] ?? eventRootEpoch;
+	const listenerIndex = path.indexOf(listener);
+	if (listenerIndex < 0) return 0;
+	// The usual application has one unchanged public root and no portals. It
+	// needs neither foreign-boundary rebasing nor per-ancestor ownership lookups.
+	// A lifecycle change since capture disables this path for the current event.
+	if (_delegationTargets.size === 1 && epoch === eventRootEpoch && isEventRoot(listener, epoch)) {
+		let i = 0;
+		for (; i < listenerIndex; i++) {
+			const node = eventPathNode(path[i]);
+			if (node === null || node.$$portalParent != null) break;
+			output.push(node);
+		}
+		if (i === listenerIndex) return output.length - base;
+		output.length = base;
+	}
+	let start = eventPathNode(path[0]);
+	if (start === null) return 0;
+	let startIndex = 0;
+	let rebaseRootAtStart = false;
+
+	for (;;) {
+		output.length = base;
+		let node: DelegatedNode | null = start;
+		let index = startIndex;
+		let firstBoundary: Node | null = null;
+		let ownsBranch = false;
+		let supersededByNearerPortal = false;
+
+		while (node !== null) {
+			// A fresh inner root owns the descendants, not the container's outer
+			// handler. On rebasing, include that container in the next outer tree.
+			if (isEventRoot(node, epoch) && !(node === start && rebaseRootAtStart)) {
+				firstBoundary ??= node;
+				if (node === listener) {
+					if (firstBoundary === node) ownsBranch = true;
+					else supersededByNearerPortal = true;
+				}
+				break;
+			}
+
+			output.push(node);
+			const logicalParent = node.$$portalParent;
+			if (logicalParent != null) {
+				// Use the actual portal container, NOT composedPath's next item:
+				// a direct portal child can be slotted, making that next item a
+				// <slot> rather than its real portal container. The cold stamp
+				// also survives a handler moving the node during this dispatch.
+				const container = node.$$portalContainer;
+				if (container == null) {
+					// Missing ownership is not permission to walk unrelated DOM.
+					output.length = base;
+					return 0;
+				}
+				firstBoundary ??= container;
+				if (container === listener) {
+					if (firstBoundary === container) ownsBranch = true;
+					else supersededByNearerPortal = true;
+				}
+				// Keep walking after a matched portal: it owns the whole logical
+				// branch up to the public root, not just its physical child range.
+				node = logicalParent as DelegatedNode;
+				index = path.indexOf(logicalParent);
+			} else if (index >= 0) {
+				node = eventPathNode(path[++index]);
+			} else {
+				// The logical portal host may not be on this native event's path.
+				// Do not force a hidden shadow-root -> host crossing here.
+				node = node.parentNode as DelegatedNode | null;
+			}
+		}
+
+		if (supersededByNearerPortal) {
+			output.length = base;
+			return 0;
+		}
+		if (ownsBranch) return output.length - base;
+		if (firstBoundary === null) {
+			output.length = base;
+			return 0;
+		}
+
+		// A foreign root/portal lies between the event target and this listener.
+		// Switch to its host container in the enclosing tree. This is also how
+		// a portal mounted inside another root reaches that other root's slots.
+		const boundaryIndex = path.indexOf(firstBoundary);
+		if (
+			boundaryIndex < startIndex ||
+			boundaryIndex >= listenerIndex ||
+			(boundaryIndex === startIndex && rebaseRootAtStart)
+		) {
+			output.length = base;
+			return 0;
+		}
+		start = firstBoundary as DelegatedNode;
+		startIndex = boundaryIndex;
+		rebaseRootAtStart = true;
+	}
+}
 
 // Invoke one event slot — a bare handler `fn(event)` or a nominal `{ fn, args }` bundle
 // (the compiler's zero-argument-arrow optimisation) as `fn(...args)`. A bundled
@@ -16701,18 +17086,16 @@ function maybeFlushDiscrete(type: string): void {
 function finishCaptureDispatch(event: Event): void {
 	const type = event.type;
 	if (!event.bubbles || event.cancelBubble || !_delegated.has(type)) {
-		if (event.bubbles && _delegated.has(type) && (event as any)[DELEGATED_DISPATCHED] !== true)
-			maybeEnqueueRestore(event);
+		if (event.bubbles && _delegated.has(type)) maybeEnqueueRestore(event);
 		maybeFlushDiscrete(type);
 		return;
 	}
-	if (!DISCRETE_EVENTS.has(type) || (event as any)[CAPTURE_FLUSH_FALLBACK] === true) return;
-	(event as any)[CAPTURE_FLUSH_FALLBACK] = true;
+	if (!DISCRETE_EVENTS.has(type)) return;
+	const bubbleVersion = (event as any)[DELEGATED_BUBBLE_VERSION];
 	const fallback = () => {
-		// The ordinary bubble listener stamped the event and already flushed. If
-		// propagation was stopped below the root, it never ran: enqueue the edit
-		// restore now and close the capture-only discrete window.
-		if ((event as any)[DELEGATED_DISPATCHED] !== true) {
+		// Any delivered bubble segment flushes all capture-scheduled work. When a
+		// native listener stops the event below its root, close that window here.
+		if ((event as any)[DELEGATED_BUBBLE_VERSION] === bubbleVersion) {
 			maybeEnqueueRestore(event);
 			maybeFlushDiscrete(type);
 		}
@@ -16729,16 +17112,14 @@ function finishCaptureDispatch(event: Event): void {
 	else queueMicrotask(fallback);
 }
 
-function dispatchDelegated(event: Event): void {
-	// Only the first delegation listener to receive this event walks it (its walk
-	// already covers every logical ancestor across roots/portals); the rest no-op.
-	if ((event as any)[DELEGATED_DISPATCHED] === true) return;
-	(event as any)[DELEGATED_DISPATCHED] = true;
+function dispatchDelegated(this: Node, event: Event): void {
+	if (delegatedCapture(event.type)) prepareDelegatedEvent(event, this);
+	(event as any)[DELEGATED_BUBBLE_VERSION] = ((event as any)[DELEGATED_BUBBLE_VERSION] || 0) + 1;
 	maybeEnqueueRestore(event);
 	const key = '$$' + event.type;
 	const targetOnly = TARGET_ONLY_DELEGATED.has(event.type);
 	_dispatchDepth++;
-	let node = event.target as any;
+	const node = event.target as any;
 	// A submit dispatch targeting a form opens the manual-action useFormStatus
 	// window (see publishManualFormPending): handlers' startTransition calls
 	// register on the record; the walk's end decides whether to publish.
@@ -16755,42 +17136,39 @@ function dispatchDelegated(event: Event): void {
 			: null;
 	if (submitRec !== null) ACTIVE_SUBMIT_DISPATCH = submitRec;
 	const nativeBatch = beginNativeEventBatch(event);
+	const pathBase = CAPTURE_PATH.length;
+	let stop: PropertyDescriptor | undefined;
+	let propagationStarted = false;
 	try {
-		// CAPTURE_DELEGATED types have BOTH dispatchers attached as capture-phase
-		// listeners on the same root, so same-node registration ORDER — not phase —
-		// would decide whether the capture pass or this walk runs first. Run the
-		// capture pass explicitly first (it self-stamps, so the natively-queued
-		// capture listener no-ops), and honor a capture-phase stopPropagation
-		// before walking — native cross-phase semantics. Nested inside our
-		// _dispatchDepth++ so the capture pass can't flush discrete work mid-event.
+		// Non-bubbling families share one native capture callback. Run the logical
+		// capture queue first, independent of module registration order, and honor
+		// a stop within that phase before starting the emulated bubble queue.
 		if (
 			delegatedCapture(event.type) &&
-			(event as any)[CAPTURE_DISPATCHED] !== true &&
-			_delegatedCapture.has(event.type)
-		) {
-			dispatchDelegatedCapture(event);
-			if (event.cancelBubble) return;
-		}
-		while (node !== null && node !== undefined) {
-			const slot = node[key] as EventSlot;
+			_delegatedCapture.has(event.type) &&
+			dispatchDelegatedCapture.call(this, event)
+		)
+			return;
+		if (!_delegated.has(event.type)) return;
+		buildDelegatedPath(event, this);
+		stop = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
+		propagationStarted = true;
+		beginDelegatedPropagation(event, stop, null);
+		for (let i = pathBase; i < CAPTURE_PATH.length; i++) {
+			const current = CAPTURE_PATH[i];
+			// Target-only native families never transfer a handler to a root boundary.
+			if (targetOnly && current !== event.target) break;
+			const slot = current[key] as EventSlot;
 			if (slot != null) {
-				// React parity: the handler's element is the currentTarget.
-				setCurrentTarget(event, node);
+				setCurrentTarget(event, current);
 				fireEventSlot(slot, event);
-				if (event.cancelBubble) return;
+				if (((event as any)[PROPAGATION_FLAGS] & 1) !== 0) break;
 			}
-			// Enter/leave and scroll events fire on the target only (see
-			// TARGET_ONLY_DELEGATED). Other capture-delegated non-bubbling events
-			// emulate React propagation and continue through logical ancestors.
-			if (targetOnly) return;
-			// Portal-aware ascent: when crossing a portal root, jump to the rendering Block's DOM parent.
-			if (node.$$portalParent) {
-				node = node.$$portalParent;
-			} else {
-				node = node.parentNode;
-			}
+			if (targetOnly) break;
 		}
 	} finally {
+		CAPTURE_PATH.length = pathBase;
+		if (propagationStarted) endDelegatedPropagation(event, stop, null);
 		if (submitRec !== null) {
 			ACTIVE_SUBMIT_DISPATCH = prevSubmitRec;
 			// Before the depth drop + discrete flush, so a published pending status
@@ -16808,48 +17186,44 @@ function dispatchDelegated(event: Event): void {
 	}
 }
 
-// Capture-phase counterpart of dispatchDelegated for `onXxxCapture` handlers. Builds
-// the logical target→root path (with portal jumps), then fires the `$$capture:<type>`
-// slots ROOT→TARGET — React's capture order. Cross-phase `stopPropagation` is handled
-// by the browser (this listener and the bubble listener are separate native
-// listeners, so a stopped event never reaches the bubble phase).
-function dispatchDelegatedCapture(event: Event): void {
-	if ((event as any)[CAPTURE_DISPATCHED] === true) return;
-	(event as any)[CAPTURE_DISPATCHED] = true;
-	// A registered bubble listener owns final restoration after bubble handlers.
-	// Enqueuing here would let the capture fallback restore a checkable before
-	// its native onChange handler can observe the activated value.
+// Capture runs only this native listener's segment, in reverse path order.
+// Returning whether this queue stopped native propagation lets the shared
+// non-bubbling listener decide whether it may start its emulated bubble queue.
+function dispatchDelegatedCapture(this: Node, event: Event): boolean {
+	const path = prepareDelegatedEvent(event, this);
+	if (!_delegatedCapture.has(event.type)) return false;
 	if (!event.bubbles || !_delegated.has(event.type)) maybeEnqueueRestore(event);
 	const key = CAPTURE_PREFIX + event.type;
 	const pathBase = CAPTURE_PATH.length;
-	for (let node = event.target as any; node !== null && node !== undefined;) {
-		CAPTURE_PATH.push(node);
-		node = node.$$portalParent ? node.$$portalParent : node.parentNode;
-	}
+	buildDelegatedPath(event, this, path);
+	const stop = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
+	const immediate = delegatedCapture(event.type)
+		? Object.getOwnPropertyDescriptor(event, 'stopImmediatePropagation')
+		: null;
+	const wasCancelled = event.cancelBubble;
+	let stopped = false;
 	_dispatchDepth++;
 	const nativeBatch = beginNativeEventBatch(event);
 	try {
+		beginDelegatedPropagation(event, stop, immediate);
 		for (let i = CAPTURE_PATH.length - 1; i >= pathBase; i--) {
 			const slot = CAPTURE_PATH[i][key] as EventSlot;
 			if (slot != null) {
-				// React parity: the handler's element is the currentTarget.
 				setCurrentTarget(event, CAPTURE_PATH[i]);
 				fireEventSlot(slot, event);
-				if (event.cancelBubble) return;
+				if (((event as any)[PROPAGATION_FLAGS] & 1) !== 0) break;
 			}
 		}
 	} finally {
-		// Nested dispatch appends its own frame and restores the outer traversal.
+		stopped = (event as any)[PROPAGATION_FLAGS] !== 0 || (!wasCancelled && event.cancelBubble);
 		CAPTURE_PATH.length = pathBase;
+		endDelegatedPropagation(event, stop, immediate);
 		clearCurrentTarget(event);
 		try {
 			endNativeEventBatch(
 				event,
 				nativeBatch,
-				event.bubbles &&
-					!event.cancelBubble &&
-					_delegated.has(event.type) &&
-					(event as any)[DELEGATED_DISPATCHED] !== true,
+				event.bubbles && !event.cancelBubble && _delegated.has(event.type),
 				reportListenerError,
 			);
 		} catch (error) {
@@ -16858,6 +17232,7 @@ function dispatchDelegatedCapture(event: Event): void {
 		_dispatchDepth--;
 		finishCaptureDispatch(event);
 	}
+	return stopped;
 }
 
 function noop(): void {}
@@ -18478,12 +18853,39 @@ interface PortalSlot {
 	__kind: 'portalSlotSlot';
 	block: Block | null;
 	target: Element | null;
+	host: Node;
 	start: Comment | null;
 	end: Comment | null;
 	fragmentOwners?: FragmentInstance | readonly FragmentInstance[];
 	fragmentAnchor?: Node;
 	sourceAnchor?: Node;
 	interleavedFragment?: FragmentInstance;
+}
+
+function registerPortalEventRange(target: Node, portal: PortalSlot): void {
+	let ranges = _portalEventRanges.get(target);
+	if (ranges === undefined) {
+		ranges = new Set();
+		_portalEventRanges.set(target, ranges);
+		portalEventTargetCount++;
+	}
+	ranges.add(portal);
+	(portal.start as PortalEventBoundary).$$portalEventRange = portal;
+	(portal.end as PortalEventBoundary).$$portalEventStart = portal.start as PortalEventBoundary;
+}
+
+function unregisterPortalEventRange(target: Node, portal: PortalSlot): void {
+	const start = portal.start as PortalEventBoundary | null;
+	const end = portal.end as PortalEventBoundary | null;
+	if (start?.$$portalEventRange === portal) delete start.$$portalEventRange;
+	if (end?.$$portalEventStart === start) delete end.$$portalEventStart;
+	const ranges = _portalEventRanges.get(target);
+	if (ranges === undefined) return;
+	ranges.delete(portal);
+	if (ranges.size === 0) {
+		_portalEventRanges.delete(target);
+		portalEventTargetCount--;
+	}
 }
 
 /**
@@ -18783,16 +19185,25 @@ function renderPortalState(
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 			__profileTrackComponent(block, profilePortalComponent(rawBody));
 		}
-		state = { __kind: 'portalSlotSlot', block, target, start, end };
+		state = { __kind: 'portalSlotSlot', block, target, host, start, end };
+		registerPortalEventRange(target, state);
 		activityPortalCreated?.(block);
 		// Portal target hosts handlers stamped via the same `el.$$click = …`
 		// mechanism as the main tree, so it needs the delegated event listeners too.
 		// Refcounted: a target hosting two portals attaches once, detaches when the
 		// last portal unmounts.
 		registerDelegationTarget(target);
-		if (ROOT_RENDER_TRANSACTION !== null) journalUndo(() => unregisterDelegationTarget(target));
+		if (ROOT_RENDER_TRANSACTION !== null) {
+			const created = state;
+			journalUndo(() => {
+				unregisterPortalEventRange(target, created);
+				unregisterDelegationTarget(target);
+			});
+		}
 		renderBlock(block);
 	} else {
+		if (state.host !== host) journalRootProperty(state, 'host');
+		state.host = host;
 		if (state.block!.body !== norm.body) journalRootProperty(state.block!, 'body');
 		if (state.block!.props !== norm.props) journalRootProperty(state.block!, 'props');
 		if (state.block!.extra !== env) journalRootProperty(state.block!, 'extra');
@@ -18813,6 +19224,7 @@ function renderPortalState(
 	if (state.interleavedFragment === undefined) {
 		while (n !== null && n !== state.end) {
 			(n as any).$$portalParent = host;
+			(n as any).$$portalContainer = target;
 			n = n.nextSibling;
 		}
 	} else {
@@ -18823,6 +19235,7 @@ function renderPortalState(
 				continue;
 			}
 			(n as any).$$portalParent = host;
+			(n as any).$$portalContainer = target;
 			n = n.nextSibling;
 		}
 	}
@@ -18850,6 +19263,7 @@ function teardownPortalState(state: PortalSlot): void {
 		state.block = null;
 	}
 	if (state.target) {
+		unregisterPortalEventRange(state.target, state);
 		unregisterDelegationTarget(state.target);
 		state.target = null;
 	}
@@ -32788,7 +33202,7 @@ function makeRoot(
 				renderOwner.adopt = undefined;
 				renderOwner.retryKey = null;
 				renderOwner.transaction = null;
-				unregisterDelegationTarget(container);
+				unregisterDelegationTarget(container, true);
 				releaseRootContainer(container, ownerToken);
 			}
 		},
@@ -32818,7 +33232,7 @@ function createRootWithOutputHandler(
 	// Register the container as an event-delegation target up front. Listeners
 	// for all currently-known delegated events attach now; any new event types
 	// registered later (via `delegateEvents`) will back-attach automatically.
-	registerDelegationTarget(container);
+	registerDelegationTarget(container, true);
 	// Lazy root: the block is created on the first `.render()` call.
 	return makeRoot(
 		container,
@@ -32911,7 +33325,7 @@ export function hydrateRoot(
 		nativeSidecar === null ? undefined : parseNativeSignalManifest(nativeSidecar.textContent || '');
 	nativeSidecar?.remove();
 	const ownerToken = claimRootContainer(container);
-	registerDelegationTarget(container);
+	registerDelegationTarget(container, true);
 	let rootBlock = createBlock(
 		'root',
 		null,

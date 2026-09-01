@@ -47,6 +47,27 @@ export function TypeSurface() {
 			<div onKeyDown={(event) => use<KeyboardEvent>(event)} />
 			<div onClickCapture={(event) => use<MouseEvent>(event)} />
 			<input onInput={(event) => use<Event>(event)} />
+			{/* Dialog lifecycle events also propagate to generic logical ancestors. */}
+			<div
+				onCancel={(event) => {
+					use<Event>(event);
+					use<HTMLDivElement>(event.currentTarget);
+					// @ts-expect-error — the event is native, not a React wrapper
+					event.nativeEvent;
+				}}
+				onCancelCapture={(event) => use<Event>(event)}
+				onClose={(event) => use<Event>(event)}
+				onCloseCapture={(event) => use<Event>(event)}
+			/>
+			<dialog
+				onCancel={(event) => {
+					use<Event>(event);
+					use<HTMLDialogElement>(event.currentTarget);
+				}}
+				onClose={(event) => use<Event>(event)}
+			/>
+			{/* @ts-expect-error — cancel handlers cannot require a KeyboardEvent */}
+			<div onCancel={(event: KeyboardEvent) => {}} />
 			{/* @ts-expect-error — handlers are functions, not strings */}
 			<button onClick="handleClick()" />
 			{/* @ts-expect-error — a click handler cannot demand a KeyboardEvent */}
