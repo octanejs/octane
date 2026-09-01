@@ -73,7 +73,7 @@ function createBindingPackage(workspace, licenseText) {
 			},
 		},
 		scripts: { test: 'node --test tests/*.test.mjs' },
-		peerDependencies: { octane: 'workspace:*' },
+		peerDependencies: { octane: 'workspace:^0.1.51 || ^0.2.0' },
 		devDependencies: { octane: 'workspace:*' },
 	});
 	writeJson(path.join(packageDirectory, 'tsconfig.json'), {

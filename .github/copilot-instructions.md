@@ -3,7 +3,7 @@
 Octane is Dominic Gannaway's successor to Inferno: a React-shaped UI framework
 with hooks, `memo`, context, portals, Suspense, and transitions, compiled ahead
 of time from `.tsrx`. The runtime, compiler, SSR, hydration, and large test suite
-work, but this is alpha and APIs still move.
+work, but this is beta and APIs still move.
 
 Trust the source over any summary, this file included:
 
@@ -146,9 +146,9 @@ tests. CLI options override the config.
 For binding parity test setup, follow `docs/react-parity-testing.md` and the
 `octane-react-library-port` skill.
 
-Add a changeset for user-facing package changes; stay on the `patch` track while
-Octane is 0.x. Runtime, compiler, scheduler, reconciler, SSR/hydration, and build
-pipeline changes follow `.rulesync/rules/core-engineering.md`.
+Add changesets for user-facing changes. 0.x uses `patch`; coordinated core beta
+bumps may use `minor`, and `major` waits for 1.0. See `CONTRIBUTING.md`. Engine
+changes follow `.rulesync/rules/core-engineering.md`.
 
 Never mutate a parsed AST during compilation: rewrites are copy-on-write. Tests
 deep-freeze adopted parser ASTs, so an in-place write throws at the offending

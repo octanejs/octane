@@ -2,7 +2,7 @@
 
 > [!NOTE]
 > Deferred hydration is experimental. Its API and compiler protocol may change
-> while Octane is in alpha.
+> while Octane is in beta.
 
 `<Hydrate>` keeps useful server-rendered HTML visible while delaying the work
 that makes a subtree interactive. It is intended for initial-page content that

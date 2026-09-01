@@ -1,11 +1,10 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-// Octane is alpha (0.x): release changesets must stay on the `patch` track.
-// This guard fails the release if any changeset declares a `major` or `minor`
-// bump, so a stray bump type can't slip through `changeset version`.
+// Octane is beta (0.x): ordinary releases stay on the `patch` track, while the
+// core package may use `minor` for a coordinated beta-line bump. A `major` bump
+// is reserved for 1.0, and bindings remain patch-only while they are 0.x.
 const CHANGESET_DIR = path.resolve('.changeset');
-const DISALLOWED_BUMPS = new Set(['major', 'minor']);
 
 function parse_frontmatter(content) {
 	const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -36,7 +35,11 @@ for (const entry of entries) {
 
 	for (const [index, line] of frontmatter.split(/\r?\n/).entries()) {
 		const changeset = parse_changeset_line(line);
-		if (changeset && DISALLOWED_BUMPS.has(changeset.bump)) {
+		if (
+			changeset &&
+			(changeset.bump === 'major' ||
+				(changeset.bump === 'minor' && changeset.package_name !== 'octane'))
+		) {
 			offenders.push({
 				file: path.relative(process.cwd(), file_path),
 				line: index + 2,
@@ -47,8 +50,9 @@ for (const entry of entries) {
 }
 
 if (offenders.length > 0) {
-	console.error('Changeset bump types "major" and "minor" are not allowed in this repo.');
-	console.error('Use "patch" for release changesets.');
+	console.error('"major" changesets are not allowed before Octane 1.0.');
+	console.error('Only the core "octane" package may use "minor" for a coordinated beta bump.');
+	console.error('Use "patch" for every other release changeset.');
 	console.error('');
 	for (const offender of offenders) {
 		console.error(`- ${offender.file}:${offender.line} ${offender.package_name}: ${offender.bump}`);

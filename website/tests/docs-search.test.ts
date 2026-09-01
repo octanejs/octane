@@ -99,7 +99,7 @@ describe('docs search index', () => {
 		// Spans a sentence boundary on purpose: the prose has to come through
 		// whole, not cut at the first full stop inside the expression.
 		expect(snippets.join(' ')).toContain(
-			'You need Node.js 22.22.2 or newer. Octane is currently alpha software',
+			'You need Node.js 22.22.2 or newer. Octane is currently beta software',
 		);
 		expect(snippets.join(' ')).not.toMatch(/[{}]/);
 	});

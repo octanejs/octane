@@ -40,7 +40,7 @@
     "typecheck:pristine": "tsc --noEmit -p audit/type-probes/tsconfig.pristine.json"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.2",

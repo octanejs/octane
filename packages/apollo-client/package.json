@@ -65,7 +65,7 @@
   "peerDependencies": {
     "@apollo/client": ">=4.2.6 <4.3.0",
     "graphql": "^16.0.0 || ^17.0.0",
-    "octane": "workspace:*",
+    "octane": "workspace:^0.1.51 || ^0.2.0",
     "rxjs": "^7.3.0"
   },
   "devDependencies": {

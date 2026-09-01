@@ -45,7 +45,7 @@
     "test": "vitest run --root ../.. --project phosphor-icons --project phosphor-icons-differential --project phosphor-icons-ssr"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@phosphor-icons/core": "catalog:default",

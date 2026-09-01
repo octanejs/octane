@@ -73,7 +73,7 @@
     "dequal": "^2.0.3"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@edge-runtime/jest-environment": "^4.0.0",

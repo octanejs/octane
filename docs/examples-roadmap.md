@@ -6,7 +6,7 @@ are difficult to prove through unit or final-HTML differential tests alone:
 focus and selection, live form and media state, scroll position, portal events,
 SSR adoption, and behavior while asynchronous work overlaps.
 
-The examples remain in this monorepo while Octane is alpha so an application
+The examples remain in this monorepo while Octane is beta so an application
 failure, its minimized package regression, and the fix can land atomically.
 Selected real applications are also copied into temporary consumers and built
 against packed Octane and binding tarballs, catching package-boundary failures

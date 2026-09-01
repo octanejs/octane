@@ -50,7 +50,7 @@
     "motion-dom": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@swc/core": "1.15.41",

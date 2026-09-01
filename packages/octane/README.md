@@ -1,6 +1,6 @@
 # What is octane?
 
-[![status: alpha](https://img.shields.io/badge/status-alpha-orange)](https://www.npmjs.com/package/octane)
+[![status: beta](https://img.shields.io/badge/status-beta-yellow)](https://www.npmjs.com/package/octane)
 [![npm version](https://img.shields.io/npm/v/octane?logo=npm)](https://www.npmjs.com/package/octane)
 [![npm downloads](https://img.shields.io/npm/dm/octane?logo=npm&label=downloads)](https://www.npmjs.com/package/octane)
 
@@ -96,7 +96,8 @@ APIs. Features such as native `inert` may require a polyfill on older supported
 browsers. Validate text entry with the keyboards, languages, and browser or
 WebView versions your application supports.
 
-Octane is alpha software. It is ready to try, but not yet ready for production.
+Octane is beta software. It is ready to build with, but its APIs may still
+change before 1.0.
 
 ## License
 

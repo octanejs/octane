@@ -1,6 +1,6 @@
 # Contributing to Octane
 
-Thanks for helping out. Octane is in alpha: the runtime, compiler, and
+Thanks for helping out. Octane is in beta: the runtime, compiler, and
 SSR/hydration paths all work and carry a large behavioral test suite, but APIs
 still move. Bug reports, regression tests, docs, new `@octanejs/*` bindings, and
 core fixes are all welcome.
@@ -243,8 +243,11 @@ test-only, or internal tooling work:
 pnpm changeset
 ```
 
-Octane is 0.x, so every changeset stays on the `patch` track. `major` and
-`minor` bumps fail CI.
+While packages are 0.x, changesets stay on the `patch` track by default. Core
+`octane` may use `minor` for a coordinated beta-line bump; bindings remain
+patch-only, and `major` is reserved for 1.0. A coordinated core minor also
+patch-releases its publishable peer dependents with ranges covering the old and
+new core lines. CI validates both declared bumps and the computed release plan.
 
 ## Commits and pull requests
 

@@ -43,7 +43,7 @@
     "style-to-js": "2.0.2"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "octane": "workspace:*",
