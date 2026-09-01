@@ -34,7 +34,7 @@
     "test": "vitest run --root ../.. --project mantine-hooks --project mantine-hooks-differential --project mantine-hooks-ssr"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@mantine/hooks": "9.5.0",

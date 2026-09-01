@@ -55,7 +55,7 @@
   "peerDependencies": {
     "@octanejs/three": "workspace:*",
     "@types/three": ">=0.159",
-    "octane": "workspace:*",
+    "octane": "workspace:^0.1.51 || ^0.2.0",
     "three": ">=0.159"
   },
   "peerDependenciesMeta": {

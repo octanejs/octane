@@ -152,7 +152,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Disallow major and minor bumps in changesets
+      - name: Validate changeset bump types
         run: pnpm changeset:check
 
       # Check the complete workspace before Changesets starts. npm publishing is

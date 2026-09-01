@@ -121,5 +121,5 @@ expected-failure cases.
 
 ## Release
 
-`@octanejs/hook-form@0.1.0` (patch-track alpha, like the other bindings).
+`@octanejs/hook-form@0.1.0` (on the 0.x patch track, like the other bindings).
 Changesets: `hook-form-binding.md`, `sync-act-and-zero-arg-hooks.md`.

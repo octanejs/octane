@@ -77,7 +77,7 @@
     "yoga-layout": "~3.2.1"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@sindresorhus/tsconfig": "8.1.0",

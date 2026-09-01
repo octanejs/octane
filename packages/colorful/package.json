@@ -40,7 +40,7 @@
     "test:pristine": "node ../../scripts/react-parity/jest-full-runner.mjs --config packages/colorful/tests/upstream-jest.config.cjs --root packages/colorful/upstream"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

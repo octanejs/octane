@@ -9,6 +9,7 @@ import {
 	isRecognizableMitText,
 } from './preflight-lib.mjs';
 import { hasObservablePackageTests } from './package-tests-lib.mjs';
+import { OCTANE_BETA_PEER_RANGE } from '../workspace-packages.mjs';
 
 const EVIDENCE_STATUSES = new Set(['required', 'passed', 'failed', 'blocked', 'inapplicable']);
 const CROSSWALK_CLASSIFICATIONS = new Set([
@@ -521,8 +522,9 @@ export function inspectBindingPackage(
 				}
 			}
 		}
-		if (manifest.peerDependencies?.octane !== 'workspace:*')
-			issues.push('octane peer must be workspace:*');
+		if (manifest.peerDependencies?.octane !== OCTANE_BETA_PEER_RANGE) {
+			issues.push(`octane peer must be ${OCTANE_BETA_PEER_RANGE}`);
+		}
 		if (manifest.devDependencies?.octane !== 'workspace:*')
 			issues.push('octane dev dependency must be workspace:*');
 		if (typeof manifest.scripts?.test !== 'string')

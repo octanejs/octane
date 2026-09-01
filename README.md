@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/octanejs/octane/actions/workflows/ci.yml"><img src="https://github.com/octanejs/octane/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#status"><img src="https://img.shields.io/badge/status-alpha-orange" alt="status: alpha"></a>
+  <a href="#status"><img src="https://img.shields.io/badge/status-beta-yellow" alt="status: beta"></a>
   <a href="https://www.npmjs.com/package/octane"><img src="https://img.shields.io/npm/v/octane?logo=npm" alt="npm version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
@@ -213,7 +213,7 @@ SSR buffering, hydration, and nesting limits.
 
 ## Status
 
-Octane is in alpha. The runtime, compiler, and SSR/hydration paths all work, but
+Octane is in beta. The runtime, compiler, and SSR/hydration paths all work, but
 APIs still move.
 
 The core suite contains **3,900+ distinct behavioral tests** across conformance,

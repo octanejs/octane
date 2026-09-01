@@ -53,7 +53,7 @@
     "parity:types:write": "node ../../scripts/react-parity/react-transition-group-types.mjs --write"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",

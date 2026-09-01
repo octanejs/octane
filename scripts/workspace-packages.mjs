@@ -52,6 +52,8 @@ const OCTANE_SINGLETON_CONSUMERS = new Set([
 	'@octanejs/vite-plugin',
 ]);
 
+export const OCTANE_BETA_PEER_RANGE = 'workspace:^0.1.51 || ^0.2.0';
+
 function readJson(file) {
 	return JSON.parse(readFileSync(file, 'utf8'));
 }
@@ -440,16 +442,23 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 			}
 		}
 
+		const octanePeerRange = pkg.manifest.peerDependencies?.octane;
+		if (octanePeerRange !== undefined && octanePeerRange !== OCTANE_BETA_PEER_RANGE) {
+			errors.push(
+				`${label} peerDependencies.octane must be ${JSON.stringify(OCTANE_BETA_PEER_RANGE)} (received ${JSON.stringify(octanePeerRange)})`,
+			);
+		}
+
 		// Hook state is module-global within one Octane runtime instance. Bindings
 		// and the metaframework must therefore consume the application's singleton
-		// runtime as an exact 0.x peer, while retaining a workspace dev dependency
-		// for this monorepo's source tests.
+		// runtime as a peer compatible with the final 0.1 and beta 0.2 lines, while
+		// retaining an exact workspace dev dependency for source tests.
 		if (pkg.role === 'framework binding' || OCTANE_SINGLETON_CONSUMERS.has(pkg.name)) {
 			if (pkg.manifest.dependencies?.octane !== undefined) {
 				errors.push(`${label} must not install octane as a regular dependency`);
 			}
-			if (pkg.manifest.peerDependencies?.octane !== 'workspace:*') {
-				errors.push(`${label} must declare exact peer octane "workspace:*"`);
+			if (octanePeerRange === undefined) {
+				errors.push(`${label} must declare Octane's beta-compatible peer range`);
 			}
 			if (pkg.manifest.devDependencies?.octane !== 'workspace:*') {
 				errors.push(`${label} must keep octane "workspace:*" as a dev dependency`);
@@ -490,7 +499,13 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 		// release job's frozen install.
 		for (const section of ['dependencies', 'devDependencies', 'peerDependencies']) {
 			for (const [dependency, range] of Object.entries(pkg.manifest[section] ?? {})) {
-				if (!workspaceNames.has(dependency) || range === 'workspace:*') continue;
+				const isOctaneBetaPeer =
+					section === 'peerDependencies' &&
+					dependency === 'octane' &&
+					range === OCTANE_BETA_PEER_RANGE;
+				if (!workspaceNames.has(dependency) || range === 'workspace:*' || isOctaneBetaPeer) {
+					continue;
+				}
 				errors.push(
 					`${label} ${section}.${dependency} must be "workspace:*" (received ${JSON.stringify(range)})`,
 				);

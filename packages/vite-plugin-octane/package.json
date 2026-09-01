@@ -50,7 +50,7 @@
     "@ripple-ts/adapter": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*",
+    "octane": "workspace:^0.1.51 || ^0.2.0",
     "vite": "^8.0.16"
   },
   "devDependencies": {

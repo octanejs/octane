@@ -587,7 +587,7 @@ proportional to actual async surface.
   > writes — no virtual DOM, no diffing. The compiler even removes suspense
   > waterfalls, proving which `use()` fetches are independent and starting
   > them together.
-- **Changeset:** patch (0.x alpha track), covering compiler + runtime.
+- **Changeset:** patch (0.x beta track), covering compiler + runtime.
 - Optional nice-to-have (separate decision): expose an `AbortSignal` to
   memoized creations so superseded in-flight fetches can be cancelled on dep
   change (Ripple's `abort(TRACKED_UPDATED)` analogue). API-surface decision —
