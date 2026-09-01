@@ -6,9 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer } from '../src/mcp/create-server.ts';
+import { BINDING_CATEGORIES, BINDING_STATUSES } from '../src/content/bindings.ts';
+import { COMMUNITY_BINDING_GROUPS } from '../../website/src/content/community-bindings.ts';
 
 let client: Client;
 let cleanup: () => Promise<void>;
+const communitySearchNames = new Set(
+	COMMUNITY_BINDING_GROUPS.flatMap((group) => group.entries.flatMap((entry) => entry.searchNames)),
+);
 
 beforeEach(async () => {
 	const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -53,8 +58,43 @@ describe('remote MCP server', () => {
 		const payload = JSON.parse(firstText(result));
 		expect(payload.results.length).toBeGreaterThan(0);
 		const hit = payload.results[0];
+		expect(hit.kind).toBe('doc');
 		expect(hit.url).toMatch(/^https:\/\//);
 		expect(hit.lines.length).toBeGreaterThan(0);
+	});
+
+	it('octane_docs_search returns packages as exact outbound destinations', async () => {
+		const result = await client.callTool({
+			name: 'octane_docs_search',
+			arguments: { query: '@distilled.cloud/octane' },
+		});
+		const payload = JSON.parse(firstText(result));
+		expect(payload.results).toHaveLength(1);
+		expect(payload.results[0]).toEqual({
+			kind: 'package',
+			title: 'Alchemy',
+			matchedName: '@distilled.cloud/octane',
+			purpose: 'Build and deployment integration for Octane on Cloudflare, AWS, and Node.',
+			owner: 'Alchemy',
+			url: 'https://github.com/alchemy-run/alchemy/tree/main/packages/frontend-frameworks/src/octane',
+			score: expect.any(Number),
+		});
+	});
+
+	it('octane_docs_search explains document follow-up and package destinations', async () => {
+		const { tools } = await client.listTools();
+		const description = tools.find((tool) => tool.name === 'octane_docs_search')?.description;
+		expect(description).toContain('octane_docs_read');
+		expect(description).toMatch(/package hits?.*outbound/i);
+
+		const result = await client.callTool({
+			name: 'octane_docs_search',
+			arguments: { query: 'zz-no-octane-result-9f4c' },
+		});
+		expect(JSON.parse(firstText(result))).toEqual({
+			query: 'zz-no-octane-result-9f4c',
+			results: [],
+		});
 	});
 
 	it('octane_docs_read returns the document with provenance', async () => {
@@ -124,6 +164,32 @@ describe('remote MCP server', () => {
 		expect(payload.statuses).toHaveLength(1);
 		expect(payload.statuses[0].package).toBe('@octanejs/tanstack-query');
 		expect(payload.statuses[0].upstream.package).toBe('@tanstack/react-query');
+	});
+
+	it('keeps community projects out of official binding tools and resources', async () => {
+		const [bindingsResult, statusesResult, resourceResult] = await Promise.all([
+			client.callTool({ name: 'octane_bindings', arguments: {} }),
+			client.callTool({ name: 'octane_bindings_status', arguments: {} }),
+			client.readResource({ uri: 'octane://bindings' }),
+		]);
+		const bindings = JSON.parse(firstText(bindingsResult));
+		const statuses = JSON.parse(firstText(statusesResult));
+		const resource = JSON.parse((resourceResult.contents[0] as { text?: string }).text ?? '{}');
+		const expectedPackages = BINDING_CATEGORIES.flatMap((category) => category.packages);
+		const expectedStatuses = BINDING_STATUSES.map((status) => status.package);
+
+		expect(bindings.count).toBe(BINDING_STATUSES.length);
+		expect(bindings.categories).toEqual(BINDING_CATEGORIES);
+		expect(statuses.statuses.map((status: { package: string }) => status.package)).toEqual(
+			expectedStatuses,
+		);
+		expect(resource.categories).toEqual(BINDING_CATEGORIES);
+		expect(resource.statuses.map((status: { package: string }) => status.package)).toEqual(
+			expectedStatuses,
+		);
+		for (const packageName of [...expectedPackages, ...expectedStatuses]) {
+			expect(communitySearchNames.has(packageName)).toBe(false);
+		}
 	});
 
 	it('lists and reads docs resources', async () => {

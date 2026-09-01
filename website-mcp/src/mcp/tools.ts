@@ -40,7 +40,7 @@ export function registerRemoteTools(server: McpServer): void {
 		{
 			title: 'Search the Octane docs',
 			description:
-				'Section-level full-text search over the official Octane documentation (the same index behind octanejs.dev search), including the SSR deep dive and the full React-divergence reference. Returns deep links with the matching lines; follow up with octane_docs_read for a full document.',
+				"Search the official Octane documentation and package ecosystem using the same index as octanejs.dev. Document hits include deep links and matching lines and can be passed to octane_docs_read by slug. Package hits are outbound URLs to the package owner's official documentation.",
 			inputSchema: {
 				query: z.string().min(2).max(200),
 				limit: z.number().int().min(1).max(20).default(6),
@@ -48,18 +48,32 @@ export function registerRemoteTools(server: McpServer): void {
 			annotations: READ_ONLY,
 		},
 		async ({ query, limit }) => {
-			const results = search(query, limit).map((group) => ({
-				slug: group.slug,
-				id: group.id,
-				title: group.title,
-				docTitle: group.docTitle,
-				url: sectionUrl(group.slug, group.id),
-				score: group.score,
-				lines: group.lines.map((line) => ({
-					code: line.code,
-					text: line.parts.map((part) => part.text).join(''),
-				})),
-			}));
+			const results = search(query, limit).map((result) => {
+				if (result.kind === 'package') {
+					return {
+						kind: 'package' as const,
+						title: result.title,
+						matchedName: result.matchedName,
+						purpose: result.purpose,
+						owner: result.owner,
+						url: result.url,
+						score: result.score,
+					};
+				}
+				return {
+					kind: 'doc' as const,
+					slug: result.slug,
+					id: result.id,
+					title: result.title,
+					docTitle: result.docTitle,
+					url: sectionUrl(result.slug, result.id),
+					score: result.score,
+					lines: result.lines.map((line) => ({
+						code: line.code,
+						text: line.parts.map((part) => part.text).join(''),
+					})),
+				};
+			});
 			return json({ query, results });
 		},
 	);

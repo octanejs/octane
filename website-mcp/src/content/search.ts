@@ -8,6 +8,11 @@ import {
 	type SearchGroup,
 	type SearchRecord,
 } from '../../../website/src/lib/docs-search-core.ts';
+import {
+	communityPackageRecords,
+	firstPartyPackageRecord,
+} from '../../../website/src/content/bindings-search.ts';
+import { BINDING_CATEGORIES } from '../../../website/src/content/bindings.ts';
 import { DOCS } from './docs.ts';
 
 export type { SearchGroup, SearchRecord };
@@ -33,12 +38,12 @@ function liftMarkdownHeadings(markdown: string, sections: readonly { id: string 
 		.join('\n');
 }
 
-export const SEARCH_INDEX: readonly SearchRecord[] = DOCS.flatMap((doc, order) => {
+const DOCUMENT_SEARCH_INDEX: readonly SearchRecord[] = DOCS.flatMap((doc, order) => {
 	const source =
 		doc.source === 'repo' ? liftMarkdownHeadings(doc.markdown, doc.sections) : doc.markdown;
 	const records = recordsFor(doc.slug, doc.title, order, source);
-	// Extra ranking hints (the bindings catalog names every package) attach to
-	// the doc's first section — mirrors the website's loadSearchIndex.
+	// Extra ranking hints attach to the doc's first section — mirrors the
+	// website's loadSearchIndex.
 	addSearchTerms(
 		records.find((record) => record.id === doc.sections[0]?.id) ?? records[0],
 		doc.searchTerms,
@@ -55,6 +60,70 @@ export const SEARCH_INDEX: readonly SearchRecord[] = DOCS.flatMap((doc, order) =
 	}
 	return records;
 });
+
+interface PackageMetadata {
+	description?: string;
+	exports?: unknown;
+}
+
+interface BindingStatusMetadata {
+	upstream?: { package?: string };
+}
+
+const packageMetadataModules = import.meta.glob('../../../packages/*/package.json', {
+	eager: true,
+	import: 'default',
+}) as Record<string, PackageMetadata>;
+
+const statusMetadataModules = import.meta.glob('../../../packages/*/status.json', {
+	eager: true,
+	import: 'default',
+}) as Record<string, BindingStatusMetadata>;
+
+function packageMetadataFor(packageName: string): PackageMetadata | undefined {
+	const directory = packageName.slice('@octanejs/'.length);
+	return Object.entries(packageMetadataModules).find(([path]) =>
+		path.endsWith(`/packages/${directory}/package.json`),
+	)?.[1];
+}
+
+function statusMetadataFor(packageName: string): BindingStatusMetadata | undefined {
+	const directory = packageName.slice('@octanejs/'.length);
+	return Object.entries(statusMetadataModules).find(([path]) =>
+		path.endsWith(`/packages/${directory}/status.json`),
+	)?.[1];
+}
+
+function publicExportSubpaths(exportsField: unknown): string[] {
+	if (typeof exportsField !== 'object' || exportsField === null || Array.isArray(exportsField)) {
+		return [];
+	}
+	return Object.keys(exportsField)
+		.filter(
+			(subpath) =>
+				subpath.startsWith('./') && subpath !== './package.json' && !subpath.includes('*'),
+		)
+		.map((subpath) => subpath.slice(1));
+}
+
+const FIRST_PARTY_PACKAGE_INDEX: readonly SearchRecord[] = BINDING_CATEGORIES.flatMap(
+	(category) => category.packages,
+).map((packageName) => {
+	const metadata = packageMetadataFor(packageName);
+	const status = statusMetadataFor(packageName);
+	return firstPartyPackageRecord({
+		packageName,
+		purpose: metadata?.description ?? '',
+		upstreamPackage: status?.upstream?.package,
+		exportSubpaths: publicExportSubpaths(metadata?.exports),
+	});
+});
+
+export const SEARCH_INDEX: readonly SearchRecord[] = [
+	...DOCUMENT_SEARCH_INDEX,
+	...FIRST_PARTY_PACKAGE_INDEX,
+	...communityPackageRecords(),
+];
 
 export function search(query: string, limit = 6): SearchGroup[] {
 	return searchDocs(SEARCH_INDEX, query, limit);
