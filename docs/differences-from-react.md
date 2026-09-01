@@ -845,6 +845,12 @@ setPage(next); // If it suspends, show the pending fallback.
 startTransition(() => setPage(next)); // Keep the previous content while pending.
 ```
 
+Delegated discrete events such as `click` flush at the outermost dispatch boundary.
+Continuous events such as `mousemove`, `pointermove`, and `scroll` retain microtask
+batching; Octane does not give them a separate interruptible priority lane. Ordinary
+delegated event updates do not join an unrelated pending async Action, while an
+explicit `startTransition` inside the handler still opts into transition work.
+
 Already-visible Suspense content stays visible without a timeout during a
 transition, matching React's
 [shell-retention contract](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberWorkLoop.js#L1356-L1369).
