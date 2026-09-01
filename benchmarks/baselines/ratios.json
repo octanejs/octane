@@ -496,6 +496,14 @@
     "note": "Same-process production compilation of 1,600 local renderer components differs only by whether the child renderer validates authored ranges, and both targets require byte-identical output. Verified indexed runs measured 0.99x to 1.15x the no-validation reference; the 1.3x ceiling retains timing headroom while catching restoration of repeated linear range scans."
   },
   {
+    "suite": "tsrx-local-component-name-catalog",
+    "op": "prepare",
+    "target": "components-high",
+    "reference": "components-low",
+    "maxRatio": 3,
+    "note": "Same-process renderer-boundary preparation holds 1,000 sibling boundaries constant while varying unrelated local components from 1,000 to 10,000. The guard retains the component Map collected during analysis while rejecting reconstruction of a full component-name Set for every boundary. Seven-sample checks measured 3.44x on exact main and 2.38x after Map reuse."
+  },
+  {
     "suite": "tsrx-renderer-selection",
     "op": "resolve",
     "target": "normalized-config",

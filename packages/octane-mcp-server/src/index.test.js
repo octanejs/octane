@@ -79,6 +79,7 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(suites).toContain('tsrx-hydrate-module-slicing');
 		expect(suites).toContain('tsrx-stable-hookful-propagation');
 		expect(suites).toContain('tsrx-renderer-validation-ranges');
+		expect(suites).toContain('tsrx-local-component-name-catalog');
 		expect(suites).toEqual(BENCHMARK_SUITES);
 
 		// The public MCP schema must accept every runner suite, not just keep

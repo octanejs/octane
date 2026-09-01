@@ -118,6 +118,7 @@ export const BENCHMARK_SUITES = [
 	'tsrx-hydrate-module-slicing',
 	'tsrx-stable-hookful-propagation',
 	'tsrx-renderer-validation-ranges',
+	'tsrx-local-component-name-catalog',
 	'tsrx-jsx-return-branches',
 	'text-type-roots',
 	'tsrx-nesting-diagnostics',

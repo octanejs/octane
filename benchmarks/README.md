@@ -84,8 +84,8 @@ runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
 **universal-object-teardown**,
 **universal-template-events**, **universal-external-store**,
-**lynx-render**, **lynx-bundle-size**, and **tsrx-renderer-validation-ranges**
-are Node-only,
+**lynx-render**, **lynx-bundle-size**, **tsrx-renderer-validation-ranges**, and
+**tsrx-local-component-name-catalog** are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
 servers per sample — that spawn/listen/first-byte cycle IS the measurement —
 and **codegen-size** / **bundle-size** / **bundle-reachability** /
@@ -287,6 +287,7 @@ internally, get their own baseline and guard namespace.
 | `tsrx-hydrate-module-slicing` | tsrx-hydrate-module-slicing | none (Node-only) | hydrate module-slicing selection at 150/2,400 sibling boundaries, with queried-child/server checks and retained-declaration controls |
 | `tsrx-stable-hookful-propagation` | tsrx-stable-hookful-propagation | none (Node-only) | stable-hookful capture and private-setter propagation through 40/1,000-component chains in both declaration orders |
 | `tsrx-renderer-validation-ranges` | tsrx-renderer-validation-ranges | none (Node-only) | authored renderer-validation range membership at 32/3,200 ranges plus matched 100/1,600-component whole-pipeline compiles with and without validation |
+| `tsrx-local-component-name-catalog` | tsrx-local-component-name-catalog | none (Node-only) | renderer-boundary preparation with 1,000 sibling regions and 1,000/10,000 unrelated local components, guarding against rebuilding the same component-name catalog per boundary |
 | `tsrx-jsx-return-branches` | tsrx-jsx-return-branches | none (Node-only) | client/server compile and bundler classification for 120/480 conditional-return components, with lowering/export controls and a same-sized ineligible parse/print control |
 | `tsrx-nesting-diagnostics` | tsrx-nesting-diagnostics | none (Node-only) | development TSRX compilation at 500 and 2,000 invalid HTML sites, with parsed diagnostic count/order controls and a per-diagnostic scaling guard |
 | `tsrx-renderer-selection` | tsrx-renderer-selection | none (Node-only) | ordered filename-to-renderer classification with semantic checksums, comparing retained normalized config against equivalent raw revalidation |

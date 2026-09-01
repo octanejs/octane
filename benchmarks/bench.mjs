@@ -968,6 +968,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Renderer-boundary preparation with a fixed 1,000 regions and either 1,000
+		// or 10,000 unrelated local component declarations.
+		name: 'tsrx-local-component-name-catalog',
+		cwd: 'tsrx-local-component-name-catalog',
+		servers: [],
+		iter: { normal: 9, quick: 7 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Conditional JSX return analysis at two component counts plus a
 		// same-sized structurally ineligible parse/print control.
 		name: 'tsrx-jsx-return-branches',
