@@ -25,35 +25,42 @@ let indexPromise: Promise<SearchRecord[]> | null = null;
 /** Build (once) and return the flat section index. Safe to call repeatedly. */
 export function loadSearchIndex(): Promise<SearchRecord[]> {
 	if (!indexPromise) {
-		const pending = import('../content/docs.ts').then(({ docs }) =>
-			Promise.all(
-				Object.entries(rawDocs).map(async ([path, load]) => {
-					const slug = slugOf(path);
-					const order = docs.findIndex((d) => d.slug === slug);
-					const doc = order === -1 ? undefined : docs[order];
-					const rank = order === -1 ? docs.length : order;
-					const records = recordsFor(slug, doc?.title ?? slug, rank, await load());
-					if (doc) {
-						addSearchTerms(
-							records.find((record) => record.id === doc.sections?.[0]?.id) ?? records[0],
-							doc.searchTerms,
-						);
-						for (const section of doc.sections ?? []) {
-							if (!section.searchTerms?.length) continue;
-							const target = records.find((record) => record.id === section.id);
-							if (!target) {
-								throw new Error(
-									`Search terms for ${doc.slug}#${section.id} must target an indexed h2 section`,
-								);
+		indexPromise = Promise.all([
+			import('../content/docs.ts'),
+			import('../content/bindings-search.ts'),
+		]).then(async ([{ docs }, { loadPackageSearchRecords }]) => {
+			const [documentGroups, packages] = await Promise.all([
+				Promise.all(
+					Object.entries(rawDocs).map(async ([path, load]) => {
+						const slug = slugOf(path);
+						const order = docs.findIndex((doc) => doc.slug === slug);
+						const doc = order === -1 ? undefined : docs[order];
+						const rank = order === -1 ? docs.length : order;
+						const records = recordsFor(slug, doc?.title ?? slug, rank, await load());
+						if (doc) {
+							addSearchTerms(
+								records.find((record) => record.id === doc.sections?.[0]?.id) ?? records[0],
+								doc.searchTerms,
+							);
+							for (const section of doc.sections ?? []) {
+								if (!section.searchTerms?.length) continue;
+								const target = records.find((record) => record.id === section.id);
+								if (!target) {
+									throw new Error(
+										`Search terms for ${doc.slug}#${section.id} must target an indexed h2 section`,
+									);
+								}
+								addSearchTerms(target, section.searchTerms);
 							}
-							addSearchTerms(target, section.searchTerms);
 						}
-					}
-					return records;
-				}),
-			).then((groups) => groups.flat()),
-		);
-		indexPromise = pending.catch((error) => {
+						return records;
+					}),
+				),
+				loadPackageSearchRecords(),
+			]);
+			return [...documentGroups.flat(), ...packages];
+		});
+		indexPromise = indexPromise.catch((error) => {
 			indexPromise = null;
 			throw error;
 		});

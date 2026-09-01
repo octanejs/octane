@@ -4,7 +4,7 @@
 // site; the remote MCP server (mcp/) imports only this file plus the raw
 // .mdx sources, so it never pulls compiled components into its bundle.
 // Its import chain must stay MDX-free (the imported catalogs are JSON-backed).
-import { BINDING_COUNT } from './bindings.ts';
+import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
 import { FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
 
 export interface DocSection {
@@ -376,8 +376,10 @@ export const docsMeta: DocMeta[] = [
 		title: 'Integrations and bindings',
 		description: `Search ${FRAMEWORK_INTEGRATION_COUNT} framework integrations and ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
 		group: 'Explore',
+		searchTerms: BINDING_CATEGORIES.flatMap((category) => [category.title, category.description]),
 		sections: [
 			{ id: 'find-a-binding', title: 'Find an integration or binding' },
+			{ id: 'community-bindings', title: 'Community bindings' },
 			{ id: 'install-and-use', title: 'Install it, then change the import' },
 			{ id: 'check-support', title: 'Check the part you plan to use' },
 		],
