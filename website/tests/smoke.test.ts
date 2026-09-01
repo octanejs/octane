@@ -668,7 +668,10 @@ describe('website routes', () => {
 			'a.community-binding-discovery',
 		)!;
 		expect(discoveryLink.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-			'Explore more community bindings ↗',
+			'Explore community packages that depend on Octane on GitHub. ↗',
+		);
+		expect(discoveryLink.parentElement?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+			'Looking for more? Explore community packages that depend on Octane on GitHub. ↗',
 		);
 		expect(discoveryLink.getAttribute('href')).toBe(
 			'https://github.com/octanejs/octane/network/dependents?dependent_type=PACKAGE',

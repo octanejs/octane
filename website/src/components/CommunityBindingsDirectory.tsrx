@@ -6,47 +6,52 @@ const COMMUNITY_BINDING_DISCOVERY_URL = 'https://github.com/octanejs/octane/netw
 
 export function CommunityBindingsDirectory() @{
 	<div class="community-binding-directory">
-		@for (const group of COMMUNITY_BINDING_GROUPS; key group.id) {
-			<section
-				class="community-binding-card"
-				aria-labelledby={'community-binding-group-' + group.id}
-			>
-				<h3 id={'community-binding-group-' + group.id}>{group.title as string}</h3>
-				<ul class="community-binding-list">
-					@for (const entry of group.entries; key entry.id) {
-						<li id={'community-binding-' + entry.id}>
-							<a
-								class="community-binding-link"
-								href={entry.destination}
-								target="_blank"
-								rel="noreferrer"
-								aria-label={`Open ${entry.name} official documentation in a new tab`}
-							>
-								<code>{entry.searchNames[0] as string}</code>
-							</a>
-						</li>
-					}
-				</ul>
-			</section>
-		}
+		<div class="community-binding-cards">
+			@for (const group of COMMUNITY_BINDING_GROUPS; key group.id) {
+				<section
+					class="community-binding-card"
+					aria-labelledby={'community-binding-group-' + group.id}
+				>
+					<h3 id={'community-binding-group-' + group.id}>{group.title as string}</h3>
+					<ul class="community-binding-list">
+						@for (const entry of group.entries; key entry.id) {
+							<li id={'community-binding-' + entry.id}>
+								<a
+									class="community-binding-link"
+									href={entry.destination}
+									target="_blank"
+									rel="noreferrer"
+									aria-label={`Open ${entry.name} official documentation in a new tab`}
+								>
+									<code>{entry.searchNames[0] as string}</code>
+								</a>
+							</li>
+						}
+					</ul>
+				</section>
+			}
+		</div>
 		<p class="community-binding-discovery-row">
+			Looking for more?{' '}
 			<a
 				class="community-binding-discovery"
 				href={COMMUNITY_BINDING_DISCOVERY_URL}
 				target="_blank"
 				rel="noreferrer"
-				aria-label="Explore more community bindings on GitHub in a new tab"
+				aria-label="Explore community packages that depend on Octane on GitHub in a new tab"
 			>
-				Explore more community bindings ↗
+				Explore community packages that depend on Octane on GitHub. ↗
 			</a>
 		</p>
 
 		<style>
 			.community-binding-directory {
+				margin: 1.5rem 0;
+			}
+			.community-binding-cards {
 				display: grid;
 				grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
 				gap: 0.75rem;
-				margin: 1.5rem 0;
 			}
 			.community-binding-card {
 				margin: 0;
@@ -103,33 +108,8 @@ export function CommunityBindingsDirectory() @{
 				white-space: nowrap;
 			}
 			.community-binding-discovery-row {
-				grid-column: 1 / -1;
-				margin: 0.15rem 0 0;
+				margin: 0.9rem 0 0;
 				font-size: 0.875rem;
-			}
-			.community-binding-discovery {
-				display: inline-flex;
-				align-items: center;
-				padding: 0.55rem 0.75rem;
-				border: 1px solid rgba(255, 93, 114, 0.4);
-				border-radius: 0.55rem;
-				background: rgba(255, 65, 90, 0.1);
-				color: var(--accent-text);
-				font-weight: 650;
-				line-height: 1.25;
-				text-decoration: none;
-				transition:
-					border-color 0.15s,
-					background 0.15s;
-			}
-			.community-binding-discovery:hover {
-				border-color: var(--accent-hover);
-				background: rgba(255, 65, 90, 0.16);
-				text-decoration: none;
-			}
-			.community-binding-discovery:focus-visible {
-				outline: 2px solid var(--accent);
-				outline-offset: 2px;
 			}
 		</style>
 	</div>
