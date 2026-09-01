@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**29 active pin(s) across 99 binding package(s).**
+**29 active pin(s) across 106 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -34,6 +34,8 @@ surface and evidence.
 | `@octanejs/drei` | 0 |
 | `@octanejs/dropzone` | 0 |
 | `@octanejs/electron` | 0 |
+| `@octanejs/email` | 0 |
+| `@octanejs/email-cli` | 0 |
 | `@octanejs/embla-carousel` | 0 |
 | `@octanejs/floating-ui` | 29 |
 | `@octanejs/formisch` | 0 |
@@ -61,6 +63,7 @@ surface and evidence.
 | `@octanejs/pdf` | 0 |
 | `@octanejs/phosphor-icons` | 0 |
 | `@octanejs/popper` | 0 |
+| `@octanejs/portabletext` | 0 |
 | `@octanejs/radix` | 0 |
 | `@octanejs/rainbowkit` | 0 |
 | `@octanejs/react-error-boundary` | 0 |
@@ -71,6 +74,9 @@ surface and evidence.
 | `@octanejs/remix-router` | 0 |
 | `@octanejs/resizable-panels` | 0 |
 | `@octanejs/rxjs` | 0 |
+| `@octanejs/sanity-icons` | 0 |
+| `@octanejs/sanity-loader` | 0 |
+| `@octanejs/sanity-logos` | 0 |
 | `@octanejs/select` | 0 |
 | `@octanejs/shadcn` | 0 |
 | `@octanejs/solana-kit` | 0 |
@@ -97,6 +103,7 @@ surface and evidence.
 | `@octanejs/tauri` | 0 |
 | `@octanejs/testing-library` | 0 |
 | `@octanejs/textarea-autosize` | 0 |
+| `@octanejs/thinking-orbs` | 0 |
 | `@octanejs/three` | 0 |
 | `@octanejs/tiptap` | 0 |
 | `@octanejs/to-print` | 0 |

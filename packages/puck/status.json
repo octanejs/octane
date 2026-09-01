@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "@measured/puck",
+    "version": "0.20.2"
+  },
+  "surface": "Full @measured/puck@0.20.2 core port — Puck editor, Render, DropZone, hooks, and config types.",
+  "divergences": [
+    "Native onChange on controlled text inputs (ExternalInput search field) — upstream React synthetic onChange; Octane uses onInput for per-edit.",
+    "use-debounce replaced with @octanejs/tanstack-pacer useDebouncer in DragDropContext."
+  ],
+  "ssr": "Not yet evaluated.",
+  "verified": "2026-08-07",
+  "notes": [
+    "Private workspace scaffold until the published source passes strict external-consumer validation.",
+    "Source ported from puckeditor/puck packages/core via scripts/port-upstream.mjs.",
+    "Render and full Puck editor shell mount pass conformance tests (2026-08-07).",
+    "@dnd-kit/react and lucide-react rewired to @octanejs/dnd-kit and @octanejs/lucide; @dnd-kit/* upgraded to catalog 0.5.0.",
+    "Manual hook slots declared for entire src/ tree."
+  ]
+}

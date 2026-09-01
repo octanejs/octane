@@ -63,7 +63,40 @@ describe('scoped signal inspection', () => {
 		expect(JSON.stringify(inspection)).not.toContain('never-in-inspection');
 		expect(JSON.stringify(inspection)).not.toContain('callback');
 		quiet.dispose();
+		expect(quiet.inspect().trace).toEqual([]);
 		scope.dispose();
+	});
+
+	it('keeps bounded trace history chronological across writes and retirement', () => {
+		const scope = createScope({ scopeKey: 'trace-order', debug: { traceLimit: 3 } });
+		const value$ = scope.signal$('value', 0);
+		value$.set(1);
+		value$.set(2);
+		value$.set(3);
+		expect(scope.inspect().trace.map((event) => event.sequence)).toEqual([1, 2, 3]);
+		value$.set(4);
+		expect(scope.inspect().trace.map((event) => event.sequence)).toEqual([2, 3, 4]);
+		value$.set(5);
+		value$.set(6);
+		expect(scope.inspect().trace.map((event) => event.sequence)).toEqual([4, 5, 6]);
+		scope.dispose();
+		expect(scope.inspect().trace).toEqual([
+			{ sequence: 5, type: 'write', key: 'value', revision: 5 },
+			{ sequence: 6, type: 'write', key: 'value', revision: 6 },
+			{ sequence: 7, type: 'retire' },
+		]);
+	});
+
+	it('retains only the latest traced event with a one-event budget', () => {
+		const scope = createScope({ scopeKey: 'single-trace-event', debug: { traceLimit: 1 } });
+		const value$ = scope.signal$('value', 0);
+		value$.set(1);
+		value$.set(2);
+		expect(scope.inspect().trace).toEqual([
+			{ sequence: 2, type: 'write', key: 'value', revision: 2 },
+		]);
+		scope.dispose();
+		expect(scope.inspect().trace).toEqual([{ sequence: 3, type: 'retire' }]);
 	});
 
 	it('reports request activity and independent historical leases through retirement', async () => {
@@ -95,10 +128,13 @@ describe('scoped signal inspection', () => {
 		const scope = createScope({ scopeKey: 'inspection-copy', debug: { traceLimit: 2 } });
 		const value$ = scope.signal$('value', 0);
 		value$.set(1);
+		value$.set(2);
+		value$.set(3);
 		const first = scope.inspect();
-		Object.assign(first.trace[0]!, { key: 'tampered', revision: -1 });
+		for (const event of first.trace) Object.assign(event, { key: 'tampered', revision: -1 });
 		expect(scope.inspect().trace).toEqual([
-			{ sequence: 1, type: 'write', key: 'value', revision: 1 },
+			{ sequence: 2, type: 'write', key: 'value', revision: 2 },
+			{ sequence: 3, type: 'write', key: 'value', revision: 3 },
 		]);
 		scope.dispose();
 	});

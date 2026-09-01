@@ -1,0 +1,19 @@
+{
+  "upstream": {
+    "package": "@blocknote/react",
+    "version": "0.53.0"
+  },
+  "surface": "Milestone 1 — useCreateBlockNote, useBlockNoteEditor, BlockNoteContext/useBlockNoteContext (+ full mechanical port scaffold).",
+  "divergences": [
+    "Upstream exports BlockNoteViewRaw; BlockNoteView alias not yet added.",
+    "TipTap/react-dom boundary files flagged CHECKPOINT in port-upstream.mjs."
+  ],
+  "ssr": "Not yet evaluated.",
+  "verified": "2026-08-07",
+  "notes": [
+    "Private workspace scaffold until the published source passes strict external-consumer validation.",
+    "Full mechanical port (~156 files) via scripts/port-upstream.mjs (2026-08-07).",
+    "M1 export conformance test wired; editor mount blocked on @octanejs/tiptap EditorContent checkpoint.",
+    "Dependencies: @blocknote/core (reuse), @octanejs/tiptap, @octanejs/floating-ui, @octanejs/tanstack-store."
+  ]
+}

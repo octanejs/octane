@@ -77,20 +77,40 @@ optional Activity implementation was retained; generated source is saved under
 the two browser fixtures are reported separately. These checks complement, and
 do not replace, the broader existing bundle-reachability byte budgets.
 
+## Hidden caught-error reveal scaling
+
+The Octane-only caught-reveal lane mounts either 512 or 4,096 independent public
+`@try`/`@catch` boundaries inside an initially hidden Activity. Its report lane
+throws one distinct error per boundary; the matched control renders the same
+component and text shape without throwing. Root creation, hidden rendering, and
+optional GC all happen outside the timer. The timer covers only the public
+hidden-to-visible render and its root `onCaughtError` reports.
+
+Every sample verifies that hidden catches publish no reports, reveal publishes
+each report exactly once in FIFO order, visible text and output identity survive,
+and unmount empties the root. The large target is normalized to the small work
+count and compared against that small target, preventing repeated per-action
+queue searches from returning without relying on a machine-specific absolute
+timing ceiling.
+
 ## Regression guards
 
-The unified runner has 33 deterministic guards for this suite: coalesced linear
-hidden-descendant work, retained rows and bounded display writes, cold ref and
-insertion-recovery walks, cached ordinary-ref ownership, and optional Activity
-bundle reachability. Ordinary updates also forbid snapshots of unchanged keyed
-list structure. The guards run only after the semantic gates pass.
+The unified runner has 34 guards for this suite: 33 deterministic work and
+semantic guards for coalesced linear hidden-descendant work, retained rows and
+bounded display writes, cold ref and insertion-recovery walks, cached ordinary-ref
+ownership, and optional Activity bundle reachability, plus the normalized
+caught-error reveal scaling guard. Ordinary updates also forbid snapshots of
+unchanged keyed list structure. The guards run only after the semantic gates pass.
 
-The initial audit deliberately adds **no wall-clock timing ceiling**. The hidden
-setter improvement is substantial, but repeated hide/reveal is slower and the
-plain-tree timing change is not attributed to a specific helper. Those costs are
-reported in the audit instead of setting a new permissive timing ceiling. Existing
-bundle byte budgets remain unchanged; their normal-toolchain validation is still
-required after the audit's parser dependency limitation is resolved.
+The initial audit deliberately added **no absolute wall-clock timing ceiling**.
+The caught-error reveal lane now adds a same-run normalized scaling ceiling; it
+compares the large target with the small target instead of pinning a
+machine-specific duration. The hidden setter improvement is substantial, but
+repeated hide/reveal is slower and the plain-tree timing change is not attributed
+to a specific helper. Those costs remain reported in the audit instead of setting
+a permissive absolute timing ceiling. Existing bundle byte budgets remain
+unchanged; their normal-toolchain validation is still required after the audit's
+parser dependency limitation is resolved.
 
 ## Run
 
@@ -102,6 +122,7 @@ node benchmarks/activity/work.mjs
 node benchmarks/activity/refs.mjs 8
 node benchmarks/activity/refs-work.mjs
 node benchmarks/activity/bundle.mjs
+node benchmarks/activity/caught-reveal-run.mjs 8
 pnpm exec tsrx-tsc --noEmit -p benchmarks/activity/tsconfig.json
 ```
 

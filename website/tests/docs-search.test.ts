@@ -236,6 +236,16 @@ describe('search dialog', () => {
 			if (!el) throw new Error('dialog did not open');
 			return el;
 		});
+		// The search index is code-split; interact only after the dialog exposes its
+		// ready state so a loaded runner cannot race the lazy import.
+		await waitFor(
+			() => {
+				if (!dialog.textContent?.includes('Search the docs, packages, and integrations.')) {
+					throw new Error('search index did not become ready');
+				}
+			},
+			{ timeout: 5_000 },
+		);
 
 		const input = dialog.querySelector<HTMLInputElement>('.search-input')!;
 		fireEvent.input(input, { target: { value: 'useState' } });

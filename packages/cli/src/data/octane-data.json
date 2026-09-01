@@ -310,6 +310,36 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/email",
+      "version": "0.0.1",
+      "category": "Content",
+      "upstream": { "package": "react-email", "version": "6.9.2" },
+      "surface": "Email component surface: Body, Button, CodeBlock, CodeInline, Column, Container, Font, Head, Heading, Hr, Html, Img, Link, Markdown, Preview, Row, Section, Tailwind, Text, Prism themes, the pixel-based Tailwind preset, and an Octane-native static render helper.",
+      "divergences": [
+        "render accepts an Octane component plus props rather than a pre-created React node, matching octane/server's entry-point API.",
+        "Preview accepts its inspectable preview copy through the text prop; natural .tsrx children are opaque render blocks.",
+        "Markdown accepts its source through a string children prop; JSX children compile to children blocks and are rejected rather than invoked as render props.",
+        "Refs are ordinary Octane ref props rather than forwardRef components.",
+        "Head uses Octane's metadata-hoisting channel; render reconstructs the consumer-visible document head around hoisted tags.",
+        "Tailwind transforms fully rendered static HTML rather than cloning a React element tree, allowing natural .tsrx children and nested compiled components."
+      ],
+      "ssr": "Supported and tested through renderToStaticMarkup: output has the React Email XHTML Transitional doctype and no hydration markers.",
+      "verified": "2026-08-10"
+    },
+    {
+      "name": "@octanejs/email-cli",
+      "version": "0.0.1",
+      "category": "Content",
+      "upstream": { "package": "react-email", "version": "6.9.2" },
+      "surface": "Octane-native `export` and `dev` commands: recursive .tsrx template discovery, static HTML export, nested output paths, static assets, development template index and previews, Vite live reload, and compile/render error pages.",
+      "divergences": [
+        "The preview application is a lightweight Octane/Vite server rather than upstream's bundled React/Next application.",
+        "The executable is named octane-email to avoid colliding with upstream's email binary."
+      ],
+      "ssr": "Templates compile with the Octane Vite plugin in SSR mode and render through @octanejs/email.",
+      "verified": "2026-08-10"
+    },
+    {
       "name": "@octanejs/embla-carousel",
       "version": "0.0.16",
       "category": "UI Libraries",
@@ -712,6 +742,24 @@
       "verified": "2026-08-03"
     },
     {
+      "name": "@octanejs/portabletext",
+      "version": "0.1.0",
+      "category": "Sanity Content",
+      "upstream": {
+        "package": "@portabletext/react",
+        "version": "8.0.1",
+        "commit": "52770c934266773c0b52ae3a8e3bc2a0c8137985"
+      },
+      "surface": "Complete runtime surface: PortableText, defaultComponents, mergeComponents, toPlainText, PortableTextBlock and ListNestMode, plus renderer component and TypeGen helper types.",
+      "divergences": [
+        "Renderer callbacks return OctaneNode rather than ReactNode.",
+        "Custom component refs and events use Octane's normal ref prop and native DOM events.",
+        "PortableTextReactComponents and ReactPortableTextList are compatibility aliases; Octane-named equivalents are preferred."
+      ],
+      "ssr": "Supported and differential-tested against @portabletext/react@8.0.1 static markup.",
+      "verified": "2026-08-24"
+    },
+    {
       "name": "@octanejs/radix",
       "version": "0.1.49",
       "category": "UI Libraries",
@@ -852,6 +900,58 @@
       ],
       "ssr": "useSyncExternalStore supplies the state snapshot during server rendering; browser-only ReactDOM batching helpers are intentionally absent.",
       "verified": "2026-08-02"
+    },
+    {
+      "name": "@octanejs/sanity-icons",
+      "version": "0.1.0",
+      "category": "Sanity Content",
+      "upstream": {
+        "package": "@sanity/icons",
+        "version": "5.2.1",
+        "commit": "e6c37d2d4f7f121254c077b3ae83e199ec0aec9c"
+      },
+      "surface": "Complete @sanity/icons@5.2.1 surface: all generated per-icon subpaths, named and default exports, Icon, icons, IconMap, IconSymbol and IconComponent.",
+      "divergences": [
+        "Refs are normal Octane ref props rather than React forwardRef wrappers.",
+        "Event callbacks receive native DOM events rather than React synthetic events."
+      ],
+      "ssr": "Supported and tested against representative @sanity/icons static SVG markup.",
+      "verified": "2026-08-24"
+    },
+    {
+      "name": "@octanejs/sanity-loader",
+      "version": "0.1.0",
+      "category": "Sanity Content",
+      "upstream": {
+        "package": "@sanity/react-loader",
+        "version": "2.2.1",
+        "commit": "2e3f5720173acfe67a771d92bb7fc5b51e6ac014"
+      },
+      "surface": "Query-store milestone: createQueryStore, loadQuery, setServerClient, useQuery, useLiveMode, useEncodeDataAttribute, create-data-attribute exports, browser conditions, and the server-only rsc entry.",
+      "divergences": [
+        "Hooks use Octane hook slots and return Octane-compatible values rather than React hooks.",
+        "The experimental upstream ./jsx wrapped-data element factory is deferred to a separate milestone.",
+        "The ./rsc entry models a server-only Octane environment rather than React Server Component conditions."
+      ],
+      "ssr": "Supported through loadQuery/setServerClient and the server-only rsc entry; initial query state is SSR-tested.",
+      "verified": "2026-08-24"
+    },
+    {
+      "name": "@octanejs/sanity-logos",
+      "version": "0.1.0",
+      "category": "Sanity Content",
+      "upstream": {
+        "package": "@sanity/logos",
+        "version": "2.2.5",
+        "commit": "e6c37d2d4f7f121254c077b3ae83e199ec0aec9c"
+      },
+      "surface": "Complete @sanity/logos@2.2.5 runtime surface: SanityLogo, SanityMonogram, GroqLogo and GroqMonogram, including dark/scheme/custom-color variants.",
+      "divergences": [
+        "Refs are normal Octane ref props rather than React forwardRef wrappers.",
+        "Event callbacks receive native DOM events rather than React synthetic events."
+      ],
+      "ssr": "Supported and differential-tested against @sanity/logos@2.2.5 static SVG markup.",
+      "verified": "2026-08-24"
     },
     {
       "name": "@octanejs/select",
@@ -1244,6 +1344,16 @@
       "verified": "2026-08-03"
     },
     {
+      "name": "@octanejs/thinking-orbs",
+      "version": "0.1.0",
+      "category": "Animation",
+      "upstream": { "package": "thinking-orbs", "version": "0.2.0" },
+      "surface": "ThinkingOrb component, resolvePreset, MODE_DRAWS, and public types — nine animation states, two tuned size presets, auto/dark/light theme, reduced-motion static frame.",
+      "divergences": [],
+      "ssr": "Canvas is client-only; server render emits the canvas element without animation.",
+      "verified": "2026-08-07"
+    },
+    {
       "name": "@octanejs/three",
       "version": "0.1.43",
       "category": "3D",
@@ -1534,7 +1644,9 @@
     "@monaco-editor/react": "@octanejs/monaco-editor",
     "@opentui/react": "@octanejs/opentui",
     "@phosphor-icons/react": "@octanejs/phosphor-icons",
+    "@portabletext/react": "@octanejs/portabletext",
     "@rainbow-me/rainbowkit": "@octanejs/rainbowkit",
+    "@react-email/components": "@octanejs/email",
     "@react-rxjs/core": "@octanejs/rxjs",
     "@react-rxjs/utils": "@octanejs/rxjs",
     "@react-spring/parallax": "@octanejs/spring",
@@ -1542,6 +1654,9 @@
     "@react-three/drei": "@octanejs/drei",
     "@react-three/fiber": "@octanejs/three",
     "@reduxjs/toolkit": "@octanejs/redux-toolkit",
+    "@sanity/icons": "@octanejs/sanity-icons",
+    "@sanity/logos": "@octanejs/sanity-logos",
+    "@sanity/react-loader": "@octanejs/sanity-loader",
     "@solana/react": "@octanejs/solana-kit",
     "@streamdown/cjk": "@octanejs/streamdown",
     "@streamdown/code": "@octanejs/streamdown",
@@ -1641,6 +1756,7 @@
     "react-day-picker": "@octanejs/day-picker",
     "react-draggable": "@octanejs/draggable",
     "react-dropzone": "@octanejs/dropzone",
+    "react-email": "@octanejs/email",
     "react-error-boundary": "@octanejs/react-error-boundary",
     "react-hook-form": "@octanejs/hook-form",
     "react-i18next": "@octanejs/i18next",
@@ -1669,6 +1785,7 @@
     "streamdown": "@octanejs/streamdown",
     "styled-components": "@octanejs/styled-components",
     "swr": "@octanejs/swr",
+    "thinking-orbs": "@octanejs/thinking-orbs",
     "use-stick-to-bottom": "@octanejs/stick-to-bottom",
     "usehooks-ts": "@octanejs/usehooks-ts",
     "valtio": "@octanejs/valtio",

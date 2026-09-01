@@ -738,6 +738,7 @@ describe('manifest-declared manual hook slots', () => {
 			'motion',
 			'opentui',
 			'phosphor-icons',
+			'puck',
 			'radix',
 			'rainbowkit',
 			'react-error-boundary',

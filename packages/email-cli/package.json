@@ -1,0 +1,47 @@
+{
+  "name": "@octanejs/email-cli",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "Compile, preview, and export Octane email templates.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/email-cli"
+  },
+  "bin": {
+    "octane-email": "./src/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./preview": "./src/preview/server.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit",
+    "dev": "node ./src/cli.js dev"
+  },
+  "dependencies": {
+    "@octanejs/email": "workspace:*",
+    "vite": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:default",
+    "octane": "workspace:*",
+    "typescript": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

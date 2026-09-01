@@ -1,0 +1,80 @@
+{
+  "name": "@octanejs/puck",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "Puck for the octane renderer — an Octane binding for @measured/puck visual page builders.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/puck"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "sideEffects": [
+    "./src/styles.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./puck.css": "./src/styles.css",
+    "./dist/index.css": "./src/styles.css"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project puck --project puck-differential",
+    "port:upstream": "node ./scripts/port-upstream.mjs"
+  },
+  "dependencies": {
+    "@dnd-kit/abstract": "catalog:default",
+    "@dnd-kit/collision": "catalog:default",
+    "@dnd-kit/dom": "catalog:default",
+    "@dnd-kit/geometry": "catalog:default",
+    "@dnd-kit/helpers": "catalog:default",
+    "@dnd-kit/state": "catalog:default",
+    "@octanejs/dnd-kit": "workspace:*",
+    "@octanejs/lucide": "workspace:*",
+    "@octanejs/tanstack-pacer": "workspace:*",
+    "@octanejs/zustand": "workspace:*",
+    "classnames": "catalog:default",
+    "css-box-model": "^1.2.1",
+    "deep-diff": "^1.0.2",
+    "fast-deep-equal": "^3.1.3",
+    "flat": "^5.0.2",
+    "object-hash": "^3.0.0",
+    "uuid": "^9.0.1"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@measured/puck": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
