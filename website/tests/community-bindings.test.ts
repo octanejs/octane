@@ -54,8 +54,7 @@ const EXPECTED_CATALOG = [
 				name: 'TanStack Highlight',
 				purpose: 'Octane code highlighting with direct component and MDX integration.',
 				owner: 'TanStack',
-				destination:
-					'https://github.com/TanStack/highlight/blob/main/docs/guides/octane.md',
+				destination: 'https://github.com/TanStack/highlight/blob/main/docs/guides/octane.md',
 				searchNames: ['@tanstack/highlight/octane'],
 			},
 			{
@@ -145,10 +144,7 @@ const EXPECTED_CATALOG = [
 				owner: 'Alchemy',
 				destination:
 					'https://github.com/alchemy-run/alchemy/tree/main/packages/frontend-frameworks/src/octane',
-				searchNames: [
-					'@alchemy.run/frontend-frameworks/octane',
-					'@distilled.cloud/octane',
-				],
+				searchNames: ['@alchemy.run/frontend-frameworks/octane', '@distilled.cloud/octane'],
 			},
 		],
 	},
@@ -194,7 +190,9 @@ describe('community binding catalog', () => {
 	it('rejects duplicate stable IDs and normalized search names', () => {
 		const duplicateId = structuredClone(COMMUNITY_BINDING_GROUPS);
 		duplicateId[0].entries[1].id = duplicateId[0].entries[0].id;
-		expect(() => validateCommunityBindingCatalog(duplicateId)).toThrow(/duplicate entry id.*tanstack-ai/i);
+		expect(() => validateCommunityBindingCatalog(duplicateId)).toThrow(
+			/duplicate entry id.*tanstack-ai/i,
+		);
 
 		const duplicateSearchName = structuredClone(COMMUNITY_BINDING_GROUPS);
 		duplicateSearchName[0].entries[1].searchNames[0] = '@TANSTACK/AI-OCTANE';

@@ -135,10 +135,7 @@
         "purpose": "Build and deployment integration for Octane on Cloudflare, AWS, and Node.",
         "owner": "Alchemy",
         "destination": "https://github.com/alchemy-run/alchemy/tree/main/packages/frontend-frameworks/src/octane",
-        "searchNames": [
-          "@alchemy.run/frontend-frameworks/octane",
-          "@distilled.cloud/octane"
-        ]
+        "searchNames": ["@alchemy.run/frontend-frameworks/octane", "@distilled.cloud/octane"]
       }
     ]
   },

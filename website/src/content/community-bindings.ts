@@ -25,14 +25,7 @@ const GROUPS = [
 ] as const;
 
 const GROUP_FIELDS = new Set(['id', 'title', 'entries']);
-const ENTRY_FIELDS = new Set([
-	'id',
-	'name',
-	'purpose',
-	'owner',
-	'destination',
-	'searchNames',
-]);
+const ENTRY_FIELDS = new Set(['id', 'name', 'purpose', 'owner', 'destination', 'searchNames']);
 const STABLE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function invalid(path: string, message: string): never {
@@ -118,10 +111,7 @@ export function validateCommunityBindingCatalog(value: unknown): CommunityBindin
 		const title = readString(group, 'title', groupPath);
 		const expectedGroup = GROUPS[groupIndex];
 		if (id !== expectedGroup.id || title !== expectedGroup.title) {
-			invalid(
-				groupPath,
-				`must be the authored ${expectedGroup.title} group (${expectedGroup.id})`,
-			);
+			invalid(groupPath, `must be the authored ${expectedGroup.title} group (${expectedGroup.id})`);
 		}
 
 		if (!Array.isArray(group.entries) || group.entries.length === 0) {
@@ -188,6 +178,4 @@ export function validateCommunityBindingCatalog(value: unknown): CommunityBindin
 	});
 }
 
-export const COMMUNITY_BINDING_GROUPS = validateCommunityBindingCatalog(
-	communityBindingCatalog,
-);
+export const COMMUNITY_BINDING_GROUPS = validateCommunityBindingCatalog(communityBindingCatalog);
