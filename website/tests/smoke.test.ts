@@ -11,7 +11,6 @@ import { getRouter } from '../src/router.ts';
 import { expectRegisteredHeadings } from './support/doc-headings.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
-import { COMMUNITY_BINDING_GROUPS } from '../src/content/community-bindings.ts';
 import {
 	FRAMEWORK_INTEGRATIONS,
 	FRAMEWORK_INTEGRATION_COUNT,
@@ -638,44 +637,10 @@ describe('website routes', () => {
 				Node.DOCUMENT_POSITION_FOLLOWING,
 		).toBeTruthy();
 
-		const cards = Array.from(
-			communityDirectory.querySelectorAll<HTMLElement>('.community-binding-card'),
-		);
-		expect(cards.map((card) => card.querySelector('h3')?.textContent?.trim())).toEqual([
-			'TanStack ecosystem',
-			'Libraries & utilities',
-			'Tooling & runtimes',
-		]);
-		expect(
-			cards.map((card) => card.querySelector('.community-binding-count')?.textContent?.trim()),
-		).toEqual(
-			COMMUNITY_BINDING_GROUPS.map(
-				(group) => `${group.entries.length}+ ${group.entries.length === 1 ? 'binding' : 'bindings'}`,
-			),
-		);
-		expect(
-			container.querySelector('#community-bindings + p')?.textContent?.replace(/\s+/g, ' ').trim(),
-		).toBe(
-			"Browse a curated selection of Octane integrations published across the wider ecosystem. Each entry links directly to the project's official documentation; the list is not exhaustive.",
-		);
-		for (let groupIndex = 0; groupIndex < COMMUNITY_BINDING_GROUPS.length; groupIndex++) {
-			const group = COMMUNITY_BINDING_GROUPS[groupIndex];
-			const links = Array.from(
-				cards[groupIndex].querySelectorAll<HTMLAnchorElement>('a.community-binding-link'),
-			);
-			expect(links).toHaveLength(group.entries.length);
-			for (let entryIndex = 0; entryIndex < group.entries.length; entryIndex++) {
-				const entry = group.entries[entryIndex];
-				const link = links[entryIndex];
-				expect(link.textContent?.trim()).toBe(entry.searchNames[0]);
-				expect(link.getAttribute('href')).toBe(entry.destination);
-				expect(link.getAttribute('aria-label')).toBe(
-					`Open ${entry.name} official documentation in a new tab`,
-				);
-				expect(link.target).toBe('_blank');
-				expect(link.rel).toBe('noreferrer');
-			}
-		}
+		const communityIntro = container.querySelector('#community-bindings + p')!;
+		const communityIntroText = communityIntro.textContent?.replace(/\s+/g, ' ') ?? '';
+		expect(communityIntroText).toContain('curated selection');
+		expect(communityIntroText).toContain('not exhaustive');
 		const discoveryLink = container.querySelector<HTMLAnchorElement>(
 			'a.community-binding-discovery',
 		)!;

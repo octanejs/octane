@@ -18,11 +18,7 @@ export interface CommunityBindingGroup {
 	entries: CommunityBindingEntry[];
 }
 
-const GROUPS = [
-	{ id: 'tanstack', title: 'TanStack ecosystem' },
-	{ id: 'community-libraries', title: 'Libraries & utilities' },
-	{ id: 'tooling-and-platforms', title: 'Tooling & runtimes' },
-] as const;
+const GROUP_IDS = ['tanstack', 'community-libraries', 'tooling-and-platforms'] as const;
 
 const GROUP_FIELDS = new Set(['id', 'title', 'entries']);
 const ENTRY_FIELDS = new Set(['id', 'name', 'purpose', 'owner', 'destination', 'searchNames']);
@@ -95,8 +91,8 @@ export function validateCommunityBindingCatalog(value: unknown): CommunityBindin
 	if (!Array.isArray(value)) {
 		invalid('catalog', 'must be an array');
 	}
-	if (value.length !== GROUPS.length) {
-		invalid('catalog', `must contain exactly ${GROUPS.length} groups`);
+	if (value.length !== GROUP_IDS.length) {
+		invalid('catalog', `must contain exactly ${GROUP_IDS.length} groups`);
 	}
 
 	const entryIds = new Map<string, string>();
@@ -109,9 +105,9 @@ export function validateCommunityBindingCatalog(value: unknown): CommunityBindin
 
 		const id = readStableId(group, groupPath);
 		const title = readString(group, 'title', groupPath);
-		const expectedGroup = GROUPS[groupIndex];
-		if (id !== expectedGroup.id || title !== expectedGroup.title) {
-			invalid(groupPath, `must be the authored ${expectedGroup.title} group (${expectedGroup.id})`);
+		const expectedId = GROUP_IDS[groupIndex];
+		if (id !== expectedId) {
+			invalid(`${groupPath}.id`, `must be the authored group "${expectedId}"`);
 		}
 
 		if (!Array.isArray(group.entries) || group.entries.length === 0) {

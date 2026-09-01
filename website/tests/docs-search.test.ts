@@ -6,6 +6,7 @@ import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
 import { headingsFor, loadSearchIndex, searchDocs } from '../src/lib/docs-search.ts';
+import { loadSiteSearchIndex } from '../src/lib/site-search.ts';
 
 const rawDocs = import.meta.glob('../src/content/docs/*.mdx', {
 	query: '?raw',
@@ -223,6 +224,10 @@ describe('search dialog', () => {
 	});
 
 	it('renders community packages as attributed direct links', async () => {
+		// This case owns the rendered result, not the lazy-loading state. Warm the
+		// shared index before opening the dialog so suite contention cannot consume
+		// the DOM wait budget while package metadata modules are still loading.
+		await loadSiteSearchIndex();
 		const { container, router } = await renderRoute('/');
 		const trigger = container.querySelector<HTMLButtonElement>('.search-trigger')!;
 		fireEvent.click(trigger);
