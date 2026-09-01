@@ -292,14 +292,14 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.1.61
-    '@tsrx/prettier-plugin': ^0.3.126
-    '@tsrx/typescript-plugin': ^0.3.126
+    '@tsrx/core': ^0.1.63
+    '@tsrx/prettier-plugin': ^0.3.128
+    '@tsrx/typescript-plugin': ^0.3.128
     '@tsrx/ripple': ^0.1.62
-    '@tsrx/react': ^0.2.61
-    '@tsrx/solid': ^0.1.61
-    '@tsrx/vite-plugin-react': ^0.0.94
-    '@tsrx/vite-plugin-solid': ^0.0.91
+    '@tsrx/react': ^0.2.63
+    '@tsrx/solid': ^0.1.63
+    '@tsrx/vite-plugin-react': ^0.0.96
+    '@tsrx/vite-plugin-solid': ^0.0.93
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -608,14 +608,14 @@ minimumReleaseAgeExclude:
   - oxc-tsrx@0.5.0
   - '@ripple-ts/adapter@0.3.125'
   - '@ripple-ts/vite-plugin@0.3.125'
-  - '@tsrx/core@0.1.61'
-  - '@tsrx/prettier-plugin@0.3.126'
-  - '@tsrx/react@0.2.61'
+  - '@tsrx/core@0.1.63'
+  - '@tsrx/prettier-plugin@0.3.128'
+  - '@tsrx/react@0.2.63'
   - '@tsrx/ripple@0.1.62'
-  - '@tsrx/solid@0.1.61'
-  - '@tsrx/typescript-plugin@0.3.126'
-  - '@tsrx/vite-plugin-react@0.0.94'
-  - '@tsrx/vite-plugin-solid@0.0.91'
+  - '@tsrx/solid@0.1.63'
+  - '@tsrx/typescript-plugin@0.3.128'
+  - '@tsrx/vite-plugin-react@0.0.96'
+  - '@tsrx/vite-plugin-solid@0.0.93'
   - ripple@0.3.125
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
@@ -625,5 +625,3 @@ minimumReleaseAgeExclude:
 # are published in the required @tsrx/core >= 0.1.60.
 patchedDependencies:
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
-  # Temporary until tsrx-org/tsrx#4 is released; remove this patch when that release is adopted.
-  '@tsrx/core@0.1.61': patches/@tsrx__core@0.1.61.patch

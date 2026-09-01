@@ -5,6 +5,7 @@ import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { TextAfterComp, TextBetweenComps, TextAfterIf } from './_fixtures/text-sibling.tsrx';
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
 // Regression for the website-tsrx-new migration: a `{x as string}` text hole
 // among sibling holes (component / control flow) must ADOPT the server text node
@@ -33,6 +34,32 @@ beforeEach(() => {
 afterEach(() => container.remove());
 
 describe('hydrateRoot — text hole among sibling holes', () => {
+	it('preserves literal less-than text across server rendering and hydration', () => {
+		const source = `export function Text() @{ <p><3 and 1 < 2 and <= 3</p> }`;
+		const compileOptions = { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' };
+		const client = loadCompiledFixtureSource(source, {
+			id: 'text.tsrx',
+			mode: 'client',
+			compileOptions,
+		});
+		const server = loadCompiledFixtureSource(source, {
+			id: 'text.tsrx',
+			mode: 'server',
+			compileOptions,
+		});
+		container.innerHTML = ServerRT.renderToString(server.Text).html;
+		const paragraph = container.querySelector('p');
+		expect(paragraph?.textContent).toBe('<3 and 1 < 2 and <= 3');
+		const root = hydrateRoot(container, client.Text);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('p')).toBe(paragraph);
+			expect(paragraph?.textContent).toBe('<3 and 1 < 2 and <= 3');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('text after a component: adopts the server text, keeps the component', async () => {
 		const { html } = await ServerRT.renderToString(server.TextAfterComp, { label: 'LBL' });
 		container.innerHTML = html;
