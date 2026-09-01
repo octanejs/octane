@@ -16297,6 +16297,12 @@ const _delegated = new Set<string>();
 // portals are currently rendering into it so we detach only when the last
 // one unmounts. createRoot containers have refcount 1 for their lifetime.
 const _delegationTargets = new Map<Node, number>();
+// Portal descendants can add their first host during a later local update,
+// without rerendering the portal itself. Resolve those hosts from the portal's
+// live owned range, paying this bookkeeping only for applications using portals.
+const _portalEventRanges = new WeakMap<Node, Set<PortalSlot>>();
+let portalEventTargetCount = 0;
+const PORTAL_EVENT_PATH_LENGTH = /* @__PURE__ */ Symbol('octane.portalPathLength');
 // Public roots end a logical event branch; portal targets do not. Keep this
 // production ownership separate from the development-only duplicate-root guard.
 interface EventRootMembership {
@@ -16340,11 +16346,29 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] {
 	// synchronously redispatching the same Event never inherits an old root epoch.
 	if (_delegationTargets.size === 1) {
 		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
+		if (portalEventTargetCount !== 0) {
+			preparePortalEventOwners(path, eventRootEpoch);
+			(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+		}
 		return path;
 	}
 	for (let i = path.length - 1; i >= 0; i--) {
 		if (_delegationTargets.has(path[i] as Node)) {
-			if (path[i] === listener) (event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
+			if (path[i] === listener) {
+				(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
+				if (portalEventTargetCount !== 0) {
+					preparePortalEventOwners(path, eventRootEpoch);
+					(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+				}
+			} else if (
+				portalEventTargetCount !== 0 &&
+				path.length > ((event as any)[PORTAL_EVENT_PATH_LENGTH] || 0)
+			) {
+				// A closed shadow root reveals additional nodes only to its inner
+				// listener. Keep just a length on the Event, never a retained DOM path.
+				preparePortalEventOwners(path, (event as any)[EVENT_ROOT_EPOCH] ?? eventRootEpoch);
+				(event as any)[PORTAL_EVENT_PATH_LENGTH] = path.length;
+			}
 			break;
 		}
 	}
@@ -16756,6 +16780,83 @@ type DelegatedNode = Node & {
 	$$portalParent?: Node;
 	$$portalContainer?: Node;
 };
+
+type PortalEventBoundary = Node & {
+	$$portalEventRange?: PortalSlot;
+	$$portalEventStart?: PortalEventBoundary;
+};
+
+function resolvePortalEventOwner(node: DelegatedNode): void {
+	if (node.$$portalParent != null || node.parentNode === null) return;
+	// assignedSlot/composedPath can put a <slot> next, but a portal range belongs
+	// to the direct child's actual DOM container, not the slot it projects into.
+	const target = node.parentNode;
+	const ranges = _portalEventRanges.get(target);
+	if (ranges === undefined) return;
+	let owner: PortalSlot | undefined;
+	let previous = node.previousSibling as PortalEventBoundary | null;
+	let remainingSkips = ranges.size;
+	while (previous !== null) {
+		const closedStart = previous.$$portalEventStart;
+		const closedRange = closedStart?.$$portalEventRange;
+		if (
+			remainingSkips !== 0 &&
+			closedStart !== undefined &&
+			closedRange !== undefined &&
+			ranges.has(closedRange) &&
+			closedRange.start === closedStart &&
+			closedRange.end === previous &&
+			closedStart.parentNode === target
+		) {
+			// Skip a completed foreign range, including all its content. A valid
+			// backward walk skips each active range at most once. Bounding jumps
+			// also prevents cycles if external DOM code reverses a marker pair;
+			// after that bound, ordinary previousSibling steps always make progress.
+			remainingSkips--;
+			previous = closedStart.previousSibling as PortalEventBoundary | null;
+			continue;
+		}
+		const range = previous.$$portalEventRange;
+		const end = range?.end;
+		if (
+			range !== undefined &&
+			ranges.has(range) &&
+			range.start === previous &&
+			end != null &&
+			end.parentNode === target &&
+			(previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 &&
+			(node.compareDocumentPosition(end) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+		) {
+			// The first enclosing start encountered backwards is the innermost
+			// active owner, including foreign ranges interleaved in a Fragment.
+			owner = range;
+			break;
+		}
+		previous = previous.previousSibling as PortalEventBoundary | null;
+	}
+	if (owner === undefined) return;
+	if (ROOT_RENDER_TRANSACTION !== null) {
+		journalRootProperty(node, '$$portalParent');
+		journalRootProperty(node, '$$portalContainer');
+	}
+	node.$$portalParent = owner.host;
+	node.$$portalContainer = target;
+}
+
+function preparePortalEventOwners(path: EventTarget[], epoch: number): void {
+	for (let i = 0; i < path.length; i++) {
+		const node = eventPathNode(path[i]);
+		if (node === null) continue;
+		resolvePortalEventOwner(node);
+		// A nested portal's logical host need not occur on the native path.
+		// Resolve that branch too, before native target listeners can move nodes.
+		let logical = node.$$portalParent as DelegatedNode | undefined;
+		while (logical != null && !isEventRoot(logical, epoch) && path.indexOf(logical) < 0) {
+			resolvePortalEventOwner(logical);
+			logical = (logical.$$portalParent || logical.parentNode) as DelegatedNode | undefined;
+		}
+	}
+}
 
 function eventPathNode(target: EventTarget | null | undefined): DelegatedNode | null {
 	return target != null && typeof (target as Node).nodeType === 'number'
@@ -18751,12 +18852,39 @@ interface PortalSlot {
 	__kind: 'portalSlotSlot';
 	block: Block | null;
 	target: Element | null;
+	host: Node;
 	start: Comment | null;
 	end: Comment | null;
 	fragmentOwners?: FragmentInstance | readonly FragmentInstance[];
 	fragmentAnchor?: Node;
 	sourceAnchor?: Node;
 	interleavedFragment?: FragmentInstance;
+}
+
+function registerPortalEventRange(target: Node, portal: PortalSlot): void {
+	let ranges = _portalEventRanges.get(target);
+	if (ranges === undefined) {
+		ranges = new Set();
+		_portalEventRanges.set(target, ranges);
+		portalEventTargetCount++;
+	}
+	ranges.add(portal);
+	(portal.start as PortalEventBoundary).$$portalEventRange = portal;
+	(portal.end as PortalEventBoundary).$$portalEventStart = portal.start as PortalEventBoundary;
+}
+
+function unregisterPortalEventRange(target: Node, portal: PortalSlot): void {
+	const start = portal.start as PortalEventBoundary | null;
+	const end = portal.end as PortalEventBoundary | null;
+	if (start?.$$portalEventRange === portal) delete start.$$portalEventRange;
+	if (end?.$$portalEventStart === start) delete end.$$portalEventStart;
+	const ranges = _portalEventRanges.get(target);
+	if (ranges === undefined) return;
+	ranges.delete(portal);
+	if (ranges.size === 0) {
+		_portalEventRanges.delete(target);
+		portalEventTargetCount--;
+	}
 }
 
 /**
@@ -19056,16 +19184,25 @@ function renderPortalState(
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 			__profileTrackComponent(block, profilePortalComponent(rawBody));
 		}
-		state = { __kind: 'portalSlotSlot', block, target, start, end };
+		state = { __kind: 'portalSlotSlot', block, target, host, start, end };
+		registerPortalEventRange(target, state);
 		activityPortalCreated?.(block);
 		// Portal target hosts handlers stamped via the same `el.$$click = …`
 		// mechanism as the main tree, so it needs the delegated event listeners too.
 		// Refcounted: a target hosting two portals attaches once, detaches when the
 		// last portal unmounts.
 		registerDelegationTarget(target);
-		if (ROOT_RENDER_TRANSACTION !== null) journalUndo(() => unregisterDelegationTarget(target));
+		if (ROOT_RENDER_TRANSACTION !== null) {
+			const created = state;
+			journalUndo(() => {
+				unregisterPortalEventRange(target, created);
+				unregisterDelegationTarget(target);
+			});
+		}
 		renderBlock(block);
 	} else {
+		if (state.host !== host) journalRootProperty(state, 'host');
+		state.host = host;
 		if (state.block!.body !== norm.body) journalRootProperty(state.block!, 'body');
 		if (state.block!.props !== norm.props) journalRootProperty(state.block!, 'props');
 		if (state.block!.extra !== env) journalRootProperty(state.block!, 'extra');
@@ -19125,6 +19262,7 @@ function teardownPortalState(state: PortalSlot): void {
 		state.block = null;
 	}
 	if (state.target) {
+		unregisterPortalEventRange(state.target, state);
 		unregisterDelegationTarget(state.target);
 		state.target = null;
 	}

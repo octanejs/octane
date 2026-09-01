@@ -19,6 +19,7 @@ import * as ServerRT from 'octane/server';
 import {
 	RootDiv,
 	PropagationTree,
+	DeferredPortalEvents,
 	DisappearingButton,
 	BatchChild,
 	BatchParent,
@@ -36,6 +37,126 @@ import {
 
 const outLogger = (log: EffectLog) => (e: Event) =>
 	log.push('out:' + (e.currentTarget as Element).className);
+
+describe('portal events after descendant updates', () => {
+	// Lifecycle extension of React's logical portal propagation, not an exact
+	// upstream test port: a child can reveal its first host without rerendering
+	// the component that created the portal. Its events still belong to that tree.
+	// https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-dom-bindings/src/events/DOMPluginEventSystem.js#L630
+	it.each(['separate container', 'another root'] as const)(
+		'delivers both portal phases after child-local state reveals content in %s',
+		(placement) => {
+			const log: string[] = [];
+			const physicalRoot =
+				placement === 'another root'
+					? mount(PropagationTree, {
+							onParentCapture: () => log.push('physical capture'),
+							onParent: () => log.push('physical bubble'),
+						})
+					: null;
+			const target = document.createElement('div');
+			(physicalRoot?.find('.propagation-parent') ?? document.body).appendChild(target);
+			let setVisible: (visible: boolean) => void = () => {};
+			const logicalRoot = mount(DeferredPortalEvents, {
+				target,
+				register: (setter) => {
+					setVisible = setter;
+				},
+				log: (label) => log.push(label),
+			});
+			try {
+				expect(target.querySelector('.deferred-portal-target')).toBeNull();
+				flushSync(() => setVisible(true));
+				const button = target.querySelector<HTMLButtonElement>('.deferred-portal-target');
+				expect(button).not.toBeNull();
+				button!.click();
+				const expected = ['logical capture', 'target capture', 'target bubble', 'logical bubble'];
+				if (physicalRoot !== null) {
+					expected.unshift('physical capture');
+					expected.push('physical bubble');
+				}
+				expect(log).toEqual(expected);
+			} finally {
+				logicalRoot.unmount();
+				physicalRoot?.unmount();
+				target.remove();
+			}
+		},
+	);
+
+	it('keeps late portal content with its own logical parent when a shared target owner unmounts', () => {
+		const log: string[] = [];
+		const target = document.createElement('div');
+		document.body.appendChild(target);
+		const emptyOwner = mount(DeferredPortalEvents, {
+			target,
+			register: () => {},
+			log: (label) => log.push('empty: ' + label),
+		});
+		let setVisible: (visible: boolean) => void = () => {};
+		const visibleOwner = mount(DeferredPortalEvents, {
+			target,
+			register: (setter) => {
+				setVisible = setter;
+			},
+			log: (label) => log.push('visible: ' + label),
+		});
+		try {
+			flushSync(() => setVisible(true));
+			target.querySelector<HTMLButtonElement>('.deferred-portal-target')!.click();
+			const expected = [
+				'visible: logical capture',
+				'visible: target capture',
+				'visible: target bubble',
+				'visible: logical bubble',
+			];
+			expect(log).toEqual(expected);
+			emptyOwner.unmount();
+			flushSync(() => setVisible(false));
+			expect(target.querySelector('.deferred-portal-target')).toBeNull();
+			flushSync(() => setVisible(true));
+			target.querySelector<HTMLButtonElement>('.deferred-portal-target')!.click();
+			expect(log).toEqual([...expected, ...expected]);
+		} finally {
+			emptyOwner.unmount();
+			visibleOwner.unmount();
+			target.remove();
+		}
+	});
+
+	it('preserves late portal ownership when a native target listener moves the host before bubbling', () => {
+		const log: string[] = [];
+		const target = document.createElement('div');
+		const destination = document.createElement('div');
+		document.body.append(target, destination);
+		target.addEventListener('auxclick', () => log.push('native capture'), true);
+		let setVisible: (visible: boolean) => void = () => {};
+		const root = mount(DeferredPortalEvents, {
+			target,
+			register: (setter) => {
+				setVisible = setter;
+			},
+			log: (label) => log.push(label),
+		});
+		try {
+			flushSync(() => setVisible(true));
+			const button = target.querySelector<HTMLButtonElement>('.deferred-portal-target')!;
+			button.addEventListener('auxclick', () => {
+				log.push('native move');
+				destination.appendChild(button);
+			});
+			// No auxclick capture binding is authored: ordinary native capture must
+			// preserve the original portal route before the target listener moves it.
+			button.dispatchEvent(new MouseEvent('auxclick', { bubbles: true }));
+			expect(destination.firstElementChild).toBe(button);
+			expect(log).toEqual(['native capture', 'native move', 'target bubble', 'logical bubble']);
+		} finally {
+			root.unmount();
+			target.remove();
+			destination.remove();
+		}
+	});
+});
 
 describe('ReactDOMEventListener — propagation across nested roots', () => {
 	// Per ReactDOMEventListener-test.js:32 — should propagate events one level down
