@@ -5,6 +5,7 @@ ported from [`@monaco-editor/react`](https://github.com/suren-atoyan/monaco-reac
 `4.7.0` (commit `eb120e66`).
 
 ```bash
+npm install @octanejs/monaco-editor monaco-editor octane
 pnpm add @octanejs/monaco-editor monaco-editor octane
 ```
 

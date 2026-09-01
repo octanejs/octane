@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
@@ -32,6 +33,8 @@ import {
 	PACKED_TSRX_PROBE_PACKAGES,
 	PACKED_TSRX_STRICT_BROWSER_PACKAGES,
 } from './package-pack-canaries.mjs';
+
+const repositoryRequire = createRequire(import.meta.url);
 
 describe('packed JavaScript consumers', () => {
 	const archiveSpecs = {
@@ -454,6 +457,19 @@ declare namespace NodeJS { interface Process { env: { NODE_ENV?: string } } }
 				new Set(['@octanejs/deferred']),
 			),
 			['@octanejs/browser'],
+		);
+	});
+
+	test('keeps the published email renderer out of the browser source consumer', () => {
+		const emailManifest = repositoryRequire('../packages/email/package.json');
+		const manifests = new Map([
+			['@octanejs/email', emailManifest],
+			['octane', {}],
+		]);
+
+		assert.deepEqual(
+			findPackedTsrxBrowserSourceConsumerPackages(manifests, ['@octanejs/email']),
+			[],
 		);
 	});
 

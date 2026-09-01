@@ -51,6 +51,10 @@ export const KNOWN_BINDINGS = {
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
 	'react-pdf': '@octanejs/pdf',
+	'@portabletext/react': '@octanejs/portabletext',
+	'@sanity/icons': '@octanejs/sanity-icons',
+	'@sanity/react-loader': '@octanejs/sanity-loader',
+	'@sanity/logos': '@octanejs/sanity-logos',
 	'@monaco-editor/react': '@octanejs/monaco-editor',
 	'lucide-react': '@octanejs/lucide',
 	'@phosphor-icons/react': '@octanejs/phosphor-icons',
@@ -68,6 +72,8 @@ export const KNOWN_BINDINGS = {
 	'react-dropzone': '@octanejs/dropzone',
 	sonner: '@octanejs/sonner',
 	'react-error-boundary': '@octanejs/react-error-boundary',
+	'react-email': '@octanejs/email',
+	'@react-email/components': '@octanejs/email',
 	'react-resizable-panels': '@octanejs/resizable-panels',
 	'react-select': '@octanejs/select',
 	'react-transition-group': '@octanejs/transition-group',
@@ -84,6 +90,7 @@ export const KNOWN_BINDINGS = {
 	'react-content-loader': '@octanejs/content-loader',
 	'react-to-print': '@octanejs/to-print',
 	'react-calendar': '@octanejs/calendar',
+	'thinking-orbs': '@octanejs/thinking-orbs',
 	'@formkit/auto-animate': '@octanejs/auto-animate',
 	streamdown: '@octanejs/streamdown',
 	'react-syntax-highlighter': '@octanejs/syntax-highlighter',
@@ -175,6 +182,7 @@ export const KNOWN_BINDINGS = {
 export const KNOWN_NATIVE_BINDINGS = new Set([
 	'@octanejs/devtools',
 	'@octanejs/electron',
+	'@octanejs/email-cli',
 	'@octanejs/tauri',
 ]);
 

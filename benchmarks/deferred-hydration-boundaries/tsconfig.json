@@ -1,0 +1,20 @@
+{
+  "include": ["src/**/*.ts", "src/**/*.tsrx"],
+  "compilerOptions": {
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["DOM", "DOM.Iterable", "ES2024"],
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "target": "ES2024",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "paths": {
+      "octane": ["../../packages/octane/src/index.ts"],
+      "octane/*": ["../../packages/octane/src/*"]
+    },
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }]
+  }
+}

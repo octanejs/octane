@@ -3,6 +3,13 @@
 [TanStack Form](https://tanstack.com/form) bindings for the
 [Octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/tanstack-form
+pnpm add @octanejs/tanstack-form
+```
+
 This package ports `@tanstack/react-form@1.33.2` onto Octane while reusing
 `@tanstack/form-core@1.33.2` unchanged. The runtime export surface matches the
 React adapter, so migration starts by changing the package import:

@@ -5340,38 +5340,70 @@ function classifyStableHookfulChildCalls(moduleBody, ctx) {
 		});
 	}
 
-	let changed = true;
-	while (changed) {
-		changed = false;
-		for (const [name, candidate] of candidates) {
-			for (const edge of candidate.dependencies) {
-				if (!candidates.has(tagBindingName(edge))) {
-					candidates.delete(name);
-					changed = true;
-					break;
-				}
+	const dependents = new Map();
+	const removalQueue = [];
+	for (const [name, candidate] of candidates) {
+		let invalid = false;
+		for (const edge of candidate.dependencies) {
+			const childName = tagBindingName(edge);
+			if (!candidates.has(childName)) {
+				invalid = true;
+				continue;
 			}
+			let childDependents = dependents.get(childName);
+			if (childDependents === undefined) {
+				dependents.set(childName, (childDependents = []));
+			}
+			childDependents.push(name);
+		}
+		if (invalid) removalQueue.push(name);
+	}
+	for (let index = 0; index < removalQueue.length; index++) {
+		const name = removalQueue[index];
+		if (!candidates.delete(name)) continue;
+		const parentNames = dependents.get(name);
+		if (parentNames === undefined) continue;
+		for (const parentName of parentNames) {
+			if (candidates.has(parentName)) removalQueue.push(parentName);
 		}
 	}
-	changed = true;
-	while (changed) {
-		changed = false;
-		for (const candidate of candidates.values()) {
-			for (const edge of candidate.dependencies) {
-				const child = candidates.get(tagBindingName(edge));
-				for (const capture of child.captures) {
-					if (!candidate.captures.has(capture)) {
-						candidate.captures.add(capture);
-						changed = true;
-					}
-				}
-				for (const publication of child.publications) {
-					if (!candidate.publications.has(publication)) {
-						candidate.publications.add(publication);
-						changed = true;
-					}
-				}
-			}
+
+	const captureOwners = [];
+	const captureValues = [];
+	const publicationOwners = [];
+	const publicationValues = [];
+	for (const [name, candidate] of candidates) {
+		for (const capture of candidate.captures) {
+			captureOwners.push(name);
+			captureValues.push(capture);
+		}
+		for (const publication of candidate.publications) {
+			publicationOwners.push(name);
+			publicationValues.push(publication);
+		}
+	}
+	for (let index = 0; index < captureOwners.length; index++) {
+		const parentNames = dependents.get(captureOwners[index]);
+		if (parentNames === undefined) continue;
+		const capture = captureValues[index];
+		for (const parentName of parentNames) {
+			const parent = candidates.get(parentName);
+			if (parent === undefined || parent.captures.has(capture)) continue;
+			parent.captures.add(capture);
+			captureOwners.push(parentName);
+			captureValues.push(capture);
+		}
+	}
+	for (let index = 0; index < publicationOwners.length; index++) {
+		const parentNames = dependents.get(publicationOwners[index]);
+		if (parentNames === undefined) continue;
+		const publication = publicationValues[index];
+		for (const parentName of parentNames) {
+			const parent = candidates.get(parentName);
+			if (parent === undefined || parent.publications.has(publication)) continue;
+			parent.publications.add(publication);
+			publicationOwners.push(parentName);
+			publicationValues.push(publication);
 		}
 	}
 	for (const [name, candidate] of candidates) {

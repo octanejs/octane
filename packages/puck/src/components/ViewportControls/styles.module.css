@@ -1,0 +1,40 @@
+.ViewportControls {
+	display: flex;
+	background: var(--puck-color-grey-11);
+	box-sizing: border-box;
+	border-inline-start: 2px solid var(--puck-color-grey-11);
+	justify-content: center;
+	gap: 8px;
+	min-width: 358px;
+	padding-bottom: 16px;
+	padding-inline-start: var(--puck-space-px);
+	padding-inline-end: var(--puck-space-px);
+	z-index: 1;
+}
+
+.ViewportControls-divider {
+	border-inline-end: 1px solid var(--puck-color-grey-09);
+	margin-inline-start: 8px;
+	margin-inline-end: 8px;
+}
+
+.ViewportControls-zoomSelect {
+	appearance: none; /* Safari */
+	background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' fill='%23c3c3c3'><polygon points='0,0 100,0 50,50'/></svg>")
+		no-repeat;
+	background-size: 10px;
+	background-position: calc(100% - 12px) calc(50% + 3px);
+	background-repeat: no-repeat;
+	border: 0;
+	font-size: var(--puck-font-size-xxxs);
+	padding: 0;
+	width: 96px;
+}
+
+.ViewportControls-zoomSelect:dir(rtl) {
+	background-position: 12px calc(50% + 3px);
+}
+
+.ViewportButton--isActive .ViewportButton-inner {
+	color: var(--puck-color-azure-04);
+}

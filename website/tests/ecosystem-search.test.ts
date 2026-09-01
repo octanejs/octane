@@ -74,7 +74,20 @@ describe('ecosystem entity search', () => {
 			forms.flatMap((result) =>
 				result.entity.kind === 'library-binding' ? [result.entity.category] : [],
 			),
-		).toContain('Forms and content');
+		).toContain('Forms');
+	});
+
+	it('uses controlled tags for cross-category discovery', () => {
+		const charts = searchEcosystem(entities, 'charts');
+		const dragDrop = searchEcosystem(entities, 'drag drop');
+
+		expect(charts.every((result) => result.matchBand === 'weak')).toBe(true);
+		expect(charts.map((result) => result.entity.packageName)).toEqual(
+			expect.arrayContaining(['@octanejs/recharts', '@octanejs/visx']),
+		);
+		expect(dragDrop.map((result) => result.entity.packageName)).toEqual(
+			expect.arrayContaining(['@octanejs/dnd-kit', '@octanejs/draggable']),
+		);
 	});
 
 	it('keeps broad mixed results stable and deduplicated', () => {
@@ -98,6 +111,7 @@ describe('ecosystem entity search', () => {
 				categoryId: 'state',
 				description: 'Use later with Octane.',
 				searchTerms: ['cache'],
+				tags: [],
 				order: 2,
 			},
 			{
@@ -110,6 +124,7 @@ describe('ecosystem entity search', () => {
 				categoryId: 'state',
 				description: 'Use earlier with Octane.',
 				searchTerms: ['cache'],
+				tags: [],
 				order: 1,
 			},
 		];
@@ -131,8 +146,8 @@ describe('ecosystem entity search', () => {
 		).toEqual(entities);
 		expect(filterEcosystemEntities(entities, { kind: 'integration' })).toHaveLength(3);
 		expect(
-			filterEcosystemEntities(entities, { category: 'forms-and-content' }).every(
-				(entity) => entity.kind === 'library-binding' && entity.categoryId === 'forms-and-content',
+			filterEcosystemEntities(entities, { category: 'state-management' }).every(
+				(entity) => entity.kind === 'library-binding' && entity.categoryId === 'state-management',
 			),
 		).toBe(true);
 	});

@@ -1,0 +1,59 @@
+{
+  "name": "@octanejs/blocknote",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "BlockNote for the octane renderer — an Octane binding for @blocknote/react block-based rich text editors.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/blocknote"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "sideEffects": [
+    "./src/editor/styles.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "port-upstream": "node scripts/port-upstream.mjs node_modules/@blocknote/react",
+    "test": "vitest run --root ../.. --project blocknote"
+  },
+  "dependencies": {
+    "@blocknote/core": "catalog:default",
+    "@octanejs/floating-ui": "workspace:*",
+    "@octanejs/tanstack-store": "workspace:*",
+    "@octanejs/tiptap": "workspace:*",
+    "fast-deep-equal": "^3.1.3"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@blocknote/react": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

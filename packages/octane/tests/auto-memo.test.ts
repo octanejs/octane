@@ -4731,6 +4731,99 @@ describe('compiler-owned component-region memoization', () => {
 		expect(transitiveCapture.match(/const __memoDep[\w$]* = \(?live\)?;/g)).toHaveLength(2);
 	});
 
+	it('classifies stable hookful dependency graphs independently of declaration order', () => {
+		const compileGraph = (
+			declarations: string,
+			root = 'StableParent',
+			privateLets = 'leafSetter',
+		) =>
+			compile(
+				`import { useState } from 'octane';
+				 import { live } from './live';
+				 let ${privateLets
+						.split(',')
+						.map((name) => `${name} = null`)
+						.join(', ')};
+				 ${declarations}
+				 function StableProbe() @{
+					const [tick, setTick] = useState(0);
+					<section><${root} /></section>
+				 }
+				 export function App() @{ <StableProbe /> }`,
+				'auto-memo-stable-hookful-graph.tsrx',
+				{ hmr: false, dev: false, autoMemo: true },
+			).code;
+		const graphSummary = (code: string, publications: string[]) => ({
+			captures: code.match(/const __memoDep[\w$]* = \(?live\)?;/g)?.length ?? 0,
+			publications: publications.reduce(
+				(count, publication) =>
+					count + (code.match(new RegExp(`!== ${publication}\\b`, 'g'))?.length ?? 0),
+				0,
+			),
+		});
+		const leaf = `function StableLeaf() @{
+			const [value, setValue] = useState(0);
+			leafSetter = setValue;
+			<span>{live + value as string}</span>
+		}`;
+		const parent = `function StableParent() @{ <StableLeaf /> }`;
+
+		expect(graphSummary(compileGraph(`${leaf}\n${parent}`), ['leafSetter'])).toEqual({
+			captures: 1,
+			publications: 1,
+		});
+		expect(graphSummary(compileGraph(`${parent}\n${leaf}`), ['leafSetter'])).toEqual({
+			captures: 1,
+			publications: 1,
+		});
+
+		const cycle = compileGraph(
+			`function CycleA() @{
+				const [value, setValue] = useState(0);
+				leafSetter = setValue;
+				<><CycleB /><span>{live + value as string}</span></>
+			 }
+			 function CycleB() @{ <><CycleA /><CycleA /></> }`,
+			'CycleB',
+		);
+		expect(graphSummary(cycle, ['leafSetter'])).toEqual({
+			captures: 2,
+			publications: 2,
+		});
+
+		const publicationGraph = (count: number) => {
+			const names = Array.from({ length: count }, (_, index) => `setter${index}`);
+			const leaves = names
+				.map(
+					(name, index) => `function PublicationLeaf${index}() @{
+						const [value, setValue] = useState(0);
+						${name} = setValue;
+						<span>{live + value as string}</span>
+					}`,
+				)
+				.join('\n');
+			const calls = names.map((_, index) => `<PublicationLeaf${index} />`).join('');
+			return {
+				code: compileGraph(
+					`${leaves}\nfunction PublicationParent() @{ <>${calls}</> }`,
+					'PublicationParent',
+					names.join(','),
+				),
+				names,
+			};
+		};
+		const atLimit = publicationGraph(16);
+		const aboveLimit = publicationGraph(17);
+		expect(graphSummary(atLimit.code, atLimit.names)).toEqual({
+			captures: 1,
+			publications: 16,
+		});
+		expect(graphSummary(aboveLimit.code, aboveLimit.names)).toEqual({
+			captures: 0,
+			publications: 0,
+		});
+	});
+
 	it('preserves authored locals that overlap compiler-generated names', () => {
 		const selections: string[] = [];
 		const root = mount(CompilerNameCollisionApp, {

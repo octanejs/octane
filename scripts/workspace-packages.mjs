@@ -56,6 +56,23 @@ function readJson(file) {
 	return JSON.parse(readFileSync(file, 'utf8'));
 }
 
+function bindingInstallCommandPackages(readme, command, packageName) {
+	for (const line of readme.split(/\r?\n/)) {
+		const tokens = line.trim().split(/\s+/);
+		const packages = tokens.slice(2);
+		if (`${tokens[0]} ${tokens[1]}` === command && commandIncludesPackage(packages, packageName)) {
+			return packages;
+		}
+	}
+	return [];
+}
+
+function commandIncludesPackage(packages, packageName) {
+	return packages.some((token) => {
+		return token === packageName || token.startsWith(`${packageName}@`);
+	});
+}
+
 function roleFor(manifest) {
 	const special = SPECIAL_ROLES.get(manifest.name);
 	if (special) return special;
@@ -119,6 +136,22 @@ function validateSearchTerms(value, label, errors) {
 	}
 }
 
+function validateBindingTags(value, label, errors) {
+	if (!Array.isArray(value) || value.length === 0) {
+		errors.push(`${label} "tags" must be a non-empty array of lowercase strings`);
+		return;
+	}
+	const tags = new Set();
+	for (const [index, tag] of value.entries()) {
+		if (typeof tag !== 'string' || !tag.trim() || tag !== tag.trim() || tag !== tag.toLowerCase()) {
+			errors.push(`${label} tags entry ${index + 1} must be a trimmed lowercase string`);
+			continue;
+		}
+		if (tags.has(tag)) errors.push(`${label} lists tag "${tag}" more than once`);
+		tags.add(tag);
+	}
+}
+
 function identity(value) {
 	return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
@@ -152,6 +185,8 @@ export function validateBindingCatalogData(catalog, packages = getWorkspacePacka
 		}
 		if (typeof category.title !== 'string' || !category.title.trim()) {
 			errors.push(`${label} needs a non-empty "title"`);
+		} else if (category.title.includes(',') || /\band\b/i.test(category.title)) {
+			errors.push(`${label} title must not contain commas or the word "and"`);
 		} else if (categoryTitles.has(identity(category.title))) {
 			errors.push(`${label} duplicates category title "${category.title}"`);
 		} else {
@@ -185,6 +220,7 @@ export function validateBindingCatalogData(catalog, packages = getWorkspacePacka
 				}
 			}
 			validateSearchTerms(binding.searchTerms, entryLabel, errors);
+			validateBindingTags(binding.tags, entryLabel, errors);
 
 			if (typeof binding.packageName === 'string' && binding.packageName.trim()) {
 				if (packageNames.has(binding.packageName)) {
@@ -374,6 +410,34 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 
 		if (pkg.role === 'framework binding' && !existsSync(pkg.statusPath)) {
 			errors.push(`${label} (${pkg.name}) is a binding but has no status.json`);
+		}
+		if (!pkg.private && pkg.role === 'framework binding') {
+			const readmePath = path.join(pkg.directory, 'README.md');
+			if (!existsSync(readmePath)) {
+				errors.push(`${label} (${pkg.name}) is a binding but has no README.md`);
+			} else {
+				const readme = readFileSync(readmePath, 'utf8');
+				const optionalPeers = pkg.manifest.peerDependenciesMeta ?? {};
+				const requiredPeers = Object.keys(pkg.manifest.peerDependencies ?? {}).filter((name) => {
+					return name !== 'octane' && optionalPeers[name]?.optional !== true;
+				});
+				for (const command of ['npm install', 'pnpm add']) {
+					const commandPackages = bindingInstallCommandPackages(readme, command, pkg.name);
+					if (!commandIncludesPackage(commandPackages, pkg.name)) {
+						errors.push(
+							`${label}/README.md must include a copy-paste \`${command} ${pkg.name}\` command`,
+						);
+						continue;
+					}
+					for (const peer of requiredPeers) {
+						if (!commandIncludesPackage(commandPackages, peer)) {
+							errors.push(
+								`${label}/README.md \`${command}\` command must include required peer ${peer}`,
+							);
+						}
+					}
+				}
+			}
 		}
 
 		// Hook state is module-global within one Octane runtime instance. Bindings

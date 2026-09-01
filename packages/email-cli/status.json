@@ -1,0 +1,14 @@
+{
+  "upstream": { "package": "react-email", "version": "6.9.2" },
+  "surface": "Octane-native `export` and `dev` commands: recursive .tsrx template discovery, static HTML export, nested output paths, static assets, development template index and previews, Vite live reload, and compile/render error pages.",
+  "divergences": [
+    "The preview application is a lightweight Octane/Vite server rather than upstream's bundled React/Next application.",
+    "The executable is named octane-email to avoid colliding with upstream's email binary."
+  ],
+  "ssr": "Templates compile with the Octane Vite plugin in SSR mode and render through @octanejs/email.",
+  "verified": "2026-08-10",
+  "notes": [
+    "Ported from the workflow contract of React Email commit ffe605819782b31d7f946e30f938b1b63e6b239c under the MIT license.",
+    "The React-specific generated .react-email Next application is intentionally replaced by native Octane tooling."
+  ]
+}

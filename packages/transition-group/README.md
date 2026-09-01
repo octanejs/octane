@@ -2,6 +2,13 @@
 
 An Octane binding for [`react-transition-group@4.4.5`](https://github.com/reactjs/react-transition-group/tree/v4.4.5).
 
+## Installation
+
+```sh
+npm install @octanejs/transition-group
+pnpm add @octanejs/transition-group
+```
+
 ## Status
 
 The package preserves React Transition Group's six public modules with native Octane components. Timed lifecycle transitions, CSS class phases, keyed group exits, and cloned keyed transitions have executable coverage.

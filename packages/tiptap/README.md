@@ -9,6 +9,7 @@ pinned to **TipTap 3.28.0** and re-exports the public `@tiptap/core` API from it
 root entry.
 
 ```bash
+npm install @octanejs/tiptap @tiptap/starter-kit
 pnpm add @octanejs/tiptap @tiptap/starter-kit
 ```
 

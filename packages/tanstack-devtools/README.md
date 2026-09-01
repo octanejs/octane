@@ -11,6 +11,7 @@ as plugin panels, titles, and custom triggers.
 ## Installation
 
 ```bash
+npm install @octanejs/tanstack-devtools
 pnpm add @octanejs/tanstack-devtools
 ```
 

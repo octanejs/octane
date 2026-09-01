@@ -7,6 +7,7 @@ streamed over `@tanstack/devtools-event-client` from a dev-only runtime hook.
 ## Installation
 
 ```bash
+npm install @octanejs/devtools
 pnpm add @octanejs/devtools
 ```
 

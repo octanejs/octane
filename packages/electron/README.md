@@ -14,6 +14,7 @@ that layout for Octane:
 | `@octanejs/electron` | renderer | Octane hooks and promise helpers over that bridge |
 
 ```bash
+npm install @octanejs/electron electron octane
 pnpm add @octanejs/electron electron octane
 ```
 

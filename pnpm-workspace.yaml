@@ -249,6 +249,14 @@ catalogs:
     '@tiptap/react': 3.28.0
     '@tiptap/starter-kit': 3.28.0
     '@playwright/test': ^1.61.1
+    '@portabletext/react': 8.0.1
+    '@portabletext/toolkit': 6.0.0
+    '@portabletext/types': 4.0.2
+    '@sanity/icons': 5.2.1
+    '@sanity/logos': 2.2.5
+    '@sanity/client': 7.26.2
+    '@sanity/core-loader': 2.2.1
+    '@sanity/react-loader': 2.2.1
     '@ripple-ts/adapter': ^0.3.125
     '@ripple-ts/vite-plugin': ^0.3.125
     '@solidjs/web': '2.0.0-beta.20'
@@ -383,12 +391,16 @@ catalogs:
     proxy-compare: ^3.0.1
     prettier-plugin-svelte: ^4.1.1
     '@base-ui/react': ^1.6.0
+    '@blocknote/core': 0.53.0
+    '@blocknote/react': 0.53.0
+    '@measured/puck': 0.20.2
     '@internationalized/date': ^3.12.2
     '@internationalized/number': ^3.6.7
     '@internationalized/string': ^3.2.9
     '@dnd-kit/abstract': 0.5.0
     '@dnd-kit/collision': 0.5.0
     '@dnd-kit/dom': 0.5.0
+    '@dnd-kit/geometry': 0.5.0
     '@dnd-kit/helpers': 0.5.0
     '@dnd-kit/react': 0.5.0
     '@dnd-kit/state': 0.5.0
@@ -446,6 +458,8 @@ catalogs:
     '@react-types/shared': ^3.36.0
     react-dom: ^19.2.7
     react-i18next: 17.0.9
+    '@react-email/components': 1.0.12
+    '@react-email/render': 2.0.6
     react-error-boundary: 6.1.2
     react-resizable-panels: 4.12.2
     ripple: ^0.3.125
@@ -453,6 +467,7 @@ catalogs:
     rulesync: ^8.32.0
     solid-js: '2.0.0-beta.20'
     sonner: 2.0.7
+    thinking-orbs: 0.2.0
     styled-components: 6.4.3
     stylis: ^4.4.0
     '@types/stylis': ^4.2.7
@@ -578,6 +593,8 @@ catalogs:
 minimumReleaseAgeExclude:
   - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39 || 0.1.42 || 0.1.43 || 0.1.45 || 0.1.46 || 0.1.47 || 0.1.49
   - react-dropzone@20.0.0
+  - '@blocknote/core@0.53.0'
+  - '@blocknote/react@0.53.0'
   - '@tanstack/db@0.7.0'
   - '@oxc-tsrx/native-darwin-arm64@0.5.0'
   - '@oxc-tsrx/native-darwin-x64@0.5.0'

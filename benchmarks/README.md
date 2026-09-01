@@ -82,7 +82,8 @@ Some suites need no preview servers: **news**, **hydration-interactivity**, and
 the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
-**universal-external-store**,
+**universal-object-teardown**,
+**universal-template-events**, **universal-external-store**,
 **lynx-render**, **lynx-bundle-size**, **tsrx-renderer-validation-ranges**, and
 **tsrx-local-component-name-catalog** are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
@@ -236,6 +237,7 @@ internally, get their own baseline and guard namespace.
 | `dev-form-diagnostics` | dev-form-diagnostics | none (Node/jsdom) | development-only controlled-form diagnostic commit scaling at 4,000 and 32,000 hosts |
 | `scheduler-depth` | scheduler-depth | none (Node/jsdom) | production client scheduler ordering across 500 and 2,000 deeply nested queued components |
 | `hydration-range-compaction` | hydration-range-compaction | none (Node/jsdom) | production SSR hydration range compaction across 64 and 512 coextensive wrappers, with adoption, interaction, marker-depth, and unmount gates |
+| `deferred-hydration-boundaries` | deferred-hydration-boundaries | none (Node/jsdom) | production deferred hydration at 1 and 2,048 server-preserved boundaries, with a deterministic per-boundary setup-allocation guard and plain-mount control |
 | `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, deterministic 100-notification work guards, and balanced subscription removal |
 | `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and seven-framework cleanup gates |
 | `store-selector-fanout` | store-selector-fanout | none (builds) | 512 subscribers reading one store through a `with-selector`-shaped selector, 20 unrelated parent re-renders with the store untouched, and deterministic selector-invocation counts beside render and snapshot counts |
@@ -270,6 +272,8 @@ internally, get their own baseline and guard namespace.
 | `async-composition` | async-composition | octane-tsrx, react, inferno | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `lynx-list` | lynx-list | none (Node-only) | deterministic 1,000-row native-list physical allocation, reuse, and teardown through a fake Element PAPI |
 | `universal-leaf-update` | universal-leaf-update | none (Node-only) | universal update locality beside 0–4,000 unrelated component siblings through the compiler and native object driver: plain leaf `setState`, keyed `@for` item state, a leaf under an idle `@try`, a structural (insert/remove) update, and compact-row list selection |
+| `universal-object-teardown` | universal-object-teardown | none (Node-only) | transactional object-driver unmount scaling at 2, 4,096, and 16,384 flat siblings, with exact remove/destroy and empty-driver controls |
+| `universal-template-events` | universal-template-events | none (Node-only) | shape-stable handler updates across 128 and 1,024 retained native event sites through the fallback collapsed-template host capability, with host identity, latest-handler dispatch, and redundant-command controls |
 | `universal-external-store` | universal-external-store | none (Node-only) | 128 native universal store subscribers, getter/subscribe identity controls, notification bursts, and deterministic subscription-lifetime and state-projection guards |
 | `lynx-render` | lynx-render | none (Node-only) | dual-thread Lynx render CPU: empty startup, create 1,000 and 10,000 keyed rows through the real background root, transport, and main receiver over a cheap fake Element PAPI, plus a gate that a native tap reaches its background handler via the engine `publishEvent` receiver |
 | `lynx-table` | lynx-table | none (Node-only; separate Chromium harness) | deterministic per-operation wire cost of the cross-framework krausest table (command counts and serialized commit bytes vs a changed-rows floor) through the real dual-thread path and real tap tokens |
@@ -280,6 +284,8 @@ internally, get their own baseline and guard namespace.
 | `template-call-memo` | template-call-memo | none (Node-only) | production Strong/compatibility receiver-call counts, immutable keyed rows, real dependency changes, current event captures, and survivor identity |
 | `compiler-throughput` | compiler-throughput | none (Node-only) | seven real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |
 | `tsrx-component-graph` | tsrx-component-graph | none (Node-only) | 2,400-component live-import propagation with dependent-first vs dependency-first declarations |
+| `tsrx-hydrate-module-slicing` | tsrx-hydrate-module-slicing | none (Node-only) | hydrate module-slicing selection at 150/2,400 sibling boundaries, with queried-child/server checks and retained-declaration controls |
+| `tsrx-stable-hookful-propagation` | tsrx-stable-hookful-propagation | none (Node-only) | stable-hookful capture and private-setter propagation through 40/1,000-component chains in both declaration orders |
 | `tsrx-renderer-validation-ranges` | tsrx-renderer-validation-ranges | none (Node-only) | authored renderer-validation range membership at 32/3,200 ranges plus matched 100/1,600-component whole-pipeline compiles with and without validation |
 | `tsrx-local-component-name-catalog` | tsrx-local-component-name-catalog | none (Node-only) | renderer-boundary preparation with 1,000 sibling regions and 1,000/10,000 unrelated local components, guarding against rebuilding the same component-name catalog per boundary |
 | `tsrx-jsx-return-branches` | tsrx-jsx-return-branches | none (Node-only) | client/server compile and bundler classification for 120/480 conditional-return components, with lowering/export controls and a same-sized ineligible parse/print control |

@@ -3,6 +3,13 @@
 [React Spring](https://www.react-spring.dev/) for the
 [Octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/spring
+pnpm add @octanejs/spring
+```
+
 The package exposes the stable `@react-spring/web@10.1.2` surface at its root
 and Parallax from `@octanejs/spring/parallax`. It reuses React Spring's
 `rafz` scheduler and ports the framework-bound controller, hook, animated-host,
