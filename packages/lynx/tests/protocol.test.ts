@@ -2167,6 +2167,73 @@ describe('@octanejs/lynx transported protocol', () => {
 		).toContainEqual([LYNX_BACKGROUND_TO_MAIN_EVENT, 'terminal-dispose']);
 	});
 
+	it('repeats one correlated readiness request until a late main listener answers', async () => {
+		vi.useFakeTimers();
+		try {
+			const context = new FakeContextProxy();
+			const transport = createLynxBackgroundTransport(context, createLynxClientContainer());
+			const requests = () =>
+				context.events
+					.filter((event) => event.type === LYNX_BACKGROUND_TO_MAIN_EVENT)
+					.map((event) => unwire(event.data))
+					.filter(
+						(message): message is LynxMainReadyRequest =>
+							message !== null &&
+							typeof message === 'object' &&
+							(message as { readonly type?: unknown }).type === 'main-ready-request',
+					);
+			const initial = requests();
+			expect(initial).toHaveLength(1);
+
+			let ready = false;
+			void transport.ready.then(() => {
+				ready = true;
+			});
+			await flushMicrotasks();
+			expect(ready).toBe(false);
+
+			installMainHarness(context);
+			await vi.advanceTimersToNextTimerAsync();
+			expect(ready).toBe(true);
+			const recovered = requests();
+			expect(recovered).toHaveLength(2);
+			expect(recovered.map(({ request }) => request)).toEqual([
+				initial[0]!.request,
+				initial[0]!.request,
+			]);
+
+			await vi.advanceTimersByTimeAsync(160);
+			expect(requests()).toHaveLength(recovered.length);
+			transport.close();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('stops readiness requests when a waiting transport closes', async () => {
+		vi.useFakeTimers();
+		try {
+			const context = new FakeContextProxy();
+			const transport = createLynxBackgroundTransport(context, createLynxClientContainer());
+			const requestCount = () =>
+				context.events.filter(
+					(event) =>
+						event.type === LYNX_BACKGROUND_TO_MAIN_EVENT &&
+						(unwire(event.data) as { readonly type?: unknown }).type === 'main-ready-request',
+				).length;
+			const beforeClose = requestCount();
+			const reason = new Error('closed before main listener installation');
+			const ready = transport.ready.catch((error: unknown) => error);
+
+			transport.close(reason);
+			expect(await ready).toBe(reason);
+			await vi.advanceTimersByTimeAsync(160);
+			expect(requestCount()).toBe(beforeClose);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('waits for named-event readiness, publishes handles at ACK, and preserves update identity', async () => {
 		const context = new FakeContextProxy();
 		const main = installMainHarness(context);

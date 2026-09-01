@@ -5340,38 +5340,70 @@ function classifyStableHookfulChildCalls(moduleBody, ctx) {
 		});
 	}
 
-	let changed = true;
-	while (changed) {
-		changed = false;
-		for (const [name, candidate] of candidates) {
-			for (const edge of candidate.dependencies) {
-				if (!candidates.has(tagBindingName(edge))) {
-					candidates.delete(name);
-					changed = true;
-					break;
-				}
+	const dependents = new Map();
+	const removalQueue = [];
+	for (const [name, candidate] of candidates) {
+		let invalid = false;
+		for (const edge of candidate.dependencies) {
+			const childName = tagBindingName(edge);
+			if (!candidates.has(childName)) {
+				invalid = true;
+				continue;
 			}
+			let childDependents = dependents.get(childName);
+			if (childDependents === undefined) {
+				dependents.set(childName, (childDependents = []));
+			}
+			childDependents.push(name);
+		}
+		if (invalid) removalQueue.push(name);
+	}
+	for (let index = 0; index < removalQueue.length; index++) {
+		const name = removalQueue[index];
+		if (!candidates.delete(name)) continue;
+		const parentNames = dependents.get(name);
+		if (parentNames === undefined) continue;
+		for (const parentName of parentNames) {
+			if (candidates.has(parentName)) removalQueue.push(parentName);
 		}
 	}
-	changed = true;
-	while (changed) {
-		changed = false;
-		for (const candidate of candidates.values()) {
-			for (const edge of candidate.dependencies) {
-				const child = candidates.get(tagBindingName(edge));
-				for (const capture of child.captures) {
-					if (!candidate.captures.has(capture)) {
-						candidate.captures.add(capture);
-						changed = true;
-					}
-				}
-				for (const publication of child.publications) {
-					if (!candidate.publications.has(publication)) {
-						candidate.publications.add(publication);
-						changed = true;
-					}
-				}
-			}
+
+	const captureOwners = [];
+	const captureValues = [];
+	const publicationOwners = [];
+	const publicationValues = [];
+	for (const [name, candidate] of candidates) {
+		for (const capture of candidate.captures) {
+			captureOwners.push(name);
+			captureValues.push(capture);
+		}
+		for (const publication of candidate.publications) {
+			publicationOwners.push(name);
+			publicationValues.push(publication);
+		}
+	}
+	for (let index = 0; index < captureOwners.length; index++) {
+		const parentNames = dependents.get(captureOwners[index]);
+		if (parentNames === undefined) continue;
+		const capture = captureValues[index];
+		for (const parentName of parentNames) {
+			const parent = candidates.get(parentName);
+			if (parent === undefined || parent.captures.has(capture)) continue;
+			parent.captures.add(capture);
+			captureOwners.push(parentName);
+			captureValues.push(capture);
+		}
+	}
+	for (let index = 0; index < publicationOwners.length; index++) {
+		const parentNames = dependents.get(publicationOwners[index]);
+		if (parentNames === undefined) continue;
+		const publication = publicationValues[index];
+		for (const parentName of parentNames) {
+			const parent = candidates.get(parentName);
+			if (parent === undefined || parent.publications.has(publication)) continue;
+			parent.publications.add(publication);
+			publicationOwners.push(parentName);
+			publicationValues.push(publication);
 		}
 	}
 	for (const [name, candidate] of candidates) {
@@ -9448,24 +9480,48 @@ function compileInternal(
 	// anchorlessRootShape for the shape rules and the hazard). Optimistic
 	// fixpoint over the same-module component-arm edges: cycles of safe-shaped
 	// components stay safe; a locally-unsafe shape drains through its
-	// dependents, so declaration order and recursion do not matter (same scheme
-	// as the autoMemo loop above). An edge to a non-lite or cross-module callee
-	// is safe outright — its componentSlot mints its own positional markers.
-	for (const [, info] of ctx.componentInfo) {
+	// dependents, so declaration order and recursion do not matter. An edge to a
+	// non-lite or cross-module callee is safe outright — its componentSlot mints
+	// its own positional markers.
+	let unsafeWorklist = null;
+	for (const [name, info] of ctx.componentInfo) {
 		info.anchorlessRootShape = anchorlessRootShape(info.node);
 		info.anchorlessRootSafe = info.anchorlessRootShape !== null;
+		if (info.eligible === true && info.anchorlessRootSafe !== true) {
+			unsafeWorklist ??= [];
+			unsafeWorklist.push(name);
+		}
 	}
-	let anchorlessChanged = true;
-	while (anchorlessChanged) {
-		anchorlessChanged = false;
-		for (const [, info] of ctx.componentInfo) {
+	// Index each relevant edge in the direction invalidation travels.
+	// Keep the graph lazy: without an unsafe seed, optimistic safety is already
+	// settled and no queue or adjacency state is needed.
+	if (unsafeWorklist !== null) {
+		let anchorlessDependents = null;
+		for (const [dependentName, info] of ctx.componentInfo) {
 			if (!info.anchorlessRootSafe) continue;
-			for (const name of info.anchorlessRootShape.edges) {
-				const dep = ctx.componentInfo.get(name);
-				if (dep !== undefined && dep.eligible === true && dep.anchorlessRootSafe !== true) {
-					info.anchorlessRootSafe = false;
-					anchorlessChanged = true;
-					break;
+			for (const calleeName of info.anchorlessRootShape.edges) {
+				const callee = ctx.componentInfo.get(calleeName);
+				if (callee === undefined || callee.eligible !== true) continue;
+				anchorlessDependents ??= new Map();
+				let dependents = anchorlessDependents.get(calleeName);
+				if (dependents === undefined) {
+					dependents = [];
+					anchorlessDependents.set(calleeName, dependents);
+				}
+				dependents.push(dependentName);
+			}
+		}
+		if (anchorlessDependents !== null) {
+			for (let cursor = 0; cursor < unsafeWorklist.length; cursor++) {
+				const dependents = anchorlessDependents.get(unsafeWorklist[cursor]);
+				if (dependents === undefined) continue;
+				for (const dependentName of dependents) {
+					const dependent = ctx.componentInfo.get(dependentName);
+					if (dependent.anchorlessRootSafe !== true) continue;
+					dependent.anchorlessRootSafe = false;
+					// Only lite-eligible callees can invalidate their callers. An
+					// ineligible dependent still records its own result, but stops here.
+					if (dependent.eligible === true) unsafeWorklist.push(dependentName);
 				}
 			}
 		}

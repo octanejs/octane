@@ -499,7 +499,7 @@ function owningComponentForReference(components, node) {
 }
 
 function ownerReachableComponentsAst(ast, localSpecializations) {
-	const localNames = new Set(localSpecializations.components.keys());
+	const localNames = localSpecializations.components;
 	const dependencies = new Map();
 	const reachable = new Set(
 		[...localSpecializations.exported].filter((name) => localNames.has(name)),
@@ -702,7 +702,7 @@ function collectSpecializationAstReplacements(node, cloneNames, runtime, aliases
 }
 
 function specializeLocalComponentsAst(region, index, state) {
-	const localNames = new Set(state.localSpecializations.components.keys());
+	const localNames = state.localSpecializations.components;
 	const selected = new Set([
 		...jsxComponentReferences(region, localNames),
 		...localCallReferences(region, localNames),

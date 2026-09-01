@@ -15,6 +15,11 @@
       "fullName": "@octanejs/xyflow — manual hook slots combines general and viewport helpers in useReactFlow"
     },
     {
+      "id": "runtime:b1cfd919f323ecbc",
+      "file": "packages/xyflow/tests/conformance/connection-slots.test.ts",
+      "fullName": "@octanejs/xyflow — manual hook slots keeps color mode state and subscription in distinct slots"
+    },
+    {
       "id": "runtime:e7a43d130a00df47",
       "file": "packages/xyflow/tests/conformance/connection-slots.test.ts",
       "fullName": "@octanejs/xyflow — manual hook slots keeps node and edge state callbacks independent"

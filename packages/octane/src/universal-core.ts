@@ -10829,10 +10829,26 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			let nodes = previousNodes;
 			const committedEvents: CommittedCollapsedTemplateEvent[] = [];
 			let changed = false;
+			let previousEventCursor = 0;
 			for (let index = 0; index < nextNodes.length; index++) {
 				const source = nextNodes[index];
 				const accepted = previousNodes[index];
 				const acceptedId = accepted.id ?? previous.firstId! + index;
+				// Mounts and fallback updates append committed events in node order, so
+				// each node can consume its prior range without rescanning the template.
+				while (
+					previousEventCursor < previous.events.length &&
+					previous.events[previousEventCursor].index < index
+				) {
+					previousEventCursor++;
+				}
+				const previousEventStart = previousEventCursor;
+				while (
+					previousEventCursor < previous.events.length &&
+					previous.events[previousEventCursor].index === index
+				) {
+					previousEventCursor++;
+				}
 				const propsChanged = !shallowPropsEqual(accepted.props, source.props);
 				let recreatedNode = false;
 				if (propsChanged) {
@@ -10873,9 +10889,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				const events = source.events;
 				if (events === undefined) continue;
 				for (const event of events) {
-					const prior = previous.events.find(
-						(candidate) => candidate.index === index && candidate.event.type === event.type,
-					)?.event;
+					let prior: CommittedEvent | undefined;
+					for (
+						let previousEventIndex = previousEventStart;
+						previousEventIndex < previousEventCursor;
+						previousEventIndex++
+					) {
+						const candidate = previous.events[previousEventIndex].event;
+						if (candidate.type === event.type) {
+							prior = candidate;
+							break;
+						}
+					}
 					const listener = prior?.listener ?? nextListener++;
 					const committed = { ...event, listener };
 					committedEvents.push({ index, event: committed });
@@ -12567,6 +12592,10 @@ export function createObjectDriver(
 				);
 			}
 			const state = container[OBJECT_DRIVER_STATE];
+			// Below this size V8's direct indexOf/splice path is cheaper than building
+			// detach sets. Large teardown batches cross over decisively and compact each
+			// touched sibling array once instead of shifting it for every command.
+			const useBatchedDetaches = batch.commands.length >= 4_096;
 			type SimulatedInstance = {
 				type: string;
 				props: Readonly<Record<string, unknown>>;
@@ -12610,26 +12639,65 @@ export function createObjectDriver(
 			type SimulatedParent = number | null | typeof DETACHED;
 			const parentChanges = new Map<number, SimulatedParent>();
 			let rootChildren: number[] | null = null;
+			let pendingDetaches: Map<number | null, Set<number>> | null = null;
 			const readParent = (id: number): SimulatedParent => {
 				if (parentChanges.has(id)) return parentChanges.get(id)!;
 				return state.parents.has(id) ? state.parents.get(id)! : DETACHED;
 			};
-			const simulatedChildren = (parent: number | null) => {
-				if (parent === null) {
-					return (rootChildren ??= container.children.map((child) => child.id));
+			const flushPendingDetaches = (parent: number | null, children: number[]): void => {
+				const detached = pendingDetaches?.get(parent);
+				if (detached === undefined) return;
+				let write = 0;
+				for (let read = 0; read < children.length; read++) {
+					const child = children[read];
+					if (!detached.delete(child)) children[write++] = child;
 				}
-				const value = readSimulated(parent);
-				if (value === undefined) throw new Error(`Object driver: unknown parent ${parent}.`);
-				return value.children;
+				if (detached.size !== 0) {
+					const missing = detached.values().next().value!;
+					throw new Error(`Object driver: child ${missing} is not attached.`);
+				}
+				children.length = write;
+				pendingDetaches!.delete(parent);
+				if (pendingDetaches!.size === 0) pendingDetaches = null;
 			};
-			const detachSimulated = (id: number): void => {
+			const simulatedChildren = (parent: number | null): number[] => {
+				let children: number[];
+				if (parent === null) {
+					children = rootChildren ??= container.children.map((child) => child.id);
+				} else {
+					const value = readSimulated(parent);
+					if (value === undefined) throw new Error(`Object driver: unknown parent ${parent}.`);
+					children = value.children;
+				}
+				flushPendingDetaches(parent, children);
+				return children;
+			};
+			const detachSimulated = (id: number, defer: boolean): void => {
 				const parent = readParent(id);
 				if (parent === DETACHED) return;
-				const children = simulatedChildren(parent);
-				const index = children.indexOf(id);
-				if (index === -1) throw new Error(`Object driver: child ${id} is not attached.`);
-				children.splice(index, 1);
+				if (useBatchedDetaches && defer) {
+					const detaches = (pendingDetaches ??= new Map());
+					const detached = detaches.get(parent);
+					if (detached === undefined) detaches.set(parent, new Set([id]));
+					else detached.add(id);
+				} else {
+					const children = simulatedChildren(parent);
+					const index = children.indexOf(id);
+					if (index === -1) throw new Error(`Object driver: child ${id} is not attached.`);
+					children.splice(index, 1);
+				}
 				parentChanges.set(id, DETACHED);
+			};
+			const forgetPendingDetachParent = (parent: number): void => {
+				if (pendingDetaches === null) return;
+				pendingDetaches.delete(parent);
+				if (pendingDetaches.size === 0) pendingDetaches = null;
+			};
+			const flushAllPendingDetaches = (): void => {
+				while (pendingDetaches !== null) {
+					const parent = pendingDetaches.keys().next().value!;
+					simulatedChildren(parent);
+				}
 			};
 			for (const command of batch.commands) {
 				if (command.op === 'create') {
@@ -12712,7 +12780,7 @@ export function createObjectDriver(
 					}
 					if (!hasSimulated(command.id))
 						throw new Error(`Object driver: unknown child ${command.id}.`);
-					detachSimulated(command.id);
+					detachSimulated(command.id, false);
 					const children = simulatedChildren(command.parent);
 					const before =
 						command.before === null ? children.length : children.indexOf(command.before);
@@ -12730,11 +12798,10 @@ export function createObjectDriver(
 					if (command.parent !== null && typeof command.parent !== 'number') {
 						throw new Error('Object driver does not support portal target parents.');
 					}
-					const children = simulatedChildren(command.parent);
-					const index = children.indexOf(command.id);
-					if (index === -1) throw new Error(`Object driver: child ${command.id} is not attached.`);
-					children.splice(index, 1);
-					parentChanges.set(command.id, DETACHED);
+					if (readParent(command.id) !== command.parent) {
+						throw new Error(`Object driver: child ${command.id} is not attached.`);
+					}
+					detachSimulated(command.id, true);
 					for (const type of readSimulated(command.id)!.localCallbacks.keys()) {
 						cleanupKeys.add(keyFor(command.id, type));
 					}
@@ -12742,12 +12809,14 @@ export function createObjectDriver(
 					const instance = readSimulated(command.id);
 					if (instance === undefined)
 						throw new Error(`Object driver: unknown destroy ${command.id}.`);
-					detachSimulated(command.id);
+					detachSimulated(command.id, true);
 					for (const child of instance.children) parentChanges.set(child, DETACHED);
 					instance.children.length = 0;
+					forgetPendingDetachParent(command.id);
 					destroyed.add(command.id);
 				}
 			}
+			flushAllPendingDetaches();
 			for (const [id, instance] of stagedInstances) {
 				const staged = readSimulated(id);
 				if (staged === undefined) continue;
@@ -12762,16 +12831,47 @@ export function createObjectDriver(
 			}
 			let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
 			let acceptedCallbacksRan = false;
-			const liveChildren = (parent: number | null): ObjectHostInstance[] =>
-				objectChildren(container, parent, state.instances);
-			const detachLive = (id: number): void => {
+			let pendingLiveDetaches: Map<number | null, Set<number>> | null = null;
+			const liveChildren = (parent: number | null): ObjectHostInstance[] => {
+				const children = objectChildren(container, parent, state.instances);
+				const detached = pendingLiveDetaches?.get(parent);
+				if (detached === undefined) return children;
+				let write = 0;
+				for (let read = 0; read < children.length; read++) {
+					const child = children[read];
+					if (!detached.has(child.id)) children[write++] = child;
+				}
+				children.length = write;
+				pendingLiveDetaches!.delete(parent);
+				if (pendingLiveDetaches!.size === 0) pendingLiveDetaches = null;
+				return children;
+			};
+			const detachLive = (id: number, defer: boolean): void => {
 				if (!state.parents.has(id)) return;
 				const parent = state.parents.get(id)!;
 				const instance = state.instances.get(id)!;
-				const children = liveChildren(parent);
-				const index = children.indexOf(instance);
-				if (index !== -1) children.splice(index, 1);
+				if (useBatchedDetaches && defer) {
+					const detaches = (pendingLiveDetaches ??= new Map());
+					const detached = detaches.get(parent);
+					if (detached === undefined) detaches.set(parent, new Set([id]));
+					else detached.add(id);
+				} else {
+					const children = liveChildren(parent);
+					const index = children.indexOf(instance);
+					if (index !== -1) children.splice(index, 1);
+				}
 				state.parents.delete(id);
+			};
+			const forgetPendingLiveParent = (parent: number): void => {
+				if (pendingLiveDetaches === null) return;
+				pendingLiveDetaches.delete(parent);
+				if (pendingLiveDetaches.size === 0) pendingLiveDetaches = null;
+			};
+			const flushAllPendingLiveDetaches = (): void => {
+				while (pendingLiveDetaches !== null) {
+					const parent = pendingLiveDetaches.keys().next().value!;
+					liveChildren(parent);
+				}
 			};
 			return {
 				apply() {
@@ -12829,7 +12929,7 @@ export function createObjectDriver(
 									throw new Error('Object driver does not support portal target parents.');
 								}
 								const instance = state.instances.get(command.id)!;
-								detachLive(command.id);
+								detachLive(command.id, false);
 								const children = liveChildren(command.parent);
 								const before =
 									command.before === null
@@ -12841,14 +12941,13 @@ export function createObjectDriver(
 								if (command.parent !== null && typeof command.parent !== 'number') {
 									throw new Error('Object driver does not support portal target parents.');
 								}
-								const children = liveChildren(command.parent);
-								children.splice(children.indexOf(state.instances.get(command.id)!), 1);
-								state.parents.delete(command.id);
+								detachLive(command.id, true);
 							} else if (command.op === 'destroy') {
 								const instance = state.instances.get(command.id)!;
-								detachLive(command.id);
+								detachLive(command.id, true);
 								for (const child of instance.children) state.parents.delete(child.id);
 								instance.children.length = 0;
+								forgetPendingLiveParent(command.id);
 								state.instances.delete(command.id);
 								state.parents.delete(command.id);
 								state.events.delete(command.id);
@@ -12857,6 +12956,7 @@ export function createObjectDriver(
 								state.localCleanups.delete(command.id);
 							}
 						}
+						flushAllPendingLiveDetaches();
 						container.commits.push(batch);
 					});
 					runCommitTasks(tasks);

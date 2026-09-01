@@ -66,6 +66,7 @@ const ROUTES = [
 	'/docs/profiling',
 	'/docs/browser-support',
 	'/docs/bindings',
+	'/docs/bindings?q=TanStack%20Router&kind=binding#binding-tanstack-router',
 	'/errors',
 	'/errors/3?args%5B%5D=%22quoted%22',
 	'/benchmarks',
@@ -937,6 +938,46 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 	);
 
 	it.concurrent(
+		'keeps command-palette results readable in a constrained viewport',
+		{ timeout: 30_000 },
+		async () => {
+			const context = await browser.newContext({ viewport: { width: 746, height: 374 } });
+			const page = await context.newPage();
+			const errors: string[] = [];
+			page.on('console', (message) => {
+				if (message.type() === 'error') errors.push(message.text());
+			});
+			page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+			try {
+				await page.goto(`http://localhost:${DEV_PORT}/docs/bindings`, {
+					waitUntil: 'networkidle',
+				});
+				await page.keyboard.press('Control+K');
+				await page.locator('.search-input').fill('tanstack');
+				const firstResult = page.locator('.search-entity').first();
+				await firstResult.waitFor();
+
+				const geometry = await firstResult.evaluate((card) => {
+					const cardBox = card.getBoundingClientRect();
+					const contentBox = card.querySelector('.search-entity-primary')!.getBoundingClientRect();
+					const board = card.parentElement!;
+					return {
+						boardIsScrollable: board.scrollHeight > board.clientHeight,
+						cardBottom: cardBox.bottom,
+						contentBottom: contentBox.bottom,
+					};
+				});
+
+				expect(geometry.boardIsScrollable).toBe(true);
+				expect(geometry.cardBottom).toBeGreaterThanOrEqual(geometry.contentBottom);
+				expect(errors.filter((error) => !error.includes('Failed to load resource'))).toEqual([]);
+			} finally {
+				await context.close();
+			}
+		},
+	);
+
+	it.concurrent(
 		'the homepage selects and copies the active React integration sample by pointer and keyboard',
 		{ timeout: 45_000 },
 		() => assertHomepageIntegrationSamples(`http://localhost:${DEV_PORT}`),
@@ -1642,6 +1683,57 @@ describe(
 			'the homepage selects and copies the active React integration sample by pointer and keyboard',
 			{ timeout: 45_000 },
 			() => assertHomepageIntegrationSamples(PREVIEW_ORIGIN),
+		);
+
+		it.concurrent(
+			'ecosystem directory preserves filter edits through browser history',
+			{ timeout: 30_000 },
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/docs/bindings', {
+					waitForNetworkIdle: true,
+				});
+				try {
+					const kind = page.locator('#ecosystem-kind');
+					const category = page.locator('#ecosystem-category');
+					const initialHistoryLength = await page.evaluate(() => history.length);
+					await kind.selectOption('binding');
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(await page.evaluate(() => history.length)).toBe(initialHistoryLength + 1);
+					await category.selectOption('state-management');
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('category') === 'state-management',
+					);
+					expect(await page.evaluate(() => history.length)).toBe(initialHistoryLength + 2);
+					expect(await page.locator('#binding-zustand').count()).toBe(1);
+
+					await page.goBack();
+					await page.waitForFunction(() => !new URL(location.href).searchParams.has('category'));
+					expect(await kind.inputValue()).toBe('binding');
+					expect(await category.inputValue()).toBe('');
+
+					await page.goBack();
+					await page.waitForFunction(() => !new URL(location.href).searchParams.has('kind'));
+					expect(await kind.inputValue()).toBe('');
+
+					await page.goForward();
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(await kind.inputValue()).toBe('binding');
+
+					await page.getByRole('button', { name: 'Reset search and filters' }).click();
+					await page.waitForFunction(() => new URL(location.href).search === '');
+					await page.goBack();
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
 		);
 
 		it.concurrent(

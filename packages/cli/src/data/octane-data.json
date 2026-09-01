@@ -2,8 +2,8 @@
   "bindings": [
     {
       "name": "@octanejs/alien-signals",
-      "version": "0.0.15",
-      "category": "Shared state",
+      "version": "0.0.16",
+      "category": "State Management",
       "upstream": {
         "package": "react-alien-signals",
         "version": "0.3.0",
@@ -20,8 +20,8 @@
     },
     {
       "name": "@octanejs/animejs",
-      "version": "0.0.19",
-      "category": "UI and interaction",
+      "version": "0.0.20",
+      "category": "Animation",
       "upstream": {
         "package": "animejs",
         "version": "4.5.0",
@@ -39,8 +39,8 @@
     },
     {
       "name": "@octanejs/apollo-client",
-      "version": "0.1.44",
-      "category": "AI, data, and routing",
+      "version": "0.1.45",
+      "category": "Data",
       "upstream": { "package": "@apollo/client", "version": "4.2.6" },
       "surface": "Complete published client adapter surface: all 18 @apollo/client/react runtime exports and their Apollo 4.2.6 TypeScript declarations, framework-neutral root/testing exports, an Octane MockedProvider, and the Octane-native /react/ssr prerenderStatic entry.",
       "divergences": [
@@ -53,8 +53,8 @@
     },
     {
       "name": "@octanejs/aria",
-      "version": "0.0.43",
-      "category": "UI and interaction",
+      "version": "0.0.44",
+      "category": "UI Libraries",
       "upstream": { "package": "react-aria", "version": "3.50.0" },
       "surface": "The `@octanejs/aria/components` entry point matches the complete named public surface of `react-aria-components@1.19.0`: 280 runtime exports and 313 type exports, checked in both directions with no missing or extra names. This includes calendar/date/time, color, drag-and-drop, DropZone/FileTrigger, toast, data hooks, and virtualized layout APIs in addition to the previously ported primitives, overlays, collections, Tree, and Table. The root behavior-hook and `/stately` entries remain curated React Aria 3.50.0 / React Stately 3.48.0 surfaces rather than separate full-export claims.",
       "divergences": [
@@ -69,8 +69,8 @@
     },
     {
       "name": "@octanejs/auto-animate",
-      "version": "0.0.5",
-      "category": "UI and interaction",
+      "version": "0.0.6",
+      "category": "Animation",
       "upstream": {
         "package": "@formkit/auto-animate",
         "version": "0.10.0",
@@ -88,8 +88,8 @@
     },
     {
       "name": "@octanejs/base-ui",
-      "version": "0.1.47",
-      "category": "UI and interaction",
+      "version": "0.1.48",
+      "category": "UI Libraries",
       "upstream": { "package": "@base-ui/react", "version": "1.6.0" },
       "surface": "Alpha, in progress: 35 of 43 upstream subpaths. The implemented surface has a complete byte-exact upstream inventory, 98 same-fixture React/Octane differential cases, and 49 Accordion, Collapsible, and Tabs adapted cases. This is bounded evidence and remains recorded-unverified because eight public subpaths and most of the canonical runtime/type suite are not yet adapted. Menu covers all 20 upstream parts, Toast all 11 parts, Collapsible all 3 parts, Accordion all 5 parts, and Tabs 4 of 5 parts (Indicator unported); their detailed gaps and evidence are recorded in UPSTREAM.md and audit/react-parity.json.",
       "divergences": [
@@ -103,8 +103,8 @@
     },
     {
       "name": "@octanejs/better-auth",
-      "version": "0.0.1",
-      "category": "AI, data, and routing",
+      "version": "0.0.2",
+      "category": "Data",
       "upstream": { "package": "better-auth", "version": "1.6.29" },
       "surface": "The public framework-agnostic Better Auth client is reused unchanged. `createAuthClient` converts the built-in session atom and plugin-provided atoms into Octane hooks while preserving endpoint actions, `$fetch`, `$store`, `$ERROR_CODES`, `$Infer`, and plugin inference. The upstream-compatible `useStore` helper is also included.",
       "divergences": [
@@ -115,8 +115,8 @@
     },
     {
       "name": "@octanejs/calendar",
-      "version": "0.0.5",
-      "category": "UI and interaction",
+      "version": "0.0.6",
+      "category": "UI Libraries",
       "upstream": {
         "package": "react-calendar",
         "version": "6.0.1",
@@ -134,8 +134,8 @@
     },
     {
       "name": "@octanejs/cmdk",
-      "version": "0.1.32",
-      "category": "UI and interaction",
+      "version": "0.1.33",
+      "category": "UI Libraries",
       "upstream": { "package": "cmdk", "version": "1.1.1" },
       "surface": "Complete against the published `cmdk@1.1.1` public surface: `Command` (the root itself) and the `CommandRoot` named export, `Command.Input`, `Command.List`, `Command.Item`, `Command.Group`, `Command.Separator`, `Command.Dialog`, `Command.Empty`, `Command.Loading`, the flat `CommandX` aliases, `useCommandState`, and `defaultFilter` — with the DOM-authoritative store and item/group registration, `useValue` text-content inference, `onInput`-driven search, score filtering plus item and group DOM sorting, keyboard navigation (arrows/Home/End/vim/Enter), controlled `value`/`onValueChange`/`loop`/`shouldFilter`/custom `filter`/`forceMount`, the `--cmdk-list-height` ResizeObserver, and a Radix-backed `Command.Dialog`. `asChild` is the one unsupported prop (see divergences).",
       "divergences": [
@@ -165,8 +165,8 @@
     },
     {
       "name": "@octanejs/colorful",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "UI Libraries",
       "upstream": { "package": "react-colorful", "version": "5.8.0" },
       "surface": "Complete against the published react-colorful 5.8.0 root runtime and type surface: all 14 picker variants, HexColorInput, setNonce, six public color types, controlled updates, mouse/touch/keyboard input, commit callbacks, ARIA state, and automatic closest-root styling.",
       "divergences": [
@@ -177,8 +177,8 @@
     },
     {
       "name": "@octanejs/content-loader",
-      "version": "0.0.5",
-      "category": "UI and interaction",
+      "version": "0.0.6",
+      "category": "UI Libraries",
       "upstream": {
         "package": "react-content-loader",
         "version": "7.1.2",
@@ -202,8 +202,8 @@
     },
     {
       "name": "@octanejs/day-picker",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "UI Libraries",
       "upstream": {
         "package": "react-day-picker",
         "version": "10.0.1",
@@ -218,8 +218,8 @@
     },
     {
       "name": "@octanejs/devtools",
-      "version": "0.0.37",
-      "category": "Styling, tests, and devtools",
+      "version": "0.0.38",
+      "category": "Developer Tools",
       "upstream": { "package": "octane", "version": "workspace" },
       "surface": "Octane-native DevTools plugin (not an upstream port): renders live runtime diagnostics into a TanStack Devtools host via @tanstack/devtools-event-client. P1 ships the Components tree + state inspector.",
       "divergences": [],
@@ -228,8 +228,8 @@
     },
     {
       "name": "@octanejs/dexie",
-      "version": "0.1.42",
-      "category": "AI, data, and routing",
+      "version": "0.1.43",
+      "category": "Data",
       "upstream": { "package": "dexie-react-hooks", "version": "4.4.0" },
       "surface": "Port of the public dexie-react-hooks surface: useObservable, useLiveQuery, useSuspendingObservable, useSuspendingLiveQuery, usePermissions, and useDocument, with Dexie's framework-neutral API re-exported from the package root.",
       "divergences": [
@@ -242,8 +242,8 @@
     },
     {
       "name": "@octanejs/dnd-kit",
-      "version": "0.1.44",
-      "category": "UI and interaction",
+      "version": "0.1.45",
+      "category": "UI Utilities",
       "upstream": { "package": "@dnd-kit/react", "version": "0.5.0" },
       "surface": "Complete modern dnd-kit React-adapter surface: DragDropProvider, DragOverlay, useDraggable/useDroppable, manager/monitor/operation hooks, PointerSensor/KeyboardSensor re-exports, the public signal-hook utilities, useSortable, and all four upstream entry points.",
       "divergences": [
@@ -255,8 +255,8 @@
     },
     {
       "name": "@octanejs/draggable",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "UI Utilities",
       "upstream": { "package": "react-draggable", "version": "4.7.1" },
       "surface": "Complete against the published react-draggable 4.7.1 root runtime and type surface: default Draggable, named DraggableCore, controlled and uncontrolled positioning, bounds, grid, axis, offsets, mouse and touch gestures, and all eight public types.",
       "divergences": [
@@ -268,8 +268,8 @@
     },
     {
       "name": "@octanejs/drei",
-      "version": "0.0.15",
-      "category": "Web 3D",
+      "version": "0.0.16",
+      "category": "3D",
       "upstream": { "package": "@react-three/drei", "version": "10.7.7" },
       "surface": "Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.",
       "divergences": [
@@ -280,8 +280,8 @@
     },
     {
       "name": "@octanejs/dropzone",
-      "version": "0.0.15",
-      "category": "Forms and content",
+      "version": "0.0.16",
+      "category": "Forms",
       "upstream": { "package": "react-dropzone", "version": "20.0.0" },
       "surface": "Exact mapped port of the react-dropzone 20.0.0 root runtime and type namespace at canonical commit 01fc05c5996bf615caf812627f7491375e647c7d. The binding preserves the default Dropzone component, useDropzone, ErrorCode, all public types, root package conditions, and ./package.json export. Runtime coverage executes 218 pristine canonical React cases plus 109 adapted, differential, SSR, hydration, browser, and evidence cases.",
       "divergences": [
@@ -293,8 +293,8 @@
     },
     {
       "name": "@octanejs/electron",
-      "version": "0.0.27",
-      "category": "Desktop",
+      "version": "0.0.28",
+      "category": "Desktop Apps",
       "upstream": { "package": "electron", "version": "43.2.0" },
       "surface": "Process-split Electron bindings: ./main registers ipcMain handlers, ./main/native re-exports main-only Electron APIs (Menu, Tray, session, protocol, BrowserWindow, …), ./preload exposes Electron IPC and desktop helpers via contextBridge, and the renderer entry provides Octane hooks (useInvoke, useInvokeState, useIpcEvent, useNativeTheme, useWindowState) plus promise helpers for app/window/dialog/shell/clipboard/screen. Menu/Tray/session/protocol stay intentional main-only under contextIsolation.",
       "divergences": [
@@ -310,9 +310,39 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/email",
+      "version": "0.0.1",
+      "category": "Content",
+      "upstream": { "package": "react-email", "version": "6.9.2" },
+      "surface": "Email component surface: Body, Button, CodeBlock, CodeInline, Column, Container, Font, Head, Heading, Hr, Html, Img, Link, Markdown, Preview, Row, Section, Tailwind, Text, Prism themes, the pixel-based Tailwind preset, and an Octane-native static render helper.",
+      "divergences": [
+        "render accepts an Octane component plus props rather than a pre-created React node, matching octane/server's entry-point API.",
+        "Preview accepts its inspectable preview copy through the text prop; natural .tsrx children are opaque render blocks.",
+        "Markdown accepts its source through a string children prop; JSX children compile to children blocks and are rejected rather than invoked as render props.",
+        "Refs are ordinary Octane ref props rather than forwardRef components.",
+        "Head uses Octane's metadata-hoisting channel; render reconstructs the consumer-visible document head around hoisted tags.",
+        "Tailwind transforms fully rendered static HTML rather than cloning a React element tree, allowing natural .tsrx children and nested compiled components."
+      ],
+      "ssr": "Supported and tested through renderToStaticMarkup: output has the React Email XHTML Transitional doctype and no hydration markers.",
+      "verified": "2026-08-10"
+    },
+    {
+      "name": "@octanejs/email-cli",
+      "version": "0.0.1",
+      "category": "Content",
+      "upstream": { "package": "react-email", "version": "6.9.2" },
+      "surface": "Octane-native `export` and `dev` commands: recursive .tsrx template discovery, static HTML export, nested output paths, static assets, development template index and previews, Vite live reload, and compile/render error pages.",
+      "divergences": [
+        "The preview application is a lightweight Octane/Vite server rather than upstream's bundled React/Next application.",
+        "The executable is named octane-email to avoid colliding with upstream's email binary."
+      ],
+      "ssr": "Templates compile with the Octane Vite plugin in SSR mode and render through @octanejs/email.",
+      "verified": "2026-08-10"
+    },
+    {
       "name": "@octanejs/embla-carousel",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "UI Libraries",
       "upstream": {
         "package": "embla-carousel-react",
         "version": "8.6.0",
@@ -325,8 +355,8 @@
     },
     {
       "name": "@octanejs/floating-ui",
-      "version": "0.1.48",
-      "category": "UI and interaction",
+      "version": "0.1.49",
+      "category": "UI Utilities",
       "upstream": { "package": "@floating-ui/react", "version": "0.27.19" },
       "surface": "Complete @floating-ui/react 0.27.19 export surface: positioning (`useFloating`, ref-aware `arrow`, and the framework-neutral middleware re-exports), floating tree and list primitives, every interaction hook, portals/overlays/focus management/arrows/composites, transitions, both delay-group APIs, and the deprecated `inner`/`useInnerOffset` pair. Runtime parity is executable and bounded: 272 adapted assertions pass compatibly, 29 remain executable expected-failure negative controls, and 6 upstream-declared skips are non-evidence.",
       "divergences": [
@@ -339,8 +369,8 @@
     },
     {
       "name": "@octanejs/formisch",
-      "version": "0.0.4",
-      "category": "Forms and content",
+      "version": "0.0.5",
+      "category": "Forms",
       "upstream": {
         "package": "@formisch/react",
         "version": "1.0.0-rc.0",
@@ -357,8 +387,8 @@
     },
     {
       "name": "@octanejs/gsap",
-      "version": "0.0.18",
-      "category": "UI and interaction",
+      "version": "0.0.19",
+      "category": "Animation",
       "upstream": {
         "package": "@gsap/react",
         "version": "2.1.2",
@@ -376,8 +406,8 @@
     },
     {
       "name": "@octanejs/hook-form",
-      "version": "0.1.46",
-      "category": "Forms and content",
+      "version": "0.1.47",
+      "category": "Forms",
       "upstream": { "package": "react-hook-form", "version": "7.81.0" },
       "surface": "Complete port of react-hook-form 7.81.0 (tag commit 46b217e034dd92f7aa3cb3a478815556b416b299). The automated parity check runs all 1,193 original tests against the pinned React package as a pristine baseline; the Octane port separately runs byte-locked, unfiltered DOM and server suites with exact collected/executed inventories containing 1,187 entries representing 1,178 unique file/full-name identities. The nine duplicate entries are repeated titles within the DOM inventory; the server inventory is disjoint. Coverage includes `useForm`, `useController`, `useFieldArray`, `useFormState`, `useWatch`, `useFormContext`/`FormProvider`, schema resolvers, and all validation modes.",
       "divergences": [
@@ -389,8 +419,8 @@
     },
     {
       "name": "@octanejs/html-react-parser",
-      "version": "0.0.5",
-      "category": "Forms and content",
+      "version": "0.0.6",
+      "category": "Content",
       "upstream": {
         "package": "html-react-parser",
         "version": "6.1.7",
@@ -410,8 +440,8 @@
     },
     {
       "name": "@octanejs/i18next",
-      "version": "0.1.44",
-      "category": "Forms and content",
+      "version": "0.1.45",
+      "category": "Content",
       "upstream": { "package": "react-i18next", "version": "17.0.9" },
       "surface": "Complete runtime port of react-i18next 17.0.9: useTranslation, I18nextProvider/context, Trans/TransWithoutContext, IcuTrans/IcuTransWithoutContext, Translation, the withTranslation/withSSR HOCs, useSSR, namespace reporting, initialization/default helpers, and the root ICU helper exports over the unchanged i18next core.",
       "divergences": [
@@ -425,8 +455,8 @@
     },
     {
       "name": "@octanejs/image-crop",
-      "version": "0.0.5",
-      "category": "UI and interaction",
+      "version": "0.0.6",
+      "category": "UI Utilities",
       "upstream": {
         "package": "react-image-crop",
         "version": "11.1.2",
@@ -442,8 +472,8 @@
     },
     {
       "name": "@octanejs/inertia",
-      "version": "0.0.18",
-      "category": "AI, data, and routing",
+      "version": "0.0.19",
+      "category": "Routing",
       "upstream": { "package": "@inertiajs/react", "version": "3.6.1" },
       "surface": "Octane Inertia 3.6.1 adapter foundation: framework-neutral router, HTTP client, progress, and server exports reuse @inertiajs/core unchanged; page, remember, poll, prefetch, form-state, router-submit, direct-HTTP, precognition, and layout-property hooks are ported to Octane.",
       "divergences": [
@@ -454,8 +484,8 @@
     },
     {
       "name": "@octanejs/ink",
-      "version": "0.0.12",
-      "category": "Terminal UI",
+      "version": "0.0.13",
+      "category": "Terminal Apps",
       "upstream": { "package": "ink", "version": "7.1.1" },
       "surface": "Complete against Ink 7.1.1's published exports: terminal render roots, Yoga-backed Box and Text primitives, Static/Transform/Newline/Spacer, application and stream hooks, input/paste/focus/cursor/animation/window-size/metrics hooks, measurement helpers, DOM element types, and Kitty keyboard protocol helpers.",
       "divergences": [
@@ -468,8 +498,8 @@
     },
     {
       "name": "@octanejs/input-otp",
-      "version": "0.0.15",
-      "category": "Forms and content",
+      "version": "0.0.16",
+      "category": "Forms",
       "upstream": { "package": "input-otp", "version": "1.5.0" },
       "surface": "Complete against input-otp@1.5.0: OTPInput, OTPInputContext, the three exported regexp patterns, public props and slot types including nonce, controlled and uncontrolled values, one-input accessibility and mobile-autofill markup, default spellcheck off, translation opt-out, render/context projection, keyboard selection and deletion, paste transformation, completion callbacks, overflow-aware password-manager displacement, SSR, and hydration.",
       "divergences": [
@@ -481,8 +511,8 @@
     },
     {
       "name": "@octanejs/intersection-observer",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "UI Utilities",
       "upstream": {
         "package": "react-intersection-observer",
         "version": "10.1.0",
@@ -503,8 +533,8 @@
     },
     {
       "name": "@octanejs/jotai",
-      "version": "0.1.46",
-      "category": "Shared state",
+      "version": "0.1.47",
+      "category": "State Management",
       "upstream": { "package": "jotai", "version": "2.20.2" },
       "surface": "Complete 1:1 port: the framework-agnostic vanilla core (`jotai/vanilla`, `/vanilla/utils`, `/vanilla/internals`) is reused verbatim; the React layer (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`) and `react/utils` (`useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms`) are ported onto octane hooks, preserving upstream's useReducer force-update + effect-subscription implementation, async atoms via octane's `use()`.",
       "divergences": [],
@@ -513,8 +543,8 @@
     },
     {
       "name": "@octanejs/lexical",
-      "version": "0.1.48",
-      "category": "Forms and content",
+      "version": "0.1.49",
+      "category": "Content",
       "upstream": { "package": "@lexical/react", "version": "0.46.0" },
       "surface": "The 35 legacy `@lexical/react` modules represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set, and the `useLexical*` hooks. The 0.46.0 extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.",
       "divergences": [
@@ -526,8 +556,8 @@
     },
     {
       "name": "@octanejs/livestore",
-      "version": "0.0.19",
-      "category": "AI, data, and routing",
+      "version": "0.0.20",
+      "category": "Data",
       "upstream": { "package": "@livestore/react", "version": "0.4.0" },
       "surface": "Ports the complete stable renderer surface (registry provider/access, Suspense store loading and augmentation, reactive queries, client documents, and sync status) plus the exported experimental LiveList over LiveStore's unchanged 0.4.0 framework-neutral packages.",
       "divergences": [
@@ -540,8 +570,8 @@
     },
     {
       "name": "@octanejs/lucide",
-      "version": "0.1.44",
-      "category": "UI and interaction",
+      "version": "0.1.45",
+      "category": "Icons",
       "upstream": { "package": "lucide-react", "version": "1.24.0" },
       "surface": "Complete against the published `lucide-react@1.24.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports.",
       "divergences": [
@@ -553,8 +583,8 @@
     },
     {
       "name": "@octanejs/mantine-hooks",
-      "version": "0.1.30",
-      "category": "UI and interaction",
+      "version": "0.1.31",
+      "category": "UI Utilities",
       "upstream": { "package": "@mantine/hooks", "version": "9.5.0" },
       "surface": "Complete @mantine/hooks 9.5.0 runtime export surface: state, timing, storage, viewport, input, focus, pointer, observer, hotkey, scrolling, collapse, drag, splitter, mask, and utility hooks.",
       "divergences": [
@@ -567,8 +597,8 @@
     },
     {
       "name": "@octanejs/markdown",
-      "version": "0.0.15",
-      "category": "Forms and content",
+      "version": "0.0.16",
+      "category": "Content",
       "upstream": { "package": "react-markdown", "version": "10.1.0" },
       "surface": "Complete react-markdown 10.1.0 root runtime and public type surface: Markdown, MarkdownAsync, MarkdownHooks, defaultUrlTransform, and all six exported type families.",
       "divergences": [
@@ -581,8 +611,8 @@
     },
     {
       "name": "@octanejs/mdx",
-      "version": "0.1.46",
-      "category": "Forms and content",
+      "version": "0.1.47",
+      "category": "Content",
       "upstream": { "package": "@mdx-js/mdx", "version": "3.1.1" },
       "surface": "The full compile-don't-interpret pipeline: `.mdx`/`.md` → `@mdx-js/mdx` (reused verbatim) → octane compiler, via the `octaneMdx()` Vite plugin plus the `./compile` and `./server` entries; compiler warnings propagate through direct and Vite compile surfaces with authored `.mdx` ranges; `@mdx-js/react`'s provider layer (`MDXProvider`/`useMDXComponents`) is ported onto octane context. The octane website runs on it.",
       "divergences": [
@@ -593,8 +623,8 @@
     },
     {
       "name": "@octanejs/mobx",
-      "version": "0.1.30",
-      "category": "Shared state",
+      "version": "0.1.31",
+      "category": "State Management",
       "upstream": { "package": "mobx-react-lite", "version": "4.1.1", "core": "mobx@6.16.1" },
       "surface": "The framework-independent MobX core is re-exported verbatim. The function-component binding includes observer, Observer, useObserver, useLocalObservable, enableStaticRendering, isUsingStaticRendering, and the deprecated useStaticRendering alias.",
       "divergences": [
@@ -607,8 +637,8 @@
     },
     {
       "name": "@octanejs/monaco-editor",
-      "version": "0.0.17",
-      "category": "Forms and content",
+      "version": "0.0.18",
+      "category": "Content",
       "upstream": {
         "package": "@monaco-editor/react",
         "version": "4.7.0",
@@ -627,8 +657,8 @@
     },
     {
       "name": "@octanejs/motion",
-      "version": "0.1.48",
-      "category": "UI and interaction",
+      "version": "0.1.49",
+      "category": "Animation",
       "upstream": { "package": "motion", "version": "12.42.2" },
       "surface": "Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, live `useReducedMotion`, reduced-motion enforcement, `LayoutGroup` layoutId namespaces, `LazyMotion` with `domAnimation`/`domMax`, the `m` proxy and complete `./react-m` named host entry, plus the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.",
       "divergences": [
@@ -641,8 +671,8 @@
     },
     {
       "name": "@octanejs/nuqs",
-      "version": "0.1.38",
-      "category": "AI, data, and routing",
+      "version": "0.1.39",
+      "category": "Routing",
       "upstream": { "package": "nuqs", "version": "2.9.1" },
       "surface": "Full vendored port: the framework-agnostic core (`parsers`/`parseAs*`/`createParser`, `createSerializer`, `createLoader`, `createStandardSchemaV1`, the throttle/debounce update queues, sync emitter and URL encoding) is vendored verbatim from nuqs 2.9.1; the React layer (`useQueryState`, `useQueryStates`, the `useSyncExternalStores` helper and the adapter context) is ported onto octane's hooks — same `useState`/`useEffect`/`useSyncExternalStore` implementation shape as upstream, so re-render and URL-reconciliation behaviour matches nuqs on React. Adapters ported: `@octanejs/nuqs/adapters/react` (`NuqsAdapter`, `enableHistorySync`), `/adapters/custom` (`unstable_createAdapterProvider`), `/adapters/testing` (`NuqsTestingAdapter`, `withNuqsTestingAdapter`). Server surface (`@octanejs/nuqs/server`) exposes `createLoader`/`createSerializer`/parsers/`createStandardSchemaV1`.",
       "divergences": [
@@ -656,8 +686,8 @@
     },
     {
       "name": "@octanejs/opentui",
-      "version": "0.0.4",
-      "category": "Terminal",
+      "version": "0.0.5",
+      "category": "Terminal Apps",
       "upstream": { "package": "@opentui/react", "version": "0.5.8" },
       "surface": "Technical-preview OpenTUI 0.5.8 renderer: renderer-local TSRX intrinsics for the complete built-in catalogue and text modifiers, custom `extend()` renderables, component-plus-props roots, OpenTUI prop/style/event application, refs and retained visibility, same-renderer `RootRenderable` portals, terminal error fallback, `act`/`flushSync`, all public hooks, `TimeToFirstDraw`, the core slot/plugin registry adapted to universal renderables, and an FFI-backed test utility. Native behavioral coverage exercises terminal frames, state and prop updates, host identity, keyboard and resize hooks, multi-argument select callbacks, subscription cleanup, portals, slots, errors, and teardown under Bun.",
       "divergences": [
@@ -673,8 +703,8 @@
     },
     {
       "name": "@octanejs/pdf",
-      "version": "0.0.15",
-      "category": "Forms and content",
+      "version": "0.0.16",
+      "category": "Content",
       "upstream": { "package": "react-pdf", "version": "10.4.1" },
       "surface": "Complete against the documented react-pdf 10.4.1 root contract: Document, Page, Thumbnail, Outline, all three context hooks, PasswordResponses, pdfjs, all ten root types, both documented layer styles, and the unchanged PDF.js worker import.",
       "divergences": [
@@ -686,8 +716,8 @@
     },
     {
       "name": "@octanejs/phosphor-icons",
-      "version": "0.0.29",
-      "category": "UI and interaction",
+      "version": "0.0.30",
+      "category": "Icons",
       "upstream": { "package": "@phosphor-icons/react", "version": "2.1.10" },
       "surface": "All 1,512 canonical icons from @phosphor-icons/core@2.1.1, including the upstream deprecated Icon-suffixed aliases, six weights, IconContext, IconBase, root exports, and per-icon imports.",
       "divergences": [
@@ -700,8 +730,8 @@
     },
     {
       "name": "@octanejs/popper",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "UI Utilities",
       "upstream": { "package": "react-popper", "version": "2.3.0" },
       "surface": "Complete against the published react-popper 2.3.0 root runtime and type surface: Manager, Reference, Popper, usePopper, render-function refs and styles, explicit and virtual references, arrows, hide data, lifecycle actions, Popper modifiers, and all public types.",
       "divergences": [
@@ -712,9 +742,27 @@
       "verified": "2026-08-03"
     },
     {
+      "name": "@octanejs/portabletext",
+      "version": "0.1.0",
+      "category": "Sanity Content",
+      "upstream": {
+        "package": "@portabletext/react",
+        "version": "8.0.1",
+        "commit": "52770c934266773c0b52ae3a8e3bc2a0c8137985"
+      },
+      "surface": "Complete runtime surface: PortableText, defaultComponents, mergeComponents, toPlainText, PortableTextBlock and ListNestMode, plus renderer component and TypeGen helper types.",
+      "divergences": [
+        "Renderer callbacks return OctaneNode rather than ReactNode.",
+        "Custom component refs and events use Octane's normal ref prop and native DOM events.",
+        "PortableTextReactComponents and ReactPortableTextList are compatibility aliases; Octane-named equivalents are preferred."
+      ],
+      "ssr": "Supported and differential-tested against @portabletext/react@8.0.1 static markup.",
+      "verified": "2026-08-24"
+    },
+    {
       "name": "@octanejs/radix",
-      "version": "0.1.48",
-      "category": "UI and interaction",
+      "version": "0.1.49",
+      "category": "UI Libraries",
       "upstream": { "package": "radix-ui", "version": "1.6.4" },
       "surface": "Surface-present against the unified `radix-ui@1.6.4` component exports. Sixteen repo-authored differential cases compare representative primitives and interactions against the real package; the complete 38-file canonical upstream suite is preserved but not adapted, so the binding remains recorded-unverified.",
       "divergences": [
@@ -726,7 +774,7 @@
     },
     {
       "name": "@octanejs/rainbowkit",
-      "version": "0.0.29",
+      "version": "0.0.30",
       "category": "Web3",
       "upstream": { "package": "@rainbow-me/rainbowkit", "version": "2.2.11" },
       "surface": "Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.",
@@ -742,8 +790,8 @@
     },
     {
       "name": "@octanejs/react-error-boundary",
-      "version": "0.1.30",
-      "category": "UI and interaction",
+      "version": "0.1.31",
+      "category": "UI Utilities",
       "upstream": { "package": "react-error-boundary", "version": "6.1.2" },
       "surface": "Complete against the published react-error-boundary 6.1.2 function/type surface adapted to Octane: ErrorBoundary, ErrorBoundaryContext, getErrorMessage, fallback variants, onError/onReset callbacks, resetKeys, useErrorBoundary (including error), withErrorBoundary, OnErrorCallback, and UseErrorBoundaryApi.",
       "divergences": [
@@ -756,8 +804,8 @@
     },
     {
       "name": "@octanejs/react-map-gl",
-      "version": "0.0.21",
-      "category": "Data-heavy screens",
+      "version": "0.0.22",
+      "category": "Visualization",
       "upstream": { "package": "@vis.gl/react-mapbox", "version": "8.1.2 (b1e46fcf)" },
       "surface": "Complete against the pinned @vis.gl/react-mapbox 8.1.2 public surface — the package react-map-gl/mapbox re-exports: Map (and default), Marker, Popup, Source, Layer, AttributionControl, FullscreenControl, GeolocateControl, NavigationControl, ScaleControl, useControl, MapProvider, useMap, and every published type. The framework-neutral half of upstream (the Mapbox engine, proxy transform, map ref, and six utils) is reused byte-for-byte and validated by upstream's own specs run against both source trees.",
       "divergences": [
@@ -772,8 +820,8 @@
     },
     {
       "name": "@octanejs/recharts",
-      "version": "0.1.46",
-      "category": "Data-heavy screens",
+      "version": "0.1.47",
+      "category": "Visualization",
       "upstream": { "package": "recharts", "version": "3.9.2" },
       "surface": "Broad runtime support across cartesian, polar, hierarchical, tooltip, legend, responsive-container, shape, and chart-state surfaces. `Brush` and `Treemap` remain intentionally unsupported.",
       "divergences": [
@@ -784,8 +832,8 @@
     },
     {
       "name": "@octanejs/redux",
-      "version": "0.1.46",
-      "category": "Shared state",
+      "version": "0.1.47",
+      "category": "State Management",
       "upstream": { "package": "react-redux", "version": "9.3.0" },
       "surface": "The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Upstream runtime-export completeness is pinned by test.",
       "divergences": [
@@ -798,8 +846,8 @@
     },
     {
       "name": "@octanejs/redux-toolkit",
-      "version": "0.1.44",
-      "category": "Shared state",
+      "version": "0.1.45",
+      "category": "State Management",
       "upstream": { "package": "@reduxjs/toolkit", "version": "2.12.0" },
       "surface": "Complete four-entry-point port: the framework-agnostic Toolkit and RTK Query core are re-exported verbatim; `/query/react` provides generated query, lazy-query, mutation, infinite-query, prefetch hooks and `ApiProvider`; `/react` provides the dynamic-middleware dispatch-hook integration.",
       "divergences": [
@@ -811,8 +859,8 @@
     },
     {
       "name": "@octanejs/remix-router",
-      "version": "0.1.45",
-      "category": "AI, data, and routing",
+      "version": "0.1.46",
+      "category": "Routing",
       "upstream": { "package": "react-router", "version": "8.2.0" },
       "surface": "All planned port phases are shipped and the pinned runtime export namespace is complete: the framework-agnostic router core, data/declarative/DOM/mutation/guard layers, static SSR, and cookie/session runtime are implemented on Octane. Framework-mode and RSC names remain throwing scope stubs. Selected vendored-core suites, local conformance, and nine exact shared-fixture scenarios provide bounded evidence rather than exhaustive React parity.",
       "divergences": [
@@ -827,8 +875,8 @@
     },
     {
       "name": "@octanejs/resizable-panels",
-      "version": "0.0.7",
-      "category": "UI and interaction",
+      "version": "0.0.8",
+      "category": "UI Utilities",
       "upstream": { "package": "react-resizable-panels", "version": "4.12.2" },
       "surface": "Group, Panel, Separator, persistence hooks, refs, imperative APIs, layout constraints, pointer and keyboard interaction, ARIA, cursor handling, and ResizeObserver behavior are implemented against react-resizable-panels 4.12.2.",
       "divergences": [
@@ -839,8 +887,8 @@
     },
     {
       "name": "@octanejs/rxjs",
-      "version": "0.1.28",
-      "category": "Shared state",
+      "version": "0.1.29",
+      "category": "State Management",
       "upstream": {
         "package": "@react-rxjs/core + @react-rxjs/utils",
         "version": "0.10.8 / 0.9.7"
@@ -854,9 +902,61 @@
       "verified": "2026-08-02"
     },
     {
-      "name": "@octanejs/select",
+      "name": "@octanejs/sanity-icons",
       "version": "0.1.0",
-      "category": "UI and interaction",
+      "category": "Sanity Content",
+      "upstream": {
+        "package": "@sanity/icons",
+        "version": "5.2.1",
+        "commit": "e6c37d2d4f7f121254c077b3ae83e199ec0aec9c"
+      },
+      "surface": "Complete @sanity/icons@5.2.1 surface: all generated per-icon subpaths, named and default exports, Icon, icons, IconMap, IconSymbol and IconComponent.",
+      "divergences": [
+        "Refs are normal Octane ref props rather than React forwardRef wrappers.",
+        "Event callbacks receive native DOM events rather than React synthetic events."
+      ],
+      "ssr": "Supported and tested against representative @sanity/icons static SVG markup.",
+      "verified": "2026-08-24"
+    },
+    {
+      "name": "@octanejs/sanity-loader",
+      "version": "0.1.0",
+      "category": "Sanity Content",
+      "upstream": {
+        "package": "@sanity/react-loader",
+        "version": "2.2.1",
+        "commit": "2e3f5720173acfe67a771d92bb7fc5b51e6ac014"
+      },
+      "surface": "Query-store milestone: createQueryStore, loadQuery, setServerClient, useQuery, useLiveMode, useEncodeDataAttribute, create-data-attribute exports, browser conditions, and the server-only rsc entry.",
+      "divergences": [
+        "Hooks use Octane hook slots and return Octane-compatible values rather than React hooks.",
+        "The experimental upstream ./jsx wrapped-data element factory is deferred to a separate milestone.",
+        "The ./rsc entry models a server-only Octane environment rather than React Server Component conditions."
+      ],
+      "ssr": "Supported through loadQuery/setServerClient and the server-only rsc entry; initial query state is SSR-tested.",
+      "verified": "2026-08-24"
+    },
+    {
+      "name": "@octanejs/sanity-logos",
+      "version": "0.1.0",
+      "category": "Sanity Content",
+      "upstream": {
+        "package": "@sanity/logos",
+        "version": "2.2.5",
+        "commit": "e6c37d2d4f7f121254c077b3ae83e199ec0aec9c"
+      },
+      "surface": "Complete @sanity/logos@2.2.5 runtime surface: SanityLogo, SanityMonogram, GroqLogo and GroqMonogram, including dark/scheme/custom-color variants.",
+      "divergences": [
+        "Refs are normal Octane ref props rather than React forwardRef wrappers.",
+        "Event callbacks receive native DOM events rather than React synthetic events."
+      ],
+      "ssr": "Supported and differential-tested against @sanity/logos@2.2.5 static SVG markup.",
+      "verified": "2026-08-24"
+    },
+    {
+      "name": "@octanejs/select",
+      "version": "0.1.1",
+      "category": "UI Libraries",
       "upstream": {
         "package": "react-select",
         "version": "5.10.2",
@@ -873,8 +973,8 @@
     },
     {
       "name": "@octanejs/shadcn",
-      "version": "0.0.34",
-      "category": "UI and interaction",
+      "version": "0.0.35",
+      "category": "UI Libraries",
       "upstream": {
         "package": "shadcn-ui/ui (radix base)",
         "version": "4baadbc6517070ae8f8feb2c97037adc2b305544 + shadcn@4.14.1"
@@ -900,7 +1000,7 @@
     },
     {
       "name": "@octanejs/solana-kit",
-      "version": "0.0.18",
+      "version": "0.0.19",
       "category": "Web3",
       "upstream": {
         "package": "@solana/react",
@@ -921,8 +1021,8 @@
     },
     {
       "name": "@octanejs/sonner",
-      "version": "0.1.44",
-      "category": "UI and interaction",
+      "version": "0.1.45",
+      "category": "UI Libraries",
       "upstream": { "package": "sonner", "version": "2.0.7" },
       "surface": "Complete against the published `sonner@2.0.7` public surface: `Toaster`, the callable `toast` API and all methods, `useSonner`, promise lifecycle, multiple toaster targeting, stacked layout, themes, styling, focus management, timers, and swipe dismissal.",
       "divergences": [
@@ -935,8 +1035,8 @@
     },
     {
       "name": "@octanejs/spring",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "Animation",
       "upstream": { "package": "@react-spring/web", "version": "10.1.2" },
       "surface": "Stable React Spring web target at the package root and Parallax through the ./parallax subpath. The port provides spring values, controllers, interpolation, Octane hooks and render-prop components, animated DOM hosts, browser observers, SSR-safe initial rendering, and Parallax scrolling.",
       "divergences": [
@@ -948,8 +1048,8 @@
     },
     {
       "name": "@octanejs/stick-to-bottom",
-      "version": "0.0.5",
-      "category": "UI and interaction",
+      "version": "0.0.6",
+      "category": "UI Utilities",
       "upstream": {
         "package": "use-stick-to-bottom",
         "version": "1.1.6",
@@ -967,8 +1067,8 @@
     },
     {
       "name": "@octanejs/streamdown",
-      "version": "0.1.28",
-      "category": "Forms and content",
+      "version": "0.1.29",
+      "category": "Content",
       "upstream": { "package": "streamdown", "version": "2.5.0" },
       "surface": "Complete Streamdown 2.5.0 root runtime and public type surface, plus the official code 1.1.1, math 1.0.2, Mermaid 1.0.2, and CJK 1.0.3 plugins exposed through ./code, ./math, ./mermaid, and ./cjk.",
       "divergences": [
@@ -983,8 +1083,8 @@
     },
     {
       "name": "@octanejs/styled-components",
-      "version": "0.1.41",
-      "category": "Styling, tests, and devtools",
+      "version": "0.1.42",
+      "category": "Styling",
       "upstream": { "package": "styled-components", "version": "6.4.3" },
       "surface": "Full v6 web API, ported from the upstream 6.4.3 sources: `styled` with every HTML/SVG tag shortcut, `.attrs`/`.withConfig` chaining, `css`, `keyframes`, `createGlobalStyle`, `createTheme`, `ThemeProvider`/`ThemeContext`/`ThemeConsumer`/`useTheme`/`withTheme`, `StyleSheetManager`/`StyleSheetContext`/`StyleSheetConsumer` (targets, namespaces, vendor prefixing, stylis plugins, `shouldForwardProp`), `ServerStyleSheet`, `isStyledComponent`, `version`, and `__PRIVATE__`. Component selectors, folding (`styled(Styled)`), transient `$` props, `as`/`forwardedAs`, and the grouped CSSOM sheet engine (with upstream `data-styled` rehydration) all behave as upstream. The React Native surface and the RSC-only `stylisPluginRSC` are not ported.",
       "divergences": [
@@ -1002,8 +1102,8 @@
     },
     {
       "name": "@octanejs/stylex",
-      "version": "0.1.48",
-      "category": "Styling, tests, and devtools",
+      "version": "0.1.49",
+      "category": "Styling",
       "upstream": { "package": "@stylexjs/stylex", "version": "0.19.0" },
       "surface": "Full compile-time integration: re-exports the StyleX runtime API (`create`, `props`, `attrs`, `keyframes`, `defineVars`, `createTheme`) and registers as an import source; the `/vite` plugin runs the StyleX compiler over octane's compiled output and emits one static atomic stylesheet (`virtual:stylex.css`) with zero StyleX runtime in the bundle.",
       "divergences": [
@@ -1015,8 +1115,8 @@
     },
     {
       "name": "@octanejs/swr",
-      "version": "0.0.15",
-      "category": "AI, data, and routing",
+      "version": "0.0.16",
+      "category": "Data",
       "upstream": { "package": "swr", "version": "2.4.2" },
       "surface": "Mapped port of SWR 2.4.2: root useSWR/config/cache/mutate/preload, infinite, immutable, remote mutation, subscription, _internal, and the published react-server condition branches. The harness executes the pinned pristine React suite plus selected adapted Octane cases, repo-authored adapted type probes, and differential/export oracles. Provenance remains recorded-unverified until the exhaustive adapted crosswalk lands.",
       "divergences": [
@@ -1028,8 +1128,8 @@
     },
     {
       "name": "@octanejs/syntax-highlighter",
-      "version": "0.0.15",
-      "category": "Forms and content",
+      "version": "0.0.16",
+      "category": "Content",
       "upstream": { "package": "react-syntax-highlighter", "version": "16.1.1" },
       "surface": "Complete against react-syntax-highlighter 16.1.1: default, Light, Prism, async and async-light components; static registration and language lists; custom renderers and tags; all pinned Highlight.js and Prism languages and styles; and all ESM/CJS deep-import aliases.",
       "divergences": [
@@ -1041,8 +1141,8 @@
     },
     {
       "name": "@octanejs/tanstack-ai",
-      "version": "0.0.43",
-      "category": "AI, data, and routing",
+      "version": "0.0.44",
+      "category": "Data",
       "upstream": { "package": "@tanstack/ai-react", "version": "0.17.0" },
       "surface": "Ports the @tanstack/ai-react 0.17.0 hook surface (useChat, useRealtimeChat, useGeneration, useGenerateImage/Audio/Speech/Video, useTranscription, useSummarize, useAudioRecorder, useMcpAppBridge) while reusing @tanstack/ai 0.41.0 and @tanstack/ai-client 0.21.0 unchanged and mirroring all 30 @tanstack/ai-client convenience re-exports from the upstream index.",
       "divergences": [
@@ -1060,8 +1160,8 @@
     },
     {
       "name": "@octanejs/tanstack-db",
-      "version": "0.0.12",
-      "category": "AI, data, and routing",
+      "version": "0.0.13",
+      "category": "Data",
       "upstream": { "package": "@tanstack/db", "version": "0.7.0" },
       "surface": "Re-exports `@tanstack/db@0.7.0` unchanged and ports the React live-query binding surface of `@tanstack/react-db@0.1.96` (`useLiveQuery`, `useLiveInfiniteQuery`, `useLiveSuspenseQuery`, `useLiveQueryEffect`, `usePacedMutations`) onto Octane hooks. `useLiveQuery`/`useLiveSuspenseQuery` are driven by db's shared `createLiveQueryObserver`; `useLiveInfiniteQuery` by the coordinated `createLiveQueryWindowController`.",
       "divergences": [
@@ -1075,8 +1175,8 @@
     },
     {
       "name": "@octanejs/tanstack-devtools",
-      "version": "0.0.43",
-      "category": "Styling, tests, and devtools",
+      "version": "0.0.44",
+      "category": "Developer Tools",
       "upstream": { "package": "@tanstack/react-devtools", "version": "0.10.7" },
       "surface": "Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; its test:types source compile is recorded as present type evidence with required pristine/adapted type lanes. Provenance is verified; core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.",
       "divergences": [
@@ -1090,8 +1190,8 @@
     },
     {
       "name": "@octanejs/tanstack-form",
-      "version": "0.0.43",
-      "category": "Forms and content",
+      "version": "0.0.44",
+      "category": "Forms",
       "upstream": { "package": "@tanstack/react-form", "version": "1.33.2" },
       "surface": "Ports the complete @tanstack/react-form 1.33.2 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.2 unchanged and using @octanejs/tanstack-store for subscriptions.",
       "divergences": [
@@ -1104,8 +1204,8 @@
     },
     {
       "name": "@octanejs/tanstack-hotkeys",
-      "version": "0.0.38",
-      "category": "UI and interaction",
+      "version": "0.0.39",
+      "category": "UI Utilities",
       "upstream": { "package": "@tanstack/react-hotkeys", "version": "0.10.0" },
       "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.",
       "divergences": [
@@ -1116,8 +1216,8 @@
     },
     {
       "name": "@octanejs/tanstack-pacer",
-      "version": "0.0.38",
-      "category": "UI and interaction",
+      "version": "0.0.39",
+      "category": "UI Utilities",
       "upstream": { "package": "@tanstack/react-pacer", "version": "0.22.1" },
       "surface": "Surface-present for all 15 runtime/type entrypoints from `@tanstack/react-pacer@0.22.1`, plus the byte-identical `@tanstack/pacer@0.21.1` core re-export. Repo-authored adapted-octane and differential lanes cover a representative debounce/throttle/batching/teardown lifecycle; upstream has no runtime suite and insufficient type evidence, so provenance remains `recorded-unverified` with nearly every export still `surface-present-unverified`.",
       "divergences": [
@@ -1128,8 +1228,8 @@
     },
     {
       "name": "@octanejs/tanstack-query",
-      "version": "0.1.48",
-      "category": "AI, data, and routing",
+      "version": "0.1.49",
+      "category": "Data",
       "upstream": { "package": "@tanstack/react-query", "version": "5.101.3" },
       "surface": "Complete: 58/58 runtime exports plus the full TypeScript surface; the export surface is byte-identical to upstream in both directions (locked by test), and `@tanstack/query-core` is re-exported verbatim.",
       "divergences": [
@@ -1140,8 +1240,8 @@
     },
     {
       "name": "@octanejs/tanstack-router",
-      "version": "0.1.48",
-      "category": "AI, data, and routing",
+      "version": "0.1.49",
+      "category": "Routing",
       "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
       "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
       "divergences": [
@@ -1154,8 +1254,8 @@
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",
-      "version": "0.0.38",
-      "category": "AI, data, and routing",
+      "version": "0.0.39",
+      "category": "Routing",
       "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
       "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
       "divergences": [],
@@ -1164,8 +1264,8 @@
     },
     {
       "name": "@octanejs/tanstack-store",
-      "version": "0.0.43",
-      "category": "Shared state",
+      "version": "0.0.44",
+      "category": "State Management",
       "upstream": { "package": "@tanstack/react-store", "version": "0.11.0" },
       "surface": "Re-exports `@tanstack/store@0.11.0` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.",
       "divergences": [
@@ -1176,8 +1276,8 @@
     },
     {
       "name": "@octanejs/tanstack-table",
-      "version": "0.1.46",
-      "category": "Data-heavy screens",
+      "version": "0.1.47",
+      "category": "Tables",
       "upstream": { "package": "@tanstack/react-table", "version": "9.0.0-beta.58" },
       "surface": "Complete port of the v9 adapter: the framework-agnostic `@tanstack/table-core` (constructTable + every tree-shakeable feature and row model) is reused verbatim, and the adapter — `useTable`, `Subscribe`, `flexRender`/`FlexRender`, `createTableHook`, `createTableHookContexts` — is transcribed onto octane hooks. Table state lives in TanStack Store atoms via the `coreReactivityFeature` bindings, and `useSelector` drives re-renders from the selected slice. Every store primitive (hooks, `createAtom`, `batch`, `shallow`, and the atom/store types) is imported from @octanejs/tanstack-store, which re-exports all of @tanstack/store — the binding takes no direct dependency on the store core, so there is only one path to it and atom identity cannot be split across duplicate copies.",
       "divergences": [
@@ -1189,8 +1289,8 @@
     },
     {
       "name": "@octanejs/tanstack-virtual",
-      "version": "0.1.46",
-      "category": "Data-heavy screens",
+      "version": "0.1.47",
+      "category": "Tables",
       "upstream": { "package": "@tanstack/react-virtual", "version": "3.14.5" },
       "surface": "Complete 1:1 port: the framework-agnostic `@tanstack/virtual-core` (Virtualizer + observers + windowing math) is reused verbatim; the React adapter (`useVirtualizer`, `useWindowVirtualizer`, incl. `useFlushSync` and the experimental `directDomUpdates` surface) is transcribed onto octane hooks, preserving upstream's force-update + flushSync-on-sync-scroll wiring and layout-effect lifecycle.",
       "divergences": [
@@ -1201,8 +1301,8 @@
     },
     {
       "name": "@octanejs/tauri",
-      "version": "0.0.32",
-      "category": "Desktop",
+      "version": "0.0.33",
+      "category": "Desktop Apps",
       "upstream": { "package": "@tauri-apps/api", "version": "2.11.1" },
       "surface": "Octane hooks over the framework-neutral Tauri IPC surface: useInvoke (suspending command), useInvokeState (pending/success/error with refetch), and useTauriEvent (event subscription with lifecycle-safe teardown). The rest of @tauri-apps/api — window, webview, menu, tray, path, dpi, image, and the plugin packages — is already framework-neutral and is imported directly rather than re-exported here.",
       "divergences": [
@@ -1219,8 +1319,8 @@
     },
     {
       "name": "@octanejs/testing-library",
-      "version": "0.1.46",
-      "category": "Styling, tests, and devtools",
+      "version": "0.1.47",
+      "category": "Testing",
       "upstream": { "package": "@testing-library/react", "version": "16.3.2" },
       "surface": "`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config.",
       "divergences": [
@@ -1232,8 +1332,8 @@
     },
     {
       "name": "@octanejs/textarea-autosize",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "UI Libraries",
       "upstream": { "package": "react-textarea-autosize", "version": "8.5.9" },
       "surface": "Complete against the published react-textarea-autosize 8.5.9 default component and named TextareaAutosizeProps and TextareaHeightChangeMeta types, including native textarea props, row clamps, measurement caching, height callbacks, refs, environmental listeners, form reset, SSR, and browser sizing.",
       "divergences": [
@@ -1244,9 +1344,19 @@
       "verified": "2026-08-03"
     },
     {
+      "name": "@octanejs/thinking-orbs",
+      "version": "0.1.0",
+      "category": "Animation",
+      "upstream": { "package": "thinking-orbs", "version": "0.2.0" },
+      "surface": "ThinkingOrb component, resolvePreset, MODE_DRAWS, and public types — nine animation states, two tuned size presets, auto/dark/light theme, reduced-motion static frame.",
+      "divergences": [],
+      "ssr": "Canvas is client-only; server render emits the canvas element without animation.",
+      "verified": "2026-08-07"
+    },
+    {
       "name": "@octanejs/three",
-      "version": "0.1.42",
-      "category": "Web 3D",
+      "version": "0.1.43",
+      "category": "3D",
       "upstream": { "package": "@react-three/fiber", "version": "9.6.1 (2a528745)" },
       "surface": "Technical-preview Milestones 0–10 surface: renderer configuration and the DOM Canvas boundary, compiler ABI and renderer-local Three intrinsic types, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, ownership-aware disposal, promise-returning HTMLCanvasElement and OffscreenCanvas roots, Octane act/flushSync scheduling, callback-aware unmountComponentAtNode, callable root state, scene/camera/raycaster and resize/DPR/viewport configuration, shadows/colors, one shared frame loop, controlled WebXR loop handoff, context-restore invalidation, compatible/reconstructing HMR, global effects, useStore/useThree/useFrame/useGraph and managed-instance helpers, the ray/pointer event system with DOM sources and custom managers, a keyed useLoader cache with preload/clear and GLTF graph augmentation, retained Suspense/Activity behavior, client Three-to-DOM pending/error projection, same-renderer createPortal targets with state/event enclaves and physical Three event bubbling, client-only Canvas shell streaming and production Vite/Rsbuild hydration adoption with the matching raw Rspack graph split, the explicit-target low-level DOMRegion boundary, a deterministic testing harness, an asynchronously acknowledged structured-clone transport proof, a checked public API/subpath matrix, Three r156/current compatibility lanes, a packed external consumer, real WebGL failure/recovery coverage, and semantic-checksummed renderer and shipped-size benchmarks.",
       "divergences": [
@@ -1266,8 +1376,8 @@
     },
     {
       "name": "@octanejs/tiptap",
-      "version": "0.0.43",
-      "category": "Forms and content",
+      "version": "0.0.44",
+      "category": "Content",
       "upstream": { "package": "@tiptap/react", "version": "3.28.0" },
       "surface": "Complete @tiptap/react 3.28.0 adapter surface across the root and ./menus entries: @tiptap/core re-exports, editor hooks and contexts, the EditorContent portal bridge, compound Tiptap API, ReactRenderer, custom NodeView/MarkView renderers and helpers, BubbleMenu, and FloatingMenu.",
       "divergences": [
@@ -1283,8 +1393,8 @@
     },
     {
       "name": "@octanejs/to-print",
-      "version": "0.0.5",
-      "category": "UI and interaction",
+      "version": "0.0.6",
+      "category": "UI Utilities",
       "upstream": {
         "package": "react-to-print",
         "version": "3.3.0",
@@ -1303,8 +1413,8 @@
     },
     {
       "name": "@octanejs/transition-group",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "Animation",
       "upstream": {
         "package": "react-transition-group",
         "version": "4.4.5",
@@ -1321,8 +1431,8 @@
     },
     {
       "name": "@octanejs/usehooks-ts",
-      "version": "0.0.30",
-      "category": "UI and interaction",
+      "version": "0.0.31",
+      "category": "UI Utilities",
       "upstream": {
         "package": "usehooks-ts",
         "version": "3.1.1",
@@ -1339,8 +1449,8 @@
     },
     {
       "name": "@octanejs/valtio",
-      "version": "0.1.32",
-      "category": "Shared state",
+      "version": "0.1.33",
+      "category": "State Management",
       "upstream": { "package": "valtio", "version": "2.3.2" },
       "surface": "The framework-agnostic `valtio/vanilla` core and `valtio/vanilla/utils` are re-exported verbatim; `useSnapshot` and the `useProxy` utility are ported to Octane.",
       "divergences": [
@@ -1351,8 +1461,8 @@
     },
     {
       "name": "@octanejs/vaul",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "UI Libraries",
       "upstream": {
         "package": "vaul",
         "version": "1.1.2",
@@ -1367,8 +1477,8 @@
     },
     {
       "name": "@octanejs/visx",
-      "version": "0.1.43",
-      "category": "Data-heavy screens",
+      "version": "0.1.44",
+      "category": "Visualization",
       "upstream": { "package": "@visx/visx", "version": "4.0.0 + master@485c035" },
       "surface": "Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies.",
       "divergences": [
@@ -1383,7 +1493,7 @@
     },
     {
       "name": "@octanejs/wagmi",
-      "version": "0.0.29",
+      "version": "0.0.30",
       "category": "Web3",
       "upstream": { "package": "wagmi", "version": "3.7.4" },
       "surface": "WagmiProvider and createConfig over @wagmi/core 3.6.4, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.",
@@ -1399,8 +1509,8 @@
     },
     {
       "name": "@octanejs/waypoint",
-      "version": "0.0.4",
-      "category": "UI and interaction",
+      "version": "0.0.5",
+      "category": "UI Utilities",
       "upstream": {
         "package": "react-waypoint",
         "version": "6.0.0",
@@ -1418,8 +1528,8 @@
     },
     {
       "name": "@octanejs/window",
-      "version": "0.0.15",
-      "category": "Data-heavy screens",
+      "version": "0.0.16",
+      "category": "Tables",
       "upstream": { "package": "react-window", "version": "2.3.0" },
       "surface": "Provisional complete exact port of the react-window 2.3.0 root surface: List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types. The byte-locked pristine React suite and generated Octane adaptation each execute all 14 upstream files and all 117 cases; shared differential, SSR, hydration, and assertion-level public type lanes are required by the React parity manifest. Final Chromium/Firefox browser and executable CommonJS package-condition evidence remain pending shared infrastructure PRs #548 and #550.",
       "divergences": [
@@ -1431,8 +1541,8 @@
     },
     {
       "name": "@octanejs/wouter",
-      "version": "0.0.5",
-      "category": "AI, data, and routing",
+      "version": "0.0.6",
+      "category": "Routing",
       "upstream": {
         "package": "wouter",
         "version": "3.10.0",
@@ -1451,8 +1561,8 @@
     },
     {
       "name": "@octanejs/xstate",
-      "version": "0.0.7",
-      "category": "Shared state",
+      "version": "0.0.8",
+      "category": "State Management",
       "upstream": { "package": "@xstate/react", "version": "6.1.0" },
       "surface": "Complete @xstate/react 6.1.0 export surface — `useActor`, `useActorRef`, `useSelector`, `createActorContext`, `shallowEqual`, and the deprecated `useMachine` alias — ported onto Octane hooks. The framework-agnostic `xstate` actor core is reused unchanged as a peer dependency and is not re-exported, exactly as upstream. Upstream's two npm-only dependencies are replaced by in-repo ports: `use-sync-external-store/shim/with-selector` by a local port of React's selector shim, and `use-isomorphic-layout-effect` by a slot-forwarding equivalent.",
       "divergences": [
@@ -1466,8 +1576,8 @@
     },
     {
       "name": "@octanejs/xstate-store",
-      "version": "0.0.7",
-      "category": "Shared state",
+      "version": "0.0.8",
+      "category": "State Management",
       "upstream": { "package": "@xstate/store-react", "version": "2.0.0" },
       "surface": "Complete @xstate/store-react 2.0.0 export surface — `useSelector`, `useStore`, `useAtom`, `useAtomState`, and `createStoreHook` — ported onto Octane hooks, plus the full `@xstate/store@4.2.3` core re-exported unchanged (`createStore`, `createAtom`, `fromStore`, `shallowEqual`, and every type), exactly as upstream re-exports it.",
       "divergences": [
@@ -1480,8 +1590,8 @@
     },
     {
       "name": "@octanejs/xyflow",
-      "version": "0.1.0",
-      "category": "UI and interaction",
+      "version": "0.1.1",
+      "category": "Visualization",
       "upstream": { "package": "@xyflow/react", "version": "12.11.2" },
       "surface": "ReactFlow, ReactFlowProvider, Handle, hooks (useReactFlow, useNodes, useEdges, …), change helpers, and node/edge utilities from @xyflow/react@12.11.2.",
       "divergences": [
@@ -1492,8 +1602,8 @@
     },
     {
       "name": "@octanejs/zag",
-      "version": "0.0.15",
-      "category": "UI and interaction",
+      "version": "0.0.16",
+      "category": "UI Libraries",
       "upstream": { "package": "@zag-js/react", "version": "1.42.0" },
       "surface": "Complete port of the @zag-js/react@1.42.0 public adapter surface: useMachine, normalizeProps, Portal, the @zag-js/core mergeProps re-export, and the framework useSyncExternalStore re-export. The framework-agnostic @zag-js/core, @zag-js/store, @zag-js/types, and @zag-js/utils packages are reused unchanged.",
       "divergences": [
@@ -1507,8 +1617,8 @@
     },
     {
       "name": "@octanejs/zustand",
-      "version": "0.1.48",
-      "category": "Shared state",
+      "version": "0.1.49",
+      "category": "State Management",
       "upstream": { "package": "zustand", "version": "5.0.14" },
       "surface": "Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).",
       "divergences": [
@@ -1534,7 +1644,9 @@
     "@monaco-editor/react": "@octanejs/monaco-editor",
     "@opentui/react": "@octanejs/opentui",
     "@phosphor-icons/react": "@octanejs/phosphor-icons",
+    "@portabletext/react": "@octanejs/portabletext",
     "@rainbow-me/rainbowkit": "@octanejs/rainbowkit",
+    "@react-email/components": "@octanejs/email",
     "@react-rxjs/core": "@octanejs/rxjs",
     "@react-rxjs/utils": "@octanejs/rxjs",
     "@react-spring/parallax": "@octanejs/spring",
@@ -1542,6 +1654,9 @@
     "@react-three/drei": "@octanejs/drei",
     "@react-three/fiber": "@octanejs/three",
     "@reduxjs/toolkit": "@octanejs/redux-toolkit",
+    "@sanity/icons": "@octanejs/sanity-icons",
+    "@sanity/logos": "@octanejs/sanity-logos",
+    "@sanity/react-loader": "@octanejs/sanity-loader",
     "@solana/react": "@octanejs/solana-kit",
     "@streamdown/cjk": "@octanejs/streamdown",
     "@streamdown/code": "@octanejs/streamdown",
@@ -1641,6 +1756,7 @@
     "react-day-picker": "@octanejs/day-picker",
     "react-draggable": "@octanejs/draggable",
     "react-dropzone": "@octanejs/dropzone",
+    "react-email": "@octanejs/email",
     "react-error-boundary": "@octanejs/react-error-boundary",
     "react-hook-form": "@octanejs/hook-form",
     "react-i18next": "@octanejs/i18next",
@@ -1669,6 +1785,7 @@
     "streamdown": "@octanejs/streamdown",
     "styled-components": "@octanejs/styled-components",
     "swr": "@octanejs/swr",
+    "thinking-orbs": "@octanejs/thinking-orbs",
     "use-stick-to-bottom": "@octanejs/stick-to-bottom",
     "usehooks-ts": "@octanejs/usehooks-ts",
     "valtio": "@octanejs/valtio",

@@ -5,6 +5,7 @@ import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import {
+	DeepWrapperChain,
 	KeyedReturnWrapper,
 	KeyedWrapperList,
 	ReturnedSuspenseChildSlot,
@@ -56,6 +57,21 @@ describe('hydrateRoot — nested wrapper and boundary adoption', () => {
 		expect(section.querySelector('.wrapper-button')).toBe(serverButton);
 		expect(serverButton.textContent).toBe('wrapped:1');
 		root.unmount();
+	});
+
+	it('keeps a deeply wrapped server node interactive through hydration and cleanup', () => {
+		container.innerHTML = renderServer('DeepWrapperChain', { depth: 32 });
+		const serverButton = container.querySelector('.deep-wrapper-button') as HTMLButtonElement;
+
+		const root = hydrateRoot(container, DeepWrapperChain, { depth: 32 });
+		expect(container.querySelector('.deep-wrapper-button')).toBe(serverButton);
+
+		flushSync(() => serverButton.click());
+		expect(container.querySelector('.deep-wrapper-button')).toBeNull();
+		expect(container.querySelector('.deep-wrapper-replacement')?.textContent).toBe('replaced');
+		expect(serverButton.isConnected).toBe(false);
+		root.unmount();
+		expect(container.childNodes).toHaveLength(0);
 	});
 
 	it('preserves component state when a hydrated branch swaps away and back', () => {

@@ -28,8 +28,8 @@
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 8,
-    "uniqueIdentities": 8,
+    "inventoryEntries": 9,
+    "uniqueIdentities": 9,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "fe1d4091418cc353f449dc9022407cc8fe97a131b890bef02017c5c4e40802ed"
+      "lockfileSha256": "e49ba67f76687623344159d87bb0484d60d4924ff2b145a9b13e4e18157e9e21"
     }
   },
   "lanes": [
@@ -60,17 +60,17 @@
         {
           "path": "packages/xyflow/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "780ae2b1ae93a494226338af031a85206024e7a023c061245fa0300585680a6d"
+          "sha256": "0c90b54e68bac770daa9c2aaa0acb57a578e978d4e587500eff890269bf9d533"
         },
         {
           "path": "packages/xyflow/tests/conformance/connection-slots.test.ts",
           "role": "support",
-          "sha256": "185fbc3b243f72816627ef2e2166e721038a27239727acdf66a9c7cb91679793"
+          "sha256": "1363a340993ec3d6f9dc7744272e72c8db09dabfbe4bd4d561a724c819d55389"
         },
         {
           "path": "packages/xyflow/tests/_fixtures/connection-slots.tsrx",
           "role": "support",
-          "sha256": "b311e245eb5a3b7b2c76f96ca05350e95f99bc230b2ed40b1bde2f498103c27d"
+          "sha256": "02dfe8e94ed3986e59be313526483c1f7ae297f3de0052ad25eadd180382b517"
         }
       ]
     },

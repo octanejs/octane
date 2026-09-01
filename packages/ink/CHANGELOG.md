@@ -1,5 +1,28 @@
 # @octanejs/ink
 
+## 0.0.13
+
+### Patch Changes
+
+- da155ad: Skip splitting an unchanged terminal frame when only Ink's cursor position moved.
+
+  Both standard and incremental rendering already retain the previous frame's line
+  geometry, but cursor-only updates rebuilt the entire line array before discarding
+  it. Reusing the retained geometry preserves the emitted escape sequences while
+  removing that whole-frame allocation. In the `ink-cursor-update` benchmark, 80
+  cursor moves over separately materialized equal 20,000-line frames dropped from
+  25.3 ms to 4.5 ms in both modes, with initial and changed-output rendering
+  unchanged.
+
+- Updated dependencies [157543f]
+- Updated dependencies [4d13159]
+- Updated dependencies [a944ff3]
+- Updated dependencies [f9f0d23]
+- Updated dependencies [edf2b9d]
+- Updated dependencies [9779569]
+- Updated dependencies [96c86fc]
+  - octane@0.1.50
+
 ## 0.0.12
 
 ### Patch Changes

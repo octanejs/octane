@@ -1,0 +1,99 @@
+.SidebarSection {
+	display: flex;
+	position: relative;
+	flex-direction: column;
+	color: var(--puck-color-black);
+}
+
+.SidebarSection:last-of-type {
+	flex-grow: 1;
+}
+
+.SidebarSection-title {
+	background: var(--puck-color-white);
+	padding: 16px;
+	border-bottom: 1px solid var(--puck-color-grey-09);
+	border-top: 1px solid var(--puck-color-grey-09);
+	overflow-x: auto;
+}
+
+.SidebarSection--noBorderTop > .SidebarSection-title {
+	border-top: 0px;
+}
+
+.SidebarSection-content {
+	padding: 16px;
+}
+
+.SidebarSection--noPadding > .SidebarSection-content {
+	padding: 0px;
+}
+
+.SidebarSection--noPadding > .SidebarSection-content:last-child {
+	padding-bottom: 4px;
+}
+
+.SidebarSection:last-of-type .SidebarSection-content {
+	border-bottom: none;
+	flex-grow: 1;
+}
+
+.SidebarSection-breadcrumbLabel {
+	background: none;
+	border: 0;
+	border-radius: 2px;
+	color: var(--puck-color-azure-04);
+	cursor: pointer;
+	font: inherit;
+	flex-shrink: 0;
+	padding: 0;
+	transition: color 50ms ease-in;
+}
+
+.SidebarSection-breadcrumbLabel:focus-visible {
+	outline: 2px solid var(--puck-color-azure-05);
+	outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.SidebarSection-breadcrumbLabel:hover {
+		color: var(--puck-color-azure-03);
+		transition: none;
+	}
+}
+
+.SidebarSection-breadcrumbLabel:active {
+	color: var(--puck-color-azure-02);
+	transition: none;
+}
+
+.SidebarSection-breadcrumbs {
+	align-items: center;
+	display: flex;
+	gap: 4px;
+}
+
+.SidebarSection-breadcrumb {
+	align-items: center;
+	display: flex;
+	gap: 4px;
+}
+
+.SidebarSection-heading {
+	padding-inline-end: 16px;
+}
+
+.SidebarSection-loadingOverlay {
+	background: var(--puck-color-white);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100%;
+	width: 100%;
+	top: 0;
+	position: absolute;
+	z-index: 1;
+	pointer-events: all;
+	box-sizing: border-box;
+	opacity: 0.8;
+}

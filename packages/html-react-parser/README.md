@@ -2,6 +2,13 @@
 
 Octane binding for [`html-react-parser@6.1.7`](https://github.com/remarkablemark/html-react-parser).
 
+## Installation
+
+```sh
+npm install @octanejs/html-react-parser
+pnpm add @octanejs/html-react-parser
+```
+
 ```ts
 import parse from '@octanejs/html-react-parser';
 

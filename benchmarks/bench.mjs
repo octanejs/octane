@@ -280,6 +280,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n, quick) => [String(n), ...(quick ? ['--quick'] : [])] }],
 	},
 	{
+		// Renderer-free production trace-event retention before and after the
+		// bounded history fills, with exact chronological sequence controls.
+		name: 'scoped-signals-trace',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run-trace.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Actual production compilation with ordinary/native read controls,
 		// plus deterministic five-dependency use() creation-cache guards.
 		name: 'scoped-native-reads',
@@ -414,6 +423,33 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production SSR hydration of coextensive wrapper chains, normalized per
+		// wrapper to catch repeated post-adoption range bookkeeping.
+		name: 'hydration-range-compaction',
+		cwd: 'hydration-range-compaction',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Production deferred-boundary adoption at 1 and 2,048 boundaries, with a
+		// deterministic per-boundary Set-allocation slope and plain-mount control.
+		name: 'deferred-hydration-boundaries',
+		cwd: 'deferred-hydration-boundaries',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Production multi-root hydration with a same-width foreign update wave
+		// already queued, normalized per row to catch repeated queue prefix scans.
+		name: 'hydration-render-phase-queue',
+		cwd: 'hydration-render-phase-queue',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Headless-Chromium production scaling for late behavior events whose
 		// distinct asynchronous adoptions settle one at a time.
 		name: 'behavior-root-events',
@@ -436,6 +472,15 @@ const SUITES = [
 		// and dynamic route tables with cost normalized per candidate route.
 		name: 'router-dispatch',
 		cwd: 'router-dispatch',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Node-only Rspack CSS-module proof collection and verification with
+		// deterministic graph traversal and yielded-connection counts.
+		name: 'rspack-css-graph',
+		cwd: 'rspack-css-graph',
 		servers: [],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -519,6 +564,7 @@ const SUITES = [
 			{ label: 'refs', script: 'refs.mjs', args: (n) => [String(n)] },
 			{ label: 'refs-work', script: 'refs-work.mjs', args: () => [] },
 			{ label: 'bundle', script: 'bundle.mjs', args: () => [] },
+			{ label: 'caught-reveal', script: 'caught-reveal-run.mjs', args: (n) => [String(n)] },
 		],
 	},
 	{
@@ -769,6 +815,24 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Universal object-driver teardown (Node-only): wide sibling unmounts through
+		// transactional simulation and apply, with exact remove/destroy controls.
+		name: 'universal-object-teardown',
+		cwd: 'universal-object-teardown',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Universal fallback collapsed-template events (Node-only): handler-only
+		// updates across 128 and 1,024 retained native event sites.
+		name: 'universal-template-events',
+		cwd: 'universal-template-events',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Native universal external-store hooks: stable subscription lifetimes and
 		// bounded state-projection work across parent renders and notification bursts.
 		name: 'universal-external-store',
@@ -874,6 +938,42 @@ const SUITES = [
 		cwd: 'tsrx-component-graph',
 		servers: [],
 		iter: { normal: 8, quick: 4 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Hydrate module-slicing selection at 150 and 2,400 sibling boundaries,
+		// with retained declarations and whole-compiler targets as controls.
+		name: 'tsrx-hydrate-module-slicing',
+		cwd: 'tsrx-hydrate-module-slicing',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Stable-hookful capture and private-setter propagation through matched
+		// same-module component chains in both declaration orders.
+		name: 'tsrx-stable-hookful-propagation',
+		cwd: 'tsrx-stable-hookful-propagation',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Authored renderer-validation range membership at two scales plus matched
+		// whole-pipeline compiles with and without validation in the same process.
+		name: 'tsrx-renderer-validation-ranges',
+		cwd: 'tsrx-renderer-validation-ranges',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Renderer-boundary preparation with a fixed 1,000 regions and either 1,000
+		// or 10,000 unrelated local component declarations.
+		name: 'tsrx-local-component-name-catalog',
+		cwd: 'tsrx-local-component-name-catalog',
+		servers: [],
+		iter: { normal: 9, quick: 7 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{

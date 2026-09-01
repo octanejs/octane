@@ -2,6 +2,13 @@
 
 Octane bindings for [`react-markdown@10.1.0`](https://github.com/remarkjs/react-markdown). The default export and the `MarkdownAsync`, `MarkdownHooks`, and `defaultUrlTransform` named exports preserve the upstream processing and option contracts while producing Octane output.
 
+## Installation
+
+```sh
+npm install @octanejs/markdown
+pnpm add @octanejs/markdown
+```
+
 ```tsrx
 import Markdown from '@octanejs/markdown';
 import remarkGfm from 'remark-gfm';

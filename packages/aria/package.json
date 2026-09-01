@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/aria",
-  "version": "0.0.43",
+  "version": "0.0.44",
   "license": "MIT AND Apache-2.0",
   "type": "module",
   "sideEffects": [

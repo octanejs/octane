@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/colorful",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "Exact Octane binding for react-colorful 5.8.0",
   "license": "MIT",
   "type": "module",

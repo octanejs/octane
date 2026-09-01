@@ -1,153 +1,582 @@
 [
   {
-    "title": "Shared state",
-    "description": "Small stores, atoms, observable state, state machines, Redux, RTK Query, and TanStack Store.",
+    "title": "State Management",
+    "description": "Stores, atoms, observables, state machines, Redux, RTK Query, and reactive streams.",
     "packages": [
-      "@octanejs/alien-signals",
-      "@octanejs/zustand",
-      "@octanejs/valtio",
-      "@octanejs/jotai",
-      "@octanejs/mobx",
-      "@octanejs/rxjs",
-      "@octanejs/redux",
-      "@octanejs/redux-toolkit",
-      "@octanejs/tanstack-store",
-      "@octanejs/xstate",
-      "@octanejs/xstate-store"
+      {
+        "packageName": "@octanejs/alien-signals",
+        "title": "Alien Signals",
+        "tags": ["signals", "reactivity"]
+      },
+      { "packageName": "@octanejs/jotai", "title": "Jotai", "tags": ["atoms"] },
+      { "packageName": "@octanejs/mobx", "title": "MobX", "tags": ["observables", "reactivity"] },
+      {
+        "packageName": "@octanejs/redux",
+        "title": "React Redux",
+        "searchTerms": ["react-redux"],
+        "tags": ["redux", "store"]
+      },
+      {
+        "packageName": "@octanejs/redux-toolkit",
+        "title": "Redux Toolkit",
+        "tags": ["redux", "rtk query"]
+      },
+      { "packageName": "@octanejs/rxjs", "title": "RxJS", "tags": ["streams", "observables"] },
+      { "packageName": "@octanejs/tanstack-store", "title": "TanStack Store", "tags": ["store"] },
+      { "packageName": "@octanejs/valtio", "title": "Valtio", "tags": ["proxy", "store"] },
+      { "packageName": "@octanejs/xstate", "title": "XState", "tags": ["state machines"] },
+      {
+        "packageName": "@octanejs/xstate-store",
+        "title": "XState Store",
+        "tags": ["state machines", "store"]
+      },
+      { "packageName": "@octanejs/zustand", "title": "Zustand", "tags": ["store"] }
     ]
   },
   {
-    "title": "AI, data, and routing",
-    "description": "Streaming AI, GraphQL, server state, live IndexedDB data, type-safe routes, and React Router-style APIs.",
+    "title": "Data",
+    "description": "AI streams, authentication, GraphQL, server state, local databases, and offline data.",
     "packages": [
-      "@octanejs/tanstack-ai",
-      "@octanejs/apollo-client",
-      "@octanejs/livestore",
-      "@octanejs/dexie",
-      "@octanejs/swr",
-      "@octanejs/tanstack-query",
-      "@octanejs/tanstack-db",
-      "@octanejs/tanstack-router",
-      "@octanejs/tanstack-router-ssr-query",
-      "@octanejs/remix-router",
-      "@octanejs/inertia",
-      "@octanejs/nuqs",
-      "@octanejs/better-auth",
-      "@octanejs/wouter"
+      {
+        "packageName": "@octanejs/apollo-client",
+        "title": "Apollo Client",
+        "tags": ["graphql", "server state", "cache"]
+      },
+      {
+        "packageName": "@octanejs/better-auth",
+        "title": "Better Auth",
+        "tags": ["authentication", "sessions"]
+      },
+      {
+        "packageName": "@octanejs/dexie",
+        "title": "Dexie",
+        "tags": ["indexeddb", "database", "offline"]
+      },
+      {
+        "packageName": "@octanejs/livestore",
+        "title": "LiveStore",
+        "searchTerms": ["live store"],
+        "tags": ["local first", "database", "offline"]
+      },
+      {
+        "packageName": "@octanejs/swr",
+        "title": "SWR",
+        "tags": ["server state", "cache", "data fetching"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-ai",
+        "title": "TanStack AI",
+        "tags": ["ai", "streaming"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-db",
+        "title": "TanStack DB",
+        "tags": ["database", "collections", "local first"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-query",
+        "title": "TanStack Query",
+        "tags": ["server state", "cache", "data fetching"]
+      }
+    ]
+  },
+  {
+    "title": "Routing",
+    "description": "Type-safe routes, URL state, server rendering helpers, and React Router-style APIs.",
+    "packages": [
+      {
+        "packageName": "@octanejs/inertia",
+        "title": "Inertia.js",
+        "tags": ["routing", "server driven"]
+      },
+      { "packageName": "@octanejs/nuqs", "title": "nuqs", "tags": ["url state", "search params"] },
+      {
+        "packageName": "@octanejs/remix-router",
+        "title": "React Router",
+        "searchTerms": ["react router"],
+        "tags": ["routing"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-router",
+        "title": "TanStack Router",
+        "searchTerms": ["TanStack React Router"],
+        "tags": ["routing", "type safe"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-router-ssr-query",
+        "title": "TanStack Router SSR Query",
+        "tags": ["routing", "ssr", "server state"]
+      },
+      { "packageName": "@octanejs/wouter", "title": "Wouter", "tags": ["routing"] }
     ]
   },
   {
     "title": "Web3",
     "description": "Wallet connection, chain state, contract reads, signing, and transactions.",
-    "packages": ["@octanejs/wagmi", "@octanejs/rainbowkit", "@octanejs/solana-kit"]
-  },
-  {
-    "title": "UI and interaction",
-    "description": "Primitives, browser hooks, positioning, motion, drag and drop, toasts, command menus, icons, keyboard shortcuts, and event pacing.",
     "packages": [
-      "@octanejs/radix",
-      "@octanejs/zag",
-      "@octanejs/vaul",
-      "@octanejs/base-ui",
-      "@octanejs/aria",
-      "@octanejs/mantine-hooks",
-      "@octanejs/embla-carousel",
-      "@octanejs/floating-ui",
-      "@octanejs/animejs",
-      "@octanejs/gsap",
-      "@octanejs/popper",
-      "@octanejs/motion",
-      "@octanejs/spring",
-      "@octanejs/dnd-kit",
-      "@octanejs/sonner",
-      "@octanejs/draggable",
-      "@octanejs/react-error-boundary",
-      "@octanejs/resizable-panels",
-      "@octanejs/transition-group",
-      "@octanejs/select",
-      "@octanejs/day-picker",
-      "@octanejs/textarea-autosize",
-      "@octanejs/colorful",
-      "@octanejs/cmdk",
-      "@octanejs/shadcn",
-      "@octanejs/lucide",
-      "@octanejs/phosphor-icons",
-      "@octanejs/usehooks-ts",
-      "@octanejs/intersection-observer",
-      "@octanejs/waypoint",
-      "@octanejs/xyflow",
-      "@octanejs/tanstack-hotkeys",
-      "@octanejs/tanstack-pacer",
-      "@octanejs/stick-to-bottom",
-      "@octanejs/image-crop",
-      "@octanejs/content-loader",
-      "@octanejs/to-print",
-      "@octanejs/calendar",
-      "@octanejs/auto-animate"
+      {
+        "packageName": "@octanejs/rainbowkit",
+        "title": "RainbowKit",
+        "tags": ["wallets", "ethereum"]
+      },
+      {
+        "packageName": "@octanejs/solana-kit",
+        "title": "Solana Kit",
+        "tags": ["solana", "blockchain"]
+      },
+      {
+        "packageName": "@octanejs/wagmi",
+        "title": "wagmi",
+        "tags": ["ethereum", "contracts", "wallets"]
+      }
     ]
   },
   {
-    "title": "Forms and content",
-    "description": "Forms, file acquisition, rich-text editing, streaming Markdown, MDX, and translations.",
+    "title": "UI Libraries",
+    "description": "Component systems, accessible primitives, menus, overlays, pickers, notifications, and common controls.",
     "packages": [
-      "@octanejs/formisch",
-      "@octanejs/hook-form",
-      "@octanejs/input-otp",
-      "@octanejs/dropzone",
-      "@octanejs/tanstack-form",
-      "@octanejs/lexical",
-      "@octanejs/tiptap",
-      "@octanejs/markdown",
-      "@octanejs/streamdown",
-      "@octanejs/pdf",
-      "@octanejs/monaco-editor",
-      "@octanejs/syntax-highlighter",
-      "@octanejs/mdx",
-      "@octanejs/i18next",
-      "@octanejs/html-react-parser"
+      {
+        "packageName": "@octanejs/aria",
+        "title": "React Aria",
+        "searchTerms": ["React Aria Components"],
+        "tags": ["accessibility", "components", "primitives"]
+      },
+      {
+        "packageName": "@octanejs/base-ui",
+        "title": "Base UI",
+        "tags": ["components", "primitives", "headless"]
+      },
+      { "packageName": "@octanejs/cmdk", "title": "cmdk", "tags": ["command menu", "components"] },
+      {
+        "packageName": "@octanejs/embla-carousel",
+        "title": "Embla Carousel",
+        "tags": ["carousel", "components"]
+      },
+      {
+        "packageName": "@octanejs/radix",
+        "title": "Radix",
+        "searchTerms": ["Radix UI"],
+        "tags": ["components", "primitives", "headless"]
+      },
+      {
+        "packageName": "@octanejs/calendar",
+        "title": "React Calendar",
+        "tags": ["calendar", "date picker", "components"]
+      },
+      {
+        "packageName": "@octanejs/colorful",
+        "title": "React Colorful",
+        "tags": ["color picker", "components"]
+      },
+      {
+        "packageName": "@octanejs/content-loader",
+        "title": "React Content Loader",
+        "tags": ["skeleton", "loading", "components"]
+      },
+      {
+        "packageName": "@octanejs/day-picker",
+        "title": "React DayPicker",
+        "tags": ["calendar", "date picker", "components"]
+      },
+      {
+        "packageName": "@octanejs/select",
+        "title": "React Select",
+        "tags": ["select", "components", "forms"]
+      },
+      {
+        "packageName": "@octanejs/textarea-autosize",
+        "title": "React Textarea Autosize",
+        "tags": ["textarea", "components", "forms"]
+      },
+      {
+        "packageName": "@octanejs/shadcn",
+        "title": "shadcn/ui",
+        "searchTerms": ["shadcn UI"],
+        "tags": ["components", "primitives"]
+      },
+      {
+        "packageName": "@octanejs/sonner",
+        "title": "Sonner",
+        "tags": ["toasts", "notifications", "components"]
+      },
+      {
+        "packageName": "@octanejs/vaul",
+        "title": "Vaul",
+        "tags": ["drawer", "components", "primitives"]
+      },
+      {
+        "packageName": "@octanejs/zag",
+        "title": "Zag",
+        "tags": ["components", "state machines", "headless"]
+      }
     ]
   },
   {
-    "title": "Data-heavy screens",
-    "description": "Tables, large virtual lists, charts, and visualization primitives.",
+    "title": "Animation",
+    "description": "Motion, transitions, springs, timelines, and automatic layout animation.",
     "packages": [
-      "@octanejs/tanstack-table",
-      "@octanejs/tanstack-virtual",
-      "@octanejs/window",
-      "@octanejs/recharts",
-      "@octanejs/visx",
-      "@octanejs/react-map-gl"
+      { "packageName": "@octanejs/animejs", "title": "Anime.js", "tags": ["motion", "timeline"] },
+      {
+        "packageName": "@octanejs/auto-animate",
+        "title": "AutoAnimate",
+        "tags": ["motion", "layout"]
+      },
+      { "packageName": "@octanejs/gsap", "title": "GSAP", "tags": ["motion", "timeline"] },
+      {
+        "packageName": "@octanejs/motion",
+        "title": "Motion",
+        "tags": ["animation", "transitions"]
+      },
+      {
+        "packageName": "@octanejs/spring",
+        "title": "React Spring",
+        "tags": ["animation", "springs"]
+      },
+      {
+        "packageName": "@octanejs/thinking-orbs",
+        "title": "Thinking Orbs",
+        "tags": ["animation", "loading", "ai"]
+      },
+      {
+        "packageName": "@octanejs/transition-group",
+        "title": "React Transition Group",
+        "tags": ["animation", "transitions"]
+      }
     ]
   },
   {
-    "title": "Web 3D",
-    "description": "Technical-preview, React Three Fiber-style scene graphs on Octane's universal renderer.",
-    "packages": ["@octanejs/three", "@octanejs/drei"]
-  },
-  {
-    "title": "Terminal UI",
-    "description": "Ink components, Yoga layout, input handling, and interactive ANSI terminal rendering.",
-    "packages": ["@octanejs/ink"]
-  },
-  {
-    "title": "Terminal",
-    "description": "Technical-preview native terminal interfaces through OpenTUI and Octane's universal renderer.",
-    "packages": ["@octanejs/opentui"]
-  },
-  {
-    "title": "Desktop",
-    "description": "Tauri v2 and Electron desktop bindings for Octane applications.",
-    "packages": ["@octanejs/tauri", "@octanejs/electron"]
-  },
-  {
-    "title": "Styling, tests, and devtools",
-    "description": "Compiled StyleX, runtime styled-components, DOM-first component tests, and the TanStack Devtools panel.",
+    "title": "UI Utilities",
+    "description": "Browser hooks, positioning, drag interactions, keyboard input, layout helpers, and event pacing.",
     "packages": [
-      "@octanejs/stylex",
-      "@octanejs/styled-components",
-      "@octanejs/testing-library",
-      "@octanejs/tanstack-devtools",
-      "@octanejs/devtools"
+      {
+        "packageName": "@octanejs/dnd-kit",
+        "title": "DnD Kit",
+        "tags": ["drag drop", "interaction"]
+      },
+      {
+        "packageName": "@octanejs/floating-ui",
+        "title": "Floating UI",
+        "tags": ["positioning", "popovers", "tooltips"]
+      },
+      {
+        "packageName": "@octanejs/image-crop",
+        "title": "React Image Crop",
+        "tags": ["images", "media"]
+      },
+      {
+        "packageName": "@octanejs/mantine-hooks",
+        "title": "Mantine Hooks",
+        "tags": ["hooks", "browser"]
+      },
+      {
+        "packageName": "@octanejs/popper",
+        "title": "Popper",
+        "tags": ["positioning", "popovers", "tooltips"]
+      },
+      {
+        "packageName": "@octanejs/draggable",
+        "title": "React Draggable",
+        "tags": ["drag drop", "interaction"]
+      },
+      {
+        "packageName": "@octanejs/react-error-boundary",
+        "title": "React Error Boundary",
+        "tags": ["errors", "recovery"]
+      },
+      {
+        "packageName": "@octanejs/intersection-observer",
+        "title": "React Intersection Observer",
+        "tags": ["visibility", "scroll", "browser"]
+      },
+      {
+        "packageName": "@octanejs/resizable-panels",
+        "title": "React Resizable Panels",
+        "tags": ["layout", "panels"]
+      },
+      {
+        "packageName": "@octanejs/to-print",
+        "title": "React to Print",
+        "tags": ["printing", "browser"]
+      },
+      {
+        "packageName": "@octanejs/waypoint",
+        "title": "React Waypoint",
+        "tags": ["visibility", "scroll", "browser"]
+      },
+      {
+        "packageName": "@octanejs/stick-to-bottom",
+        "title": "Stick to Bottom",
+        "tags": ["scroll", "chat"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-hotkeys",
+        "title": "TanStack Hotkeys",
+        "tags": ["keyboard", "shortcuts"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-pacer",
+        "title": "TanStack Pacer",
+        "tags": ["debounce", "throttle", "events"]
+      },
+      {
+        "packageName": "@octanejs/usehooks-ts",
+        "title": "usehooks-ts",
+        "tags": ["hooks", "browser"]
+      }
+    ]
+  },
+  {
+    "title": "Icons",
+    "description": "Icon component libraries for application interfaces.",
+    "packages": [
+      { "packageName": "@octanejs/lucide", "title": "Lucide", "tags": ["icons", "components"] },
+      {
+        "packageName": "@octanejs/phosphor-icons",
+        "title": "Phosphor Icons",
+        "tags": ["icons", "components"]
+      }
+    ]
+  },
+  {
+    "title": "Forms",
+    "description": "Form state, validation, one-time passwords, and file acquisition.",
+    "packages": [
+      { "packageName": "@octanejs/formisch", "title": "Formisch", "tags": ["forms", "validation"] },
+      {
+        "packageName": "@octanejs/input-otp",
+        "title": "Input OTP",
+        "tags": ["forms", "authentication"]
+      },
+      {
+        "packageName": "@octanejs/dropzone",
+        "title": "React Dropzone",
+        "tags": ["forms", "file upload"]
+      },
+      {
+        "packageName": "@octanejs/hook-form",
+        "title": "React Hook Form",
+        "searchTerms": ["React Hook Form"],
+        "tags": ["forms", "validation"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-form",
+        "title": "TanStack Form",
+        "tags": ["forms", "validation"]
+      }
+    ]
+  },
+  {
+    "title": "Content",
+    "description": "Rich-text editing, Markdown, MDX, email authoring and delivery tooling, code highlighting, PDFs, HTML parsing, and translations.",
+    "packages": [
+      {
+        "packageName": "@octanejs/email",
+        "title": "React Email",
+        "searchTerms": ["@react-email/components"],
+        "tags": ["email", "components", "ssr"]
+      },
+      {
+        "packageName": "@octanejs/email-cli",
+        "title": "React Email CLI",
+        "searchTerms": ["@react-email/cli", "octane-email"],
+        "tags": ["email", "cli", "preview"]
+      },
+      {
+        "packageName": "@octanejs/html-react-parser",
+        "title": "HTML React Parser",
+        "tags": ["html", "rendering"]
+      },
+      {
+        "packageName": "@octanejs/i18next",
+        "title": "react-i18next",
+        "tags": ["localization", "translations", "i18n"]
+      },
+      { "packageName": "@octanejs/lexical", "title": "Lexical", "tags": ["editor", "rich text"] },
+      { "packageName": "@octanejs/mdx", "title": "MDX", "tags": ["markdown", "content"] },
+      {
+        "packageName": "@octanejs/monaco-editor",
+        "title": "Monaco Editor",
+        "tags": ["editor", "code"]
+      },
+      {
+        "packageName": "@octanejs/markdown",
+        "title": "React Markdown",
+        "tags": ["markdown", "rendering"]
+      },
+      { "packageName": "@octanejs/pdf", "title": "React PDF", "tags": ["pdf", "documents"] },
+      {
+        "packageName": "@octanejs/syntax-highlighter",
+        "title": "React Syntax Highlighter",
+        "tags": ["code", "highlighting"]
+      },
+      {
+        "packageName": "@octanejs/streamdown",
+        "title": "Streamdown",
+        "tags": ["markdown", "streaming", "ai"]
+      },
+      { "packageName": "@octanejs/tiptap", "title": "Tiptap", "tags": ["editor", "rich text"] }
+    ]
+  },
+  {
+    "title": "Sanity Content",
+    "description": "Portable Text rendering, Sanity query loading and Live Mode, icons, and brand marks.",
+    "packages": [
+      {
+        "packageName": "@octanejs/portabletext",
+        "title": "Portable Text",
+        "searchTerms": ["@portabletext/react"],
+        "tags": ["content", "rich text", "sanity"]
+      },
+      {
+        "packageName": "@octanejs/sanity-loader",
+        "title": "Sanity Loader",
+        "searchTerms": ["@sanity/react-loader"],
+        "tags": ["sanity", "data fetching", "live content"]
+      },
+      {
+        "packageName": "@octanejs/sanity-icons",
+        "title": "Sanity Icons",
+        "searchTerms": ["@sanity/icons"],
+        "tags": ["sanity", "icons", "components"]
+      },
+      {
+        "packageName": "@octanejs/sanity-logos",
+        "title": "Sanity Logos",
+        "searchTerms": ["@sanity/logos"],
+        "tags": ["sanity", "logos", "branding"]
+      }
+    ]
+  },
+  {
+    "title": "Tables",
+    "description": "Tables plus high-performance rendering for large rows and lists.",
+    "packages": [
+      {
+        "packageName": "@octanejs/window",
+        "title": "React Window",
+        "tags": ["virtualization", "lists", "performance"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-table",
+        "title": "TanStack Table",
+        "tags": ["tables", "data grid"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-virtual",
+        "title": "TanStack Virtual",
+        "tags": ["virtualization", "lists", "performance"]
+      }
+    ]
+  },
+  {
+    "title": "Visualization",
+    "description": "Charts, maps, node editors, and diagramming primitives.",
+    "packages": [
+      {
+        "packageName": "@octanejs/xyflow",
+        "title": "React Flow",
+        "searchTerms": ["React Flow", "xy flow"],
+        "tags": ["diagrams", "nodes", "graphs"]
+      },
+      {
+        "packageName": "@octanejs/react-map-gl",
+        "title": "React Map GL",
+        "searchTerms": ["Mapbox", "MapLibre"],
+        "tags": ["maps", "geospatial"]
+      },
+      {
+        "packageName": "@octanejs/recharts",
+        "title": "Recharts",
+        "tags": ["charts", "data visualization"]
+      },
+      { "packageName": "@octanejs/visx", "title": "visx", "tags": ["charts", "data visualization"] }
+    ]
+  },
+  {
+    "title": "3D",
+    "description": "React Three Fiber-style scene graphs on Octane's universal renderer.",
+    "packages": [
+      { "packageName": "@octanejs/drei", "title": "Drei", "tags": ["three.js", "3d", "helpers"] },
+      {
+        "packageName": "@octanejs/three",
+        "title": "React Three Fiber",
+        "searchTerms": ["R3F", "React Three Fiber"],
+        "tags": ["three.js", "3d", "webgl"]
+      }
+    ]
+  },
+  {
+    "title": "Terminal Apps",
+    "description": "Interactive terminal interfaces with Yoga layout, input handling, and ANSI rendering.",
+    "packages": [
+      {
+        "packageName": "@octanejs/ink",
+        "title": "Ink",
+        "tags": ["terminal", "cli", "universal renderer"]
+      },
+      {
+        "packageName": "@octanejs/opentui",
+        "title": "OpenTUI",
+        "searchTerms": ["Open TUI"],
+        "tags": ["terminal", "cli", "universal renderer"]
+      }
+    ]
+  },
+  {
+    "title": "Desktop Apps",
+    "description": "Native desktop applications with Tauri v2 or Electron.",
+    "packages": [
+      {
+        "packageName": "@octanejs/electron",
+        "title": "Electron",
+        "tags": ["desktop", "native apps"]
+      },
+      { "packageName": "@octanejs/tauri", "title": "Tauri", "tags": ["desktop", "native apps"] }
+    ]
+  },
+  {
+    "title": "Styling",
+    "description": "Compiled and runtime CSS-in-JS options for Octane components.",
+    "packages": [
+      {
+        "packageName": "@octanejs/styled-components",
+        "title": "styled-components",
+        "tags": ["css", "css in js"]
+      },
+      {
+        "packageName": "@octanejs/stylex",
+        "title": "StyleX",
+        "searchTerms": ["Style X"],
+        "tags": ["css", "css in js"]
+      }
+    ]
+  },
+  {
+    "title": "Testing",
+    "description": "DOM-first component tests built around user-observable behavior.",
+    "packages": [
+      {
+        "packageName": "@octanejs/testing-library",
+        "title": "React Testing Library",
+        "searchTerms": ["React Testing Library"],
+        "tags": ["testing", "components", "dom"]
+      }
+    ]
+  },
+  {
+    "title": "Developer Tools",
+    "description": "Inspection panels and development utilities for Octane applications.",
+    "packages": [
+      {
+        "packageName": "@octanejs/devtools",
+        "title": "Octane Devtools",
+        "tags": ["devtools", "debugging"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-devtools",
+        "title": "TanStack Devtools",
+        "tags": ["devtools", "debugging"]
+      }
     ]
   }
 ]

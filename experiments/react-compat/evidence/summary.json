@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-08-28T17:00:24.963Z",
+  "octaneBaseCommit": "874178645e8b3398e8898359f0537f7345b62234",
+  "reactVersion": "19.2.7",
+  "contractStatus": "private-phase-0-experiments; public ReactCompat not implemented",
+  "suiteCommand": "node node_modules/vitest/vitest.mjs run --config experiments/react-compat/vitest.config.js --silent=passed-only",
+  "runner": {
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "browserVersions": {
+    "development": "149.0.7827.55",
+    "production": "149.0.7827.55"
+  },
+  "focusedTests": {
+    "fileExecutions": 5,
+    "passed": 49,
+    "failed": 0,
+    "pending": 0,
+    "files": [
+      {
+        "file": "packages/octane/tests/react-compat-spike/authoring.test.ts",
+        "tests": 13,
+        "status": "passed"
+      },
+      {
+        "file": "packages/octane/tests/react-compat-spike/authoring.test.ts",
+        "tests": 13,
+        "status": "passed"
+      },
+      {
+        "file": "experiments/react-compat/browser-probes.test.ts",
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "file": "experiments/react-compat/candidate-probes.test.ts",
+        "tests": 14,
+        "status": "passed"
+      },
+      {
+        "file": "experiments/react-compat/patch/materialize.test.ts",
+        "tests": 3,
+        "status": "passed"
+      }
+    ]
+  },
+  "validationLimits": {
+    "strictBrowserSourceTypes": "passed with skipLibCheck and exact cached React declarations; no .tsrx program",
+    "fullSync": "blocked at cli:data: missing @tsrx/prettier-plugin@0.3.126",
+    "standardFormatting": "not passed: exact TSRX formatter missing; plain source formatted separately",
+    "fullTypecheck": "not run: exact @tsrx/typescript-plugin@0.3.126 unavailable",
+    "fullRepositoryTests": "not run in partial installation",
+    "ciWorkflowTests": "blocked importing root config: missing @jridgewell/remapping",
+    "performance": "not measured; no production Octane source or exports changed"
+  },
+  "executableSourceSha256": {
+    "experiments/react-compat/browser-probes.test.ts": "9fbe74ba02d1d579ed517a729e49a2722f8cf2a851585c0a6e62e54c5620719f",
+    "experiments/react-compat/candidate-probes.test.ts": "dfbec2a93767d4be2fa5b39333491e7e73cad695a1e476b4cd06d6ad1e25a6e9",
+    "experiments/react-compat/candidate-probes.tsx": "77cdc7c37659c75b0dc8aed4430d32c0c7c697d618bb0749670123d7373822c0",
+    "experiments/react-compat/candidate.html": "08b2f5c34c2d264e95896185de55156ddb5e8cc4eb2ddcffabbb56741e80c0b5",
+    "experiments/react-compat/index.html": "8f63aef521159d93b9e2246f06986fe69fec843c6a25e0e027011c55756da41d",
+    "experiments/react-compat/patch/commit-admission.inc.js": "14d3506e764ebd3e83839f02f1d296022b7ac5676fa4dfbe026fd5e658ec8143",
+    "experiments/react-compat/patch/materialize.mjs": "3d747ad405b9e9b09be63328b987a21c8c093e73d21b08562c377184071b5bdf",
+    "experiments/react-compat/patch/materialize.test.ts": "5168ba582ac0208ea83abbbd826e0e4916040d15c3295a49f378dbe75b4ffff8",
+    "experiments/react-compat/patch/provenance.json": "4bf647c025f98674711b8a0e8e2b55042aab6912ca2c28d81f9637ee95f31138",
+    "experiments/react-compat/stock-react-root-probes.tsx": "aab617b75ae5f6160351fe5ccb9e882c666d30427137b56862374baeb612d6e6",
+    "experiments/react-compat/vitest.config.js": "56e9826d06db8e61627fa37a22c0edbbcf83e05ed17105d92594216c4e53ffe4",
+    "packages/octane/tests/react-compat-spike/authoring.test.ts": "f55d2bf3e65cc4301e3fb6a6613971c30c756e026547b5976e0315c41f869485",
+    "packages/octane/tests/react-compat-spike/authoring.tsrx": "12ea0479dbe3f0720ef652ff9ef5ea06b344efa1c38d1b89d8ab0fd9afee2917",
+    "packages/octane/tests/react-compat-spike/bridge-barrel.ts": "6358f518af64a6f5fabbad634cef35284b1910c64b5af9d63122f7e534bf6ca3",
+    "packages/octane/tests/react-compat-spike/react-components.tsx": "769edaa5bb16c6a1106ab8659b05dd71269b255793160819464ec8f4cf1db66a",
+    "packages/octane/tests/react-compat-spike/stock-root-bridge.ts": "0fcfa6bc8330c4cd1bc832f51342a0482d4a5f8b6c93c8a778c69d3669f9dc67",
+    "vitest.config.js": "69f1e4974ae7696ed15b58acd784f478601ca1bbfb861a52858167307867471f"
+  }
+}

@@ -2,6 +2,13 @@
 
 Octane binding for [`use-stick-to-bottom@1.1.6`](https://github.com/stackblitz/use-stick-to-bottom).
 
+## Installation
+
+```sh
+npm install @octanejs/stick-to-bottom
+pnpm add @octanejs/stick-to-bottom
+```
+
 ```tsrx
 import { StickToBottom } from '@octanejs/stick-to-bottom';
 

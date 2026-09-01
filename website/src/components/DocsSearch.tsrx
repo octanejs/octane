@@ -1,52 +1,65 @@
-// Header docs search: a compact trigger in the nav, and a ⌘K / Ctrl-K dialog
-// that ranks the .mdx sections (src/lib/docs-search.ts) and deep links into
-// /docs/<slug>#<section>.
-//
-// Results are a board rather than a list: one card per matching section
-// (breadcrumb + heading), with the individual matching lines beneath it. Both
-// the heading and every line are selectable rows — the whole card navigates to
-// the same anchor, so a line is just a more specific reason to go there.
-//
-// The dialog is portalled to <body> on purpose: the sticky header sets
-// `backdrop-filter`, which makes it a containing block for fixed descendants —
-// a `position: fixed` overlay rendered inside it would be clipped to the 60px
-// nav strip instead of covering the viewport.
+// Site search keeps the established header entry point and docs snippets, then
+// adds typed ecosystem results from the generated browser index.
 import { createPortal, useEffect, useRef, useState } from 'octane';
 import { useNavigate } from '@octanejs/tanstack-router';
-import { loadSearchIndex, searchDocs } from '../lib/docs-search.ts';
-import type { SearchGroup, SearchRecord } from '../lib/docs-search.ts';
+import {
+	loadSiteSearchIndex,
+	searchSite,
+	type SiteSearchIndex,
+	type SiteSearchResult,
+} from '../lib/site-search.ts';
+import type { EcosystemEntity } from '../lib/ecosystem-search-core.ts';
+import {
+	ecosystemEntityTypeLabel,
+	ecosystemPackageGuideHref,
+} from '../lib/ecosystem-presentation.ts';
+import type { SearchGroup } from '../lib/docs-search-core.ts';
 import searchUrl from '../assets/search.svg';
+import { DOCS_SEARCH_OPEN_EVENT, type DocsSearchOpenDetail } from '../lib/docs-search-events.ts';
 
 interface DialogProps {
 	onClose: () => void;
 }
 
+function scrollToAnchor(id: string) {
+	let frames = 0;
+	const reveal = () => {
+		const element = document.getElementById(id);
+		if (element) element.scrollIntoView({ block: 'start' });
+		else if (frames++ < 120) requestAnimationFrame(reveal);
+	};
+	requestAnimationFrame(reveal);
+}
+
 function SearchDialog(props: DialogProps) @{
 	const [query, setQuery] = useState('');
-	const [groups, setGroups] = useState<SearchGroup[]>([]);
 	const [active, setActive] = useState(0);
-	const [ready, setReady] = useState(false);
-	const index = useRef<readonly SearchRecord[]>([]);
+	const [index, setIndex] = useState<SiteSearchIndex | null>(null);
+	const [indexFailed, setIndexFailed] = useState(false);
+	const [loadAttempt, setLoadAttempt] = useState(0);
 	const inputEl = useRef<HTMLInputElement | null>(null);
 	const navigate = useNavigate();
+	const results: SiteSearchResult[] =
+		index ? searchSite(index, query) : [];
 
-	// The index is a dynamic import — load it as the dialog opens, and re-rank
-	// whatever the user typed while it was in flight.
 	useEffect(() => {
 		let live = true;
-		loadSearchIndex().then((records) => {
-			if (!live) return;
-			index.current = records;
-			setReady(true);
-			setGroups(searchDocs(records, inputEl.current?.value ?? ''));
-		});
+		loadSiteSearchIndex().then(
+			(loaded) => {
+				if (!live) return;
+				setIndex(loaded);
+				setIndexFailed(false);
+			},
+			() => {
+				if (live) setIndexFailed(true);
+			},
+		);
 		inputEl.current?.focus();
 		return () => {
 			live = false;
 		};
-	});
+	}, [loadAttempt]);
 
-	// The page behind the dialog must not scroll while it is open.
 	useEffect(() => {
 		const previous = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
@@ -55,55 +68,78 @@ function SearchDialog(props: DialogProps) @{
 		};
 	});
 
-	// Flatten the board into keyboard rows: each card's heading is a row, and so
-	// is every line under it. `targets[i]` is the section row `i` navigates to.
-	// (`@for` iterates arrays, so every row carries its own index and key.)
-	const targets: SearchGroup[] = [];
-	const board = groups.map((group) => {
-		const headRow = targets.push(group) - 1;
-		const lines = group.lines.map(
-			(line) => ({
-				...line,
-				row: targets.push(group) - 1,
-			}),
-		);
+	let targetCount = 0;
+	const nextRow = () => targetCount++;
+	const board = results.map((result) => {
+		if (result.type === 'docs') {
+			const group = result.group;
+			const headRow = nextRow();
+			const lines = group.lines.map(
+				(line) => ({
+					...line,
+					row: nextRow(),
+				}),
+			);
+			return {
+				type: 'docs' as const,
+				key: 'docs:' + group.key,
+				crumb: 'Docs › ' + group.docTitle,
+				title: group.id ? group.title : group.docTitle,
+				headRow,
+				lines,
+				group,
+			};
+		}
+
+		const entity = result.match.entity;
+		const primaryRow = nextRow();
+		const packageRow = nextRow();
+		const guideRow =
+			entity.kind === 'framework-integration' ? nextRow() : undefined;
 		return {
-			key: group.key,
-			crumb: 'Docs › ' + group.docTitle,
-			title: group.id ? group.title : group.docTitle,
-			headRow,
-			lines,
-			group,
+			type: 'entity' as const,
+			key: 'entity:' + entity.id,
+			entity,
+			primaryRow,
+			packageRow,
+			guideRow,
 		};
 	});
 
-	const go = (group: SearchGroup) => {
+	const goToDocs = (group: SearchGroup) => {
 		props.onClose();
-		navigate({
+		const navigation = navigate({
 			to: '/docs/$slug',
 			params: { slug: group.slug },
 			hash: group.id || undefined,
 		});
-		// The router restores scroll position rather than honouring the hash on a
-		// client navigation, so land on the section ourselves once it is painted.
-		// DocPage and its MDX are lazy-loaded, so the target can take many frames to
-		// mount — poll for it (bounded) instead of assuming a single frame is enough.
-		if (group.id) {
-			const id = group.id;
-			let frames = 0;
-			const scrollToSection = () => {
-				const el = document.getElementById(id);
-				if (el) {
-					el.scrollIntoView({ block: 'start' });
-				} else if (frames++ < 120) {
-					requestAnimationFrame(scrollToSection);
-				}
-			};
-			requestAnimationFrame(scrollToSection);
-		}
+		if (group.id) void navigation.then(() => scrollToAnchor(group.id));
 	};
 
-	// Keep the highlighted row inside the scrolled results panel.
+	const goToEntity = (entity: EcosystemEntity) => {
+		props.onClose();
+		void navigate({
+			to: '/docs/$slug',
+			params: { slug: 'bindings' },
+			search: {
+				q: entity.title,
+				kind: entity.kind === 'library-binding' ? 'binding' : 'integration',
+			},
+			hash: entity.id,
+		}).then(() => scrollToAnchor(entity.id));
+	};
+
+	const goToIntegrationGuide = (entity: EcosystemEntity, event: Event) => {
+		event.preventDefault();
+		if (entity.kind !== 'framework-integration') return;
+		props.onClose();
+		void navigate({
+			to: '/docs/$slug',
+			params: { slug: 'framework-integrations' },
+			hash: entity.guideAnchor,
+		}).then(() => scrollToAnchor(entity.guideAnchor));
+	};
+
 	const reveal = (row: number) => {
 		requestAnimationFrame(() => {
 			document.querySelector('[data-search-row="' + row + '"]')?.scrollIntoView({
@@ -113,20 +149,29 @@ function SearchDialog(props: DialogProps) @{
 	};
 
 	const step = (delta: number) => {
-		const count = targets.length;
-		if (count === 0) return;
-		setActive((i) => {
-			const next = (i + delta + count) % count;
+		const count = targetCount;
+		if (!count) return;
+		setActive((current) => {
+			const next = (current + delta + count) % count;
 			reveal(next);
 			return next;
 		});
 	};
 
+	const activate = (row: number) => {
+		(document.querySelector('[data-search-row="' + row + '"]') as HTMLElement | null)?.click();
+	};
+
 	const onQuery = (event: Event) => {
 		const value = (event.currentTarget as HTMLInputElement).value;
 		setQuery(value);
-		setGroups(searchDocs(index.current, value));
 		setActive(0);
+	};
+
+	const retryIndex = () => {
+		setIndex(null);
+		setIndexFailed(false);
+		setLoadAttempt((attempt) => attempt + 1);
 	};
 
 	const onKeyDown = (event: KeyboardEvent) => {
@@ -138,19 +183,18 @@ function SearchDialog(props: DialogProps) @{
 		} else if (event.key === 'ArrowUp') {
 			event.preventDefault();
 			step(-1);
-		} else if (event.key === 'Enter' && targets[active]) {
+		} else if (event.key === 'Enter' && active < targetCount) {
 			event.preventDefault();
-			go(targets[active]);
+			activate(active);
 		}
 	};
 
 	<div class="search-overlay" onClick={props.onClose} onKeyDown={onKeyDown}>
-		{/* The panel swallows clicks so only the backdrop closes the dialog. */}
 		<div
 			class="search-panel"
 			role="dialog"
 			aria-modal="true"
-			aria-label="Search the documentation"
+			aria-label="Search docs, packages, and integrations"
 			onClick={(event: Event) => event.stopPropagation()}
 		>
 			<div class="search-field">
@@ -163,8 +207,8 @@ function SearchDialog(props: DialogProps) @{
 					ref={inputEl}
 					type="search"
 					class="search-input"
-					placeholder="Search the docs"
-					aria-label="Search the documentation"
+					placeholder="Search docs, packages, and integrations"
+					aria-label="Search docs, packages, and integrations"
 					autoComplete="off"
 					spellCheck={false}
 					value={query}
@@ -176,57 +220,132 @@ function SearchDialog(props: DialogProps) @{
 			@if (board.length > 0) {
 				<div class="search-board" role="listbox">
 					@for (const card of board; key card.key) {
-						<div class="search-card">
-							<button
-								type="button"
-								class={['search-head', card.headRow === active && 'active']}
-								role="option"
-								aria-selected={card.headRow === active}
-								data-search-row={card.headRow}
-								onMouseEnter={() => setActive(card.headRow)}
-								onClick={() => go(card.group)}
-							>
-								<span class="search-crumb">{card.crumb}</span>
-								<span class="search-title">{card.title}</span>
-							</button>
-							@if (card.lines.length > 0) {
-								<div class="search-lines">
-									@for (const line of card.lines; key line.key) {
-										<button
-											type="button"
-											class={['search-line', line.code && 'code', line.row === active && 'active']}
+						@if (card.type === 'entity') {
+							<article class="search-entity">
+								<button
+									type="button"
+									class={['search-entity-primary', card.primaryRow === active && 'active']}
+									role="option"
+									aria-selected={card.primaryRow === active}
+									aria-label={'View ' + card.entity.title + ' in the ecosystem directory'}
+									data-search-row={card.primaryRow}
+									onMouseEnter={() => setActive(card.primaryRow)}
+									onFocus={() => setActive(card.primaryRow)}
+									onClick={() => goToEntity(card.entity)}
+								>
+									<span class="search-type">{ecosystemEntityTypeLabel(card.entity) as string}</span>
+									<span class="search-title">{card.entity.title as string}</span>
+									<code class="search-package">{card.entity.packageName as string}</code>
+									<span class="search-context">
+										{card.entity.kind === 'library-binding'
+											? 'Ports ' + card.entity.upstreamPackage + ' · ' + card.entity.category
+											: card.entity.model}
+									</span>
+								</button>
+								<div class="search-entity-actions">
+									<a
+										class={[
+											'search-entity-action',
+											'search-entity-package',
+											card.packageRow === active && 'active',
+										]}
+										href={ecosystemPackageGuideHref(card.entity.packageName)}
+										role="option"
+										aria-selected={card.packageRow === active}
+										aria-label={'Open the ' + card.entity.title + ' package guide'}
+										data-search-row={card.packageRow}
+										onMouseEnter={() => setActive(card.packageRow)}
+										onFocus={() => setActive(card.packageRow)}
+									>
+										Package guide ↗
+									</a>
+									@if (
+										card.entity.kind === 'framework-integration' && card.guideRow !== undefined
+									) {
+										<a
+											class={[
+												'search-entity-action',
+												'search-entity-guide',
+												card.guideRow === active && 'active',
+											]}
+											href={'/docs/framework-integrations#' + card.entity.guideAnchor}
 											role="option"
-											aria-selected={line.row === active}
-											data-search-row={line.row}
-											onMouseEnter={() => setActive(line.row)}
-											onClick={() => go(card.group)}
+											aria-selected={card.guideRow === active}
+											aria-label={'Open the ' + card.entity.title + ' integration guide'}
+											data-search-row={card.guideRow}
+											onMouseEnter={() => setActive(card.guideRow as number)}
+											onFocus={() => setActive(card.guideRow as number)}
+											onClick={(event: Event) => goToIntegrationGuide(card.entity, event)}
 										>
-											@for (const part of line.parts; key part.i) {
-												@if (part.hit) {
-													<mark>{part.text as string}</mark>
-												} @else {
-													<span>{part.text as string}</span>
-												}
-											}
-										</button>
+											Integration guide
+										</a>
 									}
 								</div>
-							}
-						</div>
+							</article>
+						} @else {
+							<div class="search-card">
+								<button
+									type="button"
+									class={['search-head', card.headRow === active && 'active']}
+									role="option"
+									aria-selected={card.headRow === active}
+									data-search-row={card.headRow}
+									onMouseEnter={() => setActive(card.headRow)}
+									onFocus={() => setActive(card.headRow)}
+									onClick={() => goToDocs(card.group)}
+								>
+									<span class="search-crumb">{card.crumb as string}</span>
+									<span class="search-title">{card.title as string}</span>
+								</button>
+								@if (card.lines.length > 0) {
+									<div class="search-lines">
+										@for (const line of card.lines; key line.key) {
+											<button
+												type="button"
+												class={[
+													'search-line',
+													line.code && 'code',
+													line.row === active && 'active',
+												]}
+												role="option"
+												aria-selected={line.row === active}
+												data-search-row={line.row}
+												onMouseEnter={() => setActive(line.row)}
+												onFocus={() => setActive(line.row)}
+												onClick={() => goToDocs(card.group)}
+											>
+												@for (const part of line.parts; key part.i) {
+													@if (part.hit) {
+														<mark>{part.text as string}</mark>
+													} @else {
+														<span>{part.text as string}</span>
+													}
+												}
+											</button>
+										}
+									</div>
+								}
+							</div>
+						}
 					}
 				</div>
 			} @else {
-				<p class="search-empty">
-					@if (!ready) {
-						<span>Loading the index…</span>
+				<div class="search-empty">
+					@if (indexFailed) {
+						<>
+							<span>Search could not load.</span>
+							<button type="button" class="search-retry" onClick={retryIndex}>Retry</button>
+						</>
+					} @else if (!index) {
+						<span>Loading the search index…</span>
 					} @else {
 						@if (query.trim().length < 2) {
-							<span>Type to search the documentation.</span>
+							<span>Search the docs, packages, and integrations.</span>
 						} @else {
 							<span>{'No matches for “' + query.trim() + '”.'}</span>
 						}
 					}
-				</p>
+				</div>
 			}
 		</div>
 
@@ -237,16 +356,14 @@ function SearchDialog(props: DialogProps) @{
 				z-index: 50;
 				display: flex;
 				justify-content: center;
-				/* flex-start, not the default stretch — the panel hugs its results
-				   instead of filling the viewport when there is nothing to show. */
 				align-items: flex-start;
 				padding: 10vh 1rem 1rem;
 				background: rgba(12, 14, 18, 0.72);
 				backdrop-filter: blur(3px);
 			}
 			.search-panel {
-				width: min(680px, 100%);
-				max-height: 74vh;
+				width: min(720px, 100%);
+				max-height: 76vh;
 				display: flex;
 				flex-direction: column;
 				background: var(--panel);
@@ -294,36 +411,30 @@ function SearchDialog(props: DialogProps) @{
 				letter-spacing: 0.04em;
 			}
 			.search-board {
-				padding: 0.5rem;
-				overflow-y: auto;
-				/* Lines are clipped to one line each, so nothing legitimately needs
-				   horizontal room — never scroll the board sideways. */
-				overflow-x: hidden;
 				display: flex;
 				flex-direction: column;
 				gap: 0.5rem;
-				/* No scrollbar chrome on the board: the wheel and ↑/↓ (which reveal the
-				   active row) are the way through the results. */
+				padding: 0.5rem;
+				overflow: auto;
+				overflow-x: hidden;
 				scrollbar-width: none;
 			}
 			.search-board::-webkit-scrollbar {
 				display: none;
 			}
-			.search-card {
+			.search-card,
+			.search-entity {
 				display: flex;
 				flex-direction: column;
+				flex-shrink: 0;
 				min-width: 0;
 			}
-			/* The rail is this wrapper's left border — it ties the matched lines back
-			   to the heading they sit under. */
-			.search-lines {
-				display: flex;
-				flex-direction: column;
-				min-width: 0;
-				margin: 0.15rem 0 0 1.1rem;
-				padding-left: 0.6rem;
-				border-left: 2px solid var(--border);
+			.search-entity {
+				border: 1px solid var(--border);
+				border-radius: 0.8rem;
+				overflow: hidden;
 			}
+			.search-entity-primary,
 			.search-head,
 			.search-line {
 				display: block;
@@ -335,35 +446,97 @@ function SearchDialog(props: DialogProps) @{
 				text-align: left;
 				cursor: pointer;
 			}
-			.search-head {
-				padding: 0.55rem 0.75rem;
-				border-radius: 0.7rem;
+			.search-entity-primary {
+				padding: 0.75rem;
 			}
+			.search-entity-primary.active,
 			.search-head.active {
 				background: var(--surface);
 			}
-			.search-crumb {
-				display: block;
-				color: var(--text-secondary);
-				font-size: 0.75rem;
+			.search-type {
+				display: inline-flex;
+				margin-bottom: 0.35rem;
+				padding: 0.12rem 0.42rem;
+				border: 1px solid rgba(255, 93, 114, 0.28);
+				border-radius: 999px;
+				color: var(--danger-text);
+				font-size: 0.68rem;
+				font-weight: 750;
+				letter-spacing: 0.03em;
+				text-transform: uppercase;
 			}
 			.search-title {
 				display: block;
 				color: var(--text);
-				font-weight: 700;
 				font-size: 0.95rem;
+				font-weight: 700;
 			}
+			.search-entity-primary.active .search-title,
 			.search-head.active .search-title {
 				color: var(--accent-text);
 			}
+			.search-package {
+				display: block;
+				overflow: hidden;
+				margin-top: 0.2rem;
+				padding: 0;
+				border: 0;
+				background: transparent;
+				color: var(--accent-text);
+				font-size: 0.78rem;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.search-context,
+			.search-crumb {
+				display: block;
+				margin-top: 0.3rem;
+				color: var(--text-secondary);
+				font-size: 0.75rem;
+			}
+			.search-entity-actions {
+				display: flex;
+				gap: 0.25rem;
+				padding: 0.35rem;
+				border-top: 1px solid var(--border);
+				background: var(--surface-subtle);
+			}
+			.search-entity-action {
+				padding: 0.35rem 0.55rem;
+				border-radius: 0.45rem;
+				color: var(--text-secondary);
+				font-size: 0.75rem;
+				font-weight: 650;
+				text-decoration: none;
+			}
+			.search-entity-action:hover,
+			.search-entity-action.active {
+				background: rgba(255, 65, 90, 0.12);
+				color: var(--text);
+			}
+			.search-head {
+				padding: 0.55rem 0.75rem;
+				border-radius: 0.7rem;
+			}
+			.search-head .search-crumb {
+				margin-top: 0;
+			}
+			.search-lines {
+				display: flex;
+				flex-direction: column;
+				min-width: 0;
+				margin: 0.15rem 0 0 1.1rem;
+				padding-left: 0.6rem;
+				border-left: 2px solid var(--border);
+			}
 			.search-line {
+				overflow: hidden;
 				min-width: 0;
 				padding: 0.35rem 0.6rem;
 				border-radius: 0.6rem;
 				color: var(--text-secondary);
 				font-size: 0.85rem;
 				line-height: 1.55;
-				overflow: hidden;
 				text-overflow: ellipsis;
 				white-space: nowrap;
 			}
@@ -390,52 +563,91 @@ function SearchDialog(props: DialogProps) @{
 				font-size: 0.9rem;
 				text-align: center;
 			}
+			.search-retry {
+				margin-left: 0.45rem;
+				padding: 0;
+				border: 0;
+				background: transparent;
+				color: var(--accent-text);
+				font: inherit;
+				font-weight: 700;
+				cursor: pointer;
+			}
+			@media (max-width: 520px) {
+				.search-overlay {
+					padding: 4.5rem 0.5rem 0.5rem;
+				}
+				.search-entity-actions {
+					flex-wrap: wrap;
+				}
+			}
 		</style>
 	</div>
 }
 
 export function DocsSearch() @{
 	const [open, setOpen] = useState(false);
+	const triggerEl = useRef<HTMLButtonElement | null>(null);
+	const returnFocusEl = useRef<HTMLElement | null>(null);
 
-	// ⌘K / Ctrl-K from anywhere, and `/` when the user is not already typing.
+	const close = () => {
+		setOpen(false);
+		(returnFocusEl.current ?? triggerEl.current)?.focus();
+		returnFocusEl.current = null;
+	};
+
+	const openSearch = (returnFocusTo: HTMLElement | null) => {
+		returnFocusEl.current = returnFocusTo ?? triggerEl.current;
+		setOpen(true);
+	};
+
 	useEffect(() => {
+		const onOpen = (event: Event) => {
+			const detail = (event as CustomEvent<DocsSearchOpenDetail>).detail;
+			openSearch(detail?.returnFocusTo ?? null);
+		};
 		const onKey = (event: KeyboardEvent) => {
-			// contentEditable surfaces (e.g. the CodeMirror editor on /playground) are
-			// typing targets too — otherwise `/` there opens the palette instead of
-			// inserting the character.
 			const target = event.target;
 			const typing =
 				target instanceof HTMLElement &&
-					(target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+					(target.isContentEditable || target.contentEditable === 'true' ||
+						target.closest('[contenteditable]:not([contenteditable="false"])') !== null ||
+						/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 			if ((event.key === 'k' || event.key === 'K') && (event.metaKey || event.ctrlKey)) {
 				event.preventDefault();
-				setOpen((o) => !o);
+				if (open) close();
+				else openSearch(triggerEl.current);
 			} else if (event.key === '/' && !typing) {
 				event.preventDefault();
-				setOpen(true);
+				openSearch(triggerEl.current);
 			}
 		};
+		document.addEventListener(DOCS_SEARCH_OPEN_EVENT, onOpen);
 		document.addEventListener('keydown', onKey);
-		return () => document.removeEventListener('keydown', onKey);
+		return () => {
+			document.removeEventListener(DOCS_SEARCH_OPEN_EVENT, onOpen);
+			document.removeEventListener('keydown', onKey);
+		};
 	});
 
 	<>
 		<button
+			ref={triggerEl}
 			type="button"
 			class="search-trigger"
-			aria-label="Search documentation"
-			onClick={() => setOpen(true)}
+			aria-label="Search docs, packages, and integrations"
+			onClick={() => openSearch(triggerEl.current)}
 		>
 			<span
 				class="search-trigger-icon"
 				style={'--icon:url("' + searchUrl + '")'}
 				aria-hidden="true"
 			></span>
-			<span class="search-trigger-label">Search docs</span>
+			<span class="search-trigger-label">Search Octane</span>
 			<kbd class="search-trigger-kbd">⌘/Ctrl K</kbd>
 		</button>
 		@if (open) {
-			<SearchDialogPortal onClose={() => setOpen(false)} />
+			<SearchDialogPortal onClose={close} />
 		}
 		<style>
 			.search-trigger {
@@ -457,9 +669,9 @@ export function DocsSearch() @{
 					border-color 0.15s;
 			}
 			.search-trigger:hover {
-				color: var(--text);
-				background: var(--surface);
 				border-color: var(--border);
+				background: var(--surface);
+				color: var(--text);
 			}
 			.search-trigger-icon {
 				width: 16px;
@@ -481,18 +693,16 @@ export function DocsSearch() @{
 			.search-trigger-kbd {
 				white-space: nowrap;
 			}
-			/* Keep the fixed-height header compact before the icon-only breakpoint. */
 			@media (max-width: 960px) {
 				.search-trigger-kbd {
 					display: none;
 				}
 			}
-			/* Below the nav breakpoint the trigger collapses to its icon. */
 			@media (max-width: 720px) {
 				.search-trigger {
 					width: 36px;
-					padding: 0;
 					justify-content: center;
+					padding: 0;
 				}
 				.search-trigger-label,
 				.search-trigger-kbd {

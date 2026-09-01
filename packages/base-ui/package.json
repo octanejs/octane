@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/base-ui",
-  "version": "0.1.47",
+  "version": "0.1.48",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

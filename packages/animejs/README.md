@@ -4,6 +4,13 @@
 The package re-exports Anime.js and adds an Octane lifecycle hook for scoped DOM
 animations.
 
+## Installation
+
+```sh
+npm install @octanejs/animejs
+pnpm add @octanejs/animejs
+```
+
 The exact upstream pin, supported entry points, explicit subpath gaps, and test
 dispositions are recorded in [`UPSTREAM.md`](./UPSTREAM.md).
 

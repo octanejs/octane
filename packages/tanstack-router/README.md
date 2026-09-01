@@ -2,6 +2,13 @@
 
 [TanStack Router](https://tanstack.com/router) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/tanstack-router
+pnpm add @octanejs/tanstack-router
+```
+
 TanStack Router splits a framework-agnostic core (`@tanstack/router-core` — the
 router, route tree, matching, history, and the reactive store) from a thin React
 binding (`@tanstack/react-router`). Mirroring `@octanejs/tanstack-query`, this package

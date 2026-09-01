@@ -1,0 +1,19 @@
+{
+  "upstream": {
+    "package": "@sanity/icons",
+    "version": "5.2.1",
+    "commit": "e6c37d2d4f7f121254c077b3ae83e199ec0aec9c"
+  },
+  "surface": "Complete @sanity/icons@5.2.1 surface: all generated per-icon subpaths, named and default exports, Icon, icons, IconMap, IconSymbol and IconComponent.",
+  "divergences": [
+    "Refs are normal Octane ref props rather than React forwardRef wrappers.",
+    "Event callbacks receive native DOM events rather than React synthetic events."
+  ],
+  "ssr": "Supported and tested against representative @sanity/icons static SVG markup.",
+  "verified": "2026-08-24",
+  "notes": [
+    "The generator renders the official React package to deterministic SVG shells and preserves upstream subpaths.",
+    "The root icons map keeps per-icon lazy imports so root consumers do not eagerly load every glyph."
+  ],
+  "docs": ["docs/sanity-react-port-research.md"]
+}

@@ -9,6 +9,7 @@ import {
 	TrailingPanel,
 	ChainTrio,
 	TransitiveTrio,
+	MultiHopTransitiveTrio,
 	Pair,
 	Tree,
 	KeyedPair,
@@ -245,6 +246,19 @@ describe('all-component-children host sibling order', () => {
 		r.update(TransitiveTrio, { bBig: false });
 		expect(order(r)).toEqual(['leaf:C']);
 		r.update(TransitiveTrio, { bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+		r.unmount();
+	});
+
+	it('a multi-hop empty leaf repeatedly reappears before its later sibling', () => {
+		const r = mount(MultiHopTransitiveTrio, { bBig: false });
+		expect(order(r)).toEqual(['leaf:C']);
+
+		r.update(MultiHopTransitiveTrio, { bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+		r.update(MultiHopTransitiveTrio, { bBig: false });
+		expect(order(r)).toEqual(['leaf:C']);
+		r.update(MultiHopTransitiveTrio, { bBig: true });
 		expect(order(r)).toEqual(['big:B', 'leaf:C']);
 		r.unmount();
 	});

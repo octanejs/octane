@@ -16,6 +16,7 @@ the package import:
 ## Install
 
 ```bash
+npm install @octanejs/i18next i18next
 pnpm add @octanejs/i18next i18next
 ```
 

@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "@sanity/react-loader",
+    "version": "2.2.1",
+    "commit": "2e3f5720173acfe67a771d92bb7fc5b51e6ac014"
+  },
+  "surface": "Query-store milestone: createQueryStore, loadQuery, setServerClient, useQuery, useLiveMode, useEncodeDataAttribute, create-data-attribute exports, browser conditions, and the server-only rsc entry.",
+  "divergences": [
+    "Hooks use Octane hook slots and return Octane-compatible values rather than React hooks.",
+    "The experimental upstream ./jsx wrapped-data element factory is deferred to a separate milestone.",
+    "The ./rsc entry models a server-only Octane environment rather than React Server Component conditions."
+  ],
+  "ssr": "Supported through loadQuery/setServerClient and the server-only rsc entry; initial query state is SSR-tested.",
+  "verified": "2026-08-24",
+  "notes": [
+    "Querying, Live Mode, cache, and Content Source Map logic remain in @sanity/core-loader.",
+    "The browser export condition prevents loadQuery and setServerClient from entering browser workflows."
+  ],
+  "docs": ["docs/sanity-react-port-research.md"]
+}

@@ -10,7 +10,7 @@
 // of the prose. Each mark links to its binding on GitHub; the rail disappears
 // below the two-column breakpoint.
 import { Link } from '@octanejs/tanstack-router';
-import { bindingRepositoryHref } from '../../../content/bindings.ts';
+import { ecosystemPackageGuideHref } from '../../../lib/ecosystem-presentation.ts';
 import { LIBRARY_ICONS } from './library-icons.ts';
 
 export function Why() @{
@@ -70,7 +70,7 @@ export function Why() @{
 						@for (const lib of LIBRARY_ICONS; key lib.slug) {
 							<a
 								class="why-rail-tile"
-								href={bindingRepositoryHref(lib.packageName)}
+								href={ecosystemPackageGuideHref(lib.packageName)}
 								target="_blank"
 								rel="noopener noreferrer"
 								aria-label={`View the ${lib.name} binding on GitHub`}
