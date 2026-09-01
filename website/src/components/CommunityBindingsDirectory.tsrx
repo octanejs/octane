@@ -2,7 +2,7 @@
 // cannot affect the first-party package inventory, counts, or status surfaces.
 import { COMMUNITY_BINDING_GROUPS } from '../content/community-bindings.ts';
 
-const COMMUNITY_BINDING_SEARCH_URL = 'https://github.com/search?q=%2F%28%22octane%22%5Cs*%3A%7C%22name%22%5Cs*%3A%5Cs*%22%5B%5E%22%5D*octane%5B%5E%22%5D*%22%29%2F%20path%3A%2Fpackage%5C.json%24%2F%20NOT%20org%3Aoctanejs%20NOT%20is%3Afork&type=code';
+const COMMUNITY_BINDING_DISCOVERY_URL = 'https://github.com/octanejs/octane/network/dependents?dependent_type=PACKAGE';
 
 export function CommunityBindingsDirectory() @{
 	<div class="community-binding-directory">
@@ -32,12 +32,12 @@ export function CommunityBindingsDirectory() @{
 		<p class="community-binding-discovery-row">
 			<a
 				class="community-binding-discovery"
-				href={COMMUNITY_BINDING_SEARCH_URL}
+				href={COMMUNITY_BINDING_DISCOVERY_URL}
 				target="_blank"
 				rel="noreferrer"
 				aria-label="Explore more community bindings on GitHub in a new tab"
 			>
-				Explore more community bindings
+				Explore more community bindings ↗
 			</a>
 		</p>
 
@@ -106,6 +106,30 @@ export function CommunityBindingsDirectory() @{
 				grid-column: 1 / -1;
 				margin: 0.15rem 0 0;
 				font-size: 0.875rem;
+			}
+			.community-binding-discovery {
+				display: inline-flex;
+				align-items: center;
+				padding: 0.55rem 0.75rem;
+				border: 1px solid rgba(255, 93, 114, 0.4);
+				border-radius: 0.55rem;
+				background: rgba(255, 65, 90, 0.1);
+				color: var(--accent-text);
+				font-weight: 650;
+				line-height: 1.25;
+				text-decoration: none;
+				transition:
+					border-color 0.15s,
+					background 0.15s;
+			}
+			.community-binding-discovery:hover {
+				border-color: var(--accent-hover);
+				background: rgba(255, 65, 90, 0.16);
+				text-decoration: none;
+			}
+			.community-binding-discovery:focus-visible {
+				outline: 2px solid var(--accent);
+				outline-offset: 2px;
 			}
 		</style>
 	</div>
