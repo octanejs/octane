@@ -122,14 +122,6 @@
         "searchNames": ["@nativescript-community/vite-octane"]
       },
       {
-        "id": "nextane",
-        "name": "Nextane",
-        "purpose": "A file-routed Octane metaframework with server rendering and data loading.",
-        "owner": "southpolesteve",
-        "destination": "https://github.com/southpolesteve/nextane",
-        "searchNames": ["nextane"]
-      },
-      {
         "id": "alchemy",
         "name": "Alchemy",
         "purpose": "Build and deployment integration for Octane on Cloudflare, AWS, and Node.",

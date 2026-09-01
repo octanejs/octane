@@ -5,7 +5,7 @@ import {
 	searchEcosystem,
 	type EcosystemEntity,
 } from '../src/lib/ecosystem-search-core.ts';
-import { recordsFor } from '../src/lib/docs-search-core.ts';
+import { packageRecordFor, recordsFor } from '../src/lib/docs-search-core.ts';
 import { createSiteSearchIndexLoader, searchSite } from '../src/lib/site-search.ts';
 
 const entities = ecosystemIndex as EcosystemEntity[];
@@ -22,6 +22,24 @@ const docRecords = [
 		1,
 		'<h2 id="rendering">Server rendering</h2>Render an Octane application on the server.',
 	),
+];
+const packageRecords = [
+	packageRecordFor({
+		key: 'markstream',
+		title: 'Markstream',
+		names: ['markstream-octane'],
+		purpose: 'Streaming Markdown rendering for Octane on the client and server.',
+		owner: 'Simon-He95',
+		url: 'https://example.com/markstream-octane',
+	}),
+	packageRecordFor({
+		key: '@octanejs/tanstack-router',
+		title: '@octanejs/tanstack-router',
+		names: ['@octanejs/tanstack-router', '@tanstack/react-router'],
+		purpose: 'TanStack Router binding for Octane.',
+		owner: 'Octane',
+		url: 'https://example.com/tanstack-router',
+	}),
 ];
 
 function packagesFor(query: string) {
@@ -155,8 +173,14 @@ describe('ecosystem entity search', () => {
 
 describe('site search composition', () => {
 	it('puts strong entities above docs and weak entity metadata below docs', () => {
-		const router = searchSite({ docs: docRecords, entities }, 'tanstack router');
-		const serverRendering = searchSite({ docs: docRecords, entities }, 'server rendering');
+		const router = searchSite(
+			{ docs: docRecords, entities, packages: packageRecords },
+			'tanstack router',
+		);
+		const serverRendering = searchSite(
+			{ docs: docRecords, entities, packages: packageRecords },
+			'server rendering',
+		);
 
 		expect(router[0]).toMatchObject({
 			type: 'entity',
@@ -170,7 +194,30 @@ describe('site search composition', () => {
 		);
 		const lastDoc = serverRendering.findLastIndex((result) => result.type === 'docs');
 		expect(firstWeak === -1 || firstWeak > lastDoc).toBe(true);
+		expect(
+			router.filter(
+				(result) =>
+					result.type === 'package' && result.result.title === '@octanejs/tanstack-router',
+			),
+		).toEqual([]);
 	}, 30_000);
+
+	it('returns community packages as direct search destinations', () => {
+		const [result] = searchSite(
+			{ docs: docRecords, entities, packages: packageRecords },
+			'markstream-octane',
+		);
+
+		expect(result).toMatchObject({
+			type: 'package',
+			result: {
+				title: 'Markstream',
+				matchedName: 'markstream-octane',
+				owner: 'Simon-He95',
+				url: 'https://example.com/markstream-octane',
+			},
+		});
+	});
 
 	it('keeps docs available when the ecosystem chunk fails', async () => {
 		let entityAttempts = 0;
@@ -184,6 +231,7 @@ describe('site search composition', () => {
 
 		const degraded = await load();
 		expect(degraded.entities).toEqual([]);
+		expect(degraded.packages).toEqual([]);
 		expect(searchSite(degraded, 'server rendering')[0]).toMatchObject({ type: 'docs' });
 		await expect(load()).resolves.toMatchObject({ entities });
 		expect(entityAttempts).toBe(2);
@@ -200,7 +248,7 @@ describe('site search composition', () => {
 		});
 
 		await expect(load()).rejects.toThrow('docs chunk unavailable');
-		await expect(load()).resolves.toEqual({ docs: [], entities: [] });
+		await expect(load()).resolves.toEqual({ docs: [], entities: [], packages: [] });
 		expect(attempts).toBe(2);
 	});
 });

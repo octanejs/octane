@@ -105,6 +105,8 @@ describe('docs search over the snapshot', () => {
 
 	it('finds section-specific aliases at their exact documentation anchor', () => {
 		const [top] = search('vscode');
+		expect(top.kind).toBe('doc');
+		if (top.kind !== 'doc') throw new Error('expected a documentation result');
 		expect(top.slug).toBe('quick-start');
 		expect(top.id).toBe('tsrx-at-a-glance');
 	});

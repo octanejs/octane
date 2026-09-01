@@ -2,7 +2,8 @@
 // loadSearchIndex(), so package/status JSON stays behind the existing lazy
 // search boundary instead of joining the ordinary bindings content bundle.
 import { packageRecordFor, type PackageSearchRecord } from '../lib/docs-search-core.ts';
-import { BINDING_CATEGORIES, bindingRepositoryHref } from './bindings.ts';
+import { ecosystemPackageGuideHref } from '../lib/ecosystem-presentation.ts';
+import { BINDING_CATEGORIES } from './bindings.ts';
 import { COMMUNITY_BINDING_GROUPS, type CommunityBindingGroup } from './community-bindings.ts';
 
 interface PackageMetadata {
@@ -29,7 +30,9 @@ const statusMetadataModules = import.meta.glob('../../../packages/*/status.json'
 	import: 'default',
 }) as Record<string, () => Promise<BindingStatusMetadata>>;
 
-const catalogPackages = BINDING_CATEGORIES.flatMap((category) => category.packages);
+const catalogPackages = BINDING_CATEGORIES.flatMap((category) =>
+	category.packages.map((binding) => binding.packageName),
+);
 
 function modulesByDirectory<T>(
 	modules: Readonly<Record<string, () => Promise<T>>>,
@@ -67,7 +70,7 @@ export function firstPartyPackageRecord(
 		names,
 		purpose,
 		owner: 'Octane',
-		url: bindingRepositoryHref(metadata.packageName),
+		url: ecosystemPackageGuideHref(metadata.packageName),
 	});
 }
 

@@ -222,6 +222,37 @@ describe('search dialog', () => {
 		expect(trigger?.textContent).toContain('Search Octane');
 	});
 
+	it('renders community packages as attributed direct links', async () => {
+		const { container, router } = await renderRoute('/');
+		const trigger = container.querySelector<HTMLButtonElement>('.search-trigger')!;
+		fireEvent.click(trigger);
+		const dialog = await waitFor(() =>
+			document.body.querySelector<HTMLElement>('[role="dialog"]')!,
+		);
+		fireEvent.input(dialog.querySelector<HTMLInputElement>('.search-input')!, {
+			target: { value: 'markstream-octane' },
+		});
+
+		const link = await waitFor(() => {
+			const element = dialog.querySelector<HTMLAnchorElement>('a.search-package-result');
+			if (!element) throw new Error('community package result did not render');
+			return element;
+		});
+		expect(link.querySelector('.search-type')?.textContent).toContain('Community package');
+		expect(link.querySelector('.search-title')?.textContent).toBe('Markstream');
+		expect(link.querySelector('.search-package-name')?.textContent).toBe('markstream-octane');
+		expect(link.querySelector('.search-package-owner')?.textContent).toContain('Simon-He95');
+		expect(link.href).toBe(
+			'https://github.com/Simon-He95/markstream-vue/tree/main/packages/markstream-octane',
+		);
+		expect(link.target).toBe('_blank');
+		expect(link.rel).toBe('noreferrer');
+
+		fireEvent.keyDown(dialog, { key: 'Enter' });
+		expect(router.state.location.pathname).toBe('/');
+		await waitFor(() => expect(document.body.querySelector('[role="dialog"]')).toBeNull());
+	});
+
 	it('is reachable from the header, and navigates to the hit on Enter', async () => {
 		const { container, router } = await renderRoute('/');
 

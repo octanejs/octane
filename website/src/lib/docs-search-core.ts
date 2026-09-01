@@ -315,6 +315,24 @@ function markLine(text: string, pattern: RegExp): SnippetPart[] {
  * ownership or catalog source.
  */
 export function searchDocs(
+	index: readonly DocumentSearchRecord[],
+	query: string,
+	limit?: number,
+	linesPerGroup?: number,
+): DocumentSearchResult[];
+export function searchDocs(
+	index: readonly PackageSearchRecord[],
+	query: string,
+	limit?: number,
+	linesPerGroup?: number,
+): PackageSearchResult[];
+export function searchDocs(
+	index: readonly SearchRecord[],
+	query: string,
+	limit?: number,
+	linesPerGroup?: number,
+): SearchResult[];
+export function searchDocs(
 	index: readonly SearchRecord[],
 	query: string,
 	limit = 6,

@@ -13,7 +13,7 @@ import {
 	ecosystemEntityTypeLabel,
 	ecosystemPackageGuideHref,
 } from '../lib/ecosystem-presentation.ts';
-import type { SearchGroup } from '../lib/docs-search-core.ts';
+import type { DocumentSearchResult } from '../lib/docs-search-core.ts';
 import searchUrl from '../assets/search.svg';
 import { DOCS_SEARCH_OPEN_EVENT, type DocsSearchOpenDetail } from '../lib/docs-search-events.ts';
 
@@ -90,6 +90,14 @@ function SearchDialog(props: DialogProps) @{
 				group,
 			};
 		}
+		if (result.type === 'package') {
+			return {
+				type: 'package' as const,
+				key: result.result.key,
+				row: nextRow(),
+				result: result.result,
+			};
+		}
 
 		const entity = result.match.entity;
 		const primaryRow = nextRow();
@@ -106,7 +114,7 @@ function SearchDialog(props: DialogProps) @{
 		};
 	});
 
-	const goToDocs = (group: SearchGroup) => {
+	const goToDocs = (group: DocumentSearchResult) => {
 		props.onClose();
 		const navigation = navigate({
 			to: '/docs/$slug',
@@ -282,6 +290,29 @@ function SearchDialog(props: DialogProps) @{
 									}
 								</div>
 							</article>
+						} @else if (card.type === 'package') {
+							<a
+								class={['search-package-result', card.row === active && 'active']}
+								href={card.result.url}
+								target={card.result.owner === 'Octane' ? undefined : '_blank'}
+								rel={card.result.owner === 'Octane' ? undefined : 'noreferrer'}
+								role="option"
+								aria-selected={card.row === active}
+								aria-label={'Open external documentation for ' + card.result.title + ' by ' +
+									card.result.owner}
+								data-search-row={card.row}
+								onMouseEnter={() => setActive(card.row)}
+								onFocus={() => setActive(card.row)}
+								onClick={props.onClose}
+							>
+								<span class="search-type">
+									{card.result.owner === 'Octane' ? 'Package' : 'Community package'}
+								</span>
+								<span class="search-title">{card.result.title as string}</span>
+								<code class="search-package-name">{card.result.matchedName as string}</code>
+								<span class="search-package-purpose">{card.result.purpose as string}</span>
+								<span class="search-package-owner">{'By ' + card.result.owner}</span>
+							</a>
 						} @else {
 							<div class="search-card">
 								<button
@@ -423,16 +454,30 @@ function SearchDialog(props: DialogProps) @{
 				display: none;
 			}
 			.search-card,
-			.search-entity {
+			.search-entity,
+			.search-package-result {
 				display: flex;
 				flex-direction: column;
 				flex-shrink: 0;
 				min-width: 0;
 			}
-			.search-entity {
+			.search-entity,
+			.search-package-result {
 				border: 1px solid var(--border);
 				border-radius: 0.8rem;
 				overflow: hidden;
+			}
+			.search-package-result {
+				padding: 0.75rem;
+				color: inherit;
+				text-decoration: none;
+			}
+			.search-package-result:hover,
+			.search-package-result.active {
+				background: var(--surface);
+			}
+			.search-package-result.active .search-title {
+				color: var(--accent-text);
 			}
 			.search-entity-primary,
 			.search-head,
@@ -486,6 +531,30 @@ function SearchDialog(props: DialogProps) @{
 				font-size: 0.78rem;
 				text-overflow: ellipsis;
 				white-space: nowrap;
+			}
+			.search-package-name {
+				display: block;
+				overflow: hidden;
+				margin-top: 0.2rem;
+				padding: 0;
+				border: 0;
+				background: transparent;
+				color: var(--accent-text);
+				font-size: 0.78rem;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.search-package-purpose,
+			.search-package-owner {
+				display: block;
+				margin-top: 0.3rem;
+				color: var(--text-secondary);
+				font-size: 0.75rem;
+				line-height: 1.45;
+			}
+			.search-package-owner {
+				margin-top: 0.2rem;
+				font-size: 0.7rem;
 			}
 			.search-context,
 			.search-crumb {
