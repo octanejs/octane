@@ -4,7 +4,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { majorReleaseNames, resolveBaseRef } from './check-release-plan.mjs';
+import { computedMajorReleaseNames, majorReleaseNames } from './check-release-plan.mjs';
 
 const checker = new URL('./check-changesets.js', import.meta.url);
 
@@ -72,9 +72,13 @@ test('finds major bumps introduced by the computed release plan', () => {
 	);
 });
 
-test('uses the remote base branch in a pull-request merge checkout', () => {
-	assert.equal(
-		resolveBaseRef('main', (ref) => ref === 'origin/main'),
-		'origin/main',
-	);
+test('reads every pending changeset without a Git comparison ref', async () => {
+	const calls = [];
+	const majors = await computedMajorReleaseNames('/repo', (...args) => {
+		calls.push(args);
+		return Promise.resolve({ releases: [{ name: '@octanejs/widget', type: 'major' }] });
+	});
+
+	assert.deepEqual(calls, [['/repo']]);
+	assert.deepEqual(majors, ['@octanejs/widget']);
 });
