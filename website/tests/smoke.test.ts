@@ -11,6 +11,7 @@ import { getRouter } from '../src/router.ts';
 import { expectRegisteredHeadings } from './support/doc-headings.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
+import { COMMUNITY_BINDING_GROUPS } from '../src/content/community-bindings.ts';
 import {
 	FRAMEWORK_INTEGRATIONS,
 	FRAMEWORK_INTEGRATION_COUNT,
@@ -626,6 +627,46 @@ describe('website routes', () => {
 			const href = `https://github.com/octanejs/octane/tree/main/packages/${directory}`;
 			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
 			expect(link?.textContent).toContain(packageName);
+		}
+
+		const communityHeading = container.querySelector('#community-bindings')!;
+		const communityDirectory = container.querySelector('.community-binding-directory')!;
+		expect(communityHeading).toBeTruthy();
+		expect(communityDirectory).toBeTruthy();
+		expect(
+			communityHeading.compareDocumentPosition(communityDirectory) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+
+		const groupSections = Array.from(
+			communityDirectory.querySelectorAll<HTMLElement>('.community-binding-group'),
+		);
+		expect(groupSections).toHaveLength(COMMUNITY_BINDING_GROUPS.length);
+		for (let groupIndex = 0; groupIndex < COMMUNITY_BINDING_GROUPS.length; groupIndex++) {
+			const group = COMMUNITY_BINDING_GROUPS[groupIndex];
+			const section = groupSections[groupIndex];
+			expect(section.querySelector('h3')?.textContent?.trim()).toBe(group.title);
+
+			const entries = Array.from(section.querySelectorAll<HTMLElement>('.community-binding-entry'));
+			expect(entries).toHaveLength(group.entries.length);
+			for (let entryIndex = 0; entryIndex < group.entries.length; entryIndex++) {
+				const entry = group.entries[entryIndex];
+				const row = entries[entryIndex];
+				expect(row.querySelector('.community-binding-name')?.textContent?.trim()).toBe(entry.name);
+				expect(row.querySelector('.community-binding-purpose')?.textContent?.trim()).toBe(
+					entry.purpose,
+				);
+				expect(row.querySelector('.community-binding-owner')?.textContent?.trim()).toBe(
+					`By ${entry.owner}`,
+				);
+
+				const link = row.querySelector<HTMLAnchorElement>('a.community-binding-link')!;
+				expect(link.getAttribute('href')).toBe(entry.destination);
+				expect(link.getAttribute('aria-label')).toBe(
+					`Open ${entry.name} official documentation`,
+				);
+				expect(link.hasAttribute('target')).toBe(false);
+			}
 		}
 	});
 
