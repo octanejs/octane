@@ -4,7 +4,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { majorReleaseNames } from './check-release-plan.mjs';
+import { majorReleaseNames, resolveBaseRef } from './check-release-plan.mjs';
 
 const checker = new URL('./check-changesets.js', import.meta.url);
 
@@ -69,5 +69,12 @@ test('finds major bumps introduced by the computed release plan', () => {
 			{ name: '@octanejs/app-core', type: 'patch' },
 		]),
 		['@octanejs/vite-plugin'],
+	);
+});
+
+test('uses the remote base branch in a pull-request merge checkout', () => {
+	assert.equal(
+		resolveBaseRef('main', (ref) => ref === 'origin/main'),
+		'origin/main',
 	);
 });
