@@ -115,6 +115,7 @@ export const BENCHMARK_SUITES = [
 	'template-call-memo',
 	'compiler-throughput',
 	'tsrx-component-graph',
+	'tsrx-void-memo-aliases',
 	'tsrx-hydrate-module-slicing',
 	'tsrx-stable-hookful-propagation',
 	'tsrx-renderer-validation-ranges',

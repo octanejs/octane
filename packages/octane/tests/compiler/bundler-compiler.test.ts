@@ -841,6 +841,38 @@ export default interface ErasedShape { value: string }
 		).toThrow(/Client-only export "\*".*server: "omit-child"/s);
 	});
 
+	it('preserves void exports through exact local memo alias chains in either declaration order', () => {
+		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const declarations = [
+			'export const App = cache(Middle);',
+			'const Middle = cache(Inner);',
+			'const Inner = cache(Leaf);',
+		];
+		const sourceFor = (dependencyFirst: boolean) =>
+			[
+				"import { memo as cache } from 'octane';",
+				'function Leaf() @{ <main /> }',
+				...(dependencyFirst ? declarations.toReversed() : declarations),
+			].join('\n');
+
+		for (const [name, dependencyFirst] of [
+			['dependent-first', false],
+			['dependency-first', true],
+		] as const) {
+			const result = compiler.transform(sourceFor(dependencyFirst), `/project/src/${name}.tsrx`, {
+				collectVoidComponentExports: true,
+			});
+			expect(result?.voidComponentExports).toEqual(['App']);
+		}
+
+		const compared = compiler.transform(
+			"import { memo } from 'octane';\nfunction Leaf() @{ <main /> }\nexport const App = memo(Leaf, () => true);",
+			'/project/src/comparator.tsrx',
+			{ collectVoidComponentExports: true },
+		);
+		expect(compared?.voidComponentExports).toEqual([]);
+	});
+
 	it('specializes only disposable production roots with proven void imports', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-void-root-'));
 		try {

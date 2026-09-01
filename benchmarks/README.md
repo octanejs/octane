@@ -284,6 +284,7 @@ internally, get their own baseline and guard namespace.
 | `template-call-memo` | template-call-memo | none (Node-only) | production Strong/compatibility receiver-call counts, immutable keyed rows, real dependency changes, current event captures, and survivor identity |
 | `compiler-throughput` | compiler-throughput | none (Node-only) | seven real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |
 | `tsrx-component-graph` | tsrx-component-graph | none (Node-only) | 2,400-component live-import propagation with dependent-first vs dependency-first declarations |
+| `tsrx-void-memo-aliases` | tsrx-void-memo-aliases | none (Node-only) | production void-export classification for 250/1,000 exact local memo aliases in both declaration orders |
 | `tsrx-hydrate-module-slicing` | tsrx-hydrate-module-slicing | none (Node-only) | hydrate module-slicing selection at 150/2,400 sibling boundaries, with queried-child/server checks and retained-declaration controls |
 | `tsrx-stable-hookful-propagation` | tsrx-stable-hookful-propagation | none (Node-only) | stable-hookful capture and private-setter propagation through 40/1,000-component chains in both declaration orders |
 | `tsrx-renderer-validation-ranges` | tsrx-renderer-validation-ranges | none (Node-only) | authored renderer-validation range membership at 32/3,200 ranges plus matched 100/1,600-component whole-pipeline compiles with and without validation |

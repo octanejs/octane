@@ -941,6 +941,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Exact local memo-alias closure at two chain lengths and both
+		// declaration orders, with identical void-export semantic controls.
+		name: 'tsrx-void-memo-aliases',
+		cwd: 'tsrx-void-memo-aliases',
+		servers: [],
+		iter: { normal: 9, quick: 4 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Hydrate module-slicing selection at 150 and 2,400 sibling boundaries,
 		// with retained declarations and whole-compiler targets as controls.
 		name: 'tsrx-hydrate-module-slicing',

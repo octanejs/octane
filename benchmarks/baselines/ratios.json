@@ -3352,6 +3352,22 @@
     "note": "A 2,400-component chain ending at an opaque component must stay within 8% of the same graph declared leaf-first. Both orders verify all 2,400 warm plans; whole-module warm-reachability rescans exceeded this ceiling on current main."
   },
   {
+    "suite": "tsrx-void-memo-aliases",
+    "op": "classification",
+    "target": "dependent-first-1000",
+    "reference": "dependency-first-1000",
+    "maxRatio": 1.5,
+    "note": "A 1,000-link exact local memo chain declared outermost-first must stay within 50% of the same parsed graph declared dependency-first. Both variants require the same void export; repeated declaration rescans made the dependent-first graph about 187x slower on exact main."
+  },
+  {
+    "suite": "tsrx-void-memo-aliases",
+    "op": "classification_per_100_aliases",
+    "target": "dependent-first-1000",
+    "reference": "dependent-first-250",
+    "maxRatio": 1.5,
+    "note": "Per-alias production void classification must stay within 50% when an outermost-first memo chain grows from 250 to 1,000 links. Every sample reuses a parsed AST and verifies the exported root; exact main scaled at about 4.45x per alias."
+  },
+  {
     "suite": "tsrx-component-graph",
     "op": "compile",
     "target": "anchorless-dependent-first-9600",
