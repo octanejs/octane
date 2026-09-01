@@ -1231,10 +1231,11 @@ let TRANSITION_DEPTH = 0;
  * callback; for an `async` action it is already 0 by the time the continuation
  * after the first `await` runs, so post-await setters would otherwise schedule
  * at urgent priority. Keeping this count elevated across the in-flight window
- * makes those setters transition-priority (React 19 Actions). Caveat: it's a
- * process-global window, so an unrelated urgent update fired while an async
- * action is pending is also tagged transition — perfect per-action scoping
- * would need AsyncContext, which isn't available in the browser target.
+ * preserves Octane's automatic post-await transition priority. Caveat: it's a
+ * process-global window, so an unrelated update outside a delegated event or
+ * flushSync while an async action is pending is also tagged transition —
+ * perfect per-action scoping would need AsyncContext, which isn't available
+ * in the browser target.
  */
 let ASYNC_TRANSITION_COUNT = 0;
 
@@ -1318,8 +1319,6 @@ interface TransitionActionBatch {
 let ACTIVE_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
 /** The entangled batch shared by explicit transitions while an Action is awaiting. */
 let IN_FLIGHT_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
-/** Direct updates from discrete handlers stay urgent even while an Action is awaiting. */
-let ACTIVE_DISCRETE_EVENT_DEPTH = 0;
 
 function createTransitionActionBatch(): TransitionActionBatch {
 	return { updates: new Map(), pendingActions: 0, closed: false, flushed: false };
@@ -1328,9 +1327,11 @@ function createTransitionActionBatch(): TransitionActionBatch {
 function transitionActionBatchForUpdate(): TransitionActionBatch | null {
 	if (ACTIVE_TRANSITION_ACTION_BATCH !== null) return ACTIVE_TRANSITION_ACTION_BATCH;
 	// AsyncContext is not available in the browser target, so post-await Action
-	// continuations share the one entangled in-flight batch. Explicit urgent
-	// surfaces opt out: their updates must commit immediately.
-	if (syncFlush || ACTIVE_DISCRETE_EVENT_DEPTH > 0) return null;
+	// continuations share the one entangled in-flight batch. Delegated handlers
+	// (including continuous events) and flushSync opt out of that fallback.
+	// This only selects the batch: continuous events still flush in a microtask,
+	// and an explicit transition inside a handler wins above.
+	if (syncFlush || _dispatchDepth > 0) return null;
 	return IN_FLIGHT_TRANSITION_ACTION_BATCH;
 }
 
@@ -3863,7 +3864,7 @@ function scheduleRender(block: Block): void {
 	const mode: 'urgent' | 'transition' =
 		TRANSITION_DEPTH > 0 ||
 		(renderPhaseSelf && block.currentRenderMode === 'transition') ||
-		(!syncFlush && ACTIVE_DISCRETE_EVENT_DEPTH === 0 && ASYNC_TRANSITION_COUNT > 0)
+		(!syncFlush && _dispatchDepth === 0 && ASYNC_TRANSITION_COUNT > 0)
 			? 'transition'
 			: 'urgent';
 	const deferred = DEFERRED_SPAWN || (renderPhaseSelf && block.currentRenderDeferred);
@@ -16491,17 +16492,14 @@ function unregisterDelegationTarget(target: Node): void {
 }
 
 /**
- * Event types React tags as DiscreteEventPriority. Updates triggered from
- * these handlers MUST commit synchronously before the handler returns to
- * the browser — otherwise:
- *   - fast double-clicks see pre-flush state and double-submit
- *   - autofocus after reveal misses (focus runs before the microtask)
- *   - `e.preventDefault(); setX(...); read(measure)` reads stale layout
- *   - controlled inputs drop keystrokes (value lags one task)
+ * Event types that use Octane's outermost delegated-dispatch sync flush, so
+ * subsequent interactions observe committed state and controlled values.
+ * Updates still batch inside a handler: setState followed by a DOM read does
+ * not observe the update without an explicit flushSync.
  *
- * Source: facebook/react packages/react-dom-bindings/src/events/
- * ReactDOMEventListener.js — getEventPriority's DiscreteEventPriority arm.
- * Kept verbatim so future React additions can be picked up by diff.
+ * Based on facebook/react packages/react-dom-bindings/src/events/
+ * ReactDOMEventListener.js — getEventPriority. React's priority classification
+ * is separate from its sync-lane microtask flush boundary.
  */
 const DISCRETE_EVENTS = new Set<string>([
 	'auxclick',
@@ -16563,6 +16561,8 @@ const DISCRETE_EVENTS = new Set<string>([
  * — nested handlers (e.g. a click handler that synthetically dispatches another
  * event on the same target chain) inherit the outer flush instead of producing
  * intermediate commits that React wouldn't.
+ * It also scopes ordinary delegated updates outside an unrelated pending Action,
+ * independently of whether this event type flushes synchronously.
  */
 let _dispatchDepth = 0;
 
@@ -16671,12 +16671,10 @@ function reportListenerError(err: unknown): void {
 	console.error(err);
 }
 
-// React parity: discrete events (click, keydown, input, …) must commit before the
-// browser regains control — otherwise fast double-clicks, focus-after-reveal,
-// e.preventDefault+setState+measure patterns and controlled-input value reads all see
-// stale state. Only the OUTERMOST dispatch flushes — nested synthetic dispatches
-// inherit the outer commit window. Non-discrete events keep microtask-batched
-// semantics so they don't thrash the scheduler.
+// Only the OUTERMOST discrete dispatch flushes: nested programmatic dispatches
+// inherit the outer commit window. Non-discrete events keep microtask batching;
+// they must not be staged with an unrelated async Action merely because they do
+// not flush synchronously here.
 function maybeFlushDiscrete(type: string): void {
 	if (_dispatchDepth === 0 && DISCRETE_EVENTS.has(type)) {
 		// Commit handler-scheduled work first, so the controlled restore below
@@ -16756,8 +16754,6 @@ function dispatchDelegated(event: Event): void {
 				}
 			: null;
 	if (submitRec !== null) ACTIVE_SUBMIT_DISPATCH = submitRec;
-	const discrete = DISCRETE_EVENTS.has(event.type);
-	if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH++;
 	const nativeBatch = beginNativeEventBatch(event);
 	try {
 		// CAPTURE_DELEGATED types have BOTH dispatchers attached as capture-phase
@@ -16807,7 +16803,6 @@ function dispatchDelegated(event: Event): void {
 		} catch (error) {
 			reportListenerError(error);
 		}
-		if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH--;
 		_dispatchDepth--;
 		maybeFlushDiscrete(event.type);
 	}
@@ -16832,8 +16827,6 @@ function dispatchDelegatedCapture(event: Event): void {
 		node = node.$$portalParent ? node.$$portalParent : node.parentNode;
 	}
 	_dispatchDepth++;
-	const discrete = DISCRETE_EVENTS.has(event.type);
-	if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH++;
 	const nativeBatch = beginNativeEventBatch(event);
 	try {
 		for (let i = CAPTURE_PATH.length - 1; i >= pathBase; i--) {
@@ -16862,7 +16855,6 @@ function dispatchDelegatedCapture(event: Event): void {
 		} catch (error) {
 			reportListenerError(error);
 		}
-		if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH--;
 		_dispatchDepth--;
 		finishCaptureDispatch(event);
 	}
