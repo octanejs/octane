@@ -630,7 +630,7 @@ describe('website routes', () => {
 		}
 
 		const communityHeading = container.querySelector('#community-bindings')!;
-		const communityDirectory = container.querySelector('.community-binding-list')!;
+		const communityDirectory = container.querySelector('.community-binding-directory')!;
 		expect(communityHeading).toBeTruthy();
 		expect(communityDirectory).toBeTruthy();
 		expect(
@@ -638,32 +638,33 @@ describe('website routes', () => {
 				Node.DOCUMENT_POSITION_FOLLOWING,
 		).toBeTruthy();
 
-		const entries = COMMUNITY_BINDING_GROUPS.flatMap((group) => group.entries);
-		const links = Array.from(
-			communityDirectory.querySelectorAll<HTMLAnchorElement>('a.community-binding-link'),
+		const cards = Array.from(
+			communityDirectory.querySelectorAll<HTMLElement>('.community-binding-card'),
 		);
-		expect(links).toHaveLength(entries.length);
-		for (let entryIndex = 0; entryIndex < entries.length; entryIndex++) {
-			const entry = entries[entryIndex];
-			const link = links[entryIndex];
-			expect(link.textContent?.trim()).toBe(entry.searchNames[0]);
-			expect(link.getAttribute('href')).toBe(entry.destination);
-			expect(link.getAttribute('aria-label')).toBe(
-				`Open ${entry.name} official documentation in a new tab`,
+		expect(cards.map((card) => card.querySelector('h3')?.textContent?.trim())).toEqual([
+			'TanStack',
+			'Community libraries',
+			'Tooling & platforms',
+		]);
+		for (let groupIndex = 0; groupIndex < COMMUNITY_BINDING_GROUPS.length; groupIndex++) {
+			const group = COMMUNITY_BINDING_GROUPS[groupIndex];
+			const links = Array.from(
+				cards[groupIndex].querySelectorAll<HTMLAnchorElement>('a.community-binding-link'),
 			);
-			expect(link.target).toBe('_blank');
-			expect(link.rel).toBe('noreferrer');
+			expect(links).toHaveLength(group.entries.length);
+			for (let entryIndex = 0; entryIndex < group.entries.length; entryIndex++) {
+				const entry = group.entries[entryIndex];
+				const link = links[entryIndex];
+				expect(link.textContent?.trim()).toBe(entry.searchNames[0]);
+				expect(link.getAttribute('href')).toBe(entry.destination);
+				expect(link.getAttribute('aria-label')).toBe(
+					`Open ${entry.name} official documentation in a new tab`,
+				);
+				expect(link.target).toBe('_blank');
+				expect(link.rel).toBe('noreferrer');
+			}
 		}
-
-		const discoveryLink = container.querySelector<HTMLAnchorElement>(
-			'a.community-binding-discovery',
-		)!;
-		expect(discoveryLink.textContent?.trim()).toBe('Search GitHub for more community bindings');
-		expect(discoveryLink.getAttribute('href')).toBe(
-			'https://github.com/search?q=%2F%28%22octane%22%5Cs*%3A%7C%22name%22%5Cs*%3A%5Cs*%22%5B%5E%22%5D*octane%5B%5E%22%5D*%22%29%2F%20path%3A%2Fpackage%5C.json%24%2F%20NOT%20org%3Aoctanejs%20NOT%20is%3Afork&type=code',
-		);
-		expect(discoveryLink.target).toBe('_blank');
-		expect(discoveryLink.rel).toBe('noreferrer');
+		expect(container.querySelector('.community-binding-discovery')).toBeNull();
 	});
 
 	it('/docs/framework-integrations links every first-party framework integration', async () => {

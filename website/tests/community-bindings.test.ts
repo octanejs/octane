@@ -6,8 +6,8 @@ import {
 
 const EXPECTED_CATALOG = [
 	{
-		id: 'library-bindings',
-		title: 'Library bindings',
+		id: 'tanstack',
+		title: 'TanStack',
 		entries: [
 			{
 				id: 'tanstack-ai',
@@ -57,6 +57,12 @@ const EXPECTED_CATALOG = [
 				destination: 'https://github.com/TanStack/highlight/blob/main/docs/guides/octane.md',
 				searchNames: ['@tanstack/highlight/octane'],
 			},
+		],
+	},
+	{
+		id: 'community-libraries',
+		title: 'Community libraries',
+		entries: [
 			{
 				id: 'markstream',
 				name: 'Markstream',
@@ -109,8 +115,8 @@ const EXPECTED_CATALOG = [
 		],
 	},
 	{
-		id: 'tooling-and-deployment',
-		title: 'Tooling and deployment',
+		id: 'tooling-and-platforms',
+		title: 'Tooling & platforms',
 		entries: [
 			{
 				id: 'cypress-component-testing',
@@ -138,12 +144,6 @@ const EXPECTED_CATALOG = [
 					'https://github.com/alchemy-run/alchemy/tree/main/packages/frontend-frameworks/src/octane',
 				searchNames: ['@alchemy.run/frontend-frameworks/octane', '@distilled.cloud/octane'],
 			},
-		],
-	},
-	{
-		id: 'platforms-and-native-renderers',
-		title: 'Platforms and native renderers',
-		entries: [
 			{
 				id: 'pocketjs',
 				name: 'PocketJS',

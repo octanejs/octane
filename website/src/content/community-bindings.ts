@@ -19,9 +19,9 @@ export interface CommunityBindingGroup {
 }
 
 const GROUPS = [
-	{ id: 'library-bindings', title: 'Library bindings' },
-	{ id: 'tooling-and-deployment', title: 'Tooling and deployment' },
-	{ id: 'platforms-and-native-renderers', title: 'Platforms and native renderers' },
+	{ id: 'tanstack', title: 'TanStack' },
+	{ id: 'community-libraries', title: 'Community libraries' },
+	{ id: 'tooling-and-platforms', title: 'Tooling & platforms' },
 ] as const;
 
 const GROUP_FIELDS = new Set(['id', 'title', 'entries']);
