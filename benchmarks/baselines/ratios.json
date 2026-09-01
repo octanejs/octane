@@ -3352,6 +3352,22 @@
     "note": "A 9,600-component anchorless-safety chain declared root-first must stay within 25% of the same graph declared leaf-first. Exact pinned main measured 2.130x while the linear candidate's paired result measured 0.976x; both orders retain the same semantic controls and output witnesses."
   },
   {
+    "suite": "tsrx-stable-hookful-propagation",
+    "op": "compile",
+    "target": "dependent-first-high-1000",
+    "reference": "dependency-first-high-1000",
+    "maxRatio": 1.25,
+    "note": "Matched 1,000-component stable-hookful chains differ only in declaration order and verify identical live-capture and private-setter witnesses. Exact pinned main measured 1.784x while the linear candidate's paired result measured 1.204x."
+  },
+  {
+    "suite": "tsrx-stable-hookful-propagation",
+    "op": "compile_per_100_components",
+    "target": "dependent-first-high-1000",
+    "reference": "dependent-first-low-40",
+    "maxRatio": 1.5,
+    "note": "The dependent-first stable-hookful graph normalizes the 1,000- and 40-component targets by component count. Exact pinned main measured 1.707x more time per component at high cardinality while the linear candidate measured 1.159x; the ceiling leaves timing headroom while catching whole-map rescans."
+  },
+  {
     "suite": "tsrx-jsx-return-branches",
     "op": "client_compile_per_100_components",
     "target": "eligible-480",

@@ -77,6 +77,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			.map((line) => line.trim())
 			.filter((line) => line && line !== 'Available suites:');
 		expect(suites).toContain('tsrx-hydrate-module-slicing');
+		expect(suites).toContain('tsrx-stable-hookful-propagation');
 		expect(suites).toContain('tsrx-renderer-validation-ranges');
 		expect(suites).toEqual(BENCHMARK_SUITES);
 

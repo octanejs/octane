@@ -950,6 +950,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Stable-hookful capture and private-setter propagation through matched
+		// same-module component chains in both declaration orders.
+		name: 'tsrx-stable-hookful-propagation',
+		cwd: 'tsrx-stable-hookful-propagation',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Authored renderer-validation range membership at two scales plus matched
 		// whole-pipeline compiles with and without validation in the same process.
 		name: 'tsrx-renderer-validation-ranges',
