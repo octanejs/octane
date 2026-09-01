@@ -646,6 +646,9 @@ describe('website routes', () => {
 			'Community libraries',
 			'Tooling & platforms',
 		]);
+		expect(
+			cards.map((card) => card.querySelector('.community-binding-count')?.textContent?.trim()),
+		).toEqual(['6 bindings', '6 bindings', '4 bindings']);
 		for (let groupIndex = 0; groupIndex < COMMUNITY_BINDING_GROUPS.length; groupIndex++) {
 			const group = COMMUNITY_BINDING_GROUPS[groupIndex];
 			const links = Array.from(
@@ -670,9 +673,15 @@ describe('website routes', () => {
 		expect(discoveryLink.textContent?.replace(/\s+/g, ' ').trim()).toBe(
 			'Explore community packages that depend on Octane on GitHub. ↗',
 		);
-		expect(discoveryLink.parentElement?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+		const discoveryParagraph = discoveryLink.parentElement!;
+		expect(discoveryParagraph.textContent?.replace(/\s+/g, ' ').trim()).toBe(
 			'Looking for more? Explore community packages that depend on Octane on GitHub. ↗',
 		);
+		expect(communityDirectory.contains(discoveryParagraph)).toBe(false);
+		expect(
+			communityDirectory.compareDocumentPosition(discoveryParagraph) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
 		expect(discoveryLink.getAttribute('href')).toBe(
 			'https://github.com/octanejs/octane/network/dependents?dependent_type=PACKAGE',
 		);
