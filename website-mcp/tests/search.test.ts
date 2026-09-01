@@ -82,6 +82,23 @@ describe('docs search over the snapshot', () => {
 		});
 	});
 
+	it('resolves concrete wildcard imports without treating arbitrary suffixes as aliases', () => {
+		const cases = [
+			['@octanejs/lucide/icons/foo', '@octanejs/lucide', '@octanejs/lucide/icons/*'],
+			['@octanejs/base-ui/foo', '@octanejs/base-ui', '@octanejs/base-ui/*'],
+		] as const;
+
+		for (const [query, title, matchedName] of cases) {
+			const results = search(query).filter(
+				(result) => result.kind === 'package' && result.title === title,
+			);
+			expect(results).toHaveLength(1);
+			expect(results[0]).toMatchObject({ kind: 'package', title, matchedName });
+		}
+		expect(search('icons/foo').some((result) => result.title === '@octanejs/lucide')).toBe(false);
+		expect(search('foo').some((result) => result.title === '@octanejs/base-ui')).toBe(false);
+	});
+
 	it('returns a successful empty result for an unmatched query', () => {
 		expect(search('zz-no-octane-result-9f4c')).toEqual([]);
 	});

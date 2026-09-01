@@ -45,10 +45,7 @@ export function publicExportSubpaths(exportsField: unknown): string[] {
 		return [];
 	}
 	return Object.keys(exportsField)
-		.filter(
-			(subpath) =>
-				subpath.startsWith('./') && subpath !== './package.json' && !subpath.includes('*'),
-		)
+		.filter((subpath) => subpath.startsWith('./') && subpath !== './package.json')
 		.map((subpath) => subpath.slice(1));
 }
 

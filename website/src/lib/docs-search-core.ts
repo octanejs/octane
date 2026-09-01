@@ -229,6 +229,14 @@ function normalize(value: string): string {
 	return value.normalize('NFKC').trim().toLowerCase();
 }
 
+function authoredNameMatches(name: string, value: string): boolean {
+	if (name.includes(value)) return true;
+	const wildcardAt = name.indexOf('*');
+	if (wildcardAt === -1) return false;
+	const prefix = name.slice(0, wildcardAt);
+	return value.length > prefix.length && value.startsWith(prefix);
+}
+
 /** Build one canonical package record from consumer-owned package metadata. */
 export function packageRecordFor(input: PackageRecordInput): PackageSearchRecord {
 	const names: string[] = [];
@@ -320,28 +328,45 @@ export function searchDocs(
 
 	const groups: SearchResult[] = [];
 	for (const record of index) {
-		if (!terms.every((term) => record.haystack.includes(term))) continue;
-
 		if (record.kind === 'package') {
 			const title = record.normalizedTitle;
 			const names = record.normalizedNames;
 			const purpose = record.normalizedPurpose;
+			if (
+				!terms.every(
+					(term) =>
+						title.includes(term) ||
+						purpose.includes(term) ||
+						names.some((name) => authoredNameMatches(name, term)),
+				)
+			) {
+				continue;
+			}
 			let score = 0;
 			for (const term of terms) {
 				if (title.includes(term)) score += 8;
-				if (names.some((name) => name.includes(term))) score += 8;
+				if (names.some((name) => authoredNameMatches(name, term))) score += 8;
 				if (purpose.includes(term)) score += 2;
 			}
-			if (names.some((name) => name === q)) score += 28;
-			else if (names.some((name) => name.includes(q))) score += 16;
+			const exact = names.findIndex((name) => name === q);
+			const wildcard = names.findIndex((name) => {
+				const wildcardAt = name.indexOf('*');
+				return (
+					wildcardAt !== -1 && q.length > wildcardAt && q.startsWith(name.slice(0, wildcardAt))
+				);
+			});
+			const containing = names.findIndex((name) => name.includes(q));
+			if (exact >= 0 || wildcard >= 0) score += 28;
+			else if (containing >= 0) score += 16;
 			if (title.includes(q)) score += 12;
 			if (purpose.includes(q)) score += 6;
 			if (phrasePattern.test(purpose)) score += 4;
 			score += Math.min(occurrences(purpose, q), 6) * 2;
 
-			const exact = names.findIndex((name) => name === q);
-			const containing = names.findIndex((name) => name.includes(q));
-			const matchedName = record.names[exact >= 0 ? exact : containing >= 0 ? containing : 0];
+			const matchedName =
+				record.names[
+					exact >= 0 ? exact : wildcard >= 0 ? wildcard : containing >= 0 ? containing : 0
+				];
 			groups.push({
 				kind: 'package',
 				key: 'package:' + record.key,
@@ -354,6 +379,8 @@ export function searchDocs(
 			});
 			continue;
 		}
+
+		if (!terms.every((term) => record.haystack.includes(term))) continue;
 
 		const title = record.title.toLowerCase();
 		const text = record.text.toLowerCase();
