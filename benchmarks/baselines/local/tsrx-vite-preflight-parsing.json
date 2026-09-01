@@ -1,0 +1,207 @@
+{
+  "suite": "tsrx-vite-preflight-parsing",
+  "iterations": 7,
+  "targets": [
+    {
+      "name": "integrated-small-client",
+      "ops": {
+        "transform": {
+          "score": 2.8365499999999884,
+          "median": 2.8426660000000084,
+          "min": 2.6651249999995343,
+          "mean": 2.894327285714293,
+          "p95": 3.234875000000102,
+          "sd": 0.1991496361540222,
+          "rme": 6.363804476455265,
+          "scoreRme": 7.010561251018883,
+          "warmupRatio": 1.0434006804040528,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "components": 8,
+        "sourceBytes": 1336,
+        "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+        "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mapChecksum": "e67a4369b63c7e78b58ee246ae4b3f1f13cfb921572b1667082af4cc3468eb06",
+        "metaChecksum": "53ef55f5268975a6866e7f243448e04966f0eb4203cf55e282c370f83d751290",
+        "outputChecksum": "93238123d0842036fe88ba75a1e35596315b8178e80f37bd7f47fe6e384d5b33",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "integrated-large-client",
+      "ops": {
+        "transform": {
+          "score": 146.31504180000002,
+          "median": 144.18533300000036,
+          "min": 141.57483300000013,
+          "mean": 145.90117257142862,
+          "p95": 156.28895899999952,
+          "sd": 4.905840036336081,
+          "rme": 3.1098507764561956,
+          "scoreRme": 4.992582511995856,
+          "warmupRatio": 1.0036640101619416,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "components": 256,
+        "sourceBytes": 36270,
+        "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+        "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mapChecksum": "80a5fa37c09ac1531aaa25f8db511033bb918ddbede7ee600fafbfc74f911802",
+        "metaChecksum": "c0da157a88aaf3a0bc05ebb1052ee022d4f7ed9bfbee684d63de904e28574f89",
+        "outputChecksum": "6ea330ac2c3b05365cd6e160dbd03ae5014d33bf08f926b80d65c6ee2e6380bf",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "integrated-small-server",
+      "ops": {
+        "transform": {
+          "score": 1.7871665999997277,
+          "median": 1.7657499999995707,
+          "min": 1.7134580000001733,
+          "mean": 1.8549642857141018,
+          "p95": 2.1644169999999576,
+          "sd": 0.16113910099219517,
+          "rme": 8.03434234726077,
+          "scoreRme": 6.606432902374709,
+          "warmupRatio": 1.0652897161350545,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "components": 8,
+        "sourceBytes": 1336,
+        "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+        "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mapChecksum": "233172eb37e0ca3af53bc79cb40e2968bc54a7327f6cddc143d360a5d28d8ce2",
+        "metaChecksum": "5bf423bb6c4f34fa39cf0accedbba2a9428c78ba4f82563f8136f9f1a8996499",
+        "outputChecksum": "2e6177f086934322b4676f8e3ceda6fc54d16304aada8661c74f732319d2d05e",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "integrated-large-server",
+      "ops": {
+        "transform": {
+          "score": 117.91614179999996,
+          "median": 117.05404199999975,
+          "min": 115.2363749999995,
+          "mean": 117.71039299999991,
+          "p95": 121.8584590000005,
+          "sd": 2.4828586411077627,
+          "rme": 1.9508421653482138,
+          "scoreRme": 3.1675522891000756,
+          "warmupRatio": 1.006135434801006,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "components": 256,
+        "sourceBytes": 36270,
+        "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+        "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mapChecksum": "142fccad5e4fd5d1c909dd61a22976367d4d75c6d9f22f0956505029c1d35228",
+        "metaChecksum": "5bf423bb6c4f34fa39cf0accedbba2a9428c78ba4f82563f8136f9f1a8996499",
+        "outputChecksum": "902cf76f14918388cf04ff5557fa279230cae2ba3cb83941183e958c17b5b612",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "classification-reparsed",
+      "ops": {
+        "classify": {
+          "score": 209.62716659999978,
+          "median": 207.9551249999995,
+          "min": 206.1351249999998,
+          "mean": 208.74233328571412,
+          "p95": 215.60420799999974,
+          "sd": 3.1985641109035132,
+          "rme": 1.4171945570986189,
+          "scoreRme": 2.038049785227597,
+          "warmupRatio": 0.9980235548344243,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "classifications": ["descriptor-children-imports", "descriptor-children-exports"],
+        "classificationChecksum": "ce336f36e31d0df9ab509e0e526bf8e588bbb732a507b2fff6990d04b99dd607",
+        "sourceBytes": 36270,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "classification-shared-ast",
+      "ops": {
+        "classify": {
+          "score": 105.08259200000002,
+          "median": 104.97816700000021,
+          "min": 103.27729200000022,
+          "mean": 104.8275300000001,
+          "p95": 106.25229200000012,
+          "sd": 0.9263983430762316,
+          "rme": 0.8173486810021073,
+          "scoreRme": 0.9046102338660258,
+          "warmupRatio": 0.9980430459880555,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "classifications": ["descriptor-children-imports", "descriptor-children-exports"],
+        "classificationChecksum": "ce336f36e31d0df9ab509e0e526bf8e588bbb732a507b2fff6990d04b99dd607",
+        "sourceBytes": 36270,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "parse-count-matrix",
+      "ops": {},
+      "meta": {
+        "cases": [
+          {
+            "name": "production-client",
+            "adapter": 1,
+            "authoritative": 1,
+            "total": 2
+          },
+          {
+            "name": "production-server",
+            "adapter": 1,
+            "authoritative": 1,
+            "total": 2
+          },
+          {
+            "name": "dev-client",
+            "adapter": 1,
+            "authoritative": 1,
+            "total": 2
+          },
+          {
+            "name": "production-client-css",
+            "adapter": 1,
+            "authoritative": 1,
+            "total": 2
+          },
+          {
+            "name": "parser-disagreement-dev-client",
+            "adapter": 2,
+            "authoritative": 1,
+            "total": 3
+          },
+          {
+            "name": "parser-disagreement-production-server",
+            "adapter": 2,
+            "authoritative": 1,
+            "total": 3
+          }
+        ],
+        "matrixChecksum": "13c5e0aa49e4d9853672a8c8da2a46a4d050080d0f021dda1207b8d11e0072e5",
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

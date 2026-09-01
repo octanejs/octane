@@ -4,6 +4,13 @@ import { parseModule } from '@tsrx/core';
 import { describe, expect, it, vi } from 'vitest';
 import type { Plugin } from 'vite';
 import { octane } from 'octane/compiler/vite';
+import {
+	findDescriptorChildrenExports,
+	findDescriptorChildrenImports,
+	findVoidComponentImports,
+} from '../../src/compiler/bundler.js';
+import { findStaticRuntimeImportRequests } from '../../src/compiler/client-only-server.js';
+import { findCssModuleImportRequests } from '../../src/compiler/css-module-imports.js';
 
 const ROOT = '/project';
 const SOURCE = "export function App() @{ <main>{'configured'}</main> }\n";
@@ -21,6 +28,19 @@ const RENDER_STATE_UPDATE =
 	'\tif (count !== props.count) setCount(props.count);\n' +
 	'\t<main>{count as string}</main>\n' +
 	'}\n';
+
+function deepFreeze(value: unknown, seen = new WeakSet<object>()): void {
+	if (value === null || typeof value !== 'object' || seen.has(value)) return;
+	seen.add(value);
+	for (const child of Object.values(value)) {
+		if (Array.isArray(child)) {
+			for (const item of child) deepFreeze(item, seen);
+		} else {
+			deepFreeze(child, seen);
+		}
+	}
+	Object.freeze(value);
+}
 
 function configure(plugin: Plugin, command: 'serve' | 'build', build: { ssr?: boolean } = {}) {
 	(plugin.config as (config: { root: string }) => unknown)({ root: ROOT });
@@ -129,6 +149,53 @@ function isChildrenBlock(code: string, value: any): boolean {
 }
 
 describe('octane/compiler/vite public options', () => {
+	it('classifies one immutable authored AST the same as the source string', () => {
+		const id = `${ROOT}/src/App.tsrx`;
+		const source = `
+			import { descriptorChildren } from 'octane';
+			import VoidLeaf from './VoidLeaf.tsrx';
+			import Slot from './Slot.tsrx';
+			import styles from './App.module.css';
+			function Impl(props) { return props.children; }
+			export const Marked = descriptorChildren(Impl);
+			export function App() @{ <main class={styles.root}><VoidLeaf /><Slot /></main> }
+		`;
+		const ast = parseModule(source, id);
+		deepFreeze(ast);
+
+		for (const classify of [
+			findVoidComponentImports,
+			findDescriptorChildrenImports,
+			findDescriptorChildrenExports,
+			findStaticRuntimeImportRequests,
+			findCssModuleImportRequests,
+		]) {
+			expect(classify(ast, id), classify.name).toEqual(classify(source, id));
+		}
+	});
+
+	it('leaves parser-disagreement syntax to authoritative compilation', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build');
+		const result = await transform(
+			plugin,
+			`using resource = acquire();
+			export function App() @{ <main>{resource.label as string}</main> }`,
+		);
+
+		expect(result).not.toBeNull();
+		expect(result?.code).toContain('using resource = acquire()');
+	});
+
+	it('keeps authoritative syntax diagnostics after preflight failure', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build');
+
+		await expect(
+			Promise.resolve(transform(plugin, 'export function App( @{ <main /> }')),
+		).rejects.toThrow();
+	});
+
 	it('carries descriptor-children export metadata through the Vite module graph', async () => {
 		const childId = `${ROOT}/src/Slot.tsrx`;
 		const barrelId = `${ROOT}/src/index.ts`;

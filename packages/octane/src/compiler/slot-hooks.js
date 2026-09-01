@@ -232,10 +232,14 @@ function collectVoidJsxImportCandidates(ast) {
  */
 export function findVoidComponentImports(source, id) {
 	let ast;
-	try {
-		ast = parseModule(source, id);
-	} catch {
-		return [];
+	if (source && typeof source === 'object' && source.type === 'Program') {
+		ast = source;
+	} else {
+		try {
+			ast = parseModule(source, id);
+		} catch {
+			return [];
+		}
 	}
 	const unique = new Map();
 	for (const candidate of [

@@ -3769,6 +3769,14 @@
     "note": "Each of 32 changes cycling through all five use() factory dependencies must refresh the resource once and display the new value. This guards generic automatic caching without pinning private compiler helper names."
   },
   {
+    "suite": "tsrx-vite-preflight-parsing",
+    "op": "classify",
+    "target": "classification-shared-ast",
+    "reference": "classification-reparsed",
+    "maxRatio": 0.65,
+    "note": "One shared read-only preflight AST must classify descriptor imports and exports no slower than 0.65x two equivalent string-based parses; both targets publish the same classification checksum before timing is accepted."
+  },
+  {
     "suite": "hydration-range-compaction",
     "op": "hydrate_per_100_wrappers",
     "target": "wrappers-512",

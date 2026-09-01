@@ -1,3 +1,5 @@
+import { parseModule } from '@tsrx/core';
+import { parseModule as parseCompilerModule } from 'oxc-tsrx/tsrx-core-compat';
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -45,6 +47,81 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it('accepts only a one-shot descriptor proof for its exact source', () => {
+		const authority = Symbol('test descriptor preflight');
+		const compiler = createOctaneCompiler({
+			_descriptorPreflightAuthority: authority,
+			root: '/project',
+		} as any);
+		const id = '/project/src/App.tsrx';
+		const marked = `
+			import { descriptorChildren } from 'octane';
+			function Impl(props) { return props.children; }
+			export const Marked = descriptorChildren(Impl);
+		`;
+		const ordinary = 'export const Ordinary = 1;';
+		expect(() =>
+			(compiler as any)._prepareDescriptorChildrenExports(
+				Symbol('unowned'),
+				marked,
+				id,
+				parseModule(marked, id),
+			),
+		).toThrow(/Invalid descriptor-children preflight input/);
+		const proof = (compiler as any)._prepareDescriptorChildrenExports(
+			authority,
+			marked,
+			id,
+			parseModule(marked, id),
+		);
+
+		const mismatched = compiler.transform(ordinary, id, {
+			_descriptorChildrenExportsProof: proof,
+		} as any);
+		expect(mismatched?.descriptorChildrenExports).toEqual([]);
+
+		const matchingProof = (compiler as any)._prepareDescriptorChildrenExports(
+			authority,
+			marked,
+			id,
+			parseModule(marked, id),
+		);
+		const matching = compiler.transform(marked, id, {
+			_descriptorChildrenExportsProof: matchingProof,
+		} as any);
+		expect(matching?.descriptorChildrenExports).toEqual(['Marked']);
+
+		// This syntax is accepted by the authoritative compiler parser but not the
+		// preflight parser, so string fallback returns no descriptor fact. It makes
+		// an id-mismatched proof observably distinct from an incorrectly reused one.
+		const parserDisagreement = `${marked}\nconst unicodeSets = /[a&&b]/v;`;
+		const oneShotProof = (compiler as any)._prepareDescriptorChildrenExports(
+			authority,
+			parserDisagreement,
+			id,
+			parseCompilerModule(parserDisagreement, id),
+		);
+		const firstUse = compiler.transform(parserDisagreement, id, {
+			_descriptorChildrenExportsProof: oneShotProof,
+		} as any);
+		expect(firstUse?.descriptorChildrenExports).toEqual(['Marked']);
+		const reused = compiler.transform(parserDisagreement, id, {
+			_descriptorChildrenExportsProof: oneShotProof,
+		} as any);
+		expect(reused?.descriptorChildrenExports).toEqual([]);
+
+		const idProof = (compiler as any)._prepareDescriptorChildrenExports(
+			authority,
+			parserDisagreement,
+			id,
+			parseCompilerModule(parserDisagreement, id),
+		);
+		const mismatchedId = compiler.transform(parserDisagreement, `${id}?changed`, {
+			_descriptorChildrenExportsProof: idProof,
+		} as any);
+		expect(mismatchedId?.descriptorChildrenExports).toEqual([]);
+	});
+
 	it('enforces project-wide Strong mode on both client and server without claiming dependencies', () => {
 		const compiler = createOctaneCompiler({ root: '/project', strong: true });
 

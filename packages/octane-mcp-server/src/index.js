@@ -124,6 +124,7 @@ export const BENCHMARK_SUITES = [
 	'tsrx-nesting-diagnostics',
 	'tsrx-renderer-selection',
 	'tsrx-native-change-analysis',
+	'tsrx-vite-preflight-parsing',
 	'bundle-size',
 	'bundle-reachability',
 	'three-renderer',

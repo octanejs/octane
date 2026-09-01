@@ -16,6 +16,7 @@
 import * as nodeCrypto from 'node:crypto';
 import * as nodeFs from 'node:fs';
 import * as nodePath from 'node:path';
+import { parseModule } from '@tsrx/core';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	cleanModuleId,
@@ -38,6 +39,7 @@ const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
 const VOID_EXPORTS_META = 'octane:void-component-exports';
 const DESCRIPTOR_CHILDREN_EXPORTS_META = 'octane:descriptor-children-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
+const DESCRIPTOR_PREFLIGHT_AUTHORITY = Symbol('octane.descriptor-preflight');
 
 function realRoot(path) {
 	try {
@@ -491,9 +493,8 @@ async function loadDescriptorChildrenImports(
 	return proven;
 }
 
-async function loadClientOnlyImports(context, compiler, code, importer) {
+async function loadClientOnlyImports(context, compiler, requests, importer) {
 	if (typeof context.resolve !== 'function') return [];
-	const requests = compiler.findServerImportRequests(code, importer);
 	const classified = [];
 	await Promise.all(
 		requests.map(async (request) => {
@@ -611,6 +612,7 @@ export function octane(options = {}) {
 	// virtual module until its own transform publishes metadata.
 	let allowDescriptorGraphLoad = true;
 	let compiler = createOctaneCompiler({
+		_descriptorPreflightAuthority: DESCRIPTOR_PREFLIGHT_AUTHORITY,
 		root: projectRoot,
 		exclude: options.exclude,
 		profile: profileEnabled,
@@ -630,6 +632,7 @@ export function octane(options = {}) {
 		cssModuleProofStates.clear();
 		projectRoot = nodePath.resolve(root);
 		compiler = createOctaneCompiler({
+			_descriptorPreflightAuthority: DESCRIPTOR_PREFLIGHT_AUTHORITY,
 			root: projectRoot,
 			exclude: options.exclude,
 			profile: profileEnabled,
@@ -752,9 +755,47 @@ export function octane(options = {}) {
 					? forceSsr
 					: transformOptions?.ssr === true || this.environment?.config?.consumer === 'server';
 			const environment = server ? 'server' : 'client';
-			const cssRequests = specializeCssModuleConstants
-				? compiler.findCssModuleImportRequests(code, id, environment)
-				: [];
+			// Parse authored source once, synchronously classify every applicable
+			// adapter concern, then let the AST fall out of scope before any graph
+			// loading begins. Compilation keeps its independent authoritative parser.
+			const preflight = (() => {
+				const authoredSource = code;
+				let ast;
+				try {
+					ast = parseModule(authoredSource, id);
+				} catch {
+					// Every adapter classifier uses this exact parser/source/id and would
+					// return an empty result after repeating the same failed parse. Preserve
+					// those facts without the retries. The compiler receives no descriptor
+					// proof, so its canonical-id fallback and authoritative diagnostics stay
+					// unchanged.
+					return {
+						cssRequests: [],
+						descriptorExportsProof: null,
+						descriptorImports: [],
+						serverImportRequests: [],
+						voidImports: [],
+					};
+				}
+				return {
+					cssRequests: specializeCssModuleConstants
+						? compiler.findCssModuleImportRequests(code, id, environment, ast)
+						: [],
+					descriptorExportsProof: compiler._prepareDescriptorChildrenExports(
+						DESCRIPTOR_PREFLIGHT_AUTHORITY,
+						code,
+						id,
+						ast,
+					),
+					descriptorImports: findDescriptorChildrenImports(ast, id),
+					serverImportRequests: server ? compiler.findServerImportRequests(ast, id) : [],
+					voidImports:
+						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
+							? findVoidComponentImports(ast, id)
+							: [],
+				};
+			})();
+			const cssRequests = preflight.cssRequests;
 			const loadCssImports = () =>
 				loadCssModuleImports(
 					this,
@@ -774,6 +815,9 @@ export function octane(options = {}) {
 					.filter((key) => key.startsWith('export\0'))
 					.map((key) => key.slice('export\0'.length));
 				const result = compiler.transform(code, id, {
+					...(preflight.descriptorExportsProof === null
+						? null
+						: { _descriptorChildrenExportsProof: preflight.descriptorExportsProof }),
 					environment,
 					hmr: !server && hmrEnabled ? 'vite' : false,
 					// DEV server transforms also carry SSR-only diagnostics. HMR itself
@@ -849,11 +893,11 @@ export function octane(options = {}) {
 			};
 
 			if (server) {
-				const descriptorImports = findDescriptorChildrenImports(code, id).filter(
+				const descriptorImports = preflight.descriptorImports.filter(
 					(candidate) => candidate.local !== undefined || !nodeFs.existsSync(cleanModuleId(id)),
 				);
 				return Promise.all([
-					loadClientOnlyImports(this, compiler, code, id),
+					loadClientOnlyImports(this, compiler, preflight.serverImportRequests, id),
 					loadDescriptorChildrenImports(
 						this,
 						descriptorImports,
@@ -871,9 +915,9 @@ export function octane(options = {}) {
 
 			const voidImports =
 				specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
-					? findVoidComponentImports(code, id)
+					? preflight.voidImports
 					: [];
-			const descriptorImports = findDescriptorChildrenImports(code, id).filter(
+			const descriptorImports = preflight.descriptorImports.filter(
 				(candidate) => candidate.local !== undefined || !nodeFs.existsSync(cleanModuleId(id)),
 			);
 			if (voidImports.length === 0 && descriptorImports.length === 0 && cssRequests.length === 0) {

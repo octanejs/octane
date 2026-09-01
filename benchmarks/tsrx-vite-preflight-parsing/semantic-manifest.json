@@ -1,0 +1,33 @@
+{
+  "classificationChecksum": "ce336f36e31d0df9ab509e0e526bf8e588bbb732a507b2fff6990d04b99dd607",
+  "integrated": {
+    "production-client-8": {
+      "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+      "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mapChecksum": "e67a4369b63c7e78b58ee246ae4b3f1f13cfb921572b1667082af4cc3468eb06",
+      "metaChecksum": "53ef55f5268975a6866e7f243448e04966f0eb4203cf55e282c370f83d751290",
+      "outputChecksum": "93238123d0842036fe88ba75a1e35596315b8178e80f37bd7f47fe6e384d5b33"
+    },
+    "production-client-256": {
+      "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+      "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mapChecksum": "80a5fa37c09ac1531aaa25f8db511033bb918ddbede7ee600fafbfc74f911802",
+      "metaChecksum": "c0da157a88aaf3a0bc05ebb1052ee022d4f7ed9bfbee684d63de904e28574f89",
+      "outputChecksum": "6ea330ac2c3b05365cd6e160dbd03ae5014d33bf08f926b80d65c6ee2e6380bf"
+    },
+    "production-server-8": {
+      "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+      "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mapChecksum": "233172eb37e0ca3af53bc79cb40e2968bc54a7327f6cddc143d360a5d28d8ce2",
+      "metaChecksum": "5bf423bb6c4f34fa39cf0accedbba2a9428c78ba4f82563f8136f9f1a8996499",
+      "outputChecksum": "2e6177f086934322b4676f8e3ceda6fc54d16304aada8661c74f732319d2d05e"
+    },
+    "production-server-256": {
+      "classificationChecksum": "935c93096b6300ae272dcb82f67af3874d4af170ea0c64199f69463278a646e3",
+      "dependencyChecksum": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mapChecksum": "142fccad5e4fd5d1c909dd61a22976367d4d75c6d9f22f0956505029c1d35228",
+      "metaChecksum": "5bf423bb6c4f34fa39cf0accedbba2a9428c78ba4f82563f8136f9f1a8996499",
+      "outputChecksum": "902cf76f14918388cf04ff5557fa279230cae2ba3cb83941183e958c17b5b612"
+    }
+  }
+}

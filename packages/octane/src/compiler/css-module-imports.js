@@ -10,12 +10,16 @@ export function isPlainCssModuleId(id) {
 
 /** Only authored CSS-module imports can ask the host for this narrow proof. */
 export function findCssModuleImportRequests(source, id) {
-	if (typeof source !== 'string' || !source.includes('.module.')) return [];
 	let ast;
-	try {
-		ast = parseModule(source, id);
-	} catch {
-		return [];
+	if (source && typeof source === 'object' && source.type === 'Program') {
+		ast = source;
+	} else {
+		if (typeof source !== 'string' || !source.includes('.module.')) return [];
+		try {
+			ast = parseModule(source, id);
+		} catch {
+			return [];
+		}
 	}
 	const requests = new Set();
 	for (const statement of ast.body ?? []) {
