@@ -1,5 +1,31 @@
 # @octanejs/visx
 
+## 0.1.45
+
+### Patch Changes
+
+- 07a26be: Reuse categorical-domain lookup work in `useCategoricalScale` and
+  `useColorScale` instead of scanning the whole domain for every color assignment.
+
+  Small domains keep the existing linear path. At the measured 64-key crossover,
+  the indexed path already amortizes its construction within one complete-domain
+  pass. In the same-run 4,096-key benchmark, including construction, lookup time
+  drops from about 1.59 ms to 0.04 ms per 1,000 calls while preserving first-match
+  duplicates and missing-key fallbacks.
+
+- Updated dependencies [9321d39]
+- Updated dependencies [fdb711a]
+- Updated dependencies [5e80135]
+- Updated dependencies [ad499d0]
+- Updated dependencies [892da9a]
+- Updated dependencies [babf8d7]
+- Updated dependencies [2785a2f]
+- Updated dependencies [df82fbc]
+- Updated dependencies [0824502]
+- Updated dependencies [47c8f54]
+  - octane@0.1.51
+  - @octanejs/floating-ui@0.1.50
+
 ## 0.1.44
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/testing-library",
-  "version": "0.1.47",
+  "version": "0.1.48",
   "license": "MIT",
   "type": "module",
   "engines": {

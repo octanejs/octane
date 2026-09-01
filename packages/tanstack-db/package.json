@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-db",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "license": "MIT",
   "type": "module",
   "engines": {
