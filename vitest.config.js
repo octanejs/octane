@@ -1644,6 +1644,66 @@ export default defineConfig({
 				},
 			},
 			{
+				test: {
+					name: 'email',
+					include: ['packages/email/tests/**/*.test.ts'],
+					exclude: ['packages/email/tests/differential/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/email/tests/differential/parity.test.ts'],
+				},
+				test: {
+					name: 'email-differential',
+					include: ['packages/email/tests/differential/**/*.test.ts'],
+					environment: 'node',
+					globalSetup: ['packages/email/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^octane\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/email$/,
+							replacement: resolve(import.meta.dirname, 'packages/email/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'email-cli',
+					include: ['packages/email-cli/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
 				// SSR half: the whole graph compiles in SERVER mode and bare `octane`
 				// imports resolve to `octane/server`, so the package's plain-.ts hooks
 				// run against the server runtime the compiled components use.

@@ -458,6 +458,8 @@ catalogs:
     '@react-types/shared': ^3.36.0
     react-dom: ^19.2.7
     react-i18next: 17.0.9
+    '@react-email/components': 1.0.12
+    '@react-email/render': 2.0.6
     react-error-boundary: 6.1.2
     react-resizable-panels: 4.12.2
     ripple: ^0.3.125

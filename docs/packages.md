@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**118 publishable package(s), including 104 framework binding(s) and 3 framework integration(s).**
+**120 publishable package(s), including 106 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -37,6 +37,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/drei` | [`packages/drei`](../packages/drei) | framework binding | `0.0.16` | 5 |
 | `@octanejs/dropzone` | [`packages/dropzone`](../packages/dropzone) | framework binding | `0.0.16` | 2 |
 | `@octanejs/electron` | [`packages/electron`](../packages/electron) | framework binding | `0.0.28` | 6 |
+| `@octanejs/email` | [`packages/email`](../packages/email) | framework binding | `0.0.1` | 1 |
+| `@octanejs/email-cli` | [`packages/email-cli`](../packages/email-cli) | framework binding | `0.0.1` | 2 |
 | `@octanejs/embla-carousel` | [`packages/embla-carousel`](../packages/embla-carousel) | framework binding | `0.0.16` | 2 |
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.49` | 1 |
 | `@octanejs/formisch` | [`packages/formisch`](../packages/formisch) | framework binding | `0.0.5` | 1 |

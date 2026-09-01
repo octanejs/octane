@@ -72,6 +72,8 @@ export const KNOWN_BINDINGS = {
 	'react-dropzone': '@octanejs/dropzone',
 	sonner: '@octanejs/sonner',
 	'react-error-boundary': '@octanejs/react-error-boundary',
+	'react-email': '@octanejs/email',
+	'@react-email/components': '@octanejs/email',
 	'react-resizable-panels': '@octanejs/resizable-panels',
 	'react-select': '@octanejs/select',
 	'react-transition-group': '@octanejs/transition-group',
@@ -180,6 +182,7 @@ export const KNOWN_BINDINGS = {
 export const KNOWN_NATIVE_BINDINGS = new Set([
 	'@octanejs/devtools',
 	'@octanejs/electron',
+	'@octanejs/email-cli',
 	'@octanejs/tauri',
 ]);
 

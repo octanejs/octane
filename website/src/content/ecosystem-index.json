@@ -970,6 +970,32 @@
   },
   {
     "kind": "library-binding",
+    "id": "binding-email",
+    "title": "React Email",
+    "packageName": "@octanejs/email",
+    "upstreamPackage": "react-email",
+    "category": "Content",
+    "categoryId": "content",
+    "description": "Use react-email with Octane.",
+    "searchTerms": ["@react-email/components"],
+    "tags": ["email", "components", "ssr"],
+    "order": 75
+  },
+  {
+    "kind": "library-binding",
+    "id": "binding-email-cli",
+    "title": "React Email CLI",
+    "packageName": "@octanejs/email-cli",
+    "upstreamPackage": "react-email",
+    "category": "Content",
+    "categoryId": "content",
+    "description": "Use react-email with Octane.",
+    "searchTerms": ["@react-email/cli", "octane-email"],
+    "tags": ["email", "cli", "preview"],
+    "order": 76
+  },
+  {
+    "kind": "library-binding",
     "id": "binding-html-react-parser",
     "title": "HTML React Parser",
     "packageName": "@octanejs/html-react-parser",
@@ -979,7 +1005,7 @@
     "description": "Use html-react-parser with Octane.",
     "searchTerms": [],
     "tags": ["html", "rendering"],
-    "order": 75
+    "order": 77
   },
   {
     "kind": "library-binding",
@@ -992,7 +1018,7 @@
     "description": "Use react-i18next with Octane.",
     "searchTerms": [],
     "tags": ["localization", "translations", "i18n"],
-    "order": 76
+    "order": 78
   },
   {
     "kind": "library-binding",
@@ -1005,7 +1031,7 @@
     "description": "Use @lexical/react with Octane.",
     "searchTerms": [],
     "tags": ["editor", "rich text"],
-    "order": 77
+    "order": 79
   },
   {
     "kind": "library-binding",
@@ -1018,7 +1044,7 @@
     "description": "Use @mdx-js/mdx with Octane.",
     "searchTerms": [],
     "tags": ["markdown", "content"],
-    "order": 78
+    "order": 80
   },
   {
     "kind": "library-binding",
@@ -1031,7 +1057,7 @@
     "description": "Use @monaco-editor/react with Octane.",
     "searchTerms": [],
     "tags": ["editor", "code"],
-    "order": 79
+    "order": 81
   },
   {
     "kind": "library-binding",
@@ -1044,7 +1070,7 @@
     "description": "Use react-markdown with Octane.",
     "searchTerms": [],
     "tags": ["markdown", "rendering"],
-    "order": 80
+    "order": 82
   },
   {
     "kind": "library-binding",
@@ -1057,7 +1083,7 @@
     "description": "Use react-pdf with Octane.",
     "searchTerms": [],
     "tags": ["pdf", "documents"],
-    "order": 81
+    "order": 83
   },
   {
     "kind": "library-binding",
@@ -1070,7 +1096,7 @@
     "description": "Use react-syntax-highlighter with Octane.",
     "searchTerms": [],
     "tags": ["code", "highlighting"],
-    "order": 82
+    "order": 84
   },
   {
     "kind": "library-binding",
@@ -1083,7 +1109,7 @@
     "description": "Use streamdown with Octane.",
     "searchTerms": [],
     "tags": ["markdown", "streaming", "ai"],
-    "order": 83
+    "order": 85
   },
   {
     "kind": "library-binding",
@@ -1096,7 +1122,7 @@
     "description": "Use @tiptap/react with Octane.",
     "searchTerms": [],
     "tags": ["editor", "rich text"],
-    "order": 84
+    "order": 86
   },
   {
     "kind": "library-binding",
@@ -1109,7 +1135,7 @@
     "description": "Use @portabletext/react with Octane.",
     "searchTerms": ["@portabletext/react"],
     "tags": ["content", "rich text", "sanity"],
-    "order": 85
+    "order": 87
   },
   {
     "kind": "library-binding",
@@ -1122,7 +1148,7 @@
     "description": "Use @sanity/react-loader with Octane.",
     "searchTerms": ["@sanity/react-loader"],
     "tags": ["sanity", "data fetching", "live content"],
-    "order": 86
+    "order": 88
   },
   {
     "kind": "library-binding",
@@ -1135,7 +1161,7 @@
     "description": "Use @sanity/icons with Octane.",
     "searchTerms": ["@sanity/icons"],
     "tags": ["sanity", "icons", "components"],
-    "order": 87
+    "order": 89
   },
   {
     "kind": "library-binding",
@@ -1148,7 +1174,7 @@
     "description": "Use @sanity/logos with Octane.",
     "searchTerms": ["@sanity/logos"],
     "tags": ["sanity", "logos", "branding"],
-    "order": 88
+    "order": 90
   },
   {
     "kind": "library-binding",
@@ -1161,7 +1187,7 @@
     "description": "Use react-window with Octane.",
     "searchTerms": [],
     "tags": ["virtualization", "lists", "performance"],
-    "order": 89
+    "order": 91
   },
   {
     "kind": "library-binding",
@@ -1174,7 +1200,7 @@
     "description": "Use @tanstack/react-table with Octane.",
     "searchTerms": [],
     "tags": ["tables", "data grid"],
-    "order": 90
+    "order": 92
   },
   {
     "kind": "library-binding",
@@ -1187,7 +1213,7 @@
     "description": "Use @tanstack/react-virtual with Octane.",
     "searchTerms": [],
     "tags": ["virtualization", "lists", "performance"],
-    "order": 91
+    "order": 93
   },
   {
     "kind": "library-binding",
@@ -1200,7 +1226,7 @@
     "description": "Use @xyflow/react with Octane.",
     "searchTerms": ["React Flow", "xy flow"],
     "tags": ["diagrams", "nodes", "graphs"],
-    "order": 92
+    "order": 94
   },
   {
     "kind": "library-binding",
@@ -1213,7 +1239,7 @@
     "description": "Use @vis.gl/react-mapbox with Octane.",
     "searchTerms": ["Mapbox", "MapLibre"],
     "tags": ["maps", "geospatial"],
-    "order": 93
+    "order": 95
   },
   {
     "kind": "library-binding",
@@ -1226,7 +1252,7 @@
     "description": "Use recharts with Octane.",
     "searchTerms": [],
     "tags": ["charts", "data visualization"],
-    "order": 94
+    "order": 96
   },
   {
     "kind": "library-binding",
@@ -1239,7 +1265,7 @@
     "description": "Use @visx/visx with Octane.",
     "searchTerms": [],
     "tags": ["charts", "data visualization"],
-    "order": 95
+    "order": 97
   },
   {
     "kind": "library-binding",
@@ -1252,7 +1278,7 @@
     "description": "Use @react-three/drei with Octane.",
     "searchTerms": [],
     "tags": ["three.js", "3d", "helpers"],
-    "order": 96
+    "order": 98
   },
   {
     "kind": "library-binding",
@@ -1265,7 +1291,7 @@
     "description": "Use @react-three/fiber with Octane.",
     "searchTerms": ["R3F", "React Three Fiber"],
     "tags": ["three.js", "3d", "webgl"],
-    "order": 97
+    "order": 99
   },
   {
     "kind": "library-binding",
@@ -1278,7 +1304,7 @@
     "description": "Use ink with Octane.",
     "searchTerms": [],
     "tags": ["terminal", "cli", "universal renderer"],
-    "order": 98
+    "order": 100
   },
   {
     "kind": "library-binding",
@@ -1291,7 +1317,7 @@
     "description": "Use @opentui/react with Octane.",
     "searchTerms": ["Open TUI"],
     "tags": ["terminal", "cli", "universal renderer"],
-    "order": 99
+    "order": 101
   },
   {
     "kind": "library-binding",
@@ -1304,7 +1330,7 @@
     "description": "Use electron with Octane.",
     "searchTerms": [],
     "tags": ["desktop", "native apps"],
-    "order": 100
+    "order": 102
   },
   {
     "kind": "library-binding",
@@ -1317,7 +1343,7 @@
     "description": "Use @tauri-apps/api with Octane.",
     "searchTerms": [],
     "tags": ["desktop", "native apps"],
-    "order": 101
+    "order": 103
   },
   {
     "kind": "library-binding",
@@ -1330,7 +1356,7 @@
     "description": "Use styled-components with Octane.",
     "searchTerms": [],
     "tags": ["css", "css in js"],
-    "order": 102
+    "order": 104
   },
   {
     "kind": "library-binding",
@@ -1343,7 +1369,7 @@
     "description": "Use @stylexjs/stylex with Octane.",
     "searchTerms": ["Style X"],
     "tags": ["css", "css in js"],
-    "order": 103
+    "order": 105
   },
   {
     "kind": "library-binding",
@@ -1356,7 +1382,7 @@
     "description": "Use @testing-library/react with Octane.",
     "searchTerms": ["React Testing Library"],
     "tags": ["testing", "components", "dom"],
-    "order": 104
+    "order": 106
   },
   {
     "kind": "library-binding",
@@ -1369,7 +1395,7 @@
     "description": "Use octane with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 105
+    "order": 107
   },
   {
     "kind": "library-binding",
@@ -1382,6 +1408,6 @@
     "description": "Use @tanstack/react-devtools with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 106
+    "order": 108
   }
 ]

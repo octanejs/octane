@@ -310,6 +310,36 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/email",
+      "version": "0.0.1",
+      "category": "Content",
+      "upstream": { "package": "react-email", "version": "6.9.2" },
+      "surface": "Email component surface: Body, Button, CodeBlock, CodeInline, Column, Container, Font, Head, Heading, Hr, Html, Img, Link, Markdown, Preview, Row, Section, Tailwind, Text, Prism themes, the pixel-based Tailwind preset, and an Octane-native static render helper.",
+      "divergences": [
+        "render accepts an Octane component plus props rather than a pre-created React node, matching octane/server's entry-point API.",
+        "Preview accepts its inspectable preview copy through the text prop; natural .tsrx children are opaque render blocks.",
+        "Markdown accepts its source through a string children prop; JSX children compile to children blocks and are rejected rather than invoked as render props.",
+        "Refs are ordinary Octane ref props rather than forwardRef components.",
+        "Head uses Octane's metadata-hoisting channel; render reconstructs the consumer-visible document head around hoisted tags.",
+        "Tailwind transforms fully rendered static HTML rather than cloning a React element tree, allowing natural .tsrx children and nested compiled components."
+      ],
+      "ssr": "Supported and tested through renderToStaticMarkup: output has the React Email XHTML Transitional doctype and no hydration markers.",
+      "verified": "2026-08-10"
+    },
+    {
+      "name": "@octanejs/email-cli",
+      "version": "0.0.1",
+      "category": "Content",
+      "upstream": { "package": "react-email", "version": "6.9.2" },
+      "surface": "Octane-native `export` and `dev` commands: recursive .tsrx template discovery, static HTML export, nested output paths, static assets, development template index and previews, Vite live reload, and compile/render error pages.",
+      "divergences": [
+        "The preview application is a lightweight Octane/Vite server rather than upstream's bundled React/Next application.",
+        "The executable is named octane-email to avoid colliding with upstream's email binary."
+      ],
+      "ssr": "Templates compile with the Octane Vite plugin in SSR mode and render through @octanejs/email.",
+      "verified": "2026-08-10"
+    },
+    {
       "name": "@octanejs/embla-carousel",
       "version": "0.0.16",
       "category": "UI Libraries",
@@ -1616,6 +1646,7 @@
     "@phosphor-icons/react": "@octanejs/phosphor-icons",
     "@portabletext/react": "@octanejs/portabletext",
     "@rainbow-me/rainbowkit": "@octanejs/rainbowkit",
+    "@react-email/components": "@octanejs/email",
     "@react-rxjs/core": "@octanejs/rxjs",
     "@react-rxjs/utils": "@octanejs/rxjs",
     "@react-spring/parallax": "@octanejs/spring",
@@ -1725,6 +1756,7 @@
     "react-day-picker": "@octanejs/day-picker",
     "react-draggable": "@octanejs/draggable",
     "react-dropzone": "@octanejs/dropzone",
+    "react-email": "@octanejs/email",
     "react-error-boundary": "@octanejs/react-error-boundary",
     "react-hook-form": "@octanejs/hook-form",
     "react-i18next": "@octanejs/i18next",

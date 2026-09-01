@@ -1,0 +1,26 @@
+{
+  "upstream": { "package": "react-email", "version": "6.9.2" },
+  "provenance": {
+    "source": "https://github.com/resend/react-email/tree/v6.9.2",
+    "license": "MIT",
+    "commit": "ffe605819782b31d7f946e30f938b1b63e6b239c",
+    "verification": "recorded-unverified"
+  },
+  "surface": "Email component surface: Body, Button, CodeBlock, CodeInline, Column, Container, Font, Head, Heading, Hr, Html, Img, Link, Markdown, Preview, Row, Section, Tailwind, Text, Prism themes, the pixel-based Tailwind preset, and an Octane-native static render helper.",
+  "divergences": [
+    "render accepts an Octane component plus props rather than a pre-created React node, matching octane/server's entry-point API.",
+    "Preview accepts its inspectable preview copy through the text prop; natural .tsrx children are opaque render blocks.",
+    "Markdown accepts its source through a string children prop; JSX children compile to children blocks and are rejected rather than invoked as render props.",
+    "Refs are ordinary Octane ref props rather than forwardRef components.",
+    "Head uses Octane's metadata-hoisting channel; render reconstructs the consumer-visible document head around hoisted tags.",
+    "Tailwind transforms fully rendered static HTML rather than cloning a React element tree, allowing natural .tsrx children and nested compiled components."
+  ],
+  "ssr": "Supported and tested through renderToStaticMarkup: output has the React Email XHTML Transitional doctype and no hydration markers.",
+  "verified": "2026-08-10",
+  "notes": [
+    "Ported from upstream commit ffe605819782b31d7f946e30f938b1b63e6b239c under the MIT license.",
+    "Bounded React parity currently runs one shared welcome-email differential render lane against @react-email/components@1.0.12. Pristine upstream suites, exhaustive classifications, and verified provenance remain open.",
+    "The two primary Prism themes, vscDarkPlus and xonokai, are included; upstream's full generated theme catalog is not yet copied.",
+    "Export/preview tooling and editor serialization are published as separate Octane packages."
+  ]
+}

@@ -367,8 +367,20 @@
   },
   {
     "title": "Content",
-    "description": "Rich-text editing, Markdown, MDX, code highlighting, PDFs, HTML parsing, and translations.",
+    "description": "Rich-text editing, Markdown, MDX, email authoring and delivery tooling, code highlighting, PDFs, HTML parsing, and translations.",
     "packages": [
+      {
+        "packageName": "@octanejs/email",
+        "title": "React Email",
+        "searchTerms": ["@react-email/components"],
+        "tags": ["email", "components", "ssr"]
+      },
+      {
+        "packageName": "@octanejs/email-cli",
+        "title": "React Email CLI",
+        "searchTerms": ["@react-email/cli", "octane-email"],
+        "tags": ["email", "cli", "preview"]
+      },
       {
         "packageName": "@octanejs/html-react-parser",
         "title": "HTML React Parser",

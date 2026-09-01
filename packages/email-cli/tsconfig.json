@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext"],
+    "target": "esnext",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "types": []
+  },
+  "include": ["src", "vitest.config.ts"],
+  "exclude": ["node_modules", "tests"]
+}

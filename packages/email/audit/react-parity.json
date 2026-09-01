@@ -1,0 +1,92 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/resend/react-email.git",
+    "version": "6.9.2",
+    "commit": "ffe605819782b31d7f946e30f938b1b63e6b239c",
+    "sourceRoot": "packages/components/src",
+    "testRoot": "packages/components",
+    "license": "MIT",
+    "integrity": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/email/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/email/tests/differential"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "e49ba67f76687623344159d87bb0484d60d4924ff2b145a9b13e4e18157e9e21"
+    }
+  },
+  "lanes": [
+    {
+      "id": "email-render-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "email-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Shared email fixtures render through Octane and @react-email/render on React, covering document output and Text margin precedence.",
+      "files": [
+        {
+          "path": "packages/email/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "4cdb652b147ab57c8d0ce6d897b23d8c9428d0df3c56b8c7e77968d820821065",
+          "cases": [
+            {
+              "id": "differential:email-welcome-render",
+              "testName": "welcome email static render matches the React Email oracle",
+              "fullName": "differential: @octanejs/email vs @react-email/components welcome email static render matches the React Email oracle"
+            },
+            {
+              "id": "differential:email-text-margin-precedence",
+              "testName": "Text margin shorthand precedence matches the React Email oracle",
+              "fullName": "differential: @octanejs/email vs @react-email/components Text margin shorthand precedence matches the React Email oracle"
+            }
+          ]
+        },
+        {
+          "path": "packages/email/tests/_fixtures/parity-email.tsrx",
+          "role": "support",
+          "sha256": "33559e202fc23b6f825cc4c765303bcb5dd5e4b4625f59411b6cd54406d067db"
+        },
+        {
+          "path": "packages/email/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "84df2a6c975438b0d638f052654ee62c38a91836a4ef4b8030b28ceedf2383cc"
+        },
+        {
+          "path": "packages/email/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "7d482b2a609dd3e44d4cef6d5450844e621bcaecf71df86a120c46222f5e426a"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}
