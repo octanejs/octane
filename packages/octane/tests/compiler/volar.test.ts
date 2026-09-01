@@ -51,6 +51,42 @@ function writeOctaneJsxRuntimeStub(root: string, intrinsics: string): void {
  * the contract.
  */
 describe('compileToVolarMappings', () => {
+	it('retains computed method keys when generated brackets have no source mapping', () => {
+		const source = `const key = Symbol.iterator;
+		export const iterable = { [key]() { return [1, 2][Symbol.iterator](); } };`;
+		const result = compileToVolarMappings(source, 'iterable.tsrx');
+		expect(result.errors).toEqual([]);
+		const offset = source.indexOf('[key]') + 1;
+		const mapped = result.mappings.flatMap((mapping) =>
+			mapping.sourceOffsets.map((start, index) => {
+				if (offset < start || offset >= start + mapping.lengths[index]) return '';
+				const generated = mapping.generatedOffsets[index] + offset - start;
+				return result.code.slice(generated, generated + 3);
+			}),
+		);
+		expect(mapped).toContain('key');
+	});
+
+	it('preserves literal less-than text in virtual TSX', () => {
+		const source = `export function Text() @{ <p><3 and 1 < 2 and <= 3</p> }`;
+		const result = compileToVolarMappings(source, 'text.tsrx');
+		expect(result.errors).toEqual([]);
+		const parsed = ts.createSourceFile(
+			'text.tsx',
+			result.code,
+			ts.ScriptTarget.Latest,
+			true,
+			ts.ScriptKind.TSX,
+		);
+		const text: string[] = [];
+		function visit(node: ts.Node) {
+			if (ts.isJsxText(node)) text.push(node.text);
+			ts.forEachChild(node, visit);
+		}
+		visit(parsed);
+		expect(text.join('')).toContain('&lt;3 and 1 &lt; 2 and &lt;= 3');
+	});
+
 	it('returns a VolarMappingsResult shape', () => {
 		const src =
 			"import { useState } from 'octane';\n" +

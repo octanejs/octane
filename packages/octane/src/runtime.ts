@@ -5047,6 +5047,14 @@ export function replaceRef(
 	next: any,
 	target: Element | FragmentInstance,
 ): any {
+	if (TRANSITION_JOURNAL !== null) {
+		// The compiler stores the replacement immediately after this call. A
+		// later suspension must restore both the binding and the fragment handle
+		// before retrying, even when no other binding in this scope changed.
+		journalBag();
+		if (Object.prototype.hasOwnProperty.call(target, '_currentRef'))
+			journalRootProperty(target, '_currentRef');
+	}
 	if (previous != null) queueRefDetach(previous, target);
 	if (next != null) queueRefAttach(scope, next, target);
 	return next;
