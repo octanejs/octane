@@ -1,5 +1,38 @@
 # octane
 
+## 0.1.51
+
+### Patch Changes
+
+- 9321d39: Speed up hydrate module slicing in files with many split boundaries and private declarations.
+- fdb711a: Keep bounded scoped-signal trace retention constant-time after its history fills.
+  Inspection still returns the latest events in chronological order as detached records.
+- 5e80135: Reuse the local component Map for name lookups across TSRX renderer boundaries
+  to speed compilation of large modules.
+- ad499d0: Speed up large universal object-driver teardown batches by compacting detached
+  sibling arrays once per transaction instead of shifting them for every host.
+- 892da9a: Make hidden Activity caught-error publication scale linearly on reveal.
+
+  Activity now claims deferred reveal actions by their queue entry instead of
+  searching and compacting the remaining array for every action. A production
+  browser benchmark with 4,096 ordered `onCaughtError` reports dropped from 9.62 ms
+  to 2.92 ms while preserving hidden deferral, FIFO exactly-once publication,
+  cancellation, retry safety, output identity, and clean unmount.
+
+- babf8d7: Make hydration render-phase queue draining scale linearly.
+
+  Hydration now partitions the live scheduler queue in one pass instead of
+  repeatedly rescanning and splicing it for every target-root update. A production
+  multi-root benchmark at 1,024 rows dropped from 20.6 ms to 7.0 ms while
+  preserving synchronous convergence, server-node adoption, foreign-root work,
+  delegated interaction, render-loop limits, and error cleanup.
+
+- 2785a2f: Allocate deferred-hydration procedural prefetch waiter sets only when `waitFor()` is used.
+- df82fbc: Speed up production void-component classification for long local memo alias chains.
+- 0824502: Parse each authored TSRX module once for Vite's preflight classifications while
+  keeping the compiler's authoritative parse and diagnostics unchanged.
+- 47c8f54: Speed up compilation of large stable-hookful component graphs by propagating candidate invalidations, live captures, and private setter publications through dependency worklists instead of repeatedly rescanning every component.
+
 ## 0.1.50
 
 ### Patch Changes

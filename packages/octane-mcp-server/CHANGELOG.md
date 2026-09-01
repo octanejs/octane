@@ -1,5 +1,12 @@
 # @octanejs/mcp-server
 
+## 0.2.23
+
+### Patch Changes
+
+- 2527340: Register the Sanity content and Thinking Orbs packages in the React-to-Octane
+  binding catalog.
+
 ## 0.2.22
 
 ### Patch Changes
