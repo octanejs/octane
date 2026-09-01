@@ -642,16 +642,21 @@ describe('website routes', () => {
 			communityDirectory.querySelectorAll<HTMLElement>('.community-binding-card'),
 		);
 		expect(cards.map((card) => card.querySelector('h3')?.textContent?.trim())).toEqual([
-			'TanStack',
-			'Community libraries',
-			'Tooling & platforms',
+			'TanStack ecosystem',
+			'Libraries & utilities',
+			'Tooling & runtimes',
 		]);
 		expect(
 			cards.map((card) => card.querySelector('.community-binding-count')?.textContent?.trim()),
 		).toEqual(
 			COMMUNITY_BINDING_GROUPS.map(
-				(group) => `${group.entries.length} ${group.entries.length === 1 ? 'binding' : 'bindings'}`,
+				(group) => `${group.entries.length}+ ${group.entries.length === 1 ? 'binding' : 'bindings'}`,
 			),
+		);
+		expect(
+			container.querySelector('#community-bindings + p')?.textContent?.replace(/\s+/g, ' ').trim(),
+		).toBe(
+			"Browse a curated selection of Octane integrations published across the wider ecosystem. Each entry links directly to the project's official documentation; the list is not exhaustive.",
 		);
 		for (let groupIndex = 0; groupIndex < COMMUNITY_BINDING_GROUPS.length; groupIndex++) {
 			const group = COMMUNITY_BINDING_GROUPS[groupIndex];

@@ -1,7 +1,7 @@
 [
   {
     "id": "tanstack",
-    "title": "TanStack",
+    "title": "TanStack ecosystem",
     "entries": [
       {
         "id": "tanstack-ai",
@@ -55,7 +55,7 @@
   },
   {
     "id": "community-libraries",
-    "title": "Community libraries",
+    "title": "Libraries & utilities",
     "entries": [
       {
         "id": "markstream",
@@ -109,7 +109,7 @@
   },
   {
     "id": "tooling-and-platforms",
-    "title": "Tooling & platforms",
+    "title": "Tooling & runtimes",
     "entries": [
       {
         "id": "cypress-component-testing",

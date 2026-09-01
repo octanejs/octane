@@ -7,7 +7,7 @@ import {
 const EXPECTED_CATALOG = [
 	{
 		id: 'tanstack',
-		title: 'TanStack',
+		title: 'TanStack ecosystem',
 		entries: [
 			{
 				id: 'tanstack-ai',
@@ -61,7 +61,7 @@ const EXPECTED_CATALOG = [
 	},
 	{
 		id: 'community-libraries',
-		title: 'Community libraries',
+		title: 'Libraries & utilities',
 		entries: [
 			{
 				id: 'markstream',
@@ -116,7 +116,7 @@ const EXPECTED_CATALOG = [
 	},
 	{
 		id: 'tooling-and-platforms',
-		title: 'Tooling & platforms',
+		title: 'Tooling & runtimes',
 		entries: [
 			{
 				id: 'cypress-component-testing',

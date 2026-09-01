@@ -19,9 +19,9 @@ export interface CommunityBindingGroup {
 }
 
 const GROUPS = [
-	{ id: 'tanstack', title: 'TanStack' },
-	{ id: 'community-libraries', title: 'Community libraries' },
-	{ id: 'tooling-and-platforms', title: 'Tooling & platforms' },
+	{ id: 'tanstack', title: 'TanStack ecosystem' },
+	{ id: 'community-libraries', title: 'Libraries & utilities' },
+	{ id: 'tooling-and-platforms', title: 'Tooling & runtimes' },
 ] as const;
 
 const GROUP_FIELDS = new Set(['id', 'title', 'entries']);

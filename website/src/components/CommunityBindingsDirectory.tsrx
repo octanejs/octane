@@ -11,8 +11,8 @@ export function CommunityBindingsDirectory() @{
 			>
 				<header class="community-binding-card-header">
 					<h3 id={'community-binding-group-' + group.id}>{group.title as string}</h3>
-					<span class="community-binding-count">{group.entries.length +
-						(group.entries.length === 1 ? ' binding' : ' bindings') as string}</span>
+					<span class="community-binding-count">{group.entries.length + '+ ' +
+						(group.entries.length === 1 ? 'binding' : 'bindings') as string}</span>
 				</header>
 				<ul class="community-binding-list">
 					@for (const entry of group.entries; key entry.id) {
