@@ -7080,6 +7080,7 @@ function unmountSlot(val: any, detachDom: boolean): void {
 		const childDetach = k === 'portalSlotSlot' ? true : detachDom;
 		if (val.block) unmountBlock(val.block, childDetach);
 		if (k === 'portalSlotSlot' && val.target) {
+			unregisterPortalEventRange(val.target, val);
 			unregisterDelegationTarget(val.target);
 		}
 	}
