@@ -8,6 +8,25 @@ export function RootDiv(props: { name: string; onOut: (e: Event) => void }) @{
 	<div class={props.name} onMouseOut={props.onOut}>{props.name}</div>
 }
 
+export function PropagationTree(props: {
+	onParent?: (event: Event) => void;
+	onParentCapture?: (event: Event) => void;
+	onTarget?: (event: Event) => void;
+	onTargetCapture?: (event: Event) => void;
+}) @{
+	<section
+		class="propagation-parent"
+		onClick={props.onParent}
+		onClickCapture={props.onParentCapture}
+	>
+		<button
+			class="propagation-target"
+			onClick={props.onTarget}
+			onClickCapture={props.onTargetCapture}
+		>Target</button>
+	</section>
+}
+
 // :106 — the clicked element is REMOVED by the update its own handler schedules.
 export function DisappearingButton() @{
 	const [clicked, setClicked] = useState(false);
