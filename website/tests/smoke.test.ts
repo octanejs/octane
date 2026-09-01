@@ -648,7 +648,11 @@ describe('website routes', () => {
 		]);
 		expect(
 			cards.map((card) => card.querySelector('.community-binding-count')?.textContent?.trim()),
-		).toEqual(['6 bindings', '6 bindings', '4 bindings']);
+		).toEqual(
+			COMMUNITY_BINDING_GROUPS.map(
+				(group) => `${group.entries.length} ${group.entries.length === 1 ? 'binding' : 'bindings'}`,
+			),
+		);
 		for (let groupIndex = 0; groupIndex < COMMUNITY_BINDING_GROUPS.length; groupIndex++) {
 			const group = COMMUNITY_BINDING_GROUPS[groupIndex];
 			const links = Array.from(
