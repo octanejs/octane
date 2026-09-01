@@ -31,17 +31,16 @@ const statusMetadataModules = import.meta.glob('../../../packages/*/status.json'
 
 const catalogPackages = BINDING_CATEGORIES.flatMap((category) => category.packages);
 
-function moduleFor<T>(
+function modulesByDirectory<T>(
 	modules: Readonly<Record<string, () => Promise<T>>>,
-	directory: string,
-	fileName: string,
-): (() => Promise<T>) | undefined {
-	return Object.entries(modules).find(([path]) =>
-		path.endsWith(`/packages/${directory}/${fileName}`),
-	)?.[1];
+): ReadonlyMap<string, () => Promise<T>> {
+	return new Map(Object.entries(modules).map(([path, load]) => [path.split('/').at(-2)!, load]));
 }
 
-function publicExportSubpaths(exportsField: unknown): string[] {
+const packageMetadataByDirectory = modulesByDirectory(packageMetadataModules);
+const statusMetadataByDirectory = modulesByDirectory(statusMetadataModules);
+
+export function publicExportSubpaths(exportsField: unknown): string[] {
 	if (typeof exportsField !== 'object' || exportsField === null || Array.isArray(exportsField)) {
 		return [];
 	}
@@ -71,7 +70,6 @@ export function firstPartyPackageRecord(
 		names,
 		purpose,
 		owner: 'Octane',
-		source: 'first-party',
 		url: bindingRepositoryHref(metadata.packageName),
 	});
 }
@@ -88,7 +86,6 @@ export function communityPackageRecords(
 				names: entry.searchNames,
 				purpose: entry.purpose,
 				owner: entry.owner,
-				source: 'community',
 				url: entry.destination,
 			}),
 		),
@@ -97,8 +94,8 @@ export function communityPackageRecords(
 
 async function loadFirstPartyPackageRecord(packageName: string): Promise<PackageSearchRecord> {
 	const directory = packageName.slice('@octanejs/'.length);
-	const packageLoader = moduleFor(packageMetadataModules, directory, 'package.json');
-	const statusLoader = moduleFor(statusMetadataModules, directory, 'status.json');
+	const packageLoader = packageMetadataByDirectory.get(directory);
+	const statusLoader = statusMetadataByDirectory.get(directory);
 	const [packageMetadata, statusMetadata] = await Promise.all([
 		packageLoader?.(),
 		statusLoader?.(),

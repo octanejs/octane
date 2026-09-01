@@ -11,8 +11,9 @@ import {
 import {
 	communityPackageRecords,
 	firstPartyPackageRecord,
+	publicExportSubpaths,
 } from '../../../website/src/content/bindings-search.ts';
-import { BINDING_CATEGORIES } from '../../../website/src/content/bindings.ts';
+import { BINDING_CATEGORIES, BINDING_STATUSES } from './bindings.ts';
 import { DOCS } from './docs.ts';
 
 export type { SearchGroup, SearchRecord };
@@ -66,51 +67,25 @@ interface PackageMetadata {
 	exports?: unknown;
 }
 
-interface BindingStatusMetadata {
-	upstream?: { package?: string };
-}
-
 const packageMetadataModules = import.meta.glob('../../../packages/*/package.json', {
 	eager: true,
 	import: 'default',
 }) as Record<string, PackageMetadata>;
 
-const statusMetadataModules = import.meta.glob('../../../packages/*/status.json', {
-	eager: true,
-	import: 'default',
-}) as Record<string, BindingStatusMetadata>;
-
-function packageMetadataFor(packageName: string): PackageMetadata | undefined {
-	const directory = packageName.slice('@octanejs/'.length);
-	return Object.entries(packageMetadataModules).find(([path]) =>
-		path.endsWith(`/packages/${directory}/package.json`),
-	)?.[1];
-}
-
-function statusMetadataFor(packageName: string): BindingStatusMetadata | undefined {
-	const directory = packageName.slice('@octanejs/'.length);
-	return Object.entries(statusMetadataModules).find(([path]) =>
-		path.endsWith(`/packages/${directory}/status.json`),
-	)?.[1];
-}
-
-function publicExportSubpaths(exportsField: unknown): string[] {
-	if (typeof exportsField !== 'object' || exportsField === null || Array.isArray(exportsField)) {
-		return [];
-	}
-	return Object.keys(exportsField)
-		.filter(
-			(subpath) =>
-				subpath.startsWith('./') && subpath !== './package.json' && !subpath.includes('*'),
-		)
-		.map((subpath) => subpath.slice(1));
-}
+const packageMetadataByDirectory = new Map(
+	Object.entries(packageMetadataModules).map(([path, metadata]) => [
+		path.split('/').at(-2)!,
+		metadata,
+	]),
+);
+const statusByPackage = new Map(BINDING_STATUSES.map((status) => [status.package, status]));
 
 const FIRST_PARTY_PACKAGE_INDEX: readonly SearchRecord[] = BINDING_CATEGORIES.flatMap(
 	(category) => category.packages,
 ).map((packageName) => {
-	const metadata = packageMetadataFor(packageName);
-	const status = statusMetadataFor(packageName);
+	const directory = packageName.slice('@octanejs/'.length);
+	const metadata = packageMetadataByDirectory.get(directory);
+	const status = statusByPackage.get(packageName);
 	return firstPartyPackageRecord({
 		packageName,
 		purpose: metadata?.description ?? '',

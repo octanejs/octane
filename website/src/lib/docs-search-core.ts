@@ -31,8 +31,6 @@ export interface DocumentSearchRecord {
 	order: number;
 }
 
-export type PackageCatalogSource = 'first-party' | 'community';
-
 export interface PackageSearchRecord {
 	kind: 'package';
 	/** Canonical project identifier, independent of which authored name matched. */
@@ -43,9 +41,11 @@ export interface PackageSearchRecord {
 	names: readonly string[];
 	purpose: string;
 	owner: string;
-	source: PackageCatalogSource;
 	url: string;
-	/** Searchable fields only; owner and source are deliberately excluded. */
+	normalizedTitle: string;
+	normalizedNames: readonly string[];
+	normalizedPurpose: string;
+	/** Searchable fields only; owner is deliberately excluded. */
 	haystack: string;
 }
 
@@ -57,7 +57,6 @@ export interface PackageRecordInput {
 	names: readonly string[];
 	purpose: string;
 	owner: string;
-	source: PackageCatalogSource;
 	url: string;
 }
 
@@ -87,7 +86,6 @@ export interface PackageSearchResult {
 	matchedName: string;
 	purpose: string;
 	owner: string;
-	source: PackageCatalogSource;
 	url: string;
 	score: number;
 }
@@ -242,6 +240,9 @@ export function packageRecordFor(input: PackageRecordInput): PackageSearchRecord
 		names.push(name);
 	}
 	if (names.length === 0) names.push(input.title);
+	const normalizedTitle = normalize(input.title);
+	const normalizedNames = names.map(normalize);
+	const normalizedPurpose = normalize(input.purpose);
 
 	return {
 		kind: 'package',
@@ -250,9 +251,11 @@ export function packageRecordFor(input: PackageRecordInput): PackageSearchRecord
 		names,
 		purpose: input.purpose,
 		owner: input.owner,
-		source: input.source,
 		url: input.url,
-		haystack: normalize([input.title, ...names, input.purpose].join(' ')),
+		normalizedTitle,
+		normalizedNames,
+		normalizedPurpose,
+		haystack: [normalizedTitle, ...normalizedNames, normalizedPurpose].join(' '),
 	};
 }
 
@@ -313,15 +316,16 @@ export function searchDocs(
 	if (q.length < 2) return [];
 	const terms = q.split(/\s+/);
 	const pattern = new RegExp('(' + terms.map(escapeRegExp).join('|') + ')', 'ig');
+	const phrasePattern = new RegExp('\\b' + escapeRegExp(q) + '\\b');
 
 	const groups: SearchResult[] = [];
 	for (const record of index) {
 		if (!terms.every((term) => record.haystack.includes(term))) continue;
 
 		if (record.kind === 'package') {
-			const title = normalize(record.title);
-			const names = record.names.map(normalize);
-			const purpose = normalize(record.purpose);
+			const title = record.normalizedTitle;
+			const names = record.normalizedNames;
+			const purpose = record.normalizedPurpose;
 			let score = 0;
 			for (const term of terms) {
 				if (title.includes(term)) score += 8;
@@ -332,7 +336,7 @@ export function searchDocs(
 			else if (names.some((name) => name.includes(q))) score += 16;
 			if (title.includes(q)) score += 12;
 			if (purpose.includes(q)) score += 6;
-			if (new RegExp('\\b' + escapeRegExp(q) + '\\b').test(purpose)) score += 4;
+			if (phrasePattern.test(purpose)) score += 4;
 			score += Math.min(occurrences(purpose, q), 6) * 2;
 
 			const exact = names.findIndex((name) => name === q);
@@ -345,7 +349,6 @@ export function searchDocs(
 				matchedName,
 				purpose: record.purpose,
 				owner: record.owner,
-				source: record.source,
 				url: record.url,
 				score,
 			});
