@@ -267,49 +267,47 @@ jobs:
               );
             }
 
-            let pull = matches[0];
+            const pull = matches[0];
             let generated;
             let lastObservedSnapshot = "not fetched";
             const snapshotAttempts = 8;
             const snapshotDelayMs = 2_000;
 
             // changesets/action force-pushes the release branch immediately
-            // before this step. The pull request API can briefly return the
-            // previous head commit, so authenticate a freshly fetched snapshot
-            // and retry only while that snapshot has not converged on this
-            // workflow's main commit.
+            // before this step. The pull request API can keep returning the
+            // previous head commit after that push succeeds, so authenticate
+            // the branch ref itself and retry only while that ref has not
+            // converged on this workflow's main commit.
             for (let attempt = 1; attempt <= snapshotAttempts; attempt += 1) {
-              const { data: candidate } = await github.rest.pulls.get({
+              const { data: releaseRef } = await github.rest.git.getRef({
                 owner,
                 repo,
-                pull_number: pull.number,
+                ref: "heads/changeset-release/main",
               });
               const { data: candidateCommit } =
                 await github.rest.repos.getCommit({
                   owner,
                   repo,
-                  ref: candidate.head.sha,
+                  ref: releaseRef.object.sha,
                 });
               const expectedReleaseCommit =
+                releaseRef.object.type === "commit" &&
                 candidateCommit.commit.message === "Version Packages" &&
                 candidateCommit.commit.author?.email ===
                   "41898282+github-actions[bot]@users.noreply.github.com" &&
                 candidateCommit.commit.committer?.email ===
                   "41898282+github-actions[bot]@users.noreply.github.com";
               const basedOnCurrentMain =
-                candidate.base.sha === context.sha &&
                 candidateCommit.parents.length === 1 &&
                 candidateCommit.parents[0].sha === context.sha;
 
               if (expectedReleaseCommit && basedOnCurrentMain) {
-                pull = candidate;
                 generated = candidateCommit;
                 break;
               }
 
               lastObservedSnapshot = [
-                `head ${candidate.head.sha}`,
-                `base ${candidate.base.sha}`,
+                `head ${releaseRef.object.sha}`,
                 `parent ${candidateCommit.parents[0]?.sha ?? "none"}`,
               ].join(", ");
               if (attempt < snapshotAttempts) {
@@ -329,13 +327,14 @@ jobs:
             }
 
             const releaseFiles = await github.paginate(
-              github.rest.pulls.listFiles,
+              github.rest.repos.getCommit,
               {
                 owner,
                 repo,
-                pull_number: pull.number,
+                ref: generated.sha,
                 per_page: 100,
               },
+              (response) => response.data.files ?? [],
             );
             const unexpectedFiles = releaseFiles.filter((file) => {
               if (
@@ -376,7 +375,7 @@ jobs:
                   owner,
                   repo,
                   name,
-                  head_sha: pull.head.sha,
+                  head_sha: generated.sha,
                   status: "completed",
                   conclusion: "success",
                   details_url: detailsUrl,
@@ -389,5 +388,5 @@ jobs:
               ),
             );
             core.notice(
-              `Recorded lightweight lint and typecheck results for Changesets PR #${pull.number} at ${pull.head.sha}.`,
+              `Recorded lightweight lint and typecheck results for Changesets PR #${pull.number} at ${generated.sha}.`,
             );

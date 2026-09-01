@@ -309,6 +309,123 @@ describe('CI workflow aggregation', () => {
 		);
 	});
 
+	test('records release checks from the fresh branch ref when pull request metadata is stale', async () => {
+		const currentMain = 'current-main';
+		const staleMain = 'stale-main';
+		const staleHead = 'stale-release';
+		const generatedHead = 'generated-release';
+		const listPulls = async () => undefined;
+		const listPullFiles = async () => undefined;
+		const getCommit = async ({ ref }) => {
+			if (ref === generatedHead) {
+				return {
+					data: {
+						sha: generatedHead,
+						commit: {
+							message: 'Version Packages',
+							author: {
+								email: '41898282+github-actions[bot]@users.noreply.github.com',
+							},
+							committer: {
+								email: '41898282+github-actions[bot]@users.noreply.github.com',
+							},
+						},
+						parents: [{ sha: currentMain }],
+					},
+				};
+			}
+			if (ref === staleHead) {
+				return {
+					data: {
+						sha: staleHead,
+						commit: {
+							message: 'Version Packages',
+							author: {
+								email: '41898282+github-actions[bot]@users.noreply.github.com',
+							},
+							committer: {
+								email: '41898282+github-actions[bot]@users.noreply.github.com',
+							},
+						},
+						parents: [{ sha: staleMain }],
+					},
+				};
+			}
+			assert.fail(`unexpected commit ${ref}`);
+		};
+		const pull = {
+			number: 915,
+			title: 'Version Packages',
+			user: { login: 'github-actions[bot]' },
+			base: {
+				ref: 'main',
+				sha: staleMain,
+				repo: { full_name: 'octanejs/octane' },
+			},
+			head: {
+				ref: 'changeset-release/main',
+				sha: staleHead,
+				repo: { full_name: 'octanejs/octane' },
+			},
+		};
+		const checks = [];
+		const github = {
+			rest: {
+				checks: {
+					create: async (check) => checks.push(check),
+				},
+				git: {
+					getRef: async () => ({
+						data: { object: { type: 'commit', sha: generatedHead } },
+					}),
+				},
+				pulls: {
+					get: async () => ({ data: pull }),
+					list: listPulls,
+					listFiles: listPullFiles,
+				},
+				repos: { getCommit },
+			},
+			paginate: async (method) => {
+				if (method === listPulls) return [pull];
+				if (method === getCommit) {
+					return [{ filename: 'packages/example/package.json', status: 'modified' }];
+				}
+				if (method === listPullFiles) {
+					assert.fail('stale pull request files must not authenticate the generated commit');
+				}
+				assert.fail('unexpected paginated request');
+			},
+		};
+		const execute = new AsyncFunction(
+			'github',
+			'context',
+			'core',
+			'setTimeout',
+			stepScript(releaseWorkflow, 'Record lightweight release pull request checks'),
+		);
+
+		await execute(
+			github,
+			{
+				repo: { owner: 'octanejs', repo: 'octane' },
+				runId: 33518770521,
+				serverUrl: 'https://github.com',
+				sha: currentMain,
+			},
+			{ info() {}, notice() {} },
+			(resolve) => resolve(),
+		);
+
+		assert.deepEqual(
+			checks.map(({ name, head_sha }) => ({ name, head_sha })),
+			[
+				{ name: 'lint', head_sha: generatedHead },
+				{ name: 'typecheck', head_sha: generatedHead },
+			],
+		);
+	});
+
 	test('keeps cheap parity validation universal and full execution on Node 24', () => {
 		const parity = jobSource('react_parity_shard');
 		const parityAggregate = jobSource('react_parity_checks');
