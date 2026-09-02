@@ -27,6 +27,15 @@ if (!upstreamRoot || (!existsSync(CORE_INDEX) && !existsSync(LEGACY_INDEX))) {
 const COPY_DIRS = ['components', 'lib', 'store', 'reducer', 'types'];
 const COPY_FILES = ['globals.d.ts', 'styles.css'];
 const SKIP_DIR_NAMES = new Set(['__tests__', '__mocks__', 'node_modules']);
+const OMITTED_UPSTREAM_FILES = new Set([
+	join('lib', 'is-ios.ts'),
+	join('lib', 'plugin-debug.tsx'),
+	join('lib', 'resolve-permissions.ts'),
+	join('lib', 'use-frame.ts'),
+	join('lib', 'use-on-value-change.ts'),
+	join('lib', 'use-parent.ts'),
+	join('lib', 'use-why-render.ts'),
+]);
 
 function walk(dir) {
 	const out = [];
@@ -224,6 +233,7 @@ for (const dirName of COPY_DIRS) {
 	if (!existsSync(sourceDir)) continue;
 	for (const file of walk(sourceDir)) {
 		const rel = relative(upstreamRoot, file);
+		if (OMITTED_UPSTREAM_FILES.has(rel)) continue;
 		let destRel = rel;
 		if (destRel.endsWith('.tsx')) destRel = destRel.replace(/\.tsx$/, '.tsrx');
 		const dest = join(DEST, destRel);
