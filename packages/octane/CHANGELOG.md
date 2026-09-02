@@ -1,5 +1,19 @@
 # octane
 
+## 0.2.0
+
+### Minor Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
+### Patch Changes
+
+- 456ac4b: Preserve element and fragment ref ownership when a suspended root rolls back, so retries detach the previous ref and attach only the committed replacement. Keep native parsing first while accepting valid TSRX syntax supported by the JavaScript parser, without hiding operational failures or malformed input. Update TSRX core to 0.1.63 and adopt its released computed-key source mapping fix.
+- f6bea37: Keep ordinary delegated continuous-event updates responsive while an unrelated async transition Action is pending. Continuous events retain microtask batching, and updates explicitly wrapped in a transition still wait for the Action.
+- 597929f: Scope delegated events to native root boundaries, preserve shadow/slot event paths and logical portal ancestry, and separate framework propagation cancellation from external native stop flags. Native `stopImmediatePropagation()` no longer truncates an already-running delegated handler queue; use `stopPropagation()` as well to stop the remaining handlers in that logical phase.
+
+  Expose native dialog lifecycle event handlers on logical ancestors in JSX typings.
+
 ## 0.1.51
 
 ### Patch Changes

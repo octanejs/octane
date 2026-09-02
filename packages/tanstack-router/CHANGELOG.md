@@ -1,5 +1,11 @@
 # @octanejs/tanstack-router
 
+## 0.1.51
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
 ## 0.1.50
 
 ### Patch Changes

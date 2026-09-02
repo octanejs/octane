@@ -1,5 +1,15 @@
 # @octanejs/docusaurus
 
+## 0.0.36
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/mdx@0.1.49
+  - @octanejs/remix-router@0.1.48
+  - @octanejs/seo@0.0.37
+
 ## 0.0.35
 
 ### Patch Changes

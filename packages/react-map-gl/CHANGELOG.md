@@ -1,5 +1,11 @@
 # @octanejs/react-map-gl
 
+## 0.0.24
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
 ## 0.0.23
 
 ### Patch Changes

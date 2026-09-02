@@ -1,5 +1,14 @@
 # @octanejs/drei
 
+## 0.0.18
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/three@0.1.45
+  - @octanejs/zustand@0.1.51
+
 ## 0.0.17
 
 ### Patch Changes

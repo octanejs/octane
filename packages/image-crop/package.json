@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/image-crop",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "react-image-crop for Octane with matching crop interaction behavior.",
   "license": "ISC",
   "type": "module",

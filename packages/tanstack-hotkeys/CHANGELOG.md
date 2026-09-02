@@ -1,5 +1,13 @@
 # @octanejs/tanstack-hotkeys
 
+## 0.0.41
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/tanstack-store@0.0.46
+
 ## 0.0.40
 
 ### Patch Changes

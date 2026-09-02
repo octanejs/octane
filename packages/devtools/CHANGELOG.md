@@ -1,5 +1,11 @@
 # @octanejs/devtools
 
+## 0.0.40
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
 ## 0.0.39
 
 ### Patch Changes
