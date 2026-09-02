@@ -76,6 +76,7 @@ const DIRECTIVE_TYPES = new Set([
  *   firstHash: string | null,
  *   staticClasses: Map<any, string | null>,
  *   appliedParts: Map<any, Array<string | any>>,
+ *   runtimeApplied: any[],
  * }} PassState
  */
 
@@ -92,9 +93,11 @@ export function createStyleScopePass(tools) {
 	 *
 	 * @param {any} root
 	 * @param {any} ctx
-	 * @returns {{ node: any, cssHash: string | null }} the rewritten node and
-	 *   the outermost scope hash the root owns (or `null`), kept for callers
-	 *   that key "this component has scoped CSS" on it
+	 * @returns {{ node: any, cssHash: string | null, runtimeApplied: any[] }}
+	 *   the rewritten node, the outermost scope hash the root owns (or `null`,
+	 *   kept for callers that key "this component has scoped CSS" on it), and
+	 *   the `theme.$class` targets the root's standalone scopes read at runtime
+	 *   (imported themes), one per distinct target expression
 	 */
 	function applyStyleScopes(root, ctx) {
 		/** @type {PassState} */
@@ -107,9 +110,10 @@ export function createStyleScopePass(tools) {
 			firstHash: null,
 			staticClasses: new Map(),
 			appliedParts: new Map(),
+			runtimeApplied: [],
 		};
 		const node = walk(root, state, 'statement');
-		return { node, cssHash: state.firstHash };
+		return { node, cssHash: state.firstHash, runtimeApplied: state.runtimeApplied };
 	}
 
 	return { applyStyleScopes };
@@ -589,6 +593,9 @@ function prepareScope(own, state) {
 			if (typeof part !== 'string' || !applied.includes(part)) applied.push(part);
 		}
 	}
+	for (const part of applied) {
+		if (typeof part !== 'string') recordRuntimeApplied(part.object, state);
+	}
 	return { hash, applied };
 }
 
@@ -685,16 +692,77 @@ function lowerAssignedStyle(styleNode, state) {
 		clone,
 		styleNode.metadata?.styleKind === 'theme' ? 'theme' : 'class-map',
 	);
+	const css = renderStylesheets([clone]);
 	ctx.cssInjections.push({
 		hash,
-		css: renderStylesheets([clone]),
+		css,
 		order: nextOrder(state),
 		origin: styleNode,
 	});
 	ctx.runtimeNeeded.add('injectStyle');
 	// The class-map object is built loc-less by the core helper; it maps to the
 	// authored <style>.
-	return tools.inheritOriginLoc(createStyleClassMapFromStylesheet(clone, { applied }), styleNode);
+	return wrapServerStyleMap(
+		tools.inheritOriginLoc(createStyleClassMapFromStylesheet(clone, { applied }), styleNode),
+		hash,
+		css,
+		applied,
+		state,
+	);
+}
+
+/**
+ * On the server a module's assigned blocks only inject inside the bodies of
+ * that module's own components; a theme read from ANOTHER module would never
+ * reach the request collector. Wrap the map so property access injects its
+ * CSS (after the CSS of the themes it applies) into the active render.
+ *
+ * @param {any} map
+ * @param {string} hash
+ * @param {string} css
+ * @param {Array<string | any>} applied
+ * @param {PassState} state
+ * @returns {any}
+ */
+function wrapServerStyleMap(map, hash, css, applied, state) {
+	const { ctx, tools } = state;
+	if (ctx.mode !== 'server') return map;
+	ctx.runtimeNeeded.add('styleMap');
+	const dependencies = applied
+		.filter((part) => typeof part !== 'string')
+		.map((part) => cloneAstNode(part.object));
+	return tools.inheritOriginLoc(
+		b.call(
+			'_$styleMap',
+			b.literal(hash, JSON.stringify(hash)),
+			b.literal(css, JSON.stringify(css)),
+			map,
+			...(dependencies.length > 0 ? [b.array(dependencies)] : []),
+		),
+		map,
+	);
+}
+
+/**
+ * @param {any} expression the theme expression read at runtime (`theme` of `theme.$class`)
+ * @param {PassState} state
+ */
+function recordRuntimeApplied(expression, state) {
+	const key = expressionKey(expression);
+	if (state.runtimeApplied.some((existing) => expressionKey(existing) === key)) return;
+	state.runtimeApplied.push(expression);
+}
+
+/**
+ * @param {any} node
+ * @returns {string}
+ */
+function expressionKey(node) {
+	if (node?.type === 'Identifier') return node.name;
+	if (node?.type === 'MemberExpression' && !node.computed) {
+		return `${expressionKey(node.object)}.${expressionKey(node.property)}`;
+	}
+	return JSON.stringify(node, (key, value) => (SKIP_KEYS.has(key) ? undefined : value));
 }
 
 // --- class stamping ----------------------------------------------------------

@@ -234,6 +234,10 @@ function inheritOriginLoc(root, origin) {
 	if (origin == null || origin.loc == null) return root;
 	const { start, end, loc } = origin;
 	mapAst(root, (node) => {
+		// A parsed `<style>` body is a CSS AST whose positions are relative to the
+		// CSS text, never to the module: stamping module positions onto it would
+		// corrupt the scoped-CSS render (and it is parser-owned, so shared).
+		if (node.type === 'StyleSheet') return node;
 		// Only real AST nodes are stamped — mapAst also visits typeless data
 		// objects (TemplateElement.value, Literal.regex, embedded config), which
 		// must stay untouched (and may be frozen).
@@ -10340,6 +10344,9 @@ function compileServerComponent(node, ctx) {
 	const scoping = applyStyleScopes(node, ctx);
 	node = scoping.node;
 	const cssHash = scoping.cssHash;
+	// Imported themes this component applies: touched at the top of its body
+	// (see serverThemeTouchStatements) so their CSS precedes the component's.
+	ctx._serverThemeTouches = scoping.runtimeApplied;
 	const cssEntries = [...ctx.moduleCssInjections, ...ctx.cssInjections.slice(beforeCss)].sort(
 		(a, b) => a.order - b.order,
 	);
@@ -10631,6 +10638,8 @@ function ssrCompileBodyWithMapTemps(
 	ctx._valueDirectiveLowering = prevValueDirectiveLowering;
 
 	const body = [];
+	body.push(...serverThemeTouchStatements(ctx._serverThemeTouches ?? [], ctx, node));
+	ctx._serverThemeTouches = null;
 	if (cssEntries && cssEntries.length) {
 		ctx.runtimeNeeded.add('injectStyle');
 		for (const entry of cssEntries) {
@@ -10847,6 +10856,23 @@ function ssrCall(helper, args, origin) {
 	return inheritOriginLoc(
 		b.call(typeof helper === 'string' ? `_$${helper}` : helper, ...args),
 		origin,
+	);
+}
+
+/**
+ * `_$touchStyleMap(theme)` for every imported theme a server component's
+ * scopes apply, emitted before the component's own `injectStyle` calls so the
+ * theme's CSS (a lazily injecting `_$styleMap`) lands first in the request
+ * collector and the applying scope's rules win the cascade.
+ */
+function serverThemeTouchStatements(runtimeApplied, ctx, origin) {
+	if (!runtimeApplied || runtimeApplied.length === 0) return [];
+	ctx.runtimeNeeded.add('touchStyleMap');
+	return runtimeApplied.map((expression) =>
+		inheritOriginLoc(
+			b.stmt(ssrCall('touchStyleMap', [cloneAstNode(expression)], expression)),
+			origin,
+		),
 	);
 }
 
@@ -17274,6 +17300,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 							compInlinedSubs,
 							cssHash,
 							cssEntries,
+							scoping.runtimeApplied,
 						),
 					};
 				}
@@ -17353,6 +17380,10 @@ function compileReturnJsxFunction(node, ctx, options) {
 			}),
 		);
 	}
+	if (ctx.mode === 'server' && !ctx.nativeReads) {
+		// Imported themes inject on read; touch them ahead of this body's own CSS.
+		returnBody.unshift(...serverThemeTouchStatements(scoping.runtimeApplied, ctx, node));
+	}
 	const emittedFunction = b.function_declaration(
 		node.id,
 		node.params,
@@ -17396,7 +17427,15 @@ function compileReturnJsxFunction(node, ctx, options) {
 	return { nodes: [fn] };
 }
 
-function nativeReturnedJsxValue(node, ctx, name, inlinedSubs, cssHash, cssEntries) {
+function nativeReturnedJsxValue(
+	node,
+	ctx,
+	name,
+	inlinedSubs,
+	cssHash,
+	cssEntries,
+	runtimeApplied = [],
+) {
 	let value;
 	if (requiresTemplateNormalization(node, 'html', true, ctx)) {
 		// Head resources, directive roots and other compiler-only syntax keep
@@ -17416,7 +17455,8 @@ function nativeReturnedJsxValue(node, ctx, name, inlinedSubs, cssHash, cssEntrie
 	}
 	// A stored styled value may be constructed outside an SSR render. Its CSS
 	// enters the request collector when interpreted, not a global pending queue.
-	if (cssHash === null && !ctx.nativeModuleStyles) return value;
+	const themeTouches = serverThemeTouchStatements(runtimeApplied, ctx, node);
+	if (cssHash === null && !ctx.nativeModuleStyles && themeTouches.length === 0) return value;
 	const scopedElement = runtimeAliasForContext(ctx, 'nativeCreateScopedElement');
 	const scopedValue = runtimeAliasForContext(ctx, 'nativeCreateScopedValue');
 	// A static styled fragment needs a reader too, even when it only owns a
@@ -17437,15 +17477,18 @@ function nativeReturnedJsxValue(node, ctx, name, inlinedSubs, cssHash, cssEntrie
 			node,
 		);
 	}
-	if (cssEntries.length === 0) return value;
-	ctx.runtimeNeeded.add('injectStyle');
-	const css = cssEntries.map((entry) => {
-		const origin = claimCssOrigins(ctx, entry) ?? node;
-		return inheritOriginLoc(
-			b.stmt(ssrCall('injectStyle', [b.literal(entry.hash), b.literal(entry.css)], origin)),
-			origin,
-		);
-	});
+	if (cssEntries.length === 0 && themeTouches.length === 0) return value;
+	if (cssEntries.length > 0) ctx.runtimeNeeded.add('injectStyle');
+	const css = [
+		...themeTouches,
+		...cssEntries.map((entry) => {
+			const origin = claimCssOrigins(ctx, entry) ?? node;
+			return inheritOriginLoc(
+				b.stmt(ssrCall('injectStyle', [b.literal(entry.hash), b.literal(entry.css)], origin)),
+				origin,
+			);
+		}),
+	];
 	const readerIndex =
 		value.callee?.name === scopedValue ? 0 : value.callee?.name === scopedElement ? 2 : -1;
 	if (readerIndex === -1) {

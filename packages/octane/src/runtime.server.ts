@@ -5817,6 +5817,48 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 	if (CSS !== null) CSS.set(id, nonce === undefined ? { css } : { css, nonce });
 }
 
+/**
+ * A compiled assigned `<style>` block (`const theme = <style>…</style>`) on the
+ * server. Its CSS belongs to whichever request reads the map — a component in
+ * another module applying `theme` or using `theme.card` — so injection happens
+ * on property access into the active render's collector, after the CSS of the
+ * themes this block itself applies (`applied`), which keeps the cascade order
+ * "applied before applier" across modules. Reads outside a render are no-ops.
+ */
+export function styleMap<T extends object>(
+	id: string,
+	css: string,
+	map: T,
+	applied: ReadonlyArray<unknown> = [],
+): T {
+	let touching = false;
+	const touch = () => {
+		if (CSS === null || touching) return;
+		touching = true;
+		try {
+			for (const dependency of applied) touchStyleMap(dependency);
+			injectStyle(id, css);
+		} finally {
+			touching = false;
+		}
+	};
+	return new Proxy(map, {
+		get(target, key, receiver) {
+			touch();
+			return Reflect.get(target, key, receiver);
+		},
+	});
+}
+
+/**
+ * Compiled at the top of a server component body for every imported theme it
+ * applies, before its own `injectStyle` calls: reading the map injects the
+ * theme's CSS first, so the applying scope's rules win the cascade.
+ */
+export function touchStyleMap(map: unknown): void {
+	if (map !== null && typeof map === 'object') void (map as { $class?: unknown }).$class;
+}
+
 // Compiler-emitted for each hoisted `<title>`/`<meta>`/`<link>` (rendered
 // anywhere in a component). Serializes the element inside a paired ownership
 // marker interval that the client's headBlock adopts and appends it to the active

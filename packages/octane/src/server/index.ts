@@ -173,6 +173,8 @@ export {
 	ssrPortal,
 	injectStyle,
 	ssrHeadEl,
+	styleMap,
+	touchStyleMap,
 	// React Float resources (stylesheet precedence links, style resources, async scripts)
 	ssrStylesheetResource,
 	ssrStyleResource,
