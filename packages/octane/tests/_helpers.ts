@@ -87,17 +87,20 @@ export function mount<P = undefined>(body: ComponentBody<P>, props?: P): MountRe
 }
 
 /**
- * Synchronously drain any pending useEffect (passive) bodies. Deterministic —
- * doesn't rely on happy-dom's rAF/setTimeout fidelity. Use instead of waiting
+ * Deterministic stand-in for letting the browser settle: commit any render a
+ * script-dispatched event or store write left queued for the microtask
+ * scheduler, then synchronously drain the pending useEffect (passive) bodies.
+ * Doesn't rely on happy-dom's rAF/setTimeout fidelity. Use instead of waiting
  * for real paint cycles.
  */
 export function flushEffects(): void {
+	flushSync(() => {});
 	drainPassiveEffects();
 }
 
 /** Older name kept for tests that read more naturally with it. */
 export function nextPaint(): Promise<void> {
-	drainPassiveEffects();
+	flushEffects();
 	return Promise.resolve();
 }
 

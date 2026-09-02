@@ -268,7 +268,7 @@
     },
     {
       "path": "packages/drei/tests/html.test.ts",
-      "sha256": "7ca6b96b13f6b8f5c8a0bc27e454f838fb2da32a4d62992953e68b15de59e910",
+      "sha256": "c04bf49b4b11c4967dd1c5fc5e4b7378b30fc4f10b3397e09ce1b6d9318a7ba5",
       "assertionCount": 6,
       "assertionInventorySha256": "818953973ef24f43abf87484bb4491c843a805532adaccffec6908e213eedfd6"
     },

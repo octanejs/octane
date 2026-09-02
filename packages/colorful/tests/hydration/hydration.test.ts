@@ -30,8 +30,9 @@ const SERVER_HTML =
 	'<!--]-->';
 
 function settle() {
-	drainPassiveEffects();
+	// Commit the render a dispatched event left queued, then run its passive effects.
 	flushSync(() => {});
+	drainPassiveEffects();
 }
 
 describe('@octanejs/colorful — hydration', () => {

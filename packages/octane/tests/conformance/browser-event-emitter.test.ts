@@ -182,11 +182,11 @@ describe('ReactBrowserEventEmitter — handler mutation during a dispatch', () =
 				r.root.render(ClickTree, { onParent: undefined, onChild: () => log.push('CHILD2') });
 			},
 		});
-		(r.find('.child') as HTMLElement).click();
+		flushSync(() => (r.find('.child') as HTMLElement).click());
 		expect(parentClicks).toBe(1);
 		// The removal DID commit after the event: a second click reaches nobody's
 		// parent handler.
-		(r.find('.child') as HTMLElement).click();
+		flushSync(() => (r.find('.child') as HTMLElement).click());
 		expect(parentClicks).toBe(1);
 		r.unmount();
 	});
@@ -203,10 +203,10 @@ describe('ReactBrowserEventEmitter — handler mutation during a dispatch', () =
 				r.root.render(ClickTree, { onParent: parentHandler, onChild: () => {} });
 			},
 		});
-		(r.find('.child') as HTMLElement).click();
+		flushSync(() => (r.find('.child') as HTMLElement).click());
 		expect(parentClicks).toBe(0);
 		// After the event the insertion has committed — the next click reaches it.
-		(r.find('.child') as HTMLElement).click();
+		flushSync(() => (r.find('.child') as HTMLElement).click());
 		expect(parentClicks).toBe(1);
 		r.unmount();
 	});

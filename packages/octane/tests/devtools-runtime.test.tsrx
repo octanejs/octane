@@ -80,7 +80,7 @@ describe('runtime devtools instrumentation (profile build)', () => {
 	);
 
 	it(
-		'notifies subscribers when a synchronous click reaches its already-queued commit',
+		'notifies subscribers when a script-dispatched click reaches its microtask commit',
 		async () => {
 			const rendered = mount(<CounterApp />);
 			let off = () => {};
@@ -88,7 +88,8 @@ describe('runtime devtools instrumentation (profile build)', () => {
 				await Promise.resolve();
 				const button = rendered.find('button') as HTMLButtonElement;
 				button.click();
-				expect(rendered.find('span').textContent).toBe('1');
+				// The click's update stays batched until the dispatching script yields.
+				expect(rendered.find('span').textContent).toBe('0');
 
 				const observedTrees: string[][] = [];
 				off = hook().subscribe(() => {

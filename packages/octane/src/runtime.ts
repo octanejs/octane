@@ -1209,10 +1209,11 @@ let QUEUE_REINDEX_EPOCH = 0;
 let scheduled = false;
 let syncFlush = false; // flushSync sets this to drain the queue synchronously
 // True while a flush (drainQueue/commitEffects) is on the stack. A flushSync
-// that lands during it — most commonly maybeFlushDiscrete for a DISCRETE event
-// the browser dispatches SYNCHRONOUSLY inside a commit-phase DOM mutation
-// (Chrome fires `blur`/`focusout` from removeChild when the focused element's
-// subtree is torn down) — must NOT drain re-entrantly: the outer removal walk
+// that lands during it — a handler's own flushSync, or maybeFlushDiscrete when a
+// controlled restore is pending for a DISCRETE event the browser dispatches
+// SYNCHRONOUSLY inside a commit-phase DOM mutation (Chrome fires `blur`/
+// `focusout`/`change` from removeChild when the focused element's subtree is
+// torn down) — must NOT drain re-entrantly: the outer removal walk
 // holds cached sibling pointers, and a nested commit mutating the same range
 // corrupts it (removeChild: "not a child"). React's rule ("flushSync was called
 // from inside a lifecycle method… cannot flush when already rendering"): run
@@ -4877,8 +4878,9 @@ function drainPassivesBeforeRender(): void {
  * React-DOM parity. Runs `fn` and synchronously drains any renders/effects it scheduled
  * before returning. Bypasses the microtask-batched flush — used by the benchmark
  * timing rig to measure operation wall-clock without microtask coalescing. Also the
- * discrete-event commit path: maybeFlushDiscrete flushes through here so
- * click/keydown/input handlers commit before the browser regains control.
+ * controlled-restore commit path: maybeFlushDiscrete flushes through here at the
+ * outermost boundary of a discrete event that armed a controlled `value`/`checked`
+ * restore, so the restore compares the DOM against freshly committed state.
  */
 export function flushSync<T>(fn: () => T): T {
 	// Already inside a flush — a DISCRETE event the browser dispatched
@@ -16602,10 +16604,20 @@ function unregisterDelegationTarget(target: Node, root = false): void {
 }
 
 /**
- * Event types that use Octane's outermost delegated-dispatch sync flush, so
- * subsequent interactions observe committed state and controlled values.
- * Updates still batch inside a handler: setState followed by a DOM read does
- * not observe the update without an explicit flushSync.
+ * Event types whose outermost delegated dispatch is a commit boundary. React's
+ * `batchedUpdates` (react-dom-bindings ReactDOMUpdateBatching.js) flushes sync
+ * work at the end of the outermost event handler ONLY when a controlled
+ * form control has a pending state restore; every other discrete update lands
+ * in the sync-lane microtask. Octane follows the same policy (maybeFlushDiscrete):
+ * a dispatch that armed a controlled restore commits synchronously so the
+ * restore compares the DOM against the values the handlers just rendered, and
+ * any other handler-scheduled work keeps the ordinary microtask batch. For a
+ * browser-dispatched event the microtask checkpoint runs before the next native
+ * listener and before the default action, so later listeners still observe
+ * committed state; a script-dispatched event (dispatchEvent, click(),
+ * requestSubmit()) commits only after the dispatching script yields, exactly
+ * as React does. Updates still batch inside a handler: setState followed by a
+ * DOM read does not observe the update without an explicit flushSync.
  *
  * Based on facebook/react packages/react-dom-bindings/src/events/
  * ReactDOMEventListener.js — getEventPriority. React's priority classification
@@ -17056,18 +17068,23 @@ function reportListenerError(err: unknown): void {
 	console.error(err);
 }
 
-// Only the OUTERMOST discrete dispatch flushes: nested programmatic dispatches
-// inherit the outer commit window. Non-discrete events keep microtask batching;
-// they must not be staged with an unrelated async Action merely because they do
-// not flush synchronously here.
+// Only the OUTERMOST discrete dispatch is a commit boundary: nested programmatic
+// dispatches inherit the outer window. Like React's batchedUpdates, the boundary
+// commits synchronously only when a controlled form control armed a state
+// restore (input/change/click on a `value`/`checked` host); every other discrete
+// update stays in the microtask batch scheduleRender already armed, so a
+// script-dispatched event never publishes a commit mid-dispatch that React would
+// publish after the dispatching script yields. Non-discrete events keep microtask
+// batching too; they must not be staged with an unrelated async Action merely
+// because they do not flush synchronously here.
 function maybeFlushDiscrete(type: string): void {
-	if (_dispatchDepth === 0 && DISCRETE_EVENTS.has(type)) {
+	if (_dispatchDepth === 0 && DISCRETE_EVENTS.has(type) && pendingRestores.length > 0) {
 		// Commit handler-scheduled work first, so the controlled restore below
 		// compares the DOM against the values the handlers just rendered.
 		if (hasPendingWork()) {
 			// A transition-only queue in an app armed for ViewTransition must reach the
 			// regular flush controller. flushSync deliberately skips animations; using
-			// it here meant the canonical onClick={() => startTransition(...)} pattern
+			// it here meant the canonical onInput={() => startTransition(...)} pattern
 			// could never call document.startViewTransition. flush() also knows how to
 			// leave a second transition queued while an earlier one is still in flight.
 			if (VIEW_TRANSITION_DRIVER?.queueAllTransition() === true) flush();
@@ -17076,7 +17093,7 @@ function maybeFlushDiscrete(type: string): void {
 		// The restore runs even when NO work was scheduled — a rejected/unheard
 		// edit (no onInput, or an Object.is-equal setState) schedules nothing and
 		// is exactly the case that must snap back (React's restoreControlledState).
-		if (pendingRestores.length > 0) restoreControlledStates();
+		restoreControlledStates();
 	}
 	// Clear after the click's own handlers (and its outermost flush, when this is
 	// not a nested dispatch), including canceled/eventless activations.
@@ -17093,8 +17110,9 @@ function finishCaptureDispatch(event: Event): void {
 	if (!DISCRETE_EVENTS.has(type)) return;
 	const bubbleVersion = (event as any)[DELEGATED_BUBBLE_VERSION];
 	const fallback = () => {
-		// Any delivered bubble segment flushes all capture-scheduled work. When a
-		// native listener stops the event below its root, close that window here.
+		// A delivered bubble segment closes the capture segment's commit boundary
+		// (controlled restores and their sync flush). When a native listener stops
+		// the event below its root, close that window here instead.
 		if ((event as any)[DELEGATED_BUBBLE_VERSION] === bubbleVersion) {
 			maybeEnqueueRestore(event);
 			maybeFlushDiscrete(type);
@@ -18029,11 +18047,17 @@ export function setValue(el: Element, value: unknown): void {
 	const prev = ctrl.v;
 	ctrl.v = value;
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
-	if (input.defaultValue !== s) input.defaultValue = s;
+	// PROPERTY before attribute (React updateInput order), as on mount. A control
+	// a native form reset left NON-DIRTY follows its value attribute, so an
+	// attribute-first write would move the live value itself and make the
+	// property write below look unnecessary — leaving the control non-dirty
+	// (a later attribute change would drag the value again) where React's
+	// property write marks it dirty. Reachable whenever the commit lands after
+	// the reset button's default action, i.e. any script-dispatched click.
 	// IME: an UNCHANGED rendered value must not cancel an active composition;
 	// a genuinely changed one still wins (React: setState during composition).
-	if (ctrl.composing && Object.is(prev, value)) return;
-	if (valueNeedsWrite(input, value)) input.value = s;
+	if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value)) input.value = s;
+	if (input.defaultValue !== s) input.defaultValue = s;
 }
 
 /**

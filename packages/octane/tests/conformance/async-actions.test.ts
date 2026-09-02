@@ -58,13 +58,13 @@ describe('conformance: delegated events during async actions', () => {
 			type: 'pointerdown',
 			discrete: true,
 			transition: false,
-			name: 'bubble pointerdown still commits synchronously',
+			name: 'bubble pointerdown commits without waiting for the action',
 		},
 		{
 			type: 'click',
 			discrete: true,
 			transition: false,
-			name: 'capture click still commits synchronously',
+			name: 'capture click commits without waiting for the action',
 		},
 		{
 			type: 'pointermove',
@@ -72,7 +72,7 @@ describe('conformance: delegated events during async actions', () => {
 			transition: true,
 			name: 'explicit pointermove transition remains held',
 		},
-	])('$name while an action is pending', async ({ type, discrete, transition }) => {
+	])('$name while an action is pending', async ({ type, transition }) => {
 		const gate = deferred();
 		const r = mount(AsyncActionEvents, { gate: gate.promise, transition });
 		try {
@@ -84,8 +84,10 @@ describe('conformance: delegated events during async actions', () => {
 			expect(r.find('#event-saved').textContent).toBe('initial');
 
 			r.find(`#event-${type}`).dispatchEvent(new Event(type, { bubbles: type !== 'scroll' }));
-			// Continuous interactions retain microtask batching rather than flushing inline.
-			expect(r.find('#event-count').textContent).toBe(discrete ? '1' : '0');
+			// Delegated updates commit in their own microtask batch (React's
+			// batchedUpdates flushes synchronously only for a pending controlled
+			// restore). What must hold is that the pending Action does not hold them.
+			expect(r.find('#event-count').textContent).toBe('0');
 			await microtasks();
 			expect(r.find('#event-count').textContent).toBe(transition ? '0' : '1');
 			expect(r.find('#event-pending').textContent).toBe('pending');

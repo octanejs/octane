@@ -11,7 +11,7 @@
  * dispatches through a portal and asserts the React-parent handler fires).
  */
 import { describe, it, expect } from 'vitest';
-import { mount } from '../_helpers';
+import { act, mount } from '../_helpers';
 import { NestedPortals } from '../_fixtures/portal-bubbling.tsrx';
 
 function makeTarget(id: string): HTMLElement {
@@ -22,7 +22,7 @@ function makeTarget(id: string): HTMLElement {
 }
 
 describe('portal event bubbling — nested portals', () => {
-	it('a click in a doubly-portaled node bubbles through both logical parents', () => {
+	it('a click in a doubly-portaled node bubbles through both logical parents', async () => {
 		const targetA = makeTarget('targetA');
 		const targetB = makeTarget('targetB');
 		const r = mount(NestedPortals, { targetA, targetB });
@@ -31,7 +31,7 @@ describe('portal event bubbling — nested portals', () => {
 		const deep = targetB.querySelector('.deep') as HTMLElement;
 		expect(deep).toBeTruthy();
 
-		deep.click();
+		await act(() => deep.click());
 
 		// btn (own handler) -> mid (inner portal's host, in targetA) -> root
 		// (outer portal's host, in the app container). All three fire, in order.
@@ -42,13 +42,13 @@ describe('portal event bubbling — nested portals', () => {
 		targetB.remove();
 	});
 
-	it('stopPropagation at the middle logical parent halts the bubble before root', () => {
+	it('stopPropagation at the middle logical parent halts the bubble before root', async () => {
 		const targetA = makeTarget('targetA');
 		const targetB = makeTarget('targetB');
 		const r = mount(NestedPortals, { targetA, targetB, stopAtMid: true });
 
 		const deep = targetB.querySelector('.deep') as HTMLElement;
-		deep.click();
+		await act(() => deep.click());
 
 		// btn fires, mid fires and cancels bubbling, root never sees it.
 		expect(r.find('.trail').textContent).toBe('btn,mid,');

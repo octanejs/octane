@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
-import { mount } from './_helpers';
+import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
 import { BoundEventArguments } from './_fixtures/attrs-event-arguments';
 import {
@@ -236,16 +236,24 @@ describe('events + useState', () => {
 		r.unmount();
 	});
 
-	it('maps onDoubleClick to the native dblclick event', () => {
+	it('maps onDoubleClick to the native dblclick event', async () => {
 		const r = mount(DoubleClicker);
-		r.find('button').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+		await act(() => {
+			r.find('button').dispatchEvent(
+				new MouseEvent('dblclick', { bubbles: true, cancelable: true }),
+			);
+		});
 		expect(r.find('button').textContent).toBe('1');
 		r.unmount();
 	});
 
-	it('maps spread onDoubleClick to the native dblclick event', () => {
+	it('maps spread onDoubleClick to the native dblclick event', async () => {
 		const r = mount(SpreadDoubleClicker);
-		r.find('button').dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+		await act(() => {
+			r.find('button').dispatchEvent(
+				new MouseEvent('dblclick', { bubbles: true, cancelable: true }),
+			);
+		});
 		expect(r.find('button').textContent).toBe('1');
 		r.unmount();
 	});

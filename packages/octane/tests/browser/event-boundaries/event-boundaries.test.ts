@@ -238,3 +238,38 @@ describe.sequential('trusted event propagation across native listener and root b
 		]);
 	});
 });
+
+describe.sequential('commit timing at the delegated dispatch boundary', () => {
+	// React's batchedUpdates defers a non-controlled discrete update to the
+	// sync-lane microtask. For a browser-dispatched click that microtask
+	// checkpoint runs before the next native listener, so a document listener
+	// already observes the committed DOM; a script-dispatched click keeps the JS
+	// stack busy, so the same listener observes the pre-commit DOM and the update
+	// lands once the dispatching script yields. Octane and React must agree.
+	// https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-dom-bindings/src/events/ReactDOMUpdateBatching.js
+	for (const runtime of ['octane', 'react'] as const) {
+		it(`${runtime}: a trusted click commits before a later native listener runs`, async () => {
+			const page = await openCase({ kind: 'commit-timing' });
+			const labels = await click(page, runtime);
+			expect(labels).toEqual(['inner:bubble', 'native:document:1']);
+			expect(await page.evaluate((r) => window.__eventBoundaries.targetText(r), runtime)).toBe('1');
+		});
+
+		it(`${runtime}: a script click commits only after the dispatching script yields`, async () => {
+			const page = await openCase({ kind: 'commit-timing' });
+			const observed = await page.evaluate(async (r) => {
+				const api = window.__eventBoundaries;
+				api.scriptClick(r);
+				const duringScript = api.targetText(r);
+				const labels = api.logs[r].map(({ label }) => label);
+				await new Promise<void>((resolve) => setTimeout(resolve, 0));
+				return { duringScript, labels, afterYield: api.targetText(r) };
+			}, runtime);
+			expect(observed).toEqual({
+				duringScript: '0',
+				labels: ['inner:bubble', 'native:document:0'],
+				afterYield: '1',
+			});
+		});
+	}
+});
