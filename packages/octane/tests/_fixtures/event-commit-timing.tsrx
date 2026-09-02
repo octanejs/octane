@@ -16,3 +16,23 @@ export function CommitTiming(props: EventProbeProps) @{
 		<button data-name="target" data-target>{count as number}</button>
 	</section>
 }
+
+// Controlled text input under a capture-phase handler. The capture handler is
+// what makes the root's capture listener run for `input`; a trusted keystroke
+// must still reach onInput with the typed value and commit it. The React
+// counterpart is written directly in the browser harness (main.ts).
+export function ControlledCapture(props: EventProbeProps) @{
+	const [value, setValue] = useState('');
+	<section data-name="form" onInputCapture={(event) => props.record('form:capture', event)}>
+		<input
+			data-name="target"
+			data-target
+			value={value}
+			onInput={(event) => {
+				setValue((event.currentTarget as HTMLInputElement).value);
+				props.record('target:bubble', event);
+			}}
+		/>
+		<output data-output>{value as string}</output>
+	</section>
+}

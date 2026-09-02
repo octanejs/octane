@@ -5,7 +5,10 @@ import { createRoot as createReactRoot } from 'react-dom/client';
 import { flushSync as flushReactSync } from 'react-dom';
 import { createElement, useState } from 'react';
 import * as OctaneFixture from '../../_fixtures/event-boundaries.tsrx';
-import { CommitTiming as OctaneCommitTiming } from '../../_fixtures/event-commit-timing.tsrx';
+import {
+	CommitTiming as OctaneCommitTiming,
+	ControlledCapture as OctaneControlledCapture,
+} from '../../_fixtures/event-commit-timing.tsrx';
 import * as ReactFixture from 'virtual:event-boundaries-react-fixture';
 import type { EventProbeProps } from '../../_fixtures/event-boundaries.tsrx';
 
@@ -26,7 +29,8 @@ export type ProbeOptions =
 	| { kind: 'nested'; stop: boolean }
 	| { kind: 'shadow'; mode: ShadowRootMode }
 	| { kind: 'slot' }
-	| { kind: 'commit-timing' };
+	| { kind: 'commit-timing' }
+	| { kind: 'controlled-capture'; stop: boolean };
 type HandlerRecord = {
 	label: string;
 	trusted: boolean;
@@ -179,6 +183,51 @@ function mountCommitTiming(runtime: RuntimeName): void {
 	});
 }
 
+// The controlled input's React counterpart. onChange is React's per-keystroke
+// text handler; it is dispatched from the same native `input` event as
+// Octane's onInput.
+function ReactControlledCapture(props: EventProbeProps) {
+	const [value, setValue] = useState('');
+	return createElement(
+		'section',
+		{
+			'data-name': 'form',
+			onInputCapture: (event: { nativeEvent: Event }) =>
+				props.record('form:capture', event as unknown as Event),
+		},
+		createElement('input', {
+			'data-name': 'target',
+			'data-target': '',
+			value,
+			onChange: (event: { nativeEvent: Event; currentTarget: HTMLInputElement }) => {
+				setValue(event.currentTarget.value);
+				props.record('target:bubble', event as unknown as Event);
+			},
+		}),
+		createElement('output', { 'data-output': '' }, value),
+	);
+}
+
+function mountControlledCapture(runtime: RuntimeName, stop: boolean): void {
+	const container = containers[runtime];
+	const props: EventProbeProps = { record: (label, event) => record(runtime, label, event) };
+	if (runtime === 'octane') createOctaneRoot(container).render(OctaneControlledCapture, props);
+	else {
+		flushReactSync(() => {
+			createReactRoot(container).render(createElement(ReactControlledCapture, props));
+		});
+	}
+	const target = container.querySelector<HTMLInputElement>('[data-target]')!;
+	targets[runtime] = target;
+	// An outside listener on the input itself runs between the root's capture
+	// and bubble listeners. It records the value the user's edit left in the
+	// field; stopping there keeps the bubble segment from ever reaching the root.
+	target.addEventListener('input', (event) => {
+		record(runtime, `native:target:${target.value}`, event);
+		if (stop) event.stopPropagation();
+	});
+}
+
 function mountShadow(options: Extract<ProbeOptions, { kind: 'shadow' | 'slot' }>): void {
 	const props: EventProbeProps = {
 		record: (label, event) => record('octane', label, event),
@@ -205,6 +254,8 @@ window.__eventBoundaries = {
 			for (const runtime of ['octane', 'react'] as const) {
 				if (options.kind === 'same-root') mountSameRoot(runtime, options.scenario);
 				else if (options.kind === 'commit-timing') mountCommitTiming(runtime);
+				else if (options.kind === 'controlled-capture')
+					mountControlledCapture(runtime, options.stop);
 				else mountNested(runtime, options.stop);
 			}
 		}
@@ -214,6 +265,16 @@ window.__eventBoundaries = {
 	},
 	targetText(runtime: RuntimeName) {
 		return targets[runtime]!.textContent ?? '';
+	},
+	fieldState(runtime: RuntimeName) {
+		const input = targets[runtime] as HTMLInputElement;
+		return {
+			value: input.value,
+			output: containers[runtime].querySelector('[data-output]')?.textContent ?? '',
+			selectionStart: input.selectionStart,
+			selectionEnd: input.selectionEnd,
+			focused: document.activeElement === input,
+		};
 	},
 	clickPoint(runtime: RuntimeName) {
 		const rect = targets[runtime]!.getBoundingClientRect();
@@ -237,6 +298,13 @@ declare global {
 			clickPoint(runtime: RuntimeName): { x: number; y: number };
 			scriptClick(runtime: RuntimeName): void;
 			targetText(runtime: RuntimeName): string;
+			fieldState(runtime: RuntimeName): {
+				value: string;
+				output: string;
+				selectionStart: number | null;
+				selectionEnd: number | null;
+				focused: boolean;
+			};
 			slotDistributesTarget(): boolean;
 		};
 	}

@@ -17118,15 +17118,20 @@ function finishCaptureDispatch(event: Event): void {
 			maybeFlushDiscrete(type);
 		}
 	};
-	const target = event.target as HTMLInputElement | null;
-	const checkableChange =
-		type === 'change' &&
-		target?.localName === 'input' &&
-		(target.type === 'checkbox' || target.type === 'radio');
-	// Chromium may checkpoint microtasks between a checkable's root capture
-	// and bubble observations. Other discrete events retain the established
-	// microtask fallback (notably stopped controlled-select change).
-	if (checkableChange) setTimeout(fallback, 0);
+	// The browser performs a microtask checkpoint after EVERY listener callback
+	// of an event it dispatches itself (the JS stack is empty between them), so
+	// a microtask queued here — from the root's CAPTURE listener — would run
+	// before the target's native listeners and before the root's bubble
+	// listener. For a trusted edit that is fatal: the fallback would restore the
+	// controlled value before onInput could hear the keystroke, snapping every
+	// typed character back to the last rendered value as soon as any
+	// onXxxCapture handler registers the type. Only a task runs after the whole
+	// native propagation. A script-dispatched event keeps the dispatching script
+	// on the stack, so its microtask cannot run until that script yields (after
+	// the bubble segment) and remains the earliest correct fallback there: a
+	// stopped controlled-select change restores in the same microtask batch as
+	// its handlers' updates, before the dispatcher's next task.
+	if (event.isTrusted) setTimeout(fallback, 0);
 	else queueMicrotask(fallback);
 }
 
