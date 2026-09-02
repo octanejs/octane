@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { mount, createLog, type EffectLog } from '../_helpers';
+import { act, mount, createLog, type EffectLog } from '../_helpers';
 import { loadServerFixture } from '../_server-fixture';
 import * as ClientRT from '../../src/index.js';
 import { createRoot, flushSync, hydrateRoot } from '../../src/index.js';
@@ -259,9 +259,13 @@ describe('ReactDOMEventListener — propagation across nested roots', () => {
 	// Per ReactDOMEventListener-test.js:157 — should batch between handlers from
 	// different roots (discrete).
 	//
-	// Each root handles its own segment of the native event path. A discrete
-	// update commits after the inner root, before the event reaches the outer one.
-	it('commits a discrete update before the event enters its outer root', () => {
+	// Each root handles its own segment of the native event path. A script-
+	// dispatched click reaches the outer root before anything commits: React's
+	// batchedUpdates defers a non-controlled discrete update to the microtask, so
+	// nested React roots read the pre-commit DOM the same way. (For a
+	// browser-dispatched click the microtask checkpoint between the two root
+	// listeners commits first — covered by the real-browser event-boundaries suite.)
+	it('batches a discrete update across nested roots until the dispatching script yields', async () => {
 		const log = createLog();
 		let childSet: (v: string) => void = () => {};
 		const childR = mount(BatchChild, {
@@ -282,9 +286,10 @@ describe('ReactDOMEventListener — propagation across nested roots', () => {
 		const span = childR.find('.child-span') as HTMLElement;
 		span.click();
 
-		expect(log.drain()).toEqual(['read:Child', 'read:1']);
-		// Discrete event: the final update is committed synchronously before the
-		// dispatch returns to the browser (React parity).
+		expect(log.drain()).toEqual(['read:Child', 'read:Child']);
+		expect(span.textContent).toBe('Child');
+		// Both roots' updates land in one commit once the script yields.
+		await act(async () => {});
 		expect(span.textContent).toBe('2');
 		childR.unmount();
 		parentR.unmount();

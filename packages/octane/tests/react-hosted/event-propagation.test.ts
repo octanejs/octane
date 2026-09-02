@@ -136,10 +136,13 @@ describe('react-hosted island — native event propagation (§8)', () => {
 		await mounted.unmount();
 	});
 
-	it('commits Octane-local discrete updates before the outer React bubble handler observes the DOM', async () => {
-		// Octane flushes discrete events synchronously inside its own delegated
-		// dispatch at the island host — which runs BEFORE the React root bubble
-		// listener — so a React ancestor observes the post-update island DOM.
+	it('batches an Octane-local discrete update past a script click, like a nested React root', async () => {
+		// The island commits in the microtask after its delegated dispatch (React's
+		// batchedUpdates defers a non-controlled discrete update the same way), so
+		// for a script-dispatched click the React root bubble listener observes the
+		// pre-update island DOM — exactly what a nested React root would show. A
+		// browser-dispatched click commits in the microtask checkpoint between the
+		// island's listener and React's root listener.
 		const observed: string[] = [];
 		const mounted = await mountReactHost(
 			h(
@@ -157,7 +160,8 @@ describe('react-hosted island — native event propagation (§8)', () => {
 		const button = mounted.host().querySelector('.count') as HTMLElement;
 		expect(button.textContent).toBe('count:0');
 		await reactAct(async () => button.click());
-		expect(observed).toEqual(['count:1']);
+		expect(observed).toEqual(['count:0']);
+		expect(button.textContent).toBe('count:1');
 		await mounted.unmount();
 	});
 

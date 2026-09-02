@@ -1315,10 +1315,10 @@ describe('folded return-JSX single root matches the inline @{} oracle', () => {
 		const r = mount(RetCount as any);
 		const btn = r.container.querySelector('button')!;
 		expect(btn.textContent).toBe('0');
-		btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		flushSync(() => btn.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 		expect(btn.textContent).toBe('1');
 		expect(r.container.querySelector('button')).toBe(btn); // SAME node — patched
-		btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		flushSync(() => btn.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 		expect(btn.textContent).toBe('2');
 		expect(r.container.querySelector('button')).toBe(btn);
 		r.unmount();

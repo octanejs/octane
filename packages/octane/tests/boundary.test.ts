@@ -20,7 +20,9 @@ describe('<Suspense> component', () => {
 		const promise = new Promise<string>((r) => (resolveFn = r));
 		const r = mount(SuspenseHost, { promise });
 		expect(r.find('#ready').textContent).toBe('ready');
-		(r.find('#suspend') as HTMLButtonElement).click();
+		await act(() => {
+			(r.find('#suspend') as HTMLButtonElement).click();
+		});
 		expect(r.container.textContent).toContain('loading');
 		expect(r.container.textContent).not.toContain('caught');
 		resolveFn('hi');

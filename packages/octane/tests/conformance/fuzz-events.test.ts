@@ -16,7 +16,7 @@
 //      (React DiscreteEventPriority parity).
 import { describe, it, expect } from 'vitest';
 import { makeRng, makeRootRng } from './_helpers/fuzz-prng';
-import { mount } from '../_helpers';
+import { act, mount } from '../_helpers';
 import { FuzzCounter, resetSnapshots, getSnapshots } from './_fixtures/fuzz-events.tsrx';
 
 const NUM_CASES = parseInt(process.env.OCTANE_FUZZ_EVENT_CASES || '60', 10);
@@ -40,7 +40,11 @@ function clickKind(r: ReturnType<typeof mount>, kind: ButtonKind): void {
 	const sel = '#b-' + kind;
 	const target = (r.container as HTMLElement).querySelector(sel) as HTMLElement | null;
 	if (!target) throw new Error('missing selector ' + sel);
-	target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+	// act() commits the click's batch before the next step reads the DOM; handlers
+	// still run as an ordinary delegated dispatch (nested flushSync stays inline).
+	void act(() => {
+		target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+	});
 }
 
 describe('Event dispatch FUZZ — discrete commits + nested flushSync', () => {

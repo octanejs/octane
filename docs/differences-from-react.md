@@ -874,11 +874,22 @@ setPage(next); // If it suspends, show the pending fallback.
 startTransition(() => setPage(next)); // Keep the previous content while pending.
 ```
 
-Delegated discrete events such as `click` flush at the outermost dispatch boundary.
-Continuous events such as `mousemove`, `pointermove`, and `scroll` retain microtask
-batching; Octane does not give them a separate interruptible priority lane. Ordinary
-delegated event updates do not join an unrelated pending async Action, while an
-explicit `startTransition` inside the handler still opts into transition work.
+Delegated events commit on React's `batchedUpdates` schedule. The outermost
+dispatch of a discrete event such as `click`, `keydown`, `input`, or `submit`
+flushes synchronously only when a controlled `value`/`checked` host armed a state
+restore during that dispatch (an accepted edit commits, an unheard edit snaps
+back, both before the dispatch returns). Every other handler update stays in the
+microtask batch. For a browser-dispatched event that microtask runs before the
+next native listener and before the default action, so later listeners and the
+next interaction observe committed state; a script-dispatched event
+(`dispatchEvent`, `click()`, `requestSubmit()`) commits only after the dispatching
+script yields, so outside code that dispatches and then inspects the DOM sees the
+same pre-commit state it would under React. Tests wrap dispatches in `act()` or
+`flushSync()` for a synchronous commit, as with React. Continuous events such as
+`mousemove`, `pointermove`, and `scroll` retain microtask batching; Octane does not
+give them a separate interruptible priority lane. Ordinary delegated event updates
+do not join an unrelated pending async Action, while an explicit
+`startTransition` inside the handler still opts into transition work.
 
 Already-visible Suspense content stays visible without a timeout during a
 transition, matching React's

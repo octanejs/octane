@@ -404,19 +404,42 @@ describe('ViewTransition features', () => {
 		expect(vt.calls).toHaveLength(0);
 		expect(container.querySelector('div')?.textContent).toBe('Short');
 
-		// The mock's update callback is synchronous but its finished promise settles
-		// in a microtask. A second immediate click therefore exercises the controller's
-		// in-flight path instead of merely repeating the idle case.
-		await act(async () => {
-			const button = container.querySelector('button')!;
-			button.click();
-			button.click();
-			await Promise.resolve();
-		});
+		// A delegated click commits in its microtask batch, which routes the
+		// transition through startViewTransition. Hold the first transition's
+		// `finished` promise open so the second click's batch lands while it is in
+		// flight and exercises the controller's in-flight path instead of repeating
+		// the idle case.
+		const finishes: Array<() => void> = [];
+		(document as never as Record<string, unknown>)['startViewTransition'] = (
+			input: (() => void) | { update: () => void },
+		) => {
+			const options = typeof input === 'function' ? { update: input } : input;
+			vt.calls.push({ options });
+			options.update();
+			return {
+				ready: Promise.resolve(),
+				finished: new Promise<void>((resolve) => finishes.push(resolve)),
+				skipTransition() {},
+			};
+		};
+		const button = container.querySelector('button')!;
+		button.click();
+		await Promise.resolve();
+		expect(vt.calls).toHaveLength(1);
+		button.click();
+		await Promise.resolve();
+		// The second transition waits for the first to finish rather than
+		// interrupting it.
+		expect(vt.calls).toHaveLength(1);
+		finishes[0]();
+		await act(async () => {});
 
 		expect(vt.calls).toHaveLength(2);
 		expect(updates).toBe(2);
 		expect(container.querySelector('div')?.textContent).toBe('Short');
+		// Settle the second transition so no in-flight state outlives this test.
+		for (const finish of finishes) finish();
+		await act(async () => {});
 	});
 
 	it('skips an asynchronous native transition when a click touches no boundary', async () => {

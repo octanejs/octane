@@ -3,8 +3,9 @@
 import { createRoot as createOctaneRoot } from '../../../src/index.js';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import { flushSync as flushReactSync } from 'react-dom';
-import { createElement } from 'react';
+import { createElement, useState } from 'react';
 import * as OctaneFixture from '../../_fixtures/event-boundaries.tsrx';
+import { CommitTiming as OctaneCommitTiming } from '../../_fixtures/event-commit-timing.tsrx';
 import * as ReactFixture from 'virtual:event-boundaries-react-fixture';
 import type { EventProbeProps } from '../../_fixtures/event-boundaries.tsrx';
 
@@ -24,7 +25,8 @@ export type ProbeOptions =
 	| { kind: 'same-root'; scenario: SameRootScenario }
 	| { kind: 'nested'; stop: boolean }
 	| { kind: 'shadow'; mode: ShadowRootMode }
-	| { kind: 'slot' };
+	| { kind: 'slot' }
+	| { kind: 'commit-timing' };
 type HandlerRecord = {
 	label: string;
 	trusted: boolean;
@@ -142,6 +144,41 @@ function mountNested(runtime: RuntimeName, stop: boolean): void {
 	targets[runtime] = container.querySelector<HTMLElement>('[data-target]')!;
 }
 
+// The click handler schedules a state update; a native document listener (an
+// outside event system further along the path) records the target's text when
+// the event reaches it, and the harness can also dispatch the click from script.
+function ReactCommitTiming(props: EventProbeProps) {
+	const [count, setCount] = useState(0);
+	return createElement(
+		'section',
+		{
+			'data-name': 'timing',
+			onClick: (event: { nativeEvent: Event }) => {
+				setCount(count + 1);
+				props.record('inner:bubble', event as unknown as Event);
+			},
+		},
+		createElement('button', { 'data-name': 'target', 'data-target': '' }, String(count)),
+	);
+}
+
+function mountCommitTiming(runtime: RuntimeName): void {
+	const container = containers[runtime];
+	const props: EventProbeProps = { record: (label, event) => record(runtime, label, event) };
+	if (runtime === 'octane') createOctaneRoot(container).render(OctaneCommitTiming, props);
+	else {
+		flushReactSync(() => {
+			createReactRoot(container).render(createElement(ReactCommitTiming, props));
+		});
+	}
+	const target = container.querySelector<HTMLElement>('[data-target]')!;
+	targets[runtime] = target;
+	document.addEventListener('click', (event) => {
+		if (container.contains(event.target as Node))
+			record(runtime, `native:document:${target.textContent ?? ''}`, event);
+	});
+}
+
 function mountShadow(options: Extract<ProbeOptions, { kind: 'shadow' | 'slot' }>): void {
 	const props: EventProbeProps = {
 		record: (label, event) => record('octane', label, event),
@@ -167,9 +204,16 @@ window.__eventBoundaries = {
 		else {
 			for (const runtime of ['octane', 'react'] as const) {
 				if (options.kind === 'same-root') mountSameRoot(runtime, options.scenario);
+				else if (options.kind === 'commit-timing') mountCommitTiming(runtime);
 				else mountNested(runtime, options.stop);
 			}
 		}
+	},
+	scriptClick(runtime: RuntimeName) {
+		targets[runtime]!.click();
+	},
+	targetText(runtime: RuntimeName) {
+		return targets[runtime]!.textContent ?? '';
 	},
 	clickPoint(runtime: RuntimeName) {
 		const rect = targets[runtime]!.getBoundingClientRect();
@@ -191,6 +235,8 @@ declare global {
 			logs: Record<RuntimeName, HandlerRecord[]>;
 			mount(options: ProbeOptions): void;
 			clickPoint(runtime: RuntimeName): { x: number; y: number };
+			scriptClick(runtime: RuntimeName): void;
+			targetText(runtime: RuntimeName): string;
 			slotDistributesTarget(): boolean;
 		};
 	}

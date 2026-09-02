@@ -164,11 +164,12 @@ describe('scheduled commits after synchronous DOM work', () => {
 			const span = rendered.find('.child-span') as HTMLElement;
 			span.click();
 			expect(observed).toEqual(['Child']);
-			expect(span.textContent).toBe('clicked');
+			// The click's update armed the batch; it commits when the script yields.
+			expect(span.textContent).toBe('Child');
 
 			queueMicrotask(() => observed.push(span.textContent ?? ''));
 			setValue('queued');
-			expect(span.textContent).toBe('clicked');
+			expect(span.textContent).toBe('Child');
 			await Promise.resolve();
 
 			expect(observed).toEqual(['Child', 'queued']);
@@ -195,8 +196,9 @@ describe('scheduled commits after synchronous DOM work', () => {
 			await Promise.resolve();
 			const span = rendered.find('.child-span') as HTMLElement;
 			span.click();
-			expect(span.textContent).toBe('clicked');
+			expect(span.textContent).toBe('Child');
 			await Promise.resolve();
+			expect(span.textContent).toBe('clicked');
 
 			queueMicrotask(() => observed.push(span.textContent ?? ''));
 			setValue('later');

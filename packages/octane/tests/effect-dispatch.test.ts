@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { mount, flushEffects } from './_helpers';
+import { act, mount, flushEffects } from './_helpers';
 import { EffectDispatch, LabelFor, InvalidEvents } from './_fixtures/effect-dispatch.tsrx';
 
 describe('effect dispatching a discrete event (drainPhase re-entrancy)', () => {
-	it('runs each queued passive effect exactly once when an effect dispatches a click', () => {
+	it('runs each queued passive effect exactly once when an effect dispatches a click', async () => {
 		// Regression: drainPhase walked the LIVE queue; the dispatched click's handler
 		// flushed synchronously and re-entered drainPhase over the same array,
 		// re-running already-executed entries (real-world: Radix form bubble inputs
@@ -13,6 +13,7 @@ describe('effect dispatching a discrete event (drainPhase re-entrancy)', () => {
 		const r = mount(EffectDispatch, { log });
 		flushEffects();
 		expect(log).toEqual(['A', 'B']);
+		await act(async () => {});
 		expect(r.find('#count').textContent).toBe('1'); // handler ran exactly once
 		r.unmount();
 	});
