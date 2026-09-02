@@ -752,6 +752,53 @@ Strings, numbers, arrays, objects, and nesting compose at every client and SSR
 apply site with byte-identical results. A nullish or `false` result removes the
 attribute; an empty string writes `class=""`.
 
+## Scoped `<style>`, `$class`, and `apply`
+
+React has no styling primitive; Octane's `.tsrx` dialect has lexically scoped
+`<style>` blocks ([RFC tsrx-org/RFCs#1](https://github.com/tsrx-org/RFCs/discussions/1)),
+covered in [tsrx-basics.md](./tsrx-basics.md#styles). The contract in brief:
+
+- A block scopes the nearest lexical template scope — the component render, a
+  nested `@{ … }` block, each `@if`/`@for`/`@switch`/`@try` branch body, or an
+  element/fragment in expression position — not the whole component. Every
+  scope has its own hash; blocks in one scope share it and compile to one
+  `injectStyle(hash, css)`.
+- Elements carry `authored classes, enclosing scope hashes (outer → inner),
+  applied theme classes`, composed through the clsx rules above, so a
+  `class={[…]}` value and the stamped hashes serialize identically on the client
+  and the server.
+- `const theme = <style>…</style>` is a class map: `{ $class: '<hash>',
+  dark: '<hash> dark', … }`. `<style apply={theme} />` stamps `theme.$class` on
+  a scope; `apply={[a, b]}` composes. Same-module targets inline as literals
+  (static templates stay hoisted); imported targets are runtime `theme.$class`
+  reads.
+- CSS emits in lexical pre-order. On the client `injectStyle` is a module-level
+  statement (import order orders sheets across modules); on the server it runs
+  inside the component body per request, so a render collects CSS only for the
+  components it rendered. A control-flow scope's CSS always ships; only the
+  class stamping follows the branch.
+- `<style href precedence>` is a Float resource (below) and stays outside the
+  scope model.
+
+The compiler reports these as compile errors, each carrying its code:
+
+- `STYLE_APPLY_VALUE` — `apply` needs an expression: `apply={theme}` or
+  `apply={[a, b]}`.
+- `STYLE_APPLY_TARGET` — the value does not resolve to a `<style>` block or an
+  import (a spread or hole in the array counts).
+- `STYLE_APPLY_BEFORE_DECLARATION` — the target block is declared after the
+  block that applies it.
+- `STYLE_APPLY_DUPLICATE` — a block has two `apply` attributes; pass an array.
+- `STYLE_APPLY_UNSUPPORTED_HOST` — `apply` on a `<style href precedence>`
+  resource or a `<style>` inside `<head>`.
+- `STYLE_RESERVED_CLASS_KEY` — a `.$class` selector in an assigned block.
+- `STYLE_STANDALONE_AT_MODULE_SCOPE` — a bodied `<style>` at module scope that
+  is not assigned.
+- `STYLE_UNKNOWN_ATTRIBUTE` — any attribute other than `apply` on a scoped
+  block.
+- `CSS_GLOBAL_PLACEMENT` — `:global(...)` in the middle of a selector sequence
+  or nested inside a pseudo-class.
+
 ## Context: callable provider object, no Consumer
 
 `createContext` returns a context that is itself the provider component —
@@ -810,8 +857,10 @@ React Float **resources** are supported with React's semantics:
 - `<style href precedence>` is a STYLE RESOURCE: its plain CSS ships by href
   identity, sharing the stylesheet dedupe namespace and precedence-group
   ordering with link resources (`data-precedence`/`data-href` mark the tags).
-  The CSS is NOT scoped — every other `<style>` in a component still belongs
-  to Octane's scoped-CSS system. Two adaptations: Octane emits one `<style>`
+  The CSS is NOT scoped — every other `<style>`, whether standalone in a
+  template scope or assigned (`const theme = <style>…</style>`), belongs to
+  Octane's lexical scope model above, and `apply` on a resource is an error
+  (`STYLE_APPLY_UNSUPPORTED_HOST`). Two adaptations: Octane emits one `<style>`
   tag per resource rather than merging same-precedence rules into a single tag
   (grouping and order are preserved), and CSS containing `</style` fails
   closed in SSR with a development diagnostic (raw-text serialization cannot
@@ -1200,7 +1249,9 @@ const { html, css } = renderToString(App, props);
 ```
 
 `renderToString`, `renderToStaticMarkup`, and `prerender` all return
-`{ html, css }`; React has no equivalent `css` field. Hoisted document metadata
+`{ html, css }`; React has no equivalent `css` field. `css` holds one
+`<style data-octane="hash">` tag per style scope the request rendered — a
+component contributes one per lexical scope it owns — deduped by hash. Hoisted document metadata
 folds into `html` as React does. For a host that owns the surrounding
 `<head>`-bearing template, `headChannel: 'separate'` instead exposes
 `RenderResult.head` and `StreamOptions.onHeadReady`.

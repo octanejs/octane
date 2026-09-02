@@ -1,0 +1,334 @@
+---
+title: Styling
+---
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">Scoped CSS, themes, and apply</p>
+	<h1>Styling</h1>
+	<p className="doc-lede">
+		{
+			'A <style> block styles the template it sits in and nothing else. Assign one to a variable and it becomes a theme you can pass around, compose, and apply to other scopes.'
+		}
+	</p>
+</div>
+
+<aside className="doc-callout note">
+	<p className="doc-callout-title">One compiler, both dialects</p>
+	<p>
+		{
+			'Scoped <style> blocks work in .tsrx and in Octane-compiled .tsx. The .tsrx examples below use @{ … } and directive arms because those add scopes of their own; the same rules hold for a plain function that returns JSX.'
+		}
+	</p>
+</aside>
+
+<h2 id="scoped-by-default">Scoped by default</h2>
+
+Write CSS next to the markup it styles. The compiler rewrites every selector with a
+hash, stamps that hash on each element the block reaches, and registers the sheet
+once per module. Rules apply inside the template that declares them and never leak
+into a child component or the page around it:
+
+```tsrx
+export function Card(props) @{
+	<style>
+		.card {
+			padding: 1.5rem;
+			border: 1px solid var(--line);
+		}
+		h2 {
+			margin: 0 0 0.5rem;
+		}
+	</style>
+	<article class="card">
+		<h2>{props.title as string}</h2>
+		<p>{props.summary as string}</p>
+	</article>
+}
+```
+
+The block compiles to `.card.tsrx-1a20093c { … }` and `h2.tsrx-1a20093c { … }`, and
+both elements carry `tsrx-1a20093c` in their class list. A `<style>` block holds
+static CSS: no `{expr}` holes, no template statements. Put runtime values in custom
+properties (`style={{ '--tone': tone }}`) and read them with `var(--tone)`. Wrap a
+selector in `:global(…)` to opt one rule out of scoping.
+
+A block sits either beside the output as a non-output sibling in a `@{ … }` body or a
+directive arm, as above, or anywhere inside the scope's output element. The only
+attributes a scoped block accepts are `ref` and `apply`.
+
+<h2 id="scopes">What a scope is</h2>
+
+Scopes are lexical. Each of these is a scope, and a `<style>` block belongs to the
+nearest one that encloses it:
+
+- A component render: the body of `function Component() @{ … }` or the JSX a function
+  returns.
+- A nested `@{ … }` block inside JSX.
+- Every arm of a directive: each `@if`, `@else if`, and `@else` body, `@for` and
+  `@empty`, each `@case` and `@default`, and `@try`, `@pending`, and `@catch`.
+- A native element or fragment used as a value: an assigned template, a returned
+  fragment, or the value of a `{ … }` hole.
+
+Every element carries the hash of each scope that encloses it, outermost first, so an
+outer block's rules reach into nested scopes while an inner block's rules never reach
+out. Stamping stops at function boundaries: elements returned from a callback such as
+`items.map((item) => <li />)` belong to no scope.
+
+```tsrx
+export function Panel() @{
+	<>
+		<style>
+			div {
+				color: black;
+			}
+		</style>
+		<div class="outer">Black</div>
+		@{
+			<>
+				<style>
+					div {
+						font-weight: bold;
+					}
+				</style>
+				<div class="inner">Black and bold</div>
+			</>
+		}
+	</>
+}
+```
+
+With `A` and `B` as the two hashes, the compiled classes are `outer A` and
+`inner A B`. The nested `div` matches both rules; the outer one matches only its own.
+
+<h2 id="multiple-blocks">Several blocks, one scope</h2>
+
+Blocks written in the same scope share one hash and render as one injection. Use
+that to keep a rule next to the element it styles instead of collecting every
+selector at the bottom:
+
+```tsrx
+export function Toolbar() @{
+	<div class="toolbar">
+		<style>
+			.toolbar {
+				display: flex;
+				gap: 0.5rem;
+			}
+		</style>
+		<button class="primary">Save</button>
+		<style>
+			.primary {
+				font-weight: 600;
+			}
+		</style>
+	</div>
+}
+```
+
+Both blocks compile into a single sheet in source order. A scope's blocks are always
+emitted together as one contiguous group, even when other scopes sit between them in
+the source.
+
+<h2 id="control-flow">Control flow: stamping follows the branch, CSS does not</h2>
+
+A block inside a directive arm is scoped to that arm, so the same class name can mean
+different things in `@if` and `@else`. The compiler still emits the CSS of every arm
+whichever branch renders; only the class stamping is conditional. Do not rely on a
+branch's rules being absent from the page, and keep a rule that must apply
+everywhere in the enclosing scope:
+
+```tsrx
+export function Status(props) @{
+	<section class="status">
+		<style>
+			.status {
+				padding: 0.5rem;
+			}
+		</style>
+		@if (props.ready) {
+			<style>
+				.ok {
+					color: green;
+				}
+			</style>
+			<p class="ok">Ready</p>
+		} @else {
+			<style>
+				.wait {
+					color: gray;
+				}
+			</style>
+			<p class="wait">Waiting</p>
+		}
+	</section>
+}
+```
+
+The `.ok` and `.wait` sheets are both registered when the module loads. Each `<p>`
+carries the section's hash plus its own arm's hash, so `.ok` cannot reach the
+waiting paragraph and vice versa.
+
+<h2 id="class-maps">
+	Class maps and <code>$class</code>
+</h2>
+
+Assign a `<style>` block to a variable and the initializer becomes a plain object
+instead of a scoped block. The object has `$class` — the block's scope hash, preceded
+by the classes of any theme it applies — plus one key per class selector whose value
+is the hash and the class name together. It can live at module scope or anywhere a
+declaration is legal inside a component body:
+
+```tsrx
+export const theme = <style>
+	div {
+		color: green;
+	}
+	.dark {
+		color: purple;
+	}
+</style>;
+// theme.$class → 'tsrx-fe4e37b1'
+// theme.dark   → 'tsrx-fe4e37b1 dark'
+
+export function Badge(props) @{
+	<span class={theme.dark}>{props.label as string}</span>
+}
+```
+
+Pass these strings to child components as ordinary props; the hash is already in
+them. `$class` is reserved, so a block cannot declare a `.$class` selector.
+
+A block that is exported or applied is a theme and keeps every selector, element and
+descendant selectors included. A local block that is neither is a class map: only its
+standalone class selectors survive, and the rest are dropped as `/* (unused) … */`
+comments in the compiled CSS. A standalone `<style>` at module scope is an error;
+assign it to a variable there.
+
+<h2 id="apply">Apply a theme to a scope</h2>
+
+`<style apply={theme} />` stamps the theme's `$class` on every element of the scope
+it sits in, so the theme's element and descendant rules reach those elements as if the
+theme had been written there. A self-closing apply adds no hash of its own; a bodied
+`<style apply={theme}>…</style>` applies the theme and declares the scope's own block
+in one tag:
+
+```tsrx
+// theme.tsrx
+const base = <style>
+	div {
+		font-family: system-ui;
+	}
+</style>;
+
+export const theme = <style apply={base}>
+	div {
+		color: green;
+	}
+	.dark {
+		color: purple;
+	}
+</style>;
+// theme.$class → base's hash, then theme's own hash
+```
+
+```tsrx
+// Panel.tsrx
+import { theme } from './theme.tsrx';
+
+export function Panel() @{
+	<>
+		<style apply={theme}>
+			div {
+				color: black;
+			}
+		</style>
+		<span class={theme.dark}>Purple</span>
+		<div>Black: the local rule beats the theme's green</div>
+	</>
+}
+
+export function Card() @{
+	<style apply={theme} />
+	<article>
+		<h2>Green, system-ui</h2>
+	</article>
+}
+```
+
+- `apply={[a, b]}` applies several themes in order, and a theme can apply another:
+  its `$class` then lists the applied classes first and its own hash last.
+- `export const bundle = <style apply={[a, b]} />;` composes themes with no CSS of its
+  own; `bundle.$class` is the two themes' classes.
+- A theme declared in the same module is inlined as a string literal, so the element's
+  static template stays hoisted. An imported theme is read at runtime through
+  `theme.$class`, which turns that element's class into a template literal.
+- A theme must be declared before the block that applies it.
+
+An element's final class list is: authored classes, enclosing scope hashes outer to
+inner, then applied theme classes.
+
+<h2 id="ordering">Ordering guarantees</h2>
+
+CSS is emitted in lexical pre-order, and at equal specificity the rule emitted last
+wins. A scope's sheet sits where its first block is, after the assigned blocks
+declared before it in the same list and before the scopes and assigned blocks nested
+inside it. Sibling scopes follow source order, and an applied theme's sheet is emitted
+before the block that applies it, so a local rule wins over the theme at equal
+specificity.
+
+The compiled module carries one `injectStyle(hash, css)` call per scope. Where it
+runs depends on the runtime:
+
+- **On the client**, every call sits at module scope and runs when the module is
+  evaluated, in the emission order above. The runtime deduplicates by hash, appends
+  one `<style data-octane="hash">` element per sheet to `<head>`, and skips a sheet
+  the server already sent.
+- **On the server**, the calls sit at the top of each component body, so a request
+  collects only the sheets of components it actually rendered. Buffered renderers
+  return them as the `css` field of the result, deduplicated by hash in injection
+  order; the streaming renderers have no `css` field and flush each scoped
+  `<style data-octane>` tag inline with the content that uses it.
+
+Bundlers do not see this CSS: it rides inside the compiled JavaScript rather than a
+virtual CSS module, so CSS plugins, PostCSS, and `build.cssMinify` never touch it.
+Global stylesheets that every component reads, such as design tokens, belong in a
+`.css` file the page links.
+
+<h2 id="float">Head resources are outside the model</h2>
+
+A `<style href="…" precedence="…">` is a Float resource: the runtime hoists it into
+`<head>` and deduplicates it by `href`, and it is not a scoped block. It accepts no
+`apply`, gets no hash, and never stamps a class. The same is true of a `<style>`
+rendered inside `<head>`.
+
+<h2 id="diagnostics">Diagnostics</h2>
+
+Style errors stop the compile. Each carries one of these codes, which `octane analyze`
+prints under the message and the bundler plugins surface in their own error output:
+
+- `STYLE_APPLY_VALUE` (`tsrx-style-apply-value`): `apply` needs an expression value —
+  `apply={theme}` or `apply={[a, b]}`.
+- `STYLE_APPLY_TARGET` (`tsrx-style-apply-target`): an `apply` entry is not an
+  identifier, member expression, or array of those, or does not resolve to a style
+  block.
+- `STYLE_APPLY_BEFORE_DECLARATION` (`tsrx-style-apply-before-declaration`): the applied
+  theme is declared after the block that applies it. Move the theme above.
+- `STYLE_APPLY_DUPLICATE` (`tsrx-style-apply-duplicate`): two `apply` attributes on one
+  block. Pass several themes as one array.
+- `STYLE_APPLY_UNSUPPORTED_HOST` (`tsrx-style-apply-unsupported-host`): `apply` on a
+  `<head>` style or an `href` resource style.
+- `STYLE_RESERVED_CLASS_KEY` (`tsrx-style-reserved-class-key`): an assigned block
+  declares a `.$class` selector. Rename it.
+- `STYLE_STANDALONE_AT_MODULE_SCOPE` (`tsrx-style-standalone-at-module-scope`): a
+  standalone `<style>` at module scope. Assign it to a variable.
+- `STYLE_UNKNOWN_ATTRIBUTE` (`tsrx-style-unknown-attribute`): an attribute other than
+  `ref` and `apply` on a scoped block.
+- `CSS_GLOBAL_PLACEMENT` (`tsrx-css-global-placement`): `:global(…)` used where the
+  scoping rules do not allow it.
+
+<h2 id="next">Next</h2>
+
+- [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — the `@{ … }` shorthand and directive arms
+  that create style scopes.
+- [Core APIs](/docs/core-apis#server-rendering) — where the server's `css` goes.
+- [Build tools](/docs/build-tools) — how each bundler carries scoped CSS.

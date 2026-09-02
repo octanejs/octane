@@ -30,6 +30,12 @@ details but do not replace these gates.
   the retained state.
 - Use native event semantics. `onInput` is the per-edit event for text controls;
   do not add synthetic `onChange` compatibility or event wrapper allocation.
+- Style with lexically scoped `<style>` blocks and assigned theme blocks
+  (`const theme = <style>…</style>`, `class={theme.card}`,
+  `<style apply={theme} />`) instead of a CSS-in-JS runtime. Keep block CSS
+  static and pass runtime values through custom properties. A block inside a
+  control-flow branch ships its CSS whichever branch renders, so keep
+  branch-only rules small.
 - For SSR, avoid client/server data divergence and duplicate fetches. Exercise
   hydration with production-compiled output and preserve abort/error behavior.
 - Treat bundle size and dependency cost as performance. Check for an official

@@ -88,10 +88,13 @@ The three buffered renderers return `RenderResult = { html, css }`:
   them and returns them as `head` instead.
 - `head` — the hoisted metadata on its own, present **only** under
   `headChannel: 'separate'` (see `RenderOptions`).
-- `css` — deduped `<style data-octane="hash">` tags collected from scoped
-  `<style>` components. Place inside `<head>`. The client skips re-injecting any
-  hash already present. (Kept as its own field because Octane has scoped CSS
-  that React core does not.)
+- `css` — deduped `<style data-octane="hash">` tags, one per style scope the
+  request rendered: a component contributes one tag per lexical scope it owns
+  (its render, nested `@{ … }` blocks, control-flow branches, assigned
+  templates), and an assigned theme block contributes its own. Only components
+  the render actually executed inject, in lexical pre-order. Place inside
+  `<head>`. The client skips re-injecting any hash already present. (Kept as its
+  own field because Octane has scoped CSS that React core does not.)
 
 ### `renderToString(component, props?, options?) => RenderResult` — `octane/server`
 
@@ -171,8 +174,9 @@ path before degraded terminal output — so a source can finalize asynchronous
 serialization and then settle `done`.
 
 When the shell is a document (`… </body></html>`), **document mode** engages:
-renderer-owned leading scoped styles and the hoisted-head buffer fold inside
-the authored `<head>` instead of preceding `<html>`, and the closing tail is
+renderer-owned leading scoped styles (one tag per style scope, deduped by
+hash) and the hoisted-head buffer fold inside the authored `<head>` instead of
+preceding `<html>`, and the closing tail is
 split out and written **last** — injected chunks and streamed Suspense
 segments land inside `<body>`, and the stream (tail included) closes only
 once rendering is complete **and** `done` has settled, so late data scripts

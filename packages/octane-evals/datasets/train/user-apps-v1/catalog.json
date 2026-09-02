@@ -57,6 +57,13 @@
       "hook-form": ["integration.hook-form-profile"],
       "i18next": ["integration.i18next-switcher"],
       "tanstack-query": ["integration.query-user-card"]
+    },
+    "scopedStyles": {
+      "nested-scopes": ["tsrx.nested-scope-styles"],
+      "control-flow-scopes": ["tsrx.nested-scope-styles"],
+      "theme-apply": ["octane.theme-apply"],
+      "theme-composition": ["octane.theme-apply"],
+      "class-map": ["octane.theme-apply"]
     }
   },
   "tasks": [
@@ -102,6 +109,26 @@
       "tags": ["hooks", "conditional-hooks", "early-return", "state", "state-updates"]
     },
     {
+      "taskId": "tsrx.nested-scope-styles",
+      "title": "Style a status panel with lexical style scopes",
+      "suite": "tsrx",
+      "capability": "authoring",
+      "difficulty": "standard",
+      "sourcePath": "README.md",
+      "createdAt": "2026-09-02",
+      "publishedAt": "2026-09-02",
+      "tags": [
+        "hooks",
+        "state",
+        "state-updates",
+        "native-events",
+        "scoped-styles",
+        "nested-scopes",
+        "control-flow-scopes",
+        "tsrx-control-flow"
+      ]
+    },
+    {
       "taskId": "octane.theme-context",
       "title": "Build live and nested theme context",
       "suite": "octane",
@@ -115,6 +142,24 @@
         "state",
         "state-updates",
         "class-composition"
+      ]
+    },
+    {
+      "taskId": "octane.theme-apply",
+      "title": "Apply a shared theme through scoped styles",
+      "suite": "octane",
+      "capability": "authoring",
+      "difficulty": "standard",
+      "sourcePath": "README.md",
+      "createdAt": "2026-09-02",
+      "publishedAt": "2026-09-02",
+      "tags": [
+        "component-composition",
+        "class-composition",
+        "scoped-styles",
+        "theme-apply",
+        "theme-composition",
+        "class-map"
       ]
     },
     {

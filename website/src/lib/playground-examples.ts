@@ -1397,6 +1397,117 @@ export function Counter({ label, start, ref, onCount }: CounterProps) {
 }
 `;
 
+// ── Scoped styles & themes ──────────────────────────────────────────────────
+
+const THEME_TSRX = `// A <style> assigned to a variable is a theme: an object with $class
+// (its scope hash) plus one key per class selector. Exported themes keep
+// every selector, element rules included.
+const base = <style>
+	article {
+		font-family: system-ui, sans-serif;
+		border-radius: 12px;
+		padding: 1rem 1.25rem;
+	}
+	h2 {
+		margin: 0 0 0.5rem;
+		font-size: 1.1rem;
+	}
+</style>;
+
+export const light = <style apply={base}>
+	article {
+		background: #f6f7fb;
+		color: #1a1c2c;
+	}
+	.accent {
+		color: #5b4bff;
+	}
+</style>;
+
+export const dark = <style apply={base}>
+	article {
+		background: #1a1c2c;
+		color: #f6f7fb;
+	}
+	.accent {
+		color: #ffb454;
+	}
+</style>;
+`;
+
+const THEME_APP_TSRX = `import { useState } from 'octane';
+import { dark, light } from './theme.tsrx';
+
+// Each card applies a theme to its own scope: the theme's article and h2
+// rules reach every element here, while the card's local rules stay local.
+function LightCard() @{
+	<style apply={light}>
+		p {
+			margin: 0;
+		}
+	</style>
+	<article>
+		<h2>Light card</h2>
+		<p>{'Accent class: ' + light.accent}</p>
+		<p class={light.accent}>A class-map entry carries its hash.</p>
+	</article>
+}
+
+function DarkCard() @{
+	<style apply={dark}>
+		p {
+			margin: 0;
+		}
+	</style>
+	<article>
+		<h2>Dark card</h2>
+		<p class={dark.accent}>Same markup, other theme.</p>
+	</article>
+}
+
+export default function App() @{
+	const [expanded, setExpanded] = useState(false);
+
+	<div class="stack">
+		<LightCard />
+		<DarkCard />
+		<button onClick={() => setExpanded(!expanded)}>
+			{(expanded ? 'Collapse' : 'Expand') as string}
+		</button>
+		@if (expanded) {
+			<style>
+				.note {
+					color: #17803d;
+				}
+			</style>
+			<p class="note">Rules in a directive arm reach only that arm.</p>
+		} @else {
+			<style>
+				.note {
+					opacity: 0.6;
+				}
+			</style>
+			<p class="note">Same class name, a different scope.</p>
+		}
+		<style>
+			.stack {
+				display: grid;
+				gap: 0.75rem;
+				justify-items: start;
+			}
+			button {
+				padding: 0.4rem 0.9rem;
+				border-radius: 8px;
+				border: 1px solid #8886;
+				background: transparent;
+				color: inherit;
+				cursor: pointer;
+			}
+		</style>
+	</div>
+}
+`;
+
 // ── Catalogue ───────────────────────────────────────────────────────────────
 
 export const CUSTOM_EXAMPLE_ID = 'custom';
@@ -1427,6 +1538,20 @@ export const EXAMPLES: PlaygroundExample[] = [
 		group: 'Basics',
 		variants: {
 			tsrx: workspace([{ name: 'App.tsrx', source: INPUTS_TSRX }]),
+		},
+	},
+	{
+		id: 'scoped-styles',
+		label: 'Scoped styles & themes (multi-file)',
+		group: 'Basics',
+		variants: {
+			tsrx: workspace(
+				[
+					{ name: 'App.tsrx', source: THEME_APP_TSRX },
+					{ name: 'theme.tsrx', source: THEME_TSRX },
+				],
+				'App.tsrx',
+			),
 		},
 	},
 	{

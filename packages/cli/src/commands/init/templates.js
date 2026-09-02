@@ -126,48 +126,61 @@ const LOGO = `<svg class="mark" viewBox="0 0 84 108" fill="none" aria-hidden="tr
  * The documentation cards, matching the card treatment on octanejs.dev: the
  * same radius, the same subtle surface, and the same accent-tinted hover rather
  * than a plain border swap.
+ *
+ * An assigned `<style>` is a theme rather than a block scoped to one template:
+ * it keeps every selector and evaluates to a class map. The page applies it by
+ * putting `apply={linkTheme}` on its own `<style>` block, which stamps the
+ * theme's class on every element of that scope so these rules reach them the
+ * same way the block's own rules do. One block rather than a self-closed
+ * `<style apply />` beside it: the type-checker's virtual TSX accepts only one
+ * `<style>` per element. The theme sits at module scope, above the component
+ * that applies it, which is the order the compiler requires.
  */
-const LINK_STYLES = `      .links {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-        gap: 0.75rem;
-        width: 100%;
-        max-width: 42rem;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-      }
-      .link {
-        display: block;
-        padding: 1rem;
-        border: 1px solid var(--border);
-        border-radius: 0.9rem;
-        background: var(--surface-subtle);
-        color: var(--text);
-        text-align: left;
-        text-decoration: none;
-        transition:
-          background 0.15s,
-          border-color 0.15s,
-          transform 0.15s;
-      }
-      .link:hover {
-        border-color: var(--card-hover-border);
-        background: var(--card-hover-bg);
-        transform: translateY(-1px);
-      }
-      .link-title {
-        display: block;
-        font-size: 0.95rem;
-        font-weight: 600;
-      }
-      .link-body {
-        display: block;
-        margin-top: 0.15rem;
-        color: var(--text-secondary);
-        font-size: 0.82rem;
-        line-height: 1.4;
-      }`;
+const LINK_THEME = `// The documentation cards. An assigned <style> is a theme: the page's own
+// <style apply={linkTheme}> block below applies it, so its rules reach that scope.
+const linkTheme = <style>
+  .links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 42rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .link {
+    display: block;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    background: var(--surface-subtle);
+    color: var(--text);
+    text-align: left;
+    text-decoration: none;
+    transition:
+      background 0.15s,
+      border-color 0.15s,
+      transform 0.15s;
+  }
+  .link:hover {
+    border-color: var(--card-hover-border);
+    background: var(--card-hover-bg);
+    transform: translateY(-1px);
+  }
+  .link-title {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .link-body {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+</style>;`;
 
 /** Where the landing page sends people next. */
 const DOC_LINKS = `const LINKS = [
@@ -208,6 +221,8 @@ export const appComponent = (mode) =>
 
 ${DOC_LINKS}
 
+${LINK_THEME}
+
 export function App() @{
   <Layout>
     <section class="hero">
@@ -229,7 +244,7 @@ export function App() @{
       </ul>
     </section>
 
-    <style>
+    <style apply={linkTheme}>
       .hero {
         display: flex;
         flex-direction: column;
@@ -253,12 +268,13 @@ export function App() @{
         color: var(--text-secondary);
         font-size: 1.25rem;
       }
-${LINK_STYLES}
     </style>
   </Layout>
 }
 `
 		: `${DOC_LINKS}
+
+${LINK_THEME}
 
 export function App() @{
   <main class="page">
@@ -279,7 +295,7 @@ export function App() @{
       }
     </ul>
 
-    <style>
+    <style apply={linkTheme}>
       .page {
         display: flex;
         min-height: 100dvh;
@@ -306,7 +322,6 @@ export function App() @{
         color: var(--text-secondary);
         font-size: 1.25rem;
       }
-${LINK_STYLES}
     </style>
   </main>
 }
@@ -462,12 +477,14 @@ export function health(): Response {
  * The reset and the theme tokens every component reads, taken from
  * octanejs.dev so a scaffolded app and the documentation look like one thing.
  *
- * A stylesheet rather than a `<style>` in the shell. A component's own `<style>`
- * is scoped — the compiler appends a scope hash to its selectors — so it can
- * style that component's markup but never `body`, and these custom properties
- * have to resolve for every component at once. Keeping them in a file the shell
- * links, rather than inline in the shell, means `init` still has something to
- * point at when the project brought its own `index.html` and kept it.
+ * A stylesheet rather than a `<style>` in the shell. A `<style>` in a component
+ * is scoped to the template scope it sits in — the compiler rewrites its
+ * selectors with a scope hash — and a theme such as `linkTheme` reaches only
+ * the scopes that apply it, so neither can style `body`, and these custom
+ * properties have to resolve for every component at once. Keeping them in a
+ * file the shell links, rather than inline in the shell, means `init` still has
+ * something to point at when the project brought its own `index.html` and kept
+ * it.
  *
  * Linked from the shell rather than imported by a component on purpose: a CSS
  * import is injected by JavaScript in dev, so the tokens would arrive after the

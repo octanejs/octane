@@ -1,6 +1,6 @@
 ---
 targets: ['*']
-description: 'Full .tsrx authoring reference: components, text holes, events, control flow, refs'
+description: 'Full .tsrx authoring reference: components, text holes, events, control flow, refs, scoped styles and themes ($class, apply)'
 globs:
   - '**/*.tsrx'
 ---
@@ -96,6 +96,83 @@ are call-order and context-identity keyed.
 
 Refs are passed as props, React-19 style: `ref={cb}`, `ref={obj}`, or multi-ref
 `ref={[a, b]}`. There is no `forwardRef`.
+
+## Styles
+
+A `<style>` block is static CSS scoped to the nearest lexical template scope: the
+component render, a nested `@{ … }` body, each control-flow branch body
+(`@if`/`@else if`/`@else`, `@for`/`@empty`, `@case`/`@default`,
+`@try`/`@pending`/`@catch`), or an element/fragment used as a value (assigned or
+returned). The compiler rewrites every selector with a scope hash and stamps that
+hash on every element the scope reaches; stamping stops at function boundaries,
+so `items.map((x) => <li />)` output is outside the scope. `:global(…)` opts a
+selector out. A block accepts only the `ref` and `apply` attributes, and its
+CSS is static: use custom properties (`style={{ '--tone': tone }}` with
+`var(--tone)`) for runtime values.
+
+- Several blocks in one scope share one hash and inject as one sheet. A nested
+  scope gets its own hash; its elements carry every enclosing hash outer to
+  inner, then the applied theme classes, all after the authored classes.
+- A block may be a child of the output element or fragment, or sit beside the
+  single output node in a `@{ … }` body or a directive body.
+- CSS emits in lexical order: outer scopes before the scopes nested in them, a
+  scope's blocks contiguous, sibling scopes in source order, assigned blocks at
+  their declaration, an applied theme before its applier. At equal specificity
+  the rule emitted last wins.
+- Control-flow caveat: a branch body's CSS is always emitted whichever branch
+  renders; only the class stamping follows the branch.
+- Selectors that match nothing in reach are dropped as `/* (unused) … */`.
+
+Assigning a block, `const theme = <style>…</style>`, produces a class map instead
+of a scoped block: `$class` (the applied themes' classes, then its own hash) plus
+one key per class selector whose value is `"<hash> <name>"`. Pass those strings
+as props (`<Badge class={theme.dark} />`). The declaration may live anywhere a
+declaration can, including module scope, where a standalone block is an error.
+Exported or applied blocks are themes and keep every selector; a local block that
+is neither keeps only its standalone class selectors.
+
+`<style apply={theme} />` stamps `theme.$class` on every element of the scope it
+sits in, so the theme's element and descendant rules reach them; the self-closed
+form adds no hash of its own, while `<style apply={theme}>…</style>` also
+declares the scope's block. `apply={[a, b]}` composes in order, a theme may
+apply another (`const accent = <style apply={base}>…</style>`), and
+`export const bundle = <style apply={[a, b]} />` composes without CSS of its own.
+A theme must be declared before the block that applies it. Same-module targets
+inline as string literals; imported themes are runtime `theme.$class` reads.
+
+```tsx
+export function Panel() @{
+	<>
+		<style apply={theme}>
+			div { color: black; } /* scope A; beats the theme's rule */
+		</style>
+		<span class={theme.dark}>Purple</span>
+		<div>Black</div>
+		@{
+			<>
+				<style>
+					div { font-weight: bold; } /* scope B, nested in A */
+				</style>
+				<div>Black and bold</div>
+			</>
+		}
+	</>
+}
+```
+
+`<style href precedence>` is a Float resource (plain CSS shipped by href
+identity, never scoped) and stays outside this model.
+
+Style diagnostics come from `@tsrx/core` and surface through the compile
+result's `diagnostics` like `OCTANE_NATIVE_TEXT_ONCHANGE` does:
+`STYLE_APPLY_VALUE` (`apply` without an expression value), `STYLE_APPLY_TARGET`
+(an entry that is not an identifier, member, or array of those, or is not a
+style block), `STYLE_APPLY_BEFORE_DECLARATION`, `STYLE_APPLY_DUPLICATE` (two
+`apply` attributes on one block), `STYLE_APPLY_UNSUPPORTED_HOST` (`apply` on a
+`<head>` or `href` style), `STYLE_RESERVED_CLASS_KEY` (an assigned block
+declares `.$class`), `STYLE_STANDALONE_AT_MODULE_SCOPE`,
+`STYLE_UNKNOWN_ATTRIBUTE`, and `CSS_GLOBAL_PLACEMENT` (`:global` where the
+scoping rules do not allow it).
 
 ## Types
 
