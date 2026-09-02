@@ -433,6 +433,151 @@ function userAppEvalSubmission() {
 	};
 }
 
+const OCTANE_SERVER_SOURCE_ALIAS = {
+	find: /^octane$/,
+	replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+};
+const PORTABLETEXT_SOURCE_ALIASES = [
+	{
+		find: /^@octanejs\/portabletext$/,
+		replacement: resolve(import.meta.dirname, 'packages/portabletext/src/index.ts'),
+	},
+];
+const SANITY_ICONS_SOURCE_ALIASES = [
+	{
+		find: /^@octanejs\/sanity-icons$/,
+		replacement: resolve(import.meta.dirname, 'packages/sanity-icons/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/sanity-icons\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/sanity-icons/src/exports') + '/$1.ts',
+	},
+];
+const SANITY_LOGOS_SOURCE_ALIASES = [
+	{
+		find: /^@octanejs\/sanity-logos$/,
+		replacement: resolve(import.meta.dirname, 'packages/sanity-logos/src/index.ts'),
+	},
+];
+const SANITY_LOADER_SOURCE_ALIASES = [
+	{
+		find: /^@octanejs\/sanity-loader$/,
+		replacement: resolve(import.meta.dirname, 'packages/sanity-loader/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/sanity-loader\/rsc$/,
+		replacement: resolve(import.meta.dirname, 'packages/sanity-loader/src/rsc.ts'),
+	},
+];
+const THINKING_ORBS_SOURCE_ALIASES = [
+	{
+		find: /^@octanejs\/thinking-orbs$/,
+		replacement: resolve(import.meta.dirname, 'packages/thinking-orbs/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/thinking-orbs\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/thinking-orbs/src') + '/$1.ts',
+	},
+];
+const PUCK_SOURCE_ALIASES = [
+	{
+		find: /^@octanejs\/puck$/,
+		replacement: resolve(import.meta.dirname, 'packages/puck/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/puck\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/puck/src') + '/$1.ts',
+	},
+	{
+		find: /^@octanejs\/zustand$/,
+		replacement: resolve(import.meta.dirname, 'packages/zustand/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/zustand\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/zustand/src') + '/$1.ts',
+	},
+	{
+		find: /^@octanejs\/dnd-kit$/,
+		replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/dnd-kit\/hooks$/,
+		replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/hooks/index.ts'),
+	},
+	{
+		find: /^@octanejs\/dnd-kit\/sortable$/,
+		replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/sortable/index.ts'),
+	},
+	{
+		find: /^@octanejs\/dnd-kit\/utilities$/,
+		replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/utilities/index.ts'),
+	},
+	{
+		find: /^@octanejs\/lucide$/,
+		replacement: resolve(import.meta.dirname, 'packages/lucide/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/lucide\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/lucide/src') + '/$1.ts',
+	},
+	{
+		find: /^@octanejs\/tanstack-pacer$/,
+		replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/tanstack-pacer\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
+	},
+	{
+		find: /^@octanejs\/tanstack-store$/,
+		replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+	},
+];
+const BLOCKNOTE_SOURCE_ALIASES = [
+	{
+		find: /^@octanejs\/blocknote$/,
+		replacement: resolve(import.meta.dirname, 'packages/blocknote/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/blocknote\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/blocknote/src') + '/$1.ts',
+	},
+	{
+		find: /^@octanejs\/tiptap$/,
+		replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/tiptap\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/tiptap/src') + '/$1.ts',
+	},
+	{
+		find: /^@octanejs\/floating-ui$/,
+		replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+	},
+	{
+		find: /^@octanejs\/floating-ui\/(.*)$/,
+		replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
+	},
+	{
+		find: /^@octanejs\/tanstack-store$/,
+		replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+	},
+];
+
+function octaneSourceTestProject({ aliases, ssr = false, test }) {
+	const sourceAliases = ssr ? [OCTANE_SERVER_SOURCE_ALIAS, ...aliases] : aliases;
+	return {
+		test,
+		plugins: [ssr ? octane({ ssr: true }) : octane()],
+		resolve: {
+			alias: sourceAliases.map(({ find, replacement }) => ({
+				find: new RegExp(find.source, find.flags),
+				replacement,
+			})),
+		},
+	};
+}
+
 export default defineConfig({
 	test: {
 		...configDefaults,
@@ -8831,7 +8976,7 @@ export default defineConfig({
 					],
 				},
 			})),
-			{
+			octaneSourceTestProject({
 				test: {
 					name: 'portabletext',
 					include: [
@@ -8842,38 +8987,19 @@ export default defineConfig({
 					globalSetup: ['packages/portabletext/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/portabletext$/,
-							replacement: resolve(import.meta.dirname, 'packages/portabletext/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
+				aliases: PORTABLETEXT_SOURCE_ALIASES,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'portabletext-ssr',
 					include: ['packages/portabletext/tests/ssr/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
-				plugins: [octane({ ssr: true })],
-				resolve: {
-					alias: [
-						{
-							find: /^octane$/,
-							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
-						},
-						{
-							find: /^@octanejs\/portabletext$/,
-							replacement: resolve(import.meta.dirname, 'packages/portabletext/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
+				aliases: PORTABLETEXT_SOURCE_ALIASES,
+				ssr: true,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'sanity-icons',
 					include: [
@@ -8884,48 +9010,19 @@ export default defineConfig({
 					globalSetup: ['packages/sanity-icons/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/sanity-icons$/,
-							replacement: resolve(import.meta.dirname, 'packages/sanity-icons/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/sanity-icons\/(.*)$/,
-							replacement:
-								resolve(import.meta.dirname, 'packages/sanity-icons/src/exports') + '/$1.ts',
-						},
-					],
-				},
-			},
-			{
+				aliases: SANITY_ICONS_SOURCE_ALIASES,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'sanity-icons-ssr',
 					include: ['packages/sanity-icons/tests/ssr/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
-				plugins: [octane({ ssr: true })],
-				resolve: {
-					alias: [
-						{
-							find: /^octane$/,
-							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
-						},
-						{
-							find: /^@octanejs\/sanity-icons$/,
-							replacement: resolve(import.meta.dirname, 'packages/sanity-icons/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/sanity-icons\/(.*)$/,
-							replacement:
-								resolve(import.meta.dirname, 'packages/sanity-icons/src/exports') + '/$1.ts',
-						},
-					],
-				},
-			},
-			{
+				aliases: SANITY_ICONS_SOURCE_ALIASES,
+				ssr: true,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'sanity-logos',
 					include: [
@@ -8936,38 +9033,19 @@ export default defineConfig({
 					globalSetup: ['packages/sanity-logos/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/sanity-logos$/,
-							replacement: resolve(import.meta.dirname, 'packages/sanity-logos/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
+				aliases: SANITY_LOGOS_SOURCE_ALIASES,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'sanity-logos-ssr',
 					include: ['packages/sanity-logos/tests/ssr/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
-				plugins: [octane({ ssr: true })],
-				resolve: {
-					alias: [
-						{
-							find: /^octane$/,
-							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
-						},
-						{
-							find: /^@octanejs\/sanity-logos$/,
-							replacement: resolve(import.meta.dirname, 'packages/sanity-logos/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
+				aliases: SANITY_LOGOS_SOURCE_ALIASES,
+				ssr: true,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'sanity-loader',
 					include: [
@@ -8978,46 +9056,19 @@ export default defineConfig({
 					globalSetup: ['packages/sanity-loader/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/sanity-loader$/,
-							replacement: resolve(import.meta.dirname, 'packages/sanity-loader/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/sanity-loader\/rsc$/,
-							replacement: resolve(import.meta.dirname, 'packages/sanity-loader/src/rsc.ts'),
-						},
-					],
-				},
-			},
-			{
+				aliases: SANITY_LOADER_SOURCE_ALIASES,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'sanity-loader-ssr',
 					include: ['packages/sanity-loader/tests/ssr/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
-				plugins: [octane({ ssr: true })],
-				resolve: {
-					alias: [
-						{
-							find: /^octane$/,
-							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
-						},
-						{
-							find: /^@octanejs\/sanity-loader$/,
-							replacement: resolve(import.meta.dirname, 'packages/sanity-loader/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/sanity-loader\/rsc$/,
-							replacement: resolve(import.meta.dirname, 'packages/sanity-loader/src/rsc.ts'),
-						},
-					],
-				},
-			},
-			{
+				aliases: SANITY_LOADER_SOURCE_ALIASES,
+				ssr: true,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'thinking-orbs',
 					include: ['packages/thinking-orbs/tests/**/*.test.ts'],
@@ -9028,21 +9079,9 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: false,
 				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/thinking-orbs$/,
-							replacement: resolve(import.meta.dirname, 'packages/thinking-orbs/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/thinking-orbs\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/thinking-orbs/src') + '/$1.ts',
-						},
-					],
-				},
-			},
-			{
+				aliases: THINKING_ORBS_SOURCE_ALIASES,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'thinking-orbs-differential',
 					include: ['packages/thinking-orbs/tests/differential/**/*.test.ts'],
@@ -9050,21 +9089,9 @@ export default defineConfig({
 					globalSetup: ['packages/thinking-orbs/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/thinking-orbs$/,
-							replacement: resolve(import.meta.dirname, 'packages/thinking-orbs/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/thinking-orbs\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/thinking-orbs/src') + '/$1.ts',
-						},
-					],
-				},
-			},
-			{
+				aliases: THINKING_ORBS_SOURCE_ALIASES,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'puck',
 					include: ['packages/puck/tests/**/*.test.ts'],
@@ -9074,66 +9101,9 @@ export default defineConfig({
 					setupFiles: ['packages/puck/tests/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/puck$/,
-							replacement: resolve(import.meta.dirname, 'packages/puck/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/puck\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/puck/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/zustand$/,
-							replacement: resolve(import.meta.dirname, 'packages/zustand/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/zustand\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/zustand/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/dnd-kit$/,
-							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/dnd-kit\/hooks$/,
-							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/hooks/index.ts'),
-						},
-						{
-							find: /^@octanejs\/dnd-kit\/sortable$/,
-							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/sortable/index.ts'),
-						},
-						{
-							find: /^@octanejs\/dnd-kit\/utilities$/,
-							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/utilities/index.ts'),
-						},
-						{
-							find: /^@octanejs\/lucide$/,
-							replacement: resolve(import.meta.dirname, 'packages/lucide/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/lucide\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/lucide/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/tanstack-pacer$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-pacer\/(.*)$/,
-							replacement:
-								resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
+				aliases: PUCK_SOURCE_ALIASES,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'puck-differential',
 					include: ['packages/puck/tests/differential/**/*.test.ts'],
@@ -9142,66 +9112,9 @@ export default defineConfig({
 					globalSetup: ['packages/puck/tests/differential/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/puck$/,
-							replacement: resolve(import.meta.dirname, 'packages/puck/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/puck\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/puck/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/zustand$/,
-							replacement: resolve(import.meta.dirname, 'packages/zustand/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/zustand\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/zustand/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/dnd-kit$/,
-							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/dnd-kit\/hooks$/,
-							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/hooks/index.ts'),
-						},
-						{
-							find: /^@octanejs\/dnd-kit\/sortable$/,
-							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/sortable/index.ts'),
-						},
-						{
-							find: /^@octanejs\/dnd-kit\/utilities$/,
-							replacement: resolve(import.meta.dirname, 'packages/dnd-kit/src/utilities/index.ts'),
-						},
-						{
-							find: /^@octanejs\/lucide$/,
-							replacement: resolve(import.meta.dirname, 'packages/lucide/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/lucide\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/lucide/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/tanstack-pacer$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-pacer/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-pacer\/(.*)$/,
-							replacement:
-								resolve(import.meta.dirname, 'packages/tanstack-pacer/src') + '/$1/index.ts',
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
+				aliases: PUCK_SOURCE_ALIASES,
+			}),
+			octaneSourceTestProject({
 				test: {
 					name: 'blocknote',
 					include: ['packages/blocknote/tests/**/*.test.ts'],
@@ -9209,40 +9122,8 @@ export default defineConfig({
 					testTimeout: 30_000,
 					globals: false,
 				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/blocknote$/,
-							replacement: resolve(import.meta.dirname, 'packages/blocknote/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/blocknote\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/blocknote/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/tiptap$/,
-							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tiptap\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/tiptap/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/floating-ui$/,
-							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/floating-ui\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-					],
-				},
-			},
+				aliases: BLOCKNOTE_SOURCE_ALIASES,
+			}),
 		],
 	},
 });
