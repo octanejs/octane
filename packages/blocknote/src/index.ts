@@ -3,9 +3,9 @@ export {
 	BlockNoteContext,
 	useBlockNoteContext,
 	type BlockNoteContextValue,
-} from './editor/BlockNoteContext.ts';
+} from './editor/BlockNoteContext.js';
 
-export { useBlockNoteEditor } from './hooks/useBlockNoteEditor.ts';
+export { useBlockNoteEditor } from './hooks/useBlockNoteEditor.js';
 export { useCreateBlockNote } from './hooks/useCreateBlockNote.tsrx';
 
 // Re-export when editor shell imports resolve:

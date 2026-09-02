@@ -12,6 +12,7 @@
   "verified": "2026-08-07",
   "notes": [
     "Private workspace scaffold until the published source passes strict external-consumer validation.",
+    "Whole-tree typechecking remains an explicit private-port exception until the incomplete upstream scaffold is adapted; ordinary CI validates the supported runtime fixtures instead.",
     "Source ported from puckeditor/puck packages/core via scripts/port-upstream.mjs.",
     "The port script omits seven upstream lib files that are absent from Puck's public core surface and have no consumers in the port.",
     "Render and full Puck editor shell mount pass conformance tests (2026-08-07).",
