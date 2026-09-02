@@ -284,7 +284,10 @@ runs depends on the runtime:
   one `<style data-octane="hash">` element per sheet to `<head>`, and skips a sheet
   the server already sent.
 - **On the server**, the calls sit at the top of each component body, so a request
-  collects only the sheets of components it actually rendered. Buffered renderers
+  collects only the sheets of components it actually rendered. An assigned block
+  injects its sheet when the request reads it — a component that applies an
+  imported theme touches the theme before its own sheets, so the theme still
+  precedes the scope that applies it, even across modules. Buffered renderers
   return them as the `css` field of the result, deduplicated by hash in injection
   order; the streaming renderers have no `css` field and flush each scoped
   `<style data-octane>` tag inline with the content that uses it.

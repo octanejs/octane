@@ -8,6 +8,7 @@ import {
 } from 'octane/constants';
 import { condition, idle, interaction, load, never } from 'octane/hydration';
 import type { HydrationStrategy } from 'octane/hydration';
+import { compile } from 'octane/compiler';
 import { renderToStaticMarkup, renderToString } from 'octane/server';
 import { prerender } from 'octane/static';
 import { flushEffects } from '../_helpers.js';
@@ -290,6 +291,14 @@ describe('deferred hydration', () => {
 		const serverHostClass = serverHost.className;
 		const serverNoteClass = serverNote.className;
 		expect(serverHostClass).toMatch(/\btsrx-[0-9a-z]+\b/);
+		// The scope hash is position-derived from authored coordinates on both
+		// sides: the client module (compiled by the plugin) already injected a
+		// sheet under the very hash the server stamped.
+		const serverScope = serverNote.className.match(/\btsrx-[0-9a-z]+\b/)![0];
+		expect(serverHostClass.split(' ')).toContain(serverScope);
+		const clientSheet = document.head.querySelector(`style[data-octane="${serverScope}"]`);
+		expect(clientSheet).not.toBeNull();
+		expect(clientSheet!.textContent).toContain(`.styled-split-note.${serverScope}`);
 
 		root = hydrateRoot(container, styledClient.StyledSplitHydration, props);
 		await vi.waitFor(async () => {
@@ -304,6 +313,30 @@ describe('deferred hydration', () => {
 		expect(serverHost.className).toBe(serverHostClass);
 		expect(serverNote.className).toBe(serverNoteClass);
 		expect(container.querySelector('#styled-split-review')).not.toBeNull();
+	});
+
+	it('rejects a scoped <style> inside a split boundary, naming the style scope it belongs to', () => {
+		// The split child would compile the sheet under another hash while the
+		// server stamps the enclosing scope's hash around the boundary.
+		const source = `import { Hydrate } from 'octane';
+export function App(props) @{
+	<Hydrate when={props.when}>
+		<div class="x">
+			<style>.x { color: red; }</style>
+		</div>
+	</Hydrate>
+}`;
+		let thrown: any = null;
+		try {
+			compile(source, 'split-style.tsrx');
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toMatchObject({ code: 'OCTANE_HYDRATE_SPLIT_STYLE' });
+		expect(thrown.message).toContain(
+			'a scoped <style> cannot move into a split child — its rules belong to the style scope it sits in',
+		);
+		expect(thrown.message).toContain('split={false}');
 	});
 
 	it('finishes eager hydration when a never split boundary is the last child', async () => {

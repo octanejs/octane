@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { OctaneCompat } from 'octane/react';
 import { act as octaneAct } from 'octane';
 import { OctaneCompat as OctaneCompatServer } from 'octane/react/server';
-import { loadServerFixture } from '../_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 import { createLog } from '../_helpers.js';
 import { h, mountReactHost, reactAct } from './_react-host.js';
 import { __setHostFiberAdapterEnabled } from '../../src/react/fiber-adapter.js';
@@ -35,6 +35,27 @@ afterEach(() => __setHostFiberAdapterEnabled(true));
 const server = loadServerFixture(
 	join(process.cwd(), 'packages/octane/tests/react-hosted/_fixtures/ssr-islands.tsrx'),
 );
+
+// RFC tsrx-org/RFCs#1 island (S3.3): a theme declared in the island module, a
+// component applying it with one scope and a nested `@{}` scope.
+const THEMED_SCOPES_SOURCE = `
+	const theme = <style>
+		.themed { color: rgb(9, 8, 7); }
+	</style>;
+
+	export function SsrThemedScopes(props) @{
+		<section class="ssr-scopes">
+			<style apply={theme}>
+				.ssr-scopes { color: rgb(1, 1, 1); }
+			</style>
+			<p class="themed">{'themed ' + props.name}</p>
+			@{
+				<p class="ssr-inner">inner</p>
+				<style>.ssr-inner { font-weight: bold; }</style>
+			}
+		</section>
+	}
+`;
 
 function deferred<T>() {
 	let resolve!: (value: T) => void;
@@ -523,6 +544,127 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		const styles = [...html.matchAll(/<style[^>]*data-href="octane-([^"]+)"/g)];
 		expect(styles).toHaveLength(1);
 		expect(html).toContain('rgb(1, 2, 3)');
+	});
+
+	it('keys one style resource per scope hash for an island with nested scopes and an applied theme (S3.3)', () => {
+		// RFC tsrx-org/RFCs#1 shape: a theme declared in the island module, a
+		// component applying it with one scope and a nested `@{}` scope. Every
+		// scope hash reaches React as its own hoisted style resource keyed by that
+		// hash, so two islands sharing the sheets still hoist each hash once.
+		const themed = loadCompiledFixtureSource(THEMED_SCOPES_SOURCE, {
+			id: '/packages/octane/tests/react-hosted/_fixtures/ssr-themed-scopes.tsrx',
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const html = reactRenderToString(
+			h(
+				'main',
+				null,
+				h(OctaneCompatServer, { key: '1' } as any, h(themed.SsrThemedScopes, { name: 'one' })),
+				h(OctaneCompatServer, { key: '2' } as any, h(themed.SsrThemedScopes, { name: 'two' })),
+			) as any,
+		);
+		// React serializes same-precedence style resources into one <style>
+		// whose data-href lists every hoisted href, so read the hrefs back as
+		// a list: one `octane-<hash>` per scope hash, each exactly once.
+		const hrefs: string[] = [];
+		let css = '';
+		for (const match of html.matchAll(/<style[^>]*data-href="([^"]+)"[^>]*>([^<]*)<\/style>/g)) {
+			hrefs.push(...match[1].split(/\s+/).filter(Boolean));
+			css += match[2];
+		}
+		const resources = hrefs.map((href) => href.replace(/^octane-/, ''));
+		// Three hashes: the theme, the section's scope, the nested scope.
+		expect(resources).toHaveLength(3);
+		expect(new Set(resources).size).toBe(3);
+		const hashesOnElements = new Set<string>();
+		for (const match of html.matchAll(/class="([^"]*)"/g)) {
+			for (const cls of match[1].split(' ')) if (cls.startsWith('tsrx-')) hashesOnElements.add(cls);
+		}
+		expect(new Set(resources)).toEqual(hashesOnElements);
+		// Each sheet is present once, hashed to its own resource key.
+		for (const rule of ['rgb(9, 8, 7)', 'rgb(1, 1, 1)', 'font-weight']) {
+			expect(css.split(rule)).toHaveLength(2);
+		}
+		for (const hash of resources) expect(css).toContain(`.${hash}`);
+		expect(html).toContain('themed one');
+		expect(html).toContain('themed two');
+	});
+
+	// KNOWN RUNTIME GAP (S3.3): the client `injectStyle` dedupes hydrated pages
+	// with the exact-match query `style[data-href="octane-<hash>"]`, but React
+	// batches same-precedence resources into ONE tag whose data-href is the
+	// space-separated href list — so no hash of a multi-hash island matches and
+	// every sheet is appended again (a token match, `[data-href~="octane-<hash>"]`,
+	// would find them). Single-hash islands are unaffected. Runtime unchanged here.
+	it("hydration dedupe: a multi-hash island's batched React style resource is not re-injected (S3.3)", async () => {
+		// React serializes the island's three same-precedence resources as ONE
+		// `<style data-href="octane-a octane-b octane-c">`. The client module's
+		// module-level `injectStyle` calls run against that markup on a hydrated
+		// page, so evaluate the client module only AFTER the server markup is in
+		// the document — the order a real page has — and count sheets per hash.
+		const compileOptions = { hmr: false, dev: false };
+		const id = '/packages/octane/tests/react-hosted/_fixtures/ssr-themed-scopes-hydrate.tsrx';
+		const serverIsland = loadCompiledFixtureSource(THEMED_SCOPES_SOURCE, {
+			id,
+			mode: 'server',
+			compileOptions,
+		});
+		const serverHtml = reactRenderToString(
+			h(
+				'main',
+				null,
+				h(OctaneCompatServer, null, h(serverIsland.SsrThemedScopes, { name: 'hy' })),
+			) as any,
+		);
+		const hashes = new Set<string>();
+		for (const match of serverHtml.matchAll(/class="([^"]*)"/g)) {
+			for (const cls of match[1].split(' ')) if (cls.startsWith('tsrx-')) hashes.add(cls);
+		}
+		expect(hashes.size).toBe(3);
+		const container = document.createElement('div');
+		container.innerHTML = serverHtml;
+		document.body.appendChild(container);
+		// The batched resource is in the document before the client module runs.
+		const batched = Array.from(container.querySelectorAll('style[data-href]'));
+		expect(batched).toHaveLength(1);
+		expect(batched[0].getAttribute('data-href')!.split(/\s+/).sort()).toEqual(
+			[...hashes].map((hash) => `octane-${hash}`).sort(),
+		);
+
+		const clientIsland = loadCompiledFixtureSource(THEMED_SCOPES_SOURCE, {
+			id,
+			mode: 'client',
+			compileOptions,
+		});
+		const duplicated = [...hashes].filter(
+			(hash) => document.querySelectorAll(`style[data-octane="${hash}"]`).length > 0,
+		);
+		const { hydrateRoot } = await import('react-dom/client');
+		const errors = vi.spyOn(console, 'error');
+		let reactRoot!: ReturnType<typeof hydrateRoot>;
+		await reactAct(async () => {
+			reactRoot = hydrateRoot(
+				container,
+				h(
+					'main',
+					null,
+					h(OctaneCompat, null, h(clientIsland.SsrThemedScopes as any, { name: 'hy' })),
+				) as any,
+			);
+		});
+		try {
+			expect(errors).not.toHaveBeenCalled();
+			expect(container.querySelector('.themed')?.textContent).toBe('themed hy');
+			// Every hash was already on the page through the batched resource:
+			// the client must not have appended its own <style data-octane>.
+			expect(duplicated).toEqual([]);
+		} finally {
+			errors.mockRestore();
+			await reactAct(async () => reactRoot.unmount());
+			container.remove();
+			for (const el of document.querySelectorAll('style[data-octane]')) el.remove();
+		}
 	});
 
 	it('rejects hoisted head content from islands (§9.2 v1) — at hosted-render time', () => {

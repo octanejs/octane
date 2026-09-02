@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { compile } from 'octane/compiler';
 
 const COMPILER_DIR = join(process.cwd(), 'packages/octane/src/compiler');
 const BASELINE_COMPILER = 'compile-2f-baseline.js';
@@ -185,5 +186,44 @@ describe('compiler AST emit architecture', () => {
 		}
 
 		expect(violations).toEqual([]);
+	});
+});
+
+// RFC tsrx-org/RFCs#1: `{style(expr)}` is resolved by the scope pre-pass
+// (style-scopes.js) into the scope chain plus the value. By the time the
+// emitters run — and compile.js's `resolveStyleExpr` fallback with them — no
+// `style(...)` call is left on the AST, so the output never carries one.
+describe('scoped style pre-pass', () => {
+	const SOURCE = `export function App(props) @{
+	<>
+		<style>.x { color: red; }</style>
+		<p class={style('x')}>{style('x y')}</p>
+		<i class={style(props.cls)}>{'i'}</i>
+	</>
+}`;
+
+	it.each([
+		['client', {}],
+		['client prod', { hmr: false as const }],
+		['server', { mode: 'server' as const }],
+	])('resolves every {style(...)} call before the emitters run — %s', (_label, options) => {
+		const { code } = compile(SOURCE, 'style-call.tsrx', options);
+		expect(code).not.toMatch(/\bstyle\(/);
+		const hash = code.match(/injectStyle\("(tsrx-[0-9a-f]+)"/)![1];
+		// Static values fold to a literal that opens with the scope chain…
+		expect(code).toContain(`${hash} x`);
+		expect(code).toContain(`${hash} x y`);
+		// …and a dynamic value concatenates after the chain at runtime.
+		expect(code).toContain(`"${hash} " + props.cls`);
+	});
+
+	it('keeps the emitter fallback out of the shipped path (no cssHash-driven rewrite)', () => {
+		// The pre-pass leaves `cssHash` only as a "this root owns scoped CSS" flag;
+		// resolveStyleExpr must not expand anything on its own.
+		const compileSource = sources.find(({ path }) => path.endsWith('compile.js'))!.code;
+		const at = compileSource.indexOf('function resolveStyleExpr(');
+		expect(at).toBeGreaterThan(-1);
+		const body = compileSource.slice(at, compileSource.indexOf('\n}', at));
+		expect(body).not.toContain('injectStyle');
 	});
 });

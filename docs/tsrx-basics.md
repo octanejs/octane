@@ -541,9 +541,13 @@ source order. On the client every sheet is a module-level
 sheets across modules, and the runtime injects each hash once. On the server
 `injectStyle` runs inside the component body, per request, so a render collects
 CSS only for the components it actually rendered; the buffered renderers return
-it as `css` and the streaming renderers flush it with the shell. Hydration
-matches the server's `<style data-octane="hash">` tags by hash and never
-re-injects them.
+it as `css` and the streaming renderers flush it with the shell. An assigned
+block's sheet joins the request when the block is read: on the server the
+class-map object injects its CSS (after the CSS of the themes it applies) on
+property access, and a component that applies an imported theme touches it
+before its own sheets, so a theme from another module still precedes the scope
+that applies it. Hydration matches the server's `<style data-octane="hash">`
+tags by hash and never re-injects them.
 
 ### `<style href precedence>`
 

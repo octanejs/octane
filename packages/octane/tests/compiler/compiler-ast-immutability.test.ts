@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { compile, compileToVolarMappings } from 'octane/compiler';
 
 // Parser-AST immutability: the compile pipeline must never mutate the module
@@ -11,8 +13,10 @@ import { compile, compileToVolarMappings } from 'octane/compiler';
 //
 // The fixture is deliberately feature-dense so the freeze walks the paths that
 // historically mutated in place: type-only statements (dropped), arrow
-// components (normalized), scoped styles (restamped/hashed), hooks with
-// inferred deps, events, directive control flow, and spreads.
+// components (normalized), scoped styles (restamped/hashed) — including blocks
+// inside `@if` and `@for` bodies, whose CSS AST nodes carry no `loc` and once
+// received in-place module positions — hooks with inferred deps, events,
+// directive control flow, and spreads.
 const SOURCE = `
 import { useState, useEffect, useMemo } from 'octane';
 import type { OctaneNode } from 'octane';
@@ -49,8 +53,18 @@ export function App() @{
 		<Title />
 		<input value={query} onInput={(e) => setQuery((e.target as HTMLInputElement).value)} />
 		@if (visible.length > 0) {
+			<style>
+				ul {
+					list-style: none;
+				}
+			</style>
 			<ul>
 				@for (const row of visible; key row.id) {
+					<style>
+						li {
+							margin: 0;
+						}
+					</style>
 					{/* Parser comments are immutable authored nodes too. */}
 					<Row row={row} onPick={(id) => setRows(rows.filter((r) => r.id !== id))} />
 				} @empty {
@@ -91,8 +105,49 @@ describe('compiler parser-AST immutability (frozen-AST enforcement)', () => {
 			const result = compile(SOURCE, FILENAME, options);
 			expect(result.code).toBeTruthy();
 			expect(result.code).not.toContain('interface RowData');
+			// The branch-body blocks scope as compound selectors: a stray position
+			// stamp on the CSS nodes used to print `.tsrx-xxx ul` instead.
+			expect(result.code).toMatch(/ul\.tsrx-[0-9a-f]+\s*\{/);
+			expect(result.code).toMatch(/li\.tsrx-[0-9a-f]+\s*\{/);
+			expect(result.code).not.toMatch(/\.tsrx-[0-9a-f]+\s+(?:ul|li|div)\b/);
 		});
 	}
+
+	// RFC tsrx-org/RFCs#1 scoped-style fixtures: every scope shape (multi-block
+	// scopes, nested `@{}`, directive branches, assigned templates, assigned
+	// blocks in every declaration position, `apply` in every form) runs the
+	// copy-on-write style pre-pass over a frozen parser AST.
+	const STYLE_FIXTURES = [
+		'style-scopes',
+		'style-theme',
+		'style-theme-consumer',
+		'style-element-rooted',
+		'style-local-assigned',
+		'return-style',
+	];
+	const FIXTURE_DIR = join(process.cwd(), 'packages/octane/tests/_fixtures');
+
+	describe.each(STYLE_FIXTURES)('scoped-style fixture %s', (name) => {
+		const source = readFileSync(join(FIXTURE_DIR, `${name}.tsrx`), 'utf8');
+		for (const [label, options] of MODES) {
+			it(`does not mutate the parsed AST — ${label}`, () => {
+				const result = compile(source, `${name}.tsrx`, options);
+				expect(result.code).toBeTruthy();
+				if (options.mode !== 'server') expect(result.code).toContain('injectStyle(');
+			});
+		}
+
+		it('emits byte-identical output with enforcement on and off', () => {
+			const frozen = compile(source, `${name}.tsrx`, { dev: true });
+			delete process.env.OCTANE_COMPILE_FROZEN_AST;
+			try {
+				const unfrozen = compile(source, `${name}.tsrx`, { dev: true });
+				expect(frozen.code).toBe(unfrozen.code);
+			} finally {
+				process.env.OCTANE_COMPILE_FROZEN_AST = '1';
+			}
+		});
+	});
 
 	it('produces the Volar (types) output alongside enforcement', () => {
 		// The Volar pipeline owns its parse (its @tsrx/core lowering is

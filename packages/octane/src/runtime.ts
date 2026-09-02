@@ -16128,10 +16128,12 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 	// `data-href="octane-<hash>"`; React drops other attributes from hoisted
 	// resources). On a hydrated page the per-runtime Set is empty, so also
 	// check the DOM before re-injecting — otherwise hydration would append a
-	// duplicate <style>.
+	// duplicate <style>. React batches same-precedence resources into one tag
+	// whose data-href lists every key (`octane-a octane-b`), so the resource
+	// match is a whitespace-token match, not an exact one.
 	if (
 		typeof document !== 'undefined' &&
-		document.querySelector(`style[data-octane="${id}"], style[data-href="octane-${id}"]`)
+		document.querySelector(`style[data-octane="${id}"], style[data-href~="octane-${id}"]`)
 	) {
 		_injectedStyles.add(id);
 		return;

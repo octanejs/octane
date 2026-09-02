@@ -29,3 +29,42 @@ export function ReturnedScopedMailbox(props: { active: boolean; title: string })
 		</>
 	</>;
 }
+
+// An assigned template rendered from returned JSX is a scope of its own; the
+// returned tree is another. Elements inside the assigned template carry only
+// its hash, elements of the returned tree only the returned scope's, and a
+// nested `@{}` in the returned tree carries both of its enclosing hashes.
+export function ReturnedNestedScopes(props: { label: string }) {
+	const badge = <em id="returned-badge" class="badge">
+		<style>
+			.badge {
+				color: rgb(70, 80, 90);
+			}
+		</style>
+		{props.label as string}
+	</em>;
+	return <section id="returned-nested" class="outer">
+		<style>
+			.outer {
+				color: rgb(1, 2, 3);
+			}
+		</style>
+		<p id="returned-note" class="note">{'note'}</p>
+		{badge}
+		<div id="returned-inner-host">@{
+			<>
+				<style>
+					.inner {
+						font-weight: 700;
+					}
+				</style>
+				<b id="returned-inner" class="inner">{'inner'}</b>
+			</>
+		}</div>
+		<style>
+			.note {
+				letter-spacing: 1px;
+			}
+		</style>
+	</section>;
+}

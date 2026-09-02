@@ -28,6 +28,17 @@ import {
 	ScopedGlobal,
 	ScopedGlobalTag,
 } from './_fixtures/style.tsrx';
+import {
+	MultiBlock,
+	NestedBlocks,
+	StyleCallChain,
+	ControlFlow,
+	SiblingScopes,
+} from './_fixtures/style-scopes.tsrx';
+import { base, theme } from './_fixtures/style-theme.tsrx';
+import { Panel } from './_fixtures/style-theme-consumer.tsrx';
+import { Templates, Enclosed } from './_fixtures/style-element-rooted.tsrx';
+import { LocalAssigned, AppliesLater, late } from './_fixtures/style-local-assigned.tsrx';
 
 const MIXED_INLINE_STYLE_SOURCE = `
 	export function MixedStyle(props) @{
@@ -985,6 +996,21 @@ function getInjectedStyles(): string[] {
 	);
 }
 
+function hashesOf(el: Element): string[] {
+	return Array.from(el.classList).filter((c) => c.startsWith('tsrx-'));
+}
+
+/** The given hashes in the order their sheets sit in document.head. */
+function sheetOrder(hashes: string[]): string[] {
+	return getInjectedStyles().filter((id) => hashes.includes(id));
+}
+
+function sheetText(hash: string): string {
+	const sheets = document.head.querySelectorAll(`style[data-octane="${hash}"]`);
+	expect(sheets, `expected exactly one sheet for ${hash}`).toHaveLength(1);
+	return sheets[0].textContent || '';
+}
+
 describe('scoped <style> blocks', () => {
 	it('injects exactly one <style> tag per module-scoped css hash', () => {
 		const before = new Set(getInjectedStyles());
@@ -1119,6 +1145,281 @@ describe('scoped <style> blocks', () => {
 		const div = r.find('div');
 		expect(div.classList.contains('top')).toBe(true);
 		expect(getComputedStyle(div).color).toBe('rgb(1, 2, 3)');
+		r.unmount();
+	});
+
+	// -------------------------------------------------------------------------
+	// RFC tsrx-org/RFCs#1: lexical scopes, `$class`, and `apply`.
+	// -------------------------------------------------------------------------
+
+	it('RFC opening example: exact class table and theme → A → B cascade order', () => {
+		// theme applies base: `$class` is base's hash then theme's own.
+		const [baseHash, themeHash] = theme.$class.split(' ');
+		expect(theme.$class.split(' ')).toHaveLength(2);
+		expect(base.$class).toBe(baseHash);
+		expect(theme.dark).toBe(`${themeHash} dark`);
+
+		const r = mount(Panel);
+		const span = r.find('#panel-span');
+		const d1 = r.find('#panel-d1');
+		const p1 = r.find('#panel-p1');
+		const d2 = r.find('#panel-d2');
+		const p2 = r.find('#panel-p2');
+
+		// Scope A is the component's scope; the imported theme rides after it.
+		const [A] = hashesOf(d1);
+		expect(A).toMatch(/^tsrx-/);
+		expect(d1.className).toBe(`panel-d1 ${A} ${theme.$class}`);
+		expect(span.className).toBe(`${theme.dark} ${A} ${theme.$class}`);
+		expect(p1.className).toBe(`panel-p1 ${A} ${theme.$class}`);
+		// Scope B nests inside A: A, then B, then the applied theme.
+		const B = hashesOf(d2)[1];
+		expect(B).toMatch(/^tsrx-/);
+		expect(B).not.toBe(A);
+		expect(d2.className).toBe(`panel-d2 ${A} ${B} ${theme.$class}`);
+		expect(p2.className).toBe(`panel-p2 ${A} ${B} ${theme.$class}`);
+		expect(hashesOf(p1)).toEqual([A, baseHash, themeHash]);
+
+		// Cascade: the theme module's sheets, then A, then B.
+		expect(sheetOrder([baseHash, themeHash, A, B])).toEqual([baseHash, themeHash, A, B]);
+		expect(sheetText(themeHash)).toContain(`div.${themeHash}`);
+		expect(sheetText(A)).toContain(`div.${A}`);
+		expect(sheetText(A)).toContain(`p.${A}`);
+		expect(sheetText(B)).toContain(`div.${B}`);
+
+		// The local rule beats the theme's green; theme.dark is purple; B is bold.
+		expect(getComputedStyle(d1).color).toBe('rgb(0, 0, 0)');
+		expect(getComputedStyle(span).color).toBe('rgb(128, 0, 128)');
+		expect(getComputedStyle(d2).color).toBe('rgb(0, 0, 0)');
+		expect(getComputedStyle(d2).fontWeight).toBe('700');
+		r.unmount();
+	});
+
+	it('multiple blocks in one scope share one hash and one style[data-octane]', () => {
+		const r = mount(MultiBlock);
+		const root = r.find('#mb-root');
+		const title = r.find('.mb-title');
+		const [hash] = hashesOf(root);
+		expect(hashesOf(root)).toEqual([hash]);
+		expect(hashesOf(title)).toEqual([hash]);
+		const css = sheetText(hash);
+		expect(css).toContain(`.mb-root.${hash}`);
+		expect(css).toContain(`.mb-title.${hash}`);
+		expect(getComputedStyle(root).color).toBe('rgb(10, 20, 30)');
+		expect(getComputedStyle(title).fontWeight).toBe('700');
+		r.unmount();
+	});
+
+	it('a nested @{} is its own scope: A reaches into B, B never reaches A', () => {
+		const r = mount(NestedBlocks);
+		const outer = r.find('#nb-outer');
+		const p = r.find('#nb-p');
+		const inner = r.find('#nb-inner');
+		const [A] = hashesOf(outer);
+		expect(hashesOf(outer)).toEqual([A]);
+		expect(hashesOf(p)).toEqual([A]);
+		const innerHashes = hashesOf(inner);
+		expect(innerHashes).toHaveLength(2);
+		expect(innerHashes[0]).toBe(A);
+		const B = innerHashes[1];
+		expect(B).not.toBe(A);
+		expect(sheetText(A)).not.toContain(B);
+		expect(sheetText(B)).toContain(`.nb-inner.${B}`);
+		expect(sheetText(B)).not.toContain(A);
+		expect(sheetOrder([A, B])).toEqual([A, B]);
+		// Both scopes' rules apply to the nested element.
+		expect(getComputedStyle(inner).fontWeight).toBe('700');
+		expect(getComputedStyle(inner).letterSpacing).toBe('2px');
+		expect(getComputedStyle(p).fontWeight).not.toBe('700');
+		r.unmount();
+	});
+
+	it('{style(expr)} resolves to the full scope chain', () => {
+		const r = mount(StyleCallChain, { cls: 'sc-cell' });
+		const host = r.find('#sc-host');
+		const stat = r.find('#sc-static');
+		const dyn = r.find('#sc-dynamic');
+		const [A] = hashesOf(host);
+		const B = hashesOf(stat)[1];
+		expect(B).toMatch(/^tsrx-/);
+		expect(stat.className).toBe(`${A} ${B} sc-row`);
+		expect(dyn.className).toBe(`${A} ${B} sc-cell`);
+		expect(getComputedStyle(stat).color).toBe('rgb(4, 5, 6)');
+		expect(getComputedStyle(dyn).fontWeight).toBe('700');
+		r.update(StyleCallChain, { cls: 'sc-row' });
+		expect(dyn.className).toBe(`${A} ${B} sc-row`);
+		expect(getComputedStyle(dyn).color).toBe('rgb(4, 5, 6)');
+		r.unmount();
+	});
+
+	it('every directive branch is a scope whose CSS ships even while inactive', () => {
+		const r = mount(ControlFlow, { ready: false, maybe: false, items: [], kind: 2 });
+		const [R] = hashesOf(r.find('#cf-root'));
+		const no = r.find('#cf-no');
+		const empty = r.find('#cf-empty');
+		const other = r.find('#cf-other');
+		const ok = r.find('#cf-ok');
+		for (const el of [no, empty, other, ok]) {
+			expect(hashesOf(el)).toHaveLength(2);
+			expect(hashesOf(el)[0]).toBe(R);
+		}
+		const [NO, E, O, K] = [no, empty, other, ok].map((el) => hashesOf(el)[1]);
+		expect(new Set([R, NO, E, O, K]).size).toBe(5);
+		expect(r.container.querySelector('#cf-yes')).toBeNull();
+		expect(r.container.querySelector('#cf-maybe')).toBeNull();
+		// The inactive branches' sheets are already in the head.
+		const all = getInjectedStyles()
+			.map((id) => sheetText(id))
+			.join('\n');
+		for (const cls of ['cf-yes', 'cf-maybe', 'cf-item', 'cf-one', 'cf-err']) {
+			expect(all).toMatch(new RegExp(`\\.${cls}\\.tsrx-[0-9a-f]+`));
+		}
+		expect(getComputedStyle(no).color).toBe('rgb(3, 3, 3)');
+		expect(getComputedStyle(empty).color).toBe('rgb(5, 5, 5)');
+		expect(getComputedStyle(other).color).toBe('rgb(7, 7, 7)');
+		expect(getComputedStyle(ok).color).toBe('rgb(8, 8, 8)');
+
+		r.update(ControlFlow, { ready: false, maybe: true, items: ['x', 'y'], kind: 1 });
+		const maybe = r.find('#cf-maybe');
+		const items = r.findAll('.cf-item');
+		const one = r.find('#cf-one');
+		expect(hashesOf(maybe)[0]).toBe(R);
+		expect(getComputedStyle(maybe).color).toBe('rgb(2, 2, 2)');
+		expect(items).toHaveLength(2);
+		for (const item of items) {
+			expect(hashesOf(item)[0]).toBe(R);
+			expect(hashesOf(item)[1]).toBe(hashesOf(items[0])[1]);
+			expect(getComputedStyle(item).color).toBe('rgb(4, 4, 4)');
+		}
+		expect(hashesOf(one)[0]).toBe(R);
+		expect(getComputedStyle(one).color).toBe('rgb(6, 6, 6)');
+
+		r.update(ControlFlow, { ready: true, maybe: true, items: [], kind: 1 });
+		const yes = r.find('#cf-yes');
+		expect(hashesOf(yes)[0]).toBe(R);
+		expect(getComputedStyle(yes).color).toBe('rgb(1, 1, 1)');
+		const seen = new Set([
+			R,
+			NO,
+			E,
+			O,
+			K,
+			hashesOf(maybe)[1],
+			hashesOf(items[0])[1],
+			hashesOf(one)[1],
+		]);
+		expect(seen.has(hashesOf(yes)[1])).toBe(false);
+		expect(seen.size).toBe(8);
+		r.unmount();
+	});
+
+	it('sibling @{} scopes get distinct hashes and never share rules', () => {
+		const r = mount(SiblingScopes);
+		const a = r.find('#sib-a');
+		const b = r.find('#sib-b');
+		const [A] = hashesOf(a);
+		const [B] = hashesOf(b);
+		expect(hashesOf(a)).toEqual([A]);
+		expect(hashesOf(b)).toEqual([B]);
+		expect(A).not.toBe(B);
+		expect(sheetText(A)).not.toContain('sib-b');
+		expect(sheetText(B)).not.toContain('sib-a');
+		expect(sheetOrder([A, B])).toEqual([A, B]);
+		expect(getComputedStyle(a).color).toBe('rgb(11, 0, 0)');
+		expect(getComputedStyle(b).color).toBe('rgb(0, 11, 0)');
+		r.unmount();
+	});
+
+	it('an assigned template is a scope of its own, at module scope and in a component body', () => {
+		const r = mount(Templates);
+		const card = r.find('#er-card');
+		const cardText = r.find('#er-card-text');
+		const chip = r.find('#er-chip');
+		const chipText = r.find('#er-chip-text');
+		const [C] = hashesOf(card);
+		const [H] = hashesOf(chip);
+		expect(hashesOf(card)).toEqual([C]);
+		expect(hashesOf(cardText)).toEqual([C]);
+		expect(hashesOf(chip)).toEqual([H]);
+		expect(hashesOf(chipText)).toEqual([H]);
+		expect(C).not.toBe(H);
+		// The rendering component has no block of its own: nothing to stamp.
+		expect(hashesOf(r.find('#er-outside'))).toEqual([]);
+		expect(sheetText(C)).toContain(`.er-card.${C}`);
+		expect(sheetText(C)).toContain(`p.${C}`);
+		expect(sheetText(H)).toContain(`.er-chip.${H}`);
+		expect(sheetOrder([C, H])).toEqual([C, H]);
+		expect(getComputedStyle(card).color).toBe('rgb(21, 22, 23)');
+		expect(getComputedStyle(chip).color).toBe('rgb(31, 32, 33)');
+		r.unmount();
+	});
+
+	it('an assigned template written inside a scope carries the enclosing hash too', () => {
+		const r = mount(Enclosed);
+		const host = r.find('#en-host');
+		const inner = r.find('#en-inner');
+		const innerText = r.find('#en-inner-text');
+		const [A] = hashesOf(host);
+		expect(hashesOf(host)).toEqual([A]);
+		expect(hashesOf(inner)).toHaveLength(2);
+		expect(hashesOf(inner)[0]).toBe(A);
+		const B = hashesOf(inner)[1];
+		expect(hashesOf(innerText)).toEqual([A, B]);
+		expect(sheetOrder([A, B])).toEqual([A, B]);
+		expect(getComputedStyle(inner).fontWeight).toBe('700');
+		expect(getComputedStyle(inner).color).toBe('rgb(51, 52, 53)');
+		r.unmount();
+	});
+
+	it('assigned blocks lower in a component body, a block statement, a nested @{}, and a function', () => {
+		const r = mount(LocalAssigned);
+		const body = r.find('#la-body');
+		const block = r.find('#la-block');
+		const nested = r.find('#la-nested');
+		const fn = r.find('#la-fn');
+		expect(body.className).toMatch(/^tsrx-[0-9a-f]+ laBody$/);
+		expect(block.className).toMatch(/^tsrx-[0-9a-f]+ laBlock$/);
+		expect(nested.className).toMatch(/^tsrx-[0-9a-f]+ laNested$/);
+		expect(fn.className).toMatch(/^tsrx-[0-9a-f]+ laFn$/);
+		const [bodyHash, blockHash, nestedHash, fnHash] = [body, block, nested, fn].map(
+			(el) => hashesOf(el)[0],
+		);
+		expect(new Set([bodyHash, blockHash, nestedHash, fnHash]).size).toBe(4);
+		expect(sheetText(bodyHash)).toContain(`.laBody.${bodyHash}`);
+		// A local, unapplied block keeps only what its class map exposes.
+		expect(sheetText(bodyHash)).toContain('(unused) i');
+		expect(sheetText(blockHash)).toContain(`.laBlock.${blockHash}`);
+		expect(sheetText(fnHash)).toContain(`.laFn.${fnHash}`);
+		expect(sheetOrder([fnHash, bodyHash, blockHash, nestedHash])).toEqual([
+			fnHash,
+			bodyHash,
+			blockHash,
+			nestedHash,
+		]);
+		expect(getComputedStyle(body).color).toBe('rgb(42, 0, 0)');
+		expect(getComputedStyle(block).color).toBe('rgb(43, 0, 0)');
+		expect(getComputedStyle(fn).color).toBe('rgb(41, 0, 0)');
+		r.unmount();
+	});
+
+	it('a block assigned inside a nested @{} scopes its class as a compound selector', () => {
+		const r = mount(LocalAssigned);
+		const nested = r.find('#la-nested');
+		const [nestedHash] = hashesOf(nested);
+		expect(sheetText(nestedHash)).toMatch(new RegExp(`\\.laNested\\.${nestedHash}\\s*\\{`));
+		expect(getComputedStyle(nested).color).toBe('rgb(44, 0, 0)');
+		r.unmount();
+	});
+
+	it('a same-module theme applied by a later component resolves to a literal and keeps selectors', () => {
+		expect(late.$class).toMatch(/^tsrx-[0-9a-f]+$/);
+		expect(late.laLate).toBe(`${late.$class} laLate`);
+		const r = mount(AppliesLater);
+		const host = r.find('#la-late');
+		expect(host.className).toBe(`laLateHost ${late.$class}`);
+		expect(sheetText(late.$class)).toContain(`.laLate.${late.$class}`);
+		expect(sheetText(late.$class)).toContain(`div.${late.$class}`);
+		expect(getComputedStyle(host).padding).toBe('3px');
 		r.unmount();
 	});
 });
