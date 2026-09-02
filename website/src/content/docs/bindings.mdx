@@ -3,6 +3,7 @@ title: Integrations and bindings
 ---
 
 import { EcosystemDirectory } from '../../components/EcosystemDirectory.tsrx';
+import { CommunityBindingsDirectory } from '../../components/CommunityBindingsDirectory.tsrx';
 import { BINDING_COUNT } from '../bindings.ts';
 import { FRAMEWORK_INTEGRATION_COUNT } from '../framework-integrations.ts';
 import { PackageInstall } from '../../components/PackageInstall.tsrx';
@@ -40,6 +41,27 @@ routing, UI, forms, charts, 3D, and more.
 The directory is server-rendered and its search and filters stay in the URL, so a result
 from the site search opens the same focused view. Follow a package link for its README.
 Framework cards also link to the deeper setup guide.
+
+<h2 id="community-bindings">Community bindings</h2>
+
+Browse a curated selection of Octane integrations published across the wider ecosystem.
+Each entry links directly to the project's official documentation; the list is not
+exhaustive.
+
+<CommunityBindingsDirectory />
+
+<p>
+	{'Looking for more? '}
+	<a
+		className="community-binding-discovery"
+		href="https://github.com/octanejs/octane/network/dependents?dependent_type=PACKAGE"
+		target="_blank"
+		rel="noreferrer"
+		aria-label="Explore community packages that depend on Octane on GitHub in a new tab"
+	>
+		{'Explore community packages that depend on Octane on GitHub. ↗'}
+	</a>
+</p>
 
 <h2 id="install-and-use">Install it, then change the import</h2>
 

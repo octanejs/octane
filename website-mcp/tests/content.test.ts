@@ -10,8 +10,12 @@ import { DOCS, DOC_SLUGS, docBySlug } from '../src/content/docs.ts';
 import { BINDING_CATEGORIES, BINDING_STATUSES, resolveBinding } from '../src/content/bindings.ts';
 import { SKILLS, SKILL_NAMES } from '../src/content/skills.ts';
 import { LLMS_TXT, LLMS_FULL_TXT } from '../src/content/llms.ts';
+import { COMMUNITY_BINDING_GROUPS } from '../../website/src/content/community-bindings.ts';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
+const communitySearchNames = new Set(
+	COMMUNITY_BINDING_GROUPS.flatMap((group) => group.entries.flatMap((entry) => entry.searchNames)),
+);
 
 describe('docs snapshot', () => {
 	it('carries every website doc plus the repo deep dives', async () => {
@@ -77,6 +81,17 @@ describe('bindings snapshot', () => {
 		expect(resolveBinding('zustand')?.package).toBe('@octanejs/zustand');
 		expect(resolveBinding('@tanstack/react-query')?.package).toBe('@octanejs/tanstack-query');
 		expect(resolveBinding('not-a-binding')).toBeUndefined();
+	});
+
+	it('keeps community projects outside the official binding snapshot', () => {
+		const officialPackageNames = [
+			...BINDING_CATEGORIES.flatMap((category) => category.packages),
+			...BINDING_STATUSES.map((status) => status.package),
+		];
+		for (const packageName of officialPackageNames) {
+			expect(packageName).toMatch(/^@octanejs\//);
+			expect(communitySearchNames.has(packageName)).toBe(false);
+		}
 	});
 });
 
@@ -192,6 +207,20 @@ describe('llms text', () => {
 		);
 		const catalogued = BINDING_CATEGORIES.flatMap((category) => category.packages);
 		expect(new Set(mentioned)).toEqual(new Set(catalogued));
+	});
+
+	it('does not list community projects in the llms binding inventory', () => {
+		const bindingsGuide = LLMS_TXT.split(
+			'Bindings — reach for these when asked about the React equivalent:\n',
+		)[1]?.split('\n## Source')[0];
+		expect(bindingsGuide).toBeDefined();
+		const mentioned = Array.from(
+			bindingsGuide!.matchAll(/`(@octanejs\/[^`]+)`/g),
+			(match) => match[1],
+		);
+		for (const packageName of mentioned) {
+			expect(communitySearchNames.has(packageName)).toBe(false);
+		}
 	});
 
 	it('llms-full.txt extends llms.txt with the whole docs corpus', () => {

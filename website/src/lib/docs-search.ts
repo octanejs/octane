@@ -6,7 +6,7 @@
 // The sectionizer and ranking live in docs-search-core.ts (pure, shared with
 // the remote MCP server); this module owns the lazy index build over the raw
 // MDX glob and re-exports the core surface for the dialog and tests.
-import { addSearchTerms, recordsFor, type SearchRecord } from './docs-search-core.ts';
+import { addSearchTerms, recordsFor, type DocumentSearchRecord } from './docs-search-core.ts';
 
 export * from './docs-search-core.ts';
 
@@ -20,16 +20,16 @@ function slugOf(path: string): string {
 	return path.slice(path.lastIndexOf('/') + 1).replace(/\.mdx$/, '');
 }
 
-let indexPromise: Promise<SearchRecord[]> | null = null;
+let indexPromise: Promise<DocumentSearchRecord[]> | null = null;
 
 /** Build (once) and return the flat section index. Safe to call repeatedly. */
-export function loadSearchIndex(): Promise<SearchRecord[]> {
+export function loadSearchIndex(): Promise<DocumentSearchRecord[]> {
 	if (!indexPromise) {
-		const pending = import('../content/docs.ts').then(({ docs }) =>
+		indexPromise = import('../content/docs.ts').then(({ docs }) =>
 			Promise.all(
 				Object.entries(rawDocs).map(async ([path, load]) => {
 					const slug = slugOf(path);
-					const order = docs.findIndex((d) => d.slug === slug);
+					const order = docs.findIndex((doc) => doc.slug === slug);
 					const doc = order === -1 ? undefined : docs[order];
 					const rank = order === -1 ? docs.length : order;
 					const records = recordsFor(slug, doc?.title ?? slug, rank, await load());
@@ -53,7 +53,7 @@ export function loadSearchIndex(): Promise<SearchRecord[]> {
 				}),
 			).then((groups) => groups.flat()),
 		);
-		indexPromise = pending.catch((error) => {
+		indexPromise = indexPromise.catch((error) => {
 			indexPromise = null;
 			throw error;
 		});

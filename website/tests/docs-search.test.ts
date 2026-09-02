@@ -6,6 +6,7 @@ import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
 import { headingsFor, loadSearchIndex, searchDocs } from '../src/lib/docs-search.ts';
+import { loadSiteSearchIndex } from '../src/lib/site-search.ts';
 
 const rawDocs = import.meta.glob('../src/content/docs/*.mdx', {
 	query: '?raw',
@@ -220,6 +221,41 @@ describe('search dialog', () => {
 
 		expect(trigger?.getAttribute('aria-label')).toBe('Search docs, packages, and integrations');
 		expect(trigger?.textContent).toContain('Search Octane');
+	});
+
+	it('renders community packages as attributed direct links', async () => {
+		// This case owns the rendered result, not the lazy-loading state. Warm the
+		// shared index before opening the dialog so suite contention cannot consume
+		// the DOM wait budget while package metadata modules are still loading.
+		await loadSiteSearchIndex();
+		const { container, router } = await renderRoute('/');
+		const trigger = container.querySelector<HTMLButtonElement>('.search-trigger')!;
+		fireEvent.click(trigger);
+		const dialog = await waitFor(() =>
+			document.body.querySelector<HTMLElement>('[role="dialog"]')!,
+		);
+		fireEvent.input(dialog.querySelector<HTMLInputElement>('.search-input')!, {
+			target: { value: 'markstream-octane' },
+		});
+
+		const link = await waitFor(() => {
+			const element = dialog.querySelector<HTMLAnchorElement>('a.search-package-result');
+			if (!element) throw new Error('community package result did not render');
+			return element;
+		});
+		expect(link.querySelector('.search-type')?.textContent).toContain('Community package');
+		expect(link.querySelector('.search-title')?.textContent).toBe('Markstream');
+		expect(link.querySelector('.search-package-name')?.textContent).toBe('markstream-octane');
+		expect(link.querySelector('.search-package-owner')?.textContent).toContain('Simon-He95');
+		expect(link.href).toBe(
+			'https://github.com/Simon-He95/markstream-vue/tree/main/packages/markstream-octane',
+		);
+		expect(link.target).toBe('_blank');
+		expect(link.rel).toBe('noreferrer');
+
+		fireEvent.keyDown(dialog, { key: 'Enter' });
+		expect(router.state.location.pathname).toBe('/');
+		await waitFor(() => expect(document.body.querySelector('[role="dialog"]')).toBeNull());
 	});
 
 	it('is reachable from the header, and navigates to the hit on Enter', async () => {

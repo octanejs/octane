@@ -627,6 +627,40 @@ describe('website routes', () => {
 			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
 			expect(link?.textContent).toContain(packageName);
 		}
+
+		const communityHeading = container.querySelector('#community-bindings')!;
+		const communityDirectory = container.querySelector('.community-binding-directory')!;
+		expect(communityHeading).toBeTruthy();
+		expect(communityDirectory).toBeTruthy();
+		expect(
+			communityHeading.compareDocumentPosition(communityDirectory) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+
+		const communityIntro = container.querySelector('#community-bindings + p')!;
+		const communityIntroText = communityIntro.textContent?.replace(/\s+/g, ' ') ?? '';
+		expect(communityIntroText).toContain('curated selection');
+		expect(communityIntroText).toContain('not exhaustive');
+		const discoveryLink = container.querySelector<HTMLAnchorElement>(
+			'a.community-binding-discovery',
+		)!;
+		expect(discoveryLink.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+			'Explore community packages that depend on Octane on GitHub. ↗',
+		);
+		const discoveryParagraph = discoveryLink.parentElement!;
+		expect(discoveryParagraph.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+			'Looking for more? Explore community packages that depend on Octane on GitHub. ↗',
+		);
+		expect(communityDirectory.contains(discoveryParagraph)).toBe(false);
+		expect(
+			communityDirectory.compareDocumentPosition(discoveryParagraph) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+		expect(discoveryLink.getAttribute('href')).toBe(
+			'https://github.com/octanejs/octane/network/dependents?dependent_type=PACKAGE',
+		);
+		expect(discoveryLink.target).toBe('_blank');
+		expect(discoveryLink.rel).toBe('noreferrer');
 	});
 
 	it('/docs/framework-integrations links every first-party framework integration', async () => {
