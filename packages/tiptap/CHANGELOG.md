@@ -1,5 +1,11 @@
 # @octanejs/tiptap
 
+## 0.0.46
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
 ## 0.0.45
 
 ### Patch Changes

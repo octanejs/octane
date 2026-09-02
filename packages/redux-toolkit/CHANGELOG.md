@@ -1,5 +1,13 @@
 # @octanejs/redux-toolkit
 
+## 0.1.47
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/redux@0.1.49
+
 ## 0.1.46
 
 ### Patch Changes
