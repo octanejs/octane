@@ -13,6 +13,7 @@
   "notes": [
     "Private workspace scaffold until the published source passes strict external-consumer validation.",
     "Source ported from puckeditor/puck packages/core via scripts/port-upstream.mjs.",
+    "The port script omits seven upstream lib files that are absent from Puck's public core surface and have no consumers in the port.",
     "Render and full Puck editor shell mount pass conformance tests (2026-08-07).",
     "@dnd-kit/react and lucide-react rewired to @octanejs/dnd-kit and @octanejs/lucide; @dnd-kit/* upgraded to catalog 0.5.0.",
     "Manual hook slots declared for entire src/ tree."
