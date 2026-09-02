@@ -282,12 +282,38 @@ async function runFormSample() {
 		await input.press('ArrowLeft');
 		await input.press('X');
 		const expected = 'octane benchmaXrk';
-		await page.waitForFunction(
-			(value) =>
-				document.querySelector('input[data-field-index="37"]')?.value === value &&
-				document.querySelector('[data-field-output="37"]')?.textContent === value,
-			expected,
-		);
+		try {
+			await page.waitForFunction(
+				(value) =>
+					document.querySelector('input[data-field-index="37"]')?.value === value &&
+					document.querySelector('[data-field-output="37"]')?.textContent === value,
+				expected,
+			);
+		} catch (error) {
+			// Report what the page actually shows: a lost keystroke (the input
+			// snapped back to the rendered value), a stale output, or lost focus
+			// each point at a different owner.
+			const actual = await page.evaluate(() => {
+				const input = document.querySelector('input[data-field-index="37"]');
+				const form = window.__runtimeStress.stats.form;
+				return {
+					value: input?.value,
+					output: document.querySelector('[data-field-output="37"]')?.textContent,
+					focused: document.activeElement === input,
+					inputSame: input === window.__runtimeStress.originalInput,
+					selectionStart: input?.selectionStart,
+					selectionEnd: input?.selectionEnd,
+					fieldRenders: form.fieldRenders[37],
+					validationRequests: form.validationRequests,
+				};
+			});
+			const errors =
+				sample.failures.length > 0 ? `; browser errors: ${sample.failures.join('; ')}` : '';
+			throw new Error(
+				`${target}: controlled typing did not converge on ${JSON.stringify(expected)}: ${JSON.stringify(actual)}${errors}`,
+				{ cause: error },
+			);
+		}
 		const typed = await page.evaluate(() => {
 			const input = document.querySelector('input[data-field-index="37"]');
 			return {

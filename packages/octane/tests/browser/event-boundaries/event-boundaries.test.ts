@@ -273,3 +273,58 @@ describe.sequential('commit timing at the delegated dispatch boundary', () => {
 		});
 	}
 });
+
+describe.sequential('controlled text input under a capture-phase handler', () => {
+	// A browser-dispatched keystroke reaches the root's capture listener first,
+	// and the browser runs a microtask checkpoint after every native listener.
+	// Nothing deferred from that capture segment may restore the controlled value
+	// before the target's own listeners and the root's bubble listener have run,
+	// or every typed character snaps back to the rendered value before onInput
+	// can commit it. Octane and React must both accept the edit, and an outside
+	// native listener on the input must observe the user's text.
+	async function type(page: Page, runtime: RuntimeName, text: string): Promise<string[]> {
+		await page.locator(`#${runtime}-root [data-target]`).click();
+		await page.keyboard.type(text);
+		const records = await page.evaluate((r) => window.__eventBoundaries.logs[r], runtime);
+		expect(records.every(({ trusted }) => trusted)).toBe(true);
+		return records.map(({ label }) => label);
+	}
+
+	for (const runtime of ['octane', 'react'] as const) {
+		it(`${runtime}: commits trusted keystrokes that pass an onInputCapture ancestor`, async () => {
+			const page = await openCase({ kind: 'controlled-capture', stop: false });
+			expect(await type(page, runtime, 'ab')).toEqual([
+				'form:capture',
+				'native:target:a',
+				'target:bubble',
+				'form:capture',
+				'native:target:ab',
+				'target:bubble',
+			]);
+			expect(await page.evaluate((r) => window.__eventBoundaries.fieldState(r), runtime)).toEqual({
+				value: 'ab',
+				output: 'ab',
+				selectionStart: 2,
+				selectionEnd: 2,
+				focused: true,
+			});
+		});
+	}
+
+	it('octane: reverts a keystroke whose bubble segment a native listener stopped', async () => {
+		// OCTANE DIVERGENCE: React never restores an edit its root bubble listener
+		// did not see. Octane closes the capture segment's window once the browser
+		// has finished propagating the event, so the rendered value wins — but only
+		// after the outside listener has observed the typed text.
+		const page = await openCase({ kind: 'controlled-capture', stop: true });
+		expect(await type(page, 'octane', 'a')).toEqual(['form:capture', 'native:target:a']);
+		await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+		expect(await page.evaluate(() => window.__eventBoundaries.fieldState('octane'))).toEqual({
+			value: '',
+			output: '',
+			selectionStart: 0,
+			selectionEnd: 0,
+			focused: true,
+		});
+	});
+});
