@@ -1,0 +1,14 @@
+{
+  "elements": {
+    "x1 scope": ["scope", "import:theme", "import:themes.dark"],
+    "{active ? 'on' : 'off'}": ["scope", "import:theme", "import:themes.dark"],
+    "x2 nested": ["scope", "nested", "import:theme", "import:themes.dark"]
+  },
+  "cssOrder": ["localBase", "mixed", "scope", "nested"],
+  "pruned": [],
+  "classMaps": {
+    "localBase": ["localBase"],
+    "mixed": ["localBase", "import:theme", "mixed"],
+    "bundle": ["import:theme", "import:themes.dark"]
+  }
+}

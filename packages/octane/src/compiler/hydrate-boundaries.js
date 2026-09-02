@@ -490,17 +490,17 @@ function validateBoundary(boundary, filename, hookNames) {
 			);
 		}
 		// `directHooks` also marks the owning component's direct render scope: a
-		// scoped <style> there belongs to that component's single style scope,
-		// which extraction would tear in half (the server annotates the whole
-		// component with one scope hash; the split chunk would compile the sheet
-		// under another). Styles nested inside functions never joined the
-		// component scope, so they move freely.
+		// scoped <style> there belongs to the style scope it sits in, which
+		// extraction would tear in half (the server stamps that scope's hash on
+		// the elements around the boundary; the split chunk would compile the
+		// sheet under another hash). Styles nested inside functions never joined
+		// the component's scopes, so they move freely.
 		if (directHooks && node.type === 'JSXStyleElement') {
 			throw extractionError(
 				'OCTANE_HYDRATE_SPLIT_STYLE',
 				filename,
 				node,
-				'a scoped <style> cannot move into a split child — its rules belong to the owning component’s style scope. Move the <style> outside the boundary, into a child component, or set `split={false}`',
+				'a scoped <style> cannot move into a split child — its rules belong to the style scope it sits in. Move the <style> outside the boundary, into a child component, or set `split={false}`',
 			);
 		}
 		if (isFunction(node)) {

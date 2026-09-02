@@ -1,0 +1,11 @@
+{
+  "elements": {
+    "e0 root": ["root"],
+    "e1": ["root"],
+    "e2 elif": ["root", "elif"],
+    "e3": ["root"]
+  },
+  "cssOrder": ["root", "elif"],
+  "pruned": [],
+  "classMaps": {}
+}

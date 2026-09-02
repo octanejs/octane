@@ -1,0 +1,17 @@
+{
+  "elements": {
+    "e0 root": ["root"],
+    "e1 yes": ["root", "yes"],
+    "e2 no": ["root", "no"],
+    "e3 item": ["root", "item"],
+    "e4 empty": ["root", "empty"],
+    "e5 one": ["root", "one"],
+    "e6": ["root"],
+    "e7 other": ["root", "other"],
+    "e8 ok": ["root", "ok"],
+    "e9 err": ["root", "err"]
+  },
+  "cssOrder": ["root", "yes", "no", "item", "empty", "one", "other", "ok", "err"],
+  "pruned": [],
+  "classMaps": {}
+}

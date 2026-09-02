@@ -1,0 +1,12 @@
+{
+  "elements": {
+    "s0 outer": ["outer"],
+    "s1 first": ["outer", "first"],
+    "s2 second": ["outer", "second"],
+    "s2a deep": ["outer", "second", "deep"],
+    "s3 third": ["outer", "third"]
+  },
+  "cssOrder": ["outer", "first", "second", "deep", "third"],
+  "pruned": [],
+  "classMaps": {}
+}

@@ -1,0 +1,12 @@
+{
+  "elements": {
+    "{theme.dark}": ["scopeA", "import:theme"],
+    "d1 scopeA": ["scopeA", "import:theme"],
+    "p1": ["scopeA", "import:theme"],
+    "d2 scopeB": ["scopeA", "scopeB", "import:theme"],
+    "p2": ["scopeA", "scopeB", "import:theme"]
+  },
+  "cssOrder": ["scopeA", "scopeA", "scopeB"],
+  "pruned": [],
+  "classMaps": {}
+}

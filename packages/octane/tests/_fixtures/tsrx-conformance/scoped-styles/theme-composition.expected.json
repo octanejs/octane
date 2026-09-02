@@ -1,0 +1,14 @@
+{
+  "elements": {
+    "c1": ["base", "accent", "theme"]
+  },
+  "cssOrder": ["base", "accent", "theme", "plain"],
+  "pruned": [],
+  "classMaps": {
+    "base": ["base"],
+    "accent": ["base", "accent"],
+    "theme": ["base", "accent", "theme"],
+    "plain": ["plain"],
+    "bundle": ["plain", "base", "accent", "theme"]
+  }
+}

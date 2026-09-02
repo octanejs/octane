@@ -1,0 +1,10 @@
+{
+  "elements": {},
+  "cssOrder": ["base", "accent", "pair"],
+  "pruned": [],
+  "classMaps": {
+    "base": ["base"],
+    "accent": ["base", "accent"],
+    "pair": ["base", "accent", "pair"]
+  }
+}

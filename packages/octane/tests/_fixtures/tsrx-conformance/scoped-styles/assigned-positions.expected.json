@@ -1,0 +1,29 @@
+{
+  "elements": {
+    "{local.local}": [],
+    "{inBody.inBody}": [],
+    "{inNested.inNested}": [],
+    "{helper().inFunction}": []
+  },
+  "cssOrder": [
+    "exported",
+    "local",
+    "reexported",
+    "renamed",
+    "inFunction",
+    "inBody",
+    "inBlock",
+    "inNested"
+  ],
+  "pruned": ["em", "i", "b", "u", "s"],
+  "classMaps": {
+    "exported": ["exported"],
+    "local": ["local"],
+    "reexported": ["reexported"],
+    "renamed": ["renamed"],
+    "inFunction": ["inFunction"],
+    "inBody": ["inBody"],
+    "inBlock": ["inBlock"],
+    "inNested": ["inNested"]
+  }
+}

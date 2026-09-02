@@ -1,0 +1,18 @@
+{
+  "elements": {
+    "a1": ["one"],
+    "a2": ["one"],
+    "a3": ["one"],
+    "b1": ["one", "two"],
+    "c1 withBody": ["withBody", "one"],
+    "c2": ["withBody", "one"],
+    "d1": ["one", "two"]
+  },
+  "cssOrder": ["one", "two", "withBody", "withBody"],
+  "pruned": [],
+  "classMaps": {
+    "one": ["one"],
+    "two": ["two"],
+    "both": ["one", "two"]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "elements": {
+    "filters panel": ["panel"],
+    "filter": ["panel"],
+    "list results": ["panel", "results"],
+    "result": ["panel", "results"]
+  },
+  "cssOrder": ["panel", "results"],
+  "pruned": [],
+  "classMaps": {}
+}

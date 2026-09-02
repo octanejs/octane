@@ -1,0 +1,11 @@
+{
+  "elements": {
+    "o1 outer": ["outer", "theme"],
+    "i1 inner": ["outer", "inner", "theme"]
+  },
+  "cssOrder": ["theme", "outer", "outer", "inner"],
+  "pruned": [],
+  "classMaps": {
+    "theme": ["theme"]
+  }
+}
