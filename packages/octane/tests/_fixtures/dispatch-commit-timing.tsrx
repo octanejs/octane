@@ -54,3 +54,18 @@ export function RejectedInput() @{
 	const [value] = useState('fixed');
 	<input id="rejected" value={value} />
 }
+
+// Controlled input beside a reset button whose click ALSO clears the state. A
+// script click queues the update; the button's default action then resets the
+// form, so the control follows its value attribute again (non-dirty) until the
+// commit writes the property — before syncing the attribute, as React's
+// updateInput does — and marks it dirty.
+export function ResetForm() @{
+	const [value, setValue] = useState('');
+	<form id="reset-form" onSubmit={(e) => e.preventDefault()}>
+		<input id="reset-input" value={value} onInput={(e) => setValue(e.currentTarget.value)} />
+		<button id="reset-btn" type="reset" onClick={() => setValue('')}>
+			reset
+		</button>
+	</form>
+}

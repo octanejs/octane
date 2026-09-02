@@ -207,6 +207,8 @@ describe('native signal rendering', () => {
 			// Do not use the helper's flushSync wrapper: the native event owns this batch.
 			(rendered.find('button') as HTMLButtonElement).click();
 			expect(log.drain()).toEqual(['capture:1', 'child:2', 'parent:3', 'notify:3']);
+			// The event's batch commits once the dispatching script yields; settle it here.
+			flushSync(() => {});
 			expect(rendered.find('button').textContent).toBe('3');
 		} finally {
 			unsubscribe();

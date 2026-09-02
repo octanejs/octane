@@ -54,7 +54,7 @@ export function Counter() @{
 		const result = await build({
 			stdin: {
 				contents: `${component}
-import { createRoot } from 'octane';
+import { createRoot, flushSync } from 'octane';
 
 const container = document.createElement('main');
 document.body.appendChild(container);
@@ -62,7 +62,7 @@ const root = createRoot(container);
 root.render(Counter);
 const button = container.querySelector('#counter');
 globalThis.counterResult = { before: button.textContent };
-button.click();
+flushSync(() => button.click());
 globalThis.counterResult.after = button.textContent;
 root.unmount();
 `,

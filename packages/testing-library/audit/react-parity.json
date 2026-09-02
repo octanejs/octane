@@ -56,7 +56,7 @@
         {
           "path": "packages/testing-library/tests/differential.test.ts",
           "role": "test",
-          "sha256": "a0650df559a647973b533d297434003820f6d6ebad01bb3cb4c077c9bbf5ff05",
+          "sha256": "ae91781d3e714024334ed9bf3ba52d30b99d045e56ab8f5e1a3aa4da35549954",
           "cases": [
             {
               "id": "differential:testing-library-render-click",

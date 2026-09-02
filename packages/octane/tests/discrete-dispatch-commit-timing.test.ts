@@ -19,6 +19,7 @@ import {
 	NestedSubmit,
 	ControlledInput,
 	RejectedInput,
+	ResetForm,
 } from './_fixtures/dispatch-commit-timing.tsrx';
 
 const nativeListeners: Array<() => void> = [];
@@ -117,6 +118,28 @@ describe('discrete dispatch commit timing (React batchedUpdates parity)', () => 
 		expect(input.value).toBe('fixed');
 		r.unmount();
 	});
+
+	it('a reset-button click that also clears controlled state leaves the control dirty, like React', async () => {
+		const r = mount(ResetForm);
+		const input = r.find('#reset-input') as HTMLInputElement;
+		const reset = r.find('#reset-btn') as HTMLButtonElement;
+		setNativeValue(input, 'test');
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		expect(input.value).toBe('test');
+		expect(input.getAttribute('value')).toBe('test');
+		// The handler's update is queued; the click's default action then resets the
+		// form, so the control follows its still-mirrored attribute until the commit.
+		reset.click();
+		expect(input.value).toBe('test');
+		await act(() => {});
+		expect(input.value).toBe('');
+		expect(input.getAttribute('value')).toBe('');
+		// The commit wrote the property before syncing the attribute, so the control
+		// is dirty again: a later attribute change must not drag the live value.
+		input.setAttribute('value', 'drift');
+		expect(input.value).toBe('');
+		r.unmount();
+	});
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,6 +184,24 @@ function ReactControlled() {
 	);
 }
 
+function ReactResetForm() {
+	const [value, setValue] = React.useState('');
+	return React.createElement(
+		'form',
+		{ id: 'rrf', onSubmit: (e: React.FormEvent) => e.preventDefault() },
+		React.createElement('input', {
+			id: 'rri',
+			value,
+			onChange: (e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value),
+		}),
+		React.createElement(
+			'button',
+			{ id: 'rrb', type: 'reset', onClick: () => setValue('') },
+			'reset',
+		),
+	);
+}
+
 describe('React 19 oracle for the same observations', () => {
 	it('a script-dispatched click commits after the dispatching script yields', async () => {
 		const m = await mountReact(React.createElement(ReactCounter));
@@ -183,6 +224,24 @@ describe('React 19 oracle for the same observations', () => {
 		input.dispatchEvent(new Event('input', { bubbles: true }));
 		expect(input.value).toBe('ab');
 		expect(m.host.querySelector('#rm')!.textContent).toBe('ab');
+		m.unmount();
+	});
+
+	it('a reset-button click that also clears controlled state leaves the control dirty', async () => {
+		const m = await mountReact(React.createElement(ReactResetForm));
+		const input = m.host.querySelector('#rri') as HTMLInputElement;
+		const reset = m.host.querySelector('#rrb') as HTMLButtonElement;
+		setNativeValue(input, 'test');
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		expect(input.value).toBe('test');
+		expect(input.getAttribute('value')).toBe('test');
+		reset.click();
+		expect(input.value).toBe('test');
+		await new Promise<void>((resolve) => setTimeout(resolve, 0));
+		expect(input.value).toBe('');
+		expect(input.getAttribute('value')).toBe('');
+		input.setAttribute('value', 'drift');
+		expect(input.value).toBe('');
 		m.unmount();
 	});
 });

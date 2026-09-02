@@ -18047,11 +18047,17 @@ export function setValue(el: Element, value: unknown): void {
 	const prev = ctrl.v;
 	ctrl.v = value;
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
-	if (input.defaultValue !== s) input.defaultValue = s;
+	// PROPERTY before attribute (React updateInput order), as on mount. A control
+	// a native form reset left NON-DIRTY follows its value attribute, so an
+	// attribute-first write would move the live value itself and make the
+	// property write below look unnecessary — leaving the control non-dirty
+	// (a later attribute change would drag the value again) where React's
+	// property write marks it dirty. Reachable whenever the commit lands after
+	// the reset button's default action, i.e. any script-dispatched click.
 	// IME: an UNCHANGED rendered value must not cancel an active composition;
 	// a genuinely changed one still wins (React: setState during composition).
-	if (ctrl.composing && Object.is(prev, value)) return;
-	if (valueNeedsWrite(input, value)) input.value = s;
+	if (!(ctrl.composing && Object.is(prev, value)) && valueNeedsWrite(input, value)) input.value = s;
+	if (input.defaultValue !== s) input.defaultValue = s;
 }
 
 /**
