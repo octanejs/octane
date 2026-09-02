@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/day-picker",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -59,7 +59,7 @@
     "date-fns": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

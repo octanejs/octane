@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/radix",
-  "version": "0.1.50",
+  "version": "0.1.51",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -55,7 +55,7 @@
     "aria-hidden": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

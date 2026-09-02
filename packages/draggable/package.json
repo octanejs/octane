@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/draggable",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "Octane port of react-draggable 4.7.1",
   "license": "MIT",
   "type": "module",
@@ -48,7 +48,7 @@
     "clsx": "^2.1.1"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

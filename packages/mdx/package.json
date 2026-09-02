@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/mdx",
-  "version": "0.1.48",
+  "version": "0.1.49",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -59,7 +59,7 @@
     "source-map": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

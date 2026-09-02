@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/popper",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "Exact Octane binding for react-popper 2.3.0",
   "license": "MIT",
   "type": "module",
@@ -45,7 +45,7 @@
   },
   "peerDependencies": {
     "@popperjs/core": "^2.0.0",
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",

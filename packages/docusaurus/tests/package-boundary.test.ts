@@ -10,7 +10,7 @@ describe('@octanejs/docusaurus package boundary', () => {
 
 		expect(manifest.peerDependencies['@docusaurus/core']).toBe('3.10.1');
 		expect(manifest.devDependencies['@docusaurus/core']).toBe('3.10.1');
-		expect(manifest.peerDependencies.octane).toBe('workspace:*');
+		expect(manifest.peerDependencies.octane).toBe('workspace:^0.1.51 || ^0.2.0');
 		expect(manifest.devDependencies.octane).toBe('workspace:*');
 		expect(manifest.dependencies?.octane).toBeUndefined();
 		expect(manifest.exports).toEqual(

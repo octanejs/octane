@@ -1,5 +1,11 @@
 # @octanejs/sanity-icons
 
+## 0.1.2
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
 ## 0.1.1
 
 ### Patch Changes

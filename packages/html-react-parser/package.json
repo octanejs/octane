@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/html-react-parser",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Octane binding for html-react-parser 6.1.7.",
   "license": "MIT",
   "type": "module",
@@ -43,7 +43,7 @@
     "style-to-js": "2.0.2"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "octane": "workspace:*",

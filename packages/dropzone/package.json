@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/dropzone",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "The exact react-dropzone 20.0.0 file-acquisition contract, ported to Octane with drag, click, paste, validation, async processing, and programmatic-open support.",
   "author": {
     "name": "Dominic Gannaway",
@@ -54,7 +54,7 @@
     "file-selector": "^4.1.0"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

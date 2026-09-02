@@ -792,10 +792,10 @@ jobs:
           pnpm rules:check
           git diff --exit-code
 
-      # 0.x alpha: changesets must stay on the patch track. release/publish
-      # already enforce this, but checking on PRs surfaces a stray major/minor
-      # bump at review time instead of at release time.
-      - name: Disallow major and minor bumps in changesets
+      # 0.x beta releases stay on the patch track by default. The core package
+      # may use minor for a coordinated beta-line bump; bindings stay patch-only
+      # and major remains reserved for 1.0. Check this on PRs as well as release.
+      - name: Validate changeset bump types
         run: pnpm changeset:check
 
       - name: Validate CI workflow behavior

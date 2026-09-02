@@ -1,5 +1,13 @@
 # @octanejs/vite-plugin
 
+## 0.1.52
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/app-core@0.0.48
+
 ## 0.1.51
 
 ### Patch Changes

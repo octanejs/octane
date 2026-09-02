@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/xstate",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "XState tools for Octane — reuses the framework-agnostic xstate actor core unchanged and ports the @xstate/react 6.1.0 binding onto Octane hooks.",
   "author": {
     "name": "Dominic Gannaway",
@@ -48,7 +48,7 @@
     "upstream:verify": "node scripts/verify-upstream.mjs"
   },
   "peerDependencies": {
-    "octane": "workspace:*",
+    "octane": "workspace:^0.1.51 || ^0.2.0",
     "xstate": "^5.28.0"
   },
   "peerDependenciesMeta": {

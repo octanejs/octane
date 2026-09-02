@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/valtio",
-  "version": "0.1.34",
+  "version": "0.1.35",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -48,7 +48,7 @@
     "valtio": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

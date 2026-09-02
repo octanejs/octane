@@ -7,6 +7,11 @@ import { compile } from 'octane/compiler';
 // the user-facing contract, not the throw itself.
 
 describe('compile errors — rejected authoring patterns', () => {
+	it.each(['client', 'server'] as const)('accepts literal less-than text in %s output', (mode) => {
+		const source = `export function Text() @{ <p><3 and 1 < 2 and <= 3</p> }`;
+		expect(compile(source, 'text.tsrx', { mode }).diagnostics).toEqual([]);
+	});
+
 	it('rejects multiple `ref={…}` attributes on a single element', () => {
 		const src = `
       import { useRef } from 'octane';

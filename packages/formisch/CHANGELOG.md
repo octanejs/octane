@@ -1,5 +1,11 @@
 # @octanejs/formisch
 
+## 0.0.7
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
 ## 0.0.6
 
 ### Patch Changes

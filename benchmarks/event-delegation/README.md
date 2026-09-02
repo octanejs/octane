@@ -21,6 +21,14 @@ It also requires the 128 capture traversals to reuse one path array. Native
 capture and bubbling, framework capture, event targets, all 128 controlled
 inputs, and their corresponding output text must remain correct.
 
+Before those inputs, a separate work-only fixture mounts and unmounts two compiled
+JSX portals sharing `document.body` three times. Portal capture, target and bubble
+handlers and ref cleanup must all run; detached buttons must stop receiving
+delegated clicks, while the second owner stays live after the first unmounts.
+The subsequent ordinary input events must perform no sibling
+walks or DOM-order comparisons left over from portal ownership. These observers
+run only in this deterministic gate, not in the timing application.
+
 The work gate builds its own production fixture, starts a temporary preview, and
 closes it before exiting. The unified benchmark runner also invokes the gate
 after its existing per-framework timing runs:
@@ -30,4 +38,5 @@ node benchmarks/event-delegation/work.mjs
 node benchmarks/bench.mjs --quick event-delegation
 ```
 
-Set `EVENT_URL` to reuse an existing production preview instead of building one.
+Set `EVENT_URL` to an existing production `event-work.html` preview instead of
+building one.

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/stick-to-bottom",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Octane binding for use-stick-to-bottom 1.1.6.",
   "license": "MIT",
   "type": "module",
@@ -44,7 +44,7 @@
     "typecheck": "tsrx-tsc --noEmit"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

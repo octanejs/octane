@@ -1,11 +1,60 @@
 // Fixtures for conformance/event-listener.test.ts — port of
 // react-dom/src/__tests__/ReactDOMEventListener-test.js. Kept minimal: each
 // component models exactly the tree shape one React case dispatches into.
-import { useState } from 'octane';
+import { createPortal, useState } from 'octane';
 
 // Nested-root propagation (:32/:65) — one div per root, handler + name via props.
 export function RootDiv(props: { name: string; onOut: (e: Event) => void }) @{
 	<div class={props.name} onMouseOut={props.onOut}>{props.name}</div>
+}
+
+export function PropagationTree(props: {
+	onParent?: (event: Event) => void;
+	onParentCapture?: (event: Event) => void;
+	onTarget?: (event: Event) => void;
+	onTargetCapture?: (event: Event) => void;
+}) @{
+	<section
+		class="propagation-parent"
+		onClick={props.onParent}
+		onClickCapture={props.onParentCapture}
+	>
+		<button
+			class="propagation-target"
+			onClick={props.onTarget}
+			onClickCapture={props.onTargetCapture}
+		>Target</button>
+	</section>
+}
+
+interface DeferredPortalProps {
+	target: Element;
+	register: (setVisible: (visible: boolean) => void) => void;
+	log: (label: string) => void;
+}
+
+function DeferredPortalChild(props: DeferredPortalProps) @{
+	const [visible, setVisible] = useState(false);
+	props.register(setVisible);
+	<>
+		@if (visible) {
+			<button
+				class="deferred-portal-target"
+				onClickCapture={() => props.log('target capture')}
+				onClick={() => props.log('target bubble')}
+				onAuxClick={() => props.log('target bubble')}
+			>Portal target</button>
+		}
+	</>
+}
+
+export function DeferredPortalEvents(props: DeferredPortalProps) @{
+	<section
+		class="deferred-portal-parent"
+		onClickCapture={() => props.log('logical capture')}
+		onClick={() => props.log('logical bubble')}
+		onAuxClick={() => props.log('logical bubble')}
+	>{createPortal(<DeferredPortalChild {...props} />, props.target)}</section>
 }
 
 // :106 — the clicked element is REMOVED by the update its own handler schedules.

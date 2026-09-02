@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/rsbuild-plugin",
-  "version": "0.1.46",
+  "version": "0.1.47",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -53,7 +53,7 @@
   },
   "peerDependencies": {
     "@rsbuild/core": "^2.0.0",
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@rsbuild/core": "catalog:default",

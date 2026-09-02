@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/formisch",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -43,7 +43,7 @@
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "peerDependencies": {
-    "octane": "workspace:*",
+    "octane": "workspace:^0.1.51 || ^0.2.0",
     "valibot": "^1.4.1"
   },
   "devDependencies": {

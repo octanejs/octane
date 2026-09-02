@@ -1,5 +1,11 @@
 # @octanejs/phosphor-icons
 
+## 0.0.32
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
 ## 0.0.31
 
 ### Patch Changes

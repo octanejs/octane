@@ -144,7 +144,8 @@ Dependency mapping (upstream → this port):
 
 Binding-package conventions this package must follow (all verified against the
 current rules): raw-source publish (`main`/`module`/`types` → `src/index.ts`,
-`files: ["src"]`), `octane` as `peerDependencies: workspace:*`, third-party deps
+`files: ["src"]`), `octane` as
+`peerDependencies: workspace:^0.1.51 || ^0.2.0`, third-party deps
 via `catalog:default`, sibling bindings pinned to published versions (the
 maintainer decision on `cmdk→radix`; registry-item `dependencies` carry the same
 pins), `tsconfig` with `jsx: react-jsx` + `jsxImportSource: octane`, central

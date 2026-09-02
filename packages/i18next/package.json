@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/i18next",
-  "version": "0.1.46",
+  "version": "0.1.47",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -57,7 +57,7 @@
   },
   "peerDependencies": {
     "i18next": ">=26.2.0",
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "catalog:default",

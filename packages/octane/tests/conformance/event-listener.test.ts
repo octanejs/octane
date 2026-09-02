@@ -12,11 +12,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import { mount, createLog, type EffectLog } from '../_helpers';
+import { loadServerFixture } from '../_server-fixture';
 import * as ClientRT from '../../src/index.js';
-import { flushSync, hydrateRoot } from '../../src/index.js';
+import { createRoot, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import {
 	RootDiv,
+	PropagationTree,
+	DeferredPortalEvents,
 	DisappearingButton,
 	BatchChild,
 	BatchParent,
@@ -35,6 +38,126 @@ import {
 const outLogger = (log: EffectLog) => (e: Event) =>
 	log.push('out:' + (e.currentTarget as Element).className);
 
+describe('portal events after descendant updates', () => {
+	// Lifecycle extension of React's logical portal propagation, not an exact
+	// upstream test port: a child can reveal its first host without rerendering
+	// the component that created the portal. Its events still belong to that tree.
+	// https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-dom-bindings/src/events/DOMPluginEventSystem.js#L630
+	it.each(['separate container', 'another root'] as const)(
+		'delivers both portal phases after child-local state reveals content in %s',
+		(placement) => {
+			const log: string[] = [];
+			const physicalRoot =
+				placement === 'another root'
+					? mount(PropagationTree, {
+							onParentCapture: () => log.push('physical capture'),
+							onParent: () => log.push('physical bubble'),
+						})
+					: null;
+			const target = document.createElement('div');
+			(physicalRoot?.find('.propagation-parent') ?? document.body).appendChild(target);
+			let setVisible: (visible: boolean) => void = () => {};
+			const logicalRoot = mount(DeferredPortalEvents, {
+				target,
+				register: (setter) => {
+					setVisible = setter;
+				},
+				log: (label) => log.push(label),
+			});
+			try {
+				expect(target.querySelector('.deferred-portal-target')).toBeNull();
+				flushSync(() => setVisible(true));
+				const button = target.querySelector<HTMLButtonElement>('.deferred-portal-target');
+				expect(button).not.toBeNull();
+				button!.click();
+				const expected = ['logical capture', 'target capture', 'target bubble', 'logical bubble'];
+				if (physicalRoot !== null) {
+					expected.unshift('physical capture');
+					expected.push('physical bubble');
+				}
+				expect(log).toEqual(expected);
+			} finally {
+				logicalRoot.unmount();
+				physicalRoot?.unmount();
+				target.remove();
+			}
+		},
+	);
+
+	it('keeps late portal content with its own logical parent when a shared target owner unmounts', () => {
+		const log: string[] = [];
+		const target = document.createElement('div');
+		document.body.appendChild(target);
+		const emptyOwner = mount(DeferredPortalEvents, {
+			target,
+			register: () => {},
+			log: (label) => log.push('empty: ' + label),
+		});
+		let setVisible: (visible: boolean) => void = () => {};
+		const visibleOwner = mount(DeferredPortalEvents, {
+			target,
+			register: (setter) => {
+				setVisible = setter;
+			},
+			log: (label) => log.push('visible: ' + label),
+		});
+		try {
+			flushSync(() => setVisible(true));
+			target.querySelector<HTMLButtonElement>('.deferred-portal-target')!.click();
+			const expected = [
+				'visible: logical capture',
+				'visible: target capture',
+				'visible: target bubble',
+				'visible: logical bubble',
+			];
+			expect(log).toEqual(expected);
+			emptyOwner.unmount();
+			flushSync(() => setVisible(false));
+			expect(target.querySelector('.deferred-portal-target')).toBeNull();
+			flushSync(() => setVisible(true));
+			target.querySelector<HTMLButtonElement>('.deferred-portal-target')!.click();
+			expect(log).toEqual([...expected, ...expected]);
+		} finally {
+			emptyOwner.unmount();
+			visibleOwner.unmount();
+			target.remove();
+		}
+	});
+
+	it('preserves late portal ownership when a native target listener moves the host before bubbling', () => {
+		const log: string[] = [];
+		const target = document.createElement('div');
+		const destination = document.createElement('div');
+		document.body.append(target, destination);
+		target.addEventListener('auxclick', () => log.push('native capture'), true);
+		let setVisible: (visible: boolean) => void = () => {};
+		const root = mount(DeferredPortalEvents, {
+			target,
+			register: (setter) => {
+				setVisible = setter;
+			},
+			log: (label) => log.push(label),
+		});
+		try {
+			flushSync(() => setVisible(true));
+			const button = target.querySelector<HTMLButtonElement>('.deferred-portal-target')!;
+			button.addEventListener('auxclick', () => {
+				log.push('native move');
+				destination.appendChild(button);
+			});
+			// No auxclick capture binding is authored: ordinary native capture must
+			// preserve the original portal route before the target listener moves it.
+			button.dispatchEvent(new MouseEvent('auxclick', { bubbles: true }));
+			expect(destination.firstElementChild).toBe(button);
+			expect(log).toEqual(['native capture', 'native move', 'target bubble', 'logical bubble']);
+		} finally {
+			root.unmount();
+			target.remove();
+			destination.remove();
+		}
+	});
+});
+
 describe('ReactDOMEventListener — propagation across nested roots', () => {
 	// Per ReactDOMEventListener-test.js:32 — should propagate events one level down
 	it('propagates events one level down (child root nested inside a parent root)', () => {
@@ -49,8 +172,7 @@ describe('ReactDOMEventListener — propagation across nested roots', () => {
 			.dispatchEvent(new Event('mouseout', { bubbles: true, cancelable: true }));
 
 		// Both handlers fire, inner-first, each seeing its OWN element as
-		// currentTarget — and exactly once each (the outer root's delegated
-		// listener must not re-walk the chain).
+		// currentTarget — and exactly once each.
 		expect(log.drain()).toEqual(['out:childdiv', 'out:parentdiv']);
 		child.unmount();
 		parent.unmount();
@@ -75,6 +197,55 @@ describe('ReactDOMEventListener — propagation across nested roots', () => {
 		grand.unmount();
 	});
 
+	// Lifecycle extension of ReactDOMEventListener's nested-root propagation:
+	// unmounting cannot replay an inner root's completed handler queue when the
+	// same native event subsequently reaches an enclosing root. Whether a removed
+	// target still reaches outer framework handlers is intentionally not pinned.
+	it.each([
+		{ at: 'handler', reattach: false },
+		{ at: 'handler', reattach: true },
+		{ at: 'native bridge', reattach: false },
+		{ at: 'native bridge', reattach: true },
+	] as const)(
+		'does not replay an unmounted root during native propagation (%j)',
+		({ at, reattach }) => {
+			const log: string[] = [];
+			const outer = mount(PropagationTree, { onParent: () => log.push('outer') });
+			const bridge = document.createElement('div');
+			outer.find('.propagation-parent').appendChild(bridge);
+			const innerContainer = document.createElement('div');
+			bridge.appendChild(innerContainer);
+			const inner = createRoot(innerContainer);
+			let target: HTMLElement | null = null;
+			const retire = () => {
+				inner.unmount();
+				if (reattach && target !== null) innerContainer.appendChild(target);
+			};
+			inner.render(PropagationTree, {
+				onTarget: () => {
+					log.push('inner target');
+					if (at === 'handler') retire();
+				},
+				onParent: () => log.push('inner parent'),
+			});
+			target = innerContainer.querySelector<HTMLElement>('.propagation-target')!;
+			bridge.addEventListener('click', () => {
+				log.push('native bridge');
+				if (at === 'native bridge') retire();
+			});
+			try {
+				target.click();
+				expect(log.filter((entry) => entry.startsWith('inner '))).toEqual([
+					'inner target',
+					'inner parent',
+				]);
+			} finally {
+				inner.unmount();
+				outer.unmount();
+			}
+		},
+	);
+
 	// Per ReactDOMEventListener-test.js:106 — should not get confused by disappearing elements
 	it('is not confused by the clicked element disappearing in its own handler update', () => {
 		const r = mount(DisappearingButton);
@@ -88,15 +259,9 @@ describe('ReactDOMEventListener — propagation across nested roots', () => {
 	// Per ReactDOMEventListener-test.js:157 — should batch between handlers from
 	// different roots (discrete).
 	//
-	// Intentional divergence (synthetic architecture): React attaches ONE listener
-	// per root, so a discrete event entering two nested roots flushes between the
-	// two listeners (their test reads '1' inside the outer root's handler — a
-	// behavior React itself documents as incidental "over-flushing"). octane's
-	// single deduped delegated walk gives ONE batch window: neither handler
-	// observes a mid-event commit. The React-shared contract that IS asserted:
-	// updates are batched while handlers run, and a discrete event's updates are
-	// committed synchronously by the time the dispatch returns.
-	it('batches between handlers from different roots (discrete): one batch window, committed by dispatch end', () => {
+	// Each root handles its own segment of the native event path. A discrete
+	// update commits after the inner root, before the event reaches the outer one.
+	it('commits a discrete update before the event enters its outer root', () => {
 		const log = createLog();
 		let childSet: (v: string) => void = () => {};
 		const childR = mount(BatchChild, {
@@ -117,9 +282,7 @@ describe('ReactDOMEventListener — propagation across nested roots', () => {
 		const span = childR.find('.child-span') as HTMLElement;
 		span.click();
 
-		// Both handlers ran; neither saw a mid-event flush (React's second read
-		// would be '1' — see divergence note above).
-		expect(log.drain()).toEqual(['read:Child', 'read:Child']);
+		expect(log.drain()).toEqual(['read:Child', 'read:1']);
 		// Discrete event: the final update is committed synchronously before the
 		// dispatch returns to the browser (React parity).
 		expect(span.textContent).toBe('2');
@@ -158,6 +321,386 @@ describe('ReactDOMEventListener — propagation across nested roots', () => {
 		expect(span.textContent).toBe('2');
 		childR.unmount();
 		parentR.unmount();
+	});
+});
+
+describe('ReactDOMEventListener — native listeners between nested roots', () => {
+	// Derived from ReactDOMEventPropagation-test.js:2552, :2620, and :2690:
+	// a native listener between roots runs between their framework dispatches.
+	it.each(['none', 'capture', 'bubble'] as const)(
+		'preserves native interleaving when propagation stops at %s',
+		(stopAt) => {
+			const log: string[] = [];
+			const outer = mount(PropagationTree, {
+				onParentCapture: () => log.push('outer capture'),
+				onParent: () => log.push('outer bubble'),
+			});
+			const inner = mount(PropagationTree, {
+				onParentCapture: () => log.push('inner capture'),
+				onTarget: () => log.push('inner target'),
+				onParent: () => log.push('inner bubble'),
+			});
+			const bridge = document.createElement('div');
+			outer.find('.propagation-parent').appendChild(bridge);
+			bridge.appendChild(inner.container);
+			bridge.addEventListener('click', (event) => {
+				log.push('native bubble');
+				if (stopAt === 'bubble') event.stopPropagation();
+			});
+			bridge.addEventListener(
+				'click',
+				(event) => {
+					log.push('native capture');
+					if (stopAt === 'capture') event.stopPropagation();
+				},
+				true,
+			);
+			try {
+				(inner.find('.propagation-target') as HTMLElement).click();
+				const expected = ['outer capture', 'native capture'];
+				if (stopAt !== 'capture') {
+					expected.push('inner capture', 'inner target', 'inner bubble', 'native bubble');
+					if (stopAt === 'none') expected.push('outer bubble');
+				}
+				expect(log).toEqual(expected);
+			} finally {
+				inner.unmount();
+				outer.unmount();
+			}
+		},
+	);
+
+	// Hydration extension of ReactDOMEventListener-test.js:32 and :1176:
+	// adopted roots retain the same native interleaving as newly mounted roots.
+	it('preserves native interleaving across hydrated roots without replacing their nodes', () => {
+		const server = loadServerFixture<{ PropagationTree: typeof PropagationTree }>(
+			join(process.cwd(), 'packages/octane/tests/conformance/_fixtures/event-listener.tsrx'),
+		);
+		const { html } = ServerRT.renderToString(server.PropagationTree, {});
+		const log: string[] = [];
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const parent = container.querySelector('.propagation-parent')!;
+		const outer = hydrateRoot(container, PropagationTree, {
+			onParentCapture: () => log.push('outer capture'),
+			onParent: () => log.push('outer bubble'),
+		});
+		flushSync(() => {});
+		const bridge = document.createElement('div');
+		const innerContainer = document.createElement('div');
+		parent.appendChild(bridge);
+		bridge.appendChild(innerContainer);
+		innerContainer.innerHTML = html;
+		const target = innerContainer.querySelector('.propagation-target')!;
+		const inner = hydrateRoot(innerContainer, PropagationTree, {
+			onParentCapture: () => log.push('inner capture'),
+			onTarget: () => log.push('target'),
+			onParent: () => log.push('inner bubble'),
+		});
+		flushSync(() => {});
+		bridge.addEventListener('click', () => log.push('native capture'), true);
+		bridge.addEventListener('click', () => log.push('native bubble'));
+		try {
+			expect(container.querySelector('.propagation-parent')).toBe(parent);
+			expect(innerContainer.querySelector('.propagation-target')).toBe(target);
+			target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			expect(log).toEqual([
+				'outer capture',
+				'native capture',
+				'inner capture',
+				'target',
+				'inner bubble',
+				'native bubble',
+				'outer bubble',
+			]);
+		} finally {
+			inner.unmount();
+			outer.unmount();
+			container.remove();
+		}
+	});
+});
+
+describe('ReactDOMEventListener — native and framework cancellation', () => {
+	// Source-derived parity regressions, not direct ports of an upstream test:
+	// React initializes logical propagation independently of native cancelBubble,
+	// then checks that logical flag between framework listeners.
+	// https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-dom-bindings/src/events/SyntheticEvent.js#L81
+	// https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-dom-bindings/src/events/DOMPluginEventSystem.js#L266
+	it.each(['stopPropagation', 'stopImmediatePropagation'] as const)(
+		'honors an earlier root-native %s before framework handlers',
+		(method) => {
+			const log: string[] = [];
+			const observed: Event[] = [];
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.addEventListener('click', (event) => {
+				log.push('native before');
+				event[method]();
+			});
+			const root = createRoot(container);
+			root.render(PropagationTree, {
+				onTarget: (event: Event) => {
+					log.push('target');
+					observed.push(event);
+				},
+				onParent: (event: Event) => {
+					log.push('parent');
+					observed.push(event);
+				},
+			});
+			container.addEventListener('click', () => log.push('native after'));
+			const outside = () => log.push('outside');
+			document.body.addEventListener('click', outside);
+			const event = new MouseEvent('click', { bubbles: true });
+			try {
+				container.querySelector('.propagation-target')!.dispatchEvent(event);
+				expect(log).toEqual(
+					method === 'stopPropagation'
+						? ['native before', 'target', 'parent', 'native after']
+						: ['native before'],
+				);
+				expect(observed.map((seen) => seen === event)).toEqual(
+					method === 'stopPropagation' ? [true, true] : [],
+				);
+			} finally {
+				document.body.removeEventListener('click', outside);
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	// Calling stopPropagation in a framework handler cancels logical ancestors.
+	// stopImmediatePropagation retains the native-only behavior of React's
+	// nativeEvent.stopImmediatePropagation: it blocks subsequent native listeners,
+	// not the already-running framework queue (source references above).
+	it.each(['stopPropagation', 'stopImmediatePropagation'] as const)(
+		'preserves the selected framework/native scope of %s inside a handler',
+		(method) => {
+			const log: string[] = [];
+			const observed: Event[] = [];
+			const r = mount(PropagationTree, {
+				onTarget: (event) => {
+					log.push('target');
+					observed.push(event);
+					event[method]();
+				},
+				onParent: (event) => {
+					log.push('parent');
+					observed.push(event);
+				},
+			});
+			r.container.addEventListener('click', () => log.push('native after'));
+			const outside = () => log.push('outside');
+			document.body.addEventListener('click', outside);
+			const event = new MouseEvent('click', { bubbles: true });
+			try {
+				r.find('.propagation-target').dispatchEvent(event);
+				expect(log).toEqual(
+					method === 'stopPropagation' ? ['target', 'native after'] : ['target', 'parent'],
+				);
+				expect(observed.map((seen) => seen === event)).toEqual(
+					method === 'stopPropagation' ? [true] : [true, true],
+				);
+			} finally {
+				document.body.removeEventListener('click', outside);
+				r.unmount();
+			}
+		},
+	);
+
+	// Capture has its own logical queue; native immediate cancellation must not
+	// truncate that queue, but the browser still prevents target/bubble delivery.
+	it.each(['stopPropagation', 'stopImmediatePropagation'] as const)(
+		'keeps capture-queue cancellation distinct from native %s',
+		(method) => {
+			const log: string[] = [];
+			let nativeStopped: boolean | undefined;
+			const r = mount(PropagationTree, {
+				onParentCapture: (event: Event) => {
+					log.push('parent capture');
+					event[method]();
+				},
+				onTargetCapture: (event: Event) => {
+					log.push('target capture');
+					nativeStopped = event.cancelBubble;
+				},
+				onTarget: () => log.push('target bubble'),
+			});
+			r.container.addEventListener('click', () => log.push('native capture'), true);
+			try {
+				(r.find('.propagation-target') as HTMLElement).click();
+				expect(log).toEqual(
+					method === 'stopPropagation'
+						? ['parent capture', 'native capture']
+						: ['parent capture', 'target capture'],
+				);
+				if (method === 'stopImmediatePropagation') expect(nativeStopped).toBe(true);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	// Reentrant extension of the same source-derived cancellation contract:
+	// stopping a nested native event must not stop its caller's logical ancestors.
+	it('isolates nested cancellation and restores the native event after dispatch', () => {
+		const log: string[] = [];
+		const resumedTargets: (EventTarget | null)[] = [];
+		const r = mount(PropagationTree, {
+			onTarget: (event) => {
+				const detail = (event as MouseEvent).detail;
+				log.push('target:' + detail);
+				if (detail === 2) event.stopPropagation();
+				else {
+					r.find('.propagation-target').dispatchEvent(
+						new MouseEvent('click', { bubbles: true, detail: 2 }),
+					);
+					resumedTargets.push(event.currentTarget);
+				}
+			},
+			onParent: (event) => log.push('parent:' + (event as MouseEvent).detail),
+		});
+		const event = new MouseEvent('click', { bubbles: true, detail: 1 });
+		const stopPropagation = event.stopPropagation;
+		try {
+			r.find('.propagation-target').dispatchEvent(event);
+			expect(log).toEqual(['target:1', 'target:2', 'parent:1']);
+			expect(resumedTargets[0]).toBe(r.find('.propagation-target'));
+			expect(event.stopPropagation).toBe(stopPropagation);
+			expect(event.currentTarget).toBe(null);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Native EventTarget permits redispatch after a dispatch returns; logical
+	// propagation state must be scoped to that dispatch, not the Event's lifetime.
+	it('runs both phases again when the same native event is synchronously redispatched', () => {
+		const log: string[] = [];
+		let stop = true;
+		const r = mount(PropagationTree, {
+			onParentCapture: () => log.push('capture'),
+			onTarget: (event) => {
+				log.push('target');
+				if (stop) event.stopPropagation();
+			},
+			onParent: () => log.push('parent'),
+		});
+		const event = new MouseEvent('click', { bubbles: true });
+		try {
+			const target = r.find('.propagation-target');
+			target.dispatchEvent(event);
+			stop = false;
+			target.dispatchEvent(event);
+			expect(log).toEqual(['capture', 'target', 'capture', 'target', 'parent']);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Octane uses the native object rather than a SyntheticEvent wrapper. A
+	// consumer's own stopPropagation method and descriptor must survive dispatch.
+	it.each([
+		{ configurable: true, writable: false },
+		{ configurable: false, writable: true },
+	])('restores an own stopPropagation descriptor (%j) before later native listeners', (flags) => {
+		const log: string[] = [];
+		const event = new MouseEvent('click', { bubbles: true });
+		const stopPropagation = function (this: Event) {
+			log.push('own stop');
+			Event.prototype.stopPropagation.call(this);
+		};
+		Object.defineProperty(event, 'stopPropagation', {
+			value: stopPropagation,
+			enumerable: true,
+			...flags,
+		});
+		const descriptor = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
+		const observed: (PropertyDescriptor | undefined)[] = [];
+		const r = mount(PropagationTree, {
+			onTarget: (event) => {
+				log.push('target');
+				event.stopPropagation();
+			},
+			onParent: () => log.push('parent'),
+		});
+		r.container.addEventListener('click', (nativeEvent) => {
+			log.push('native after');
+			observed.push(Object.getOwnPropertyDescriptor(nativeEvent, 'stopPropagation'));
+		});
+		try {
+			r.find('.propagation-target').dispatchEvent(event);
+			expect(log).toEqual(['target', 'own stop', 'native after']);
+			expect(observed).toEqual([descriptor]);
+			expect(Object.getOwnPropertyDescriptor(event, 'stopPropagation')).toEqual(descriptor);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// A retained native method remains callable after the framework's dispatch
+	// scope has ended; it still sets the original Event's native stop flag.
+	it.each(['stopPropagation', 'stopImmediatePropagation'] as const)(
+		'keeps a retained %s callable after dispatch',
+		(method) => {
+			const retained: (() => void)[] = [];
+			const r = mount(PropagationTree, {
+				onTarget: (event) => retained.push(event[method]),
+			});
+			const event = new MouseEvent('click', { bubbles: true });
+			try {
+				r.find('.propagation-target').dispatchEvent(event);
+				expect(event.cancelBubble).toBe(false);
+				retained[0].call(event);
+				expect(event.cancelBubble).toBe(true);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	// An immutable own method cannot be interposed without replacing the Event.
+	// It retains native-only cancellation, like calling Event.prototype directly.
+	it('keeps a locked own stop method native-only without affecting the next event', () => {
+		const log: string[] = [];
+		const nativeFlags: boolean[] = [];
+		const event = new MouseEvent('click', { bubbles: true });
+		const stopPropagation = function (this: Event) {
+			log.push('own stop');
+			Event.prototype.stopPropagation.call(this);
+		};
+		Object.defineProperty(event, 'stopPropagation', {
+			value: stopPropagation,
+			configurable: false,
+			writable: false,
+		});
+		const descriptor = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
+		const r = mount(PropagationTree, {
+			onTarget: (event) => {
+				log.push('target');
+				event.stopPropagation();
+			},
+			onParent: (event) => {
+				log.push('parent');
+				nativeFlags.push(event.cancelBubble);
+			},
+		});
+		r.container.addEventListener('click', () => log.push('native after'));
+		try {
+			const target = r.find('.propagation-target');
+			target.dispatchEvent(event);
+			expect(log).toEqual(['target', 'own stop', 'parent', 'native after']);
+			expect(nativeFlags).toEqual([true]);
+			expect(Object.getOwnPropertyDescriptor(event, 'stopPropagation')).toEqual(descriptor);
+			log.length = 0;
+			target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			expect(log).toEqual(['target', 'native after']);
+		} finally {
+			r.unmount();
+		}
 	});
 });
 

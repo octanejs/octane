@@ -447,7 +447,7 @@ Proposed skeleton:
 # Octane
 
 Compiler-first UI framework with React's programming model. Components are
-authored in `.tsrx` and compiled ahead of time. Alpha: APIs can still change.
+authored in `.tsrx` and compiled ahead of time. Beta: APIs can still change.
 
 Read `packages/octane/src/runtime.ts` for runtime behavior: its comments are
 the design spec. `docs/differences-from-react.md` is the divergence contract.

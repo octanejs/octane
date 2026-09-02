@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/react-error-boundary",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -41,7 +41,7 @@
     "test": "vitest run --root ../.. --project react-error-boundary --project react-error-boundary-ssr"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
