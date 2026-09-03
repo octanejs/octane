@@ -569,10 +569,11 @@ describe('scoped style conformance fixtures (@tsrx/core test harness)', () => {
 					for (const [variable, chain] of Object.entries(expected.classMaps)) {
 						const composition = classExpression(variable, chain, hashes);
 						// The map literal, on the server possibly wrapped in the lazily
-						// injecting `_$styleMap(hash, css, { … }, [applied])`.
+						// injecting `_$styleMap(hash, css, { … }, [applied])` — `null`
+						// hash and css for a body-less bundle that only forwards the touch.
 						expect(code).toMatch(
 							new RegExp(
-								`\\b${escapeRegExp(variable)} = (?:_\\$styleMap\\(\\s*${STRING},\\s*${STRING},\\s*)?` +
+								`\\b${escapeRegExp(variable)} = (?:_\\$styleMap\\(\\s*(?:${STRING}|null),\\s*(?:${STRING}|null),\\s*)?` +
 									`\\{\\s*'\\$class': ${escapeRegExp(composition)}\\s*(?:,|\\})`,
 							),
 						);

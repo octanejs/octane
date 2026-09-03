@@ -670,7 +670,16 @@ function lowerAssignedStyle(styleNode, state) {
 	const applied = resolveAppliedParts(styleNode, state);
 	const sheet = (styleNode.children || []).find((c) => c && c.type === 'StyleSheet');
 	if (!sheet) {
-		return tools.inheritOriginLoc(buildStyleClassMap(new Map(), null, { applied }), styleNode);
+		// A body-less bundle has no sheet of its own, but on the server reading
+		// it must still inject the themes it applies: it is wrapped like any
+		// assigned block, with nothing to inject for itself.
+		return wrapServerStyleMap(
+			tools.inheritOriginLoc(buildStyleClassMap(new Map(), null, { applied }), styleNode),
+			null,
+			null,
+			styleNode,
+			state,
+		);
 	}
 	const hash = styleNode.metadata?.styleScopeHash || sheet.hash;
 	const clone = cloneAstNode(sheet);
@@ -696,7 +705,7 @@ function lowerAssignedStyle(styleNode, state) {
 		tools.inheritOriginLoc(createStyleClassMapFromStylesheet(clone, { applied }), styleNode),
 		hash,
 		css,
-		applied,
+		styleNode,
 		state,
 	);
 }
@@ -707,25 +716,43 @@ function lowerAssignedStyle(styleNode, state) {
  * reach the request collector. Wrap the map so property access injects its
  * CSS (after the CSS of the themes it applies) into the active render.
  *
+ * Every applied block is a dependency, whether it lives in this module or is
+ * imported: the class list inlines a same-module theme's hashes as literals,
+ * which says nothing about its CSS, so the wrapper touches the applied maps
+ * first (each of them a wrapper touching its own, so a chain injects
+ * transitively, applied before applier, each sheet once). A body-less bundle
+ * has no sheet (`null` id and css) and only forwards the touch.
+ *
  * @param {any} map
- * @param {string} hash
- * @param {string} css
- * @param {Array<string | any>} applied
+ * @param {string | null} hash
+ * @param {string | null} css
+ * @param {any} styleNode the authored block, whose `styleApplies` name the dependencies
  * @param {PassState} state
  * @returns {any}
  */
-function wrapServerStyleMap(map, hash, css, applied, state) {
+function wrapServerStyleMap(map, hash, css, styleNode, state) {
 	const { ctx, tools } = state;
 	if (ctx.mode !== 'server') return map;
 	ctx.runtimeNeeded.add('styleMap');
-	const dependencies = applied
-		.filter((part) => typeof part !== 'string')
-		.map((part) => cloneAstNode(part.object));
+	/** @type {any[]} */
+	const dependencies = [];
+	/** @type {string[]} */
+	const seen = [];
+	for (const resolution of styleNode.metadata?.styleApplies ?? []) {
+		const key = expressionKey(resolution.expression);
+		if (seen.includes(key)) continue;
+		seen.push(key);
+		dependencies.push(
+			tools.inheritOriginLoc(cloneAstNode(resolution.expression), resolution.expression),
+		);
+	}
+	const literal = (value) =>
+		value === null ? b.literal(null, 'null') : b.literal(value, JSON.stringify(value));
 	return tools.inheritOriginLoc(
 		b.call(
 			'_$styleMap',
-			b.literal(hash, JSON.stringify(hash)),
-			b.literal(css, JSON.stringify(css)),
+			literal(hash),
+			literal(css),
 			map,
 			...(dependencies.length > 0 ? [b.array(dependencies)] : []),
 		),

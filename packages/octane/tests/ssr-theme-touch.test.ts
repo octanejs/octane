@@ -49,4 +49,26 @@ describe('server: imported theme touches', () => {
 		expect(code).not.toContain('touchStyleMap');
 		expect(code).toContain('_$styleMap(');
 	});
+
+	// A same-module theme an exported block applies is inlined as a hash in
+	// the class list, which says nothing about its CSS: when another module
+	// touches the export, the wrapper must touch the applied maps first.
+	it('lists same-module and imported applied blocks as server dependencies', () => {
+		const { code } = compile(
+			`import { ext } from './ext.tsrx';
+			export const base = <style>.b { color: red; }</style>;
+			export const theme = <style apply={[base, ext]}>.t { color: blue; }</style>;
+			export const bundle = <style apply={[theme, base]} />;`,
+			'themes.tsrx',
+			{ mode: 'server' },
+		);
+		expect(code).toMatch(/const base = _\$styleMap\("tsrx-[a-z0-9]+", "[^"]*", \{[^}]*\}\);/);
+		expect(code).toMatch(
+			/const theme = _\$styleMap\(\s*"tsrx-[a-z0-9]+",\s*"[^"]*",\s*\{[\s\S]*?\},\s*\[base, ext\],?\s*\);/,
+		);
+		// A body-less bundle has no sheet: `null` id and css, dependencies kept.
+		expect(code).toMatch(
+			/const bundle = _\$styleMap\(\s*null,\s*null,\s*\{[\s\S]*?\},\s*\[theme, base\],?\s*\);/,
+		);
+	});
 });

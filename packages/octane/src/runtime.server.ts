@@ -5822,12 +5822,15 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
  * server. Its CSS belongs to whichever request reads the map — a component in
  * another module applying `theme` or using `theme.card` — so injection happens
  * on property access into the active render's collector, after the CSS of the
- * themes this block itself applies (`applied`), which keeps the cascade order
- * "applied before applier" across modules. Reads outside a render are no-ops.
+ * themes this block itself applies (`applied`: every applied map, same-module
+ * or imported, each a wrapper of its own, so a chain injects transitively in
+ * "applied before applier" order and each sheet once). A body-less bundle
+ * (`<style apply={[a, b]} />`) has no sheet — `id` and `css` are `null` — and
+ * only forwards the touch. Reads outside a render are no-ops.
  */
 export function styleMap<T extends object>(
-	id: string,
-	css: string,
+	id: string | null,
+	css: string | null,
 	map: T,
 	applied: ReadonlyArray<unknown> = [],
 ): T {
@@ -5837,7 +5840,7 @@ export function styleMap<T extends object>(
 		touching = true;
 		try {
 			for (const dependency of applied) touchStyleMap(dependency);
-			injectStyle(id, css);
+			if (id !== null && css !== null) injectStyle(id, css);
 		} finally {
 			touching = false;
 		}
