@@ -1,5 +1,12 @@
 # @octanejs/solana-kit
 
+## 0.0.22
+
+### Patch Changes
+
+- Updated dependencies [44d50db]
+  - @octanejs/tanstack-query@0.1.52
+
 ## 0.0.21
 
 ### Patch Changes

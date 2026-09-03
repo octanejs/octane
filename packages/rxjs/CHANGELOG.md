@@ -1,5 +1,11 @@
 # @octanejs/rxjs
 
+## 0.1.32
+
+### Patch Changes
+
+- 44d50db: Preserve Symbol arguments passed to hooks returned by observable factory bindings.
+
 ## 0.1.31
 
 ### Patch Changes

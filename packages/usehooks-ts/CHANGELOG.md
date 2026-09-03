@@ -1,5 +1,11 @@
 # @octanejs/usehooks-ts
 
+## 0.0.34
+
+### Patch Changes
+
+- 44d50db: Validate useStep setStep calls synchronously before scheduling state updates, including updater results and NaN, while retaining earlier accepted actions from the same turn.
+
 ## 0.0.33
 
 ### Patch Changes

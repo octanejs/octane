@@ -1,5 +1,11 @@
 # @octanejs/tanstack-store
 
+## 0.0.47
+
+### Patch Changes
+
+- 44d50db: Preserve explicit subscription slots when useSelector and useStore are called through compiled hook adapters, keeping independent subscriptions reactive.
+
 ## 0.0.46
 
 ### Patch Changes
