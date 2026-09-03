@@ -3,19 +3,22 @@ import * as ServerRT from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import { mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture.js';
-import { ReturnedScopedMailbox, ReturnedNestedScopes } from './_fixtures/return-style.tsrx';
+import { ReturnedBranchScopes, ReturnedNestedScopes } from './_fixtures/return-style.tsrx';
 import { ControlFlow } from './_fixtures/style-scopes.tsrx';
+
+// Raw CSS in <style> is TSRX template syntax (RFC tsrx-org/RFCs#1, amendment
+// A1, rule B). A plain function that returns JSX carries a standalone block
+// only inside a TSRX container written in that JSX — a directive body or a
+// nested `@{ … }` — and the block styles the items beside it in that body and
+// everything below them. The returned tree around the container is not in
+// the scope. (A block directly in the returned JSX is the analyzer's
+// `tsrx-style-standalone-outside-template` error; see
+// tests/compiler/style-standalone-placement.test.ts.)
 
 const FIXTURE = 'packages/octane/tests/_fixtures/return-style.tsrx';
 const server = loadServerFixture(FIXTURE);
 const SCOPES_FIXTURE = 'packages/octane/tests/_fixtures/style-scopes.tsrx';
 const scopesServer = loadServerFixture(SCOPES_FIXTURE);
-
-function scopeHash(element: Element): string {
-	const hash = Array.from(element.classList).find((name) => name.startsWith('tsrx-'));
-	if (!hash) throw new Error('expected a scoped CSS hash class');
-	return hash;
-}
 
 function cssHashes(css: string): string[] {
 	return [...new Set(css.match(/tsrx-[a-f0-9]+/g) ?? [])];
@@ -25,143 +28,126 @@ function hashesOf(element: Element): string[] {
 	return Array.from(element.classList).filter((name) => name.startsWith('tsrx-'));
 }
 
-function sheetOrder(hashes: string[]): string[] {
-	return Array.from(document.head.querySelectorAll('style[data-octane]'))
-		.map((style) => style.getAttribute('data-octane')!)
-		.filter((id) => hashes.includes(id));
+function sheetText(hash: string): string {
+	const sheet = document.head.querySelector(`style[data-octane="${hash}"]`);
+	if (!sheet) throw new Error(`no injected sheet for ${hash}`);
+	return sheet.textContent ?? '';
 }
 
-describe('scoped styles in React-style returned JSX', () => {
-	it('injects two style blocks under one scope and preserves DOM across updates', () => {
-		const r = mount(ReturnedScopedMailbox as any, {
-			active: false,
-			title: 'Draft mailbox',
-		});
-		const section = r.find('#returned-scoped-mailbox') as HTMLElement;
-		const title = r.find('.mailbox-title') as HTMLElement;
-		const hash = scopeHash(section);
-		const style = document.head.querySelector(
-			`style[data-octane="${hash}"]`,
-		) as HTMLStyleElement | null;
-
+describe('scoped styles inside the TSRX containers of returned JSX', () => {
+	it('each @if arm is a scope of its own; the returned section around it carries no hash', () => {
+		const r = mount(ReturnedBranchScopes as any, { active: false, title: 'Draft mailbox' });
+		const section = r.find('#returned-branches') as HTMLElement;
+		const title = r.find('#returned-title') as HTMLElement;
+		const idle = r.find('#returned-status') as HTMLElement;
+		expect(hashesOf(section)).toEqual([]);
+		expect(hashesOf(title)).toEqual([]);
+		const [idleHash] = hashesOf(idle);
+		expect(hashesOf(idle)).toEqual([idleHash]);
 		expect(r.container.querySelector('style')).toBeNull();
-		expect(style).not.toBeNull();
-		expect(cssHashes(style!.textContent || '')).toEqual([hash]);
-		expect(style!.textContent).toContain(`.mailbox.${hash}`);
-		expect(style!.textContent).toContain(`.mailbox-title.${hash}`);
-		expect(getComputedStyle(section).color).toBe('rgb(10, 20, 30)');
-		expect(getComputedStyle(title).fontWeight).toBe('700');
+		expect(sheetText(idleHash)).toContain(`.status.${idleHash}`);
+		expect(getComputedStyle(idle).color).toBe('rgb(40, 50, 60)');
 
-		r.update(ReturnedScopedMailbox as any, {
-			active: true,
-			title: 'Sent mailbox',
-		});
-		expect(r.find('#returned-scoped-mailbox')).toBe(section);
-		expect(r.find('.mailbox-title')).toBe(title);
-		expect(section.classList.contains('active')).toBe(true);
-		expect(scopeHash(section)).toBe(hash);
+		r.update(ReturnedBranchScopes as any, { active: true, title: 'Sent mailbox' });
+		expect(r.find('#returned-branches')).toBe(section);
+		expect(r.find('#returned-title')).toBe(title);
 		expect(title.textContent).toBe('Sent mailbox');
-		expect(getComputedStyle(section).backgroundColor).toBe('rgb(40, 50, 60)');
+		const active = r.find('#returned-status') as HTMLElement;
+		const [activeHash] = hashesOf(active);
+		expect(hashesOf(active)).toEqual([activeHash]);
+		expect(activeHash).not.toBe(idleHash);
+		expect(sheetText(activeHash)).toContain(`.status.${activeHash}`);
+		expect(getComputedStyle(active).color).toBe('rgb(10, 20, 30)');
+		expect(hashesOf(section)).toEqual([]);
 		r.unmount();
 	});
 
-	it('collects both blocks into SSR CSS under the client-visible hash', () => {
-		const { html, css } = ServerRT.renderToString(server.ReturnedScopedMailbox, {
+	it('collects both arm sheets into SSR CSS and stamps only the rendered arm', () => {
+		const { html, css } = ServerRT.renderToString(server.ReturnedBranchScopes, {
 			active: false,
 			title: 'Server mailbox',
 		});
-		const hashes = cssHashes(css);
-
-		expect(hashes).toHaveLength(1);
-		expect(cssHashes(html)).toEqual(hashes);
-		expect(css).toContain(`.mailbox.${hashes[0]}`);
-		expect(css).toContain(`.mailbox-title.${hashes[0]}`);
-		expect(css).toContain('letter-spacing: 2px');
+		const tags = [...css.matchAll(/data-octane="(tsrx-[a-f0-9]+)"/g)].map((m) => m[1]);
+		// Both arms ship whichever branch renders; only the stamping follows it.
+		expect(tags).toHaveLength(2);
+		expect(cssHashes(css)).toEqual(tags);
+		expect(html).toContain('<section id="returned-branches" class="mailbox">');
+		expect(html).toContain('<h2 id="returned-title" class="mailbox-title">');
+		const stamped = html.match(/class="status (tsrx-[a-f0-9]+)"/)![1];
+		expect(tags).toContain(stamped);
+		const sheets = new Map(
+			[...css.matchAll(/<style data-octane="(tsrx-[a-f0-9]+)">([\s\S]*?)<\/style>/g)].map((m) => [
+				m[1],
+				m[2],
+			]),
+		);
+		expect(sheets.get(stamped)).toMatch(new RegExp(`\\.status\\.${stamped}\\s*\\{`));
+		expect(sheets.get(stamped)).toContain('rgb(40, 50, 60)');
 		expect(html).not.toContain('<style');
 	});
 
-	it('hydrates the scoped returned fragment in place and keeps its hash on update', () => {
+	it('hydrates the returned section in place and keeps the arm hash on update', () => {
 		const props = { active: false, title: 'Hydrated mailbox' };
-		const { html } = ServerRT.renderToString(server.ReturnedScopedMailbox, props);
+		const { html } = ServerRT.renderToString(server.ReturnedBranchScopes, props);
 		const container = document.createElement('div');
 		document.body.appendChild(container);
 		container.innerHTML = html;
-		const section = container.querySelector('#returned-scoped-mailbox') as HTMLElement;
-		const title = container.querySelector('.mailbox-title') as HTMLElement;
-		const hash = scopeHash(section);
+		const section = container.querySelector('#returned-branches') as HTMLElement;
+		const idle = container.querySelector('#returned-status') as HTMLElement;
+		const [idleHash] = hashesOf(idle);
 
-		const root = hydrateRoot(container, ReturnedScopedMailbox, props);
+		const root = hydrateRoot(container, ReturnedBranchScopes, props);
 		flushSync(() => {});
-		expect(container.querySelector('#returned-scoped-mailbox')).toBe(section);
-		expect(container.querySelector('.mailbox-title')).toBe(title);
-		expect(scopeHash(section)).toBe(hash);
+		expect(container.querySelector('#returned-branches')).toBe(section);
+		expect(container.querySelector('#returned-status')).toBe(idle);
+		expect(hashesOf(idle)).toEqual([idleHash]);
+		expect(hashesOf(section)).toEqual([]);
 
-		root.render(ReturnedScopedMailbox, { active: true, title: 'Updated mailbox' });
+		root.render(ReturnedBranchScopes, { active: true, title: 'Updated mailbox' });
 		flushSync(() => {});
-		expect(container.querySelector('#returned-scoped-mailbox')).toBe(section);
-		expect(container.querySelector('.mailbox-title')).toBe(title);
-		expect(scopeHash(section)).toBe(hash);
-		expect(section.classList.contains('active')).toBe(true);
-		expect(title.textContent).toBe('Updated mailbox');
+		expect(container.querySelector('#returned-branches')).toBe(section);
+		const active = container.querySelector('#returned-status') as HTMLElement;
+		expect(hashesOf(active)).toHaveLength(1);
+		expect(hashesOf(active)[0]).not.toBe(idleHash);
+		expect(section.querySelector('#returned-title')!.textContent).toBe('Updated mailbox');
 		root.unmount();
 		container.remove();
 	});
 
-	// RFC tsrx-org/RFCs#1: an assigned template is a scope, the returned tree
-	// is another, and a nested `@{}` inside it carries both enclosing hashes.
-	it('stamps every enclosing hash per element and orders scope sheets lexically (client)', () => {
+	it('a nested @{} in returned JSX stamps its own output only (client)', () => {
 		const r = mount(ReturnedNestedScopes as any, { label: 'badge' });
 		const section = r.find('#returned-nested');
 		const note = r.find('#returned-note');
-		const badge = r.find('#returned-badge');
 		const innerHost = r.find('#returned-inner-host');
 		const inner = r.find('#returned-inner');
-		const [outer] = hashesOf(section);
-		expect(hashesOf(section)).toEqual([outer]);
-		expect(hashesOf(note)).toEqual([outer]);
-		expect(hashesOf(innerHost)).toEqual([outer]);
-		const [badgeHash] = hashesOf(badge);
-		expect(hashesOf(badge)).toEqual([badgeHash]);
-		expect(badgeHash).not.toBe(outer);
-		expect(hashesOf(inner)).toHaveLength(2);
-		expect(hashesOf(inner)[0]).toBe(outer);
-		const innerHash = hashesOf(inner)[1];
-		expect(new Set([outer, badgeHash, innerHash]).size).toBe(3);
-		// Lexical pre-order: the badge is declared first, then the returned
-		// tree's scope, then the scope nested in it.
-		expect(sheetOrder([outer, badgeHash, innerHash])).toEqual([badgeHash, outer, innerHash]);
-		const outerSheet = document.head.querySelector(`style[data-octane="${outer}"]`)!;
-		expect(outerSheet.textContent).toContain(`.outer.${outer}`);
-		expect(outerSheet.textContent).toContain(`.note.${outer}`);
-		expect(getComputedStyle(badge).color).toBe('rgb(70, 80, 90)');
-		expect(getComputedStyle(note).letterSpacing).toBe('1px');
+		expect(hashesOf(section)).toEqual([]);
+		expect(hashesOf(note)).toEqual([]);
+		expect(hashesOf(innerHost)).toEqual([]);
+		const [innerHash] = hashesOf(inner);
+		expect(hashesOf(inner)).toEqual([innerHash]);
+		expect(sheetText(innerHash)).toContain(`.inner.${innerHash}`);
 		expect(getComputedStyle(inner).fontWeight).toBe('700');
-		expect(getComputedStyle(inner).color).toBe('rgb(1, 2, 3)');
+		expect(getComputedStyle(note).fontWeight).not.toBe('700');
 		r.unmount();
 	});
 
-	it('server css and html agree with the client on every hash and on per-scope order', () => {
+	it('server css and html agree with the client on the nested hash', () => {
 		const { html, css } = ServerRT.renderToString(server.ReturnedNestedScopes, { label: 'badge' });
 		const tags = [...css.matchAll(/data-octane="(tsrx-[a-f0-9]+)"/g)].map((m) => m[1]);
-		expect(tags).toHaveLength(3);
-		const [badgeHash, outer, innerHash] = tags;
+		expect(tags).toHaveLength(1);
+		const [innerHash] = tags;
 		expect(cssHashes(css)).toEqual(tags);
-		expect(css).toContain(`.badge.${badgeHash}`);
-		expect(css).toContain(`.outer.${outer}`);
-		expect(css).toContain(`.note.${outer}`);
 		expect(css).toContain(`.inner.${innerHash}`);
-		expect(html).toContain(`<section id="returned-nested" class="outer ${outer}">`);
-		expect(html).toContain(`class="note ${outer}"`);
-		expect(html).toContain(`class="badge ${badgeHash}"`);
-		expect(html).toContain(`<div id="returned-inner-host" class="${outer}">`);
-		expect(html).toContain(`class="inner ${outer} ${innerHash}"`);
+		expect(html).toContain('<section id="returned-nested" class="outer">');
+		expect(html).toContain('<p id="returned-note" class="note">');
+		expect(html).toContain('<div id="returned-inner-host">');
+		expect(html).toContain(`class="inner ${innerHash}"`);
 		expect(html).not.toContain('<style');
 
-		// The client compile derives the same position-based hashes.
+		// The client compile derives the same position-based hash.
 		const r = mount(ReturnedNestedScopes as any, { label: 'badge' });
-		expect(hashesOf(r.find('#returned-nested'))).toEqual([outer]);
-		expect(hashesOf(r.find('#returned-badge'))).toEqual([badgeHash]);
-		expect(hashesOf(r.find('#returned-inner'))).toEqual([outer, innerHash]);
+		expect(hashesOf(r.find('#returned-inner'))).toEqual([innerHash]);
+		expect(hashesOf(r.find('#returned-nested'))).toEqual([]);
 		r.unmount();
 	});
 

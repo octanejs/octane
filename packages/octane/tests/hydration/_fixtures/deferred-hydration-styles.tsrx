@@ -8,6 +8,8 @@ function StyledReviews() @{
 // the server fallback-strip rewrite both shift the tag's source position by
 // different amounts, so the position-derived scope hash must be restamped from
 // authored coordinates on both sides or hydration rebuilds the whole section.
+// The block is an item of the section's children list, so it stamps the note
+// beside it (and the boundary's fallback), never the section that contains it.
 export function StyledSplitHydration(props) @{
 	<section id="styled-split-host">
 		<Hydrate

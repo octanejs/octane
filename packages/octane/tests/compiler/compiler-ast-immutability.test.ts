@@ -53,24 +53,28 @@ export function App() @{
 		<Title />
 		<input value={query} onInput={(e) => setQuery((e.target as HTMLInputElement).value)} />
 		@if (visible.length > 0) {
-			<style>
-				ul {
-					list-style: none;
-				}
-			</style>
-			<ul>
-				@for (const row of visible; key row.id) {
-					<style>
-						li {
-							margin: 0;
-						}
-					</style>
-					{/* Parser comments are immutable authored nodes too. */}
-					<Row row={row} onPick={(id) => setRows(rows.filter((r) => r.id !== id))} />
-				} @empty {
-					<li>Empty</li>
-				}
-			</ul>
+			<>
+				<style>
+					ul {
+						list-style: none;
+					}
+				</style>
+				<ul>
+					@for (const row of visible; key row.id) {
+						<>
+							<style>
+								li {
+									margin: 0;
+								}
+							</style>
+							{/* Parser comments are immutable authored nodes too. */}
+							<Row row={row} onPick={(id) => setRows(rows.filter((r) => r.id !== id))} />
+						</>
+					} @empty {
+						<li>Empty</li>
+					}
+				</ul>
+			</>
 		} @else {
 			<p>{'No rows for: ' + query}</p>
 		}

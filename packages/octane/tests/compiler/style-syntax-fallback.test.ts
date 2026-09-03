@@ -13,6 +13,11 @@
  * produced the tree. `NEEDS_FALLBACK` pins the forms `oxc-tsrx` cannot parse
  * today; once the upstream port ships, the pinned-list test fails and the
  * expected action is to shrink the list (and eventually delete the fallback).
+ *
+ * A native rejection is a translated `SyntaxError` or, for a source carrying a
+ * `<style>` expression child (`<style>{css}</style>`), the bare `Error` the
+ * facade's CSS reader raises after its error translation. The Node entry
+ * (`parser.node.js`) retries both in JavaScript; the probe mirrors that rule.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -83,8 +88,14 @@ function probeNative(source: string): NativeOutcome {
 		parseNativeModule(source, FILENAME);
 		return { accepted: true };
 	} catch (error) {
-		if (!(error instanceof SyntaxError)) throw error;
-		return { accepted: false, error: error.message };
+		const rejection =
+			error instanceof SyntaxError ||
+			(error instanceof Error &&
+				error.name === 'Error' &&
+				error.constructor === Error &&
+				/<style\b[^>]*>\s*\{/.test(source));
+		if (!rejection) throw error;
+		return { accepted: false, error: (error as Error).message };
 	}
 }
 

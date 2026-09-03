@@ -13338,13 +13338,14 @@ function compileComponent(node, ctx, options) {
 			: null;
 	const firstStyle = ctx.cssInjections.length;
 
-	// Scoped `<style>` block. New TSRX surfaces each style block as a
-	// `JSXStyleElement` child of the rendered tree (parser pre-computes the
-	// content hash + parses CSS into a StyleSheet AST). Collect them, run the
-	// @tsrx/core scoping pipeline (rewrites `.foo` → `.foo.<hash>` AND stamps
-	// the hash class onto every element under this component), emit a single
-	// module-level `injectStyle(hash, css)`, and surface `cssHash` so
-	// resolveStyleExpr can also prefix any `{style (expr)}` class expressions.
+	// Scoped `<style>` blocks. TSRX surfaces each block as a `JSXStyleElement`
+	// item of the list it is written in (parser pre-computes the content hash
+	// + parses CSS into a StyleSheet AST). The pre-pass gives every list that
+	// holds a block its own hash, rewrites `.foo` → `.foo.<hash>`, stamps the
+	// hash on the list's other items and their descendants (never on the
+	// element that contains the list), emits one `injectStyle(hash, css)` per
+	// scope, and surfaces the first scope's hash as `cssHash` — kept only as a
+	// "this component owns scoped CSS" flag for resolveStyleExpr's fallback.
 	const scoping = applyStyleScopes(node, ctx);
 	node = scoping.node;
 	let cssHash = scoping.cssHash;

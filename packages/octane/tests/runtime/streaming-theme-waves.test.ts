@@ -26,9 +26,11 @@ const SAME_MODULE_SOURCE = `
 	</style>;
 
 	function Late(props) @{
-		<style apply={theme} />
-		<span class="late">{props.value as string}</span>
-		<style>.late { ${LATE_RULE}; }</style>
+		<>
+			<style apply={theme} />
+			<span class="late">{props.value as string}</span>
+			<style>.late { ${LATE_RULE}; }</style>
+		</>
 	}
 
 	export function Shell(props) @{
@@ -55,9 +57,11 @@ const CROSS_MODULE_SOURCE = `
 	import { theme } from './streaming-theme-module.tsrx';
 
 	function Late(props) @{
-		<style apply={theme} />
-		<span class="late">{props.value as string}</span>
-		<style>.late { ${LATE_RULE}; }</style>
+		<>
+			<style apply={theme} />
+			<span class="late">{props.value as string}</span>
+			<style>.late { ${LATE_RULE}; }</style>
+		</>
 	}
 
 	export function Shell(props) @{

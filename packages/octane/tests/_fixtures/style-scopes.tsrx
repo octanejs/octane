@@ -1,12 +1,15 @@
 import { use } from 'octane';
 
-// Lexically scoped <style> blocks (RFC tsrx-org/RFCs#1): a scope is a `@{}`
-// body, a directive branch body, or an assigned template. Every block of a
-// scope shares one position-derived hash and one injection; elements carry
-// the hashes of every enclosing scope, outer first.
+// Lexically scoped <style> blocks (RFC tsrx-org/RFCs#1, amendment A1): the
+// list a block sits in is its scope — a `@{}` body, a directive branch body,
+// or the children list of an element or fragment. A block styles the items
+// beside it and everything below them; it never styles the element that
+// contains it. Every block of one list shares one position-derived hash and
+// one injection; elements carry the hashes of every enclosing scope, outer
+// first.
 
 // One scope, two blocks: both rules share the scope hash and one injection,
-// wherever the blocks sit in the scope's element subtree.
+// wherever the blocks sit in the fragment's children list.
 export function MultiBlock() @{
 	<>
 		<style>
@@ -75,8 +78,9 @@ export function StyleCallChain(props: { cls: string }) @{
 	</>
 }
 
-// Every directive branch body is a scope of its own whose CSS ships whether
-// or not the branch is active.
+// Every directive branch renders a fragment holding a block: each of those
+// children lists is a scope of its own whose CSS ships whether or not the
+// branch is active.
 export function ControlFlow(props: {
 	ready: boolean;
 	maybe: boolean;
@@ -91,84 +95,102 @@ export function ControlFlow(props: {
 		</style>
 		<div id="cf-root" class="cf-root">
 			@if (props.ready) {
-				<style>
-					.cf-yes {
-						color: rgb(1, 1, 1);
-					}
-					b {
-						font-weight: 700;
-					}
-				</style>
-				<p id="cf-yes" class="cf-yes">
-					<b id="cf-yes-text">{'yes'}</b>
-				</p>
+				<>
+					<style>
+						.cf-yes {
+							color: rgb(1, 1, 1);
+						}
+						b {
+							font-weight: 700;
+						}
+					</style>
+					<p id="cf-yes" class="cf-yes">
+						<b id="cf-yes-text">{'yes'}</b>
+					</p>
+				</>
 			} @else if (props.maybe) {
-				<style>
-					.cf-maybe {
-						color: rgb(2, 2, 2);
-					}
-				</style>
-				<p id="cf-maybe" class="cf-maybe">{'maybe'}</p>
+				<>
+					<style>
+						.cf-maybe {
+							color: rgb(2, 2, 2);
+						}
+					</style>
+					<p id="cf-maybe" class="cf-maybe">{'maybe'}</p>
+				</>
 			} @else {
-				<style>
-					.cf-no {
-						color: rgb(3, 3, 3);
-					}
-				</style>
-				<p id="cf-no" class="cf-no">{'no'}</p>
+				<>
+					<style>
+						.cf-no {
+							color: rgb(3, 3, 3);
+						}
+					</style>
+					<p id="cf-no" class="cf-no">{'no'}</p>
+				</>
 			}
 			<ul id="cf-list">
 				@for (const item of props.items) {
-					<style>
-						.cf-item {
-							color: rgb(4, 4, 4);
-						}
-						li {
-							letter-spacing: 1px;
-						}
-					</style>
-					<li class="cf-item">{item}</li>
+					<>
+						<style>
+							.cf-item {
+								color: rgb(4, 4, 4);
+							}
+							li {
+								letter-spacing: 1px;
+							}
+						</style>
+						<li class="cf-item">{item}</li>
+					</>
 				} @empty {
-					<style>
-						.cf-empty {
-							color: rgb(5, 5, 5);
-						}
-					</style>
-					<li id="cf-empty" class="cf-empty">{'none'}</li>
+					<>
+						<style>
+							.cf-empty {
+								color: rgb(5, 5, 5);
+							}
+						</style>
+						<li id="cf-empty" class="cf-empty">{'none'}</li>
+					</>
 				}
 			</ul>
 			@switch (props.kind) {
 				@case 1: {
-					<style>
-						.cf-one {
-							color: rgb(6, 6, 6);
-						}
-					</style>
-					<b id="cf-one" class="cf-one">{'one'}</b>
+					<>
+						<style>
+							.cf-one {
+								color: rgb(6, 6, 6);
+							}
+						</style>
+						<b id="cf-one" class="cf-one">{'one'}</b>
+					</>
 				}
 				@default: {
-					<style>
-						.cf-other {
-							color: rgb(7, 7, 7);
-						}
-					</style>
-					<i id="cf-other" class="cf-other">{'other'}</i>
+					<>
+						<style>
+							.cf-other {
+								color: rgb(7, 7, 7);
+							}
+						</style>
+						<i id="cf-other" class="cf-other">{'other'}</i>
+					</>
 				}
 			}
 			@try {
-				<style>
-					.cf-ok {
-						color: rgb(8, 8, 8);
-					}
-				</style>
-				<em id="cf-ok" class="cf-ok">{'ok'}</em>
+				<>
+					<style>
+						.cf-ok {
+							color: rgb(8, 8, 8);
+						}
+					</style>
+					<em id="cf-ok" class="cf-ok">{'ok'}</em>
+				</>
 			} @catch (error) {
-				<style>
-					.cf-err {
-						color: rgb(10, 10, 10);
-					}
-				</style>
-				<s id="cf-err" class="cf-err">{'err'}</s>
+				<>
+					<style>
+						.cf-err {
+							color: rgb(10, 10, 10);
+						}
+					</style>
+					<s id="cf-err" class="cf-err">{'err'}</s>
+				</>
 			}
 		</div>
 	</>
@@ -222,42 +244,46 @@ export function FloatSibling() @{
 // scope hashes, each shipped once across waves.
 function StreamedLeaf(props: { promise: Promise<string> }) @{
 	const value = use(props.promise);
-	<section class="leaf">
+	<>
 		<style>
 			.leaf {
 				color: rgb(2, 2, 2);
 			}
 		</style>
-		<b class="leaf-text">{value as string}</b>
-		@{
-			<>
-				<style>
-					.leaf-deep {
-						font-weight: 700;
-					}
-				</style>
-				<i class="leaf-deep">{'deep'}</i>
-			</>
-		}
-	</section>
+		<section class="leaf">
+			<b class="leaf-text">{value as string}</b>
+			@{
+				<>
+					<style>
+						.leaf-deep {
+							font-weight: 700;
+						}
+					</style>
+					<i class="leaf-deep">{'deep'}</i>
+				</>
+			}
+		</section>
+	</>
 }
 
 export function StreamedScopes(props: { a: Promise<string>; b: Promise<string> }) @{
-	<div id="streamed-scopes" class="shell">
+	<>
 		<style>
 			.shell {
 				color: rgb(1, 1, 1);
 			}
 		</style>
-		@try {
-			<StreamedLeaf promise={props.a} />
-		} @pending {
-			<p class="pending-a">{'a'}</p>
-		}
-		@try {
-			<StreamedLeaf promise={props.b} />
-		} @pending {
-			<p class="pending-b">{'b'}</p>
-		}
-	</div>
+		<div id="streamed-scopes" class="shell">
+			@try {
+				<StreamedLeaf promise={props.a} />
+			} @pending {
+				<p class="pending-a">{'a'}</p>
+			}
+			@try {
+				<StreamedLeaf promise={props.b} />
+			} @pending {
+				<p class="pending-b">{'b'}</p>
+			}
+		</div>
+	</>
 }

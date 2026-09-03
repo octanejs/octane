@@ -1,23 +1,24 @@
-// RFC tsrx-org/RFCs#1 problem 4: a native element assigned to a variable is a
-// scope of its own — at module scope and inside a component body alike. Its
-// sheet injects at the declaration position and only its own subtree carries
-// its hash; the component rendering it does not.
-const card = <div id="er-card" class="er-card">
-	<style>
-		.er-card {
-			color: rgb(21, 22, 23);
-		}
-		p {
-			margin: 0;
-		}
-	</style>
-	<p id="er-card-text" class="er-card-text">{'card'}</p>
-</div>;
-
+// RFC tsrx-org/RFCs#1 problem 4 under amendment A1: a block written inside an
+// assigned element styles that element's other children (and below), never
+// the element itself, and the component rendering the template carries
+// nothing from it. Raw CSS in <style> is TSRX template syntax, so an assigned
+// template with a block must be written inside a `@{ … }` body (at module
+// scope it is a `tsrx-style-standalone-outside-template` error).
 export function Templates() @{
+	const card = <div id="er-card" class="er-card">
+		<style>
+			.er-card-text {
+				color: rgb(21, 22, 23);
+			}
+			p {
+				margin: 0;
+			}
+		</style>
+		<p id="er-card-text" class="er-card-text">{'card'}</p>
+	</div>;
 	const chip = <span id="er-chip" class="er-chip">
 		<style>
-			.er-chip {
+			.er-chip-text {
 				color: rgb(31, 32, 33);
 			}
 		</style>
@@ -30,22 +31,26 @@ export function Templates() @{
 	</>
 }
 
-// The component's own scope encloses an assigned template only when the
-// template is written inside it.
+// A block beside the host in the output fragment is the fragment-children
+// scope: it reaches the host, the assigned template written inside it, and
+// everything below. The template's own block is a nested scope over its
+// children only.
 export function Enclosed() @{
-	<div id="en-host" class="en-host">
+	<>
 		<style>
 			.en-host {
 				color: rgb(51, 52, 53);
 			}
 		</style>
-		{<section id="en-inner" class="en-inner">
-			<style>
-				.en-inner {
-					font-weight: 700;
-				}
-			</style>
-			<b id="en-inner-text" class="en-inner-text">{'inner'}</b>
-		</section>}
-	</div>
+		<div id="en-host" class="en-host">
+			{<section id="en-inner" class="en-inner">
+				<style>
+					.en-inner-text {
+						font-weight: 700;
+					}
+				</style>
+				<b id="en-inner-text" class="en-inner-text">{'inner'}</b>
+			</section>}
+		</div>
+	</>
 }

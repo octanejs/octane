@@ -290,12 +290,13 @@ describe('deferred hydration', () => {
 		const serverNote = container.querySelector('.styled-split-note') as HTMLElement;
 		const serverHostClass = serverHost.className;
 		const serverNoteClass = serverNote.className;
-		expect(serverHostClass).toMatch(/\btsrx-[0-9a-z]+\b/);
+		// The block is an item of the section's children list: it stamps the
+		// note beside it, never the section that contains it.
+		expect(serverHostClass).toBe('');
 		// The scope hash is position-derived from authored coordinates on both
 		// sides: the client module (compiled by the plugin) already injected a
 		// sheet under the very hash the server stamped.
 		const serverScope = serverNote.className.match(/\btsrx-[0-9a-z]+\b/)![0];
-		expect(serverHostClass.split(' ')).toContain(serverScope);
 		const clientSheet = document.head.querySelector(`style[data-octane="${serverScope}"]`);
 		expect(clientSheet).not.toBeNull();
 		expect(clientSheet!.textContent).toContain(`.styled-split-note.${serverScope}`);

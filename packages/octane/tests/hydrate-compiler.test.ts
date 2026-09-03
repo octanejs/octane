@@ -963,8 +963,15 @@ export function App() @{
 		const serverCode = compile(source, FILE, { hmr: false, mode: 'server' }).code;
 		expect(hasStaticImport(clientCode, './StaticNavigation.tsrx')).toBe(false);
 		expect(clientCode).not.toContain('StaticNavigation');
+		// The erased children still own their sheet on the client…
+		expect(clientCode).toContain('.static.tsrx-');
 		expect(clientCode).toContain('.host.tsrx-');
-		expect(clientCode).toContain('live tsrx-');
+		// …and the block's scope is the boundary's children list: the server
+		// stamps the static section, while the live sibling outside the boundary
+		// (and the host that contains it) carry no hash on either side.
+		expect(serverCode).toContain('static tsrx-');
+		expect(clientCode).not.toContain('live tsrx-');
+		expect(serverCode).not.toContain('live tsrx-');
 		expect(hashes(clientCode).size).toBeGreaterThan(0);
 		expect(hashes(clientCode)).toEqual(hashes(serverCode));
 	});

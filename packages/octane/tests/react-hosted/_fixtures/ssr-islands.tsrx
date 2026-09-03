@@ -82,12 +82,12 @@ export function SsrLayout() @{
 
 /** Scoped style — exercises the §9.2 style-resource channel. */
 export function SsrStyled(props) @{
-	<p class="ssr-styled">
-		{'styled ' + props.name}
+	<>
 		<style>
 			.ssr-styled {
 				color: rgb(1, 2, 3);
 			}
 		</style>
-	</p>
+		<p class="ssr-styled">{'styled ' + props.name}</p>
+	</>
 }

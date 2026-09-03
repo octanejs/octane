@@ -1330,43 +1330,55 @@ describe('scoped <style> blocks', () => {
 		r.unmount();
 	});
 
-	it('an assigned template is a scope of its own, at module scope and in a component body', () => {
+	it("a block inside an assigned template styles the template's children, never its root", () => {
+		// Amendment A1 (RFC problem 4): the block is an item of the assigned
+		// element's children list, so that list is the scope — the root element,
+		// the body that assigns it, and the component's other output stay unstamped.
 		const r = mount(Templates);
 		const card = r.find('#er-card');
 		const cardText = r.find('#er-card-text');
 		const chip = r.find('#er-chip');
 		const chipText = r.find('#er-chip-text');
-		const [C] = hashesOf(card);
-		const [H] = hashesOf(chip);
-		expect(hashesOf(card)).toEqual([C]);
-		expect(hashesOf(cardText)).toEqual([C]);
-		expect(hashesOf(chip)).toEqual([H]);
-		expect(hashesOf(chipText)).toEqual([H]);
+		const [C] = hashesOf(cardText);
+		const [H] = hashesOf(chipText);
+		expect(C).toMatch(/^tsrx-/);
+		expect(H).toMatch(/^tsrx-/);
 		expect(C).not.toBe(H);
+		expect(hashesOf(cardText)).toEqual([C]);
+		expect(hashesOf(chipText)).toEqual([H]);
+		expect(hashesOf(card)).toEqual([]);
+		expect(hashesOf(chip)).toEqual([]);
 		// The rendering component has no block of its own: nothing to stamp.
 		expect(hashesOf(r.find('#er-outside'))).toEqual([]);
-		expect(sheetText(C)).toContain(`.er-card.${C}`);
+		expect(sheetText(C)).toContain(`.er-card-text.${C}`);
 		expect(sheetText(C)).toContain(`p.${C}`);
-		expect(sheetText(H)).toContain(`.er-chip.${H}`);
+		expect(sheetText(H)).toContain(`.er-chip-text.${H}`);
 		expect(sheetOrder([C, H])).toEqual([C, H]);
-		expect(getComputedStyle(card).color).toBe('rgb(21, 22, 23)');
-		expect(getComputedStyle(chip).color).toBe('rgb(31, 32, 33)');
+		expect(getComputedStyle(cardText).color).toBe('rgb(21, 22, 23)');
+		expect(getComputedStyle(cardText).margin).toBe('0px');
+		expect(getComputedStyle(chipText).color).toBe('rgb(31, 32, 33)');
 		r.unmount();
 	});
 
-	it('an assigned template written inside a scope carries the enclosing hash too', () => {
+	it('an assigned template written inside a scope carries the enclosing hash, its own block stamps below it', () => {
 		const r = mount(Enclosed);
 		const host = r.find('#en-host');
 		const inner = r.find('#en-inner');
 		const innerText = r.find('#en-inner-text');
 		const [A] = hashesOf(host);
+		expect(A).toMatch(/^tsrx-/);
 		expect(hashesOf(host)).toEqual([A]);
-		expect(hashesOf(inner)).toHaveLength(2);
-		expect(hashesOf(inner)[0]).toBe(A);
-		const B = hashesOf(inner)[1];
-		expect(hashesOf(innerText)).toEqual([A, B]);
+		// The section is the root of the assigned template: it is inside the
+		// body's scope, not inside its own children's.
+		expect(hashesOf(inner)).toEqual([A]);
+		expect(hashesOf(innerText)).toHaveLength(2);
+		expect(hashesOf(innerText)[0]).toBe(A);
+		const B = hashesOf(innerText)[1];
+		expect(B).not.toBe(A);
+		expect(sheetText(B)).toContain(`.en-inner-text.${B}`);
 		expect(sheetOrder([A, B])).toEqual([A, B]);
-		expect(getComputedStyle(inner).fontWeight).toBe('700');
+		expect(getComputedStyle(innerText).fontWeight).toBe('700');
+		expect(getComputedStyle(innerText).color).toBe('rgb(51, 52, 53)');
 		expect(getComputedStyle(inner).color).toBe('rgb(51, 52, 53)');
 		r.unmount();
 	});

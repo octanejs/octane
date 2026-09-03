@@ -7,22 +7,35 @@
  * the classes of every applied theme — so the client and server emitters only
  * serialize what is already on the AST and agree by construction.
  *
- * Scope model (shared with `@tsrx/core`'s `transform/jsx/style-scopes.js`):
+ * Scope model (shared with `@tsrx/core`'s `transform/jsx/style-scopes.js`;
+ * amendment A1 of the RFC):
  *
- * - A scope is a statement list plus the template it renders: a `@{ … }`
- *   body, each `@if`/`@else if`/`@else`/`@for`/`@empty`/`@switch`/`@try`
- *   branch body, or a native element/fragment in expression position (an
- *   assigned template, a returned fragment, a value in `{ … }`).
- * - A scope owns the standalone blocks written directly in its list and inside
- *   its own element subtree; nested scopes own their own. Every block of a
- *   scope shares the scope hash (the first bodied block's position-derived
- *   hash) and renders into ONE injection — the runtime dedupes by id.
+ * - A standalone block is a child of a native element or a fragment, and
+ *   that CHILDREN LIST is its scope: the block styles the items beside it and
+ *   everything below them; it never styles the element that contains it, nor
+ *   any ancestor. A `@{ … }` body or a directive branch body holds setup
+ *   statements and exactly one output node, and a block is an output node
+ *   like any other, so a block beside the output node is the parser's
+ *   multiple-outputs error and a lone block as the output is the analyzer's
+ *   `tsrx-style-standalone-needs-fragment`; those lists are only searched for
+ *   nested templates and assigned blocks. A list holding no block is not a
+ *   scope and adds no hash.
+ * - Every block of one list shares the scope hash (the first bodied block's
+ *   position-derived hash) and renders into ONE injection — the runtime
+ *   dedupes by id. Lists nested in a scope that hold blocks are nested scopes
+ *   with hashes of their own; two blocks in different lists never share one.
  * - Elements carry `authored hashes… applied…`: enclosing scope hashes outer
  *   first, then applied theme classes (literals for same-module themes whose
- *   class is statically known, `theme.$class` reads otherwise).
+ *   class is statically known, `theme.$class` reads otherwise). `apply` on a
+ *   standalone block reaches the same set of elements as its CSS.
  * - Emission order is lexical pre-order: a scope's sheet sits where its first
- *   block is, after the assigned blocks declared before it in the same list,
- *   before the scopes and assigned blocks nested in it.
+ *   block is, after the assigned blocks declared before it in the enclosing
+ *   statement list, before the scopes and assigned blocks nested in it.
+ * - Raw CSS in `<style>` is TSRX template syntax: the core analyzer rejects a
+ *   standalone block outside a `@{ … }` or directive body
+ *   (`tsrx-style-standalone-outside-template`), so plain-TSX returns never
+ *   reach this pass with one. `<style>{expr}</style>` parses as an ordinary
+ *   `JSXElement`: it is not a block, opens no scope, and is never stamped.
  * - Assigned blocks (`const theme = <style>…</style>`) lower anywhere a
  *   declaration is legal: their sheet injects at the declaration position and
  *   the initializer becomes the class-map object (`$class` first). Exported or
@@ -151,14 +164,6 @@ function isFunctionNode(node) {
 
 /**
  * @param {any} node
- * @returns {boolean}
- */
-function isRenderItem(node) {
-	return isTemplateNode(node) || node?.type === 'JSXCodeBlock' || isDirective(node);
-}
-
-/**
- * @param {any} node
  * @param {string} key
  * @returns {boolean}
  */
@@ -219,15 +224,15 @@ function rewriteChildren(node, map) {
  *
  * `mode` says what a node found here is:
  * - `statement`: a statement slot (a bare `<style>` here was already reported
- *   by the analyzer; a native template roots a scope of its own),
- * - `expression`: a value slot (a `<style>` here is an assigned block; a
- *   native template roots a scope of its own),
- * - `template`: a child of a native element inside the current scope
- *   (elements are stamped; the scope's own blocks were stripped already).
+ *   by the analyzer),
+ * - `expression`: a value slot (a `<style>` here is an assigned block).
+ *
+ * A native element or fragment is the same thing in either slot: it is
+ * stamped with the current chain and its children list may open a scope.
  *
  * @param {any} node
  * @param {PassState} state
- * @param {'statement' | 'expression' | 'template'} mode
+ * @param {'statement' | 'expression'} mode
  * @returns {any}
  */
 function walk(node, state, mode) {
@@ -235,14 +240,16 @@ function walk(node, state, mode) {
 
 	switch (node.type) {
 		case 'JSXStyleElement':
+			// A value slot is an assigned block. A statement slot (or the render
+			// slot of a code block) is the analyzer's `needs-fragment` error; the
+			// node is left alone and contributes no CSS.
 			if (mode === 'expression') return lowerAssignedStyle(node, state);
 			return node;
 		case 'JSXCodeBlock':
 			return processCodeBlock(node, state);
 		case 'JSXElement':
 		case 'JSXFragment':
-			if (mode === 'template') return walkTemplateNode(node, state);
-			return processRoot(node, state);
+			return walkTemplateNode(node, state);
 		case 'JSXExpressionContainer':
 			return rewriteChildren(node, (child) => walk(child, state, 'expression'));
 		case 'ExpressionStatement':
@@ -291,9 +298,12 @@ function withStack(state, stack, run) {
 }
 
 /**
- * A native element or fragment inside the current scope: stamp it (elements
- * only), then walk its children as template content and its attribute values
- * as expressions.
+ * A native element or fragment: stamp it with the CURRENT chain (host
+ * elements only — the element itself is never inside its own children's
+ * scope), walk its attribute values as expressions of that same chain, then
+ * walk its children list. When the list holds standalone blocks it is a scope:
+ * the blocks are stripped, their sheet prepared, and the other children walked
+ * with the scope pushed. A list without blocks keeps the current chain.
  *
  * @param {any} node
  * @param {PassState} state
@@ -301,54 +311,54 @@ function withStack(state, stack, run) {
  */
 function walkTemplateNode(node, state) {
 	let out = node;
-	if (
-		node.type === 'JSXElement' &&
-		(!state.tools.isCompositeJsxTag(node) || node.metadata?.dynamicElement)
-	) {
-		out = addScopeClasses(node, state);
-	}
-	return rewriteChildren(out, (child, key) => {
-		if (key === 'children') {
-			if (isTemplateNode(child)) return walkTemplateNode(child, state);
-			if (child.type === 'JSXStyleElement') return child;
-			return walk(child, state, 'statement');
-		}
-		return walk(child, state, 'expression');
-	});
+	if (isStampedHost(node, state)) out = addScopeClasses(node, state);
+	out = rewriteChildren(out, (child, key) =>
+		key === 'children' ? child : walk(child, state, 'expression'),
+	);
+	const children = node.children;
+	if (!Array.isArray(children)) return out;
+	const own = collectOwnBlocks(children);
+	const scope = own.length > 0 ? prepareScope(own, state) : null;
+	const next = withStack(state, scope === null ? state.stack : [...state.stack, scope], () =>
+		mapList(children, (child) => {
+			if (child.type === 'JSXStyleElement') return own.includes(child) ? null : child;
+			return walkListItem(child, state);
+		}),
+	);
+	return next === children ? out : { ...out, children: next };
 }
 
 /**
- * `@{ … }`: the setup statements and the render slot form one scope, in
- * source order (a `<style>` sibling may follow the output node).
+ * Whether the scope chain is stamped on this element: a host element or a
+ * dynamic `<{expr}>` tag. Composite components stop stamping (their host
+ * elements belong to their own scopes), and a `style` host element —
+ * `<style>{expr}</style>`, an ordinary element after amendment A1 — is never
+ * stamped, like a `<style>` block.
+ *
+ * @param {any} node
+ * @param {PassState} state
+ * @returns {boolean}
+ */
+function isStampedHost(node, state) {
+	if (node.type !== 'JSXElement') return false;
+	if (state.tools.isCompositeJsxTag(node) && !node.metadata?.dynamicElement) return false;
+	const name = node.openingElement?.name;
+	return !(name?.type === 'JSXIdentifier' && name.name === 'style');
+}
+
+/**
+ * `@{ … }`: setup statements (searched for assigned blocks and nested
+ * templates) and the single output node, walked in the current chain.
  *
  * @param {any} node
  * @param {PassState} state
  * @returns {any}
  */
 function processCodeBlock(node, state) {
-	const body = node.body || [];
-	const items = insertInSourceOrder(body, node.render);
-	const { nodes, render } = processList(items, state, node.render);
-	if (nodes === items && render === node.render) return node;
-	return {
-		...node,
-		body: nodes.filter((item) => item !== render),
-		render,
-	};
-}
-
-/**
- * @param {any[]} body
- * @param {any} render
- * @returns {any[]}
- */
-function insertInSourceOrder(body, render) {
-	if (!render) return body;
-	const start = render.start;
-	if (typeof start !== 'number') return [...body, render];
-	const index = body.findIndex((item) => typeof item?.start === 'number' && item.start > start);
-	if (index === -1) return [...body, render];
-	return [...body.slice(0, index), render, ...body.slice(index)];
+	const body = processList(node.body || [], state);
+	const render = node.render ? walkListItem(node.render, state) : node.render;
+	if (body === node.body && render === node.render) return node;
+	return { ...node, body, render };
 }
 
 /**
@@ -367,7 +377,7 @@ function processDirective(node, state) {
 			return body === child.body ? child : { ...child, body };
 		}
 		if (child.type === 'SwitchCase') {
-			const consequent = processList(child.consequent || [], state, null).nodes;
+			const consequent = processList(child.consequent || [], state);
 			return consequent === child.consequent ? child : { ...child, consequent };
 		}
 		if (key === 'alternate' && (isDirective(child) || child.type === 'IfStatement')) {
@@ -383,88 +393,21 @@ function processDirective(node, state) {
  * @returns {any}
  */
 function processBlockBody(block, state) {
-	const body = processList(block.body || [], state, null).nodes;
+	const body = processList(block.body || [], state);
 	return body === block.body ? block : { ...block, body };
 }
 
 /**
- * A native element/fragment rooting a scope of its own (its enclosing scopes
- * still stamp it).
+ * A statement list (a `@{ … }` body, a directive branch body, a switch case):
+ * not a scope of its own. Its items are searched for nested templates and
+ * assigned blocks in the current chain.
  *
- * @param {any} node
+ * @param {any[]} nodes
  * @param {PassState} state
- * @returns {any}
+ * @returns {any[]}
  */
-function processRoot(node, state) {
-	const own = collectOwnBlocks([node]);
-	if (own.length === 0) return walkTemplateNode(node, state);
-	const scope = prepareScope(own, state);
-	return withStack(state, [...state.stack, scope], () =>
-		walkTemplateNode(strip(node, own, state), state),
-	);
-}
-
-/**
- * One statement-list scope.
- *
- * @param {any[]} nodes source-ordered: setup statements, style siblings, render items
- * @param {PassState} state
- * @param {any} renderItem the code block's render slot, tracked through the rewrite
- * @returns {{ nodes: any[], render: any }}
- */
-function processList(nodes, state, renderItem) {
-	const own = collectOwnBlocks(nodes);
-	const renderIndex = renderItem ? nodes.indexOf(renderItem) : -1;
-
-	if (own.length === 0) {
-		const out = mapList(nodes, (item) => walkListItem(item, state));
-		return { nodes: out, render: renderIndex === -1 ? null : out[renderIndex] };
-	}
-
-	const firstBlockStart = own[0].start ?? 0;
-	/** @type {Array<any | null>} */
-	const out = nodes.slice();
-
-	// Setup statements ahead of the scope's first block emit first: a theme
-	// declared there is applied by this scope and must precede its CSS.
-	for (let i = 0; i < nodes.length; i++) {
-		const item = nodes[i];
-		if (!isRenderItem(item) && item.type !== 'JSXStyleElement' && precedes(item, firstBlockStart)) {
-			out[i] = walk(item, state, 'statement');
-		}
-	}
-
-	const scope = prepareScope(own, state);
-	withStack(state, [...state.stack, scope], () => {
-		for (let i = 0; i < nodes.length; i++) {
-			const item = nodes[i];
-			if (item.type === 'JSXStyleElement') {
-				if (own.includes(item)) out[i] = null;
-				continue;
-			}
-			if (isRenderItem(item)) {
-				out[i] = walkListItem(strip(item, own, state), state);
-				continue;
-			}
-			if (!precedes(item, firstBlockStart)) {
-				// Setup after the first block is not template output: no stamping.
-				out[i] = withStack(state, state.stack.slice(0, -1), () => walk(item, state, 'statement'));
-			}
-		}
-	});
-
-	const render = renderIndex === -1 ? null : out[renderIndex];
-	const kept = out.filter((item) => item !== null);
-	return { nodes: kept, render };
-}
-
-/**
- * @param {any} item
- * @param {number} position
- * @returns {boolean}
- */
-function precedes(item, position) {
-	return typeof item?.end === 'number' && item.end <= position;
+function processList(nodes, state) {
+	return mapList(nodes, (item) => walkListItem(item, state));
 }
 
 /**
@@ -479,23 +422,18 @@ function walkListItem(item, state) {
 }
 
 /**
- * The standalone blocks a scope owns: style items of its list and blocks
- * inside its native element subtrees. Float style resources are not scoped
- * blocks. Nested scopes keep their own.
+ * The standalone blocks a children list owns: its direct `<style>` items, in
+ * source order. Blocks inside a nested element or fragment belong to that
+ * node's own children list; Float style resources are not scoped blocks.
  *
  * @param {any[]} nodes
- * @param {any[]} [blocks]
- * @param {PassState} [state]
  * @returns {any[]}
  */
-function collectOwnBlocks(nodes, blocks = []) {
+function collectOwnBlocks(nodes) {
+	/** @type {any[]} */
+	const blocks = [];
 	for (const node of nodes) {
-		if (node === null || typeof node !== 'object') continue;
-		if (node.type === 'JSXStyleElement') {
-			if (!isFloatStyleResource(node)) blocks.push(node);
-		} else if (isTemplateNode(node)) {
-			collectOwnBlocks(node.children || [], blocks);
-		}
+		if (node?.type === 'JSXStyleElement' && !isFloatStyleResource(node)) blocks.push(node);
 	}
 	return blocks.sort((a, b) => (a.start ?? 0) - (b.start ?? 0));
 }
@@ -516,26 +454,6 @@ function isFloatStyleResource(node) {
 		else if (attr.name.name === 'precedence') hasPrecedence = true;
 	}
 	return hasHref && hasPrecedence;
-}
-
-/**
- * Remove the scope's own blocks from a render item's native subtree (and, for
- * a code block or directive, leave nested lists to their own pass).
- *
- * @param {any} node
- * @param {any[]} own
- * @param {PassState} state
- * @returns {any}
- */
-function strip(node, own, state) {
-	if (!isTemplateNode(node)) return node;
-	const children = node.children;
-	if (!Array.isArray(children)) return node;
-	const next = mapList(children, (child) => {
-		if (child.type === 'JSXStyleElement' && own.includes(child)) return null;
-		return strip(child, own, state);
-	});
-	return next === children ? node : { ...node, children: next };
 }
 
 // --- sheets ------------------------------------------------------------------

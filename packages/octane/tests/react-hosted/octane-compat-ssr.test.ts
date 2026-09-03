@@ -37,23 +37,28 @@ const server = loadServerFixture(
 );
 
 // RFC tsrx-org/RFCs#1 island (S3.3): a theme declared in the island module, a
-// component applying it with one scope and a nested `@{}` scope.
+// component applying it with one scope (the block and the section are
+// fragment siblings, so the section carries it too) and a nested `@{}` scope.
 const THEMED_SCOPES_SOURCE = `
 	const theme = <style>
 		.themed { color: rgb(9, 8, 7); }
 	</style>;
 
 	export function SsrThemedScopes(props) @{
-		<section class="ssr-scopes">
+		<>
 			<style apply={theme}>
 				.ssr-scopes { color: rgb(1, 1, 1); }
 			</style>
-			<p class="themed">{'themed ' + props.name}</p>
-			@{
-				<p class="ssr-inner">inner</p>
-				<style>.ssr-inner { font-weight: bold; }</style>
-			}
-		</section>
+			<section class="ssr-scopes">
+				<p class="themed">{'themed ' + props.name}</p>
+				@{
+					<>
+						<p class="ssr-inner">inner</p>
+						<style>.ssr-inner { font-weight: bold; }</style>
+					</>
+				}
+			</section>
+		</>
 	}
 `;
 
