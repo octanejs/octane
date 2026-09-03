@@ -10344,9 +10344,6 @@ function compileServerComponent(node, ctx) {
 	const scoping = applyStyleScopes(node, ctx);
 	node = scoping.node;
 	const cssHash = scoping.cssHash;
-	// Imported themes this component applies: touched at the top of its body
-	// (see serverThemeTouchStatements) so their CSS precedes the component's.
-	ctx._serverThemeTouches = scoping.runtimeApplied;
 	const cssEntries = [...ctx.moduleCssInjections, ...ctx.cssInjections.slice(beforeCss)].sort(
 		(a, b) => a.order - b.order,
 	);
@@ -10372,6 +10369,12 @@ function compileServerComponent(node, ctx) {
 			cssEntries,
 			'opaque',
 			node.body?.type === 'JSXCodeBlock',
+			null,
+			false,
+			false,
+			// Imported themes this component applies are touched at the top of
+			// its body (serverThemeTouchStatements) so their CSS precedes its own.
+			scoping.runtimeApplied,
 		);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
@@ -10453,6 +10456,7 @@ function ssrCompileBody(
 	componentNs = null,
 	returnedFragmentTemplate = false,
 	returnedFragmentRoot = false,
+	themeTouches = [],
 ) {
 	const prevMapTemps = ctx.currentMapTemps;
 	ctx.currentMapTemps = [];
@@ -10468,6 +10472,7 @@ function ssrCompileBody(
 			componentNs,
 			returnedFragmentTemplate,
 			returnedFragmentRoot,
+			themeTouches,
 		);
 	} finally {
 		ctx.currentMapTemps = prevMapTemps;
@@ -10485,6 +10490,9 @@ function ssrCompileBodyWithMapTemps(
 	componentNs,
 	returnedFragmentTemplate,
 	returnedFragmentRoot,
+	// Imported themes the component's scopes apply — only the component body
+	// itself passes them; nested branch/loop helpers (ssrCompileSub) pass none.
+	themeTouches,
 ) {
 	const returnedOutput = node.body?.type === 'JSXCodeBlock' && hasOwnValueReturn(node);
 	const mapTemps = ctx.currentMapTemps;
@@ -10638,8 +10646,7 @@ function ssrCompileBodyWithMapTemps(
 	ctx._valueDirectiveLowering = prevValueDirectiveLowering;
 
 	const body = [];
-	body.push(...serverThemeTouchStatements(ctx._serverThemeTouches ?? [], ctx, node));
-	ctx._serverThemeTouches = null;
+	body.push(...serverThemeTouchStatements(themeTouches ?? [], ctx, node));
 	if (cssEntries && cssEntries.length) {
 		ctx.runtimeNeeded.add('injectStyle');
 		for (const entry of cssEntries) {
