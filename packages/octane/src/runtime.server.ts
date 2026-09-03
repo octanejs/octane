@@ -6221,8 +6221,11 @@ export interface RenderOptions {
 // Insert the hoisted head markup into `body`: before `</head>` when the render
 // produced a document (React-19 resource-hoisting shape), otherwise prepend it so
 // the caller/metaframework can place `html` in a document whose `<head>` then
-// contains the metadata. Empty head → body unchanged.
+// contains the metadata. A document root always gains a `<head>`; any other
+// body with nothing to splice is returned as is, decided from its first bytes so
+// the common fragment response is never scanned for a `</head>`.
 function spliceHead(body: string, head: string): string {
+	if (head === '' && !isDocumentRoot(body)) return body;
 	const headClose = body.indexOf('</head>');
 	if (headClose !== -1) return body.slice(0, headClose) + head + body.slice(headClose);
 	if (isDocumentRoot(body)) {
