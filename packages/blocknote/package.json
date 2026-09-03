@@ -24,18 +24,20 @@
   "module": "src/index.ts",
   "types": "src/index.ts",
   "files": [
-    "src",
+    "src/index.ts",
+    "src/editor/BlockNoteContext.ts",
+    "src/hooks/useBlockNoteEditor.ts",
+    "src/hooks/useCreateBlockNote.tsrx",
     "README.md"
   ],
-  "sideEffects": [
-    "./src/editor/styles.css"
-  ],
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "port-upstream": "node scripts/port-upstream.mjs node_modules/@blocknote/react",
-    "test": "vitest run --root ../.. --project blocknote"
+    "test": "vitest run --root ../.. --project blocknote",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.supported.json"
   },
   "dependencies": {
     "@blocknote/core": "catalog:default",
