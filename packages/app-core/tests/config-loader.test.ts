@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { build } from 'esbuild';
 import { createTempProject, type TempProject } from '../../octane/tests/_temp-project.js';
 import { loadOctaneConfig, loadOctaneConfigWithMetadata } from '../src/config-loader.js';
 
@@ -60,15 +61,40 @@ describe('loadOctaneConfig', () => {
 	});
 
 	it('server-compiles TSRX imported by the config evaluator', async () => {
+		// Config evaluation externalizes packages like a real application's Node
+		// process. Give the isolated project the current server runtime: compiled
+		// TSRX can import helpers even when its authored source has no imports.
+		write(
+			'node_modules/octane/package.json',
+			JSON.stringify({
+				name: 'octane',
+				type: 'module',
+				exports: { './server': './server.mjs' },
+			}),
+		);
+		await build({
+			entryPoints: [path.resolve(import.meta.dirname, '../../octane/src/server/index.ts')],
+			outfile: path.join(fixtureRoot, 'node_modules/octane/server.mjs'),
+			bundle: true,
+			format: 'esm',
+			platform: 'node',
+			target: 'node22',
+		});
 		write('ConfigMarker.tsrx', `export function ConfigMarker() @{ <span>ready</span> }\n`);
 		write(
 			'octane.config.ts',
-			`import { ConfigMarker } from './ConfigMarker.tsrx';\nexport default { platform: { env: { marker: typeof ConfigMarker } } };\n`,
+			`import { ConfigMarker } from './ConfigMarker.tsrx';
+import { renderToString } from 'octane/server';
+export default { platform: { env: { marker: typeof ConfigMarker, html: (await renderToString(ConfigMarker)).html } } };
+`,
 		);
 
 		const loaded = await loadOctaneConfigWithMetadata(fixtureRoot);
 		expect(loaded.config.platform.env.marker).toBe('function');
+		expect(loaded.config.platform.env.html).toBe('<span>ready</span>');
 		expect(loaded.dependencies).toContain(path.join(fixtureRoot, 'ConfigMarker.tsrx'));
+		expect(loaded.dependencies).toContain(path.join(fixtureRoot, 'node_modules/octane/server.mjs'));
+		expect(loaded.missingDependencies).toEqual([]);
 	});
 
 	it('attaches missing dependencies to config evaluation failures', async () => {

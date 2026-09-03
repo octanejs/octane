@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "db5756231dafe9fb22407678ad3fbfc5f9a5004d26ac07a4999516b53983c184"
+      "lockfileSha256": "b24e375c5be5c4017d420b7fde0c1c13163aed1525f2f42f6b220a02ee2ff9dd"
     }
   },
   "lanes": [
@@ -90,7 +90,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "c1f88b4b1f29ef55ad11e82275790074e94e4d97dd7331281a67eeb65f9e5a11"
+          "sha256": "5f9da371ba345e92bc84c150b554f2468744a64c726e8be66b34934906d0f22e"
         },
         {
           "path": "packages/zag/tests/upstream-vitest.config.ts",
@@ -111,7 +111,7 @@
       "environment": "workspace-node",
       "project": "zag",
       "evidenceOrigin": "upstream-suite",
-      "notes": "One-for-one adapted @zag-js/react 1.42.0 machine and nested-states suite identities against @octanejs/zag. The inventory generator and react-parity:validate enforce the normalized pristine\u2192adapted crosswalk; StrictMode identities stay pristine-only via audit/runtime-case-dispositions.json.",
+      "notes": "One-for-one adapted @zag-js/react 1.42.0 machine and nested-states suite identities against @octanejs/zag. The inventory generator and react-parity:validate enforce the normalized pristine→adapted crosswalk; StrictMode identities stay pristine-only via audit/runtime-case-dispositions.json.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/zag/audit/adapted-runtime.json"
@@ -254,7 +254,7 @@
       "environment": "workspace-node",
       "project": "zag-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode\u2192OctaneNode transformation.",
+      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode→OctaneNode transformation.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",

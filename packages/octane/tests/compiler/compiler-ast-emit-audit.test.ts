@@ -153,6 +153,8 @@ describe('compiler AST emit architecture', () => {
 			'MetaProperty',
 			'Program',
 			'ThrowStatement',
+			// @tsrx/core has a type-argument builder but no expression-instantiation builder.
+			'TSInstantiationExpression',
 		]);
 		const compilerRecordShapes = new Set([
 			'ActivityStatement',

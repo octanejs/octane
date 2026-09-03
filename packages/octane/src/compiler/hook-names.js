@@ -17,6 +17,7 @@ export const HOOK_NAMES = new Set([
 	'useSyncExternalStore',
 	// React 19 Actions bundle.
 	'useActionState',
+	'useFormState',
 	'useFormStatus',
 	'useOptimistic',
 ]);

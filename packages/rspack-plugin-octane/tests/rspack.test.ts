@@ -153,6 +153,7 @@ export const universalActivity = () => null;
 export const rendererRegion = (_owner, _child, body) => body;
 export const useBatch = () => undefined;
 export const warmChild = () => undefined;
+export const markWarm = (component) => component;
 `,
 		);
 		write(
@@ -338,7 +339,10 @@ ${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
 	globalThis.${slotArgumentCountGlobal} = args.length;
 	return [args[0]];
 };
-exports.hookSlots = () => 0;\n`,
+exports.hookSlots = () => 0;
+// Direct invocation has no ambient call-site slot to append.
+exports.manualHook = (hook) => hook;
+exports.invokeManualHook = (hook, receiver, args) => Reflect.apply(hook, receiver, args);\n`,
 		);
 		write(
 			root,
@@ -450,7 +454,7 @@ export function useValue(): number { return useState(1)[0]; }\n`,
 			);
 			const updated = await rebuild;
 			expect([...updated.compilation.fileDependencies]).toContain(manifest);
-			expect(hookInfo(updated)).toBeNull();
+			expect(hookInfo(updated)).toMatchObject({ transformKind: 'slots' });
 			await loadBundle(updated);
 			expect(globalThis[slotArgumentCountGlobal as keyof typeof globalThis]).toBe(1);
 		} finally {

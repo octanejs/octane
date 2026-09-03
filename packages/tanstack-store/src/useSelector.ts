@@ -52,7 +52,10 @@ export function useSelector<TSource, TSelected = NoInfer<TSource>>(
 		slot?: symbol,
 	]
 ): TSelected {
-	const [user, slot] = splitSlot(rest);
+	const [user, callerSlot] = splitSlot(rest);
+	// The authored fourth argument precedes any slot appended by the compiler adapter.
+	const explicitSlot = user[2];
+	const slot = typeof explicitSlot === 'symbol' ? explicitSlot : callerSlot;
 	const selector =
 		(user[0] as ((snapshot: TSource) => TSelected) | undefined) ??
 		((snapshot: TSource) => snapshot as unknown as TSelected);

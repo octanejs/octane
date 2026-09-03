@@ -644,7 +644,7 @@ export const capturedDeclarationValue = setupCapturedDeclaration();`;
 		});
 		const executable = result.code
 			.replace(
-				/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/,
+				/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/,
 				(_statement, specifiers: string) =>
 					`const { ${specifiers.replace(/\s+as\s+/g, ': ')} } = runtime;`,
 			)
@@ -910,7 +910,7 @@ function onTap(value) {
 		);
 		const executable = lowered.prelude
 			.replace(
-				/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/,
+				/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/,
 				(_statement, specifiers: string) =>
 					`const { ${specifiers.replace(/\s+as\s+/g, ': ')} } = runtime;`,
 			)
@@ -2135,7 +2135,7 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		expect(hmrOutput).not.toMatch(/,\s*null,\s*true/);
 
 		output = output.replace(
-			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>
 				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
 		);
@@ -2226,7 +2226,7 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 			hmr: false,
 		}).code;
 		output = output.replace(
-			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>
 				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
 		);
@@ -2285,7 +2285,7 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		).not.toMatch(/,\s*null,\s*false,\s*false,\s*true\s*\)/);
 
 		output = output.replace(
-			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>
 				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
 		);
@@ -2527,7 +2527,7 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		}).code;
 		expect(output).toMatch(/,\s*null,\s*true,\s*true,\s*void 0,\s*\w+\s*\)/);
 		output = output.replace(
-			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>
 				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
 		);
@@ -2840,7 +2840,7 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		expect(output).toContain('__profileComponent as __octaneProfileComponent');
 		expect(output).toContain('useBatch as _$useBatch');
 		expect(output).toContain('_$useBatch([__pu$0, __pu$1])');
-		expect(output).toContain('__warm:');
+		expect(output).toContain('_$markWarm(');
 		expect(output).toContain('import.meta.hot.accept');
 		expect(inspectProfileOutput(output).hooks.map(({ metadata }) => metadata)).toEqual(
 			expect.arrayContaining([
@@ -3164,7 +3164,7 @@ export function App() @{
 			hmr: false,
 		}).code;
 		output = output.replace(
-			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>
 				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
 		);
@@ -3244,7 +3244,7 @@ export function App() @{
 			hmr: false,
 		}).code;
 		output = output.replace(
-			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>
 				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
 		);
@@ -3332,7 +3332,7 @@ export function App() @{
 			hmr: false,
 		}).code;
 		output = output.replace(
-			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>
 				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
 		);
@@ -3391,7 +3391,7 @@ export function App() @{
 			hmr: false,
 		}).code;
 		output = output.replace(
-			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			/import\s*\{([^}]*)\}\s*from\s*["']octane\/universal["'];/g,
 			(_match, specifiers: string) =>
 				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
 		);

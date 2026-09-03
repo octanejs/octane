@@ -5,15 +5,16 @@
 // byte-for-byte. Production bundlers may additionally select the separate
 // whole-AST memo path, which preserves TypeScript and supplies a source map.
 //
-// This pass parses the module (for byte offsets), finds ONLY octane BASE hook
-// calls, and splices a trailing compiler slot into each — every other byte (all the
-// TS the printer can't handle) passes through verbatim. It does NOT wrap custom
-// hooks in `withSlot` (that's done by the `.tsrx`/`.tsx` CALLER, and wrapping a
-// hand-written binding that already forwards a slot would double-slot it). In
+// This pass parses the module (for byte offsets), slots Octane base hooks and
+// gives imported custom hooks their own withSlot boundary. Imported aliases can
+// point directly at a base hook, so the enclosing component's boundary alone
+// cannot distinguish their call sites. Local helpers retain their authored slot
+// policy; explicitly manual modules opt out of all injected slots. In
 // production it reserves a collision-free runtime range because these arbitrary
 // helpers can execute in a Scope alongside code from any other source module.
 
 import { parseModule } from '@tsrx/core';
+import { parseModule as parseFallbackModule } from '#octane/compiler-parser';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
 import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 import { METHOD_DEP_IMPORT, annotateHookCalls } from './hook-deps.js';
@@ -21,6 +22,7 @@ import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
 import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
+import { findManualHookProviders, manualHookWrapperParameters } from './manual-hooks.js';
 
 function importsNativeRenderer(ast) {
 	return ast.body.some(
@@ -42,6 +44,7 @@ function octaneHookLocals(ast, nativeReads = false) {
 	const locals = new Map();
 	let importsHook = false;
 	let hasOctaneImport = false;
+	let importsCustomHook = false;
 	for (const node of ast.body || []) {
 		if (
 			(node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') &&
@@ -51,6 +54,15 @@ function octaneHookLocals(ast, nativeReads = false) {
 			continue;
 		}
 		if (node.type !== 'ImportDeclaration') continue;
+		if (node.importKind === 'type') continue;
+		for (const sp of node.specifiers || []) {
+			if (
+				sp.importKind !== 'type' &&
+				(/^use[A-Z]/.test(sp.imported?.name ?? '') || /^use[A-Z]/.test(sp.local?.name ?? ''))
+			) {
+				importsCustomHook = true;
+			}
+		}
 		const native =
 			nativeReads &&
 			(node.source?.value === 'octane/signals/client' ||
@@ -76,7 +88,11 @@ function octaneHookLocals(ast, nativeReads = false) {
 				importsHook = true;
 		}
 	}
-	return { locals, importsHook, hasOctaneImport };
+	return {
+		locals,
+		importsHook: importsHook || (hasOctaneImport && importsCustomHook),
+		hasOctaneImport,
+	};
 }
 
 // Find only the disposable top-level root shape used by production entries:
@@ -158,7 +174,7 @@ function collectVoidRootCandidates(ast) {
 export function findVoidRootImports(source, id) {
 	let ast;
 	try {
-		ast = parseModule(source, id);
+		ast = parseHookSource(source, id).ast;
 	} catch {
 		return [];
 	}
@@ -236,7 +252,7 @@ export function findVoidComponentImports(source, id) {
 		ast = source;
 	} else {
 		try {
-			ast = parseModule(source, id);
+			ast = parseHookSource(source, id).ast;
 		} catch {
 			return [];
 		}
@@ -737,6 +753,19 @@ function collectStateGetterCalls(ast) {
 	return calls;
 }
 
+function collectStateGetterEdit(node, imported, st) {
+	if (!st.getterCalls.has(node) || !STATE_GETTER_HELPERS[imported]) return;
+	let helper = st.getterHelpers.get(imported);
+	if (helper === undefined) {
+		const base = `_$${STATE_GETTER_HELPERS[imported]}`;
+		helper = base;
+		let suffix = 0;
+		while (st.source.includes(helper)) helper = `${base}$${++suffix}`;
+		st.getterHelpers.set(imported, helper);
+	}
+	st.edits.push({ pos: node.callee.start, end: node.callee.end, text: helper });
+}
+
 // DFS in SOURCE ORDER, allocating a hook's slot id BEFORE descending into its args
 // — identical pre-order to rewriteHookCalls, so a base hook nested as an argument
 // (e.g. in a deps array) gets its own stable id. Collects insertion edits + the
@@ -954,6 +983,20 @@ function collectParallelUseEdits(ast, st) {
 	scan(ast.body, hookOwner(null, 'module'));
 }
 
+// Locate the call delimiter after the callee/type arguments without consuming
+// comments or TypeScript syntax. Parenthesized identifier callees are valid too.
+function callOpenParen(node, source) {
+	let pos = node.typeArguments?.end ?? node.callee.end;
+	while (pos < node.end) {
+		if (/\s/.test(source[pos]) || source[pos] === ')') pos++;
+		else if (source.startsWith('/*', pos)) pos = source.indexOf('*/', pos + 2) + 2;
+		else if (source.startsWith('//', pos)) {
+			while (pos < node.end && source[pos] !== '\n' && source[pos] !== '\r') pos++;
+		} else return source[pos] === '(' ? pos : -1;
+	}
+	return -1;
+}
+
 function walk(node, owner, st) {
 	if (!node || typeof node !== 'object') return;
 	if (Array.isArray(node)) {
@@ -976,10 +1019,24 @@ function walk(node, owner, st) {
 		node.type === 'FunctionDeclaration' && node.id ? hookOwner(node, node.id.name) : owner;
 
 	if (node.type === 'CallExpression') {
+		if (!st.manualSlots && node._octaneCustomHookCall) {
+			const open = callOpenParen(node, st.source);
+			if (open !== -1) {
+				const sym = allocHookSymbol(st, owner, node.callee.name, node._octaneCustomHookCall, node);
+				const helper = requireParallelHelper(st, 'withSlot');
+				// The path stack supplies identity without changing the authored
+				// argument list. An alias may point at a foreign hook whose omitted
+				// parameter has a default, rather than at Octane's trailing-slot ABI.
+				st.edits.push({ pos: node.start, text: `${helper}(${sym}, ` });
+				st.edits.push({ pos: open, end: open + 1, text: node.arguments.length ? ', ' : '' });
+			}
+		}
 		const imported =
 			node._octaneImportedHook ??
 			(st.nativeReads ? node._octaneHookRuntimeImportedHook : undefined);
+		collectStateGetterEdit(node, imported, st);
 		if (
+			!st.manualSlots &&
 			imported &&
 			(HOOK_NAMES.has(imported) || (st.nativeReads && NATIVE_SIGNAL_HOOK_NAMES.has(imported)))
 		) {
@@ -996,7 +1053,17 @@ function walk(node, owner, st) {
 					text: requireParallelHelper(st, 'nativePuMemo'),
 				});
 			}
-			if (inferred !== undefined) {
+			if (
+				(imported === 'useState' || imported === 'useRef') &&
+				node.arguments.some((arg) => arg.type === 'SpreadElement')
+			) {
+				const open = callOpenParen(node, st.source);
+				if (open !== -1) {
+					const helper = requireParallelHelper(st, 'withSlot');
+					st.edits.push({ pos: node.start, text: `${helper}(${sym}, ` });
+					st.edits.push({ pos: open, end: open + 1, text: ', ' });
+				}
+			} else if (inferred !== undefined) {
 				// The dependency callback is already the final user argument. Insert
 				// both the generated array and slot in one edit so equal-position edit
 				// ordering cannot reverse them. Dependency nodes retain original source
@@ -1016,11 +1083,11 @@ function walk(node, owner, st) {
 					text: `, [${deps}], ${sym}`,
 				});
 			} else if (node.arguments.length === 0) {
-				// `useId()` → `useId(_h$N)`. Symbols remain self-identifying when
-				// optional user arguments are omitted.
+				// State/ref initializers may themselves be Symbols. Reserve their
+				// authored position even when empty; other hooks keep their ABI.
 				st.edits.push({
 					pos: node.end - 1,
-					text: sym,
+					text: imported === 'useState' || imported === 'useRef' ? `undefined, ${sym}` : sym,
 				});
 			} else {
 				// `useState(0)` → `useState(0, _h$N)` — insert AFTER the last arg's end so
@@ -1029,17 +1096,6 @@ function walk(node, owner, st) {
 					pos: node.arguments[node.arguments.length - 1].end,
 					text: ', ' + sym,
 				});
-			}
-			if (st.getterCalls.has(node) && STATE_GETTER_HELPERS[imported]) {
-				let helper = st.getterHelpers.get(imported);
-				if (helper === undefined) {
-					const base = `_$${STATE_GETTER_HELPERS[imported]}`;
-					helper = base;
-					let suffix = 0;
-					while (st.source.includes(helper)) helper = `${base}$${++suffix}`;
-					st.getterHelpers.set(imported, helper);
-				}
-				st.edits.push({ pos: node.callee.start, end: node.callee.end, text: helper });
 			}
 		}
 	}
@@ -1051,8 +1107,59 @@ function walk(node, owner, st) {
 	}
 }
 
+function collectManualHookEdits(ast, providers, st) {
+	function visit(node) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const item of node) visit(item);
+			return;
+		}
+		if (providers.has(node)) {
+			if (node.type === 'FunctionDeclaration') {
+				const helper = requireParallelHelper(st, 'invokeManualHook');
+				const implementation = allocSlotName(st, `_$manual_${node.id.name}`);
+				const params = manualHookWrapperParameters(node)
+					.map((param) => param.name)
+					.join(', ');
+				st.edits.push({
+					pos: node.start,
+					text: `function ${node.id.name}(${params}) { return ${helper}(${implementation}, this, arguments); } `,
+				});
+				st.edits.push({ pos: node.id.start, end: node.id.end, text: implementation });
+			} else {
+				const helper = requireParallelHelper(st, 'manualHook');
+				st.edits.push({ pos: node.start, text: `/* @__PURE__ */ ${helper}(` });
+				st.edits.push({ pos: node.end, text: `, ${JSON.stringify(providers.get(node))})` });
+			}
+		}
+		for (const key in node) {
+			if (key === 'loc' || key === 'metadata' || key === 'parent' || key.startsWith('_octane'))
+				continue;
+			const value = node[key];
+			if (value && typeof value === 'object') visit(value);
+		}
+	}
+	visit(ast);
+}
+
+function parseHookSource(source, id) {
+	try {
+		return { ast: parseModule(source, id), canPrint: true };
+	} catch (error) {
+		if (!(error instanceof SyntaxError)) throw error;
+		// Some binding signatures (const generics in function types) need the
+		// native parser. Its object-TS dialect retains types and source offsets,
+		// but drops type parentheses required by the Program printer. Keep that
+		// AST on the surgical path so every authored type stays byte-for-byte.
+		return {
+			ast: parseFallbackModule(source, `${id.split(/[?#]/, 1)[0]}.object.ts`),
+			canPrint: false,
+		};
+	}
+}
+
 /**
- * Inject per-call-site hook slots into octane BASE hook calls in a plain
+ * Inject per-call-site hook slots into Octane base and imported/aliased hook calls in a plain
  * `.ts`/`.js` module. Returns `null` (pass through unchanged) when the module
  * imports no octane base hook or calls none.
  *
@@ -1064,8 +1171,8 @@ function walk(node, owner, st) {
  *   runtime-ranged Symbols. Profiling retains short described Symbols because
  *   hook metadata is keyed by Symbol identity.
  *   `inlineHookMemo: true` enables the production-client whole-AST memo path;
- *   the default remains surgical. `manualSlots: true` permits only that memo
- *   rewrite and never injects or changes the module's authored slot policy.
+ *   the default remains surgical. `manualSlots: true` permits memo and observed
+ *   getter rewrites without injecting or changing the authored slot policy.
  * @returns {{ code: string, map: any } | null}
  */
 export function slotHooks(source, id, options) {
@@ -1077,21 +1184,29 @@ export function slotHooks(source, id, options) {
 		);
 	}
 	let ast;
+	let canPrint;
 	try {
-		ast = parseModule(source, id);
+		({ ast, canPrint } = parseHookSource(source, id));
 	} catch {
 		return null; // let the normal pipeline surface the parse error
 	}
 	assertStrongMode(ast, source, id, options);
 	assertNativeReadDiagnostics(ast, source, id, options);
 	const importInfo = octaneHookLocals(ast, options?.nativeReads === true);
+	const manualProviders = options?.manualSlots ? findManualHookProviders(ast) : new Map();
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
 	const canSpecializeRoot =
+		!options?.manualSlots &&
 		!options?.hmr &&
 		!options?.profile &&
 		typeof options?.isVoidComponentImport === 'function' &&
 		importInfo.hasOctaneImport;
-	if (!importInfo.importsHook && !canSpecializeRoot && !nativeReadActivation) {
+	if (
+		!importInfo.importsHook &&
+		!canSpecializeRoot &&
+		!nativeReadActivation &&
+		!manualProviders.size
+	) {
 		return null;
 	}
 	// The parsed tree is never mutated: annotateHookCalls returns a COW-rebuilt
@@ -1114,6 +1229,7 @@ export function slotHooks(source, id, options) {
 	}
 	const getterCalls = importInfo.importsHook ? collectStateGetterCalls(ast) : new WeakSet();
 	if (
+		canPrint &&
 		options?.inlineHookMemo === true &&
 		environment === 'client' &&
 		!options?.hmr &&
@@ -1137,9 +1253,8 @@ export function slotHooks(source, id, options) {
 		});
 		if (inlined !== null) return inlined;
 	}
-	if (options?.manualSlots === true && !nativeReadActivation) return null;
-
 	const st = {
+		manualSlots: options?.manualSlots === true,
 		nativeReads: options?.nativeReads === true,
 		locals: importInfo.locals,
 		source,
@@ -1163,9 +1278,12 @@ export function slotHooks(source, id, options) {
 		voidRootName: null,
 	};
 	if (!st.hmr && !st.profile) st.slotBaseName = allocSlotName(st, '_hs$');
-	if (importInfo.importsHook && options?.manualSlots !== true) {
-		collectParallelUseEdits(ast, st);
+	if (importInfo.importsHook) {
+		if (!st.manualSlots) collectParallelUseEdits(ast, st);
 		for (const node of ast.body || []) walk(node, hookOwner(null, 'module'), st);
+	}
+	if (manualProviders.size) {
+		collectManualHookEdits(ast, findManualHookProviders(ast), st);
 	}
 	if (canSpecializeRoot) {
 		collectVoidRootEdits(ast, st, options.isVoidComponentImport);
@@ -1210,9 +1328,10 @@ export function slotHooks(source, id, options) {
 	const otherHelperImports = [...otherHelpers]
 		.map(([request, specifiers]) => `import { ${specifiers.join(', ')} } from '${request}';\n`)
 		.join('');
-	const profileImport = st.profile
-		? "import { __profileHook as _$__profileHook } from 'octane/profiling';\n"
-		: '';
+	const profileImport =
+		st.profile && !st.manualSlots
+			? "import { __profileHook as _$__profileHook } from 'octane/profiling';\n"
+			: '';
 	const slotBase =
 		!st.hmr && !st.profile && st.nextId > 0
 			? `const ${st.slotBaseName} = /* @__PURE__ */ ${st.hookSlotsName}(${st.nextId});\n`

@@ -17,6 +17,13 @@ async function renderRoute(url: string) {
 }
 
 describe('error decoder', () => {
+	it('keeps the published root-container diagnostic decodable after its replacement', async () => {
+		const { container } = await renderRoute('/errors/28');
+		expect(container.querySelector('.error-message')?.textContent).toBe(
+			'Target container is not a DOM element.',
+		);
+	});
+
 	it('preserves opaque and repeated production-error arguments', () => {
 		const parsed = parseWebsiteSearch(
 			'?args%5B%5D=%22quoted%22&args%5B%5D=null&args%5B%5D=true&note=01',

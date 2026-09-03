@@ -41,6 +41,23 @@ describe('scanSource', () => {
 		expect(scanSource('class Memoish extends PureComponent {}').classComponent).toBe(true);
 	});
 
+	it('classifies symbol-kind exports without requiring the corresponding renderer', () => {
+		const report = bridgeReportFromSource(`
+			var REACT_PROFILER_TYPE = Symbol.for('react.profiler');
+			exports.Profiler = REACT_PROFILER_TYPE;
+			exports.isProfiler = value => value.type === REACT_PROFILER_TYPE;
+		`);
+		expect(report.apis.find((row) => row.name === 'Profiler').status).toBe('rewrite');
+		expect(report.verdict).toBe('bridgeable-with-rewrites');
+		const renderer = bridgeReportFromSource(`
+			import { Profiler } from 'react';
+			var REACT_PROFILER_TYPE = Symbol.for('react.profiler');
+			exports.Profiler = REACT_PROFILER_TYPE;
+			export const View = () => <Profiler />;
+		`);
+		expect(renderer.verdict).toBe('needs-rework');
+	});
+
 	it('targets only React-style text-host onChange wiring', () => {
 		const source = `
 			function Demo(props) {

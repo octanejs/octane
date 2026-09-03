@@ -14,9 +14,19 @@ export function markComponentFlags<T extends Function>(
 	component: T,
 	flags: number,
 	name: string,
+	kind?: symbol,
 ): T {
 	Object.defineProperty(component, OCTANE_COMPONENT_FLAGS, { value: flags });
 	Object.defineProperty(component, 'name', { value: name, configurable: true });
+	if (kind !== undefined) {
+		// Introspection must recognize the same built-in in client and server
+		// modules, while descriptor hoisting must not brand an unrelated HOC.
+		Object.defineProperty(component, kind, {
+			get() {
+				return this === component;
+			},
+		});
+	}
 	return component;
 }
 

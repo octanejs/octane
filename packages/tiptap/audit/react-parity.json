@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "db5756231dafe9fb22407678ad3fbfc5f9a5004d26ac07a4999516b53983c184"
+      "lockfileSha256": "b24e375c5be5c4017d420b7fde0c1c13163aed1525f2f42f6b220a02ee2ff9dd"
     }
   },
   "lanes": [
@@ -278,7 +278,7 @@
         {
           "path": "packages/tiptap/typetests/assertions.md",
           "role": "support",
-          "sha256": "71ef34610923b32f20691c2eb1a1afeba9c3e7d78c712f2d27cc9a53774c3328"
+          "sha256": "5419fbacacf3fa0afa4e8d57072bbff77eafccf7484f553f6bdb413d3cd8bc9a"
         }
       ]
     },
@@ -316,7 +316,7 @@
         {
           "path": "packages/tiptap/typetests/adapted/tsconfig.json",
           "role": "support",
-          "sha256": "85342f8f26ac24e2ac20a4f02687b4d82db76a7796c8395a2aa4d6933a398ecd"
+          "sha256": "beaabe87105bd9ab2a564016e3a27094fbfb70d83faee0ce829d8800a696b672"
         },
         {
           "path": "packages/tiptap/audit/type-parity.json",
@@ -326,7 +326,7 @@
         {
           "path": "packages/tiptap/typetests/assertions.md",
           "role": "support",
-          "sha256": "71ef34610923b32f20691c2eb1a1afeba9c3e7d78c712f2d27cc9a53774c3328"
+          "sha256": "5419fbacacf3fa0afa4e8d57072bbff77eafccf7484f553f6bdb413d3cd8bc9a"
         }
       ]
     }

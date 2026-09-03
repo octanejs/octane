@@ -13,10 +13,11 @@ pnpm add @octanejs/testing-library
 The split mirrors RTL's own architecture (and
 `docs/react-library-compat-plan.md` §2): **`@testing-library/dom` is
 framework-agnostic and reused verbatim** — every query, `screen`, `within`,
-`waitFor`/`waitForElementToBeRemoved`, `findBy*`, `fireEvent`, `prettyDOM`,
+`waitFor`/`waitForElementToBeRemoved`, `findBy*`, `prettyDOM`,
 `configure` — while only react-testing-library's thin React layer is ported to
 octane: `render`, `cleanup`, `renderHook`, the `act` re-export, and the
-dom-testing-library config wiring (`eventWrapper`/`asyncWrapper`) that makes
+focus/blur event helpers and dom-testing-library config wiring
+(`eventWrapper`/`asyncWrapper`) that makes
 every dispatch/wait commit octane's scheduled work before your assertions run.
 
 ```ts
@@ -40,7 +41,8 @@ test('increments', () => {
   `RTL_SKIP_AUTO_CLEANUP=true` or import `@octanejs/testing-library/pure`)
 - `renderHook(callback, { initialProps, wrapper, ... }?)` → `{ result, rerender, unmount }`
 - `act` — octane's `act`, re-exported (always async; always `await` it)
-- `fireEvent`, `screen`, `waitFor`, `within`, … — dom-testing-library, re-exported
+- `screen`, `waitFor`, `within`, … — dom-testing-library, re-exported
+- `fireEvent` — DOM event helpers, with focus/blur pairs for delegated handlers
 
 ## Octane-specific surface
 
@@ -60,8 +62,8 @@ remounts — exactly RTL's rerender semantics.
 ## Differences from react-testing-library
 
 Octane dispatches **native, delegated DOM events — there is no synthetic event
-layer** — so `fireEvent` is dom-testing-library's, deliberately *without* RTL's
-React-specific remappings:
+layer**. `fireEvent` uses DOM Testing Library with focus/blur pairs for
+delegation. Other helpers keep native semantics:
 
 - **`fireEvent.change` fires a native `change`; `fireEvent.input` a native
   `input`.** In React, `onChange` handlers actually run off native `input`
@@ -85,18 +87,21 @@ React-specific remappings:
   sequence and automatic checked-state transition. `fireEvent.change(checkbox)`
   is only an explicit change dispatch; it does not model the click, activation,
   cancellation/rollback, or full event ordering.
-- **No enter/leave/focus double-dispatch.** RTL's `fireEvent.mouseEnter` also
-  fires `mouseover` (and `focus` fires `focusin`, `select` fires `keyup`, …)
-  purely to feed React's plugin system, which listens to different native
-  events than the handler names suggest. Octane's `onMouseEnter` receives the
-  real `mouseenter` (non-bubbling events are capture-delegated), so
-  `fireEvent.mouseEnter` alone triggers it — no compensation needed or wanted.
-- **Commit timing is wired, not synthesized.** Octane already commits discrete
-  events (`click`, `input`, `keydown`, …) synchronously; this package
-  additionally wraps *every* `fireEvent` dispatch in `flushSync` + an effect
-  drain via dom-testing-library's `eventWrapper`, so non-discrete/programmatic
-  events also commit — with their `useEffect` cascades — before `fireEvent`
-  returns (the equivalent of RTL's `act()` around each dispatch).
+- **Focus helpers emit both native focus events.** `fireEvent.focus` dispatches
+  `focus` then `focusin`; `fireEvent.blur` dispatches `blur` then `focusout`,
+  matching browser order.
+  Octane's delegated `onFocus`/`onBlur` handlers receive `focusin`/`focusout`.
+  Both events preserve the supplied options, including `relatedTarget`, except
+  that the paired `focusin`/`focusout` always bubbles. The return value is false
+  when the native `focus`/`blur` event was canceled.
+  Use `user.tab()` or native `focus()`/`blur()` to move actual focus.
+- **No enter/leave remapping.** `fireEvent.mouseEnter` dispatches a real
+  `mouseenter`, which Octane's capture delegation delivers directly. It does
+  not also dispatch `mouseover` to drive React's synthetic event plugins.
+- **Every dispatch commits before returning.** The DOM library's
+  `eventWrapper` runs every `fireEvent` dispatch in `flushSync` and then drains
+  effects, so the event's state updates and `useEffect` cascades are visible
+  before the helper returns.
 - **Host elements at the root are `container.firstChild`, like RTL.**
   `render(createElement('div', …))` goes through octane's value-position
   renderer, which mounts a lone host element anchorless (the element

@@ -74,7 +74,7 @@ export function TransApp(props) @{
 
 export function BlockChildrenApp(props) @{
 	<Trans i18n={props.i18n} i18nKey="rich">
-		Fallback
+		Fallback{' '}
 		<strong>source</strong>
 	</Trans>
 }

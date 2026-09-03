@@ -11,6 +11,43 @@ const SOURCE = `import { useMemo } from 'octane';
 export function useValue(value) { return useMemo(() => ({ value }), [value]); }`;
 
 describe('plain-module memo compilation', () => {
+	it.each([false, true])(
+		'preserves parenthesized types with native fallback %s',
+		(nativeFallback) => {
+			const source = `import { useMemo } from 'octane';
+${nativeFallback ? 'export type Preserve = <const T>(value: T) => T;' : ''}
+export type StateAction<S> = S | ((previous: S) => S);
+export function useValue(initial: boolean | (() => boolean), slot: symbol) {
+  return useMemo(() => typeof initial === 'function' ? initial() : initial, [initial], slot);
+}`;
+			const out = slotHooks(source, 'parenthesized-types.ts', {
+				manualSlots: true,
+				inlineHookMemo: true,
+			});
+			expect(out).not.toBeNull();
+			const compiled = ts.transpileModule(out!.code, {
+				fileName: 'parenthesized-types.ts',
+				reportDiagnostics: true,
+				compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext },
+			});
+			expect(compiled.diagnostics).toEqual([]);
+			const ast = ts.createSourceFile(
+				'parenthesized-types.ts',
+				out!.code,
+				ts.ScriptTarget.Latest,
+				true,
+			);
+			const action = ast.statements.find(
+				(statement): statement is ts.TypeAliasDeclaration =>
+					ts.isTypeAliasDeclaration(statement) && statement.name.text === 'StateAction',
+			)!;
+			expect(ts.isUnionTypeNode(action.type)).toBe(true);
+			if (ts.isUnionTypeNode(action.type)) {
+				expect(ts.isParenthesizedTypeNode(action.type.types[1])).toBe(true);
+			}
+		},
+	);
+
 	it('preserves the TypeScript module surface and emits an authored source map', () => {
 		const source = `/** @jsxImportSource octane */
 import { useMemo } from 'octane';
@@ -97,33 +134,37 @@ export function useValue<T>(value: T) {
 		}
 	});
 
-	it('does not infer dependencies in a manually slotted module', () => {
-		const source = `import { useMemo } from 'octane';
+	it.each([false, true])(
+		'does not infer dependencies in a manually slotted module (inline=%s)',
+		(inlineHookMemo) => {
+			const source = `import { useMemo } from 'octane';
 const slot = Symbol('value');
 function makeFactory(value) { return () => value; }
 export function useValue(value) {
   const always = useMemo(makeFactory(value));
   return useMemo(() => always, [always], slot);
 }`;
-		expect(slotHooks(source, 'manual.ts', { manualSlots: true, inlineHookMemo: false })).toBeNull();
-		const out = slotHooks(source, 'manual.ts', { manualSlots: true, inlineHookMemo: true });
-		expect(out?.map).not.toBeNull();
-		const ast = ts.createSourceFile('manual.ts', out!.code, ts.ScriptTarget.Latest, true);
-		const omitted: ts.CallExpression[] = [];
-		function visit(node: ts.Node) {
-			if (
-				ts.isCallExpression(node) &&
-				ts.isIdentifier(node.expression) &&
-				node.expression.text === 'useMemo' &&
-				node.arguments.length === 1
-			) {
-				omitted.push(node);
+			const out = slotHooks(source, 'manual.ts', { manualSlots: true, inlineHookMemo });
+			expect(out).not.toBeNull();
+			if (inlineHookMemo) expect(out!.map).not.toBeNull();
+			else expect(out!.map).toBeNull();
+			const ast = ts.createSourceFile('manual.ts', out!.code, ts.ScriptTarget.Latest, true);
+			const omitted: ts.CallExpression[] = [];
+			function visit(node: ts.Node) {
+				if (
+					ts.isCallExpression(node) &&
+					ts.isIdentifier(node.expression) &&
+					node.expression.text === 'useMemo' &&
+					node.arguments.length === 1
+				) {
+					omitted.push(node);
+				}
+				ts.forEachChild(node, visit);
 			}
-			ts.forEachChild(node, visit);
-		}
-		visit(ast);
-		expect(omitted).toHaveLength(1);
-	});
+			visit(ast);
+			expect(omitted).toHaveLength(1);
+		},
+	);
 
 	it('retains factories and owners whose execution scope cannot be inlined', () => {
 		for (const body of [
@@ -187,7 +228,7 @@ export function useValue(value) { return useMemo(() => value, [value]); }`;
 		expect(memoCalls(ordinary)).toBe(0);
 	});
 
-	it('runs memo-only optimization for manual source packages and honors the hard opt-out', () => {
+	it('keeps authored manual hook calls when memo optimization is disabled and honors the hard opt-out', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-manual-memo-'));
 		try {
 			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
@@ -213,13 +254,37 @@ export function useValue(value) { return useMemo(() => value, [value]); }`;
 			const compiler = createOctaneCompiler({ root });
 			const enabled = compiler.transform(source, id);
 			expect(enabled?.map).not.toBeNull();
-			expect(compiler.transform(source, id, { inlineHookMemo: false })?.code ?? source).toBe(
-				source,
-			);
 			const optedOut = `// octane-no-slot\n${source}`;
 			expect(compiler.transform(optedOut, id)?.code ?? optedOut).toBe(optedOut);
-			for (const mode of [{ dev: true }, { hmr: true }, { environment: 'server' as const }]) {
-				expect(compiler.transform(source, id, mode)?.code ?? source).toBe(source);
+			for (const mode of [
+				{ inlineHookMemo: false },
+				{ dev: true },
+				{ hmr: true },
+				{ environment: 'server' as const },
+			]) {
+				const output = compiler.transform(source, id, mode);
+				expect(output?.map).toBeNull();
+				const ast = ts.createSourceFile(id, output!.code, ts.ScriptTarget.Latest, true);
+				const calls: Array<[string, number, string]> = [];
+				function visit(node: ts.Node) {
+					if (
+						ts.isCallExpression(node) &&
+						ts.isIdentifier(node.expression) &&
+						(node.expression.text === 'useState' || node.expression.text === 'useMemo')
+					) {
+						calls.push([
+							node.expression.text,
+							node.arguments.length,
+							node.arguments.at(-1)!.getText(ast),
+						]);
+					}
+					ts.forEachChild(node, visit);
+				}
+				visit(ast);
+				expect(calls).toEqual([
+					['useState', 2, 'stateSlot'],
+					['useMemo', 3, 'memoSlot'],
+				]);
 			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });

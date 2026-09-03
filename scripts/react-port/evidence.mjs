@@ -660,12 +660,13 @@ function typeContainsUnsafe(type, checker, seen = new Set()) {
 		if (typeContainsUnsafe(checker.getReturnTypeOfSignature(signature), checker, seen)) return true;
 		for (const parameter of signature.parameters) {
 			const declaration = parameter.valueDeclaration ?? parameter.declarations?.[0];
-			if (
-				declaration &&
-				typeContainsUnsafe(checker.getTypeOfSymbolAtLocation(parameter, declaration), checker, seen)
-			) {
-				return true;
-			}
+			if (!declaration) continue;
+			const parameterType = checker.getTypeOfSymbolAtLocation(parameter, declaration);
+			// Classifiers can safely accept an arbitrary value without erasing their
+			// return contract. Only a direct unknown parameter has that meaning;
+			// any, nested unknown shapes, and unknown returns still fail below.
+			if (parameterType.flags & ts.TypeFlags.Unknown) continue;
+			if (typeContainsUnsafe(parameterType, checker, seen)) return true;
 		}
 	}
 	if (type.flags & ts.TypeFlags.Object) {
@@ -1446,14 +1447,31 @@ export function assertApprovedGateCommand(
 	gateIds,
 	commandArguments,
 	node,
-	{ workspaceRoot = null } = {},
+	{ workspaceRoot = null, manifestPath = null, nodeId = null } = {},
 ) {
 	const bindingDirectory = node.bindingDirectory?.replaceAll('\\', '/');
 	if (!bindingDirectory) throw new Error('Evidence node has no graph-planned binding directory');
 	let packageTestPlan = null;
+	const absenceCommand = Boolean(
+		workspaceRoot &&
+		manifestPath &&
+		nodeId &&
+		isExactCommand(commandArguments, [
+			'node',
+			'scripts/react-port/upstream-types-absence.mjs',
+			'--package-dir',
+			bindingDirectory,
+			'--manifest',
+			manifestPath,
+			'--node',
+			nodeId,
+		]),
+	);
 	for (const gateId of gateIds) {
 		let approved = false;
-		if (gateId === 'package-tests') {
+		if (absenceCommand && ['upstream-types-pristine', 'upstream-types-adapted'].includes(gateId)) {
+			approved = true;
+		} else if (gateId === 'package-tests') {
 			approved = isExactCommand(commandArguments, ['pnpm', '--dir', bindingDirectory, 'test']);
 		} else if (gateId === 'public-exports') {
 			approved = isExactCommand(commandArguments, [
@@ -1495,6 +1513,7 @@ export function assertApprovedGateCommand(
 			inspectPublicExports(bindingPackageDirectory(node, workspaceRoot));
 		}
 		if (
+			!absenceCommand &&
 			workspaceRoot &&
 			[
 				'upstream-types-pristine',
@@ -1635,6 +1654,8 @@ async function operate(
 		}
 		const commandValidation = assertCommand(gateIds, commandArguments, node, {
 			workspaceRoot: manifest.workspaceRoot ?? process.cwd(),
+			manifestPath: path.join(batchDirectory, 'manifest.json'),
+			nodeId: options.node,
 		});
 		const packageTestPlan = gateIds.includes('package-tests')
 			? (commandValidation?.packageTestPlan ??

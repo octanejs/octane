@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { motionValue } from 'motion';
 import { mount, nextPaint } from '../_helpers';
 import { MVBox } from '../_fixtures/mv.tsrx';
@@ -8,6 +8,24 @@ import { StyleXY } from '../_fixtures/style-xy.tsrx';
 import { removeTransformFn, patchTransformFn } from '../../src/useMotionValue';
 
 describe('useMotionValue', function useMotionValueSuite() {
+	it('retains subscriptions when a render keeps the same MotionValue inventory', async () => {
+		const x = motionValue(10);
+		const subscribe = vi.spyOn(x, 'on');
+		const r = mount(StyleXLater, { x });
+		try {
+			await nextPaint();
+			expect(subscribe).toHaveBeenCalledOnce();
+			r.update(StyleXLater, { x });
+			await nextPaint();
+			expect(subscribe).toHaveBeenCalledOnce();
+			x.set(20);
+			expect(r.find('#box').style.transform).toBe('translateX(20px)');
+		} finally {
+			r.unmount();
+			subscribe.mockRestore();
+		}
+	});
+
 	it('binds a MotionValue to style and updates the element without a re-render', async function bindsWithoutRerender() {
 		let x: any;
 		const r = mount(MVBox, {

@@ -131,7 +131,7 @@ describe('scheduled commits after synchronous DOM work', () => {
 
 				expect(log).toEqual(['A:body', 'B:body', 'C:body']);
 				root.unmount();
-				expect(log).toEqual(['A:body', 'B:body', 'C:body']);
+				expect(log).toEqual(['A:body', 'B:body', 'C:body', 'A:cleanup', 'B:cleanup', 'C:cleanup']);
 				flushEffects();
 				expect(log).toEqual(['A:body', 'B:body', 'C:body', 'A:cleanup', 'B:cleanup', 'C:cleanup']);
 			} finally {

@@ -1635,6 +1635,18 @@ export function useBatch(items: any[], warm?: () => void): void {
 }
 
 export function warmMemo(): void {}
+
+/** Compiler ABI: warm plans belong only to the component that declared them. */
+export function markWarm<T extends Function>(component: T, plan: unknown): T {
+	Object.defineProperty(component, '__warm', {
+		configurable: true,
+		get() {
+			return this === component ? plan : undefined;
+		},
+	});
+	return component;
+}
+
 export function warmChild(component: any, props: any): void {
 	if (FIRST_SCREEN_WARM_DEPTH === 0 || component == null) return;
 	const plan = component.__warm;

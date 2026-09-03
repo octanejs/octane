@@ -308,14 +308,34 @@ describe('profile build render causes', () => {
 		const mounted = mount(TransitionRebaseApp, { gate });
 		mounted.click('#stage');
 		mounted.click('#urgent');
+		expect(mounted.find('#urgent').textContent).toBe('0');
 		profiler.clear();
 
 		await act(() => resolveGate());
 
 		const causes = profiler.getEvents().flatMap((event) => event.causes);
+		expect(mounted.find('#urgent').textContent).toBe('0');
 		expect(causes.some((entry) => entry.type === 'state')).toBe(false);
 		expect(causes.some((entry) => entry.type === 'transition-pending')).toBe(true);
 
+		mounted.unmount();
+	});
+
+	it('reports a transition state cause when the settled value changes', async () => {
+		let resolveGate!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			resolveGate = resolve;
+		});
+		const mounted = mount(TransitionRebaseApp, { gate });
+		mounted.click('#stage');
+		expect(mounted.find('#urgent').textContent).toBe('1');
+		profiler.clear();
+
+		await act(() => resolveGate());
+
+		expect(mounted.find('#urgent').textContent).toBe('0');
+		const causes = profiler.getEvents().flatMap((event) => event.causes);
+		expect(causes.some((entry) => entry.type === 'state')).toBe(true);
 		mounted.unmount();
 	});
 

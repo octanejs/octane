@@ -893,7 +893,7 @@ describe('template directives in a returned fragment', () => {
 		container.remove();
 	});
 
-	it('preserves returned-fragment head diagnostics', () => {
+	it('accepts document head elements inside a returned fragment', () => {
 		for (const mode of ['client', 'server'] as const) {
 			expect(() =>
 				compile(
@@ -901,7 +901,7 @@ describe('template directives in a returned fragment', () => {
 					`returned-head-${mode}.tsrx`,
 					{ mode },
 				),
-			).toThrow(/<head>.*not supported/);
+			).not.toThrow();
 		}
 	});
 

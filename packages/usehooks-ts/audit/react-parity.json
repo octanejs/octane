@@ -11,10 +11,7 @@
     "integrity": "sha256:bc0080ec78244f8d7adeddcad45b270d726e599e6ead2e8183b42bbf97f1701a",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/usehooks-ts/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "db5756231dafe9fb22407678ad3fbfc5f9a5004d26ac07a4999516b53983c184"
+      "lockfileSha256": "b24e375c5be5c4017d420b7fde0c1c13163aed1525f2f42f6b220a02ee2ff9dd"
     }
   },
   "lanes": [
@@ -68,7 +65,7 @@
         {
           "path": "packages/usehooks-ts/tests/_fixtures/hooks.tsrx",
           "role": "support",
-          "sha256": "36d54b6596ff98d94dbd13c2a8103bbba967fbfad2866eb9cec22078bdc7aad2"
+          "sha256": "fb0addc15f92ae1c7d4bc75ed1790310ad946699a04593c84cea4b4080af1f8d"
         },
         {
           "path": "packages/usehooks-ts/tests/differential/_setup.ts",

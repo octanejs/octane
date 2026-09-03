@@ -72,10 +72,9 @@ render nothing, or first render after mount all behave as they do upstream. The
 one difference: a child that stays truthy while never rendering anything gets
 Mapbox's default pin here, where upstream leaves an empty, invisible element.
 
-**Teardown is not synchronous with unmount.** Effect cleanups run on the passive
-drain that follows `root.unmount()`, so `map.remove()` — and with it the WebGL
-context and worker pool — happens one drain later. Do not assume the map's
-resources are released the instant `unmount()` returns.
+**Root teardown releases resources synchronously.** `root.unmount()` drains
+effect cleanups, so `map.remove()` releases the WebGL context and worker pool
+before the call returns.
 
 **Out of scope.** `react-map-gl/mapbox-legacy` (mapbox-gl v1) and
 `@vis.gl/react-maplibre`.

@@ -12,6 +12,11 @@
       "reason": "Checks Octane async-wrapper and timer integration."
     },
     {
+      "path": "packages/testing-library/tests/audit-focus-events.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks native focus/blur delegation, event options and cancellation, commit timing, and the unchanged DOM-only helper."
+    },
+    {
       "path": "packages/testing-library/tests/cleanup.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane root and effect cleanup."
@@ -30,6 +35,11 @@
       "path": "packages/testing-library/tests/events.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks fireEvent commit timing against Octane's native event model."
+    },
+    {
+      "path": "packages/testing-library/tests/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks that both Octane testing-library entrypoints preserve the complete DOM Testing Library query surface."
     },
     {
       "path": "packages/testing-library/tests/hydrate.test.ts",

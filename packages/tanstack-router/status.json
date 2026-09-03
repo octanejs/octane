@@ -10,6 +10,7 @@
   "verified": "2026-08-02",
   "notes": [
     "The framework-neutral runtime dependency is `@tanstack/router-core@1.171.15`.",
+    "Same-route search navigations now render store updates urgently: a route that suspends on the new search input can show its pending fallback. To retain stale content, use `useDeferredValue` on the search input consumed by the suspending content; the previous automatic same-route hold no longer applies.",
     "The TSRX-aware generator plugin is exported from `@octanejs/tanstack-router/generator-plugin` for `@octanejs/tanstack-start`'s package-owned generator.",
     "React parity provenance is still recorded-unverified until pristine-upstream and one-for-one adapted suite lanes are fetched from the pinned tag; differential harness evidence is landed separately."
   ],

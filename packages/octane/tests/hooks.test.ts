@@ -45,7 +45,7 @@ describe('useState', () => {
 		r.unmount();
 	});
 
-	it('rebases functional Action updates while retaining later replacement values', async () => {
+	it('replays functional Action updates and replacements in dispatch order', async () => {
 		let setValue!: (next: number | ((previous: number) => number)) => void;
 		let getValue!: () => number;
 		let releaseFirst!: () => void;
@@ -74,18 +74,18 @@ describe('useState', () => {
 			expect(getValue()).toBe(11);
 			flushSync(() => setValue(5));
 			expect(r.find('span').textContent).toBe('5');
-			expect(getValue()).toBe(15);
+			expect(getValue()).toBe(5);
 
 			await act(() => releaseFirst());
 			expect(r.find('span').textContent).toBe('5');
 			expect(getValue()).toBe(42);
 			flushSync(() => setValue(9));
 			expect(r.find('span').textContent).toBe('9');
-			expect(getValue()).toBe(42);
+			expect(getValue()).toBe(9);
 
 			await act(() => releaseFinal());
-			expect(r.find('span').textContent).toBe('42');
-			expect(getValue()).toBe(42);
+			expect(r.find('span').textContent).toBe('9');
+			expect(getValue()).toBe(9);
 		} finally {
 			releaseFirst();
 			releaseFinal();
@@ -122,10 +122,10 @@ describe('useState', () => {
 			expect(getValue()).toBe(staged);
 			flushSync(() => setValue(() => urgent));
 			expect(r.find('span').textContent).toBe('urgent');
-			expect(getValue()).toBe(staged);
+			expect(getValue()).toBe(urgent);
 			await act(() => release());
-			expect(r.find('span').textContent).toBe('staged');
-			expect(getValue()).toBe(staged);
+			expect(r.find('span').textContent).toBe('urgent');
+			expect(getValue()).toBe(urgent);
 		} finally {
 			release();
 			await act(() => {});

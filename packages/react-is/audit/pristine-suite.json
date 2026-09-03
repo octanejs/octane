@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "project": "react-is-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "REACT_IS_PRISTINE_ROOT",
+  "copy": ["src"]
+}

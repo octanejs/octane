@@ -3,7 +3,7 @@
 // (opacity, zIndex, lineHeight, flex, …). Strings pass through untouched.
 
 // Dynamic object style — goes through setStyle → applyStyleProperty at runtime.
-export function DynStyle(props) @{
+export function DynStyle(props: { s: any }) @{
 	<div id="d" style={props.s}>{'x'}</div>
 }
 
@@ -21,4 +21,8 @@ export function StaticStyle() @{
 			backgroundColor: 'red',
 		}}
 	>{'x'}</div>
+}
+
+export function StaticStyleAliases() @{
+	<div id="aliases" style={{ scale: 1.5, cssFloat: 'left' }}>style</div>
 }

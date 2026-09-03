@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { mount, act, createLog } from './_helpers';
-import { flushSync } from '../src/index.js';
+import { createRoot, flushSync } from '../src/index.js';
 import {
 	TransitionBasics,
 	DeferredSpawnListenerApp,
@@ -700,14 +700,7 @@ describe('Transitions — multiple-suspend edge cases', () => {
 		r.unmount();
 	});
 
-	it("deferred-swap 'deferred lane' tag does not leak to useTransition listener renders", async () => {
-		// Regression (PR review): spawnDeferredSwap's DEFERRED_SPAWN flag must
-		// wrap ONLY the scheduleRender for the deferred block. startTransition
-		// synchronously notifies useTransition listeners (tickTransitionCount)
-		// before running its callback; those listeners scheduleRender their own
-		// blocks. If the flag covered the whole startTransition call, the
-		// probe's render would be tagged as a deferred pass and a
-		// useDeferredValue mounting in it would wrongly skip its preview state.
+	it('deferred swaps leave unrelated transition hooks idle', async () => {
 		const log = createLog();
 		let setValue!: (v: number) => void;
 		const r = mount(DeferredSpawnListenerApp, {
@@ -715,20 +708,13 @@ describe('Transitions — multiple-suspend edge cases', () => {
 			log: log.push,
 		});
 		await act(() => {});
-		expect(r.find('#deferred').textContent).toBe('Deferred: 1');
-		expect(r.find('#probe-idle').textContent).toBe('idle');
-
-		// Urgent update → useDeferredValue defers and spawns its swap. The swap's
-		// startTransition flips isPending true, mounting the probe's inner
-		// useDeferredValue in the SAME flush as the deferred pass.
 		flushSync(() => setValue(2));
 		expect(r.find('#deferred').textContent).toBe('Deferred: 1');
 		await act(() => {});
 		expect(r.find('#deferred').textContent).toBe('Deferred: 2');
-		const entries = log.drain();
+		expect(r.find('#probe-idle').textContent).toBe('idle');
+		expect(log.drain()).toEqual([]);
 		r.unmount();
-		// The probe is NOT part of the deferred pass — its preview must render.
-		expect(entries[0]).toBe('render:Preview');
 	});
 });
 
@@ -759,23 +745,28 @@ describe('useTransition — async actions (React 19)', () => {
 		r.unmount();
 	});
 
-	it('drops isPending when the async action promise rejects (decrements exactly once)', async () => {
+	it('reports rejected actions through their owning root and unmounts the failed tree', async () => {
 		const gate = deferred<void>();
-		const r = mount(AsyncStartTransition, { gate: gate.promise });
-
-		r.click('#go');
-		expect(r.find('#pending').textContent).toBe('pending');
-		await act(() => {});
-		expect(r.find('#pending').textContent).toBe('pending');
-
-		// Reject the gate — the action's promise rejects; isPending must still
-		// drop (settle handles both fulfil and reject), and the setter never ran.
-		await act(() => {
-			gate.reject(new Error('action failed'));
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const errors: unknown[] = [];
+		const root = createRoot(container, {
+			onUncaughtError: (error) => {
+				errors.push(error);
+			},
 		});
-		expect(r.find('#pending').textContent).toBe('idle');
-		expect(r.find('#n').textContent).toBe('0');
-		r.unmount();
+		try {
+			root.render(AsyncStartTransition, { gate: gate.promise });
+			flushSync(() => container.querySelector<HTMLButtonElement>('#go')!.click());
+			expect(container.querySelector('#pending')!.textContent).toBe('pending');
+			const error = new Error('action failed');
+			await act(() => gate.reject(error));
+			expect(errors).toEqual([error]);
+			expect(container.textContent).toBe('');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
 	});
 
 	it('post-await setters keep transition priority (suspending render holds prior DOM, no fallback)', async () => {

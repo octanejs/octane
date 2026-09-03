@@ -41,10 +41,15 @@ export function useObservable<T, TDefault>(
 	observableOrFactory: InteropableObservable<T> | ObservableFactory<T>,
 	...rest: [unknown?, unknown?, symbol?]
 ): T | TDefault | undefined {
-	const [args, slot] = splitSlot(rest);
-	const deps = typeof observableOrFactory === 'function' ? ((args[0] as unknown[]) ?? []) : [];
-	const defaultResult = (typeof observableOrFactory === 'function' ? args[1] : args[0]) as
-		TDefault | undefined;
+	const [args, callerSlot] = splitSlot(rest);
+	const isFactory = typeof observableOrFactory === 'function';
+	// An authored explicit slot can precede the compiler's call-site slot.
+	// Keep that identity when one helper reads multiple observables, while
+	// preserving Symbol defaults in their public argument positions.
+	const explicitSlot = args[isFactory ? 2 : 1];
+	const slot = typeof explicitSlot === 'symbol' ? explicitSlot : callerSlot;
+	const deps = isFactory ? ((args[0] as unknown[]) ?? []) : [];
+	const defaultResult = args[isFactory ? 1 : 0] as TDefault | undefined;
 	const monitor = useRef(
 		{
 			hasResult: false,

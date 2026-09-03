@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**120 publishable package(s), including 106 framework binding(s) and 3 framework integration(s).**
+**121 publishable package(s), including 107 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -71,6 +71,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.51` | 1 |
 | `@octanejs/rainbowkit` | [`packages/rainbowkit`](../packages/rainbowkit) | framework binding | `0.0.32` | 2 |
 | `@octanejs/react-error-boundary` | [`packages/react-error-boundary`](../packages/react-error-boundary) | framework binding | `0.1.33` | 2 |
+| `@octanejs/react-is` | [`packages/react-is`](../packages/react-is) | framework binding | `0.1.0` | 1 |
 | `@octanejs/react-map-gl` | [`packages/react-map-gl`](../packages/react-map-gl) | framework binding | `0.0.24` | 2 |
 | `@octanejs/recharts` | [`packages/recharts`](../packages/recharts) | framework binding | `0.1.49` | 1 |
 | `@octanejs/redux` | [`packages/redux`](../packages/redux) | framework binding | `0.1.49` | 1 |

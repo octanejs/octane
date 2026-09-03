@@ -4,7 +4,6 @@
   "divergences": [
     "<Source> delivers its generated id to child layers through context rather than cloneElement, so the id reaches any descendant <Layer> rather than only direct children. It still overrides an explicitly set source, as cloneElement did.",
     "Map, Marker, Popup and GeolocateControl take their ref as an ordinary prop; Octane has no forwardRef. `<Map ref={mapRef} />` is unchanged.",
-    "Effect cleanups run on the passive drain after root.unmount() rather than inside it, so the map's WebGL context and worker pool are released one drain later.",
     "Marker picks between its own element and Mapbox's default pin from what its children actually rendered, because a compiled children block cannot be inspected the way React.Children.forEach inspects descriptors. Children that render something, render nothing, or first render after mount all match upstream; a child that stays truthy while rendering nothing forever gets the default pin here and an empty, invisible element upstream.",
     "react-map-gl/mapbox-legacy (mapbox-gl v1) and @vis.gl/react-maplibre are out of scope."
   ],

@@ -378,6 +378,19 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				if (isMotionValue(v) || isTransformKey(key)) styleMvDeps.push(key, v);
 			}
 		}
+		// The style inventory can grow or shrink; a hook dependency tuple cannot.
+		// Retain an equal inventory so ordinary renders do not churn subscriptions.
+		const previousStyleMvDeps: any[] | undefined = latest.styleMvDeps;
+		let sameMotionStyles = previousStyleMvDeps?.length === styleMvDeps.length;
+		if (sameMotionStyles) {
+			for (let i = 0; i < styleMvDeps.length; i++) {
+				if (!Object.is(previousStyleMvDeps![i], styleMvDeps[i])) {
+					sameMotionStyles = false;
+					break;
+				}
+			}
+		}
+		if (!sameMotionStyles) latest.styleMvDeps = styleMvDeps;
 		useLayoutEffect(
 			() => {
 				// Clear only keys this effect previously managed that are absent from the
@@ -426,7 +439,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					for (const cleanup of cleanups) cleanup();
 				};
 			},
-			styleMvDeps,
+			[latest.styleMvDeps],
 			MV,
 		);
 

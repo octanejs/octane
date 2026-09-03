@@ -3,7 +3,7 @@
  *
  * Strategy (docs/react-library-compat-plan.md §2): `@testing-library/dom` is
  * framework-agnostic, so it is depended on VERBATIM and re-exported wholesale
- * (queries, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, …). Only
+ * (queries, `screen`, `within`, `waitFor`, `prettyDOM`, …). Only
  * react-testing-library's thin React layer is ported here, onto octane:
  *
  *  - `render` / `cleanup` / `renderHook` mount through octane's `createRoot`
@@ -43,6 +43,7 @@ import {
 } from '@testing-library/dom';
 import type { BoundFunctions, Queries } from '@testing-library/dom';
 import { getIsOctaneActEnvironment, setOctaneActEnvironment } from './act-environment';
+import { fireEvent as octaneFireEvent } from './fire-event';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // dom-testing-library config wiring (RTL pure.js does the same three hooks).
@@ -87,13 +88,8 @@ configureDTL({
 			setOctaneActEnvironment(previousActEnvironment);
 		}
 	},
-	// Every `fireEvent` dispatch runs through here. Octane's DISCRETE delegated
-	// events (click/input/keydown/…) already commit synchronously on their own
-	// (maybeFlushDiscrete → flushSync), but fireEvent also dispatches event types
-	// with no discrete path — non-delegated or programmatic events whose updates
-	// would otherwise sit queued until the next microtask, i.e. after the test's
-	// assertion. flushSync commits those too, and the passive drain mirrors RTL's
-	// act(): effects scheduled by the event have run before fireEvent returns.
+	// Every fireEvent dispatch commits its updates and drains passive effects
+	// before returning, including programmatic and non-discrete events.
 	eventWrapper: (cb) => {
 		let result: unknown;
 		flushSync(() => {
@@ -407,10 +403,93 @@ export function renderHook<Result, Props = undefined>(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports — everything dom-testing-library ships, plus the octane layer.
-// `fireEvent` is dom-testing-library's own (see fire-event.ts for why there is
-// deliberately NO react-testing-library-style event remapping on top).
+// fireEvent adds native focus/blur pairs for delegated focus handlers.
+// Other convenience helpers retain DOM Testing Library's event semantics.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export * from '@testing-library/dom';
-export { fireEvent } from './fire-event';
+export const fireEvent = octaneFireEvent;
+// Explicit value exports keep older SSR module runners from replacing our
+// focus-aware fireEvent with the DOM helper during wildcard re-export.
+export {
+	buildQueries,
+	configure,
+	createEvent,
+	findAllByAltText,
+	findAllByDisplayValue,
+	findAllByLabelText,
+	findAllByPlaceholderText,
+	findAllByRole,
+	findAllByTestId,
+	findAllByText,
+	findAllByTitle,
+	findByAltText,
+	findByDisplayValue,
+	findByLabelText,
+	findByPlaceholderText,
+	findByRole,
+	findByTestId,
+	findByText,
+	findByTitle,
+	getAllByAltText,
+	getAllByDisplayValue,
+	getAllByLabelText,
+	getAllByPlaceholderText,
+	getAllByRole,
+	getAllByTestId,
+	getAllByText,
+	getAllByTitle,
+	getByAltText,
+	getByDisplayValue,
+	getByLabelText,
+	getByPlaceholderText,
+	getByRole,
+	getByTestId,
+	getByText,
+	getByTitle,
+	getConfig,
+	getDefaultNormalizer,
+	getElementError,
+	getNodeText,
+	getQueriesForElement,
+	getRoles,
+	getSuggestedQuery,
+	isInaccessible,
+	logDOM,
+	logRoles,
+	prettyDOM,
+	prettyFormat,
+	queries,
+	queryAllByAltText,
+	queryAllByAttribute,
+	queryAllByDisplayValue,
+	queryAllByLabelText,
+	queryAllByPlaceholderText,
+	queryAllByRole,
+	queryAllByTestId,
+	queryAllByText,
+	queryAllByTitle,
+	queryByAltText,
+	queryByAttribute,
+	queryByDisplayValue,
+	queryByLabelText,
+	queryByPlaceholderText,
+	queryByRole,
+	queryByTestId,
+	queryByText,
+	queryByTitle,
+	screen,
+	waitFor,
+	waitForElementToBeRemoved,
+	within,
+} from '@testing-library/dom';
+export {
+	getMultipleElementsFoundError,
+	makeFindQuery,
+	makeGetAllQuery,
+	makeSingleQuery,
+	queryHelpers,
+	wrapAllByQueryWithSuggestion,
+	wrapSingleQueryWithSuggestion,
+} from './dom-query-helpers';
+export type * from '@testing-library/dom';
 export { act } from 'octane';

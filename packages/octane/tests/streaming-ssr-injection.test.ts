@@ -305,15 +305,16 @@ describe('streaming injection — document renders', () => {
 		expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
 	});
 
-	it('keeps leading styles ahead of the markup for documents without injection', async () => {
+	it('places scoped styles in the document head without an injection source', async () => {
 		const value = deferred<string>();
 		value.resolve('streamed');
 		const { html } = await collectPipeableStream(server.StyledDocumentApp, {
 			promise: value.promise,
 		});
-		// The established fragment-friendly shape: renderer styles precede the
-		// rendered markup when no injection source opted into document mode.
-		expect(html.indexOf('<style data-octane=')).toBeLessThan(html.indexOf('<html'));
+		const rendered = new DOMParser().parseFromString(html, 'text/html');
+		expect(rendered.head.querySelector('style[data-octane]')).not.toBeNull();
+		expect(html.indexOf('<style data-octane=')).toBeGreaterThan(html.indexOf('<head'));
+		expect(html.indexOf('<style data-octane=')).toBeLessThan(html.indexOf('</head>'));
 	});
 });
 

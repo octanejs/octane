@@ -32,10 +32,13 @@ export function useDocument<TDoc extends object>(
 	doc: TDoc | null | undefined,
 	...rest: [symbol?]
 ): DexieYProvider<TDoc> | null {
-	const [args, slot] = splitSlot(rest);
-	if (args.length !== 0) {
+	const [args, callerSlot] = splitSlot(rest);
+	// The authored second argument precedes any slot appended by the compiler adapter.
+	const explicitSlot = args[0];
+	if (args.length !== 0 && !(args.length === 1 && typeof explicitSlot === 'symbol')) {
 		throw new TypeError('useDocument() accepts one document argument.');
 	}
+	const slot = typeof explicitSlot === 'symbol' ? explicitSlot : callerSlot;
 	if (!finalizationRegistry) {
 		throw new TypeError('useDocument() requires FinalizationRegistry support.');
 	}

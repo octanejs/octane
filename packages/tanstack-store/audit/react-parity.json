@@ -11,10 +11,7 @@
     "integrity": "sha256:00e8fa1891d1b70a83838b15aec65ea5817c7b88aa737ead07dea9dbce14897f",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-store/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "db5756231dafe9fb22407678ad3fbfc5f9a5004d26ac07a4999516b53983c184"
+      "lockfileSha256": "b24e375c5be5c4017d420b7fde0c1c13163aed1525f2f42f6b220a02ee2ff9dd"
     }
   },
   "lanes": [
@@ -80,7 +77,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "c1f88b4b1f29ef55ad11e82275790074e94e4d97dd7331281a67eeb65f9e5a11"
+          "sha256": "5f9da371ba345e92bc84c150b554f2468744a64c726e8be66b34934906d0f22e"
         },
         {
           "path": "packages/tanstack-store/tests/upstream-vitest.config.ts",
@@ -145,7 +142,7 @@
         {
           "path": "packages/tanstack-store/audit/test-classifications.json",
           "role": "support",
-          "sha256": "32610b5626bababc6cecca42901cfb01166b9f5c8a2f2116bdfeb7562fde5bc6"
+          "sha256": "caf7e3ae3deb0fc23c436437169bbff3e814036083c7081c062422dcdb3cdb44"
         },
         {
           "path": "packages/tanstack-store/audit/upstream.lock.json",
@@ -236,7 +233,7 @@
         {
           "path": "packages/tanstack-store/typetests/tsconfig.adapted.json",
           "role": "support",
-          "sha256": "4985ef1a507c2d236fad7c923bff3655286b4667c789ea3ea212f54b119dccdf"
+          "sha256": "0ba3fd6840e2722e42764c76f5d4ebc2e9662ae0c567dd0da79253a50260229f"
         },
         {
           "path": "packages/tanstack-store/audit/type-parity.json",
@@ -279,7 +276,7 @@
         {
           "path": "packages/tanstack-store/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "c045d177e942c1dc1ec3b5bc8ebc1718a976f23c888171fc01764cfbb606fa67"
+          "sha256": "b8ffe3ce4af9bbcca6cb9c3a628b9e58b406d525ee334eb305dc3249de171dfb"
         },
         {
           "path": "packages/tanstack-store/audit/type-parity.json",
@@ -332,7 +329,7 @@
         {
           "path": "packages/tanstack-store/audit/test-classifications.json",
           "role": "support",
-          "sha256": "32610b5626bababc6cecca42901cfb01166b9f5c8a2f2116bdfeb7562fde5bc6"
+          "sha256": "caf7e3ae3deb0fc23c436437169bbff3e814036083c7081c062422dcdb3cdb44"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

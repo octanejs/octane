@@ -1,12 +1,15 @@
 import { use, useTransition, useSyncExternalStore, useEffect } from 'octane';
 
-// ---------------------------------------------------------------------------
-// Phase-2 adversarial fixtures for the transition-held / urgent-resuspend fix.
-// Each fixture takes its external store + per-value promise registry via props
-// so tests stay isolated. `props.store` is a tiny number store; a transition is
-// driven through the captured `start` (props.bindStart), urgent changes via
-// `store.setUrgent`.
-// ---------------------------------------------------------------------------
+interface StoreProps {
+	store: { get: () => number; subscribe: (listener: () => void) => () => void };
+	promiseFor: (value: number) => PromiseLike<number>;
+}
+interface BoundStoreProps extends StoreProps {
+	bindStart: (start: (fn: () => void) => void) => void;
+}
+interface EffectProps extends BoundStoreProps {
+	log: (message: string) => void;
+}
 
 function PendingProbe() @{
 	const [isPending] = useTransition();
@@ -15,13 +18,7 @@ function PendingProbe() @{
 	</span>
 }
 
-// ---------------------------------------------------------------------------
-// (c) NESTED boundaries: an OUTER @try whose body holds an INNER @try. A
-// transition re-renders the inner reader (holds the OUTER? no — the inner is the
-// nearest boundary). We assert the INNER boundary owns the suspend and the
-// outer is undisturbed, then an URGENT re-suspend keeps the inner held.
-// ---------------------------------------------------------------------------
-function InnerChild(props) @{
+function InnerChild(props: BoundStoreProps) @{
 	const value = useSyncExternalStore(props.store.subscribe, props.store.get);
 	const [, start] = useTransition();
 	props.bindStart(start);
@@ -29,7 +26,7 @@ function InnerChild(props) @{
 	<span id="inner-content">{'inner-' + v as string}</span>
 }
 
-export function NestedHeldBoundary(props) @{
+export function NestedHeldBoundary(props: BoundStoreProps) @{
 	<div>
 		<PendingProbe />
 		@try {
@@ -51,12 +48,7 @@ export function NestedHeldBoundary(props) @{
 	</div>
 }
 
-// ---------------------------------------------------------------------------
-// (d) ERROR while held: the descendant re-suspends under a transition (hold),
-// then an URGENT re-render THROWS a real error (not a suspend). The boundary
-// must route to @catch, not stay stuck holding. value<0 → throw.
-// ---------------------------------------------------------------------------
-function ThrowableChild(props) @{
+function ThrowableChild(props: BoundStoreProps) @{
 	const value = useSyncExternalStore(props.store.subscribe, props.store.get);
 	const [, start] = useTransition();
 	props.bindStart(start);
@@ -67,7 +59,7 @@ function ThrowableChild(props) @{
 	<span id="content">{'content-' + v as string}</span>
 }
 
-export function ErrorWhileHeld(props) @{
+export function ErrorWhileHeld(props: BoundStoreProps) @{
 	<div>
 		<PendingProbe />
 		@try {
@@ -84,13 +76,7 @@ export function ErrorWhileHeld(props) @{
 	</div>
 }
 
-// ---------------------------------------------------------------------------
-// (e) RAPID successive transitions: value 1 committed, then transition→2,
-// transition→3, transition→4 before any resolve. Each is a transition-priority
-// re-render. Must keep holding content-1 (no stale 2/3), then commit the LATEST
-// resolved value cleanly. Driven entirely via `start`.
-// ---------------------------------------------------------------------------
-export function RapidTransitions(props) @{
+export function RapidTransitions(props: StoreProps) @{
 	<div>
 		<PendingProbe />
 		@try {
@@ -103,13 +89,7 @@ export function RapidTransitions(props) @{
 	</div>
 }
 
-// ---------------------------------------------------------------------------
-// (f) EFFECT ordering: the held content's child mounts an effect on first
-// commit; on the eventual resolve-commit of the new value, the effect cleanup
-// fires then the new effect runs. We log mount/cleanup with the value so the
-// test asserts the commit-time ordering on the held→resolved transition.
-// ---------------------------------------------------------------------------
-function EffectChild(props) @{
+function EffectChild(props: EffectProps) @{
 	const value = useSyncExternalStore(props.store.subscribe, props.store.get);
 	const [, start] = useTransition();
 	props.bindStart(start);
@@ -121,7 +101,7 @@ function EffectChild(props) @{
 	<span id="content">{'content-' + v as string}</span>
 }
 
-export function EffectOrdering(props) @{
+export function EffectOrdering(props: EffectProps) @{
 	<div>
 		<PendingProbe />
 		@try {

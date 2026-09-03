@@ -1249,6 +1249,10 @@ export const Indirect = indirect(Host);
 	});
 
 	it('returns manifest watch metadata for transforms and pass-through decisions', () => {
+		const countHook = HOOK.replace(
+			'return useState(0)',
+			'const [count] = useState(0); return count',
+		);
 		const root = mkdtempSync(join(tmpdir(), 'octane-bundler-transform-'));
 		try {
 			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
@@ -1272,18 +1276,22 @@ export const Indirect = indirect(Host);
 			expect(tsx?.kind).toBe('compile');
 			expect(tsx?.dependencies).toContain(manifest);
 
-			const manual = compiler.transform(HOOK, join(packageRoot, 'src/manual/useCount.ts'));
-			expect(manual).toMatchObject({ kind: 'none', code: HOOK, map: null });
+			const manual = compiler.transform(countHook, join(packageRoot, 'src/manual/useCount.ts'));
+			expect(manual).toMatchObject({ kind: 'slots', map: null });
 			expect(manual?.dependencies).toContain(manifest);
-			const manualServer = compiler.transform(HOOK, join(packageRoot, 'src/manual/useCount.ts'), {
-				environment: 'server',
-				explicitRuntimeRequests: true,
-			});
+			const manualServer = compiler.transform(
+				countHook,
+				join(packageRoot, 'src/manual/useCount.ts'),
+				{
+					environment: 'server',
+					explicitRuntimeRequests: true,
+				},
+			);
 			expect(manualServer).toMatchObject({
-				kind: 'runtime-requests',
-				code: HOOK.replace("from 'octane'", "from 'octane/server'"),
+				kind: 'slots',
 				map: null,
 			});
+			expect(manualServer?.code).toContain("from 'octane/server'");
 			expect(manualServer?.dependencies).toContain(manifest);
 			const automaticServer = compiler.transform(HOOK, join(packageRoot, 'src/useCount.ts'), {
 				environment: 'server',
@@ -1398,6 +1406,10 @@ export const Indirect = indirect(Host);
 	});
 
 	it('reports missing manifests and refreshes instance caches on invalidate', () => {
+		const countHook = HOOK.replace(
+			'return useState(0)',
+			'const [count] = useState(0); return count',
+		);
 		const root = mkdtempSync(join(tmpdir(), 'octane-bundler-invalidate-'));
 		try {
 			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
@@ -1406,7 +1418,7 @@ export const Indirect = indirect(Host);
 			const id = join(sourceDir, 'useCount.ts');
 			const compiler = createOctaneCompiler({ root });
 
-			const first = compiler.transform(HOOK, id);
+			const first = compiler.transform(countHook, id);
 			expect(first?.kind).toBe('slots');
 			expect(first?.missingDependencies).toContain(join(sourceDir, 'package.json'));
 
@@ -1421,12 +1433,12 @@ export const Indirect = indirect(Host);
 			);
 			// Cached nearest-manifest decisions are stable until the bundler reports
 			// a watched change.
-			expect(compiler.transform(HOOK, id)?.kind).toBe('slots');
+			expect(compiler.transform(countHook, id)?.kind).toBe('slots');
 			compiler.invalidate(id);
-			expect(compiler.transform(HOOK, id)?.kind).toBe('slots');
+			expect(compiler.transform(countHook, id)?.kind).toBe('slots');
 			compiler.invalidate(sourceManifest + '?watch=1#created');
-			const refreshed = compiler.transform(HOOK, id);
-			expect(refreshed?.kind).toBe('none');
+			const refreshed = compiler.transform(countHook, id);
+			expect(refreshed?.kind).toBe('slots');
 			expect(refreshed?.dependencies).toContain(sourceManifest);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

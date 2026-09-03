@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "db5756231dafe9fb22407678ad3fbfc5f9a5004d26ac07a4999516b53983c184"
+      "lockfileSha256": "b24e375c5be5c4017d420b7fde0c1c13163aed1525f2f42f6b220a02ee2ff9dd"
     }
   },
   "lanes": [
@@ -247,7 +247,7 @@
         {
           "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/register.test.tsx.patch",
           "role": "support",
-          "sha256": "390f7b3e7a52452d586b89ae8a3687fc271a33e4285506de7c2a17a4c1a7a0e4"
+          "sha256": "685d3b7b14f2a8ff7ae31b2de3e14a0f900e379f54c4fcaf2b746c17c0b82835"
         },
         {
           "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/reset.test.tsx.patch",
@@ -475,8 +475,8 @@
           "cases": [
             {
               "id": "differential:register",
-              "testName": "register: typing \u2192 per-keystroke validation \u2192 submit \u2192 reset renders byte-identical",
-              "fullName": "differential: @octanejs/hook-form vs real react-hook-form register: typing \u2192 per-keystroke validation \u2192 submit \u2192 reset renders byte-identical"
+              "testName": "register: typing → per-keystroke validation → submit → reset renders byte-identical",
+              "fullName": "differential: @octanejs/hook-form vs real react-hook-form register: typing → per-keystroke validation → submit → reset renders byte-identical"
             },
             {
               "id": "differential:controller",

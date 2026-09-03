@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 60,
+  "nextCode": 64,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -168,7 +168,7 @@
       "message": "Target container is not a DOM element.",
       "argumentCount": 0,
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "29": {
       "message": "Cannot update an unmounted root.",
@@ -350,10 +350,34 @@
       "runtime": ["client", "server"],
       "status": "active"
     },
+    "60": {
+      "message": "A component suspended without a Suspense boundary during synchronous server rendering. Use prerender() or a streaming renderer to await it.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "61": {
+      "message": "Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "62": {
+      "message": "Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
     "59": {
       "message": "%s requires an active server component.",
       "argumentCount": 1,
       "runtime": ["server"],
+      "status": "active"
+    },
+    "63": {
+      "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
+      "argumentCount": 0,
+      "runtime": ["client"],
       "status": "active"
     }
   }

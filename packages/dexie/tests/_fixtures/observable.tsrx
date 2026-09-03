@@ -1,4 +1,5 @@
 import { useDocument, useObservable } from '@octanejs/dexie';
+import { withSlot } from 'octane';
 
 export function ObservableReader({
 	observable,
@@ -27,5 +28,13 @@ export function FactoryReader({ observable, version }: { observable: any; versio
 
 export function DocumentReader({ doc, nonce: _nonce }: { doc: any; nonce?: number }) @{
 	const provider = useDocument(doc);
+	<div id="document">{provider?.doc?.id as string}</div>
+}
+
+const DOCUMENT_CALL = Symbol('document call');
+const DOCUMENT_SLOT = Symbol('document provider');
+
+export function ExplicitDocumentReader({ doc, nonce: _nonce }: { doc: any; nonce?: number }) @{
+	const provider = withSlot(DOCUMENT_CALL, useDocument, doc, DOCUMENT_SLOT);
 	<div id="document">{provider?.doc?.id as string}</div>
 }

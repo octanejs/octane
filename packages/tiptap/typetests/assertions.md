@@ -6,6 +6,10 @@ The two files assert the same public-surface claims: one against the published
 upstream binding compiled with `tsc`, one against `@octanejs/tiptap` compiled
 with `tsrx-tsc`.
 
+The authored binding and adapted probes must not import React. The
+`tests/unit/react-import-boundary.test.ts` guard enforces that boundary directly;
+the type program permits Octane's own transitive migration type dependencies.
+
 Executable structural verification lives in
 `scripts/react-parity/tiptap-types-lib.mjs` and is wired through
 `pnpm react-parity:validate` / `pnpm react-parity:check`. Inventories are

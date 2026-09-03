@@ -356,30 +356,26 @@ describe('bubbling events — capture root→target then bubble target→root, s
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// onFocus / onBlur — React's bubbling matrix drives them via the BUBBLING
-// focusin/focusout natives. Octane instead capture-delegates the non-bubbling
-// focus/blur natives and walks the ancestor chain, reproducing the same
-// bubbling-onFocus contract (tests/focus-events.test.ts pins the basic walk).
-// The bubble-phase half matches React order-for-order; the combined
-// capture+bubble ordering is a pinned gap.
+// onFocus / onBlur use the bubbling native focusin/focusout pair, so authored
+// capture and bubble handlers follow the same phase ordering as React.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FOCUS: EventConfig = {
 	react: 'Focus',
 	line: 363,
-	native: 'focus',
+	native: 'focusin',
 	type: 'input',
-	dispatch: (n) => n.dispatchEvent(new FocusEvent('focus', { bubbles: false })),
+	dispatch: (n) => n.dispatchEvent(new FocusEvent('focusin', { bubbles: true })),
 };
 const BLUR: EventConfig = {
 	react: 'Blur',
 	line: 127,
-	native: 'blur',
+	native: 'focusout',
 	type: 'input',
-	dispatch: (n) => n.dispatchEvent(new FocusEvent('blur', { bubbles: false })),
+	dispatch: (n) => n.dispatchEvent(new FocusEvent('focusout', { bubbles: true })),
 };
 
-describe('onFocus/onBlur — emulated bubbling of the non-bubbling focus/blur natives', () => {
+describe('onFocus/onBlur — native focusin/focusout delegation', () => {
 	// Per ReactDOMEventPropagation-test.js:363 (onFocus) — bubble handlers fire
 	// target→root exactly like React's focusin-driven onFocus.
 	it('onFocus walks target→root (line 363)', () => {

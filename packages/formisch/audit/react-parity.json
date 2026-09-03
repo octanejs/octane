@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "db5756231dafe9fb22407678ad3fbfc5f9a5004d26ac07a4999516b53983c184"
+      "lockfileSha256": "b24e375c5be5c4017d420b7fde0c1c13163aed1525f2f42f6b220a02ee2ff9dd"
     }
   },
   "lanes": [
@@ -463,7 +463,7 @@
         {
           "path": "packages/formisch/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "1312aa66085caf5617228b6080266599bc9cdec1e1f106896d2045d320f12128"
+          "sha256": "d3cf7d342548bc62204c1ad14b6c0f0708e7b11ec153243bf819b8da5cb39fb3"
         },
         {
           "path": "packages/formisch/audit/type-parity.json",

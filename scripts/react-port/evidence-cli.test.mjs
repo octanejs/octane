@@ -848,9 +848,106 @@ describe('evidence CLI', () => {
 		);
 	});
 
+	test('binds upstream type absence commands to the active immutable node and manifest', () => {
+		const { workspaceRoot, batchDirectory } = createReadyBatch();
+		const manifestPath = path.join(batchDirectory, 'manifest.json');
+		const node = { packageName: 'widget', bindingDirectory: 'packages/widget' };
+		const command = [
+			'node',
+			'scripts/react-port/upstream-types-absence.mjs',
+			'--package-dir',
+			'packages/widget',
+			'--manifest',
+			manifestPath,
+			'--node',
+			'pkg:widget',
+		];
+		const validation = { workspaceRoot, manifestPath, nodeId: 'pkg:widget' };
+		assert.doesNotThrow(() =>
+			assertApprovedGateCommand(
+				['upstream-types-pristine', 'upstream-types-adapted'],
+				command,
+				node,
+				validation,
+			),
+		);
+		assert.throws(
+			() => assertApprovedGateCommand(['public-types'], command, node, validation),
+			/approved command/i,
+		);
+		assert.throws(
+			() =>
+				assertApprovedGateCommand(['upstream-types-pristine'], command, node, {
+					...validation,
+					manifestPath: path.join(batchDirectory, 'substitute.json'),
+				}),
+			/approved command/i,
+		);
+		assert.throws(
+			() =>
+				assertApprovedGateCommand(
+					['upstream-types-adapted'],
+					[...command.slice(0, -1), 'pkg:other'],
+					node,
+					validation,
+				),
+			/approved command/i,
+		);
+	});
+
+	test('accepts precise unknown-input predicates and still requires an independent expected shape', () => {
+		const { workspaceRoot } = createReadyBatch();
+		const packageDirectory = createCompletePackage(workspaceRoot);
+		const publicPath = path.join(packageDirectory, 'tests/types/public/public.ts');
+		writeFileSync(
+			path.join(packageDirectory, 'src/index.ts'),
+			'export declare function widget(value: unknown): boolean;\n',
+		);
+		const node = {
+			binding: '@octanejs/widget',
+			bindingDirectory: 'packages/widget',
+			upstreamTestInventory: [],
+		};
+		const verify = () =>
+			assertApprovedGateCommand(
+				['public-types'],
+				[
+					'pnpm',
+					'exec',
+					'tsrx-tsc',
+					'--noEmit',
+					'-p',
+					'packages/widget/tests/types/public/tsconfig.json',
+				],
+				node,
+				{ workspaceRoot },
+			);
+		const negative =
+			'// @ts-expect-error classifiers return boolean, not string\nconst invalid: string = widget(null);\n';
+		writeFileSync(
+			publicPath,
+			"import { widget } from '@octanejs/widget';\nimport type { Assert, Equal } from '../../../../../scripts/react-port/type-assertions.js';\ntype Signature = Assert<Equal<typeof widget, (value: unknown) => boolean>>;\n" +
+				negative,
+		);
+		assert.doesNotThrow(verify);
+		writeFileSync(
+			publicPath,
+			"import { widget } from '@octanejs/widget';\nwidget satisfies typeof widget;\n" + negative,
+		);
+		assert.throws(verify, /positive type assertion/i);
+	});
+
 	test('rejects nested any and unknown in imported public contracts', () => {
 		for (const [label, source] of [
 			['return', 'export declare function unsafe(): any;\n'],
+			['unknown-return', 'export declare function unsafe(): unknown;\n'],
+			['any-parameter', 'export declare function unsafe(value: any): boolean;\n'],
+			[
+				'nested-unknown-parameter',
+				'export declare function unsafe(value: { nested: unknown }): boolean;\n',
+			],
+			['array-unknown-parameter', 'export declare function unsafe(value: unknown[]): boolean;\n'],
+			['predicate-unknown-return', 'export declare function unsafe(value: unknown): unknown;\n'],
 			['generic-default-any', 'export declare function unsafe<T = any>(): T;\n'],
 			['generic-default-unknown', 'export declare function unsafe<T = unknown>(): T;\n'],
 			['property', 'export declare const unsafe: { value: any };\n'],

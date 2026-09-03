@@ -6,6 +6,11 @@ The two files assert the same public-surface claims: one against the published
 upstream binding compiled with `tsc`, one against `@octanejs/inertia` compiled
 with `tsrx-tsc`.
 
+The binding's authored imports are checked separately for React dependencies in
+`tests/conformance/exports.test.ts`. Octane's migration types reuse its own
+shipped `@types/react` dependency, so these programs resolve that transitive type
+basis normally; consumers do not need to add a React runtime dependency.
+
 Permitted differences between the two files, and nothing else:
 
 | # | Transformation | Why |

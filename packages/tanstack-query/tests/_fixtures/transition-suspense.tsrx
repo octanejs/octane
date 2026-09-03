@@ -1,24 +1,20 @@
 import { useState, useTransition } from 'octane';
 import { QueryClientProvider, useSuspenseQuery } from '@octanejs/tanstack-query';
+import type { QueryClient } from '@octanejs/tanstack-query';
 
-// ---------------------------------------------------------------------------
-// React useTransition + Suspense parity for useSuspenseQuery.
-//
-// A `useSuspenseQuery` whose queryKey depends on `value`. When `value` changes
-// inside a transition, the query refetches under a NEW key and the reader
-// re-suspends. The query observer notifies ASYNCHRONOUSLY (query-core's
-// notifyManager uses setTimeout(0) — a macrotask), so by the time the re-render
-// that re-suspends on the new in-flight fetch actually runs, octane's
-// transition window has already closed and the re-render is URGENT.
-//
-// React keeps the previously committed content on screen until the new query
-// resolves — it does NOT flash the Suspense fallback. This fixture lets the
-// test drive that exact sequence: commit value=1, transition to value=2,
-// observe the value=1 content holds, then resolves to value=2.
-//
-// `props.bindSetValue` captures the (transition-wrapped) value setter, and
-// `props.queryFn(value)` returns a per-value promise the test controls.
-// ---------------------------------------------------------------------------
+interface ReaderProps {
+	queryFn: (value: number) => Promise<string>;
+	bindSetValue: (setter: (value: number) => void) => void;
+	bindSetValueUrgent?: (setter: (value: number) => void) => void;
+}
+
+interface AppProps extends ReaderProps {
+	client: QueryClient;
+}
+
+// Reader owns the transition; PendingProbe is independent and stays idle.
+// Controlled query promises let tests distinguish held transitions from urgent
+// key changes without depending on query-core notification timing.
 
 function PendingProbe() @{
 	const [isPending] = useTransition();
@@ -27,24 +23,22 @@ function PendingProbe() @{
 	</span>
 }
 
-function Reader(props) @{
+function Reader(props: ReaderProps) @{
 	const [value, setValue] = useState(1);
-	const [, start] = useTransition();
+	const [isPending, start] = useTransition();
 	// Expose a transition-priority value setter to the test.
 	props.bindSetValue((v) => start(() => setValue(v)));
-	// Expose an URGENT (non-transition) value setter so the test can re-render the
-	// reader under a new key WHILE the boundary is transition-held — modelling the
-	// query observer's async macrotask notify, which lands at urgent priority.
+	// An explicit urgent update can supersede the held transition.
 	if (props.bindSetValueUrgent) props.bindSetValueUrgent((v) => setValue(v));
 	const q = useSuspenseQuery({
 		queryKey: ['transition-suspense', value],
 		queryFn: () => props.queryFn(value),
 		retry: false,
 	});
-	<span id="data">{'data:' + q.data as string}</span>
+	<span id="data" data-pending={isPending ? 'pending' : 'idle'}>{'data:' + q.data as string}</span>
 }
 
-export function TransitionSuspenseApp(props) @{
+export function TransitionSuspenseApp(props: AppProps) @{
 	<QueryClientProvider client={props.client}>
 		<div>
 			<PendingProbe />

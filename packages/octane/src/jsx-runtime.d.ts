@@ -53,6 +53,10 @@ import type { ElementDescriptor, FragmentInstance } from './index.js';
  */
 export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
+export interface CSSProperties extends React.CSSProperties {
+	cssFloat?: React.CSSProperties['float'];
+}
+
 export type ClassValue =
 	| string
 	| number
@@ -135,7 +139,7 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 		className?: ClassValue;
 		for?: string;
 		xmlns?: string;
-		style?: string | React.CSSProperties;
+		style?: string | CSSProperties;
 		children?: unknown;
 	};
 
@@ -177,6 +181,7 @@ declare namespace Octane {
 	interface FieldsetHTMLAttributes<T> extends Transformed<React.FieldsetHTMLAttributes<T>, T> {}
 	interface FormHTMLAttributes<T> extends Transformed<React.FormHTMLAttributes<T>, T> {}
 	interface HTMLAttributes<T> extends Transformed<React.HTMLAttributes<T>, T> {}
+	interface AllHTMLAttributes<T> extends Transformed<React.AllHTMLAttributes<T>, T> {}
 	interface HtmlHTMLAttributes<T> extends Transformed<React.HtmlHTMLAttributes<T>, T> {}
 	interface IframeHTMLAttributes<T> extends Transformed<React.IframeHTMLAttributes<T>, T> {}
 	interface ImgHTMLAttributes<T> extends Transformed<React.ImgHTMLAttributes<T>, T> {}

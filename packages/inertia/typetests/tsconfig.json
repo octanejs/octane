@@ -10,11 +10,7 @@
     "noEmit": true,
     "noErrorTruncation": true,
     "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "paths": {
-      "react": ["./react-types-must-not-be-imported.d.ts"],
-      "react/*": ["./react-types-must-not-be-imported.d.ts"]
-    }
+    "noUnusedParameters": false
   },
-  "include": ["./public-api.test-d.ts", "./react-types-must-not-be-imported.d.ts"]
+  "include": ["./public-api.test-d.ts"]
 }

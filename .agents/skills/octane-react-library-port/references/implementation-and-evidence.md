@@ -483,7 +483,7 @@ The approved shapes are:
 
 Record all five strict type obligations under six dedicated evidence gates. The
 pristine and adapted upstream suites are separate observations with different
-compilers; they must never share a gate or command. The packed repository gate
+compilers; present suites must never share a gate or command. The packed repository gate
 proves both installed-source contexts and the package boundary in one run:
 
 ```bash
@@ -514,6 +514,27 @@ must have distinct package-local projects. The pristine project must contain a
 `pristine` path/name marker and the adapted project an `adapted` marker so the
 runner can bind each compiler to the right evidence. Do not use a shared project
 or substitute arbitrary commands for a gate-owned command.
+
+When the immutable upstream package has no TypeScript suite or declarations,
+record checked absence rather than inventing upstream type probes. The owned
+absence command is the only alternative for the two upstream type gates:
+
+```bash
+pnpm react-port:evidence run --batch <id> --node pkg:<name> \
+  --gate upstream-types-pristine --gate upstream-types-adapted -- \
+  node scripts/react-port/upstream-types-absence.mjs \
+  --package-dir packages/<binding> \
+  --manifest <absolute-active-batch-manifest-path> --node pkg:<name>
+```
+
+It requires an explicit preflight inventory with no type cases, an unrestricted
+materialized source lock matching the preflight identity, every pristine source
+blob, and the integrity-checked npm tarball under `upstream-artifact/`. Any
+TypeScript source/declaration, published type entrypoint, incomplete source scope,
+or identity/hash mismatch rejects absence. The runner binds the command to the
+active batch manifest and node. Authored-source, public, and both packed-source
+type gates remain mandatory; absence does not waive their precise assertions or
+negative controls.
 
 Evidence gates declare whether they are `command` or machine-`automated`.
 Command gates accept passed/failed evidence only from `run`; automated gates are

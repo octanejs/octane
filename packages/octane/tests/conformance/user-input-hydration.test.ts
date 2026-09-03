@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
-import * as ClientRT from '../../src/index.js';
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 
@@ -25,29 +24,13 @@ const FIX = join(
 );
 const FILE = 'user-input-hydration.tsrx';
 
-function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIX, 'utf8'), FILE, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
-}
-function devClientModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIX, 'utf8'), FILE, { mode: 'client', dev: true });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});
-}
-
-const server = serverModule();
-const client = devClientModule();
+const source = readFileSync(FIX, 'utf8');
+const server = loadCompiledFixtureSource(source, { id: FILE, mode: 'server' });
+const client = loadCompiledFixtureSource(source, {
+	id: FILE,
+	mode: 'client',
+	compileOptions: { dev: true },
+});
 
 let container: HTMLElement;
 let errSpy: ReturnType<typeof vi.spyOn>;

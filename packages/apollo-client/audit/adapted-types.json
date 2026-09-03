@@ -1,12 +1,8 @@
 {
   "schemaVersion": 1,
-  "files": [
-    "packages/apollo-client/typetests/public-api.test-d.ts",
-    "packages/apollo-client/typetests/react-types-must-not-be-imported.d.ts"
-  ],
+  "files": ["packages/apollo-client/typetests/public-api.test-d.ts"],
   "assertionGroups": [
     "complete public React adapter declarations",
-    "framework-neutral root and testing exports",
-    "React type import exclusion"
+    "framework-neutral root and testing exports"
   ]
 }

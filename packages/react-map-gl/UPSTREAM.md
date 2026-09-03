@@ -193,12 +193,7 @@ Four, two of them recorded in `audit/react-parity.json` and bound to a case:
 2. **`react-map-gl-refs-as-props`** — `forwardRef` does not exist in Octane, so
    `Map`, `Marker`, `Popup` and `GeolocateControl` take `ref` as a plain prop.
    `<Map ref={mapRef} />` is unchanged for consumers.
-3. **Teardown timing** — effect cleanups run on the passive drain after
-   `root.unmount()`, not inside it, so the map's WebGL context and workers are
-   released one drain later. This is an Octane runtime property rather than a
-   binding behavior and no parity lane observes it, so it is deliberately not a
-   manifest divergence; it is pinned by `tests/runtime/lifecycle.test.ts`.
-4. **`Marker` element chosen from rendered output** — upstream asks
+3. **`Marker` element chosen from rendered output** — upstream asks
    `React.Children.forEach` whether it was handed a truthy child and, if so,
    gives the marker its own element to portal into. A `.tsrx` children block is
    an opaque render function, and evaluating it to look inside would re-run any

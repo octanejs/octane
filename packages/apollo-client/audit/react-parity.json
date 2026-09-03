@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "db5756231dafe9fb22407678ad3fbfc5f9a5004d26ac07a4999516b53983c184"
+      "lockfileSha256": "b24e375c5be5c4017d420b7fde0c1c13163aed1525f2f42f6b220a02ee2ff9dd"
     }
   },
   "lanes": [
@@ -159,7 +159,7 @@
       "environment": "workspace-node",
       "project": "apollo-client-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Compiles the complete supported public declaration surface and rejects React type leakage.",
+      "notes": "Compiles the complete supported public declaration surface. Authored React import exclusion is checked separately in tests/conformance/exports.test.ts so Octane can resolve its own migration-type dependencies.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
@@ -169,7 +169,7 @@
         {
           "path": "packages/apollo-client/audit/adapted-types.json",
           "role": "test",
-          "sha256": "105f55a1da9f5d99dcf1097956217c7ca792f8cd6aa436b48f0ddb8b598ab67b",
+          "sha256": "47bef10136a06ce3cf9380622b66e07819522e78666d0fac51ce02d19f75e32e",
           "cases": [
             {
               "id": "types:apollo-client-public-api",
@@ -184,14 +184,9 @@
           "sha256": "5de0d24928da2ddb261c10aaae92cad1c58e1d5447910b5ad037ecfe684a7e96"
         },
         {
-          "path": "packages/apollo-client/typetests/react-types-must-not-be-imported.d.ts",
-          "role": "support",
-          "sha256": "6d9b2a38662c8b7ad5dbcdc84373d4de8b888fb501a6afe6cced29ee115740b1"
-        },
-        {
           "path": "packages/apollo-client/typetests/tsconfig.json",
           "role": "support",
-          "sha256": "6b5908080ce3c16de60f9688236d1570d3b66c88c3946ed16084ead57aa039fd"
+          "sha256": "31ee1ef9b6afc840720d7eb5b4a694b6b83095cc3a38c4d9262b8f473df16c42"
         }
       ]
     }

@@ -41,8 +41,11 @@ export interface CompiledFixtureSourceOptions {
 export interface PlainHookFixtureSourceOptions {
 	id: string;
 	inlineHookMemo: boolean;
+	mode?: 'client' | 'server';
+	hmr?: boolean;
 	manualSlots?: boolean;
 	nativeReads?: boolean;
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
 export function loadCompiledFixtureSource<T extends CompiledFixtureModule = CompiledFixtureModule>(
@@ -62,10 +65,11 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 	source: string,
 	options: PlainHookFixtureSourceOptions,
 ): T {
+	const mode = options.mode ?? 'client';
 	const out = slotHooks(source, options.id, {
-		environment: 'client',
-		hmr: false,
-		dev: false,
+		environment: mode,
+		hmr: options.hmr ?? false,
+		dev: options.hmr ?? false,
 		profile: false,
 		inlineHookMemo: options.inlineHookMemo,
 		manualSlots: options.manualSlots,
@@ -82,10 +86,10 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 			verbatimModuleSyntax: true,
 		},
 	});
-	return evaluateCompiledFixtureCode<T>(outputText, options.id, 'client', undefined);
+	return evaluateCompiledFixtureCode<T>(outputText, options.id, mode, options.runtimeModules);
 }
 
-function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
+export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 	code: string,
 	id: string,
 	mode: 'client' | 'server',
@@ -93,27 +97,35 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 ): T {
 	const runtime = mode === 'server' ? ServerRuntime : ClientRuntime;
 	const internalRuntime = mode === 'server' ? InternalServerRuntime : InternalClientRuntime;
+	// ESM imports initialize before module statements even when emitted at the
+	// module tail. Keep that ordering when replacing imports with fixture values.
+	const imports: string[] = [];
+	const importBinding = (binding: string): string => {
+		imports.push(binding);
+		return '';
+	};
 	code = code.replace(
 		/import\s*\*\s*as\s+([\w$]+)\s*from\s*['"]octane\/internal\/(?:client|server)['"];?/g,
-		(_match: string, name: string) => `const ${name} = __internalRuntime;`,
+		(_match: string, name: string) => importBinding(`const ${name} = __internalRuntime;`),
 	);
 	code = code.replace(
 		/import\s*\*\s*as\s+([\w$]+)\s*from\s*['"]octane(?:\/server)?['"];?/g,
-		(_match: string, name: string) => `const ${name} = __runtime;`,
+		(_match: string, name: string) => importBinding(`const ${name} = __runtime;`),
 	);
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/internal\/(?:client|server)['"];?/g,
 		(_match: string, names: string) =>
-			`const {${names.replace(/\s+as\s+/g, ': ')}} = __internalRuntime;`,
+			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __internalRuntime;`),
 	);
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
-		(_match: string, names: string) => `const {${names.replace(/\s+as\s+/g, ': ')}} = __runtime;`,
+		(_match: string, names: string) =>
+			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __runtime;`),
 	);
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/hydration['"];?/g,
 		(_match: string, names: string) =>
-			`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`,
+			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`),
 	);
 	code = code.replace(
 		/import\s+(\*\s+as\s+[\w$]+|\{[^}]*\}|[\w$]+)\s+from\s*['"]([^'"]+)['"];?/g,
@@ -121,10 +133,10 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 			if (runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)) return match;
 			const module = `__runtimeModules[${JSON.stringify(request)}]`;
 			if (binding.startsWith('*'))
-				return `const ${binding.replace(/^\*\s+as\s+/, '')} = ${module};`;
+				return importBinding(`const ${binding.replace(/^\*\s+as\s+/, '')} = ${module};`);
 			if (binding.startsWith('{'))
-				return `const ${binding.replace(/\s+as\s+/g, ': ')} = ${module};`;
-			return `const ${binding} = ${module}.default;`;
+				return importBinding(`const ${binding.replace(/\s+as\s+/g, ': ')} = ${module};`);
+			return importBinding(`const ${binding} = ${module}.default;`);
 		},
 	);
 
@@ -165,7 +177,7 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 		'__hydrationRuntime',
 		'__runtimeModules',
 		'__exports',
-		`'use strict';\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
+		`'use strict';\n${imports.join('\n')}\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
 	);
 	return evaluate(runtime, internalRuntime, HydrationRuntime, runtimeModules, {}) as T;
 }

@@ -1,11 +1,11 @@
 // Chrome fires `blur`/`focusout` SYNCHRONOUSLY inside removeChild when the
 // focused element's subtree is removed ("Perhaps it was moved in a 'blur' event
-// handler?"). blur is a DISCRETE event, so dispatchDelegated's end-of-dispatch
+// handler?"). focusout is a DISCRETE event, so dispatchDelegated's end-of-dispatch
 // flush would re-enter the scheduler MID-COMMIT — draining queued renders and
 // effects while the outer removal walk holds cached nextSibling pointers, which
 // then corrupts the walk (removeChild: "not a child"). jsdom never fires blur on
 // removal, so this test replays Chrome's behavior by patching the parent's
-// removeChild to dispatch a native blur at the focused descendant first.
+// removeChild to dispatch native focusout at the focused descendant first.
 import { describe, it, expect } from 'vitest';
 import { act, mount } from './_helpers';
 import { NavApp } from './_fixtures/blur-during-teardown.tsrx';
@@ -24,7 +24,7 @@ describe('discrete events dispatched during an in-progress flush', () => {
 		(app as any).removeChild = (child: Node) => {
 			if (!blurFired && (child === anchor || child.contains(anchor))) {
 				blurFired = true;
-				anchor.dispatchEvent(new Event('blur')); // non-bubbling, like the real one
+				anchor.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
 			}
 			return originalRemoveChild(child);
 		};

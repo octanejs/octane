@@ -422,6 +422,35 @@ declare namespace NodeJS { interface Process { env: { NODE_ENV?: string } } }
 			['octane'],
 		);
 	});
+	test('enrolls the pure TypeScript introspection binding in packed source and browser checks', () => {
+		const name = '@octanejs/react-is';
+		const packages = [{ name, private: false, role: 'framework binding' }];
+		const files = new Set(['src/index.ts', 'src/ReactIs.ts']);
+		assert.deepEqual(findPackedTsrxSourceConsumerPackages(packages, new Map([[name, files]])), [
+			name,
+			'octane',
+		]);
+		assert.deepEqual(
+			findPackedTsrxSourceConsumerSpecifiers(name, { exports: { '.': './src/index.ts' } }, files),
+			[name],
+		);
+		assert.ok(PACKED_TSRX_STRICT_BROWSER_PACKAGES.includes(name));
+		for (const source of [
+			renderPackedTsrxConsumerTypeProbe(),
+			renderPackedStrictBrowserConsumerTypeProbe(),
+		]) {
+			assert.match(source, /PackedIsExports = PackedIsAssert/);
+			assert.match(source, /PackedIs\.isMemo\(\)/);
+			assert.match(source, /PackedIs\.Profiler\(\)/);
+		}
+		assert.deepEqual(
+			findPackedTsrxSourceConsumerPackages(
+				packages,
+				new Map([[name, new Set(['src/index.d.ts'])]]),
+			),
+			['octane'],
+		);
+	});
 
 	test('installs the complete packed workspace dependency closure', () => {
 		const manifests = new Map([

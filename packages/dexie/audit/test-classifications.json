@@ -27,6 +27,11 @@
       "reason": "Checks broader fake-indexeddb reactivity and dependency behavior."
     },
     {
+      "path": "packages/dexie/tests/conformance/symbol-default.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Symbol defaults, observable updates and cleanup, and explicit slot independence under the Octane hook-call protocol."
+    },
+    {
       "path": "packages/dexie/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
       "oracle": "Runs the same useLiveQuery fixture against dexie-react-hooks@4.4.0 and Octane."
@@ -45,6 +50,11 @@
       "path": "packages/dexie/tests/ssr/server.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks non-suspending server defaults without opening IndexedDB."
+    },
+    {
+      "path": "packages/dexie/tests/ssr/symbol-default.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Symbol default serialization without server subscriptions or queries."
     },
     {
       "path": "packages/dexie/typetests/public-api.test-d.ts",

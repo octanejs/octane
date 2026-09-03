@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/facebook/react.git",
+    "version": "19.2.7",
+    "commit": "6117d7cca4906492c51fe6a03381e35adfd86e7d",
+    "sourceRoot": "packages/react-is/upstream/src",
+    "testRoot": "packages/react-is/upstream/src/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:70e0dac61c6782a508e77c70e0c459f8fbbbed82d5ab341921f2f85f8014f0e0",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "adaptedRoots": {
+    "source": { "roots": ["packages/react-is/src"], "include": ["\\.ts$"], "exclude": [] },
+    "tests": {
+      "roots": ["packages/react-is/tests"],
+      "include": ["/adapted\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 14,
+    "uniqueIdentities": 14,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "b24e375c5be5c4017d420b7fde0c1c13163aed1525f2f42f6b220a02ee2ff9dd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-is-pristine-full",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-is-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/react-is/audit/pristine-runtime.json"
+      },
+      "notes": "Runs every stable upstream registration from byte-exact source against the hash-pinned npm oracle; only the experimental SuspenseList gate is disabled as upstream requires.",
+      "files": [
+        {
+          "path": "packages/react-is/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "b188f9fb43f4d941c742e64c665e563fdcf9254806e5edb9218f0aa91e1004a4"
+        },
+        {
+          "path": "packages/react-is/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "8cc34366ad3ecbcc6e9f7f7cb5bd65cccc65701f09cd6d5ac909da77e767c384"
+        },
+        {
+          "path": "packages/react-is/audit/provenance.json",
+          "role": "support",
+          "sha256": "a2dadbde378bf08b7c21c6a28ee5858526fcbf6a204e20baa888a2042ee60740"
+        },
+        {
+          "path": "packages/react-is/tests/register-upstream.ts",
+          "role": "support",
+          "sha256": "10d98246a6400e26bb5f8b01cf2fc7b5f5ad98674b95402df525cc5f96cc22ab"
+        },
+        {
+          "path": "packages/react-is/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "d5b9cf871d5968dd755340618440ab88852f902b1a9aafc673ccbe28ae541c91"
+        },
+        {
+          "path": "packages/react-is/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "a760c9be99ac117f9a3738806b288883573c1b49303131c0f65e37608b7c540b"
+        },
+        {
+          "path": "packages/react-is/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "7a7334ef046b7f88b4bacc4b6d04ec154b15061a96f55e3c04bd183e7dbcd822"
+        }
+      ]
+    },
+    {
+      "id": "react-is-adapted-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-is",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/react-is/audit/adapted-runtime.json"
+      },
+      "notes": "Runs all 14 upstream registrations against Octane, including explicit negative probes for unsupported renderer kinds.",
+      "files": [
+        {
+          "path": "packages/react-is/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "ebc1e9de64146c785e5d43babc50e1308c561acc5e4435935eb955b060984c52"
+        },
+        {
+          "path": "packages/react-is/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "8cc34366ad3ecbcc6e9f7f7cb5bd65cccc65701f09cd6d5ac909da77e767c384"
+        },
+        {
+          "path": "packages/react-is/audit/provenance.json",
+          "role": "support",
+          "sha256": "a2dadbde378bf08b7c21c6a28ee5858526fcbf6a204e20baa888a2042ee60740"
+        },
+        {
+          "path": "packages/react-is/tests/register-upstream.ts",
+          "role": "support",
+          "sha256": "10d98246a6400e26bb5f8b01cf2fc7b5f5ad98674b95402df525cc5f96cc22ab"
+        },
+        {
+          "path": "packages/react-is/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "d5b9cf871d5968dd755340618440ab88852f902b1a9aafc673ccbe28ae541c91"
+        },
+        {
+          "path": "packages/react-is/audit/upstream-patches/tests/upstream/ReactIs-test.js.patch",
+          "role": "support",
+          "sha256": "afe0fa12e1d68686e85078a1b611543bb7f4736b68bacc6d5e5a8d0a8ae62466"
+        }
+      ]
+    },
+    {
+      "id": "react-is-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-is-differential",
+      "evidenceOrigin": "repo-authored",
+      "files": [
+        {
+          "path": "packages/react-is/tests/differential.test.ts",
+          "role": "test",
+          "sha256": "4233cfe7d3f127a2707c7aad2f64fe558087cb28828dce849c20c43f862ac941",
+          "cases": [
+            {
+              "id": "differential:react-is-supported-surface",
+              "testName": "matches every predicate for corresponding supported element values",
+              "fullName": "matches every predicate for corresponding supported element values"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "unsupported-renderer-kinds",
+      "caseIds": [
+        "runtime:43665b67972897c5",
+        "runtime:62a09aa6f8dfc41c",
+        "runtime:4e6519750f97e468",
+        "runtime:e429db3af079339c",
+        "runtime:f9ed57d478733d1c"
+      ],
+      "upstreamResult": "React recognizes class components, Context.Consumer, forwardRef, Profiler and experimental SuspenseList kinds.",
+      "octaneResult": "Functions and ref props replace class and forwarding wrappers; unsupported kind predicates return false. Stable SuspenseList is absent in the pinned React oracle and has an explicit Octane negative control.",
+      "rationale": "Octane deliberately omits these renderer kinds; retaining their predicate names permits safe feature probes without inventing renderer support.",
+      "classification": "framework-component-model",
+      "consumerImpact": "Unsupported React kinds cannot be rendered or identified as supported Octane descriptors.",
+      "migrationGuidance": "Use function components, plain ref props and use/useContext; import rendering components from octane and classifier labels from @octanejs/react-is.",
+      "owner": "octanejs",
+      "reviewCondition": "Revisit if Octane adds one of the currently unsupported renderer kinds."
+    }
+  ]
+}

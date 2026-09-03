@@ -261,12 +261,7 @@ export function DeferredValueInTransition() @{
 }
 
 // ---------------------------------------------------------------------------
-// Regression: the deferred-swap "deferred lane" tag applies ONLY to the
-// deferred block's own re-render. startTransition notifies useTransition
-// listeners synchronously (tickTransitionCount) around running its callback;
-// a probe re-rendered by that notification mounts a fresh useDeferredValue,
-// which must still show its preview — it is NOT part of the deferred pass.
-// ---------------------------------------------------------------------------
+// A deferred value must not activate an unrelated transition hook.
 function ListenerPreviewProbe(props) @{
 	const text = useDeferredValue('Final', 'Preview');
 	props.log('render:' + text);

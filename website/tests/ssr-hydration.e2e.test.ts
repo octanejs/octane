@@ -22,6 +22,7 @@ import { createRequire } from 'node:module';
 import { join, relative } from 'node:path';
 import { encodePlaygroundHash } from '../src/lib/playground-hash.ts';
 import { PLAYGROUND_REACT_VERSION } from '../src/lib/playground-sandbox.ts';
+import { LYNX_EXAMPLES } from '../src/content/lynx-examples.ts';
 import {
 	getFreePort,
 	spawnServer as spawnServerIn,
@@ -1657,6 +1658,17 @@ describe(
 			expect(serverFallbackIndex).toBeGreaterThan(filesystemIndex);
 			expect(existsSync(join(outputDir, 'static/playground-runtime.json'))).toBe(true);
 			expect(existsSync(join(outputDir, 'functions/__server.func/index.mjs'))).toBe(true);
+			for (const asset of [
+				'lynx-runtime/static/js/client.js',
+				'lynx-runtime/static/css/client.css',
+				...LYNX_EXAMPLES.flatMap(({ id, entry }) => [
+					`lynx-examples/${id}/example-metadata.json`,
+					`lynx-examples/${id}/example-source.json`,
+					`lynx-examples/${id}/dist/${entry}.web.bundle`,
+				]),
+			]) {
+				expect(existsSync(join(outputDir, 'static', asset)), asset).toBe(true);
+			}
 
 			const functionConfig = JSON.parse(
 				readFileSync(join(outputDir, 'functions/__server.func/.vc-config.json'), 'utf8'),

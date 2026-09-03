@@ -27,12 +27,7 @@
  * SOFTWARE.
  */
 
-type ChildRule =
-	| { direct: readonly string[] }
-	| { descendant: readonly string[]; resetBy?: readonly string[] }
-	| { only: readonly string[] };
-
-const autoclosingChildren: Record<string, ChildRule> = {
+const autoclosingChildren = {
 	li: {
 		descendant: ['li'],
 		resetBy: [
@@ -103,7 +98,7 @@ const autoclosingChildren: Record<string, ChildRule> = {
 	th: { direct: ['td', 'th', 'tr'] },
 };
 
-const disallowedChildren: Record<string, ChildRule> = {
+const disallowedChildren = {
 	...autoclosingChildren,
 	form: { descendant: ['form'] },
 	a: { descendant: ['a'], resetBy: ['object', 'table', 'td', 'th', 'template'] },
@@ -145,17 +140,17 @@ const disallowedChildren: Record<string, ChildRule> = {
 	'#document': { only: ['html'] },
 };
 
-function elementLabel(tag: string, location?: string): string {
+function elementLabel(tag, location) {
 	return location ? `\`<${tag}>\` (${location})` : `\`<${tag}>\``;
 }
 
 /** Return a diagnostic when `childTag` causes an ancestor to be repaired. */
 export function invalidHtmlNestingWithAncestor(
-	childTag: string,
-	ancestors: string[],
-	childLocation?: string,
-	ancestorLocation?: string,
-): string | null {
+	childTag,
+	ancestors,
+	childLocation,
+	ancestorLocation,
+) {
 	if (childTag.includes('-')) return null;
 
 	const ancestorTag = ancestors[ancestors.length - 1];
@@ -178,12 +173,7 @@ export function invalidHtmlNestingWithAncestor(
 }
 
 /** Return a diagnostic when `childTag` causes its direct parent to be repaired. */
-export function invalidHtmlNestingWithParent(
-	childTag: string,
-	parentTag: string,
-	childLocation?: string,
-	parentLocation?: string,
-): string | null {
+export function invalidHtmlNestingWithParent(childTag, parentTag, childLocation, parentLocation) {
 	if (childTag.includes('-') || parentTag.includes('-')) return null;
 	if (parentTag === 'template') return null;
 
@@ -238,11 +228,7 @@ export function invalidHtmlNestingWithParent(
 }
 
 /** Return a diagnostic when visible or whitespace text cannot remain under its parent. */
-export function invalidHtmlTextNesting(
-	text: string,
-	parentTag: string,
-	parentLocation?: string,
-): string | null {
+export function invalidHtmlTextNesting(text, parentTag, parentLocation) {
 	if (text === '') return null;
 	if (
 		parentTag !== 'table' &&

@@ -39,7 +39,6 @@ type ClientErrorArguments = {
 	25: [];
 	26: [unknown];
 	27: [];
-	28: [];
 	29: [];
 	46: [unknown, unknown];
 	49: [];
@@ -51,6 +50,9 @@ type ClientErrorArguments = {
 	55: [];
 	56: [];
 	58: [];
+	61: [];
+	62: [];
+	63: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -182,8 +184,6 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 					'A hosted foreign-context request escaped its renderer-region owner; the owning bridge is gone or declined it.',
 					args,
 				);
-			case 28:
-				return formatDevErrorMessage('Target container is not a DOM element.', args);
 			case 29:
 				return formatDevErrorMessage('Cannot update an unmounted root.', args);
 			case 46:
@@ -230,6 +230,21 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 58:
 				return formatDevErrorMessage('Unsupported native-read compiler/runtime version.', args);
+			case 61:
+				return formatDevErrorMessage(
+					'Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.',
+					args,
+				);
+			case 62:
+				return formatDevErrorMessage(
+					'Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.',
+					args,
+				);
+			case 63:
+				return formatDevErrorMessage(
+					'Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.',
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

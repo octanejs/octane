@@ -729,6 +729,7 @@ describe('manifest-declared manual hook slots', () => {
 			'i18next',
 			'inertia',
 			'ink',
+			'input-otp',
 			'jotai',
 			'lexical',
 			'livestore',
@@ -773,6 +774,11 @@ describe('manifest-declared manual hook slots', () => {
 			'xyflow',
 			'zag',
 			'zustand',
+		]);
+		const inputOtp = JSON.parse(readFileSync(join(packagesDir, 'input-otp/package.json'), 'utf8'));
+		expect(inputOtp.octane.hookSlots.manual).toEqual([
+			'src/use-previous.ts',
+			'src/use-pwm-badge.ts',
 		]);
 	});
 });
