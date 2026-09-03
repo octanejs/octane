@@ -576,7 +576,8 @@ describe('setup checkpoint emission', () => {
 			const read = useCallback(() => value, [value]);
 			const label = useRef(String(props.n) + Math.max(props.n, 1) + JSON.stringify(read.length));
 			const [count] = useState(() => Number(label.current));
-			if (count > 1) props.n = count;
+			const keys = Object.keys(props).length + Number(Array.isArray(props.list)) + Date.now();
+			if (count > keys) props.n = JSON.parse(label.current);
 		`);
 		expect(code).not.toContain(checkpoint);
 	});
@@ -598,6 +599,19 @@ describe('setup checkpoint emission', () => {
 		[
 			'a conditional memo factory',
 			`const [value, setValue] = useState(0);\nconst doubled = useMemo(props.fast ? () => value : () => { setValue(1); return value; }, [value]);`,
+		],
+		[
+			'a global that iterates or maps its input',
+			`const value = Array.from(props.items, props.map);`,
+		],
+		['a JSON reviver passed by reference', `const value = JSON.parse(props.text, props.revive);`],
+		[
+			'a JSON replacer passed by reference',
+			`const value = JSON.stringify(props.n, props.replace);`,
+		],
+		[
+			'an unlisted namespace member',
+			`const value = Object.groupBy(props.items, (item: any) => item.kind);`,
 		],
 		['a custom hook call', `const value = useThing(props.n);`],
 		['a prop callback call', `props.observe(props.n);`],

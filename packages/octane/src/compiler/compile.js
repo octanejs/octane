@@ -4772,7 +4772,21 @@ const SETUP_PURE_GLOBAL_CALLEES = new Set([
 	'decodeURI',
 	'decodeURIComponent',
 ]);
-const SETUP_PURE_GLOBAL_NAMESPACES = new Set(['Math', 'JSON', 'Number', 'Object', 'Array', 'Date']);
+// Namespace members that never invoke an argument. `Array.from`,
+// `Object.groupBy`, `Object.fromEntries`, and friends iterate or call user
+// code, so they stay unclassified. JSON's replacer and reviver positions are
+// checked like a hook factory (see walkInvokedArgument).
+const SETUP_PURE_NAMESPACE_MEMBERS = new Map([
+	['Math', null],
+	[
+		'Number',
+		new Set(['isFinite', 'isInteger', 'isNaN', 'isSafeInteger', 'parseFloat', 'parseInt']),
+	],
+	['Object', new Set(['entries', 'freeze', 'hasOwn', 'is', 'isFrozen', 'keys', 'values'])],
+	['Array', new Set(['isArray', 'of'])],
+	['Date', new Set(['now', 'parse', 'UTC'])],
+	['JSON', new Set(['parse', 'stringify'])],
+]);
 
 // Every binding name the module declares anywhere. A global namespace shadowed
 // by any local, parameter, or import is treated as an unknown callee.
@@ -4873,11 +4887,19 @@ function setupCanScheduleSelfUpdate(stmts, ctx) {
 				callee?.type === 'MemberExpression' &&
 				!callee.computed &&
 				callee.object?.type === 'Identifier' &&
-				SETUP_PURE_GLOBAL_NAMESPACES.has(callee.object.name) &&
+				callee.property?.type === 'Identifier' &&
+				SETUP_PURE_NAMESPACE_MEMBERS.has(callee.object.name) &&
 				isGlobal(callee.object.name)
 			) {
-				walk(n.arguments, true);
-				return;
+				const members = SETUP_PURE_NAMESPACE_MEMBERS.get(callee.object.name);
+				if (members === null || members.has(callee.property.name)) {
+					if (callee.object.name === 'JSON') {
+						walk(n.arguments[0], true);
+						for (let index = 1; index < n.arguments.length; index++)
+							walkInvokedArgument(n.arguments[index]);
+					} else walk(n.arguments, true);
+					return;
+				}
 			}
 			found = true;
 			return;
