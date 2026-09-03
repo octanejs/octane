@@ -3079,6 +3079,286 @@
     "note": "Same-run clean tree-shaken application plus Octane runtime: closure-free lowering must stay within 2% gzip of the runtime-form control. No instrumentation contributes to these bytes."
   },
   {
+    "suite": "transition-hooks",
+    "op": "cycle_renders",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "A useTransition start → pending render → settle cycle renders the owner exactly twice: the pending cue with the new value and the falling edge."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "cycle_runtime_functions",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Per cycle the runtime creates the replacement value's replay closure and the Action's settle microtask callback; nothing else."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "cycle_runtime_arrays",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Per-cycle runtime array literals/constructors/rest arrays across both renders and the Action batch. A breach means a render or flush path started allocating."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "cycle_runtime_objects",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Per-cycle runtime object literals (batch, staged update, render frames, journal copies) plus a one-time lazily installed driver record."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "cycle_runtime_constructors",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Per cycle exactly three runtime `new` expressions (the batch Map and two render-frame Maps). Hook pending tracking must not allocate Sets per transition; the audited runtime allocated a fourth."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "updater_renders",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "A functional updater inside startTransition renders exactly like a replacement value: pending cue then falling edge."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "updater_runtime_functions",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "A queued functional updater needs no replay closure; only the Action's settle callback is created."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "updater_runtime_arrays",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "The single-update queue and render paths must not add arrays beyond the replacement-value cycle."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "updater_runtime_objects",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Same object budget as the replacement-value cycle."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "updater_runtime_constructors",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Same constructor budget as the replacement-value cycle: no per-hook Set allocations."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "held_renders",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "A transition that suspends renders the origin twice on hold (pending render, then the cue re-render with the committed value) and twice on release (promotion, then the falling edge)."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "held_runtime_functions",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Hold + release closure budget: journal rollback, hold records, resume listeners, and the settle callback."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "held_runtime_arrays",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Hold + release array budget across the four renders, the attempt journal, and the resume path."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "held_runtime_objects",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Hold + release object budget: attempt, hold, and promotion records plus render frames."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "held_runtime_constructors",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Hold + release `new` budget including the hook-holder registration; plus a one-time WeakMap for the holder table."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "dispatch_renders",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "An urgent functional update renders exactly once."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "dispatch_runtime_functions",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "An urgent functional update evaluates eagerly and creates no runtime closure."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "dispatch_runtime_arrays",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "An urgent functional update allocates no update queue; only the render's own frame arrays remain."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "dispatch_runtime_objects",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Render-frame object budget for a single urgent render."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "dispatch_runtime_constructors",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Render-frame constructor budget for a single urgent render."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "bail_renders",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "A same-value set on an idle cell bails eagerly and renders nothing."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "bail_runtime_functions",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "The eager same-value bailout creates no closure."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "bail_runtime_arrays",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "The eager same-value bailout creates no array."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "bail_runtime_objects",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "The eager same-value bailout creates no object."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "bail_runtime_constructors",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "The eager same-value bailout runs no constructor."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "click_renders",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "A native delegated click whose handler dispatches a functional update renders exactly once."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "click_runtime_functions",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Delegated dispatch and the following functional update create no runtime closure."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "click_runtime_arrays",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Delegated dispatch reuses its capture path and slot storage; only the render's own frame arrays remain."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "click_runtime_objects",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Delegated dispatch allocates no propagation or snapshot records for a single handler; render-frame objects only."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "click_runtime_constructors",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Render-frame constructor budget for a single delegated click."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "urgent_renders",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "An urgent parent update beside a queued child transition renders the parent once and the child three times: the committed value under the urgent render, the transition value, and the falling edge."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "urgent_runtime_functions",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Closure budget for the urgent traversal, the queued transition, and the settle callback."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "urgent_runtime_arrays",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Array budget across the urgent render, the urgent-transition cell snapshot, and the transition renders."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "urgent_runtime_objects",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Object budget across the urgent render, the urgent-transition cell snapshot, and the transition renders."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "urgent_runtime_constructors",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Constructor budget for the urgent traversal and the transition; no per-hook Set allocations."
+  },
+  {
     "suite": "activity",
     "op": "hidden_descendant_updates_hideActivityRange",
     "target": "octane-tsrx-work",
