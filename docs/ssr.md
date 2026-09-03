@@ -89,9 +89,10 @@ The three buffered renderers return `RenderResult = { html, css }`:
 - `head` — the hoisted metadata on its own, present **only** under
   `headChannel: 'separate'` (see `RenderOptions`).
 - `css` — deduped `<style data-octane="hash">` tags, one per style scope the
-  request rendered: a component contributes one tag per lexical scope it owns
-  (its render, nested `@{ … }` blocks, control-flow branches, assigned
-  templates), and an assigned theme block contributes its own. Only components
+  request rendered: a component contributes one tag per children list that
+  holds a `<style>` block (its output fragment, nested elements, the fragments
+  of nested `@{ … }` blocks and control-flow branches, assigned templates), and
+  an assigned theme block contributes its own. Only components
   the render actually executed inject, in lexical pre-order. Place inside
   `<head>`. The client skips re-injecting any hash already present. (Kept as its
   own field because Octane has scoped CSS that React core does not.)

@@ -80,9 +80,9 @@ export function AccountRow(props: {
 An empty child block disappears. A child block containing only a JSX node is
 transparent grouping and does not create an extra render scope.
 
-A child block is also a style scope: a `<style>` written inside it scopes the
-block's own template, under its own hash, while the parent's rules keep reaching
-the block's elements. See [Styles](#styles).
+A child block's output fragment is also a style scope: a `<style>` among its
+children styles the siblings beside it under its own hash, while the parent's
+rules keep reaching the block's elements. See [Styles](#styles).
 
 Dynamic text needs a cast, `{expr as string}`, unless the expression is provably
 a string. A bare `{expr}` is a renderable hole, not text.
@@ -398,12 +398,12 @@ JavaScript. Only inject source you trust.
 
 ## Styles
 
-A `<style>` block written in a template is scoped CSS. The compiler rewrites its
-selectors to match only the elements of the template scope the block sits in and
-stamps that scope's hash class on those elements, so rules never leak into a
-parent, a sibling, or a child component. A selector that matches nothing in its
-scope is pruned from the sheet (it survives as a `/* (unused) … */` comment), and
-`:global(...)` opts a selector out of scoping.
+A `<style>` block written among the children of an element or a fragment is
+scoped CSS. The block styles the items beside it and everything below them; it
+never styles the element that contains it. The compiler rewrites the block's
+selectors with the hash of that children list and stamps the hash on those
+siblings and their descendants, so rules never leak into a parent, an outer
+sibling, or a child component. `:global(...)` opts a selector out of scoping.
 
 ```jsx
 export function Panel() @{
@@ -418,21 +418,34 @@ export function Panel() @{
 }
 ```
 
-### Lexical scopes
+To style an element, put the block beside it — both siblings in a fragment, as
+above. A block written inside the element styles the element's other children:
 
-A block scopes the nearest lexical template scope, not the whole component. Each
-of these is a scope of its own, with its own hash:
+```jsx
+export function Card() @{
+	<article class="card">
+		<style>
+			h2 { margin: 0; } /* the h2, not .card */
+		</style>
+		<h2>Title</h2>
+	</article>
+}
+```
 
-- the component render (`@{ … }` body or returned JSX);
-- a nested `@{ … }` child block;
-- each control-flow branch body: `@if`/`@else if`/`@else`, `@for`/`@empty`,
-  every `@switch` case, and `@try`/`@catch`/`@pending`;
-- an element or fragment in expression position — assigned to a variable,
-  returned, or written inside `{ … }`.
+A `@{ … }` body and every control-flow body hold setup statements and exactly
+one output node, and a block is an output node like any other: a block beside
+the output node is the multiple-outputs parser error, and a lone block as the
+output styles nothing (`STYLE_STANDALONE_NEEDS_FRAGMENT`). Wrap the block and
+the output in a fragment.
 
-Elements carry every enclosing scope hash, outer to inner, so a parent scope's
-rules still reach the elements of a nested scope while the nested block's rules
-stay inside it:
+### Scopes
+
+Every children list that holds a block is a scope with its own hash: an
+element's children, a fragment's children, the fragment a nested `@{ … }` or a
+control-flow branch renders, an assigned or returned element's children. Elements
+carry every enclosing scope hash, outer to inner, so an outer block's rules still
+reach the elements of a nested scope while the nested block's rules stay inside
+it:
 
 ```jsx
 export function Panel() @{
@@ -453,11 +466,23 @@ export function Panel() @{
 }
 ```
 
-Several blocks in one scope share its hash and compile to one `injectStyle`
-call, so a block can sit wherever it reads best next to the elements it styles.
-A block inside a control-flow branch is owned by that branch: its CSS is always
-emitted, and only the class stamping follows the branch, so the rules are present
-before the branch first renders and there is no style flash when it does.
+Several blocks among the same children share the list's hash and compile to one
+`injectStyle` call, so a block can sit wherever it reads best next to the
+elements it styles. A block among the fragment a control-flow branch renders is
+owned by that branch: its CSS is always emitted, and only the class stamping
+follows the branch, so the rules are present before the branch first renders and
+there is no style flash when it does.
+
+### Raw CSS is TSRX syntax
+
+Raw CSS text in `<style>` is TSRX template syntax. A standalone block is allowed
+only lexically inside a `@{ … }` body or an `@if`/`@for`/`@switch`/`@try` body —
+at any depth of elements, fragments, holes, callbacks, or templates assigned in
+that body. In a plain function that returns JSX, or in an element assigned at
+module scope, it is `STYLE_STANDALONE_OUTSIDE_TEMPLATE`. Plain TSX keeps the TSX
+rule: `<style>` is an ordinary element whose content is an expression child,
+`<style>{css}</style>`, and the compiler passes it through untouched — no scope,
+no hash, no injection.
 
 ### Assigned blocks and class maps
 
@@ -484,15 +509,16 @@ The sheet injects at the declaration position. A block that is exported, applied
 keeps every selector; a local block that is none of these keeps only the class
 selectors its map exposes, and the rest are pruned.
 `.$class` is reserved as a selector name in an assigned block
-(`STYLE_RESERVED_CLASS_KEY`), and a standalone block at module scope is an error
-(`STYLE_STANDALONE_AT_MODULE_SCOPE`): assign it.
+(`STYLE_RESERVED_CLASS_KEY`), and a bare standalone block at module scope is an
+error (`STYLE_STANDALONE_AT_MODULE_SCOPE`): assign it.
 
 ### `apply`
 
-`<style apply={theme} />` stamps `theme.$class` on every element of its scope, so
-the theme's rules match there. A self-closed block only applies; a block with a
-body applies the theme and scopes its own rules too, and the local rules win over
-the theme's because they come later in the cascade:
+`<style apply={theme} />` stamps `theme.$class` on the items beside it and
+everything below them (never on the element that contains it), so the theme's
+rules match there. A self-closed block only applies; a block with a body applies
+the theme and scopes its own rules too, and the local rules win over the theme's
+because they come later in the cascade:
 
 ```jsx
 import { theme } from './theme.tsrx';
@@ -525,7 +551,7 @@ an array). Any other attribute on a scoped block is `STYLE_UNKNOWN_ATTRIBUTE`.
 
 ### Opting elements in with `$class`
 
-`apply` stamps a theme on every element of a scope. To pick the elements
+`apply` stamps a theme on every element of its scope. To pick the elements
 yourself, put `theme.$class` in their `class` instead and leave `apply` out:
 only the elements that carry it match the theme's element and descendant
 selectors, and the rest of the scope is untouched. The class is a plain string,
@@ -577,7 +603,7 @@ always present.
 ### Ordering guarantees
 
 Sheets emit in lexical pre-order. A scope's sheet sits where its first block is,
-after the assigned blocks declared before it in the same statement list and
+after the assigned blocks declared before it in the enclosing statement list and
 before the scopes and assigned blocks nested inside it; sibling scopes follow
 source order. On the client every sheet is a module-level
 `injectStyle(hash, css)` statement, so module evaluation — import order — orders

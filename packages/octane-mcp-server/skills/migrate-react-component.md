@@ -45,7 +45,7 @@ locals, early returns) stays above it.
 | text `<input onChange={...}>` meaning every edit | `<input onInput={...}>` (native event) |
 | controlled `value={state}` | keep it — React's controlled semantics apply; pair with `onInput` |
 | `className={clsx(...)}` | `class={[...]}` composes clsx-style natively |
-| CSS Modules `styles.card` / CSS-in-JS | `const theme = <style>…</style>` (a class map: `$class` plus one key per class) and `class={theme.card}`; a `<style>` block inside the template scopes to that template, and `<style apply={theme} />` applies a theme to a scope |
+| CSS Modules `styles.card` / CSS-in-JS | `const theme = <style>…</style>` (a class map: `$class` plus one key per class) and `class={theme.card}`; a `<style>` block among an element's or fragment's children styles the items beside it and below (never its container), and `<style apply={theme} />` applies a theme to those same items |
 | `useDebugValue(x)` | keep or delete — present as an accepted no-op |
 | `React.lazy(() => import(...))` | `lazy()` works as-is (and also accepts a bare component from the loader) |
 | `defaultProps` | parameter defaults / destructuring defaults |

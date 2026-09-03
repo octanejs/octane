@@ -130,14 +130,17 @@ const LOGO = `<svg class="mark" viewBox="0 0 84 108" fill="none" aria-hidden="tr
  * An assigned `<style>` is a theme rather than a block scoped to one template:
  * it keeps every selector and evaluates to a class map. The page applies it by
  * putting `apply={linkTheme}` on its own `<style>` block, which stamps the
- * theme's class on every element of that scope so these rules reach them the
- * same way the block's own rules do. One block rather than a self-closed
+ * theme's class on the items beside that block and everything below them —
+ * never on the element that contains it, which is why the block and the
+ * page's root are fragment siblings — so these rules reach them the same way
+ * the block's own rules do. One block rather than a self-closed
  * `<style apply />` beside it: the type-checker's virtual TSX accepts only one
  * `<style>` per element. The theme sits at module scope, above the component
  * that applies it, which is the order the compiler requires.
  */
 const LINK_THEME = `// The documentation cards. An assigned <style> is a theme: the page's own
-// <style apply={linkTheme}> block below applies it, so its rules reach that scope.
+// <style apply={linkTheme}> block below applies it, so its rules reach the
+// items beside that block and everything below them.
 const linkTheme = <style>
   .links {
     display: grid;
@@ -277,24 +280,7 @@ export function App() @{
 ${LINK_THEME}
 
 export function App() @{
-  <main class="page">
-    ${LOGO}
-    <h1 class="title">octane</h1>
-    <p class="lede">
-      React’s programming model, compiled. Edit src/App.tsrx and save — the page
-      updates without a reload.
-    </p>
-    <ul class="links">
-      @for (const link of LINKS; key link.href) {
-        <li>
-          <a class="link" href={link.href} target="_blank" rel="noreferrer">
-            <span class="link-title">{link.title as string}</span>
-            <span class="link-body">{link.body as string}</span>
-          </a>
-        </li>
-      }
-    </ul>
-
+  <>
     <style apply={linkTheme}>
       .page {
         display: flex;
@@ -323,7 +309,25 @@ export function App() @{
         font-size: 1.25rem;
       }
     </style>
-  </main>
+    <main class="page">
+      ${LOGO}
+      <h1 class="title">octane</h1>
+      <p class="lede">
+        React’s programming model, compiled. Edit src/App.tsrx and save — the page
+        updates without a reload.
+      </p>
+      <ul class="links">
+        @for (const link of LINKS; key link.href) {
+          <li>
+            <a class="link" href={link.href} target="_blank" rel="noreferrer">
+              <span class="link-title">{link.title as string}</span>
+              <span class="link-body">{link.body as string}</span>
+            </a>
+          </li>
+        }
+      </ul>
+    </main>
+  </>
 }
 `;
 
@@ -338,14 +342,7 @@ interface LayoutProps {
 }
 
 export function Layout(props: LayoutProps) @{
-  <div class="shell">
-    <nav class="nav">
-      <a class="nav-link" href="/">Home</a>
-      <a class="nav-link" href="/counter">Counter</a>
-      <a class={["nav-link", "nav-endpoint"]} href="/api/health">/api/health</a>
-    </nav>
-    <main class="main">{props.children}</main>
-
+  <>
     <style>
       .shell {
         display: flex;
@@ -388,7 +385,15 @@ export function Layout(props: LayoutProps) @{
         padding: 3rem 1.5rem;
       }
     </style>
-  </div>
+    <div class="shell">
+      <nav class="nav">
+        <a class="nav-link" href="/">Home</a>
+        <a class="nav-link" href="/counter">Counter</a>
+        <a class={["nav-link", "nav-endpoint"]} href="/api/health">/api/health</a>
+      </nav>
+      <main class="main">{props.children}</main>
+    </div>
+  </>
 }
 `;
 
@@ -406,6 +411,42 @@ export function Counter() @{
   const [count, setCount] = useState(0);
 
   <Layout>
+    <style>
+      .counter {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.25rem;
+        text-align: center;
+      }
+      .title {
+        margin: 0;
+        font-size: 2rem;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+      }
+      .lede {
+        max-width: 34rem;
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 1.25rem;
+      }
+      /* The site's primary action: an accent pill. */
+      .button {
+        padding: 0.7rem 1.4rem;
+        border: none;
+        border-radius: 9999px;
+        background: var(--accent);
+        color: var(--on-accent);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .button:hover {
+        background: var(--accent-hover);
+      }
+    </style>
     <section class="counter">
       <h1 class="title">Server-rendered, then interactive</h1>
       <p class="lede">
@@ -415,43 +456,6 @@ export function Counter() @{
       <button class="button" onClick={() => setCount(count + 1)}>
         {"Pressed " + count + " times"}
       </button>
-
-      <style>
-        .counter {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 1.25rem;
-          text-align: center;
-        }
-        .title {
-          margin: 0;
-          font-size: 2rem;
-          line-height: 1.1;
-          letter-spacing: -0.02em;
-        }
-        .lede {
-          max-width: 34rem;
-          margin: 0;
-          color: var(--text-secondary);
-          font-size: 1.25rem;
-        }
-        /* The site's primary action: an accent pill. */
-        .button {
-          padding: 0.7rem 1.4rem;
-          border: none;
-          border-radius: 9999px;
-          background: var(--accent);
-          color: var(--on-accent);
-          font: inherit;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background 0.15s;
-        }
-        .button:hover {
-          background: var(--accent-hover);
-        }
-      </style>
     </section>
   </Layout>
 }
@@ -478,9 +482,9 @@ export function health(): Response {
  * octanejs.dev so a scaffolded app and the documentation look like one thing.
  *
  * A stylesheet rather than a `<style>` in the shell. A `<style>` in a component
- * is scoped to the template scope it sits in — the compiler rewrites its
- * selectors with a scope hash — and a theme such as `linkTheme` reaches only
- * the scopes that apply it, so neither can style `body`, and these custom
+ * styles only the items beside it and everything below them — the compiler
+ * rewrites its selectors with a scope hash — and a theme such as `linkTheme`
+ * reaches only the scopes that apply it, so neither can style `body`, and these custom
  * properties have to resolve for every component at once. Keeping them in a
  * file the shell links, rather than inline in the shell, means `init` still has
  * something to point at when the project brought its own `index.html` and kept

@@ -11,8 +11,10 @@ export interface PriceBadgeProps {
 
 // The dark variant is a theme: an assigned <style> keeps every selector, and
 // the badge's own <style apply={dark}> block applies it so these rules reach
-// the badge's elements alongside the block's own. Declared above the component
-// because a theme must precede the block that applies it.
+// the badge alongside the block's own. The block sits BESIDE the badge in a
+// fragment: a block styles the items beside it and everything below them,
+// never the element that contains it. Declared above the component because a
+// theme must precede the block that applies it.
 const dark = <style>
 	.price-badge[data-theme='dark'] {
 		background: rgb(13, 17, 23);
@@ -28,9 +30,7 @@ export function PriceBadge(props: PriceBadgeProps) @{
 		currency: locale === 'de-DE' ? 'EUR' : 'USD',
 		maximumFractionDigits: 0,
 	}).format(props.pricePerSeat);
-	<p class="price-badge" data-island="price-badge" data-theme={theme}>
-		<strong class="price-badge-amount">{price}</strong>
-		<span class="price-badge-unit">{' / seat / month'}</span>
+	<>
 		<style apply={dark}>
 			.price-badge {
 				display: inline-block;
@@ -39,5 +39,9 @@ export function PriceBadge(props: PriceBadgeProps) @{
 				border: 1px solid rgb(31, 111, 235);
 			}
 		</style>
-	</p>
+		<p class="price-badge" data-island="price-badge" data-theme={theme}>
+			<strong class="price-badge-amount">{price}</strong>
+			<span class="price-badge-unit">{' / seat / month'}</span>
+		</p>
+	</>
 }

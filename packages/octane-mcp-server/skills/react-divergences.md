@@ -87,18 +87,24 @@ components, so wrapping them in `lazy()` is valid; nested lazy wrappers are not.
 
 ## Scoped styles are lexical
 
-A `<style>` block inside a template is scoped CSS, not a global stylesheet as in
-React: selectors are rewritten with a hash of the nearest lexical template scope
-(the component render, a nested `@{ … }` body, each `@if`/`@for`/`@switch`/
-`@try` branch body, or an element/fragment used as a value) and the hash is
-stamped on every element that scope reaches. Nested scopes stack their hashes
-outer to inner; several blocks in one scope share one hash; `:global(…)` opts
+A `<style>` block with raw CSS is TSRX template syntax, not a global stylesheet
+as in React. It is a child of an element or a fragment and styles the items
+beside it and everything below them — never the element that contains it:
+selectors are rewritten with the hash of that children list and the hash is
+stamped on those siblings and their descendants. To style an element, make the
+block and the element fragment siblings (`<><style>…</style><div>…</div></>`);
+a `@{ … }` or directive body holds one output node, so wrap the block and the
+output in a fragment there too. Nested scopes stack their hashes outer to
+inner; several blocks among the same children share one hash; `:global(…)` opts
 out. `const theme = <style>…</style>` yields a class map (`$class` plus one key
-per class) and `<style apply={theme} />` applies it to a scope, with
-`apply={[a, b]}` composing. A theme must be declared before its applier. The
-CSS of a control-flow branch is always emitted; only the stamping follows the
-branch. Only `<style href precedence>` keeps React's Float semantics. Do not
-port this to CSS Modules or a CSS-in-JS runtime.
+per class) and `<style apply={theme} />` applies it to the items beside it,
+with `apply={[a, b]}` composing. A theme must be declared before its applier.
+The CSS of a control-flow branch is always emitted; only the stamping follows
+the branch. A raw-CSS block is allowed only inside a `@{ … }` or
+`@if`/`@for`/`@switch`/`@try` body; plain TSX keeps React's rule, where
+`<style>{css}</style>` is an ordinary element passed through untouched. Only
+`<style href precedence>` keeps React's Float semantics. Do not port this to
+CSS Modules or a CSS-in-JS runtime.
 
 ## class / className composes clsx-style
 
