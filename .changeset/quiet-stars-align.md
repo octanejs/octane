@@ -10,6 +10,9 @@ Preserve dispatch order across consecutive and awaited Actions, retain committed
 child inputs during urgent parent updates, and keep third-tuple getters available
 to bindings that supply their own hook slots.
 Preserve authored custom-hook arguments and symbol initial values through aliases.
+Keep manually slotted hooks independent when nested inside custom hooks. Replay
+parent setup updates before initializing children, and explain missing
+document bodies after document-root hydration.
 
 Escape application strings in every server renderer, accept renderable roots,
 recover buffered Suspense errors, and report hydration recoveries consistently.

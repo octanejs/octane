@@ -11,11 +11,13 @@ export function useLiveQuery<T, TDefault>(
 	querier: () => Promise<T> | T,
 	...rest: [unknown?, unknown?, symbol?]
 ): T | TDefault | undefined {
-	// The public default result may itself be a Symbol. Only the extra
-	// argument after deps and defaultResult is an internal hook slot.
-	const slot = rest[2];
+	const slot = typeof rest[rest.length - 1] === 'symbol' ? rest.pop() : undefined;
 	const deps = (rest[0] as unknown[] | undefined) ?? [];
 	const defaultResult = rest[1] as TDefault | undefined;
-	return useObservable(() => Dexie.liveQuery(querier) as any, deps, defaultResult, slot) as
-		T | TDefault | undefined;
+	return useObservable(
+		() => Dexie.liveQuery(querier) as any,
+		deps,
+		defaultResult,
+		slot as symbol | undefined,
+	) as T | TDefault | undefined;
 }

@@ -1277,7 +1277,7 @@ export const Indirect = indirect(Host);
 			expect(tsx?.dependencies).toContain(manifest);
 
 			const manual = compiler.transform(countHook, join(packageRoot, 'src/manual/useCount.ts'));
-			expect(manual).toMatchObject({ kind: 'none', code: countHook, map: null });
+			expect(manual).toMatchObject({ kind: 'slots', map: null });
 			expect(manual?.dependencies).toContain(manifest);
 			const manualServer = compiler.transform(
 				countHook,
@@ -1288,10 +1288,10 @@ export const Indirect = indirect(Host);
 				},
 			);
 			expect(manualServer).toMatchObject({
-				kind: 'runtime-requests',
-				code: countHook.replace("from 'octane'", "from 'octane/server'"),
+				kind: 'slots',
 				map: null,
 			});
+			expect(manualServer?.code).toContain("from 'octane/server'");
 			expect(manualServer?.dependencies).toContain(manifest);
 			const automaticServer = compiler.transform(HOOK, join(packageRoot, 'src/useCount.ts'), {
 				environment: 'server',
@@ -1438,7 +1438,7 @@ export const Indirect = indirect(Host);
 			expect(compiler.transform(countHook, id)?.kind).toBe('slots');
 			compiler.invalidate(sourceManifest + '?watch=1#created');
 			const refreshed = compiler.transform(countHook, id);
-			expect(refreshed?.kind).toBe('none');
+			expect(refreshed?.kind).toBe('slots');
 			expect(refreshed?.dependencies).toContain(sourceManifest);
 		} finally {
 			rmSync(root, { recursive: true, force: true });

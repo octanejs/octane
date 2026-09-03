@@ -7,6 +7,7 @@ import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { METHOD_DEP_IMPORT } from './hook-deps.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
+import { adaptManualHookProviders } from './manual-hooks.js';
 import {
 	hasInlineMemoDirectEval,
 	inheritHookMemoOrigin,
@@ -284,6 +285,11 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	});
 	if (lowered.lowered === 0) return null;
 	transformed = lowered.ast;
+	if (options.manualSlots) {
+		transformed = adaptManualHookProviders(transformed, (name) =>
+			requireHelper(state, name, 'octane'),
+		);
+	}
 	const origin = ast.body[0] ?? ast;
 	const activation = options.nativeReadActivation
 		? inheritHookMemoOrigin(

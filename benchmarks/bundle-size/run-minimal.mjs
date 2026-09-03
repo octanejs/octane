@@ -240,11 +240,12 @@ async function buildScenario(scenario, entry) {
 			define: productionDefines,
 			plugins: [
 				{
-					name: 'octane-reachability-template',
+					name: 'octane-reachability-source',
 					setup(build) {
-						build.onLoad({ filter: /\.(?:tsrx|ts)$/ }, ({ path: filename }) => {
+						build.onLoad({ filter: /\.(?:tsrx|[jt]sx?)$/ }, ({ path: filename }) => {
 							const template = filename.endsWith('.tsrx');
-							if (!template && !filename.includes('/packages/mantine-hooks/src/')) return null;
+							// Authored dependencies use their own package manifest to select
+							// compilation, including providers with explicit hook slots.
 							const source = fs.readFileSync(filename, 'utf8');
 							const result = compiler.transform(source, filename, {
 								environment: 'client',
@@ -260,7 +261,10 @@ async function buildScenario(scenario, entry) {
 								);
 							}
 							if (result === null || result.kind === 'none') return null;
-							return { contents: result.code, loader: result.kind === 'compile' ? 'js' : 'ts' };
+							return {
+								contents: result.code,
+								loader: result.kind === 'compile' ? 'js' : path.extname(filename).slice(1),
+							};
 						});
 					},
 				},

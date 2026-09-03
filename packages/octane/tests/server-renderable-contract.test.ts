@@ -108,6 +108,49 @@ describe('server renderable values', () => {
 			}
 		}
 	});
+	it.each([false, true])(
+		'keeps authored text returns distinct from template HTML in one component (text: %s)',
+		async (text) => {
+			const value = '<img src=x onerror=alert(1)> & text';
+			const props = { value, text };
+			for (const { html } of [
+				Server.renderToString(fixture.MixedTextReturn, props),
+				Server.renderToStaticMarkup(fixture.MixedTextReturn, props),
+				await Static.prerender(fixture.MixedTextReturn, props),
+				await collectPipeableStream(fixture.MixedTextReturn, props),
+				await collectReadableStream(fixture.MixedTextReturn, props),
+			]) {
+				const node = parsed(html);
+				expect(node.querySelector('img')).toBeNull();
+				expect(node.textContent).toBe(value);
+				expect(node.querySelector('strong') !== null).toBe(!text);
+			}
+		},
+	);
+	it.each([false, true])(
+		'preserves compiled output forwarded by an ordinary wrapper (descriptor: %s)',
+		async (descriptor) => {
+			const Wrapper = (props: { value: string }, scope: unknown) => {
+				const first = fixture.MixedTextReturn({ value: props.value, text: false }, scope);
+				if (!descriptor) return first;
+				const second = fixture.MixedTextReturn({ value: 'second', text: false }, scope);
+				return Server.createElement('div', null, [first, second]);
+			};
+			for (const { html } of [
+				Server.renderToString(Wrapper, { value: hostile }),
+				Server.renderToStaticMarkup(Wrapper, { value: hostile }),
+				await Static.prerender(Wrapper, { value: hostile }),
+				await collectPipeableStream(Wrapper, { value: hostile }),
+				await collectReadableStream(Wrapper, { value: hostile }),
+			]) {
+				const node = parsed(html);
+				expect([...node.querySelectorAll('strong')].map((element) => element.textContent)).toEqual(
+					descriptor ? [hostile, 'second'] : [hostile],
+				);
+				expect(node.querySelector('img')).toBeNull();
+			}
+		},
+	);
 	it('exposes memo metadata without mutating the wrapped component', () => {
 		const Named = (props: { text: string }) => props.text;
 		const Memo = Server.memo(Named);

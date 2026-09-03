@@ -185,7 +185,10 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 					args,
 				);
 			case 28:
-				return formatDevErrorMessage('Target container is not a DOM element.', args);
+				return formatDevErrorMessage(
+					'Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.',
+					args,
+				);
 			case 29:
 				return formatDevErrorMessage('Cannot update an unmounted root.', args);
 			case 46:

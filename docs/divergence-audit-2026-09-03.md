@@ -59,7 +59,7 @@ functional replay, and late-promise cancellation.
 | B1 | Fixed: each transition hook tracks its own action batches and suspended work. Unrelated transitions and deferred values do not flip its pending indicator. |
 | B2 | Fixed: hook action failures route to their owner's boundary; module-level transition failures report globally. |
 | B3 | Fixed: queued updaters/reducers observe render-time inputs and route failures through render boundaries. Transition updates retain that behavior. |
-| B4 | Fixed: mount-time render-phase updates replay before publishing discarded children or effects; update-limit errors reach the owning boundary. |
+| B4 | Fixed: parent setup self-updates replay before initializing children or publishing effects; update-limit errors reach the owning boundary. Output entrypoints also discard inputs that schedule a self-update before that entrypoint runs. |
 | B5 | Preserved and documented: passive effects normally run after paint, including discrete, store, and flushSync commits. Subscriptions needed at commit completion belong in layout effects. |
 | B6 | Fixed: public root unmount drains passive work and cleanup synchronously. Ordinary reconciler deletion retains its passive phase. |
 | B7 | Fixed: new keyed children mount in forward order while survivor placement retains the LIS algorithm. |
@@ -104,6 +104,13 @@ and [server-renderable-contract.test.ts](../packages/octane/tests/server-rendera
 | G4 | Fixed: JSX Suspense errors render the buffered fallback, notify onError, and mark the arm for client recovery. Explicit server @catch behavior remains supported. |
 | G5 | Fixed: unhandled pending roots throw in synchronous renderers instead of returning truncated HTML. |
 | G6 | Fixed: descriptor Promise children participate in the same usable/retry machinery as template holes. |
+
+Apollo, Inertia, Tiptap, Formisch, and Spring enforce their React import boundary
+on authored source and adapted type probes. These checks do not forbid React
+references in transitive declarations: Octane's migration aliases and JSX types
+use its declared `@types/react` dependency. Strict consumer typechecks remain
+separate from the authored-import checks.
+
 | G7 | Fixed: recognized text and surplus-node recoveries report through onRecoverableError, with shallow suppression and retained matched DOM. Shell failures destroy capable pipe destinations, including destinations attached after failure. Equivalent serialization differences, server-hook no-ops, portal placeholders, and bounded static hydration inspection remain documented. |
 
 ## Documentation and diagnostic findings
@@ -142,10 +149,24 @@ hosts use existing descriptor machinery, custom-event tables initialize lazily,
 and successful commits allocate no error queue. Handler snapshots use reusable
 dispatch storage; mutable bundles copy only when changed during dispatch.
 Server template results gain a short-lived carrier object so text can never be
-mistaken for serialized HTML.
+mistaken for serialized HTML. Function identity alone cannot provide that proof:
+one compiled template can return user text early, and an ordinary wrapper can
+forward another component's serialized result. A `WeakSet`-only prototype exposed
+the early text as HTML and escaped the forwarded markup. The
+[server return regressions](../packages/octane/tests/server-renderable-contract.test.ts)
+protect both cases across buffered and streaming renderers.
 Ordered hook replay reuses staged Action records. Prefix snapshots and urgent
 operation indices allocate only when those queues overlap; the committed-input
 snapshot is limited to urgent ancestor traversal of a queued transition.
+Manual-slot packages adapt their hook definitions once, allowing bound and
+forwarded aliases to retain their internal slots while ordinary custom hooks
+receive exactly the authored arguments. The adapter avoids a second argument
+array for calls with up to four authored arguments. Render-phase self-updates
+reuse the existing pending flag and retry limit; output entrypoints check that
+flag before initializing children from discarded parent inputs. This does not
+make template execution transactional: an expression in a later sibling cannot
+roll back a child that an earlier sibling already initialized. Keep render-phase
+self-updates in setup when they must settle before child initialization.
 
 Measurements compare the baseline above with the candidate using the same
 installed dependencies and authored fixtures on Node 26.4.0 and Chromium:
@@ -153,11 +174,11 @@ installed dependencies and authored fixtures on Node 26.4.0 and Chromium:
 | Control | Baseline → candidate | Interpretation |
 | --- | --- | --- |
 | `benchmarks/hook-memo/run.mjs` operation and allocation counters | Identical | Ordinary render/memo creation counts stay unchanged. These counters are not a full heap census. |
-| Hook-memo complete production bundles, gzip | 54,611 → 57,599 bytes; 55,159 → 58,171 bytes | The whole patch adds 2,988 / 3,012 bytes in the runtime / inline variants. |
-| Hook transition, 40 alternating samples of 500 complete cycles after 1,000 warmups | 3.4 → 4.0 µs median | Per-hook tracking and render-time replay cost about 0.6 µs per cycle on this fixture. Value, pending, and layout-commit controls pass. |
+| Hook-memo complete production bundles, gzip | 54,611 → 57,999 bytes; 55,159 → 58,570 bytes | The whole patch adds 3,388 / 3,411 bytes in the runtime / inline variants. |
+| Hook transition, 40 alternating samples of 500 complete cycles after 1,000 warmups | 2.8 → 3.6 µs median | Observed 0.8 µs / 29% increase on this fixture. Value, pending, and layout-commit controls pass. |
 | `benchmarks/ssr-throughput/run.mjs`, compiled deopt-page fixture | 1.761 → 1.914 ms | About 9% higher median render score, including string materialization. |
 | Same SSR fixture through descriptors | 3.656 → 3.901 ms | About 7% higher median render score. |
-| Hook-memo compiled fixture output, minified | 5,784 → 5,764 bytes; 7,183 → 7,163 bytes | Preserving custom hooks' authored arguments removes unnecessary trailing arguments. |
+| Hook-memo compiled fixture output, minified | 5,784 → 6,455 bytes; 7,183 → 7,854 bytes | Setup checkpoints and manual provider adaptation add 671 bytes in each variant. |
 
 SSR uses three alternating runs with `CONFIGS=deopt-page`, a one-second timed
 budget per configuration, and 500 memory-phase renders. Baseline and candidate
@@ -168,6 +189,11 @@ GC-sensitive and are not used as retention evidence.
 The SSR figures retain the original audit measurement; that serializer fixture
 does not call hooks affected by the later argument and slot fixes. Bundle and
 transition measurements above include those follow-ups.
+The final transition sample ran after the broad suites completed. A preceding
+sample under concurrent test load measured 4.6 / 5.8 µs (26% increase), supporting
+the slowdown direction while showing that absolute timings depend on machine
+load. These results describe this minimal workload rather than application-wide
+throughput.
 
 The existing keyed-row browser harness passes all 28 order and survivor-identity
 gates. Twelve timing samples per target were noisy: several insertion medians

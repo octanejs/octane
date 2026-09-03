@@ -1946,7 +1946,7 @@
       "status": "active"
     },
     "28": {
-      "message": "Target container is not a DOM element.",
+      "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
       "runtime": ["client"],
       "status": "active"
     },

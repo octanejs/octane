@@ -1271,13 +1271,15 @@ class OctaneBundlerCompiler {
 				return passThrough();
 			}
 			const nativeHookImport = /from\s*['"]octane\/signals\/(?:client|server)['"]/.test(code);
-			if (
-				!/from\s*['"]octane['"]/.test(code) &&
-				!(nativeReads && /from\s*['"]octane\/server['"]/.test(code)) &&
-				!nativeHookImport &&
-				!(nativeReads && /from\s*['"]octane\/signals['"]/.test(code))
-			)
-				return passThrough();
+			const hasHookRuntimeImport =
+				/from\s*['"]octane['"]/.test(code) ||
+				(nativeReads && /from\s*['"]octane\/server['"]/.test(code)) ||
+				nativeHookImport ||
+				(nativeReads && /from\s*['"]octane\/signals['"]/.test(code));
+			// Manual factories can import only other binding helpers, so their
+			// escaping hooks still need a provider boundary. Unrelated helpers keep
+			// their cheap pass-through without collecting unused manifest watches.
+			if (!hasHookRuntimeImport && !/(?:\b|_)use[A-Z]/.test(code)) return passThrough();
 			if (!this._isInstalledOctaneSource(file, collected)) {
 				return passThrough();
 			}
@@ -1290,6 +1292,7 @@ class OctaneBundlerCompiler {
 				return passThrough();
 			}
 			const manualSlots = this._hasManualHookSlots(file, collected);
+			if (!hasHookRuntimeImport && !manualSlots) return passThrough();
 			const inlinePlainMemo =
 				inlineHookMemo &&
 				environment === 'client' &&

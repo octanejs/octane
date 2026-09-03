@@ -1202,6 +1202,11 @@ Both `createRoot` and `hydrateRoot` accept an `Element`, a `Document`, or a
 `DocumentFragment` (including `ShadowRoot`). Document roots own the document
 element and preserve its doctype.
 
+A document root replaces the document shell when its output does not contain
+`<html>` and `<body>`. In that case `document.body` is `null`, so it cannot be
+passed to another `createRoot` call. Update the existing document root or render
+a complete document shell first.
+
 The first `root.render()` mounts synchronously. React's concurrent root queues
 its initial mount, so a render followed by an unmount in the same surrounding
 batch exposes no intermediate DOM there; Octane may expose the mounted DOM

@@ -140,7 +140,7 @@ function predeclareDirect(statements, scope, hookRuntimeModules, bindingsOnly = 
 						!isHookRuntime &&
 						original.importKind !== 'type' &&
 						specifier.importKind !== 'type' &&
-						/^use[A-Z]/.test(imported ?? specifier.local.name)
+						(/^use[A-Z]/.test(imported ?? '') || /^use[A-Z]/.test(specifier.local.name))
 							? (imported ?? specifier.local.name)
 							: null,
 				});

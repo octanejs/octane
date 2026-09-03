@@ -4,6 +4,11 @@ export function TextReturn(props: { value: string }) {
 	return props.value;
 }
 
+export function MixedTextReturn(props: { value: string; text: boolean }) @{
+	if (props.text) return props.value;
+	<strong>{props.value}</strong>
+}
+
 export function TextNested(props: { value: string }) @{
 	<section>
 		<TextReturn value={props.value} />

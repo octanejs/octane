@@ -14,6 +14,7 @@
 // helpers can execute in a Scope alongside code from any other source module.
 
 import { parseModule } from '@tsrx/core';
+import { parseModule as parseFallbackModule } from '#octane/compiler-parser';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
 import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 import { METHOD_DEP_IMPORT, annotateHookCalls } from './hook-deps.js';
@@ -21,6 +22,7 @@ import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
 import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
+import { findManualHookProviders } from './manual-hooks.js';
 
 function importsNativeRenderer(ast) {
 	return ast.body.some(
@@ -54,7 +56,10 @@ function octaneHookLocals(ast, nativeReads = false) {
 		if (node.type !== 'ImportDeclaration') continue;
 		if (node.importKind === 'type') continue;
 		for (const sp of node.specifiers || []) {
-			if (sp.importKind !== 'type' && /^use[A-Z]/.test(sp.imported?.name ?? sp.local?.name ?? '')) {
+			if (
+				sp.importKind !== 'type' &&
+				(/^use[A-Z]/.test(sp.imported?.name ?? '') || /^use[A-Z]/.test(sp.local?.name ?? ''))
+			) {
 				importsCustomHook = true;
 			}
 		}
@@ -169,7 +174,7 @@ function collectVoidRootCandidates(ast) {
 export function findVoidRootImports(source, id) {
 	let ast;
 	try {
-		ast = parseModule(source, id);
+		ast = parseHookSource(source, id).ast;
 	} catch {
 		return [];
 	}
@@ -247,7 +252,7 @@ export function findVoidComponentImports(source, id) {
 		ast = source;
 	} else {
 		try {
-			ast = parseModule(source, id);
+			ast = parseHookSource(source, id).ast;
 		} catch {
 			return [];
 		}
@@ -1102,6 +1107,67 @@ function walk(node, owner, st) {
 	}
 }
 
+function collectManualHookEdits(ast, providers, helper, edits) {
+	function visit(node) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const item of node) visit(item);
+			return;
+		}
+		if (node.type === 'Program' || node.type === 'BlockStatement') {
+			const names = node.body.flatMap((statement) => {
+				const declaration =
+					statement.type === 'ExportNamedDeclaration' ||
+					statement.type === 'ExportDefaultDeclaration'
+						? statement.declaration
+						: statement;
+				return declaration?.type === 'FunctionDeclaration' && providers.has(declaration)
+					? [providers.get(declaration)]
+					: [];
+			});
+			if (names.length) {
+				let index = 0;
+				while (
+					node.body[index]?.type === 'ExpressionStatement' &&
+					typeof node.body[index].expression?.value === 'string'
+				)
+					index++;
+				edits.push({
+					pos: node.body[index]?.start ?? node.end - 1,
+					text: names.map((name) => `${name} = ${helper}(${name}); `).join(''),
+				});
+			}
+		}
+		if (providers.has(node) && node.type !== 'FunctionDeclaration') {
+			edits.push({ pos: node.start, text: `${helper}(` });
+			edits.push({ pos: node.end, text: `, ${JSON.stringify(providers.get(node))})` });
+		}
+		for (const key in node) {
+			if (key === 'loc' || key === 'metadata' || key === 'parent' || key.startsWith('_octane'))
+				continue;
+			const value = node[key];
+			if (value && typeof value === 'object') visit(value);
+		}
+	}
+	visit(ast);
+}
+
+function parseHookSource(source, id) {
+	try {
+		return { ast: parseModule(source, id), canPrint: true };
+	} catch (error) {
+		if (!(error instanceof SyntaxError)) throw error;
+		// Some binding signatures (const generics in function types) need the
+		// native parser. Its object-TS dialect retains types and source offsets,
+		// but drops type parentheses required by the Program printer. Keep that
+		// AST on the surgical path so every authored type stays byte-for-byte.
+		return {
+			ast: parseFallbackModule(source, `${id.split(/[?#]/, 1)[0]}.object.ts`),
+			canPrint: false,
+		};
+	}
+}
+
 /**
  * Inject per-call-site hook slots into Octane base and imported/aliased hook calls in a plain
  * `.ts`/`.js` module. Returns `null` (pass through unchanged) when the module
@@ -1128,14 +1194,16 @@ export function slotHooks(source, id, options) {
 		);
 	}
 	let ast;
+	let canPrint;
 	try {
-		ast = parseModule(source, id);
+		({ ast, canPrint } = parseHookSource(source, id));
 	} catch {
 		return null; // let the normal pipeline surface the parse error
 	}
 	assertStrongMode(ast, source, id, options);
 	assertNativeReadDiagnostics(ast, source, id, options);
 	const importInfo = octaneHookLocals(ast, options?.nativeReads === true);
+	const manualProviders = options?.manualSlots ? findManualHookProviders(ast) : new Map();
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
 	const canSpecializeRoot =
 		!options?.manualSlots &&
@@ -1143,7 +1211,12 @@ export function slotHooks(source, id, options) {
 		!options?.profile &&
 		typeof options?.isVoidComponentImport === 'function' &&
 		importInfo.hasOctaneImport;
-	if (!importInfo.importsHook && !canSpecializeRoot && !nativeReadActivation) {
+	if (
+		!importInfo.importsHook &&
+		!canSpecializeRoot &&
+		!nativeReadActivation &&
+		!manualProviders.size
+	) {
 		return null;
 	}
 	// The parsed tree is never mutated: annotateHookCalls returns a COW-rebuilt
@@ -1166,6 +1239,7 @@ export function slotHooks(source, id, options) {
 	}
 	const getterCalls = importInfo.importsHook ? collectStateGetterCalls(ast) : new WeakSet();
 	if (
+		canPrint &&
 		options?.inlineHookMemo === true &&
 		environment === 'client' &&
 		!options?.hmr &&
@@ -1217,6 +1291,14 @@ export function slotHooks(source, id, options) {
 	if (importInfo.importsHook) {
 		if (!st.manualSlots) collectParallelUseEdits(ast, st);
 		for (const node of ast.body || []) walk(node, hookOwner(null, 'module'), st);
+	}
+	if (manualProviders.size) {
+		collectManualHookEdits(
+			ast,
+			findManualHookProviders(ast),
+			requireParallelHelper(st, 'manualHook'),
+			st.edits,
+		);
 	}
 	if (canSpecializeRoot) {
 		collectVoidRootEdits(ast, st, options.isVoidComponentImport);

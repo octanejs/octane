@@ -1472,7 +1472,14 @@ function flushTransitionActionBatch(batch: TransitionActionBatch): void {
 		if (changed) slot.value = value;
 		if (update.reducer !== undefined) update.reducer.renderTransition = update;
 		if (update.state !== undefined) update.state.renderTransition = update;
-		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		// Queue replay can still be required after an urgent replacement already
+		// published the staged value. That bookkeeping is not a state-change cause;
+		// reducers retain their explicit forced-render cause.
+		if (
+			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+			__OCTANE_PROFILE_ENABLED__ &&
+			(changed || update.profileType !== 'state')
+		)
 			__profileSchedule(
 				block,
 				update.profileType ?? (forceRender ? 'reducer' : 'state'),
@@ -1730,7 +1737,16 @@ function getHeldTransitionUpdate(
 		const entries = FLUSHED_TRANSITION_UPDATES[i];
 		for (let j = entries.length - 1; j >= 0; j--) {
 			const entry = entries[j];
-			if (entry.slot === slot && !entry.superseded && Object.is(slot.value, entry.baseValue))
+			if (
+				entry.slot === slot &&
+				!entry.superseded &&
+				Object.is(slot.value, entry.baseValue) &&
+				// A completed hook render clears this pointer before the flush's
+				// retained-entry list is released. Returning to an old base value
+				// must not turn that completed update into pending work again.
+				((entry.state === undefined && entry.reducer === undefined) ||
+					slot.renderTransition !== undefined)
+			)
 				return latestHeldTransitionUpdate(entry);
 		}
 	}
@@ -6498,10 +6514,17 @@ function createBlock(
 export function renderBlock(block: Block): void {
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.owns(block)) {
-		hydration.suspend(() => renderBlockInner(block));
+		hydration.suspend(() => renderBlock(block));
 		return;
 	}
-	renderBlockInner(block);
+	let retries = 0;
+	while (renderBlockInner(block)) {
+		if (block.nestedUpdateError) {
+			block.nestedUpdateError = false;
+			throw maximumUpdateDepthError();
+		}
+		if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
+	}
 }
 
 function enqueueEffectEventUpdate(entry: PendingEffectEvent): void {
@@ -6606,7 +6629,7 @@ function endUrgentTransitionRender(block: Block, render: UrgentTransitionRender)
 	if (render.queueEpoch !== QUEUE_REINDEX_EPOCH && !QUEUE.includes(block)) QUEUE.push(block);
 }
 
-function renderBlockInner(block: Block): void {
+function renderBlockInner(block: Block): true | undefined {
 	// Keep retries visible to compiler-owned cache hits throughout the body. A
 	// fresh invalidation during this attempt replaces RETRYING, so successful
 	// hidden renders cannot erase work still waiting for their reveal.
@@ -6673,6 +6696,7 @@ function renderBlockInner(block: Block): void {
 	// redundant standalone render (it checks `pending` before rendering). Cleared
 	// at the TOP so a re-entrant setState during this render re-queues correctly.
 	block.pending = false;
+	block.crossRenderUpdate = false;
 	// Reset the per-render `use(thenable)` call-order counter. Cached entries
 	// in __thenables persist ONLY across the failed attempts of ONE suspension
 	// episode: earlier use() calls return synchronously on replay-after-resolve
@@ -6730,6 +6754,7 @@ function renderBlockInner(block: Block): void {
 	let profileDidThrow = false;
 	let profileThrown: unknown;
 	let renderCompleted = false;
+	let renderRetry = false;
 	NATIVE_READ_DRIVER?.beginRender(block);
 	NATIVE_BLOCK_RETRIES?.get(block)?.clear();
 	try {
@@ -6740,6 +6765,15 @@ function renderBlockInner(block: Block): void {
 			block,
 			block.extra,
 		);
+		// Compiled bodies stop between setup and output when setup queues a
+		// self-update. Plain return-value bodies reach the same checkpoint here.
+		// Replay within this call, before a caller captures single-root DOM or
+		// publishes the child's mounted state. Cross-component updates retain
+		// their ordinary scheduler path.
+		if (block.pending && !block.crossRenderUpdate) {
+			renderRetry = true;
+			return true;
+		}
 		if (out !== undefined && block.outputHandler !== null) block.outputHandler(block, out);
 		finishEffectRender(block);
 		if (!block.mounted) block.mounted = true;
@@ -6776,6 +6810,7 @@ function renderBlockInner(block: Block): void {
 		)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
 		if (!renderCompleted) {
+			if (renderRetry) block.renderStatus = RENDER_INVALID;
 			// A descendant may already have invalidated this live render stack.
 			// A separately scheduled reader instead marks its logical ancestors up
 			// to the actual Suspense owner, passing through catch-only boundaries.
@@ -7162,6 +7197,7 @@ export function componentSlotLite<P>(
 	props: P,
 	anchor?: Node,
 ): void {
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const hydration = activeHydration();
 	let scope = parentScope.slots[slotKey] as Scope | undefined;
 	// The server `<!--]-->` this call adopted as its range end (hydration first
@@ -7602,13 +7638,74 @@ function missingSlot(name: string): never {
 // compile.js — the keyed `@for` template block is the supported loop: each item
 // renders in its own scope).
 const slotStack: HookSlot[] = [];
+// Only manual-slot provider definitions install this capability. Ordinary custom
+// hooks keep their authored arguments; an actual provider adapter consumes the
+// pending call-site slot even when reached through a bound or forwarding alias.
+let MANUAL_HOOK_DRIVER: { pending: HookSlot | undefined; active: boolean } | null = null;
+
+/** @internal Adapt a provider that owns the trailing hook-slot ABI. */
+export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+	const driver = (MANUAL_HOOK_DRIVER ??= {
+		pending: slotStack[slotStack.length - 1],
+		active: false,
+	});
+	function provider(this: unknown) {
+		const pending = driver.pending;
+		const active = driver.active;
+		driver.pending = undefined;
+		driver.active = true;
+		try {
+			if (pending === undefined) return Reflect.apply(fn, this, arguments);
+			// Avoid a second rest array for the usual provider arities. The
+			// withSlot caller already owns its authored argument array.
+			switch (arguments.length) {
+				case 0:
+					return fn.call(this, pending);
+				case 1:
+					return fn.call(this, arguments[0], pending);
+				case 2:
+					return fn.call(this, arguments[0], arguments[1], pending);
+				case 3:
+					return fn.call(this, arguments[0], arguments[1], arguments[2], pending);
+				case 4:
+					return fn.call(this, arguments[0], arguments[1], arguments[2], arguments[3], pending);
+				default: {
+					const args = new Array(arguments.length + 1);
+					for (let index = 0; index < arguments.length; index++) args[index] = arguments[index];
+					args[arguments.length] = pending;
+					return fn.apply(this, args);
+				}
+			}
+		} finally {
+			driver.pending = pending;
+			driver.active = active;
+		}
+	}
+	Object.defineProperty(provider, 'name', { value: name ?? fn.name, configurable: true });
+	Object.defineProperty(provider, 'length', { value: fn.length, configurable: true });
+	return provider as F;
+}
+
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
+	const driver = MANUAL_HOOK_DRIVER;
+	const pending = driver?.pending;
+	const active = driver?.active ?? false;
+	if (driver !== null) {
+		driver.pending = sym;
+		driver.active = false;
+	}
 	slotStack.push(sym);
 	try {
 		return fn(...args);
 	} finally {
 		slotStack.pop();
+		if (MANUAL_HOOK_DRIVER !== null) {
+			// A provider can first be defined inside this call. In that case the
+			// previous path predates the capability and has no manual body active.
+			MANUAL_HOOK_DRIVER.pending = driver === null ? slotStack[slotStack.length - 1] : pending;
+			MANUAL_HOOK_DRIVER.active = active;
+		}
 	}
 }
 
@@ -7682,15 +7779,15 @@ export function useState<T = undefined>(): StateTuple<T | undefined>;
 export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
 export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTuple<T> {
 	// Compiled base calls supply the slot separately, padding omitted initial
-	// values with undefined. Retain the legacy lone-slot form only outside a
-	// custom-hook path: aliases (including bound/forwarding functions) receive
-	// authored args there, so their lone Symbol is an initial value. An explicit
-	// second argument also stays unambiguous when a binding forwards undefined.
+	// values with undefined. Manual providers retain the legacy lone-slot form;
+	// automatic aliases (including bound/forwarding functions) receive authored
+	// args, so their lone Symbol is an initial value. An explicit second argument
+	// also stays unambiguous when a binding forwards undefined.
 	if (
 		slot === undefined &&
 		typeof initial === 'symbol' &&
 		arguments.length === 1 &&
-		slotStack.length === 0
+		(slotStack.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
 	) {
 		slot = initial as unknown as symbol;
 		initial = undefined as T;
@@ -7928,7 +8025,7 @@ export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot)
 		slot === undefined &&
 		typeof initial === 'symbol' &&
 		arguments.length === 1 &&
-		slotStack.length === 0
+		(slotStack.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
 	) {
 		slot = initial as unknown as symbol;
 		initial = undefined as T;
@@ -8909,7 +9006,7 @@ export function useRef<T>(initial?: T, slot?: HookSlot): { current: T | undefine
 		slot === undefined &&
 		typeof initial === 'symbol' &&
 		arguments.length === 1 &&
-		slotStack.length === 0
+		(slotStack.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
 	) {
 		slot = initial as unknown as symbol;
 		initial = undefined;
@@ -19903,6 +20000,7 @@ export function portal(
 	fragmentOwners?: FragmentInstance | readonly FragmentInstance[],
 	fragmentAnchor?: Node,
 ): void {
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const prev = parentScope.slots[slotKey] as PortalSlot | undefined;
 	const key = portalKey(props);
 	if (
@@ -21104,6 +21202,9 @@ function componentSlotImpl(
 	// explicit `key={undefined}` from an unkeyed call.
 	hasKey?: boolean,
 ): void {
+	// Attribute expressions can schedule a self-update after the compiled
+	// setup checkpoint. Skip their discarded child before it owns any state.
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	// A component nested inside a client-built replacement range must mount as
@@ -24315,6 +24416,7 @@ export function childSlot(
 	compiledMapDeps?: any[],
 	mappedFallback?: boolean,
 ): void {
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	// Reading the host's tag costs two DOM accessors and this runs for every
 	// renderable hole on every render, so lead with the cheap facts. A de-opt list
 	// ITEM (`includeKeyedSingle === false`, passed only by deoptItemBody) shares
@@ -29785,6 +29887,9 @@ function renderBranchSlot(
 	// the same staleness a per-render closure had).
 	env?: any[],
 ): void {
+	// A condition/discriminant can queue a parent self-update while its call
+	// arguments are evaluated. Preserve the previous branch for the replay.
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	if (next !== state.branch) {
@@ -30748,6 +30853,7 @@ export function activityBlock(
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
 ): void {
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	if (mode === 'hidden') ensureScheduledVisibilityDriver();
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
@@ -31293,6 +31399,9 @@ export function forBlock<T>(
 	// both that placeholder and a newly-created `/for` comment.
 	ownEnd?: boolean,
 ): void {
+	// The iterable expression can queue a self-update before this call starts.
+	// Do not mount or remove items from an output the owner will replay.
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	// flags bitfield: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item
 	// Comment markers), bit 2 = depEligible (compare `deps` to cachedDeps and
 	// promote body to PURE when unchanged), bit 3 = indexIndependent (the body
@@ -31559,6 +31668,9 @@ export function keyedForBlock<T>(
 	ownEnd?: boolean,
 	selectionBody?: ComponentBody<T, any[]>,
 ): void {
+	// forBlock may skip discarded output before it creates the list slot.
+	// Skip selection bookkeeping with the same owner check.
+	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const state = parentScope.slots[slotKey] as ForSlot | undefined;
 	if (TRANSITION_JOURNAL !== null && ROOT_RENDER_TRANSACTION === null) {
 		if (state !== undefined) {

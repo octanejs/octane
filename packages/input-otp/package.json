@@ -6,6 +6,14 @@
   "engines": {
     "node": ">=22.22.2"
   },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src/use-previous.ts",
+        "src/use-pwm-badge.ts"
+      ]
+    }
+  },
   "description": "Accessible one-time password inputs for Octane, ported from input-otp 1.5.0.",
   "author": {
     "name": "Dominic Gannaway",

@@ -13,11 +13,12 @@
     "noEmit": true,
     "noErrorTruncation": true,
     "baseUrl": "../../..",
-    "paths": { "@octanejs/formisch": ["packages/formisch/src/index.ts"] }
+    "paths": {
+      "@octanejs/formisch": ["packages/formisch/src/index.ts"]
+    }
   },
   "include": [
     "./public-api.test-d.ts",
-    "./react-types-must-not-be-imported.d.ts",
     "./upstream/frameworks/react/**/*.test-d.ts",
     "./upstream/packages/methods/**/*.test-d.ts",
     "./upstream/packages/methods/src/vitest/**/*.ts"

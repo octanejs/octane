@@ -265,10 +265,17 @@ describe('imported hook aliases in plain modules', () => {
 		}
 	});
 
-	it('retains the authored policy in an explicitly manually slotted module', () => {
+	it('retains authored hook arguments in an explicitly manually slotted module', () => {
 		const source = `import { createElement } from 'octane';
 			import { useCell } from './aliases'; export function useValue(slot) { return useCell(1, slot); }`;
-		expect(slotHooks(source, 'manual-alias.ts', { manualSlots: true })).toBeNull();
+		const { useValue } = loadPlainHookFixtureSource(source, {
+			id: 'manual-alias.ts',
+			inlineHookMemo: false,
+			manualSlots: true,
+			runtimeModules: { './aliases': { useCell: (...args: unknown[]) => args } },
+		});
+		const slot = Symbol('authored identity');
+		expect(useValue(slot)).toEqual([1, slot]);
 	});
 
 	it('does not treat shadowed factories or reassigned values as proven hook aliases', () => {

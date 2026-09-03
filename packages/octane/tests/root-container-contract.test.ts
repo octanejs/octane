@@ -71,6 +71,30 @@ describe('public root containers and test environment', () => {
 		expect(onRecoverableError).not.toHaveBeenCalled();
 		root.unmount();
 	});
+	it('allows a body root inside a hydrated document that retains its body', () => {
+		const html = renderToString(server.DocumentView, { label: 'hydrated' }).html;
+		const container = new DOMParser().parseFromString('<!DOCTYPE html>' + html, 'text/html');
+		const documentRoot = hydrateRoot(container, DocumentView, { label: 'hydrated' });
+		const bodyRoot = createRoot(container.body);
+		bodyRoot.render(Label, { label: 'nested' });
+		expect(container.body.textContent).toBe('nested');
+		bodyRoot.unmount();
+		documentRoot.unmount();
+	});
+	it('explains a missing body when document hydration replaces the document shell', () => {
+		const container = document.implementation.createHTMLDocument('old');
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(container, Label, { label: 'whole document' });
+		expect(container.body).toBeNull();
+		if (process.env.OCTANE_TEST_COMPILE_MODE !== 'prod') {
+			expect(() => createRoot(container.body)).toThrow(
+				'If document.body is null after document hydration, update the existing document root',
+			);
+		} else {
+			expect(() => createRoot(container.body)).toThrow();
+		}
+		root.unmount();
+	});
 	it.each([false, true])(
 		'mounts and updates metadata in its Document head (global: %s)',
 		(global) => {

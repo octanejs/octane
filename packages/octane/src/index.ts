@@ -249,6 +249,7 @@ export {
 	portal,
 	hookSlots,
 	withSlot,
+	manualHook,
 	// Compiler-emitted parallel use(): batched stratum unwrap + fetch-tree
 	// warming (docs/suspense-parallel-use-plan.md).
 	useBatch,

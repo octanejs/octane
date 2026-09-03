@@ -87,6 +87,7 @@ export {
 	lazy,
 	hookSlots,
 	withSlot,
+	manualHook,
 	startTransition,
 	flushSync,
 	isChildrenBlock,

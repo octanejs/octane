@@ -5511,7 +5511,7 @@ export function useState<T>(
 		slot === undefined &&
 		typeof initial === 'symbol' &&
 		arguments.length === 1 &&
-		HOOK_SLOT_PATH.length === 0
+		(HOOK_SLOT_PATH.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
 	) {
 		slot = initial;
 		initial = undefined as T;
@@ -5549,7 +5549,7 @@ export function __useStateWithGetter<T>(
 		slot === undefined &&
 		typeof initial === 'symbol' &&
 		arguments.length === 1 &&
-		HOOK_SLOT_PATH.length === 0
+		(HOOK_SLOT_PATH.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
 	) {
 		slot = initial;
 		initial = undefined as T;
@@ -5787,7 +5787,7 @@ export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | un
 		slot === undefined &&
 		typeof initial === 'symbol' &&
 		arguments.length === 1 &&
-		HOOK_SLOT_PATH.length === 0
+		(HOOK_SLOT_PATH.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
 	) {
 		slot = initial;
 		initial = undefined;
@@ -5911,13 +5911,70 @@ export function markWarm<T extends Function>(component: T, plan: unknown): T {
 // whole nested call-site path ambient while the wrapped hook runs so its base
 // hooks resolve by definition site + every call boundary, rather than by a
 // render-pass occurrence that can shift when a conditional call disappears.
+let MANUAL_HOOK_DRIVER: { pending: ServerHookSlot | undefined; active: boolean } | null = null;
+
+/** @internal Adapt a provider that owns the trailing hook-slot ABI. */
+export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+	const driver = (MANUAL_HOOK_DRIVER ??= {
+		pending: HOOK_SLOT_PATH[HOOK_SLOT_PATH.length - 1],
+		active: false,
+	});
+	function provider(this: unknown) {
+		const pending = driver.pending;
+		const active = driver.active;
+		driver.pending = undefined;
+		driver.active = true;
+		try {
+			if (pending === undefined) return Reflect.apply(fn, this, arguments);
+			// Avoid a second rest array for the usual provider arities. The
+			// withSlot caller already owns its authored argument array.
+			switch (arguments.length) {
+				case 0:
+					return fn.call(this, pending);
+				case 1:
+					return fn.call(this, arguments[0], pending);
+				case 2:
+					return fn.call(this, arguments[0], arguments[1], pending);
+				case 3:
+					return fn.call(this, arguments[0], arguments[1], arguments[2], pending);
+				case 4:
+					return fn.call(this, arguments[0], arguments[1], arguments[2], arguments[3], pending);
+				default: {
+					const args = new Array(arguments.length + 1);
+					for (let index = 0; index < arguments.length; index++) args[index] = arguments[index];
+					args[arguments.length] = pending;
+					return fn.apply(this, args);
+				}
+			}
+		} finally {
+			driver.pending = pending;
+			driver.active = active;
+		}
+	}
+	Object.defineProperty(provider, 'name', { value: name ?? fn.name, configurable: true });
+	Object.defineProperty(provider, 'length', { value: fn.length, configurable: true });
+	return provider as F;
+}
+
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: ServerHookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
+	const driver = MANUAL_HOOK_DRIVER;
+	const pending = driver?.pending;
+	const active = driver?.active ?? false;
+	if (driver !== null) {
+		driver.pending = sym;
+		driver.active = false;
+	}
 	HOOK_SLOT_PATH.push(sym);
 	try {
 		return fn(...args);
 	} finally {
 		HOOK_SLOT_PATH.pop();
+		if (MANUAL_HOOK_DRIVER !== null) {
+			MANUAL_HOOK_DRIVER.pending =
+				driver === null ? HOOK_SLOT_PATH[HOOK_SLOT_PATH.length - 1] : pending;
+			MANUAL_HOOK_DRIVER.active = active;
+		}
 	}
 }
 

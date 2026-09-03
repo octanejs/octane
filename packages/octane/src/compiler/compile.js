@@ -14399,6 +14399,31 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		bodyStatements.push(...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)));
 	}
 	bodyStatements.push(...rewrittenStatements);
+	// A self-update scheduled by setup discards this output. The owning Block
+	// replays setup before returning to its parent, so children initialize from
+	// the settled state and no template/resource work escapes the first pass.
+	// Call-free setup cannot schedule an update; keep those bodies unchanged.
+	if (
+		ctx.mode !== 'server' &&
+		ctx._universalRuntimeUnit == null &&
+		!returnedOutput &&
+		containsRenderCall(statements)
+	) {
+		bodyStatements.push(
+			inheritOriginLoc(
+				b.if(
+					b.logical(
+						'&&',
+						b.member(b.member(b.id('__s'), 'block'), 'pending'),
+						b.unary('!', b.member(b.member(b.id('__s'), 'block'), 'crossRenderUpdate')),
+					),
+					b.return(null),
+					null,
+				),
+				node,
+			),
+		);
+	}
 	// GLOBAL resource registrations (stylesheet precedence links, style
 	// resources, async scripts) run here: after setup, so an href computed from
 	// a body local is initialized, and BEFORE the constructs below mount any

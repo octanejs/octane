@@ -4873,12 +4873,74 @@ export function hookSlots(count: number): number {
 	return base;
 }
 
-export function withSlot<T>(slot: unknown, fn: (...args: any[]) => T, ...args: any[]): T {
-	UNIVERSAL_SLOT_STACK.push(slot);
+// Only manual-slot provider definitions install this capability. Ordinary custom
+// hooks keep their authored arguments; an actual provider adapter consumes the
+// pending call-site slot even when reached through a bound or forwarding alias.
+let MANUAL_HOOK_DRIVER: { pending: unknown; active: boolean } | null = null;
+
+/** @internal Adapt a provider that owns the trailing hook-slot ABI. */
+export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+	const driver = (MANUAL_HOOK_DRIVER ??= {
+		pending: UNIVERSAL_SLOT_STACK[UNIVERSAL_SLOT_STACK.length - 1],
+		active: false,
+	});
+	function provider(this: unknown) {
+		const pending = driver.pending;
+		const active = driver.active;
+		driver.pending = undefined;
+		driver.active = true;
+		try {
+			if (pending === undefined) return Reflect.apply(fn, this, arguments);
+			// Avoid a second rest array for the usual provider arities. The
+			// withSlot caller already owns its authored argument array.
+			switch (arguments.length) {
+				case 0:
+					return fn.call(this, pending);
+				case 1:
+					return fn.call(this, arguments[0], pending);
+				case 2:
+					return fn.call(this, arguments[0], arguments[1], pending);
+				case 3:
+					return fn.call(this, arguments[0], arguments[1], arguments[2], pending);
+				case 4:
+					return fn.call(this, arguments[0], arguments[1], arguments[2], arguments[3], pending);
+				default: {
+					const args = new Array(arguments.length + 1);
+					for (let index = 0; index < arguments.length; index++) args[index] = arguments[index];
+					args[arguments.length] = pending;
+					return fn.apply(this, args);
+				}
+			}
+		} finally {
+			driver.pending = pending;
+			driver.active = active;
+		}
+	}
+	Object.defineProperty(provider, 'name', { value: name ?? fn.name, configurable: true });
+	Object.defineProperty(provider, 'length', { value: fn.length, configurable: true });
+	return provider as F;
+}
+
+export function withSlot<T>(sym: unknown, fn: (...a: any[]) => T, ...args: any[]): T {
+	const driver = MANUAL_HOOK_DRIVER;
+	const pending = driver?.pending;
+	const active = driver?.active ?? false;
+	if (driver !== null) {
+		driver.pending = sym;
+		driver.active = false;
+	}
+	UNIVERSAL_SLOT_STACK.push(sym);
 	try {
 		return fn(...args);
 	} finally {
 		UNIVERSAL_SLOT_STACK.pop();
+		if (MANUAL_HOOK_DRIVER !== null) {
+			// A provider can first be defined inside this call. In that case the
+			// previous path predates the capability and has no manual body active.
+			MANUAL_HOOK_DRIVER.pending =
+				driver === null ? UNIVERSAL_SLOT_STACK[UNIVERSAL_SLOT_STACK.length - 1] : pending;
+			MANUAL_HOOK_DRIVER.active = active;
+		}
 	}
 }
 
@@ -5245,6 +5307,17 @@ export function useState<T>(
 	initial: T | (() => T),
 	slot?: unknown,
 ): [T, (value: T | ((previous: T) => T)) => void, () => T] {
+	// Universal direct calls accept Symbol data. Only an adapted manual provider
+	// uses a lone Symbol as the legacy empty-initializer slot form.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		MANUAL_HOOK_DRIVER?.active === true
+	) {
+		slot = initial;
+		initial = undefined as T;
+	}
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
 	let hook = cloneStateHook<T>(owner, resolved);
@@ -5712,6 +5785,15 @@ export function useCallback<T extends (...args: any[]) => any>(
 }
 
 export function useRef<T>(initial: T, slot?: unknown): { current: T } {
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		MANUAL_HOOK_DRIVER?.active === true
+	) {
+		slot = initial;
+		initial = undefined as T;
+	}
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
 	let hook = owner.hooks.get(resolved) as RefHook<T> | undefined;
