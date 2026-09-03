@@ -205,7 +205,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@tsrx/core": "catalog:default",
+    "@tsrx/core": "github:tsrx-org/tsrx#feat/scoped-styles-apply&path:packages/tsrx",
     "@types/react": "catalog:default",
     "@volar/language-core": "catalog:default",
     "@volar/typescript": "catalog:default",

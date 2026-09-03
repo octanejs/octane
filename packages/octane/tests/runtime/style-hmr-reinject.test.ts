@@ -44,31 +44,17 @@ describe('injectStyle dedupe (S3.6)', () => {
 		serverSheet.remove();
 	});
 
-	it('current behavior: a second call with the same id but different css is ignored', () => {
+	// After an HMR re-evaluation the scope hash is unchanged (it derives from the
+	// first block's position and content) but a later block's CSS may differ;
+	// the runtime refreshes the sheet in place instead of keeping the stale one.
+	it('re-injecting an unchanged hash with changed css replaces the sheet', () => {
 		const id = freshId();
-		const before = `.c.${id} { color: rgb(4, 4, 4); }`;
-		const after = `.c.${id} { color: rgb(5, 5, 5); }`;
+		const before = `.d.${id} { color: rgb(6, 6, 6); }`;
+		const after = `.d.${id} { color: rgb(7, 7, 7); }`;
 		injectStyle(id, before);
 		injectStyle(id, after);
 		const tags = sheets(id);
 		expect(tags).toHaveLength(1);
-		expect(tags[0].textContent).toBe(before);
+		expect(tags[0].textContent).toBe(after);
 	});
-
-	// The dedupe hazard the plan describes: after an HMR re-evaluation the
-	// scope hash is unchanged but its CSS is not, and the runtime keeps the
-	// stale sheet. Recorded as a known failure — the runtime is not changed here.
-	it.fails(
-		'HMR hazard: re-injecting an unchanged hash with changed css should replace the sheet',
-		() => {
-			const id = freshId();
-			const before = `.d.${id} { color: rgb(6, 6, 6); }`;
-			const after = `.d.${id} { color: rgb(7, 7, 7); }`;
-			injectStyle(id, before);
-			injectStyle(id, after);
-			const tags = sheets(id);
-			expect(tags).toHaveLength(1);
-			expect(tags[0].textContent).toBe(after);
-		},
-	);
 });

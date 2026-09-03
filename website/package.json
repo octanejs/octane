@@ -32,7 +32,7 @@
     "@lynx-js/web-core": "catalog:lynx",
     "@octanejs/testing-library": "workspace:*",
     "@shikijs/rehype": "catalog:default",
-    "@tsrx/core": "catalog:default",
+    "@tsrx/core": "github:tsrx-org/tsrx#feat/scoped-styles-apply&path:packages/tsrx",
     "@tsrx/prettier-plugin": "catalog:default",
     "@types/qrcode": "^1.5.6",
     "@types/three": "catalog:default",
