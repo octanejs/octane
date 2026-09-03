@@ -937,6 +937,17 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: () => [] }],
 	},
 	{
+		// Transition/hook hot paths: useTransition cycles, functional updaters,
+		// suspended hold + release, urgent dispatch, delegated clicks, and an
+		// urgent update beside a queued transition. Deterministic creation-event
+		// and render counts with semantic controls; timings are secondary.
+		name: 'transition-hooks',
+		cwd: 'transition-hooks',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Strong-mode keyed row reuse, with receiver calls observed outside the
 		// compiled source and DOM/event controls for every dependency change.
 		name: 'template-call-memo',

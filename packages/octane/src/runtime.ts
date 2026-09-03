@@ -1348,8 +1348,15 @@ interface TransitionActionBatch {
 	pendingActions: number;
 	closed: boolean;
 	flushed: boolean;
-	/** Only hook-started actions own pending indicators. */
-	hooks?: Set<TransitionHookSlot>;
+	/**
+	 * Only hook-started actions own pending indicators. Nearly every batch has
+	 * exactly one starting hook, so the first is a plain field and only a second
+	 * distinct hook (a nested start from another component) allocates the list.
+	 */
+	hook: TransitionHookSlot | null;
+	hooks: TransitionHookSlot[] | null;
+	/** True while this batch is counted in its hooks' pending batch counts. */
+	hooksPending: boolean;
 	pendingHolds?: number;
 	workComplete?: boolean;
 }
@@ -1372,7 +1379,15 @@ let ACTIVE_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
 let IN_FLIGHT_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
 
 function createTransitionActionBatch(): TransitionActionBatch {
-	return { updates: new Map(), pendingActions: 0, closed: false, flushed: false };
+	return {
+		updates: new Map(),
+		pendingActions: 0,
+		closed: false,
+		flushed: false,
+		hook: null,
+		hooks: null,
+		hooksPending: false,
+	};
 }
 
 function transitionActionBatchForUpdate(): TransitionActionBatch | null {
@@ -1526,27 +1541,66 @@ let TRANSITION_PENDING_COUNT = 0;
 const TRANSITION_LISTENERS = new Set<() => void>();
 let TRANSITION_HOOK_HOLDERS: WeakMap<object, Set<TransitionActionBatch>> | null = null;
 
+/**
+ * Count `batch` toward `hook`'s pending indicator. Idempotent per batch: a hook
+ * joins once however many nested starts it performs inside the same batch, and
+ * a batch counted in its hooks stays counted until it finishes.
+ */
+function addTransitionHookToBatch(batch: TransitionActionBatch, hook: TransitionHookSlot): void {
+	if (batch.hook === null) batch.hook = hook;
+	else if (batch.hook !== hook) {
+		const hooks = batch.hooks;
+		if (hooks === null) batch.hooks = [hook];
+		else if (hooks.includes(hook)) return;
+		else hooks.push(hook);
+	} else return;
+	if (batch.hooksPending) {
+		// The batch is already counted in its earlier hooks; count the newcomer.
+		hook.pendingBatches++;
+		hook.publish(true);
+	}
+}
+
+/** Publish the rising edge to every hook of `batch` and count the batch once. */
+function publishTransitionHookBatch(batch: TransitionActionBatch): void {
+	const hook = batch.hook;
+	if (hook === null || batch.hooksPending) return;
+	batch.hooksPending = true;
+	hook.pendingBatches++;
+	hook.publish(true);
+	const hooks = batch.hooks;
+	if (hooks !== null) {
+		for (let i = 0; i < hooks.length; i++) {
+			hooks[i].pendingBatches++;
+			hooks[i].publish(true);
+		}
+	}
+}
+
 function finishTransitionHookBatch(batch: TransitionActionBatch): void {
 	if (!batch.workComplete || batch.pendingActions !== 0 || (batch.pendingHolds ?? 0) !== 0) return;
-	if (batch.hooks === undefined) return;
-	for (const hook of batch.hooks) {
-		hook.batches.delete(batch);
-		if (hook.batches.size === 0) hook.publish(false);
+	if (!batch.hooksPending) return;
+	batch.hooksPending = false;
+	const hook = batch.hook!;
+	if (--hook.pendingBatches === 0) hook.publish(false);
+	const hooks = batch.hooks;
+	if (hooks !== null) {
+		for (let i = 0; i < hooks.length; i++) {
+			if (--hooks[i].pendingBatches === 0) hooks[i].publish(false);
+		}
 	}
 }
 
 function holdTransitionHookBatch(holder: object, batch: TransitionActionBatch): void {
-	if (batch.hooks === undefined || batch.hooks.size === 0) return;
+	if (batch.hook === null) return;
 	const holders = (TRANSITION_HOOK_HOLDERS ??= new WeakMap());
 	let batches = holders.get(holder);
 	if (batches === undefined) holders.set(holder, (batches = new Set()));
 	if (batches.has(batch)) return;
 	batches.add(batch);
 	batch.pendingHolds = (batch.pendingHolds ?? 0) + 1;
-	for (const hook of batch.hooks) {
-		hook.batches.add(batch);
-		hook.publish(true);
-	}
+	// A finished batch that a later round re-holds becomes pending again.
+	publishTransitionHookBatch(batch);
 }
 
 function releaseTransitionHookHolder(holder: object): void {
@@ -28825,9 +28879,8 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 	const ownsActionBatch = parentActionBatch === null && pendingActionBatch === null;
 	ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
 	if (hook !== undefined) {
-		(actionBatch.hooks ??= new Set()).add(hook);
-		hook.batches.add(actionBatch);
-		hook.publish(true);
+		addTransitionHookToBatch(actionBatch, hook);
+		publishTransitionHookBatch(actionBatch);
 	}
 	// A transition started synchronously during a form's submit dispatch
 	// entangles with that form's status (manual-action useFormStatus activation —
@@ -28921,7 +28974,12 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 interface TransitionHookSlot {
 	isPending: boolean;
 	block: Block;
-	batches: Set<TransitionActionBatch>;
+	/**
+	 * Action batches this hook started or was re-held into that have not
+	 * finished. The batches themselves list their hooks; the hook only needs
+	 * the count to publish its falling edge, so no per-hook collection exists.
+	 */
+	pendingBatches: number;
 	error?: { value: unknown };
 	start: (fn: () => void | Promise<unknown>) => void;
 	publish: (pending: boolean) => void;
@@ -28952,7 +29010,7 @@ export function useTransition(
 		const hook: TransitionHookSlot = {
 			isPending: false,
 			block,
-			batches: new Set(),
+			pendingBatches: 0,
 			start: (fn) => {
 				if (!block.disposed) runTransition(fn, hook);
 			},
@@ -28971,10 +29029,9 @@ export function useTransition(
 		};
 		s = hook;
 		ensureHooks(scope).set(slot, hook);
-		registerHookCleanup(scope, () => {
-			for (const batch of hook.batches) batch.hooks?.delete(hook);
-			hook.batches.clear();
-		});
+		// An in-flight batch keeps referencing an unmounted hook until it
+		// finishes; publish() ignores a disposed block, and the batch releases the
+		// reference when its Action settles. No unmount-time cleanup is needed.
 	}
 	if (s.error !== undefined) {
 		const error = s.error.value;
