@@ -41,6 +41,25 @@ export default function App() @{
 	};
 
 	<>
+		<div class="demo">
+			<h2>{'Count: ' + count}</h2>
+
+			<button onClick={() => setCount(count + 1)}>Increment</button>
+			<button onClick={addItem}>Add item</button>
+
+			@if (count >= 5) {
+				<p class="hot">Count is heating up!</p>
+			}
+
+			<ul>
+				@for (const item of items; key item) {
+					<li>{item}</li>
+				} @empty {
+					<li class="empty">No items yet — add one.</li>
+				}
+			</ul>
+		</div>
+
 		<style>
 			.demo {
 				display: grid;
@@ -62,24 +81,6 @@ export default function App() @{
 				opacity: 0.6;
 			}
 		</style>
-		<div class="demo">
-			<h2>{'Count: ' + count}</h2>
-
-			<button onClick={() => setCount(count + 1)}>Increment</button>
-			<button onClick={addItem}>Add item</button>
-
-			@if (count >= 5) {
-				<p class="hot">Count is heating up!</p>
-			}
-
-			<ul>
-				@for (const item of items; key item) {
-					<li>{item}</li>
-				} @empty {
-					<li class="empty">No items yet — add one.</li>
-				}
-			</ul>
-		</div>
 	</>
 }
 `;
