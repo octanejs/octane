@@ -186,3 +186,12 @@ dist-redact
 .content-collections
 # Pristine Vitest caches
 packages/*/.vite-pristine/
+
+# INTERIM: `<style>` blocks beside a code block's output node (RFC tsrx-org/RFCs#1)
+# parse only with the @tsrx/core on the scoped-styles branch; the published
+# @tsrx/prettier-plugin still uses the released parser. Remove once the plugin
+# release that ships the new parser is in the catalog.
+packages/octane-evals/datasets/train/user-apps-v1/tasks/tsrx.nested-scope-styles/reference/src/App.tsrx
+packages/octane/tests/_fixtures/style-order-applier.tsrx
+packages/octane/tests/_fixtures/style-scopes.tsrx
+packages/octane/tests/browser/scoped-styles/panel.tsrx
