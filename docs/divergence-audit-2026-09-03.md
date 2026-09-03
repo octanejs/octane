@@ -154,6 +154,23 @@ forward another component's serialized result. A `WeakSet`-only prototype expose
 the early text as HTML and escaped the forwarded markup. The
 [server return regressions](../packages/octane/tests/server-renderable-contract.test.ts)
 protect both cases across buffered and streaming renderers.
+A follow-up measured where the SSR cost below actually came from. Bundles built
+from the base and candidate sources, plus a candidate with the carrier removed,
+were within run-to-run noise of each other on both deopt-page fixtures and on
+the 10,000-item escape-heavy fixture, and a CPU profile attributed the whole
+difference to `spliceHead`: with an empty hoisted head it scanned the complete
+response for a `</head>` on every render. The follow-up returns a non-document
+body unchanged after the existing document prefix check, so that scan only runs
+for documents; a document still gains its implicit `<head>`. Timing only that
+tail work on freshly rendered bodies, harness materialization included, gives
+96 → 167 → 101 µs (compiled deopt-page), 234 → 343 → 265 µs (descriptors), and
+950 → 1,483 → 1,003 µs (escape-heavy) for base → #943 → fix. Loop item helpers
+stop wrapping their markup in the carrier separately (#945), which reduces
+carrier calls without a measurable time change. An identity-register design
+that removed the remaining per-component carrier was prototyped, passed the
+suites, and was set aside as unmeasurable. The same suite now also covers
+wrappers that keep several directly obtained results, wrappers that return their
+own text after such calls, and string children of `<pre>` and `<textarea>`.
 Ordered hook replay reuses staged Action records. Prefix snapshots and urgent
 operation indices allocate only when those queues overlap; the committed-input
 snapshot is limited to urgent ancestor traversal of a queued transition.
@@ -180,10 +197,40 @@ installed dependencies and authored fixtures on Node 26.4.0 and Chromium:
 | `benchmarks/hook-memo/run.mjs` operation and allocation counters | Identical | Ordinary render/memo creation counts stay unchanged. These counters are not a full heap census. |
 | Hook-memo complete production bundles, gzip | 54,611 → 57,959 bytes; 55,159 → 58,521 bytes | The whole patch adds 3,348 / 3,362 bytes in the runtime / inline variants. |
 | Hook transition, 40 alternating samples of 500 complete cycles after 1,000 warmups | 2.8 → 3.6 µs median | Observed 0.8 µs / 29% increase on this fixture. Value, pending, and layout-commit controls pass. |
-| `benchmarks/ssr-throughput/run.mjs`, compiled deopt-page fixture | 1.761 → 1.914 ms | About 9% higher median render score, including string materialization. |
-| Same SSR fixture through descriptors | 3.656 → 3.901 ms | About 7% higher median render score. |
+| `benchmarks/ssr-throughput/run.mjs`, compiled deopt-page fixture | 1.761 → 1.914 ms; follow-up 1.635 → 1.744 → 1.666 ms with the carrier removed | About 9% higher median render score, including string materialization. The follow-up attributes it to `spliceHead` (0% → 8.8% of profiled self time; after the fix the prefix check shows the flatten that materialization already pays, and the scan is gone), not the carrier. |
+| Same SSR fixture through descriptors | 3.656 → 3.901 ms; follow-up 3.567 → 3.709 → 3.582 ms with the carrier removed | About 7% higher median render score; same attribution. On escape-heavy (996 KB body) the paired ratio to the pre-#943 base fell from 1.13 to 1.06 after the fix, measured under shared machine load. |
 | Hook-memo compiled fixture output, minified | 5,784 → 6,497 bytes; 7,183 → 7,896 bytes | Setup checkpoints and manual provider adaptation add 713 bytes in each variant. |
 | `benchmarks/transition-hooks/run.mjs` runtime constructor creations per 64 cycles (follow-up, 2026-09-03) | cycle 192 → 256 → 192; updater 192 → 256 → 192; held 896 → 1,025 → 961; urgent n/a → 448 → 384 | Baseline → this audit → the follow-up that removed the per-transition hook `Set`. Every render count and every function/array/object count is otherwise identical between the audit and the follow-up; the held path keeps one hook-holder registration per suspended hold. |
+
+A same-environment follow-up (Node 24.18.0, macOS ARM64, the locked native
+parser) attributed the bundle growth per top-level declaration under Vite's
+production tree-shaking. The first version of these fixes let `dispatchDelegated`
+call the form-action submit handler directly, so `startTransition` and the
+held-transition swap graph became reachable from every bundle that delegates
+events, including compiler-specialized roots that never render descriptors.
+`setFormAction`, the only writer of `$$formAction`, now installs that handler,
+and the compiled setup checkpoint is emitted only when setup can schedule a
+render-phase self-update: the passive built-in hooks and unshadowed standard
+globals cannot, while setters, custom hooks, prop callbacks, factories passed by
+reference, and every other call keep it.
+
+| Measurement, gzip unless noted                | Audit base → first fix → follow-up |
+| --------------------------------------------- | ---------------------------------- |
+| `run-minimal.mjs` root-static-specialized     | 18,565 → 23,499 → 19,410           |
+| `run-minimal.mjs` cli-spa-starter             | 31,256 → 36,459 → 32,294           |
+| `run-minimal.mjs` hooks-state                 | 47,553 → 51,346 → 51,350           |
+| Hook-memo inline bundle                       | 55,169 → 58,568 → 58,580           |
+| Hook-memo inline compiled fixture, minified   | 7,183 → 7,896 → 7,896              |
+| `benchmarks/codegen-size` corpus, minified    | 76,534 → 78,983 → 76,553           |
+
+The remaining growth is the fixed behavior itself. Bundles whose entry retains
+the descriptor renderer (`createRoot`, spreads, `createElement` hosts) already
+reached the transition graph through function form actions before the audit, and
+the transition-hook records, queued state replay, submit and handler snapshots,
+root-container support, and mount-time render-phase drain are the fixes. Every
+hook-memo fixture component invokes an `observe` prop in setup, so its
+checkpoints stay, and the `event-names` table remains runtime data because
+spread and descriptor props on custom elements decide delegation at render time.
 
 SSR uses three alternating runs with `CONFIGS=deopt-page`, a one-second timed
 budget per configuration, and 500 memory-phase renders. Baseline and candidate

@@ -110,11 +110,11 @@ transition value under the urgent parent render, which the audit corrected.
 
 ## Staged-update lookup reuse
 
-The follow-up to `eff02711b` returns the staged update record directly instead
-of looking it up again. On Node 26.4.0 with esbuild 0.28.1, the unchanged fixture
-and dependencies produced these native `Map.get` counts per 64 cycles:
+Returning the staged update record directly avoids looking it up again. Against
+`613508303`, on Node 26.4.0 with esbuild 0.28.1, the unchanged fixture and
+dependencies produced these native `Map.get` counts per 64 cycles:
 
-| Scenario | `eff02711b` | Record reuse |
+| Scenario | `613508303` | Record reuse |
 | --- | ---: | ---: |
 | `cycle` | 832 | 768 |
 | `updater` | 832 | 768 |
@@ -127,8 +127,8 @@ and dependencies produced these native `Map.get` counts per 64 cycles:
 Each scenario that stages one update removes exactly one lookup per cycle.
 The ordinary-update controls, every existing source creation counter, and
 every semantic observation are unchanged. The compiled fixture remains 3,368
-minified bytes; the complete minified bundle falls from 202,995 to 202,980 bytes
-(−15 bytes), with gzip unchanged at 64,347 bytes.
+minified bytes; the complete minified bundle falls from 203,020 to 203,005 bytes
+(−15 bytes), while gzip changes from 64,354 to 64,355 bytes (+1 byte).
 
 The seven new lookup ceilings supplement the 35 existing work guards. The
 unmodified baseline breaches the four staged-update lookup ceilings while
@@ -136,14 +136,15 @@ passing all existing guards and the three new controls; record reuse passes
 all 42. These counts establish removed lookup work, without making an
 allocation or application-latency claim.
 
-A quiet A/B/B/A run used the existing Node/happy-dom timing settings above.
-The functional-updater timings and unchanged native-click control were:
+Historical quiet A/B/B/A timings against `eff02711b`, before the compiler and
+SSR changes in `613508303`, used the Node/happy-dom settings above. The
+functional-updater timings and unchanged native-click control were:
 
 | Order | Runtime | Updater mean (µs) | Updater median (µs) | Click mean (µs) |
 | --- | --- | ---: | ---: | ---: |
 | A1 | `eff02711b` | 1.753 | 1.583 | 5.821 |
-| B1 | Record reuse | 2.041 | 1.967 | 7.701 |
-| B2 | Record reuse | 1.674 | 1.562 | 5.813 |
+| B1 | Record reuse on `eff02711b` | 2.041 | 1.967 | 7.701 |
+| B2 | Record reuse on `eff02711b` | 1.674 | 1.562 | 5.813 |
 | A2 | `eff02711b` | 1.648 | 1.555 | 5.607 |
 
 All four runs passed the semantic controls and reproduced the deterministic
@@ -151,4 +152,6 @@ counter results. The first candidate run was slower, including the unchanged
 click control; the other candidate run was much closer to the baseline.
 The variability prevents attributing elapsed-time differences to this change.
 No elapsed-time improvement is established; the supported result is the removed
-lookup per staged update with unchanged creation counts.
+lookup per staged update with unchanged creation counts. The `613508303`
+revalidation repeated the deterministic counters and byte measurements, without
+claiming those historical timings describe the newer base.
