@@ -17641,10 +17641,21 @@ function requiresTemplateNormalization(
 		t === 'FragmentStart' ||
 		t === 'FragmentEnd' ||
 		t === 'FoldedDirective' ||
-		t === 'HeadHoist' ||
-		t === 'JSXCodeBlock'
+		t === 'HeadHoist'
 	) {
 		return true;
+	}
+	if (t === 'JSXCodeBlock') {
+		// A render-only child block is transparent template grouping (the same
+		// rule normalizeChildren and extractFragment apply): only its render
+		// decides. A setup-bearing or code-only block is a render scope of its
+		// own and needs the compiled-fragment path. A styled static fragment
+		// therefore stays a descriptor when its block only groups the fragment
+		// that holds the `<style>` — the form amendment A1 leaves a value factory
+		// written in plain TSX (raw CSS needs a `@{ … }` container).
+		const body = node.body || [];
+		if (body.length > 0 || !node.render) return true;
+		return requiresTemplateNormalization(node.render, parentNs, allowHeadHoists, ctx);
 	}
 	if (t === 'Fragment' || t === 'JSXFragment' || t === 'Tsx' || t === 'Tsrx') {
 		return (node.children || []).some((child) =>
