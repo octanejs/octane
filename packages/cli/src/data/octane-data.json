@@ -805,7 +805,7 @@
     {
       "name": "@octanejs/react-is",
       "version": "0.1.0",
-      "category": "UI Utilities",
+      "category": "Developer Tools",
       "upstream": { "package": "react-is", "version": "19.2.7" },
       "surface": "All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata.",
       "divergences": [

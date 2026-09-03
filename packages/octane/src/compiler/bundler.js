@@ -33,8 +33,7 @@ import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { formatCompileDiagnostic } from './native-change-diagnostics.js';
 import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
 import { rewriteServerRuntimeRequests } from './runtime-requests.js';
-import { assertStrongMode } from './strong-mode.js';
-import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
+import { assertNativeReadOptions } from './native-read-diagnostics.js';
 import { findCssModuleImportRequests } from './css-module-imports.js';
 import {
 	assertNoLiveClientOnlyImports,
@@ -1299,27 +1298,8 @@ class OctaneBundlerCompiler {
 				profile === false &&
 				renderer.target === 'dom' &&
 				universalRuntime === undefined;
-			if (manualSlots && !inlinePlainMemo) {
-				const authoredSource = code;
-				if (nativeReads || nativeHookImport)
-					assertNativeReadDiagnostics(
-						parseModule(authoredSource, filename),
-						authoredSource,
-						filename,
-						{
-							nativeReads,
-							renderer,
-						},
-					);
-				// Hand-slotted bindings still own their authored policy. Opting one
-				// module in must not require changing its established slot ABI.
-				if (strong || code.includes('use strong')) {
-					assertStrongMode(parseModule(authoredSource, filename), authoredSource, filename, {
-						strong,
-					});
-				}
-				if (!nativeReads) return passThrough();
-			}
+			// Manual modules still need observed tuple capabilities. slotHooks keeps
+			// their authored slots and dependencies while selecting getter helpers.
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
 				!manualSlots &&

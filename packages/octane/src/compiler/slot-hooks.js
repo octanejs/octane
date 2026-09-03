@@ -748,6 +748,19 @@ function collectStateGetterCalls(ast) {
 	return calls;
 }
 
+function collectStateGetterEdit(node, imported, st) {
+	if (!st.getterCalls.has(node) || !STATE_GETTER_HELPERS[imported]) return;
+	let helper = st.getterHelpers.get(imported);
+	if (helper === undefined) {
+		const base = `_$${STATE_GETTER_HELPERS[imported]}`;
+		helper = base;
+		let suffix = 0;
+		while (st.source.includes(helper)) helper = `${base}$${++suffix}`;
+		st.getterHelpers.set(imported, helper);
+	}
+	st.edits.push({ pos: node.callee.start, end: node.callee.end, text: helper });
+}
+
 // DFS in SOURCE ORDER, allocating a hook's slot id BEFORE descending into its args
 // — identical pre-order to rewriteHookCalls, so a base hook nested as an argument
 // (e.g. in a deps array) gets its own stable id. Collects insertion edits + the
@@ -1001,7 +1014,7 @@ function walk(node, owner, st) {
 		node.type === 'FunctionDeclaration' && node.id ? hookOwner(node, node.id.name) : owner;
 
 	if (node.type === 'CallExpression') {
-		if (node._octaneCustomHookCall) {
+		if (!st.manualSlots && node._octaneCustomHookCall) {
 			const open = callOpenParen(node, st.source);
 			if (open !== -1) {
 				const sym = allocHookSymbol(st, owner, node.callee.name, node._octaneCustomHookCall, node);
@@ -1016,7 +1029,9 @@ function walk(node, owner, st) {
 		const imported =
 			node._octaneImportedHook ??
 			(st.nativeReads ? node._octaneHookRuntimeImportedHook : undefined);
+		collectStateGetterEdit(node, imported, st);
 		if (
+			!st.manualSlots &&
 			imported &&
 			(HOOK_NAMES.has(imported) || (st.nativeReads && NATIVE_SIGNAL_HOOK_NAMES.has(imported)))
 		) {
@@ -1033,7 +1048,17 @@ function walk(node, owner, st) {
 					text: requireParallelHelper(st, 'nativePuMemo'),
 				});
 			}
-			if (inferred !== undefined) {
+			if (
+				(imported === 'useState' || imported === 'useRef') &&
+				node.arguments.some((arg) => arg.type === 'SpreadElement')
+			) {
+				const open = callOpenParen(node, st.source);
+				if (open !== -1) {
+					const helper = requireParallelHelper(st, 'withSlot');
+					st.edits.push({ pos: node.start, text: `${helper}(${sym}, ` });
+					st.edits.push({ pos: open, end: open + 1, text: ', ' });
+				}
+			} else if (inferred !== undefined) {
 				// The dependency callback is already the final user argument. Insert
 				// both the generated array and slot in one edit so equal-position edit
 				// ordering cannot reverse them. Dependency nodes retain original source
@@ -1053,11 +1078,11 @@ function walk(node, owner, st) {
 					text: `, [${deps}], ${sym}`,
 				});
 			} else if (node.arguments.length === 0) {
-				// `useId()` → `useId(_h$N)`. Symbols remain self-identifying when
-				// optional user arguments are omitted.
+				// State/ref initializers may themselves be Symbols. Reserve their
+				// authored position even when empty; other hooks keep their ABI.
 				st.edits.push({
 					pos: node.end - 1,
-					text: sym,
+					text: imported === 'useState' || imported === 'useRef' ? `undefined, ${sym}` : sym,
 				});
 			} else {
 				// `useState(0)` → `useState(0, _h$N)` — insert AFTER the last arg's end so
@@ -1066,17 +1091,6 @@ function walk(node, owner, st) {
 					pos: node.arguments[node.arguments.length - 1].end,
 					text: ', ' + sym,
 				});
-			}
-			if (st.getterCalls.has(node) && STATE_GETTER_HELPERS[imported]) {
-				let helper = st.getterHelpers.get(imported);
-				if (helper === undefined) {
-					const base = `_$${STATE_GETTER_HELPERS[imported]}`;
-					helper = base;
-					let suffix = 0;
-					while (st.source.includes(helper)) helper = `${base}$${++suffix}`;
-					st.getterHelpers.set(imported, helper);
-				}
-				st.edits.push({ pos: node.callee.start, end: node.callee.end, text: helper });
 			}
 		}
 	}
@@ -1101,8 +1115,8 @@ function walk(node, owner, st) {
  *   runtime-ranged Symbols. Profiling retains short described Symbols because
  *   hook metadata is keyed by Symbol identity.
  *   `inlineHookMemo: true` enables the production-client whole-AST memo path;
- *   the default remains surgical. `manualSlots: true` permits only that memo
- *   rewrite and never injects or changes the module's authored slot policy.
+ *   the default remains surgical. `manualSlots: true` permits memo and observed
+ *   getter rewrites without injecting or changing the authored slot policy.
  * @returns {{ code: string, map: any } | null}
  */
 export function slotHooks(source, id, options) {
@@ -1124,6 +1138,7 @@ export function slotHooks(source, id, options) {
 	const importInfo = octaneHookLocals(ast, options?.nativeReads === true);
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
 	const canSpecializeRoot =
+		!options?.manualSlots &&
 		!options?.hmr &&
 		!options?.profile &&
 		typeof options?.isVoidComponentImport === 'function' &&
@@ -1174,9 +1189,8 @@ export function slotHooks(source, id, options) {
 		});
 		if (inlined !== null) return inlined;
 	}
-	if (options?.manualSlots === true && !nativeReadActivation) return null;
-
 	const st = {
+		manualSlots: options?.manualSlots === true,
 		nativeReads: options?.nativeReads === true,
 		locals: importInfo.locals,
 		source,
@@ -1200,8 +1214,8 @@ export function slotHooks(source, id, options) {
 		voidRootName: null,
 	};
 	if (!st.hmr && !st.profile) st.slotBaseName = allocSlotName(st, '_hs$');
-	if (importInfo.importsHook && options?.manualSlots !== true) {
-		collectParallelUseEdits(ast, st);
+	if (importInfo.importsHook) {
+		if (!st.manualSlots) collectParallelUseEdits(ast, st);
 		for (const node of ast.body || []) walk(node, hookOwner(null, 'module'), st);
 	}
 	if (canSpecializeRoot) {
@@ -1247,9 +1261,10 @@ export function slotHooks(source, id, options) {
 	const otherHelperImports = [...otherHelpers]
 		.map(([request, specifiers]) => `import { ${specifiers.join(', ')} } from '${request}';\n`)
 		.join('');
-	const profileImport = st.profile
-		? "import { __profileHook as _$__profileHook } from 'octane/profiling';\n"
-		: '';
+	const profileImport =
+		st.profile && !st.manualSlots
+			? "import { __profileHook as _$__profileHook } from 'octane/profiling';\n"
+			: '';
 	const slotBase =
 		!st.hmr && !st.profile && st.nextId > 0
 			? `const ${st.slotBaseName} = /* @__PURE__ */ ${st.hookSlotsName}(${st.nextId});\n`

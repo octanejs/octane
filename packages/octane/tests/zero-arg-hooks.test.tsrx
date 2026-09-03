@@ -2,12 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { useState, useRef } from 'octane';
 import { mount, act } from './_helpers';
 
-// Zero-arg `useState()` / `useRef()` (state/ref start undefined — React
-// parity). The compiler appends the slot as the LAST argument, so these
-// arrive as `useState(slot)` with the symbol in the initial-value position;
-// the runtime must reinterpret the trailing symbol (same ABI rule as
-// resolveHookArgs for optional-deps effects). Regression: before the
-// reinterpretation, `useState<T>()` threw "called without a hook slot".
+// Zero-arg state/ref calls start undefined. The compiler reserves the authored
+// initializer position with undefined before its slot, so a real Symbol
+// initializer remains a value when a call is forwarded through a custom hook.
 
 function ZeroArgState() @{
 	const [value, setValue] = useState<string | undefined>();
@@ -24,7 +21,7 @@ function ZeroArgRef() @{
 	<div>{ref.current}</div>
 }
 
-describe('zero-arg hooks (slot in first position)', () => {
+describe('zero-arg hooks (reserved initializer position)', () => {
 	it('useState() starts undefined and updates', async () => {
 		const r = mount(ZeroArgState);
 		expect(r.container.textContent).toBe('undef');

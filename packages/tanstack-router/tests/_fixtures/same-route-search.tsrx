@@ -7,7 +7,7 @@ import {
 	useRouterState,
 	createMemoryHistory,
 } from '@octanejs/tanstack-router';
-import { use } from 'octane';
+import { use, useDeferredValue } from 'octane';
 
 // A layout that just renders an <Outlet/> for the active route.
 function RootLayout() @{
@@ -17,9 +17,7 @@ function RootLayout() @{
 	</div>
 }
 
-// A distinct pendingComponent so the test can assert the route's fallback is NOT
-// shown while the transition holds the current page during a same-route
-// search-param change.
+// A distinct fallback makes urgent and explicitly deferred navigation observable.
 function StoriesPending() @{
 	<div class="stories-pending">{'Loading page…'}</div>
 }
@@ -65,23 +63,29 @@ function PageView(props: { page: number }) @{
 	<h1 class="stories" data-page={String(props.page)}>{value as string}</h1>
 }
 
-// The route component reads the `?page` search param and passes it to PageView.
-// A same-route `?page=1` → `?page=2` change updates the search this component
-// observes; PageView then suspends on page=2's deferred. Because the navigation
-// rides the concurrent-navigation transition, octane should HOLD the page=1
-// content rather than flash the route's pending fallback.
+// External store updates are urgent. The route may opt into stale content by
+// deferring the scalar render input while the router's location updates eagerly.
 function StoriesPage() @{
-	const page = useSearch({ select: (s: any) => s.page ?? 1 }) as number;
+	const page = useSearch({ strict: false, select: (s: any) => s.page ?? 1 }) as number;
+	<PageView page={page} />
+}
+
+function DeferredStoriesPage() @{
+	const nextPage = useSearch({ strict: false, select: (s: any) => s.page ?? 1 }) as number;
+	const page = useDeferredValue(nextPage);
 	<PageView page={page} />
 }
 
 // Builds a single-route router whose '/' route reads `?page` and suspends per page.
-export function makeSameRouteSearchRouter(initial: string, options: { isServer?: boolean } = {}) {
+export function makeSameRouteSearchRouter(
+	initial: string,
+	options: { isServer?: boolean; deferPage?: boolean } = {},
+) {
 	const rootRoute = createRootRoute({ component: RootLayout });
 	const indexRoute = createRoute({
 		getParentRoute: () => rootRoute,
 		path: '/',
-		component: StoriesPage,
+		component: options.deferPage ? DeferredStoriesPage : StoriesPage,
 		pendingComponent: StoriesPending,
 		validateSearch: (search: Record<string, unknown>) => ({
 			page: search.page != null ? Number(search.page) : 1,

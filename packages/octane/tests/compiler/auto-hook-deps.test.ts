@@ -644,7 +644,7 @@ export function run(value: string) {
 		expect(slotHooks(source, 'shadowed-namespace.ts')).toBeNull();
 	});
 
-	it('keeps the self-identifying Symbol ABI for runtime-variable spread arity', () => {
+	it('uses a Symbol call path for runtime-variable state spread arity', () => {
 		const source = `
 import { useState } from 'octane';
 export function useThing(args: [] | [number]) {
@@ -652,7 +652,7 @@ export function useThing(args: [] | [number]) {
 }
 `;
 		const code = slotHooks(source, 'spread-hook.ts')!.code;
-		expect(code).toMatch(/(?:useState|_\$__useStateWithGetter)\(\.\.\.args, _h\$0\)/);
+		expect(code).toMatch(/_\$withSlot\(_h\$0, (?:useState|_\$__useStateWithGetter), \.\.\.args\)/);
 		expect(code).toContain('const _h$0 = /* @__PURE__ */ Symbol(_hs$);');
 	});
 });

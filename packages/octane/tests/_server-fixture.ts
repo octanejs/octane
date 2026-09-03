@@ -41,6 +41,8 @@ export interface CompiledFixtureSourceOptions {
 export interface PlainHookFixtureSourceOptions {
 	id: string;
 	inlineHookMemo: boolean;
+	mode?: 'client' | 'server';
+	hmr?: boolean;
 	manualSlots?: boolean;
 	nativeReads?: boolean;
 	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
@@ -63,10 +65,11 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 	source: string,
 	options: PlainHookFixtureSourceOptions,
 ): T {
+	const mode = options.mode ?? 'client';
 	const out = slotHooks(source, options.id, {
-		environment: 'client',
-		hmr: false,
-		dev: false,
+		environment: mode,
+		hmr: options.hmr ?? false,
+		dev: options.hmr ?? false,
 		profile: false,
 		inlineHookMemo: options.inlineHookMemo,
 		manualSlots: options.manualSlots,
@@ -83,7 +86,7 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 			verbatimModuleSyntax: true,
 		},
 	});
-	return evaluateCompiledFixtureCode<T>(outputText, options.id, 'client', options.runtimeModules);
+	return evaluateCompiledFixtureCode<T>(outputText, options.id, mode, options.runtimeModules);
 }
 
 export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(

@@ -10254,7 +10254,8 @@ function compileServer(
 				},
 			});
 		} else {
-			bodyNodes.push(rewriteModuleJsxValues(node, ctx));
+			const fnName = node.id?.name || node.declaration?.id?.name || 'module';
+			bodyNodes.push(rewriteModuleJsxValues(rewriteHookCalls(node, ctx, fnName), ctx));
 		}
 	}
 
@@ -16681,12 +16682,27 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 
 function appendHookSlotArgument(name, args, slot, numeric, origin) {
 	const out = [...args];
-	const position = numeric ? NUMERIC_HOOK_SLOT_POSITION[name] : undefined;
+	const position =
+		numeric || name === 'useState' || name === 'useRef'
+			? NUMERIC_HOOK_SLOT_POSITION[name]
+			: undefined;
 	if (position !== undefined) {
 		while (out.length < position) out.push(b.id('undefined', origin));
 	}
 	out.push(typeof slot === 'string' ? b.id(slot, origin) : inheritOriginLoc(slot, origin));
 	return out;
+}
+
+function wrapHookCallWithSlot(call, ctx, slot, callee, args) {
+	const fn = call.typeArguments
+		? { type: 'TSInstantiationExpression', expression: callee, typeArguments: call.typeArguments }
+		: callee;
+	return {
+		...call,
+		callee: b.id(requireRuntimeForContext(ctx, 'withSlot')),
+		typeArguments: null,
+		arguments: [typeof slot === 'string' ? b.id(slot) : slot, fn, ...args],
+	};
 }
 
 function arrayPatternObservesStateGetter(pattern) {
@@ -17339,20 +17355,20 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			const importedName = n._octaneImportedHook;
 			const hookRuntimeImportedName = n._octaneHookRuntimeImportedHook;
 			const name = importedName ?? hookRuntimeImportedName ?? localName;
-			// Three kinds of call get a trailing per-call-site hook slot:
+			// Three kinds of call receive a per-call-site hook identity:
 			//  - a built-in base hook (HOOK_NAMES) — also needs its runtime import;
 			//  - a custom / library hook by React's `use[A-Z]` convention — e.g. a
 			//    `useStore` binding from @octanejs/zustand that WRAPS a base hook and
-			//    FORWARDS the slot to it. `useContext` is keyed by context identity (no
+			//    resolves the enclosing call path. `useContext` is keyed by context identity (no
 			//    slot) and `use` has no uppercase suffix, so both are excluded here. We
 			//    do NOT import custom hooks — they're user/library imports;
 			//  - a server-mode `use(thenable)` — a stable suspense-cache key.
 			// Distinct call sites get distinct slots, so `useStore(a)`/`useStore(b)`
 			// (or the same hook twice) stay independent.
 			//
-			// NB: a `use*` NAME is reserved for hooks (React's convention) — a non-hook
-			// function named like one gets a harmless extra trailing argument (though
-			// inside a plain JS loop the convention is enforced: rejectHookInJsLoop).
+			// A `use*` name is reserved for hooks. The custom wrapper preserves its
+			// authored argument list; inside a plain JS loop the convention is
+			// enforced by rejectHookInJsLoop.
 			const isBuiltin =
 				(HOOK_NAMES.has(name) ||
 					(ctx.nativeReads &&
@@ -17369,10 +17385,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					const inline = lowerLocalMemoExpression(n, name);
 					if (inline !== null) return inline;
 				}
-				// Keep a Symbol at custom-hook call boundaries: published bindings split
-				// that trailing value from optional user args and derive manual sub-slots
-				// from it. Proven render-scope base hooks can use the smaller numeric
-				// production ABI; arbitrary callable helpers cannot.
+				// Keep a Symbol on custom-hook call paths so their internal base-hook
+				// identities compose across modules. Proven render-scope base hooks
+				// can use the smaller numeric production ABI.
 				const hasSpread = n.arguments.some((arg) => arg.type === 'SpreadElement');
 				const memoRoute = isBuiltin && canLowerClientMemo(n, name);
 				const memoCandidate = memoRoute ? slotMemoCandidate(n, name) : null;
@@ -17437,18 +17452,20 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				// separately must not re-promote its nested hooks to render-local.
 				const argsLocalRoot = localSlotMarks.get(n) === true;
 				const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName, argsLocalRoot));
-				// NB: base hooks are ALSO `use[A-Z]`, so the wrap is for custom hooks ONLY
-				// (`isCustom && !isBuiltin`) — base hooks keep the plain trailing-slot form.
-				if (isCustom && !isBuiltin) {
-					// A CUSTOM hook is wrapped in `withSlot(sym, hook, ...args, sym)`: the
-					// withSlot pushes a call-site symbol on the path stack so the hook's
-					// inner BASE hooks combine it (→ the same custom hook reused at two
-					// sites keeps independent state — base hooks are "owned by octane" and
-					// need no wrapper). The TRAILING `sym` is retained so existing library
-					// bindings that extract the slot from their last argument keep working.
-					const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
-					return b.call(withSlotAlias, b.id(symVar), n.callee, ...args, b.id(symVar));
-				}
+				const callee = nativeMemo
+					? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
+					: getterHelper !== null
+						? b.id(runtimeAliasForContext(ctx, getterHelper))
+						: n.callee._octaneGenerated
+							? b.id(runtimeAliasForContext(ctx, name))
+							: n.callee;
+				// The call path supplies identity without adding an argument that
+				// changes a custom hook's defaults, rest values or arguments.length.
+				// State/ref spreads also need this path: an empty spread has no
+				// initializer position into which a trailing slot may safely fall.
+				if (isCustom || (hasSpread && (name === 'useState' || name === 'useRef')))
+					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
+
 				const hookArgs = explicitMemoSlot
 					? args
 					: appendHookSlotArgument(name, args, slot, numericSlot, n);
@@ -17463,13 +17480,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				return {
 					...n,
 					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
-					callee: nativeMemo
-						? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
-						: getterHelper !== null
-							? b.id(runtimeAliasForContext(ctx, getterHelper))
-							: n.callee._octaneGenerated
-								? b.id(runtimeAliasForContext(ctx, name))
-								: n.callee,
+					callee,
 					arguments: hookArgs,
 				};
 			}
@@ -17536,14 +17547,20 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				const args = n.arguments.map((a) =>
 					rewriteHookCalls(a, ctx, componentName, localSlotMarks.get(n) === true),
 				);
+				const callee = nativeMemo
+					? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
+					: getterHelper !== null
+						? b.id(runtimeAliasForContext(ctx, getterHelper))
+						: n.callee;
+				if (
+					(name === 'useState' || name === 'useRef') &&
+					args.some((arg) => arg.type === 'SpreadElement')
+				)
+					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
 				return {
 					...n,
 					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
-					callee: nativeMemo
-						? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
-						: getterHelper !== null
-							? b.id(runtimeAliasForContext(ctx, getterHelper))
-							: n.callee,
+					callee,
 					arguments: explicitMemoSlot
 						? args
 						: appendHookSlotArgument(name, args, slot, numericSlot, n),
@@ -17555,9 +17572,8 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 		// and the like). Same `use[A-Z]` convention, applied to the PROPERTY name.
 		// The callee is a member access, so the plain withSlot form would sever
 		// `this`; instead the WHOLE call is wrapped in a thunk —
-		// `_$withSlot(sym, () => obj.useX(...args, sym))` — which pushes the
-		// call-site path symbol for the hook's inner base hooks while the trailing
-		// `sym` still reaches slot-forwarding bindings (splitSlot convention).
+		// `_$withSlot(sym, () => obj.useX(...args))` preserves the receiver and
+		// authored arguments while supplying the inner base hooks' call path.
 		if (
 			n.type === 'CallExpression' &&
 			!n.optional &&
@@ -17589,7 +17605,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			return b.call(
 				withSlotAlias,
 				b.id(symVar),
-				b.arrow([], b.call({ ...n.callee, object }, ...args, b.id(symVar))),
+				b.arrow([], { ...n, callee: { ...n.callee, object }, arguments: args }),
 			);
 		}
 		return null;

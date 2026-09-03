@@ -1,7 +1,6 @@
 import { state } from '@rx-state/core';
 import type { DefaultedStateObservable, StateObservable, SUSPENSE } from '@rx-state/core';
 import type { Observable } from 'rxjs';
-import { splitSlot } from './internal.ts';
 import { useStateObservable } from './useStateObservable.ts';
 
 type AddStopArg<A extends unknown[]> = number extends A['length']
@@ -27,10 +26,9 @@ export function bind(source: unknown, defaultValue?: unknown): readonly [unknown
 		const bound = hasDefault
 			? state(source as (...args: unknown[]) => Observable<unknown>, defaultValue)
 			: state(source as (...args: unknown[]) => Observable<unknown>);
-		const useBound = (...runtimeArgs: unknown[]) => {
-			const [args, slot] = splitSlot(runtimeArgs);
-			return useStateObservable(bound(...args), slot, args);
-		};
+		// Factory arguments are user data, including Symbols. The compiler's
+		// custom-hook path supplies identity without appending a public argument.
+		const useBound = (...args: unknown[]) => useStateObservable(bound(...args), undefined, args);
 		return [useBound, bound] as const;
 	}
 	const bound = hasDefault

@@ -5505,9 +5505,14 @@ export function useState<T>(
 	initial?: T | (() => T),
 	slot?: ServerHookSlot,
 ): [T, (next: T | ((value: T) => T)) => void, () => T] {
-	// A compiled zero-argument call is emitted as `useState(slot)`. Mirror the
-	// client trailing-slot ABI so the injected symbol is not mistaken for state.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Compiled calls pass a separate slot. Preserve legacy lone-slot calls outside
+	// a custom path while keeping aliases' authored Symbol initial values inside it.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		HOOK_SLOT_PATH.length === 0
+	) {
 		slot = initial;
 		initial = undefined as T;
 	}
@@ -5538,9 +5543,14 @@ export function __useStateWithGetter<T>(
 	initial: T | (() => T),
 	slot?: ServerHookSlot,
 ): [T, (next: any) => void, () => T] {
-	// A compiled zero-argument call is emitted as `__useStateWithGetter(slot)`.
-	// Mirror the public hook's trailing-slot ABI before creating the getter cell.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Mirror the public hook's legacy lone-slot compatibility before creating
+	// the getter cell, preserving authored alias arguments inside a custom path.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		HOOK_SLOT_PATH.length === 0
+	) {
 		slot = initial;
 		initial = undefined as T;
 	}
@@ -5771,9 +5781,14 @@ export function useCallback<F>(
 export function useRef<T = undefined>(): { current: T | undefined };
 export function useRef<T>(initial: T, slot?: symbol): { current: T };
 export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | undefined } {
-	// A spread-shaped zero-argument call cannot be padded positionally, so the
-	// compiler retains the self-identifying Symbol ABI: `useRef(slot)`.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Legacy lone-slot calls remain valid outside custom paths. Compiled spread
+	// calls use the path for identity and preserve the original argument count.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		HOOK_SLOT_PATH.length === 0
+	) {
 		slot = initial;
 		initial = undefined;
 	}

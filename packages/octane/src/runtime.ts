@@ -1276,11 +1276,17 @@ interface TransitionSwapDriver {
 	splice: typeof spliceWipCapture;
 	begin: typeof beginTransitionAttempt;
 	end: typeof endTransitionAttempt;
+	beginUrgent: typeof beginUrgentTransitionRender;
+	endUrgent: typeof endUrgentTransitionRender;
 	holdRoot: typeof holdRootTransition;
 	retryRoot: typeof retryRootTransition;
 	commitRoot: typeof commitRootTransition;
 	discardRoot: typeof discardRootTransition;
 	keepsRoot: typeof keepsRootTransition;
+	cancelEqual: typeof cancelHeldTransitionUpdate;
+	hasHeld: typeof hasHeldTransitionUpdate;
+	heldUpdate: typeof getHeldTransitionUpdate;
+	rebaseHeld: typeof rebaseHeldTransitionUpdate;
 }
 
 let TRANSITION_SWAP_DRIVER: TransitionSwapDriver | null = null;
@@ -1293,22 +1299,38 @@ function ensureTransitionSwapDriver(): void {
 		splice: spliceWipCapture,
 		begin: beginTransitionAttempt,
 		end: endTransitionAttempt,
+		beginUrgent: beginUrgentTransitionRender,
+		endUrgent: endUrgentTransitionRender,
 		holdRoot: holdRootTransition,
 		retryRoot: retryRootTransition,
 		commitRoot: commitRootTransition,
 		discardRoot: discardRootTransition,
 		keepsRoot: keepsRootTransition,
+		cancelEqual: cancelHeldTransitionUpdate,
+		hasHeld: hasHeldTransitionUpdate,
+		heldUpdate: getHeldTransitionUpdate,
+		rebaseHeld: rebaseHeldTransitionUpdate,
 	};
 }
 
 interface TransitionActionSlot<T> {
 	value: T;
+	renderTransition?: { value: T };
 	pendingActionBatch?: TransitionActionBatch;
 	pendingActionValue?: T;
 }
 
 interface TransitionActionUpdate<T = unknown> {
+	/** An urgent replacement can cancel a held value even when its base is equal. */
+	superseded?: boolean;
 	state?: StateSlot<T>;
+	/** Already queued work precedes this batch; later urgent work stays on the cell. */
+	previous?: TransitionActionUpdate<T>;
+	next?: TransitionActionUpdate<T>;
+	stateUpdates?: Array<T | ((previous: T) => T)>;
+	reducerActions?: any[];
+	replayBaseValue?: T;
+	urgentOperations?: number[];
 	batch?: TransitionActionBatch;
 	reducer?: ReducerSlot<T, any>;
 	slot: TransitionActionSlot<T>;
@@ -1365,6 +1387,9 @@ function transitionActionBatchForUpdate(): TransitionActionBatch | null {
 }
 
 function rebaseTransitionActionUpdate<T>(update: TransitionActionUpdate<T>): T {
+	// Hook queues retain their original base and chronological operations. Their
+	// approximate eager value never replaces the owner's render-time replay.
+	if (update.state !== undefined || update.reducer !== undefined) return update.value;
 	if (Object.is(update.baseValue, update.slot.value)) return update.value;
 	let value = update.slot.value;
 	for (const operation of update.operations) value = operation(value);
@@ -1374,11 +1399,14 @@ function rebaseTransitionActionUpdate<T>(update: TransitionActionUpdate<T>): T {
 	return value;
 }
 
-function stagedTransitionValue<T>(slot: TransitionActionSlot<T>): T {
+function stagedTransitionValue<T>(slot: TransitionActionSlot<T>, block?: Block): T {
 	const batch = transitionActionBatchForUpdate();
 	if (batch === null) return slot.value;
 	const update = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
-	return update === undefined ? slot.value : rebaseTransitionActionUpdate(update);
+	if (update !== undefined) return rebaseTransitionActionUpdate(update);
+	if (slot.renderTransition !== undefined) return slot.renderTransition.value;
+	const held = block === undefined ? undefined : TRANSITION_SWAP_DRIVER?.heldUpdate(slot, block);
+	return held === undefined ? slot.value : held.value;
 }
 
 function stageTransitionValue<T>(
@@ -1422,14 +1450,25 @@ function flushTransitionActionBatch(batch: TransitionActionBatch): void {
 		const value =
 			update.state === undefined && update.reducer === undefined
 				? rebaseTransitionActionUpdate(update)
-				: ((update.baseValue = slot.value), update.value);
+				: update.value;
 		if (slot.pendingActionBatch === batch) {
 			slot.pendingActionBatch = undefined;
 			slot.pendingActionValue = undefined;
 		}
 		if (block.disposed) continue;
+		const state = update.state;
+		const reducer = update.reducer;
+		const previous = state?.renderTransition ?? reducer?.renderTransition;
+		if (state !== undefined || reducer !== undefined) {
+			update.baseValue = previous === undefined ? slot.value : previous.baseValue;
+			if (state !== undefined) {
+				state.updates = undefined;
+			} else if (reducer !== undefined) {
+				reducer.renderPhaseActions = undefined;
+			}
+		}
 		const changed = !Object.is(slot.value, value);
-		if (!changed && !forceRender) continue;
+		if (!changed && !forceRender && update.previous === undefined) continue;
 		if (changed) slot.value = value;
 		if (update.reducer !== undefined) update.reducer.renderTransition = update;
 		if (update.state !== undefined) update.state.renderTransition = update;
@@ -1615,6 +1654,8 @@ interface WarmHarvestEntry {
 
 /** The same single-origin staged cells as P1, owned by a root rather than a TrySlot. */
 interface RootTransitionHold {
+	/** Coalesce retries when an urgent action changes the retained forward value. */
+	replayScheduled?: boolean;
 	origin: Block;
 	entries: Array<TransitionActionUpdate<any>>;
 	memoSwaps: TransitionMemoSwap[] | null;
@@ -1627,6 +1668,7 @@ interface RootTransitionHold {
 
 /** The reverted state of a held transition, waiting for promotion on settle. */
 let HELD_SYNC_TRANSITION: {
+	replayScheduled?: boolean;
 	origin: Block;
 	entries: Array<TransitionActionUpdate<any>>;
 	memoSwaps: TransitionMemoSwap[] | null;
@@ -1635,6 +1677,161 @@ let HELD_SYNC_TRANSITION: {
 	warmHarvest: WarmHarvestEntry[] | null;
 	holders: Set<TrySlot>;
 } | null = null;
+
+function urgentTransitionCellUpdate(block: Block): boolean {
+	return (
+		TRANSITION_DEPTH === 0 &&
+		!(CURRENT_BLOCK === block && block.currentRenderMode === 'transition') &&
+		(syncFlush || _dispatchDepth > 0 || ASYNC_TRANSITION_COUNT === 0)
+	);
+}
+
+function latestHeldTransitionUpdate(
+	entry: TransitionActionUpdate<any>,
+): TransitionActionUpdate<any> {
+	// Later batches can be linked before their async Action settles. Only a
+	// flushed successor is part of the rendered work being held here.
+	while (entry.next?.batch?.flushed === true && !entry.next.superseded) entry = entry.next;
+	return entry;
+}
+
+function findHeldTransitionUpdate(
+	slot: TransitionActionSlot<unknown>,
+	block: Block,
+): TransitionActionUpdate<any> | undefined {
+	if (!urgentTransitionCellUpdate(block)) return;
+	return getHeldTransitionUpdate(slot, block);
+}
+
+function getHeldTransitionUpdate(
+	slot: TransitionActionSlot<unknown>,
+	block: Block,
+): TransitionActionUpdate<any> | undefined {
+	if (block.disposed) return;
+	const rootHeld = block.idState.renderOwner?.transition;
+	if (
+		HELD_SYNC_TRANSITION === null &&
+		rootHeld === undefined &&
+		FLUSHED_TRANSITION_UPDATES.length === 0
+	)
+		return;
+	const groups = [HELD_SYNC_TRANSITION?.entries, rootHeld?.entries];
+	for (const entries of groups) {
+		if (entries === undefined) continue;
+		for (let i = entries.length - 1; i >= 0; i--) {
+			const entry = entries[i];
+			if (entry.slot === slot && !entry.superseded && Object.is(slot.value, entry.baseValue))
+				return latestHeldTransitionUpdate(entry);
+		}
+	}
+	// An urgent ancestor can temporarily expose the base of a queued child
+	// transition. Its entries have not reached a Suspense/root hold yet.
+	for (let i = FLUSHED_TRANSITION_UPDATES.length - 1; i >= 0; i--) {
+		const entries = FLUSHED_TRANSITION_UPDATES[i];
+		for (let j = entries.length - 1; j >= 0; j--) {
+			const entry = entries[j];
+			if (entry.slot === slot && !entry.superseded && Object.is(slot.value, entry.baseValue))
+				return latestHeldTransitionUpdate(entry);
+		}
+	}
+}
+
+function hasHeldTransitionUpdate(slot: TransitionActionSlot<unknown>, block: Block): boolean {
+	return findHeldTransitionUpdate(slot, block) !== undefined;
+}
+
+function cancelHeldTransitionUpdate(slot: TransitionActionSlot<unknown>, block: Block): boolean {
+	if (!urgentTransitionCellUpdate(block)) return false;
+	const rootHeld = block.idState.renderOwner?.transition;
+	if (
+		HELD_SYNC_TRANSITION === null &&
+		rootHeld === undefined &&
+		FLUSHED_TRANSITION_UPDATES.length === 0
+	)
+		return false;
+	let cancelled = false;
+	const cancel = (entries: Array<TransitionActionUpdate<any>> | undefined): void => {
+		if (entries === undefined) return;
+		for (const entry of entries) {
+			if (entry.slot === slot && !entry.superseded) {
+				entry.superseded = true;
+				cancelled = true;
+			}
+		}
+	};
+	cancel(HELD_SYNC_TRANSITION?.entries);
+	cancel(rootHeld?.entries);
+	for (const entries of FLUSHED_TRANSITION_UPDATES) cancel(entries);
+	return cancelled;
+}
+
+/** Replay equal urgent actions against held inputs only from the rendering hook. */
+function rebaseHeldTransitionUpdate<T, A = T | ((previous: T) => T)>(
+	slot: TransitionActionSlot<T>,
+	block: Block,
+	actions: readonly A[],
+	reducer?: (value: T, action: A) => T,
+): void {
+	const entry = findHeldTransitionUpdate(slot, block);
+	if (entry === undefined) return;
+	// The queued Action already records this urgent operation after its own
+	// updates. Replaying it on an earlier held record would apply it twice and
+	// move it before that Action's updates.
+	if (slot.pendingActionBatch?.flushed === false) return;
+	let value = entry.value as T;
+	for (const action of actions) {
+		value = reducer
+			? reducer(value, action)
+			: typeof action === 'function'
+				? (action as (previous: T) => T)(value)
+				: (action as unknown as T);
+	}
+	if (Object.is(value, entry.baseValue)) {
+		cancelHeldTransitionUpdate(slot, block);
+		return;
+	}
+	const changed = !Object.is(value, entry.value);
+	for (
+		let current: TransitionActionUpdate<T> | undefined = entry;
+		current;
+		current = current.previous
+	)
+		current.value = value;
+	for (const action of actions) {
+		entry.operations.push(
+			reducer
+				? (previous: T) => reducer(previous, action)
+				: typeof action === 'function'
+					? (action as (previous: T) => T)
+					: () => action as unknown as T,
+		);
+	}
+	if (changed) scheduleHeldTransitionReplay(entry, block);
+}
+
+function scheduleHeldTransitionReplay(entry: TransitionActionUpdate<any>, block: Block): void {
+	const held = HELD_SYNC_TRANSITION;
+	if (held !== null && held.entries.includes(entry)) {
+		if (held.replayScheduled) return;
+		held.replayScheduled = true;
+		queueMicrotask(() => {
+			if (HELD_SYNC_TRANSITION !== held) return;
+			held.replayScheduled = false;
+			promoteHeldSyncTransition();
+		});
+		return;
+	}
+	const owner = block.idState.renderOwner;
+	const rootHeld = owner?.transition;
+	if (rootHeld === undefined || !rootHeld.entries.includes(entry) || rootHeld.replayScheduled)
+		return;
+	rootHeld.replayScheduled = true;
+	queueMicrotask(() => {
+		if (owner!.transition !== rootHeld) return;
+		rootHeld.replayScheduled = false;
+		retryRootTransition(owner!);
+	});
+}
 
 /**
  * Swaps a promotion applied forward, pending the promoted round's outcome. A
@@ -1865,21 +2062,29 @@ function heldSyncCellsIntact(state: TrySlot): boolean {
 	if (held === null || !held.holders.has(state)) return false;
 	for (let i = 0; i < held.entries.length; i++) {
 		const entry = held.entries[i];
-		if (!Object.is(entry.slot.value, entry.baseValue)) return false;
+		if (entry.superseded || !Object.is(entry.slot.value, entry.baseValue)) return false;
 	}
 	return true;
+}
+
+/** A later Action on the same cell owns its next complete publication. */
+function heldTransitionHasPendingAction(entries: Array<TransitionActionUpdate<any>>): boolean {
+	for (const entry of entries) {
+		if (!entry.superseded && entry.slot.pendingActionBatch?.flushed === false) return true;
+	}
+	return false;
 }
 
 /** Write the held transition forward, returning whether a render was scheduled. */
 function promoteHeldSyncTransition(): boolean {
 	const held = HELD_SYNC_TRANSITION;
-	if (held === null) return false;
+	if (held === null || heldTransitionHasPendingAction(held.entries)) return false;
 	HELD_SYNC_TRANSITION = null;
 	const promoted: Array<TransitionActionUpdate<any>> = [];
 	for (let i = 0; i < held.entries.length; i++) {
 		const entry = held.entries[i];
 		// A cell an urgent write superseded keeps the urgent value.
-		if (!Object.is(entry.slot.value, entry.baseValue)) continue;
+		if (entry.superseded || !Object.is(entry.slot.value, entry.baseValue)) continue;
 		entry.slot.value = entry.value;
 		if (!entry.block.disposed) promoted.push(entry);
 	}
@@ -1928,7 +2133,7 @@ function discardHeldSyncTransition(state: TrySlot): void {
 function rootTransitionCellsIntact(held: RootTransitionHold): boolean {
 	for (let i = 0; i < held.entries.length; i++) {
 		const entry = held.entries[i];
-		if (!Object.is(entry.slot.value, entry.baseValue)) return false;
+		if (entry.superseded || !Object.is(entry.slot.value, entry.baseValue)) return false;
 	}
 	return true;
 }
@@ -2008,6 +2213,9 @@ function retryRootTransition(owner: RootRenderOwner): boolean {
 		discardRootTransition(owner);
 		return false;
 	}
+	// The Action's flush schedules the next complete state. Consuming an older
+	// wakeup must not publish the earlier held value or abandon its ownership.
+	if (heldTransitionHasPendingAction(held.entries)) return true;
 	held.promoted = true;
 	held.cue = false;
 	if (held.memoSwaps !== null) {
@@ -6335,6 +6543,69 @@ function recordCapturedRender(capture: OffscreenCapture, block: Block): void {
 	}
 }
 
+interface UrgentTransitionRender {
+	pendingDeferred: boolean;
+	queueEpoch: number;
+	cells: Array<{
+		update: TransitionActionUpdate<any>;
+		baseValue: unknown;
+		value: unknown;
+		hook: ReturnType<typeof beginUrgentTransitionCell> | undefined;
+	}>;
+}
+
+/** Expose committed cells while an urgent ancestor traverses queued transition work. */
+function beginUrgentTransitionRender(block: Block, render: UrgentTransitionRender): void {
+	const slots = new Map<TransitionActionSlot<any>, number>();
+	for (const entries of FLUSHED_TRANSITION_UPDATES) {
+		for (const update of entries) {
+			if (update.block !== block || update.superseded) continue;
+			const previous = slots.get(update.slot);
+			if (previous !== undefined) {
+				// State/reducer entries retain their preceding operation chain. Plain
+				// deferred cells still need the earliest committed value below.
+				render.cells[previous].update = update;
+			} else {
+				slots.set(update.slot, render.cells.length);
+				render.cells.push({
+					update,
+					baseValue: update.baseValue,
+					value: update.slot.value,
+					hook: undefined,
+				});
+			}
+		}
+	}
+	for (const cell of render.cells) {
+		cell.hook = beginUrgentTransitionCell(cell.update);
+		if (cell.hook === null) cell.update.slot.value = cell.baseValue;
+	}
+}
+
+/** Leave the queued transition intact unless urgent work superseded it. */
+function endUrgentTransitionRender(block: Block, render: UrgentTransitionRender): void {
+	for (let i = render.cells.length - 1; i >= 0; i--) {
+		const cell = render.cells[i];
+		if (cell.hook === undefined) continue;
+		if (cell.hook !== null) endUrgentTransitionCell(cell.hook);
+		else if (
+			!block.disposed &&
+			!cell.update.superseded &&
+			Object.is(cell.update.slot.value, cell.baseValue)
+		)
+			cell.update.slot.value = cell.value;
+	}
+	if (block.disposed || (block.pending && block.pendingMode === 'urgent')) return;
+	if (render.cells.length !== 0 && render.cells.every((cell) => cell.update.superseded)) return;
+	block.pending = true;
+	block.pendingMode = 'transition';
+	block.pendingDeferred = render.pendingDeferred;
+	// A nested flush can consume/reindex the queue while this urgent body runs.
+	// Its old queue position is otherwise retained, so ordinary cascades need no
+	// membership scan or extra queue entry.
+	if (render.queueEpoch !== QUEUE_REINDEX_EPOCH && !QUEUE.includes(block)) QUEUE.push(block);
+}
+
 function renderBlockInner(block: Block): void {
 	// Keep retries visible to compiler-owned cache hits throughout the body. A
 	// fresh invalidation during this attempt replaces RETRYING, so successful
@@ -6364,6 +6635,20 @@ function renderBlockInner(block: Block): void {
 	CURRENT_EFFECT_RENDER_VERSION = block.effectSlots === null ? 0 : NEXT_EFFECT_RENDER_VERSION++;
 	CURRENT_EFFECT_REACHED = 0;
 	const continuesParentTree = prevBlock !== null && blockIsAncestor(prevBlock, block);
+	// An urgent ancestor must observe this child's committed cells, even when
+	// the child already queued a transition. Preserve that queue entry so its
+	// later owned pass gets the transition's boundary journal and reveal policy.
+	const urgentTransitionDriver =
+		block.pending &&
+		block.pendingMode === 'transition' &&
+		continuesParentTree &&
+		prevBlock!.currentRenderMode === 'urgent'
+			? TRANSITION_SWAP_DRIVER
+			: null;
+	const urgentTransitionRender: UrgentTransitionRender | null =
+		urgentTransitionDriver === null
+			? null
+			: { pendingDeferred: block.pendingDeferred, queueEpoch: QUEUE_REINDEX_EPOCH, cells: [] };
 	if (!continuesParentTree) {
 		// A true Suspense retry enters from no ambient block and resumes its saved
 		// episode. A synchronously nested independent root has an ambient block but
@@ -6421,14 +6706,19 @@ function renderBlockInner(block: Block): void {
 	// wins. Otherwise INHERIT from the outer block — re-entrant renders (try,
 	// if, for, comp slots) called synchronously inside an outer body should
 	// run at the outer body's priority so transitions propagate down naturally.
-	block.currentRenderMode = block.pendingMode ?? prevBlock?.currentRenderMode ?? 'urgent';
+	block.currentRenderMode =
+		urgentTransitionRender !== null
+			? 'urgent'
+			: (block.pendingMode ?? prevBlock?.currentRenderMode ?? 'urgent');
 	// The deferred bit rides the same channel: explicit when this block was
 	// scheduled with a mode (pendingMode set), otherwise inherited from the
 	// enclosing render so it reaches components mounting inside a deferred pass.
 	block.currentRenderDeferred =
-		block.pendingMode !== null
-			? block.pendingDeferred
-			: (prevBlock?.currentRenderDeferred ?? false);
+		urgentTransitionRender !== null
+			? false
+			: block.pendingMode !== null
+				? block.pendingDeferred
+				: (prevBlock?.currentRenderDeferred ?? false);
 	block.pendingMode = null;
 	block.pendingDeferred = false;
 	const profileFrame: ProfileFrame | null =
@@ -6443,6 +6733,8 @@ function renderBlockInner(block: Block): void {
 	NATIVE_READ_DRIVER?.beginRender(block);
 	NATIVE_BLOCK_RETRIES?.get(block)?.clear();
 	try {
+		if (urgentTransitionRender !== null)
+			urgentTransitionDriver!.beginUrgent(block, urgentTransitionRender);
 		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
 			block.props,
 			block,
@@ -6514,7 +6806,12 @@ function renderBlockInner(block: Block): void {
 		CURRENT_EFFECT_REACHED = prevEffectReached;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
-		NATIVE_READ_DRIVER?.endRender(block, renderCompleted, isSuspenseException(profileThrown));
+		try {
+			NATIVE_READ_DRIVER?.endRender(block, renderCompleted, isSuspenseException(profileThrown));
+		} finally {
+			if (urgentTransitionRender !== null)
+				urgentTransitionDriver!.endUrgent(block, urgentTransitionRender);
+		}
 	}
 }
 
@@ -7295,9 +7592,9 @@ function missingSlot(name: string): never {
 // withSlot — establishes hook call-site identity via a per-render PATH STACK, so a
 // hook reached THROUGH a custom-hook wrapper combines the wrapper's call-site symbol
 // with its own. The compiler wraps CUSTOM hook calls only, as
-// `withSlot(sym, hook, ...args, sym)` — the hook + args pass through directly (no
-// per-render closure to allocate), and the trailing `sym` is retained so library
-// bindings that read the slot off their last argument keep working. BASE hooks keep
+// `withSlot(sym, hook, ...args)` — the authored args pass through directly (no
+// per-render closure to allocate or extra argument to alter foreign defaults).
+// BASE hooks keep
 // the plain trailing-slot form (`useState(0, sym)`); inside a wrapper, resolveSlot
 // folds the path in. Two calls to the same custom hook push DIFFERENT call-site
 // symbols → different paths → independent state; a hook in a plain JS loop would
@@ -7370,6 +7667,8 @@ interface StateSlot<T> {
 	updates?: Array<T | ((previous: T) => T)>;
 	/** Promoted transition work folds with the inputs of the rendering owner. */
 	renderTransition?: TransitionActionUpdate<T>;
+	/** An urgent ancestor reads queued urgent operations without consuming the transition. */
+	urgentTransition?: boolean;
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => T;
 	pendingActionBatch?: TransitionActionBatch;
@@ -7382,12 +7681,17 @@ type StateTuple<T> = [T, StateSetter<T>, () => T];
 export function useState<T = undefined>(): StateTuple<T | undefined>;
 export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
 export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTuple<T> {
-	// ABI: the compiler appends the slot as the LAST argument, so a zero-arg
-	// `useState()` (state starts undefined — React parity) arrives as
-	// `useState(slot)` with the symbol in the initial-value position. Same
-	// trailing-symbol reinterpretation as resolveHookArgs. Unambiguous: a
-	// symbol-valued initial from compiled code always arrives WITH a slot arg.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Compiled base calls supply the slot separately, padding omitted initial
+	// values with undefined. Retain the legacy lone-slot form only outside a
+	// custom-hook path: aliases (including bound/forwarding functions) receive
+	// authored args there, so their lone Symbol is an initial value. An explicit
+	// second argument also stays unambiguous when a binding forwards undefined.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		slotStack.length === 0
+	) {
 		slot = initial as unknown as symbol;
 		initial = undefined as T;
 	}
@@ -7402,11 +7706,16 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 			value: initVal,
 			setter: (next) => {
 				if (block.disposed) return;
+				if (s!.pendingActionBatch !== undefined && transitionActionBatchForUpdate() === null)
+					recordUrgentActionUpdate(s!, next);
 				// Preserve the idle eager bailout. Once work is already queued, a
 				// functional update must observe the next render's inputs instead.
 				if (
 					(s!.updates !== undefined ||
 						s!.renderTransition !== undefined ||
+						(typeof next === 'function' &&
+							TRANSITION_PENDING_COUNT > 0 &&
+							TRANSITION_SWAP_DRIVER?.hasHeld(s!, block)) ||
 						(block.pending && typeof next === 'function')) &&
 					transitionActionBatchForUpdate() === null
 				) {
@@ -7414,7 +7723,7 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 					scheduleRender(block);
 					return;
 				}
-				const previous = stagedTransitionValue(s!);
+				const previous = stagedTransitionValue(s!, block);
 				let computed: T;
 				let failed = false;
 				try {
@@ -7431,10 +7740,24 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 					computed = previous;
 					failed = true;
 				}
-				const forceRender = failed || (block.pending && typeof next === 'function');
-				if (Object.is(computed, previous) && !forceRender) return;
+				const forceRender =
+					failed ||
+					s!.updates !== undefined ||
+					s!.renderTransition !== undefined ||
+					s!.pendingActionBatch !== undefined ||
+					(block.pending && typeof next === 'function');
+				if (Object.is(computed, previous) && !forceRender) {
+					if (typeof next !== 'function' && TRANSITION_SWAP_DRIVER?.cancelEqual(s!, block)) {
+						scheduleRender(block);
+					}
+					return;
+				}
 				if (stageTransitionValue(s!, block, next, computed, forceRender)) {
-					(s!.pendingActionBatch!.updates.get(s!) as TransitionActionUpdate<T>).state = s!;
+					const update = s!.pendingActionBatch!.updates.get(s!) as TransitionActionUpdate<T>;
+					if (update.state === undefined) {
+						update.state = s!;
+						captureTransitionHookQueue(update, s!);
+					}
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
 							TransitionActionUpdate<T> | undefined;
@@ -7458,12 +7781,17 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 		ensureHooks(scope).set(slot, s);
 	}
 	if (s.renderTransition !== undefined || s.updates !== undefined) {
-		s.value = readQueuedState(s);
-		if (s.renderTransition !== undefined) {
-			s.renderTransition.value = s.value;
-			s.renderTransition = undefined;
+		const value = readQueuedState(s);
+		if (!s.urgentTransition && s.updates !== undefined && Object.is(value, s.value))
+			TRANSITION_SWAP_DRIVER?.rebaseHeld(s, block, s.updates);
+		s.value = value;
+		if (!s.urgentTransition) {
+			if (s.renderTransition !== undefined) {
+				finishQueuedTransition(s.renderTransition, s.value);
+				s.renderTransition = undefined;
+			}
+			s.updates = undefined;
 		}
-		s.updates = undefined;
 	}
 	// Source-level useState has a third getState member, but this physical base
 	// path stays allocation-free. The compiler selects __useStateWithGetter only
@@ -7473,15 +7801,117 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 
 function readQueuedState<T>(state: StateSlot<T>): T {
 	const transition = state.renderTransition;
-	let value = transition === undefined ? state.value : transition.baseValue;
-	if (transition !== undefined) {
-		for (const operation of transition.operations) value = operation(value);
-	}
+	let value =
+		transition === undefined
+			? state.value
+			: readQueuedTransition(transition, state.urgentTransition === true);
 	if (state.updates !== undefined) {
 		for (const update of state.updates)
 			value = typeof update === 'function' ? (update as (previous: T) => T)(value) : update;
 	}
 	return value;
+}
+
+/** Follow the existing batch records instead of allocating another per-update queue. */
+function readQueuedTransition<T>(
+	last: TransitionActionUpdate<T>,
+	urgent: boolean,
+	reducer?: (value: T, action: any) => T,
+): T {
+	let first = last;
+	while (first.previous !== undefined) first = first.previous;
+	let value = first.replayBaseValue as T;
+	for (let entry = first; ; entry = entry.next!) {
+		if (entry.stateUpdates !== undefined) {
+			for (const update of entry.stateUpdates)
+				value = typeof update === 'function' ? (update as (previous: T) => T)(value) : update;
+		}
+		if (entry.reducerActions !== undefined) {
+			for (const action of entry.reducerActions) value = reducer!(value, action);
+		}
+		if ((urgent || entry.superseded) && entry.urgentOperations !== undefined) {
+			for (const index of entry.urgentOperations) value = entry.operations[index](value);
+		} else if (!urgent && !entry.superseded) {
+			for (const operation of entry.operations) value = operation(value);
+		}
+		if (entry === last) return value;
+	}
+}
+
+function captureTransitionHookQueue<T>(
+	update: TransitionActionUpdate<T>,
+	cell: StateSlot<T> | ReducerSlot<T, any>,
+): void {
+	update.replayBaseValue = cell.value;
+	const previous = cell.renderTransition ?? TRANSITION_SWAP_DRIVER?.heldUpdate(cell, update.block);
+	if (previous !== undefined) {
+		update.previous = previous;
+		previous.next = update;
+	}
+	// A still-awaiting Action can overlap an urgent render which consumes the
+	// cell queue. Snapshot only an existing prefix; ordinary transition updates
+	// need no additional queue allocation.
+	if (update.state !== undefined) update.stateUpdates = update.state.updates?.slice();
+	else update.reducerActions = update.reducer!.renderPhaseActions?.slice();
+}
+
+function recordUrgentActionUpdate<T>(
+	cell: StateSlot<T> | ReducerSlot<T, any>,
+	operation: T | ((value: T) => T),
+): void {
+	const update = cell.pendingActionBatch!.updates.get(cell) as
+		TransitionActionUpdate<T> | undefined;
+	if (update === undefined) return;
+	(update.urgentOperations ??= []).push(update.operations.length);
+	update.operations.push(
+		typeof operation === 'function' ? (operation as (value: T) => T) : () => operation,
+	);
+	update.forceRender = true;
+}
+
+function finishQueuedTransition<T>(last: TransitionActionUpdate<T>, value: T): void {
+	// Consecutive batches can drive the same cell. They share one final value
+	// and committed base so holding/promoting any retained batch cannot resurrect
+	// an intermediate value from the middle of that sequence.
+	for (let entry: TransitionActionUpdate<T> | undefined = last; entry; entry = entry.previous) {
+		entry.value = value;
+		// A later Action can replace a held change with its committed base.
+		// Retire that predecessor while leaving this render's successor active.
+		if (entry !== last && Object.is(value, entry.baseValue)) entry.superseded = true;
+	}
+}
+
+function beginUrgentTransitionCell(update: TransitionActionUpdate<any>): {
+	update: TransitionActionUpdate<any>;
+	cell: StateSlot<any> | ReducerSlot<any, any>;
+} | null {
+	const cell = update.state ?? update.reducer;
+	if (
+		update.block.disposed ||
+		update.superseded ||
+		cell === undefined ||
+		cell.renderTransition === undefined
+	)
+		return null;
+	cell.urgentTransition = true;
+	cell.value = update.baseValue;
+	return { update, cell };
+}
+
+function endUrgentTransitionCell(
+	snapshot: NonNullable<ReturnType<typeof beginUrgentTransitionCell>>,
+): void {
+	const { update, cell } = snapshot;
+	cell.urgentTransition = false;
+	if (update.block.disposed || update.superseded) {
+		cell.renderTransition = undefined;
+		return;
+	}
+	// The urgent render has published these inputs. Keep its committed result
+	// as the rollback value while the original ordered operations remain queued
+	// for their independent transition pass.
+	for (let entry: TransitionActionUpdate<any> | undefined = update; entry; entry = entry.previous)
+		entry.baseValue = cell.value;
 }
 
 type AssertUseStateType<T extends true> = T;
@@ -7492,9 +7922,14 @@ type _UseStateAcceptsNoArguments = AssertUseStateType<
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot): StateTuple<T> {
-	// Mirror useState's zero-argument trailing-slot ABI before delegating so we
-	// can look the resulting cell up by the same effective slot afterwards.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Normalize the legacy lone-slot form before delegating so the getter looks
+	// up the same cell. Aliases inside a path retain their authored initial value.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		slotStack.length === 0
+	) {
 		slot = initial as unknown as symbol;
 		initial = undefined as T;
 	}
@@ -7508,7 +7943,7 @@ export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot)
 			const batch = s.pendingActionBatch;
 			if (batch === undefined) return readQueuedState(s);
 			const update = batch.updates.get(s) as TransitionActionUpdate<T> | undefined;
-			return update === undefined ? s.value : rebaseTransitionActionUpdate(update);
+			return update === undefined ? readQueuedState(s) : readQueuedTransition(update, false);
 		});
 	return [pair[0], pair[1], getter];
 }
@@ -7858,6 +8293,7 @@ interface ReducerSlot<S, A> {
 	renderPhaseActions?: A[];
 	/** A promoted Action is reduced with this render's reducer before publication. */
 	renderTransition?: TransitionActionUpdate<S>;
+	urgentTransition?: boolean;
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => S;
 	pendingActionBatch?: TransitionActionBatch;
@@ -7915,12 +8351,14 @@ export function useReducer<S, A, I = S>(
 				// reducer supplied by the replaying render. Reducing eagerly here uses
 				// the previous pass's reducer when that reducer changes alongside state.
 				if (CURRENT_BLOCK === block || transitionActionBatchForUpdate() === null) {
+					if (s!.pendingActionBatch !== undefined && transitionActionBatchForUpdate() === null)
+						recordUrgentActionUpdate(s!, (value) => s!.reducer(value, action));
 					const actions = (s!.renderPhaseActions ??= []);
 					actions.push(action);
 					scheduleRender(block);
 					return;
 				}
-				const previous = stagedTransitionValue(s!);
+				const previous = stagedTransitionValue(s!, block);
 				const operation = (value: S) => s!.reducer(value, action);
 				let computed = previous;
 				try {
@@ -7930,7 +8368,10 @@ export function useReducer<S, A, I = S>(
 				}
 				if (stageTransitionValue(s!, block, operation, computed, true)) {
 					const update = s!.pendingActionBatch!.updates.get(s!) as TransitionActionUpdate<S>;
-					update.reducer = s!;
+					if (update.reducer === undefined) {
+						update.reducer = s!;
+						captureTransitionHookQueue(update, s!);
+					}
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
 							TransitionActionUpdate<S> | undefined;
@@ -7955,25 +8396,37 @@ export function useReducer<S, A, I = S>(
 	} else {
 		// Allow reducer reference to update across renders.
 		s.reducer = reducer;
-		const transition = s.renderTransition;
-		if (transition !== undefined) {
-			let value = transition.baseValue;
-			for (const operation of transition.operations) value = operation(value);
-			transition.value = value;
+		if (s.renderTransition !== undefined || s.renderPhaseActions !== undefined) {
+			const value = readQueuedReducer(s);
+			if (!s.urgentTransition && s.renderPhaseActions !== undefined && Object.is(value, s.value))
+				TRANSITION_SWAP_DRIVER?.rebaseHeld(s, block, s.renderPhaseActions, reducer);
 			s.value = value;
-			s.renderTransition = undefined;
-		}
-		const actions = s.renderPhaseActions;
-		if (actions !== undefined) {
-			let value = s.value;
-			for (let i = 0; i < actions.length; i++) value = reducer(value, actions[i]);
-			s.value = value;
-			s.renderPhaseActions = undefined;
+			if (!s.urgentTransition) {
+				if (s.renderTransition !== undefined) {
+					finishQueuedTransition(s.renderTransition, s.value);
+					s.renderTransition = undefined;
+				}
+				s.renderPhaseActions = undefined;
+			}
 		}
 	}
 	// See useState: the compiler selects __useReducerWithGetter whenever the
 	// source can observe the third tuple member.
 	return [s.value, s.dispatch] as unknown as ReducerTuple<S, A>;
+}
+
+function readQueuedReducer<S, A>(state: ReducerSlot<S, A>): S {
+	let value =
+		state.renderTransition === undefined
+			? state.value
+			: readQueuedTransition(
+					state.renderTransition,
+					state.urgentTransition === true,
+					state.reducer,
+				);
+	if (state.renderPhaseActions !== undefined)
+		for (const action of state.renderPhaseActions) value = state.reducer(value, action);
+	return value;
 }
 
 /** Compiler-emitted useReducer variant for a tuple whose third member is observable. */
@@ -7997,17 +8450,12 @@ export function __useReducerWithGetter<S, A, I = S>(
 	const getter =
 		s.getter ??
 		(s.getter = () => {
-			// Action presence is the sentinel; the reduced value may legitimately be
-			// null or undefined.
-			if (s.renderPhaseActions !== undefined) {
-				let value = s.value;
-				for (const action of s.renderPhaseActions) value = s.reducer(value, action);
-				return value;
-			}
 			const batch = s.pendingActionBatch;
-			if (batch === undefined) return s.value;
+			if (batch === undefined) return readQueuedReducer(s);
 			const update = batch.updates.get(s) as TransitionActionUpdate<S> | undefined;
-			return update === undefined ? s.value : rebaseTransitionActionUpdate(update);
+			return update === undefined
+				? readQueuedReducer(s)
+				: readQueuedTransition(update, false, s.reducer);
 		});
 	return [pair[0], pair[1], getter];
 }
@@ -8453,18 +8901,23 @@ export function hookMemoPublishInvariant<T>(cells: any[], base: number, value: T
 	return value;
 }
 
+export function useRef<T = undefined>(): { current: T | undefined };
 export function useRef<T>(initial: T, slot?: symbol): { current: T };
-export function useRef<T>(initial: T, slot?: HookSlot): { current: T } {
-	// Zero-arg `useRef()` — same compiler-ABI trailing-symbol reinterpretation
-	// as useState above.
-	if (slot === undefined && typeof initial === 'symbol') {
+export function useRef<T>(initial?: T, slot?: HookSlot): { current: T | undefined } {
+	// Same legacy lone-slot compatibility and authored alias arguments as useState.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		slotStack.length === 0
+	) {
 		slot = initial as unknown as symbol;
-		initial = undefined as T;
+		initial = undefined;
 	}
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useRef');
 	const scope = CURRENT_SCOPE!;
-	let s = scope.hooks?.get(slot) as { current: T } | undefined;
+	let s = scope.hooks?.get(slot) as { current: T | undefined } | undefined;
 	if (s === undefined) {
 		s = { current: initial };
 		ensureHooks(scope).set(slot, s);
@@ -26580,7 +27033,7 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 				throw renderError;
 			if (isSuspenseException(renderError)) {
 				if (state.propagateSuspense) throw renderError;
-				handleSuspense(state, renderError.thenable, block, journalCheckpoint);
+				handleSuspense(state, renderError.thenable, block, journalCheckpoint, source ?? block);
 			} else switchToCatch(state, renderError, true);
 		} else {
 			if (capture !== null) spliceOffscreenCapture(capture);
@@ -26956,6 +27409,10 @@ function handleSuspense(
 	// every caller that renders outside an armed window (a fresh mount or a
 	// retry, neither of which has committed content to keep whole).
 	journalCheckpoint = -1,
+	// Independent descendant updates render through their boundary's journal
+	// window. That boundary supplies render priority, but the descendant remains
+	// the owner whose Action batch must keep its useTransition cue pending.
+	transitionOrigin = sourceBlock,
 ): void {
 	// Ordinary roots do not need hidden-subtree ancestry walks. Install this
 	// capability before the first boundary can preserve a suspended primary.
@@ -27000,7 +27457,7 @@ function handleSuspense(
 		if (ACTIVE_TRANSITION_ATTEMPT !== null) {
 			(ACTIVE_TRANSITION_ATTEMPT.heldSlots ??= new Set()).add(state);
 		}
-		holdTransitionHooksForBlock(state, sourceBlock);
+		holdTransitionHooksForBlock(state, transitionOrigin);
 		if (!state.transitionHeld) {
 			state.transitionHeld = true;
 			tickTransitionCount(+1);
@@ -28110,6 +28567,7 @@ function flushStagedReveals(): void {
 				break;
 			}
 		}
+		if (allVisible && heldTransitionHasPendingAction(HELD_SYNC_TRANSITION.entries)) return;
 		if (allVisible && promoteHeldSyncTransition()) {
 			STAGED_REVEALS.clear();
 			flush();

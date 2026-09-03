@@ -45,6 +45,15 @@ Evidence:
 [audit-events-portals.test.ts](../packages/octane/tests/audit-events-portals.test.ts),
 and the existing action, transition, effect, reconciliation, and browser event suites.
 
+Integration follow-ups cover repeated and awaited Actions interleaved with urgent
+updates. State, reducers, and third-tuple getters replay those operations in
+dispatch order. An urgent ancestor can publish new props and effects while a
+child retains its committed inputs for a separate transition attempt. The
+[descendant suspension controls](../packages/octane/tests/transition-descendant-suspend.test.ts)
+and [urgent equality controls](../packages/octane/tests/transition-urgent-equality.test.ts)
+cover retained DOM identity, independent pending indicators, urgent replacement,
+functional replay, and late-promise cancellation.
+
 | ID | Disposition |
 | --- | --- |
 | B1 | Fixed: each transition hook tracks its own action batches and suspended work. Unrelated transitions and deferred values do not flip its pending indicator. |
@@ -115,8 +124,7 @@ the client and server.
 Native form and submitter actions supply action context before their queued
 `useActionState` callback starts, so they do not emit the outside-action warning.
 Direct async dispatch outside that context still warns. The added check is
-development-only; the production bundle sizes and memo operation counters below
-remain unchanged after this follow-up. Both Cartlane production and development
+development-only and adds no production code. Both Cartlane production and development
 browser suites pass (five cases each).
 The relevant tests are
 [audit-list-diagnostics.test.ts](../packages/octane/tests/audit-list-diagnostics.test.ts)
@@ -135,18 +143,21 @@ and successful commits allocate no error queue. Handler snapshots use reusable
 dispatch storage; mutable bundles copy only when changed during dispatch.
 Server template results gain a short-lived carrier object so text can never be
 mistaken for serialized HTML.
+Ordered hook replay reuses staged Action records. Prefix snapshots and urgent
+operation indices allocate only when those queues overlap; the committed-input
+snapshot is limited to urgent ancestor traversal of a queued transition.
 
 Measurements compare the baseline above with the candidate using the same
 installed dependencies and authored fixtures on Node 26.4.0 and Chromium:
 
 | Control | Baseline → candidate | Interpretation |
 | --- | --- | --- |
-| `benchmarks/hook-memo/run.mjs` operation and allocation counters | Identical | Ordinary render/memo creation counts and fixture output sizes stay unchanged. These counters are not a full heap census. |
-| Hook-memo complete production bundles, gzip | 54,611 → 56,374 bytes; 55,159 → 56,963 bytes | The whole patch adds 1,763 / 1,804 bytes in the runtime / inline variants. |
-| Hook transition, 40 alternating samples of 500 complete cycles after 1,000 warmups | 2.7 → 3.3 µs median | Per-hook tracking and render-time replay cost about 0.6 µs per cycle on this fixture. Value, pending, and layout-commit controls pass. |
+| `benchmarks/hook-memo/run.mjs` operation and allocation counters | Identical | Ordinary render/memo creation counts stay unchanged. These counters are not a full heap census. |
+| Hook-memo complete production bundles, gzip | 54,611 → 57,599 bytes; 55,159 → 58,171 bytes | The whole patch adds 2,988 / 3,012 bytes in the runtime / inline variants. |
+| Hook transition, 40 alternating samples of 500 complete cycles after 1,000 warmups | 3.4 → 4.0 µs median | Per-hook tracking and render-time replay cost about 0.6 µs per cycle on this fixture. Value, pending, and layout-commit controls pass. |
 | `benchmarks/ssr-throughput/run.mjs`, compiled deopt-page fixture | 1.761 → 1.914 ms | About 9% higher median render score, including string materialization. |
 | Same SSR fixture through descriptors | 3.656 → 3.901 ms | About 7% higher median render score. |
-| Compiler ordinary production outputs | 386 / 601 / 1,685 / 759 bytes, unchanged | The parser-safety prepass and entity decoder add compiler cost without inflating these ordinary outputs. |
+| Hook-memo compiled fixture output, minified | 5,784 → 5,764 bytes; 7,183 → 7,163 bytes | Preserving custom hooks' authored arguments removes unnecessary trailing arguments. |
 
 SSR uses three alternating runs with `CONFIGS=deopt-page`, a one-second timed
 budget per configuration, and 500 memory-phase renders. Baseline and candidate
@@ -154,6 +165,9 @@ bundles are built separately from the archived base and candidate sources; only
 the existing runner's bundle and helper paths change. Its body-equivalence gates
 pass, and body lengths remain 134,189 / 148,003 bytes. Short-run memory deltas are
 GC-sensitive and are not used as retention evidence.
+The SSR figures retain the original audit measurement; that serializer fixture
+does not call hooks affected by the later argument and slot fixes. Bundle and
+transition measurements above include those follow-ups.
 
 The existing keyed-row browser harness passes all 28 order and survivor-identity
 gates. Twelve timing samples per target were noisy: several insertion medians

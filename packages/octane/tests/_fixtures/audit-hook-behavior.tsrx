@@ -1,4 +1,5 @@
 import {
+	startTransition,
 	memo,
 	use,
 	useCallback,
@@ -11,6 +12,133 @@ import {
 	useSyncExternalStore,
 	useTransition,
 } from 'octane';
+
+export function RepeatedTransitionFlag(props: { repeats: number }) @{
+	const [pending, setPending] = useState(false);
+	<button
+		onClick={() => {
+			for (let i = 0; i < props.repeats; i++) {
+				setPending(true);
+				startTransition(() => setPending(false));
+			}
+		}}
+	>{String(pending)}</button>
+}
+
+export function QueuedStateOrder(props: {
+	steps: Array<{ value: number; transition: boolean }>;
+	read: (value: number) => void;
+}) @{
+	const [value, setValue, getValue] = useState(0);
+	<button
+		onClick={() => {
+			for (const step of props.steps) {
+				const update = () => setValue((previous) => previous * 10 + step.value);
+				if (step.transition) startTransition(update);
+				else update();
+			}
+			props.read(getValue());
+		}}
+	>{String(value)}</button>
+}
+
+export function QueuedReducerOrder(props: {
+	steps: Array<{ value: number; transition: boolean }>;
+	read: (value: number) => void;
+}) @{
+	const [value, dispatch, getValue] = useReducer(
+		(previous: number, digit: number) => previous * 10 + digit,
+		0,
+	);
+	<button
+		onClick={() => {
+			for (const step of props.steps) {
+				const update = () => dispatch(step.value);
+				if (step.transition) startTransition(update);
+				else update();
+			}
+			props.read(getValue());
+		}}
+	>{String(value)}</button>
+}
+
+export function AsyncQueuedStateOrder(props: {
+	reducer: boolean;
+	urgent: 'replace' | 'append';
+	gate: Promise<void>;
+	read: (value: number) => void;
+}) @{
+	const [state, setState, getState] = useState(0);
+	const [reduced, dispatch, getReduced] = useReducer(
+		(previous: number, action: { value: number; replace: boolean }) => action.replace
+			? action.value
+			: previous * 10 + action.value,
+		0,
+	);
+	const [pending, start] = useTransition();
+	<div>
+		<button
+			id="action"
+			onClick={() => start(async () => {
+				if (props.reducer) dispatch({ value: 1, replace: false });
+				else setState((previous) => previous * 10 + 1);
+				await props.gate;
+			})}
+		>action</button>
+		<button
+			id="urgent"
+			onClick={() => {
+				if (props.reducer) dispatch({ value: 2, replace: props.urgent === 'replace' });
+				else if (props.urgent === 'replace') setState(2);
+				else setState((previous) => previous * 10 + 2);
+				props.read(props.reducer ? getReduced() : getState());
+			}}
+		>urgent</button>
+		<p>{String(props.reducer ? reduced : state)}</p>
+		<span>{String(pending)}</span>
+	</div>
+}
+
+export function AsyncInterleavedStateOrder(props: {
+	reducer: boolean;
+	gate: Promise<void>;
+	read: (value: number) => void;
+}) @{
+	const [state, setState, getState] = useState(0);
+	const [reduced, dispatch, getReduced] = useReducer(
+		(previous: number, digit: number) => previous * 10 + digit,
+		0,
+	);
+	const [, start] = useTransition();
+	const append = (digit: number) => {
+		if (props.reducer) dispatch(digit);
+		else setState((previous) => previous * 10 + digit);
+	};
+	<div>
+		<button
+			id="action"
+			onClick={() => {
+				append(1);
+				startTransition(() => append(2));
+				start(async () => {
+					append(3);
+					await props.gate;
+				});
+				props.read(props.reducer ? getReduced() : getState());
+			}}
+		>action</button>
+		<button
+			id="urgent"
+			onClick={() => {
+				append(4);
+				startTransition(() => append(5));
+				append(6);
+				props.read(props.reducer ? getReduced() : getState());
+			}}
+		>urgent</button>
+		<p>{String(props.reducer ? reduced : state)}</p>
+	</div>
+}
 
 function KeyedChild() @{
 	const [value, setValue] = useState(0);

@@ -18,12 +18,100 @@ import {
 	IndependentTransitions,
 	MountSelfUpdate,
 	OrderedInsertion,
+	RepeatedTransitionFlag,
+	QueuedStateOrder,
+	QueuedReducerOrder,
+	AsyncQueuedStateOrder,
+	AsyncInterleavedStateOrder,
 	PassiveCleanup,
 	TransitionStore,
 	UrgentSuspendingValue,
 } from './_fixtures/audit-hook-behavior.tsrx';
 
 describe('state, component identity, and lifecycle contracts', () => {
+	it.each([
+		{ reducer: false, urgent: 'replace' as const, expected: '2' },
+		{ reducer: true, urgent: 'replace' as const, expected: '2' },
+		{ reducer: false, urgent: 'append' as const, expected: '12' },
+		{ reducer: true, urgent: 'append' as const, expected: '12' },
+	])('preserves a later urgent $urgent after an async Action (reducer=$reducer)', async (props) => {
+		let resolve!: () => void;
+		const gate = new Promise<void>((done) => {
+			resolve = done;
+		});
+		const read = vi.fn();
+		const root = mount(AsyncQueuedStateOrder, { ...props, gate, read });
+		try {
+			root.click('#action');
+			expect(root.find('p').textContent).toBe('0');
+			root.click('#urgent');
+			expect(root.find('p').textContent).toBe('2');
+			expect(read).toHaveBeenCalledWith(Number(props.expected));
+			await act(() => resolve());
+			expect(root.find('p').textContent).toBe(props.expected);
+			expect(root.find('span').textContent).toBe('false');
+		} finally {
+			resolve();
+			root.unmount();
+		}
+	});
+	it.each([false, true])(
+		'retains getter and Action ordering across repeated interleavings (reducer=%s)',
+		async (reducer) => {
+			let resolve!: () => void;
+			const gate = new Promise<void>((done) => {
+				resolve = done;
+			});
+			const read = vi.fn();
+			const root = mount(AsyncInterleavedStateOrder, { reducer, gate, read });
+			try {
+				root.click('#action');
+				expect(read).toHaveBeenLastCalledWith(123);
+				root.click('#urgent');
+				expect(read).toHaveBeenLastCalledWith(123456);
+				await act(() => resolve());
+				expect(root.find('p').textContent).toBe('123456');
+			} finally {
+				resolve();
+				root.unmount();
+			}
+		},
+	);
+	it.each([QueuedStateOrder, QueuedReducerOrder])(
+		'preserves urgent prefixes, transition segments, and urgent suffixes for %s',
+		async (Component) => {
+			const read = vi.fn();
+			const root = mount(Component, {
+				steps: [
+					{ value: 1, transition: false },
+					{ value: 2, transition: true },
+					{ value: 3, transition: false },
+					{ value: 4, transition: true },
+					{ value: 5, transition: false },
+				],
+				read,
+			});
+			try {
+				await act(() => root.click('button'));
+				expect(read).toHaveBeenCalledWith(12345);
+				expect(root.find('button').textContent).toBe('12345');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+	it.each([1, 2, 3, 1000])(
+		'preserves update order across %s consecutive transitions',
+		async (repeats) => {
+			const root = mount(RepeatedTransitionFlag, { repeats });
+			try {
+				await act(() => root.click('button'));
+				expect(root.find('button').textContent).toBe('false');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
 	it.each([1, NaN, true])(
 		'normalizes direct component key %s before comparing identity',
 		(value) => {
@@ -239,7 +327,7 @@ describe('transition ownership', () => {
 			window.addEventListener('error', globalError);
 			try {
 				root.render(IndependentTransitions, {
-					bind: (fn) => {
+					bind: (fn: (action: () => void | Promise<unknown>) => void) => {
 						start = fn;
 					},
 				});

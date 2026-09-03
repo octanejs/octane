@@ -1,5 +1,5 @@
 import { useDebugValue, useEffect, useMemo, useReducer, useRef } from 'octane';
-import { splitSlot, subSlot } from './internal';
+import { subSlot } from './internal';
 
 export interface InteropableObservable<T> {
 	subscribe(
@@ -41,10 +41,13 @@ export function useObservable<T, TDefault>(
 	observableOrFactory: InteropableObservable<T> | ObservableFactory<T>,
 	...rest: [unknown?, unknown?, symbol?]
 ): T | TDefault | undefined {
-	const [args, slot] = splitSlot(rest);
-	const deps = typeof observableOrFactory === 'function' ? ((args[0] as unknown[]) ?? []) : [];
-	const defaultResult = (typeof observableOrFactory === 'function' ? args[1] : args[0]) as
-		TDefault | undefined;
+	const isFactory = typeof observableOrFactory === 'function';
+	// Generic defaults occupy public argument positions even when they are
+	// Symbols; an internal slot can only follow the complete public arguments.
+	const slotArgument = rest[isFactory ? 2 : 1];
+	const slot = typeof slotArgument === 'symbol' ? slotArgument : undefined;
+	const deps = isFactory ? ((rest[0] as unknown[]) ?? []) : [];
+	const defaultResult = rest[isFactory ? 1 : 0] as TDefault | undefined;
 	const monitor = useRef(
 		{
 			hasResult: false,
