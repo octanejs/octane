@@ -100,11 +100,11 @@ Refs are passed as props, React-19 style: `ref={cb}`, `ref={obj}`, or multi-ref
 A `<style>` block is static CSS written among the children of an element or a
 fragment. The block is scoped to its siblings, not to the `@{ … }` body around
 it: it styles the items beside it and everything below them and never the
-element that contains it. The compiler rewrites every selector
-with that children list's hash and stamps the hash on those siblings and their
-descendants; stamping stops at composite components and function boundaries, so
-a child component's elements and `items.map((x) => <li />)` output are outside
-the scope. `:global(…)` opts a selector out. A block accepts only the `ref` and
+element that contains it. The compiler adds that children list's
+hash to every selector and adds the same hash class to those siblings and their
+descendants, so the selectors match only there; the hash class stops at
+composite components and function boundaries, so a child component's elements
+and `items.map((x) => <li />)` output are outside the scope. `:global(…)` opts a selector out. A block accepts only the `ref` and
 `apply` attributes, and its CSS is static: use custom properties
 (`style={{ '--tone': tone }}` with `var(--tone)`) for runtime values.
 
@@ -116,16 +116,18 @@ the scope. `:global(…)` opts a selector out. A block accepts only the `ref` an
   node is the multiple-outputs parser error and a lone block as the output is
   `STYLE_STANDALONE_NEEDS_FRAGMENT`. Wrap both in a fragment, in branches too:
   `@if (x) { <><style>…</style><p>…</p></> }`.
-- Every children list holding a block is a sibling scope with its own hash;
-  sibling blocks share it and inject as one sheet. Elements
-  carry every enclosing hash outer to inner, then the applied theme classes,
-  all after the authored classes.
-- CSS emits in lexical order: outer scopes before the scopes nested in them, a
-  scope's blocks contiguous, sibling scopes in source order, assigned blocks at
-  their declaration, an applied theme before its applier. At equal specificity
-  the rule emitted last wins.
-- Control-flow caveat: a branch's CSS is always emitted whichever branch
-  renders; only the class stamping follows the branch.
+- Every children list holding a block is a sibling scope with its own hash
+  class; sibling blocks share it and inject as one sheet. An element gets every
+  enclosing hash class outer to inner, then the applied theme classes, all
+  after the authored classes.
+- CSS comes out in source order, outer scope first: outer scopes before the
+  scopes nested in them, a scope's blocks together, sibling scopes in source
+  order, assigned blocks at their declaration, an applied theme before the
+  block that applies it. At equal specificity the rule that comes later wins.
+- A block inside an `@if`/`@for` branch styles only what that branch renders,
+  but its CSS is always in the module's stylesheet whichever branch renders;
+  only the hash class follows the branch. Rules wanted everywhere go outside
+  the branch.
 - Raw CSS in `<style>` is TSRX template syntax: a standalone block is allowed
   only lexically inside a `@{ … }` body or an `@if`/`@for`/`@switch`/`@try`
   body, at any depth. In a plain `return <…>` function or a module-scope
@@ -142,22 +144,22 @@ Exported or applied blocks, and blocks whose `$class` is read anywhere in the
 module, are themes and keep every selector; a local block that is none of these
 keeps only its standalone class selectors.
 
-`<style apply={theme} />` stamps `theme.$class` on the items beside it and
+`<style apply={theme} />` adds `theme.$class` to the items beside it and
 everything below them, so the theme's element and descendant rules reach them;
-the self-closed
-form adds no hash of its own, while `<style apply={theme}>…</style>` also
-declares the scope's block. `apply={[a, b]}` composes in order, a theme may
+the self-closed form adds no hash class of its own, while a
+`<style apply={theme}>…</style>` with CSS in it also declares the scope's block. `apply={[a, b]}` composes in order, a theme may
 apply another (`const accent = <style apply={base}>…</style>`), and
 `export const bundle = <style apply={[a, b]} />` composes without CSS of its own.
-A theme must be declared before the block that applies it. Same-module targets
-inline as string literals; imported themes are runtime `theme.$class` reads.
+A theme must be declared before the block that applies it. A same-module theme
+becomes a string literal; an imported theme is read at runtime through
+`theme.$class`.
 
 `apply` is the whole-scope form. To opt single elements in, give them
 `class={theme.$class}` and leave `apply` out: only the elements carrying the
 class match the theme's element and descendant rules, their siblings stay
 untouched, and a child component can take the class through a prop
 (`<Card parentClass={theme.$class} />`, then `<article class={parentClass}>`),
-where it lands before the child's own scope hash. `class={[a.$class, b.$class]}`
+where it lands before the child's own hash class. `class={[a.$class, b.$class]}`
 is the per-element counterpart of `apply={[a, b]}`; the two forms compose.
 
 ```tsx
