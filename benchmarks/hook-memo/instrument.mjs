@@ -47,7 +47,16 @@ function inferredFunctionName(node, parent, key) {
 	return null;
 }
 
-export const COUNTER_KINDS = ['functions', 'arrayLiterals', 'arrayConstructors', 'restArrays'];
+export const COUNTER_KINDS = [
+	'functions',
+	'arrayLiterals',
+	'arrayConstructors',
+	'restArrays',
+	// Counted only when a caller opts in with `objects: true`: object literals and
+	// non-Array `new` expressions (Map, Set, Promise, user classes, ...).
+	'objectLiterals',
+	'constructors',
+];
 export const COUNTER_GLOBAL = '__octaneHookMemoAllocations';
 
 export function emptyCounters() {
@@ -58,8 +67,15 @@ export function emptyCounters() {
 	);
 }
 
-export function instrumentJavaScript(source, filename, owner, { parseModule, builders, print }) {
+export function instrumentJavaScript(
+	source,
+	filename,
+	owner,
+	{ parseModule, builders, print },
+	options = {},
+) {
 	const b = builders;
+	const countObjects = options.objects === true;
 	const increment = (siteOwner, kind) =>
 		b.update('++', b.member(b.member(b.id('globalThis'), COUNTER_GLOBAL), `${siteOwner}_${kind}`));
 
@@ -130,6 +146,12 @@ export function instrumentJavaScript(source, filename, owner, { parseModule, bui
 			node.callee.name === 'Array'
 		) {
 			return b.sequence([increment(siteOwner, 'arrayConstructors'), rewritten]);
+		}
+		if (countObjects && node.type === 'NewExpression') {
+			return b.sequence([increment(siteOwner, 'constructors'), rewritten]);
+		}
+		if (countObjects && node.type === 'ObjectExpression') {
+			return b.sequence([increment(siteOwner, 'objectLiterals'), rewritten]);
 		}
 		return rewritten;
 	}
