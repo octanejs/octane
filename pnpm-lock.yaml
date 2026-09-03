@@ -6907,7 +6907,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: github:tsrx-org/tsrx#feat/scoped-styles-apply&path:packages/tsrx
-        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c00bcd73d59a61b807cc05f64961f45065619ead#path:packages/tsrx
+        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx
       '@types/react':
         specifier: catalog:default
         version: 19.2.17
@@ -6977,7 +6977,7 @@ importers:
     devDependencies:
       '@tsrx/core':
         specifier: github:tsrx-org/tsrx#feat/scoped-styles-apply&path:packages/tsrx
-        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c00bcd73d59a61b807cc05f64961f45065619ead#path:packages/tsrx
+        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -10522,7 +10522,7 @@ importers:
         version: 3.23.0
       '@tsrx/core':
         specifier: github:tsrx-org/tsrx#feat/scoped-styles-apply&path:packages/tsrx
-        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c00bcd73d59a61b807cc05f64961f45065619ead#path:packages/tsrx
+        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx
       '@tsrx/prettier-plugin':
         specifier: catalog:default
         version: 0.3.128(prettier@3.9.6)
@@ -20228,8 +20228,8 @@ packages:
   '@tsrx/core@0.1.64':
     resolution: {integrity: sha512-cmpl6Gif1j9n4munRE+elgs8zKvBlhG22IOqUvyMsclG17h41BVQULpC4FIcLfdkENUrz55g68m4XvEpvWJdKw==}
 
-  '@tsrx/core@https://codeload.github.com/tsrx-org/tsrx/tar.gz/c00bcd73d59a61b807cc05f64961f45065619ead#path:packages/tsrx':
-    resolution: {gitHosted: true, integrity: sha512-cvAbSGJSwXhAj6yQyAOGhE3jXUFj51S/EZIfMuJLL3zFMx9pkxdm+WlmJqp/2XIRr5yZnINP3wl4FwgRUNq5Yw==, path: packages/tsrx, tarball: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c00bcd73d59a61b807cc05f64961f45065619ead}
+  '@tsrx/core@https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx':
+    resolution: {gitHosted: true, integrity: sha512-Pd99zMaJ4wc8vZWG4v7+cbtNG0zbXXky0v2J1woez5Msh+B2IXPeq0tGEEOSXvTBUBsCCahdXlu8lzvvl0fD/A==, path: packages/tsrx, tarball: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c}
     version: 0.1.65
 
   '@tsrx/prettier-plugin@0.3.128':
@@ -47314,7 +47314,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/core@https://codeload.github.com/tsrx-org/tsrx/tar.gz/c00bcd73d59a61b807cc05f64961f45065619ead#path:packages/tsrx':
+  '@tsrx/core@https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
