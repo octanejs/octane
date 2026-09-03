@@ -2,6 +2,7 @@ import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import type { Chord, ChordSubgroup } from 'd3-chord';
 import { ribbon as d3ribbon } from 'd3-chord';
+import setNumberOrNumberAccessor from '../internal/setNumberOrNumberAccessor';
 
 type NumAccessor = (d: ChordSubgroup) => number;
 
@@ -27,15 +28,6 @@ export type RibbonProps = {
 	/** Classname to apply to the rendered `<path />`. */
 	className?: string;
 };
-
-/** This is a workaround for TypeScript not inferring the correct method overload */
-function setNumberOrNumberAccessor(
-	func: (d: number | NumAccessor) => void,
-	value: number | NumAccessor,
-) {
-	if (typeof value === 'number') func(value);
-	else func(value);
-}
 
 export default function Ribbon({
 	chord,

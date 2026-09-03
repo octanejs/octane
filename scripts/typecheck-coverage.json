@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "scope": "Projects and explicit private-port exceptions added by the 2026-09-02 cleanup audit.",
+  "requiredProjects": [
+    "packages/blocknote/tsconfig.supported.json",
+    "packages/thinking-orbs/tsconfig.json",
+    "packages/xyflow/tsconfig.json"
+  ],
+  "privateExceptions": [
+    {
+      "package": "@octanejs/puck",
+      "project": "packages/puck/tsconfig.json",
+      "reason": "The incomplete upstream port remains private while its whole-tree Octane type adaptation is unfinished; runtime fixtures validate the currently supported paths."
+    }
+  ]
+}
