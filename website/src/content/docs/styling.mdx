@@ -91,7 +91,7 @@ Wrap the block and the output in `<>…</>`, inside branches too.
 
 <h2 id="static-css">The CSS is static</h2>
 
-A block holds plain CSS: no `{expr}` holes and no template statements. Put a runtime
+A block holds plain CSS: no `{ … }` expressions and no template statements. Put a runtime
 value in a custom property on the element and read it from the CSS:
 
 ```tsrx
@@ -120,8 +120,8 @@ the list it is written in. These lists count:
 - The children of a fragment, including the fragment a `@{ … }` block or an `@if`,
   `@else if`, `@else`, `@for`, `@empty`, `@case`, `@default`, `@try`, `@pending`, or
   `@catch` branch renders.
-- The children of an element or fragment used as a value: an assigned template, or the
-  value of a `{ … }` hole, written inside a component body.
+- The children of an element or fragment used as a value inside a component body: a
+  template assigned to a variable, or one written inside a `{ … }` expression.
 
 Scopes nest. An element gets the hash class of every scope around it, outermost first,
 so an outer block's rules reach into nested scopes and an inner block's rules never
@@ -467,6 +467,6 @@ prints under the message and the bundler plugins surface in their own error outp
 <h2 id="next">Next</h2>
 
 - [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — the `@{ … }` shorthand and the
-  `@if`/`@for` branches that create style scopes.
+  `@if`/`@for` branches whose fragments hold style blocks.
 - [Core APIs](/docs/core-apis#server-rendering) — where the server's `css` goes.
 - [Build tools](/docs/build-tools) — how each bundler carries scoped CSS.
