@@ -24,6 +24,114 @@ function parsed(html: string): HTMLDivElement {
 	return container;
 }
 
+describe.each([true, false])('server-rendered lists (development compile: %s)', (dev) => {
+	const lists = loadServerFixture(
+		'packages/octane/tests/_fixtures/server-renderable-contract.tsrx',
+		{ compileOptions: { dev, hmr: dev, inlineHookMemo: false } },
+	);
+	const items = [
+		{ id: 'plain', value: hostile, text: true },
+		{ id: 'template', value: '<b>second & item</b>', text: false },
+	];
+	const groups = [
+		{ id: 'filled', label: '<h1>Filled & group</h1>', items },
+		{ id: 'empty', label: '<b>Empty & group</b>', items: [] },
+	];
+
+	it.each([false, true])(
+		'preserves nested list markup and escaped values across server APIs (empty: %s)',
+		async (empty) => {
+			const props = { groups: empty ? [] : groups };
+			for (const { html } of [
+				Server.renderToString(lists.NestedRenderableList, props),
+				Server.renderToStaticMarkup(lists.NestedRenderableList, props),
+				await Static.prerender(lists.NestedRenderableList, props),
+				await collectPipeableStream(lists.NestedRenderableList, props),
+				await collectReadableStream(lists.NestedRenderableList, props),
+			]) {
+				const node = parsed(html);
+				expect(node.querySelector('section')).not.toBeNull();
+				expect(node.querySelector('img, h1, b')).toBeNull();
+				expect(
+					[...node.querySelectorAll('article')].map((article) => article.dataset.group),
+				).toEqual(empty ? [] : ['filled', 'empty']);
+				expect([...node.querySelectorAll('h2')].map((heading) => heading.textContent)).toEqual(
+					empty ? [] : groups.map((group) => group.label),
+				);
+				expect([...node.querySelectorAll('button')].map((button) => button.textContent)).toEqual(
+					empty ? [] : items.map((item) => item.value),
+				);
+				expect([...node.querySelectorAll('small')].map((caption) => caption.textContent)).toEqual(
+					empty ? [] : items.map((item) => item.value),
+				);
+				expect([...node.querySelectorAll('strong')].map((strong) => strong.textContent)).toEqual(
+					empty ? [] : [items[1].value],
+				);
+				expect(node.querySelector('[data-empty]')?.textContent).toBe(
+					empty ? 'No groups' : groups[1].label,
+				);
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'preserves loop children forwarded into an ordinary component descriptor (empty: %s)',
+		async (empty) => {
+			const Wrapper = (
+				props: { children: (arg: undefined, scope: unknown) => unknown },
+				scope: unknown,
+			) =>
+				Server.createElement('section', null, [
+					props.children(undefined, scope),
+					lists.MixedTextReturn({ value: hostile, text: false }, scope),
+				]);
+			const props = { Wrapper, groups: empty ? [] : groups };
+			for (const { html } of [
+				Server.renderToString(lists.ForwardedLoopChildren, props),
+				Server.renderToStaticMarkup(lists.ForwardedLoopChildren, props),
+				await Static.prerender(lists.ForwardedLoopChildren, props),
+				await collectPipeableStream(lists.ForwardedLoopChildren, props),
+				await collectReadableStream(lists.ForwardedLoopChildren, props),
+			]) {
+				const node = parsed(html);
+				expect(node.querySelector('section')).not.toBeNull();
+				expect([...node.querySelectorAll('strong')].map((strong) => strong.textContent)).toEqual(
+					empty ? [hostile] : [...items.map((item) => item.value), hostile, hostile],
+				);
+				expect(node.querySelector('em')?.textContent).toBe(empty ? 'No groups' : groups[1].label);
+				expect(node.querySelector('img, b')).toBeNull();
+			}
+		},
+	);
+
+	it('hydrates nested list nodes in place and activates item events', () => {
+		const onSelect = vi.fn();
+		const props = { groups, onSelect };
+		const container = parsed(Server.renderToString(lists.NestedRenderableList, props).html);
+		document.body.appendChild(container);
+		const articles = [...container.querySelectorAll('article')];
+		const buttons = [...container.querySelectorAll('button')];
+		const empty = container.querySelector('[data-empty]');
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(container, Client.NestedRenderableList, props, { onRecoverableError });
+		try {
+			flushSync(() => {});
+			for (const article of articles)
+				expect(container.querySelector(`[data-group="${article.dataset.group}"]`)).toBe(article);
+			for (const button of buttons)
+				expect(container.querySelector(`[data-item="${button.dataset.item}"]`)).toBe(button);
+			expect(container.querySelector('[data-empty]')).toBe(empty);
+			expect(buttons.map((button) => button.textContent)).toEqual(items.map((item) => item.value));
+			flushSync(() => buttons[1].click());
+			expect(onSelect).toHaveBeenCalledExactlyOnceWith('template');
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+});
+
 describe('server renderable values', () => {
 	it.each(['value', 'defaultValue'])('omits non-serializable input %s values', (prop) => {
 		for (const value of [() => 'handler', Symbol('value')]) {
