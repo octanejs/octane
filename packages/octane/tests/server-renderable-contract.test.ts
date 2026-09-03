@@ -259,6 +259,66 @@ describe('server renderable values', () => {
 			}
 		},
 	);
+	it.each([false, true])(
+		'preserves every compiled result an ordinary wrapper keeps across later calls (descriptor: %s)',
+		async (descriptor) => {
+			// Each compiled result carries its own proof, so a wrapper may keep calling
+			// compiled components and still return or embed an earlier result; call
+			// order never demotes markup to text.
+			const values = ['first', hostile, 'third', 'fourth'];
+			const Wrapper = (_props: unknown, scope: unknown) => {
+				const results = values.map((value) =>
+					fixture.MixedTextReturn({ value, text: false }, scope),
+				);
+				if (!descriptor) return results[1];
+				return Server.createElement('div', null, [results[3], results[0], results[2], results[1]]);
+			};
+			for (const { html } of [
+				Server.renderToString(Wrapper),
+				Server.renderToStaticMarkup(Wrapper),
+				await Static.prerender(Wrapper),
+				await collectPipeableStream(Wrapper),
+				await collectReadableStream(Wrapper),
+			]) {
+				const node = parsed(html);
+				expect([...node.querySelectorAll('strong')].map((element) => element.textContent)).toEqual(
+					descriptor ? ['fourth', 'first', 'third', hostile] : [hostile],
+				);
+				expect(node.querySelector('img')).toBeNull();
+			}
+		},
+	);
+	it('escapes authored text a wrapper returns after calling compiled components', async () => {
+		// Compiled results the wrapper never hands back lend no trust to a
+		// different string: the wrapper's own text is still text.
+		const Wrapper = (_props: unknown, scope: unknown) => {
+			fixture.MixedTextReturn({ value: 'kept', text: false }, scope);
+			fixture.MixedTextReturn({ value: 'also kept', text: false }, scope);
+			return hostile;
+		};
+		for (const { html } of [
+			Server.renderToString(Wrapper),
+			Server.renderToStaticMarkup(Wrapper),
+			await Static.prerender(Wrapper),
+			await collectPipeableStream(Wrapper),
+			await collectReadableStream(Wrapper),
+		]) {
+			const node = parsed(html);
+			expect(node.textContent).toBe(hostile);
+			expect(node.querySelector('strong')).toBeNull();
+			expect(node.querySelector('img')).toBeNull();
+		}
+	});
+	it.each(['pre', 'textarea'])('escapes string children of %s descriptors', (tag) => {
+		const html = Server.renderToStaticMarkup(() => Server.createElement(tag, null, hostile)).html;
+		expect(html).not.toContain('<img');
+		expect(parsed(html).querySelector(tag)?.textContent).toBe(hostile);
+	});
+	it('escapes a template hole inside a newline-sensitive element', () => {
+		const html = Server.renderToString(fixture.PreHole, { value: hostile }).html;
+		expect(html).not.toContain('<img');
+		expect(parsed(html).querySelector('pre')?.textContent).toBe(hostile);
+	});
 	it('exposes memo metadata without mutating the wrapped component', () => {
 		const Named = (props: { text: string }) => props.text;
 		const Memo = Server.memo(Named);
@@ -436,6 +496,30 @@ describe('server renderable values', () => {
 		});
 		expect(parsed(result.html).querySelector('div')?.textContent).toBe('ready');
 	});
+	it.each(['renderToString', 'renderToStaticMarkup'] as const)(
+		'%s gives a document without head content an empty head and leaves fragments unchanged',
+		(api) => {
+			const document = Server.createElement(
+				'html',
+				null,
+				Server.createElement('body', null, 'body'),
+			);
+			const documentHtml = Server[api](document).html;
+			expect(documentHtml).toContain('<html><head></head><body>body</body></html>');
+			expect(
+				new DOMParser().parseFromString(documentHtml, 'text/html').head.childNodes.length,
+			).toBe(0);
+			// A fragment is not a document: it neither gains a head nor loses one it
+			// authored.
+			const fragment = Server.createElement(
+				'div',
+				null,
+				Server.createElement('head', null),
+				'body',
+			);
+			expect(Server[api](fragment).html).toContain('<div><head></head>body</div>');
+		},
+	);
 	it('folds metadata into an implicit head in full documents', () => {
 		const html = Server.renderToString(fixture.DocumentMetadata).html;
 		expect(html.indexOf('<html')).toBeLessThan(html.indexOf('<title'));
