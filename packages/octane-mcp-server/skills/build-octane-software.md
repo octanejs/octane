@@ -30,7 +30,7 @@ details but do not replace these gates.
   the retained state.
 - Use native event semantics. `onInput` is the per-edit event for text controls;
   do not add synthetic `onChange` compatibility or event wrapper allocation.
-- Style with lexically scoped `<style>` blocks and assigned theme blocks
+- Style with sibling-scoped `<style>` blocks and assigned theme blocks
   (`const theme = <style>…</style>`, `class={theme.card}`,
   `<style apply={theme} />`) instead of a CSS-in-JS runtime. A block styles
   the items beside it and everything below them, never the element that

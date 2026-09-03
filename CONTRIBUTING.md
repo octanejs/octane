@@ -76,8 +76,9 @@ end-to-end evidence.
 - Read a nearby `.tsrx` file before writing one. The dialect reference is
   [`.rulesync/rules/tsrx-authoring.md`](./.rulesync/rules/tsrx-authoring.md):
   `@{ … }` return shorthand, `{expr as string}` text holes, the `@if`,
-  `@for`, `@switch`, `@try` directive blocks, and lexically scoped `<style>`
-  blocks with `$class` themes and `apply`.
+  `@for`, `@switch`, `@try` directive blocks, and sibling-scoped `<style>`
+  blocks (a block styles its siblings and everything below them) with `$class`
+  themes and `apply`.
 - Type-check any program containing `.tsrx` with `tsrx-tsc --noEmit`, never
   plain `tsc`. Use `OctaneNode` for renderables, not `React.ReactNode`.
 - Never write `declare module '*.tsrx'` in a published package's `src/`. It is

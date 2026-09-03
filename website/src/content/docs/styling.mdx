@@ -66,8 +66,9 @@ styles nothing (`STYLE_STANDALONE_NEEDS_FRAGMENT`). Wrap the block and the outpu
 
 <h2 id="scopes">What a scope is</h2>
 
-Scopes are lexical. Every children list that holds at least one block is a scope, and
-a block belongs to the list it is written in:
+A block is scoped to its siblings: it styles its siblings and everything below them, and
+sibling blocks share one hash. Every children list that holds at least one block is a
+**sibling scope**, and a block belongs to the list it is written in:
 
 - The children of a native element.
 - The children of a fragment — including the fragment a `@{ … }` block or a directive

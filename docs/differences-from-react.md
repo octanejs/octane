@@ -754,9 +754,10 @@ attribute; an empty string writes `class=""`.
 
 ## Scoped `<style>`, `$class`, and `apply`
 
-React has no styling primitive; Octane's `.tsrx` dialect has lexically scoped
+React has no styling primitive; Octane's `.tsrx` dialect has sibling-scoped
 `<style>` blocks ([RFC tsrx-org/RFCs#1](https://github.com/tsrx-org/RFCs/discussions/1)),
-covered in [tsrx-basics.md](./tsrx-basics.md#styles). The contract in brief:
+covered in [tsrx-basics.md](./tsrx-basics.md#styles): a block styles its siblings and
+everything below them, and sibling blocks share one hash. The contract in brief:
 
 - A block is a child of an element or a fragment and styles the items beside
   it and everything below them; it never styles the element that contains it.
@@ -870,7 +871,7 @@ React Float **resources** are supported with React's semantics:
   ordering with link resources (`data-precedence`/`data-href` mark the tags).
   The CSS is NOT scoped — every other `<style>`, whether standalone in a
   template scope or assigned (`const theme = <style>…</style>`), belongs to
-  Octane's lexical scope model above, and `apply` on a resource is an error
+  Octane's sibling-scope model above, and `apply` on a resource is an error
   (`STYLE_APPLY_UNSUPPORTED_HOST`). Two adaptations: Octane emits one `<style>`
   tag per resource rather than merging same-precedence rules into a single tag
   (grouping and order are preserved), and CSS containing `</style` fails
@@ -1262,7 +1263,7 @@ const { html, css } = renderToString(App, props);
 `renderToString`, `renderToStaticMarkup`, and `prerender` all return
 `{ html, css }`; React has no equivalent `css` field. `css` holds one
 `<style data-octane="hash">` tag per style scope the request rendered — a
-component contributes one per lexical scope it owns — deduped by hash. Hoisted document metadata
+component contributes one per sibling scope it owns — deduped by hash. Hoisted document metadata
 folds into `html` as React does. For a host that owns the surrounding
 `<head>`-bearing template, `headChannel: 'separate'` instead exposes
 `RenderResult.head` and `StreamOptions.onHeadReady`.

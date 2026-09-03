@@ -194,10 +194,11 @@ export const docsMeta: DocMeta[] = [
 		slug: 'styling',
 		title: 'Styling',
 		description:
-			'Lexically scoped <style> blocks that style the items beside them, class maps with $class, and apply for composing themes.',
+			'Sibling-scoped <style> blocks that style the items beside them and everything below them, class maps with $class, and apply for composing themes.',
 		group: 'Learn Octane',
 		searchTerms: [
 			'scoped styles',
+			'sibling scope',
 			'scoped CSS',
 			'style tag',
 			'style block',

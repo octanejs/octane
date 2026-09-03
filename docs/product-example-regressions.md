@@ -117,10 +117,11 @@ a binding, or the application. The PR and commit fields intentionally remain
 
 ## Scoped styles — current change
 
-The lexical style-scope pass (`packages/octane/src/compiler/style-scopes.js`,
+The sibling-scope style pass (`packages/octane/src/compiler/style-scopes.js`,
 RFC tsrx-org/RFCs#1) replaced the single per-component style scope. Its
 regression class is a sibling of `EX-W4-002`: the CSS of a `<style>` block is
-owned by the template scope the block sits in, and any scope that is not the
+owned by the sibling scope the block sits in — the children list of one element
+or fragment, whose blocks share one hash — and any scope that is not the
 component render can be lost or mis-hashed independently.
 
 | ID | Consumer-visible symptom | Classification and owner | Focused owning regression | Retained application journey | Fix | Status |

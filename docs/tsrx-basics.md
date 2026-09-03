@@ -399,8 +399,9 @@ JavaScript. Only inject source you trust.
 ## Styles
 
 A `<style>` block written among the children of an element or a fragment is
-scoped CSS. The block styles the items beside it and everything below them; it
-never styles the element that contains it. The compiler rewrites the block's
+scoped CSS. The block is scoped to its siblings, not to the `@{ … }` body around
+it: it styles the items beside it and everything below them and never the
+element that contains it. The compiler rewrites the block's
 selectors with the hash of that children list and stamps the hash on those
 siblings and their descendants, so rules never leak into a parent, an outer
 sibling, or a child component. `:global(...)` opts a selector out of scoping.
@@ -440,7 +441,7 @@ the output in a fragment.
 
 ### Scopes
 
-Every children list that holds a block is a scope with its own hash: an
+Every children list that holds a block is a sibling scope with its own hash: an
 element's children, a fragment's children, the fragment a nested `@{ … }` or a
 control-flow branch renders, an assigned or returned element's children. Elements
 carry every enclosing scope hash, outer to inner, so an outer block's rules still

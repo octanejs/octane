@@ -19,7 +19,7 @@ asks it to repair or modify the Octane monorepo.
 | Composition and state | Parent/child composition, local versus lifted state, functional updates, reducers, context, and keyed identity |
 | React divergences | Conditional hooks, inferred hook dependencies, current-state getters, native controlled input, deliberate text commit handling, ref props/multi-ref, class composition, and parallel `use()` |
 | Core platform | Suspense/error handling, SSR, hydration, controlled inputs, and `useId` |
-| Scoped styles | Lexically scoped `<style>` blocks for nested `@{ … }` template scopes and control-flow branches, exported themes, `apply` composition, and `$class` in class props |
+| Scoped styles | Sibling-scoped `<style>` blocks (a block styles its siblings and everything below them) for nested `@{ … }` template scopes and control-flow branches, exported themes, `apply` composition, and `$class` in class props |
 | Integrations | Zustand, Hook Form, i18next, and TanStack Query through their public `@octanejs/*` APIs |
 
 Representative executable tasks include

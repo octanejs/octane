@@ -104,8 +104,9 @@ choices, not gaps, and they are written down in
   detectable violations, and let production memoization condition every
   user-authored render call shape on its witnessed inputs.
 - **`class` / `className` composes clsx-style** everywhere: strings, arrays,
-  objects, and nesting, at every apply site. `<style>` blocks are lexically
-  scoped, and `const theme = <style>…</style>` exposes `$class` plus one key
+  objects, and nesting, at every apply site. `<style>` blocks are
+  sibling-scoped (a block styles its siblings and everything below them, never
+  its parent), and `const theme = <style>…</style>` exposes `$class` plus one key
   per class for `class={theme.dark}` and `<style apply={theme} />`.
 - **A current-state getter.** `useState` and `useReducer` return
   `[state, update, getState]`, so a delayed callback can read the latest value

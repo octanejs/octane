@@ -85,11 +85,12 @@ React's `{ default }` module shape works, and Octane additionally accepts a
 component directly from the loader. Suspense and ViewTransition are ordinary
 components, so wrapping them in `lazy()` is valid; nested lazy wrappers are not.
 
-## Scoped styles are lexical
+## Scoped styles are sibling-scoped
 
 A `<style>` block with raw CSS is TSRX template syntax, not a global stylesheet
-as in React. It is a child of an element or a fragment and styles the items
-beside it and everything below them — never the element that contains it:
+as in React. It is a child of an element or a fragment and is scoped to its
+siblings, not to the `@{ … }` body around it: it styles the items beside it and
+everything below them — never the element that contains it —
 selectors are rewritten with the hash of that children list and the hash is
 stamped on those siblings and their descendants. To style an element, make the
 block and the element fragment siblings (`<><style>…</style><div>…</div></>`);

@@ -150,8 +150,9 @@ that returns a `Response` instead of a component:
 The palette, typography and card styling are this site's own, so a new app and
 these docs look like one thing. `src/styles.css` holds the tokens and both
 colour schemes, linked from the shell so they resolve for every component at
-once; each component's own rules sit in a lexically scoped `<style>` block that
-reaches only that component's template (see [Styling](/docs/styling)). There is
+once; each component's own rules sit in a sibling-scoped `<style>` block that
+reaches only the block's siblings and everything below them (see
+[Styling](/docs/styling)). There is
 no CSS framework to uninstall.
 
 The directory has to be empty, though a repository with nothing committed to it

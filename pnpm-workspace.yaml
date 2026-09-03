@@ -105,7 +105,7 @@ esrap_common: &esrap_common ^2.3.2
 
 overrides:
   # INTERIM: packages/octane, packages/octane-evals, and website depend on
-  # @tsrx/core from the tsrx branch that implements lexically scoped <style>
+  # @tsrx/core from the tsrx branch that implements sibling-scoped <style>
   # blocks, $class, and apply (tsrx-org/tsrx PR feat/scoped-styles-apply) until
   # that release ships. The git spec lives on those package.json files because
   # a git dependency is not allowed as a subdependency (blockExoticSubdeps);

@@ -1,7 +1,7 @@
 # Scoped status panel
 
 Implement `src/App.tsrx` as a build-status panel whose CSS is written in
-lexically scoped `<style>` blocks.
+sibling-scoped `<style>` blocks.
 
 The module must continue to export `App`.
 

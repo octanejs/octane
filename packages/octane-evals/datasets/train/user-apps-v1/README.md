@@ -22,7 +22,7 @@ tasks. The corpus includes:
 - conditional hooks, inferred dependencies, current-state getters, controlled
   native input, deliberate text commit handling, class composition, ref
   props/multi-ref, and parallel `use()` as intentional React divergences;
-- lexically scoped `<style>` blocks across nested template and control-flow
+- sibling-scoped `<style>` blocks across nested template and control-flow
   scopes, exported themes applied with `apply`, theme composition, and
   `$class`; and
 - consumer applications using Zustand, Hook Form, i18next, and TanStack Query.

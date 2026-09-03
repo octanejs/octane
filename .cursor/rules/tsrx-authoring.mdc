@@ -98,8 +98,9 @@ Refs are passed as props, React-19 style: `ref={cb}`, `ref={obj}`, or multi-ref
 ## Styles
 
 A `<style>` block is static CSS written among the children of an element or a
-fragment. The block styles the items beside it and everything below them; it
-never styles the element that contains it. The compiler rewrites every selector
+fragment. The block is scoped to its siblings, not to the `@{ … }` body around
+it: it styles the items beside it and everything below them and never the
+element that contains it. The compiler rewrites every selector
 with that children list's hash and stamps the hash on those siblings and their
 descendants; stamping stops at composite components and function boundaries, so
 a child component's elements and `items.map((x) => <li />)` output are outside
@@ -115,8 +116,8 @@ the scope. `:global(…)` opts a selector out. A block accepts only the `ref` an
   node is the multiple-outputs parser error and a lone block as the output is
   `STYLE_STANDALONE_NEEDS_FRAGMENT`. Wrap both in a fragment, in branches too:
   `@if (x) { <><style>…</style><p>…</p></> }`.
-- Every children list holding a block is a scope with its own hash; several
-  blocks among the same children share it and inject as one sheet. Elements
+- Every children list holding a block is a sibling scope with its own hash;
+  sibling blocks share it and inject as one sheet. Elements
   carry every enclosing hash outer to inner, then the applied theme classes,
   all after the authored classes.
 - CSS emits in lexical order: outer scopes before the scopes nested in them, a

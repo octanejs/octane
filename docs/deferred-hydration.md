@@ -266,7 +266,8 @@ When a descendant module is reachable only through a pruned static declaration
 chain, it is absent from the client manifest; a CSS file imported only by that
 module is absent too. Import ordinary stylesheets from an eager route/layout
 module. Scoped `<style>` remains safe: the client compiler retains a directly
-authored style long enough to preserve the hash of the lexical scope it sits in
+authored style long enough to preserve the hash of the sibling scope it sits in
+(the children list that holds the block)
 (so the elements around the boundary keep the same class chain), while SSR
 collects the style scopes owned by removed descendant components and emits them
 with the rendered static content.

@@ -110,7 +110,7 @@
     },
     {
       "taskId": "tsrx.nested-scope-styles",
-      "title": "Style a status panel with lexical style scopes",
+      "title": "Style a status panel with sibling style scopes",
       "suite": "tsrx",
       "capability": "authoring",
       "difficulty": "standard",
