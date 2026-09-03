@@ -6,6 +6,7 @@ import {
 	useDeferredValue,
 	useEffect,
 	useLayoutEffect,
+	useMemo,
 	useReducer,
 	useRef,
 	useState,
@@ -304,6 +305,17 @@ export function MountSelfUpdate(props: { log: (message: string) => void }) @{
 	const [value, setValue] = useState(0);
 	if (value === 0) setValue(1);
 	<MountChild value={value} log={props.log} />
+}
+
+// A memo factory runs during render, so its self-update must replay setup
+// before the child mounts, exactly like a bare setter call in setup.
+export function MemoFactorySelfUpdate(props: { log: (message: string) => void }) @{
+	const [value, setValue] = useState(0);
+	const doubled = useMemo(() => {
+		if (value === 0) setValue(1);
+		return value * 2;
+	}, [value]);
+	<MountChild value={doubled} log={props.log} />
 }
 
 export function IndependentTransitions(props: {

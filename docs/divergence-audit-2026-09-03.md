@@ -184,6 +184,36 @@ installed dependencies and authored fixtures on Node 26.4.0 and Chromium:
 | Same SSR fixture through descriptors | 3.656 → 3.901 ms | About 7% higher median render score. |
 | Hook-memo compiled fixture output, minified | 5,784 → 6,497 bytes; 7,183 → 7,896 bytes | Setup checkpoints and manual provider adaptation add 713 bytes in each variant. |
 
+A same-environment follow-up (Node 24.18.0, macOS ARM64, the locked native
+parser) attributed the bundle growth per top-level declaration under Vite's
+production tree-shaking. The first version of these fixes let `dispatchDelegated`
+call the form-action submit handler directly, so `startTransition` and the
+held-transition swap graph became reachable from every bundle that delegates
+events, including compiler-specialized roots that never render descriptors.
+`setFormAction`, the only writer of `$$formAction`, now installs that handler,
+and the compiled setup checkpoint is emitted only when setup can schedule a
+render-phase self-update: the passive built-in hooks and unshadowed standard
+globals cannot, while setters, custom hooks, prop callbacks, and every other call
+keep it.
+
+| Measurement, gzip unless noted                | Audit base → first fix → follow-up |
+| --------------------------------------------- | ---------------------------------- |
+| `run-minimal.mjs` root-static-specialized     | 18,565 → 23,499 → 19,410           |
+| `run-minimal.mjs` cli-spa-starter             | 31,256 → 36,459 → 32,294           |
+| `run-minimal.mjs` hooks-state                 | 47,553 → 51,346 → 51,350           |
+| Hook-memo inline bundle                       | 55,169 → 58,568 → 58,580           |
+| Hook-memo inline compiled fixture, minified   | 7,183 → 7,896 → 7,896              |
+| `benchmarks/codegen-size` corpus, minified    | 76,534 → 78,983 → 76,454           |
+
+The remaining growth is the fixed behavior itself. Bundles whose entry retains
+the descriptor renderer (`createRoot`, spreads, `createElement` hosts) already
+reached the transition graph through function form actions before the audit, and
+the transition-hook records, queued state replay, submit and handler snapshots,
+root-container support, and mount-time render-phase drain are the fixes. Every
+hook-memo fixture component invokes an `observe` prop in setup, so its
+checkpoints stay, and the `event-names` table remains runtime data because
+spread and descriptor props on custom elements decide delegation at render time.
+
 SSR uses three alternating runs with `CONFIGS=deopt-page`, a one-second timed
 budget per configuration, and 500 memory-phase renders. Baseline and candidate
 bundles are built separately from the archived base and candidate sources; only
