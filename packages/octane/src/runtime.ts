@@ -33962,7 +33962,7 @@ function assertValidRootContainer(container: unknown): asserts container is Root
 			(container as Node).nodeType !== 9 &&
 			(container as Node).nodeType !== 11)
 	) {
-		throw new Error(formatClientError(28));
+		throw new Error(formatClientError(63));
 	}
 }
 

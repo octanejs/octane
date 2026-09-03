@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 63,
+  "nextCode": 64,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -165,10 +165,10 @@
       "status": "active"
     },
     "28": {
-      "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
+      "message": "Target container is not a DOM element.",
       "argumentCount": 0,
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "29": {
       "message": "Cannot update an unmounted root.",
@@ -372,6 +372,12 @@
       "message": "%s requires an active server component.",
       "argumentCount": 1,
       "runtime": ["server"],
+      "status": "active"
+    },
+    "63": {
+      "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
+      "argumentCount": 0,
+      "runtime": ["client"],
       "status": "active"
     }
   }

@@ -179,7 +179,7 @@ installed dependencies and authored fixtures on Node 26.4.0 and Chromium:
 | Control | Baseline → candidate | Interpretation |
 | --- | --- | --- |
 | `benchmarks/hook-memo/run.mjs` operation and allocation counters | Identical | Ordinary render/memo creation counts stay unchanged. These counters are not a full heap census. |
-| Hook-memo complete production bundles, gzip | 54,611 → 57,958 bytes; 55,159 → 58,520 bytes | The whole patch adds 3,347 / 3,361 bytes in the runtime / inline variants. |
+| Hook-memo complete production bundles, gzip | 54,611 → 57,959 bytes; 55,159 → 58,521 bytes | The whole patch adds 3,348 / 3,362 bytes in the runtime / inline variants. |
 | Hook transition, 40 alternating samples of 500 complete cycles after 1,000 warmups | 2.8 → 3.6 µs median | Observed 0.8 µs / 29% increase on this fixture. Value, pending, and layout-commit controls pass. |
 | `benchmarks/ssr-throughput/run.mjs`, compiled deopt-page fixture | 1.761 → 1.914 ms | About 9% higher median render score, including string materialization. |
 | Same SSR fixture through descriptors | 3.656 → 3.901 ms | About 7% higher median render score. |

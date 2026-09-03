@@ -1946,9 +1946,9 @@
       "status": "active"
     },
     "28": {
-      "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
+      "message": "Target container is not a DOM element.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "29": {
       "message": "Cannot update an unmounted root.",
@@ -2109,6 +2109,11 @@
     },
     "62": {
       "message": "Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "63": {
+      "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
       "runtime": ["client"],
       "status": "active"
     }
