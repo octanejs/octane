@@ -194,7 +194,7 @@ export const docsMeta: DocMeta[] = [
 		slug: 'styling',
 		title: 'Styling',
 		description:
-			'Lexically scoped <style> blocks, class maps with $class, and apply for composing themes.',
+			'Lexically scoped <style> blocks that style the items beside them, class maps with $class, and apply for composing themes.',
 		group: 'Learn Octane',
 		searchTerms: [
 			'scoped styles',
@@ -232,6 +232,8 @@ export const docsMeta: DocMeta[] = [
 					'STYLE_APPLY_UNSUPPORTED_HOST',
 					'STYLE_RESERVED_CLASS_KEY',
 					'STYLE_STANDALONE_AT_MODULE_SCOPE',
+					'STYLE_STANDALONE_OUTSIDE_TEMPLATE',
+					'STYLE_STANDALONE_NEEDS_FRAGMENT',
 					'STYLE_UNKNOWN_ATTRIBUTE',
 					'CSS_GLOBAL_PLACEMENT',
 				],

@@ -3,11 +3,7 @@ import { useTitle } from '../../hooks/use-title.ts';
 
 export function NotFound() @{
 	useTitle('Octane — Page not found');
-	<div class="notfound">
-		<p class="notfound-code">404</p>
-		<h1 class="notfound-title">Page not found</h1>
-		<p class="notfound-sub">That route didn’t match anything.</p>
-		<Link to="/" class="notfound-home">Back to the homepage</Link>
+	<>
 		<style>
 			.notfound {
 				max-width: 1420px;
@@ -41,5 +37,11 @@ export function NotFound() @{
 				text-decoration: none;
 			}
 		</style>
-	</div>
+		<div class="notfound">
+			<p class="notfound-code">404</p>
+			<h1 class="notfound-title">Page not found</h1>
+			<p class="notfound-sub">That route didn’t match anything.</p>
+			<Link to="/" class="notfound-home">Back to the homepage</Link>
+		</div>
+	</>
 }

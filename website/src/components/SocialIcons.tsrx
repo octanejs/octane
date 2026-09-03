@@ -1,52 +1,14 @@
 // The X / Discord / GitHub icon row. Rendered twice by the Header — inline on
 // the right of the bar at desktop width, and inside the hamburger menu at the
-// bottom on small screens — so its styles live here (Octane scopes a component's
-// <style> to that component) and both placements stay in sync.
+// bottom on small screens — so its styles live here (the <style> block beside
+// the row styles it and everything below it) and both placements stay in sync.
 import { SOCIAL } from '../constants/site.ts';
 import xUrl from '../assets/x.svg';
 import discordUrl from '../assets/discord.svg';
 import githubUrl from '../assets/github.svg';
 
 export function SocialIcons() @{
-	<span class="social-group">
-		<a
-			class="nav-icon"
-			href={SOCIAL.x}
-			target="_blank"
-			rel="noreferrer"
-			title="X"
-			aria-label="Octane on X"
-		>
-			<span class="nav-icon-glyph" style={'--icon:url("' + xUrl + '")'} aria-hidden="true"></span>
-		</a>
-		<a
-			class="nav-icon"
-			href={SOCIAL.discord}
-			target="_blank"
-			rel="noreferrer"
-			title="Discord"
-			aria-label="Octane on Discord"
-		>
-			<span
-				class="nav-icon-glyph"
-				style={'--icon:url("' + discordUrl + '")'}
-				aria-hidden="true"
-			></span>
-		</a>
-		<a
-			class="nav-icon"
-			href={SOCIAL.github}
-			target="_blank"
-			rel="noreferrer"
-			title="GitHub"
-			aria-label="Octane on GitHub"
-		>
-			<span
-				class="nav-icon-glyph"
-				style={'--icon:url("' + githubUrl + '")'}
-				aria-hidden="true"
-			></span>
-		</a>
+	<>
 		<style>
 			.social-group {
 				display: inline-flex;
@@ -84,5 +46,45 @@ export function SocialIcons() @{
 				-webkit-mask: var(--icon) center / contain no-repeat;
 			}
 		</style>
-	</span>
+		<span class="social-group">
+			<a
+				class="nav-icon"
+				href={SOCIAL.x}
+				target="_blank"
+				rel="noreferrer"
+				title="X"
+				aria-label="Octane on X"
+			>
+				<span class="nav-icon-glyph" style={'--icon:url("' + xUrl + '")'} aria-hidden="true"></span>
+			</a>
+			<a
+				class="nav-icon"
+				href={SOCIAL.discord}
+				target="_blank"
+				rel="noreferrer"
+				title="Discord"
+				aria-label="Octane on Discord"
+			>
+				<span
+					class="nav-icon-glyph"
+					style={'--icon:url("' + discordUrl + '")'}
+					aria-hidden="true"
+				></span>
+			</a>
+			<a
+				class="nav-icon"
+				href={SOCIAL.github}
+				target="_blank"
+				rel="noreferrer"
+				title="GitHub"
+				aria-label="Octane on GitHub"
+			>
+				<span
+					class="nav-icon-glyph"
+					style={'--icon:url("' + githubUrl + '")'}
+					aria-hidden="true"
+				></span>
+			</a>
+		</span>
+	</>
 }

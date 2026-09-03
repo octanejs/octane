@@ -183,26 +183,30 @@ The same family includes `@if` for two-way branches, `@switch` for several choic
 the function. The [TSRX vs TSX/JSX guide](/docs/tsrx-vs-tsx) shows when each syntax is the
 better fit.
 
-CSS lives next to the markup it styles. A `<style>` block is scoped to the template it
-sits in — the compiler hashes its selectors and stamps the hash on the elements it
-reaches, so `li` here never styles another component's list:
+CSS lives next to the markup it styles. A `<style>` block styles the items beside it
+and everything below them, never the element that contains it — the compiler hashes
+its selectors and stamps the hash on those elements, so `li` here never styles another
+component's list. The block and the list are siblings in a fragment, which is how a
+block reaches the element it sits beside:
 
 ```tsrx
 export function TodoList(props) @{
-	<style>
-		.todos {
-			padding: 0;
-			list-style: none;
-		}
-		li {
-			padding: 0.25rem 0;
-		}
-	</style>
-	<ul class="todos">
-		@for (const todo of props.todos; key todo.id) {
-			<li>{todo.label as string}</li>
-		}
-	</ul>
+	<>
+		<style>
+			.todos {
+				padding: 0;
+				list-style: none;
+			}
+			li {
+				padding: 0.25rem 0;
+			}
+		</style>
+		<ul class="todos">
+			@for (const todo of props.todos; key todo.id) {
+				<li>{todo.label as string}</li>
+			}
+		</ul>
+	</>
 }
 ```
 

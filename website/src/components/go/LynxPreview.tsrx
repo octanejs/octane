@@ -94,24 +94,7 @@ export function LynxPreview(props: LynxPreviewProps) @{
 		view.current?.reload();
 	});
 
-	<div class="lynx-preview" data-rendered={state.rendered}>
-		<div class="lynx-preview-host" ref={host} role="figure" aria-label={props.label}></div>
-
-		@if (state.error) {
-			<div class="lynx-preview-overlay" role="status">
-				<p class="lynx-preview-error">{'The preview could not start. ' + state.error}</p>
-			</div>
-		} @else if (!state.rendered) {
-			<div class="lynx-preview-overlay" role="status">
-				<div class="lynx-preview-dots" aria-hidden="true">
-					<span></span>
-					<span></span>
-					<span></span>
-				</div>
-				<p class="lynx-preview-stage">{STAGE_LABELS[state.stage] + '…'}</p>
-			</div>
-		}
-
+	<>
 		<style>
 			.lynx-preview {
 				position: relative;
@@ -197,5 +180,23 @@ export function LynxPreview(props: LynxPreviewProps) @{
 				}
 			}
 		</style>
-	</div>
+		<div class="lynx-preview" data-rendered={state.rendered}>
+			<div class="lynx-preview-host" ref={host} role="figure" aria-label={props.label}></div>
+
+			@if (state.error) {
+				<div class="lynx-preview-overlay" role="status">
+					<p class="lynx-preview-error">{'The preview could not start. ' + state.error}</p>
+				</div>
+			} @else if (!state.rendered) {
+				<div class="lynx-preview-overlay" role="status">
+					<div class="lynx-preview-dots" aria-hidden="true">
+						<span></span>
+						<span></span>
+						<span></span>
+					</div>
+					<p class="lynx-preview-stage">{STAGE_LABELS[state.stage] + '…'}</p>
+				</div>
+			}
+		</div>
+	</>
 }

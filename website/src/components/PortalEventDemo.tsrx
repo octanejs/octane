@@ -33,31 +33,7 @@ export function PortalEventDemo() @{
 
 	useLayoutEffect(() => setTargetReady(true), []);
 
-	<section class="portal-demo" data-demo="portal" aria-label="Portal event bubbling example">
-		<div class="portal-demo-grid">
-			<div class="portal-demo-source">
-				<span class="portal-demo-label">Logical source</span>
-				<button type="button" onClick={() => setShowToast(true)} disabled={showToast}>
-					{showToast ? 'Toast is showing' : 'Show saved toast'}
-				</button>
-				<div class="portal-demo-parent" onClick={() => setParentClicks((count) => count + 1)}>
-					<span>{'Event parent'}</span>
-					@if (targetReady && portalTarget !== null && showToast) {
-						<SavedToast target={portalTarget} onDismiss={() => setShowToast(false)} />
-					}
-				</div>
-			</div>
-
-			<div class="portal-demo-target">
-				<span class="portal-demo-label">Separate DOM target</span>
-				<div class="portal-demo-layer" ref={portalTargetRef} />
-			</div>
-		</div>
-
-		<p class="portal-demo-result" aria-live="polite">
-			{'Clicks observed by the logical parent: ' + parentClicks}
-		</p>
-
+	<>
 		<style>
 			.portal-demo {
 				margin: 1.4rem 0 1.75rem;
@@ -155,5 +131,30 @@ export function PortalEventDemo() @{
 				}
 			}
 		</style>
-	</section>
+		<section class="portal-demo" data-demo="portal" aria-label="Portal event bubbling example">
+			<div class="portal-demo-grid">
+				<div class="portal-demo-source">
+					<span class="portal-demo-label">Logical source</span>
+					<button type="button" onClick={() => setShowToast(true)} disabled={showToast}>
+						{showToast ? 'Toast is showing' : 'Show saved toast'}
+					</button>
+					<div class="portal-demo-parent" onClick={() => setParentClicks((count) => count + 1)}>
+						<span>{'Event parent'}</span>
+						@if (targetReady && portalTarget !== null && showToast) {
+							<SavedToast target={portalTarget} onDismiss={() => setShowToast(false)} />
+						}
+					</div>
+				</div>
+
+				<div class="portal-demo-target">
+					<span class="portal-demo-label">Separate DOM target</span>
+					<div class="portal-demo-layer" ref={portalTargetRef} />
+				</div>
+			</div>
+
+			<p class="portal-demo-result" aria-live="polite">
+				{'Clicks observed by the logical parent: ' + parentClicks}
+			</p>
+		</section>
+	</>
 }

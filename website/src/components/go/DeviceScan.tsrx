@@ -47,24 +47,7 @@ export function DeviceScan(props: DeviceScanProps) @{
 		};
 	});
 
-	<div class="scan">
-		<div class="scan-card">
-			@if (svg) {
-				<div class="scan-code" dangerouslySetInnerHTML={{ __html: svg }}></div>
-			} @else {
-				<div class="scan-code scan-code-empty" aria-hidden="true"></div>
-			}
-		</div>
-		<p class="scan-lead">
-			{failed
-				? 'The QR code could not be generated. Open the bundle URL below in Lynx Explorer instead.'
-				: 'Scan with Lynx Explorer to run this example natively on your phone.'}
-		</p>
-		<p class="scan-url">{target}</p>
-		<a class="scan-link" href={LYNX_EXPLORER_GUIDE} target="_blank" rel="noreferrer">
-			Get Lynx Explorer ↗
-		</a>
-
+	<>
 		<style>
 			.scan {
 				display: flex;
@@ -118,5 +101,23 @@ export function DeviceScan(props: DeviceScanProps) @{
 				font-weight: 600;
 			}
 		</style>
-	</div>
+		<div class="scan">
+			<div class="scan-card">
+				@if (svg) {
+					<div class="scan-code" dangerouslySetInnerHTML={{ __html: svg }}></div>
+				} @else {
+					<div class="scan-code scan-code-empty" aria-hidden="true"></div>
+				}
+			</div>
+			<p class="scan-lead">
+				{failed
+					? 'The QR code could not be generated. Open the bundle URL below in Lynx Explorer instead.'
+					: 'Scan with Lynx Explorer to run this example natively on your phone.'}
+			</p>
+			<p class="scan-url">{target}</p>
+			<a class="scan-link" href={LYNX_EXPLORER_GUIDE} target="_blank" rel="noreferrer">
+				Get Lynx Explorer ↗
+			</a>
+		</div>
+	</>
 }

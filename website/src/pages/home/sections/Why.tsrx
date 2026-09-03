@@ -14,79 +14,7 @@ import { ecosystemPackageGuideHref } from '../../../lib/ecosystem-presentation.t
 import { LIBRARY_ICONS } from './library-icons.ts';
 
 export function Why() @{
-	<section class="why" aria-labelledby="why-heading">
-		<h2 id="why-heading" class="why-title">
-			{'Your app should feel fast. '}
-			<span class="why-accent">Your code should still feel familiar.</span>
-		</h2>
-
-		<div class="why-body">
-			<div class="why-main">
-				<div class="why-grid">
-					<div class="why-row">
-						<h3 class="why-question">What does moving a React app to Octane look like?</h3>
-						<div class="why-answers">
-							<p class="why-answer">
-								{'An Octane component is still a plain function with props, hooks and context. ' +
-									'State lives where you expect it to, and data still flows from parent to ' +
-									'child. If you know React, most of Octane will already make sense.'}
-							</p>
-							<p class="why-answer">
-								{'Keep your existing TSX and convert components to TSRX as you go. The ' +
-									'component model stays the same, so the migration does not require a ' +
-									'redesign. The work is easy to review, whether you do it by hand or with a ' +
-									'coding agent.'}
-							</p>
-						</div>
-					</div>
-
-					<div class="why-row">
-						<h3 class="why-question">Why not build Octane on signals?</h3>
-						<div class="why-answers">
-							<p class="why-answer">
-								{'Signals are useful, and you can use them in an Octane app when they fit. ' +
-									'Octane does not make them the foundation because that would change how ' +
-									'every component reads state. Components stay as plain functions that run ' +
-									'from top to bottom. The compiler handles the bookkeeping.'}
-							</p>
-						</div>
-					</div>
-				</div>
-
-				<blockquote class="why-coda">
-					<strong>The benchmarks show the trade-off.</strong>
-					{' Signal-based frameworks lead in workloads designed around signals. Across ' +
-						'the suites below, Octane stays competitive without changing the way you ' +
-						'structure components. '}
-					<Link to="/docs/$slug" params={{ slug: 'tsrx-vs-tsx' }}>
-						See what TSRX adds →
-					</Link>
-				</blockquote>
-			</div>
-
-			<div class="why-rail">
-				<div class="why-rail-inner">
-					<div class="why-rail-grid">
-						@for (const lib of LIBRARY_ICONS; key lib.slug) {
-							<a
-								class="why-rail-tile"
-								href={ecosystemPackageGuideHref(lib.packageName)}
-								target="_blank"
-								rel="noopener noreferrer"
-								aria-label={`View the ${lib.name} binding on GitHub`}
-								title={lib.name}
-							>
-								<svg viewBox="0 0 24 24" fill="currentColor">
-									<path d={lib.path} />
-								</svg>
-							</a>
-						}
-					</div>
-					<p class="why-rail-caption">The libraries you already use, ported.</p>
-				</div>
-			</div>
-		</div>
-
+	<>
 		<style>
 			/* Shares the hairline top border the other lower sections use. */
 			.why {
@@ -244,5 +172,78 @@ export function Why() @{
 				}
 			}
 		</style>
-	</section>
+		<section class="why" aria-labelledby="why-heading">
+			<h2 id="why-heading" class="why-title">
+				{'Your app should feel fast. '}
+				<span class="why-accent">Your code should still feel familiar.</span>
+			</h2>
+
+			<div class="why-body">
+				<div class="why-main">
+					<div class="why-grid">
+						<div class="why-row">
+							<h3 class="why-question">What does moving a React app to Octane look like?</h3>
+							<div class="why-answers">
+								<p class="why-answer">
+									{'An Octane component is still a plain function with props, hooks and context. ' +
+										'State lives where you expect it to, and data still flows from parent to ' +
+										'child. If you know React, most of Octane will already make sense.'}
+								</p>
+								<p class="why-answer">
+									{'Keep your existing TSX and convert components to TSRX as you go. The ' +
+										'component model stays the same, so the migration does not require a ' +
+										'redesign. The work is easy to review, whether you do it by hand or with a ' +
+										'coding agent.'}
+								</p>
+							</div>
+						</div>
+
+						<div class="why-row">
+							<h3 class="why-question">Why not build Octane on signals?</h3>
+							<div class="why-answers">
+								<p class="why-answer">
+									{'Signals are useful, and you can use them in an Octane app when they fit. ' +
+										'Octane does not make them the foundation because that would change how ' +
+										'every component reads state. Components stay as plain functions that run ' +
+										'from top to bottom. The compiler handles the bookkeeping.'}
+								</p>
+							</div>
+						</div>
+					</div>
+
+					<blockquote class="why-coda">
+						<strong>The benchmarks show the trade-off.</strong>
+						{' Signal-based frameworks lead in workloads designed around signals. Across ' +
+							'the suites below, Octane stays competitive without changing the way you ' +
+							'structure components. '}
+						<Link to="/docs/$slug" params={{ slug: 'tsrx-vs-tsx' }}>
+							See what TSRX adds →
+						</Link>
+					</blockquote>
+				</div>
+
+				<div class="why-rail">
+					<div class="why-rail-inner">
+						<div class="why-rail-grid">
+							@for (const lib of LIBRARY_ICONS; key lib.slug) {
+								<a
+									class="why-rail-tile"
+									href={ecosystemPackageGuideHref(lib.packageName)}
+									target="_blank"
+									rel="noopener noreferrer"
+									aria-label={`View the ${lib.name} binding on GitHub`}
+									title={lib.name}
+								>
+									<svg viewBox="0 0 24 24" fill="currentColor">
+										<path d={lib.path} />
+									</svg>
+								</a>
+							}
+						</div>
+						<p class="why-rail-caption">The libraries you already use, ported.</p>
+					</div>
+				</div>
+			</div>
+		</section>
+	</>
 }
