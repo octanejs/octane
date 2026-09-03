@@ -10450,6 +10450,7 @@ function ssrCompileBody(
 	componentNs = null,
 	returnedFragmentTemplate = false,
 	returnedFragmentRoot = false,
+	unboxedHtml = false,
 ) {
 	const prevMapTemps = ctx.currentMapTemps;
 	ctx.currentMapTemps = [];
@@ -10465,6 +10466,7 @@ function ssrCompileBody(
 			componentNs,
 			returnedFragmentTemplate,
 			returnedFragmentRoot,
+			unboxedHtml,
 		);
 	} finally {
 		ctx.currentMapTemps = prevMapTemps;
@@ -10482,6 +10484,7 @@ function ssrCompileBodyWithMapTemps(
 	componentNs,
 	returnedFragmentTemplate,
 	returnedFragmentRoot,
+	unboxedHtml,
 ) {
 	const returnedOutput = node.body?.type === 'JSXCodeBlock' && hasOwnValueReturn(node);
 	const mapTemps = ctx.currentMapTemps;
@@ -10703,8 +10706,12 @@ function ssrCompileBodyWithMapTemps(
 		node.params.length > 0
 			? [...node.params, b.id('__s'), b.id('__extra')]
 			: [b.id('__props'), b.id('__s'), b.id('__extra')];
-	ctx.runtimeNeeded.add('ssrHtml');
-	body.push(b.return(ssrCall('ssrHtml', [htmlExpr], node)));
+	// Private loop items feed only HTML concatenation, so their serialized tail
+	// needs no carrier. Other bodies can cross a component/value boundary, where
+	// the carrier distinguishes compiled HTML from authored text returns. This
+	// flag belongs to this body only; nested callbacks keep their own contract.
+	if (!unboxedHtml) ctx.runtimeNeeded.add('ssrHtml');
+	body.push(b.return(unboxedHtml ? htmlExpr : ssrCall('ssrHtml', [htmlExpr], node)));
 	const origin =
 		node.loc != null
 			? node
@@ -12416,6 +12423,7 @@ function ssrCompileSub(
 	componentNs,
 	returnedFragmentTemplate = false,
 	returnedFragmentRoot = false,
+	unboxedHtml = false,
 ) {
 	const fnName = `${baseName}$${ctx.nextHelperId++}`;
 	const synth = { params: paramNodes || [], body: bodyStmts };
@@ -12444,6 +12452,7 @@ function ssrCompileSub(
 			componentNs,
 			returnedFragmentTemplate,
 			returnedFragmentRoot,
+			unboxedHtml,
 		);
 	} finally {
 		ctx._ssrFoldedExprHoles = prevFoldedExprHoles;
@@ -12606,6 +12615,9 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		cssHash,
 		parentNs,
 		componentNs,
+		false,
+		false,
+		true,
 	);
 	inlinedSubs.push(itemSub.fn);
 	let emptyCall = ssrHtmlTemplate([], node, ctx);

@@ -58,6 +58,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
+import { createHtmlWorkObserver } from './html-work.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NEWS = path.join(__dirname, '..', 'news');
@@ -408,6 +409,7 @@ configs.push({
 	entry: FIXTURE_ENTRY,
 	fn: (mod) => () => mod.renderDeoptFast(),
 	verify: async (mod) => bodyMeta((await deoptGate(mod)).fast),
+	htmlWork: { render: 'renderDeoptFast', maxCalls: 601 },
 });
 configs.push({
 	name: 'deopt-page/octane-deopt',
@@ -415,6 +417,7 @@ configs.push({
 	entry: FIXTURE_ENTRY,
 	fn: (mod) => () => mod.renderDeoptPlain(),
 	verify: async (mod) => bodyMeta((await deoptGate(mod)).plain),
+	htmlWork: { render: 'renderDeoptPlain', maxCalls: 0 },
 });
 
 configs.push({
@@ -432,6 +435,7 @@ configs.push({
 		return bodyMeta(body);
 	},
 	work: escapeWorkGate,
+	htmlWork: { render: 'renderEscapeHeavy', maxCalls: 1 },
 });
 
 // ── run ───────────────────────────────────────────────────────────────────────
@@ -454,17 +458,46 @@ for (const cfg of selected) {
 		const fn = cfg.fn(mod);
 		const stats = await timeLoop(fn);
 		const mem = await memGrowth(fn, cfg.batch ? Math.ceil(MEM_RENDERS / cfg.batch) : MEM_RENDERS);
-		const work = cfg.work === undefined ? undefined : await cfg.work(mod);
 		if (cfg.batch) {
 			mem.memRenders *= cfg.batch;
 			// stats time whole batches; surface the effective per-render throughput.
 			meta.rendersPerSec = stats.opsPerSec * cfg.batch;
 		}
-		results.push({ name: cfg.name, group: cfg.group, stats, meta: { ...meta, ...mem, ...work } });
+		results.push({ name: cfg.name, group: cfg.group, stats, meta: { ...meta, ...mem } });
 	} catch (err) {
 		failures.push(`${cfg.name}: ${err.message}`);
 		console.error(`  ✗ ${err.message}`);
 	}
+}
+
+// Keep observer parsing/imports and instrumentation out of every clean timing
+// and memory phase, including later configs in the same process.
+let htmlObserver;
+try {
+	for (const cfg of selected) {
+		const result = results.find((r) => r.name === cfg.name);
+		if (!result) continue;
+		try {
+			const mod = await loadEntry(cfg.entry);
+			if (cfg.work) Object.assign(result.meta, await cfg.work(mod));
+			if (cfg.htmlWork) {
+				htmlObserver ??= await createHtmlWorkObserver(FIXTURE_ENTRY);
+				const work = await htmlObserver.measure(mod, cfg.htmlWork.render);
+				Object.assign(result.meta, work, { htmlFactoryCallBudget: cfg.htmlWork.maxCalls });
+				if (work.htmlFactoryCalls > cfg.htmlWork.maxCalls) {
+					throw new Error(
+						`expected at most ${cfg.htmlWork.maxCalls} server HTML factory calls, ` +
+							`got ${work.htmlFactoryCalls}`,
+					);
+				}
+			}
+		} catch (err) {
+			failures.push(`${cfg.name}: ${err.message}`);
+			console.error(`  ✗ ${err.message}`);
+		}
+	}
+} finally {
+	htmlObserver?.dispose();
 }
 
 // ── report ────────────────────────────────────────────────────────────────────
@@ -498,6 +531,14 @@ for (const r of results) {
 	const m = r.meta;
 	console.log(
 		`${r.name.padEnd(26)} |${kb(m.bodyBytes)} | ${String(m.hydrationMarkerPairs).padStart(7)} | ${String(m.memRenders).padStart(11)} |${kb(m.rssGrowthBytes).padStart(10)} |${kb(m.heapUsedGrowthBytes).padStart(9)}`,
+	);
+}
+
+for (const r of results) {
+	if (r.meta.htmlFactoryCalls === undefined) continue;
+	console.log(
+		`${r.name}: ${r.meta.htmlFactoryCalls} server HTML factory calls ` +
+			`(budget ${r.meta.htmlFactoryCallBudget}; untimed, complete response unchanged)`,
 	);
 }
 
@@ -537,7 +578,7 @@ if (have('deopt-page/octane-deopt', 'deopt-page/octane-fast')) {
 }
 
 if (failures.length > 0) {
-	console.error(`\n✗ correctness gate failures:\n  - ${failures.join('\n  - ')}`);
+	console.error(`\n✗ benchmark gate failures:\n  - ${failures.join('\n  - ')}`);
 }
 
 // ── BENCH_JSON contract ───────────────────────────────────────────────────────

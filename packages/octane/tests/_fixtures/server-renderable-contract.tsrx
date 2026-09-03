@@ -1,4 +1,4 @@
-import { createElement, Suspense, use, useMemo } from 'octane';
+import { createElement, Suspense, use, useMemo, type ComponentBody } from 'octane';
 
 export function TextReturn(props: { value: string }) {
 	return props.value;
@@ -7,6 +7,54 @@ export function TextReturn(props: { value: string }) {
 export function MixedTextReturn(props: { value: string; text: boolean }) @{
 	if (props.text) return props.value;
 	<strong>{props.value}</strong>
+}
+
+type ListItem = { id: string; value: string; text: boolean };
+type ListGroup = { id: string; label: string; items: ListItem[] };
+
+export function NestedRenderableList(props: {
+	groups: ListGroup[];
+	onSelect?: (id: string) => void;
+}) @{
+	<section>
+		@for (const group of props.groups; key group.id) {
+			<article data-group={group.id}>
+				<h2>{group.label as string}</h2>
+				<div>
+					@for (const item of group.items; key item.id) {
+						<>
+							<button data-item={item.id} onClick={() => props.onSelect?.(item.id)}>
+								<MixedTextReturn value={item.value} text={item.text} />
+							</button>
+							<small data-caption={item.id}>{item.value as string}</small>
+						</>
+					} @empty {
+						<p data-empty="items">{group.label as string}</p>
+					}
+				</div>
+			</article>
+		} @empty {
+			<p data-empty="groups">No groups</p>
+		}
+	</section>
+}
+
+export function ForwardedLoopChildren(props: { Wrapper: ComponentBody; groups: ListGroup[] }) @{
+	<div>
+		@for (const group of props.groups; key group.id) {
+			<props.Wrapper>
+				@for (const item of group.items; key item.id) {
+					<strong>{item.value as string}</strong>
+				} @empty {
+					<em>{group.label as string}</em>
+				}
+			</props.Wrapper>
+		} @empty {
+			<props.Wrapper>
+				<em>No groups</em>
+			</props.Wrapper>
+		}
+	</div>
 }
 
 export function TextNested(props: { value: string }) @{
