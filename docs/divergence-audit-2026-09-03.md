@@ -183,6 +183,7 @@ installed dependencies and authored fixtures on Node 26.4.0 and Chromium:
 | `benchmarks/ssr-throughput/run.mjs`, compiled deopt-page fixture | 1.761 → 1.914 ms | About 9% higher median render score, including string materialization. |
 | Same SSR fixture through descriptors | 3.656 → 3.901 ms | About 7% higher median render score. |
 | Hook-memo compiled fixture output, minified | 5,784 → 6,497 bytes; 7,183 → 7,896 bytes | Setup checkpoints and manual provider adaptation add 713 bytes in each variant. |
+| `benchmarks/transition-hooks/run.mjs` runtime constructor creations per 64 cycles (follow-up, 2026-09-03) | cycle 192 → 256 → 192; updater 192 → 256 → 192; held 896 → 1,025 → 961; urgent n/a → 448 → 384 | Baseline → this audit → the follow-up that removed the per-transition hook `Set`. Every render count and every function/array/object count is otherwise identical between the audit and the follow-up; the held path keeps one hook-holder registration per suspended hold. |
 
 SSR uses three alternating runs with `CONFIGS=deopt-page`, a one-second timed
 budget per configuration, and 500 memory-phase renders. Baseline and candidate
@@ -210,6 +211,39 @@ sample under concurrent test load measured 4.6 / 5.8 µs (26% increase), support
 the slowdown direction while showing that absolute timings depend on machine
 load. These results describe this minimal workload rather than application-wide
 throughput.
+
+### Transition hot-path follow-up
+
+The committed `transition-hooks` benchmark now covers a `useTransition`
+start → pending render → settle cycle with a replacement value and with a
+functional updater, a suspended hold + release, an urgent functional dispatch and
+its same-value bailout, a delegated click, and an urgent update beside a queued
+transition, each with render-sequence and DOM controls and deterministic
+creation-event counts guarded by `benchmarks/baselines/ratios.json`. Against the
+audit baseline it attributes the audited runtime's extra work on a
+non-suspending cycle to the per-transition `Set` that tracked a batch's starting
+hooks and to the render-time replay that the corrected semantics require. The
+follow-up stores the first starting hook in a batch field and counts pending
+batches on the hook, so a cycle allocates the baseline's three collections
+again; the audited runtime breaches the four constructor guards the follow-up
+passes. The render-time replay, the staged-update record, the retained flush list,
+and the setter's held-update lookups are the corrected semantics themselves and
+stay. Per-cycle wall-clock medians move with machine load more than with these
+changes: three alternating rounds at a steady load average near 5.5 measured
+baseline / audit / follow-up medians of 1.55 / 1.83 / 1.52 µs per replacement
+cycle, 1.31 / 1.44 / 1.36 µs per updater cycle, 6.07 / 6.66 / 6.25 µs per hold +
+release, and 2.47 → 2.38 µs per urgent-beside-queued cycle, while the same rounds
+under a load average above 20 doubled every figure. Treat the counts, not the
+timings, as the regression evidence.
+
+The manual-provider adapter was re-measured in isolation with the same
+fifteen-sample protocol: the prior module-initialization provider took 6.85 ns per
+bound call, the hoisted declaration adapter 9.93 ns, and two call-site-specialized
+variants that pass the argument count and named parameters instead of `arguments`
+9.75–9.93 ns; a direct call is 6.01 ns. The remaining cost is the second call
+frame that a hoisted declaration needs to reach the shared driver, not
+`arguments` forwarding, so the adapter is unchanged and that cost stays
+documented above.
 
 The existing keyed-row browser harness passes all 28 order and survivor-identity
 gates. Twelve timing samples per target were noisy: several insertion medians

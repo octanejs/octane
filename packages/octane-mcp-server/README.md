@@ -162,12 +162,12 @@ one manifest suite by name (`js-framework`, `todomvc`, `weather-app`,
 `hydration-interactivity`, `hydration-stress`, `lifecycle-memory`,
 `controlled-form`, `external-store-fanout`, `external-store-integrations`,
 `scheduler-responsiveness`, `suspense-recovery`, `event-delegation`,
-`application-composition`, `scaling-curves`, `dev-form-diagnostics`, `transition-bookkeeping`,
+`application-composition`, `scaling-curves`, `dev-form-diagnostics`,
 `behavior-root-events`, `radix-collection-order`, `router-dispatch`,
 `floating-tree-navigation`, `manifest-cache-invalidation`, `vite-client-assets`, `activity`,
 `streaming-ssr`, `streaming-backpressure`,
 `compiler-throughput`, `tsrx-component-graph`, `codegen-size`, `hook-memo`,
-`template-call-memo`, `tsrx-renderer-selection`, `bundle-size`, `bundle-reachability`, `three-renderer`,
+`transition-hooks`, `template-call-memo`, `tsrx-renderer-selection`, `bundle-size`, `bundle-reachability`, `three-renderer`,
 `three-bundle-size`, …)
 or every suite with `all`; `quick` selects the reduced-iteration smoke pass. The
 suite list mirrors the runner manifest and `node benchmarks/bench.mjs --list`.
