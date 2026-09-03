@@ -74,6 +74,10 @@ Octane-specific server paths.
   Correctness gate: both bodies byte-identical after stripping HTML comments
   (hydration markers legitimately differ). **The headline number is the
   plain/compiled ratio** — the SSR authoring cliff a binding-heavy page pays.
+  An untimed observer of the clean production bundle also limits server HTML
+  factory calls to 601 (the page plus 300 cards and 300 avatars); the descriptor
+  twin must make none. Private loop bodies should concatenate serialized strings
+  without creating additional carriers.
 - **`escape-heavy`** — 10k text holes whose every value contains `&<>"'`.
   Isolates `escapeHtml`. After timing and memory measurement, a deterministic
   work gate renders the fixture again, checks that its complete response is
@@ -83,6 +87,10 @@ Octane-specific server paths.
   the list snapshot; its independently measured cost was about 0.025% of
   render time. Preserving that snapshot protects custom iterators, observable
   getters, and render-time mutations.
+  Its 10,000-item loop has a server HTML factory-call budget of one for the public
+  root component. Factory observers run after all timing and memory phases and
+  require complete body/CSS equality with the clean bundle. These count source
+  factory calls, not V8 heap allocations or allocated bytes.
 
 ## Running
 
@@ -100,6 +108,42 @@ time-budgeted; per-op sample counts are reported). `BENCH_JSON` follows the
 shared contract: ms stats under `ops.render` (plus `opsPerSec`), payload
 bytes / marker counts / memory growth under `meta`, a top-level `failed` on any
 gate failure (and a non-zero exit).
+
+### Private loop HTML carriers — 2026-09-03
+
+Compared merged main `44d50dbc0` with private loop bodies returning serialized
+strings directly, on Node 26.4.0 / macOS Darwin 25.6.0 / Apple M5 Max (arm64).
+Both clean production fixture bundles were preserved before measurement. The
+same runner loaded each bundle in a fresh process, in A-B-B-A-A-B-B-A order:
+four runs per variant, 0.2 seconds warmup, 2 seconds timing per fixture, and
+1,000 memory-phase renders. Values below are the median and range of the four
+run scores (each score is the shared harness's steady-window mean).
+
+| Fixture | Main ms, median [range] | Candidate ms, median [range] | HTML factory calls, main → candidate |
+| --- | --- | --- | --- |
+| 300 compiled cards | 1.871 [1.868–1.917] | 1.891 [1.821–1.931] | 1,801 → 601 |
+| Descriptor twin (control) | 3.814 [3.776–3.901] | 3.902 [3.803–4.080] | 0 → 0 |
+| 10,000 escaped text holes | 3.318 [3.277–3.382] | 3.338 [3.270–3.539] | 10,001 → 1 |
+
+The timing ranges overlap and paired directions vary, including the unchanged
+descriptor control: these runs establish no throughput improvement or
+regression. The deterministic result is fewer factory calls, not a measurement
+of actual heap allocations. The unminified fixture bundle shrank from 176,179
+to 176,125 bytes. Complete body/CSS output was byte-identical across both
+versions for all three fixtures and the hydratable/static control-flow pages;
+every observed copy also matched its clean bundle. Main failed only the two
+new factory-call budgets, while the candidate passed them.
+
+To reproduce, build and preserve each revision's fixture bundle with the same
+installed dependencies, restore each clean bundle to this suite's
+`dist/fixtures/`, and run the current harness in the order above. Both commands
+below run from the repository root (which also keeps emitted path comments
+consistent for the byte comparison):
+
+```bash
+pnpm exec vite build benchmarks/ssr-throughput/fixtures --ssr src/entry-server.ts --outDir ../dist/fixtures --emptyOutDir
+CONFIGS=deopt-page,escape-heavy BENCH_JSON=/tmp/ssr-sample.json node benchmarks/ssr-throughput/run.mjs 2 --no-build
+```
 
 ## Production HTML payload audit
 
