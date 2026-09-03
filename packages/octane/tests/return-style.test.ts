@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as ServerRT from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import { mount } from './_helpers';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import { ReturnedBranchScopes, ReturnedNestedScopes } from './_fixtures/return-style.tsrx';
 import { ControlFlow } from './_fixtures/style-scopes.tsrx';
 
@@ -185,5 +185,48 @@ describe('scoped styles inside the TSRX containers of returned JSX', () => {
 		expect(getComputedStyle(r.find('#cf-yes-text')).fontWeight).toBe('700');
 		expect(getComputedStyle(item).letterSpacing).toBe('1px');
 		r.unmount();
+	});
+});
+
+// A value factory in plain TSX keeps its scoped CSS in a render-only `@{ … }`
+// inside the returned fragment (rule B: raw CSS needs a TSRX container). That
+// block is transparent grouping, so the fragment stays a static descriptor —
+// and the block's output, its siblings, the scope hash, and the injected sheet
+// must all reach the rendered result on both sides.
+describe('a render-only @{} inside a returned fragment renders its output', () => {
+	const SOURCE = `export function make() {
+	return <><h1>Title</h1>@{ <><style>.x { color: rgb(200, 0, 0); }</style><div class="x">Hi</div></> }</>;
+}
+`;
+	const ID = '/packages/octane/tests/value-factory-styled.tsrx';
+	const compileOptions = { hmr: false, dev: false };
+
+	it('client: mounts the heading and the styled div with the scope hash and its CSS', () => {
+		const client = loadCompiledFixtureSource(SOURCE, { id: ID, mode: 'client', compileOptions });
+		const value = client.make();
+		expect(Array.isArray(value)).toBe(false);
+		const r = mount(client.make as any);
+		try {
+			expect(r.find('h1').textContent).toBe('Title');
+			const div = r.find('div.x') as HTMLElement;
+			expect(div.textContent).toBe('Hi');
+			const [hash] = hashesOf(div);
+			expect(hash).toMatch(/^tsrx-/);
+			expect(hashesOf(r.find('h1'))).toEqual([]);
+			expect(sheetText(hash)).toContain(`.x.${hash}`);
+			expect(getComputedStyle(div).color).toBe('rgb(200, 0, 0)');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('server: renders the heading and the styled div and collects the sheet', () => {
+		const server = loadCompiledFixtureSource(SOURCE, { id: ID, mode: 'server', compileOptions });
+		const { html, css } = ServerRT.renderToString(server.make, {});
+		const hash = css.match(/data-octane="(tsrx-[a-f0-9]+)"/)![1];
+		expect(css).toContain(`.x.${hash} { color: rgb(200, 0, 0); }`);
+		expect(html).toContain('<h1>Title</h1>');
+		expect(html).toContain(`<div class="x ${hash}">Hi</div>`);
+		expect(html).not.toContain('<style');
 	});
 });
