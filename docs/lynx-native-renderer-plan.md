@@ -33,6 +33,8 @@ Post-Milestone-9 typed data-lifecycle source/test evidence date: **2026-07-22**
 Background native-event delivery and dual-thread render-cost evidence date:
 **2026-07-28**
 
+Issue #888 diagnostic source/fixture evidence date: **2026-09-02; fresh Android campaign pending**
+
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
 for ReactLynx can migrate without carrying React, Preact, React Reconciler, or a
@@ -601,6 +603,55 @@ not full ReactLynx `defer` parity. Its
 `defer={{ unmountRecycled: true }}` lifecycle mode is also excluded initially:
 a recycled cell detaches refs but does not unmount the logical Octane subtree
 or run component/effect cleanup merely because it left the native viewport.
+
+### Native capacity evidence and issue #888 closure
+
+The issue #888 investigation keeps two Native workloads separate. The eager
+table renders seven native elements per logical row plus 42 fixed chrome
+elements and is an opt-in, unranked capacity probe. The bounded list renders 1k
+or 10k logical rows through Lynx `list`/`list-item` recycling. An eager bundle,
+`scroll-view`, Web observer, calculated element count, or this repository's
+deterministic fake-PAPI ratio cannot substitute for real Android list-allocation
+evidence.
+
+Diagnostic attempts distinguish measured, DNF, and not-measured outcomes.
+Measured means the semantic and evidence envelope was accepted; Native timing
+is reportable only with at least five accepted samples. DNF means a real attempt
+failed and retains a typed reason. Not-measured means the required device
+capability or observer was unavailable before a credible attempt; it is neither
+DNF nor zero. Optional capacity-threshold cells are outcome-only, and
+load-to-crash chronology is diagnostic detail rather than a latency sample.
+
+The Android ART capacity category requires one post-launch, same-PID sequence:
+the exact `global reference table overflow (max=51200)` marker, `Last 10
+entries`, the complete summary through the 51,200-reference total (including
+the exact 30,026 `PaintingContext$a` and 20,444 `m7.w` holders), SIGABRT, and
+matching Explorer process death. Truncated, late, reordered, wrong-PID, or
+restart evidence is a process failure rather than the capacity classification.
+
+The campaign force-stops Explorer before every repetition, uses a pinned
+DevTool-disabled preflight and no CDP session for capacity, requires an
+interactive/stay-awake display, thermal status 0, and battery temperature at or
+below 35 °C. Source commits, manifests, build receipts, runner sources,
+per-scale bundle bytes, workload contracts, policy, device cohort, and the real
+Native list observer's method revision and measured overhead form immutable
+campaign identity. For the reported issue cohort, the target remains aries_10,
+Android 10, LynxExplorer 1.0, Lynx Engine 3.9, and SDK 4.0, with eager→list and
+list→eager order control and cold processes throughout.
+
+The source contracts can be checked without making a device claim:
+
+```bash
+node --test benchmarks/lynx-table/stages/*.test.mjs
+node --test benchmarks/lynx-list/*.test.mjs
+```
+
+Closure requires the Octane fixture/source change, the corresponding
+`Huxpro/lynx-js-framework-benchmark` runner/artifact/presentation change, and a
+fresh Android campaign satisfying the protocol above. The first two source
+lanes are implemented; no connected-device campaign accompanies this change,
+so issue #888 remains open and Native allocation/capacity conclusions remain
+pending.
 
 ### Suspense, Activity, lazy bundles, and portals
 

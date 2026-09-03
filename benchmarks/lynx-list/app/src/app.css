@@ -1,0 +1,28 @@
+.page {
+	width: 390px;
+	height: 640px;
+	display: flex;
+	flex-direction: column;
+	background-color: #fff;
+}
+
+.bounded-list {
+	width: 390px;
+	height: 640px;
+	flex: 1;
+}
+
+.row {
+	height: 40px;
+	display: flex;
+	align-items: center;
+	padding-left: 12px;
+	padding-right: 12px;
+	border-bottom-width: 1px;
+	border-bottom-color: #e5e7eb;
+}
+
+.row-label {
+	font-size: 14px;
+	color: #111827;
+}
