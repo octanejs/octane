@@ -104,14 +104,13 @@ and [server-renderable-contract.test.ts](../packages/octane/tests/server-rendera
 | G4 | Fixed: JSX Suspense errors render the buffered fallback, notify onError, and mark the arm for client recovery. Explicit server @catch behavior remains supported. |
 | G5 | Fixed: unhandled pending roots throw in synchronous renderers instead of returning truncated HTML. |
 | G6 | Fixed: descriptor Promise children participate in the same usable/retry machinery as template holes. |
+| G7 | Fixed: recognized text and surplus-node recoveries report through onRecoverableError, with shallow suppression and retained matched DOM. Shell failures destroy capable pipe destinations, including destinations attached after failure. Equivalent serialization differences, server-hook no-ops, portal placeholders, and bounded static hydration inspection remain documented. |
 
 Apollo, Inertia, Tiptap, Formisch, and Spring enforce their React import boundary
 on authored source and adapted type probes. These checks do not forbid React
 references in transitive declarations: Octane's migration aliases and JSX types
 use its declared `@types/react` dependency. Strict consumer typechecks remain
 separate from the authored-import checks.
-
-| G7 | Fixed: recognized text and surplus-node recoveries report through onRecoverableError, with shallow suppression and retained matched DOM. Shell failures destroy capable pipe destinations, including destinations attached after failure. Equivalent serialization differences, server-hook no-ops, portal placeholders, and bounded static hydration inspection remain documented. |
 
 ## Documentation and diagnostic findings
 
