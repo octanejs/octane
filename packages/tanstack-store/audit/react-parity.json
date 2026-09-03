@@ -142,7 +142,7 @@
         {
           "path": "packages/tanstack-store/audit/test-classifications.json",
           "role": "support",
-          "sha256": "32610b5626bababc6cecca42901cfb01166b9f5c8a2f2116bdfeb7562fde5bc6"
+          "sha256": "caf7e3ae3deb0fc23c436437169bbff3e814036083c7081c062422dcdb3cdb44"
         },
         {
           "path": "packages/tanstack-store/audit/upstream.lock.json",
@@ -329,7 +329,7 @@
         {
           "path": "packages/tanstack-store/audit/test-classifications.json",
           "role": "support",
-          "sha256": "32610b5626bababc6cecca42901cfb01166b9f5c8a2f2116bdfeb7562fde5bc6"
+          "sha256": "caf7e3ae3deb0fc23c436437169bbff3e814036083c7081c062422dcdb3cdb44"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
