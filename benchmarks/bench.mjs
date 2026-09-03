@@ -414,6 +414,14 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production Chromium transition cycles and separate Set/Map work guards.
+		name: 'transition-bookkeeping',
+		cwd: 'transition-bookkeeping',
+		servers: [],
+		iter: { normal: 40, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Production client scheduler scaling for deepest-first state updates across
 		// a nested component chain, normalized per queued component.
 		name: 'scheduler-depth',

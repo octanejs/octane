@@ -3839,5 +3839,85 @@
     "reference": "octane-tsrx-caught-reveal-small",
     "maxRatio": 1.35,
     "note": "Revealing 4,096 hidden caught-error reports, normalized to the 512-report work count, must remain near-linear. Exact origin/main measured 2.00x before direct queue-entry claims; every sample separately gates hidden deferral, FIFO exactly-once reporting, retained output identity, visible text, and clean unmount."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "sets_per_cycle",
+    "target": "current:urgent",
+    "reference": "work-budget",
+    "maxRatio": 0,
+    "note": "Production synchronous urgent cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "map_gets_per_cycle",
+    "target": "current:urgent",
+    "reference": "work-budget",
+    "maxRatio": 7,
+    "note": "Production synchronous urgent cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "sets_per_cycle",
+    "target": "current:single-owner",
+    "reference": "work-budget",
+    "maxRatio": 0,
+    "note": "Production synchronous single-owner cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "map_gets_per_cycle",
+    "target": "current:single-owner",
+    "reference": "work-budget",
+    "maxRatio": 14,
+    "note": "Production synchronous single-owner cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "sets_per_cycle",
+    "target": "current:repeat-owner",
+    "reference": "work-budget",
+    "maxRatio": 0,
+    "note": "Production synchronous repeat-owner cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "map_gets_per_cycle",
+    "target": "current:repeat-owner",
+    "reference": "work-budget",
+    "maxRatio": 14,
+    "note": "Production synchronous repeat-owner cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "sets_per_cycle",
+    "target": "current:two-owners",
+    "reference": "work-budget",
+    "maxRatio": 1,
+    "note": "Production synchronous two-owners cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "map_gets_per_cycle",
+    "target": "current:two-owners",
+    "reference": "work-budget",
+    "maxRatio": 18,
+    "note": "Production synchronous two-owners cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "sets_per_cycle",
+    "target": "current:two-updates",
+    "reference": "work-budget",
+    "maxRatio": 0,
+    "note": "Production synchronous two-updates cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
+  },
+  {
+    "suite": "transition-bookkeeping",
+    "op": "map_gets_per_cycle",
+    "target": "current:two-updates",
+    "reference": "work-budget",
+    "maxRatio": 16,
+    "note": "Production synchronous two-updates cycles after mount and warmup. Whole-cycle native operation counts must stay within this measured upper bound; visible state, pending completion, commits, host identity, cleanup, and unmount independently gate equal work. The reference represents one operation per completed cycle."
   }
 ]

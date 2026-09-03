@@ -236,6 +236,7 @@ internally, get their own baseline and guard namespace.
 | `controlled-form` | controlled-form | none (builds) | 512 controlled fields, real typing, DOM identity, focus and caret, validation cancellation, complete submit/reset, and native select/checkbox/radio correctness |
 | `dev-form-diagnostics` | dev-form-diagnostics | none (Node/jsdom) | development-only controlled-form diagnostic commit scaling at 4,000 and 32,000 hosts |
 | `scheduler-depth` | scheduler-depth | none (Node/jsdom) | production client scheduler ordering across 500 and 2,000 deeply nested queued components |
+| `transition-bookkeeping` | transition-bookkeeping | none (headless Chromium) | completed synchronous transitions, nested same/distinct owners and urgent control, with separate Set-construction and Map-lookup guards |
 | `hydration-range-compaction` | hydration-range-compaction | none (Node/jsdom) | production SSR hydration range compaction across 64 and 512 coextensive wrappers, with adoption, interaction, marker-depth, and unmount gates |
 | `deferred-hydration-boundaries` | deferred-hydration-boundaries | none (Node/jsdom) | production deferred hydration at 1 and 2,048 server-preserved boundaries, with a deterministic per-boundary setup-allocation guard and plain-mount control |
 | `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, deterministic 100-notification work guards, and balanced subscription removal |

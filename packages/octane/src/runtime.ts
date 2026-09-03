@@ -1349,6 +1349,8 @@ interface TransitionActionBatch {
 	closed: boolean;
 	flushed: boolean;
 	/** Only hook-started actions own pending indicators. */
+	hook?: TransitionHookSlot;
+	/** Promoted batches keep all owners here, even after cleanup empties the set. */
 	hooks?: Set<TransitionHookSlot>;
 	pendingHolds?: number;
 	workComplete?: boolean;
@@ -1415,15 +1417,16 @@ function stageTransitionValue<T>(
 	operation: T | ((value: T) => T),
 	value: T,
 	forceRender = false,
-): boolean {
+): TransitionActionUpdate<T> | null {
+	// Select after the caller evaluates its updater: user code can open an Action.
 	const batch = transitionActionBatchForUpdate();
-	if (batch === null) return false;
+	if (batch === null) return null;
 	// Replacement values need a replay closure only when an Action actually
 	// stages the update. Ordinary useState setters stay allocation-free here.
 	const replay = typeof operation === 'function' ? (operation as (value: T) => T) : () => operation;
-	const current = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
+	let current = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
 	if (current === undefined) {
-		batch.updates.set(slot, {
+		current = {
 			batch,
 			slot,
 			block,
@@ -1431,7 +1434,8 @@ function stageTransitionValue<T>(
 			baseValue: slot.value,
 			value,
 			forceRender,
-		});
+		};
+		batch.updates.set(slot, current);
 	} else {
 		current.operations.push(replay);
 		current.value = value;
@@ -1439,7 +1443,7 @@ function stageTransitionValue<T>(
 	}
 	slot.pendingActionBatch = batch;
 	slot.pendingActionValue = value;
-	return true;
+	return current;
 }
 
 function flushTransitionActionBatch(batch: TransitionActionBatch): void {
@@ -1528,6 +1532,13 @@ let TRANSITION_HOOK_HOLDERS: WeakMap<object, Set<TransitionActionBatch>> | null 
 
 function finishTransitionHookBatch(batch: TransitionActionBatch): void {
 	if (!batch.workComplete || batch.pendingActions !== 0 || (batch.pendingHolds ?? 0) !== 0) return;
+	// Retained updates can discover a Suspense hold later and republish these owners.
+	const hook = batch.hook;
+	if (hook !== undefined) {
+		hook.batches.delete(batch);
+		if (hook.batches.size === 0) hook.publish(false);
+		return;
+	}
 	if (batch.hooks === undefined) return;
 	for (const hook of batch.hooks) {
 		hook.batches.delete(batch);
@@ -1536,14 +1547,20 @@ function finishTransitionHookBatch(batch: TransitionActionBatch): void {
 }
 
 function holdTransitionHookBatch(holder: object, batch: TransitionActionBatch): void {
-	if (batch.hooks === undefined || batch.hooks.size === 0) return;
+	const hook = batch.hook;
+	if (hook === undefined && (batch.hooks === undefined || batch.hooks.size === 0)) return;
 	const holders = (TRANSITION_HOOK_HOLDERS ??= new WeakMap());
 	let batches = holders.get(holder);
 	if (batches === undefined) holders.set(holder, (batches = new Set()));
 	if (batches.has(batch)) return;
 	batches.add(batch);
 	batch.pendingHolds = (batch.pendingHolds ?? 0) + 1;
-	for (const hook of batch.hooks) {
+	if (hook !== undefined) {
+		hook.batches.add(batch);
+		hook.publish(true);
+		return;
+	}
+	for (const hook of batch.hooks!) {
 		hook.batches.add(batch);
 		hook.publish(true);
 	}
@@ -7860,19 +7877,15 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 					}
 					return;
 				}
-				if (stageTransitionValue(s!, block, next, computed, forceRender)) {
-					const update = s!.pendingActionBatch!.updates.get(s!) as TransitionActionUpdate<T>;
+				const update = stageTransitionValue(s!, block, next, computed, forceRender);
+				if (update !== null) {
 					if (update.state === undefined) {
 						update.state = s!;
 						captureTransitionHookQueue(update, s!);
 					}
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-						const update = s!.pendingActionBatch?.updates.get(s!) as
-							TransitionActionUpdate<T> | undefined;
-						if (update !== undefined) {
-							update.profileType = 'state';
-							update.profileSlot = slot;
-						}
+						update.profileType = 'state';
+						update.profileSlot = slot;
 					}
 					return;
 				}
@@ -8251,14 +8264,11 @@ export function useLinkedState<Source, Value>(
 					else scheduleRender(block);
 					return;
 				}
-				if (stageTransitionValue(state!, block, operation, computed)) {
+				const update = stageTransitionValue(state!, block, operation, computed);
+				if (update !== null) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-						const update = state!.pendingActionBatch?.updates.get(state!) as
-							TransitionActionUpdate<Value> | undefined;
-						if (update !== undefined) {
-							update.profileType = 'state';
-							update.profileSlot = slot;
-						}
+						update.profileType = 'state';
+						update.profileSlot = slot;
 					}
 					return;
 				}
@@ -8474,19 +8484,15 @@ export function useReducer<S, A, I = S>(
 				} catch {
 					/* Re-evaluate in render. */
 				}
-				if (stageTransitionValue(s!, block, operation, computed, true)) {
-					const update = s!.pendingActionBatch!.updates.get(s!) as TransitionActionUpdate<S>;
+				const update = stageTransitionValue(s!, block, operation, computed, true);
+				if (update !== null) {
 					if (update.reducer === undefined) {
 						update.reducer = s!;
 						captureTransitionHookQueue(update, s!);
 					}
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-						const update = s!.pendingActionBatch?.updates.get(s!) as
-							TransitionActionUpdate<S> | undefined;
-						if (update !== undefined) {
-							update.profileType = 'reducer';
-							update.profileSlot = slot;
-						}
+						update.profileType = 'reducer';
+						update.profileSlot = slot;
 					}
 					return;
 				}
@@ -28825,7 +28831,12 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 	const ownsActionBatch = parentActionBatch === null && pendingActionBatch === null;
 	ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
 	if (hook !== undefined) {
-		(actionBatch.hooks ??= new Set()).add(hook);
+		if (actionBatch.hooks !== undefined) actionBatch.hooks.add(hook);
+		else if (actionBatch.hook === undefined) actionBatch.hook = hook;
+		else if (actionBatch.hook !== hook) {
+			actionBatch.hooks = new Set<TransitionHookSlot>().add(actionBatch.hook).add(hook);
+			actionBatch.hook = undefined;
+		}
 		hook.batches.add(actionBatch);
 		hook.publish(true);
 	}
@@ -28972,7 +28983,10 @@ export function useTransition(
 		s = hook;
 		ensureHooks(scope).set(slot, hook);
 		registerHookCleanup(scope, () => {
-			for (const batch of hook.batches) batch.hooks?.delete(hook);
+			for (const batch of hook.batches) {
+				if (batch.hook === hook) batch.hook = undefined;
+				else batch.hooks?.delete(hook);
+			}
 			hook.batches.clear();
 		});
 	}
