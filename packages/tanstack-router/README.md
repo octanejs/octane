@@ -62,6 +62,15 @@ tree renders **pull-based**: `RouterProvider` renders the first match, and each 
 component's `<Outlet/>` looks up the next match via `matchContext` — so navigation
 re-renders only the matches that changed.
 
+## Same-route search navigation
+
+Same-route search navigations now render store updates urgently. If the route
+component suspends on the new search input, its pending fallback can replace the
+current content; the previous automatic same-route hold no longer applies. To
+retain stale content while the new data loads, use `useDeferredValue` from `octane`
+on the search input (for example, `page`) and render the suspending content from
+that deferred value. The router location still advances when navigation commits.
+
 ## Scope
 
 Included: `createRouter`, `createRootRoute`, `createRoute`, `RouterProvider`,
