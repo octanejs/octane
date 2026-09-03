@@ -71,6 +71,7 @@ export const BENCHMARK_SUITES = [
 	'application-composition',
 	'scaling-curves',
 	'dev-form-diagnostics',
+	'transition-bookkeeping',
 	'scheduler-depth',
 	'hydration-range-compaction',
 	'deferred-hydration-boundaries',
