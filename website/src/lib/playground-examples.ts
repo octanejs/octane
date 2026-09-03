@@ -41,15 +41,37 @@ export default function App() @{
 	};
 
 	<>
+		<style>
+			.demo {
+				display: grid;
+				gap: 0.5rem;
+				justify-items: start;
+			}
+		</style>
 		<div class="demo">
 			<h2>{'Count: ' + count}</h2>
 
 			<button onClick={() => setCount(count + 1)}>Increment</button>
 			<button onClick={addItem}>Add item</button>
+			<style>
+				button {
+					padding: 0.4rem 0.9rem;
+					border-radius: 8px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					cursor: pointer;
+				}
+			</style>
 
 			@if (count >= 5) {
 				<p class="hot">Count is heating up!</p>
 			}
+			<style>
+				.hot {
+					color: #ff5d72;
+				}
+			</style>
 
 			<ul>
 				@for (const item of items; key item) {
@@ -57,30 +79,13 @@ export default function App() @{
 				} @empty {
 					<li class="empty">No items yet — add one.</li>
 				}
+				<style>
+					.empty {
+						opacity: 0.6;
+					}
+				</style>
 			</ul>
 		</div>
-
-		<style>
-			.demo {
-				display: grid;
-				gap: 0.5rem;
-				justify-items: start;
-			}
-			button {
-				padding: 0.4rem 0.9rem;
-				border-radius: 8px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			.hot {
-				color: #ff5d72;
-			}
-			.empty {
-				opacity: 0.6;
-			}
-		</style>
 	</>
 }
 `;
@@ -138,27 +143,6 @@ export default function App() @{
 				display: grid;
 				gap: 0.75rem;
 			}
-			.row {
-				display: flex;
-				gap: 0.5rem;
-			}
-			button {
-				padding: 0.3rem 0.7rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			li {
-				display: flex;
-				align-items: center;
-				gap: 0.5rem;
-				padding: 0.2rem 0;
-			}
-			.empty {
-				opacity: 0.6;
-			}
 		</style>
 		<div class="demo">
 			<div class="row">
@@ -167,6 +151,20 @@ export default function App() @{
 				<button onClick={() => setItems([...items].reverse())}>Reverse</button>
 				<button onClick={() => setItems([])}>Clear</button>
 			</div>
+			<style>
+				.row {
+					display: flex;
+					gap: 0.5rem;
+				}
+				button {
+					padding: 0.3rem 0.7rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					cursor: pointer;
+				}
+			</style>
 
 			<ul>
 				@for (const item of items; key item.id) {
@@ -179,6 +177,17 @@ export default function App() @{
 				} @empty {
 					<li class="empty">Empty — add an item above.</li>
 				}
+				<style>
+					li {
+						display: flex;
+						align-items: center;
+						gap: 0.5rem;
+						padding: 0.2rem 0;
+					}
+					.empty {
+						opacity: 0.6;
+					}
+				</style>
 			</ul>
 		</div>
 	</>
@@ -248,31 +257,6 @@ export default function App() @{
 				display: grid;
 				gap: 0.75rem;
 			}
-			.row {
-				display: flex;
-				gap: 0.5rem;
-				align-items: center;
-			}
-			input,
-			select {
-				padding: 0.3rem 0.5rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-			}
-			.panel {
-				padding: 0.75rem;
-				border: 1px solid #8884;
-				border-radius: 8px;
-			}
-			.shout {
-				font-weight: 700;
-			}
-			.whisper {
-				opacity: 0.6;
-				font-style: italic;
-			}
 		</style>
 		<div class="demo">
 			<div class="row">
@@ -293,6 +277,21 @@ export default function App() @{
 					extra loud
 				</label>
 			</div>
+			<style>
+				.row {
+					display: flex;
+					gap: 0.5rem;
+					align-items: center;
+				}
+				input,
+				select {
+					padding: 0.3rem 0.5rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+				}
+			</style>
 
 			<div class="panel">
 				@switch (kind) {
@@ -310,6 +309,20 @@ export default function App() @{
 					}
 				}
 			</div>
+			<style>
+				.panel {
+					padding: 0.75rem;
+					border: 1px solid #8884;
+					border-radius: 8px;
+				}
+				.shout {
+					font-weight: 700;
+				}
+				.whisper {
+					opacity: 0.6;
+					font-style: italic;
+				}
+			</style>
 		</div>
 	</>
 }
@@ -327,6 +340,22 @@ export default function App() @{
 	const [open, setOpen] = useState(true);
 
 	<>
+		<div class="demo">
+			<button onClick={() => setOpen(!open)}>
+				{(open ? 'Collapse' : 'Expand') as string}
+			</button>
+
+			@if (open) {
+				const [bumps, setBumps] = useState(0);
+
+				<div class="panel">
+					<p>{'Branch-local bumps: ' + bumps}</p>
+					<button onClick={() => setBumps(bumps + 1)}>Bump</button>
+				</div>
+			} @else {
+				<p class="hint">Collapsed — re-expand and the inner counter starts fresh.</p>
+			}
+		</div>
 		<style>
 			.demo {
 				display: grid;
@@ -353,22 +382,6 @@ export default function App() @{
 				opacity: 0.6;
 			}
 		</style>
-		<div class="demo">
-			<button onClick={() => setOpen(!open)}>
-				{(open ? 'Collapse' : 'Expand') as string}
-			</button>
-
-			@if (open) {
-				const [bumps, setBumps] = useState(0);
-
-				<div class="panel">
-					<p>{'Branch-local bumps: ' + bumps}</p>
-					<button onClick={() => setBumps(bumps + 1)}>Bump</button>
-				</div>
-			} @else {
-				<p class="hint">Collapsed — re-expand and the inner counter starts fresh.</p>
-			}
-		</div>
 	</>
 }
 `;
@@ -382,15 +395,44 @@ const Theme = createContext('light');
 function ThemeCard() @{
 	const theme = use(Theme);
 
-	<div class={'card ' + theme}>
-		<p>{'The current theme is ' + theme + '.'}</p>
-	</div>
+	<>
+		<div class={'card ' + theme}>
+			<p>{'The current theme is ' + theme + '.'}</p>
+		</div>
+		<style>
+			.card {
+				padding: 0.75rem 1rem;
+				border-radius: 8px;
+				border: 1px solid #8884;
+			}
+			.card.dark {
+				background: #101318;
+				color: #f4eee8;
+			}
+			.card.light {
+				background: #f6f2ea;
+				color: #1c1b18;
+			}
+		</style>
+	</>
 }
 
 export default function App() @{
 	const [theme, setTheme] = useState('light');
 
 	<>
+		<div class="demo">
+			<button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+				Switch theme
+			</button>
+
+			<Theme.Provider value={theme}>
+				<ThemeCard />
+			</Theme.Provider>
+
+			<ThemeCard />
+			<p class="hint">The second card sits outside the provider, so it sees the fallback.</p>
+		</div>
 		<style>
 			.demo {
 				display: grid;
@@ -405,35 +447,10 @@ export default function App() @{
 				color: inherit;
 				cursor: pointer;
 			}
-			.card {
-				padding: 0.75rem 1rem;
-				border-radius: 8px;
-				border: 1px solid #8884;
-			}
-			.card.dark {
-				background: #101318;
-				color: #f4eee8;
-			}
-			.card.light {
-				background: #f6f2ea;
-				color: #1c1b18;
-			}
 			.hint {
 				opacity: 0.6;
 			}
 		</style>
-		<div class="demo">
-			<button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
-				Switch theme
-			</button>
-
-			<Theme.Provider value={theme}>
-				<ThemeCard />
-			</Theme.Provider>
-
-			<ThemeCard />
-			<p class="hint">The second card sits outside the provider, so it sees the fallback.</p>
-		</div>
 	</>
 }
 `;
@@ -489,6 +506,10 @@ const PORTAL_TSRX = `import { createPortal, useState } from 'octane';
 // tree, so the demo's own handlers see clicks from inside the toast.
 function Toast(props: { onDismiss: () => void }) @{
 	<>
+		<aside class="toast" role="status">
+			<p>Draft saved.</p>
+			<button onClick={props.onDismiss}>Dismiss</button>
+		</aside>
 		<style>
 			.toast {
 				position: fixed;
@@ -513,10 +534,6 @@ function Toast(props: { onDismiss: () => void }) @{
 				cursor: pointer;
 			}
 		</style>
-		<aside class="toast" role="status">
-			<p>Draft saved.</p>
-			<button onClick={props.onDismiss}>Dismiss</button>
-		</aside>
 	</>
 }
 
@@ -524,6 +541,18 @@ export default function App() @{
 	const [toastOpen, setToastOpen] = useState(false);
 
 	<>
+		<div class="demo">
+			<button onClick={() => setToastOpen(true)}>Save draft</button>
+
+			@if (toastOpen) {
+				{createPortal(Toast, document.body, { onDismiss: () => setToastOpen(false) })}
+			}
+
+			<p class="hint">
+				The toast mounts at the end of document.body — inspect the preview to see it
+				escape this component's DOM.
+			</p>
+		</div>
 		<style>
 			.demo {
 				display: grid;
@@ -542,18 +571,6 @@ export default function App() @{
 				opacity: 0.6;
 			}
 		</style>
-		<div class="demo">
-			<button onClick={() => setToastOpen(true)}>Save draft</button>
-
-			@if (toastOpen) {
-				{createPortal(Toast, document.body, { onDismiss: () => setToastOpen(false) })}
-			}
-
-			<p class="hint">
-				The toast mounts at the end of document.body — inspect the preview to see it
-				escape this component's DOM.
-			</p>
-		</div>
 	</>
 }
 `;
@@ -564,15 +581,45 @@ const DYNAMIC_TSRX = `import { useState } from 'octane';
 // expression remounts just that slot's subtree — the parent never
 // re-renders.
 function Red(props: { label: string }) @{
-	<span class="chip red">{'red: ' + props.label}</span>
+	<>
+		<span class="chip">{'red: ' + props.label}</span>
+		<style>
+			.chip {
+				padding: 0.35rem 0.75rem;
+				border-radius: 6px;
+				background: #fee2e2;
+				color: #991b1b;
+			}
+		</style>
+	</>
 }
 
 function Blue(props: { label: string }) @{
-	<span class="chip blue">{'blue: ' + props.label}</span>
+	<>
+		<span class="chip">{'blue: ' + props.label}</span>
+		<style>
+			.chip {
+				padding: 0.35rem 0.75rem;
+				border-radius: 6px;
+				background: #dbeafe;
+				color: #1e40af;
+			}
+		</style>
+	</>
 }
 
 function Green(props: { label: string }) @{
-	<span class="chip green">{'green: ' + props.label}</span>
+	<>
+		<span class="chip">{'green: ' + props.label}</span>
+		<style>
+			.chip {
+				padding: 0.35rem 0.75rem;
+				border-radius: 6px;
+				background: #d1fae5;
+				color: #065f46;
+			}
+		</style>
+	</>
 }
 
 const CHIPS = { red: Red, blue: Blue, green: Green };
@@ -582,6 +629,17 @@ export default function App() @{
 	const Chip = CHIPS[which];
 
 	<>
+		<div class="demo">
+			<div class="row">
+				<button onClick={() => setWhich('red')}>red</button>
+				<button onClick={() => setWhich('blue')}>blue</button>
+				<button onClick={() => setWhich('green')}>green</button>
+			</div>
+
+			<div class="panel">
+				<{Chip} label="live swap" />
+			</div>
+		</div>
 		<style>
 			.demo {
 				display: grid;
@@ -605,34 +663,7 @@ export default function App() @{
 				border: 1px solid #8884;
 				border-radius: 8px;
 			}
-			.chip {
-				padding: 0.35rem 0.75rem;
-				border-radius: 6px;
-			}
-			.red {
-				background: #fee2e2;
-				color: #991b1b;
-			}
-			.blue {
-				background: #dbeafe;
-				color: #1e40af;
-			}
-			.green {
-				background: #d1fae5;
-				color: #065f46;
-			}
 		</style>
-		<div class="demo">
-			<div class="row">
-				<button onClick={() => setWhich('red')}>red</button>
-				<button onClick={() => setWhich('blue')}>blue</button>
-				<button onClick={() => setWhich('green')}>green</button>
-			</div>
-
-			<div class="panel">
-				<{Chip} label="live swap" />
-			</div>
-		</div>
 	</>
 }
 `;
@@ -659,7 +690,14 @@ function fakeFetch(shouldFail: boolean, attempt: number) {
 function Quote(props: { shouldFail: boolean; attempt: number }) @{
 	const quote = use(fakeFetch(props.shouldFail, props.attempt));
 
-	<p class="quote">{'“' + quote + '”'}</p>
+	<>
+		<p class="quote">{'“' + quote + '”'}</p>
+		<style>
+			.quote {
+				margin: 0;
+			}
+		</style>
+	</>
 }
 
 export default function App() @{
@@ -671,38 +709,6 @@ export default function App() @{
 			.demo {
 				display: grid;
 				gap: 0.75rem;
-			}
-			.row {
-				display: flex;
-				gap: 0.5rem;
-				align-items: center;
-			}
-			button {
-				padding: 0.3rem 0.7rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			.panel {
-				padding: 0.75rem;
-				border: 1px solid #8884;
-				border-radius: 8px;
-				display: grid;
-				gap: 0.5rem;
-				justify-items: start;
-			}
-			.quote {
-				margin: 0;
-			}
-			.hint {
-				opacity: 0.6;
-				margin: 0;
-			}
-			.boom {
-				color: #ff5d72;
-				margin: 0;
 			}
 		</style>
 		<div class="demo">
@@ -717,6 +723,21 @@ export default function App() @{
 					simulate failure
 				</label>
 			</div>
+			<style>
+				.row {
+					display: flex;
+					gap: 0.5rem;
+					align-items: center;
+				}
+				button {
+					padding: 0.3rem 0.7rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					cursor: pointer;
+				}
+			</style>
 
 			<div class="panel">
 				@try {
@@ -737,6 +758,24 @@ export default function App() @{
 					</>
 				}
 			</div>
+			<style>
+				.panel {
+					padding: 0.75rem;
+					border: 1px solid #8884;
+					border-radius: 8px;
+					display: grid;
+					gap: 0.5rem;
+					justify-items: start;
+				}
+				.hint {
+					opacity: 0.6;
+					margin: 0;
+				}
+				.boom {
+					color: #ff5d72;
+					margin: 0;
+				}
+			</style>
 		</div>
 	</>
 }
@@ -816,6 +855,27 @@ export default function App() @{
 	const [startedAt, setStartedAt] = useState(() => performance.now());
 
 	<>
+		<div class="demo">
+			<button
+				onClick={() => {
+					setStartedAt(performance.now());
+					setAttempt(attempt + 1);
+				}}
+			>
+				Reload both
+			</button>
+
+			<div class="panel">
+				@try {
+					<>
+						<Dashboard attempt={attempt} />
+						<Elapsed since={startedAt} />
+					</>
+				} @pending {
+					<p class="hint">loading both…</p>
+				}
+			</div>
+		</div>
 		<style>
 			.demo {
 				display: grid;
@@ -840,34 +900,21 @@ export default function App() @{
 				margin: 0;
 			}
 		</style>
-		<div class="demo">
-			<button
-				onClick={() => {
-					setStartedAt(performance.now());
-					setAttempt(attempt + 1);
-				}}
-			>
-				Reload both
-			</button>
-
-			<div class="panel">
-				@try {
-					<>
-						<Dashboard attempt={attempt} />
-						<Elapsed since={startedAt} />
-					</>
-				} @pending {
-					<p class="hint">loading both…</p>
-				}
-			</div>
-		</div>
 	</>
 }
 
 function Elapsed(props: { since: number }) @{
 	const ms = Math.round(performance.now() - props.since);
 
-	<p class="hint">{'Both resolved after ~' + ms + 'ms — two 700ms fetches, one round.'}</p>
+	<>
+		<p class="hint">{'Both resolved after ~' + ms + 'ms — two 700ms fetches, one round.'}</p>
+		<style>
+			.hint {
+				opacity: 0.6;
+				margin: 0;
+			}
+		</style>
+	</>
 }
 `;
 
@@ -909,6 +956,11 @@ function SlowList(props: { query: string }) @{
 		} @empty {
 			<li class="hint">no matches</li>
 		}
+		<style>
+			.hint {
+				opacity: 0.6;
+			}
+		</style>
 	</ul>
 }
 
@@ -925,38 +977,6 @@ export default function App() @{
 				display: grid;
 				gap: 0.75rem;
 			}
-			.row {
-				display: flex;
-				gap: 0.5rem;
-			}
-			input {
-				padding: 0.3rem 0.5rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				min-width: 16rem;
-			}
-			button {
-				padding: 0.3rem 0.7rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			.panel {
-				padding: 0.75rem;
-				border: 1px solid #8884;
-				border-radius: 8px;
-				transition: opacity 0.15s;
-			}
-			.stale {
-				opacity: 0.5;
-			}
-			.hint {
-				opacity: 0.6;
-			}
 		</style>
 		<div class="demo">
 			<div class="row">
@@ -969,10 +989,43 @@ export default function App() @{
 					{(isPending ? 'Sorting…' : sorted ? 'Unsort' : 'Sort') as string}
 				</button>
 			</div>
+			<style>
+				.row {
+					display: flex;
+					gap: 0.5rem;
+				}
+				input {
+					padding: 0.3rem 0.5rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					min-width: 16rem;
+				}
+				button {
+					padding: 0.3rem 0.7rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					cursor: pointer;
+				}
+			</style>
 
 			<div class={'panel' + (isStale ? ' stale' : '')}>
 				<SlowList query={sorted ? deferredQuery.split('').sort().join('') : deferredQuery} />
 			</div>
+			<style>
+				.panel {
+					padding: 0.75rem;
+					border: 1px solid #8884;
+					border-radius: 8px;
+					transition: opacity 0.15s;
+				}
+				.stale {
+					opacity: 0.5;
+				}
+			</style>
 		</div>
 	</>
 }
@@ -1066,15 +1119,39 @@ async function saveName(previous: string, formData: FormData) {
 function SubmitButton() @{
 	const status = useFormStatus();
 
-	<button type="submit" disabled={status.pending}>
-		{(status.pending ? 'Saving…' : 'Save') as string}
-	</button>
+	<>
+		<button type="submit" disabled={status.pending}>
+			{(status.pending ? 'Saving…' : 'Save') as string}
+		</button>
+		<style>
+			button {
+				padding: 0.4rem 0.9rem;
+				border-radius: 8px;
+				border: 1px solid #8886;
+				background: transparent;
+				color: inherit;
+				cursor: pointer;
+			}
+		</style>
+	</>
 }
 
 export default function App() @{
 	const [message, submit] = useActionState(saveName, '');
 
 	<>
+		<form action={submit} class="demo">
+			<label>
+				Name
+				<input name="name" defaultValue="Ada" />
+			</label>
+
+			<SubmitButton />
+
+			@if (message) {
+				<p role="status">{message as string}</p>
+			}
+		</form>
 		<style>
 			.demo {
 				display: grid;
@@ -1092,27 +1169,7 @@ export default function App() @{
 				background: transparent;
 				color: inherit;
 			}
-			button {
-				padding: 0.4rem 0.9rem;
-				border-radius: 8px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
 		</style>
-		<form action={submit} class="demo">
-			<label>
-				Name
-				<input name="name" defaultValue="Ada" />
-			</label>
-
-			<SubmitButton />
-
-			@if (message) {
-				<p role="status">{message as string}</p>
-			}
-		</form>
 	</>
 }
 `;
@@ -1134,6 +1191,18 @@ export default function App() @{
 	const count = useSyncExternalStore(store.subscribe, () => store.getState().count);
 
 	<>
+		<div class="demo">
+			<h2>{'Zustand count: ' + count}</h2>
+
+			<div class="row">
+				<button onClick={increment}>Increment</button>
+				<button onClick={reset}>Reset</button>
+			</div>
+
+			<p class="hint">
+				The store lives outside octane entirely — any subscriber sees the same state.
+			</p>
+		</div>
 		<style>
 			.demo {
 				display: grid;
@@ -1156,18 +1225,6 @@ export default function App() @{
 				opacity: 0.6;
 			}
 		</style>
-		<div class="demo">
-			<h2>{'Zustand count: ' + count}</h2>
-
-			<div class="row">
-				<button onClick={increment}>Increment</button>
-				<button onClick={reset}>Reset</button>
-			</div>
-
-			<p class="hint">
-				The store lives outside octane entirely — any subscriber sees the same state.
-			</p>
-		</div>
 	</>
 }
 `;
@@ -1224,7 +1281,14 @@ function fakeFetch(attempt: number) {
 function IslandData(props: { attempt: number }) @{
 	const data = use(fakeFetch(props.attempt));
 
-	<p class="data">{data as string}</p>
+	<>
+		<p class="data">{data as string}</p>
+		<style>
+			.data {
+				margin: 0;
+			}
+		</style>
+	</>
 }
 
 export function Island(props: { start: number }) @{
@@ -1232,6 +1296,20 @@ export function Island(props: { start: number }) @{
 	const [attempt, setAttempt] = useState(1);
 
 	<>
+		<section class="island">
+			<h3>Octane island</h3>
+
+			<div class="row">
+				<button onClick={() => setCount(count + 1)}>{'clicks: ' + count}</button>
+				<button onClick={() => setAttempt(attempt + 1)}>Refetch</button>
+			</div>
+
+			@try {
+				<IslandData attempt={attempt} />
+			} @pending {
+				<p class="hint">island loading…</p>
+			}
+		</section>
 		<style>
 			.island {
 				padding: 0.9rem 1.1rem;
@@ -1257,28 +1335,11 @@ export function Island(props: { start: number }) @{
 				color: inherit;
 				cursor: pointer;
 			}
-			.data,
 			.hint {
 				margin: 0;
-			}
-			.hint {
 				opacity: 0.6;
 			}
 		</style>
-		<section class="island">
-			<h3>Octane island</h3>
-
-			<div class="row">
-				<button onClick={() => setCount(count + 1)}>{'clicks: ' + count}</button>
-				<button onClick={() => setAttempt(attempt + 1)}>Refetch</button>
-			</div>
-
-			@try {
-				<IslandData attempt={attempt} />
-			} @pending {
-				<p class="hint">island loading…</p>
-			}
-		</section>
 	</>
 }
 `;
@@ -1297,33 +1358,6 @@ export default function App() @{
 	const input = useRef<HTMLInputElement | null>(null);
 
 	<>
-		<style>
-			.demo {
-				display: grid;
-				gap: 0.75rem;
-				justify-items: start;
-			}
-			h2,
-			p {
-				margin: 0;
-			}
-			.controls {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 0.5rem;
-			}
-			button {
-				padding: 0.4rem 0.7rem;
-				border: 1px solid #8886;
-				border-radius: 8px;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			.hint {
-				opacity: 0.7;
-			}
-		</style>
 		<main class="demo">
 			<h2>Octane host</h2>
 			<p class="hint">The React island keeps its state when Octane updates its props.</p>
@@ -1353,6 +1387,33 @@ export default function App() @{
 
 			<p class="hint">The initial count changes on the next mount. Loading stays inside React Suspense.</p>
 		</main>
+		<style>
+			.demo {
+				display: grid;
+				gap: 0.75rem;
+				justify-items: start;
+			}
+			h2,
+			p {
+				margin: 0;
+			}
+			.controls {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+			}
+			button {
+				padding: 0.4rem 0.7rem;
+				border: 1px solid #8886;
+				border-radius: 8px;
+				background: transparent;
+				color: inherit;
+				cursor: pointer;
+			}
+			.hint {
+				opacity: 0.7;
+			}
+		</style>
 	</>
 }
 `;
