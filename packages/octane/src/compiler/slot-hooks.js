@@ -22,7 +22,7 @@ import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
 import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
-import { findManualHookProviders } from './manual-hooks.js';
+import { findManualHookProviders, manualHookWrapperParameters } from './manual-hooks.js';
 
 function importsNativeRenderer(ast) {
 	return ast.body.some(
@@ -1107,40 +1107,30 @@ function walk(node, owner, st) {
 	}
 }
 
-function collectManualHookEdits(ast, providers, helper, edits) {
+function collectManualHookEdits(ast, providers, st) {
 	function visit(node) {
 		if (!node || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
 			for (const item of node) visit(item);
 			return;
 		}
-		if (node.type === 'Program' || node.type === 'BlockStatement') {
-			const names = node.body.flatMap((statement) => {
-				const declaration =
-					statement.type === 'ExportNamedDeclaration' ||
-					statement.type === 'ExportDefaultDeclaration'
-						? statement.declaration
-						: statement;
-				return declaration?.type === 'FunctionDeclaration' && providers.has(declaration)
-					? [providers.get(declaration)]
-					: [];
-			});
-			if (names.length) {
-				let index = 0;
-				while (
-					node.body[index]?.type === 'ExpressionStatement' &&
-					typeof node.body[index].expression?.value === 'string'
-				)
-					index++;
-				edits.push({
-					pos: node.body[index]?.start ?? node.end - 1,
-					text: names.map((name) => `${name} = ${helper}(${name}); `).join(''),
+		if (providers.has(node)) {
+			if (node.type === 'FunctionDeclaration') {
+				const helper = requireParallelHelper(st, 'invokeManualHook');
+				const implementation = allocSlotName(st, `_$manual_${node.id.name}`);
+				const params = manualHookWrapperParameters(node)
+					.map((param) => param.name)
+					.join(', ');
+				st.edits.push({
+					pos: node.start,
+					text: `function ${node.id.name}(${params}) { return ${helper}(${implementation}, this, arguments); } `,
 				});
+				st.edits.push({ pos: node.id.start, end: node.id.end, text: implementation });
+			} else {
+				const helper = requireParallelHelper(st, 'manualHook');
+				st.edits.push({ pos: node.start, text: `/* @__PURE__ */ ${helper}(` });
+				st.edits.push({ pos: node.end, text: `, ${JSON.stringify(providers.get(node))})` });
 			}
-		}
-		if (providers.has(node) && node.type !== 'FunctionDeclaration') {
-			edits.push({ pos: node.start, text: `${helper}(` });
-			edits.push({ pos: node.end, text: `, ${JSON.stringify(providers.get(node))})` });
 		}
 		for (const key in node) {
 			if (key === 'loc' || key === 'metadata' || key === 'parent' || key.startsWith('_octane'))
@@ -1293,12 +1283,7 @@ export function slotHooks(source, id, options) {
 		for (const node of ast.body || []) walk(node, hookOwner(null, 'module'), st);
 	}
 	if (manualProviders.size) {
-		collectManualHookEdits(
-			ast,
-			findManualHookProviders(ast),
-			requireParallelHelper(st, 'manualHook'),
-			st.edits,
-		);
+		collectManualHookEdits(ast, findManualHookProviders(ast), st);
 	}
 	if (canSpecializeRoot) {
 		collectVoidRootEdits(ast, st, options.isVoidComponentImport);

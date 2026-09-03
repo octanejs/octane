@@ -88,6 +88,7 @@ export {
 	hookSlots,
 	withSlot,
 	manualHook,
+	invokeManualHook,
 	startTransition,
 	flushSync,
 	isChildrenBlock,

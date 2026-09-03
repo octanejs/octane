@@ -90,20 +90,22 @@ function declarationOf(statement) {
 		: statement;
 }
 
-function prologueIndex(body) {
-	let index = 0;
-	while (
-		body[index]?.type === 'ExpressionStatement' &&
-		typeof body[index].expression?.value === 'string'
-	)
-		index++;
-	return index;
+// Only the parameters before the first default/rest contribute to Function.length.
+// The public wrapper must not evaluate authored defaults or destructuring; the
+// private implementation receives the original arguments after slot adaptation.
+export function manualHookWrapperParameters(node) {
+	const parameters = [];
+	for (const param of node.params) {
+		if (param.type === 'Identifier' && param.name === 'this') continue;
+		if (param.type === 'AssignmentPattern' || param.type === 'RestElement') break;
+		parameters.push(b.id(`_$arg${parameters.length}`));
+	}
+	return parameters;
 }
 
-export function adaptManualHookProviders(ast, requireHelper) {
+export function adaptManualHookProviders(ast, requireHelper, allocateName) {
 	const providers = findManualHookProviders(ast);
 	if (!providers.size) return ast;
-	const helper = requireHelper('manualHook');
 	function visit(node) {
 		if (!node || typeof node !== 'object') return node;
 		if (Array.isArray(node)) {
@@ -127,23 +129,42 @@ export function adaptManualHookProviders(ast, requireHelper) {
 			}
 		}
 		if (node.type === 'Program' || node.type === 'BlockStatement') {
-			const declarations = node.body
-				.map(declarationOf)
-				.filter((item) => item?.type === 'FunctionDeclaration' && providers.has(item));
-			if (declarations.length) {
-				const index = prologueIndex(result.body);
-				const assignments = declarations.map((item) => {
-					const name = providers.get(item);
-					return b.stmt(b.assignment('=', b.id(name), b.call(helper, b.id(name))));
-				});
-				result = {
-					...result,
-					body: [...result.body.slice(0, index), ...assignments, ...result.body.slice(index)],
-				};
-			}
+			let changed = false;
+			const body = result.body.flatMap((statement, index) => {
+				const original = declarationOf(node.body[index]);
+				if (original?.type !== 'FunctionDeclaration' || !providers.has(original))
+					return [statement];
+				changed = true;
+				const declaration = declarationOf(statement);
+				const implementation = allocateName(`_$manual_${original.id.name}`);
+				const wrapper = b.function_declaration(
+					original.id,
+					manualHookWrapperParameters(original),
+					b.block([
+						b.return(
+							b.call(
+								requireHelper('invokeManualHook'),
+								b.id(implementation),
+								b.this,
+								b.id('arguments'),
+							),
+						),
+					]),
+				);
+				// Both declarations hoist. Keep the exported binding stable even for
+				// cyclic imports and aliases captured before the textual declaration.
+				return [
+					statement === declaration ? wrapper : { ...statement, declaration: wrapper },
+					{ ...declaration, id: b.id(implementation) },
+				];
+			});
+			if (changed) result = { ...result, body };
 		}
 		return providers.has(node) && node.type !== 'FunctionDeclaration'
-			? b.call(helper, result, b.literal(providers.get(node)))
+			? {
+					...b.call(requireHelper('manualHook'), result, b.literal(providers.get(node))),
+					__octanePure: true,
+				}
 			: result;
 	}
 	return visit(ast);

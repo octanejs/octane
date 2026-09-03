@@ -341,7 +341,8 @@ ${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
 };
 exports.hookSlots = () => 0;
 // Direct invocation has no ambient call-site slot to append.
-exports.manualHook = (hook) => hook;\n`,
+exports.manualHook = (hook) => hook;
+exports.invokeManualHook = (hook, receiver, args) => Reflect.apply(hook, receiver, args);\n`,
 		);
 		write(
 			root,

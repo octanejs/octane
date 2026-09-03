@@ -158,10 +158,15 @@ protect both cases across buffered and streaming renderers.
 Ordered hook replay reuses staged Action records. Prefix snapshots and urgent
 operation indices allocate only when those queues overlap; the committed-input
 snapshot is limited to urgent ancestor traversal of a queued transition.
-Manual-slot packages adapt their hook definitions once, allowing bound and
+Manual-slot packages adapt their hook definitions, allowing bound and
 forwarded aliases to retain their internal slots while ordinary custom hooks
-receive exactly the authored arguments. The adapter avoids a second argument
-array for calls with up to four authored arguments. Render-phase self-updates
+receive exactly the authored arguments. Declaration adapters are hoisted with
+their private implementation, preserving early calls and cyclic imports without
+module-initialization assignments that retain unused providers. Expression
+adapters use a pure factory. Production bundling tests verify that an unused
+provider and its dependency disappear, while a retained export keeps both
+reachable. The invocation adapter avoids a second argument array for calls with
+up to four authored arguments. Render-phase self-updates
 reuse the existing pending flag and retry limit; output entrypoints check that
 flag before initializing children from discarded parent inputs. This does not
 make template execution transactional: an expression in a later sibling cannot
@@ -174,11 +179,11 @@ installed dependencies and authored fixtures on Node 26.4.0 and Chromium:
 | Control | Baseline → candidate | Interpretation |
 | --- | --- | --- |
 | `benchmarks/hook-memo/run.mjs` operation and allocation counters | Identical | Ordinary render/memo creation counts stay unchanged. These counters are not a full heap census. |
-| Hook-memo complete production bundles, gzip | 54,611 → 57,999 bytes; 55,159 → 58,570 bytes | The whole patch adds 3,388 / 3,411 bytes in the runtime / inline variants. |
+| Hook-memo complete production bundles, gzip | 54,611 → 57,958 bytes; 55,159 → 58,520 bytes | The whole patch adds 3,347 / 3,361 bytes in the runtime / inline variants. |
 | Hook transition, 40 alternating samples of 500 complete cycles after 1,000 warmups | 2.8 → 3.6 µs median | Observed 0.8 µs / 29% increase on this fixture. Value, pending, and layout-commit controls pass. |
 | `benchmarks/ssr-throughput/run.mjs`, compiled deopt-page fixture | 1.761 → 1.914 ms | About 9% higher median render score, including string materialization. |
 | Same SSR fixture through descriptors | 3.656 → 3.901 ms | About 7% higher median render score. |
-| Hook-memo compiled fixture output, minified | 5,784 → 6,455 bytes; 7,183 → 7,854 bytes | Setup checkpoints and manual provider adaptation add 671 bytes in each variant. |
+| Hook-memo compiled fixture output, minified | 5,784 → 6,497 bytes; 7,183 → 7,896 bytes | Setup checkpoints and manual provider adaptation add 713 bytes in each variant. |
 
 SSR uses three alternating runs with `CONFIGS=deopt-page`, a one-second timed
 budget per configuration, and 500 memory-phase renders. Baseline and candidate
@@ -189,6 +194,18 @@ GC-sensitive and are not used as retention evidence.
 The SSR figures retain the original audit measurement; that serializer fixture
 does not call hooks affected by the later argument and slot fixes. Bundle and
 transition measurements above include those follow-ups.
+All 28 minimal production bundle scenarios pass their behavior and dependency
+reachability gates. Their fixtures observe committed visible Suspense content
+before starting a transition, await the bound store's committed snapshot, and
+use renderable descriptors for server markup. Controls that release the hold,
+omit the store increment, or return escaped markup still fail.
+An isolated manual-provider benchmark compares the follow-up against the prior
+`ff70daab3` adapter on Node 24.20.0/macOS ARM64: fifteen alternating million-call
+samples after six warmups measured bound calls at 6.79 → 12.49 ns and forwarded
+calls at 21.77 → 31.31 ns. Return values, slot identity, receiver, name, and arity
+match. Removing unused-provider retention therefore trades a measurable 5.7–9.5 ns
+per manual invocation for the smaller dependency graph; this is not an
+application render measurement.
 The final transition sample ran after the broad suites completed. A preceding
 sample under concurrent test load measured 4.6 / 5.8 µs (26% increase), supporting
 the slowdown direction while showing that absolute timings depend on machine

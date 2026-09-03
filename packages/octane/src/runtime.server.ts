@@ -5913,43 +5913,54 @@ export function markWarm<T extends Function>(component: T, plan: unknown): T {
 // render-pass occurrence that can shift when a conditional call disappears.
 let MANUAL_HOOK_DRIVER: { pending: ServerHookSlot | undefined; active: boolean } | null = null;
 
-/** @internal Adapt a provider that owns the trailing hook-slot ABI. */
-export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+/** @internal Invoke a provider that owns the trailing hook-slot ABI. */
+export function invokeManualHook<T>(
+	fn: (...args: any[]) => T,
+	receiver: unknown,
+	args: IArguments,
+): T {
+	// Hoisted provider declarations need no module initialization. Establish
+	// their capability on first invocation, including inside an existing call.
 	const driver = (MANUAL_HOOK_DRIVER ??= {
 		pending: HOOK_SLOT_PATH[HOOK_SLOT_PATH.length - 1],
 		active: false,
 	});
-	function provider(this: unknown) {
-		const pending = driver.pending;
-		const active = driver.active;
-		driver.pending = undefined;
-		driver.active = true;
-		try {
-			if (pending === undefined) return Reflect.apply(fn, this, arguments);
-			// Avoid a second rest array for the usual provider arities. The
-			// withSlot caller already owns its authored argument array.
-			switch (arguments.length) {
-				case 0:
-					return fn.call(this, pending);
-				case 1:
-					return fn.call(this, arguments[0], pending);
-				case 2:
-					return fn.call(this, arguments[0], arguments[1], pending);
-				case 3:
-					return fn.call(this, arguments[0], arguments[1], arguments[2], pending);
-				case 4:
-					return fn.call(this, arguments[0], arguments[1], arguments[2], arguments[3], pending);
-				default: {
-					const args = new Array(arguments.length + 1);
-					for (let index = 0; index < arguments.length; index++) args[index] = arguments[index];
-					args[arguments.length] = pending;
-					return fn.apply(this, args);
-				}
+	const pending = driver.pending;
+	const active = driver.active;
+	driver.pending = undefined;
+	driver.active = true;
+	try {
+		if (pending === undefined) return Reflect.apply(fn, receiver, args);
+		// Forward the wrapper's arguments object directly for common arities.
+		// Only larger calls need an array to append the compiler's slot.
+		switch (args.length) {
+			case 0:
+				return fn.call(receiver, pending);
+			case 1:
+				return fn.call(receiver, args[0], pending);
+			case 2:
+				return fn.call(receiver, args[0], args[1], pending);
+			case 3:
+				return fn.call(receiver, args[0], args[1], args[2], pending);
+			case 4:
+				return fn.call(receiver, args[0], args[1], args[2], args[3], pending);
+			default: {
+				const forwarded = new Array(args.length + 1);
+				for (let index = 0; index < args.length; index++) forwarded[index] = args[index];
+				forwarded[args.length] = pending;
+				return fn.apply(receiver, forwarded);
 			}
-		} finally {
-			driver.pending = pending;
-			driver.active = active;
 		}
+	} finally {
+		driver.pending = pending;
+		driver.active = active;
+	}
+}
+
+/** @internal Adapt an expression provider that owns the trailing hook-slot ABI. */
+export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+	function provider(this: unknown) {
+		return invokeManualHook(fn, this, arguments);
 	}
 	Object.defineProperty(provider, 'name', { value: name ?? fn.name, configurable: true });
 	Object.defineProperty(provider, 'length', { value: fn.length, configurable: true });

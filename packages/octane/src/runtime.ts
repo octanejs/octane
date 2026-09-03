@@ -7638,48 +7638,59 @@ function missingSlot(name: string): never {
 // compile.js — the keyed `@for` template block is the supported loop: each item
 // renders in its own scope).
 const slotStack: HookSlot[] = [];
-// Only manual-slot provider definitions install this capability. Ordinary custom
+// Only manual-slot provider invocations install this capability. Ordinary custom
 // hooks keep their authored arguments; an actual provider adapter consumes the
 // pending call-site slot even when reached through a bound or forwarding alias.
 let MANUAL_HOOK_DRIVER: { pending: HookSlot | undefined; active: boolean } | null = null;
 
-/** @internal Adapt a provider that owns the trailing hook-slot ABI. */
-export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+/** @internal Invoke a provider that owns the trailing hook-slot ABI. */
+export function invokeManualHook<T>(
+	fn: (...args: any[]) => T,
+	receiver: unknown,
+	args: IArguments,
+): T {
+	// Hoisted provider declarations need no module initialization. Establish
+	// their capability on first invocation, including inside an existing call.
 	const driver = (MANUAL_HOOK_DRIVER ??= {
 		pending: slotStack[slotStack.length - 1],
 		active: false,
 	});
-	function provider(this: unknown) {
-		const pending = driver.pending;
-		const active = driver.active;
-		driver.pending = undefined;
-		driver.active = true;
-		try {
-			if (pending === undefined) return Reflect.apply(fn, this, arguments);
-			// Avoid a second rest array for the usual provider arities. The
-			// withSlot caller already owns its authored argument array.
-			switch (arguments.length) {
-				case 0:
-					return fn.call(this, pending);
-				case 1:
-					return fn.call(this, arguments[0], pending);
-				case 2:
-					return fn.call(this, arguments[0], arguments[1], pending);
-				case 3:
-					return fn.call(this, arguments[0], arguments[1], arguments[2], pending);
-				case 4:
-					return fn.call(this, arguments[0], arguments[1], arguments[2], arguments[3], pending);
-				default: {
-					const args = new Array(arguments.length + 1);
-					for (let index = 0; index < arguments.length; index++) args[index] = arguments[index];
-					args[arguments.length] = pending;
-					return fn.apply(this, args);
-				}
+	const pending = driver.pending;
+	const active = driver.active;
+	driver.pending = undefined;
+	driver.active = true;
+	try {
+		if (pending === undefined) return Reflect.apply(fn, receiver, args);
+		// Forward the wrapper's arguments object directly for common arities.
+		// Only larger calls need an array to append the compiler's slot.
+		switch (args.length) {
+			case 0:
+				return fn.call(receiver, pending);
+			case 1:
+				return fn.call(receiver, args[0], pending);
+			case 2:
+				return fn.call(receiver, args[0], args[1], pending);
+			case 3:
+				return fn.call(receiver, args[0], args[1], args[2], pending);
+			case 4:
+				return fn.call(receiver, args[0], args[1], args[2], args[3], pending);
+			default: {
+				const forwarded = new Array(args.length + 1);
+				for (let index = 0; index < args.length; index++) forwarded[index] = args[index];
+				forwarded[args.length] = pending;
+				return fn.apply(receiver, forwarded);
 			}
-		} finally {
-			driver.pending = pending;
-			driver.active = active;
 		}
+	} finally {
+		driver.pending = pending;
+		driver.active = active;
+	}
+}
+
+/** @internal Adapt an expression provider that owns the trailing hook-slot ABI. */
+export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+	function provider(this: unknown) {
+		return invokeManualHook(fn, this, arguments);
 	}
 	Object.defineProperty(provider, 'name', { value: name ?? fn.name, configurable: true });
 	Object.defineProperty(provider, 'length', { value: fn.length, configurable: true });
@@ -7701,7 +7712,7 @@ export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[
 	} finally {
 		slotStack.pop();
 		if (MANUAL_HOOK_DRIVER !== null) {
-			// A provider can first be defined inside this call. In that case the
+			// A provider can first be invoked inside this call. In that case the
 			// previous path predates the capability and has no manual body active.
 			MANUAL_HOOK_DRIVER.pending = driver === null ? slotStack[slotStack.length - 1] : pending;
 			MANUAL_HOOK_DRIVER.active = active;

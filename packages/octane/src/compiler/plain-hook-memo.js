@@ -286,8 +286,10 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	if (lowered.lowered === 0) return null;
 	transformed = lowered.ast;
 	if (options.manualSlots) {
-		transformed = adaptManualHookProviders(transformed, (name) =>
-			requireHelper(state, name, 'octane'),
+		transformed = adaptManualHookProviders(
+			transformed,
+			(name) => requireHelper(state, name, 'octane'),
+			(preferred) => allocName(state, preferred),
 		);
 	}
 	const origin = ast.body[0] ?? ast;

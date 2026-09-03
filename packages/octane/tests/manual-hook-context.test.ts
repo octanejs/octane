@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Client from '../src/runtime.js';
 import * as Server from '../src/runtime.server.js';
+import * as Universal from '../src/universal-native.js';
 import { renderToString } from '../src/server/index.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
@@ -55,28 +56,42 @@ interface Report {
 }
 
 describe('manual provider context', () => {
-	for (const mode of ['client', 'server'] as const) {
-		it(`restores enclosing call sites when a provider is first defined inside a nested call in ${mode}`, async () => {
-			vi.resetModules();
-			const runtime =
-				mode === 'client'
-					? await import('../src/runtime.js')
-					: await import('../src/runtime.server.js');
-			const outer = Symbol('outer call');
-			const inner = Symbol('inner call');
-			const value = Symbol('authored value');
-			let provider!: (...args: unknown[]) => unknown[];
-			runtime.withSlot(outer, () => {
-				runtime.withSlot(inner, () => {
-					provider = runtime.manualHook(function useCreated(...args: unknown[]) {
-						return args;
+	for (const mode of ['client', 'server', 'universal'] as const) {
+		it.each(['expression', 'declaration'] as const)(
+			`restores enclosing call sites after a %s provider first throws inside a nested call in ${mode}`,
+			async (form) => {
+				vi.resetModules();
+				const runtime =
+					mode === 'client'
+						? await import('../src/runtime.js')
+						: mode === 'server'
+							? await import('../src/runtime.server.js')
+							: await import('../src/universal-native.js');
+				const outer = Symbol('outer call');
+				const inner = Symbol('inner call');
+				const value = Symbol('authored value');
+				const failure = Symbol('throw');
+				function original(...args: unknown[]) {
+					if (args[0] === failure) throw new Error('expected provider failure');
+					return args;
+				}
+				let provider!: (...args: unknown[]) => unknown[];
+				runtime.withSlot(outer, () => {
+					runtime.withSlot(inner, () => {
+						provider =
+							form === 'expression'
+								? runtime.manualHook(original)
+								: function useCreated(this: unknown, ..._args: unknown[]) {
+										return runtime.invokeManualHook(original, this, arguments);
+									};
+						expect(() => provider(failure)).toThrow('expected provider failure');
+						expect(provider(value)).toEqual([value, inner]);
 					});
-					expect(provider(value)).toEqual([value, inner]);
+					expect(provider(value)).toEqual([value, outer]);
 				});
-				expect(provider(value)).toEqual([value, outer]);
-			});
-			expect(provider(value)).toEqual([value]);
-		});
+				expect(provider(value)).toEqual([value]);
+			},
+		);
 	}
 
 	for (const mode of ['client', 'server'] as const) {
@@ -175,26 +190,40 @@ describe('manual provider context', () => {
 	for (const [name, runtime] of [
 		['client', Client],
 		['server', Server],
+		['universal', Universal],
 	] as const) {
-		it(`forwards omitted, explicit undefined and variadic Symbol arguments in ${name}`, () => {
-			const value = Symbol('authored tail');
-			const slot = Symbol('provider slot');
-			const provider = runtime.manualHook(function useVariadic(...args: unknown[]) {
-				return args;
-			});
-			for (const args of [
-				[],
-				[value],
-				[undefined, value],
-				[1, 2, value],
-				[1, 2, 3, value],
-				[1, 2, 3, 4, value],
-				[1, 2, 3, 4, 5, value],
-			]) {
-				expect(runtime.withSlot(slot, provider, ...args)).toEqual([...args, slot]);
-				expect(provider(...args)).toEqual(args);
-			}
-		});
+		it.each(['expression', 'declaration'] as const)(
+			`forwards omitted, explicit undefined and variadic Symbol arguments through a %s provider in ${name}`,
+			(form) => {
+				const value = Symbol('authored tail');
+				const slot = Symbol('provider slot');
+				const receiver = { label: 'owner' };
+				function original(this: unknown, ...args: unknown[]) {
+					return { args, receiver: this };
+				}
+				const provider =
+					form === 'expression'
+						? runtime.manualHook(original)
+						: function useVariadic(this: unknown, ..._args: unknown[]) {
+								return runtime.invokeManualHook(original, this, arguments);
+							};
+				for (const args of [
+					[],
+					[value],
+					[undefined, value],
+					[1, 2, value],
+					[1, 2, 3, value],
+					[1, 2, 3, 4, value],
+					[1, 2, 3, 4, 5, value],
+				]) {
+					expect(runtime.withSlot(slot, provider.bind(receiver), ...args)).toEqual({
+						args: [...args, slot],
+						receiver,
+					});
+					expect(provider.apply(receiver, args)).toEqual({ args, receiver });
+				}
+			},
+		);
 
 		it(`preserves receiver, name, length and bound/forwarded invocation in ${name}`, () => {
 			function useProvider(this: { label: string }, value: symbol, slot?: symbol) {
