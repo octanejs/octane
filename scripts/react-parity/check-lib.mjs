@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 
 import { isVitestLane, requiredExecutableLanes } from './harness-lib.mjs';
 import { createBalancedShardPlan, parseShard } from './shard-lib.mjs';
@@ -14,7 +15,7 @@ export function buildHarnessArgv(harnessPath, relativeFile) {
 	return [harnessPath, 'run-required-non-vitest', '--manifest', relativeFile];
 }
 
-export function buildParityVitestArgv(configPath, shardValue = '1/1') {
+export function buildParityVitestArgv(configPath, shardValue = '1/1', reportPath) {
 	const shard = parseShard(shardValue);
 	return [
 		'node_modules/vitest/vitest.mjs',
@@ -23,11 +24,12 @@ export function buildParityVitestArgv(configPath, shardValue = '1/1') {
 		configPath,
 		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 		'--reporter=./scripts/react-parity/vitest-unhandled-reporter.mjs',
+		...(reportPath ? [`--outputFile=${reportPath}`] : []),
 		...(shard.total === 1 ? [] : [`--shard=${shard.value}`]),
 	];
 }
 
-export function runRequiredVitestLanes({
+export async function runRequiredVitestLanes({
 	lanes,
 	repo,
 	configPath = 'vitest.react-parity.config.js',
@@ -38,44 +40,49 @@ export function runRequiredVitestLanes({
 	const shard = parseShard(shardValue);
 	const startedAt = Date.now();
 	console.log(`starting parity-wide Vitest shard ${shard.value} (${lanes.length} required lanes)`);
-	return new Promise((resolve, reject) => {
-		let stdout = '';
-		const child = spawnProcess(process.execPath, buildParityVitestArgv(configPath, shard.value), {
-			cwd: repo,
-			stdio: ['inherit', 'pipe', 'inherit'],
-			env: process.env,
+	// Vite and plugins also write to stdout. Keep diagnostics visible and read
+	// only the reporter's fresh file, never a previous run's archived result.
+	const runDirectory = mkdtempSync(join(tmpdir(), 'octane-react-parity-vitest-'));
+	const runReportPath = join(runDirectory, 'report.json');
+	try {
+		if (reportPath) rmSync(reportPath, { force: true });
+		const { code, signal } = await new Promise((resolve, reject) => {
+			const child = spawnProcess(
+				process.execPath,
+				buildParityVitestArgv(configPath, shard.value, runReportPath),
+				{ cwd: repo, stdio: 'inherit', env: process.env },
+			);
+			child.once('error', reject);
+			child.once('close', (code, signal) => resolve({ code, signal }));
 		});
-		child.stdout.on('data', (chunk) => (stdout += chunk));
-		child.once('error', reject);
-		child.once('close', (code, signal) => {
+		let report;
+		try {
 			try {
-				verifyBatchedVitestShardResult(lanes, stdout, repo);
-				if (reportPath) {
-					mkdirSync(dirname(reportPath), { recursive: true });
-					writeFileSync(reportPath, stdout);
-				}
+				report = readFileSync(runReportPath, 'utf8');
 			} catch (error) {
-				reject(
-					new Error(
-						`parity-wide Vitest run failed after ${((Date.now() - startedAt) / 1000).toFixed(1)}s: ${error.message}`,
-					),
-				);
-				return;
+				throw new Error(`Vitest did not produce a readable JSON report: ${error.message}`);
 			}
-			if (code === 0) {
-				console.log(
-					`completed parity-wide Vitest shard ${shard.value} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
-				);
-				resolve();
-			} else {
-				reject(
-					new Error(
-						`parity-wide Vitest run failed ${signal ? `with signal ${signal}` : `with exit code ${code}`}`,
-					),
-				);
-			}
-		});
-	});
+			verifyBatchedVitestShardResult(lanes, report, repo);
+		} catch (error) {
+			throw new Error(
+				`parity-wide Vitest run failed after ${((Date.now() - startedAt) / 1000).toFixed(1)}s: ${error.message}`,
+			);
+		}
+		if (code !== 0 || signal) {
+			throw new Error(
+				`parity-wide Vitest run failed ${signal ? `with signal ${signal}` : `with exit code ${code}`}`,
+			);
+		}
+		if (reportPath) {
+			mkdirSync(dirname(reportPath), { recursive: true });
+			writeFileSync(reportPath, report);
+		}
+		console.log(
+			`completed parity-wide Vitest shard ${shard.value} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
+		);
+	} finally {
+		rmSync(runDirectory, { recursive: true, force: true });
+	}
 }
 
 function inventoryTestCount(lane, root) {

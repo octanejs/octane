@@ -177,6 +177,14 @@ supported built-in hook. The compiler does not infer that contract from a
 `use*` name alone. Plain `.ts`/`.js` compilation still infers direct built-in
 hook calls inside a custom hook; it only declines to modify calls to wrappers.
 
+### Dependency values as callback arguments
+
+Octane passes a hook's dependency values as positional arguments to `useMemo`
+factories and effect callbacks. This extension also applies to an explicitly
+supplied dependency array; callbacks written for React usually ignore these
+arguments. A callback with default parameters can observe the difference. Client
+and server `useMemo` use the same convention.
+
 ## Automatic memoization and calls in templates
 
 Production builds automatically memoize component regions. The default
@@ -554,7 +562,73 @@ a provider or boundary that has not rendered. Static JSX, explicit
 `createElement(...)` calls, and event or render-prop callbacks retain ordinary
 JavaScript evaluation semantics.
 
+### Template children and inspection
+
+Children authored inside an `@{ ... }` template normally arrive at a component
+as a compiled render body. Rendering `{children}` works, but that body is not an
+element descriptor: `Children.count`, `Children.map`, `Children.toArray`,
+`Children.only`, and `cloneElement` cannot inspect its contents. JSX returned
+from an ordinary function and explicit `createElement` values remain inspectable.
+
+Mark components that inspect or clone their children with the public
+`descriptorChildren` compiler marker:
+
+```tsx
+import { Children, cloneElement, descriptorChildren } from 'octane';
+
+const Slot = descriptorChildren(function Slot({ children }) {
+  return cloneElement(Children.only(children), { 'data-slot': true });
+});
+
+function Example() @{
+  <Slot><button>Save</button></Slot>
+}
+```
+
+The marker leaves the component's runtime identity unchanged and requests
+descriptor children at compiled call sites. The bundler follows marked exports
+through imports; a standalone compiler caller can mark a local binding explicitly.
+For a function-as-child API that also accepts ordinary template children, use
+`typeof children === 'function' && !isChildrenBlock(children)` before invoking a
+render prop. A compiled children body must be rendered through Octane.
+
+### Template branch identity
+
+Each `@if`/`@else`, `@switch` arm, and template-lowered conditional arm owns a
+separate render scope. Switching arms remounts their contents even when both
+arms contain the same component or host tag. Uncontrolled values and child
+state therefore reset. To preserve identity, keep one component outside the
+branch and make its props conditional, such as `<Row value={active ? a : b} />`.
+Ordinary returned element descriptors follow their type and key identity instead.
+
+### Raw script and scoped style bodies
+
+In `.tsrx`, the body of `<script>` is JavaScript source and the body of
+`<style>` is scoped CSS source. They are not JSX expression containers.
+`<script>{JSON.stringify(data)}</script>` therefore writes those literal source
+characters, and `<style>{css}</style>` is not valid scoped CSS syntax.
+Use a prop for dynamic content:
+
+```tsx
+<script type="application/ld+json" children={JSON.stringify(data)} />
+<style children={css} />
+<style dangerouslySetInnerHTML={{ __html: css }} />
+```
+
+A style element with explicit content props is an ordinary host element. A
+literal CSS body retains Octane's scoped-style compilation. These forms also
+work through `createElement` for runtime-created content.
+
 ## Native event objects, no synthetic event layer
+
+The public type names follow that contract too. `MouseEvent<T>`,
+`MouseEventHandler<T>`, `InputEvent<T>`, and the other event families describe
+native DOM events with a typed `currentTarget`; they have no `nativeEvent`,
+`persist`, or synthetic propagation methods. `HTMLAttributes`, the specialized
+host attribute types, `CSSProperties`, `Ref`, `FC`, and `ComponentProps` can be
+imported from `octane`. `ReactNode` and `ReactElement` are migration aliases for
+Octane values; prefer `OctaneNode` and `ElementDescriptor` in new code. These
+aliases do not make Octane elements renderable by a React root.
 
 Delegated capture and bubbling are scoped to each root's portion of the event
 path. Native listeners between nested roots run before the next root's handlers,
@@ -605,8 +679,18 @@ What differs is the event API and synthesis layer:
   `event.currentTarget` is the handler's element.
 - `mouseenter`/`pointerenter` families are the real per-element native events —
   no synthesis from `over`/`out`.
+- `onFocus`/`onBlur` use the browser's bubbling `focusin`/`focusout` events,
+  including capture variants; the event object retains that native type.
 - There are no synthetic `onChange`/`onBeforeInput`/`onSelect` polyfills — use
   the native events (`onInput` etc.).
+- Root listeners are non-passive. `preventDefault()` in `onWheel` or
+  `onTouchMove` can cancel scrolling when the native event is cancelable.
+- Native `keypress` events are delivered even when their `charCode` is zero;
+  Octane does not apply React's printable-character filter.
+- Non-bubbling event families are available on any host, rather than only
+  React's selected host types. A spread that introduces a previously unseen
+  event installs its delegated listener lazily, after native container listeners
+  that were registered earlier.
 
 A noop `onclick` is stamped on delegation roots for iOS Safari, not on every
 element.
@@ -621,6 +705,16 @@ respected, radio groups restore as a group, `<select value>` projects options
 escape hatch. Hydration adopts pre-hydration user input, then the first
 commit/discrete event reasserts. `<textarea>` with children AND a
 `value`/`defaultValue` prop is a compile error (the prop owns the content).
+
+Uncontrolled `defaultValue` updates change an input or textarea's reset baseline
+without replacing its live value. A select uses `defaultValue` on mount and
+when `multiple` changes. A textarea authored with children instead has a live
+text binding; use `defaultValue` when later renders must preserve user edits.
+Removing a controlled textarea's `value` retains its current content.
+
+A function form action has no `action` attribute while intercepted. Octane does
+not serialize React's JavaScript-URL sentinel. `onSubmit` and ancestor handlers
+run before the action and may cancel it with `preventDefault()`.
 
 What differs is the **event layer**: there is no synthetic `onChange`.
 `onInput` is the per-keystroke handler for text controls (the native `change`
@@ -715,6 +809,13 @@ Other current differences:
   it.
 - The browser parser canonicalizes a statically authored lowercase SVG
   `textlength` instead of following React's imperative warning path.
+- `style` accepts a CSS string as well as an object, including `!important` and
+  kebab-case property names. Object updates own only their authored properties;
+  a string owns the complete inline declaration. Numeric object values receive
+  units from the shared property table; `scale` is unitless and `cssFloat`
+  aliases `float`.
+- Child boundaries can leave empty comment anchors inside an `option`; its
+  visible text and selected value are the supported observations.
 
 ## Development diagnostics and production errors
 
@@ -727,6 +828,13 @@ component/source context. Current coverage is intentionally partial: the
 records implemented, pending, adapted, divergent, and unsupported families.
 Diagnostics are adapted when an intentional Octane difference changes the useful
 guidance; React-only APIs remain outside the supported surface.
+
+An unknown event prop on an ordinary host can name a real native event instead
+of being discarded. Template `@for` accepts iterable inputs, including maps and
+generators, and supports inferred keys; React's missing-key and unsupported
+iterator warnings do not describe those directives. Symbol renderables are
+stringified as text. Error messages use Octane's vocabulary, and caught-error
+logging and owner-stack context do not promise React's console transcript.
 
 Development builds retain complete messages. Framework-authored errors in the
 core DOM client and server runtimes that must still throw in production use an
@@ -914,6 +1022,30 @@ flushSync(() => {
 // Both updates committed; passive effects still run later.
 ```
 
+Passive effects normally run after paint, including effects queued by discrete
+events and external-store updates. A listener installed by `useEffect` can miss
+another event dispatched before that drain. Use `useLayoutEffect` when the
+subscription must be installed by the end of the commit. Passive timing is not
+React's synchronous discrete-event effect timing.
+
+`root.unmount()` drains pending passive work and its passive cleanups before
+returning, so root-owned subscriptions cannot outlive the unmount call.
+
+Octane also skips React's extra same-value render after a previous state change.
+If a component body does run, its children can render even when the final state
+is unchanged; do not depend on React's incidental render counts. Updates across
+roots share a microtask wave, and an `await` continuation can observe the commit
+after `setState(); await 0`. Cross-component render-time updates join the current
+drain. Ordinary layout cascades continue through the microtask scheduler;
+`flushSync` drains them before returning.
+
+Commit phases retain Octane's ordering: insertion effects mount with connected
+DOM, refs attach before layout bodies, and layout cleanups can observe DOM
+already changed by the render walk. A changed ref detaches after its owner's
+layout cleanup; deletion cleanups interleave insertion and layout work. This
+does not provide React's per-component ref/layout interleaving or a global
+before-mutation ref-detach phase.
+
 Other consequences:
 
 - Priority (`urgent` vs `transition`) governs Suspense hold semantics, not
@@ -960,10 +1092,17 @@ Other consequences:
   reconnect on reveal. Insertion effects stay connected. Hidden suspension is
   contained by the Activity, but general structural-deletion atomicity still has
   the per-swap limitation above. See the [Activity audit](./activity-audit.md).
+- Suspense and Activity hide portal content with their ordinary descendants.
+  Initially suspended primary DOM can remain connected but hidden before its
+  first commit; hidden inputs still participate in native form submission and
+  DOM queries still find those nodes. Effect/ref connection follows visibility,
+  not physical DOM membership. Hook state created above the first suspending
+  `use()` is retained for retry instead of discarding that initial state.
 - `useId` generates `:<prefix>in-<n>:` identifiers (React 19.2 uses
   `_r_<n>_`). Both are opaque; only the format differs.
 - `version` reports Octane's own package version (`0.x`), not a React version —
-  ported code gating on `version >= '19'` must not rely on it.
+  ported code gating on `version >= '19'` must not rely on it. The same value is
+  exported by the client, server, and static entry points.
 
 ## Parallel `use()`: no suspense waterfalls
 
@@ -1059,6 +1198,15 @@ The second form avoids creating an element descriptor at application bootstrap.
 A bare function passed to `root.render` is therefore intentional, not an
 invalid-child warning.
 
+Both `createRoot` and `hydrateRoot` accept an `Element`, a `Document`, or a
+`DocumentFragment` (including `ShadowRoot`). Document roots own the document
+element and preserve its doctype.
+
+A document root replaces the document shell when its output does not contain
+`<html>` and `<body>`. In that case `document.body` is `null`, so it cannot be
+passed to another `createRoot` call. Update the existing document root or render
+a complete document shell first.
+
 The first `root.render()` mounts synchronously. React's concurrent root queues
 its initial mount, so a render followed by an unmount in the same surrounding
 batch exposes no intermediate DOM there; Octane may expose the mounted DOM
@@ -1073,6 +1221,21 @@ After `root.unmount()`, the root is permanently closed. If outside code removes
 some of a root's managed DOM first, unmount still performs safe cleanup instead
 of surfacing the browser's incidental `NotFoundError` from removing an already
 detached node.
+
+## Portal keys and component props
+
+`createPortal(children, target, key)` accepts a string or number key, normalized
+to a string, so keyed portal arrays preserve their child state on reordering.
+Octane also supports a component body as the first argument and an object of
+component props as the third:
+
+```tsx
+createPortal(<Menu />, overlay, 'menu');
+createPortal(Menu, overlay, { open: true });
+```
+
+The object overload does not supply a reconciliation key. Use a keyed element
+inside the portal or the keyed renderable overload when identity must change.
 
 ## `lazy()` module resolution
 
@@ -1185,9 +1348,7 @@ object. First-level children expose their owning instances through
 `reactFragments: Set<FragmentInstance>`.
 
 Fragment refs are inactive during server rendering and attach during client
-hydration. Octane roots require an `Element`, so React's empty-fragment scrolling
-fallbacks for roots mounted directly into a `ShadowRoot` or `DocumentFragment`
-are outside the supported root-container surface.
+hydration.
 
 ## SSR and streaming
 
@@ -1199,11 +1360,36 @@ The buffered renderers return Octane's scoped CSS beside the HTML:
 const { html, css } = renderToString(App, props);
 ```
 
+Renderable roots are also accepted: `renderToString(createElement(App), options)`
+and primitive, array, or null roots use the second argument for renderer options.
+The function-root extension uses `renderToString(App, props, options)`.
+
 `renderToString`, `renderToStaticMarkup`, and `prerender` all return
 `{ html, css }`; React has no equivalent `css` field. Hoisted document metadata
 folds into `html` as React does. For a host that owns the surrounding
 `<head>`-bearing template, `headChannel: 'separate'` instead exposes
 `RenderResult.head` and `StreamOptions.onHeadReady`.
+
+Plain string returns are text and are escaped. The compiler brands its already
+serialized HTML internally; user components must use descriptors or templates
+for markup. Style text uses raw CSS serialization, and script/style closing
+sequences are hardened to prevent an embedded closing tag from ending the host.
+
+Serialization is not byte-identical to React: entity spelling, trailing CSS
+semicolons, boolean-attribute spelling, and empty comment separators can differ.
+`renderToStaticMarkup` retains Octane's separators. Automatic image preload hints
+are not synthesized. Host props remain lenient for custom-element objects,
+attributes such as `selected` on unrelated hosts, and void elements with
+children. Server style inputs accept strings and other values the style
+normalizer accepts, in addition to ordinary objects.
+
+Server `useSyncExternalStore` falls back to `getSnapshot` when
+`getServerSnapshot` is absent. Transition starters and optimistic setters from
+server hooks are no-ops; a server hook's transition starter does not invoke its
+callback. Portals emit an empty placeholder. Unlike React's client-only error
+boundaries, template `@catch` also catches during SSR. JSX Suspense errors render
+its fallback and notify `onError`; a pending promise with no boundary makes a
+synchronous buffered render throw instead of returning partial HTML.
 
 ### Streaming
 
@@ -1229,13 +1415,19 @@ React 19.2's partial pre-rendering — `resume`, `resumeToPipeableStream`,
 `resumeAndPrerender`, and the postpone/prelude protocol — is a non-goal: that
 request protocol is not part of Octane's public SSR surface. Relatedly,
 `prerender` resolves `{ html, css }` (a complete buffered document), not
-React's `{ prelude: ReadableStream }`; `prerenderToNodeStream` is planned but
-not yet implemented.
+React's `{ prelude: ReadableStream }`. `prerenderToNodeStream` is implemented:
+it resolves after the complete render and exposes that complete document as a
+Node stream in `prelude`.
 
 A readable stream's `allReady` settles after all boundary bytes have been
 accepted under consumer backpressure, so consumers should read the stream while
 awaiting it. Error callbacks report the original value without synthesizing
 React digests or React's `errorInfo` shape.
+
+A pipeable stream's shell failure calls the destination's `destroy(error)` when
+available, including when piping begins after the failure. A minimal destination
+without `destroy` receives no body bytes and ends after `onShellError` reports
+the failure; its owner must choose the transport response.
 
 ### Hydration
 
@@ -1244,7 +1436,8 @@ value. Octane warns and rebuilds a mismatched subtree in place rather than
 throwing.
 
 `hydrateRoot`'s `onRecoverableError` option fires (dev AND prod) after a
-STRUCTURAL recovery — a rebuilt subtree or a discarded stale server range —
+structural or text recovery — a rebuilt subtree, corrected text, or a discarded
+stale server range —
 coalesced to one report per root per microtask burst. Octane recovers per site
 rather than client-rendering a whole boundary, so attribute-level value patches
 do not report: production React does not detect those at all, and reporting
@@ -1255,9 +1448,10 @@ form POST requires React's server-action state serialization, which is part of
 the RSC model Octane does not implement (the matching `useActionState`
 `permalink` argument is accepted for signature parity and ignored).
 
-Production structural validation has the same depth as React: it checks an
-adopted root's node type and tag. Tag and text mismatches still recover, but
-different static branches that share a tag may not be detected:
+Production validates a template root's node type and tag, together with its
+dynamic binding and range sites. It does not walk arbitrary static descendants.
+Tag and text mismatches at inspected sites recover, but different static
+branches that share a tag may not be detected:
 
 ```html
 <!-- Server branch -->
@@ -1267,8 +1461,9 @@ different static branches that share a tag may not be detected:
 <span class="expanded">...</span>
 ```
 
-Development performs the full static-structure and attribute comparison, warns,
-and rebuilds.
+Development recursively compares unambiguous static structure and attributes,
+warns, and rebuilds. It stops at dynamic holes, so unmatched static descendants
+outside an inspected range can remain. This is not React's full hydration walk.
 
 ## Hot module updates remount the edited component
 
@@ -1318,7 +1513,6 @@ Octane does not implement:
 - `Profiler`, `SuspenseList`, `forwardRef`, or `createRef`;
 - `captureOwnerStack` and development owner-stack collection (diagnostics
   dedupe per rendering block instead);
-- `unstable_batchedUpdates` (renders are microtask-batched by default);
 - partial pre-rendering (`resume`/`resumeAndPrerender` and the
   postpone/prelude protocol — see SSR and streaming);
 - gesture View Transitions (`useSwipeTransition` /
@@ -1328,7 +1522,16 @@ Octane does not implement:
 (`preload`, `preinit`, `preloadModule`, `preinitModule`, `preconnect`, and
 `prefetchDNS`).
 
+`StrictMode` is a pass-through wrapper; it does not replay renders or effects.
+`unstable_batchedUpdates` invokes its callback and preserves its arguments,
+result, and thrown errors because updates are already microtask-batched.
+`useFormState` is accepted as a deprecated alias for `useActionState`.
+`unstable_Activity` remains a compatibility alias for Octane's `Activity`; React
+19.2.7 does not export that legacy name.
+
 React 19 custom-element listener semantics are also supported: a
-function-valued lowercase `on*` prop on a custom element attaches a real
-listener (adjudicated 2026-07-05). The property-versus-attribute heuristic is
+function-valued custom `on*` prop attaches a real listener with the exact event
+name after `on`. For example, `onFooBar` listens for `FooBar`, while `onfoobar`
+listens for `foobar`; a trailing `Capture` selects capture. Recognized DOM
+handler names retain their native delegated behavior. The property-versus-attribute heuristic is
 not; custom-element values follow Octane's attribute-only pass-through policy.

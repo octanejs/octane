@@ -366,7 +366,7 @@ describe('hoisted document metadata — hydration', () => {
 		},
 	);
 
-	it('adopts a server-rendered resource and keeps load/error handlers current through unmount', () => {
+	it('adopts an inline stylesheet and keeps load/error handlers current through unmount', () => {
 		interface ResourceModule extends CompiledFixtureModule {
 			Page: (props: { handlers: Record<string, () => void> }) => unknown;
 		}
@@ -397,11 +397,8 @@ export function Page(props: { handlers: Record<string, () => void> }) @{
 		];
 		const initial = handlers('initial');
 		const { html } = ServerRT.renderToString(serverModule.Page, { handlers: initial });
-		const bodyStart = html.indexOf('<main');
-		if (bodyStart === -1) throw new Error('Expected hydrated resource body markup');
-		document.head.innerHTML = html.slice(0, bodyStart);
-		container.innerHTML = html.slice(bodyStart);
-		const link = document.head.querySelector('link[href="/hydrated-resource.css"]')!;
+		container.innerHTML = html;
+		const link = container.querySelector('link[href="/hydrated-resource.css"]')!;
 		const body = container.querySelector('main')!;
 		const dispatch = () => {
 			link.dispatchEvent(new Event('load'));
@@ -410,7 +407,7 @@ export function Page(props: { handlers: Record<string, () => void> }) @{
 		const root = hydrateRoot(container, client.Page, { handlers: initial });
 		flushSync(() => {});
 
-		expect(document.head.querySelector('link[href="/hydrated-resource.css"]')).toBe(link);
+		expect(container.querySelector('link[href="/hydrated-resource.css"]')).toBe(link);
 		expect(container.querySelector('main')).toBe(body);
 		dispatch();
 		expect(calls).toEqual(expected('initial'));

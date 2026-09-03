@@ -195,6 +195,19 @@ type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
  */
 export type ServerEntryComponent = ServerComponent | ((props: any) => unknown);
 
+export type ServerRenderNode =
+	| ServerEntryComponent
+	| ElementDescriptor
+	| Iterable<unknown>
+	| PromiseLike<unknown>
+	| Context<unknown>
+	| string
+	| number
+	| bigint
+	| boolean
+	| null
+	| undefined;
+
 let CURRENT_SCOPE: SSRScope | null = null;
 // Server helpers use the same synchronous read/witness ABI without importing
 // the client renderer or attaching a subscription to any shared producer.
@@ -950,10 +963,10 @@ function fragmentRefDescriptor(value: ElementDescriptor): ElementDescriptor {
 
 /** Retain the exact range adopted by the client without attaching its ref. */
 function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: SSRScope): string {
-	return (
+	return ssrHtml(
 		ssrFragmentMarker(true, descriptor.ref) +
-		ssrChild(descriptor.children, scope) +
-		ssrFragmentMarker(false)
+			ssrChild(descriptor.children, scope) +
+			ssrFragmentMarker(false),
 	);
 }
 
@@ -1370,7 +1383,8 @@ export const Children = {
 // PORTAL_TAG descriptor shape; `ssrChild` renders it as a bare site anchor
 // (portal content mounts into its client-side container on hydration).
 export function createPortal(body: unknown, target: unknown, props: any = undefined): unknown {
-	return { $$kind: PORTAL_TAG, body, target, props };
+	const key = typeof props === 'string' || typeof props === 'number' ? String(props) : null;
+	return { $$kind: PORTAL_TAG, body, target, key, props: key === null ? props : undefined };
 }
 
 // ---------------------------------------------------------------------------
@@ -1383,6 +1397,33 @@ export function createPortal(body: unknown, target: unknown, props: any = undefi
 // measured faster than an exec-loop or replace-with-callback single pass on V8
 // for both sparse and dense escape densities.
 const HTML_ESCAPE_RE = /[&<>]/g;
+
+// A primitive component return is user text. Only compiler-owned HTML may
+// bypass escaping; carrying the proof with the value also preserves it through
+// ordinary wrappers that call another component directly.
+const SERVER_HTML = Symbol.for('octane.serverHtml');
+class ServerHtml {
+	readonly [SERVER_HTML]: string;
+	constructor(html: string) {
+		this[SERVER_HTML] = html;
+	}
+	toString(): string {
+		return this[SERVER_HTML];
+	}
+}
+
+/** @internal Brand the final serialized output of a compiled server body. */
+export function ssrHtml(html: string): string {
+	return typeof html === 'string' ? (new ServerHtml(html) as unknown as string) : html;
+}
+
+function serverComponentOutput(out: unknown, scope: SSRScope): string {
+	if (out == null) return '';
+	if (typeof out === 'string') return escapeHtml(out);
+	if (typeof out === 'object' && SERVER_HTML in out) return (out as ServerHtml)[SERVER_HTML];
+	return ssrChild(out, scope);
+}
+
 export function escapeHtml(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
 	HTML_ESCAPE_RE.lastIndex = 0;
@@ -1465,6 +1506,9 @@ function ssrChildValue(
 	includeKeyedSingle: boolean,
 	selfMarkItem: boolean = false,
 ): string {
+	if (v !== null && typeof v === 'object' && SERVER_HTML in v) {
+		return (v as ServerHtml)[SERVER_HTML];
+	}
 	// Every renderable hole serializes to ONE `<!--[-->…<!--]-->` range so the
 	// client's childSlot adopts a uniform marker pair on hydration regardless of
 	// whether the value is a component, an element, a primitive, or empty — and
@@ -1554,6 +1598,18 @@ export function ssrChildText(v: unknown, scope: SSRScope): string {
 	if (v == null || v === false || v === true) return '';
 	if (typeof v === 'object' || typeof v === 'function') return ssrChild(v, scope);
 	return escapeHtml(v);
+}
+
+/** @internal First-child renderable hole in a newline-eating HTML element. */
+export function ssrChildTextPre(v: unknown, scope: SSRScope): string {
+	const content = ssrChildText(v, scope);
+	return content.charCodeAt(0) === 10 ? '\n' + content : content;
+}
+
+/** @internal First renderable child when static output has no shielding markers. */
+export function ssrChildPre(v: unknown, scope: SSRScope): string {
+	const content = ssrChild(v, scope);
+	return content.charCodeAt(0) === 10 ? '\n' + content : content;
 }
 
 // Serialize a HOST element descriptor (`createElement('span', props, ...children)`)
@@ -1690,9 +1746,13 @@ function ssrHostElement(
 			// descriptor therefore needs the same whole-body serializer as the direct
 			// template path. Join primitive arrays before escaping so a breakout token
 			// split across adjacent children cannot evade the boundary guard.
-			const scriptText = semanticTag === 'script' ? scriptDescriptorText(children) : null;
-			if (scriptText !== null) {
-				inner = escapeEntireInlineScriptContent(scriptText);
+			const rawText =
+				semanticTag === 'script' || semanticTag === 'style' ? scriptDescriptorText(children) : null;
+			if (rawText !== null) {
+				inner =
+					semanticTag === 'script'
+						? escapeEntireInlineScriptContent(rawText)
+						: escapeEntireInlineStyleContent(rawText);
 			} else {
 				// A de-opt host whose children contain COMPONENTS renders those children on the
 				// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
@@ -1724,6 +1784,12 @@ function ssrHostElement(
 				attrs,
 				inner,
 			);
+		}
+		if (
+			(semanticTag === 'pre' || semanticTag === 'textarea' || semanticTag === 'listing') &&
+			inner.charCodeAt(0) === 10
+		) {
+			inner = '\n' + inner;
 		}
 		return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
 	} finally {
@@ -1771,6 +1837,7 @@ function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 // through the block-bearing `ssrChild` path rather than plain markup).
 function serverDescNeedsBlocks(v: unknown): boolean {
 	if (v == null || typeof v !== 'object') return false;
+	if ((v as any).$$kind === CONTEXT_TAG || typeof (v as any).then === 'function') return true;
 	// Arrays are the ordinary descriptor-children container. Inspect their
 	// descendants before the generic iterable check below; treating every array
 	// as an opaque iterable forces pure host/text trees onto the block path and
@@ -1848,6 +1915,7 @@ function ssrDeoptItemContent(value: unknown, scope: SSRScope): string {
 // boundary even inside de-opt markup), primitives coerce to escaped text.
 function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
 	if (v == null || v === false || v === true || v === '') return '';
+	if (typeof v === 'object' && SERVER_HTML in v) return (v as ServerHtml)[SERVER_HTML];
 	if (Array.isArray(v)) {
 		let out = '';
 		for (let i = 0; i < v.length; i++) out += ssrDescriptorContent(v[i], scope);
@@ -1875,7 +1943,7 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  * protocol (shared constants in ./constants).
  */
 export function ssrBlock(content: string): string {
-	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : content;
+	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : String(content);
 }
 
 /**
@@ -1906,7 +1974,7 @@ function renderActivityDescriptor(
 ): string {
 	// Keep the accessor inside the visibility branch: scoped JSX children may
 	// start data work or throw, and hidden server Activities must evaluate neither.
-	return ssrActivity(props.mode ?? 'visible', () => ssrChild(props.children, scope));
+	return ssrHtml(ssrActivity(props.mode ?? 'visible', () => ssrChild(props.children, scope)));
 }
 
 /**
@@ -1918,7 +1986,7 @@ function renderActivityDescriptor(
 export function ssrForBlock(content: string, hasItems: boolean): string {
 	return MARKERS
 		? (hasItems ? FOR_BLOCK_OPEN_ITEMS : FOR_BLOCK_OPEN_EMPTY) + content + BLOCK_CLOSE
-		: content;
+		: String(content);
 }
 
 // URI encoders reject lone UTF-16 surrogates, while UTF-8 encoders generally
@@ -2220,11 +2288,13 @@ export function ssrAttr(
 	// `aria-*` attributes are ENUMERATED (React parity): `false` serialises as "false"
 	// and `true` as "true"; only null/undefined drops them.
 	if (name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')) {
-		if (v == null) return '';
+		if (v == null || typeof v === 'function' || typeof v === 'symbol') return '';
 		return ' ' + name + '="' + escapeAttr(String(v)) + '"';
 	}
 	// React-only warning-suppression hints never serialize (client parity).
 	if (
+		name === 'innerText' ||
+		name === 'textContent' ||
 		name === 'suppressContentEditableWarning' ||
 		name === 'suppressHydrationWarning' ||
 		name === 'suppressNativeChangeWarning' ||
@@ -2329,6 +2399,7 @@ export function ssrAttr(
 			return '';
 		}
 		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && !(Number(v) >= 1)) return '';
+		if ((lower === 'rowspan' || lower === 'start') && Number.isNaN(Number(v))) return '';
 	}
 	if (v == null || v === false) return '';
 	// A plain object has no useful attribute representation. Objects with an
@@ -2908,7 +2979,7 @@ export function ssrFormAuthoringDiagnostics(
  * (the generic ssrAttr would DROP a false boolean); only nullish omits.
  */
 export function ssrValueAttr(v: unknown): string {
-	if (v == null) return '';
+	if (v == null || typeof v === 'function' || typeof v === 'symbol') return '';
 	return ' value="' + escapeAttr(typeof v === 'string' ? v : String(v)) + '"';
 }
 
@@ -3673,7 +3744,7 @@ function renderComponentFramed(
 			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 			HOOK_PASS = previousHookPass;
 		}
-		const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, scope);
+		const inner = serverComponentOutput(out, scope);
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
@@ -3776,7 +3847,7 @@ export function ssrComponent(
 					// string) returns a descriptor, not HTML — normalize via ssrChild, exactly
 					// like renderComponentFramed normalizes a de-opt body's return.
 					const out = (kids as any)(undefined, parent);
-					const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, parent);
+					const inner = serverComponentOutput(out, parent);
 					const html = ssrHostElement(tag, props, null, parent, inner);
 					return inherit ? html : ssrBlock(html);
 				}
@@ -3862,7 +3933,8 @@ export function ssrInNamespace(namespace: 'html' | 'svg' | 'mathml', render: () 
 // the client `childrenAsBody`, so the JSX `<Suspense>`/`<ErrorBoundary>` built-ins
 // render their children whichever dialect authored the parent.
 function ssrChildrenHtml(children: unknown, scope: SSRScope): string {
-	if (typeof children === 'function') return (children as any)(undefined, scope) ?? '';
+	if (typeof children === 'function')
+		return serverComponentOutput(children(undefined, scope), scope);
 	return ssrChild(children, scope);
 }
 
@@ -3939,7 +4011,8 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 			// The outer static range already erases this client subtree and reserves
 			// all descendant IDs. Collapse nested exact boundaries to their authored
 			// children instead of leaving orphaned private sidecars.
-			if (inheritedPermanentStatic || !MARKERS) return ssrChildrenHtml(props.children, scope);
+			if (inheritedPermanentStatic || !MARKERS)
+				return ssrHtml(ssrChildrenHtml(props.children, scope));
 			const childIdStart = ID_COUNTER;
 			const serialStart = SERIAL?.length ?? 0;
 			const children = ssrBlock(
@@ -3956,10 +4029,10 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 			const streamToken = streamTokenForPendingHtml(children);
 			const markerToken = streamToken === null ? '' : streamToken + ':';
 			const endToken = streamToken === null ? '' : ':' + streamToken;
-			return (
+			return ssrHtml(
 				`<!--${HYDRATE_STATIC_ID_COUNT_PREFIX}${markerToken}${idCount}-->` +
-				children +
-				`<!--${HYDRATE_STATIC_END}${endToken}-->`
+					children +
+					`<!--${HYDRATE_STATIC_END}${endToken}-->`,
 			);
 		} finally {
 			// The compiler erases this client subtree. Its data cannot be borrowed
@@ -3979,72 +4052,74 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 		// SSR children and attribute semantics instead of inheriting SVG/MathML from
 		// the call site. Direct placement in foreign content remains unsupported: an
 		// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
-		return withSsrElementContext(
-			'div',
-			undefined,
-			() =>
-				ssrInNamespace('html', () => {
-					if (!MARKERS) {
-						return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
-					}
+		return ssrHtml(
+			withSsrElementContext(
+				'div',
+				undefined,
+				() =>
+					ssrInNamespace('html', () => {
+						if (!MARKERS) {
+							return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
+						}
 
-					const childIdStart = ID_COUNTER;
-					const serialStart = SERIAL?.length ?? 0;
-					const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
-					const previousNativeReads = NATIVE_SERVER_READS;
-					if (nativeCapture < 0) NATIVE_SERVER_READS = null;
-					// The outer range belongs to Hydrate itself. ssrTry supplies the nested
-					// Suspense slot/content ranges and makes a suspending child a real stream
-					// boundary. `fallback` remains client-only, so the server pending arm is
-					// intentionally empty.
-					let children: string;
-					let nativeReads: NativeSeedReads | null = null;
-					try {
-						children = ssrBlock(
-							ssrTry(
-								scope,
-								'jsx-hydrate',
-								(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
-								null,
-								null,
-								'html',
-							),
+						const childIdStart = ID_COUNTER;
+						const serialStart = SERIAL?.length ?? 0;
+						const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+						const previousNativeReads = NATIVE_SERVER_READS;
+						if (nativeCapture < 0) NATIVE_SERVER_READS = null;
+						// The outer range belongs to Hydrate itself. ssrTry supplies the nested
+						// Suspense slot/content ranges and makes a suspending child a real stream
+						// boundary. `fallback` remains client-only, so the server pending arm is
+						// intentionally empty.
+						let children: string;
+						let nativeReads: NativeSeedReads | null = null;
+						try {
+							children = ssrBlock(
+								ssrTry(
+									scope,
+									'jsx-hydrate',
+									(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+									null,
+									null,
+									'html',
+								),
+							);
+						} finally {
+							nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
+						}
+						const idCount = ID_COUNTER - childIdStart;
+						const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+						const permanentStaticAncestor = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
+						const attrs = ssrHydrateAttrs(
+							id,
+							props.when,
+							idCount,
+							permanentStaticAncestor,
+							streamTokenForPendingHtml(children),
 						);
-					} finally {
-						nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
-					}
-					const idCount = ID_COUNTER - childIdStart;
-					const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
-					const permanentStaticAncestor = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
-					const attrs = ssrHydrateAttrs(
-						id,
-						props.when,
-						idCount,
-						permanentStaticAncestor,
-						streamTokenForPendingHtml(children),
-					);
-					const seedJson =
-						permanentStaticAncestor || childSeeds.length === 0
-							? null
-							: serializeSuspenseSeedJson(childSeeds);
-					const seedSidecar =
-						seedJson === null || seedJson === '[]'
-							? ''
-							: '<script type="application/json" ' +
-								HYDRATE_SEED_ATTR +
-								NONCE_ATTR +
-								'>' +
-								seedJson +
-								'</script>';
-					const nativeSeeds = permanentStaticAncestor
-						? undefined
-						: NATIVE_READ_COLLECTOR?.serialize(nativeReads);
-					const nativeSidecar =
-						nativeSeeds === undefined ? '' : serializeNativeSignalSeeds(nativeSeeds, NONCE_ATTR);
+						const seedJson =
+							permanentStaticAncestor || childSeeds.length === 0
+								? null
+								: serializeSuspenseSeedJson(childSeeds);
+						const seedSidecar =
+							seedJson === null || seedJson === '[]'
+								? ''
+								: '<script type="application/json" ' +
+									HYDRATE_SEED_ATTR +
+									NONCE_ATTR +
+									'>' +
+									seedJson +
+									'</script>';
+						const nativeSeeds = permanentStaticAncestor
+							? undefined
+							: NATIVE_READ_COLLECTOR?.serialize(nativeReads);
+						const nativeSidecar =
+							nativeSeeds === undefined ? '' : serializeNativeSignalSeeds(nativeSeeds, NONCE_ATTR);
 
-					return '<div' + attrs + '>' + children + seedSidecar + nativeSidecar + '</div>';
-				}),
-			'html',
+						return '<div' + attrs + '>' + children + seedSidecar + nativeSidecar + '</div>';
+					}),
+				'html',
+			),
 		);
 	},
 	COMPONENT_FLAG_BOUNDARY,
@@ -4066,25 +4141,31 @@ export const Hydrate: ServerComponent = /* @__PURE__ */ initializeHydrateCompone
  * branch's inner `ssrBlock`, so the client's `<Suspense>` (componentSlot →
  * tryBlock) adopts it byte-for-byte. A descendant `use(thenable)` that hasn't
  * resolved throws `SSR_SUSPENSE` → the `fallback` renders for this pass and
- * render()'s loop awaits + re-renders; a real error rethrows to an outer boundary.
+ * render()'s loop awaits + re-renders. A render error publishes the fallback,
+ * reports onError, and leaves the boundary ready for a fresh client render.
  */
 export const Suspense = /* @__PURE__ */ markComponentFlags(
 	function Suspense(props: { fallback?: unknown; children?: unknown }, scope: SSRScope): string {
 		// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
 		// real STREAMING boundary too (registration + template sentinel), with the
-		// identical nested-block byte shape as before for buffered renders. Errors
-		// rethrow to an outer boundary (catchFn = null), matching the old emit.
-		return ssrTry(
-			scope,
-			'jsx-suspense',
-			(_arg, s) => ssrChildrenHtml(props.children, s),
-			(_arg, s) => ssrChild(props.fallback, s),
-			null,
-			FRAME?.namespace ?? 'html',
+		// identical nested-block shape for buffered renders. Unlike an authored
+		// @try/@pending, JSX Suspense recovers server errors for a client retry.
+		return ssrHtml(
+			ssrTry(
+				scope,
+				'jsx-suspense',
+				(_arg, s) => ssrChildrenHtml(props.children, s),
+				(_arg, s) => ssrChild(props.fallback, s),
+				null,
+				FRAME?.namespace ?? 'html',
+				false,
+				true,
+			),
 		);
 	},
 	COMPONENT_FLAG_BOUNDARY,
 	'Suspense',
+	Symbol.for('octane.suspense'),
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4278,7 +4359,7 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 		attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
 		attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
 		if (named) attrs.push(['vt-share', cand.share]);
-		return ssrBlock(vtSsrAnnotate(inner, attrs));
+		return ssrHtml(ssrBlock(vtSsrAnnotate(inner, attrs)));
 	},
 	COMPONENT_FLAG_BOUNDARY,
 	'ViewTransition',
@@ -4304,22 +4385,26 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 		props: { fallback?: unknown; children?: unknown },
 		scope: SSRScope,
 	): string {
-		return ssrBlock(
-			(() => {
-				try {
-					return withAsyncIdentity('error-boundary', 'content', () =>
-						ssrBlock(ssrChildrenHtml(props.children, scope)),
-					);
-				} catch (e) {
-					e = normalizeThrownServerThenable(e);
-					if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
-					const fb =
-						typeof props.fallback === 'function'
-							? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
-							: props.fallback;
-					return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
-				}
-			})(),
+		return ssrHtml(
+			ssrBlock(
+				(() => {
+					try {
+						return withAsyncIdentity('error-boundary', 'content', () =>
+							ssrBlock(ssrChildrenHtml(props.children, scope)),
+						);
+					} catch (e) {
+						e = normalizeThrownServerThenable(e);
+						if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
+						const fb =
+							typeof props.fallback === 'function'
+								? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
+								: props.fallback;
+						return withAsyncIdentity('error-boundary', 'catch', () =>
+							ssrBlock(ssrChild(fb, scope)),
+						);
+					}
+				})(),
+			),
 		);
 	},
 	COMPONENT_FLAG_BOUNDARY,
@@ -4344,7 +4429,7 @@ export interface Context<T> {
 
 export function createContext<T>(defaultValue: T): Context<T> {
 	const ctx = function ProviderBody(props, scope) {
-		return renderServerContextProvider(ctx, props, scope);
+		return ssrHtml(renderServerContextProvider(ctx, props, scope));
 	} as Context<T>;
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
@@ -4383,9 +4468,7 @@ function renderServerContextProvider(
 	if (children == null) return '';
 	// `.tsrx` children are render functions; `.tsx` children are descriptors,
 	// arrays, or primitives and must keep the ordinary server serializer.
-	return typeof children === 'function'
-		? (children(undefined, scope) ?? '')
-		: ssrChild(children, scope);
+	return ssrHtml(ssrChildrenHtml(children, scope));
 }
 
 function readContext<T>(ctx: Context<T>): T {
@@ -4672,6 +4755,11 @@ export function use<T>(
 	siteKey?: ServerHookSlot,
 	directSite?: string,
 ): T {
+	if (process.env.NODE_ENV !== 'production' && devMemoComputeDepth !== 0) {
+		console.error(
+			'Do not call use() inside a useMemo() factory. Cached factories can skip context or promise reads; call use() before useMemo() and memoize the returned value instead.',
+		);
+	}
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) {
 		recordSkippedHydrationSite(SERIAL, directSite);
 		return readContext(usable as Context<T>);
@@ -5309,14 +5397,6 @@ function resolveLazyModule(mod: any): ServerComponent {
 	return comp as ServerComponent;
 }
 
-function callLazyComponent(mod: any, props: any, scope: SSRScope, extra?: any): unknown {
-	// Resolve `.default` at render time. If an accessor throws, a later render
-	// reads it again without re-running the already-fulfilled loader, matching the
-	// client and React payload semantics.
-	const comp = resolveLazyModule(mod);
-	return comp(lazyResolvedProps(comp, props), scope, extra);
-}
-
 /**
  * React's `lazy(load)` — the server mirror of the client wrapper. Unresolved,
  * it records its promise for render()'s await loop and throws the suspense
@@ -5326,14 +5406,23 @@ function callLazyComponent(mod: any, props: any, scope: SSRScope, extra?: any): 
  * `use()` — a module namespace must never enter the client-seed stream
  * (`SERIAL`), which serializes resolved use() values in render order.
  */
-export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
+export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C & { displayName?: string } {
 	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
 	let result: any = null; // fulfilled → module value; rejected → the reason
 	let promise: PromiseLike<unknown> | null = null;
 	const key = '|lazy#' + LAZY_ID++;
+	let displayName: string | undefined;
+	let resolvedName = 'Lazy';
+	const callResolved = (props: any, scope: SSRScope, extra?: any): unknown => {
+		// Access `.default` only during rendering; introspection must not load the
+		// module or invoke a possibly throwing accessor.
+		const comp = resolveLazyModule(result);
+		resolvedName = (comp as any).displayName || comp.name || 'Lazy';
+		return comp(lazyResolvedProps(comp, props), scope, extra);
+	};
 	const lazyWrapper = (props: any, scope: SSRScope, extra?: any): unknown => {
 		if (status === 'fulfilled') {
-			return callLazyComponent(result as ServerComponent, props, scope, extra);
+			return callResolved(props, scope, extra);
 		}
 		if (status === 'rejected') throw result;
 		if (status === 'uninitialized') {
@@ -5363,7 +5452,7 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
 			if (status === 'uninitialized') status = 'pending';
 			const settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
 			if (settledStatus === 'fulfilled') {
-				return callLazyComponent(result as ServerComponent, props, scope, extra);
+				return callResolved(props, scope, extra);
 			}
 			if (settledStatus === 'rejected') throw result;
 		}
@@ -5381,8 +5470,19 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
 		}
 		throw SSR_SUSPENSE;
 	};
-	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, { value: true });
-	return lazyWrapper as unknown as C;
+	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, {
+		get() {
+			return this === lazyWrapper;
+		},
+	});
+	Object.defineProperty(lazyWrapper, 'displayName', {
+		configurable: true,
+		get: () => displayName ?? resolvedName,
+		set: (value: string | undefined) => {
+			displayName = value;
+		},
+	});
+	return lazyWrapper as unknown as C & { displayName?: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -5405,9 +5505,14 @@ export function useState<T>(
 	initial?: T | (() => T),
 	slot?: ServerHookSlot,
 ): [T, (next: T | ((value: T) => T)) => void, () => T] {
-	// A compiled zero-argument call is emitted as `useState(slot)`. Mirror the
-	// client trailing-slot ABI so the injected symbol is not mistaken for state.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Compiled calls pass a separate slot. Preserve legacy lone-slot calls outside
+	// a custom path while keeping aliases' authored Symbol initial values inside it.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		(HOOK_SLOT_PATH.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
+	) {
 		slot = initial;
 		initial = undefined as T;
 	}
@@ -5438,9 +5543,14 @@ export function __useStateWithGetter<T>(
 	initial: T | (() => T),
 	slot?: ServerHookSlot,
 ): [T, (next: any) => void, () => T] {
-	// A compiled zero-argument call is emitted as `__useStateWithGetter(slot)`.
-	// Mirror the public hook's trailing-slot ABI before creating the getter cell.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Mirror the public hook's legacy lone-slot compatibility before creating
+	// the getter cell, preserving authored alias arguments inside a custom path.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		(HOOK_SLOT_PATH.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
+	) {
 		slot = initial;
 		initial = undefined as T;
 	}
@@ -5611,6 +5721,8 @@ export const useLayoutEffect = useEffect;
 export const useInsertionEffect = useEffect;
 export function useImperativeHandle(): void {}
 
+let devMemoComputeDepth = 0;
+
 function memoHookValue<T>(
 	input: T | (() => T),
 	compute: boolean,
@@ -5624,13 +5736,17 @@ function memoHookValue<T>(
 	// runtime as compiler-inferred arrays, preserving Octane's documented API.
 	if (deps === null) return compute ? (input as () => T)() : (input as T);
 	const position = hookPosition(slot);
-	if (position === null) return compute ? (input as () => T)() : (input as T);
+	if (position === null)
+		return compute ? (input as (...deps: readonly unknown[]) => T)(...deps) : (input as T);
 	let rec = position.list[position.index] as MemoHookRec | undefined;
 	if (rec === undefined) {
-		rec = { value: compute ? (input as () => T)() : input, deps: deps.slice() };
+		rec = {
+			value: compute ? (input as (...deps: readonly unknown[]) => T)(...deps) : input,
+			deps: deps.slice(),
+		};
 		position.list[position.index] = rec;
 	} else if (!serverDepsEqual(rec.deps, deps)) {
-		rec.value = compute ? (input as () => T)() : input;
+		rec.value = compute ? (input as (...deps: readonly unknown[]) => T)(...deps) : input;
 		rec.deps = deps.slice();
 	}
 	return rec.value as T;
@@ -5642,6 +5758,14 @@ export function useMemo<T>(
 	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
 	maybeSlot?: ServerHookSlot,
 ): T {
+	if (process.env.NODE_ENV !== 'production') {
+		devMemoComputeDepth++;
+		try {
+			return memoHookValue<T>(compute, true, depsOrSlot, maybeSlot);
+		} finally {
+			devMemoComputeDepth--;
+		}
+	}
 	return memoHookValue<T>(compute, true, depsOrSlot, maybeSlot);
 }
 
@@ -5657,9 +5781,14 @@ export function useCallback<F>(
 export function useRef<T = undefined>(): { current: T | undefined };
 export function useRef<T>(initial: T, slot?: symbol): { current: T };
 export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | undefined } {
-	// A spread-shaped zero-argument call cannot be padded positionally, so the
-	// compiler retains the self-identifying Symbol ABI: `useRef(slot)`.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Legacy lone-slot calls remain valid outside custom paths. Compiled spread
+	// calls use the path for identity and preserve the original argument count.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		(HOOK_SLOT_PATH.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
+	) {
 		slot = initial;
 		initial = undefined;
 	}
@@ -5729,18 +5858,51 @@ export function useActionState<S>(
 export interface FormStatus {
 	pending: boolean;
 	data: FormData | null;
-	method: string;
+	method: string | null;
 	action: ((formData: FormData) => unknown) | string | null;
 }
 export function useFormStatus(): FormStatus {
-	return { pending: false, data: null, method: 'get', action: null };
+	return { pending: false, data: null, method: null, action: null };
 }
 
 export function useOptimistic<S, V = S>(state: S): [S, (value: V) => void] {
 	return [state, NOOP];
 }
 
-export function memo<P>(component: P): P {
+export function memo<C extends (...args: any[]) => any>(
+	component: C,
+): C & { readonly type: C; displayName?: string } {
+	const memoWrapper = (props: any, scope: SSRScope, extra?: any): unknown =>
+		component(props, scope, extra);
+	Object.defineProperty(memoWrapper, 'type', { value: component });
+	Object.defineProperty(memoWrapper, 'displayName', {
+		configurable: true,
+		writable: true,
+		value: (component as any).displayName || component.name || 'Memo',
+	});
+	Object.defineProperty(memoWrapper, '__memo', {
+		get() {
+			return this === memoWrapper;
+		},
+	});
+	Object.defineProperty(memoWrapper, 'defaultProps', {
+		configurable: true,
+		get: () => (component as any).defaultProps,
+		set: (value) => {
+			(component as any).defaultProps = value;
+		},
+	});
+	return memoWrapper as unknown as C & { readonly type: C; displayName?: string };
+}
+
+/** @internal Keep a copied static descriptor from warming an unrelated wrapper. */
+export function markWarm<T extends Function>(component: T, plan: unknown): T {
+	Object.defineProperty(component, '__warm', {
+		configurable: true,
+		get() {
+			return this === component ? plan : undefined;
+		},
+	});
 	return component;
 }
 
@@ -5749,13 +5911,81 @@ export function memo<P>(component: P): P {
 // whole nested call-site path ambient while the wrapped hook runs so its base
 // hooks resolve by definition site + every call boundary, rather than by a
 // render-pass occurrence that can shift when a conditional call disappears.
+let MANUAL_HOOK_DRIVER: { pending: ServerHookSlot | undefined; active: boolean } | null = null;
+
+/** @internal Invoke a provider that owns the trailing hook-slot ABI. */
+export function invokeManualHook<T>(
+	fn: (...args: any[]) => T,
+	receiver: unknown,
+	args: IArguments,
+): T {
+	// Hoisted provider declarations need no module initialization. Establish
+	// their capability on first invocation, including inside an existing call.
+	const driver = (MANUAL_HOOK_DRIVER ??= {
+		pending: HOOK_SLOT_PATH[HOOK_SLOT_PATH.length - 1],
+		active: false,
+	});
+	const pending = driver.pending;
+	const active = driver.active;
+	driver.pending = undefined;
+	driver.active = true;
+	try {
+		if (pending === undefined) return Reflect.apply(fn, receiver, args);
+		// Forward the wrapper's arguments object directly for common arities.
+		// Only larger calls need an array to append the compiler's slot.
+		switch (args.length) {
+			case 0:
+				return fn.call(receiver, pending);
+			case 1:
+				return fn.call(receiver, args[0], pending);
+			case 2:
+				return fn.call(receiver, args[0], args[1], pending);
+			case 3:
+				return fn.call(receiver, args[0], args[1], args[2], pending);
+			case 4:
+				return fn.call(receiver, args[0], args[1], args[2], args[3], pending);
+			default: {
+				const forwarded = new Array(args.length + 1);
+				for (let index = 0; index < args.length; index++) forwarded[index] = args[index];
+				forwarded[args.length] = pending;
+				return fn.apply(receiver, forwarded);
+			}
+		}
+	} finally {
+		driver.pending = pending;
+		driver.active = active;
+	}
+}
+
+/** @internal Adapt an expression provider that owns the trailing hook-slot ABI. */
+export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+	function provider(this: unknown) {
+		return invokeManualHook(fn, this, arguments);
+	}
+	Object.defineProperty(provider, 'name', { value: name ?? fn.name, configurable: true });
+	Object.defineProperty(provider, 'length', { value: fn.length, configurable: true });
+	return provider as F;
+}
+
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: ServerHookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
+	const driver = MANUAL_HOOK_DRIVER;
+	const pending = driver?.pending;
+	const active = driver?.active ?? false;
+	if (driver !== null) {
+		driver.pending = sym;
+		driver.active = false;
+	}
 	HOOK_SLOT_PATH.push(sym);
 	try {
 		return fn(...args);
 	} finally {
 		HOOK_SLOT_PATH.pop();
+		if (MANUAL_HOOK_DRIVER !== null) {
+			MANUAL_HOOK_DRIVER.pending =
+				driver === null ? HOOK_SLOT_PATH[HOOK_SLOT_PATH.length - 1] : pending;
+			MANUAL_HOOK_DRIVER.active = active;
+		}
 	}
 }
 
@@ -5993,10 +6223,19 @@ export interface RenderOptions {
 // the caller/metaframework can place `html` in a document whose `<head>` then
 // contains the metadata. Empty head → body unchanged.
 function spliceHead(body: string, head: string): string {
-	if (head === '') return body;
 	const headClose = body.indexOf('</head>');
 	if (headClose !== -1) return body.slice(0, headClose) + head + body.slice(headClose);
+	if (isDocumentRoot(body)) {
+		const openingEnd = documentTagEnd(body, body.indexOf('<html') + 5);
+		if (openingEnd !== -1)
+			return body.slice(0, openingEnd) + '<head>' + head + '</head>' + body.slice(openingEnd);
+	}
+	if (head === '') return body;
 	return head + body;
+}
+
+function renderEntryValue(props: { value: ServerRenderNode }, scope: SSRScope): string {
+	return ssrHtml(ssrChild(props.value, scope));
 }
 
 /** Guard against a `use(thenable)` that never resolves wedging the render loop. */
@@ -6142,6 +6381,8 @@ type SuspenseOutcome = SuspenseResult & {
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
+	/** Recoverable buffered-boundary errors are reported once across async retries. */
+	bufferedErrors?: Map<string, { error: unknown; reported: boolean }>;
 	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
 	resourceOptions?: RenderOptions | null;
 	/** Optional renderer resources; allocated only by a participating adapter. */
@@ -6480,7 +6721,7 @@ function runFullFramedPass(
 		// `.ts` root (the shape every @octanejs binding produces) returns a
 		// createElement descriptor that must render through ssrChild.
 		const out = invokeComponentBody(component, props, root, FRAME);
-		body = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, root);
+		body = serverComponentOutput(out, root);
 		nativePassCompleted = true;
 	} catch (err) {
 		err = normalizeThrownServerThenable(err);
@@ -6497,6 +6738,14 @@ function runFullFramedPass(
 				signals = NATIVE_READ_COLLECTOR?.serialize(NATIVE_SERVER_READS);
 		} finally {
 			restoreAmbient(saved);
+		}
+	}
+	if (resolved.bufferedErrors !== undefined) {
+		for (const report of resolved.bufferedErrors.values()) {
+			if (!report.reported) {
+				report.reported = true;
+				resolved.resourceOptions?.onError?.(report.error);
+			}
 		}
 	}
 	let css = '';
@@ -6972,11 +7221,16 @@ function passToResult(
  * This is the buffered, await-everything behaviour of the old `render()`.
  */
 export async function prerender(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: RenderOptions,
 ): Promise<RenderResult> {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	const nonceAttr = nonceAttrOf(options);
 	const resolved = newResolvedMap(options ?? null);
 	try {
@@ -7002,10 +7256,14 @@ export async function prerender(
  * (the head folds), with a development diagnostic.
  */
 export async function prerenderToNodeStream(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: RenderOptions,
 ): Promise<{ prelude: import('node:stream').Readable }> {
+	if (typeof entryComponent !== 'function' && options === undefined) {
+		options = props;
+		props = undefined;
+	}
 	let resolved = options;
 	if (options?.headChannel === 'separate') {
 		if (process.env.NODE_ENV !== 'production') {
@@ -7044,7 +7302,7 @@ export async function prerenderToNodeStream(
 // outcomes into the session as they settle; the host delegates the wait to
 // `React.use(stratum)` (Fizz's positional replay state — Phase 0 evidence).
 // Do NOT call public renderToString for this: its bare-root suspension
-// contract returns partial output and a fresh resolved map per call.
+// contract throws and each call owns a fresh resolved map.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Read hook for FOREIGN host contexts during a hosted pass (§6.4): the server
@@ -7173,16 +7431,21 @@ export function renderHostedAttempt(
 /**
  * React `react-dom/server` `renderToString` — a SINGLE synchronous pass, no
  * awaiting. A Suspense boundary that suspends renders its fallback (the inline
- * `@try`/`@pending` arm); a bare `use(thenable)` with no enclosing boundary ends
- * the render early (its partial output is returned). Synchronously-resolved
+ * `@try`/`@pending` arm); a bare `use(thenable)` with no enclosing boundary throws
+ * instead of returning an incomplete document. Synchronously-resolved
  * `use()` in the shell still seeds. Use `prerender` when you need the data awaited.
  */
 export function renderToString(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = newResolvedMap(options ?? null);
@@ -7191,6 +7454,7 @@ export function renderToString(
 		pass = withStream(null, () =>
 			runFullFramedPass(component, props, resolved, nonceAttr, options?.identifierPrefix ?? ''),
 		);
+		if (pass.rootSuspended) throw new Error(formatServerError(60));
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
@@ -7206,11 +7470,16 @@ export function renderToString(
  * no head-adoption markers, no suspense seed script. For static pages / email.
  */
 export function renderToStaticMarkup(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = newResolvedMap(options ?? null);
@@ -7226,6 +7495,7 @@ export function renderToStaticMarkup(
 				false,
 			),
 		);
+		if (pass.rootSuspended) throw new Error(formatServerError(60));
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
@@ -7485,7 +7755,8 @@ function pruneStreamBoundariesAbsentFromShell(
  *   suspend, @pending  → ssrBlock(ssrBlock(pendingHtml))
  *   suspend, no arm    → ssrBlock('')
  *   error, @catch      → ssrBlock(ssrBlock(catchHtml))
- *   error, no @catch   → rethrow (buffered) / stream fallback for client recovery
+ *   error, no @catch   → rethrow for authored buffered @try; JSX Suspense and
+ *                       streamed boundaries publish fallback for client recovery
  * In streaming mode a suspended boundary additionally carries the
  * `<template data-oct-b>` sentinel, and a REGISTERED boundary keeps returning
  * its pending form (content ships via its segment).
@@ -7498,6 +7769,7 @@ export function ssrTry(
 	catchFn: ((err: unknown, scope: SSRScope, reset: () => void) => string) | null,
 	namespace: 'html' | 'svg' | 'mathml' = FRAME?.namespace ?? 'html',
 	propagateSuspense = false,
+	recoverErrors = false,
 ): string {
 	VT_SSR_TRY_SEQ++;
 	// Consume the nearest un-consumed outer ViewTransition candidate: its
@@ -7866,8 +8138,7 @@ export function ssrTry(
 			if (stream !== null) {
 				// Fizz keeps a Suspense shell valid when its primary content throws:
 				// publish the fallback, report the error, and mark this boundary for a
-				// client render. Buffered renderers still rethrow below because they have
-				// no progressive recovery channel.
+				// client render. Buffered JSX Suspense uses a fresh-arm marker below.
 				if (SERIAL !== null) SERIAL.length = serialStart;
 				if (entry === undefined && PERMANENT_STATIC_HYDRATE_DEPTH !== 0) throw e;
 				if (entry === undefined) {
@@ -7903,6 +8174,16 @@ export function ssrTry(
 				const fallback = pendingForm();
 				pruneUnrepresentedStreamDescendants(stream, key, fallback);
 				return fallback;
+			}
+			if (recoverErrors && pendFn !== null && PERMANENT_STATIC_HYDRATE_DEPTH === 0) {
+				// A buffered Suspense boundary can retry on hydration just like a
+				// streamed boundary. Discard failed-content seeds and mark only this
+				// arm for a fresh client render; surrounding server hosts still adopt.
+				if (SERIAL !== null) SERIAL.length = serialStart;
+				const reports = RESOLVED?.bufferedErrors ?? (RESOLVED!.bufferedErrors = new Map());
+				if (!reports.has(key)) reports.set(key, { error: e, reported: false });
+				nativeFresh = true;
+				return pendingForm();
 			}
 			throw e;
 		}
@@ -8114,18 +8395,22 @@ function documentHeadInsertionPoint(body: string): number {
 		const next = body.charCodeAt(start + 5);
 		if (next === 62 /* > */) return start + 6;
 		if (next === 32 || next === 9 || next === 10 || next === 13) {
-			let quote = 0;
-			for (let i = start + 6; i < body.length; i++) {
-				const code = body.charCodeAt(i);
-				if (quote !== 0) {
-					if (code === quote) quote = 0;
-				} else if (code === 34 /* " */ || code === 39 /* ' */) quote = code;
-				else if (code === 62 /* > */) return i + 1;
-			}
-			return -1;
+			return documentTagEnd(body, start + 6);
 		}
 		searchFrom = start + 5;
 	}
+}
+
+function documentTagEnd(body: string, from: number): number {
+	let quote = 0;
+	for (let i = from; i < body.length; i++) {
+		const code = body.charCodeAt(i);
+		if (quote !== 0) {
+			if (code === quote) quote = 0;
+		} else if (code === 34 /* " */ || code === 39 /* ' */) quote = code;
+		else if (code === 62 /* > */) return i + 1;
+	}
+	return -1;
 }
 
 function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
@@ -8488,17 +8773,19 @@ async function runStream(
 		const tailStart = documentTailStart(pass.body);
 		if (tailStart !== -1) {
 			heldDocumentTail = pass.body.slice(tailStart);
-			const bodyHtml = pass.body.slice(0, tailStart);
+			const bodyHtml = spliceHead(pass.body.slice(0, tailStart), '');
 			const headInsert = documentHeadInsertionPoint(bodyHtml);
 			shell +=
 				headInsert !== -1
 					? bodyHtml.slice(0, headInsert) + leadingStyles + shellHead + bodyHtml.slice(headInsert)
 					: leadingStyles + shellHead + bodyHtml;
 		} else {
-			shell += leadingStyles + shellHead + pass.body;
+			shell += spliceHead(pass.body, leadingStyles + shellHead);
 		}
 	} else {
-		shell += leadingStyles + shellHead + pass.body;
+		shell += documentRoot
+			? spliceHead(pass.body, leadingStyles + shellHead)
+			: leadingStyles + shellHead + pass.body;
 	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) shell += serializeNativeSignalSeeds(pass.signals, nonceAttr);
@@ -8747,17 +9034,23 @@ async function runStream(
  * `(Component, props?, options?)`.
  */
 export function renderToPipeableStream(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: StreamOptions,
 ): {
 	pipe: <T extends { write(chunk: string): unknown; end(): unknown }>(destination: T) => T;
 	abort: (reason?: unknown) => void;
 } {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	interface Destination {
 		write(chunk: string): unknown;
 		end(): unknown;
+		destroy?: (error: unknown) => unknown;
 		once?: (event: string, listener: (...args: any[]) => void) => unknown;
 		off?: (event: string, listener: (...args: any[]) => void) => unknown;
 		removeListener?: (event: string, listener: (...args: any[]) => void) => unknown;
@@ -8781,6 +9074,7 @@ export function renderToPipeableStream(
 	let endCalled = false;
 	let pipeCalled = false;
 	let writeGate: Promise<void> | null = null;
+	let shellFailure: { error: unknown } | null = null;
 
 	const destinationFailure = (reason: unknown): void => {
 		if (closed) return;
@@ -8799,6 +9093,13 @@ export function renderToPipeableStream(
 		if (!ended || destination === null || writeGate !== null || endCalled || closed) return;
 		endCalled = true;
 		try {
+			if (shellFailure !== null && destination.destroy !== undefined) {
+				// No shell exists to hydrate. Fail the transport instead of reporting
+				// an empty response as successful; the render callbacks already ran.
+				closed = true;
+				destination.destroy(shellFailure.error);
+				return;
+			}
 			destination.end();
 		} catch (err) {
 			destinationFailure(err);
@@ -8927,6 +9228,7 @@ export function renderToPipeableStream(
 				},
 				shellError(err) {
 					releaseServerRenderResources(resolved);
+					shellFailure = { error: err };
 					options?.onShellError?.(err);
 					flushEnd();
 				},
@@ -8999,11 +9301,16 @@ export function renderToPipeableStream(
  * pauses `allReady`; read concurrently when waiting for it.
  */
 export function renderToReadableStream(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: StreamOptions,
 ): Promise<ReadableStream<Uint8Array> & { allReady: Promise<void> }> {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	return new Promise((resolveShell, rejectShell) => {
 		const encoder = new TextEncoder();
 		const renderController = new AbortController();

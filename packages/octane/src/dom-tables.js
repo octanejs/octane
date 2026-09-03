@@ -512,6 +512,7 @@ for (const base of [
 	'opacity',
 	'order',
 	'orphans',
+	'scale',
 	'tabSize',
 	'widows',
 	'zIndex',
@@ -575,6 +576,7 @@ export function cssStyleValue(name, value) {
  * css.ts; the compiler's static bake calls this directly (compile-time only).
  */
 export function hyphenateStyleName(name) {
+	if (name === 'cssFloat') return 'float';
 	// `--custom-prop` and pre-hyphenated `-webkit-…` keys: leave untouched.
 	if (name.charCodeAt(0) === 45 /* - */) return name;
 	// Fast path: no uppercase → already kebab (the common case), no allocation.

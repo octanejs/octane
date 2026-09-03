@@ -18,9 +18,12 @@
  * `postponed` field and the buffered `prerender` resolves `{ html, css }`
  * rather than React's `{ prelude: ReadableStream }`.
  */
+export { version } from '../version.js';
+
 export {
 	prerender,
 	prerenderToNodeStream,
 	type RenderResult,
 	type RenderOptions,
+	type ServerRenderNode,
 } from '../runtime.server.js';

@@ -43,6 +43,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile
 
+      - name: Test Lynx diagnostic fixture contracts
+        run: |
+          node --test benchmarks/lynx-table/stages/*.test.mjs
+          node --test benchmarks/lynx-list/*.test.mjs
+
       - name: Test UIbench measurement failures
         run: node --test benchmarks/uibench/run.test.mjs
 

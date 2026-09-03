@@ -89,11 +89,7 @@ describe('hydrateRoot — router Match shape: @try > @if > component with a spre
 				value: 'a',
 				children: re.createElement(comps.RPLike, props),
 			});
-		const serverTree = (_p: any, scope: any) =>
-			(ServerRT as any).ssrChild(
-				tree(ServerRT, { Wrap: server.Wrap, RPLike: server.RPLike }),
-				scope,
-			);
+		const serverTree = () => tree(ServerRT, { Wrap: server.Wrap, RPLike: server.RPLike });
 		const clientTree = () => tree({ createElement }, { Wrap, RPLike });
 		const { html } = ServerRT.renderToString(serverTree, {});
 		assertCleanHydration(html, clientTree, {});

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "dc92ba914076fbfb811c4b5d1d895e07604281847b139d8e9975ea886a77bf4e"
+      "lockfileSha256": "62220f1edd218133ac3b3f09e3e6fa013088cd1f93f2cb5849d10bdd3deabf4c"
     }
   },
   "lanes": [
@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "c1f88b4b1f29ef55ad11e82275790074e94e4d97dd7331281a67eeb65f9e5a11"
+          "sha256": "5f9da371ba345e92bc84c150b554f2468744a64c726e8be66b34934906d0f22e"
         },
         {
           "path": "packages/solana-kit/tests/upstream-vitest.config.ts",

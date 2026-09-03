@@ -187,7 +187,8 @@ describe('native reads throughout component invocation', () => {
 		) {
 			const token = server.beginNativeReadScope(owner);
 			try {
-				return '<p>' + value + ':' + body$.get() + '</p>';
+				// This case drives the compiler ABI directly, including its HTML carrier.
+				return server.ssrHtml('<p>' + value + ':' + body$.get() + '</p>');
 			} finally {
 				server.endNativeReadScope(token, true);
 			}
@@ -200,7 +201,7 @@ describe('native reads throughout component invocation', () => {
 	it('collects server children while normalizing an ordinary root return', () => {
 		const model = state$('collection-abi-server-normalization');
 		function Child({ count$, value = count$.get() }: typeof model & { value?: number }) {
-			const output = '<p>' + value + '</p>';
+			const output = server.createElement('p', null, String(value));
 			return output;
 		}
 		function Parent(props: typeof model) {

@@ -1,0 +1,100 @@
+[
+  {
+    "id": "react-case-v1:52d4cbf6b3a2f62b6860",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:5e5e2d5a4bcbe16c19dc",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:9cd9c995d3483e0f23a6",
+    "classification": "conformance",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Octane lacks this renderer kind; the unchanged public predicate returns false. Stable upstream gates SuspenseList off, and the adaptation executes the explicit negative control.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:c23ff54b872dd3cf4939",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:83c8789f5f13605cdd23",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:8798b8bf558c3338b12f",
+    "classification": "conformance",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Octane lacks this renderer kind; the unchanged public predicate returns false. Stable upstream gates SuspenseList off, and the adaptation executes the explicit negative control.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:f2e30e28e0c823fc5818",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:8d7b8c0b83dcedb44082",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:7c030b5f92140fc65f8f",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:53d311b5ce2e7c2f7e4c",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:64ced70773cea3bc19a8",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:b8ab65015bde9c21900a",
+    "classification": "implemented",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Runs the pinned upstream scenario against the Octane kind model.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:9dd4445cc1f1215f7a15",
+    "classification": "conformance",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Octane lacks this renderer kind; the unchanged public predicate returns false. Stable upstream gates SuspenseList off, and the adaptation executes the explicit negative control.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  },
+  {
+    "id": "react-case-v1:e560cc1bb82c1bc59aa8",
+    "classification": "conformance",
+    "localEvidence": ["tests/adapted.test.ts", "tests/upstream/ReactIs-test.js"],
+    "rationale": "Octane lacks this renderer kind; the unchanged public predicate returns false. Stable upstream gates SuspenseList off, and the adaptation executes the explicit negative control.",
+    "upstreamCommit": "6117d7cca4906492c51fe6a03381e35adfd86e7d"
+  }
+]

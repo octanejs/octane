@@ -571,6 +571,7 @@ describe('union prerequisite graph', () => {
 				licensedTarget('react-widget', '1.0.0'),
 				licensedTarget('@acme/react-tools', '1.0.0'),
 				licensedTarget('preact-widget', '1.0.0'),
+				licensedTarget('react-is', '19.2.7'),
 			],
 			inventory: fixtureInventory(),
 		});
@@ -580,6 +581,8 @@ describe('union prerequisite graph', () => {
 		assert.equal(graph.nodes['pkg:@acme/react-tools'].binding, '@octanejs/acme-tools');
 		assert.equal(graph.nodes['pkg:@acme/react-tools'].bindingDirectory, 'packages/acme-tools');
 		assert.equal(graph.nodes['pkg:preact-widget'].binding, '@octanejs/preact-widget');
+		assert.equal(graph.nodes['pkg:react-is'].binding, '@octanejs/react-is');
+		assert.equal(graph.nodes['pkg:react-is'].bindingDirectory, 'packages/react-is');
 	});
 
 	test('blocks derived binding names that collide with another target or workspace package', () => {

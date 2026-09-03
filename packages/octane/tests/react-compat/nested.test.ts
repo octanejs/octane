@@ -2,7 +2,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
-import { drainPassiveEffects, flushSync } from 'octane';
+import { act as octaneAct, drainPassiveEffects, flushSync } from 'octane';
 import { mount } from '../_helpers.js';
 import { OctaneMiddle, OctaneOuter } from './nested.tsrx';
 import { ReactOuter } from './nested.react.js';
@@ -38,13 +38,15 @@ afterEach(async () => {
 });
 
 async function run(action: () => void) {
-	await React.act(async () => {
-		action();
+	await octaneAct(async () => {
+		await React.act(async () => {
+			action();
+			flushSync(() => {});
+			drainPassiveEffects();
+		});
 		flushSync(() => {});
 		drainPassiveEffects();
 	});
-	flushSync(() => {});
-	drainPassiveEffects();
 }
 
 function fixture(strict: boolean) {

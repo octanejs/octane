@@ -351,16 +351,26 @@ describe('ReactUpdates update reconciliation', () => {
 		removeRoot(root, container);
 	});
 
-	// Per ReactUpdates-test.js:1638. Dependency-change cleanups are commit
-	// callbacks too; both layout and passive cleanup-driven loops are bounded.
-	it('prevents infinite update loops triggered by effect cleanup callbacks', async () => {
-		for (const Body of [Fixture.LayoutCleanupLoop, Fixture.PassiveCleanupLoop]) {
-			const container = ownedContainer();
-			const root = createRoot(container);
-			await expect(async () => {
-				await act(() => root.render(Body));
-			}).rejects.toThrow(/Maximum update depth exceeded/);
-			removeRoot(root, container);
+	// Synchronous layout cascades throw; asynchronous passive cascades warn and
+	// remain subject to act's test-only quiescence guard.
+	it('bounds infinite cleanup loops at the appropriate observation boundary', async () => {
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			for (const Body of [Fixture.LayoutCleanupLoop, Fixture.PassiveCleanupLoop]) {
+				const container = ownedContainer();
+				const root = createRoot(container);
+				try {
+					await expect(act(() => root.render(Body))).rejects.toThrow(
+						Body === Fixture.PassiveCleanupLoop
+							? /act\(\): scheduler did not stabilize/
+							: /Maximum update depth exceeded/,
+					);
+				} finally {
+					removeRoot(root, container);
+				}
+			}
+		} finally {
+			warning.mockRestore();
 		}
 	});
 

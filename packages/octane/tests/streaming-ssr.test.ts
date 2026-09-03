@@ -1018,7 +1018,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			if (prerenders.length === 0) {
 				prerenders.push(prerender(server.Boundary, { promise: data.promise }));
 			}
-			return '<main>outer-only</main>';
+			return ServerRT.createElement('main', null, 'outer-only');
 		};
 		const c = collector();
 		const onError = vi.fn();
@@ -1033,7 +1033,10 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			expect(html).not.toContain('data-oct-b');
 		}
 		expect(nestedResult.html).toContain('nested-ready');
-		expect(c.chunks.join('')).toBe('<main>outer-only</main>');
+		const container = document.createElement('div');
+		container.innerHTML = c.chunks.join('');
+		expect(container.querySelector('main')?.textContent).toBe('outer-only');
+		expect(container.textContent).toBe('outer-only');
 		expect(onError).not.toHaveBeenCalled();
 	});
 
@@ -1123,25 +1126,29 @@ describe('renderToPipeableStream — chunk protocol', () => {
 
 	it('defers an inner segment until its outer segment introduces the template', async () => {
 		const NestedInnerFirst = (props: any, scope: any) =>
-			ServerRT.ssrTry(
-				scope,
-				'outer-inner-first',
-				() => {
-					const inner = ServerRT.ssrTry(
-						scope,
-						'inner-first',
-						() =>
-							ServerRT.ssrBlock(
-								'<span class="inner-value">' + ServerRT.use(props.inner, 'inner-value') + '</span>',
-							),
-						() => ServerRT.ssrBlock('<span class="inner-pending">inner…</span>'),
-						null,
-					);
-					const outer = ServerRT.use(props.outer, 'outer-value');
-					return inner + ServerRT.ssrBlock('<span class="outer-value">' + outer + '</span>');
-				},
-				() => ServerRT.ssrBlock('<span class="outer-pending">outer…</span>'),
-				null,
+			ServerRT.ssrHtml(
+				ServerRT.ssrTry(
+					scope,
+					'outer-inner-first',
+					() => {
+						const inner = ServerRT.ssrTry(
+							scope,
+							'inner-first',
+							() =>
+								ServerRT.ssrBlock(
+									'<span class="inner-value">' +
+										ServerRT.use(props.inner, 'inner-value') +
+										'</span>',
+								),
+							() => ServerRT.ssrBlock('<span class="inner-pending">inner…</span>'),
+							null,
+						);
+						const outer = ServerRT.use(props.outer, 'outer-value');
+						return inner + ServerRT.ssrBlock('<span class="outer-value">' + outer + '</span>');
+					},
+					() => ServerRT.ssrBlock('<span class="outer-pending">outer…</span>'),
+					null,
+				),
 			);
 		const outer = deferred<string>();
 		const inner = deferred<string>();

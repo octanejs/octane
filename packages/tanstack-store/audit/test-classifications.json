@@ -13,6 +13,11 @@
       "reason": "Authenticates the documented omission of the upstream experimental _useStore export."
     },
     {
+      "path": "packages/tanstack-store/tests/conformance/explicit-slot.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks that authored explicit slots keep independent useSelector and useStore subscriptions reactive through Octane hook adapters; it is not same-scenario React execution."
+    },
+    {
       "path": "packages/tanstack-store/tests/conformance/parity.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks that store-core re-exports are the same module instance used by the differential oracle."

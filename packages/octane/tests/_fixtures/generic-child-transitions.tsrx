@@ -1,4 +1,11 @@
-import { createElement, use, useSyncExternalStore, useTransition, type OctaneNode } from 'octane';
+import {
+	createElement,
+	use,
+	useState,
+	useSyncExternalStore,
+	useTransition,
+	type OctaneNode,
+} from 'octane';
 
 export interface GenericChildSnapshot {
 	value: OctaneNode;
@@ -56,6 +63,25 @@ export function GenericChildTransition(props: { store: GenericChildStore }) @{
 			<Contents snapshot={snapshot} />
 		} @pending {
 			<output id="fallback">{'loading'}</output>
+		}
+	</div>
+}
+
+export function GenericChildStateTransition(props: {
+	initial: GenericChildSnapshot;
+	bind: (set: (snapshot: GenericChildSnapshot) => void) => void;
+}) @{
+	const [snapshot, setSnapshot] = useState(props.initial);
+	const [pending, start] = useTransition();
+	props.bind((next) => start(() => setSnapshot(next)));
+	<div>
+		<output id="pending">
+			{pending ? 'pending' : 'idle'}
+		</output>
+		@try {
+			<Contents snapshot={snapshot} />
+		} @pending {
+			<output id="fallback">loading</output>
 		}
 	</div>
 }

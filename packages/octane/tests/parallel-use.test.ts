@@ -422,7 +422,17 @@ describe('parallel use() — independent asynchronous keyed-list children', () =
 				'activity-v0',
 				'insights-v0',
 			]);
-			expect(root.find('.transition-dashboard').getAttribute('data-version')).toBe('0');
+			expect((root.find('.transition-dashboard') as HTMLElement).style.display).toBe('none');
+			expect(root.find('.transition-pending').textContent).toBe('loading');
+			await act(() => {
+				for (const resource of ['badge', 'activity', 'insights', 'project'])
+					resources.settle(resource, 2);
+			});
+			await act(() => resources.settle('owner', 2));
+			expect(root.findAll('.transition-pending')).toHaveLength(0);
+			expect(root.find('.transition-dashboard').getAttribute('data-version')).toBe('2');
+			expect(root.find('.transition-owner').textContent).toBe('owner-v2');
+			expect(resources.calls).not.toContain('owner:1');
 		} finally {
 			root.unmount();
 		}

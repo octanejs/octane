@@ -129,7 +129,7 @@ describe('useSyncExternalStore — live selectors and commit updates', () => {
 		r.unmount();
 	});
 
-	it('an urgent store change upgrades a queued transition without changing held-transition behavior', async () => {
+	it('external-store changes remain urgent inside transitions', async () => {
 		const store = makeStore(0);
 		const first = deferred();
 		const next = deferred();
@@ -142,7 +142,7 @@ describe('useSyncExternalStore — live selectors and commit updates', () => {
 		try {
 			flushSync(() => startTransition(() => store.setState(1)));
 			expect(r.find('#store-priority-value').textContent).toBe('value:0');
-			expect(r.container.querySelector('#store-priority-fallback')).toBeNull();
+			expect(r.find('#store-priority-fallback').textContent).toBe('loading');
 
 			await act(() => first.resolve());
 			expect(r.find('#store-priority-value').textContent).toBe('value:1');

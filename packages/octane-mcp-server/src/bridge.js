@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 // expected union from the workspace manifests, so publishing a new binding
 // without registering it in either catalog fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
+	'react-is': '@octanejs/react-is',
 	'@gsap/react': '@octanejs/gsap',
 	animejs: '@octanejs/animejs',
 	'usehooks-ts': '@octanejs/usehooks-ts',
@@ -474,6 +475,20 @@ export async function collectSourceFiles(root, out = [], depth = 0) {
 
 export function scanSource(source) {
 	const apis = new Map();
+	const symbolExports = new Map();
+	// Introspection libraries export element-kind symbols, not components.
+	// Require the right-hand identifier to resolve to an actual Symbol.for
+	// declaration; ordinary component exports/render calls remain API uses.
+	const symbols = new Set(
+		[...source.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*Symbol\.for\(\s*['"][^'"]+['"]\s*\)/g)].map(
+			(match) => match[1],
+		),
+	);
+	for (const match of source.matchAll(
+		/\bexports\.([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*;/g,
+	)) {
+		if (symbols.has(match[2])) symbolExports.set(match[1], (symbolExports.get(match[1]) ?? 0) + 1);
+	}
 	for (const name of Object.keys(REACT_API_MAP)) {
 		if (name === 'onChange') continue;
 		const matches = source.match(new RegExp(`\\b${name}\\b`, 'g'));
@@ -493,13 +508,14 @@ export function scanSource(source) {
 		}
 	}
 	const classComponent = /\bextends\s+(React\.)?(Pure)?Component\b/.test(source);
-	return { apis, imports, classComponent };
+	return { apis, imports, classComponent, symbolExports };
 }
 
 export async function scanPath(root) {
 	const files = await collectSourceFiles(resolve(root));
 	const totals = new Map();
 	const imports = new Set();
+	const symbolExports = new Map();
 	let classComponents = false;
 	for (const file of files) {
 		let source;
@@ -513,14 +529,26 @@ export async function scanPath(root) {
 			totals.set(name, (totals.get(name) ?? 0) + count);
 		}
 		for (const spec of result.imports) imports.add(spec);
+		for (const [name, count] of result.symbolExports) {
+			symbolExports.set(name, (symbolExports.get(name) ?? 0) + count);
+		}
 		classComponents ||= result.classComponent;
 	}
-	return { filesScanned: files.length, totals, imports, classComponents };
+	return { filesScanned: files.length, totals, imports, classComponents, symbolExports };
 }
 
-function apiRows(totals) {
+function apiRows(totals, symbolExports) {
 	return [...totals.entries()]
-		.map(([name, count]) => ({ name, count, ...REACT_API_MAP[name] }))
+		.map(([name, count]) =>
+			symbolExports.get(name) === count
+				? {
+						name,
+						count,
+						status: 'rewrite',
+						note: 'Exported element-kind marker: map to the Octane kind; predicates for unsupported kinds remain false. This does not require rendering that component.',
+					}
+				: { name, count, ...REACT_API_MAP[name] },
+		)
 		.sort((a, b) => b.count - a.count);
 }
 
@@ -581,7 +609,7 @@ export async function bridgeReport({ packageName, path, projectRoot }) {
 	}
 
 	const scan = await scanPath(scanRoot);
-	const rows = apiRows(scan.totals);
+	const rows = apiRows(scan.totals, scan.symbolExports);
 	report.filesScanned = scan.filesScanned;
 	report.reactImports = [...scan.imports];
 	report.classComponents = scan.classComponents;
@@ -604,7 +632,7 @@ export function bridgeReportFromSource(source, { packageName } = {}) {
 		report.vanillaCore = detectVanillaCore(packageName, null);
 	}
 	const scan = scanSource(source);
-	const rows = apiRows(scan.apis);
+	const rows = apiRows(scan.apis, scan.symbolExports);
 	report.reactImports = [...scan.imports];
 	report.classComponents = scan.classComponent;
 	report.apis = rows;

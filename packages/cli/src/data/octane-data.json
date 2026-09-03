@@ -803,6 +803,21 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/react-is",
+      "version": "0.1.0",
+      "category": "Developer Tools",
+      "upstream": { "package": "react-is", "version": "19.2.7" },
+      "surface": "All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata.",
+      "divergences": [
+        "Kind labels use Octane symbols and reject React elements.",
+        "Context.Consumer, forwardRef, Profiler and SuspenseList have no Octane kind; their predicates return false.",
+        "StrictMode identifies Octane's pass-through wrapper without double invocation.",
+        "React Server Component references are not valid Octane types."
+      ],
+      "ssr": "Predicates are pure; they never render a component or start a lazy loader.",
+      "verified": "2026-09-03"
+    },
+    {
       "name": "@octanejs/react-map-gl",
       "version": "0.0.24",
       "category": "Visualization",
@@ -811,7 +826,6 @@
       "divergences": [
         "<Source> delivers its generated id to child layers through context rather than cloneElement, so the id reaches any descendant <Layer> rather than only direct children. It still overrides an explicitly set source, as cloneElement did.",
         "Map, Marker, Popup and GeolocateControl take their ref as an ordinary prop; Octane has no forwardRef. `<Map ref={mapRef} />` is unchanged.",
-        "Effect cleanups run on the passive drain after root.unmount() rather than inside it, so the map's WebGL context and worker pool are released one drain later.",
         "Marker picks between its own element and Mapbox's default pin from what its children actually rendered, because a compiled children block cannot be inspected the way React.Children.forEach inspects descriptors. Children that render something, render nothing, or first render after mount all match upstream; a child that stays truthy while rendering nothing forever gets the default pin here and an empty, invisible element upstream.",
         "react-map-gl/mapbox-legacy (mapbox-gl v1) and @vis.gl/react-maplibre are out of scope."
       ],
@@ -1322,9 +1336,9 @@
       "version": "0.1.49",
       "category": "Testing",
       "upstream": { "package": "@testing-library/react", "version": "16.3.2" },
-      "surface": "`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config.",
+      "surface": "`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. Focus and blur helpers additionally emit their bubbling native counterparts.",
       "divergences": [
-        "`fireEvent` dispatches real native events — no React remappings (`fireEvent.change` fires an explicit native `change`, not text typing or checkbox click activation) and no enter/leave/focus double-dispatch.",
+        "`fireEvent` dispatches native events: change remains an explicit native change and mouseEnter does not also dispatch mouseover. Focus/blur helpers emit focusin/focusout as well, for Octane delegated focus handlers.",
         "Not ported: the `ReactStrictMode` wrapper, `legacyRoot`, and the `onCaughtError`/`onRecoverableError` options."
       ],
       "ssr": "`hydrate: true` adopts octane SSR output via `hydrateRoot`.",
@@ -1762,6 +1776,7 @@
     "react-i18next": "@octanejs/i18next",
     "react-image-crop": "@octanejs/image-crop",
     "react-intersection-observer": "@octanejs/intersection-observer",
+    "react-is": "@octanejs/react-is",
     "react-map-gl": "@octanejs/react-map-gl",
     "react-map-gl/mapbox": "@octanejs/react-map-gl",
     "react-markdown": "@octanejs/markdown",
@@ -1933,7 +1948,7 @@
     "28": {
       "message": "Target container is not a DOM element.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "29": {
       "message": "Cannot update an unmounted root.",
@@ -2080,6 +2095,26 @@
     "59": {
       "message": "%s requires an active server component.",
       "runtime": ["server"],
+      "status": "active"
+    },
+    "60": {
+      "message": "A component suspended without a Suspense boundary during synchronous server rendering. Use prerender() or a streaming renderer to await it.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "61": {
+      "message": "Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "62": {
+      "message": "Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "63": {
+      "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
+      "runtime": ["client"],
       "status": "active"
     }
   }

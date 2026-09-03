@@ -45,26 +45,20 @@ describe('conformance: useInsertionEffect ordering (ReactHooksWithNoopRenderer-t
 		r.unmount();
 	});
 
-	it('on unmount, destroys insertion effects before layout effects, and passive effects after the sync phase', () => {
-		// Per ReactHooksWithNoopRenderer-test.js:2626 (unmount section) — React
-		// destroys the deleted component's effects phase-ordered: insertion
-		// cleanup, then layout cleanup (both in the mutation phase), and the
-		// passive cleanup later, in the deferred passive flush. octane matches:
-		// unmountScope walks the scope's effect slots in hook declaration order
-		// (React's forward effect-list walk in commitDeletionEffectsOnFiber),
-		// firing insertion+layout destroys synchronously and deferring passive
-		// destroys to the passive flush.
+	it('root unmount finishes mutation destroys before passive destroys', () => {
 		const log = createLog();
 		const shared = { text: '(empty)' };
 		const r = mount(InsertionValueThreading, { count: 0, shared, log: log.push });
 		flushEffects();
 		log.clear();
 		r.unmount();
-		const syncEntries = log.drain();
+		expect(log.drain()).toEqual([
+			'Destroy insertion [current: 0]',
+			'Destroy layout [current: 0]',
+			'Destroy passive [current: 0]',
+		]);
 		flushEffects();
-		const deferredEntries = log.drain();
-		expect(syncEntries).toEqual(['Destroy insertion [current: 0]', 'Destroy layout [current: 0]']);
-		expect(deferredEntries).toEqual(['Destroy passive [current: 0]']);
+		expect(log.drain()).toEqual([]);
 	});
 
 	it('force flushes passive effects before firing new insertion effects', () => {

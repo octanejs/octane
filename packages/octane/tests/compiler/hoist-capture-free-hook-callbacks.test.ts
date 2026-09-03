@@ -17,7 +17,7 @@ const DEV = { hmr: 'vite' as const, dev: true };
 
 /** The argument text still sitting inline at the `useSelector` call site. */
 function selectorArgs(code: string): string[] {
-	return [...code.matchAll(/useSelector,[^\n]*?,\s*([^\n]*?),\s*_h\$\d+\)/g)].map((m) => m[1]);
+	return [...code.matchAll(/useSelector,[^\n]*?,\s*([^\n]*)\);/g)].map((m) => m[1]);
 }
 
 function hoistCount(code: string): number {

@@ -3,6 +3,7 @@ import { mount, act } from './_helpers';
 import {
 	TransitionDescendantSuspend,
 	UrgentDescendantSuspend,
+	UrgentParentWithTransitionChild,
 	setValueTransition,
 	setValueUrgent,
 } from './_fixtures/transition-descendant-suspend.tsrx';
@@ -41,7 +42,74 @@ function makeRegistry() {
 }
 
 describe('transition — DESCENDANT re-suspend keeps prior content (React useTransition parity)', () => {
-	it('holds content-1 while a transition re-suspends the child on value=2; isPending true; resolves to content-2', async () => {
+	it.each([false, true])(
+		'commits urgent parent props and layout while queued child content stays visible (reducer %s)',
+		async (useReducer) => {
+			const { promiseFor, d2 } = makeRegistry();
+			let updateParent!: () => void;
+			const layouts: number[] = [];
+			const r = mount(UrgentParentWithTransitionChild, {
+				promiseFor,
+				useReducer,
+				bindParent: (update: () => void) => {
+					updateParent = update;
+				},
+				onLayout: (revision: number) => {
+					layouts.push(revision);
+				},
+			});
+			const content = r.find('#content');
+			try {
+				await act(() => {
+					setValueTransition(2);
+					updateParent();
+				});
+				expect(r.find('[data-revision]').getAttribute('data-revision')).toBe('1');
+				expect(r.find('#content')).toBe(content);
+				expect(content.getAttribute('data-parent')).toBe('1');
+				expect(layouts.at(-1)).toBe(1);
+				expect(r.find('#content').textContent).toBe('content-1');
+				expect((r.find('#content') as HTMLElement).style.display).toBe('');
+				expect(r.findAll('#fallback')).toHaveLength(0);
+				expect(r.find('#content').getAttribute('data-pending')).toBe('pending');
+				expect(r.find('#pending').textContent).toBe('idle');
+				await act(() => d2.resolve(2));
+				expect(r.find('#content').textContent).toBe('content-2');
+				expect(r.find('#content').getAttribute('data-pending')).toBe('idle');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('an urgent child error tears down a queued transition without reviving it on resolve', async () => {
+		const { promiseFor, d2 } = makeRegistry();
+		let updateParent!: () => void;
+		const r = mount(UrgentParentWithTransitionChild, {
+			promiseFor,
+			failOnRevision: true,
+			bindParent: (update: () => void) => {
+				updateParent = update;
+			},
+			onLayout: () => {},
+		});
+		try {
+			await act(() => {
+				setValueTransition(2);
+				updateParent();
+			});
+			expect(r.find('[role=alert]').textContent).toBe('urgent child error');
+			expect(r.findAll('#content')).toHaveLength(0);
+			expect(r.findAll('#fallback')).toHaveLength(0);
+			await act(() => d2.resolve(2));
+			expect(r.find('[role=alert]').textContent).toBe('urgent child error');
+			expect(r.findAll('#content')).toHaveLength(0);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('holds content-1 while a transition re-suspends the child on value=2; unrelated hook stays idle; resolves to content-2', async () => {
 		const { promiseFor, d2 } = makeRegistry();
 		const r = mount(TransitionDescendantSuspend, { promiseFor });
 		await act(() => {});
@@ -55,11 +123,12 @@ describe('transition — DESCENDANT re-suspend keeps prior content (React useTra
 		// Inside a transition, change value=2 → the CHILD re-renders on its OWN
 		// (a descendant block) and re-suspends on d2 (still pending). The
 		// descendant re-suspend must be HELD: content-1 stays in the DOM, NO
-		// fallback flash, and isPending (from the sibling probe) flips true.
+		// fallback flash. The sibling hook does not own this transition.
 		await act(() => setValueTransition(2));
 		expect(r.find('#content').textContent).toBe('content-1'); // OLD content held
+		expect(r.find('#content').getAttribute('data-pending')).toBe('pending');
 		expect(r.findAll('#fallback')).toHaveLength(0); // no fallback flash
-		expect(r.find('#pending').textContent).toBe('pending');
+		expect(r.find('#pending').textContent).toBe('idle');
 
 		// Resolve d2 → the held try block resumes, the child re-renders with the
 		// resolved value, content-2 commits, and isPending returns to idle.
@@ -67,8 +136,27 @@ describe('transition — DESCENDANT re-suspend keeps prior content (React useTra
 			d2.resolve(2);
 		});
 		expect(r.find('#content').textContent).toBe('content-2');
+		expect(r.find('#content').getAttribute('data-pending')).toBe('idle');
 		expect(r.findAll('#fallback')).toHaveLength(0);
 		expect(r.find('#pending').textContent).toBe('idle');
+		r.unmount();
+	});
+
+	it('an urgent ready update ends the descendant owner pending cue while its old request is unresolved', async () => {
+		const { promiseFor: unresolvedFor, d2 } = makeRegistry();
+		const ready = fulfilled(3);
+		const promiseFor = (value: number) => (value === 3 ? ready : unresolvedFor(value));
+		const r = mount(TransitionDescendantSuspend, { promiseFor });
+		await act(() => setValueTransition(2));
+		expect(r.find('#content').getAttribute('data-pending')).toBe('pending');
+		expect(r.find('#pending').textContent).toBe('idle');
+		await act(() => setValueUrgent(3));
+		expect(r.find('#content').textContent).toBe('content-3');
+		expect(r.find('#content').getAttribute('data-pending')).toBe('idle');
+		expect(r.findAll('#fallback')).toHaveLength(0);
+		await act(() => d2.resolve(2));
+		expect(r.find('#content').textContent).toBe('content-3');
+		expect(r.find('#content').getAttribute('data-pending')).toBe('idle');
 		r.unmount();
 	});
 });

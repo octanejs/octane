@@ -1399,6 +1399,19 @@
   },
   {
     "kind": "library-binding",
+    "id": "binding-react-is",
+    "title": "React Is",
+    "packageName": "@octanejs/react-is",
+    "upstreamPackage": "react-is",
+    "category": "Developer Tools",
+    "categoryId": "developer-tools",
+    "description": "Use react-is with Octane.",
+    "searchTerms": [],
+    "tags": ["elements", "introspection", "compatibility"],
+    "order": 108
+  },
+  {
+    "kind": "library-binding",
     "id": "binding-tanstack-devtools",
     "title": "TanStack Devtools",
     "packageName": "@octanejs/tanstack-devtools",
@@ -1408,6 +1421,6 @@
     "description": "Use @tanstack/react-devtools with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 108
+    "order": 109
   }
 ]

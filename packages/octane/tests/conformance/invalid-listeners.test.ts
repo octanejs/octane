@@ -316,6 +316,8 @@ describe('InvalidEventListeners', () => {
 		try {
 			const target = root.find('.target');
 			target.dispatchEvent(new CustomEvent('customevent', { bubbles: true }));
+			expect(upper).not.toHaveBeenCalled();
+			target.dispatchEvent(new CustomEvent('CustomEvent', { bubbles: true }));
 			target.dispatchEvent(new CustomEvent('custom-event', { bubbles: true }));
 			expect(upper).toHaveBeenCalledOnce();
 			expect(lower).toHaveBeenCalledOnce();
@@ -331,6 +333,7 @@ describe('InvalidEventListeners', () => {
 			});
 			expect(root.find('.target')).toBe(target);
 			target.dispatchEvent(new CustomEvent('customevent', { bubbles: true }));
+			target.dispatchEvent(new CustomEvent('CustomEvent', { bubbles: true }));
 			target.dispatchEvent(new CustomEvent('custom-event', { bubbles: true }));
 			expect(upper).toHaveBeenCalledOnce();
 			expect(lower).toHaveBeenCalledOnce();

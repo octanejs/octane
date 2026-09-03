@@ -12,6 +12,19 @@ export function ActionForm(props) @{
 	</form>
 }
 
+export function SubmitterActionForm(props: {
+	action: (previous: string, data: FormData) => string | Promise<string>;
+	initial: string;
+}) @{
+	const [state, formAction, isPending] = useActionState(props.action, props.initial);
+	<form>
+		<input id="field" name="name" />
+		<button id="submit" type="submit" formAction={formAction}>{'submit'}</button>
+		<span id="state">{String(state) as string}</span>
+		<span id="pending">{(isPending ? 'pending' : 'idle') as string}</span>
+	</form>
+}
+
 // useFormStatus read from a CHILD component of the form.
 function StatusReader() @{
 	const status = useFormStatus();

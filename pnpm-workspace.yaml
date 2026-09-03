@@ -33,6 +33,7 @@ packages:
   - benchmarks/ssr-workerd/*
   - benchmarks/codegen-size
   - benchmarks/lynx-render
+  - benchmarks/lynx-list
   - benchmarks/lynx-table
   - benchmarks/bundle-size
   - benchmarks/three

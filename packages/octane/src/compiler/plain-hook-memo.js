@@ -7,6 +7,7 @@ import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { METHOD_DEP_IMPORT } from './hook-deps.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
+import { adaptManualHookProviders } from './manual-hooks.js';
 import {
 	hasInlineMemoDirectEval,
 	inheritHookMemoOrigin,
@@ -126,13 +127,32 @@ function inferredDependencyArray(inferred, state, origin) {
 	);
 }
 
-// Match the surgical pass's BASE-hook-only policy. Custom hooks remain normal
-// calls; their compiled caller owns withSlot. Existing explicit memo slots are
+// Match the surgical pass's base-hook and imported-hook slot policy. Local
+// custom helpers keep their authored boundaries. Existing explicit memo slots are
 // already the effective third argument, so no unused fourth argument is added.
 function slotBaseHooks(ast, state, options) {
 	function visit(node) {
 		if (node === null || typeof node !== 'object') return node;
 		if (Array.isArray(node)) return mapChildren(node, visit);
+		if (!options.manualSlots && node.type === 'CallExpression' && node._octaneCustomHookCall) {
+			const slot = allocateHookSlot(state, node);
+			const mapped = mapChildren(node, visit);
+			const callee = mapped.typeArguments
+				? {
+						type: 'TSInstantiationExpression',
+						expression: mapped.callee,
+						typeArguments: mapped.typeArguments,
+					}
+				: mapped.callee;
+			return {
+				...mapped,
+				callee: b.id(requireHelper(state, 'withSlot', 'octane'), node),
+				typeArguments: null,
+				// Keep foreign/default parameters and arguments.length unchanged;
+				// Octane base aliases resolve their slot from this call's path.
+				arguments: [slot, callee, ...mapped.arguments],
+			};
+		}
 		const imported =
 			node.type === 'CallExpression'
 				? (node._octaneImportedHook ??
@@ -147,19 +167,41 @@ function slotBaseHooks(ast, state, options) {
 			inferred === undefined &&
 			node.arguments.length === 3 &&
 			!node.arguments.some((argument) => argument.type === 'SpreadElement');
-		const slot = explicitMemoSlot ? null : allocateHookSlot(state, node);
+		const slot = options.manualSlots || explicitMemoSlot ? null : allocateHookSlot(state, node);
 		const mapped = mapChildren(node, visit);
 		const args = mapped.arguments.slice();
 		if (inferred !== undefined) {
 			args.splice(inferred.depsIndex, 0, inferredDependencyArray(inferred, state, node));
 		}
-		if (slot !== null) args.push(slot);
 		let callee = mapped.callee;
 		if (options.getterCalls.has(node) && options.stateGetterHelpers[imported]) {
 			callee = b.id(requireHelper(state, options.stateGetterHelpers[imported], 'octane'), node);
 		}
 		if (node._octaneNativeInferredMemo === true) {
 			callee = b.id(requireHelper(state, 'nativePuMemo'), node);
+		}
+		if (slot !== null) {
+			if (
+				(imported === 'useState' || imported === 'useRef') &&
+				args.some((arg) => arg.type === 'SpreadElement')
+			) {
+				const fn = mapped.typeArguments
+					? {
+							type: 'TSInstantiationExpression',
+							expression: callee,
+							typeArguments: mapped.typeArguments,
+						}
+					: callee;
+				return {
+					...mapped,
+					callee: b.id(requireHelper(state, 'withSlot', 'octane'), node),
+					typeArguments: null,
+					arguments: [slot, fn, ...args],
+				};
+			}
+			if (args.length === 0 && (imported === 'useState' || imported === 'useRef'))
+				args.push(b.id('undefined', node));
+			args.push(slot);
 		}
 		return { ...mapped, callee, arguments: args };
 	}
@@ -235,7 +277,7 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 		slotBase: null,
 		slotDeclarations: [],
 	};
-	let transformed = options.manualSlots ? ast : slotBaseHooks(ast, state, options);
+	let transformed = slotBaseHooks(ast, state, options);
 	const lowered = lowerSlotMemoFunctions(transformed, {
 		allocateName: (preferred) => allocName(state, preferred),
 		requireRuntime: (imported) => requireHelper(state, imported),
@@ -243,6 +285,13 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	});
 	if (lowered.lowered === 0) return null;
 	transformed = lowered.ast;
+	if (options.manualSlots) {
+		transformed = adaptManualHookProviders(
+			transformed,
+			(name) => requireHelper(state, name, 'octane'),
+			(preferred) => allocName(state, preferred),
+		);
+	}
 	const origin = ast.body[0] ?? ast;
 	const activation = options.nativeReadActivation
 		? inheritHookMemoOrigin(
