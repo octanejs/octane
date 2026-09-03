@@ -4723,6 +4723,225 @@ function containsRenderCall(stmts, memoCtx = null) {
 	return found;
 }
 
+// Built-in hooks whose render-time work cannot schedule an update for the
+// calling component. Their function arguments run later (commit, event, or
+// never), so those bodies are deferred like any other closure.
+const SETUP_PASSIVE_HOOKS = new Set([
+	'useCallback',
+	'useRef',
+	'useEffect',
+	'useLayoutEffect',
+	'useInsertionEffect',
+	'useImperativeHandle',
+	'useEffectEvent',
+	'useId',
+	'useDeferredValue',
+	'useTransition',
+	'useFormStatus',
+	'useActionState',
+	'useFormState',
+	'useContext',
+	'use',
+]);
+// Built-in hooks that invoke a function argument synchronously during render
+// (a memo factory, a lazy initializer, a snapshot reader, an optimistic
+// reducer, a linked-state reconciler). Those bodies belong to setup.
+const SETUP_SYNC_FACTORY_HOOKS = new Set([
+	'useMemo',
+	'useState',
+	'useLinkedState',
+	'useReducer',
+	'useSyncExternalStore',
+	'useOptimistic',
+]);
+// Standard globals that only project their arguments. A user-defined
+// `toString`/`valueOf`/`toJSON` that schedules a render violates the hook rules
+// in React and Octane alike, so these count as call-free setup.
+const SETUP_PURE_GLOBAL_CALLEES = new Set([
+	'String',
+	'Number',
+	'Boolean',
+	'BigInt',
+	'Symbol',
+	'parseInt',
+	'parseFloat',
+	'isNaN',
+	'isFinite',
+	'encodeURI',
+	'encodeURIComponent',
+	'decodeURI',
+	'decodeURIComponent',
+]);
+// Namespace members that never invoke an argument. `Array.from`,
+// `Object.groupBy`, `Object.fromEntries`, and friends iterate or call user
+// code, so they stay unclassified. JSON's replacer and reviver positions are
+// checked like a hook factory (see walkInvokedArgument).
+const SETUP_PURE_NAMESPACE_MEMBERS = new Map([
+	['Math', null],
+	[
+		'Number',
+		new Set(['isFinite', 'isInteger', 'isNaN', 'isSafeInteger', 'parseFloat', 'parseInt']),
+	],
+	['Object', new Set(['entries', 'freeze', 'hasOwn', 'is', 'isFrozen', 'keys', 'values'])],
+	['Array', new Set(['isArray', 'of'])],
+	['Date', new Set(['now', 'parse', 'UTC'])],
+	['JSON', new Set(['parse', 'stringify'])],
+]);
+
+// Every binding name the module declares anywhere. A global namespace shadowed
+// by any local, parameter, or import is treated as an unknown callee.
+function collectModuleBoundNames(ast) {
+	const names = new Set();
+	const seen = new WeakSet();
+	function walk(n) {
+		if (!n || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (seen.has(n)) return;
+		seen.add(n);
+		switch (n.type) {
+			case 'VariableDeclarator':
+				collectBindings(n.id, names);
+				break;
+			case 'FunctionDeclaration':
+			case 'FunctionExpression':
+			case 'ArrowFunctionExpression':
+				if (n.id) names.add(n.id.name);
+				for (const param of n.params || []) collectBindings(param, names);
+				break;
+			case 'ClassDeclaration':
+			case 'ClassExpression':
+				if (n.id) names.add(n.id.name);
+				break;
+			case 'CatchClause':
+				collectBindings(n.param, names);
+				break;
+			case 'ImportSpecifier':
+			case 'ImportDefaultSpecifier':
+			case 'ImportNamespaceSpecifier':
+				if (n.local) names.add(n.local.name);
+				break;
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	walk(ast);
+	return names;
+}
+
+/**
+ * Can this setup schedule a render-phase update for its own component? A
+ * setter, dispatcher, transition start, custom hook, or any other call the
+ * compiler cannot classify may; the built-in hooks above and standard pure
+ * globals cannot. Closures are deferred unless a built-in hook runs them
+ * during render. This admits the setup checkpoint, an optimization over the
+ * runtime's own child-initialization guards, so an unclassified callee fails
+ * closed to emitting the checkpoint.
+ */
+function setupCanScheduleSelfUpdate(stmts, ctx) {
+	let found = false;
+	const seen = new WeakSet();
+	const bound = ctx._moduleBoundNames;
+	const isGlobal = (name) => bound !== undefined && !bound.has(name);
+	function walk(n, deep) {
+		if (found || !n) return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x, deep);
+			return;
+		}
+		if (typeof n !== 'object') return;
+		const t = n.type;
+		if (!t) return;
+		if (seen.has(n)) return;
+		seen.add(n);
+		if (
+			!deep &&
+			(t === 'ArrowFunctionExpression' || t === 'FunctionExpression' || t === 'FunctionDeclaration')
+		) {
+			return;
+		}
+		if (t === 'CallExpression' || t === 'OptionalCallExpression') {
+			const hook = n._octaneImportedHook;
+			if (hook !== undefined && SETUP_PASSIVE_HOOKS.has(hook)) {
+				walk(n.arguments, deep);
+				return;
+			}
+			if (hook !== undefined && SETUP_SYNC_FACTORY_HOOKS.has(hook)) {
+				for (const argument of n.arguments) walkInvokedArgument(argument);
+				return;
+			}
+			const callee = n.callee;
+			if (
+				callee?.type === 'Identifier' &&
+				n._octaneUnboundCallee === true &&
+				SETUP_PURE_GLOBAL_CALLEES.has(callee.name)
+			) {
+				walk(n.arguments, true);
+				return;
+			}
+			if (
+				callee?.type === 'MemberExpression' &&
+				!callee.computed &&
+				callee.object?.type === 'Identifier' &&
+				callee.property?.type === 'Identifier' &&
+				SETUP_PURE_NAMESPACE_MEMBERS.has(callee.object.name) &&
+				isGlobal(callee.object.name)
+			) {
+				const members = SETUP_PURE_NAMESPACE_MEMBERS.get(callee.object.name);
+				if (members === null || members.has(callee.property.name)) {
+					if (callee.object.name === 'JSON') {
+						walk(n.arguments[0], true);
+						for (let index = 1; index < n.arguments.length; index++)
+							walkInvokedArgument(n.arguments[index]);
+					} else walk(n.arguments, true);
+					return;
+				}
+			}
+			found = true;
+			return;
+		}
+		if (t === 'NewExpression' || t === 'TaggedTemplateExpression') {
+			found = true;
+			return;
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key], deep);
+		}
+	}
+	// A sync-factory hook may invoke any argument whose value can be a function.
+	// Only shapes that visibly cannot be callable, or whose bodies are visible
+	// here, keep the analysis open; a named factory, member, call result, or
+	// conditional fails closed exactly like an unclassified call.
+	function walkInvokedArgument(argument) {
+		if (found || !argument) return;
+		switch (argument.type) {
+			case 'ArrowFunctionExpression':
+			case 'FunctionExpression':
+			case 'Literal':
+			case 'TemplateLiteral':
+			case 'BinaryExpression':
+			case 'UnaryExpression':
+			case 'UpdateExpression':
+				walk(argument, true);
+				return;
+			case 'ArrayExpression':
+				// Dependency and initial-value arrays are never invoked; their
+				// elements are ordinary setup expressions.
+				walk(argument.elements, true);
+				return;
+			default:
+				found = true;
+		}
+	}
+	for (const s of stmts) walk(s, false);
+	return found;
+}
+
 // A hook call is identified by naming convention — the same signal React and
 // React Compiler key on — plus the exact `unstable_` and `UNSTABLE_` staging
 // prefixes bindings expose (`unstable_useRouterState` in @octanejs/remix-router
@@ -9035,6 +9254,9 @@ function compileInternal(
 	// that are ever assigned (`foo = bar`) are excluded: their identity is then
 	// as mutable as a module `let`, which fails closed.
 	ctx.moduleFunctionDeclarations = collectImmutableModuleFunctions(ast.body);
+	// Global namespaces are only trusted by the setup checkpoint analysis when
+	// no module binding shadows them (see setupCanScheduleSelfUpdate).
+	ctx._moduleBoundNames = collectModuleBoundNames(ast);
 	// M3 inherit-range exclusion set (see inheritSoleCompRoot).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
 	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, true);
@@ -14414,12 +14636,13 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// A self-update scheduled by setup discards this output. The owning Block
 	// replays setup before returning to its parent, so children initialize from
 	// the settled state and no template/resource work escapes the first pass.
-	// Call-free setup cannot schedule an update; keep those bodies unchanged.
+	// Setup that only reads built-in hooks and pure globals cannot schedule an
+	// update; keep those bodies unchanged (see setupCanScheduleSelfUpdate).
 	if (
 		ctx.mode !== 'server' &&
 		ctx._universalRuntimeUnit == null &&
 		!returnedOutput &&
-		containsRenderCall(statements)
+		setupCanScheduleSelfUpdate(statements, ctx)
 	) {
 		bodyStatements.push(
 			inheritOriginLoc(

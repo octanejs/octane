@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createElement, createRoot, HMR, hmr, lazy, memo, startTransition } from '../src/index.js';
 import { act, flushEffects, mount } from './_helpers';
+import { compile } from '../src/compiler/compile.js';
 import {
 	CaughtTransition,
 	CaughtPassiveChain,
@@ -16,6 +17,7 @@ import {
 	FreshTransitionUpdater,
 	HoistedMemo,
 	IndependentTransitions,
+	MemoFactorySelfUpdate,
 	MountSelfUpdate,
 	OrderedInsertion,
 	RepeatedTransitionFlag,
@@ -290,6 +292,17 @@ describe('state, component identity, and lifecycle contracts', () => {
 			root.unmount();
 		}
 	});
+	it('replays a self-update scheduled by a memo factory before children mount', () => {
+		const log: string[] = [];
+		const root = mount(MemoFactorySelfUpdate, { log: (message) => log.push(message) });
+		try {
+			flushEffects();
+			expect(root.find('span').textContent).toBe('2');
+			expect(log).toEqual(['effect 2']);
+		} finally {
+			root.unmount();
+		}
+	});
 	it('mounts inserted keyed rows in their authored order', () => {
 		const log: string[] = [];
 		const props = { names: ['a', 'b'], log: (message: string) => log.push(message) };
@@ -545,4 +558,68 @@ describe('effect update depth and commit recovery', () => {
 			}
 		},
 	);
+});
+
+describe('setup checkpoint emission', () => {
+	const checkpoint = '__s.block.pending';
+	function compiled(body: string, imports = 'useCallback, useMemo, useRef, useState'): string {
+		return compile(
+			`import { ${imports} } from 'octane';\nexport function App(props: any) @{\n${body}\n<output>{String(props.n)}</output>\n}`,
+			'setup-checkpoint.tsrx',
+			{ mode: 'client', dev: false, hmr: false },
+		).code;
+	}
+
+	it('omits the checkpoint when setup only reads built-in hooks and pure globals', () => {
+		const code = compiled(`
+			const value = useMemo(() => props.n * 2, [props.n]);
+			const read = useCallback(() => value, [value]);
+			const label = useRef(String(props.n) + Math.max(props.n, 1) + JSON.stringify(read.length));
+			const [count] = useState(() => Number(label.current));
+			const keys = Object.keys(props).length + Number(Array.isArray(props.list)) + Date.now();
+			if (count > keys) props.n = JSON.parse(label.current);
+		`);
+		expect(code).not.toContain(checkpoint);
+	});
+
+	it.each([
+		[
+			'a setter called in setup',
+			`const [value, setValue] = useState(0);\nif (value === 0) setValue(1);`,
+		],
+		[
+			'a memo factory that calls a setter',
+			`const [value, setValue] = useState(0);\nconst doubled = useMemo(() => { if (value === 0) setValue(1); return value * 2; }, [value]);`,
+		],
+		[
+			'a memo factory passed by reference',
+			`const [value, setValue] = useState(0);\nfunction read() { if (value === 0) setValue(1); return value; }\nconst doubled = useMemo(read, [value]);`,
+		],
+		['a state initializer passed by reference', `const [value] = useState(props.getInitial);`],
+		[
+			'a conditional memo factory',
+			`const [value, setValue] = useState(0);\nconst doubled = useMemo(props.fast ? () => value : () => { setValue(1); return value; }, [value]);`,
+		],
+		[
+			'a global that iterates or maps its input',
+			`const value = Array.from(props.items, props.map);`,
+		],
+		['a JSON reviver passed by reference', `const value = JSON.parse(props.text, props.revive);`],
+		[
+			'a JSON replacer passed by reference',
+			`const value = JSON.stringify(props.n, props.replace);`,
+		],
+		[
+			'an unlisted namespace member',
+			`const value = Object.groupBy(props.items, (item: any) => item.kind);`,
+		],
+		['a custom hook call', `const value = useThing(props.n);`],
+		['a prop callback call', `props.observe(props.n);`],
+		[
+			'a shadowed global namespace',
+			`const Math = props.math;\nconst value = Math.max(props.n, 1);`,
+		],
+	])('keeps the checkpoint for %s', (_, body) => {
+		expect(compiled(body)).toContain(checkpoint);
+	});
 });

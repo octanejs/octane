@@ -18246,10 +18246,11 @@ function dispatchDelegated(this: Node, event: Event): void {
 		// had a chance to cancel. Keep their storage separate from $$submit.
 		if (
 			submitRec !== null &&
+			FORM_SUBMIT_DRIVER !== null &&
 			!event.defaultPrevented &&
 			CAPTURE_PATH.includes(submitRec.form, pathBase)
 		) {
-			handleFormSubmit(submitRec.form, event, submitRec.action, submitRec.submitter);
+			FORM_SUBMIT_DRIVER(submitRec.form, event, submitRec.action, submitRec.submitter);
 		}
 	} finally {
 		CAPTURE_PATH.length = pathBase;
@@ -18419,6 +18420,12 @@ function snapshotSubmitDispatch(form: HTMLFormElement, event: SubmitEvent): Subm
 }
 
 let ACTIVE_SUBMIT_DISPATCH: SubmitDispatchRec | null = null;
+// Function form actions are the only submits the runtime intercepts, and
+// setFormAction is the only writer of `$$formAction`. Installing the handler
+// from there keeps the Action/transition graph out of every bundle that only
+// delegates events; the dispatch loop still records the submit for manual
+// useFormStatus activation.
+let FORM_SUBMIT_DRIVER: typeof handleFormSubmit | null = null;
 
 // Runs when the submit dispatch's handler walk finishes (dispatchDelegated).
 function publishManualFormPending(rec: SubmitDispatchRec): void {
@@ -18525,6 +18532,7 @@ export function setFormAction(
 		if (process.env.NODE_ENV !== 'production') queueFormActionAuthoringDiagnostic(el);
 		if (!(el as any).$$formSubmitWired) {
 			(el as any).$$formSubmitWired = true;
+			FORM_SUBMIT_DRIVER = handleFormSubmit;
 			delegateEvents(['submit']);
 		}
 		// A function action implies a non-native submit; drop any stale attribute.

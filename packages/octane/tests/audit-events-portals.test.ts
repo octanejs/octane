@@ -176,6 +176,35 @@ describe('audit event and portal behavior', () => {
 		}
 	});
 
+	it('intercepts a function form action installed through spread props after mount', () => {
+		const calls: string[] = [];
+		const { App } = fixture(
+			`export function App(props: { form: Record<string, unknown> }) @{ <form {...props.form}><button>go</button></form> }`,
+		);
+		const r = mount(App, { form: { onSubmit: () => calls.push('submit') } });
+		try {
+			const submit = () => {
+				const event = new Event('submit', { bubbles: true, cancelable: true });
+				r.find('form').dispatchEvent(event);
+				return event.defaultPrevented;
+			};
+			// Without a function action the submit stays native and only the
+			// authored handler observes it.
+			expect(submit()).toBe(false);
+			expect(calls).toEqual(['submit']);
+			r.update(App, {
+				form: {
+					onSubmit: () => calls.push('submit'),
+					action: (data: FormData) => calls.push('action ' + (data instanceof FormData)),
+				},
+			});
+			expect(submit()).toBe(true);
+			expect(calls).toEqual(['submit', 'submit', 'action true']);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('matches custom-element nonbubbling event behavior with React', () => {
 		function run(react: boolean) {
 			const calls: string[] = [];
