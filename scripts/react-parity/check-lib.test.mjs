@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { existsSync, writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -192,64 +193,202 @@ test('spawns the required non-Vitest harness without a shell and propagates fail
 	await assert.rejects(run, /with exit code 7/);
 });
 
-test('runs one native Vitest file shard and writes its verified report', async (t) => {
-	const root = await mkdtemp(join(tmpdir(), 'react-parity-vitest-report-'));
-	t.after(() => rm(root, { recursive: true, force: true }));
-	const reportPath = join(root, 'shard-2.json');
-	const calls = [];
-	const spawnProcess = (...args) => {
-		calls.push(args);
-		const child = new EventEmitter();
-		child.stdout = new EventEmitter();
-		setImmediate(() => {
-			child.stdout.emit(
-				'data',
-				JSON.stringify({
-					testResults: [
-						{
-							name: '/repo/packages/example/example.test.ts',
-							assertionResults: [{ fullName: 'suite > works', status: 'passed' }],
-						},
-					],
-				}),
-			);
-			child.emit('close', 0, null);
-		});
-		return child;
-	};
-	const lanes = [
-		{
-			id: 'example-runtime',
-			project: 'example',
-			files: [
-				{
-					path: 'packages/example/example.test.ts',
-					role: 'test',
-					cases: [{ fullName: 'suite works' }],
-				},
-			],
-		},
-	];
-
-	await runRequiredVitestLanes({
-		lanes,
-		repo: '/repo',
-		shard: '2/3',
-		reportPath,
-		spawnProcess,
-	});
-	assert.equal(calls.length, 1);
-	assert.equal(calls[0][0], process.execPath);
-	assert.deepEqual(calls[0][1], buildParityVitestArgv('vitest.react-parity.config.js', '2/3'));
-	assert.equal(calls[0][2].cwd, '/repo');
-	assert.deepEqual(calls[0][2].stdio, ['inherit', 'pipe', 'inherit']);
-	assert.equal(calls[0][2].env, process.env);
-	assert.deepEqual(JSON.parse(await readFile(reportPath, 'utf8')).testResults, [
+const exampleVitestLanes = [
+	{
+		id: 'example-runtime',
+		project: 'example',
+		files: [
+			{
+				path: 'packages/example/example.test.ts',
+				role: 'test',
+				cases: [{ fullName: 'suite works' }],
+			},
+		],
+	},
+];
+const passingVitestReport = JSON.stringify({
+	testResults: [
 		{
 			name: '/repo/packages/example/example.test.ts',
 			assertionResults: [{ fullName: 'suite > works', status: 'passed' }],
 		},
-	]);
+	],
+});
+
+function fakeVitestRun({ report = passingVitestReport, code = 0, signal = null, error } = {}) {
+	const calls = [];
+	let outputFile;
+	const spawnProcess = (...args) => {
+		calls.push(args);
+		outputFile = args[1]
+			.find((arg) => arg.startsWith('--outputFile='))
+			.slice('--outputFile='.length);
+		const child = new EventEmitter();
+		child.stdout = new EventEmitter();
+		setImmediate(() => {
+			if (error) child.emit('error', error);
+			else {
+				if (report !== null) writeFileSync(outputFile, report);
+				// Even valid stdout cannot substitute for a missing or invalid report.
+				child.stdout.emit('data', passingVitestReport);
+			}
+			child.emit('close', code, signal);
+		});
+		return child;
+	};
+	return {
+		calls,
+		spawnProcess,
+		get outputFile() {
+			return outputFile;
+		},
+	};
+}
+
+test('runs one native Vitest file shard and writes its verified report', async (t) => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-vitest-report-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	const reportPath = join(root, 'reports', 'shard-2.json');
+	const child = fakeVitestRun();
+
+	await runRequiredVitestLanes({
+		lanes: exampleVitestLanes,
+		repo: '/repo',
+		shard: '2/3',
+		reportPath,
+		spawnProcess: child.spawnProcess,
+	});
+	const { calls } = child;
+	assert.equal(calls.length, 1);
+	assert.equal(calls[0][0], process.execPath);
+	assert.deepEqual(
+		calls[0][1],
+		buildParityVitestArgv('vitest.react-parity.config.js', '2/3', child.outputFile),
+	);
+	assert.equal(calls[0][2].cwd, '/repo');
+	assert.equal(calls[0][2].stdio, 'inherit');
+	assert.equal(calls[0][2].env, process.env);
+	assert.equal(await readFile(reportPath, 'utf8'), passingVitestReport);
+	assert.equal(existsSync(dirname(child.outputFile)), false);
+});
+
+test('rejects missing, malformed, failed and interrupted reports without reusing old evidence', async (t) => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-invalid-report-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	const failedReport = JSON.parse(passingVitestReport);
+	failedReport.testResults[0].assertionResults[0] = {
+		fullName: 'suite > works',
+		status: 'failed',
+		failureMessages: ['expected visible content to survive the transition'],
+	};
+	const cases = [
+		{ name: 'missing', report: null, expected: /did not produce a readable JSON report/ },
+		{ name: 'empty', report: '', expected: /Unexpected end of JSON input/ },
+		{ name: 'malformed', report: '{"testResults":', expected: /Unexpected end of JSON input/ },
+		{ name: 'invalid shape', report: '{}', expected: /invalid JSON result/ },
+		{
+			name: 'failed assertion with zero exit',
+			report: JSON.stringify(failedReport),
+			expected: /expected visible content to survive the transition/,
+		},
+		{ name: 'nonzero exit', code: 7, expected: /with exit code 7/ },
+		{ name: 'signal', code: null, signal: 'SIGTERM', expected: /with signal SIGTERM/ },
+		{
+			name: 'spawn error',
+			error: new Error('could not start Vitest'),
+			expected: /could not start Vitest/,
+		},
+	];
+	for (const { name, expected, ...options } of cases) {
+		await t.test(name, async () => {
+			const reportPath = join(root, `${name}.json`);
+			await writeFile(reportPath, passingVitestReport);
+			const child = fakeVitestRun(options);
+			await assert.rejects(
+				runRequiredVitestLanes({
+					lanes: exampleVitestLanes,
+					repo: '/repo',
+					reportPath,
+					spawnProcess: child.spawnProcess,
+				}),
+				expected,
+			);
+			assert.equal(existsSync(reportPath), false);
+			assert.equal(existsSync(dirname(child.outputFile)), false);
+		});
+	}
+});
+
+test('cleans temporary reports without an archive and when process creation throws', async () => {
+	const child = fakeVitestRun();
+	await runRequiredVitestLanes({
+		lanes: exampleVitestLanes,
+		repo: '/repo',
+		spawnProcess: child.spawnProcess,
+	});
+	assert.equal(existsSync(dirname(child.outputFile)), false);
+	let outputFile;
+	await assert.rejects(
+		runRequiredVitestLanes({
+			lanes: exampleVitestLanes,
+			repo: '/repo',
+			spawnProcess(_command, args) {
+				outputFile = args
+					.find((arg) => arg.startsWith('--outputFile='))
+					.slice('--outputFile='.length);
+				throw new Error('could not create process');
+			},
+		}),
+		/could not create process/,
+	);
+	assert.equal(existsSync(dirname(outputFile)), false);
+});
+
+test('separates real JSON reports from colored Vite output and preserves assertion failures', async (t) => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-noisy-vitest-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	const repo = resolve(import.meta.dirname, '../..');
+	const configPath = join(root, 'vitest.config.mjs');
+	const testPath = join(root, 'example.test.js');
+	const reportPath = join(root, 'report.json');
+	await writeFile(
+		configPath,
+		`process.stdout.write('\\u001b[2m12:00:00 PM [vite] configuration loaded\\u001b[0m\\n');
+export default ${JSON.stringify({
+			root,
+			test: {
+				include: ['example.test.js'],
+				globals: true,
+				maxWorkers: 1,
+				fileParallelism: false,
+			},
+		})};`,
+	);
+	await writeFile(testPath, "test('works', () => expect(1 + 1).toBe(2));");
+	const run = () =>
+		runRequiredVitestLanes({
+			lanes: [
+				{
+					id: 'example-runtime',
+					project: 'example',
+					files: [{ path: relative(repo, testPath), role: 'test', cases: [{ fullName: 'works' }] }],
+				},
+			],
+			repo,
+			configPath,
+			reportPath,
+		});
+	await run();
+	const report = JSON.parse(await readFile(reportPath, 'utf8'));
+	assert.equal(report.success, true);
+	assert.equal(report.testResults[0].name, testPath);
+	assert.equal(report.testResults[0].assertionResults[0].status, 'passed');
+	await writeFile(
+		testPath,
+		"test('works', () => { throw new Error('expected content to remain visible'); });",
+	);
+	await assert.rejects(run, /expected content to remain visible/);
+	assert.equal(existsSync(reportPath), false);
 });
 
 test('balances complete non-Vitest manifests using their declared runner work', async (t) => {
