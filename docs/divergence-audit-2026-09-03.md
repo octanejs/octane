@@ -193,8 +193,8 @@ events, including compiler-specialized roots that never render descriptors.
 `setFormAction`, the only writer of `$$formAction`, now installs that handler,
 and the compiled setup checkpoint is emitted only when setup can schedule a
 render-phase self-update: the passive built-in hooks and unshadowed standard
-globals cannot, while setters, custom hooks, prop callbacks, and every other call
-keep it.
+globals cannot, while setters, custom hooks, prop callbacks, factories passed by
+reference, and every other call keep it.
 
 | Measurement, gzip unless noted                | Audit base → first fix → follow-up |
 | --------------------------------------------- | ---------------------------------- |
@@ -203,7 +203,7 @@ keep it.
 | `run-minimal.mjs` hooks-state                 | 47,553 → 51,346 → 51,350           |
 | Hook-memo inline bundle                       | 55,169 → 58,568 → 58,580           |
 | Hook-memo inline compiled fixture, minified   | 7,183 → 7,896 → 7,896              |
-| `benchmarks/codegen-size` corpus, minified    | 76,534 → 78,983 → 76,454           |
+| `benchmarks/codegen-size` corpus, minified    | 76,534 → 78,983 → 76,553           |
 
 The remaining growth is the fixed behavior itself. Bundles whose entry retains
 the descriptor renderer (`createRoot`, spreads, `createElement` hosts) already

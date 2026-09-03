@@ -4857,7 +4857,7 @@ function setupCanScheduleSelfUpdate(stmts, ctx) {
 				return;
 			}
 			if (hook !== undefined && SETUP_SYNC_FACTORY_HOOKS.has(hook)) {
-				walk(n.arguments, true);
+				for (const argument of n.arguments) walkInvokedArgument(argument);
 				return;
 			}
 			const callee = n.callee;
@@ -4889,6 +4889,31 @@ function setupCanScheduleSelfUpdate(stmts, ctx) {
 		for (const key in n) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
 			walk(n[key], deep);
+		}
+	}
+	// A sync-factory hook may invoke any argument whose value can be a function.
+	// Only shapes that visibly cannot be callable, or whose bodies are visible
+	// here, keep the analysis open; a named factory, member, call result, or
+	// conditional fails closed exactly like an unclassified call.
+	function walkInvokedArgument(argument) {
+		if (found || !argument) return;
+		switch (argument.type) {
+			case 'ArrowFunctionExpression':
+			case 'FunctionExpression':
+			case 'Literal':
+			case 'TemplateLiteral':
+			case 'BinaryExpression':
+			case 'UnaryExpression':
+			case 'UpdateExpression':
+				walk(argument, true);
+				return;
+			case 'ArrayExpression':
+				// Dependency and initial-value arrays are never invoked; their
+				// elements are ordinary setup expressions.
+				walk(argument.elements, true);
+				return;
+			default:
+				found = true;
 		}
 	}
 	for (const s of stmts) walk(s, false);

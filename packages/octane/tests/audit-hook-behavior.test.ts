@@ -590,6 +590,15 @@ describe('setup checkpoint emission', () => {
 			'a memo factory that calls a setter',
 			`const [value, setValue] = useState(0);\nconst doubled = useMemo(() => { if (value === 0) setValue(1); return value * 2; }, [value]);`,
 		],
+		[
+			'a memo factory passed by reference',
+			`const [value, setValue] = useState(0);\nfunction read() { if (value === 0) setValue(1); return value; }\nconst doubled = useMemo(read, [value]);`,
+		],
+		['a state initializer passed by reference', `const [value] = useState(props.getInitial);`],
+		[
+			'a conditional memo factory',
+			`const [value, setValue] = useState(0);\nconst doubled = useMemo(props.fast ? () => value : () => { setValue(1); return value; }, [value]);`,
+		],
 		['a custom hook call', `const value = useThing(props.n);`],
 		['a prop callback call', `props.observe(props.n);`],
 		[
