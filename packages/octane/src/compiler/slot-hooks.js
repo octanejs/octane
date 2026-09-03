@@ -1006,9 +1006,11 @@ function walk(node, owner, st) {
 			if (open !== -1) {
 				const sym = allocHookSymbol(st, owner, node.callee.name, node._octaneCustomHookCall, node);
 				const helper = requireParallelHelper(st, 'withSlot');
+				// The path stack supplies identity without changing the authored
+				// argument list. An alias may point at a foreign hook whose omitted
+				// parameter has a default, rather than at Octane's trailing-slot ABI.
 				st.edits.push({ pos: node.start, text: `${helper}(${sym}, ` });
 				st.edits.push({ pos: open, end: open + 1, text: node.arguments.length ? ', ' : '' });
-				st.edits.push({ pos: node.arguments.at(-1)?.end ?? node.end - 1, text: `, ${sym}` });
 			}
 		}
 		const imported =

@@ -52,7 +52,11 @@ describe('conformance: useInsertionEffect ordering (ReactHooksWithNoopRenderer-t
 		flushEffects();
 		log.clear();
 		r.unmount();
-		expect(log.drain()).toEqual(['Destroy insertion [current: 0]', 'Destroy layout [current: 0]', 'Destroy passive [current: 0]']);
+		expect(log.drain()).toEqual([
+			'Destroy insertion [current: 0]',
+			'Destroy layout [current: 0]',
+			'Destroy passive [current: 0]',
+		]);
 		flushEffects();
 		expect(log.drain()).toEqual([]);
 	});

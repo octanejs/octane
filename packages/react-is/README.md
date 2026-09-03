@@ -3,11 +3,18 @@
 The `react-is` 19.2.7 predicates for Octane elements. Replace `react-is` imports
 with `@octanejs/react-is` when porting source to Octane.
 
-Install it alongside Octane:
+This binding requires the coordinated Octane core release containing the
+behavioral-audit fixes, planned for **Octane 0.2.3**. Its predicates depend on that
+release's `StrictMode` export and owner-bound component-kind metadata. Release
+and install the binding together with that core version or a later compatible
+release. The repository's shared beta peer range is broader than this capability
+requirement; it does not establish compatibility with older core releases.
+
+Install it alongside the required Octane release:
 
 ```sh
-npm install @octanejs/react-is octane
-pnpm add @octanejs/react-is octane
+npm install @octanejs/react-is octane@^0.2.3
+pnpm add @octanejs/react-is octane@^0.2.3
 ```
 
 ```ts

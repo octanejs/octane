@@ -27,7 +27,9 @@ describe('public root containers and test environment', () => {
 		container.innerHTML = '<aside>wrong</aside>';
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		const root = hydrateRoot(container, NoscriptChildren);
-		expect(container.querySelector('noscript')?.textContent).toBe('Enable JavaScript to run this app.');
+		expect(container.querySelector('noscript')?.textContent).toBe(
+			'Enable JavaScript to run this app.',
+		);
 		flushSync(() => root.render(Label, { label: 'updated' }));
 		expect(container.textContent).toBe('updated');
 		root.unmount();

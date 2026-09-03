@@ -28477,7 +28477,12 @@ export function useActionState<S>(
 			}
 		};
 		const dispatch = ((payload?: any): Promise<S> => {
-			const outsideTransition = transitionActionBatchForUpdate() === null;
+			// Native form actions dispatch before this hook starts its queued
+			// transition. The intercepted submit already supplies action context.
+			const outsideTransition =
+				process.env.NODE_ENV !== 'production' &&
+				transitionActionBatchForUpdate() === null &&
+				ACTIVE_SUBMIT_DISPATCH?.intercepted !== true;
 			slotRef.pendingCount++;
 			setPending(true);
 			// Sequential queue: each run sees the prior COMPLETED state.

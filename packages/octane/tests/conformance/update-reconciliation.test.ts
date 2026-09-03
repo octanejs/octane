@@ -365,9 +365,13 @@ describe('ReactUpdates update reconciliation', () => {
 							? /act\(\): scheduler did not stabilize/
 							: /Maximum update depth exceeded/,
 					);
-				} finally { removeRoot(root, container); }
+				} finally {
+					removeRoot(root, container);
+				}
 			}
-		} finally { warning.mockRestore(); }
+		} finally {
+			warning.mockRestore();
+		}
 	});
 
 	// Per ReactUpdates-test.js:1638. A render-phase synchronization nested inside

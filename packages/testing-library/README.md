@@ -88,9 +88,12 @@ delegation. Other helpers keep native semantics:
   is only an explicit change dispatch; it does not model the click, activation,
   cancellation/rollback, or full event ordering.
 - **Focus helpers emit both native focus events.** `fireEvent.focus` dispatches
-  `focusin` and `focus`; `fireEvent.blur` dispatches `focusout` and `blur`.
+  `focus` then `focusin`; `fireEvent.blur` dispatches `blur` then `focusout`,
+  matching browser order.
   Octane's delegated `onFocus`/`onBlur` handlers receive `focusin`/`focusout`.
-  Both events preserve the supplied options, including `relatedTarget`.
+  Both events preserve the supplied options, including `relatedTarget`, except
+  that the paired `focusin`/`focusout` always bubbles. The return value is false
+  when the native `focus`/`blur` event was canceled.
   Use `user.tab()` or native `focus()`/`blur()` to move actual focus.
 - **No enter/leave remapping.** `fireEvent.mouseEnter` dispatches a real
   `mouseenter`, which Octane's capture delegation delivers directly. It does

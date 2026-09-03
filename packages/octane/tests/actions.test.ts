@@ -3,6 +3,7 @@ import { mount, flushEffects } from './_helpers';
 import { flushSync, setFormAction } from '../src/index.js';
 import {
 	ActionForm,
+	SubmitterActionForm,
 	FormWithStatus,
 	RawFormWithStatus,
 	StatusProbe,
@@ -53,6 +54,35 @@ function submit(container: HTMLElement, selector = 'form', submitter?: HTMLEleme
 }
 
 describe('useActionState + <form action>', () => {
+	it.each([
+		['form action', ActionForm],
+		['submitter formAction', SubmitterActionForm],
+	] as const)(
+		'accepts async dispatch through %s without an outside-action diagnostic',
+		async (_name, Component) => {
+			const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const d = deferred();
+			const r = mount(Component, {
+				action: (_prev: string, fd: FormData) => d.promise.then(() => 'got:' + fd.get('name')),
+				initial: 'init',
+			});
+			try {
+				(r.find('#field') as HTMLInputElement).value = 'alice';
+				submit(r.container, 'form', r.find('#submit') as HTMLElement);
+				await tick();
+				expect(r.find('#pending').textContent).toBe('pending');
+				d.resolve();
+				await settle();
+				expect(r.find('#state').textContent).toBe('got:alice');
+				expect(r.find('#pending').textContent).toBe('idle');
+				expect(error).not.toHaveBeenCalled();
+			} finally {
+				r.unmount();
+				error.mockRestore();
+			}
+		},
+	);
+
 	it('runs action(prev, formData), flips isPending, and commits the returned state', async () => {
 		const d = deferred();
 		const action = (_prev: string, fd: FormData) => d.promise.then(() => 'got:' + fd.get('name'));
@@ -194,7 +224,11 @@ describe('useFormStatus', () => {
 			event.preventDefault();
 		};
 		window.addEventListener('error', onError);
-		const r = mount(RawFormWithStatus, { action: () => { throw err; } });
+		const r = mount(RawFormWithStatus, {
+			action: () => {
+				throw err;
+			},
+		});
 		try {
 			flushSync(() => {});
 			expect(r.find('#status').textContent).toBe('idle');
@@ -248,6 +282,25 @@ describe('useOptimistic', () => {
 });
 
 describe('direct dispatch (formAction(payload) outside a form)', () => {
+	it('still diagnoses an async dispatch after an intercepted form action has finished', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const form = mount(ActionForm, { action: async () => 'submitted', initial: 'init' });
+		const direct = mount(DirectAction, { action: async () => 42, initial: 0, payload: 1 });
+		try {
+			submit(form.container);
+			await settle();
+			expect(error).not.toHaveBeenCalled();
+			flushSync(() => (direct.find('#run') as HTMLElement).click());
+			await settle();
+			expect(direct.find('#state').textContent).toBe('42');
+			expect(error).toHaveBeenCalledWith(expect.stringContaining('outside a transition or action'));
+		} finally {
+			form.unmount();
+			direct.unmount();
+			error.mockRestore();
+		}
+	});
+
 	it('runs the action with the raw payload and tracks isPending', async () => {
 		const d = deferred();
 		const action = (_prev: number, payload: number) => d.promise.then(() => payload * 2);

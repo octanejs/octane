@@ -147,7 +147,9 @@ function slotBaseHooks(ast, state, options) {
 				...mapped,
 				callee: b.id(requireHelper(state, 'withSlot', 'octane'), node),
 				typeArguments: null,
-				arguments: [slot, callee, ...mapped.arguments, slot],
+				// Keep foreign/default parameters and arguments.length unchanged;
+				// Octane base aliases resolve their slot from this call's path.
+				arguments: [slot, callee, ...mapped.arguments],
 			};
 		}
 		const imported =

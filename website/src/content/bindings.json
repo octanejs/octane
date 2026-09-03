@@ -284,11 +284,6 @@
         "tags": ["errors", "recovery"]
       },
       {
-        "packageName": "@octanejs/react-is",
-        "title": "React Is",
-        "tags": ["elements", "introspection", "compatibility"]
-      },
-      {
         "packageName": "@octanejs/intersection-observer",
         "title": "React Intersection Observer",
         "tags": ["visibility", "scroll", "browser"]
@@ -576,6 +571,11 @@
         "packageName": "@octanejs/devtools",
         "title": "Octane Devtools",
         "tags": ["devtools", "debugging"]
+      },
+      {
+        "packageName": "@octanejs/react-is",
+        "title": "React Is",
+        "tags": ["elements", "introspection", "compatibility"]
       },
       {
         "packageName": "@octanejs/tanstack-devtools",

@@ -112,6 +112,12 @@ invalid effect returns, insertion-effect updates, lifecycle flushSync calls,
 uncached snapshots, action/optimistic dispatch context, cached-factory `use()`
 reads, and act component names. Idle form status reports a null method on both
 the client and server.
+Native form and submitter actions supply action context before their queued
+`useActionState` callback starts, so they do not emit the outside-action warning.
+Direct async dispatch outside that context still warns. The added check is
+development-only; the production bundle sizes and memo operation counters below
+remain unchanged after this follow-up. Both Cartlane production and development
+browser suites pass (five cases each).
 The relevant tests are
 [audit-list-diagnostics.test.ts](../packages/octane/tests/audit-list-diagnostics.test.ts)
 and [audit-hook-diagnostics.test.ts](../packages/octane/tests/audit-hook-diagnostics.test.ts).

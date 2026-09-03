@@ -425,7 +425,8 @@ describe('parallel use() — independent asynchronous keyed-list children', () =
 			expect((root.find('.transition-dashboard') as HTMLElement).style.display).toBe('none');
 			expect(root.find('.transition-pending').textContent).toBe('loading');
 			await act(() => {
-				for (const resource of ['badge', 'activity', 'insights', 'project']) resources.settle(resource, 2);
+				for (const resource of ['badge', 'activity', 'insights', 'project'])
+					resources.settle(resource, 2);
 			});
 			await act(() => resources.settle('owner', 2));
 			expect(root.findAll('.transition-pending')).toHaveLength(0);

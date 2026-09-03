@@ -123,4 +123,41 @@ describe('imported hook aliases in plain modules', () => {
 			export function other() { return mutable(2); }`;
 		expect(slotHooks(source, 'unproven-alias.ts')).toBeNull();
 	});
+
+	it.each([false, true])(
+		'preserves foreign hook defaults and argument counts (inline=%s)',
+		(inlineHookMemo) => {
+			const argumentCounts: number[] = [];
+			function useOptional(selector = (value: string) => value) {
+				argumentCounts.push(arguments.length);
+				return selector('default');
+			}
+			const { App } = loadPlainHookFixtureSource(
+				`
+			import {createElement, useMemo} from 'octane';
+			import {useOptional as read} from '@foreign/hooks';
+			export function App() {
+				const first = read();
+				const second = read(value => value + '!');
+				const label = useMemo(() => first + ':' + second, [first, second]);
+				return createElement('p', null, label);
+			}
+		`,
+				{
+					id: 'foreign-hook-defaults.ts',
+					inlineHookMemo,
+					runtimeModules: { '@foreign/hooks': { useOptional } },
+				},
+			);
+			const root = mount(App);
+			try {
+				expect(root.find('p').textContent).toBe('default:default!');
+				expect(argumentCounts.splice(0)).toEqual([0, 1]);
+				root.update(App);
+				expect(argumentCounts).toEqual([0, 1]);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
 });

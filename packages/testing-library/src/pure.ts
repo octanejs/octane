@@ -449,7 +449,6 @@ export {
 	getConfig,
 	getDefaultNormalizer,
 	getElementError,
-	getMultipleElementsFoundError,
 	getNodeText,
 	getQueriesForElement,
 	getRoles,
@@ -457,9 +456,6 @@ export {
 	isInaccessible,
 	logDOM,
 	logRoles,
-	makeFindQuery,
-	makeGetAllQuery,
-	makeSingleQuery,
 	prettyDOM,
 	prettyFormat,
 	queries,
@@ -481,13 +477,19 @@ export {
 	queryByTestId,
 	queryByText,
 	queryByTitle,
-	queryHelpers,
 	screen,
 	waitFor,
 	waitForElementToBeRemoved,
 	within,
+} from '@testing-library/dom';
+export {
+	getMultipleElementsFoundError,
+	makeFindQuery,
+	makeGetAllQuery,
+	makeSingleQuery,
+	queryHelpers,
 	wrapAllByQueryWithSuggestion,
 	wrapSingleQueryWithSuggestion,
-} from '@testing-library/dom';
+} from './dom-query-helpers';
 export type * from '@testing-library/dom';
 export { act } from 'octane';

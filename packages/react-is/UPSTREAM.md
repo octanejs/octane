@@ -11,6 +11,16 @@ adapts `src/ReactIs.js`; `src/index.ts` mirrors `index.stable.js`. Runtime owner
 is Octane's `$$kind`, callable context, memo marker and lazy marker. No React
 runtime dependency or React element branding ships.
 
+## Octane release requirement
+
+Publish this binding with the coordinated Octane core release containing the
+behavioral-audit fixes, planned for **0.2.3**. Earlier releases do not supply the
+required `StrictMode` export and owner-bound component-kind metadata. Validation
+uses the current workspace core containing those changes. The shared beta peer
+range is mandated by repository source and tarball validation; it is not a claim
+that earlier core releases implement these capabilities. Shipping this binding
+before the coordinated core release would expose an unresolved runtime dependency.
+
 ## Source boundary
 
 The two authored TypeScript source modules adapt only the pinned `react-is`

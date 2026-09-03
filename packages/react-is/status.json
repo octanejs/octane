@@ -11,6 +11,9 @@
     "React Server Component references are not valid Octane types."
   ],
   "ssr": "Predicates are pure; they never render a component or start a lazy loader.",
+  "notes": [
+    "Requires the coordinated Octane core release containing the behavioral-audit fixes, planned for 0.2.3, or a later compatible release. Its new StrictMode export and owner-bound component-kind metadata are required even though repository policy mandates a broader beta peer range. Publish the binding and that core release together."
+  ],
   "verified": "2026-09-03",
   "provenance": {
     "source": "https://github.com/facebook/react",

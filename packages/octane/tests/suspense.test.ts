@@ -652,7 +652,14 @@ describe('Suspense — effects of siblings rendered before the suspend', () => {
 		// cleanups followed by passive cleanups before root unmount returns.
 		log.length = 0;
 		r.unmount();
-		expect(log).toEqual(['layout cleanup a', 'layout cleanup b', 'layout cleanup plain', 'passive cleanup a', 'passive cleanup b', 'passive cleanup plain']);
+		expect(log).toEqual([
+			'layout cleanup a',
+			'layout cleanup b',
+			'layout cleanup plain',
+			'passive cleanup a',
+			'passive cleanup b',
+			'passive cleanup plain',
+		]);
 		await nextPaint();
 		expect(log).toEqual([
 			'layout cleanup a',

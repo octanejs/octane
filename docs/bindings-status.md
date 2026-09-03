@@ -1059,6 +1059,8 @@ SSR / hydration: Predicates are pure; they never render a component or start a l
 
 Scope/evidence last checked: 2026-09-03.
 
+- Requires the coordinated Octane core release containing the behavioral-audit fixes, planned for 0.2.3, or a later compatible release. Its new StrictMode export and owner-bound component-kind metadata are required even though repository policy mandates a broader beta peer range. Publish the binding and that core release together.
+
 ## @octanejs/react-map-gl
 
 [`packages/react-map-gl`](../packages/react-map-gl) `0.0.24` — ports `@vis.gl/react-mapbox@8.1.2 (b1e46fcf)`. Status data: [`packages/react-map-gl/status.json`](../packages/react-map-gl/status.json).
