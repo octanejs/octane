@@ -1,6 +1,6 @@
 import cx from 'classnames';
 import type { PositionScale, AddSVGProps, BaseAreaProps } from '../types';
-import setNumOrAccessor from '../util/setNumberOrNumberAccessor';
+import setNumOrAccessor from '../../internal/setNumberOrNumberAccessor';
 import { area } from '../util/D3ShapeFactories';
 
 export type AreaClosedProps<Datum> = BaseAreaProps<Datum> & {

@@ -419,9 +419,7 @@ catalogs:
     d3-array: 3.2.1
     d3-chord: ^1.0.6
     d3-cloud: ^1.2.9
-    d3-color: 3.1.0
     d3-delaunay: 6.0.2
-    d3-format: 3.1.0
     d3-geo: 3.1.0
     d3-hierarchy: ^1.1.9
     d3-interpolate: 3.0.1
@@ -432,7 +430,6 @@ catalogs:
     d3-scale: 4.0.2
     d3-shape: 3.2.0
     d3-time: 3.1.0
-    d3-time-format: 4.1.0
     d3-voronoi: ^1.1.4
     'decimal.js-light': ^2.5.1
     'es-toolkit': ^1.49.0
@@ -440,7 +437,6 @@ catalogs:
     eventemitter3: ^5.0.4
     fast-equals: ^5.4.1
     immer: ^11.1.15
-    internmap: 2.0.3
     mitt: ^2.1.0
     recharts: 3.9.2
     'react-hook-form': 7.81.0

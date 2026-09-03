@@ -5,8 +5,12 @@ Octane binding for [`@blocknote/react`](https://www.npmjs.com/package/@blocknote
 ## Usage
 
 ```tsx
-// Scaffold — exports will land as the port progresses.
-import {} from '@octanejs/blocknote';
+import {
+  BlockNoteContext,
+  useBlockNoteContext,
+  useBlockNoteEditor,
+  useCreateBlockNote,
+} from '@octanejs/blocknote';
 ```
 
 ## Compatibility
@@ -16,9 +20,13 @@ Pinned to `@blocknote/react@0.53.0`. Reuses `@blocknote/core` unchanged; React b
 ### Milestone 1 exports
 
 - `useCreateBlockNote`
-- `BlockNoteView`
 - `useBlockNoteEditor`
 - `BlockNoteContext` / `useBlockNoteContext`
+
+Only the four authored modules behind these exports are included by the package
+files allowlist and checked by the package's CI typecheck. The rest of the
+mechanical port remains private staging source until later milestones make it
+part of the supported surface.
 
 ### Mechanical port
 
