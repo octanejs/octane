@@ -4119,5 +4119,61 @@
     "reference": "octane-tsrx-caught-reveal-small",
     "maxRatio": 1.35,
     "note": "Revealing 4,096 hidden caught-error reports, normalized to the 512-report work count, must remain near-linear. Exact origin/main measured 2.00x before direct queue-entry claims; every sample separately gates hidden deferral, FIFO exactly-once reporting, retained output identity, visible text, and clean unmount."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "cycle_map_gets",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Whole-workload native Map.get calls during 64 completed cycle cycles, excluding mount/unmount and timing. Includes DOM/harness lookups; independent render-sequence, DOM, hold/release, and cleanup gates establish equal work. The measured per-cycle ceiling permits cheaper equivalent implementations."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "updater_map_gets",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Whole-workload native Map.get calls during 64 completed updater cycles, excluding mount/unmount and timing. Includes DOM/harness lookups; independent render-sequence, DOM, hold/release, and cleanup gates establish equal work. The measured per-cycle ceiling permits cheaper equivalent implementations."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "held_map_gets",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Whole-workload native Map.get calls during 64 completed held cycles, excluding mount/unmount and timing. Includes DOM/harness lookups; independent render-sequence, DOM, hold/release, and cleanup gates establish equal work. The measured per-cycle ceiling permits cheaper equivalent implementations."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "dispatch_map_gets",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Whole-workload native Map.get calls during 64 completed dispatch cycles, excluding mount/unmount and timing. Includes DOM/harness lookups; independent render-sequence, DOM, hold/release, and cleanup gates establish equal work. The measured per-cycle ceiling permits cheaper equivalent implementations."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "bail_map_gets",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Whole-workload native Map.get calls during 64 completed bail cycles, excluding mount/unmount and timing. Includes DOM/harness lookups; independent render-sequence, DOM, hold/release, and cleanup gates establish equal work. The measured per-cycle ceiling permits cheaper equivalent implementations."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "click_map_gets",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Whole-workload native Map.get calls during 64 completed click cycles, excluding mount/unmount and timing. Includes DOM/harness lookups; independent render-sequence, DOM, hold/release, and cleanup gates establish equal work. The measured per-cycle ceiling permits cheaper equivalent implementations."
+  },
+  {
+    "suite": "transition-hooks",
+    "op": "urgent_map_gets",
+    "target": "octane",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Whole-workload native Map.get calls during 64 completed urgent cycles, excluding mount/unmount and timing. Includes DOM/harness lookups; independent render-sequence, DOM, hold/release, and cleanup gates establish equal work. The measured per-cycle ceiling permits cheaper equivalent implementations."
   }
 ]

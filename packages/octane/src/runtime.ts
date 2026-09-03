@@ -1430,15 +1430,16 @@ function stageTransitionValue<T>(
 	operation: T | ((value: T) => T),
 	value: T,
 	forceRender = false,
-): boolean {
+): TransitionActionUpdate<T> | null {
+	// Select after the caller evaluates its updater: user code can open an Action.
 	const batch = transitionActionBatchForUpdate();
-	if (batch === null) return false;
+	if (batch === null) return null;
 	// Replacement values need a replay closure only when an Action actually
 	// stages the update. Ordinary useState setters stay allocation-free here.
 	const replay = typeof operation === 'function' ? (operation as (value: T) => T) : () => operation;
-	const current = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
+	let current = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
 	if (current === undefined) {
-		batch.updates.set(slot, {
+		current = {
 			batch,
 			slot,
 			block,
@@ -1446,7 +1447,8 @@ function stageTransitionValue<T>(
 			baseValue: slot.value,
 			value,
 			forceRender,
-		});
+		};
+		batch.updates.set(slot, current);
 	} else {
 		current.operations.push(replay);
 		current.value = value;
@@ -1454,7 +1456,7 @@ function stageTransitionValue<T>(
 	}
 	slot.pendingActionBatch = batch;
 	slot.pendingActionValue = value;
-	return true;
+	return current;
 }
 
 function flushTransitionActionBatch(batch: TransitionActionBatch): void {
@@ -7914,19 +7916,15 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 					}
 					return;
 				}
-				if (stageTransitionValue(s!, block, next, computed, forceRender)) {
-					const update = s!.pendingActionBatch!.updates.get(s!) as TransitionActionUpdate<T>;
+				const update = stageTransitionValue(s!, block, next, computed, forceRender);
+				if (update !== null) {
 					if (update.state === undefined) {
 						update.state = s!;
 						captureTransitionHookQueue(update, s!);
 					}
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-						const update = s!.pendingActionBatch?.updates.get(s!) as
-							TransitionActionUpdate<T> | undefined;
-						if (update !== undefined) {
-							update.profileType = 'state';
-							update.profileSlot = slot;
-						}
+						update.profileType = 'state';
+						update.profileSlot = slot;
 					}
 					return;
 				}
@@ -8305,14 +8303,11 @@ export function useLinkedState<Source, Value>(
 					else scheduleRender(block);
 					return;
 				}
-				if (stageTransitionValue(state!, block, operation, computed)) {
+				const update = stageTransitionValue(state!, block, operation, computed);
+				if (update !== null) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-						const update = state!.pendingActionBatch?.updates.get(state!) as
-							TransitionActionUpdate<Value> | undefined;
-						if (update !== undefined) {
-							update.profileType = 'state';
-							update.profileSlot = slot;
-						}
+						update.profileType = 'state';
+						update.profileSlot = slot;
 					}
 					return;
 				}
@@ -8528,19 +8523,15 @@ export function useReducer<S, A, I = S>(
 				} catch {
 					/* Re-evaluate in render. */
 				}
-				if (stageTransitionValue(s!, block, operation, computed, true)) {
-					const update = s!.pendingActionBatch!.updates.get(s!) as TransitionActionUpdate<S>;
+				const update = stageTransitionValue(s!, block, operation, computed, true);
+				if (update !== null) {
 					if (update.reducer === undefined) {
 						update.reducer = s!;
 						captureTransitionHookQueue(update, s!);
 					}
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-						const update = s!.pendingActionBatch?.updates.get(s!) as
-							TransitionActionUpdate<S> | undefined;
-						if (update !== undefined) {
-							update.profileType = 'reducer';
-							update.profileSlot = slot;
-						}
+						update.profileType = 'reducer';
+						update.profileSlot = slot;
 					}
 					return;
 				}

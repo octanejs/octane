@@ -456,15 +456,31 @@ function scenarios(bundle) {
 async function exercise(bundle, observed) {
 	const counters = {};
 	const semantics = {};
+	const mapGets = {};
 	const suite = scenarios(bundle);
 	async function phase(name, count, step) {
 		globalThis[COUNTER_GLOBAL] = emptyCounters();
 		const rendersBefore = suite.renders.count;
 		const first = [];
-		for (let index = 0; index < count; index++) {
-			await step();
-			if (index === 0) first.push(...suite.observations);
+		const nativeGet = Map.prototype.get;
+		let lookups = 0;
+		// Count the complete observed workload, including DOM/harness lookups. This
+		// native-operation census is separate from runtime-attributed creations.
+		if (observed) {
+			Map.prototype.get = function (key) {
+				lookups++;
+				return nativeGet.call(this, key);
+			};
 		}
+		try {
+			for (let index = 0; index < count; index++) {
+				await step();
+				if (index === 0) first.push(...suite.observations);
+			}
+		} finally {
+			if (observed) Map.prototype.get = nativeGet;
+		}
+		if (observed) mapGets[name] = lookups;
 		if (observed) counters[name] = { cycles: count, counters: { ...globalThis[COUNTER_GLOBAL] } };
 		semantics[name] = {
 			renders: suite.renders.count - rendersBefore,
@@ -503,7 +519,7 @@ async function exercise(bundle, observed) {
 		await phase('urgent', CYCLES, urgent.step);
 		urgent.unmount();
 	}
-	return { counters, semantics };
+	return { counters, semantics, mapGets };
 }
 
 async function time(bundle) {
@@ -585,7 +601,7 @@ const runMetadata = {
 	observerSha256: sha256(fs.readFileSync(path.join(ROOT, '../hook-memo/instrument.mjs'))),
 	runnerSha256: sha256(fs.readFileSync(path.join(ROOT, 'run.mjs'))),
 	measurement:
-		'source creation events per observed drive phase, render counts, bytes, and secondary microsecond timings',
+		'source creation events, untimed whole-workload native Map.get calls, render counts, bytes, and secondary microsecond timings',
 };
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-transition-hooks-'));
@@ -600,6 +616,9 @@ try {
 	fs.writeFileSync(cleanFile, cleanCode);
 	const cleanBundle = await import(pathToFileURL(cleanFile).href);
 	const clean = await exercise(cleanBundle, false);
+	// Time before replacing native methods: restoring them need not restore a
+	// JavaScript engine's invalidated optimization assumptions.
+	const timings = TIMING === null ? {} : await time(cleanBundle);
 
 	const observedCode = instrumentJavaScript(
 		cleanCode,
@@ -617,19 +636,25 @@ try {
 	const ops = {};
 	for (const [phase, measurement] of Object.entries(observed.counters)) {
 		ops[`${phase}_renders`] = val(clean.semantics[phase].renders);
+		ops[`${phase}_map_gets`] = val(observed.mapGets[phase]);
 		for (const [metric, count] of Object.entries(summarizedCounters(measurement.counters))) {
 			ops[`${phase}_${metric}`] = val(count);
 		}
 	}
 	const minifiedBundle = transformSync(cleanCode, { loader: 'js', minify: true }).code;
 	ops.code_minified = val(bytes(transformSync(compiled.code, { loader: 'js', minify: true }).code));
+	ops.bundle_minified = val(bytes(minifiedBundle));
 	ops.bundle_gzip = val(gzipBytes(minifiedBundle));
-	const timings = TIMING === null ? {} : await time(cleanBundle);
 	Object.assign(ops, timings);
 	target = {
 		name: 'octane',
 		ops,
-		meta: { run: runMetadata, counters: observed.counters, semantics: clean.semantics },
+		meta: {
+			run: runMetadata,
+			counters: observed.counters,
+			semantics: clean.semantics,
+			mapGets: observed.mapGets,
+		},
 	};
 	for (const phase of Object.keys(observed.counters)) {
 		const summary = summarizedCounters(observed.counters[phase].counters);
@@ -662,6 +687,13 @@ try {
  * enforce exact ceilings, including zero for paths that must stay allocation-free.
  */
 const WORK_MODEL = {
+	cycle_map_gets: [12, 0],
+	updater_map_gets: [12, 0],
+	held_map_gets: [27, 1],
+	dispatch_map_gets: [4, 0],
+	bail_map_gets: [1, 0],
+	click_map_gets: [53, 0],
+	urgent_map_gets: [23, 0],
 	cycle_renders: [2, 0],
 	cycle_runtime_functions: [2, 0],
 	cycle_runtime_arrays: [27, 0],

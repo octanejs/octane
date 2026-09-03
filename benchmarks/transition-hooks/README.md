@@ -67,8 +67,17 @@ These are **source-level creation events, not a V8 heap census**. Timings
 1,000 warmup cycles, 40 samples of 500 cycles; the held and urgent scenarios use
 200 warmups and 40 samples of 100) are secondary evidence and carry no guard:
 this machine-dependent signal is smaller than ordinary run-to-run noise for the
-cheapest cycles. `code_minified` is the compiled fixture; `bundle_gzip` includes
-the tree-shaken runtime.
+cheapest cycles. `code_minified` is the compiled fixture; `bundle_minified` and
+`bundle_gzip` include the tree-shaken runtime.
+
+A separate native-operation census wraps `Map.prototype.get` only during each
+untimed observed drive phase and restores it in `finally`. `<scenario>_map_gets`
+counts the complete workload, including happy-dom, fixture, and harness calls;
+it is not attributed to runtime source. Mount and unmount are outside this
+census, and the creation observer adds no Map lookups. The clean run uses the
+original native method and must produce the same semantics. Clean timings run
+before any native-method override, since restoration alone need not restore
+the engine's optimization assumptions.
 
 `OCTANE_TRANSITION_ROOT` selects another Octane source checkout and
 `OCTANE_TRANSITION_EXTERNAL_ROOT` the checkout supplying installed dependencies.
@@ -98,3 +107,51 @@ first hook in a field and counts pending batches on the hook. The one remaining
 transition creates when it holds; it stays on that cold path. The `urgent`
 scenario has no baseline column because the baseline rendered the child's
 transition value under the urgent parent render, which the audit corrected.
+
+## Staged-update lookup reuse
+
+Returning the staged update record directly avoids looking it up again. Against
+`613508303`, on Node 26.4.0 with esbuild 0.28.1, the unchanged fixture and
+dependencies produced these native `Map.get` counts per 64 cycles:
+
+| Scenario | `613508303` | Record reuse |
+| --- | ---: | ---: |
+| `cycle` | 832 | 768 |
+| `updater` | 832 | 768 |
+| `held` | 1,793 | 1,729 |
+| `urgent` | 1,536 | 1,472 |
+| `dispatch` | 256 | 256 |
+| `bail` | 0 | 0 |
+| `click` | 3,392 | 3,392 |
+
+Each scenario that stages one update removes exactly one lookup per cycle.
+The ordinary-update controls, every existing source creation counter, and
+every semantic observation are unchanged. The compiled fixture remains 3,368
+minified bytes; the complete minified bundle falls from 203,020 to 203,005 bytes
+(−15 bytes), while gzip changes from 64,354 to 64,355 bytes (+1 byte).
+
+The seven new lookup ceilings supplement the 35 existing work guards. The
+unmodified baseline breaches the four staged-update lookup ceilings while
+passing all existing guards and the three new controls; record reuse passes
+all 42. These counts establish removed lookup work, without making an
+allocation or application-latency claim.
+
+Historical quiet A/B/B/A timings against `eff02711b`, before the compiler and
+SSR changes in `613508303`, used the Node/happy-dom settings above. The
+functional-updater timings and unchanged native-click control were:
+
+| Order | Runtime | Updater mean (µs) | Updater median (µs) | Click mean (µs) |
+| --- | --- | ---: | ---: | ---: |
+| A1 | `eff02711b` | 1.753 | 1.583 | 5.821 |
+| B1 | Record reuse on `eff02711b` | 2.041 | 1.967 | 7.701 |
+| B2 | Record reuse on `eff02711b` | 1.674 | 1.562 | 5.813 |
+| A2 | `eff02711b` | 1.648 | 1.555 | 5.607 |
+
+All four runs passed the semantic controls and reproduced the deterministic
+counter results. The first candidate run was slower, including the unchanged
+click control; the other candidate run was much closer to the baseline.
+The variability prevents attributing elapsed-time differences to this change.
+No elapsed-time improvement is established; the supported result is the removed
+lookup per staged update with unchanged creation counts. The `613508303`
+revalidation repeated the deterministic counters and byte measurements, without
+claiming those historical timings describe the newer base.
