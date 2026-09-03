@@ -1438,6 +1438,33 @@ export const dark = <style apply={base}>
 const THEME_APP_TSRX = `import { useState } from 'octane';
 import { dark, light } from './theme.tsrx';
 
+// A block is a theme as soon as something reads its $class, even if nothing
+// exports or applies it: \`accent\` keeps its element rules, and only the
+// elements that carry accent.$class pick them up.
+const accent = <style>
+	p {
+		border-left: 3px solid #5b4bff;
+		padding-left: 0.5rem;
+	}
+	strong {
+		color: #5b4bff;
+	}
+</style>;
+
+// A child stamps a passed class on the elements it chooses; its own scope
+// hash follows, so its local rules still reach them.
+function Footnote({ parentClass }: { parentClass: string }) @{
+	<style>
+		p {
+			margin: 0;
+			font-size: 0.9rem;
+		}
+	</style>
+	<p class={parentClass}>
+		<strong class={parentClass}>Footnote:</strong> a child opted in through a prop.
+	</p>
+}
+
 // Each card applies a theme to its own scope: the theme's article and h2
 // rules reach every element here, while the card's local rules stay local.
 function LightCard() @{
@@ -1471,6 +1498,9 @@ export default function App() @{
 	<div class="stack">
 		<LightCard />
 		<DarkCard />
+		<p class={accent.$class}>Opted in with accent.$class; apply would stamp every element.</p>
+		<p>An untouched sibling.</p>
+		<Footnote parentClass={accent.$class} />
 		<button onClick={() => setExpanded(!expanded)}>
 			{(expanded ? 'Collapse' : 'Expand') as string}
 		</button>

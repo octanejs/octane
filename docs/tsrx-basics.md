@@ -479,9 +479,10 @@ export function Label() @{
 }
 ```
 
-The sheet injects at the declaration position. A block that is exported or
-applied (below) is a **theme** and keeps every selector; a local block that is
-neither keeps only the class selectors its map exposes, and the rest are pruned.
+The sheet injects at the declaration position. A block that is exported, applied
+(below), or whose `$class` is read anywhere in the module is a **theme** and
+keeps every selector; a local block that is none of these keeps only the class
+selectors its map exposes, and the rest are pruned.
 `.$class` is reserved as a selector name in an assigned block
 (`STYLE_RESERVED_CLASS_KEY`), and a standalone block at module scope is an error
 (`STYLE_STANDALONE_AT_MODULE_SCOPE`): assign it.
@@ -521,6 +522,48 @@ path. A target must be declared before the block that applies it
 (`STYLE_APPLY_VALUE`) that resolves to a style block or an import
 (`STYLE_APPLY_TARGET`), and appears once per block (`STYLE_APPLY_DUPLICATE`; use
 an array). Any other attribute on a scoped block is `STYLE_UNKNOWN_ATTRIBUTE`.
+
+### Opting elements in with `$class`
+
+`apply` stamps a theme on every element of a scope. To pick the elements
+yourself, put `theme.$class` in their `class` instead and leave `apply` out:
+only the elements that carry it match the theme's element and descendant
+selectors, and the rest of the scope is untouched. The class is a plain string,
+so a child component can take it through a prop and stamp its own elements with
+it; the passed class lands before the child's own scope hash:
+
+```jsx
+function Card({ parentClass }: { parentClass: string }) @{
+	<>
+		<style>
+			.local { padding: 0; }
+		</style>
+		<article class={parentClass}>
+			<h2 class={parentClass}>Blue, from the parent's theme</h2>
+		</article>
+	</>
+}
+
+export function App() @{
+	const theme = <style>
+		div, h2 { color: blue; }
+		.card { color: red; }
+	</style>;
+	<>
+		<Card parentClass={theme.$class} />
+		<div class={theme.$class}>Blue: opted in</div>
+		<div class={theme.card}>Red: a class entry carries the hash too</div>
+		<p>Untouched</p>
+	</>
+}
+```
+
+Reading `theme.$class` is what makes `theme` a theme here: the `div, h2` rule
+survives although nothing exports or applies the block. A block whose only reads
+are class entries (`theme.card`) stays a class map and prunes its element
+selectors. `class={[a.$class, b.$class]}` opts one element into several themes,
+the way `apply={[a, b]}` does for a whole scope, and the two forms compose: a
+scope can apply a base theme while single elements opt into an accent.
 
 ### Class order and `style()`
 

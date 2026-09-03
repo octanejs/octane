@@ -128,8 +128,9 @@ of a scoped block: `$class` (the applied themes' classes, then its own hash) plu
 one key per class selector whose value is `"<hash> <name>"`. Pass those strings
 as props (`<Badge class={theme.dark} />`). The declaration may live anywhere a
 declaration can, including module scope, where a standalone block is an error.
-Exported or applied blocks are themes and keep every selector; a local block that
-is neither keeps only its standalone class selectors.
+Exported or applied blocks, and blocks whose `$class` is read anywhere in the
+module, are themes and keep every selector; a local block that is none of these
+keeps only its standalone class selectors.
 
 `<style apply={theme} />` stamps `theme.$class` on every element of the scope it
 sits in, so the theme's element and descendant rules reach them; the self-closed
@@ -139,6 +140,14 @@ apply another (`const accent = <style apply={base}>…</style>`), and
 `export const bundle = <style apply={[a, b]} />` composes without CSS of its own.
 A theme must be declared before the block that applies it. Same-module targets
 inline as string literals; imported themes are runtime `theme.$class` reads.
+
+`apply` is the whole-scope form. To opt single elements in, give them
+`class={theme.$class}` and leave `apply` out: only the elements carrying the
+class match the theme's element and descendant rules, their siblings stay
+untouched, and a child component can take the class through a prop
+(`<Card parentClass={theme.$class} />`, then `<article class={parentClass}>`),
+where it lands before the child's own scope hash. `class={[a.$class, b.$class]}`
+is the per-element counterpart of `apply={[a, b]}`; the two forms compose.
 
 ```tsx
 export function Panel() @{
