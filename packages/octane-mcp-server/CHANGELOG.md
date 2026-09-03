@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.2.24
+
+### Patch Changes
+
+- 44d50db: Recognize exported element-kind symbols as introspection labels during binding preflight, while continuing to reject unsupported renderer use. Register the verified react-is binding.
+
 ## 0.2.23
 
 ### Patch Changes

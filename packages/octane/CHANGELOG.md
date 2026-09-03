@@ -1,5 +1,36 @@
 # octane
 
+## 0.2.3
+
+### Patch Changes
+
+- 6135083: Keep the form-action submit handler, and the transition graph it starts, out of production bundles that never install a function form action, and emit the compiled setup checkpoint only for component setups that can schedule a render-phase self-update.
+- 0705d6c: Reuse staged transition updates instead of repeating map lookups.
+- 415e7fd: Recover server rendering throughput: a render whose hoisted head is empty no
+  longer scans the whole response for a `</head>` unless it is a document.
+  Rendered output is unchanged.
+- eff0271: Track `useTransition` pending ownership without allocating a `Set` per transition. A batch stores its starting hook in a field and the hook counts its pending batches, so a start → pending → settle cycle allocates the same three collections it did before the React behavioral audit fixes while keeping every corrected behavior: nested starts from another hook share the batch's pending window, a hook starting nested transitions inside its own Action is counted once, and a re-held batch becomes pending again.
+- 44d50db: Fix JSX ordering, whitespace, entities, keyed hosts and portals, parser-sensitive
+  markup, document roots, and Suspense warming. Correct transition ownership,
+  queued state updates, deferred values, effect cleanup and error delivery, native
+  event dispatch, uncontrolled form defaults, form actions, and style updates.
+  Preserve dispatch order across consecutive and awaited Actions, retain committed
+  child inputs during urgent parent updates, and keep third-tuple getters available
+  to bindings that supply their own hook slots.
+  Preserve authored custom-hook arguments and symbol initial values through aliases.
+  Keep manually slotted hooks independent when nested inside custom hooks.
+  Preserve hoisting and remove unused manual hook providers from production bundles.
+  Replay parent setup updates before initializing children, and explain missing
+  document bodies after document-root hydration.
+
+  Escape application strings in every server renderer, accept renderable roots,
+  recover buffered Suspense errors, and report hydration recoveries consistently.
+  Add React-named migration types, StrictMode and batching pass-throughs, the
+  useFormState alias, and server version exports. Document intentional differences
+  in template children, branch identity, native events, scheduling, and SSR.
+
+- bf860be: Skip redundant HTML wrapping in compiled server loop bodies while preserving escaping, streaming, and hydration behavior.
+
 ## 0.2.2
 
 ### Patch Changes
