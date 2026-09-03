@@ -246,6 +246,7 @@ const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 	'startTransition',
 	'use',
 	'useActionState',
+	'useFormState',
 	'useCallback',
 	'useContext',
 	'useDebugValue',
@@ -3818,6 +3819,7 @@ export const UNIVERSAL_COMPILER_RUNTIME_IMPORTS = new Set([
 	'useBatch',
 	'warmChild',
 	'warmMemo',
+	'markWarm',
 	'withSlot',
 ]);
 
@@ -4237,6 +4239,7 @@ export function lowerUniversalRendererRegionAst(
 				'useBatch',
 				'warmMemo',
 				'warmChild',
+				'markWarm',
 				'withSlot',
 				'hookSlots',
 			].map((imported) => [

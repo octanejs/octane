@@ -211,6 +211,7 @@
     "@volar/typescript": "catalog:default",
     "alien-signals": "3.2.0",
     "devalue": "catalog:default",
+    "entities": "7.0.1",
     "es-module-lexer": "catalog:default",
     "esrap": "catalog:default",
     "oxc-tsrx": "catalog:default"

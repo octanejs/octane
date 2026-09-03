@@ -41,7 +41,7 @@ function makeRegistry() {
 }
 
 describe('transition — DESCENDANT re-suspend keeps prior content (React useTransition parity)', () => {
-	it('holds content-1 while a transition re-suspends the child on value=2; isPending true; resolves to content-2', async () => {
+	it('holds content-1 while a transition re-suspends the child on value=2; unrelated hook stays idle; resolves to content-2', async () => {
 		const { promiseFor, d2 } = makeRegistry();
 		const r = mount(TransitionDescendantSuspend, { promiseFor });
 		await act(() => {});
@@ -55,11 +55,11 @@ describe('transition — DESCENDANT re-suspend keeps prior content (React useTra
 		// Inside a transition, change value=2 → the CHILD re-renders on its OWN
 		// (a descendant block) and re-suspends on d2 (still pending). The
 		// descendant re-suspend must be HELD: content-1 stays in the DOM, NO
-		// fallback flash, and isPending (from the sibling probe) flips true.
+		// fallback flash. The sibling hook does not own this transition.
 		await act(() => setValueTransition(2));
 		expect(r.find('#content').textContent).toBe('content-1'); // OLD content held
 		expect(r.findAll('#fallback')).toHaveLength(0); // no fallback flash
-		expect(r.find('#pending').textContent).toBe('pending');
+		expect(r.find('#pending').textContent).toBe('idle');
 
 		// Resolve d2 → the held try block resumes, the child re-renders with the
 		// resolved value, content-2 commits, and isPending returns to idle.

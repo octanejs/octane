@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-is",
+    "version": "19.2.7",
+    "repository": {
+      "owner": "facebook",
+      "repo": "react",
+      "subdirectory": "packages/react-is"
+    },
+    "commit": "6117d7cca4906492c51fe6a03381e35adfd86e7d",
+    "integrity": "sha512-kZFnouyVv7eP/Phmrlo9FK+zcAdriZJvzxXHF1Sl1P377WSGe2G/JxVolhTrB/jeV47lKImhNUsijjHAAbcl/A=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "src/__tests__",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "require('react')",
+      "replace": "require('octane')"
+    },
+    {
+      "find": "require('react-dom')",
+      "replace": "require('octane')"
+    },
+    {
+      "find": "require('react-is')",
+      "replace": "require('@octanejs/react-is')"
+    }
+  ],
+  "files": [
+    {
+      "path": "index.experimental.js",
+      "gitBlob": "b9bddfa421797a40cf93c7d39935f2ca5a38245f",
+      "size": 618
+    },
+    {
+      "path": "index.js",
+      "gitBlob": "f358e66565fbe8c509a71cbba0adce054c55f59c",
+      "size": 250
+    },
+    {
+      "path": "index.stable.js",
+      "gitBlob": "b9bddfa421797a40cf93c7d39935f2ca5a38245f",
+      "size": 618
+    },
+    {
+      "path": "npm/index.js",
+      "gitBlob": "2cafe482766b4ba227a9735f141428678339e278",
+      "size": 192
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "5bb50e6c864ed9d96c3f8a044517fc81b2769ec0",
+      "size": 516
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "c446e89c6b0fe231391f5c4f313c204555d8d6d3",
+      "size": 2314
+    },
+    {
+      "path": "src/__tests__/ReactIs-test.js",
+      "gitBlob": "f9d9dc923cc2339ad58356a66f4a55247499050a",
+      "size": 8651
+    },
+    {
+      "path": "src/ReactIs.js",
+      "gitBlob": "ed70f0e68eb752bb0d760383d8baf6a73cbe0757",
+      "size": 5174
+    }
+  ],
+  "fingerprint": "48b881568e24959eaeb57d85888aac2da5e3f490bf2ccd8431a17960d728b677"
+}

@@ -2090,7 +2090,7 @@ export function hmrUniversalComponent<P>(
 				__profileComponentSource(wrapper, next);
 			}
 			if ((next as any).__warm === undefined) delete (wrapper as any).__warm;
-			else (wrapper as any).__warm = (next as any).__warm;
+			else markWarm(wrapper, (next as any).__warm);
 			for (const owner of owners) {
 				if (owner.disposed) {
 					owners.delete(owner);
@@ -2113,13 +2113,17 @@ export function hmrUniversalComponent<P>(
 		{ module: metadata.module },
 	) as UniversalHmrComponent<P>;
 	Object.defineProperties(wrapper, {
-		[UNIVERSAL_HMR]: { value: meta },
+		[UNIVERSAL_HMR]: {
+			get() {
+				return this === wrapper ? meta : undefined;
+			},
+		},
 		[UNIVERSAL_COMPONENT_REVISION]: { get: () => meta.revision },
 	});
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 		__profileComponentSource(wrapper, component);
 	}
-	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
+	if ((component as any).__warm !== undefined) markWarm(wrapper, (component as any).__warm);
 	return wrapper;
 }
 
@@ -6290,6 +6294,17 @@ export function warmMemo(compute: () => any, deps: readonly any[], slot: unknown
 	CURRENT_UNIVERSAL_WARM_CLAIMS?.add(entry);
 }
 
+/** Keep compiler-owned plans from following static hoisting onto unrelated HOCs. */
+export function markWarm<T extends Function>(component: T, plan: unknown): T {
+	Object.defineProperty(component, '__warm', {
+		configurable: true,
+		get() {
+			return this === component ? plan : undefined;
+		},
+	});
+	return component;
+}
+
 /** Compiler ABI: recurse into a compiled child's statically attached warm plan. */
 export function warmChild(component: any, props: any): void {
 	if (CURRENT_UNIVERSAL_WARM === null || component == null) return;
@@ -6387,9 +6402,13 @@ export function lazy<C extends UniversalComponent<any>>(
 		throw new UniversalSuspense(thenable!);
 	}) as UniversalComponent<any>;
 	Object.defineProperties(wrapper, {
-		[LAZY_COMPONENT]: { value: true },
-		__warm: { value: initialize },
+		[LAZY_COMPONENT]: {
+			get() {
+				return this === wrapper;
+			},
+		},
 	});
+	markWarm(wrapper, initialize);
 	return wrapper as C;
 }
 
@@ -6542,6 +6561,14 @@ function mergeMemoContextReads(contextReads: Map<UniversalContext<any>, unknown>
 	for (const [context, value] of contextReads) CURRENT_MEMO_CONTEXT_READS.set(context, value);
 }
 
+export function memo<C extends UniversalComponent<any>>(
+	component: C,
+	compare?: (previous: Readonly<Parameters<C>[0]>, next: Readonly<Parameters<C>[0]>) => boolean,
+): C;
+export function memo<P>(
+	component: UniversalComponent<P>,
+	compare?: (previous: Readonly<P>, next: Readonly<P>) => boolean,
+): UniversalComponent<P>;
 export function memo<P>(
 	component: UniversalComponent<P>,
 	compare?: (previous: Readonly<P>, next: Readonly<P>) => boolean,
@@ -6603,7 +6630,11 @@ export function memo<P>(
 		// The wrapper remains renderer-neutral until the lazy module resolves; the
 		// wrapped lazy component still owns loader caching and renderer validation.
 		wrapper = renderMemo as UniversalComponent<P>;
-		Object.defineProperty(wrapper, LAZY_COMPONENT, { value: true });
+		Object.defineProperty(wrapper, LAZY_COMPONENT, {
+			get() {
+				return this === wrapper;
+			},
+		});
 	} else {
 		wrapper = defineUniversalComponent<P>(metadata.id, renderMemo, { module: metadata.module });
 	}
@@ -6613,7 +6644,7 @@ export function memo<P>(
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 		__profileComponentSource(wrapper, component);
 	}
-	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
+	if ((component as any).__warm !== undefined) markWarm(wrapper, (component as any).__warm);
 	return wrapper;
 }
 

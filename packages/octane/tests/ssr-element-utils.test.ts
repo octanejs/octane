@@ -149,15 +149,17 @@ describe('octane/server element utilities', () => {
 	it('Children promises keep SSR boundary suspension bookkeeping during render', () => {
 		const promise = new Promise(() => {});
 		const App = (props: { promise: Promise<unknown> }, scope: unknown) =>
-			(Server as any).ssrTry(
-				scope,
-				'children-promise',
-				() => {
-					Children.toArray(props.promise);
-					return '<strong>ready</strong>';
-				},
-				() => '<em>loading</em>',
-				null,
+			Server.ssrHtml(
+				(Server as any).ssrTry(
+					scope,
+					'children-promise',
+					() => {
+						Children.toArray(props.promise);
+						return '<strong>ready</strong>';
+					},
+					() => '<em>loading</em>',
+					null,
+				),
 			);
 		const { html } = renderToStaticMarkup(App, { promise });
 		expect(html).toContain('<em>loading</em>');

@@ -13,14 +13,8 @@ import { use, useState, useTransition } from 'octane';
 // new tree is ready — NO fallback flash. A non-transition (urgent) re-suspend
 // SHOULD swap to the @pending fallback.
 //
-// The boundary does NOT use useTransition (that would cascade a re-render of
-// the whole try subtree, turning the descendant suspend into an own-body
-// suspend). isPending is surfaced from a SIBLING `PendingProbe` that sits
-// OUTSIDE the @try — it has its own useTransition() hook, so when the global
-// transition pending count is held open by the descendant's suspended
-// transition, the probe re-renders and reports `pending`. Reading it from
-// inside the held subtree would only ever show the stale (held) DOM.
-// ---------------------------------------------------------------------------
+// The sibling probe owns no actions and must stay idle while a descendant's
+// separately owned transition holds its content.
 
 let _setValueTransition: ((v: number) => void) | null = null;
 let _setValueUrgent: ((v: number) => void) | null = null;
@@ -35,9 +29,6 @@ export function setValueUrgent(v: number): void {
 	_setValueUrgent!(v);
 }
 
-// A sibling outside the @try whose own useTransition hook reflects the global
-// transition pending count. Stays mounted (and re-renderable) throughout, so it
-// can report `pending` while the descendant transition is held.
 function PendingProbe() @{
 	const [isPending] = useTransition();
 	<span id="pending">

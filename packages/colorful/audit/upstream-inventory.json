@@ -970,7 +970,7 @@
       "upstream": "tag/tests/components.test.js::Fires custom `onBlur` when `HexColorInput` has lost focus",
       "disposition": "adapted-and-executable",
       "evidence": "tests/upstream/components.test.ts::Fires custom `onBlur` when `HexColorInput` has lost focus",
-      "adaptedDigest": "d4f94941cc467aa2c447d4ca68413552139f9fe3d97696e3ad0497fb3180bfdf"
+      "adaptedDigest": "8f828d90f820deffbae45c656323f993307327ac85aff5ea08c2c927831fd986"
     },
     {
       "upstream": "tag/tests/components.test.js::Displays `#` prefix in `HexColorInput` if `prefixed` is turned on",

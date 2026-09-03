@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 60,
+  "nextCode": 63,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -348,6 +348,24 @@
       "message": "Unsupported native-read compiler/runtime version.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "60": {
+      "message": "A component suspended without a Suspense boundary during synchronous server rendering. Use prerender() or a streaming renderer to await it.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "61": {
+      "message": "Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "62": {
+      "message": "Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.",
+      "argumentCount": 0,
+      "runtime": ["client"],
       "status": "active"
     },
     "59": {

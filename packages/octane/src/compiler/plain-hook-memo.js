@@ -126,13 +126,30 @@ function inferredDependencyArray(inferred, state, origin) {
 	);
 }
 
-// Match the surgical pass's BASE-hook-only policy. Custom hooks remain normal
-// calls; their compiled caller owns withSlot. Existing explicit memo slots are
+// Match the surgical pass's base-hook and imported-hook slot policy. Local
+// custom helpers keep their authored boundaries. Existing explicit memo slots are
 // already the effective third argument, so no unused fourth argument is added.
 function slotBaseHooks(ast, state, options) {
 	function visit(node) {
 		if (node === null || typeof node !== 'object') return node;
 		if (Array.isArray(node)) return mapChildren(node, visit);
+		if (node.type === 'CallExpression' && node._octaneCustomHookCall) {
+			const slot = allocateHookSlot(state, node);
+			const mapped = mapChildren(node, visit);
+			const callee = mapped.typeArguments
+				? {
+						type: 'TSInstantiationExpression',
+						expression: mapped.callee,
+						typeArguments: mapped.typeArguments,
+					}
+				: mapped.callee;
+			return {
+				...mapped,
+				callee: b.id(requireHelper(state, 'withSlot', 'octane'), node),
+				typeArguments: null,
+				arguments: [slot, callee, ...mapped.arguments, slot],
+			};
+		}
 		const imported =
 			node.type === 'CallExpression'
 				? (node._octaneImportedHook ??

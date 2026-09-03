@@ -187,23 +187,25 @@ describe('useFormStatus', () => {
 	});
 
 	it('clears pending when a raw form action throws synchronously', async () => {
-		// A synchronously-throwing action must still reset the form status — it must
-		// not leave useFormStatus stuck on pending — and report the error.
-		const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const err = new Error('boom');
-		const action = () => {
-			throw err;
+		const errors: unknown[] = [];
+		const onError = (event: ErrorEvent) => {
+			errors.push(event.error);
+			event.preventDefault();
 		};
-		const r = mount(RawFormWithStatus, { action });
-		flushSync(() => {});
-		expect(r.find('#status').textContent).toBe('idle');
-
-		submit(r.container);
-		await tick();
-		expect(r.find('#status').textContent).toBe('idle'); // not stuck on pending
-		expect(spy).toHaveBeenCalledWith(err);
-		spy.mockRestore();
-		r.unmount();
+		window.addEventListener('error', onError);
+		const r = mount(RawFormWithStatus, { action: () => { throw err; } });
+		try {
+			flushSync(() => {});
+			expect(r.find('#status').textContent).toBe('idle');
+			submit(r.container);
+			await tick();
+			expect(r.find('#status').textContent).toBe('idle');
+			expect(errors).toEqual([err]);
+		} finally {
+			r.unmount();
+			window.removeEventListener('error', onError);
+		}
 	});
 });
 

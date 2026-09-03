@@ -36,8 +36,11 @@ describe('@octanejs/dexie hooks', () => {
 		await nextPaint();
 		expect(result.find('#value').textContent).toBe('ready');
 
+		const unsubscribesBeforeUnmount = observable.unsubscribeCount;
+		expect(observable.listeners.size).toBe(1);
 		result.unmount();
-		expect(observable.unsubscribeCount).toBe(1);
+		expect(observable.unsubscribeCount).toBe(unsubscribesBeforeUnmount + 1);
+		expect(observable.listeners.size).toBe(0);
 	});
 
 	it('keeps multiple hook call sites independent', async () => {

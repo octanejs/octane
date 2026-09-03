@@ -18,14 +18,7 @@ function base(extra: Record<string, unknown> = {}) {
 }
 
 describe('resource lifecycle', () => {
-	/**
-	 * OCTANE DIVERGENCE (framework, not binding; not a manifest lane divergence): effect cleanups run when the
-	 * passive queue drains, not synchronously inside `root.unmount()`. The map,
-	 * its sources and its layers therefore outlive the unmount call itself by one
-	 * drain. Consumers tearing a map down before, say, navigating away should not
-	 * assume the GL context is gone the instant `unmount()` returns.
-	 */
-	it('releases the map on the drain that follows unmount, not inside the call', async () => {
+	it('releases the map before root unmount returns', async () => {
 		const ref: { current: any } = { current: null };
 		const view = mount(
 			MarkerMap,
@@ -36,7 +29,7 @@ describe('resource lifecycle', () => {
 		expect(instance.removed).toBe(false);
 
 		view.root.unmount();
-		expect(instance.removed).toBe(false);
+		expect(instance.removed).toBe(true);
 
 		flushEffects();
 		flushSync(() => {});

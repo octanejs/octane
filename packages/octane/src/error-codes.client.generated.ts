@@ -51,6 +51,8 @@ type ClientErrorArguments = {
 	55: [];
 	56: [];
 	58: [];
+	61: [];
+	62: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -230,6 +232,16 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 58:
 				return formatDevErrorMessage('Unsupported native-read compiler/runtime version.', args);
+			case 61:
+				return formatDevErrorMessage(
+					'Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.',
+					args,
+				);
+			case 62:
+				return formatDevErrorMessage(
+					'Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.',
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

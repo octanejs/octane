@@ -177,8 +177,8 @@ export const componentWrongCallback = (
 	<ReactCompat component={Counter} props={{ ...counterProps, onCount: stringHandler }} />
 );
 export const mixedForms = (
-	// @ts-expect-error — the two authoring forms are mutually exclusive
 	<ReactCompat component={Counter} props={{ label: 'Count', start: 3 }}>
+		{/* @ts-expect-error — the two authoring forms are mutually exclusive */}
 		<Counter label="Count" start={3} />
 	</ReactCompat>
 );

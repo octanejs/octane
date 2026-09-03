@@ -43,6 +43,7 @@ export interface PlainHookFixtureSourceOptions {
 	inlineHookMemo: boolean;
 	manualSlots?: boolean;
 	nativeReads?: boolean;
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
 export function loadCompiledFixtureSource<T extends CompiledFixtureModule = CompiledFixtureModule>(
@@ -82,10 +83,10 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 			verbatimModuleSyntax: true,
 		},
 	});
-	return evaluateCompiledFixtureCode<T>(outputText, options.id, 'client', undefined);
+	return evaluateCompiledFixtureCode<T>(outputText, options.id, 'client', options.runtimeModules);
 }
 
-function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
+export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 	code: string,
 	id: string,
 	mode: 'client' | 'server',

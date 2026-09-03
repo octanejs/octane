@@ -5,11 +5,11 @@
 // byte-for-byte. Production bundlers may additionally select the separate
 // whole-AST memo path, which preserves TypeScript and supplies a source map.
 //
-// This pass parses the module (for byte offsets), finds ONLY octane BASE hook
-// calls, and splices a trailing compiler slot into each — every other byte (all the
-// TS the printer can't handle) passes through verbatim. It does NOT wrap custom
-// hooks in `withSlot` (that's done by the `.tsrx`/`.tsx` CALLER, and wrapping a
-// hand-written binding that already forwards a slot would double-slot it). In
+// This pass parses the module (for byte offsets), slots Octane base hooks and
+// gives imported custom hooks their own withSlot boundary. Imported aliases can
+// point directly at a base hook, so the enclosing component's boundary alone
+// cannot distinguish their call sites. Local helpers retain their authored slot
+// policy; explicitly manual modules opt out of all injected slots. In
 // production it reserves a collision-free runtime range because these arbitrary
 // helpers can execute in a Scope alongside code from any other source module.
 
@@ -42,6 +42,7 @@ function octaneHookLocals(ast, nativeReads = false) {
 	const locals = new Map();
 	let importsHook = false;
 	let hasOctaneImport = false;
+	let importsCustomHook = false;
 	for (const node of ast.body || []) {
 		if (
 			(node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') &&
@@ -51,6 +52,12 @@ function octaneHookLocals(ast, nativeReads = false) {
 			continue;
 		}
 		if (node.type !== 'ImportDeclaration') continue;
+		if (node.importKind === 'type') continue;
+		for (const sp of node.specifiers || []) {
+			if (sp.importKind !== 'type' && /^use[A-Z]/.test(sp.imported?.name ?? sp.local?.name ?? '')) {
+				importsCustomHook = true;
+			}
+		}
 		const native =
 			nativeReads &&
 			(node.source?.value === 'octane/signals/client' ||
@@ -76,7 +83,11 @@ function octaneHookLocals(ast, nativeReads = false) {
 				importsHook = true;
 		}
 	}
-	return { locals, importsHook, hasOctaneImport };
+	return {
+		locals,
+		importsHook: importsHook || (hasOctaneImport && importsCustomHook),
+		hasOctaneImport,
+	};
 }
 
 // Find only the disposable top-level root shape used by production entries:
@@ -954,6 +965,20 @@ function collectParallelUseEdits(ast, st) {
 	scan(ast.body, hookOwner(null, 'module'));
 }
 
+// Locate the call delimiter after the callee/type arguments without consuming
+// comments or TypeScript syntax. Parenthesized identifier callees are valid too.
+function callOpenParen(node, source) {
+	let pos = node.typeArguments?.end ?? node.callee.end;
+	while (pos < node.end) {
+		if (/\s/.test(source[pos]) || source[pos] === ')') pos++;
+		else if (source.startsWith('/*', pos)) pos = source.indexOf('*/', pos + 2) + 2;
+		else if (source.startsWith('//', pos)) {
+			while (pos < node.end && source[pos] !== '\n' && source[pos] !== '\r') pos++;
+		} else return source[pos] === '(' ? pos : -1;
+	}
+	return -1;
+}
+
 function walk(node, owner, st) {
 	if (!node || typeof node !== 'object') return;
 	if (Array.isArray(node)) {
@@ -976,6 +1001,16 @@ function walk(node, owner, st) {
 		node.type === 'FunctionDeclaration' && node.id ? hookOwner(node, node.id.name) : owner;
 
 	if (node.type === 'CallExpression') {
+		if (node._octaneCustomHookCall) {
+			const open = callOpenParen(node, st.source);
+			if (open !== -1) {
+				const sym = allocHookSymbol(st, owner, node.callee.name, node._octaneCustomHookCall, node);
+				const helper = requireParallelHelper(st, 'withSlot');
+				st.edits.push({ pos: node.start, text: `${helper}(${sym}, ` });
+				st.edits.push({ pos: open, end: open + 1, text: node.arguments.length ? ', ' : '' });
+				st.edits.push({ pos: node.arguments.at(-1)?.end ?? node.end - 1, text: `, ${sym}` });
+			}
+		}
 		const imported =
 			node._octaneImportedHook ??
 			(st.nativeReads ? node._octaneHookRuntimeImportedHook : undefined);
@@ -1052,7 +1087,7 @@ function walk(node, owner, st) {
 }
 
 /**
- * Inject per-call-site hook slots into octane BASE hook calls in a plain
+ * Inject per-call-site hook slots into Octane base and imported/aliased hook calls in a plain
  * `.ts`/`.js` module. Returns `null` (pass through unchanged) when the module
  * imports no octane base hook or calls none.
  *

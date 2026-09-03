@@ -2,6 +2,8 @@ import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { renderToString } from 'octane/server';
+import { evaluateCompiledFixtureCode } from '../../octane/tests/_server-fixture.js';
 import octaneLoader from '../src/loader.js';
 import { getOctaneRspackBuildInfo } from '../src/shared.js';
 
@@ -148,9 +150,8 @@ describe('loader with the neutral compiler', () => {
 		const code = String(result.content);
 		expect(code).not.toContain('_$template');
 		expect(code).not.toContain('webpackHot');
-		const moduleUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
-		const generated = await import(moduleUrl);
-		expect(generated.App()).toBe('<p>server</p>');
+		const generated = evaluateCompiledFixtureCode(code, resourcePath, 'server', undefined);
+		expect(renderToString(generated.App, {}).html).toBe('<p>server</p>');
 	});
 
 	it.each([

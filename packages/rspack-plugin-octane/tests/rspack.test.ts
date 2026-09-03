@@ -153,6 +153,7 @@ export const universalActivity = () => null;
 export const rendererRegion = (_owner, _child, body) => body;
 export const useBatch = () => undefined;
 export const warmChild = () => undefined;
+export const markWarm = (component) => component;
 `,
 		);
 		write(

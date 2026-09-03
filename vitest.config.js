@@ -5441,6 +5441,39 @@ export default defineConfig({
 				plugins: [octaneMdx(websiteMdxOptions), octane()],
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/react-is/tests/adapted.test.ts'],
+				},
+				test: {
+					name: 'react-is',
+					include: [
+						'packages/react-is/tests/contract.test.ts',
+						'packages/react-is/tests/adapted.test.ts',
+					],
+					environment: 'jsdom',
+				},
+				plugins: [octane()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-is-pristine',
+					include: ['packages/react-is/tests/pristine-entry.test.ts'],
+					environment: 'jsdom',
+				},
+				plugins: [octane()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-is-differential',
+					include: ['packages/react-is/tests/differential.test.ts'],
+					environment: 'jsdom',
+				},
+				plugins: [octane()],
+			},
+			{
 				test: {
 					name: 'react-error-boundary',
 					include: [
