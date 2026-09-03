@@ -963,13 +963,16 @@ export function App() @{
 		const serverCode = compile(source, FILE, { hmr: false, mode: 'server' }).code;
 		expect(hasStaticImport(clientCode, './StaticNavigation.tsrx')).toBe(false);
 		expect(clientCode).not.toContain('StaticNavigation');
-		// The erased children still own their sheet on the client…
-		expect(clientCode).toContain('.static.tsrx-');
-		expect(clientCode).toContain('.host.tsrx-');
-		// …and the block's scope is the boundary's children list: the server
-		// stamps the static section, while the live sibling outside the boundary
-		// (and the host that contains it) carry no hash on either side.
+		// The erased children still own their sheet on the client, under the
+		// server's hash. The block's scope is the boundary's children list: the
+		// server stamps the static section and keeps `.static`, while `.host`
+		// (the container, outside the scope) prunes on both sides; the client
+		// never renders the erased section, so its copy prunes `.static` too —
+		// hydration adopts the server's sheet by hash. The live sibling outside
+		// the boundary carries no hash on either side.
+		expect(serverCode).toContain('/* (unused) .host,*/ .static.tsrx-');
 		expect(serverCode).toContain('static tsrx-');
+		expect(clientCode).toContain('/* (unused) .host, .static { color: red; }*/');
 		expect(clientCode).not.toContain('live tsrx-');
 		expect(serverCode).not.toContain('live tsrx-');
 		expect(hashes(clientCode).size).toBeGreaterThan(0);

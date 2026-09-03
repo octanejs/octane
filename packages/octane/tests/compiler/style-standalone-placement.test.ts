@@ -133,9 +133,20 @@ describe('rule C: <style>{expr}</style> is an ordinary element', () => {
 		const { code } = compile(IN_BODY, 'style-value-scoped.tsrx', options);
 		const hash = code.match(/injectStyle\("(tsrx-[a-z0-9]+)"/)![1];
 		const unescaped = code.replace(/\\"/g, '"');
-		expect(unescaped).toContain(
-			`<section class="${hash}"><style></style><div class="a ${hash}"></div></section>`,
-		);
-		expect(unescaped).not.toContain(`<style class=`);
+		// The section (a fragment sibling of the block) and the div carry the
+		// hash; the style host between them is emitted bare on both sides — one
+		// static template on the client, nested template-literal runs with the
+		// text hole on the server.
+		expect(unescaped).toContain(`<section class="${hash}">`);
+		expect(unescaped).toContain(`<div class="a ${hash}">`);
+		expect(unescaped).not.toContain('<style class=');
+		expect(unescaped).not.toContain(`<style ${hash}`);
+		if ('mode' in options && options.mode === 'server') {
+			expect(unescaped).toContain('<style>${_$ssrChildText(props.css, __s)}</style>');
+		} else {
+			expect(unescaped).toContain(
+				`<section class="${hash}"><style></style><div class="a ${hash}"></div></section>`,
+			);
+		}
 	});
 });

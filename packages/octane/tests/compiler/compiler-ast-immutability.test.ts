@@ -68,7 +68,9 @@ export function App() @{
 								}
 							</style>
 							{/* Parser comments are immutable authored nodes too. */}
-							<Row row={row} onPick={(id) => setRows(rows.filter((r) => r.id !== id))} />
+							<li>
+								<Row row={row} onPick={(id) => setRows(rows.filter((r) => r.id !== id))} />
+							</li>
 						</>
 					} @empty {
 						<li>Empty</li>

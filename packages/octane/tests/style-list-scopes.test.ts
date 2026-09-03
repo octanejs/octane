@@ -18,10 +18,8 @@ import { loadCompiledFixtureSource } from './_server-fixture.js';
 //   wait     "wait A B D"
 //
 // with the CSS emitted A, B, C, D. The `.status` rule written in scope B
-// targets the section, which is not in B: it is hashed `.status.B` and matches
-// nothing. (The spec has it pruned as `(unused)`; Octane keeps every selector
-// of a standalone block, so the observable outcome — the rule never applies —
-// is what is pinned here.)
+// targets the section, which is not in B: it matches none of B's children and
+// is pruned to an `/* (unused) … */` comment.
 
 const SOURCE = `
 export function Status(props: { ready: boolean }) @{
@@ -90,12 +88,13 @@ describe('amendment A1: a block styles the items beside it, never its container'
 			expect(unescaped).toContain(`class="title ${A} ${B}"`);
 			expect(unescaped).toContain(`class="ok ${A} ${B} ${C}"`);
 			expect(unescaped).toContain(`class="wait ${A} ${B} ${D}"`);
-			// Scope A's rule is hashed A; scope B's `.status` rule is hashed B and
-			// reaches no element (the section carries A only).
+			// Scope A's rule is hashed A; scope B's `.status` rule reaches none of
+			// the section's children (the section carries A only) and is pruned.
 			const sheets = new Map(injections(code).map((sheet) => [sheet.hash, sheet.css]));
 			expect(sheets.get(A)).toContain(`.status.${A} { padding: 0.5rem; }`);
 			expect(sheets.get(B)).toContain(`.title.${B} { font-weight: 700; }`);
-			expect(sheets.get(B)).toContain(`.status.${B} { color: rgb(9, 9, 9); }`);
+			expect(sheets.get(B)).toContain('/* (unused) .status { color: rgb(9, 9, 9); }*/');
+			expect(sheets.get(B)).not.toContain(`.status.${B}`);
 			expect(sheets.get(B)).not.toContain(`.status.${A}`);
 		},
 	);

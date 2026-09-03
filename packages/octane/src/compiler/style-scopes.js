@@ -24,6 +24,14 @@
  *   position-derived hash) and renders into ONE injection — the runtime
  *   dedupes by id. Lists nested in a scope that hold blocks are nested scopes
  *   with hashes of their own; two blocks in different lists never share one.
+ * - A scope's sheets are pruned against the list's other children and their
+ *   subtrees (function boundaries excluded): a selector that matches none of
+ *   them survives only as a `(unused)` comment, so a rule aimed at the
+ *   container is visibly dead. `@tsrx/core`'s `prune_css` matches selectors
+ *   against elements and records what it found on their metadata, and the
+ *   adopted AST may be frozen, so the elements it sees are a private clone of
+ *   the items (`cloneAstNode`, fresh metadata per node) carrying the ancestor
+ *   paths its combinator matching reads.
  * - Elements carry `authored hashes… applied…`: enclosing scope hashes outer
  *   first, then applied theme classes (literals for same-module themes whose
  *   class is statically known, `theme.$class` reads otherwise). `apply` on a
@@ -59,6 +67,7 @@ import {
 	clone_ast_node as cloneAstNode,
 	createStyleClassMapFromStylesheet,
 	prepareStylesheetForRender,
+	pruneCss,
 	renderStylesheets,
 } from '@tsrx/core';
 
@@ -318,7 +327,14 @@ function walkTemplateNode(node, state) {
 	const children = node.children;
 	if (!Array.isArray(children)) return out;
 	const own = collectOwnBlocks(children);
-	const scope = own.length > 0 ? prepareScope(own, state) : null;
+	const scope =
+		own.length > 0
+			? prepareScope(
+					own,
+					state,
+					children.filter((child) => !own.includes(child)),
+				)
+			: null;
 	const next = withStack(state, scope === null ? state.stack : [...state.stack, scope], () =>
 		mapList(children, (child) => {
 			if (child.type === 'JSXStyleElement') return own.includes(child) ? null : child;
@@ -439,6 +455,52 @@ function collectOwnBlocks(nodes) {
 }
 
 /**
+ * The elements a scope's selectors can match (the core transform's
+ * `collect_css_prunable_elements`): every host element of the items and their
+ * subtrees, nested scopes included, stopping at function boundaries and
+ * skipping `<style>` hosts. Each element gets its ancestor chain as
+ * `metadata.path`, which `pruneCss` reads for combinators; the nodes are a
+ * private clone, so the writes never reach the (possibly frozen) parser AST.
+ *
+ * @param {any} value a cloned node or list of cloned nodes
+ * @param {any[]} elements
+ * @param {any[]} path
+ * @returns {any[]}
+ */
+function collectPrunableElements(value, elements, path) {
+	if (Array.isArray(value)) {
+		for (const item of value) collectPrunableElements(item, elements, path);
+		return elements;
+	}
+	if (value === null || typeof value !== 'object' || typeof value.type !== 'string')
+		return elements;
+	if (isFunctionNode(value)) return elements;
+	if (value.type === 'JSXElement' && value.metadata?.native_tsrx) {
+		const name = value.openingElement?.name;
+		if (name?.type === 'JSXIdentifier' && name.name === 'style') return elements;
+		value.metadata.path = path.slice();
+		elements.push(value);
+	}
+	const childPath = [...path, value];
+	for (const key of Object.keys(value)) {
+		if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata' || key === 'css') {
+			continue;
+		}
+		const child = value[key];
+		if (Array.isArray(child)) {
+			for (const item of child) {
+				if (item !== null && typeof item === 'object' && typeof item.type === 'string') {
+					collectPrunableElements(item, elements, childPath);
+				}
+			}
+		} else if (child !== null && typeof child === 'object' && typeof child.type === 'string') {
+			collectPrunableElements(child, elements, childPath);
+		}
+	}
+	return elements;
+}
+
+/**
  * `<style href precedence>` (React Float): plain CSS by href identity, outside
  * the scope model.
  *
@@ -471,11 +533,12 @@ function nextOrder(state) {
  * Render a scope's sheets into one injection and compute what its elements
  * carry.
  *
- * @param {any[]} own
+ * @param {any[]} own the list's standalone blocks
  * @param {PassState} state
+ * @param {any[]} items the list's other children — what the blocks reach
  * @returns {ScopeEntry}
  */
-function prepareScope(own, state) {
+function prepareScope(own, state, items) {
 	const { ctx } = state;
 	/** @type {Array<{ node: any, sheet: any }>} */
 	const sheets = [];
@@ -486,11 +549,20 @@ function prepareScope(own, state) {
 	let hash = null;
 	if (sheets.length > 0) {
 		hash = sheets[0].node.metadata?.styleScopeHash || sheets[0].sheet.hash || null;
-		const prepared = sheets.map(({ sheet }) => {
+		const elements = collectPrunableElements(cloneAstNode(items), [], []);
+		const prepared = sheets.map(({ node, sheet }) => {
+			const regionHash = node.metadata?.styleScopeHash || sheet.hash;
 			const clone = cloneAstNode(sheet);
 			clone.hash = hash;
+			// `analyzeCss` marks `:global(...)` selectors; pruning then marks the
+			// selectors that reach an element as scoped and used, exactly like the
+			// core transform — an unmatched rule renders as an `(unused)` comment.
 			analyzeCss(clone);
-			prepareStylesheetForRender(clone, 'scope');
+			const styleClasses = new Map();
+			const topScopedClasses = new Map();
+			for (const element of elements) {
+				pruneCss(clone, element, styleClasses, topScopedClasses, regionHash);
+			}
 			return clone;
 		});
 		ctx.cssInjections.push({

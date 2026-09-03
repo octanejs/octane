@@ -40,22 +40,22 @@ const FILENAME = 'App.tsrx';
  * the list rather than the parser wiring.
  */
 const NEEDS_FALLBACK = [
-	'self-closing <style /> without apply',
-	'self-closing <style apply={theme} />',
-	'self-closing <style apply={[a, b]} />',
-	'self-closing <style apply={ns.dark} />',
-	'self-closing <style ref={r} apply={theme} /> keeps every attribute in order',
-	'bodied <style apply={t}>…</style> keeps its sheet, css, scope hash and apply',
-	'style before the output node in a @{} body',
-	'style after the output node in a @{} body',
-	'styles both before and after the output node in a @{} body',
-	'nested @{} with its own style',
+	// The multiple-outputs error cases: oxc-tsrx rejects the adjacent JSX
+	// outright ("Adjacent JSX elements must be wrapped in an enclosing tag"),
+	// so the JavaScript parser produces the spec's recovery tree and errors.
+	'style before the output node in a @{} body is the multiple-outputs error',
+	'style after the output node in a @{} body is the multiple-outputs error',
 	'assigned @{} block: a theme in its setup and an applying fragment output',
-	'style siblings inside @if consequent and @else',
-	'style siblings inside @for body and @empty',
-	'style siblings inside @switch case and default',
-	'style siblings inside @try, @pending and @catch',
-	'two non-style output nodes in a @{} body is a recoverable error on the second node',
+	'style beside the output node in an @if consequent is the multiple-outputs error',
+	'style beside the output node in a @for body is the multiple-outputs error',
+	'style beside the output node in a @try block is the multiple-outputs error',
+	// `<style>{css}</style>` (amendment A1, rule C): the native facade reads
+	// every <style> element's raw text as CSS and its reader rejects the `{`
+	// with a bare Error; parser.node.js retries the shape in JavaScript.
+	'<style>{css}</style> is an ordinary JSXElement in a plain-TSX return',
+	'<style>{css}</style> stays an ordinary JSXElement inside a @{} body',
+	'<style> with whitespace before its first { child is an ordinary JSXElement',
+	'<style> with two expression children is an ordinary JSXElement',
 ];
 
 /**
@@ -64,16 +64,26 @@ const NEEDS_FALLBACK = [
  * divergent tree today. Pinned with `it.fails`; remove entries as oxc-tsrx
  * catches up.
  */
-const NATIVE_SHAPE_DIVERGES: Record<string, string> = {
-	'only a style and no output node in a @{} body':
-		"oxc-tsrx makes the lone <style> the code block's `render` (body []) instead of a body sibling with `render: null`",
-	'only a style inside an @if consequent':
-		'oxc-tsrx omits `css` on a self-closed <style /> (spec: css is the empty string)',
-	'multiple sibling style blocks inside one fragment':
-		'oxc-tsrx omits `css` on a self-closed <style /> (spec: css is the empty string)',
-	'module-scope assigned self-closed block':
-		'oxc-tsrx omits `css` on a self-closed <style /> (spec: css is the empty string)',
-};
+const SELF_CLOSED_CSS =
+	'oxc-tsrx omits `css` on a self-closed <style /> (spec: css is the empty string)';
+const NATIVE_SHAPE_DIVERGES: Record<string, string> = Object.fromEntries(
+	[
+		'self-closing <style /> without apply',
+		'self-closing <style apply={theme} />',
+		'self-closing <style apply={[a, b]} />',
+		'self-closing <style apply={ns.dark} />',
+		'self-closing <style ref={r} apply={theme} /> keeps every attribute in order',
+		'a fragment holding the style and the output node is the valid @{} form',
+		'nested @{} with its own style inside a fragment',
+		'only a style inside an @if consequent parses (the analyzer rejects it)',
+		'fragments holding style and output inside @if consequent and @else',
+		'fragments holding style and output inside @for body and @empty',
+		'fragments holding style and output inside @switch case and default',
+		'fragments holding style and output inside @try, @pending and @catch',
+		'multiple sibling style blocks inside one fragment',
+		'module-scope assigned self-closed block',
+	].map((name) => [name, SELF_CLOSED_CSS]),
+);
 
 // --- native-parser probe ----------------------------------------------------
 
@@ -163,6 +173,18 @@ function assertShape(node: unknown, shape: Shape): void {
 			break;
 		case 'JSXElement':
 			expect(actual.openingElement.name.name).toBe(shape.name);
+			// A `<style>{css}</style>` host is an ordinary element: no css, no
+			// sheet, no scope hash — only its expression-container children.
+			if (shape.children) {
+				expect(actual.css).toBeUndefined();
+				expect(actual.metadata?.styleScopeHash).toBeUndefined();
+				assertShapes(
+					actual.children.filter(
+						(child: AnyNode) => !(child.type === 'JSXText' && child.value.trim() === ''),
+					),
+					shape.children,
+				);
+			}
 			break;
 		case 'JSXFragment':
 			assertShapes(actual.children, shape.children);

@@ -12,8 +12,9 @@
  * - `elements`: every authored class value rendered with its scope chain
  *   (outer → inner) followed by applied themes;
  * - `classMaps`: `$class` composition of assigned blocks and their own entry;
- * - `pruned`: `(unused)` comments — Octane intentionally keeps every selector
- *   of a standalone block, so only assigned-block pruning is asserted.
+ * - `pruned`: `(unused)` comments, in emission order across every sheet —
+ *   standalone blocks prune what matches nothing among the list's other
+ *   children, assigned blocks what their class map does not expose.
  *
  * Where the shared module loader can evaluate the module (no export lists,
  * imports satisfiable with stubs) the client module is mounted and the
@@ -541,25 +542,10 @@ describe('scoped style conformance fixtures (@tsrx/core test harness)', () => {
 							expect(foreign, `sheet ${injection.hash}`).toEqual([]);
 						}
 
-						// Pruning: standalone-scope sheets keep every selector (Octane's
-						// choice), assigned blocks prune exactly what the contract lists.
-						const assignedPruned: string[] = [];
-						for (const injection of distinct) {
-							const markers = new Set(emittedMarkers(injection.css, labels));
-							const pruned = prunedSelectors(injection.css);
-							const isAssigned =
-								markers.size > 0 && [...markers].every((label) => assignedLabels.has(label));
-							if (isAssigned) assignedPruned.push(...pruned);
-							else expect(pruned, `standalone sheet ${injection.hash}`).toEqual([]);
-						}
-						for (const selector of assignedPruned) expect(expected.pruned).toContain(selector);
-						const expectedAssigned = expected.pruned.filter((selector) =>
-							assignedPruned.includes(selector),
-						);
-						expect(assignedPruned).toEqual(expectedAssigned);
-						if ([...labels].every((label) => assignedLabels.has(label))) {
-							expect(assignedPruned).toEqual(expected.pruned);
-						}
+						// Pruning: every `(unused)` selector, in emission order, is exactly
+						// what the contract lists — standalone scopes prune against the
+						// list's other children, assigned blocks against their class map.
+						expect(prunedSelectors(css)).toEqual(expected.pruned);
 					},
 				);
 
