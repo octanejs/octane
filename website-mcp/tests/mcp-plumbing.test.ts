@@ -37,6 +37,9 @@ const INITIALIZE = rpc('initialize', {
 });
 
 describe('/v1/mcp plumbing', () => {
+	// The first request crosses the production lazy-import boundary. A cold CI
+	// worker may need more than Vitest's default timeout to transform the MCP SDK
+	// and tool graph while the rest of the shard is running.
 	it('answers initialize with buffered JSON and the server identity', async () => {
 		const response = await dispatch('/v1/mcp', {
 			method: 'POST',
@@ -48,7 +51,7 @@ describe('/v1/mcp plumbing', () => {
 		const body = await response.json();
 		expect(body.result.serverInfo.name).toBe('octane');
 		expect(body.result.capabilities.tools).toBeDefined();
-	});
+	}, 30_000);
 
 	it('serves sequential requests — each POST gets a fresh stateless transport', async () => {
 		// A reused stateless transport throws in the SDK; two identical
