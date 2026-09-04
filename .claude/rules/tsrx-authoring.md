@@ -103,7 +103,13 @@ element that contains it. The compiler adds that children list's
 hash to every selector and adds the same hash class to those siblings and their
 descendants, so the selectors match only there; the hash class stops at
 composite components and function boundaries, so a child component's elements
-and `items.map((x) => <li />)` output are outside the scope. `:global(…)` opts a selector out. A block accepts only the `ref` and
+and `items.map((x) => <li />)` output are outside the scope. `:global(…)` unscopes
+the wrapped part of a selector (start or end only, else `CSS_GLOBAL_PLACEMENT`):
+`.wrap :global(.x)`, or `.wrap { :global { … } }` for several rules, reaches below
+`.wrap` only, for a child you cannot change; bare `:global { … }` is all page-wide;
+`:global(.theme-dark) .card` reacts to a page class; bare `:global(.x)` is a
+page-wide rule, so keep it for page-level elements. For a child you own, pass
+`theme.$class` as a prop instead. A block accepts only the `ref` and
 `apply` attributes, and its CSS is static: use custom properties
 (`style={{ '--tone': tone }}` with `var(--tone)`) for runtime values.
 

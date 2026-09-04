@@ -216,7 +216,7 @@ export const docsMeta: DocMeta[] = [
 			{
 				id: 'static-css',
 				title: 'The CSS is static',
-				searchTerms: ['custom properties', ':global'],
+				searchTerms: ['custom properties'],
 			},
 			{ id: 'scopes', title: 'What a scope is', searchTerms: ['hash class'] },
 			{ id: 'multiple-blocks', title: 'Several blocks, one scope' },
@@ -227,6 +227,21 @@ export const docsMeta: DocMeta[] = [
 				searchTerms: ['$class', 'theme object'],
 			},
 			{ id: 'apply', title: 'Apply a theme to a scope', searchTerms: ['apply', 'compose themes'] },
+			{
+				id: 'global',
+				title: 'Reach outside the scope with :global',
+				searchTerms: [
+					':global',
+					'global styles',
+					'unscoped',
+					'third-party component',
+					'specificity',
+					':where',
+					'CSS_GLOBAL_PLACEMENT',
+				],
+			},
+			{ id: 'global-when', title: 'Which one to use', level: 3 },
+			{ id: 'global-specificity', title: 'How a global rule ranks', level: 3 },
 			{
 				id: 'ordering',
 				title: 'Which rule wins',

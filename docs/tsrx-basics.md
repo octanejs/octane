@@ -405,7 +405,7 @@ element that contains it. The compiler gives that children
 list a hash, adds it to every selector in the block, and adds the same class —
 the block's **hash class** — to those siblings and their descendants, so the
 selectors match only there and rules never leak into a parent, an outer sibling,
-or a child component. `:global(...)` opts a selector out of scoping.
+or a child component. `:global(…)` reaches outside the scope (below).
 
 ```jsx
 export function Panel() @{
@@ -595,6 +595,70 @@ are class entries (`theme.card`) stays a class map and drops its element
 selectors. `class={[a.$class, b.$class]}` opts one element into several themes,
 the way `apply={[a, b]}` does for a whole scope, and the two forms compose: a
 scope can apply a base theme while single elements opt into an accent.
+
+### `:global(…)`
+
+Wrap part of a selector in `:global(…)` and that part gets no hash class;
+everything outside the parentheses is still scoped. It may sit at the start or
+the end of a selector, not in the middle (`.card :global(.x) .title` is
+`CSS_GLOBAL_PLACEMENT`):
+
+```jsx
+export function Post(props) @{
+	<>
+		<style>
+			:global(.toast) { position: fixed; }        /* → .toast: page-wide, matches anywhere */
+			.post :global(pre) { overflow-x: auto; }     /* → .post.<hash> pre: only below .post */
+			:global(.theme-dark) .post { color: white; } /* → .theme-dark .post.<hash>: under a page class */
+			.post:global(.is-open) { display: block; }   /* → .post.<hash>.is-open: a class a library toggles */
+		</style>
+		<article class="post">
+			<Markdown source={props.body} />
+		</article>
+	</>
+}
+```
+
+`:global { … }` is the block form: the wrapper is dropped (it stays as a
+comment in the output) and every rule inside it is unscoped. Nested under a
+scoped rule it reaches only below that rule, the same as the prefixed selector
+form with the scoped prefix written once:
+
+```jsx
+<style>
+	:global { .toast { position: fixed; } body { margin: 0; } } /* → .toast { … } body { … } */
+	.post { :global { pre { overflow-x: auto; } .footnote { font-size: 0.875rem; } } } /* → .post.<hash> { pre { … } .footnote { … } } */
+	.post { :global(pre) { overflow-x: auto; } } /* → the same, selector form */
+	.post { pre { margin: 0; } } /* → .post.<hash> { pre.<hash> { … } }: both parts scoped */
+</style>
+```
+
+Which form to use:
+
+| I want to …                                                     | Use …                                                                  |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Style my own elements                                           | A block beside them. Nothing global.                                   |
+| Let a child component pick up my styles                         | Pass `theme.$class` or a class-map entry (`theme.card`) as a prop.     |
+| Style a child I cannot change (a library component, rendered HTML) | `.wrapper :global(.their-class)`, or `.wrapper { :global { … } }` for several classes, with a scoped selector in front. |
+| React to page-level state (a theme class on `<html>`)           | `:global(.theme-dark) .card` or `:global([data-theme='dark']) .card`.  |
+| Write page-wide rules (`body`, resets, fonts)                   | A `.css` file the page links, not a bare `:global`.                    |
+
+For a child you own, pass the class rather than reaching in: the dependency is
+a visible prop, the child chooses which elements take it, renaming a class in
+the child cannot silently break the parent, and the hash keeps the rule on the
+elements that carry it. With `:global` the child has no say and cannot see who
+styles it; when you must, nest one `:global { … }` under the scoped wrapper so
+the prefix is written once. A bare `:global(.toast)` is a global stylesheet hidden inside a
+component: it matches anywhere on the page with nothing pointing back to the
+file. Write one only for page-level elements, and prefer a linked `.css` file.
+
+Specificity: a scoped rule adds its hash class to the first compound only and
+`:where(.<hash>)` to the rest (`.card .title` → `.card.<hash>
+.title:where(.<hash>)`), so a scoped `.note.<hash>` (0,2,0) beats a bare
+`:global(.note)` (0,1,0) from anywhere on the page, a `theme.$class` or
+class-map rule beats a bare global for the same reason, and a prefixed
+`.card.<hash> .note` (0,3,0) beats the child's own `.note.<hash>`: it overrides
+the child, so keep it narrow. At equal specificity the later sheet wins.
 
 ### Class order and `style()`
 
