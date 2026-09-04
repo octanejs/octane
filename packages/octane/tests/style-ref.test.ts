@@ -4,9 +4,12 @@ import { mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
 import {
 	AssignedStyleRef,
+	BareIfReturnStyleRef,
 	CallbackStyleRef,
 	CurrentStyleRef,
+	EarlyReturnScopeStyleRef,
 	IdentifierCallbackStyleRef,
+	NestedReturnStyleRef,
 	ReturnedStyleRef,
 	ValueStyleRef,
 } from './_fixtures/style-ref.tsrx';
@@ -88,5 +91,44 @@ describe('style block ref class maps', function () {
 		expect(html).not.toContain('missing');
 		expect(html).toMatch(/tsrx-[a-z0-9]+ card/i);
 		expect(css).toMatch(/\.card\.tsrx-[a-z0-9]+/i);
+	});
+
+	it('assigns the class map before nested if/else returns', function () {
+		const alt = mount(NestedReturnStyleRef as any, { alt: true });
+		expectClassMap(alt.find('#nested-alt') as HTMLElement, 'rgb(41, 42, 43)');
+		alt.unmount();
+		const main = mount(NestedReturnStyleRef as any, { alt: false });
+		expectClassMap(main.find('#nested-main') as HTMLElement, 'rgb(41, 42, 43)');
+		main.unmount();
+	});
+
+	it('assigns the class map before a braceless if-return', function () {
+		const alt = mount(BareIfReturnStyleRef as any, { alt: true });
+		expectClassMap(alt.find('#bare-alt') as HTMLElement, 'rgb(61, 62, 63)');
+		alt.unmount();
+		const main = mount(BareIfReturnStyleRef as any, { alt: false });
+		expectClassMap(main.find('#bare-main') as HTMLElement, 'rgb(61, 62, 63)');
+		main.unmount();
+	});
+
+	it('assigns the class map before an early return in a statement-list scope', function () {
+		const alt = mount(EarlyReturnScopeStyleRef as any, { alt: true });
+		expectClassMap(alt.find('#early-alt') as HTMLElement, 'rgb(31, 32, 33)');
+		alt.unmount();
+		const main = mount(EarlyReturnScopeStyleRef as any, { alt: false });
+		expectClassMap(main.find('#early-main') as HTMLElement, 'rgb(31, 32, 33)');
+		main.unmount();
+	});
+
+	it('assigns the class map during SSR of a nested if/else return', function () {
+		const alt = ServerRT.renderToString(server.NestedReturnStyleRef, { alt: true });
+		expect(alt.html).toContain('id="nested-alt"');
+		expect(alt.html).not.toContain('missing');
+		expect(alt.html).toMatch(/tsrx-[a-z0-9]+ card/i);
+		expect(alt.css).toMatch(/\.card\.tsrx-[a-z0-9]+/i);
+		const main = ServerRT.renderToString(server.NestedReturnStyleRef, { alt: false });
+		expect(main.html).toContain('id="nested-main"');
+		expect(main.html).not.toContain('missing');
+		expect(main.html).toMatch(/tsrx-[a-z0-9]+ card/i);
 	});
 });

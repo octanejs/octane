@@ -97,3 +97,73 @@ export function ReturnedStyleRef() {
 		</style>
 	</>;
 }
+
+export function NestedReturnStyleRef(props: { alt: boolean }) {
+	let classes: StyleClassMap | undefined;
+	if (props.alt) {
+		return <>
+			<div id="nested-alt" class="card">
+				{classes && classes.card ? classes.card as string : 'missing'}
+			</div>
+			<style ref={classes as never}>
+				.card {
+					color: rgb(41, 42, 43);
+				}
+			</style>
+		</>;
+	} else {
+		return <>
+			<div id="nested-main" class="card">
+				{classes && classes.card ? classes.card as string : 'missing'}
+			</div>
+			<style ref={classes as never}>
+				.card {
+					color: rgb(41, 42, 43);
+				}
+			</style>
+		</>;
+	}
+}
+
+export function BareIfReturnStyleRef(props: { alt: boolean }) {
+	let classes: StyleClassMap | undefined;
+	if (props.alt) return <>
+		<div id="bare-alt" class="card">
+			{classes && classes.card ? classes.card as string : 'missing'}
+		</div>
+		<style ref={classes as never}>
+			.card {
+				color: rgb(61, 62, 63);
+			}
+		</style>
+	</>;
+	return <>
+		<div id="bare-main" class="card">
+			{classes && classes.card ? classes.card as string : 'missing'}
+		</div>
+		<style ref={classes as never}>
+			.card {
+				color: rgb(61, 62, 63);
+			}
+		</style>
+	</>;
+}
+
+export function EarlyReturnScopeStyleRef(props: { alt: boolean }) @{
+	let classes: StyleClassMap | undefined;
+	if (props.alt) {
+		return <div id="early-alt" class="card">
+			{classes && classes.card ? classes.card as string : 'missing'}
+		</div>;
+	}
+	<>
+		<div id="early-main" class="card">
+			{classes && classes.card ? classes.card as string : 'missing'}
+		</div>
+		<style ref={classes as never}>
+			.card {
+				color: rgb(31, 32, 33);
+			}
+		</style>
+	</>
+}

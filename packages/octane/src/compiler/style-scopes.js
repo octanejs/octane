@@ -9,7 +9,8 @@
  * The class map is already produced from the prepared sheets (same hash the
  * scoping pass stamps on elements). This module turns each authored `ref`
  * into setup statements and grafts them onto the component body so the
- * assignment runs after `let x` (no TDZ) and before the template reads `x`.
+ * assignment runs after `let x` (no TDZ) and before every template that
+ * reads `x`, including nested `if`/`switch` returns.
  *
  * Identifier refs get a small hybrid of the core helper's two paths: a
  * function is called, a `current`/`value` object is written, and anything
@@ -198,9 +199,150 @@ function unwrapExpression(node) {
 }
 
 /**
- * Append onto a `@{ … }` setup list; insert before the first top-level
- * `return` of a React-style function. Both placements run after `let x` and
- * before the template that reads `x`.
+ * Clone the setup template for one insertion site. `inheritOriginLoc` mutates
+ * nodes in place, so each graft must own its own statement copies.
+ *
+ * @param {any[]} statements
+ * @returns {any[]}
+ */
+function cloneSetupStatements(statements) {
+	const cloned = [];
+	for (let i = 0; i < statements.length; i++) {
+		cloned.push(cloneAstNode(statements[i], false));
+	}
+	return cloned;
+}
+
+function isNestedFunctionType(type) {
+	return (
+		type === 'FunctionDeclaration' ||
+		type === 'FunctionExpression' ||
+		type === 'ArrowFunctionExpression'
+	);
+}
+
+/**
+ * Insert a cloned setup copy immediately before every owned `return`
+ * (if/else/switch/try/loops). Nested function bodies are left alone — those
+ * are compiled as their own components. Braceless `return` arms become a
+ * block so the write and the return stay a single consequent.
+ *
+ * @param {any} stmt
+ * @param {any[]} statements
+ * @returns {{ node: any, foundReturn: boolean }}
+ */
+function graftReturnsInStatement(stmt, statements) {
+	if (!stmt) return { node: stmt, foundReturn: false };
+	const type = stmt.type;
+	if (type === 'ReturnStatement') {
+		return { node: b.block([...cloneSetupStatements(statements), stmt]), foundReturn: true };
+	}
+	if (isNestedFunctionType(type)) return { node: stmt, foundReturn: false };
+	if (type === 'BlockStatement') {
+		const grafted = graftReturnsInList(stmt.body || [], statements);
+		return {
+			node: grafted.foundReturn ? { ...stmt, body: grafted.list } : stmt,
+			foundReturn: grafted.foundReturn,
+		};
+	}
+	if (type === 'IfStatement') {
+		const consequent = graftReturnsInStatement(stmt.consequent, statements);
+		const alternate = graftReturnsInStatement(stmt.alternate, statements);
+		if (!consequent.foundReturn && !alternate.foundReturn) {
+			return { node: stmt, foundReturn: false };
+		}
+		return {
+			node: {
+				...stmt,
+				consequent: consequent.node,
+				alternate: alternate.node,
+			},
+			foundReturn: true,
+		};
+	}
+	if (type === 'SwitchStatement') {
+		let foundReturn = false;
+		const cases = [];
+		const authored = stmt.cases || [];
+		for (let i = 0; i < authored.length; i++) {
+			const switchCase = authored[i];
+			const grafted = graftReturnsInList(switchCase.consequent || [], statements);
+			if (grafted.foundReturn) foundReturn = true;
+			cases.push(grafted.foundReturn ? { ...switchCase, consequent: grafted.list } : switchCase);
+		}
+		return {
+			node: foundReturn ? { ...stmt, cases } : stmt,
+			foundReturn,
+		};
+	}
+	if (type === 'TryStatement') {
+		const block = graftReturnsInStatement(stmt.block, statements);
+		const handlerBody = stmt.handler
+			? graftReturnsInStatement(stmt.handler.body, statements)
+			: { node: null, foundReturn: false };
+		const finalizer = graftReturnsInStatement(stmt.finalizer, statements);
+		if (!block.foundReturn && !handlerBody.foundReturn && !finalizer.foundReturn) {
+			return { node: stmt, foundReturn: false };
+		}
+		return {
+			node: {
+				...stmt,
+				block: block.node,
+				handler:
+					stmt.handler && handlerBody.foundReturn
+						? { ...stmt.handler, body: handlerBody.node }
+						: stmt.handler,
+				finalizer: finalizer.node,
+			},
+			foundReturn: true,
+		};
+	}
+	if (
+		type === 'ForStatement' ||
+		type === 'ForInStatement' ||
+		type === 'ForOfStatement' ||
+		type === 'WhileStatement' ||
+		type === 'DoWhileStatement' ||
+		type === 'LabeledStatement' ||
+		type === 'WithStatement'
+	) {
+		const body = graftReturnsInStatement(stmt.body, statements);
+		if (!body.foundReturn) return { node: stmt, foundReturn: false };
+		return { node: { ...stmt, body: body.node }, foundReturn: true };
+	}
+	return { node: stmt, foundReturn: false };
+}
+
+/**
+ * @param {any[]} list
+ * @param {any[]} statements
+ * @returns {{ list: any[], foundReturn: boolean }}
+ */
+function graftReturnsInList(list, statements) {
+	const next = [];
+	let foundReturn = false;
+	for (let i = 0; i < list.length; i++) {
+		const stmt = list[i];
+		if (stmt && stmt.type === 'ReturnStatement') {
+			const cloned = cloneSetupStatements(statements);
+			for (let j = 0; j < cloned.length; j++) next.push(cloned[j]);
+			next.push(stmt);
+			foundReturn = true;
+			continue;
+		}
+		const grafted = graftReturnsInStatement(stmt, statements);
+		next.push(grafted.node);
+		if (grafted.foundReturn) foundReturn = true;
+	}
+	return { list: next, foundReturn };
+}
+
+/**
+ * `@{ … }` scopes append setup for the fall-through render and also write
+ * before any early `return` in that setup list. React-style functions insert
+ * a cloned copy before every owned `return`, including nested if/else/switch
+ * arms — not only the first top-level one. Both placements run after `let x`
+ * and before the template that reads `x`.
  *
  * @param {any} componentNode
  * @param {any[]} statements
@@ -210,35 +352,26 @@ function graftSetupStatements(componentNode, statements) {
 	const body = componentNode.body;
 	if (!body) return componentNode;
 	if (body.type === 'JSXCodeBlock') {
+		const grafted = graftReturnsInList(body.body || [], statements);
 		return {
 			...componentNode,
 			body: {
 				...body,
-				body: [...(body.body || []), ...statements],
+				body: [...grafted.list, ...cloneSetupStatements(statements)],
 			},
 		};
 	}
 	if (body.type === 'BlockStatement') {
+		const grafted = graftReturnsInList(body.body || [], statements);
 		return {
 			...componentNode,
 			body: {
 				...body,
-				body: insertBeforeFirstReturn(body.body || [], statements),
+				body: grafted.foundReturn
+					? grafted.list
+					: [...grafted.list, ...cloneSetupStatements(statements)],
 			},
 		};
 	}
 	return componentNode;
-}
-
-/** @param {any[]} list @param {any[]} statements @returns {any[]} */
-function insertBeforeFirstReturn(list, statements) {
-	let index = -1;
-	for (let i = 0; i < list.length; i++) {
-		if (list[i] && list[i].type === 'ReturnStatement') {
-			index = i;
-			break;
-		}
-	}
-	if (index === -1) return [...list, ...statements];
-	return [...list.slice(0, index), ...statements, ...list.slice(index)];
 }
