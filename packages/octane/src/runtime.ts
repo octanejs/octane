@@ -14756,7 +14756,12 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 /** Resolve source-ordered direct/spread raw-HTML writers and apply only the winner. */
 export function setDangerouslySetInnerHTMLSources(
 	el: Element,
-	sources: readonly (readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown])[],
+	sources: readonly (readonly [
+		isSpread: boolean,
+		sourceOrName: unknown,
+		value?: unknown,
+		merge?: boolean,
+	])[],
 	ignoreSourceChildren = false,
 ): void {
 	let foundDanger = false;
@@ -16660,13 +16665,9 @@ export function setHostPropSources(
 	const props = new Map<string, PropWriter>();
 	let classMerges: Array<{ rawName: string; value: unknown; order: number }> | null = null;
 	let sourceOrder = 0;
-	function record(rawName: unknown, value: unknown, merge = false): void {
+	function record(rawName: unknown, value: unknown): void {
 		if (typeof rawName !== 'string') return;
 		const order = sourceOrder++;
-		if (merge && (rawName === 'class' || rawName === 'className')) {
-			(classMerges ??= []).push({ rawName, value, order });
-			return;
-		}
 		const previous = props.get(rawName);
 		props.set(rawName, {
 			rawName,
@@ -16678,7 +16679,16 @@ export function setHostPropSources(
 
 	for (const source of sources) {
 		if (!source[0]) {
-			record(source[1], source[2], source[3] === true);
+			const rawName = source[1];
+			if (
+				source[3] === true &&
+				typeof rawName === 'string' &&
+				(rawName === 'class' || rawName === 'className')
+			) {
+				(classMerges ??= []).push({ rawName, value: source[2], order: sourceOrder++ });
+				continue;
+			}
+			record(rawName, source[2]);
 			continue;
 		}
 		const spread = source[1];
@@ -19495,7 +19505,7 @@ export function setDefaultChecked(el: Element, value: unknown): void {
  */
 export function setFormControlSources(
 	el: Element,
-	sources: ReadonlyArray<readonly [boolean, unknown, unknown?]>,
+	sources: ReadonlyArray<readonly [boolean, unknown, unknown?, boolean?]>,
 ): void {
 	let value: unknown;
 	let defaultValue: unknown;

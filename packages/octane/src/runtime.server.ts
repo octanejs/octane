@@ -2597,13 +2597,9 @@ export function ssrAttrs(
 	const props = new Map<string, PropWriter>();
 	let classMerges: Array<{ rawName: string; value: unknown; order: number }> | null = null;
 	let sourceOrder = 0;
-	function record(rawName: unknown, value: unknown, merge = false): void {
+	function record(rawName: unknown, value: unknown): void {
 		if (typeof rawName !== 'string') return;
 		const order = sourceOrder++;
-		if (merge && (rawName === 'class' || rawName === 'className')) {
-			(classMerges ??= []).push({ rawName, value, order });
-			return;
-		}
 		const previous = props.get(rawName);
 		props.set(rawName, {
 			rawName,
@@ -2615,7 +2611,19 @@ export function ssrAttrs(
 
 	for (const [isSpread, sourceOrName, directValue, merge] of sources) {
 		if (!isSpread) {
-			record(sourceOrName, directValue, merge === true);
+			if (
+				merge === true &&
+				typeof sourceOrName === 'string' &&
+				(sourceOrName === 'class' || sourceOrName === 'className')
+			) {
+				(classMerges ??= []).push({
+					rawName: sourceOrName,
+					value: directValue,
+					order: sourceOrder++,
+				});
+				continue;
+			}
+			record(sourceOrName, directValue);
 			continue;
 		}
 		const source = sourceOrName;
