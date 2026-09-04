@@ -1,6 +1,8 @@
 // Keep package metadata behind an isolated re-export: applications that do not
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';
+export type * from './public-types.js';
+export { StrictMode, unstable_batchedUpdates } from './compatibility.js';
 export { initializeHydrationEventCapture } from './hydration/event-capture.js';
 // Keep external DOM ownership separate from the reconciling runtime so
 // behavior-only consumers never retain component or hydration machinery.
@@ -32,6 +34,7 @@ export {
 	flushSync,
 	act,
 	type Root,
+	type RootContainer,
 	type RootOptions,
 	// Hooks (octane extension: each accepts a trailing compiler slot — required
 	// when calling from plain .ts, injected by the compiler in .tsrx/.tsx)
@@ -53,6 +56,7 @@ export {
 	useDeferredValue,
 	useTransition,
 	useActionState,
+	useActionState as useFormState,
 	useFormStatus,
 	useOptimistic,
 	useDebugValue,
@@ -99,6 +103,7 @@ export {
 	cloneElement,
 	isValidElement,
 	isChildrenBlock,
+	descriptorChildren,
 	Children,
 	type ElementDescriptor,
 	type ComponentBody,
@@ -228,10 +233,10 @@ export {
 	compilerCacheContext,
 	compilerOwnsContextProvider,
 	markSingleRoot,
+	markWarm,
 	// Compact compiler ABI; keep the descriptive export for older compiled output.
 	markSingleRoot as __s,
 	markChildrenBlock,
-	descriptorChildren,
 	createScopedValue,
 	createScopedElement,
 	childSlot,
@@ -244,6 +249,8 @@ export {
 	portal,
 	hookSlots,
 	withSlot,
+	manualHook,
+	invokeManualHook,
 	// Compiler-emitted parallel use(): batched stratum unwrap + fetch-tree
 	// warming (docs/suspense-parallel-use-plan.md).
 	useBatch,

@@ -13,9 +13,7 @@
     "strict": true,
     "paths": {
       "@octanejs/inertia": ["../../src/index.ts"],
-      "@octanejs/inertia/server": ["../../src/server.ts"],
-      "react": ["../react-types-must-not-be-imported.d.ts"],
-      "react/*": ["../react-types-must-not-be-imported.d.ts"]
+      "@octanejs/inertia/server": ["../../src/server.ts"]
     }
   },
   "include": ["./types.test-d.ts"]

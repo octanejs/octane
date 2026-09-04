@@ -51,7 +51,10 @@ mismatches; clean and observed names must always agree within each variant.
 ## What the numbers mean
 
 The observed copy counts evaluations of function expressions/arrows, array
-literals, `new Array(...)`, and rest-parameter array creation. Application and
+literals, `new Array(...)`, and rest-parameter array creation. The observer also
+has an opt-in extended mode that counts object literals and every other `new`
+expression; `transition-hooks` uses it, while this suite keeps the default so its
+historical counts stay comparable. Application and
 Octane-runtime counts are kept separately in each phase's JSON metadata. This
 exposes both call-site dependency arrays and costs moved into runtime helpers,
 including the runtime callback wrapper. The `one-per-render` target is a fixed

@@ -228,7 +228,7 @@
     },
     {
       "name": "@octanejs/dexie",
-      "version": "0.1.45",
+      "version": "0.1.46",
       "category": "Data",
       "upstream": { "package": "dexie-react-hooks", "version": "4.4.0" },
       "surface": "Port of the public dexie-react-hooks surface: useObservable, useLiveQuery, useSuspendingObservable, useSuspendingLiveQuery, usePermissions, and useDocument, with Dexie's framework-neutral API re-exported from the package root.",
@@ -498,7 +498,7 @@
     },
     {
       "name": "@octanejs/input-otp",
-      "version": "0.0.18",
+      "version": "0.0.19",
       "category": "Forms",
       "upstream": { "package": "input-otp", "version": "1.5.0" },
       "surface": "Complete against input-otp@1.5.0: OTPInput, OTPInputContext, the three exported regexp patterns, public props and slot types including nonce, controlled and uncontrolled values, one-input accessibility and mobile-autofill markup, default spellcheck off, translation opt-out, render/context projection, keyboard selection and deletion, paste transformation, completion callbacks, overflow-aware password-manager displacement, SSR, and hydration.",
@@ -657,7 +657,7 @@
     },
     {
       "name": "@octanejs/motion",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "Animation",
       "upstream": { "package": "motion", "version": "12.42.2" },
       "surface": "Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, live `useReducedMotion`, reduced-motion enforcement, `LayoutGroup` layoutId namespaces, `LazyMotion` with `domAnimation`/`domMax`, the `m` proxy and complete `./react-m` named host entry, plus the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.",
@@ -683,6 +683,21 @@
       ],
       "ssr": "The react-free server entry has a dedicated Node lane for parsing and serialising search params. Client hydration remains outside the supported evidence claim.",
       "verified": "2026-08-02"
+    },
+    {
+      "name": "@octanejs/octane-is",
+      "version": "0.0.1",
+      "category": "Developer Tools",
+      "upstream": { "package": "react-is", "version": "19.2.7" },
+      "surface": "All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata.",
+      "divergences": [
+        "Kind labels use Octane symbols and reject React elements.",
+        "Context.Consumer, forwardRef, Profiler and SuspenseList have no Octane kind; their predicates return false.",
+        "StrictMode identifies Octane's pass-through wrapper without double invocation.",
+        "React Server Component references are not valid Octane types."
+      ],
+      "ssr": "Predicates are pure; they never render a component or start a lazy loader.",
+      "verified": "2026-09-03"
     },
     {
       "name": "@octanejs/opentui",
@@ -774,7 +789,7 @@
     },
     {
       "name": "@octanejs/rainbowkit",
-      "version": "0.0.32",
+      "version": "0.0.33",
       "category": "Web3",
       "upstream": { "package": "@rainbow-me/rainbowkit", "version": "2.2.11" },
       "surface": "Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.",
@@ -811,7 +826,6 @@
       "divergences": [
         "<Source> delivers its generated id to child layers through context rather than cloneElement, so the id reaches any descendant <Layer> rather than only direct children. It still overrides an explicitly set source, as cloneElement did.",
         "Map, Marker, Popup and GeolocateControl take their ref as an ordinary prop; Octane has no forwardRef. `<Map ref={mapRef} />` is unchanged.",
-        "Effect cleanups run on the passive drain after root.unmount() rather than inside it, so the map's WebGL context and worker pool are released one drain later.",
         "Marker picks between its own element and Mapbox's default pin from what its children actually rendered, because a compiled children block cannot be inspected the way React.Children.forEach inspects descriptors. Children that render something, render nothing, or first render after mount all match upstream; a child that stays truthy while rendering nothing forever gets the default pin here and an empty, invisible element upstream.",
         "react-map-gl/mapbox-legacy (mapbox-gl v1) and @vis.gl/react-maplibre are out of scope."
       ],
@@ -887,7 +901,7 @@
     },
     {
       "name": "@octanejs/rxjs",
-      "version": "0.1.31",
+      "version": "0.1.32",
       "category": "State Management",
       "upstream": {
         "package": "@react-rxjs/core + @react-rxjs/utils",
@@ -1000,7 +1014,7 @@
     },
     {
       "name": "@octanejs/solana-kit",
-      "version": "0.0.21",
+      "version": "0.0.22",
       "category": "Web3",
       "upstream": {
         "package": "@solana/react",
@@ -1190,7 +1204,7 @@
     },
     {
       "name": "@octanejs/tanstack-form",
-      "version": "0.0.46",
+      "version": "0.0.47",
       "category": "Forms",
       "upstream": { "package": "@tanstack/react-form", "version": "1.33.2" },
       "surface": "Ports the complete @tanstack/react-form 1.33.2 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.2 unchanged and using @octanejs/tanstack-store for subscriptions.",
@@ -1204,7 +1218,7 @@
     },
     {
       "name": "@octanejs/tanstack-hotkeys",
-      "version": "0.0.41",
+      "version": "0.0.42",
       "category": "UI Utilities",
       "upstream": { "package": "@tanstack/react-hotkeys", "version": "0.10.0" },
       "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.",
@@ -1216,7 +1230,7 @@
     },
     {
       "name": "@octanejs/tanstack-pacer",
-      "version": "0.0.41",
+      "version": "0.0.42",
       "category": "UI Utilities",
       "upstream": { "package": "@tanstack/react-pacer", "version": "0.22.1" },
       "surface": "Surface-present for all 15 runtime/type entrypoints from `@tanstack/react-pacer@0.22.1`, plus the byte-identical `@tanstack/pacer@0.21.1` core re-export. Repo-authored adapted-octane and differential lanes cover a representative debounce/throttle/batching/teardown lifecycle; upstream has no runtime suite and insufficient type evidence, so provenance remains `recorded-unverified` with nearly every export still `surface-present-unverified`.",
@@ -1228,7 +1242,7 @@
     },
     {
       "name": "@octanejs/tanstack-query",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "Data",
       "upstream": { "package": "@tanstack/react-query", "version": "5.101.3" },
       "surface": "Complete: 58/58 runtime exports plus the full TypeScript surface; the export surface is byte-identical to upstream in both directions (locked by test), and `@tanstack/query-core` is re-exported verbatim.",
@@ -1240,7 +1254,7 @@
     },
     {
       "name": "@octanejs/tanstack-router",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
       "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
@@ -1254,7 +1268,7 @@
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",
-      "version": "0.0.41",
+      "version": "0.0.42",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
       "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
@@ -1264,7 +1278,7 @@
     },
     {
       "name": "@octanejs/tanstack-store",
-      "version": "0.0.46",
+      "version": "0.0.47",
       "category": "State Management",
       "upstream": { "package": "@tanstack/react-store", "version": "0.11.0" },
       "surface": "Re-exports `@tanstack/store@0.11.0` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.",
@@ -1276,7 +1290,7 @@
     },
     {
       "name": "@octanejs/tanstack-table",
-      "version": "0.1.49",
+      "version": "0.1.50",
       "category": "Tables",
       "upstream": { "package": "@tanstack/react-table", "version": "9.0.0-beta.58" },
       "surface": "Complete port of the v9 adapter: the framework-agnostic `@tanstack/table-core` (constructTable + every tree-shakeable feature and row model) is reused verbatim, and the adapter — `useTable`, `Subscribe`, `flexRender`/`FlexRender`, `createTableHook`, `createTableHookContexts` — is transcribed onto octane hooks. Table state lives in TanStack Store atoms via the `coreReactivityFeature` bindings, and `useSelector` drives re-renders from the selected slice. Every store primitive (hooks, `createAtom`, `batch`, `shallow`, and the atom/store types) is imported from @octanejs/tanstack-store, which re-exports all of @tanstack/store — the binding takes no direct dependency on the store core, so there is only one path to it and atom identity cannot be split across duplicate copies.",
@@ -1319,12 +1333,12 @@
     },
     {
       "name": "@octanejs/testing-library",
-      "version": "0.1.49",
+      "version": "0.1.50",
       "category": "Testing",
       "upstream": { "package": "@testing-library/react", "version": "16.3.2" },
-      "surface": "`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config.",
+      "surface": "`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. Focus and blur helpers additionally emit their bubbling native counterparts.",
       "divergences": [
-        "`fireEvent` dispatches real native events — no React remappings (`fireEvent.change` fires an explicit native `change`, not text typing or checkbox click activation) and no enter/leave/focus double-dispatch.",
+        "`fireEvent` dispatches native events: change remains an explicit native change and mouseEnter does not also dispatch mouseover. Focus/blur helpers emit focusin/focusout as well, for Octane delegated focus handlers.",
         "Not ported: the `ReactStrictMode` wrapper, `legacyRoot`, and the `onCaughtError`/`onRecoverableError` options."
       ],
       "ssr": "`hydrate: true` adopts octane SSR output via `hydrateRoot`.",
@@ -1431,7 +1445,7 @@
     },
     {
       "name": "@octanejs/usehooks-ts",
-      "version": "0.0.33",
+      "version": "0.0.34",
       "category": "UI Utilities",
       "upstream": {
         "package": "usehooks-ts",
@@ -1477,7 +1491,7 @@
     },
     {
       "name": "@octanejs/visx",
-      "version": "0.1.46",
+      "version": "0.1.47",
       "category": "Visualization",
       "upstream": { "package": "@visx/visx", "version": "4.0.0 + master@485c035" },
       "surface": "Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies.",
@@ -1493,7 +1507,7 @@
     },
     {
       "name": "@octanejs/wagmi",
-      "version": "0.0.32",
+      "version": "0.0.33",
       "category": "Web3",
       "upstream": { "package": "wagmi", "version": "3.7.4" },
       "surface": "WagmiProvider and createConfig over @wagmi/core 3.6.4, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.",
@@ -1762,6 +1776,7 @@
     "react-i18next": "@octanejs/i18next",
     "react-image-crop": "@octanejs/image-crop",
     "react-intersection-observer": "@octanejs/intersection-observer",
+    "react-is": "@octanejs/octane-is",
     "react-map-gl": "@octanejs/react-map-gl",
     "react-map-gl/mapbox": "@octanejs/react-map-gl",
     "react-markdown": "@octanejs/markdown",
@@ -1933,7 +1948,7 @@
     "28": {
       "message": "Target container is not a DOM element.",
       "runtime": ["client"],
-      "status": "active"
+      "status": "retired"
     },
     "29": {
       "message": "Cannot update an unmounted root.",
@@ -2080,6 +2095,26 @@
     "59": {
       "message": "%s requires an active server component.",
       "runtime": ["server"],
+      "status": "active"
+    },
+    "60": {
+      "message": "A component suspended without a Suspense boundary during synchronous server rendering. Use prerender() or a streaming renderer to await it.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "61": {
+      "message": "Hydration mismatch: the server-rendered text differed from the client; the text was updated to the client value.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "62": {
+      "message": "Hydration mismatch: the server rendered extra children in a text element; the stale children were discarded.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "63": {
+      "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
+      "runtime": ["client"],
       "status": "active"
     }
   }

@@ -3,6 +3,7 @@ import { startTransition } from '../src/index.js';
 import { act, mount } from './_helpers.js';
 import {
 	GenericChildTransition,
+	GenericChildStateTransition,
 	type GenericChildSnapshot,
 	type GenericChildStore,
 } from './_fixtures/generic-child-transitions.tsrx';
@@ -33,7 +34,7 @@ function makeStore(initial: GenericChildSnapshot): GenericChildStore & {
 	};
 }
 
-describe('renderable children in a held transition', () => {
+describe.each(['state', 'store'] as const)('renderable children updated through %s', (mode) => {
 	it.each([
 		{ kind: 'string', value: 'next', expected: 'next' },
 		{ kind: 'number', value: 0, expected: '0' },
@@ -43,7 +44,16 @@ describe('renderable children in a held transition', () => {
 		const second = deferred<string>();
 		first.resolve('ready:first');
 		const store = makeStore({ value: 'first', request: first.promise });
-		const root = mount(GenericChildTransition, { store });
+		let setSnapshot!: (snapshot: GenericChildSnapshot) => void;
+		const root =
+			mode === 'store'
+				? mount(GenericChildTransition, { store })
+				: mount(GenericChildStateTransition, {
+						initial: store.get(),
+						bind: (set) => {
+							setSnapshot = set;
+						},
+					});
 		try {
 			await act(() => {});
 			const onlyChild = root.find('#only-child');
@@ -55,16 +65,24 @@ describe('renderable children in a held transition', () => {
 			expect(descriptorChild.textContent).toBe('first');
 			expect(anchoredChild.textContent).toBe('before:first:after');
 
-			// The store keeps its new snapshot while the later sibling suspends.
-			// Revealing must therefore reapply each child, not mistake its aborted
-			// update for content that already reached the screen.
-			await act(() => startTransition(() => store.set({ value, request: second.promise })));
-			expect(onlyChild.textContent).toBe('first');
-			expect(descriptorChild.textContent).toBe('first');
-			expect(anchoredChild.textContent).toBe('before:first:after');
-			expect(root.find('#ready').textContent).toBe('ready:first');
-			expect(root.find('#pending').textContent).toBe('pending');
-			expect(root.findAll('#fallback')).toEqual([]);
+			await act(() => {
+				if (mode === 'store') startTransition(() => store.set({ value, request: second.promise }));
+				else setSnapshot({ value, request: second.promise });
+			});
+			if (mode === 'state') {
+				expect(onlyChild.textContent).toBe('first');
+				expect(descriptorChild.textContent).toBe('first');
+				expect(anchoredChild.textContent).toBe('before:first:after');
+				expect(root.find('#ready').textContent).toBe('ready:first');
+				expect(root.find('#pending').textContent).toBe('pending');
+				expect(root.findAll('#fallback')).toEqual([]);
+			} else {
+				// External stores stay synchronous, including notifications inside
+				// startTransition. The incomplete primary is hidden behind fallback.
+				expect(root.find('#fallback').textContent).toBe('loading');
+				expect(root.find('#pending').textContent).toBe('idle');
+				expect(onlyChild.parentElement!.style.display).toBe('none');
+			}
 
 			await act(() => second.resolve('ready:second'));
 			expect(root.find('#only-child')).toBe(onlyChild);

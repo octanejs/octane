@@ -15,7 +15,7 @@ describe('spread hook arguments', () => {
 		r.unmount();
 	});
 
-	it('retains self-identifying Symbols only at production spread sites', () => {
+	it('uses Symbol call paths at production state spread sites', () => {
 		const { code } = compile(
 			`import { useState } from 'octane';
 			 export function App() @{ const args = [] as const; const [n] = useState(...args); <p>{n as string}</p> }`,
@@ -23,6 +23,6 @@ describe('spread hook arguments', () => {
 			{ hmr: false },
 		);
 		expect(code).toMatch(/const _h\$0 = \/\* @__PURE__ \*\/ Symbol\(_hs\$\);/);
-		expect(code).toContain('useState(...args, _h$0)');
+		expect(code).toContain('_$withSlot(_h$0, useState, ...args)');
 	});
 });

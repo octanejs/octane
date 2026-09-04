@@ -1,3 +1,5 @@
+/** @jsxImportSource octane */
+import { useDeferredValue } from 'octane';
 import { useSuspenseQuery } from '@octanejs/tanstack-query';
 import { useRouterState, useSearch, Link } from '@octanejs/tanstack-router';
 import * as stylex from '@octanejs/stylex';
@@ -78,10 +80,13 @@ export function StoriesPage() {
 		strict: false,
 		select: (s: { page?: number }) => s.page ?? 1,
 	});
+	// Router snapshots update immediately. Keep the visible page together while
+	// the next page's query loads in the background.
+	const renderedPage = useDeferredValue(page);
 
 	// The id list, cached per feed (won't re-suspend on a page change).
 	const { data: ids } = useSuspenseQuery(storiesQuery(feed));
-	const start = (page - 1) * PAGE_SIZE;
+	const start = (renderedPage - 1) * PAGE_SIZE;
 	const pageIds = ids.slice(start, start + PAGE_SIZE);
 
 	// Keep this dependent query sequential in the same component. Besides being
@@ -91,5 +96,5 @@ export function StoriesPage() {
 
 	// The typed destructured child intentionally owns the keyed `.map`: it keeps
 	// the return-JSX helper-insertion regression covered by a production app.
-	return <StoriesList ids={ids} items={items} feed={feed} page={page} />;
+	return <StoriesList ids={ids} items={items} feed={feed} page={renderedPage} />;
 }

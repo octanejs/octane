@@ -1,5 +1,11 @@
 # @octanejs/tanstack-query
 
+## 0.1.52
+
+### Patch Changes
+
+- 44d50db: Keep committed query content visible while a new query key suspends in a transition. Retain each key's promise through pending-cue replays without losing sequential query suspension.
+
 ## 0.1.51
 
 ### Patch Changes

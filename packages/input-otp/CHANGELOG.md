@@ -1,5 +1,11 @@
 # @octanejs/input-otp
 
+## 0.0.19
+
+### Patch Changes
+
+- 44d50db: Preserve the explicit hook identities used by the previous-value and password-manager helpers so completion callbacks fire after entering the final digit.
+
 ## 0.0.18
 
 ### Patch Changes

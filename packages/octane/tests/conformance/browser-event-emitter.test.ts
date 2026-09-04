@@ -211,13 +211,8 @@ describe('ReactBrowserEventEmitter — handler mutation during a dispatch', () =
 		r.unmount();
 	});
 
-	// Companion to :332 — intentional divergence (synthetic snapshot): if the
-	// child handler FORCES the removal to commit mid-dispatch (flushSync), React's
-	// snapshot would still invoke the parent's listener, but the DOM's own
-	// contract reads each node's listeners when the event reaches it — a listener
-	// removed before the event arrives does not fire. octane's live `$$click`
-	// slot walk matches the platform.
-	it('flushSync removal mid-dispatch takes effect for the rest of the walk (platform-live semantics)', () => {
+	// A committed update cannot change the already-snapshotted logical phase.
+	it('flushSync removal takes effect on the next dispatch', () => {
 		let parentClicks = 0;
 		const r = mount(ClickTree, {
 			onParent: () => parentClicks++,
@@ -226,14 +221,14 @@ describe('ReactBrowserEventEmitter — handler mutation during a dispatch', () =
 			},
 		});
 		(r.find('.child') as HTMLElement).click();
-		expect(parentClicks).toBe(0);
+		expect(parentClicks).toBe(1);
+		(r.find('.child') as HTMLElement).click();
+		expect(parentClicks).toBe(1);
 		r.unmount();
 	});
 
-	// Companion to :346 — intentional divergence (synthetic snapshot): a listener
-	// ADDED to an ancestor before the event reaches it DOES fire on the platform
-	// (and in octane's live walk); React's snapshot would exclude it.
-	it('flushSync insertion mid-dispatch fires for the rest of the walk (platform-live semantics)', () => {
+	// A newly committed handler begins receiving events on the next dispatch.
+	it('flushSync insertion takes effect on the next dispatch', () => {
 		let parentClicks = 0;
 		const parentHandler = () => parentClicks++;
 		const r = mount(ClickTree, {
@@ -242,6 +237,8 @@ describe('ReactBrowserEventEmitter — handler mutation during a dispatch', () =
 				flushSync(() => r.root.render(ClickTree, { onParent: parentHandler, onChild: () => {} }));
 			},
 		});
+		(r.find('.child') as HTMLElement).click();
+		expect(parentClicks).toBe(0);
 		(r.find('.child') as HTMLElement).click();
 		expect(parentClicks).toBe(1);
 		r.unmount();

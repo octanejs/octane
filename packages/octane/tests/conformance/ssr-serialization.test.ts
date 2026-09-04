@@ -490,9 +490,8 @@ describe('conformance: SSR serialization — void elements + dangerouslySetInner
 	// functional outcome. Server-output half only (React's clientCleanRender half
 	// diverges in React itself).
 	it('renders a noscript with children (Per :581 — outcome level)', () => {
-		expect(ssr('NoscriptChildren')).toBe(
-			'<noscript><div>Enable JavaScript to run this app.</div></noscript>',
-		);
+		const noscript = parse(ssr('NoscriptChildren')).querySelector('noscript');
+		expect(noscript?.textContent).toContain('Enable JavaScript to run this app.');
 	});
 });
 

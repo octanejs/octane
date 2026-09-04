@@ -1,5 +1,12 @@
 # @octanejs/motion
 
+## 0.1.52
+
+### Patch Changes
+
+- 44d50db: Rebind animated style values when properties are added or removed while retaining
+  subscriptions for unchanged values, using a fixed-length hook dependency tuple.
+
 ## 0.1.51
 
 ### Patch Changes

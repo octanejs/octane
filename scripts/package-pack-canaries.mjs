@@ -178,6 +178,33 @@ process.stdout.write(JSON.stringify(['default', 'DraggableCore'].filter((key) =>
 `;
 }
 
+export const PACKED_STRICT_BROWSER_SOURCE_PACKAGES = [
+	'@octanejs/octane-is',
+	'@octanejs/jotai',
+	'@octanejs/redux',
+	'@octanejs/remix-router',
+	'@octanejs/visx',
+	'@octanejs/recharts',
+];
+
+const strictBrowserSourcePackages = new Set(PACKED_STRICT_BROWSER_SOURCE_PACKAGES);
+
+function hasTypeScriptSource(files) {
+	for (const file of files ?? []) {
+		if (file.startsWith('src/') && /\.(?:[cm]?ts|tsx)$/.test(file) && !/\.d\.[cm]?ts$/.test(file)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function hasPackedSourceConsumer(packageName, files) {
+	return (
+		hasTsrxFile(files) ||
+		(strictBrowserSourcePackages.has(packageName) && hasTypeScriptSource(files))
+	);
+}
+
 export function findPackedTsrxSourceConsumerPackages(
 	packages,
 	packedFiles,
@@ -189,7 +216,7 @@ export function findPackedTsrxSourceConsumerPackages(
 				!pkg.private &&
 				pkg.role === 'framework binding' &&
 				!excludedPackages.has(pkg.name) &&
-				hasTsrxFile(packedFiles.get(pkg.name)),
+				hasPackedSourceConsumer(pkg.name, packedFiles.get(pkg.name)),
 		)
 		.map((pkg) => pkg.name)
 		.sort();
@@ -214,7 +241,7 @@ function collectExportTargets(value, output = []) {
 }
 
 export function findPackedTsrxSourceConsumerSpecifiers(packageName, manifest, files) {
-	if (!hasTsrxFile(files)) return [];
+	if (!hasPackedSourceConsumer(packageName, files)) return [];
 
 	const exports = manifest.exports;
 	if (
@@ -388,14 +415,6 @@ export function createPackedTsrxConsumerConfig({
 	};
 }
 
-export const PACKED_TSRX_STRICT_BROWSER_PACKAGES = [
-	'@octanejs/jotai',
-	'@octanejs/redux',
-	'@octanejs/remix-router',
-	'@octanejs/visx',
-	'@octanejs/recharts',
-];
-
 export const PACKED_TSRX_CONSUMER_PROJECTS = [
 	'tsconfig.json',
 	'tsconfig.browser.json',
@@ -450,8 +469,53 @@ export type BrowserHasNoNodeNamespace = NodeJS.Process;
 `;
 }
 
+// Pure TypeScript introspection bindings also need packed Node and browser
+// source checks, even though they do not author a TSRX component.
+function renderPackedOctaneIsTypeProbe() {
+	return `import * as PackedIs from '@octanejs/octane-is';
+import type { ElementDescriptor as PackedIsDescriptor } from 'octane';
+type PackedIsEqual<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type PackedIsAssert<T extends true> = T;
+type PackedIsExports = PackedIsAssert<PackedIsEqual<keyof typeof PackedIs, 'ContextConsumer' | 'ContextProvider' | 'Element' | 'ForwardRef' | 'Fragment' | 'Lazy' | 'Memo' | 'Portal' | 'Profiler' | 'StrictMode' | 'Suspense' | 'SuspenseList' | 'isValidElementType' | 'isContextConsumer' | 'isContextProvider' | 'isForwardRef' | 'isFragment' | 'isLazy' | 'isMemo' | 'isPortal' | 'isProfiler' | 'isStrictMode' | 'isSuspense' | 'isSuspenseList' | 'typeOf' | 'isElement'>>;
+type PackedIsContextConsumer = PackedIsAssert<PackedIsEqual<typeof PackedIs.ContextConsumer, symbol>>;
+type PackedIsContextProvider = PackedIsAssert<PackedIsEqual<typeof PackedIs.ContextProvider, symbol>>;
+type PackedIsElement = PackedIsAssert<PackedIsEqual<typeof PackedIs.Element, symbol>>;
+type PackedIsForwardRef = PackedIsAssert<PackedIsEqual<typeof PackedIs.ForwardRef, symbol>>;
+type PackedIsFragment = PackedIsAssert<PackedIsEqual<typeof PackedIs.Fragment, symbol>>;
+type PackedIsLazy = PackedIsAssert<PackedIsEqual<typeof PackedIs.Lazy, symbol>>;
+type PackedIsMemo = PackedIsAssert<PackedIsEqual<typeof PackedIs.Memo, symbol>>;
+type PackedIsPortal = PackedIsAssert<PackedIsEqual<typeof PackedIs.Portal, symbol>>;
+type PackedIsProfiler = PackedIsAssert<PackedIsEqual<typeof PackedIs.Profiler, symbol>>;
+type PackedIsStrictMode = PackedIsAssert<PackedIsEqual<typeof PackedIs.StrictMode, symbol>>;
+type PackedIsSuspense = PackedIsAssert<PackedIsEqual<typeof PackedIs.Suspense, symbol>>;
+type PackedIsSuspenseList = PackedIsAssert<PackedIsEqual<typeof PackedIs.SuspenseList, symbol>>;
+type PackedIsisValidElementType = PackedIsAssert<PackedIsEqual<typeof PackedIs.isValidElementType, (value: unknown) => boolean>>;
+type PackedIsisContextConsumer = PackedIsAssert<PackedIsEqual<typeof PackedIs.isContextConsumer, (value: unknown) => boolean>>;
+type PackedIsisContextProvider = PackedIsAssert<PackedIsEqual<typeof PackedIs.isContextProvider, (value: unknown) => boolean>>;
+type PackedIsisForwardRef = PackedIsAssert<PackedIsEqual<typeof PackedIs.isForwardRef, (value: unknown) => boolean>>;
+type PackedIsisFragment = PackedIsAssert<PackedIsEqual<typeof PackedIs.isFragment, (value: unknown) => boolean>>;
+type PackedIsisLazy = PackedIsAssert<PackedIsEqual<typeof PackedIs.isLazy, (value: unknown) => boolean>>;
+type PackedIsisMemo = PackedIsAssert<PackedIsEqual<typeof PackedIs.isMemo, (value: unknown) => boolean>>;
+type PackedIsisPortal = PackedIsAssert<PackedIsEqual<typeof PackedIs.isPortal, (value: unknown) => boolean>>;
+type PackedIsisProfiler = PackedIsAssert<PackedIsEqual<typeof PackedIs.isProfiler, (value: unknown) => boolean>>;
+type PackedIsisStrictMode = PackedIsAssert<PackedIsEqual<typeof PackedIs.isStrictMode, (value: unknown) => boolean>>;
+type PackedIsisSuspense = PackedIsAssert<PackedIsEqual<typeof PackedIs.isSuspense, (value: unknown) => boolean>>;
+type PackedIsisSuspenseList = PackedIsAssert<PackedIsEqual<typeof PackedIs.isSuspenseList, (value: unknown) => boolean>>;
+type PackedIsTypeOf = PackedIsAssert<PackedIsEqual<typeof PackedIs.typeOf, (value: unknown) => symbol | undefined>>;
+type PackedIsElementGuard = PackedIsAssert<PackedIsEqual<typeof PackedIs.isElement, (value: unknown) => value is PackedIsDescriptor<unknown>>>;
+// @ts-expect-error Kind labels are symbols, not strings.
+const packedIsWrong: string = PackedIs.typeOf(null);
+// @ts-expect-error Predicates require a value.
+PackedIs.isMemo();
+// @ts-expect-error Kind labels are not component factories.
+PackedIs.Profiler();
+void packedIsWrong;
+`;
+}
+
 export function renderPackedStrictBrowserConsumerTypeProbe() {
-	return `import { sumTypedPair } from './App.tsrx';
+	return `${renderPackedOctaneIsTypeProbe()}
+import { sumTypedPair } from './App.tsrx';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { atom, useAtom } from '@octanejs/jotai';
 import { useSelector } from '@octanejs/redux';
@@ -779,7 +843,8 @@ export function PublishedSourceConsumer() @{
 }
 
 export function renderPackedTsrxConsumerTypeProbe() {
-	return `import { Command, type CommandProps } from '@octanejs/cmdk';
+	return `${renderPackedOctaneIsTypeProbe()}
+import { Command, type CommandProps } from '@octanejs/cmdk';
 import {
 	Bar,
 	BarChart,

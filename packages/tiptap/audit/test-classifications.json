@@ -2,6 +2,11 @@
   "schemaVersion": 1,
   "tests": [
     {
+      "path": "packages/tiptap/tests/unit/react-import-boundary.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks authored binding and adapted-probe imports without poisoning Octane's transitive migration type dependencies."
+    },
+    {
       "path": "packages/tiptap/tests/browser/editor.browser.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks real Chromium integration and geometry; it is not same-scenario React execution."

@@ -1,6 +1,6 @@
 // Shared internals for the binding hooks.
 import { shouldThrowError } from '@tanstack/query-core';
-import { subSlot, use, useRef } from 'octane';
+import { subSlot, use, useMemo } from 'octane';
 
 export { subSlot };
 
@@ -78,7 +78,6 @@ type SuspensePromise = PromiseLike<unknown> & {
 };
 
 interface SuspensePromiseCache {
-	key: unknown;
 	promise: SuspensePromise | undefined;
 }
 
@@ -95,8 +94,10 @@ interface SuspensePromiseCache {
  *
  * Retain the promise that suspended this query hook and keep reading it after
  * it settles. That reserves the query hook's call-order position throughout
- * the replay episode. A new query key or retry replaces a settled promise;
- * re-renders during the same pending fetch reuse the in-flight promise.
+ * the replay episode. A key-specific memo lets a held transition restore the
+ * committed key's promise when publishing its pending cue. A mutable ref would
+ * make that old-key render read the new key's pending promise and show fallback.
+ * Re-renders during the same pending fetch reuse the in-flight promise.
  */
 export function useSuspensePromise(
 	shouldSuspend: boolean,
@@ -104,12 +105,8 @@ export function useSuspensePromise(
 	createPromise: () => PromiseLike<unknown>,
 	slot: symbol | undefined,
 ): void {
-	const cache = useRef<SuspensePromiseCache>({ key: undefined, promise: undefined }, slot).current;
-	if (
-		shouldSuspend &&
-		(cache.promise === undefined || cache.key !== key || cache.promise.status !== 'pending')
-	) {
-		cache.key = key;
+	const cache = useMemo<SuspensePromiseCache>(() => ({ promise: undefined }), [key], slot);
+	if (shouldSuspend && (cache.promise === undefined || cache.promise.status !== 'pending')) {
 		cache.promise = createPromise() as SuspensePromise;
 	}
 	if (cache.promise !== undefined) use(cache.promise);

@@ -1,22 +1,26 @@
-// `fireEvent` — dom-testing-library's, re-exported UNWRAPPED.
-//
-// react-testing-library layers remappings on top of dom-testing-library's
-// fireEvent because React's synthetic event system listens to DIFFERENT native
-// events than the handler names suggest (mouseEnter handlers run off native
-// mouseover, focus/blur off focusin/focusout, `select` is synthesized from key
-// events, `onChange` fires on native input, …), so RTL double-dispatches to
-// feed React's plugins.
-//
-// Octane has NO synthetic event layer — `onX` handlers receive the native `x`
-// event, delegated. `fireEvent.mouseEnter` therefore dispatches a real
-// `mouseenter` and octane's capture-phase delegation of non-bubbling events
-// delivers it; `fireEvent.change` fires a native `change` (NOT React's
-// input-as-change); no remapping is wanted. The commit wiring (flushSync +
-// effect drain around every dispatch) rides on dom-testing-library's
-// `eventWrapper` config hook — see pure.ts.
-//
-// In particular, `fireEvent.change(textbox)` means “dispatch an explicit native
-// commit event”; it does not simulate typing or blur. Likewise, change on a
-// checkbox does not reproduce click activation/toggling or click → input →
-// change ordering. Use user-event's type/tab/click flows for those sequences.
-export { fireEvent } from '@testing-library/dom';
+import { fireEvent as domFireEvent } from '@testing-library/dom';
+
+// Keep the DOM helpers independent: callers importing @testing-library/dom
+// directly still get one native event per helper. Octane's onFocus/onBlur
+// delegation listens to focusin/focusout, so those two convenience helpers
+// emit native focus/blur followed by the corresponding bubbling event.
+export const fireEvent: typeof domFireEvent = Object.assign(
+	(...args: Parameters<typeof domFireEvent>) => domFireEvent(...args),
+	domFireEvent,
+);
+
+fireEvent.focus = (element, options) => {
+	const result = domFireEvent.focus(element, options);
+	domFireEvent.focusIn(element, { ...options, bubbles: true });
+	return result;
+};
+fireEvent.blur = (element, options) => {
+	const result = domFireEvent.blur(element, options);
+	domFireEvent.focusOut(element, { ...options, bubbles: true });
+	return result;
+};
+
+// Other helpers retain DOM semantics: change dispatches an explicit native
+// commit event; mouseEnter does not also dispatch mouseover. Use user-event
+// for complete typing, click activation, and focus movement sequences.
+// Commit/effect flushing uses the DOM library's eventWrapper (see pure.ts).

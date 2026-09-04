@@ -18,7 +18,7 @@ describe('direct server script compilation', () => {
 				sourcefile: 'bundled-server-preload.js',
 			},
 			bundle: true,
-			external: ['@tsrx/core', 'esrap', 'esrap/*', 'es-module-lexer'],
+			external: ['@tsrx/core', 'oxc-tsrx', 'esrap', 'esrap/*', 'es-module-lexer'],
 			format: 'esm',
 			logLevel: 'silent',
 			minify: true,

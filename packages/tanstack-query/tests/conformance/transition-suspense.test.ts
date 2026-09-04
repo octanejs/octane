@@ -1,16 +1,7 @@
 /**
- * React useTransition + Suspense parity for `useSuspenseQuery`.
- *
- * Per React's useTransition contract (ReactSuspense*-test "transition does not
- * show fallback when refetching the same boundary"): once a transition is
- * showing previously-committed content, React keeps it on screen until the new
- * query resolves — it does NOT flash the Suspense fallback, even though the
- * query observer's notification (and thus the re-render that re-suspends on the
- * new fetch) arrives asynchronously at URGENT priority (query-core's
- * notifyManager schedules on a setTimeout(0) macrotask).
- *
- * Before the octane fix this flashed the @pending fallback during the move; the
- * runtime now continues the transition hold across the urgent re-suspend.
+ * React 19.2.7 parity: a transition keeps committed query content visible, while
+ * an explicit urgent key change may reveal fallback. Pending state belongs to
+ * the useTransition hook that started the update, not an independent probe.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { QueryClient } from '@octanejs/tanstack-query';
@@ -69,16 +60,8 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 		expect(r.findAll('#fallback')).toHaveLength(0);
 		expect(r.find('#pending').textContent).toBe('idle');
 
-		// Transition to value=2: the reader re-renders under key ['…', 2] and the
-		// new query is in flight. The observer notifies asynchronously (macrotask)
-		// so the re-suspend re-render is URGENT — but because the boundary is
-		// transition-held, value=1 content STAYS and the fallback NEVER appears.
-		//
-		// The flash (pre-fix) is TRANSIENT — it shows only across the macrotask
-		// window between the observer's async notify and the eventual resolve, so
-		// asserting only after a full `flush()` would miss it. Watch the DOM with a
-		// MutationObserver so any momentary appearance of #fallback (or the loss of
-		// the value=1 content) is recorded for the whole in-flight window.
+		// Observe the entire pending window so a transient fallback cannot pass a
+		// settled-only assertion. The query key changes at transition priority.
 		let fallbackEverSeen = false;
 		let contentEverLost = false;
 		const mo = new MutationObserver(() => {
@@ -91,11 +74,12 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 		await flush();
 		mo.disconnect();
 
-		expect(fallbackEverSeen).toBe(false); // <- pre-fix this FLASHED (true)
+		expect(fallbackEverSeen).toBe(false);
 		expect(contentEverLost).toBe(false); // value=1 content never removed
 		expect(r.find('#data').textContent).toBe('data:one'); // OLD content held
+		expect(r.find('#data').getAttribute('data-pending')).toBe('pending');
 		expect(r.findAll('#fallback')).toHaveLength(0);
-		expect(r.find('#pending').textContent).toBe('pending');
+		expect(r.find('#pending').textContent).toBe('idle');
 
 		// Resolve value=2 → the held boundary commits the new content all at once
 		// and isPending returns to idle. The fallback never showed at any point.
@@ -104,23 +88,16 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 			await flush();
 		});
 		expect(r.find('#data').textContent).toBe('data:two');
+		expect(r.find('#data').getAttribute('data-pending')).toBe('idle');
 		expect(r.findAll('#fallback')).toHaveLength(0);
 		expect(r.find('#pending').textContent).toBe('idle');
 
 		r.unmount();
 	});
 
-	it('an URGENT key change while held re-suspends the query without flashing the fallback', async () => {
-		// This is the exact failing shape from the hacker-news example: a transition
-		// changes the key and the boundary HOLDS on the new page's in-flight fetch;
-		// then the query observer notifies ASYNCHRONOUSLY (a setTimeout(0) macrotask)
-		// so a SUBSEQUENT re-render that re-suspends on a DIFFERENT in-flight query
-		// runs at URGENT priority. React keeps the prior content on screen; pre-fix
-		// octane flashed the @pending fallback on that urgent re-suspend.
-		//
-		// We model the urgent macrotask re-render by changing the key to value=3
-		// urgently (NOT wrapped in a transition) WHILE the boundary is still held on
-		// value=2 — exactly the priority the observer notify lands at.
+	it('an urgent key change supersedes a held transition and reveals fallback', async () => {
+		// Unlike a transition update, an explicit urgent key change must interrupt
+		// the held screen. This is also the negative control for transition holds.
 		const d1 = deferred<string>();
 		const d2 = deferred<string>();
 		const d3 = deferred<string>();
@@ -172,25 +149,28 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 		expect(r.find('#data').textContent).toBe('data:one');
 		expect(fallbackEverSeen).toBe(false);
 
-		// While STILL held, an URGENT key change to value=3 re-renders the reader
-		// under key ['…', 3] and re-suspends on the value=3 fetch — a DIFFERENT
-		// thenable, at urgent priority. React holds; pre-fix octane flashed here.
+		// An urgent move to key3 supersedes key2. The old content stays mounted
+		// but hidden while key3's fallback is visible.
 		await act(() => setValueUrgent(3));
 		await flush();
-		expect(r.find('#data').textContent).toBe('data:one'); // OLD content still held
-		expect(fallbackEverSeen).toBe(false); // <- pre-fix this FLASHED (true)
-		expect(r.find('#pending').textContent).toBe('pending');
+		expect(fallbackEverSeen).toBe(true);
+		expect(r.find('#fallback').textContent).toBe('loading');
+		expect((r.find('#data') as HTMLElement).style.display).toBe('none');
+		expect(r.find('#pending').textContent).toBe('idle');
 
-		// Resolve the value=3 fetch → the held boundary commits content-three all at
-		// once and isPending returns to idle.
+		// A stale key2 resolution cannot replace the current key3 fallback.
 		await act(async () => {
 			d2.resolve('two');
+			await flush();
+		});
+		expect(r.find('#fallback').textContent).toBe('loading');
+		await act(async () => {
 			d3.resolve('three');
 			await flush();
 		});
 		mo.disconnect();
 
-		expect(fallbackEverSeen).toBe(false); // never flashed at any point
+		expect(fallbackEverSeen).toBe(true);
 		expect(contentEverLost).toBe(false); // value=1 content was never removed
 		expect(r.find('#data').textContent).toBe('data:three');
 		expect(r.findAll('#fallback')).toHaveLength(0);

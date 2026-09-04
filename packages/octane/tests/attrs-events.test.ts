@@ -162,13 +162,13 @@ describe('attributes', () => {
 	it('preserves enumerated ARIA coercion on the narrow attribute path', () => {
 		const r = mount(DynamicAriaAttribute, { value: 'label' });
 		const el = r.find('#dynamic-aria');
-		const values: unknown[] = [false, true, 0, () => 'function', Symbol('symbol'), ['a', 'b']];
+		const values: unknown[] = [false, true, 0, ['a', 'b']];
 		for (const value of values) {
 			r.update(DynamicAriaAttribute, { value });
 			expect(el.getAttribute('aria-label')).toBe(String(value));
 			expect(r.find('#dynamic-aria')).toBe(el);
 		}
-		for (const value of [null, undefined]) {
+		for (const value of [null, undefined, () => 'function', Symbol('symbol')]) {
 			r.update(DynamicAriaAttribute, { value });
 			expect(el.getAttribute('aria-label')).toBeNull();
 		}

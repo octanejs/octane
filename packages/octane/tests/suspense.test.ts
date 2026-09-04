@@ -649,10 +649,17 @@ describe('Suspense — effects of siblings rendered before the suspend', () => {
 		]);
 
 		// The mount effects really connected, so unmount tears them down: layout
-		// cleanups synchronously, passive ones deferred (see effect-timing).
+		// cleanups followed by passive cleanups before root unmount returns.
 		log.length = 0;
 		r.unmount();
-		expect(log).toEqual(['layout cleanup a', 'layout cleanup b', 'layout cleanup plain']);
+		expect(log).toEqual([
+			'layout cleanup a',
+			'layout cleanup b',
+			'layout cleanup plain',
+			'passive cleanup a',
+			'passive cleanup b',
+			'passive cleanup plain',
+		]);
 		await nextPaint();
 		expect(log).toEqual([
 			'layout cleanup a',

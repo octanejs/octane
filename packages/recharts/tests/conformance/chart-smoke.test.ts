@@ -184,13 +184,30 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 		await settle();
 		expect(result.container.querySelectorAll('.recharts-scatter-symbol')).toHaveLength(0);
 
-		result.update(HiddenScatterCellsApp, { hide: false });
-		const symbols = result.container.querySelectorAll(
-			'.recharts-scatter-symbol path.recharts-symbols',
-		);
-		const fills = Array.from(symbols, (symbol) => symbol.getAttribute('fill'));
-		result.unmount();
-		expect(fills).toEqual(['#ff0000', '#0000ff']);
+		let firstVisibleFills: Array<string | null> | undefined;
+		const captureFirstVisible = () => {
+			if (firstVisibleFills !== undefined) return;
+			const symbols = result.container.querySelectorAll(
+				'.recharts-scatter-symbol path.recharts-symbols',
+			);
+			if (symbols.length > 0) {
+				firstVisibleFills = Array.from(symbols, (symbol) => symbol.getAttribute('fill'));
+			}
+		};
+		const observer = new MutationObserver(captureFirstVisible);
+		observer.observe(result.container, { childList: true, subtree: true, attributes: true });
+		try {
+			result.update(HiddenScatterCellsApp, { hide: false });
+			captureFirstVisible();
+			// Store/layout cascades can finish at the next paint boundary. Capture
+			// the first visible mutation so a later color correction cannot pass.
+			await nextPaint();
+			captureFirstVisible();
+			expect(firstVisibleFills).toEqual(['#ff0000', '#0000ff']);
+		} finally {
+			observer.disconnect();
+			result.unmount();
+		}
 	});
 
 	it('renders a zero-valued ErrorBar', async () => {

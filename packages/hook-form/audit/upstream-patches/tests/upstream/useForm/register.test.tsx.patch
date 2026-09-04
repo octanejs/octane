@@ -138,12 +138,12 @@ diff --git a/tests/upstream/useForm/register.test.tsx b/tests/upstream/useForm/r
        }),
      );
    });
-@@ -1994,7 +1993,7 @@ describe('register', () => {
-     expect(onBlur).toHaveBeenCalledTimes(1);
-     expect(onBlur).toHaveBeenCalledWith(
-       expect.objectContaining({
--        bubbles: true,
-+        bubbles: false, // octane: native blur does not bubble (no synthetic event layer)
+@@ -1997,7 +1996,7 @@ describe('register', () => {
+         bubbles: true,
          cancelable: false,
          currentTarget: null,
-         type: 'blur',
+-        type: 'blur',
++        type: 'focusout', // octane: delegated onBlur receives native focusout
+       }),
+     );
+   });

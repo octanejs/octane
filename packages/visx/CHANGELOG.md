@@ -1,5 +1,13 @@
 # @octanejs/visx
 
+## 0.1.47
+
+### Patch Changes
+
+- fc0ba16: Remove four unused runtime dependency declarations and share the internal D3
+  number-or-accessor overload helper across the chord, hierarchy, and shape ports.
+  - @octanejs/floating-ui@0.1.51
+
 ## 0.1.46
 
 ### Patch Changes

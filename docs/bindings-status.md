@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 106 `@octanejs/*` framework bindings.
+The central status table for the 107 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -62,6 +62,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/monaco-editor`](#octanejsmonaco-editor) | `@monaco-editor/react@4.7.0` | Editor (default), DiffEditor, loader, useMonaco, and the complete upstream 4.7.0 prop and callback type surface, including controlled values, model paths, languages, themes, options, view-state restoration, validation, and model ownership. | Components are compiled Octane `.tsrx` modules and accept OctaneNode for loading content; they do not depend on React; MonacoContainer uses Octane ref as an ordinary prop instead of upstream private _ref; Model disposal is ownership-aware: binding-owned models are tracked in a WeakSet with lease counts in a WeakMap, so externally created or shared models are not disposed by the wrong owner; superseded owned path models are cleaned up on unmount; View state is stored in a WeakMap keyed by model identity rather than upstream path-string Map; CSS style modules use plain records instead of React CSSProperties | Editor and DiffEditor render a deterministic loading shell without touching browser globals; live Monaco construction begins in a client effect. Hydration adopts server DOM (section, slot nodes) and reaches a ready editor without mismatch warnings. | 2026-08-10 |
 | [`@octanejs/motion`](#octanejsmotion) | `motion@12.42.2` | Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, live `useReducedMotion`, reduced-motion enforcement, `LayoutGroup` layoutId namespaces, `LazyMotion` with `domAnimation`/`domMax`, the `m` proxy and complete `./react-m` named host entry, plus the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim. | Exit animations run via cleanup-before-detach instead of React's deferred-deletion machinery; `layout`/`layoutId` use single-element FLIP, not the full projection tree; An `initial` target without an `animate` target does not materialize inline initial styles; set the starting style explicitly or provide an animation target | No SSR-specific surface; no dedicated SSR tests. | 2026-08-02 |
 | [`@octanejs/nuqs`](#octanejsnuqs) | `nuqs@2.9.1` | Full vendored port: the framework-agnostic core (`parsers`/`parseAs*`/`createParser`, `createSerializer`, `createLoader`, `createStandardSchemaV1`, the throttle/debounce update queues, sync emitter and URL encoding) is vendored verbatim from nuqs 2.9.1; the React layer (`useQueryState`, `useQueryStates`, the `useSyncExternalStores` helper and the adapter context) is ported onto octane's hooks — same `useState`/`useEffect`/`useSyncExternalStore` implementation shape as upstream, so re-render and URL-reconciliation behaviour matches nuqs on React. Adapters ported: `@octanejs/nuqs/adapters/react` (`NuqsAdapter`, `enableHistorySync`), `/adapters/custom` (`unstable_createAdapterProvider`), `/adapters/testing` (`NuqsTestingAdapter`, `withNuqsTestingAdapter`). Server surface (`@octanejs/nuqs/server`) exposes `createLoader`/`createSerializer`/parsers/`createStandardSchemaV1`. | Router-specific React adapters are not shipped; use the standalone or custom adapter; createSearchParamsCache is unavailable because Octane does not implement React.cache; TransitionStartFunction is declared locally instead of importing React types; NuqsTestingAdapter resets the shared update queue once per mount instead of every render | The react-free server entry has a dedicated Node lane for parsing and serialising search params. Client hydration remains outside the supported evidence claim. | 2026-08-02 |
+| [`@octanejs/octane-is`](#octanejsoctane-is) | `react-is@19.2.7` | All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata. | Kind labels use Octane symbols and reject React elements; Context.Consumer, forwardRef, Profiler and SuspenseList have no Octane kind; their predicates return false; StrictMode identifies Octane's pass-through wrapper without double invocation; React Server Component references are not valid Octane types | Predicates are pure; they never render a component or start a lazy loader. | 2026-09-03 |
 | [`@octanejs/opentui`](#octanejsopentui) | `@opentui/react@0.5.8` | Technical-preview OpenTUI 0.5.8 renderer: renderer-local TSRX intrinsics for the complete built-in catalogue and text modifiers, custom `extend()` renderables, component-plus-props roots, OpenTUI prop/style/event application, refs and retained visibility, same-renderer `RootRenderable` portals, terminal error fallback, `act`/`flushSync`, all public hooks, `TimeToFirstDraw`, the core slot/plugin registry adapted to universal renderables, and an FFI-backed test utility. Native behavioral coverage exercises terminal frames, state and prop updates, host identity, keyboard and resize hooks, multi-argument select callbacks, subscription cleanup, portals, slots, errors, and teardown under Bun. | Octane owns reconciliation, components, hooks, context, scheduling, errors, refs, and effects instead of embedding React Reconciler; Components are authored in `.opentui.tsrx`; the package does not export React `createElement` or accept React element trees. Programmatic roots render an Octane component plus props; Refs are ordinary Octane props and may be composed with `ref={[a, b]}`; there is no `forwardRef` layer; Slot plugins return universal renderables and plugin errors use source `octane` instead of `react`. `createReactSlotRegistry` and the upstream `React*` type names remain migration aliases for the canonical Octane-named API; React DevTools and OpenTUI's React runtime-plugin bundling subpaths are not ported. Applications configure the Octane compiler with `opentuiRenderers`; Portal targets are explicitly limited to borrowed `RootRenderable` instances from the same `CliRenderer` context and are never destroyed by the binding | Unsupported. OpenTUI is a native terminal renderer; `.opentui.tsrx` modules are rejected from server graphs and have no HTML hydration contract. | 2026-08-25 |
 | [`@octanejs/pdf`](#octanejspdf) | `react-pdf@10.4.1` | Complete against the documented react-pdf 10.4.1 root contract: Document, Page, Thumbnail, Outline, all three context hooks, PasswordResponses, pdfjs, all ten root types, both documented layer styles, and the unchanged PDF.js worker import. | React nodes, refs, DOM events, and CSS property types are represented by Octane nodes, refs-as-props, native DOM events, and Octane class/style values while preserving observable behavior; The permissive upstream ./* export exposes React implementation and source artifacts; these are pinned framework-private evidence rather than supported Octane entry points. Root imports and the two documented CSS paths are exact public support | Document renders deterministic loading, no-data, and error shells without browser globals or workers. The browser build adopts the server shell before starting PDF.js and uses the modern worker-backed build; Node resolves the legacy PDF.js build. | 2026-08-04 |
 | [`@octanejs/phosphor-icons`](#octanejsphosphor-icons) | `@phosphor-icons/react@2.1.10` | All 1,512 canonical icons from @phosphor-icons/core@2.1.1, including the upstream deprecated Icon-suffixed aliases, six weights, IconContext, IconBase, root exports, and per-icon imports. | Icon refs are normal Octane ref props rather than React forwardRef components; Event callbacks receive native DOM events rather than React synthetic events; The React package's SSR namespace is unnecessary because Octane icons use the same components on client and server | Supported and tested against @phosphor-icons/react/ssr for every weight; hydration adopts and updates server-rendered SVG hosts. | 2026-08-02 |
@@ -70,7 +71,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/radix`](#octanejsradix) | `radix-ui@1.6.4` | Surface-present against the unified `radix-ui@1.6.4` component exports. Sixteen repo-authored differential cases compare representative primitives and interactions against the real package; the complete 38-file canonical upstream suite is preserved but not adapted, so the binding remains recorded-unverified. | `Slot`/`asChild` compose element descriptors (prop-position JSX, `createElement`, `.map()` returns), not children-position JSX; `forwardRef` becomes octane's ref-as-prop | SSR/hydration coverage for the overlay/portal components is still open (tracked in the migration plan). | 2026-08-03 |
 | [`@octanejs/rainbowkit`](#octanejsrainbowkit) | `@rainbow-me/rainbowkit@2.2.11` | Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes. | IMPORTANT: upstream RainbowKit 2.2.11 declares wagmi ^2.9.0. This adapter intentionally consumes @octanejs/wagmi v3 and is not drop-in dependency or peer-range parity; The React DOM and vanilla-extract implementation is replaced by native Octane TSRX, DOM events, focus/scroll containment, and CSS custom properties; The wallet list merges optional configured descriptors with the enclosing Wagmi v3 connector list, deduplicated by canonical connector uid with explicit id/name fallback. Unavailable configured entries remain visible with a reason. RainbowKit wallet factories, vendor SDKs, and WalletConnect project configuration remain application-owned; Authentication, recent transactions, ENS/avatar resolution, localization, cool mode, account avatars/balances, chain icons, and pixel-identical upstream themes are unsupported and their upstream props are not accepted; rainbowTheme is an explicitly documented Octane-only purple/rounded preset; it is not an upstream RainbowKit export | The provider and controls emit deterministic disconnected markup without browser wallet access. Connector discovery and live Wagmi state become authoritative after hydration; no hydrated UI state authorizes wallet actions. | 2026-08-02 |
 | [`@octanejs/react-error-boundary`](#octanejsreact-error-boundary) | `react-error-boundary@6.1.2` | Complete against the published react-error-boundary 6.1.2 function/type surface adapted to Octane: ErrorBoundary, ErrorBoundaryContext, getErrorMessage, fallback variants, onError/onReset callbacks, resetKeys, useErrorBoundary (including error), withErrorBoundary, OnErrorCallback, and UseErrorBoundaryApi. | Component stack information is currently an empty string because Octane does not expose a public component-stack formatter; Event-handler and asynchronous errors must be passed to useErrorBoundary().showBoundary(), matching upstream's explicit forwarding requirement; Server rendering that must match upstream error propagation uses the explicit @octanejs/react-error-boundary/server entry | The explicit server entry renders children without a boundary so descendant errors propagate, matching react-error-boundary 6.1.2. | 2026-08-02 |
-| [`@octanejs/react-map-gl`](#octanejsreact-map-gl) | `@vis.gl/react-mapbox@8.1.2 (b1e46fcf)` | Complete against the pinned @vis.gl/react-mapbox 8.1.2 public surface — the package react-map-gl/mapbox re-exports: Map (and default), Marker, Popup, Source, Layer, AttributionControl, FullscreenControl, GeolocateControl, NavigationControl, ScaleControl, useControl, MapProvider, useMap, and every published type. The framework-neutral half of upstream (the Mapbox engine, proxy transform, map ref, and six utils) is reused byte-for-byte and validated by upstream's own specs run against both source trees. | <Source> delivers its generated id to child layers through context rather than cloneElement, so the id reaches any descendant <Layer> rather than only direct children. It still overrides an explicitly set source, as cloneElement did; Map, Marker, Popup and GeolocateControl take their ref as an ordinary prop; Octane has no forwardRef. `<Map ref={mapRef} />` is unchanged; Effect cleanups run on the passive drain after root.unmount() rather than inside it, so the map's WebGL context and worker pool are released one drain later; Marker picks between its own element and Mapbox's default pin from what its children actually rendered, because a compiled children block cannot be inspected the way React.Children.forEach inspects descriptors. Children that render something, render nothing, or first render after mount all match upstream; a child that stays truthy while rendering nothing forever gets the default pin here and an empty, invisible element upstream; react-map-gl/mapbox-legacy (mapbox-gl v1) and @vis.gl/react-maplibre are out of scope | Supported and tested: Map server-renders its container with the merged style and omits every child, because mapbox-gl is only imported inside an effect. Nothing in the tree reads a browser global on the server. hydrateRoot adopts that container rather than replacing it, and the map is created inside the server's own node once the library resolves. | 2026-08-06 |
+| [`@octanejs/react-map-gl`](#octanejsreact-map-gl) | `@vis.gl/react-mapbox@8.1.2 (b1e46fcf)` | Complete against the pinned @vis.gl/react-mapbox 8.1.2 public surface — the package react-map-gl/mapbox re-exports: Map (and default), Marker, Popup, Source, Layer, AttributionControl, FullscreenControl, GeolocateControl, NavigationControl, ScaleControl, useControl, MapProvider, useMap, and every published type. The framework-neutral half of upstream (the Mapbox engine, proxy transform, map ref, and six utils) is reused byte-for-byte and validated by upstream's own specs run against both source trees. | <Source> delivers its generated id to child layers through context rather than cloneElement, so the id reaches any descendant <Layer> rather than only direct children. It still overrides an explicitly set source, as cloneElement did; Map, Marker, Popup and GeolocateControl take their ref as an ordinary prop; Octane has no forwardRef. `<Map ref={mapRef} />` is unchanged; Marker picks between its own element and Mapbox's default pin from what its children actually rendered, because a compiled children block cannot be inspected the way React.Children.forEach inspects descriptors. Children that render something, render nothing, or first render after mount all match upstream; a child that stays truthy while rendering nothing forever gets the default pin here and an empty, invisible element upstream; react-map-gl/mapbox-legacy (mapbox-gl v1) and @vis.gl/react-maplibre are out of scope | Supported and tested: Map server-renders its container with the merged style and omits every child, because mapbox-gl is only imported inside an effect. Nothing in the tree reads a browser global on the server. hydrateRoot adopts that container rather than replacing it, and the map is created inside the server's own node once the library resolves. | 2026-08-06 |
 | [`@octanejs/recharts`](#octanejsrecharts) | `recharts@3.9.2` | Broad runtime support across cartesian, polar, hierarchical, tooltip, legend, responsive-container, shape, and chart-state surfaces. `Brush` and `Treemap` remain intentionally unsupported. | Chart events coordinate through octane's native delegated events rather than React's synthetic layer | Untested; text measurement (`getStringSize`) returns 0×0 under SSR. | 2026-08-02 |
 | [`@octanejs/redux`](#octanejsredux) | `react-redux@9.3.0` | The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Upstream runtime-export completeness is pinned by test. | `connect()` (the legacy HOC surface) intentionally throws — the hooks API is the supported surface; Error messages are octane-branded; The root also exposes createReduxContextHook, useReduxContext, createSubscription, and useSyncExternalStoreWithSelector as Octane extension exports | No SSR-specific surface; no dedicated SSR tests. | 2026-08-02 |
 | [`@octanejs/redux-toolkit`](#octanejsredux-toolkit) | `@reduxjs/toolkit@2.12.0` | Complete four-entry-point port: the framework-agnostic Toolkit and RTK Query core are re-exported verbatim; `/query/react` provides generated query, lazy-query, mutation, infinite-query, prefetch hooks and `ApiProvider`; `/react` provides the dynamic-middleware dispatch-hook integration. | The compatibility `/react` subpaths and `reactHooksModule` names are retained, but use octane and `@octanejs/redux` internally; `useDebugValue` is octane's no-op compatibility hook; observable query behavior is unchanged | Preloaded RTK Query state renders through the traditional @octanejs/redux Provider; effects and browser listeners remain client-only. Dedicated SSR and hydration tests are included. | 2026-08-02 |
@@ -104,7 +105,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/tanstack-table`](#octanejstanstack-table) | `@tanstack/react-table@9.0.0-beta.58` | Complete port of the v9 adapter: the framework-agnostic `@tanstack/table-core` (constructTable + every tree-shakeable feature and row model) is reused verbatim, and the adapter — `useTable`, `Subscribe`, `flexRender`/`FlexRender`, `createTableHook`, `createTableHookContexts` — is transcribed onto octane hooks. Table state lives in TanStack Store atoms via the `coreReactivityFeature` bindings, and `useSelector` drives re-renders from the selected slice. Every store primitive (hooks, `createAtom`, `batch`, `shallow`, and the atom/store types) is imported from @octanejs/tanstack-store, which re-exports all of @tanstack/store — the binding takes no direct dependency on the store core, so there is only one path to it and atom identity cannot be split across duplicate copies. | `flexRender`'s class-component and `react.memo`/`forwardRef` exotic-component branches are dropped — octane has no class components or forwardRef, and octane's `memo()` returns a plain function, so `typeof === 'function'` covers every component; Upstream's `useLegacyTable` entry (the v8-compat `get*RowModel` shim, its marker factories, and the `Legacy*` type aliases) is NOT ported. It exists to migrate existing React v8 codebases; octane has none, so octane code targets the v9 `useTable` API directly | No SSR-specific surface; table-core is pure computation. | 2026-08-02 |
 | [`@octanejs/tanstack-virtual`](#octanejstanstack-virtual) | `@tanstack/react-virtual@3.14.5` | Complete 1:1 port: the framework-agnostic `@tanstack/virtual-core` (Virtualizer + observers + windowing math) is reused verbatim; the React adapter (`useVirtualizer`, `useWindowVirtualizer`, incl. `useFlushSync` and the experimental `directDomUpdates` surface) is transcribed onto octane hooks, preserving upstream's force-update + flushSync-on-sync-scroll wiring and layout-effect lifecycle. | octane's `flushSync` called while a flush is already on the stack degrades to a plain call drained by the ambient flush (re-entrancy guard) — sync scroll notifies dispatched from inside a discrete-event flush land at that flush's boundary instead of nested; consumer-invisible, pinned by a conformance test | SSR-safe: `useIsomorphicLayoutEffect` degrades to `useEffect` without `document`; the first paint windows from `initialRect`/`initialOffset` exactly as upstream. No dedicated SSR tests. | 2026-08-02 |
 | [`@octanejs/tauri`](#octanejstauri) | `@tauri-apps/api@2.11.1` | Octane hooks over the framework-neutral Tauri IPC surface: useInvoke (suspending command), useInvokeState (pending/success/error with refetch), and useTauriEvent (event subscription with lifecycle-safe teardown). The rest of @tauri-apps/api — window, webview, menu, tray, path, dpi, image, and the plugin packages — is already framework-neutral and is imported directly rather than re-exported here. | There is no React binding upstream; @tauri-apps/api ships promise and callback APIs, so this package is a new hook layer rather than a port; Hook call-site slots are forwarded through Octane's compiler binding ABI; useInvoke integrates with Octane's use() rather than React's use() or a thrown-promise implementation detail; Command arguments given as a plain record are compared by value for the default refetch key; array and binary payloads are compared by identity. The command name is always part of the key, so explicit deps extend it rather than replacing it; useInvokeState returns to pending on refetch and does not implement stale-while-revalidate; a caching query layer belongs to @octanejs/tanstack-query; A failed useTauriEvent subscription throws by default so a missing capability is loud, and is then recovered by the enclosing boundary's reset(); passing onError reports it instead, keeping the component mounted so a changed event or enabled flag retries; Channel-based streaming has no hook yet: construct Channel directly and keep it stable with useMemo | Server rendering performs no IPC. useInvokeState renders its pending state and issues the command on the client after hydration; useTauriEvent subscribes only on the client. useInvoke is client-oriented: without a Tauri host it rejects with TauriUnavailableError so the boundary reports rather than hangs. | 2026-07-27 |
-| [`@octanejs/testing-library`](#octanejstesting-library) | `@testing-library/react@16.3.2` | `render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. | `fireEvent` dispatches real native events — no React remappings (`fireEvent.change` fires an explicit native `change`, not text typing or checkbox click activation) and no enter/leave/focus double-dispatch; Not ported: the `ReactStrictMode` wrapper, `legacyRoot`, and the `onCaughtError`/`onRecoverableError` options | `hydrate: true` adopts octane SSR output via `hydrateRoot`. | 2026-08-02 |
+| [`@octanejs/testing-library`](#octanejstesting-library) | `@testing-library/react@16.3.2` | `render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. Focus and blur helpers additionally emit their bubbling native counterparts. | `fireEvent` dispatches native events: change remains an explicit native change and mouseEnter does not also dispatch mouseover. Focus/blur helpers emit focusin/focusout as well, for Octane delegated focus handlers; Not ported: the `ReactStrictMode` wrapper, `legacyRoot`, and the `onCaughtError`/`onRecoverableError` options | `hydrate: true` adopts octane SSR output via `hydrateRoot`. | 2026-08-02 |
 | [`@octanejs/textarea-autosize`](#octanejstextarea-autosize) | `react-textarea-autosize@8.5.9` | Complete against the published react-textarea-autosize 8.5.9 default component and named TextareaAutosizeProps and TextareaHeightChangeMeta types, including native textarea props, row clamps, measurement caching, height callbacks, refs, environmental listeners, form reset, SSR, and browser sizing. | onChange and onChangeCapture receive the native InputEvent rather than a React SyntheticEvent; target and currentTarget are the textarea during dispatch; Programmatic value assignment does not synthesize a public change callback; dispatch a native input event when that behavior is required | Server rendering emits one plain textarea without accessing browser measurement globals; Octane hydration adopts the existing host and preserves pre-hydration uncontrolled edits. | 2026-08-03 |
 | [`@octanejs/thinking-orbs`](#octanejsthinking-orbs) | `thinking-orbs@0.2.0` | ThinkingOrb component, resolvePreset, MODE_DRAWS, and public types — nine animation states, two tuned size presets, auto/dark/light theme, reduced-motion static frame. | none known | Canvas is client-only; server render emits the canvas element without animation. | 2026-08-07 |
 | [`@octanejs/three`](#octanejsthree) | `@react-three/fiber@9.6.1 (2a528745)` | Technical-preview Milestones 0–10 surface: renderer configuration and the DOM Canvas boundary, compiler ABI and renderer-local Three intrinsic types, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, ownership-aware disposal, promise-returning HTMLCanvasElement and OffscreenCanvas roots, Octane act/flushSync scheduling, callback-aware unmountComponentAtNode, callable root state, scene/camera/raycaster and resize/DPR/viewport configuration, shadows/colors, one shared frame loop, controlled WebXR loop handoff, context-restore invalidation, compatible/reconstructing HMR, global effects, useStore/useThree/useFrame/useGraph and managed-instance helpers, the ray/pointer event system with DOM sources and custom managers, a keyed useLoader cache with preload/clear and GLTF graph augmentation, retained Suspense/Activity behavior, client Three-to-DOM pending/error projection, same-renderer createPortal targets with state/event enclaves and physical Three event bubbling, client-only Canvas shell streaming and production Vite/Rsbuild hydration adoption with the matching raw Rspack graph split, the explicit-target low-level DOMRegion boundary, a deterministic testing harness, an asynchronously acknowledged structured-clone transport proof, a checked public API/subpath matrix, Three r156/current compatibility lanes, a packed external consumer, real WebGL failure/recovery coverage, and semantic-checksummed renderer and shipped-size benchmarks. | `octane-renderer-ownership`: Octane owns execution, hooks, scheduling, Suspense, refs, and effects instead of React Reconciler; `component-props-root-api`: Programmatic roots render an Octane component plus props rather than a React element descriptor; `order-based-callable-selector`: Dynamic callable store selectors remain order-based outside compiler-visible hook calls; `build-graph-named-only`: buildGraph publishes named mesh and material entries only; `pierced-prop-reset-target`: Removed pierced props reset the original nested target rather than a root leaf key; `reconstructed-intersection-rewrite`: Reconstruction rewrites nested captured and hovered intersections to the replacement; `hidden-activity-raycast`: Hidden retained Activity subtrees are excluded from recursive raycasts; `root-scoped-portal-targets`: Portal target handles are root-scoped and cross-root placement is rejected before mutation; `synchronous-root-teardown`: Root teardown and callback delivery are synchronous instead of delayed by 500ms; `octane-dom-region`: DOMRegion is an Octane-specific explicit-target Three-to-DOM primitive | Three scene modules are client-only and Canvas.children is omitted from the server graph. Canvas streams its DOM shell and native fallback, then production Vite and Rsbuild hydration adopt those nodes and create one Three root on the client; raw Rspack proves the equivalent client/server graph split without claiming an application SSR lifecycle. DOMRegion and its reverse-DOM content remain inside the omitted client-only Three scene. | 2026-07-17 |
@@ -369,7 +370,7 @@ Scope/evidence last checked: 2026-07-24.
 
 ## @octanejs/dexie
 
-[`packages/dexie`](../packages/dexie) `0.1.45` — ports `dexie-react-hooks@4.4.0`. Status data: [`packages/dexie/status.json`](../packages/dexie/status.json).
+[`packages/dexie`](../packages/dexie) `0.1.46` — ports `dexie-react-hooks@4.4.0`. Status data: [`packages/dexie/status.json`](../packages/dexie/status.json).
 
 Port of the public dexie-react-hooks surface: useObservable, useLiveQuery, useSuspendingObservable, useSuspendingLiveQuery, usePermissions, and useDocument, with Dexie's framework-neutral API re-exported from the package root.
 
@@ -673,7 +674,7 @@ Scope/evidence last checked: 2026-08-10.
 
 ## @octanejs/input-otp
 
-[`packages/input-otp`](../packages/input-otp) `0.0.18` — ports `input-otp@1.5.0`. Status data: [`packages/input-otp/status.json`](../packages/input-otp/status.json).
+[`packages/input-otp`](../packages/input-otp) `0.0.19` — ports `input-otp@1.5.0`. Status data: [`packages/input-otp/status.json`](../packages/input-otp/status.json).
 
 Complete against input-otp@1.5.0: OTPInput, OTPInputContext, the three exported regexp patterns, public props and slot types including nonce, controlled and uncontrolled values, one-input accessibility and mobile-autofill markup, default spellcheck off, translation opt-out, render/context projection, keyboard selection and deletion, paste transformation, completion callbacks, overflow-aware password-manager displacement, SSR, and hydration.
 
@@ -865,7 +866,7 @@ Scope/evidence last checked: 2026-08-10.
 
 ## @octanejs/motion
 
-[`packages/motion`](../packages/motion) `0.1.51` — ports `motion@12.42.2`. Status data: [`packages/motion/status.json`](../packages/motion/status.json).
+[`packages/motion`](../packages/motion) `0.1.52` — ports `motion@12.42.2`. Status data: [`packages/motion/status.json`](../packages/motion/status.json).
 
 Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, live `useReducedMotion`, reduced-motion enforcement, `LayoutGroup` layoutId namespaces, `LazyMotion` with `domAnimation`/`domMax`, the `m` proxy and complete `./react-m` named host entry, plus the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.
 
@@ -897,6 +898,25 @@ Known divergences:
 SSR / hydration: The react-free server entry has a dedicated Node lane for parsing and serialising search params. Client hydration remains outside the supported evidence claim.
 
 Scope/evidence last checked: 2026-08-02.
+
+## @octanejs/octane-is
+
+[`packages/octane-is`](../packages/octane-is) `0.0.1` — ports `react-is@19.2.7`. Status data: [`packages/octane-is/status.json`](../packages/octane-is/status.json).
+
+All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata.
+
+Known divergences:
+
+- Kind labels use Octane symbols and reject React elements.
+- Context.Consumer, forwardRef, Profiler and SuspenseList have no Octane kind; their predicates return false.
+- StrictMode identifies Octane's pass-through wrapper without double invocation.
+- React Server Component references are not valid Octane types.
+
+SSR / hydration: Predicates are pure; they never render a component or start a lazy loader.
+
+Scope/evidence last checked: 2026-09-03.
+
+- Requires the coordinated Octane core release containing the behavioral-audit fixes, planned for 0.2.3, or a later compatible release. Its new StrictMode export and owner-bound component-kind metadata are required even though repository policy mandates a broader beta peer range. Publish the binding and that core release together.
 
 ## @octanejs/opentui
 
@@ -1009,7 +1029,7 @@ See also: [`docs/radix-migration-plan.md`](radix-migration-plan.md)
 
 ## @octanejs/rainbowkit
 
-[`packages/rainbowkit`](../packages/rainbowkit) `0.0.32` — ports `@rainbow-me/rainbowkit@2.2.11`. Status data: [`packages/rainbowkit/status.json`](../packages/rainbowkit/status.json).
+[`packages/rainbowkit`](../packages/rainbowkit) `0.0.33` — ports `@rainbow-me/rainbowkit@2.2.11`. Status data: [`packages/rainbowkit/status.json`](../packages/rainbowkit/status.json).
 
 Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.
 
@@ -1051,7 +1071,6 @@ Known divergences:
 
 - <Source> delivers its generated id to child layers through context rather than cloneElement, so the id reaches any descendant <Layer> rather than only direct children. It still overrides an explicitly set source, as cloneElement did.
 - Map, Marker, Popup and GeolocateControl take their ref as an ordinary prop; Octane has no forwardRef. `<Map ref={mapRef} />` is unchanged.
-- Effect cleanups run on the passive drain after root.unmount() rather than inside it, so the map's WebGL context and worker pool are released one drain later.
 - Marker picks between its own element and Mapbox's default pin from what its children actually rendered, because a compiled children block cannot be inspected the way React.Children.forEach inspects descriptors. Children that render something, render nothing, or first render after mount all match upstream; a child that stays truthy while rendering nothing forever gets the default pin here and an empty, invisible element upstream.
 - react-map-gl/mapbox-legacy (mapbox-gl v1) and @vis.gl/react-maplibre are out of scope.
 
@@ -1158,7 +1177,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/rxjs
 
-[`packages/rxjs`](../packages/rxjs) `0.1.31` — ports `@react-rxjs/core + @react-rxjs/utils@0.10.8 / 0.9.7`. Status data: [`packages/rxjs/status.json`](../packages/rxjs/status.json).
+[`packages/rxjs`](../packages/rxjs) `0.1.32` — ports `@react-rxjs/core + @react-rxjs/utils@0.10.8 / 0.9.7`. Status data: [`packages/rxjs/status.json`](../packages/rxjs/status.json).
 
 Core bind/state/Subscribe APIs and the complete @react-rxjs/utils surface.
 
@@ -1290,7 +1309,7 @@ See also: [`docs/shadcn-port-plan.md`](shadcn-port-plan.md)
 
 ## @octanejs/solana-kit
 
-[`packages/solana-kit`](../packages/solana-kit) `0.0.21` — ports `@solana/react@7.0.0`. Status data: [`packages/solana-kit/status.json`](../packages/solana-kit/status.json).
+[`packages/solana-kit`](../packages/solana-kit) `0.0.22` — ports `@solana/react@7.0.0`. Status data: [`packages/solana-kit/status.json`](../packages/solana-kit/status.json).
 
 Octane-native client provider/store hooks, a validated private Wallet Standard adapter, explicit-action transaction orchestration, and a TanStack Query-backed request hook. Applications import framework-neutral operations directly from @solana/kit@7.0.0.
 
@@ -1528,7 +1547,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-form
 
-[`packages/tanstack-form`](../packages/tanstack-form) `0.0.46` — ports `@tanstack/react-form@1.33.2`. Status data: [`packages/tanstack-form/status.json`](../packages/tanstack-form/status.json).
+[`packages/tanstack-form`](../packages/tanstack-form) `0.0.47` — ports `@tanstack/react-form@1.33.2`. Status data: [`packages/tanstack-form/status.json`](../packages/tanstack-form/status.json).
 
 Ports the complete @tanstack/react-form 1.33.2 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.2 unchanged and using @octanejs/tanstack-store for subscriptions.
 
@@ -1549,7 +1568,7 @@ Scope/evidence last checked: 2026-08-09.
 
 ## @octanejs/tanstack-hotkeys
 
-[`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) `0.0.41` — ports `@tanstack/react-hotkeys@0.10.0`. Status data: [`packages/tanstack-hotkeys/status.json`](../packages/tanstack-hotkeys/status.json).
+[`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) `0.0.42` — ports `@tanstack/react-hotkeys@0.10.0`. Status data: [`packages/tanstack-hotkeys/status.json`](../packages/tanstack-hotkeys/status.json).
 
 Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.
 
@@ -1566,7 +1585,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-pacer
 
-[`packages/tanstack-pacer`](../packages/tanstack-pacer) `0.0.41` — ports `@tanstack/react-pacer@0.22.1`. Status data: [`packages/tanstack-pacer/status.json`](../packages/tanstack-pacer/status.json).
+[`packages/tanstack-pacer`](../packages/tanstack-pacer) `0.0.42` — ports `@tanstack/react-pacer@0.22.1`. Status data: [`packages/tanstack-pacer/status.json`](../packages/tanstack-pacer/status.json).
 
 Surface-present for all 15 runtime/type entrypoints from `@tanstack/react-pacer@0.22.1`, plus the byte-identical `@tanstack/pacer@0.21.1` core re-export. Repo-authored adapted-octane and differential lanes cover a representative debounce/throttle/batching/teardown lifecycle; upstream has no runtime suite and insufficient type evidence, so provenance remains `recorded-unverified` with nearly every export still `surface-present-unverified`.
 
@@ -1583,7 +1602,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-query
 
-[`packages/tanstack-query`](../packages/tanstack-query) `0.1.51` — ports `@tanstack/react-query@5.101.3`. Status data: [`packages/tanstack-query/status.json`](../packages/tanstack-query/status.json).
+[`packages/tanstack-query`](../packages/tanstack-query) `0.1.52` — ports `@tanstack/react-query@5.101.3`. Status data: [`packages/tanstack-query/status.json`](../packages/tanstack-query/status.json).
 
 Complete: 58/58 runtime exports plus the full TypeScript surface; the export surface is byte-identical to upstream in both directions (locked by test), and `@tanstack/query-core` is re-exported verbatim.
 
@@ -1599,7 +1618,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router
 
-[`packages/tanstack-router`](../packages/tanstack-router) `0.1.51` — ports `@tanstack/react-router@1.170.18`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
+[`packages/tanstack-router`](../packages/tanstack-router) `0.1.52` — ports `@tanstack/react-router@1.170.18`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
 
 Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.
 
@@ -1614,6 +1633,7 @@ SSR / hydration: Full-document buffered and readable-stream SSR through `./ssr/s
 Scope/evidence last checked: 2026-08-02.
 
 - The framework-neutral runtime dependency is `@tanstack/router-core@1.171.15`.
+- Same-route search navigations now render store updates urgently: a route that suspends on the new search input can show its pending fallback. To retain stale content, use `useDeferredValue` on the search input consumed by the suspending content; the previous automatic same-route hold no longer applies.
 - The TSRX-aware generator plugin is exported from `@octanejs/tanstack-router/generator-plugin` for `@octanejs/tanstack-start`'s package-owned generator.
 - React parity provenance is still recorded-unverified until pristine-upstream and one-for-one adapted suite lanes are fetched from the pinned tag; differential harness evidence is landed separately.
 
@@ -1621,7 +1641,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router-ssr-query
 
-[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.41` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
+[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.42` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
 
 Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.
 
@@ -1633,7 +1653,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-store
 
-[`packages/tanstack-store`](../packages/tanstack-store) `0.0.46` — ports `@tanstack/react-store@0.11.0`. Status data: [`packages/tanstack-store/status.json`](../packages/tanstack-store/status.json).
+[`packages/tanstack-store`](../packages/tanstack-store) `0.0.47` — ports `@tanstack/react-store@0.11.0`. Status data: [`packages/tanstack-store/status.json`](../packages/tanstack-store/status.json).
 
 Re-exports `@tanstack/store@0.11.0` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.
 
@@ -1651,7 +1671,7 @@ Scope/evidence last checked: 2026-08-09.
 
 ## @octanejs/tanstack-table
 
-[`packages/tanstack-table`](../packages/tanstack-table) `0.1.49` — ports `@tanstack/react-table@9.0.0-beta.58`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
+[`packages/tanstack-table`](../packages/tanstack-table) `0.1.50` — ports `@tanstack/react-table@9.0.0-beta.58`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
 
 Complete port of the v9 adapter: the framework-agnostic `@tanstack/table-core` (constructTable + every tree-shakeable feature and row model) is reused verbatim, and the adapter — `useTable`, `Subscribe`, `flexRender`/`FlexRender`, `createTableHook`, `createTableHookContexts` — is transcribed onto octane hooks. Table state lives in TanStack Store atoms via the `coreReactivityFeature` bindings, and `useSelector` drives re-renders from the selected slice. Every store primitive (hooks, `createAtom`, `batch`, `shallow`, and the atom/store types) is imported from @octanejs/tanstack-store, which re-exports all of @tanstack/store — the binding takes no direct dependency on the store core, so there is only one path to it and atom identity cannot be split across duplicate copies.
 
@@ -1705,13 +1725,13 @@ Scope/evidence last checked: 2026-07-27.
 
 ## @octanejs/testing-library
 
-[`packages/testing-library`](../packages/testing-library) `0.1.49` — ports `@testing-library/react@16.3.2`. Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
+[`packages/testing-library`](../packages/testing-library) `0.1.50` — ports `@testing-library/react@16.3.2`. Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
 
-`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config.
+`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. Focus and blur helpers additionally emit their bubbling native counterparts.
 
 Known divergences:
 
-- `fireEvent` dispatches real native events — no React remappings (`fireEvent.change` fires an explicit native `change`, not text typing or checkbox click activation) and no enter/leave/focus double-dispatch.
+- `fireEvent` dispatches native events: change remains an explicit native change and mouseEnter does not also dispatch mouseover. Focus/blur helpers emit focusin/focusout as well, for Octane delegated focus handlers.
 - Not ported: the `ReactStrictMode` wrapper, `legacyRoot`, and the `onCaughtError`/`onRecoverableError` options.
 
 SSR / hydration: `hydrate: true` adopts octane SSR output via `hydrateRoot`.
@@ -1844,7 +1864,7 @@ Scope/evidence last checked: 2026-08-09.
 
 ## @octanejs/usehooks-ts
 
-[`packages/usehooks-ts`](../packages/usehooks-ts) `0.0.33` — ports `usehooks-ts@3.1.1`. Status data: [`packages/usehooks-ts/status.json`](../packages/usehooks-ts/status.json).
+[`packages/usehooks-ts`](../packages/usehooks-ts) `0.0.34` — ports `usehooks-ts@3.1.1`. Status data: [`packages/usehooks-ts/status.json`](../packages/usehooks-ts/status.json).
 
 First host-safe cohort: useBoolean, useCounter, useToggle, useMap, useStep, useDebounceCallback, useDebounceValue, useInterval, useTimeout, useIsMounted, and useUnmount.
 
@@ -1891,7 +1911,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/visx
 
-[`packages/visx`](../packages/visx) `0.1.46` — ports `@visx/visx@4.0.0 + master@485c035`. Status data: [`packages/visx/status.json`](../packages/visx/status.json).
+[`packages/visx`](../packages/visx) `0.1.47` — ports `@visx/visx@4.0.0 + master@485c035`. Status data: [`packages/visx/status.json`](../packages/visx/status.json).
 
 Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies.
 
@@ -1914,7 +1934,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/wagmi
 
-[`packages/wagmi`](../packages/wagmi) `0.0.32` — ports `wagmi@3.7.4`. Status data: [`packages/wagmi/status.json`](../packages/wagmi/status.json).
+[`packages/wagmi`](../packages/wagmi) `0.0.33` — ports `wagmi@3.7.4`. Status data: [`packages/wagmi/status.json`](../packages/wagmi/status.json).
 
 WagmiProvider and createConfig over @wagmi/core 3.6.4, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.
 

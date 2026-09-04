@@ -573,6 +573,12 @@
         "tags": ["devtools", "debugging"]
       },
       {
+        "packageName": "@octanejs/octane-is",
+        "title": "Octane Is",
+        "searchTerms": ["react-is", "React Is"],
+        "tags": ["elements", "introspection", "compatibility"]
+      },
+      {
         "packageName": "@octanejs/tanstack-devtools",
         "title": "TanStack Devtools",
         "tags": ["devtools", "debugging"]

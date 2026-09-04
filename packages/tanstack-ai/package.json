@@ -43,7 +43,6 @@
     "@octanejs/testing-library": "workspace:*",
     "@tanstack/ai-react": "catalog:default",
     "@testing-library/jest-dom": "catalog:default",
-    "@testing-library/user-event": "^14.6.1",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",

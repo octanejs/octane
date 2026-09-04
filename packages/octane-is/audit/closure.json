@@ -1,0 +1,18 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [{ "packageName": "react-is", "paths": ["src/ReactIs.ts", "src/index.ts"] }],
+  "sourceLedger": [
+    {
+      "path": "src/ReactIs.ts",
+      "origin": "adapted",
+      "packageName": "react-is",
+      "sha256": "197baa3ea0d40aae0614c74de845d3f120cc5dd8f949ddea8c902f2e5711c123"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "react-is",
+      "sha256": "c3981b11de4cc586d40c6c2005d4054757d94218c98299dcd9d2b5026a092654"
+    }
+  ]
+}

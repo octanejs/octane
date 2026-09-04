@@ -3,7 +3,7 @@
  *
  * Public API (React `react-dom/server` parity): `renderToString(Component,
  * props?, options?)` (a single sync pass; suspended boundaries render their
- * fallback) and `renderToStaticMarkup` (clean, non-hydratable HTML). Both return
+ * fallback) and `renderToStaticMarkup` (non-hydratable HTML). Both return
  * `{ html, css }`: hoisted head folds into `html` (plus the suspense seed script
  * when anything resolved synchronously) and the deduped scoped-style tags are in
  * `css`. The await-everything renderer is `prerender` in `octane/static`.
@@ -22,6 +22,9 @@
  */
 
 export { executeServerFunction } from './rpc.js';
+export { version } from '../version.js';
+export { StrictMode, unstable_batchedUpdates } from '../compatibility.js';
+
 export {
 	createSubSlot,
 	subSlot,
@@ -36,9 +39,9 @@ export {
 export { __methodDep } from '../method-dep.js';
 
 export {
-	// Entry — React `react-dom/server` parity (buffered; streaming lands in a
-	// later phase). `renderToString` is a single sync pass (fallbacks for
-	// suspended boundaries); `renderToStaticMarkup` is non-hydratable clean HTML.
+	// Buffered and streaming renderers accept renderable roots plus options,
+	// or the Octane (Component, props, options) extension. Synchronous rendering
+	// uses boundary fallbacks and rejects suspension without a boundary.
 	// The await-everything behaviour lives in `octane/static` as `prerender`.
 	renderToString,
 	renderToStaticMarkup,
@@ -46,6 +49,7 @@ export {
 	renderToReadableStream,
 	type RenderResult,
 	type RenderOptions,
+	type ServerRenderNode,
 	type StreamOptions,
 	type StreamInjectionSource,
 	setSsrSuspenseTimeout,
@@ -75,6 +79,7 @@ export {
 	useDeferredValue,
 	useSyncExternalStore,
 	useActionState,
+	useActionState as useFormState,
 	useFormStatus,
 	useOptimistic,
 	useDebugValue,
@@ -82,6 +87,8 @@ export {
 	lazy,
 	hookSlots,
 	withSlot,
+	manualHook,
+	invokeManualHook,
 	startTransition,
 	flushSync,
 	isChildrenBlock,
@@ -121,6 +128,10 @@ export {
 
 	// Compiler-emitted codegen helpers (private ABI — see module doc)
 	markChildrenBlock,
+	markWarm,
+	ssrHtml,
+	ssrChildTextPre,
+	ssrChildPre,
 	descriptorChildren,
 	createElement,
 	createScopedValue,

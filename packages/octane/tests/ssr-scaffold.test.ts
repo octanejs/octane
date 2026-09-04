@@ -21,8 +21,8 @@ describe('SSR scaffold (phase 0)', () => {
 
 	it('octane/server renderToString() renders a component to { html, css }', () => {
 		// renderToString is a single synchronous pass; it returns { html, css }
-		// (head folded into html). A plain string-returning component → its string.
+		// (head folded into html). A plain string-returning component renders text.
 		const out = renderToString(((_s: any) => '<p>hi</p>') as any);
-		expect(out).toEqual({ html: '<p>hi</p>', css: '' });
+		expect(out).toEqual({ html: '&lt;p&gt;hi&lt;/p&gt;', css: '' });
 	});
 });

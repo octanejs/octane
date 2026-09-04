@@ -9,23 +9,28 @@ import {
 	statSync,
 	writeFileSync,
 } from 'node:fs';
-import { basename, dirname, join, relative } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEST = join(__dirname, '../src');
 const upstreamRoot = process.argv[2];
+const DEST = process.argv[3] ? resolve(process.argv[3]) : join(__dirname, '../src');
 
 const CORE_INDEX = join(upstreamRoot, 'bundle', 'core.ts');
 const LEGACY_INDEX = join(upstreamRoot, 'src', 'index.ts');
 
 if (!upstreamRoot || (!existsSync(CORE_INDEX) && !existsSync(LEGACY_INDEX))) {
-	console.error('Usage: node port-upstream.mjs <path-to-puck/packages/core>');
+	console.error('Usage: node port-upstream.mjs <path-to-puck/packages/core> [destination]');
 	process.exit(1);
 }
 
 const COPY_DIRS = ['components', 'lib', 'store', 'reducer', 'types'];
-const COPY_FILES = ['globals.d.ts', 'styles.css'];
+const COPY_FILES = [
+	'globals.d.ts',
+	'styles.css',
+	join('bundle', 'index.css'),
+	join('bundle', 'core.css'),
+];
 const SKIP_DIR_NAMES = new Set(['__tests__', '__mocks__', 'node_modules']);
 const OMITTED_UPSTREAM_FILES = new Set([
 	join('lib', 'is-ios.ts'),

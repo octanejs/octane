@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as ServerRuntime from 'octane/server';
+import { prerender } from 'octane/static';
 import { compile } from '../src/compiler/compile.js';
 import { createContext, createElement, flushSync, hydrateRoot } from '../src/index.js';
 import { act, flushEffects, mount } from './_helpers';
@@ -2788,7 +2789,7 @@ describe('compiler-owned component-region memoization', () => {
 		},
 	);
 
-	it('preserves promise-valued children from async map callbacks', () => {
+	it('preserves promise-valued children from async map callbacks', async () => {
 		const source = `
 			import { Suspense } from 'octane';
 			function AsyncMapApp(props) {
@@ -2815,10 +2816,16 @@ describe('compiler-owned component-region memoization', () => {
 			mode: 'client',
 			compileOptions: { hmr: false, dev: false },
 		});
-		expect(() => mount(client.App, { rows, onItem })).toThrow(
-			/Objects are not valid as an Octane child.*\[object Promise\]/,
-		);
-		expect(events).toEqual(['callback:1']);
+		const rendered = mount(client.App, { rows, onItem });
+		try {
+			expect(rendered.container.textContent).toBe('pending');
+			expect(events).toEqual(['callback:1']);
+			await act(async () => {});
+			expect(rendered.find('li').textContent).toBe('first');
+			expect(rendered.find('li').getAttribute('data-callback')).toBe('1');
+		} finally {
+			rendered.unmount();
+		}
 
 		events.length = 0;
 		const server = loadCompiledFixtureSource(source, {
@@ -2826,10 +2833,12 @@ describe('compiler-owned component-region memoization', () => {
 			mode: 'server',
 			compileOptions: { hmr: false, dev: false },
 		});
-		expect(() => ServerRuntime.renderToString(server.App, { rows, onItem })).toThrow(
-			/Objects are not valid as an Octane child.*\[object Promise\]/,
-		);
-		expect(events).toEqual(['callback:1']);
+		const result = await prerender(server.App, { rows, onItem });
+		const container = document.createElement('div');
+		container.innerHTML = result.html;
+		expect(container.querySelector('li')?.textContent).toBe('first');
+		expect(container.querySelector('li')?.getAttribute('data-callback')).toBe('1');
+		expect(events.length).toBeGreaterThan(0);
 	});
 
 	it.each([

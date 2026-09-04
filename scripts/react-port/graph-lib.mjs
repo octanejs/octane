@@ -138,6 +138,9 @@ function packageNameFromBlockedTarget(target) {
 }
 
 function proposedBindingName(packageName) {
+	// Keep the classifier's purpose explicit while naming the package for the
+	// Octane descriptors it actually inspects.
+	if (packageName === 'react-is') return '@octanejs/octane-is';
 	const slash = packageName.startsWith('@') ? packageName.indexOf('/') : -1;
 	const scope = slash === -1 ? null : packageName.slice(1, slash);
 	const unscopedName = slash === -1 ? packageName : packageName.slice(slash + 1);

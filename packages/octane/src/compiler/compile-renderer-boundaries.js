@@ -25,6 +25,7 @@ const AUTO_RUNTIME_HOOKS = new Set([
 	'useTransition',
 	'useSyncExternalStore',
 	'useActionState',
+	'useFormState',
 	'useFormStatus',
 	'useOptimistic',
 	'useContext',

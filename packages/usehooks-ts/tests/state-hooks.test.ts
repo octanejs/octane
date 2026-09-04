@@ -39,16 +39,48 @@ describe('state hooks', () => {
 		result.unmount();
 	});
 
-	it('rejects step values outside the configured range', () => {
-		let setStep: ((value: number) => void) | undefined;
+	it.each([0, 3, Number.NaN])(
+		'rejects invalid step value %s before scheduling a render',
+		(value) => {
+			let setStep: ((value: number) => void) | undefined;
+			const result = mount(StepValidationProbe, {
+				onReady(actions) {
+					setStep = actions.setStep;
+				},
+			});
+			try {
+				expect(() => setStep?.(value)).toThrow('Step not valid');
+				expect(result.find('p').textContent).toBe('1');
+			} finally {
+				result.unmount();
+			}
+		},
+	);
+
+	it('validates updater results immediately without losing earlier same-turn actions', () => {
+		let setStep: ((value: number | ((previous: number) => number)) => void) | undefined;
 		const result = mount(StepValidationProbe, {
 			onReady(actions) {
 				setStep = actions.setStep;
 			},
 		});
-		expect(() => setStep?.(3)).toThrow('Step not valid');
-		expect(result.find('p').textContent).toBe('1');
-		result.unmount();
+		try {
+			let rejected: unknown;
+			act(() => {
+				setStep!(2);
+				try {
+					setStep!((step) => step + 1);
+				} catch (error) {
+					rejected = error;
+				}
+				setStep!((step) => step - 1);
+			});
+			expect(rejected).toBeInstanceOf(Error);
+			expect((rejected as Error).message).toBe('Step not valid');
+			expect(result.find('p').textContent).toBe('1');
+		} finally {
+			result.unmount();
+		}
 	});
 
 	it('keeps repeated same-turn step actions within both bounds', () => {

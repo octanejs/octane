@@ -2090,7 +2090,7 @@ export function hmrUniversalComponent<P>(
 				__profileComponentSource(wrapper, next);
 			}
 			if ((next as any).__warm === undefined) delete (wrapper as any).__warm;
-			else (wrapper as any).__warm = (next as any).__warm;
+			else markWarm(wrapper, (next as any).__warm);
 			for (const owner of owners) {
 				if (owner.disposed) {
 					owners.delete(owner);
@@ -2113,13 +2113,17 @@ export function hmrUniversalComponent<P>(
 		{ module: metadata.module },
 	) as UniversalHmrComponent<P>;
 	Object.defineProperties(wrapper, {
-		[UNIVERSAL_HMR]: { value: meta },
+		[UNIVERSAL_HMR]: {
+			get() {
+				return this === wrapper ? meta : undefined;
+			},
+		},
 		[UNIVERSAL_COMPONENT_REVISION]: { get: () => meta.revision },
 	});
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 		__profileComponentSource(wrapper, component);
 	}
-	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
+	if ((component as any).__warm !== undefined) markWarm(wrapper, (component as any).__warm);
 	return wrapper;
 }
 
@@ -4869,12 +4873,85 @@ export function hookSlots(count: number): number {
 	return base;
 }
 
-export function withSlot<T>(slot: unknown, fn: (...args: any[]) => T, ...args: any[]): T {
-	UNIVERSAL_SLOT_STACK.push(slot);
+// Only manual-slot provider invocations install this capability. Ordinary custom
+// hooks keep their authored arguments; an actual provider adapter consumes the
+// pending call-site slot even when reached through a bound or forwarding alias.
+let MANUAL_HOOK_DRIVER: { pending: unknown; active: boolean } | null = null;
+
+/** @internal Invoke a provider that owns the trailing hook-slot ABI. */
+export function invokeManualHook<T>(
+	fn: (...args: any[]) => T,
+	receiver: unknown,
+	args: IArguments,
+): T {
+	// Hoisted provider declarations need no module initialization. Establish
+	// their capability on first invocation, including inside an existing call.
+	const driver = (MANUAL_HOOK_DRIVER ??= {
+		pending: UNIVERSAL_SLOT_STACK[UNIVERSAL_SLOT_STACK.length - 1],
+		active: false,
+	});
+	const pending = driver.pending;
+	const active = driver.active;
+	driver.pending = undefined;
+	driver.active = true;
+	try {
+		if (pending === undefined) return Reflect.apply(fn, receiver, args);
+		// Forward the wrapper's arguments object directly for common arities.
+		// Only larger calls need an array to append the compiler's slot.
+		switch (args.length) {
+			case 0:
+				return fn.call(receiver, pending);
+			case 1:
+				return fn.call(receiver, args[0], pending);
+			case 2:
+				return fn.call(receiver, args[0], args[1], pending);
+			case 3:
+				return fn.call(receiver, args[0], args[1], args[2], pending);
+			case 4:
+				return fn.call(receiver, args[0], args[1], args[2], args[3], pending);
+			default: {
+				const forwarded = new Array(args.length + 1);
+				for (let index = 0; index < args.length; index++) forwarded[index] = args[index];
+				forwarded[args.length] = pending;
+				return fn.apply(receiver, forwarded);
+			}
+		}
+	} finally {
+		driver.pending = pending;
+		driver.active = active;
+	}
+}
+
+/** @internal Adapt an expression provider that owns the trailing hook-slot ABI. */
+export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+	function provider(this: unknown) {
+		return invokeManualHook(fn, this, arguments);
+	}
+	Object.defineProperty(provider, 'name', { value: name ?? fn.name, configurable: true });
+	Object.defineProperty(provider, 'length', { value: fn.length, configurable: true });
+	return provider as F;
+}
+
+export function withSlot<T>(sym: unknown, fn: (...a: any[]) => T, ...args: any[]): T {
+	const driver = MANUAL_HOOK_DRIVER;
+	const pending = driver?.pending;
+	const active = driver?.active ?? false;
+	if (driver !== null) {
+		driver.pending = sym;
+		driver.active = false;
+	}
+	UNIVERSAL_SLOT_STACK.push(sym);
 	try {
 		return fn(...args);
 	} finally {
 		UNIVERSAL_SLOT_STACK.pop();
+		if (MANUAL_HOOK_DRIVER !== null) {
+			// A provider can first be invoked inside this call. In that case the
+			// previous path predates the capability and has no manual body active.
+			MANUAL_HOOK_DRIVER.pending =
+				driver === null ? UNIVERSAL_SLOT_STACK[UNIVERSAL_SLOT_STACK.length - 1] : pending;
+			MANUAL_HOOK_DRIVER.active = active;
+		}
 	}
 }
 
@@ -5241,6 +5318,17 @@ export function useState<T>(
 	initial: T | (() => T),
 	slot?: unknown,
 ): [T, (value: T | ((previous: T) => T)) => void, () => T] {
+	// Universal direct calls accept Symbol data. Only an adapted manual provider
+	// uses a lone Symbol as the legacy empty-initializer slot form.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		MANUAL_HOOK_DRIVER?.active === true
+	) {
+		slot = initial;
+		initial = undefined as T;
+	}
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
 	let hook = cloneStateHook<T>(owner, resolved);
@@ -5708,6 +5796,15 @@ export function useCallback<T extends (...args: any[]) => any>(
 }
 
 export function useRef<T>(initial: T, slot?: unknown): { current: T } {
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		MANUAL_HOOK_DRIVER?.active === true
+	) {
+		slot = initial;
+		initial = undefined as T;
+	}
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
 	let hook = owner.hooks.get(resolved) as RefHook<T> | undefined;
@@ -6290,6 +6387,17 @@ export function warmMemo(compute: () => any, deps: readonly any[], slot: unknown
 	CURRENT_UNIVERSAL_WARM_CLAIMS?.add(entry);
 }
 
+/** Keep compiler-owned plans from following static hoisting onto unrelated HOCs. */
+export function markWarm<T extends Function>(component: T, plan: unknown): T {
+	Object.defineProperty(component, '__warm', {
+		configurable: true,
+		get() {
+			return this === component ? plan : undefined;
+		},
+	});
+	return component;
+}
+
 /** Compiler ABI: recurse into a compiled child's statically attached warm plan. */
 export function warmChild(component: any, props: any): void {
 	if (CURRENT_UNIVERSAL_WARM === null || component == null) return;
@@ -6387,9 +6495,13 @@ export function lazy<C extends UniversalComponent<any>>(
 		throw new UniversalSuspense(thenable!);
 	}) as UniversalComponent<any>;
 	Object.defineProperties(wrapper, {
-		[LAZY_COMPONENT]: { value: true },
-		__warm: { value: initialize },
+		[LAZY_COMPONENT]: {
+			get() {
+				return this === wrapper;
+			},
+		},
 	});
+	markWarm(wrapper, initialize);
 	return wrapper as C;
 }
 
@@ -6542,6 +6654,14 @@ function mergeMemoContextReads(contextReads: Map<UniversalContext<any>, unknown>
 	for (const [context, value] of contextReads) CURRENT_MEMO_CONTEXT_READS.set(context, value);
 }
 
+export function memo<C extends UniversalComponent<any>>(
+	component: C,
+	compare?: (previous: Readonly<Parameters<C>[0]>, next: Readonly<Parameters<C>[0]>) => boolean,
+): C;
+export function memo<P>(
+	component: UniversalComponent<P>,
+	compare?: (previous: Readonly<P>, next: Readonly<P>) => boolean,
+): UniversalComponent<P>;
 export function memo<P>(
 	component: UniversalComponent<P>,
 	compare?: (previous: Readonly<P>, next: Readonly<P>) => boolean,
@@ -6603,7 +6723,11 @@ export function memo<P>(
 		// The wrapper remains renderer-neutral until the lazy module resolves; the
 		// wrapped lazy component still owns loader caching and renderer validation.
 		wrapper = renderMemo as UniversalComponent<P>;
-		Object.defineProperty(wrapper, LAZY_COMPONENT, { value: true });
+		Object.defineProperty(wrapper, LAZY_COMPONENT, {
+			get() {
+				return this === wrapper;
+			},
+		});
 	} else {
 		wrapper = defineUniversalComponent<P>(metadata.id, renderMemo, { module: metadata.module });
 	}
@@ -6613,7 +6737,7 @@ export function memo<P>(
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 		__profileComponentSource(wrapper, component);
 	}
-	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
+	if ((component as any).__warm !== undefined) markWarm(wrapper, (component as any).__warm);
 	return wrapper;
 }
 

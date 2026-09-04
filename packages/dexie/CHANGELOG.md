@@ -1,5 +1,13 @@
 # @octanejs/dexie
 
+## 0.1.46
+
+### Patch Changes
+
+- 44d50db: Preserve Symbol defaults in useLiveQuery and useObservable on the client and server.
+
+  Preserve authored useDocument slots when called through a compiled hook adapter.
+
 ## 0.1.45
 
 ### Patch Changes

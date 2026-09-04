@@ -176,11 +176,11 @@ export const componentWrongCallback = (
 	// @ts-expect-error — the callback parameter remains a number
 	<ReactCompat component={Counter} props={{ ...counterProps, onCount: stringHandler }} />
 );
+const mixedComponentProps = { component: Counter, props: counterProps };
+const mixedChild = <Counter {...counterProps} />;
 export const mixedForms = (
 	// @ts-expect-error — the two authoring forms are mutually exclusive
-	<ReactCompat component={Counter} props={{ label: 'Count', start: 3 }}>
-		<Counter label="Count" start={3} />
-	</ReactCompat>
+	<ReactCompat {...mixedComponentProps} children={mixedChild} />
 );
 export const detachedProps = (
 	// @ts-expect-error — props without a component are not an authoring form

@@ -30,6 +30,15 @@ const { compile } = require('octane/compiler') as {
 		code: string;
 	};
 };
+const { createOctaneCompiler } = require('octane/compiler/bundler') as {
+	createOctaneCompiler: (options: { root: string }) => {
+		transform: (
+			source: string,
+			filename: string,
+			options: { dev: boolean; hmr: boolean },
+		) => { code: string; kind: string } | null;
+	};
+};
 
 describe('@octanejs/usehooks-ts production package boundary', () => {
 	it('classifies its authored state, timing, and lifecycle hooks as side-effect-free', () => {
@@ -39,6 +48,7 @@ describe('@octanejs/usehooks-ts production package boundary', () => {
 	});
 
 	it('executes the public counter without retaining unrelated debouncing hooks', async () => {
+		const compiler = createOctaneCompiler({ root: packageDirectory });
 		const component = compile(
 			`
 import { useCounter } from '@octanejs/usehooks-ts';
@@ -79,6 +89,26 @@ root.unmount();
 			metafile: true,
 			minify: true,
 			platform: 'browser',
+			plugins: [
+				{
+					name: 'octane-authored-dependencies',
+					setup(builder) {
+						// Published bindings ship authored source. Apply the same manifest-aware
+						// transform used by Octane bundler integrations before esbuild lowers it.
+						builder.onLoad({ filter: /\.[jt]s$/ }, ({ path: filename }) => {
+							const transformed = compiler.transform(readFileSync(filename, 'utf8'), filename, {
+								dev: false,
+								hmr: false,
+							});
+							if (transformed === null || transformed.kind === 'none') return null;
+							return {
+								contents: transformed.code,
+								loader: filename.endsWith('.ts') ? 'ts' : 'js',
+							};
+						});
+					},
+				},
+			],
 			treeShaking: true,
 			write: false,
 		});
