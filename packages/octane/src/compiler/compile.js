@@ -317,6 +317,13 @@ function markSynthesizedAttr(attr) {
 	return attr;
 }
 
+/** A compiler-added scope-hash class, not an authored `class`/`className`. */
+function isSynthesizedClassAttr(attr) {
+	const raw = jsxAttrRawName(attr);
+	if (raw !== 'class' && raw !== 'className') return false;
+	return attr.name?.metadata?.tsrx_synthesized_origin === true;
+}
+
 // Curated exact origins (`inspect: true`). A generated token whose authored
 // counterpart the compiler KNOWS — the `$$click` slot key of an `onClick`, the
 // block helper an `@if`/`@for` lowers to — but which the module map alone
@@ -11097,17 +11104,17 @@ function ssrSourcePair(present, value, origin) {
 }
 
 /**
- * One `[spread, name, value]` source row for a grouped attribute helper. The
- * name literal is the only token in the group that names THIS attribute, so it
- * is what the authored name is claimed against (see registerAttrLoweringOrigin);
- * the helper itself stays anchored on the element it serializes.
+ * One `[spread, name, value, merge?]` source row for a grouped attribute helper.
+ * The name literal is the only token in the group that names THIS attribute, so
+ * it is what the authored name is claimed against (see registerAttrLoweringOrigin);
+ * the helper itself stays anchored on the element it serializes. A trailing
+ * `true` marks a synthesized scope class that must merge with a spread's class.
  */
-function ssrDirectSource(ctx, name, value, origin) {
+function ssrDirectSource(ctx, name, value, origin, merge) {
 	registerAttrLoweringOrigin(ctx, origin?.name, null, name);
-	return inheritOriginLoc(
-		b.array([b.literal(false, 'false'), b.literal(name, JSON.stringify(name)), value]),
-		origin,
-	);
+	const cells = [b.literal(false, 'false'), b.literal(name, JSON.stringify(name)), value];
+	if (merge) cells.push(b.literal(true, 'true'));
+	return inheritOriginLoc(b.array(cells), origin);
 }
 
 /**
@@ -11866,7 +11873,15 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				);
 				attrExpr = tsrxExprNode(attrInner, ctx, name, inlinedSubs);
 			}
-			attrSources.push(ssrDirectSource(ctx, rawAttrName, bindAttributeEvaluation(attrExpr), attr));
+			attrSources.push(
+				ssrDirectSource(
+					ctx,
+					rawAttrName,
+					bindAttributeEvaluation(attrExpr),
+					attr,
+					isSynthesizedClassAttr(attr),
+				),
+			);
 			continue;
 		}
 
@@ -24116,7 +24131,7 @@ function cleanupsPush(fnNode) {
 }
 
 /**
- * The `[spread, name, value]` rows a commit-phase source collector
+ * The `[spread, name, value, merge?]` rows a commit-phase source collector
  * (`setHostPropSources` / `setFormControlSources`) resolves in authored order.
  * Shared by the mount and update emits, which differ only in how a source's
  * value is read back — a bag local at mount, a bag field on update.
@@ -24126,20 +24141,26 @@ function cleanupsPush(fnNode) {
  * split ssrDirectSource makes on the server); the collector itself serializes
  * every source of the element and stays anchored there. Nothing else in a row
  * reproduces the authored name — the value is the prop's expression — so
- * without this the whole group answered only for the element.
+ * without this the whole group answered only for the element. A trailing `true`
+ * marks a synthesized scope class that must merge with a spread's class.
  */
 function commitSourceRows(sources, valueOf) {
-	return b.array(
-		sources.map(({ spread, name, nameOrigin, binding }) =>
-			spread
-				? b.array([b.literal(true), valueOf(binding, true)])
-				: b.array([
-						b.literal(false),
-						inheritOriginLoc(b.literal(name), nameOrigin ?? null),
-						valueOf(binding, false),
-					]),
-		),
-	);
+	const rows = [];
+	for (let i = 0; i < sources.length; i++) {
+		const source = sources[i];
+		if (source.spread) {
+			rows.push(b.array([b.literal(true), valueOf(source.binding, true)]));
+			continue;
+		}
+		const cells = [
+			b.literal(false),
+			inheritOriginLoc(b.literal(source.name), source.nameOrigin ?? null),
+			valueOf(source.binding, false),
+		];
+		if (source.merge) cells.push(b.literal(true));
+		rows.push(b.array(cells));
+	}
+	return b.array(rows);
 }
 
 // Mount for a DEFERRED property-write binding: store the element ref + seed the
@@ -25630,6 +25651,7 @@ function emitElementHtml(
 				name: rawAttrName,
 				nameOrigin: attr.name,
 				binding,
+				merge: isSynthesizedClassAttr(attr),
 			});
 			continue;
 		}

@@ -16257,7 +16257,13 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 // clsx-style `class`/`className` composition — shared with the SSR serializer
 // via css.ts so client and server compose byte-equal class strings (hydration
 // parity). Re-exported here because it is part of the semi-public surface.
-import { devWarnStyleCoercion, devWarnStyleProperty, normalizeClass, styleName } from './css.js';
+import {
+	devWarnStyleCoercion,
+	devWarnStyleProperty,
+	mergeClass,
+	normalizeClass,
+	styleName,
+} from './css.js';
 export { normalizeClass };
 
 export function setClassName(el: Element, value: unknown): void {
@@ -16573,7 +16579,12 @@ export function snapshotSpread(value: unknown): Record<string, unknown> | null {
 	return snapshot;
 }
 
-type HostPropSource = readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown];
+type HostPropSource = readonly [
+	isSpread: boolean,
+	sourceOrName: unknown,
+	value?: unknown,
+	merge?: boolean,
+];
 
 function formActionAttributeName(el: Element, name: string): string | null {
 	if (name === 'action' && el.localName === 'form') return 'action';
@@ -16626,6 +16637,12 @@ function normalizedHostProp(
  * property. Canonical identities ensure a vanished earlier source cannot
  * remove an unchanged later winner, and hydration compares only the final
  * client value against the final server value.
+ *
+ * A synthesized scope-hash class (4th tuple flag) is not an authored later
+ * writer: after identity last-writer-wins, it composes onto the winning class
+ * instead of replacing a spread's class. An authored `class` beside a spread
+ * stays last-writer-wins because its hash is baked into that authored value
+ * and carries no merge flag.
  */
 export function setHostPropSources(
 	el: Element,
@@ -16641,10 +16658,15 @@ export function setHostPropSources(
 		lastOrder: number;
 	}
 	const props = new Map<string, PropWriter>();
+	let classMerges: Array<{ rawName: string; value: unknown; order: number }> | null = null;
 	let sourceOrder = 0;
-	const record = (rawName: unknown, value: unknown): void => {
+	function record(rawName: unknown, value: unknown, merge = false): void {
 		if (typeof rawName !== 'string') return;
 		const order = sourceOrder++;
+		if (merge && (rawName === 'class' || rawName === 'className')) {
+			(classMerges ??= []).push({ rawName, value, order });
+			return;
+		}
 		const previous = props.get(rawName);
 		props.set(rawName, {
 			rawName,
@@ -16652,11 +16674,11 @@ export function setHostPropSources(
 			firstOrder: previous?.firstOrder ?? order,
 			lastOrder: order,
 		});
-	};
+	}
 
 	for (const source of sources) {
 		if (!source[0]) {
-			record(source[1], source[2]);
+			record(source[1], source[2], source[3] === true);
 			continue;
 		}
 		const spread = source[1];
@@ -16690,6 +16712,22 @@ export function setHostPropSources(
 			writer.firstOrder,
 			writer.lastOrder,
 		]);
+	}
+	if (classMerges !== null) {
+		for (const extra of classMerges) {
+			const [identity, name] = normalizedHostProp(el, extra.rawName);
+			const previous = values.get(identity);
+			if (previous !== undefined) {
+				values.set(identity, [
+					previous[0],
+					mergeClass(previous[1], extra.value),
+					previous[2],
+					extra.order,
+				]);
+				continue;
+			}
+			values.set(identity, [name, extra.value, extra.order, extra.order]);
+		}
 	}
 	const resolved: Record<string, unknown> = Object.create(null);
 	const ordered = [...values.values()];
