@@ -484,11 +484,28 @@ async function locateSourceKeyword(page: import('playwright').Page, word: string
 				}
 				return found;
 			};
+			// CodeMirror re-renders the viewport in a measure phase after the
+			// scroll event, and a slow runner can take more than two frames to get
+			// there. Wait until the editor has painted a line inside the visible
+			// range at the new position before reading the DOM.
+			const rendered = async () => {
+				const visible = () => {
+					const box = scroller.getBoundingClientRect();
+					return Array.from(content.querySelectorAll('.cm-line')).some((line) => {
+						const rect = line.getBoundingClientRect();
+						return rect.bottom > box.top && rect.top < box.bottom;
+					});
+				};
+				for (let frame = 0; frame < 30; frame++) {
+					await settle();
+					if (visible()) return;
+				}
+			};
 			const occurrences = new Map<string, { top: number; at: number }>();
-			const step = Math.max(200, scroller.clientHeight * 0.8);
+			const step = Math.max(120, scroller.clientHeight * 0.5);
 			for (let y = 0; ; y += step) {
 				scroller.scrollTop = y;
-				await settle();
+				await rendered();
 				for (const hit of hits()) {
 					occurrences.set(`${Math.round(hit.top)}:${hit.at}`, { top: hit.top, at: hit.at });
 				}
@@ -499,10 +516,16 @@ async function locateSourceKeyword(page: import('playwright').Page, word: string
 			const target = ordered.at(index);
 			if (!target) return null;
 			scroller.scrollTop = Math.max(0, target.top - scroller.clientHeight / 2);
-			await settle();
-			const hit = hits().find(
+			await rendered();
+			let hit = hits().find(
 				(candidate) => Math.abs(candidate.top - target.top) < 2 && candidate.at === target.at,
 			);
+			for (let frame = 0; !hit && frame < 30; frame++) {
+				await settle();
+				hit = hits().find(
+					(candidate) => Math.abs(candidate.top - target.top) < 2 && candidate.at === target.at,
+				);
+			}
 			if (!hit) return null;
 			const range = document.createRange();
 			range.setStart(hit.node, hit.at + 1);
