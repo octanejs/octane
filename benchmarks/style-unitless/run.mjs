@@ -142,12 +142,14 @@ assert.equal(cssStyleValue('line-height', 2), '2', 'kebab line-height gained px'
 assert.equal(cssStyleValue('WebkitLineClamp', 3), '3', 'vendor line-clamp gained px');
 assert.equal(cssStyleValue('--gap', 8), '8', 'custom property gained px');
 
+const WARMUP_LOOKUPS = 200;
 const expectedChecksums = new Map();
 for (const scenario of scenarios) {
-	const warmup = runLookups(scenario.serialize, scenario.names, scenario.nums, 200);
-	const control = runLookups(cssStyleValueScan, scenario.names, scenario.nums, 200);
+	const warmup = runLookups(scenario.serialize, scenario.names, scenario.nums, WARMUP_LOOKUPS);
+	const control = runLookups(cssStyleValueScan, scenario.names, scenario.nums, WARMUP_LOOKUPS);
 	assert.equal(warmup.checksum, control.checksum, scenario.name + ' warmup drifted');
-	expectedChecksums.set(scenario.name, warmup.checksum);
+	assert.equal(warmup.checksum % WARMUP_LOOKUPS, 0, scenario.name + ' warmup checksum not uniform');
+	expectedChecksums.set(scenario.name, warmup.checksum / WARMUP_LOOKUPS);
 }
 
 const samples = new Map();
@@ -164,7 +166,7 @@ for (let iteration = 0; iteration < iterations; iteration++) {
 		);
 		assert.equal(
 			sample.checksum,
-			expectedChecksums.get(scenario.name),
+			expectedChecksums.get(scenario.name) * LOOKUPS_PER_SAMPLE,
 			scenario.name + ' timed checksum drifted',
 		);
 		samples.get(scenario.name).push((sample.elapsed * 1_000) / LOOKUPS_PER_SAMPLE);

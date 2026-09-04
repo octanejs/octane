@@ -604,8 +604,8 @@
     "op": "lookup_per_1000",
     "target": "cached-mixed",
     "reference": "scan-mixed",
-    "maxRatio": 0.25,
-    "note": "Same-process numeric cssStyleValue writes through a mixed bag of unitless, px, kebab, vendor-prefixed, and custom-property keys. Uncached replaceAll+toLowerCase measured at ~1.8M object-serializations/s; the bounded name cache measured at ~12M (~0.15x). The 0.25 ceiling leaves more than 1.5x timing headroom while catching restoration of per-write string allocation."
+    "maxRatio": 0.5,
+    "note": "Same-process numeric cssStyleValue writes through a mixed bag of unitless, px, kebab, vendor-prefixed, and custom-property keys. The linear replaceAll+toLowerCase scan measured at 0.96ms/1,000 lookups; the bounded name cache measured at 0.30ms (~0.31x) on Node 22.22.2. The 0.5 ceiling leaves more than 1.5x timing headroom while catching restoration of per-write string allocation."
   },
   {
     "suite": "rspack-css-graph",
