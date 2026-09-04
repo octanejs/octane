@@ -72,6 +72,8 @@ function compilePath(path) {
 /**
  * Last static segment of a dynamic route pattern. Positions skip empty
  * segments so they line up with a leading-slash pathname split.
+ * A static token after a catch-all is not at a fixed index (`(.+)` can
+ * consume several segments), so those patterns stay on the linear remainder.
  *
  * @param {string} path
  * @returns {{ pos: number, value: string } | null}
@@ -81,11 +83,15 @@ function lastStaticSegment(path) {
 	let pos = -1;
 	let value = '';
 	let index = 0;
+	let sawCatchAll = false;
 	for (let i = 0; i < raw.length; i++) {
 		const segment = raw[i];
 		if (!segment) continue;
 		const first = segment.charCodeAt(0);
-		if (first !== 58 /* : */ && first !== 42 /* * */) {
+		if (first === 42 /* * */) {
+			sawCatchAll = true;
+		} else if (first !== 58 /* : */) {
+			if (sawCatchAll) return null;
 			pos = index;
 			value = segment;
 		}

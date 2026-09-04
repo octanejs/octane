@@ -129,6 +129,19 @@ describe('app-core request router', () => {
 		});
 	});
 
+	it('matches a static suffix after a mid-path catch-all', function () {
+		const download = new RenderRoute({
+			path: '/files/*rest/download',
+			entry: '/src/download.tsrx',
+		});
+		const router = createRouter([download]);
+
+		expect(router.match('GET', '/files/a/b/c/download')).toEqual({
+			route: download,
+			params: { rest: 'a/b/c' },
+		});
+	});
+
 	it('matches pure parameter routes and preserves catch-all slashes', function () {
 		const pair = new RenderRoute({ path: '/:left/:right', entry: '/src/pair.tsrx' });
 		const docs = new RenderRoute({ path: '/docs/*slug', entry: '/src/docs.tsrx' });
