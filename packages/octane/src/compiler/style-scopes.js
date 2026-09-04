@@ -51,8 +51,14 @@
  *   what the class map exposes. The classification comes from the core
  *   analyzer (`metadata.styleKind`, `metadata.styleApplies`), which runs on
  *   the parser AST before it is adopted, so this pass reads it read-only.
- * - `{style(expr)}` calls resolve to the scope chain plus the value, so the
- *   emitters no longer need a `cssHash` to expand them.
+ * - `style(expr)` is Octane's class-string expression (core has no such
+ *   intrinsic): it resolves to the scope chain plus the value only where TSRX
+ *   reads a class value — as the expression of a JSX attribute value or of a
+ *   template expression-container child, directly or nested in the
+ *   array/conditional/logical/template expressions of that container. The
+ *   `style` attribute is excluded (its value is CSS, never a class list), and
+ *   every other `style(...)` — a statement, a declaration initializer, a call
+ *   argument, a callback body — is an ordinary user call left untouched.
  * - Float style resources (`<style href precedence>`) stay in the tree.
  *
  * The parser AST may be frozen (see `adoptParserAst`): nodes are never
@@ -263,9 +269,8 @@ function walk(node, state, mode) {
 			return rewriteChildren(node, (child) => walk(child, state, 'expression'));
 		case 'ExpressionStatement':
 			return rewriteChildren(node, (child) => walk(child, state, 'statement'));
-		case 'CallExpression':
-			if (state.tools.isStyleCall(node)) return resolveStyleCall(node, state);
-			break;
+		case 'JSXAttribute':
+			return processAttribute(node, state);
 		default:
 			if (isDirective(node)) return processDirective(node, state);
 			if (isFunctionNode(node)) {
@@ -319,11 +324,12 @@ function withStack(state, stack, run) {
  * @returns {any}
  */
 function walkTemplateNode(node, state) {
-	let out = node;
-	if (isStampedHost(node, state)) out = addScopeClasses(node, state);
-	out = rewriteChildren(out, (child, key) =>
+	// Attribute values first — a `style(expr)` in a class value resolves to the
+	// chain before the stamp reads that value — then the stamp itself.
+	let out = rewriteChildren(node, (child, key) =>
 		key === 'children' ? child : walk(child, state, 'expression'),
 	);
+	if (isStampedHost(node, state)) out = addScopeClasses(out, state);
 	const children = node.children;
 	if (!Array.isArray(children)) return out;
 	const own = collectOwnBlocks(children);
@@ -434,7 +440,92 @@ function processList(nodes, state) {
 function walkListItem(item, state) {
 	if (isTemplateNode(item)) return walkTemplateNode(item, state);
 	if (item.type === 'JSXStyleElement') return item;
+	if (item.type === 'JSXExpressionContainer') {
+		// A template child hole is a class-string position for `style(expr)`.
+		const expression = walkStyleValue(item.expression, state);
+		return expression === item.expression ? item : { ...item, expression };
+	}
 	return walk(item, state, 'statement');
+}
+
+/**
+ * A JSX attribute: its value is a class-string position for `style(expr)`
+ * unless the attribute is `style` (CSS, never a class list — a `style(...)`
+ * there is a user helper), so that one and every other value walk as ordinary
+ * expressions.
+ *
+ * @param {any} attribute
+ * @param {PassState} state
+ * @returns {any}
+ */
+function processAttribute(attribute, state) {
+	const value = attribute.value;
+	if (value?.type !== 'JSXExpressionContainer') {
+		return rewriteChildren(attribute, (child) => walk(child, state, 'expression'));
+	}
+	const name = attribute.name;
+	const isStyleAttribute = name?.type === 'JSXIdentifier' && name.name === 'style';
+	const expression = isStyleAttribute
+		? walk(value.expression, state, 'expression')
+		: walkStyleValue(value.expression, state);
+	if (expression === value.expression) return attribute;
+	return { ...attribute, value: { ...value, expression } };
+}
+
+/**
+ * The class-string positions inside an attribute value or a child hole: the
+ * expression itself, or the parts of an array, conditional, logical, template,
+ * or parenthesized/TS-wrapper expression around it. Anything else is walked as
+ * an ordinary expression, so a `style(...)` inside (a call argument, a callback
+ * body) stays a user call.
+ *
+ * @param {any} node
+ * @param {PassState} state
+ * @returns {any}
+ */
+function walkStyleValue(node, state) {
+	if (node === null || typeof node !== 'object' || typeof node.type !== 'string') return node;
+	if (state.tools.isStyleCall(node)) return resolveStyleCall(node, state);
+	switch (node.type) {
+		case 'ArrayExpression': {
+			const elements = mapList(node.elements, (element) =>
+				element?.type === 'SpreadElement'
+					? walk(element, state, 'expression')
+					: walkStyleValue(element, state),
+			);
+			return elements === node.elements ? node : { ...node, elements };
+		}
+		case 'ConditionalExpression': {
+			const test = walk(node.test, state, 'expression');
+			const consequent = walkStyleValue(node.consequent, state);
+			const alternate = walkStyleValue(node.alternate, state);
+			if (test === node.test && consequent === node.consequent && alternate === node.alternate) {
+				return node;
+			}
+			return { ...node, test, consequent, alternate };
+		}
+		case 'LogicalExpression': {
+			const left = walkStyleValue(node.left, state);
+			const right = walkStyleValue(node.right, state);
+			return left === node.left && right === node.right ? node : { ...node, left, right };
+		}
+		case 'TemplateLiteral': {
+			const expressions = mapList(node.expressions, (expression) =>
+				walkStyleValue(expression, state),
+			);
+			return expressions === node.expressions ? node : { ...node, expressions };
+		}
+		case 'ParenthesizedExpression':
+		case 'TSAsExpression':
+		case 'TSSatisfiesExpression':
+		case 'TSNonNullExpression':
+		case 'TSTypeAssertion': {
+			const expression = walkStyleValue(node.expression, state);
+			return expression === node.expression ? node : { ...node, expression };
+		}
+		default:
+			return walk(node, state, 'expression');
+	}
 }
 
 /**
@@ -899,7 +990,7 @@ function addScopeClasses(element, state) {
 		} else {
 			const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
 			let base;
-			if (tools.isStyleCall(expression)) {
+			if (tools.isStyleCall(expression) || expression.metadata?.tsrx_style_resolved === true) {
 				// `class={style(expr)}` already resolves to the chain plus the value.
 				return element;
 			}
@@ -945,9 +1036,11 @@ function resolveStyleCall(node, state) {
 	const chain = [...hashes, ...applied];
 	if (inner.type === 'Literal' && typeof inner.value === 'string') {
 		const value = buildClassValue([...chain, inner.value]);
-		return state.tools.inheritOriginLoc(
-			value.type === 'Literal' ? b.literal(value.value, value.raw) : value,
-			node,
+		return markResolvedStyle(
+			state.tools.inheritOriginLoc(
+				value.type === 'Literal' ? b.literal(value.value, value.raw) : value,
+				node,
+			),
 		);
 	}
 	// `(<chain> + ' ' + (expr))`: the chain must always be present.
@@ -968,5 +1061,17 @@ function resolveStyleCall(node, state) {
 	const expression = prefix
 		? b.binary('+', b.binary('+', prefix, tail), inner)
 		: b.binary('+', b.literal(`${text} `, JSON.stringify(`${text} `)), inner);
-	return state.tools.inheritOriginLoc(expression, node);
+	return markResolvedStyle(state.tools.inheritOriginLoc(expression, node));
+}
+
+/**
+ * A class value the pre-pass built from `style(expr)` already carries the
+ * chain; the stamp must not append it again. Compiler-built nodes only.
+ *
+ * @param {any} node
+ * @returns {any}
+ */
+function markResolvedStyle(node) {
+	node.metadata = { ...(node.metadata ?? {}), tsrx_style_resolved: true };
+	return node;
 }

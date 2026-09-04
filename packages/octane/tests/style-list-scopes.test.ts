@@ -235,4 +235,63 @@ export function Applied() @{
 			expect(unescaped).toContain('<section id="outside">');
 		}
 	});
+
+	it('a rule matched only by a dynamic-tag sibling is kept and the host carries the hash', () => {
+		// `<{expr}>` resolves its tag at runtime, so pruning treats it as able to
+		// match any type or class selector (core's `is_dynamic_element`): the
+		// element is collected like any host and its class attribute is read, so
+		// `.host` and `.chip` both survive — whether the expression is a tag name
+		// or a component — and the element is stamped with the scope hash.
+		const source = `
+export function Dyn(props: { tag: string; chip: any }) @{
+	const Tag = props.tag;
+	const Chip = props.chip;
+	<>
+		<style>
+			.chip { color: rgb(200, 0, 0); }
+			.host { padding: 3px; }
+		</style>
+		<{Tag} class="host">{'host'}</{Tag}>
+		<{Chip} class="chip">{'chip'}</{Chip}>
+	</>
+}
+`;
+		const id = 'dynamic-tag-scope.tsrx';
+		for (const mode of ['client', 'server'] as const) {
+			const { code } = compile(source, id, { ...COMPILE_OPTIONS, mode });
+			const [sheet] = injections(code);
+			expect(sheet.css).toContain(`.chip.${sheet.hash}`);
+			expect(sheet.css).toContain(`.host.${sheet.hash}`);
+			expect(sheet.css).not.toContain('(unused)');
+			expect(code.replace(/\\"/g, '"')).toContain(`host ${sheet.hash}`);
+			expect(code.replace(/\\"/g, '"')).toContain(`chip ${sheet.hash}`);
+		}
+		const client = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: COMPILE_OPTIONS,
+		});
+		const r = mount(client.Dyn, { tag: 'section', chip: 'b' });
+		try {
+			const host = r.find('section') as HTMLElement;
+			const chip = r.find('b') as HTMLElement;
+			expect(hashesOf(host)).toHaveLength(1);
+			expect(hashesOf(chip)).toEqual(hashesOf(host));
+			expect(getComputedStyle(host).padding).toBe('3px');
+			expect(getComputedStyle(chip).color).toBe('rgb(200, 0, 0)');
+		} finally {
+			r.unmount();
+		}
+		const server = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions: COMPILE_OPTIONS,
+		});
+		const { html, css } = ServerRuntime.renderToString(server.Dyn, { tag: 'section', chip: 'b' });
+		const hash = css.match(/data-octane="(tsrx-[a-f0-9]+)"/)![1];
+		expect(css).toContain(`.host.${hash}`);
+		expect(css).toContain(`.chip.${hash}`);
+		expect(html).toContain(`<section class="host ${hash}">host</section>`);
+		expect(html).toContain(`<b class="chip ${hash}">chip</b>`);
+	});
 });

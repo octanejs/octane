@@ -6730,9 +6730,10 @@ const { applyStyleScopes } = createStyleScopePass({
 	isStyleCall,
 });
 
-// Recognise `{style (expr)}` — TSRX parses it as a plain
-// `CallExpression(style, [expr])` (the dedicated `Style` intrinsic node is
-// gone); resolveStyleExpr rewrites it into a scoped class-string expression.
+// Recognise `style(expr)` — a plain `CallExpression(style, [expr])`, Octane's
+// class-string expression. The style-scope pre-pass (./style-scopes.js)
+// resolves it where TSRX reads a class value (attribute values and template
+// child holes, the `style` attribute excepted); anywhere else it is a user call.
 function isStyleCall(node) {
 	return (
 		node &&
@@ -6744,26 +6745,14 @@ function isStyleCall(node) {
 	);
 }
 
-// Resolve a `{style (expr)}` CallExpression (see isStyleCall) into a plain
-// expression that yields a class string, with the component's scoped css hash
-// prepended (so `{style ('row')}` in a component with hash "tsrx-abc" produces
-// "tsrx-abc row"). Literal values inline; dynamic values become a runtime
-// string concat. Components without a <style> block (no hash) — and any other
-// expression shape — pass through untouched.
-function resolveStyleExpr(node, cssHash) {
-	if (!node) return node;
-	if (!isStyleCall(node) || !cssHash) return node;
-	const inner = node.arguments[0];
-	if (inner.type === 'Literal' && typeof inner.value === 'string') {
-		const combined = inner.value ? `${cssHash} ${inner.value}` : cssHash;
-		// The resolved class string maps to the authored `{style (…)}` call.
-		return b.literal(combined, JSON.stringify(combined), node);
-	}
-	// Dynamic: emit `(<hash> + ' ' + (expr))` so absent/null produces "<hash> ".
-	return inheritOriginLoc(
-		b.binary('+', b.literal(cssHash + ' ', JSON.stringify(cssHash + ' ')), inner),
-		node,
-	);
+// The emitters' former `style(expr)` expansion. The pre-pass resolves every
+// class-string position before the emitters run, and a `style(...)` still on
+// the AST here is a user call in another position (a `style={style(p)}` value,
+// a child hole's call argument), which must print as authored — so this is a
+// pass-through kept at its call sites; `cssHash` is only the "this component
+// owns scoped CSS" flag they thread along.
+function resolveStyleExpr(node, _cssHash) {
+	return node;
 }
 
 /**
