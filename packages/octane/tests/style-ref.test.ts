@@ -1,0 +1,92 @@
+import { describe, expect, it } from 'vitest';
+import * as ServerRT from 'octane/server';
+import { mount } from './_helpers';
+import { loadServerFixture } from './_server-fixture';
+import {
+	AssignedStyleRef,
+	CallbackStyleRef,
+	CurrentStyleRef,
+	IdentifierCallbackStyleRef,
+	ReturnedStyleRef,
+	ValueStyleRef,
+} from './_fixtures/style-ref.tsrx';
+
+const FIXTURE = 'packages/octane/tests/_fixtures/style-ref.tsrx';
+const server = loadServerFixture(FIXTURE);
+
+function scopeHash(element: Element): string {
+	const hash = Array.from(element.classList).find(function (name) {
+		return name.startsWith('tsrx-');
+	});
+	if (!hash) throw new Error('expected a scoped CSS hash class');
+	return hash;
+}
+
+function expectClassMap(element: HTMLElement, color: string): string {
+	const hash = scopeHash(element);
+	const text = element.textContent || '';
+	expect(text).not.toBe('missing');
+	expect(text).toContain(hash);
+	expect(text).toContain('card');
+	expect(element.classList.contains('card')).toBe(true);
+	expect(element.classList.contains(hash)).toBe(true);
+	expect(getComputedStyle(element).color).toBe(color);
+	return text;
+}
+
+describe('style block ref class maps', function () {
+	it('assigns the class map to a let binding', function () {
+		const r = mount(AssignedStyleRef as any);
+		const text = expectClassMap(r.find('#assigned') as HTMLElement, 'rgb(9, 8, 7)');
+		expect(r.container.querySelector('style')).toBeNull();
+		expect(text).toMatch(/tsrx-[a-z0-9]+ card/i);
+		r.unmount();
+	});
+
+	it('calls a callback ref with the class map', function () {
+		const r = mount(CallbackStyleRef as any);
+		expectClassMap(r.find('#callback') as HTMLElement, 'rgb(6, 5, 4)');
+		r.unmount();
+	});
+
+	it('calls an identifier callback ref with the class map', function () {
+		const r = mount(IdentifierCallbackStyleRef as any);
+		expectClassMap(r.find('#id-callback') as HTMLElement, 'rgb(14, 15, 16)');
+		r.unmount();
+	});
+
+	it('writes the class map onto a current ref object', function () {
+		const r = mount(CurrentStyleRef as any);
+		expectClassMap(r.find('#current') as HTMLElement, 'rgb(3, 2, 1)');
+		r.unmount();
+	});
+
+	it('writes the class map onto a value ref object', function () {
+		const r = mount(ValueStyleRef as any);
+		expectClassMap(r.find('#value') as HTMLElement, 'rgb(11, 12, 13)');
+		r.unmount();
+	});
+
+	it('assigns the class map in a returned template', function () {
+		const r = mount(ReturnedStyleRef as any);
+		expectClassMap(r.find('#returned') as HTMLElement, 'rgb(21, 22, 23)');
+		r.unmount();
+	});
+
+	it('assigns the class map during SSR of a statement-list scope', function () {
+		const { html, css } = ServerRT.renderToString(server.AssignedStyleRef);
+		expect(html).toContain('id="assigned"');
+		expect(html).not.toContain('missing');
+		expect(html).toMatch(/tsrx-[a-z0-9]+ card/i);
+		expect(css).toMatch(/\.card\.tsrx-[a-z0-9]+/i);
+		expect(html).not.toContain('<style');
+	});
+
+	it('assigns the class map during SSR of a returned template', function () {
+		const { html, css } = ServerRT.renderToString(server.ReturnedStyleRef);
+		expect(html).toContain('id="returned"');
+		expect(html).not.toContain('missing');
+		expect(html).toMatch(/tsrx-[a-z0-9]+ card/i);
+		expect(css).toMatch(/\.card\.tsrx-[a-z0-9]+/i);
+	});
+});

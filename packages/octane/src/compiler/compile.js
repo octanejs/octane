@@ -88,6 +88,7 @@ import {
 } from './native-read-codegen.js';
 import { createTextTypeFactsLookup } from './text-type-facts.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
+import { applyStyleRefs } from './style-scopes.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -13651,6 +13652,9 @@ function componentStyleRoots(componentNode) {
  *   - Rebuild the render roots via `annotateRootWithHash` (COW) to stamp the
  *     hash class on every native JSX element AND remove the JSXStyleElement
  *     nodes from the rendered tree (they don't contribute DOM in the new model).
+ *   - When a stripped block carried `ref={x}`, graft class-map setup onto the
+ *     component body so `x` receives `{ card: "hash card", … }` instead of
+ *     staying unset.
  *
  * Returns `{ cssHash, node }` — the hash (or `null` when no `<style>` blocks
  * are present) and the possibly-rebuilt component node the caller must use.
@@ -13751,6 +13755,14 @@ function applyCssScoping(componentNode, ctx) {
 	if (returnReplacements.size > 0) {
 		node = mapAst(node, (n) => returnReplacements.get(n) ?? null);
 	}
+	// `<style ref={x}>` is stripped with the block. Write the class map to `x`
+	// as setup so assignment/callback/`current`/`value` refs are not dropped.
+	node = applyStyleRefs(node, styles, preparedSheets, {
+		inheritOriginLoc,
+		createTempIdentifier: function () {
+			return b.id(allocCompilerName(ctx, '__styleMap'));
+		},
+	});
 	return { cssHash, node };
 }
 
