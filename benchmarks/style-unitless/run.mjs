@@ -101,6 +101,14 @@ function expectedCss(name, value) {
 	return cssStyleValueScan(name, value);
 }
 
+function bagChecksum(serialize, names, nums) {
+	let checksum = 0;
+	for (let i = 0; i < names.length; i++) {
+		checksum += serialize(names[i], nums[i]).length;
+	}
+	return checksum;
+}
+
 function runLookups(serialize, names, nums, count) {
 	const started = performance.now();
 	let checksum = 0;
@@ -145,11 +153,14 @@ assert.equal(cssStyleValue('--gap', 8), '8', 'custom property gained px');
 const WARMUP_LOOKUPS = 200;
 const expectedChecksums = new Map();
 for (const scenario of scenarios) {
-	const warmup = runLookups(scenario.serialize, scenario.names, scenario.nums, WARMUP_LOOKUPS);
-	const control = runLookups(cssStyleValueScan, scenario.names, scenario.nums, WARMUP_LOOKUPS);
-	assert.equal(warmup.checksum, control.checksum, scenario.name + ' warmup drifted');
-	assert.equal(warmup.checksum % WARMUP_LOOKUPS, 0, scenario.name + ' warmup checksum not uniform');
-	expectedChecksums.set(scenario.name, warmup.checksum / WARMUP_LOOKUPS);
+	runLookups(scenario.serialize, scenario.names, scenario.nums, WARMUP_LOOKUPS);
+	const perBag = bagChecksum(scenario.serialize, scenario.names, scenario.nums);
+	assert.equal(
+		perBag,
+		bagChecksum(cssStyleValueScan, scenario.names, scenario.nums),
+		scenario.name + ' bag checksum drifted',
+	);
+	expectedChecksums.set(scenario.name, perBag * LOOKUPS_PER_SAMPLE);
 }
 
 const samples = new Map();
@@ -166,7 +177,7 @@ for (let iteration = 0; iteration < iterations; iteration++) {
 		);
 		assert.equal(
 			sample.checksum,
-			expectedChecksums.get(scenario.name) * LOOKUPS_PER_SAMPLE,
+			expectedChecksums.get(scenario.name),
 			scenario.name + ' timed checksum drifted',
 		);
 		samples.get(scenario.name).push((sample.elapsed * 1_000) / LOOKUPS_PER_SAMPLE);
