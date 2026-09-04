@@ -92,6 +92,25 @@ export function createRouter(routes) {
 	// Sort by specificity (higher first) for correct matching order
 	compiledRoutes.sort((a, b) => b.specificity - a.specificity);
 
+	// Exact static paths are O(1). A static segment always out-scores a param or
+	// catch-all that could match the same pathname, so the map is consulted first.
+	// After a method miss, fall through to dynamic routes — a catch-all can still
+	// own the request.
+	/** @type {Map<string, CompiledRoute[]>} */
+	const staticByPath = new Map();
+	/** @type {CompiledRoute[]} */
+	const dynamicRoutes = [];
+	for (let i = 0; i < compiledRoutes.length; i++) {
+		const compiled = compiledRoutes[i];
+		if (typeof compiled.pattern === 'string') {
+			const existing = staticByPath.get(compiled.pattern);
+			if (existing === undefined) staticByPath.set(compiled.pattern, [compiled]);
+			else existing.push(compiled);
+		} else {
+			dynamicRoutes.push(compiled);
+		}
+	}
+
 	return {
 		/**
 		 * Match a request to a route
@@ -100,28 +119,37 @@ export function createRouter(routes) {
 		 * @returns {RouteMatch | null}
 		 */
 		match(method, pathname) {
+			const staticMatches = staticByPath.get(pathname);
+			if (staticMatches !== undefined) {
+				let normalizedMethod;
+				for (let i = 0; i < staticMatches.length; i++) {
+					const route = staticMatches[i].route;
+					if (route.type === 'server') {
+						const methods = /** @type {ServerRoute} */ (route).methods;
+						if (normalizedMethod === undefined) normalizedMethod = method.toUpperCase();
+						if (!methods.includes(normalizedMethod)) continue;
+					}
+					return { route, params: {} };
+				}
+			}
+
 			let normalizedMethod;
-			for (const { route, pattern, paramNames } of compiledRoutes) {
-				// Check method for ServerRoute
+			for (let i = 0; i < dynamicRoutes.length; i++) {
+				const compiled = dynamicRoutes[i];
+				const route = compiled.route;
 				if (route.type === 'server') {
 					const methods = /** @type {ServerRoute} */ (route).methods;
-					normalizedMethod ??= method.toUpperCase();
-					if (!methods.includes(normalizedMethod)) {
-						continue;
-					}
+					if (normalizedMethod === undefined) normalizedMethod = method.toUpperCase();
+					if (!methods.includes(normalizedMethod)) continue;
 				}
 
-				if (typeof pattern === 'string') {
-					if (pathname === pattern) return { route, params: {} };
-					continue;
-				}
-
-				const match = pathname.match(pattern);
-				if (!match) continue;
+				const match = compiled.pattern.exec(pathname);
+				if (match === null) continue;
+				const paramNames = compiled.paramNames;
 				/** @type {Record<string, string>} */
 				const params = {};
-				for (let i = 0; i < paramNames.length; i++) {
-					params[paramNames[i]] = decodeURIComponent(match[i + 1]);
+				for (let p = 0; p < paramNames.length; p++) {
+					params[paramNames[p]] = decodeURIComponent(match[p + 1]);
 				}
 				return { route, params };
 			}
