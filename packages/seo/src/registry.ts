@@ -38,8 +38,8 @@ export interface SeoRegistry {
 function sameDescriptors(a: readonly SeoDescriptor[], b: readonly SeoDescriptor[]): boolean {
 	if (a.length !== b.length) return false;
 	for (let i = 0; i < a.length; i++) {
-		const x = a[i];
-		const y = b[i];
+		const x = a[i]!;
+		const y = b[i]!;
 		if (x.key !== y.key || x.tag !== y.tag || x.text !== y.text) return false;
 		const xa = x.attrs;
 		const ya = y.attrs;
