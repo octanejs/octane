@@ -25,7 +25,7 @@ import {
 	isSuspenseList,
 	typeOf,
 	isElement,
-} from '@octanejs/react-is';
+} from '@octanejs/octane-is';
 import type { ElementDescriptor } from 'octane';
 import type { Assert, Equal } from '../../../../scripts/react-port/type-assertions.js';
 

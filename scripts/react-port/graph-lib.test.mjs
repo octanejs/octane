@@ -581,8 +581,8 @@ describe('union prerequisite graph', () => {
 		assert.equal(graph.nodes['pkg:@acme/react-tools'].binding, '@octanejs/acme-tools');
 		assert.equal(graph.nodes['pkg:@acme/react-tools'].bindingDirectory, 'packages/acme-tools');
 		assert.equal(graph.nodes['pkg:preact-widget'].binding, '@octanejs/preact-widget');
-		assert.equal(graph.nodes['pkg:react-is'].binding, '@octanejs/react-is');
-		assert.equal(graph.nodes['pkg:react-is'].bindingDirectory, 'packages/react-is');
+		assert.equal(graph.nodes['pkg:react-is'].binding, '@octanejs/octane-is');
+		assert.equal(graph.nodes['pkg:react-is'].bindingDirectory, 'packages/octane-is');
 	});
 
 	test('blocks derived binding names that collide with another target or workspace package', () => {

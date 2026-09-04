@@ -41,7 +41,7 @@ import {
 	PACKED_TSRX_CONSUMER_ESRAP_VERSION,
 	PACKED_TSRX_BROWSER_AMBIENT_FILE,
 	PACKED_TSRX_PROBE_PACKAGES,
-	PACKED_TSRX_STRICT_BROWSER_PACKAGES,
+	PACKED_STRICT_BROWSER_SOURCE_PACKAGES,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
 	renderPackedDraggableEsmConsumerSource,
@@ -1146,7 +1146,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 			sourceConsumerSpecifiers.get(packageName),
 		]),
 	);
-	const strictBrowserSpecifiers = PACKED_TSRX_STRICT_BROWSER_PACKAGES.flatMap((packageName) => {
+	const strictBrowserSpecifiers = PACKED_STRICT_BROWSER_SOURCE_PACKAGES.flatMap((packageName) => {
 		const specifiers = browserSourceConsumerSpecifiers.get(packageName);
 		if (!specifiers) {
 			throw new Error(`${packageName} must remain enrolled in strict packed browser validation`);
@@ -1311,7 +1311,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		`strict tsrx-tsc validated ${validatedPackages.length - 1} packed TSRX bindings with and without Node ambient types using the installed Octane Volar compiler`,
 	);
 	console.log(
-		`strict ESNext browser source and public contracts passed for ${PACKED_TSRX_STRICT_BROWSER_PACKAGES.join(', ')} with consumer esrap ${consumerPrinter.version}`,
+		`strict ESNext browser source and public contracts passed for ${PACKED_STRICT_BROWSER_SOURCE_PACKAGES.join(', ')} with consumer esrap ${consumerPrinter.version}`,
 	);
 	for (const [packageName, reason] of packedTsrxSourceExceptions) {
 		console.warn(`deferred strict packed TSRX validation for ${packageName}: ${reason}`);

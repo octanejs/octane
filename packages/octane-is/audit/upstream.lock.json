@@ -13,6 +13,7 @@
   },
   "license": {
     "spdx": "MIT",
+    "declaration": "manifest",
     "evidence": [
       {
         "path": "LICENSE",
@@ -39,7 +40,7 @@
     },
     {
       "find": "require('react-is')",
-      "replace": "require('@octanejs/react-is')"
+      "replace": "require('@octanejs/octane-is')"
     }
   ],
   "files": [
@@ -84,5 +85,5 @@
       "size": 5174
     }
   ],
-  "fingerprint": "48b881568e24959eaeb57d85888aac2da5e3f490bf2ccd8431a17960d728b677"
+  "fingerprint": "826372ab65b2c099dddb2828081668847aed7a10bcb6996b98a262e8c7c4b9aa"
 }

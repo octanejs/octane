@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "project": "octane-is-pristine",
+  "roots": ["packages/octane-is/tests"],
+  "files": ["packages/octane-is/tests/pristine-entry.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:fc4fa20defa54cc6",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs identifies valid element types"
+    },
+    {
+      "id": "runtime:d126661aacdb3521",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify context consumers"
+    },
+    {
+      "id": "runtime:9729dbd39f3f9382",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify context providers"
+    },
+    {
+      "id": "runtime:bf19d17d1f41c111",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify elements"
+    },
+    {
+      "id": "runtime:4312a1b1880869c8",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify fragments"
+    },
+    {
+      "id": "runtime:b22d2fb55a0f2cc0",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify lazy"
+    },
+    {
+      "id": "runtime:f9e00d7e3b6def4f",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify memo"
+    },
+    {
+      "id": "runtime:9af8f8d59d47d994",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify portals"
+    },
+    {
+      "id": "runtime:3c07d7fb7649de45",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify profile root"
+    },
+    {
+      "id": "runtime:e73beeffe13ff5b9",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify ref forwarding component"
+    },
+    {
+      "id": "runtime:78f9e43a51bfd6c6",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify strict mode"
+    },
+    {
+      "id": "runtime:94424abe2a8ee039",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should identify suspense"
+    },
+    {
+      "id": "runtime:cacb6654358f2e8a",
+      "file": "packages/octane-is/tests/pristine-entry.test.ts",
+      "fullName": "ReactIs should return undefined for unknown/invalid types"
+    }
+  ],
+  "snapshots": 0
+}

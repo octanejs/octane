@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "62220f1edd218133ac3b3f09e3e6fa013088cd1f93f2cb5849d10bdd3deabf4c"
+      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
     }
   },
   "lanes": [
@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "5f9da371ba345e92bc84c150b554f2468744a64c726e8be66b34934906d0f22e"
+          "sha256": "98a4282d861b978d002c46b843ef60becb452402616df1daf83973857a096693"
         },
         {
           "path": "packages/monaco-editor/tests/upstream-pristine.vitest.config.ts",

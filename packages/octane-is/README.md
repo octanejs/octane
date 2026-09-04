@@ -1,7 +1,7 @@
-# @octanejs/react-is
+# @octanejs/octane-is
 
 The `react-is` 19.2.7 predicates for Octane elements. Replace `react-is` imports
-with `@octanejs/react-is` when porting source to Octane.
+with `@octanejs/octane-is` when porting source to Octane.
 
 This binding requires the coordinated Octane core release containing the
 behavioral-audit fixes, planned for **Octane 0.2.3**. Its predicates depend on that
@@ -13,13 +13,13 @@ requirement; it does not establish compatibility with older core releases.
 Install it alongside the required Octane release:
 
 ```sh
-npm install @octanejs/react-is octane@^0.2.3
-pnpm add @octanejs/react-is octane@^0.2.3
+npm install @octanejs/octane-is octane@^0.2.3
+pnpm add @octanejs/octane-is octane@^0.2.3
 ```
 
 ```ts
 import { createElement, Fragment, memo } from 'octane';
-import { isFragment, isMemo, typeOf } from '@octanejs/react-is';
+import { isFragment, isMemo, typeOf } from '@octanejs/octane-is';
 
 isFragment(createElement(Fragment, null)); // true
 isMemo(createElement(memo(() => null), null)); // true

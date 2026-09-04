@@ -31,7 +31,7 @@ import {
 	PACKED_TSRX_CONSUMER_PROJECTS,
 	PACKED_TSRX_BROWSER_AMBIENT_FILE,
 	PACKED_TSRX_PROBE_PACKAGES,
-	PACKED_TSRX_STRICT_BROWSER_PACKAGES,
+	PACKED_STRICT_BROWSER_SOURCE_PACKAGES,
 } from './package-pack-canaries.mjs';
 
 const repositoryRequire = createRequire(import.meta.url);
@@ -354,7 +354,7 @@ declare namespace NodeJS { interface Process { env: { NODE_ENV?: string } } }
 
 	test('checks precise public contracts rather than only rejecting top-level any', () => {
 		const source = renderPackedStrictBrowserConsumerTypeProbe();
-		for (const packageName of PACKED_TSRX_STRICT_BROWSER_PACKAGES) {
+		for (const packageName of PACKED_STRICT_BROWSER_SOURCE_PACKAGES) {
 			assert.ok(
 				source.includes(`from '${packageName}${packageName.endsWith('/visx') ? '/group' : ''}'`),
 			);
@@ -423,7 +423,7 @@ declare namespace NodeJS { interface Process { env: { NODE_ENV?: string } } }
 		);
 	});
 	test('enrolls the pure TypeScript introspection binding in packed source and browser checks', () => {
-		const name = '@octanejs/react-is';
+		const name = '@octanejs/octane-is';
 		const packages = [{ name, private: false, role: 'framework binding' }];
 		const files = new Set(['src/index.ts', 'src/ReactIs.ts']);
 		assert.deepEqual(findPackedTsrxSourceConsumerPackages(packages, new Map([[name, files]])), [
@@ -434,7 +434,7 @@ declare namespace NodeJS { interface Process { env: { NODE_ENV?: string } } }
 			findPackedTsrxSourceConsumerSpecifiers(name, { exports: { '.': './src/index.ts' } }, files),
 			[name],
 		);
-		assert.ok(PACKED_TSRX_STRICT_BROWSER_PACKAGES.includes(name));
+		assert.ok(PACKED_STRICT_BROWSER_SOURCE_PACKAGES.includes(name));
 		for (const source of [
 			renderPackedTsrxConsumerTypeProbe(),
 			renderPackedStrictBrowserConsumerTypeProbe(),

@@ -7,7 +7,7 @@ import { format, resolveConfig } from 'prettier';
 // stable React feature gate omits only experimental SuspenseList. Runtime
 // reports must match these identities exactly, so deleting a case fails CI.
 const root = resolve(import.meta.dirname, '../../..');
-const base = 'packages/react-is';
+const base = 'packages/octane-is';
 const read = (path) => readFileSync(resolve(root, path));
 const digest = (path) => createHash('sha256').update(read(path)).digest('hex');
 const options = await resolveConfig(resolve(root, `${base}/audit/react-parity.json`));
@@ -45,7 +45,7 @@ for (const kind of ['pristine', 'adapted']) {
 		.sort((a, b) => a.fullName.localeCompare(b.fullName));
 	await write(`${base}/audit/${kind}-runtime.json`, {
 		schemaVersion: 1,
-		project: kind === 'pristine' ? 'react-is-pristine' : 'react-is',
+		project: kind === 'pristine' ? 'octane-is-pristine' : 'octane-is',
 		roots: [`${base}/tests`],
 		files: [file],
 		tests,
@@ -62,11 +62,11 @@ const commonSupport = [
 	`${base}/scripts/update-audit.mjs`,
 ];
 const lanes = ['pristine', 'adapted'].map((kind) => ({
-	id: `react-is-${kind}-full`,
+	id: `octane-is-${kind}-full`,
 	type: kind === 'pristine' ? 'pristine-upstream' : 'adapted-octane',
 	oracle: 'required',
 	environment: 'workspace-node',
-	project: kind === 'pristine' ? 'react-is-pristine' : 'react-is',
+	project: kind === 'pristine' ? 'octane-is-pristine' : 'octane-is',
 	evidenceOrigin: 'upstream-suite',
 	execution: { kind: 'vitest-full', inventory: `${base}/audit/${kind}-runtime.json` },
 	notes:
@@ -82,11 +82,11 @@ const lanes = ['pristine', 'adapted'].map((kind) => ({
 	].map(support),
 }));
 lanes.push({
-	id: 'react-is-differential',
+	id: 'octane-is-differential',
 	type: 'differential',
 	oracle: 'required',
 	environment: 'workspace-node',
-	project: 'react-is-differential',
+	project: 'octane-is-differential',
 	evidenceOrigin: 'repo-authored',
 	files: [
 		{
@@ -95,7 +95,7 @@ lanes.push({
 			sha256: digest(`${base}/tests/differential.test.ts`),
 			cases: [
 				{
-					id: 'differential:react-is-supported-surface',
+					id: 'differential:octane-is-supported-surface',
 					testName: 'matches every predicate for corresponding supported element values',
 					fullName: 'matches every predicate for corresponding supported element values',
 				},
@@ -161,7 +161,7 @@ await write(`${base}/audit/react-parity.json`, {
 			consumerImpact:
 				'Unsupported React kinds cannot be rendered or identified as supported Octane descriptors.',
 			migrationGuidance:
-				'Use function components, plain ref props and use/useContext; import rendering components from octane and classifier labels from @octanejs/react-is.',
+				'Use function components, plain ref props and use/useContext; import rendering components from octane and classifier labels from @octanejs/octane-is.',
 			owner: 'octanejs',
 			reviewCondition: 'Revisit if Octane adds one of the currently unsupported renderer kinds.',
 		},

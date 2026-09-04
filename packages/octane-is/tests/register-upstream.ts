@@ -9,7 +9,7 @@ import * as OctaneIs from '../src/index.js';
 const oracleRequire = createRequire(resolve(import.meta.dirname, '../../octane/package.json'));
 const React = oracleRequire('react');
 const ReactDOM = oracleRequire('react-dom');
-const ReactIs = oracleRequire('../react-is/upstream-artifact/package/index.js');
+const ReactIs = oracleRequire('../octane-is/upstream-artifact/package/index.js');
 if (React.version !== '19.2.7') throw new Error('The pristine React oracle must be 19.2.7');
 
 /** Execute pinned test bytes with syntax-only JSX lowering and the upstream stable feature gate. */
@@ -28,7 +28,7 @@ export function registerUpstream(sourcePath: string, adapted: boolean): void {
 	const require = (specifier: string): unknown => {
 		if (specifier === 'react' || specifier === 'octane') return runtime;
 		if (specifier === 'react-dom') return ReactDOM;
-		if (specifier === 'react-is' || specifier === '@octanejs/react-is') return introspection;
+		if (specifier === 'react-is' || specifier === '@octanejs/octane-is') return introspection;
 		throw new Error(`Unexpected upstream import: ${specifier}`);
 	};
 	const register = (title: string, callback: () => void): void => {

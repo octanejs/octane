@@ -7,9 +7,9 @@ import * as Is from '../src/index.js';
 const oracleRequire = createRequire(resolve(import.meta.dirname, '../../octane/package.json'));
 const React = oracleRequire('react');
 const ReactDOM = oracleRequire('react-dom');
-const ReactIs = oracleRequire('../react-is/upstream-artifact/package/index.js');
+const ReactIs = oracleRequire('../octane-is/upstream-artifact/package/index.js');
 
-// @parity-case differential:react-is-supported-surface
+// @parity-case differential:octane-is-supported-surface
 it('matches every predicate for corresponding supported element values', () => {
 	expect(React.version).toBe('19.2.7');
 	expect(Object.keys(Is).sort()).toEqual(Object.keys(ReactIs).sort());

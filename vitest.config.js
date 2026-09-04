@@ -5443,13 +5443,13 @@ export default defineConfig({
 			{
 				testExecution: {
 					group: 'react-parity',
-					include: ['packages/react-is/tests/adapted.test.ts'],
+					include: ['packages/octane-is/tests/adapted.test.ts'],
 				},
 				test: {
-					name: 'react-is',
+					name: 'octane-is',
 					include: [
-						'packages/react-is/tests/contract.test.ts',
-						'packages/react-is/tests/adapted.test.ts',
+						'packages/octane-is/tests/contract.test.ts',
+						'packages/octane-is/tests/adapted.test.ts',
 					],
 					environment: 'jsdom',
 				},
@@ -5458,8 +5458,8 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'react-is-pristine',
-					include: ['packages/react-is/tests/pristine-entry.test.ts'],
+					name: 'octane-is-pristine',
+					include: ['packages/octane-is/tests/pristine-entry.test.ts'],
 					environment: 'jsdom',
 				},
 				plugins: [octane()],
@@ -5467,8 +5467,8 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'react-is-differential',
-					include: ['packages/react-is/tests/differential.test.ts'],
+					name: 'octane-is-differential',
+					include: ['packages/octane-is/tests/differential.test.ts'],
 					environment: 'jsdom',
 				},
 				plugins: [octane()],
