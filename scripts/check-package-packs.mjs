@@ -478,6 +478,14 @@ async function validatePackedConsumer(tempRoot, archives) {
 					typescript: typescriptVersion,
 					vite: viteVersion,
 				},
+				// postcss 8.5.28 makes DeclarationProps extend NodeProps, but
+				// tsrx-tsc cannot resolve that named export from node.d.ts
+				// (TS2304). Pin the last types that typecheck here.
+				pnpm: {
+					overrides: {
+						postcss: '8.5.26',
+					},
+				},
 			},
 			null,
 			2,
