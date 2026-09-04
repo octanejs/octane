@@ -329,9 +329,6 @@ describe('deferred hydration', () => {
 		const serverScope = serverNote.className.match(/\btsrx-[0-9a-z]+\b/)![0];
 		expect(serverNoteClass).toContain(serverScope);
 		expect(serverReviewClass).toContain(serverScope);
-		const clientSheet = document.head.querySelector(`style[data-octane="${serverScope}"]`);
-		expect(clientSheet).not.toBeNull();
-		expect(clientSheet!.textContent).toContain(`.styled-complete-note.${serverScope}`);
 
 		root = hydrateRoot(container, styledClient.StyledCompleteSplitHydration, props);
 		await vi.waitFor(async () => {
@@ -339,6 +336,12 @@ describe('deferred hydration', () => {
 			expect(onHydrated).toHaveBeenCalledOnce();
 		});
 
+		// The sheet lives in the split child, so it appears only after the
+		// child chunk runs — under the same authored-position hash the server
+		// stamped.
+		const clientSheet = document.head.querySelector(`style[data-octane="${serverScope}"]`);
+		expect(clientSheet).not.toBeNull();
+		expect(clientSheet!.textContent).toContain(`.styled-complete-note.${serverScope}`);
 		expect(container.querySelector('#styled-complete-split-host')).toBe(serverHost);
 		expect(container.querySelector('#styled-complete-note')).toBe(serverNote);
 		expect(container.querySelector('#styled-complete-review')).toBe(serverReview);

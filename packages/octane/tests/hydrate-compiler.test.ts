@@ -1071,7 +1071,7 @@ export function App() @{
 		expect(hashes(child.code)).toEqual(hashes(server.code));
 		expect(child.code).toContain('.x.tsrx-');
 		expect(server.code).toContain('.x.tsrx-');
-		expect(server.code).toContain('inside tsrx-');
+		expect(server.code).toContain('class="x tsrx-');
 	});
 
 	it('rejects a style scope that straddles a split boundary', () => {

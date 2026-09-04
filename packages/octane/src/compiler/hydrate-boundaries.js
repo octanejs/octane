@@ -30,7 +30,14 @@ function inheritGeneratedOrigin(root, origin) {
 			for (const item of value) visit(item);
 			return;
 		}
-		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
+		// Adopted parser nodes (including StyleSheet subtrees) may be frozen
+		// and already carry CSS-relative positions; only stamp generated nodes.
+		if (
+			typeof value.type === 'string' &&
+			value.loc == null &&
+			origin?.loc != null &&
+			!Object.isFrozen(value)
+		) {
 			value.start = origin.start;
 			value.end = origin.end;
 			value.loc = origin.loc;
