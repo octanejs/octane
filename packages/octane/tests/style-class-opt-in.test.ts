@@ -14,7 +14,7 @@ const SOURCE = `
 function Card({ parentClass }: { parentClass: string }) @{
 	<>
 		<style>.local { padding: 0; }</style>
-		<article class={parentClass}>
+		<article class={['local', parentClass]}>
 			<h2 class={parentClass}>{'title'}</h2>
 		</article>
 	</>
@@ -120,7 +120,9 @@ describe('$class opt-in — a block whose $class is read is a theme', () => {
 
 		const article = r.find('article');
 		const heading = r.find('h2');
-		expect(article.className).toBe(`${theme} ${local}`);
+		// The article keeps its own `local` class ahead of the passed theme
+		// class and its scope hash; the heading carries only what it was given.
+		expect(article.className).toBe(`local ${theme} ${local}`);
 		expect(heading.className).toBe(`${theme} ${local}`);
 		r.unmount();
 	});
@@ -132,7 +134,7 @@ describe('$class opt-in — a block whose $class is read is a theme', () => {
 		expect(css).toContain(`div.${theme} { color: blue; }`);
 		expect(css).not.toContain('(unused)');
 		expect(html).toContain(
-			`<article class="${theme} ${local}"><h2 class="${theme} ${local}">title</h2></article>`,
+			`<article class="local ${theme} ${local}"><h2 class="${theme} ${local}">title</h2></article>`,
 		);
 		expect(html).toContain(`<div class="${theme}">opted in</div>`);
 		expect(html).toContain(`<div class="${theme} card">card</div>`);

@@ -569,7 +569,7 @@ function Card({ parentClass }: { parentClass: string }) @{
 		<style>
 			.local { padding: 0; }
 		</style>
-		<article class={parentClass}>
+		<article class={['local', parentClass]}>
 			<h2 class={parentClass}>Blue, from the parent's theme</h2>
 		</article>
 	</>

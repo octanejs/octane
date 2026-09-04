@@ -1305,7 +1305,7 @@ importers:
         version: 0.3.128(prettier@3.9.6)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.3.128(@tsrx/react@0.2.63(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.63(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.2.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
+        version: 0.3.128(@tsrx/react@0.2.63(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.63(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.2.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -6916,7 +6916,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: github:tsrx-org/tsrx#feat/scoped-styles-apply&path:packages/tsrx
-        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx
+        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/393d1754044f06292ebbc48e40d117ff06d0fabc#path:packages/tsrx
       '@types/react':
         specifier: catalog:default
         version: 19.2.17
@@ -6989,7 +6989,7 @@ importers:
     devDependencies:
       '@tsrx/core':
         specifier: github:tsrx-org/tsrx#feat/scoped-styles-apply&path:packages/tsrx
-        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx
+        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/393d1754044f06292ebbc48e40d117ff06d0fabc#path:packages/tsrx
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -10528,7 +10528,7 @@ importers:
         version: 3.23.0
       '@tsrx/core':
         specifier: github:tsrx-org/tsrx#feat/scoped-styles-apply&path:packages/tsrx
-        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx
+        version: https://codeload.github.com/tsrx-org/tsrx/tar.gz/393d1754044f06292ebbc48e40d117ff06d0fabc#path:packages/tsrx
       '@tsrx/prettier-plugin':
         specifier: catalog:default
         version: 0.3.128(prettier@3.9.6)
@@ -20231,11 +20231,11 @@ packages:
   '@tsrx/core@0.1.63':
     resolution: {integrity: sha512-EQIkCcqW7wTLtLGQQP8bRUe9O+GYFpBsZXXgs7088YIjtoHlNAE2qVgtsEPYY86oV5XBY9aGWLsjCS0SzXvLqw==}
 
-  '@tsrx/core@0.1.64':
-    resolution: {integrity: sha512-cmpl6Gif1j9n4munRE+elgs8zKvBlhG22IOqUvyMsclG17h41BVQULpC4FIcLfdkENUrz55g68m4XvEpvWJdKw==}
+  '@tsrx/core@0.1.65':
+    resolution: {integrity: sha512-YYRMTRCrBSCGtnYSrQX55cybjTZgHOo+trQ6N2rMJb/pnL264dXPb2dUGyAWjbyu1UJehdJkzCRiMYgy4NzPnQ==}
 
-  '@tsrx/core@https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx':
-    resolution: {gitHosted: true, integrity: sha512-Pd99zMaJ4wc8vZWG4v7+cbtNG0zbXXky0v2J1woez5Msh+B2IXPeq0tGEEOSXvTBUBsCCahdXlu8lzvvl0fD/A==, path: packages/tsrx, tarball: https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c}
+  '@tsrx/core@https://codeload.github.com/tsrx-org/tsrx/tar.gz/393d1754044f06292ebbc48e40d117ff06d0fabc#path:packages/tsrx':
+    resolution: {gitHosted: true, path: packages/tsrx, tarball: https://codeload.github.com/tsrx-org/tsrx/tar.gz/393d1754044f06292ebbc48e40d117ff06d0fabc}
     version: 0.1.65
 
   '@tsrx/prettier-plugin@0.3.128':
@@ -20258,9 +20258,6 @@ packages:
 
   '@tsrx/runtime@0.1.2':
     resolution: {integrity: sha512-bhiacN/1cDKtBAY/sePUmRldkj5TvAXk8gqlyCxF22XM7l+gM0FIISDDSg0jIa1pcBfnyW2vnc82WdtfO9h7Ng==}
-
-  '@tsrx/runtime@0.1.3':
-    resolution: {integrity: sha512-RpkvHq0w6ehzabA2WyoNMSwD61goV8G+T5qneSQexrMUswKNCb98/7Mr+LpC6sr73G8iPW2/5/BohRoJTRUH2Q==}
 
   '@tsrx/runtime@0.1.4':
     resolution: {integrity: sha512-2QMN9OibiIXxk3l0A2FllBaBJDoT5D6BSlhWSH7q71eyqtoIIhEFizGHKzbiSOleTR0gq5j3iTGiYgLz1AYPSQ==}
@@ -28292,8 +28289,8 @@ packages:
   ocache@0.1.5:
     resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
 
-  octane@0.2.2:
-    resolution: {integrity: sha512-6aupN6DjB4LaIsoPErrQPMIjZM2ACM0zIioXcuD8Zte7jP0CxLbRz727FCTG1VEjBhZYngypUkkSHy8vwQX9gA==}
+  octane@0.2.3:
+    resolution: {integrity: sha512-QzK8LEZ/UCZJB+ZnIHMtdGm2y2O0QKf0gFwuvk3x6GfOE1tU8XIyaieern8Xdu8CQBael+kLP9s2RQim1YlaDw==}
     engines: {node: '>=22.22.2'}
     peerDependencies:
       react: ^19.0.0
@@ -43647,7 +43644,7 @@ snapshots:
   '@ripple-ts/vite-plugin@0.3.125':
     dependencies:
       '@ripple-ts/adapter': 0.3.125
-      '@tsrx/core': 0.1.64
+      '@tsrx/core': 0.1.65
       '@tsrx/ripple': 0.1.62
     transitivePeerDependencies:
       - '@typescript-eslint/types'
@@ -47304,12 +47301,12 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/core@0.1.64':
+  '@tsrx/core@0.1.65':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
       '@sveltejs/acorn-typescript': 1.0.13(acorn@8.17.0)
-      '@tsrx/runtime': 0.1.3
+      '@tsrx/runtime': 0.1.4
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
       acorn: 8.17.0
@@ -47320,7 +47317,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/core@https://codeload.github.com/tsrx-org/tsrx/tar.gz/c05ca37064c9c1dd66d0986200724a27eec0168c#path:packages/tsrx':
+  '@tsrx/core@https://codeload.github.com/tsrx-org/tsrx/tar.gz/393d1754044f06292ebbc48e40d117ff06d0fabc#path:packages/tsrx':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
@@ -47421,7 +47418,7 @@ snapshots:
 
   '@tsrx/ripple@0.1.62':
     dependencies:
-      '@tsrx/core': 0.1.64
+      '@tsrx/core': 0.1.65
       esrap: 2.3.2
       is-reference: 3.0.3
       source-map: 0.7.6
@@ -47430,8 +47427,6 @@ snapshots:
       - '@typescript-eslint/types'
 
   '@tsrx/runtime@0.1.2': {}
-
-  '@tsrx/runtime@0.1.3': {}
 
   '@tsrx/runtime@0.1.4': {}
 
@@ -47471,7 +47466,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/typescript-plugin@0.3.128(@tsrx/react@0.2.63(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.63(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.2.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
+  '@tsrx/typescript-plugin@0.3.128(@tsrx/react@0.2.63(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.63(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.2.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
       '@volar/typescript': 2.4.28
@@ -47480,7 +47475,7 @@ snapshots:
       '@tsrx/react': 0.2.63(react@19.2.8)
       '@tsrx/ripple': 0.1.62
       '@tsrx/solid': 0.1.63(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)
-      octane: 0.2.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      octane: 0.2.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
   '@tsrx/typescript-plugin@0.3.128(@tsrx/react@0.2.63(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.63(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@packages+octane)(typescript@5.9.3)':
     dependencies:
@@ -59673,14 +59668,15 @@ snapshots:
     dependencies:
       ohash: 2.0.11
 
-  octane@0.2.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  octane@0.2.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
-      '@tsrx/core': 0.1.64
+      '@tsrx/core': 0.1.65
       '@types/react': 19.2.17
       '@volar/language-core': 2.4.28
       '@volar/typescript': 2.4.28
       alien-signals: 3.2.0
       devalue: 5.8.2
+      entities: 7.0.1
       es-module-lexer: 1.7.0
       esrap: 2.3.2
       oxc-tsrx: 0.5.0(svelte@5.56.7)
@@ -62746,7 +62742,7 @@ snapshots:
 
   ripple@0.3.125:
     dependencies:
-      '@tsrx/core': 0.1.64
+      '@tsrx/core': 0.1.65
       '@tsrx/ripple': 0.1.62
       clsx: 2.1.1
       devalue: 5.8.2
