@@ -27,6 +27,7 @@ export function Card() @{
 			.card { .title { color: gray; } }
 		</style>
 		<article class="card"><h2 class="title">{'t'}</h2></article>
+		<p class="note">{'n'}</p>
 		<div class={theme.$class}>{'x'}</div>
 	</>
 }
@@ -65,7 +66,10 @@ describe(':global forms — compiled selector shapes', () => {
 			// Compound: the own element with an unscoped class on it.
 			expect(css).toContain(`.card.${hash}.is-open { color: pink; }`);
 			// The scoped `.note` (0,2,0) that beats a bare `:global(.note)` (0,1,0).
+			// The sibling `<p class="note">` keeps the rule live; without a match it
+			// would be removed as unused and the pin would prove nothing.
 			expect(css).toContain(`.note.${hash} { color: purple; }`);
+			expect(css).not.toContain('(unused)');
 			// A theme rule carries its hash too, so it beats a bare global as well.
 			expect(themeCss).toContain(`.note.${themeHash} { color: red; }`);
 
