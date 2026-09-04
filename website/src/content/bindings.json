@@ -573,8 +573,9 @@
         "tags": ["devtools", "debugging"]
       },
       {
-        "packageName": "@octanejs/react-is",
-        "title": "React Is",
+        "packageName": "@octanejs/octane-is",
+        "title": "Octane Is",
+        "searchTerms": ["react-is", "React Is"],
         "tags": ["elements", "introspection", "compatibility"]
       },
       {

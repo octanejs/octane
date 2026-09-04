@@ -1,6 +1,6 @@
 {
-  "name": "@octanejs/react-is",
-  "version": "0.1.1",
+  "name": "@octanejs/octane-is",
+  "version": "0.0.1",
   "description": "Element-kind predicates for Octane, matching react-is 19.2.7's public surface.",
   "license": "MIT",
   "type": "module",
@@ -18,7 +18,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git",
-    "directory": "packages/react-is"
+    "directory": "packages/octane-is"
   },
   "main": "src/index.ts",
   "module": "src/index.ts",
@@ -34,9 +34,9 @@
     "LICENSE.upstream"
   ],
   "scripts": {
-    "test": "vitest run --root ../.. --project react-is --project react-is-pristine --project react-is-differential --maxWorkers=2",
+    "test": "vitest run --root ../.. --project octane-is --project octane-is-pristine --project octane-is-differential --maxWorkers=2",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs",
-    "upstream:test": "node ../../scripts/react-parity/run-pristine.mjs react-is"
+    "upstream:test": "node ../../scripts/react-parity/run-pristine.mjs octane-is"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"

@@ -15,7 +15,7 @@ diff --git a/tests/upstream/ReactIs-test.js b/tests/upstream/ReactIs-test.js
 -        return React.createElement('div');
 -      }
 -    }
-+    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:43665b67972897c5]: public component types are functions.
++    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:ab271415b83a9e49]: public component types are functions.
 +    const Component = () => React.createElement('div');
 +    const PureComponent = () => React.createElement('div');
  
@@ -23,7 +23,7 @@ diff --git a/tests/upstream/ReactIs-test.js b/tests/upstream/ReactIs-test.js
 -    const ForwardRefComponent = React.forwardRef((props, ref) =>
 -      React.createElement(Component, {forwardedRef: ref, ...props}),
 -    );
-+    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:43665b67972897c5]: refs need no forwarding wrapper.
++    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:ab271415b83a9e49]: refs need no forwarding wrapper.
 +    const ForwardRefComponent = props => React.createElement(Component, props);
      const LazyComponent = React.lazy(() => Component);
      const MemoComponent = React.memo(Component);
@@ -41,7 +41,7 @@ diff --git a/tests/upstream/ReactIs-test.js b/tests/upstream/ReactIs-test.js
    });
  
    it('should identify context consumers', () => {
-+    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:62a09aa6f8dfc41c]: slot-keyed use(Context) replaces Consumers.
++    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:50faf032d93f99c2]: slot-keyed use(Context) replaces Consumers.
      const Context = React.createContext(false);
 -    expect(ReactIs.isValidElementType(Context.Consumer)).toBe(true);
 -    expect(ReactIs.typeOf(<Context.Consumer />)).toBe(ReactIs.ContextConsumer);
@@ -56,7 +56,7 @@ diff --git a/tests/upstream/ReactIs-test.js b/tests/upstream/ReactIs-test.js
  
    it('should identify ref forwarding component', () => {
 -    const RefForwardingComponent = React.forwardRef((props, ref) => null);
-+    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:e429db3af079339c]: refs are ordinary props, so the kind is Element.
++    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:c64ba0d78ccf5ae2]: refs are ordinary props, so the kind is Element.
 +    const RefForwardingComponent = props => null;
      expect(ReactIs.isValidElementType(RefForwardingComponent)).toBe(true);
 -    expect(ReactIs.typeOf(<RefForwardingComponent />)).toBe(ReactIs.ForwardRef);
@@ -73,7 +73,7 @@ diff --git a/tests/upstream/ReactIs-test.js b/tests/upstream/ReactIs-test.js
 -    expect(ReactIs.isValidElementType(SuspenseList)).toBe(true);
 -    expect(ReactIs.typeOf(<SuspenseList />)).toBe(ReactIs.SuspenseList);
 -    expect(ReactIs.isSuspenseList(<SuspenseList />)).toBe(true);
-+    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:f9ed57d478733d1c]: no renderer kind exists.
++    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:acbfb9e764858887]: no renderer kind exists.
 +    expect(ReactIs.isValidElementType(SuspenseList)).toBe(false);
 +    expect(ReactIs.isValidElementType(ReactIs.SuspenseList)).toBe(false);
 +    expect(ReactIs.isSuspenseList(<div />)).toBe(false);
@@ -90,7 +90,7 @@ diff --git a/tests/upstream/ReactIs-test.js b/tests/upstream/ReactIs-test.js
 -    expect(
 -      ReactIs.isProfiler(<React.Profiler id="foo" onRender={jest.fn()} />),
 -    ).toBe(true);
-+    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:4e6519750f97e468]: profiling is opt-in runtime instrumentation.
++    // OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:f321a4fcb6033d91]: profiling is opt-in runtime instrumentation.
 +    expect(ReactIs.isValidElementType(React.Profiler)).toBe(false);
 +    expect(ReactIs.isValidElementType(ReactIs.Profiler)).toBe(false);
 +    expect(ReactIs.isProfiler(<div />)).toBe(false);

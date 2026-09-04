@@ -152,6 +152,33 @@ process.stdout.write(JSON.stringify(['default', 'DraggableCore'].filter((key) =>
 `;
 }
 
+export const PACKED_STRICT_BROWSER_SOURCE_PACKAGES = [
+	'@octanejs/octane-is',
+	'@octanejs/jotai',
+	'@octanejs/redux',
+	'@octanejs/remix-router',
+	'@octanejs/visx',
+	'@octanejs/recharts',
+];
+
+const strictBrowserSourcePackages = new Set(PACKED_STRICT_BROWSER_SOURCE_PACKAGES);
+
+function hasTypeScriptSource(files) {
+	for (const file of files ?? []) {
+		if (file.startsWith('src/') && /\.(?:[cm]?ts|tsx)$/.test(file) && !/\.d\.[cm]?ts$/.test(file)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function hasPackedSourceConsumer(packageName, files) {
+	return (
+		hasTsrxFile(files) ||
+		(strictBrowserSourcePackages.has(packageName) && hasTypeScriptSource(files))
+	);
+}
+
 export function findPackedTsrxSourceConsumerPackages(
 	packages,
 	packedFiles,
@@ -163,8 +190,7 @@ export function findPackedTsrxSourceConsumerPackages(
 				!pkg.private &&
 				pkg.role === 'framework binding' &&
 				!excludedPackages.has(pkg.name) &&
-				(hasTsrxFile(packedFiles.get(pkg.name)) ||
-					(pkg.name === '@octanejs/react-is' && packedFiles.get(pkg.name)?.has('src/index.ts'))),
+				hasPackedSourceConsumer(pkg.name, packedFiles.get(pkg.name)),
 		)
 		.map((pkg) => pkg.name)
 		.sort();
@@ -189,8 +215,7 @@ function collectExportTargets(value, output = []) {
 }
 
 export function findPackedTsrxSourceConsumerSpecifiers(packageName, manifest, files) {
-	if (!hasTsrxFile(files) && !(packageName === '@octanejs/react-is' && files?.has('src/index.ts')))
-		return [];
+	if (!hasPackedSourceConsumer(packageName, files)) return [];
 
 	const exports = manifest.exports;
 	if (
@@ -364,15 +389,6 @@ export function createPackedTsrxConsumerConfig({
 	};
 }
 
-export const PACKED_TSRX_STRICT_BROWSER_PACKAGES = [
-	'@octanejs/react-is',
-	'@octanejs/jotai',
-	'@octanejs/redux',
-	'@octanejs/remix-router',
-	'@octanejs/visx',
-	'@octanejs/recharts',
-];
-
 export const PACKED_TSRX_CONSUMER_PROJECTS = [
 	'tsconfig.json',
 	'tsconfig.browser.json',
@@ -429,8 +445,8 @@ export type BrowserHasNoNodeNamespace = NodeJS.Process;
 
 // Pure TypeScript introspection bindings also need packed Node and browser
 // source checks, even though they do not author a TSRX component.
-function renderPackedReactIsTypeProbe() {
-	return `import * as PackedIs from '@octanejs/react-is';
+function renderPackedOctaneIsTypeProbe() {
+	return `import * as PackedIs from '@octanejs/octane-is';
 import type { ElementDescriptor as PackedIsDescriptor } from 'octane';
 type PackedIsEqual<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 type PackedIsAssert<T extends true> = T;
@@ -472,7 +488,7 @@ void packedIsWrong;
 }
 
 export function renderPackedStrictBrowserConsumerTypeProbe() {
-	return `${renderPackedReactIsTypeProbe()}
+	return `${renderPackedOctaneIsTypeProbe()}
 import { sumTypedPair } from './App.tsrx';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { atom, useAtom } from '@octanejs/jotai';
@@ -801,7 +817,7 @@ export function PublishedSourceConsumer() @{
 }
 
 export function renderPackedTsrxConsumerTypeProbe() {
-	return `${renderPackedReactIsTypeProbe()}
+	return `${renderPackedOctaneIsTypeProbe()}
 import { Command, type CommandProps } from '@octanejs/cmdk';
 import {
 	Bar,

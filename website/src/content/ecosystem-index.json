@@ -1399,14 +1399,14 @@
   },
   {
     "kind": "library-binding",
-    "id": "binding-react-is",
-    "title": "React Is",
-    "packageName": "@octanejs/react-is",
+    "id": "binding-octane-is",
+    "title": "Octane Is",
+    "packageName": "@octanejs/octane-is",
     "upstreamPackage": "react-is",
     "category": "Developer Tools",
     "categoryId": "developer-tools",
     "description": "Use react-is with Octane.",
-    "searchTerms": [],
+    "searchTerms": ["react-is", "React Is"],
     "tags": ["elements", "introspection", "compatibility"],
     "order": 108
   },

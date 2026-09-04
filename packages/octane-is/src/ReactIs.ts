@@ -57,7 +57,7 @@ export function isValidElementType(type: unknown): boolean {
 		typeof type === 'string' || typeof type === 'function' || type === Fragment || type === Activity
 	);
 }
-// OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:62a09aa6f8dfc41c]
+// OCTANE DIVERGENCE[unsupported-renderer-kinds][runtime:50faf032d93f99c2]
 // Unsupported renderer kinds remain negative feature probes.
 export function isContextConsumer(_value: unknown): boolean {
 	return false;

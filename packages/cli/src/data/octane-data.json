@@ -685,6 +685,21 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/octane-is",
+      "version": "0.0.1",
+      "category": "Developer Tools",
+      "upstream": { "package": "react-is", "version": "19.2.7" },
+      "surface": "All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata.",
+      "divergences": [
+        "Kind labels use Octane symbols and reject React elements.",
+        "Context.Consumer, forwardRef, Profiler and SuspenseList have no Octane kind; their predicates return false.",
+        "StrictMode identifies Octane's pass-through wrapper without double invocation.",
+        "React Server Component references are not valid Octane types."
+      ],
+      "ssr": "Predicates are pure; they never render a component or start a lazy loader.",
+      "verified": "2026-09-03"
+    },
+    {
       "name": "@octanejs/opentui",
       "version": "0.0.7",
       "category": "Terminal Apps",
@@ -801,21 +816,6 @@
       ],
       "ssr": "The explicit server entry renders children without a boundary so descendant errors propagate, matching react-error-boundary 6.1.2.",
       "verified": "2026-08-02"
-    },
-    {
-      "name": "@octanejs/react-is",
-      "version": "0.1.1",
-      "category": "Developer Tools",
-      "upstream": { "package": "react-is", "version": "19.2.7" },
-      "surface": "All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata.",
-      "divergences": [
-        "Kind labels use Octane symbols and reject React elements.",
-        "Context.Consumer, forwardRef, Profiler and SuspenseList have no Octane kind; their predicates return false.",
-        "StrictMode identifies Octane's pass-through wrapper without double invocation.",
-        "React Server Component references are not valid Octane types."
-      ],
-      "ssr": "Predicates are pure; they never render a component or start a lazy loader.",
-      "verified": "2026-09-03"
     },
     {
       "name": "@octanejs/react-map-gl",
@@ -1776,7 +1776,7 @@
     "react-i18next": "@octanejs/i18next",
     "react-image-crop": "@octanejs/image-crop",
     "react-intersection-observer": "@octanejs/intersection-observer",
-    "react-is": "@octanejs/react-is",
+    "react-is": "@octanejs/octane-is",
     "react-map-gl": "@octanejs/react-map-gl",
     "react-map-gl/mapbox": "@octanejs/react-map-gl",
     "react-markdown": "@octanejs/markdown",

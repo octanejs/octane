@@ -59,6 +59,7 @@ surface and evidence.
 | `@octanejs/monaco-editor` | 0 |
 | `@octanejs/motion` | 0 |
 | `@octanejs/nuqs` | 0 |
+| `@octanejs/octane-is` | 0 |
 | `@octanejs/opentui` | 0 |
 | `@octanejs/pdf` | 0 |
 | `@octanejs/phosphor-icons` | 0 |
@@ -67,7 +68,6 @@ surface and evidence.
 | `@octanejs/radix` | 0 |
 | `@octanejs/rainbowkit` | 0 |
 | `@octanejs/react-error-boundary` | 0 |
-| `@octanejs/react-is` | 0 |
 | `@octanejs/react-map-gl` | 0 |
 | `@octanejs/recharts` | 0 |
 | `@octanejs/redux` | 0 |

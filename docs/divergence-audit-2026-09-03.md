@@ -89,7 +89,7 @@ and [server-renderable-contract.test.ts](../packages/octane/tests/server-rendera
 | C1 | Fixed: buffered, static, prerender, and streaming entries accept renderables and second-position options while retaining the function/props extension. |
 | C2 | Fixed: StrictMode and batching pass-throughs, useFormState alias, and server/static version exports. Profiler remains a documented non-goal; Octane's profiling API is separate. |
 | C3 | Fixed: Element, Document, DocumentFragment, and ShadowRoot containers work; document doctypes survive root cleanup. |
-| C4 | Added the pinned `@octanejs/react-is` binding over Octane's actual brands, plus memo identity/displayName and lazy displayName metadata. React-only component predicates do not imply support for those component types. |
+| C4 | Added the pinned `@octanejs/octane-is` binding over Octane's actual brands, plus memo identity/displayName and lazy displayName metadata. React-only component predicates do not imply support for those component types. |
 | C5 | Added React-named aliases for Octane renderables, functions, props, refs, context, hooks, host attributes, styles, and native events. Class-component and synthetic-event types remain outside Octane's model. |
 | C6 | Preserved: refs are props; forwardRef/createRef and executing precompiled React JSX are documented non-goals. The JSX runtime entry remains type-only. |
 | C7 | Fixed: IS_REACT_ACT_ENVIRONMENT is honored, with component-aware update warnings. Nested act draining retains Octane's scheduler behavior. |

@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const runners = new Map([
-	['react-is', { module: './react-is-pristine-runtime.mjs', label: 'react-is' }],
+	['octane-is', { module: './octane-is-pristine-runtime.mjs', label: 'react-is' }],
 	['alien-signals', { module: './alien-signals-pristine-runtime.mjs', label: 'Alien Signals' }],
 	['draggable', { module: './react-draggable-pristine-runtime.mjs', label: 'react-draggable' }],
 	['floating-ui', { module: './floating-ui-pristine-runtime.mjs', label: '@floating-ui/react' }],
