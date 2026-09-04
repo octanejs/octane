@@ -3,7 +3,12 @@ import { splitSlot, subSlot } from './internal';
 import { useSyncExternalStoreWithSelector } from './useSyncExternalStoreWithSelector';
 
 export interface UseSelectorOptions<TSelected> {
-	compare?: (a: TSelected, b: TSelected) => boolean;
+	// Written as an optional property that also admits `undefined`, because this
+	// package publishes source and the consumer's compiler options apply to it.
+	// Under `exactOptionalPropertyTypes` a bare `compare?:` would reject both an
+	// options object forwarded from another optional value and this package's own
+	// `useStore` bridge, which always passes the key through.
+	compare?: ((a: TSelected, b: TSelected) => boolean) | undefined;
 }
 
 type SyncExternalStoreSubscribe = Parameters<typeof useSyncExternalStoreWithSelector>[0];
