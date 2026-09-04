@@ -58,11 +58,15 @@ export function applyStyleRefs(componentNode, styles, preparedSheets, options) {
 	};
 
 	const identifierRefs = [];
+	const seenIdentifiers = new Set();
 	const otherRefs = [];
 	for (let i = 0; i < refs.length; i++) {
 		const expression = unwrapExpression(getRefAttributeExpression(refs[i]));
-		if (expression && expression.type === 'Identifier') identifierRefs.push(expression);
-		else otherRefs.push(refs[i]);
+		if (expression && expression.type === 'Identifier') {
+			if (seenIdentifiers.has(expression.name)) continue;
+			seenIdentifiers.add(expression.name);
+			identifierRefs.push(expression);
+		} else otherRefs.push(refs[i]);
 	}
 
 	const statements = [inheritOriginLoc(b.const(styleMapName, styleMap), origin)];

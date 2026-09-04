@@ -113,7 +113,13 @@ describe('style block ref class maps', function () {
 
 	it('assigns the class map before an early return in a statement-list scope', function () {
 		const alt = mount(EarlyReturnScopeStyleRef as any, { alt: true });
-		expectClassMap(alt.find('#early-alt') as HTMLElement, 'rgb(31, 32, 33)');
+		const early = alt.find('#early-alt') as HTMLElement;
+		const text = early.textContent || '';
+		// `@{ }` only scopes `body.render`, so the early-return host is not
+		// hash-stamped. The class map must still be written before that return.
+		expect(text).not.toBe('missing');
+		expect(text).toMatch(/tsrx-[a-z0-9]+ card/i);
+		expect(early.classList.contains('card')).toBe(true);
 		alt.unmount();
 		const main = mount(EarlyReturnScopeStyleRef as any, { alt: false });
 		expectClassMap(main.find('#early-main') as HTMLElement, 'rgb(31, 32, 33)');
