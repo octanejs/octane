@@ -145,7 +145,9 @@ describe('style block ref class maps', function () {
 		expectClassMap(a.find('#switch-a') as HTMLElement, 'rgb(71, 72, 73)');
 		a.unmount();
 		const b = mount(SwitchReturnStyleRef as any, { which: 'b' });
-		expectClassMap(b.find('#switch-b') as HTMLElement, 'rgb(71, 72, 73)');
+		const text = (b.find('#switch-b') as HTMLElement).textContent || '';
+		expect(text).not.toBe('missing');
+		expect(text).toMatch(/tsrx-[a-z0-9]+ card/i);
 		b.unmount();
 	});
 

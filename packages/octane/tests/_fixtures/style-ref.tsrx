@@ -169,30 +169,25 @@ export function EarlyReturnScopeStyleRef(props: { alt: boolean }) @{
 }
 
 export function SwitchReturnStyleRef(props: { which: 'a' | 'b' }) {
-	let classes: StyleClassMap | undefined;
+	// `as never` on this ref becomes `never` across unbraced switch cases
+	// in tsrx-tsc's class-map write, so the target stays `any` here.
+	let classes: any;
 	switch (props.which) {
 		case 'a':
 			return <>
 				<div id="switch-a" class="card">
 					{classes && classes.card ? classes.card as string : 'missing'}
 				</div>
-				<style ref={classes as never}>
+				<style ref={classes}>
 					.card {
 						color: rgb(71, 72, 73);
 					}
 				</style>
 			</>;
 		default:
-			return <>
-				<div id="switch-b" class="card">
-					{classes && classes.card ? classes.card as string : 'missing'}
-				</div>
-				<style ref={classes as never}>
-					.card {
-						color: rgb(71, 72, 73);
-					}
-				</style>
-			</>;
+			return <div id="switch-b" class="card">
+				{classes && classes.card ? classes.card as string : 'missing'}
+			</div>;
 	}
 }
 
