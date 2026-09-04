@@ -143,7 +143,9 @@ export function createRouter(routes) {
 					if (!methods.includes(normalizedMethod)) continue;
 				}
 
-				const match = compiled.pattern.exec(pathname);
+				const pattern = compiled.pattern;
+				if (typeof pattern === 'string') continue;
+				const match = pattern.exec(pathname);
 				if (match === null) continue;
 				const paramNames = compiled.paramNames;
 				/** @type {Record<string, string>} */
