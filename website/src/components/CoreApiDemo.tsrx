@@ -1,5 +1,10 @@
 // Small, real Octane components embedded throughout the Core APIs guide.
 // Each demo keeps one concept tangible without depending on a backend.
+//
+// Shared chrome lives in `demoControls` and is applied with
+// `<style apply={demoControls}>`. Frame chrome and per-demo layouts sit in
+// sibling scopes next to the markup they style. Branch-only rules live in
+// `@if` / `@empty` / `@pending` scopes. No `:global` escapes.
 import {
 	use,
 	useActionState,
@@ -10,63 +15,7 @@ import {
 	useTransition,
 } from 'octane';
 
-const demoStyles = <style>
-	.demo {
-		margin: 1rem 0 1.75rem;
-		border: 1px solid var(--border);
-		border-radius: 1rem;
-		overflow: hidden;
-		background: var(--panel);
-	}
-	.demo :global(.demo-bar) {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		padding: 0.65rem 1rem;
-		border-bottom: 1px solid var(--border);
-		color: var(--text-secondary);
-		font-size: 0.78rem;
-		font-weight: 650;
-		letter-spacing: 0.02em;
-	}
-	.demo :global(.demo-bar-leading) {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-	.demo :global(.demo-dot) {
-		display: inline-block;
-		width: 0.5rem;
-		height: 0.5rem;
-		border-radius: 999px;
-		background: #63d391;
-		box-shadow: 0 0 0 4px rgba(99, 211, 145, 0.12);
-	}
-	.demo :global(.demo-preview) {
-		padding: 1.5rem;
-		background:
-			radial-gradient(circle at 92% 12%, rgba(255, 65, 90, 0.14), transparent 32%), var(--panel);
-	}
-	.demo :global(.demo-copy) {
-		margin-bottom: 1.25rem;
-	}
-	.demo :global(.demo-title) {
-		margin: 0 0 0.15rem;
-		color: var(--text);
-		font-size: 1rem;
-		font-weight: 750;
-	}
-	.demo :global(.demo-description) {
-		margin: 0;
-		color: var(--text-secondary);
-		font-size: 0.875rem;
-	}
-	.demo :global(.demo-actions) {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.65rem;
-	}
+const demoControls = <style>
 	.button {
 		min-height: 2.5rem;
 		border: 1px solid transparent;
@@ -104,78 +53,17 @@ const demoStyles = <style>
 		font: inherit;
 		font-size: 0.9rem;
 	}
-	.demo :global(.demo-status) {
+	.demo-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.65rem;
+	}
+	.demo-status {
 		margin: 0;
 		color: var(--text-secondary);
 		font-size: 0.82rem;
 	}
-	.demo :global(.counter-layout) {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1.5rem;
-	}
-	.demo :global(.demo-count) {
-		min-width: 4.5rem;
-		color: var(--text);
-		font-size: clamp(2.75rem, 8vw, 4.5rem);
-		font-variant-numeric: tabular-nums;
-		letter-spacing: -0.08em;
-		line-height: 1;
-		text-align: right;
-	}
-	.demo :global(.packing-summary) {
-		margin: 0 0 0.8rem;
-		color: var(--text);
-		font-size: 0.875rem;
-		font-weight: 700;
-	}
-	.demo :global(.packing-list) {
-		list-style: none;
-		margin: 0 0 1rem;
-		padding: 0;
-		display: grid;
-		gap: 0.45rem;
-	}
-	.demo :global(.packing-item) {
-		display: grid;
-		grid-template-columns: auto minmax(0, 1fr);
-		align-items: center;
-		gap: 0.75rem;
-		min-height: 3rem;
-		border: 1px solid var(--border);
-		border-radius: 0.75rem;
-		padding: 0.45rem 0.55rem 0.45rem 0.75rem;
-		background: var(--surface-inset);
-	}
-	.demo :global(.packing-check) {
-		width: 1.15rem;
-		height: 1.15rem;
-		margin: 0;
-		accent-color: #63d391;
-		cursor: pointer;
-	}
-	.demo :global(.packing-label) {
-		cursor: pointer;
-	}
-	.packedLabel {
-		color: var(--text-secondary);
-		text-decoration: line-through;
-	}
-	.demo :global(.packing-empty) {
-		border: 1px dashed var(--border);
-		border-radius: 0.75rem;
-		padding: 1.2rem;
-		color: var(--text-secondary);
-		text-align: center;
-	}
-	.demo :global(.shortcut-controls) {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		align-items: end;
-		gap: 0.75rem;
-	}
-	.demo :global(.demo-field) {
+	.demo-field {
 		display: grid;
 		gap: 0.35rem;
 		min-width: 0;
@@ -183,8 +71,9 @@ const demoStyles = <style>
 		font-size: 0.8rem;
 		font-weight: 700;
 	}
-	.demo :global(.shortcut-note) {
-		margin-top: 0.75rem;
+	.packedLabel {
+		color: var(--text-secondary);
+		text-decoration: line-through;
 	}
 	.shortcutKey {
 		display: inline-block;
@@ -198,220 +87,25 @@ const demoStyles = <style>
 		font-size: 0.75rem;
 		text-align: center;
 	}
-	.demo :global(.data-stage) {
-		display: grid;
-		place-items: center;
-		min-height: 9rem;
-		margin-bottom: 1rem;
-		border: 1px solid var(--border);
-		border-radius: 0.875rem;
-		padding: 1rem;
-		background: var(--surface-inset);
-	}
-	.demo :global(.data-empty),
-	.demo :global(.data-loading),
-	.demo :global(.data-error) {
-		margin: 0;
-		color: var(--text-secondary);
-		font-size: 0.875rem;
-		text-align: center;
-	}
-	.demo :global(.data-loading) {
-		color: var(--text);
-	}
-	.demo :global(.data-error) {
-		color: var(--danger-text);
-	}
-	.demo :global(.profile-card) {
-		display: grid;
-		grid-template-columns: auto minmax(0, 1fr);
-		align-items: center;
-		gap: 0.9rem;
-		width: min(100%, 24rem);
-	}
-	.demo :global(.profile-avatar) {
-		display: grid;
-		place-items: center;
-		width: 3.25rem;
-		height: 3.25rem;
-		border-radius: 999px;
-		background: rgba(255, 65, 90, 0.16);
-		color: var(--danger-text);
-		font-size: 1.1rem;
-		font-weight: 800;
-	}
-	.demo :global(.profile-name),
-	.demo :global(.profile-role) {
-		display: block;
-	}
-	.demo :global(.profile-role) {
-		color: var(--text-secondary);
-		font-size: 0.82rem;
-	}
-	.demo :global(.profile-form) {
-		display: grid;
-		gap: 0.85rem;
-	}
-	.demo :global(.form-controls) {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		align-items: end;
-		gap: 0.75rem;
-	}
-	.demo :global(.form-result) {
-		min-height: 1.35rem;
-	}
-	.demo :global(.demo-tabs) {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.45rem;
-		margin-bottom: 0.85rem;
-	}
-	.demo :global(.demo-tab) {
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		padding: 0.45rem 0.8rem;
-		background: var(--surface-subtle);
-		color: var(--text-secondary);
-		font: inherit;
-		font-size: 0.82rem;
-		font-weight: 700;
-		cursor: pointer;
-	}
-	.demo :global(.demo-tab-selected) {
-		border-color: rgba(255, 65, 90, 0.48);
-		background: rgba(255, 65, 90, 0.13);
-		color: var(--text);
-	}
-	.demo :global(.demo-tab-pending) {
-		border-color: rgba(255, 65, 90, 0.34);
-		background: rgba(255, 65, 90, 0.07);
-		color: var(--text);
-		box-shadow: inset 0 0 0 1px rgba(255, 65, 90, 0.1);
-	}
-	.demo :global(.transition-status) {
-		min-height: 1.25rem;
-		margin: 0 0 0.65rem;
-	}
-	.demo :global(.report-card) {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		align-items: center;
-		gap: 1rem;
-		min-height: 7.5rem;
-		border: 1px solid var(--border);
-		border-radius: 0.85rem;
-		padding: 1rem;
-		background: var(--surface-inset);
-	}
-	.demo :global(.report-name),
-	.demo :global(.report-detail),
-	.demo :global(.report-metric) {
-		margin: 0;
-	}
-	.demo :global(.report-name) {
-		margin-bottom: 0.25rem;
-		color: var(--text);
-		font-size: 0.95rem;
-		font-weight: 750;
-	}
-	.demo :global(.report-detail) {
-		color: var(--text-secondary);
-		font-size: 0.82rem;
-	}
-	.demo :global(.report-metric) {
-		color: var(--success-text);
-		font-size: 1.8rem;
-		font-weight: 800;
-		letter-spacing: -0.04em;
-	}
-	.demo :global(.product-search) {
-		display: grid;
-		gap: 0.85rem;
-	}
-	.demo :global(.search-summary) {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		min-height: 1.3rem;
-	}
-	.demo :global(.search-summary span) {
-		color: var(--text-secondary);
-		font-size: 0.8rem;
-	}
-	.demo :global(.search-updating) {
-		color: var(--danger-text);
-		font-weight: 750;
-	}
-	.demo :global(.product-results) {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 0.55rem;
-		transition: opacity 0.15s;
-	}
-	.demo :global(.product-results[data-stale='true']) {
-		opacity: 0.52;
-	}
-	.demo :global(.product-result) {
-		border: 1px solid var(--border);
-		border-radius: 0.7rem;
-		padding: 0.7rem 0.8rem;
-		background: var(--surface-inset);
-		color: var(--text);
-		font-size: 0.84rem;
-	}
-	.demo :global(.product-category) {
-		display: block;
-		margin-top: 0.15rem;
-		color: var(--text-secondary);
-	}
-	.demo :global(.product-empty) {
-		grid-column: 1 / -1;
-		border: 1px dashed var(--border);
-		border-radius: 0.7rem;
-		padding: 1rem;
-		color: var(--text-secondary);
-		font-size: 0.84rem;
-		text-align: center;
-	}
 	.success {
 		color: var(--success-text);
 	}
 	.error {
 		color: var(--danger-text);
 	}
-	@media (max-width: 520px) {
-		.demo :global(.demo-hint) {
-			display: none;
-		}
-		.demo :global(.demo-preview) {
-			padding: 1.25rem;
-		}
-		.demo :global(.counter-layout) {
-			align-items: flex-end;
-			flex-direction: column;
-		}
-		.counterActions,
-		.demo :global(.shortcut-controls),
-		.demo :global(.form-controls) {
-			width: 100%;
-			grid-template-columns: 1fr;
-		}
-		.counterActions {
-			display: grid;
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-		}
-		.demo :global(.report-card),
-		.demo :global(.product-results) {
-			grid-template-columns: 1fr;
-		}
-		.demo :global(.report-metric) {
-			font-size: 1.45rem;
-		}
+	.data-empty,
+	.data-loading,
+	.data-error {
+		margin: 0;
+		color: var(--text-secondary);
+		font-size: 0.875rem;
+		text-align: center;
+	}
+	.data-loading {
+		color: var(--text);
+	}
+	.data-error {
+		color: var(--danger-text);
 	}
 </style>;
 
@@ -424,22 +118,85 @@ interface DemoFrameProps {
 }
 
 function DemoFrame(props: DemoFrameProps) @{
-	<section class={demoStyles.demo} data-demo={props.id} aria-labelledby={props.id + '-title'}>
-		<div class="demo-bar">
-			<div class="demo-bar-leading">
-				<span class="demo-dot" aria-hidden="true"></span>
-				<span class="demo-kicker">Live example</span>
+	<>
+		<style>
+			.demo {
+				margin: 1rem 0 1.75rem;
+				border: 1px solid var(--border);
+				border-radius: 1rem;
+				overflow: hidden;
+				background: var(--panel);
+			}
+			.demo-bar {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				padding: 0.65rem 1rem;
+				border-bottom: 1px solid var(--border);
+				color: var(--text-secondary);
+				font-size: 0.78rem;
+				font-weight: 650;
+				letter-spacing: 0.02em;
+			}
+			.demo-bar-leading {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+			}
+			.demo-dot {
+				display: inline-block;
+				width: 0.5rem;
+				height: 0.5rem;
+				border-radius: 999px;
+				background: #63d391;
+				box-shadow: 0 0 0 4px rgba(99, 211, 145, 0.12);
+			}
+			.demo-preview {
+				padding: 1.5rem;
+				background:
+					radial-gradient(circle at 92% 12%, rgba(255, 65, 90, 0.14), transparent 32%), var(--panel);
+			}
+			.demo-copy {
+				margin-bottom: 1.25rem;
+			}
+			.demo-title {
+				margin: 0 0 0.15rem;
+				color: var(--text);
+				font-size: 1rem;
+				font-weight: 750;
+			}
+			.demo-description {
+				margin: 0;
+				color: var(--text-secondary);
+				font-size: 0.875rem;
+			}
+			@media (max-width: 520px) {
+				.demo-hint {
+					display: none;
+				}
+				.demo-preview {
+					padding: 1.25rem;
+				}
+			}
+		</style>
+		<section class="demo" data-demo={props.id} aria-labelledby={props.id + '-title'}>
+			<div class="demo-bar">
+				<div class="demo-bar-leading">
+					<span class="demo-dot" aria-hidden="true"></span>
+					<span class="demo-kicker">Live example</span>
+				</div>
+				<span class="demo-hint">{props.hint as string}</span>
 			</div>
-			<span class="demo-hint">{props.hint as string}</span>
-		</div>
-		<div class="demo-preview">
-			<div class="demo-copy">
-				<p id={props.id + '-title'} class="demo-title">{props.title as string}</p>
-				<p class="demo-description">{props.description as string}</p>
+			<div class="demo-preview">
+				<div class="demo-copy">
+					<p id={props.id + '-title'} class="demo-title">{props.title as string}</p>
+					<p class="demo-description">{props.description as string}</p>
+				</div>
+				{props.children}
 			</div>
-			{props.children}
-		</div>
-	</section>
+		</section>
+	</>
 }
 
 export function CoreApiDemo() @{
@@ -451,31 +208,61 @@ export function CoreApiDemo() @{
 		description="The number is state. Each click updates it and renders again."
 		hint="Try the buttons"
 	>
-		<div class="counter-layout">
-			<strong class="demo-count" aria-live="polite">{`${count}`}</strong>
-			<div class={['demo-actions', demoStyles.counterActions]}>
-				<button
-					type="button"
-					class={[
-						'demo-button',
-						demoStyles.button,
-						demoStyles.secondary,
-						count === 0 && demoStyles.disabled,
-					]}
-					disabled={count === 0}
-					onClick={() => setCount((current) => Math.max(0, current - 1))}
-				>
-					Remove one
-				</button>
-				<button
-					type="button"
-					class={['demo-button', demoStyles.button, demoStyles.primary]}
-					onClick={() => setCount((current) => current + 1)}
-				>
-					Add one
-				</button>
+		<>
+			<style apply={demoControls}>
+				.counter-layout {
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					gap: 1.5rem;
+				}
+				.demo-count {
+					min-width: 4.5rem;
+					color: var(--text);
+					font-size: clamp(2.75rem, 8vw, 4.5rem);
+					font-variant-numeric: tabular-nums;
+					letter-spacing: -0.08em;
+					line-height: 1;
+					text-align: right;
+				}
+				@media (max-width: 520px) {
+					.counter-layout {
+						align-items: flex-end;
+						flex-direction: column;
+					}
+					.counter-actions {
+						width: 100%;
+						display: grid;
+						grid-template-columns: repeat(2, minmax(0, 1fr));
+					}
+				}
+			</style>
+			<div class="counter-layout">
+				<strong class="demo-count" aria-live="polite">{`${count}`}</strong>
+				<div class={['demo-actions', 'counter-actions']}>
+					<button
+						type="button"
+						class={[
+							'demo-button',
+							'button',
+							'secondary',
+							count === 0 && 'disabled',
+						]}
+						disabled={count === 0}
+						onClick={() => setCount((current) => Math.max(0, current - 1))}
+					>
+						Remove one
+					</button>
+					<button
+						type="button"
+						class={['demo-button', 'button', 'primary']}
+						onClick={() => setCount((current) => current + 1)}
+					>
+						Add one
+					</button>
+				</div>
 			</div>
-		</div>
+		</>
 	</DemoFrame>
 }
 
@@ -502,65 +289,116 @@ export function ListConditionsDemo() @{
 		description="The keyed list preserves each row while conditions update its status."
 		hint="Pack or clear items"
 	>
-		<p class="packing-summary" aria-live="polite">
-			@if (items.length === 0) {
-				<span>Your list is empty.</span>
-			} @else if (packedCount === items.length) {
-				<span>Everything is packed.</span>
-			} @else {
-				<span>{packedCount + ' of ' + items.length + ' packed'}</span>
+		<>
+			<style apply={demoControls}>
+				.packing-summary {
+					margin: 0 0 0.8rem;
+					color: var(--text);
+					font-size: 0.875rem;
+					font-weight: 700;
+				}
+			</style>
+			<p class="packing-summary" aria-live="polite">
+				@if (items.length === 0) {
+					<span>Your list is empty.</span>
+				} @else if (packedCount === items.length) {
+					<span>Everything is packed.</span>
+				} @else {
+					<span>{packedCount + ' of ' + items.length + ' packed'}</span>
+				}
+			</p>
+			@{
+				<>
+					<style>
+						.packing-list {
+							list-style: none;
+							margin: 0 0 1rem;
+							padding: 0;
+							display: grid;
+							gap: 0.45rem;
+						}
+						.packing-item {
+							display: grid;
+							grid-template-columns: auto minmax(0, 1fr);
+							align-items: center;
+							gap: 0.75rem;
+							min-height: 3rem;
+							border: 1px solid var(--border);
+							border-radius: 0.75rem;
+							padding: 0.45rem 0.55rem 0.45rem 0.75rem;
+							background: var(--surface-inset);
+						}
+						.packing-check {
+							width: 1.15rem;
+							height: 1.15rem;
+							margin: 0;
+							accent-color: #63d391;
+							cursor: pointer;
+						}
+						.packing-label {
+							cursor: pointer;
+						}
+					</style>
+					<ul class="packing-list">
+						@for (const item of items; key item.id) {
+							<li class="packing-item">
+								<input
+									id={'packing-item-' + item.id}
+									class="packing-check"
+									type="checkbox"
+									checked={item.packed}
+									onInput={(event) => {
+										const packed = (event.target as HTMLInputElement).checked;
+										setItems(
+											(current) => current.map(
+												(currentItem) => currentItem.id === item.id
+													? { ...currentItem, packed }
+													: currentItem,
+											),
+										);
+									}}
+								/>
+								<label
+									for={'packing-item-' + item.id}
+									class={['packing-label', item.packed && 'packedLabel']}
+								>{item.label as string}</label>
+							</li>
+						} @empty {
+							<>
+								<style>
+									.packing-empty {
+										border: 1px dashed var(--border);
+										border-radius: 0.75rem;
+										padding: 1.2rem;
+										color: var(--text-secondary);
+										text-align: center;
+									}
+								</style>
+								<li class="packing-empty">No items yet. Restore the list to keep packing.</li>
+							</>
+						}
+					</ul>
+				</>
 			}
-		</p>
-		<ul class="packing-list">
-			@for (const item of items; key item.id) {
-				<li class="packing-item">
-					<input
-						id={'packing-item-' + item.id}
-						class="packing-check"
-						type="checkbox"
-						checked={item.packed}
-						onInput={(event) => {
-							const packed = (event.target as HTMLInputElement).checked;
-							setItems(
-								(current) => current.map(
-									(currentItem) => currentItem.id === item.id
-										? { ...currentItem, packed }
-										: currentItem,
-								),
-							);
-						}}
-					/>
-					<label
-						for={'packing-item-' + item.id}
-						class={['packing-label', item.packed && demoStyles.packedLabel]}
-					>{item.label as string}</label>
-				</li>
-			} @empty {
-				<li class="packing-empty">No items yet. Restore the list to keep packing.</li>
-			}
-		</ul>
-		<div class="demo-actions">
-			<button
-				type="button"
-				class={[
-					'demo-button',
-					demoStyles.button,
-					demoStyles.secondary,
-					items.length === 0 && demoStyles.disabled,
-				]}
-				disabled={items.length === 0}
-				onClick={() => setItems([])}
-			>
-				Clear list
-			</button>
-			<button
-				type="button"
-				class={['demo-button', demoStyles.button, demoStyles.primary]}
-				onClick={restoreItems}
-			>
-				Restore list
-			</button>
-		</div>
+			<div class="demo-actions">
+				<button
+					type="button"
+					class={[
+						'demo-button',
+						'button',
+						'secondary',
+						items.length === 0 && 'disabled',
+					]}
+					disabled={items.length === 0}
+					onClick={() => setItems([])}
+				>
+					Clear list
+				</button>
+				<button type="button" class={['demo-button', 'button', 'primary']} onClick={restoreItems}>
+					Restore list
+				</button>
+			</div>
+		</>
 	</DemoFrame>
 }
 
@@ -601,37 +439,56 @@ export function RefEffectDemo() @{
 		description="The ref points to the input; the effect owns a global keyboard subscription."
 		hint="Press /"
 	>
-		<div class="shortcut-controls">
-			<label class="demo-field" for="core-api-search">
-				Search the guide
-				<input
-					id="core-api-search"
-					ref={inputRef}
-					class={['demo-input', demoStyles.input]}
-					type="search"
-					placeholder="Components, state, effects…"
-					aria-keyshortcuts="/"
-				/>
-			</label>
-			<button
-				type="button"
-				class={['demo-button', demoStyles.button, demoStyles.primary]}
-				onClick={() => inputRef.current?.focus()}
-			>
-				Focus search
-			</button>
-		</div>
-		<p class="demo-status shortcut-note" aria-live="polite">
-			@if (shortcutUsed) {
-				<span>The shortcut focused the search field.</span>
-			} @else {
-				<span>
-					Press
-					<kbd class={demoStyles.shortcutKey}>/</kbd>
-					outside a form field, or use the button.
-				</span>
-			}
-		</p>
+		<>
+			<style apply={demoControls}>
+				.shortcut-controls {
+					display: grid;
+					grid-template-columns: minmax(0, 1fr) auto;
+					align-items: end;
+					gap: 0.75rem;
+				}
+				.shortcut-note {
+					margin-top: 0.75rem;
+				}
+				@media (max-width: 520px) {
+					.shortcut-controls {
+						width: 100%;
+						grid-template-columns: 1fr;
+					}
+				}
+			</style>
+			<div class="shortcut-controls">
+				<label class="demo-field" for="core-api-search">
+					Search the guide
+					<input
+						id="core-api-search"
+						ref={inputRef}
+						class={['demo-input', 'input']}
+						type="search"
+						placeholder="Components, state, effects…"
+						aria-keyshortcuts="/"
+					/>
+				</label>
+				<button
+					type="button"
+					class={['demo-button', 'button', 'primary']}
+					onClick={() => inputRef.current?.focus()}
+				>
+					Focus search
+				</button>
+			</div>
+			<p class="demo-status shortcut-note" aria-live="polite">
+				@if (shortcutUsed) {
+					<span>The shortcut focused the search field.</span>
+				} @else {
+					<span>
+						Press
+						<kbd class="shortcutKey">/</kbd>
+						outside a form field, or use the button.
+					</span>
+				}
+			</p>
+		</>
 	</DemoFrame>
 }
 
@@ -658,25 +515,58 @@ function loadDemoProfile(): Promise<DemoProfile> {
 function ProfileResult(props: { request: Promise<DemoProfile> }) @{
 	const profile = use(props.request);
 
-	<article class="profile-card">
-		<span class="profile-avatar" aria-hidden="true">{profile.initials as string}</span>
-		<div>
-			<strong class="profile-name">{profile.name as string}</strong>
-			<span class="profile-role">{profile.role as string}</span>
-		</div>
-	</article>
+	<>
+		<style>
+			.profile-card {
+				display: grid;
+				grid-template-columns: auto minmax(0, 1fr);
+				align-items: center;
+				gap: 0.9rem;
+				width: min(100%, 24rem);
+			}
+			.profile-avatar {
+				display: grid;
+				place-items: center;
+				width: 3.25rem;
+				height: 3.25rem;
+				border-radius: 999px;
+				background: rgba(255, 65, 90, 0.16);
+				color: var(--danger-text);
+				font-size: 1.1rem;
+				font-weight: 800;
+			}
+			.profile-name,
+			.profile-role {
+				display: block;
+			}
+			.profile-role {
+				color: var(--text-secondary);
+				font-size: 0.82rem;
+			}
+		</style>
+		<article class="profile-card">
+			<span class="profile-avatar" aria-hidden="true">{profile.initials as string}</span>
+			<div>
+				<strong class="profile-name">{profile.name as string}</strong>
+				<span class="profile-role">{profile.role as string}</span>
+			</div>
+		</article>
+	</>
 }
 
 function ProfileRequest(props: { request: Promise<DemoProfile> }) @{
-	@try {
-		<ProfileResult request={props.request} />
-	} @pending {
-		<p class="data-loading">Loading profile…</p>
-	} @catch (error) {
-		<p class="data-error">
-			{error instanceof Error ? error.message : 'The request failed.'}
-		</p>
-	}
+	<>
+		<style apply={demoControls} />
+		@try {
+			<ProfileResult request={props.request} />
+		} @pending {
+			<p class="data-loading">Loading profile…</p>
+		} @catch (error) {
+			<p class="data-error">
+				{error instanceof Error ? error.message : 'The request failed.'}
+			</p>
+		}
+	</>
 }
 
 export function DataLoadingDemo() @{
@@ -688,22 +578,36 @@ export function DataLoadingDemo() @{
 		description="The button creates one stable request; the boundary owns the pending UI."
 		hint="Start a request"
 	>
-		<div class="data-stage" role="status" aria-atomic="true">
-			@if (request) {
-				<ProfileRequest request={request} />
-			} @else {
-				<p class="data-empty">Load the profile to see the boundary change.</p>
-			}
-		</div>
-		<div class="demo-actions">
-			<button
-				type="button"
-				class={['demo-button', demoStyles.button, demoStyles.primary]}
-				onClick={() => setRequest(loadDemoProfile())}
-			>
-				Load profile
-			</button>
-		</div>
+		<>
+			<style apply={demoControls}>
+				.data-stage {
+					display: grid;
+					place-items: center;
+					min-height: 9rem;
+					margin-bottom: 1rem;
+					border: 1px solid var(--border);
+					border-radius: 0.875rem;
+					padding: 1rem;
+					background: var(--surface-inset);
+				}
+			</style>
+			<div class="data-stage" role="status" aria-atomic="true">
+				@if (request) {
+					<ProfileRequest request={request} />
+				} @else {
+					<p class="data-empty">Load the profile to see the boundary change.</p>
+				}
+			</div>
+			<div class="demo-actions">
+				<button
+					type="button"
+					class={['demo-button', 'button', 'primary']}
+					onClick={() => setRequest(loadDemoProfile())}
+				>
+					Load profile
+				</button>
+			</div>
+		</>
 	</DemoFrame>
 }
 
@@ -754,18 +658,62 @@ function DashboardReportPanel(props: { value: DashboardReport | Promise<Dashboar
 	const report =
 		props.value instanceof Promise ? use(props.value) : props.value;
 
-	<article
-		class="report-card"
-		role="tabpanel"
-		aria-labelledby={'dashboard-tab-' + report.id}
-		data-report={report.id}
-	>
-		<div>
-			<p class="report-name">{report.label as string}</p>
-			<p class="report-detail">{report.detail as string}</p>
-		</div>
-		<p class="report-metric">{report.metric as string}</p>
-	</article>
+	<>
+		<style>
+			.report-card {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) auto;
+				align-items: center;
+				gap: 1rem;
+				min-height: 7.5rem;
+				border: 1px solid var(--border);
+				border-radius: 0.85rem;
+				padding: 1rem;
+				background: var(--surface-inset);
+			}
+			.report-name,
+			.report-detail,
+			.report-metric {
+				margin: 0;
+			}
+			.report-name {
+				margin-bottom: 0.25rem;
+				color: var(--text);
+				font-size: 0.95rem;
+				font-weight: 750;
+			}
+			.report-detail {
+				color: var(--text-secondary);
+				font-size: 0.82rem;
+			}
+			.report-metric {
+				color: var(--success-text);
+				font-size: 1.8rem;
+				font-weight: 800;
+				letter-spacing: -0.04em;
+			}
+			@media (max-width: 520px) {
+				.report-card {
+					grid-template-columns: 1fr;
+				}
+				.report-metric {
+					font-size: 1.45rem;
+				}
+			}
+		</style>
+		<article
+			class="report-card"
+			role="tabpanel"
+			aria-labelledby={'dashboard-tab-' + report.id}
+			data-report={report.id}
+		>
+			<div>
+				<p class="report-name">{report.label as string}</p>
+				<p class="report-detail">{report.detail as string}</p>
+			</div>
+			<p class="report-metric">{report.metric as string}</p>
+		</article>
+	</>
 }
 
 export function TransitionDemo() @{
@@ -795,41 +743,83 @@ export function TransitionDemo() @{
 		description="Open another report. The current one stays useful while its data loads."
 		hint="Try Activity"
 	>
-		<section aria-busy={isLoading}>
-			<div class="demo-tabs" role="tablist" aria-label="Project reports">
-				@for (const tab of DASHBOARD_TABS; key tab) {
-					<button
-						id={'dashboard-tab-' + tab}
-						type="button"
-						class={[
-							'demo-tab',
-							selection.id === tab && 'demo-tab-selected',
-							isLoading && pendingTab.current === tab && 'demo-tab-pending',
-						]}
-						role="tab"
-						aria-selected={selection.id === tab}
-						disabled={isLoading}
-						onClick={() => openReport(tab)}
-					>{DASHBOARD_REPORTS[tab].label as string}</button>
+		<>
+			<style apply={demoControls}>
+				.transition-status {
+					min-height: 1.25rem;
+					margin: 0 0 0.65rem;
 				}
-			</div>
-			<p class="demo-status transition-status" aria-live="polite">
-				@if (isLoading && pendingTab.current !== null) {
-					<span>
-						{'Loading ' + DASHBOARD_REPORTS[pendingTab.current].label + ' — ' +
-							DASHBOARD_REPORTS[selection.id].label +
-							' stays on screen.'}
-					</span>
-				} @else {
-					<span>{DASHBOARD_REPORTS[selection.id].label + ' is ready.'}</span>
+			</style>
+			<section aria-busy={isLoading}>
+				@{
+					<>
+						<style>
+							.demo-tabs {
+								display: flex;
+								flex-wrap: wrap;
+								gap: 0.45rem;
+								margin-bottom: 0.85rem;
+							}
+							.demo-tab {
+								border: 1px solid var(--border);
+								border-radius: 999px;
+								padding: 0.45rem 0.8rem;
+								background: var(--surface-subtle);
+								color: var(--text-secondary);
+								font: inherit;
+								font-size: 0.82rem;
+								font-weight: 700;
+								cursor: pointer;
+							}
+							.demo-tab-selected {
+								border-color: rgba(255, 65, 90, 0.48);
+								background: rgba(255, 65, 90, 0.13);
+								color: var(--text);
+							}
+							.demo-tab-pending {
+								border-color: rgba(255, 65, 90, 0.34);
+								background: rgba(255, 65, 90, 0.07);
+								color: var(--text);
+								box-shadow: inset 0 0 0 1px rgba(255, 65, 90, 0.1);
+							}
+						</style>
+						<div class="demo-tabs" role="tablist" aria-label="Project reports">
+							@for (const tab of DASHBOARD_TABS; key tab) {
+								<button
+									id={'dashboard-tab-' + tab}
+									type="button"
+									class={[
+										'demo-tab',
+										selection.id === tab && 'demo-tab-selected',
+										isLoading && pendingTab.current === tab && 'demo-tab-pending',
+									]}
+									role="tab"
+									aria-selected={selection.id === tab}
+									disabled={isLoading}
+									onClick={() => openReport(tab)}
+								>{DASHBOARD_REPORTS[tab].label as string}</button>
+							}
+						</div>
+					</>
 				}
-			</p>
-			@try {
-				<DashboardReportPanel value={selection.value} />
-			} @pending {
-				<p class="data-loading">Loading the first report…</p>
-			}
-		</section>
+				<p class="demo-status transition-status" aria-live="polite">
+					@if (isLoading && pendingTab.current !== null) {
+						<span>
+							{'Loading ' + DASHBOARD_REPORTS[pendingTab.current].label + ' — ' +
+								DASHBOARD_REPORTS[selection.id].label +
+								' stays on screen.'}
+						</span>
+					} @else {
+						<span>{DASHBOARD_REPORTS[selection.id].label + ' is ready.'}</span>
+					}
+				</p>
+				@try {
+					<DashboardReportPanel value={selection.value} />
+				} @pending {
+					<p class="data-loading">Loading the first report…</p>
+				}
+			</section>
+		</>
 	</DemoFrame>
 }
 
@@ -874,32 +864,101 @@ function ProductResults(props: { query: string; isStale: boolean }) @{
 	const visibleQuery =
 		props.query === '' ? 'all products' : '“' + props.query + '”';
 
-	<section aria-busy={props.isStale}>
-		<div class="search-summary" aria-live="polite">
-			<span>{'Showing results for ' + visibleQuery}</span>
-			@if (props.isStale) {
-				<strong class="search-updating">Updating…</strong>
+	<>
+		<style>
+			.search-summary {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				min-height: 1.3rem;
 			}
-		</div>
-		<ul class="product-results" data-stale={props.isStale}>
-			@for (const product of products; key product.id) {
-				<li class="product-result">
-					{product.name as string}
-					<small class="product-category">{'Category: ' + product.category}</small>
-				</li>
-			} @empty {
-				<li class="product-empty">No products match this search.</li>
+			.search-summary span {
+				color: var(--text-secondary);
+				font-size: 0.8rem;
 			}
-		</ul>
-	</section>
+			.product-results {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 0.55rem;
+				transition: opacity 0.15s;
+			}
+			.product-results[data-stale='true'] {
+				opacity: 0.52;
+			}
+			.product-result {
+				border: 1px solid var(--border);
+				border-radius: 0.7rem;
+				padding: 0.7rem 0.8rem;
+				background: var(--surface-inset);
+				color: var(--text);
+				font-size: 0.84rem;
+			}
+			.product-category {
+				display: block;
+				margin-top: 0.15rem;
+				color: var(--text-secondary);
+			}
+			@media (max-width: 520px) {
+				.product-results {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
+		<section aria-busy={props.isStale}>
+			<div class="search-summary" aria-live="polite">
+				<span>{'Showing results for ' + visibleQuery}</span>
+				@if (props.isStale) {
+					<>
+						<style>
+							.search-updating {
+								color: var(--danger-text);
+								font-weight: 750;
+							}
+						</style>
+						<strong class="search-updating">Updating…</strong>
+					</>
+				}
+			</div>
+			<ul class="product-results" data-stale={props.isStale}>
+				@for (const product of products; key product.id) {
+					<li class="product-result">
+						{product.name as string}
+						<small class="product-category">{'Category: ' + product.category}</small>
+					</li>
+				} @empty {
+					<>
+						<style>
+							.product-empty {
+								grid-column: 1 / -1;
+								border: 1px dashed var(--border);
+								border-radius: 0.7rem;
+								padding: 1rem;
+								color: var(--text-secondary);
+								font-size: 0.84rem;
+								text-align: center;
+							}
+						</style>
+						<li class="product-empty">No products match this search.</li>
+					</>
+				}
+			</ul>
+		</section>
+	</>
 }
 
 function DeferredProductResults(props: { query: string; isStale: boolean }) @{
-	@try {
-		<ProductResults query={props.query} isStale={props.isStale} />
-	} @pending {
-		<p class="data-loading">Searching the catalogue…</p>
-	}
+	<>
+		<style apply={demoControls} />
+		@try {
+			<ProductResults query={props.query} isStale={props.isStale} />
+		} @pending {
+			<p class="data-loading">Searching the catalogue…</p>
+		}
+	</>
 }
 
 export function DeferredSearchDemo() @{
@@ -913,20 +972,28 @@ export function DeferredSearchDemo() @{
 		description="The search box stays immediate while the slower result view catches up."
 		hint="Type camera or desk"
 	>
-		<div class="product-search">
-			<label class="demo-field" for="core-api-product-search">
-				Search products
-				<input
-					id="core-api-product-search"
-					class={['demo-input', demoStyles.input]}
-					type="search"
-					value={query}
-					placeholder="Try camera or desk"
-					onInput={(event) => setQuery(event.currentTarget.value)}
-				/>
-			</label>
-			<DeferredProductResults query={deferredQuery} isStale={isStale} />
-		</div>
+		<>
+			<style apply={demoControls}>
+				.product-search {
+					display: grid;
+					gap: 0.85rem;
+				}
+			</style>
+			<div class="product-search">
+				<label class="demo-field" for="core-api-product-search">
+					Search products
+					<input
+						id="core-api-product-search"
+						class={['demo-input', 'input']}
+						type="search"
+						value={query}
+						placeholder="Try camera or desk"
+						onInput={(event) => setQuery(event.currentTarget.value)}
+					/>
+				</label>
+				<DeferredProductResults query={deferredQuery} isStale={isStale} />
+			</div>
+		</>
 	</DemoFrame>
 }
 
@@ -960,40 +1027,63 @@ export function FormActionDemo() @{
 		description="Save the prefilled name to see pending and success states, or clear it to see validation."
 		hint="Try both paths"
 	>
-		<form class="profile-form" action={submit} aria-busy={isPending}>
-			<div class="form-controls">
-				<label class="demo-field" for="core-api-profile-name">
-					Name
-					<input
-						id="core-api-profile-name"
-						class={['demo-input', demoStyles.input]}
-						name="name"
-						autoComplete="name"
-						defaultValue="Ada Lovelace"
-					/>
-				</label>
-				<button
-					type="submit"
+		<>
+			<style apply={demoControls}>
+				.profile-form {
+					display: grid;
+					gap: 0.85rem;
+				}
+				.form-controls {
+					display: grid;
+					grid-template-columns: minmax(0, 1fr) auto;
+					align-items: end;
+					gap: 0.75rem;
+				}
+				.form-result {
+					min-height: 1.35rem;
+				}
+				@media (max-width: 520px) {
+					.form-controls {
+						width: 100%;
+						grid-template-columns: 1fr;
+					}
+				}
+			</style>
+			<form class="profile-form" action={submit} aria-busy={isPending}>
+				<div class="form-controls">
+					<label class="demo-field" for="core-api-profile-name">
+						Name
+						<input
+							id="core-api-profile-name"
+							class={['demo-input', 'input']}
+							name="name"
+							autoComplete="name"
+							defaultValue="Ada Lovelace"
+						/>
+					</label>
+					<button
+						type="submit"
+						class={[
+							'demo-button',
+							'button',
+							'primary',
+							isPending && 'disabled',
+						]}
+						disabled={isPending}
+					>
+						{isPending ? 'Saving…' : 'Save name'}
+					</button>
+				</div>
+				<p
 					class={[
-						'demo-button',
-						demoStyles.button,
-						demoStyles.primary,
-						isPending && demoStyles.disabled,
+						'demo-status',
+						'form-result',
+						result.status === 'success' && 'success',
+						result.status === 'error' && 'error',
 					]}
-					disabled={isPending}
-				>
-					{isPending ? 'Saving…' : 'Save name'}
-				</button>
-			</div>
-			<p
-				class={[
-					'demo-status',
-					'form-result',
-					result.status === 'success' && demoStyles.success,
-					result.status === 'error' && demoStyles.error,
-				]}
-				aria-live="polite"
-			>{result.message as string}</p>
-		</form>
+					aria-live="polite"
+				>{result.message as string}</p>
+			</form>
+		</>
 	</DemoFrame>
 }

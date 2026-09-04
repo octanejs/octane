@@ -9,15 +9,53 @@ interface SavedToastProps {
 }
 
 function ToastBody(props: { onDismiss: () => void }) @{
-	<aside class="portal-demo-toast" role="status">
-		<div>
-			<strong>{'Project saved'}</strong>
-			<span>{'Your changes are live.'}</span>
-		</div>
-		<button type="button" onClick={props.onDismiss}>
-			Dismiss
-		</button>
-	</aside>
+	<>
+		<style>
+			.portal-demo-toast {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.8rem;
+				padding: 0.8rem;
+				border: 1px solid rgba(99, 211, 145, 0.35);
+				border-radius: 0.75rem;
+				background: rgba(33, 105, 65, 0.2);
+				box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.22);
+			}
+			.portal-demo-toast div {
+				display: grid;
+				gap: 0.15rem;
+			}
+			.portal-demo-toast strong {
+				color: var(--text);
+				font-size: 0.88rem;
+			}
+			.portal-demo-toast span {
+				color: var(--text-secondary);
+				font-size: 0.75rem;
+			}
+			.portal-demo-toast button {
+				border: 1px solid var(--border);
+				border-radius: 999px;
+				background: transparent;
+				color: var(--on-accent);
+				font: inherit;
+				font-size: 0.82rem;
+				font-weight: 700;
+				padding: 0.35rem 0.65rem;
+				cursor: pointer;
+			}
+		</style>
+		<aside class="portal-demo-toast" role="status">
+			<div>
+				<strong>{'Project saved'}</strong>
+				<span>{'Your changes are live.'}</span>
+			</div>
+			<button type="button" onClick={props.onDismiss}>
+				Dismiss
+			</button>
+		</aside>
+	</>
 }
 
 function SavedToast(props: SavedToastProps) {
@@ -64,8 +102,7 @@ export function PortalEventDemo() @{
 				letter-spacing: 0.04em;
 				text-transform: uppercase;
 			}
-			.portal-demo-source > button,
-			:global(.portal-demo-toast button) {
+			.portal-demo-source > button {
 				border: 1px solid transparent;
 				border-radius: 999px;
 				background: var(--accent);
@@ -90,35 +127,6 @@ export function PortalEventDemo() @{
 			}
 			.portal-demo-layer {
 				min-height: 5.5rem;
-			}
-			/* Portal content lives outside this component's scoped DOM subtree. */
-			:global(.portal-demo-toast) {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 0.8rem;
-				padding: 0.8rem;
-				border: 1px solid rgba(99, 211, 145, 0.35);
-				border-radius: 0.75rem;
-				background: rgba(33, 105, 65, 0.2);
-				box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.22);
-			}
-			:global(.portal-demo-toast div) {
-				display: grid;
-				gap: 0.15rem;
-			}
-			:global(.portal-demo-toast strong) {
-				color: var(--text);
-				font-size: 0.88rem;
-			}
-			:global(.portal-demo-toast span) {
-				color: var(--text-secondary);
-				font-size: 0.75rem;
-			}
-			:global(.portal-demo-toast button) {
-				background: transparent;
-				border-color: var(--border);
-				padding: 0.35rem 0.65rem;
 			}
 			.portal-demo-result {
 				margin: 0.85rem 0 0;
