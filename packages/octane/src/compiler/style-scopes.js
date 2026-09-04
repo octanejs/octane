@@ -226,10 +226,27 @@ function isNestedFunctionType(type) {
 }
 
 /**
+ * Each graft owns a block so `const __styleMap` is not redeclared in a
+ * shared scope (unbraced `switch` cases, or a `@{ }` return plus the
+ * fall-through append).
+ *
+ * @param {any[]} statements
+ * @param {any[]} [extra]
+ * @returns {any}
+ */
+function wrapSetupBlock(statements, extra) {
+	const body = cloneSetupStatements(statements);
+	if (extra) {
+		for (let i = 0; i < extra.length; i++) body.push(extra[i]);
+	}
+	return b.block(body);
+}
+
+/**
  * Insert a cloned setup copy immediately before every owned `return`
  * (if/else/switch/try/loops). Nested function bodies are left alone — those
- * are compiled as their own components. Braceless `return` arms become a
- * block so the write and the return stay a single consequent.
+ * are compiled as their own components. Each write is a block so the
+ * `const __styleMap` binding stays local to that site.
  *
  * @param {any} stmt
  * @param {any[]} statements
@@ -239,7 +256,7 @@ function graftReturnsInStatement(stmt, statements) {
 	if (!stmt) return { node: stmt, foundReturn: false };
 	const type = stmt.type;
 	if (type === 'ReturnStatement') {
-		return { node: b.block([...cloneSetupStatements(statements), stmt]), foundReturn: true };
+		return { node: wrapSetupBlock(statements, [stmt]), foundReturn: true };
 	}
 	if (isNestedFunctionType(type)) return { node: stmt, foundReturn: false };
 	if (type === 'BlockStatement') {
@@ -328,9 +345,7 @@ function graftReturnsInList(list, statements) {
 	for (let i = 0; i < list.length; i++) {
 		const stmt = list[i];
 		if (stmt && stmt.type === 'ReturnStatement') {
-			const cloned = cloneSetupStatements(statements);
-			for (let j = 0; j < cloned.length; j++) next.push(cloned[j]);
-			next.push(stmt);
+			next.push(wrapSetupBlock(statements, [stmt]));
 			foundReturn = true;
 			continue;
 		}
@@ -361,7 +376,7 @@ function graftSetupStatements(componentNode, statements) {
 			...componentNode,
 			body: {
 				...body,
-				body: [...grafted.list, ...cloneSetupStatements(statements)],
+				body: [...grafted.list, wrapSetupBlock(statements)],
 			},
 		};
 	}
@@ -371,9 +386,7 @@ function graftSetupStatements(componentNode, statements) {
 			...componentNode,
 			body: {
 				...body,
-				body: grafted.foundReturn
-					? grafted.list
-					: [...grafted.list, ...cloneSetupStatements(statements)],
+				body: grafted.foundReturn ? grafted.list : [...grafted.list, wrapSetupBlock(statements)],
 			},
 		};
 	}

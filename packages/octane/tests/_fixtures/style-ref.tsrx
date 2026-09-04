@@ -167,3 +167,53 @@ export function EarlyReturnScopeStyleRef(props: { alt: boolean }) @{
 		</style>
 	</>
 }
+
+export function SwitchReturnStyleRef(props: { which: 'a' | 'b' }) {
+	let classes: StyleClassMap | undefined;
+	switch (props.which) {
+		case 'a':
+			return <>
+				<div id="switch-a" class="card">
+					{classes && classes.card ? classes.card as string : 'missing'}
+				</div>
+				<style ref={classes as never}>
+					.card {
+						color: rgb(71, 72, 73);
+					}
+				</style>
+			</>;
+		default:
+			return <>
+				<div id="switch-b" class="card">
+					{classes && classes.card ? classes.card as string : 'missing'}
+				</div>
+				<style ref={classes as never}>
+					.card {
+						color: rgb(71, 72, 73);
+					}
+				</style>
+			</>;
+	}
+}
+
+export function SwitchScopeStyleRef(props: { which: 'a' | 'b' }) @{
+	let classes: StyleClassMap | undefined;
+	switch (props.which) {
+		case 'a':
+			return <div id="scope-switch-a" class="card">
+				{classes && classes.card ? classes.card as string : 'missing'}
+			</div>;
+		default:
+			break;
+	}
+	<>
+		<div id="scope-switch-b" class="card">
+			{classes && classes.card ? classes.card as string : 'missing'}
+		</div>
+		<style ref={classes as never}>
+			.card {
+				color: rgb(81, 82, 83);
+			}
+		</style>
+	</>
+}

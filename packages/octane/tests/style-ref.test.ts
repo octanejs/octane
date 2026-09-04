@@ -11,6 +11,8 @@ import {
 	IdentifierCallbackStyleRef,
 	NestedReturnStyleRef,
 	ReturnedStyleRef,
+	SwitchReturnStyleRef,
+	SwitchScopeStyleRef,
 	ValueStyleRef,
 } from './_fixtures/style-ref.tsrx';
 
@@ -136,5 +138,26 @@ describe('style block ref class maps', function () {
 		expect(main.html).toContain('id="nested-main"');
 		expect(main.html).not.toContain('missing');
 		expect(main.html).toMatch(/tsrx-[a-z0-9]+ card/i);
+	});
+
+	it('assigns the class map before unbraced switch returns', function () {
+		const a = mount(SwitchReturnStyleRef as any, { which: 'a' });
+		expectClassMap(a.find('#switch-a') as HTMLElement, 'rgb(71, 72, 73)');
+		a.unmount();
+		const b = mount(SwitchReturnStyleRef as any, { which: 'b' });
+		expectClassMap(b.find('#switch-b') as HTMLElement, 'rgb(71, 72, 73)');
+		b.unmount();
+	});
+
+	it('assigns the class map for a switch return and fall-through in one scope', function () {
+		const a = mount(SwitchScopeStyleRef as any, { which: 'a' });
+		const early = a.find('#scope-switch-a') as HTMLElement;
+		const text = early.textContent || '';
+		expect(text).not.toBe('missing');
+		expect(text).toMatch(/tsrx-[a-z0-9]+ card/i);
+		a.unmount();
+		const b = mount(SwitchScopeStyleRef as any, { which: 'b' });
+		expectClassMap(b.find('#scope-switch-b') as HTMLElement, 'rgb(81, 82, 83)');
+		b.unmount();
 	});
 });
