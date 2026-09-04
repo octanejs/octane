@@ -169,12 +169,20 @@ chunk would not be worthwhile:
 
 The compiler recognizes `Hydrate` imported from `octane`, including an import
 alias. Split children must be authored directly inside the boundary. Extraction
-rejects function-as-children, hook calls directly inside the extracted JSX,
-scoped `<style>` elements (their rules belong to the style scope they sit in,
-which extraction would tear in half; `OCTANE_HYDRATE_SPLIT_STYLE`), and `this`
-or `super` captures; move that work into a child component or opt out with
-`split={false}`. Ordinary lexical values can be
-captured by the generated child component.
+rejects function-as-children, hook calls directly inside the extracted JSX, and
+`this` or `super` captures; move that work into a child component or opt out
+with `split={false}`. Ordinary lexical values can be captured by the generated
+child component.
+
+A scoped `<style>` whose whole lexical style scope sits inside the split child
+compiles (plan S8.5). The scope is the children list the block is written in:
+its sibling blocks and the host elements they stamp. Both the server compile and
+the extracted child keep the authored-position hash, so hydration adopts the
+server classes. A scope that straddles the boundary — blocks or stamped host
+elements on both sides — is still a compile error (`OCTANE_HYDRATE_SPLIT_STYLE`).
+Keep that scope entirely inside the boundary, move it entirely outside, extract
+a child component, or set `split={false}`. A `<style>` nested in a function
+never joined the enclosing scopes and may move with the split child.
 
 Generated Hydrate chunks are not eagerly module-preloaded. Lazy-module discovery
 for independently suspended siblings never enters a dormant Hydrate boundary,
