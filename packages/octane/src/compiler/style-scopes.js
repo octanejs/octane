@@ -228,7 +228,8 @@ function isNestedFunctionType(type) {
 /**
  * Each graft owns a block so `const __styleMap` is not redeclared in a
  * shared scope (unbraced `switch` cases, or a `@{ }` return plus the
- * fall-through append).
+ * fall-through append). The `return` stays a sibling so later return-JSX
+ * / SSR passes can still see a top-level `ReturnStatement`.
  *
  * @param {any[]} statements
  * @param {any[]} [extra]
@@ -345,7 +346,8 @@ function graftReturnsInList(list, statements) {
 	for (let i = 0; i < list.length; i++) {
 		const stmt = list[i];
 		if (stmt && stmt.type === 'ReturnStatement') {
-			next.push(wrapSetupBlock(statements, [stmt]));
+			next.push(wrapSetupBlock(statements));
+			next.push(stmt);
 			foundReturn = true;
 			continue;
 		}

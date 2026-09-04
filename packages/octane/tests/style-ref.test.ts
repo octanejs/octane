@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { compile } from 'octane/compiler';
 import * as ServerRT from 'octane/server';
 import { mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
@@ -93,6 +95,17 @@ describe('style block ref class maps', function () {
 		expect(html).not.toContain('missing');
 		expect(html).toMatch(/tsrx-[a-z0-9]+ card/i);
 		expect(css).toMatch(/\.card\.tsrx-[a-z0-9]+/i);
+	});
+
+	it('keeps a returned template as a top-level return after the class-map write', function () {
+		const source = readFileSync(FIXTURE, 'utf8');
+		const { code } = compile(source, 'style-ref.tsrx');
+		const start = code.indexOf('function ReturnedStyleRef');
+		expect(start).toBeGreaterThan(-1);
+		const nextExport = code.indexOf('\nexport ', start + 1);
+		const fn = code.slice(start, nextExport === -1 ? start + 2000 : nextExport);
+		expect(fn).toMatch(/\{\s*const __styleMap/);
+		expect(fn).toMatch(/\}\s*return /);
 	});
 
 	it('assigns the class map before nested if/else returns', function () {
