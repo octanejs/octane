@@ -59,7 +59,7 @@ export function applyStyleRefs(componentNode, styles, preparedSheets, options) {
 	const identifierRefs = [];
 	const otherRefs = [];
 	for (let i = 0; i < refs.length; i++) {
-		const expression = getRefAttributeExpression(refs[i]);
+		const expression = unwrapExpression(getRefAttributeExpression(refs[i]));
 		if (expression && expression.type === 'Identifier') identifierRefs.push(expression);
 		else otherRefs.push(refs[i]);
 	}
@@ -179,6 +179,22 @@ function getRefAttributeExpression(attr) {
 			: value.expression;
 	}
 	return value;
+}
+
+/** @param {any} node @returns {any} */
+function unwrapExpression(node) {
+	let current = node;
+	while (
+		current &&
+		(current.type === 'TSAsExpression' ||
+			current.type === 'TSTypeAssertion' ||
+			current.type === 'TSNonNullExpression' ||
+			current.type === 'TSSatisfiesExpression' ||
+			current.type === 'ParenthesizedExpression')
+	) {
+		current = current.expression;
+	}
+	return current;
 }
 
 /**
