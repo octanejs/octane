@@ -1098,6 +1098,32 @@ export function App() @{
 		expect(thrown.message).toContain('split={false}');
 	});
 
+	it('rejects a style scope that straddles a split boundary through a namespaced host', () => {
+		// A namespaced host is stamped by the style-scope pass. If the
+		// straddle check missed it, a parent-list <style> would extract
+		// while the server still stamped the host — disagreeing class lists.
+		const source = `
+import { Hydrate } from 'octane';
+export function App() @{
+  <div>
+    <style>.x { color: red; }</style>
+    <Hydrate when={gate}>
+      <svg:rect class="x" />
+    </Hydrate>
+  </div>
+}
+`;
+		let thrown: any = null;
+		try {
+			compiler().transform(source, FILE, { environment: 'client' });
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toMatchObject({ code: 'OCTANE_HYDRATE_SPLIT_STYLE', filename: '/src/App.tsrx' });
+		expect(thrown.message).toContain('straddle a split Hydrate boundary');
+		expect(thrown.message).toContain('split={false}');
+	});
+
 	it('permits scoped styles under split={false} and inside nested split-child functions', () => {
 		// split={false} keeps children in the owning component, so its style
 		// scope stays whole; a style nested in a function never joined that

@@ -510,7 +510,9 @@ function isStampableHost(node) {
 	if (name.type === 'JSXIdentifier' || name.type === 'Identifier') {
 		return name.name !== 'style' && !/^[A-Z]/.test(name.name);
 	}
-	return false;
+	// Namespaced hosts (`svg:rect`) are stamped by the style-scope pass;
+	// member expressions are composites and are not.
+	return name.type === 'JSXNamespacedName' || name.type === 'NamespacedName';
 }
 
 function walkStampableHosts(node, visitHost) {
