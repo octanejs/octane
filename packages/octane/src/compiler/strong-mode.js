@@ -595,8 +595,10 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 				}
 			}
 			case 'BlockStatement':
-			case 'JSXCodeBlock':
 				block(node, scope, region, effect);
+				return;
+			case 'JSXCodeBlock':
+				block(node, scope, templateArm(node, region, '@{} block'), effect, true);
 				return;
 			case 'CatchClause': {
 				const catchScope = createScope(scope, 'block', [], [node.param]);
@@ -937,7 +939,7 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 	for (const handler of handlers) {
 		if (!handler.uses.some((use) => use.event !== null)) continue;
 		const owner = nearestOwner(handler.uses, handler.region);
-		if (owner !== null && handler.uses.length > 1) {
+		if (owner !== null) {
 			diagnostics.push(
 				diagnostic(
 					STRONG_EVENT_HANDLER_LOCALITY,
@@ -946,18 +948,7 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 					`Move this event handler into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, where it is used.`,
 				),
 			);
-			continue;
 		}
-		if (handler.uses.length !== 1 || handler.uses[0].event === null) continue;
-		const attribute = handler.uses[0].event;
-		diagnostics.push(
-			diagnostic(
-				STRONG_EVENT_HANDLER_LOCALITY,
-				filename,
-				attribute,
-				`Define this handler inline at ${attribute.name.name} instead of declaring it in an outer scope.`,
-			),
-		);
 	}
 	return diagnostics;
 }
@@ -3114,7 +3105,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	for (const statement of ast.body ?? []) visit(statement, moduleScope, 'module');
-	if (/@(if|for|switch|try)\b/.test(source) || /\bon[A-Z]/.test(source)) {
+	if (source.includes('@{') || /@(if|for|switch|try)\b/.test(source) || /\bon[A-Z]/.test(source)) {
 		diagnostics.push(...strongLocalityDiagnostics(ast, source, filename, isReassigned));
 	}
 	return { enabled, diagnostics };

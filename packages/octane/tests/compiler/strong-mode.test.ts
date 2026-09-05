@@ -637,13 +637,13 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
-	it('locates a one-site local handler at its event attribute', () => {
+	it('locates a handler declared outside the template block that owns its event', () => {
 		const source = `"use strong";
 export function App(props) @{
   const handle = () => props.onAction();
-  <button onClick={handle}>run</button>
+  <div>@{ <button onClick={handle}>run</button> }</div>
 }`;
-		const start = source.indexOf('onClick={handle}');
+		const start = source.indexOf('handle =');
 		let failure: unknown;
 		try {
 			compile(source, '/src/App.tsrx');
@@ -655,8 +655,92 @@ export function App(props) @{
 			filename: '/src/App.tsrx',
 			pos: start,
 		});
-		expect((failure as Error).message).toMatch(/inline.*onClick/i);
+		expect((failure as Error).message).toMatch(/Move.*handler.*@\{.*line/i);
 		expect(() => compile(source.replace('"use strong";\n', ''), '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['a shorthand event attribute', '{onClick}'],
+		['an explicit event attribute', 'onClick={onClick}'],
+	])('accepts a named handler beside %s in a template block', (_label, attribute) => {
+		const source = `"use strong";
+export function App(props) @{
+  <div>@{
+    const onClick = () => props.onAction();
+    <button ${attribute}>run</button>
+  }</div>
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			for (const dev of [true, false]) {
+				expect(() => compile(source, '/src/App.tsrx', { mode, dev })).not.toThrow();
+			}
+		}
+		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toEqual([]);
+	});
+
+	it('accepts a named handler beside JSX in the root template and an @if arm', () => {
+		const sources = [
+			`"use strong";
+export function App(props) @{
+  const onClick = () => props.onAction();
+  <button {onClick}>run</button>
+}`,
+			`"use strong";
+export function App(props) @{
+  <div>@if (props.ready) {
+    const onClick = () => props.onAction();
+    <button {onClick}>run</button>
+  }</div>
+}`,
+		];
+		for (const source of sources) {
+			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		}
+	});
+
+	it('locates a hook used only by a nested template block without an event', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App() @{
+  const [label] = useState('ready');
+  <div>@{ <span>{label}</span> }</div>
+}`;
+		const start = source.indexOf("useState('ready')");
+		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: HOOK_LOCALITY,
+				start: expect.objectContaining({ offset: start }),
+				message: expect.stringMatching(/useState.*@\{.*line/),
+			}),
+		);
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
+	});
+
+	it('accepts hooks and effects beside their JSX in a nested template block', () => {
+		const source = `"use strong";
+import { useState, useEffect } from 'octane';
+export function App(props) @{
+  <div>@{
+    const [count, setCount] = useState(0);
+    useEffect(() => props.observe(count), [count]);
+    <button onClick={() => setCount(count + 1)}>{count as string}</button>
+  }</div>
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			for (const dev of [true, false]) {
+				expect(() => compile(source, '/src/App.tsrx', { mode, dev })).not.toThrow();
+			}
+		}
+	});
+
+	it('keeps a hook shared by separate template blocks at their parent', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App() @{
+  const [count] = useState(0);
+  <div>@{ <span>{count as string}</span> }@{ <output>{count as string}</output> }</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('moves a handler shared by events in one arm into that arm', () => {
@@ -849,7 +933,7 @@ export function App(props) @{
 		const source = `"use strong";
 export function App(props) @{
   const handle = () => props.onAction();
-  <button onClickCapture={handle}>run</button>
+  <div>@{ <button onClickCapture={handle}>run</button> }</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(EVENT_HANDLER_LOCALITY);
 		expect(() =>
@@ -869,7 +953,7 @@ export function App(props) @{
 		const event = `"use strong";
 export function App(props) @{
   const handle = () => props.onAction();
-  <button onClick={handle}>run</button>
+  <div>@{ <button onClick={handle}>run</button> }</div>
 }`;
 		expect(() => compile(event, '/src/App.tsrx', options)).toThrow(EVENT_HANDLER_LOCALITY);
 	});

@@ -516,18 +516,21 @@ for their witnessed inputs. Function names—including `use*` names—do not cha
 that contract or disable the optimization.
 
 Strong mode also checks where compiler-managed work belongs. If a locally
-declared built-in hook value is used only in one template arm (`@if`, keyed
-`@for`, `@switch`, or `@try`), declare it there. Effects observing hook values
-confined to that arm belong there too. A declaration outside its arm reports
-`OCTANE_STRONG_HOOK_LOCALITY` and names the target arm and source line, including
-any local helpers that must move with the value. State and effects shared by
-multiple arms stay in their common scope; effects without a provable single arm
-remain valid. A local callback used by just one native `onX` event belongs inline
-in that JSX attribute (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`). A callback shared
-by several events inside one arm belongs in that arm. Cross-arm, imported, and
-forwarded callbacks remain supported. The placement diagnostics use the authored
-source location in client, server, and editor compilation; they do not move
-declarations or change emitted code for valid modules.
+declared built-in hook value is used only in one template scope (`@if`, keyed
+`@for`, `@switch`, `@try`, or a nested `@{…}` block), declare it there. Effects
+observing hook values confined to that scope belong there too. An outer
+declaration reports `OCTANE_STRONG_HOOK_LOCALITY` and names the target scope and
+source line, including any local helpers that must move with the value. State
+and effects shared by multiple scopes stay in their common scope; effects
+without a provable single scope remain valid. A local callback used by a native
+`onX` event can be inline or declared beside its JSX in the owning template
+scope, including `<button {onClick} />`. A callback declared outside the sole
+child block or arm that uses it reports `OCTANE_STRONG_EVENT_HANDLER_LOCALITY`.
+Cross-arm, imported, and forwarded callbacks remain supported. The diagnostics
+use the authored source location in client, server, and editor compilation;
+they do not move declarations or change emitted code for valid modules.
+Moving a hook into a nested `@{…}` block gives it that block's lifetime, even
+if the block held only JSX before the move.
 
 Event handlers, genuinely deferred callbacks, effect cleanup, effects that
 synchronize an external system, and normal DOM or timer refs remain supported.

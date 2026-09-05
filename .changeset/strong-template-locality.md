@@ -2,4 +2,4 @@
 "octane": patch
 ---
 
-Check that Strong-mode built-in hook values and effects are declared in the template arm that owns their use, and that single-use native event handlers are defined at their event attributes. Report source-located compiler errors with placement guidance.
+Check that Strong-mode built-in hook values, effects, and local native event handlers are declared in the template arm or nested `@{…}` block that owns their use. Allow named handlers beside JSX, including shorthand event attributes, and report source-located compiler errors with placement guidance.

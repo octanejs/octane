@@ -448,16 +448,17 @@ These patterns become compile errors:
 - Calling unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`,
   or `new Date()` without arguments during render
   (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
-- Declaring a built-in hook value outside the only template arm (`@if`, keyed
-  `@for`, `@switch`, or `@try`) that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
-- Declaring a local callback outside its only native `onX` event attribute
-  (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
+- Declaring a built-in hook value outside the only template arm or nested
+  `@{…}` block that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
+- Declaring a local callback outside the template scope that owns its native
+  `onX` event (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
 
-### Keep work with its template arm
+### Keep work with its template scope
 
-Each `@if`, keyed `@for`, `@switch`, and `@try` arm has its own render scope.
-When every use of a built-in hook value is in one arm, declare the hook in that
-arm. An effect that observes hook values belonging to that arm goes there too:
+Each `@if`, keyed `@for`, `@switch`, and `@try` arm has its own render scope. A
+nested `@{…}` block gives hooks declared beside its JSX a local scope too. When
+every use of a built-in hook value is in one of these scopes, declare the hook
+there. An effect that observes its local values goes there too:
 
 ```jsx
 "use strong";
@@ -477,32 +478,55 @@ export function Search({ open }) @{
 }
 ```
 
+Hooks can also sit directly beside their JSX in a nested `@{…}` block:
+
+```jsx
+"use strong";
+
+import { useEffect, useState } from 'octane';
+
+export function Counter({ observe }) @{
+  <div>@{
+    const [count, setCount] = useState(0);
+    useEffect(() => observe(count), [count]);
+    <button onClick={() => setCount(count + 1)}>{count as string}</button>
+  }</div>
+}
+```
+
 A setup-level `useState` whose value and setter are both used only in that arm
 instead reports `OCTANE_STRONG_HOOK_LOCALITY`, with the target arm and line in
 the error. The same code applies to an effect that belongs with those local
-values. A state value shared by sibling arms stays in their common scope;
-effects with no provable single arm also remain valid there. A local helper that
-captures the hook value must move with it; the diagnostic names that helper.
-Moving state or an effect into a template arm changes its lifetime; a keyed
-`@for` row gives each item its own state. Keep genuinely shared row state in a
-parent scope with a parent template consumer, and split independent parent-scope
-work into a separate effect. The placement check
-recognizes built-in hooks imported from Octane; custom hook calls are outside
-this check.
+values. A state value shared by sibling arms or template blocks stays in their
+common scope; effects with no provable single scope also remain valid there. A
+local helper that captures the hook value must move with it; the diagnostic
+names that helper.
 
-Put a callback that serves one native event at the attribute where it is used:
+Moving state or an effect into an arm or nested `@{…}` block changes its
+lifetime, even when the block previously contained only JSX. A keyed `@for`
+row gives each item its own state. Keep genuinely shared row state in a parent
+scope with a parent template consumer, and split independent parent-scope work
+into a separate effect. The placement check recognizes built-in hooks
+imported from Octane; custom hook calls are outside this check.
+
+Define a callback that serves one native event inline or beside its JSX:
 
 ```jsx
 <button onClick={() => save(query)}>Save</button>
+
+<div>@{
+  const onClick = () => save(query);
+  <button {onClick}>Save</button>
+}</div>
 ```
 
-For example, declaring `const handleClick = () => save(query)` in setup and
-using it only as `<button onClick={handleClick}>` reports
-`OCTANE_STRONG_EVENT_HANDLER_LOCALITY` at the attribute. Callbacks shared by
-several arms, forwarded through component props, or imported from another module
-can retain their named bindings. If several native events in one arm share a local
-callback, declare it in that arm. These placement checks apply only to modules
-that opt into Strong mode; ordinary modules keep their existing behavior.
+The named form also works as `<button onClick={onClick}>` in the same template
+block, arm, or root template. Declaring the callback outside a child `@{…}`
+block that is its only use reports `OCTANE_STRONG_EVENT_HANDLER_LOCALITY` at the
+declaration and names the owning block. Callbacks shared by several arms,
+forwarded through component props, or imported from another module can retain
+their named bindings. These placement checks apply only to modules that opt into
+Strong mode; ordinary modules keep their existing behavior.
 
 The checks follow provable synchronous calls through local helpers,
 `useCallback` and `useEffectEvent` results, and functions returned by analyzable
