@@ -9282,6 +9282,9 @@ export function renderToPipeableStream(
 	};
 
 	const waitForDrain = (dest: Destination, allowAborted = false): Promise<void> => {
+		// A recovery write can close the destination synchronously inside
+		// dest.write(false), before these one-shot listeners are installed.
+		if (allowAborted && closed) return Promise.reject(new Error(formatServerError(38)));
 		if (dest.once === undefined) {
 			return Promise.reject(new TypeError(formatServerError(39)));
 		}

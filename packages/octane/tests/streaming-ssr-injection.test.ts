@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import * as ServerRuntime from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
@@ -404,6 +404,59 @@ describe('streaming injection — document renders', () => {
 });
 
 describe('streaming injection — failure modes', () => {
+	it('finishes a pipeable render when recovery closes its destination during write', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+		const aborter = new AbortController();
+		const events = new EventEmitter();
+		const first = '<script data-inject="node-accepted">window.__accepted=1</script>';
+		const second = '<script data-inject="node-closing">window.__closing=1</script>';
+		const chunks: string[] = [];
+		const errors: unknown[] = [];
+		let allReady = 0;
+		let didEnd = false;
+		ServerRuntime.renderToPipeableStream(
+			server.DocumentApp,
+			{ promise: value.promise },
+			{
+				injection: injection.source,
+				signal: aborter.signal,
+				onError: (error) => errors.push(error),
+				onAllReady: () => allReady++,
+			},
+		).pipe({
+			write(chunk: string) {
+				chunks.push(chunk);
+				if (chunk === second) {
+					events.emit('close');
+					return false;
+				}
+				return chunk !== first;
+			},
+			end() {
+				didEnd = true;
+			},
+			once: events.once.bind(events),
+			off: events.off.bind(events),
+		});
+		await flushMicrotasks();
+		injection.push(first);
+		await flushMicrotasks();
+		expect(chunks).toContain(first);
+		injection.push(second);
+		await flushMicrotasks();
+		const reason = new Error('request timed out');
+		aborter.abort(reason);
+		await vi.waitFor(() => expect(allReady).toBe(1));
+
+		const html = chunks.join('');
+		expect(errors).toContain(reason);
+		expect(html.split(first)).toHaveLength(2);
+		expect(html.split(second)).toHaveLength(2);
+		expect(didEnd).toBe(false);
+		expect(injection.unsubscribed).toBe(true);
+	});
+
 	it('retains a queued pipeable injection after abort without duplicating accepted bytes', async () => {
 		const value = deferred<string>();
 		const injection = createTestInjection();
