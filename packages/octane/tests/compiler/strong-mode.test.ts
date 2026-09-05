@@ -644,6 +644,55 @@ export function App() @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
 	});
 
+	it('does not mistake a callback captured by a memo for a native event handler', () => {
+		const source = `"use strong";
+import { useMemo } from 'octane';
+export function App(props) @{
+  const handle = () => props.compute();
+  const value = useMemo(() => handle, []);
+  <div>@{ <span>{value.name as string}</span> }</div>
+}`;
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		expect(diagnostics.map(({ code }) => code)).toEqual([HOOK_LOCALITY]);
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
+	});
+
+	it('moves each named event handler while shared state remains in its parent', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App() @{
+  const [count, setCount] = useState(0);
+  const left = () => setCount(count + 1);
+  const right = () => setCount(count - 1);
+  <div><output>{count as string}</output>
+    @{ <button onClick={left}>+</button> }
+    @{ <button onClick={right}>-</button> }
+  </div>
+}`;
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			EVENT_HANDLER_LOCALITY,
+			EVENT_HANDLER_LOCALITY,
+		]);
+		expect(diagnostics.map(({ start }) => start.offset)).toEqual([
+			source.indexOf('left ='),
+			source.indexOf('right ='),
+		]);
+		const fixed = `"use strong";
+import { useState } from 'octane';
+export function App() @{
+  const [count, setCount] = useState(0);
+  <div><output>{count as string}</output>
+    @{ const left = () => setCount(count + 1); <button {left}>+</button> }
+    @{ const right = () => setCount(count - 1); <button {right}>-</button> }
+  </div>
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(fixed, '/src/App.tsrx', { mode })).not.toThrow();
+		}
+		expect(compileToVolarMappings(fixed, '/src/App.tsrx').diagnostics).toEqual([]);
+	});
+
 	it('keeps a hook, its helper, and its effect together when a nested block uses its value', () => {
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
@@ -1043,6 +1092,27 @@ export function App(props) @{
   <div>@if (props.show) { <button onClick={h18}>run</button> }</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('locates events through a long flat helper chain without exhausting the stack', () => {
+		const length = 4_000;
+		const helpers = ['const h0 = () => {};'];
+		for (let index = 1; index <= length; index++) {
+			helpers.push(`const h${index} = () => h${index - 1}();`);
+		}
+		const source = `"use strong";
+export function App() @{
+  ${helpers.join('\n  ')}
+  <div>@{ <button onClick={h0}>first</button><button onClick={h${length}}>last</button> }</div>
+}`;
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		expect(diagnostics.filter(({ code }) => code === EVENT_HANDLER_LOCALITY)).toHaveLength(2);
+		expect(diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: EVENT_HANDLER_LOCALITY,
+				start: expect.objectContaining({ offset: source.indexOf('h0 =') }),
+			}),
+		);
 	});
 
 	it('keeps shared, forwarded, and imported callbacks available for events', () => {

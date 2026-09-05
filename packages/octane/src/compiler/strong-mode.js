@@ -952,23 +952,10 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 						`Move ${member.hook}${helperText} into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, before the JSX or local effect that uses its value.`,
 					),
 				);
-			} else if (member.kind === 'locality-handler') {
-				if (!member.uses.some((use) => use.event !== null)) continue;
-				if (member.node.type === 'FunctionDeclaration' && isReassigned(member.node.id)) continue;
-				const name = member.node.id?.name;
-				const inlineAlternative =
-					member.uses.length === 1
-						? ' Alternatively, define the callback inline at that event attribute.'
-						: '';
-				diagnostics.push(
-					diagnostic(
-						STRONG_EVENT_HANDLER_LOCALITY,
-						filename,
-						member.node,
-						`Move the ${name ?? 'event'} handler into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, before the JSX event attribute that uses it.${inlineAlternative}`,
-					),
-				);
-			} else if (member.dependencies.size > 0 || member.helpers.size > 0) {
+			} else if (
+				member.kind !== 'locality-handler' &&
+				(member.dependencies.size > 0 || member.helpers.size > 0)
+			) {
 				diagnostics.push(
 					diagnostic(
 						STRONG_HOOK_LOCALITY,
@@ -979,6 +966,54 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 				);
 			}
 		}
+	}
+	// A callback may safely move beside its sole event even when a hook it
+	// captures is also consumed by the parent or by a sibling block. Determine
+	// handler placement from handler uses separately from hook ownership.
+	function handlerUseRegions(handler) {
+		const regions = [];
+		const seen = new Set();
+		const pending = [handler];
+		while (pending.length > 0) {
+			const current = pending.pop();
+			if (seen.has(current)) continue;
+			seen.add(current);
+			if (componentHandlers.has(current) || current.uses.length === 0) {
+				regions.push(current.region);
+				continue;
+			}
+			for (const use of current.uses) {
+				if (use.viaHandler) pending.push(use.viaHandler);
+				else if (use.viaDerived) regions.push(current.region);
+				else regions.push(use.region);
+			}
+		}
+		return regions;
+	}
+	for (const handler of handlers) {
+		if (!handler.uses.some((use) => use.event != null)) continue;
+		const uses = handlerUseRegions(handler);
+		let common = uses[0];
+		for (let index = 1; common != null && index < uses.length; index++) {
+			common = commonAncestor(common, uses[index]);
+		}
+		let owner = common;
+		while (owner !== null && !canMoveInto(owner, handler.region)) owner = owner.parent;
+		if (owner == null || owner === handler.region) continue;
+		if (handler.node.type === 'FunctionDeclaration' && isReassigned(handler.node.id)) continue;
+		const name = handler.node.id?.name;
+		const inlineAlternative =
+			handler.uses.length === 1
+				? ' Alternatively, define the callback inline at that event attribute.'
+				: '';
+		diagnostics.push(
+			diagnostic(
+				STRONG_EVENT_HANDLER_LOCALITY,
+				filename,
+				handler.node,
+				`Move the ${name ?? 'event'} handler into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, before the JSX event attribute that uses it.${inlineAlternative}`,
+			),
+		);
 	}
 	return diagnostics;
 }
