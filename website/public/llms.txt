@@ -240,7 +240,7 @@ See the [behavior-only roots guide](https://octanejs.dev/docs/core-apis#behavior
 
 ## Strong mode
 
-Put `"use strong"` before a module's imports, or enable `compiler: { strong: true }` in `octane.config.ts` for application-owned modules. Vite, Rspack, and Rsbuild also accept `strong: true` in their Octane plugin options. Installed dependencies keep their existing behavior unless their own source opts in.
+Put `"use strong"` before a module's imports, or enable `compiler: { strong: true }` in `octane.config.ts` for all application-owned modules. Vite, Rspack, and Rsbuild also accept `strong: true` in their Octane plugin options. Installed dependencies keep their existing behavior unless their own source opts in.
 
 Strong modules reject these statically provable patterns:
 
@@ -252,6 +252,10 @@ Strong modules reject these statically provable patterns:
 - Mutating a provable state snapshot during render (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).
 - Mutating a binding declared outside a retained keyed `@for` row from that row (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh setup-local and row-local scratch data remain valid.
 - Reading a known clock or random source during render (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
+- Declaring a built-in hook value or its dependent effect outside the sole nested `@{…}` block that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
+- Declaring a named native event handler outside the sole deeper nested `@{…}` block containing its direct `onX` use (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
+
+Inside `<div>@{ const [count, setCount] = useState(0); const onClick = () => setCount(count + 1); <button {onClick}>{count as string}</button> }</div>`, the hook and named handler sit beside their JSX. Inline events work too. Hooks and effects used only by conditional, keyed, switch, or try arms may stay in the parent scope to keep that lifetime. Moving a hook into a nested `@{…}` block gives it the block's local lifetime; a JSX-only block is transparent until it gets setup.
 
 The checks follow provable synchronous calls through local helpers, `useCallback` and `useEffectEvent` results, and functions returned by analyzable `useMemo` factories. These hooks remain supported; creating a callback is not itself an error. Effect Events are non-reactive and should be omitted from dependencies. Other explicit dependency arrays remain authoritative and are never rewritten.
 

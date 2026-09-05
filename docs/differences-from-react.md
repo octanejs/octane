@@ -515,21 +515,26 @@ All user-authored render calls and synchronously invoked callbacks must be pure
 for their witnessed inputs. Function names—including `use*` names—do not change
 that contract or disable the optimization.
 
-Strong mode also checks where compiler-managed work belongs. If a locally
-declared built-in hook value is used only in one template scope (`@if`, keyed
-`@for`, `@switch`, `@try`, or a nested `@{…}` block), declare it there. Effects
-observing hook values confined to that scope belong there too. An outer
-declaration reports `OCTANE_STRONG_HOOK_LOCALITY` and names the target scope and
-source line, including any local helpers that must move with the value. State
-and effects shared by multiple scopes stay in their common scope; effects
-without a provable single scope remain valid. A local callback used by a native
-`onX` event can be inline or declared beside its JSX in the owning template
-scope, including `<button {onClick} />`. A callback declared outside the sole
-child block or arm that uses it reports `OCTANE_STRONG_EVENT_HANDLER_LOCALITY`.
-Cross-arm, imported, and forwarded callbacks remain supported. The diagnostics
-use the authored source location in client, server, and editor compilation;
-they do not move declarations or change emitted code for valid modules.
-Moving a hook into a nested `@{…}` block gives it that block's lifetime.
+Strong mode also checks where compiler-managed work belongs. A locally
+declared built-in hook value used only inside one nested `@{…}` block belongs
+beside that block's JSX, as does an effect observing only its local values. An
+outer declaration reports `OCTANE_STRONG_HOOK_LOCALITY` and names the block and
+source line, including any local helpers that must move with the value. Hooks
+and effects used only in an `@if`, keyed `@for`, `@switch`, or `@try` arm can
+remain in the parent scope, preserving their parent lifetime. A hook shared by
+sibling template blocks stays in their common scope. Moving a hook into a
+nested `@{…}` block gives it that block's lifetime, even when the previous
+block contained only JSX and served as transparent grouping.
+
+A local callback used by a native `onX` event can be inline or declared beside
+its JSX, including `<button {onClick} />`. A named callback declared outside
+the sole deeper nested `@{…}` block containing its direct event use reports
+`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`; a callback declared in the same scope
+as the JSX is valid. Shared, imported, and forwarded callbacks remain
+supported. The diagnostics use the authored source location in client, server,
+and editor compilation; they do not move declarations or change emitted code
+for valid modules. Setting `compiler: { strong: true }` applies these checks
+across application-owned modules; installed dependencies opt in separately.
 
 Event handlers, genuinely deferred callbacks, effect cleanup, effects that
 synchronize an external system, and normal DOM or timer refs remain supported.
