@@ -330,6 +330,16 @@ const MIME_TYPES = {
  * @returns {boolean} true when the request was handled as a static file
  */
 export function serveStaticFile(req, res, staticDir) {
+	return serveStaticFileFromRoot(req, res, staticDir);
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @param {import('node:http').ServerResponse} res
+ * @param {string} staticDir
+ * @param {string} [configuredRoot] Canonical root pinned by createNodeServer
+ */
+function serveStaticFileFromRoot(req, res, staticDir, configuredRoot) {
 	const method = (req.method || 'GET').toUpperCase();
 	if (method !== 'GET' && method !== 'HEAD') return false;
 
@@ -338,49 +348,79 @@ export function serveStaticFile(req, res, staticDir) {
 	const filePath = path.normalize(path.join(staticDir, pathname));
 	if (!filePath.startsWith(path.normalize(staticDir + path.sep))) return false;
 
+	/** @type {string} */
+	let resolvedFile;
 	/** @type {fs.Stats} */
 	let stat;
+	let fd = -1;
 	try {
-		stat = fs.statSync(filePath);
+		const realRoot = configuredRoot ?? fs.realpathSync.native(staticDir);
+		resolvedFile = fs.realpathSync.native(filePath);
+		const rootPrefix = realRoot.endsWith(path.sep) ? realRoot : realRoot + path.sep;
+		if (!resolvedFile.startsWith(rootPrefix)) return false;
+
+		// Open the verified target before responding. Passing this descriptor to
+		// the stream prevents a later path swap from changing what is served.
+		// The built static tree must not be writable by an untrusted actor during
+		// serving: Node has no portable directory-relative open for ancestor swaps.
+		fd = fs.openSync(
+			resolvedFile,
+			fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0),
+		);
+		stat = fs.fstatSync(fd);
+		if (!stat.isFile()) {
+			fs.closeSync(fd);
+			return false;
+		}
 	} catch {
+		if (fd !== -1) fs.closeSync(fd);
 		return false;
 	}
-	if (!stat.isFile()) return false;
 
-	const ext = path.extname(filePath).toLowerCase();
-	const headers = new Headers({
-		'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
-		'Content-Length': String(stat.size),
-		'Cache-Control':
-			pathname.startsWith('/assets/') || pathname.startsWith('/static/')
-				? 'public, max-age=31536000, immutable'
-				: 'public, max-age=0, must-revalidate',
-	});
-	const gzip = shouldGzip(req, 200, headers, method !== 'HEAD');
-	if (gzip) {
-		headers.set('Content-Encoding', 'gzip');
-		headers.delete('Content-Length');
-	}
-
-	res.statusCode = 200;
-	res.setHeader('Content-Type', /** @type {string} */ (headers.get('Content-Type')));
-	const contentLength = headers.get('Content-Length');
-	if (contentLength !== null) res.setHeader('Content-Length', contentLength);
-	res.setHeader('Cache-Control', /** @type {string} */ (headers.get('Cache-Control')));
-	const contentEncoding = headers.get('Content-Encoding');
-	if (contentEncoding !== null) res.setHeader('Content-Encoding', contentEncoding);
-	const vary = headers.get('Vary');
-	if (vary !== null) res.setHeader('Vary', vary);
-	if (method === 'HEAD') {
-		res.end();
-	} else if (gzip) {
-		pipeline(fs.createReadStream(filePath), createGzip(), res, (error) => {
-			if (error && !res.destroyed) res.destroy(error);
+	try {
+		const ext = path.extname(filePath).toLowerCase();
+		const headers = new Headers({
+			'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
+			'Content-Length': String(stat.size),
+			'Cache-Control':
+				pathname.startsWith('/assets/') || pathname.startsWith('/static/')
+					? 'public, max-age=31536000, immutable'
+					: 'public, max-age=0, must-revalidate',
 		});
-	} else {
-		fs.createReadStream(filePath).pipe(res);
+		const gzip = shouldGzip(req, 200, headers, method !== 'HEAD');
+		if (gzip) {
+			headers.set('Content-Encoding', 'gzip');
+			headers.delete('Content-Length');
+		}
+
+		res.statusCode = 200;
+		res.setHeader('Content-Type', /** @type {string} */ (headers.get('Content-Type')));
+		const contentLength = headers.get('Content-Length');
+		if (contentLength !== null) res.setHeader('Content-Length', contentLength);
+		res.setHeader('Cache-Control', /** @type {string} */ (headers.get('Cache-Control')));
+		const contentEncoding = headers.get('Content-Encoding');
+		if (contentEncoding !== null) res.setHeader('Content-Encoding', contentEncoding);
+		const vary = headers.get('Vary');
+		if (vary !== null) res.setHeader('Vary', vary);
+		if (method === 'HEAD') {
+			res.end();
+		} else {
+			const source = fs.createReadStream(resolvedFile, { fd, autoClose: true });
+			fd = -1; // The stream now owns and closes the descriptor.
+			if (gzip) {
+				pipeline(source, createGzip(), res, (error) => {
+					if (error && !res.destroyed) res.destroy(error);
+				});
+			} else {
+				pipeline(source, res, (error) => {
+					if (error && !res.destroyed) res.destroy(error);
+				});
+			}
+		}
+		return true;
+	} finally {
+		if (fd !== -1) fs.closeSync(fd);
 	}
-	return true;
 }
 
 /**
@@ -394,10 +434,24 @@ export function serveStaticFile(req, res, staticDir) {
  */
 export function createNodeServer(handler, options = {}) {
 	const staticDir = options.staticDir;
+	/** @type {string | null} */
+	let configuredRoot = null;
+	try {
+		if (staticDir) configuredRoot = fs.realpathSync.native(staticDir);
+	} catch {
+		// A missing root must remain unavailable for this server's lifetime.
+		// Otherwise it could appear later as a symlink to a private directory.
+	}
 
 	const server = http.createServer((req, res) => {
 		(async () => {
-			if (staticDir && serveStaticFile(req, res, staticDir)) return;
+			if (
+				staticDir &&
+				configuredRoot &&
+				serveStaticFileFromRoot(req, res, staticDir, configuredRoot)
+			) {
+				return;
+			}
 			const response = await handler(nodeRequestToWebRequest(req));
 			await sendWebResponseForRequest(res, response, req);
 		})().catch((error) => {

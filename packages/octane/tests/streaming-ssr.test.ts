@@ -1422,6 +1422,138 @@ describe('renderToPipeableStream — chunk protocol', () => {
 });
 
 describe('renderToReadableStream', () => {
+	async function settlesWithin<T>(value: Promise<T>): Promise<T> {
+		let timer: ReturnType<typeof setTimeout>;
+		try {
+			return await Promise.race([
+				value,
+				new Promise<never>((_resolve, reject) => {
+					timer = setTimeout(() => reject(new Error('render did not settle')), 1000);
+				}),
+			]);
+		} finally {
+			clearTimeout(timer!);
+		}
+	}
+
+	it('rejects when onShellReady throws before the stream promise settles', async () => {
+		const callbackError = new Error('shell callback failed');
+		const onError = vi.fn();
+		await expect(
+			settlesWithin(
+				ServerRT.renderToReadableStream(() => 'shell', undefined, {
+					onShellReady() {
+						throw callbackError;
+					},
+					onError,
+				}),
+			),
+		).rejects.toBe(callbackError);
+		expect(onError).toHaveBeenCalledWith(callbackError);
+	});
+
+	it('rejects when onError throws before the stream promise settles', async () => {
+		const callbackError = new Error('error callback failed');
+		const Broken = () => {
+			throw new Error('render failed');
+		};
+		await expect(
+			settlesWithin(
+				ServerRT.renderToReadableStream(Broken, undefined, {
+					onError() {
+						throw callbackError;
+					},
+				}),
+			),
+		).rejects.toBe(callbackError);
+	});
+
+	it('rejects when onShellError throws before the stream promise settles', async () => {
+		const callbackError = new Error('shell-error callback failed');
+		await expect(
+			settlesWithin(
+				ServerRT.renderToReadableStream(
+					() => {
+						throw new Error('render failed');
+					},
+					undefined,
+					{
+						onShellError() {
+							throw callbackError;
+						},
+					},
+				),
+			),
+		).rejects.toBe(callbackError);
+	});
+
+	it('rejects allReady and closes output when onAllReady throws', async () => {
+		const callbackError = new Error('completion callback failed');
+		const onError = vi.fn();
+		const stream = await ServerRT.renderToReadableStream(() => 'shell', undefined, {
+			onAllReady() {
+				throw callbackError;
+			},
+			onError,
+		});
+		const output = new Response(stream).text();
+		await expect(settlesWithin(stream.allReady)).rejects.toBe(callbackError);
+		expect(await output).toBe('shell');
+		expect(onError).toHaveBeenCalledWith(callbackError);
+	});
+
+	it('rejects allReady after a recoverable boundary error if onError throws', async () => {
+		const value = deferred<string>();
+		const callbackError = new Error('recoverable-error callback failed');
+		const stream = await ServerRT.renderToReadableStream(
+			permanentStaticServer.PermanentStaticRejectedStream,
+			{ promise: value.promise },
+			{
+				onError() {
+					throw callbackError;
+				},
+			},
+		);
+		const output = new Response(stream).text();
+		value.reject(new Error('boundary failed'));
+		await expect(settlesWithin(stream.allReady)).rejects.toBe(callbackError);
+		const html = await output;
+		expect(html).toContain('permanent-static-rejected-fallback');
+		const [id] = protocolIds(html);
+		expect(html).toContain(staticErrorCall(id));
+	});
+
+	it('rejects allReady and finalizes injection when onError throws after abort', async () => {
+		const value = deferred<string>();
+		let unsubscribed = false;
+		let renderCompleteCalls = 0;
+		const injection: ServerRT.StreamInjectionSource = {
+			take: () => '',
+			subscribe: () => () => {
+				unsubscribed = true;
+			},
+			done: new Promise<void>(() => {}),
+			renderComplete() {
+				renderCompleteCalls++;
+			},
+		};
+		const callbackError = new Error('error callback failed');
+		const stream = await ServerRT.renderToReadableStream(
+			server.Boundary,
+			{ promise: value.promise },
+			{
+				injection,
+				onError() {
+					throw callbackError;
+				},
+			},
+		);
+		await stream.cancel(new Error('consumer left'));
+		await expect(settlesWithin(stream.allReady)).rejects.toBe(callbackError);
+		expect(renderCompleteCalls).toBe(1);
+		expect(unsubscribed).toBe(true);
+	});
+
 	it('resolves at shell-ready; allReady settles after the last segment', async () => {
 		const d = deferred<string>();
 		const stream = await ServerRT.renderToReadableStream(server.Boundary, {

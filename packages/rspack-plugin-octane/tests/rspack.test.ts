@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import rspack from '@rspack/core';
+import { JSDOM } from 'jsdom';
 import { compile as compileOctane } from 'octane/compiler';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getOctaneRspackBuildInfo, OctaneRspackPlugin } from '../src/index.js';
@@ -196,6 +197,7 @@ export function App() @{
 		Reflect.deleteProperty(globalThis, slotArgumentCountGlobal);
 		Reflect.deleteProperty(globalThis, lynxWorkletFeatureGlobal);
 		Reflect.deleteProperty(globalThis, lynxWorkletHelperGlobal);
+		Reflect.deleteProperty(globalThis, '__octane_descriptor_result__');
 		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	});
 
@@ -819,6 +821,133 @@ export function App() @{ const live = Scene as unknown; <Canvas><Scene /></Canva
 			expect(server.code).not.toContain(marker);
 		}
 	}, 30_000);
+
+	it.each(['client', 'server'] as const)(
+		'renders imported marked children through direct, named, and default re-exports in %s bundles',
+		async (environment) => {
+			rmSync(join(root, 'node_modules/octane'), { recursive: true, force: true });
+			symlinkSync(
+				join(repositoryRoot, 'packages/octane'),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			write(
+				root,
+				'src/Slot.tsrx',
+				`import { Children, cloneElement, descriptorChildren } from 'octane';
+
+function Slot(props: { children?: unknown }) {
+	return cloneElement(Children.only(props.children), { class: 'cloned' });
+}
+
+export const Marked = descriptorChildren(Slot);
+export default descriptorChildren(Slot);
+export function Ordinary(props: { children?: unknown }) { return props.children; }
+`,
+			);
+			write(
+				root,
+				'src/chain.ts',
+				`import { Marked } from './Slot.tsrx'; export { Marked as ChainedSlot };\n`,
+			);
+			write(root, 'src/barrel.ts', `export { ChainedSlot as BarrelSlot } from './chain.ts';\n`);
+			write(
+				root,
+				'src/default-barrel.ts',
+				`import { Marked } from './Slot.tsrx'; export default Marked;\n`,
+			);
+			write(
+				root,
+				'src/App.tsrx',
+				`import DefaultSlot, { Marked as DirectSlot } from './Slot.tsrx';
+import { BarrelSlot } from './barrel.ts';
+import BarrelDefault from './default-barrel.ts';
+
+export function App() @{
+	<main>
+		<DirectSlot><button>direct</button></DirectSlot>
+		<DefaultSlot><button>default</button></DefaultSlot>
+		<BarrelSlot><button>barrel</button></BarrelSlot>
+		<BarrelDefault><button>default barrel</button></BarrelDefault>
+	</main>
+}
+`,
+			);
+			const expected =
+				'<main><button class="cloned">direct</button><button class="cloned">default</button><button class="cloned">barrel</button><button class="cloned">default barrel</button></main>';
+			const markedBarrel = `export { ChainedSlot as BarrelSlot } from './chain.ts';\n`;
+			const ordinaryBarrel = `export { Ordinary as BarrelSlot } from './Slot.tsrx';\n`;
+			write(
+				root,
+				'src/descriptor-entry.js',
+				environment === 'client'
+					? `import { createRoot } from 'octane';
+import { App } from './App.tsrx';
+createRoot(document.getElementById('root')).render(App, {});
+globalThis.__octane_descriptor_result__ = document.getElementById('root').innerHTML;
+`
+					: `import { renderToString } from 'octane/server';
+import { App } from './App.tsrx';
+globalThis.__octane_descriptor_result__ = renderToString(App, {}).html;
+`,
+			);
+			const outputPath = join(root, `dist-descriptor-${environment}`);
+			const buildDescriptor = async (output: string) =>
+				compile({
+					context: root,
+					mode: 'production',
+					target: environment === 'client' ? 'web' : 'node',
+					entry: './src/descriptor-entry.js',
+					cache: {
+						type: 'persistent',
+						version: 'descriptor-source-v1',
+						storage: {
+							type: 'filesystem',
+							directory: join(root, `.rspack-descriptor-cache-${environment}`),
+						},
+					},
+					resolve: { extensionAlias: { '.js': ['.ts', '.js'] } },
+					optimization: { minimize: false },
+					output: { path: output, filename: 'bundle.cjs' },
+					plugins: [new OctaneRspackPlugin()],
+				});
+			await buildDescriptor(outputPath);
+			const bundlePath = join(outputPath, 'bundle.cjs');
+			if (environment === 'client') {
+				const renderClient = (file: string) => {
+					const browser = new JSDOM('<!doctype html><div id="root"></div>', {
+						runScripts: 'outside-only',
+					});
+					try {
+						browser.window.eval(readFileSync(file, 'utf8'));
+						return (browser.window as any).__octane_descriptor_result__.replace(/<!--.*?-->/g, '');
+					} finally {
+						browser.window.close();
+					}
+				};
+				expect(renderClient(bundlePath)).toBe(expected);
+				// A persistent build must recompile the importer when its barrel
+				// retargets the name to an ordinary component, and restore it later.
+				write(root, 'src/barrel.ts', ordinaryBarrel);
+				const changedOutput = join(root, 'dist-descriptor-changed');
+				await buildDescriptor(changedOutput);
+				expect(renderClient(join(changedOutput, 'bundle.cjs'))).toBe(
+					expected.replace('<button class="cloned">barrel</button>', '<button>barrel</button>'),
+				);
+				write(root, 'src/barrel.ts', markedBarrel);
+				const restoredOutput = join(root, 'dist-descriptor-restored');
+				await buildDescriptor(restoredOutput);
+				expect(renderClient(join(restoredOutput, 'bundle.cjs'))).toBe(expected);
+			} else {
+				await import(`${pathToFileURL(bundlePath).href}?descriptor`);
+				expect((globalThis as any).__octane_descriptor_result__.replace(/<!--.*?-->/g, '')).toBe(
+					expected,
+				);
+				Reflect.deleteProperty(globalThis, '__octane_descriptor_result__');
+			}
+		},
+		60_000,
+	);
 
 	it('invalidates persistent module caches when profiling toggles', async () => {
 		const cacheDirectory = join(root, '.rspack-profile-cache');

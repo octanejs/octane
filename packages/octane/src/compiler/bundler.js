@@ -471,6 +471,13 @@ export function findDescriptorChildrenImports(source, id) {
 		if (jsxBindings.has(local)) candidates.push({ ...imported, local });
 	}
 	for (const node of ast.body || []) {
+		if (node.type === 'ExportDefaultDeclaration') {
+			if (node.declaration?.type === 'Identifier') {
+				const imported = importedBindings.get(node.declaration.name);
+				if (imported !== undefined) candidates.push({ ...imported, exported: 'default' });
+			}
+			continue;
+		}
 		if (node.type !== 'ExportNamedDeclaration') continue;
 		for (const specifier of node.specifiers || []) {
 			const exported = specifier.exported?.name ?? specifier.exported?.value;

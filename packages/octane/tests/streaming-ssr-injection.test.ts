@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 import * as ServerRuntime from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
 import {
@@ -214,9 +215,93 @@ describe('streaming injection — fragment renders', () => {
 		expect(html).toContain('streamed');
 		expect(html.indexOf('shell')).toBeLessThan(html.indexOf(script));
 	});
+
+	it('keeps notified HTML in order when the web-stream reader starts after injection completes', async () => {
+		const first = '<script data-inject="first">window.__first=1</script>';
+		const second = '<script data-inject="second">window.__second=1</script>';
+		const queue: string[] = [];
+		const done = deferred<void>();
+		let notify: (() => void) | undefined;
+		const source: ServerRuntime.StreamInjectionSource = {
+			take: () => queue.splice(0).join(''),
+			subscribe(callback) {
+				notify = callback;
+				return () => {
+					notify = undefined;
+				};
+			},
+			done: done.promise,
+			renderComplete() {
+				queue.push(first);
+				notify?.();
+				queue.push(second);
+				notify?.();
+				done.resolve();
+			},
+		};
+		const stream = await ServerRuntime.renderToReadableStream(() => 'shell', undefined, {
+			injection: source,
+		});
+		const reader = stream.getReader();
+		const decoder = new TextDecoder();
+		const chunks: string[] = [];
+		for (;;) {
+			const { done: finished, value } = await reader.read();
+			if (finished) break;
+			chunks.push(decoder.decode(value));
+		}
+		await stream.allReady;
+		expect(chunks).toEqual(['shell', first, second]);
+	});
+
+	it('rejects pending injected writes and unsubscribes when the web-stream reader cancels', async () => {
+		const injection = createTestInjection();
+		const abort = new Error('reader left');
+		const errors: unknown[] = [];
+		const stream = await ServerRuntime.renderToReadableStream(() => 'shell', undefined, {
+			injection: injection.source,
+			onError: (error) => errors.push(error),
+		});
+		injection.push('<script data-inject="cancel">window.__cancel=1</script>');
+		await stream.cancel(abort);
+		await expect(stream.allReady).rejects.toBe(abort);
+		expect(errors).toContain(abort);
+		expect(injection.renderCompleteCalls).toBe(1);
+		expect(injection.unsubscribed).toBe(true);
+	});
 });
 
 describe('streaming injection — document renders', () => {
+	it('closes a document once when the reader starts after an external abort', async () => {
+		const injection = createTestInjection();
+		injection.finish();
+		const aborter = new AbortController();
+		const document = ServerRuntime.createElement(
+			'html',
+			{ lang: 'en' },
+			ServerRuntime.createElement('head', null, ServerRuntime.createElement('title', null, 'tail')),
+			ServerRuntime.createElement('body', null, ServerRuntime.createElement('p', null, 'shell')),
+		);
+		const stream = await ServerRuntime.renderToReadableStream(document, undefined, {
+			injection: injection.source,
+			signal: aborter.signal,
+		});
+		// The shell fills the high-water slot; the held closing tags are still
+		// waiting to be accepted when the producer gives up.
+		await flushMicrotasks();
+		const reason = new Error('request timed out');
+		aborter.abort(reason);
+		const output = new Response(stream).text();
+		await expect(stream.allReady).rejects.toBe(reason);
+		const html = await output;
+		expect(html).toContain('<p>shell</p>');
+		expect(html.split('</body>')).toHaveLength(2);
+		expect(html.split('</html>')).toHaveLength(2);
+		expect(tailOf(html)).toMatch(DOCUMENT_TAIL);
+		expect(injection.renderCompleteCalls).toBe(1);
+		expect(injection.unsubscribed).toBe(true);
+	});
+
 	it('holds </body></html> until render and injection both finish', async () => {
 		const value = deferred<string>();
 		const injection = createTestInjection();
@@ -319,6 +404,241 @@ describe('streaming injection — document renders', () => {
 });
 
 describe('streaming injection — failure modes', () => {
+	it('finishes a pipeable render when recovery closes its destination during write', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+		const aborter = new AbortController();
+		const events = new EventEmitter();
+		const first = '<script data-inject="node-accepted">window.__accepted=1</script>';
+		const second = '<script data-inject="node-closing">window.__closing=1</script>';
+		const chunks: string[] = [];
+		const errors: unknown[] = [];
+		let allReady = 0;
+		let didEnd = false;
+		ServerRuntime.renderToPipeableStream(
+			server.DocumentApp,
+			{ promise: value.promise },
+			{
+				injection: injection.source,
+				signal: aborter.signal,
+				onError: (error) => errors.push(error),
+				onAllReady: () => allReady++,
+			},
+		).pipe({
+			write(chunk: string) {
+				chunks.push(chunk);
+				if (chunk === second) {
+					events.emit('close');
+					return false;
+				}
+				return chunk !== first;
+			},
+			end() {
+				didEnd = true;
+			},
+			once: events.once.bind(events),
+			off: events.off.bind(events),
+		});
+		await flushMicrotasks();
+		injection.push(first);
+		await flushMicrotasks();
+		expect(chunks).toContain(first);
+		injection.push(second);
+		await flushMicrotasks();
+		const reason = new Error('request timed out');
+		aborter.abort(reason);
+		await vi.waitFor(() => expect(allReady).toBe(1));
+
+		const html = chunks.join('');
+		expect(errors).toContain(reason);
+		expect(html.split(first)).toHaveLength(2);
+		expect(html.split(second)).toHaveLength(2);
+		expect(didEnd).toBe(false);
+		expect(injection.unsubscribed).toBe(true);
+	});
+
+	it('retains a queued pipeable injection after abort without duplicating accepted bytes', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+		const aborter = new AbortController();
+		const events = new EventEmitter();
+		const first = '<script data-inject="node-first">window.__first=1</script>';
+		const second = '<script data-inject="node-second">window.__second=1</script>';
+		const chunks: string[] = [];
+		let didEnd = false;
+		let finish!: () => void;
+		const ended = new Promise<void>((resolve) => {
+			finish = () => {
+				didEnd = true;
+				resolve();
+			};
+		});
+		ServerRuntime.renderToPipeableStream(
+			server.DocumentApp,
+			{ promise: value.promise },
+			{ injection: injection.source, signal: aborter.signal },
+		).pipe({
+			write(chunk: string) {
+				chunks.push(chunk);
+				return chunk !== first && chunk !== second;
+			},
+			end: finish,
+			once: events.once.bind(events),
+			off: events.off.bind(events),
+		});
+		await flushMicrotasks();
+		injection.push(first);
+		await flushMicrotasks();
+		expect(chunks).toContain(first);
+		injection.push(second);
+		await flushMicrotasks();
+		const reason = new Error('request timed out');
+		aborter.abort(reason);
+		await flushMicrotasks();
+		expect(chunks).toContain(second);
+		// The recovered write is accepted under pressure; recovery markers and
+		// end() still wait for drain even though the request signal is aborted.
+		expect(chunks.join('')).not.toContain('$OCTRX(');
+		expect(didEnd).toBe(false);
+		events.emit('drain');
+		await ended;
+
+		const html = chunks.join('');
+		expect(html.split(first)).toHaveLength(2);
+		expect(html.split(second)).toHaveLength(2);
+		expect(html.indexOf(first)).toBeLessThan(html.indexOf(second));
+		expect(html.indexOf(second)).toBeLessThan(html.indexOf('$OCTRX('));
+		expect(tailOf(html)).toMatch(DOCUMENT_TAIL);
+		expect(injection.renderCompleteCalls).toBe(1);
+		expect(injection.unsubscribed).toBe(true);
+	});
+
+	it('preserves a pending fragment injection when the source wait is aborted', async () => {
+		const injection = createTestInjection();
+		const aborter = new AbortController();
+		const script = '<script data-inject="abort-idle">window.__idle=1</script>';
+		const reason = new Error('request timed out');
+		const stream = await ServerRuntime.renderToReadableStream(() => 'shell', undefined, {
+			injection: injection.source,
+			signal: aborter.signal,
+		});
+		injection.push(script);
+		await flushMicrotasks();
+		aborter.abort(reason);
+		const output = new Response(stream).text();
+		await expect(stream.allReady).rejects.toBe(reason);
+		expect(await output).toBe('shell' + script);
+		expect(injection.unsubscribed).toBe(true);
+	});
+
+	it('releases a pending recovery write when its reader cancels after external abort', async () => {
+		const injection = createTestInjection();
+		const aborter = new AbortController();
+		const reason = new Error('request timed out');
+		const stream = await ServerRuntime.renderToReadableStream(() => 'shell', undefined, {
+			injection: injection.source,
+			signal: aborter.signal,
+		});
+		const reader = stream.getReader();
+		injection.push('<script data-inject="disconnected">window.__disconnected=1</script>');
+		await flushMicrotasks();
+		aborter.abort(reason);
+		await flushMicrotasks();
+		await reader.cancel(new Error('client disconnected'));
+		await expect(stream.allReady).rejects.toBe(reason);
+		expect(injection.unsubscribed).toBe(true);
+	});
+
+	it('preserves notified HTML ahead of recovery and the document tail on external abort', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+		const aborter = new AbortController();
+		const first = '<script data-inject="aborted-first">window.__first=1</script>';
+		const second = '<script data-inject="aborted-second">window.__second=1</script>';
+		const reason = new Error('request timed out');
+		const stream = await ServerRuntime.renderToReadableStream(
+			server.DocumentApp,
+			{ promise: value.promise },
+			{ injection: injection.source, signal: aborter.signal },
+		);
+		// Hold the shell in the web stream's high-water slot while notifications
+		// take both scripts. The reader remains alive after the producer aborts.
+		const reader = stream.getReader();
+		injection.push(first);
+		injection.push(second);
+		await flushMicrotasks();
+		aborter.abort(reason);
+		const decoder = new TextDecoder();
+		const output = (async () => {
+			let html = '';
+			for (;;) {
+				const { done, value: bytes } = await reader.read();
+				if (done) break;
+				html += decoder.decode(bytes, { stream: true });
+			}
+			return html + decoder.decode();
+		})();
+		await expect(stream.allReady).rejects.toBe(reason);
+		const html = await output;
+		const recovery = html.indexOf('$OCTRX(');
+		expect(recovery).toBeGreaterThan(-1);
+		expect(html.split(first)).toHaveLength(2);
+		expect(html.split(second)).toHaveLength(2);
+		expect(html.indexOf(first)).toBeLessThan(html.indexOf(second));
+		expect(html.indexOf(second)).toBeLessThan(recovery);
+		expect(recovery).toBeLessThan(html.indexOf('</body>'));
+		expect(tailOf(html)).toMatch(DOCUMENT_TAIL);
+		expect(injection.unsubscribed).toBe(true);
+	});
+
+	it('finalizes injection when a web stream aborts before its shell is available', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+		const aborter = new AbortController();
+		const reason = new Error('request cancelled before shell');
+		const pending = ServerRuntime.renderToReadableStream(value.promise, undefined, {
+			injection: injection.source,
+			signal: aborter.signal,
+		});
+		aborter.abort(reason);
+		await expect(pending).rejects.toBe(reason);
+		expect(injection.renderCompleteCalls).toBe(1);
+		expect(injection.subscribed).toBe(false);
+	});
+
+	it('finalizes injection when a pipeable stream aborts before its shell is available', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+		const collector = createPipeableCollector();
+		const errors: unknown[] = [];
+		const reason = new Error('request cancelled before shell');
+		const render = ServerRuntime.renderToPipeableStream(value.promise, undefined, {
+			injection: injection.source,
+			onShellError: (error) => errors.push(error),
+		});
+		render.pipe(collector.destination);
+		render.abort(reason);
+		await collector.ended;
+		expect(errors).toContain(reason);
+		expect(injection.renderCompleteCalls).toBe(1);
+		expect(injection.subscribed).toBe(false);
+	});
+
+	it('finalizes injection when onShellReady fails before its callback returns', async () => {
+		const injection = createTestInjection();
+		const reason = new Error('shell observer failed');
+		await expect(
+			ServerRuntime.renderToReadableStream(() => 'shell', undefined, {
+				injection: injection.source,
+				onShellReady() {
+					throw reason;
+				},
+			}),
+		).rejects.toBe(reason);
+		expect(injection.renderCompleteCalls).toBe(1);
+		expect(injection.subscribed).toBe(false);
+	});
+
 	it('a rejected `done` fails the stream after rendering', async () => {
 		const value = deferred<string>();
 		const injection = createTestInjection();
