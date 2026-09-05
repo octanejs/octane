@@ -88,6 +88,7 @@ import {
 } from './native-read-codegen.js';
 import { createTextTypeFactsLookup } from './text-type-facts.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
+import { applyStyleRefs } from './style-scopes.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -6780,6 +6781,11 @@ function isComponentFunction(node) {
 // hooks slotted (via withSlot) and its returned JSX lowered to a descriptor, and
 // whatever USES it (`<Foo/>` / `{expr}`) is what renders it. (Async/generator
 // excluded; a `use*` custom hook that returns JSX is still a hook, not this.)
+//
+// Owned returns inside `if`/`else`/`switch`/`try`/loops count: a function whose
+// only JSX exits are nested still needs the return-JSX path so scoped `<style>`
+// (hash stamp, injectStyle, `ref` class-map writes) runs. Nested function
+// bodies are a different component/value boundary and are ignored.
 function isReturnJsxFunction(node) {
 	if (!node) return false;
 	if (node.type !== 'FunctionDeclaration' && node.type !== 'FunctionExpression') return false;
@@ -6789,9 +6795,58 @@ function isReturnJsxFunction(node) {
 	if (node.id == null) return false;
 	if (node.async || node.generator) return false;
 	if (!node.body || node.body.type !== 'BlockStatement') return false;
-	return (node.body.body || []).some(
-		(s) => s.type === 'ReturnStatement' && s.argument && isJsxNode(s.argument),
-	);
+	const statements = node.body.body || [];
+	for (let i = 0; i < statements.length; i++) {
+		if (statementHasOwnedJsxReturn(statements[i])) return true;
+	}
+	return false;
+}
+
+/** @param {any} stmt @returns {boolean} */
+function statementHasOwnedJsxReturn(stmt) {
+	if (!stmt) return false;
+	if (stmt.type === 'ReturnStatement') return !!(stmt.argument && isJsxNode(stmt.argument));
+	if (stmt.type === 'BlockStatement') {
+		const list = stmt.body || [];
+		for (let i = 0; i < list.length; i++) {
+			if (statementHasOwnedJsxReturn(list[i])) return true;
+		}
+		return false;
+	}
+	if (stmt.type === 'IfStatement') {
+		return (
+			statementHasOwnedJsxReturn(stmt.consequent) || statementHasOwnedJsxReturn(stmt.alternate)
+		);
+	}
+	if (stmt.type === 'SwitchStatement') {
+		const cases = stmt.cases || [];
+		for (let i = 0; i < cases.length; i++) {
+			const consequent = cases[i].consequent || [];
+			for (let j = 0; j < consequent.length; j++) {
+				if (statementHasOwnedJsxReturn(consequent[j])) return true;
+			}
+		}
+		return false;
+	}
+	if (stmt.type === 'TryStatement') {
+		return (
+			statementHasOwnedJsxReturn(stmt.block) ||
+			(stmt.handler ? statementHasOwnedJsxReturn(stmt.handler.body) : false) ||
+			statementHasOwnedJsxReturn(stmt.finalizer)
+		);
+	}
+	if (
+		stmt.type === 'ForStatement' ||
+		stmt.type === 'ForInStatement' ||
+		stmt.type === 'ForOfStatement' ||
+		stmt.type === 'WhileStatement' ||
+		stmt.type === 'DoWhileStatement' ||
+		stmt.type === 'LabeledStatement' ||
+		stmt.type === 'WithStatement'
+	) {
+		return statementHasOwnedJsxReturn(stmt.body);
+	}
+	return false;
 }
 
 /** True when `node` is one plain lowercase host element (never a component/fragment). */
@@ -13666,6 +13721,9 @@ function componentStyleRoots(componentNode) {
  *   - Rebuild the render roots via `annotateRootWithHash` (COW) to stamp the
  *     hash class on every native JSX element AND remove the JSXStyleElement
  *     nodes from the rendered tree (they don't contribute DOM in the new model).
+ *   - When a stripped block carried `ref={x}`, graft class-map setup onto the
+ *     component body so `x` receives `{ card: "hash card", … }` instead of
+ *     staying unset.
  *
  * Returns `{ cssHash, node }` — the hash (or `null` when no `<style>` blocks
  * are present) and the possibly-rebuilt component node the caller must use.
@@ -13766,6 +13824,14 @@ function applyCssScoping(componentNode, ctx) {
 	if (returnReplacements.size > 0) {
 		node = mapAst(node, (n) => returnReplacements.get(n) ?? null);
 	}
+	// `<style ref={x}>` is stripped with the block. Write the class map to `x`
+	// as setup so assignment/callback/`current`/`value` refs are not dropped.
+	node = applyStyleRefs(node, styles, preparedSheets, {
+		inheritOriginLoc,
+		createTempIdentifier: function () {
+			return b.id(allocCompilerName(ctx, '__styleMap'));
+		},
+	});
 	return { cssHash, node };
 }
 

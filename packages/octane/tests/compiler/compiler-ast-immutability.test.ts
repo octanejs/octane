@@ -40,8 +40,9 @@ export function App() @{
 		setRows([{ id: 1, label: 'one' }]);
 	});
 	const extra = { 'data-kind': 'list' };
+	let classes;
 	<div class={['list', { empty: visible.length === 0 }]} {...extra}>
-		<style>
+		<style ref={classes}>
 			div {
 				color: rgb(10, 20, 30);
 			}
