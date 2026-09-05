@@ -148,7 +148,7 @@ export function expandSeo(input: SeoInput): SeoDescriptor[] {
 		// merge, so one place decides which origin applies.
 		const images = normalizeImages(og.images);
 		for (let i = 0; i < images.length; i++) {
-			const image = images[i];
+			const image = images[i]!;
 			const url = image.url;
 			// Repeated og:image tags are legitimate, so each gets its own identity.
 			out.push({
