@@ -955,6 +955,126 @@ export function App() @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
 	});
 
+	it.each([
+		['an unused arrow helper', 'const read = () => count;', false],
+		['an unused function helper', 'function read() { return count; }', false],
+		['an unused helper beside an effect', 'const read = () => count;', true],
+	])('locates state despite %s in its parent scope', (_label, helper, withEffect) => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [count] = useState(0);
+  ${helper}
+  ${withEffect ? 'useEffect(() => props.observe(count), [count]);' : ''}
+  <div>@{ <span>{count as string}</span> }</div>
+}`;
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		expect(diagnostics.map(({ code }) => code)).toEqual(
+			withEffect ? [HOOK_LOCALITY, HOOK_LOCALITY] : [HOOK_LOCALITY],
+		);
+		expect(diagnostics.map(({ start }) => start.offset)).toEqual(
+			withEffect
+				? [source.indexOf('useState(0)'), source.indexOf('useEffect(')]
+				: [source.indexOf('useState(0)')],
+		);
+		expect(diagnostics[0].message).toMatch(
+			/Move useState into the @\{\} block.*Remove unused helper read/,
+		);
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
+
+		const fixed = source.replace(
+			`  const [count] = useState(0);\n  ${helper}\n  ${withEffect ? 'useEffect(() => props.observe(count), [count]);' : ''}\n  <div>@{ <span>{count as string}</span> }</div>`,
+			`  <div>@{\n    const [count] = useState(0);\n    ${withEffect ? 'useEffect(() => props.observe(count), [count]);' : ''}\n    <span>{count as string}</span>\n  }</div>`,
+		);
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(fixed, '/src/App.tsrx', { mode })).not.toThrow();
+		}
+		expect(compileToVolarMappings(fixed, '/src/App.tsrx').diagnostics).toEqual([]);
+	});
+
+	it('keeps a helper and captured state at the parent when the helper is used there', () => {
+		for (const consumer of ['<button onClick={read}>read</button>', '<Dialog onRead={read} />']) {
+			const source = `"use strong";
+import { useState } from 'octane';
+export function App() @{
+  const [count] = useState(0);
+  const read = () => count;
+  <div>${consumer}@{ <span>{count as string}</span> }</div>
+}`;
+			for (const mode of ['client', 'server'] as const) {
+				expect(() => compile(source, '/src/App.tsrx', { mode })).not.toThrow();
+			}
+			expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toEqual([]);
+		}
+	});
+
+	it('keeps state shared by sibling blocks at its parent despite an unused helper', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App() @{
+  const [count] = useState(0);
+  const read = () => count;
+  <div>@{ <span>{count as string}</span> }@{ <output>{count as string}</output> }</div>
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, '/src/App.tsrx', { mode })).not.toThrow();
+		}
+		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toEqual([]);
+	});
+
+	it('locates independent hooks in sibling blocks despite a shared unused helper', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App() @{
+  const [left] = useState('left');
+  const [right] = useState('right');
+  const read = () => left + right;
+  <div>@{ <span>{left as string}</span> }@{ <output>{right as string}</output> }</div>
+}`;
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		expect(diagnostics.map(({ code }) => code)).toEqual([HOOK_LOCALITY, HOOK_LOCALITY]);
+		expect(diagnostics.map(({ start }) => start.offset)).toEqual([
+			source.indexOf("useState('left')"),
+			source.indexOf("useState('right')"),
+		]);
+		for (const diagnostic of diagnostics) {
+			expect(diagnostic.message).toMatch(
+				/Move useState into the @\{\} block.*Remove unused helper read/,
+			);
+			expect(diagnostic.message).toContain('line 7');
+		}
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
+
+		const fixed = `"use strong";
+import { useState } from 'octane';
+export function App() @{
+  <div>
+    @{ const [left] = useState('left'); <span>{left as string}</span> }
+    @{ const [right] = useState('right'); <output>{right as string}</output> }
+  </div>
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(fixed, '/src/App.tsrx', { mode })).not.toThrow();
+		}
+		expect(compileToVolarMappings(fixed, '/src/App.tsrx').diagnostics).toEqual([]);
+	});
+
+	it('keeps a helper captured by a parent effect with parent-owned state', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [root] = useState(0);
+  const [count] = useState(0);
+  const read = () => count;
+  useEffect(() => props.observe(root, read()), [root, read]);
+  <div><output>{root as string}</output>@{ <span>{count as string}</span> }</div>
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, '/src/App.tsrx', { mode })).not.toThrow();
+		}
+		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toEqual([]);
+	});
+
 	it('keeps a hook in root setup when ordinary JSX consumes it directly', () => {
 		const source = `"use strong";
 import { useState } from 'octane';

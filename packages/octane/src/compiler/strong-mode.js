@@ -836,6 +836,31 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 	// A hook, the callbacks that capture it, and effects that observe it must
 	// agree on one owner. Grouping these dependencies once avoids repeatedly
 	// recalculating every owner for a chain of effects.
+	// Only referenced helpers constrain ownership. An unused closure can read
+	// several hooks needed by separate blocks without sharing their lifetime.
+	const consumedHandlers = new Set();
+	const capturedHandlers = new Map();
+	for (const handler of handlers) {
+		if (componentHandlers.has(handler)) consumedHandlers.add(handler);
+		for (const use of handler.uses) {
+			if (use.viaHandler) {
+				let captured = capturedHandlers.get(use.viaHandler);
+				if (captured === undefined) capturedHandlers.set(use.viaHandler, (captured = []));
+				captured.push(handler);
+			} else {
+				consumedHandlers.add(handler);
+			}
+		}
+	}
+	const reachable = [...consumedHandlers];
+	for (let index = 0; index < reachable.length; index++) {
+		for (const captured of capturedHandlers.get(reachable[index]) ?? []) {
+			if (consumedHandlers.has(captured)) continue;
+			consumedHandlers.add(captured);
+			reachable.push(captured);
+		}
+	}
+	const unusedCaptures = new Map();
 	const nodes = [...values, ...effects, ...handlers];
 	const edges = new Map(nodes.map((node) => [node, new Set()]));
 	const directUses = new Map(nodes.map((node) => [node, []]));
@@ -846,8 +871,15 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 	}
 	for (const value of values) {
 		for (const use of value.uses) {
-			if (use?.viaHandler) connect(value, use.viaHandler);
-			else directUses.get(value).push(use?.region ?? use);
+			if (use?.viaHandler) {
+				if (consumedHandlers.has(use.viaHandler)) {
+					connect(value, use.viaHandler);
+				} else {
+					let unused = unusedCaptures.get(value);
+					if (unused === undefined) unusedCaptures.set(value, (unused = new Set()));
+					unused.add(use.viaHandler);
+				}
+			} else directUses.get(value).push(use?.region ?? use);
 		}
 		for (const dependency of value.dependencies) connect(value, dependency);
 		for (const helper of value.helpers) connect(value, helper);
@@ -861,12 +893,15 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 	}
 	for (const handler of handlers) {
 		for (const use of handler.uses) {
-			if (use.viaHandler) connect(handler, use.viaHandler);
-			else if (use.viaDerived) connect(handler, use.viaDerived);
+			if (use.viaHandler) {
+				if (consumedHandlers.has(use.viaHandler)) connect(handler, use.viaHandler);
+			} else if (use.viaDerived) connect(handler, use.viaDerived);
 			else if (use.effect) connect(handler, use.effect);
 			else directUses.get(handler).push(use.region);
 		}
-		if (handler.uses.length === 0 || componentHandlers.has(handler)) {
+		// An unused helper does not consume its captured hooks in this region;
+		// keep an actual component reference anchored to its own lifetime.
+		if (componentHandlers.has(handler)) {
 			directUses.get(handler).push(handler.region);
 		}
 	}
@@ -943,12 +978,20 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 		for (const member of group) {
 			if (member.region === owner) continue;
 			if (member.kind === 'locality-value') {
+				const unused = unusedCaptures.get(member);
+				const unusedNames = unused
+					? [...unused].slice(0, 3).map((helper) => helper.node.id.name)
+					: [];
+				const unusedText =
+					unusedNames.length === 0
+						? ''
+						: ` Remove unused ${unused.size === 1 ? 'helper' : 'helpers'} ${unusedNames.join(', ')}${unused.size > 3 ? ` and ${unused.size - 3} more` : ''}, which still ${unused.size === 1 ? 'captures' : 'capture'} this value, before moving it.`;
 				diagnostics.push(
 					diagnostic(
 						STRONG_HOOK_LOCALITY,
 						filename,
 						member.node,
-						`Move ${member.hook}${helperText} into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, before the JSX or local effect that uses its value.`,
+						`Move ${member.hook}${helperText} into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, before the JSX or local effect that uses its value.${unusedText}`,
 					),
 				);
 			} else if (
