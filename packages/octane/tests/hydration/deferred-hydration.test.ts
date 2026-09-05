@@ -316,16 +316,49 @@ describe('deferred hydration', () => {
 		expect(container.querySelector('#styled-split-review')).not.toBeNull();
 	});
 
-	it('rejects a scoped <style> inside a split boundary, naming the style scope it belongs to', () => {
-		// The split child would compile the sheet under another hash while the
-		// server stamps the enclosing scope's hash around the boundary.
+	it('adopts server DOM when a complete style scope sits inside a split child', async () => {
+		const onHydrated = vi.fn();
+		const props = { when: load(), onHydrated };
+		const { html } = renderToString(styledServer.StyledCompleteSplitHydration, props);
+		container.innerHTML = html;
+		const serverHost = container.querySelector('#styled-complete-split-host') as HTMLElement;
+		const serverNote = container.querySelector('#styled-complete-note') as HTMLElement;
+		const serverReview = container.querySelector('#styled-complete-review') as HTMLElement;
+		const serverNoteClass = serverNote.className;
+		const serverReviewClass = serverReview.className;
+		const serverScope = serverNote.className.match(/\btsrx-[0-9a-z]+\b/)![0];
+		expect(serverNoteClass).toContain(serverScope);
+		expect(serverReviewClass).toContain(serverScope);
+
+		root = hydrateRoot(container, styledClient.StyledCompleteSplitHydration, props);
+		await vi.waitFor(async () => {
+			await act(() => {});
+			expect(onHydrated).toHaveBeenCalledOnce();
+		});
+
+		// The sheet lives in the split child, so it appears only after the
+		// child chunk runs — under the same authored-position hash the server
+		// stamped.
+		const clientSheet = document.head.querySelector(`style[data-octane="${serverScope}"]`);
+		expect(clientSheet).not.toBeNull();
+		expect(clientSheet!.textContent).toContain(`.styled-complete-note.${serverScope}`);
+		expect(container.querySelector('#styled-complete-split-host')).toBe(serverHost);
+		expect(container.querySelector('#styled-complete-note')).toBe(serverNote);
+		expect(container.querySelector('#styled-complete-review')).toBe(serverReview);
+		expect(serverNote.className).toBe(serverNoteClass);
+		expect(serverReview.className).toBe(serverReviewClass);
+	});
+
+	it('rejects a style scope that straddles a split boundary', () => {
 		const source = `import { Hydrate } from 'octane';
 export function App(props) @{
-	<Hydrate when={props.when}>
-		<div class="x">
-			<style>.x { color: red; }</style>
-		</div>
-	</Hydrate>
+	<div>
+		<style>.x { color: red; }</style>
+		<p class="x">outside</p>
+		<Hydrate when={props.when}>
+			<span class="x">inside</span>
+		</Hydrate>
+	</div>
 }`;
 		let thrown: any = null;
 		try {
@@ -334,9 +367,7 @@ export function App(props) @{
 			thrown = error;
 		}
 		expect(thrown).toMatchObject({ code: 'OCTANE_HYDRATE_SPLIT_STYLE' });
-		expect(thrown.message).toContain(
-			'a scoped <style> cannot move into a split child — its rules belong to the style scope it sits in',
-		);
+		expect(thrown.message).toContain('straddle a split Hydrate boundary');
 		expect(thrown.message).toContain('split={false}');
 	});
 

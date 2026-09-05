@@ -30,7 +30,14 @@ function inheritGeneratedOrigin(root, origin) {
 			for (const item of value) visit(item);
 			return;
 		}
-		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
+		// Adopted parser nodes (including StyleSheet subtrees) may be frozen
+		// and already carry CSS-relative positions; only stamp generated nodes.
+		if (
+			typeof value.type === 'string' &&
+			value.loc == null &&
+			origin?.loc != null &&
+			!Object.isFrozen(value)
+		) {
 			value.start = origin.start;
 			value.end = origin.end;
 			value.loc = origin.loc;
@@ -440,6 +447,161 @@ function isHookCall(node, hookNames) {
 	);
 }
 
+function collectSubtreeNodes(value, output) {
+	if (!value || typeof value !== 'object') return;
+	if (Array.isArray(value)) {
+		for (const child of value) collectSubtreeNodes(child, output);
+		return;
+	}
+	if (output.has(value)) return;
+	output.add(value);
+	for (const [key, child] of Object.entries(value)) {
+		if (!SKIP_KEYS.has(key)) collectSubtreeNodes(child, output);
+	}
+}
+
+function subtreeContainsNode(root, target) {
+	if (root === target) return true;
+	const seen = new WeakSet();
+	const visit = (value) => {
+		if (!value || typeof value !== 'object') return false;
+		if (Array.isArray(value)) {
+			for (const child of value) {
+				if (visit(child)) return true;
+			}
+			return false;
+		}
+		if (seen.has(value)) return false;
+		seen.add(value);
+		if (value === target) return true;
+		for (const [key, child] of Object.entries(value)) {
+			if (!SKIP_KEYS.has(key) && visit(child)) return true;
+		}
+		return false;
+	};
+	return visit(root);
+}
+
+function collectOwnStyleBlocks(nodes) {
+	const blocks = [];
+	for (const node of nodes ?? []) {
+		if (node?.type === 'JSXStyleElement' && !isFloatStyleResource(node)) blocks.push(node);
+	}
+	return blocks;
+}
+
+function isFloatStyleResource(node) {
+	let hasHref = false;
+	let hasPrecedence = false;
+	for (const attribute of node.openingElement?.attributes ?? []) {
+		if (attribute?.type !== 'JSXAttribute' && attribute?.type !== 'Attribute') continue;
+		const name = jsxAttributeName(attribute);
+		if (name === 'href') hasHref = true;
+		else if (name === 'precedence') hasPrecedence = true;
+	}
+	return hasHref && hasPrecedence;
+}
+
+function isStampableHost(node) {
+	if (node?.type !== 'JSXElement' && node?.type !== 'Element') return false;
+	if (node.metadata?.dynamicElement) return true;
+	const name = node.openingElement?.name ?? node.name;
+	if (!name) return false;
+	if (name.type === 'JSXIdentifier' || name.type === 'Identifier') {
+		return name.name !== 'style' && !/^[A-Z]/.test(name.name);
+	}
+	// Namespaced hosts (`svg:rect`) are stamped by the style-scope pass;
+	// member expressions are composites and are not.
+	return name.type === 'JSXNamespacedName' || name.type === 'NamespacedName';
+}
+
+function walkStampableHosts(node, visitHost) {
+	if (!node || typeof node !== 'object') return;
+	if (Array.isArray(node)) {
+		for (const child of node) walkStampableHosts(child, visitHost);
+		return;
+	}
+	if (isFunction(node)) return;
+	if (isStampableHost(node)) visitHost(node);
+	for (const [key, child] of Object.entries(node)) {
+		if (!SKIP_KEYS.has(key)) walkStampableHosts(child, visitHost);
+	}
+}
+
+/**
+ * A children list that holds standalone `<style>` blocks is one lexical style
+ * scope (plan S8.5 / RFC sibling scopes). Extraction is safe when that whole
+ * scope — its blocks and the host elements they stamp — sits inside the split
+ * boundary, because both compiles keep the authored-position hash. A scope
+ * that has blocks or stamped hosts on both sides of the boundary would emit
+ * disagreeing class lists; that is still `OCTANE_HYDRATE_SPLIT_STYLE`. Styles
+ * nested in functions never joined the enclosing scopes and are not checked.
+ */
+function styleScopeStraddlesBoundary(list, own, inside) {
+	let hasInside = false;
+	let hasOutside = false;
+	const mark = (node) => {
+		if (inside.has(node)) hasInside = true;
+		else hasOutside = true;
+	};
+	for (const block of own) mark(block);
+	for (const item of list) {
+		if (own.includes(item)) continue;
+		walkStampableHosts(item, mark);
+	}
+	return hasInside && hasOutside;
+}
+
+function assertHydrateStyleScopes(boundary, filename) {
+	const inside = new WeakSet();
+	collectSubtreeNodes(boundary.node.children, inside);
+	const seenLists = new WeakSet();
+	const seen = new WeakSet();
+	const visit = (node, inFunction) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, inFunction);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (TRANSPARENT_TS_EXPRESSIONS.has(node.type)) {
+			visit(node.expression, inFunction);
+			return;
+		}
+		if (!inFunction && isFunction(node)) {
+			const nested = !subtreeContainsNode(node, boundary.node);
+			for (const [key, child] of Object.entries(node)) {
+				if (!SKIP_KEYS.has(key)) visit(child, nested);
+			}
+			return;
+		}
+		if (
+			!inFunction &&
+			(node.type === 'JSXElement' || node.type === 'JSXFragment' || node.type === 'Element') &&
+			Array.isArray(node.children)
+		) {
+			const own = collectOwnStyleBlocks(node.children);
+			if (own.length > 0 && !seenLists.has(node.children)) {
+				seenLists.add(node.children);
+				if (styleScopeStraddlesBoundary(node.children, own, inside)) {
+					const reported = own.find((block) => inside.has(block)) ?? own[0];
+					throw extractionError(
+						'OCTANE_HYDRATE_SPLIT_STYLE',
+						filename,
+						reported,
+						'a scoped <style> cannot straddle a split Hydrate boundary — its style scope has blocks or stamped elements on both sides. Keep the whole scope inside the boundary, move it entirely outside, extract a child component, or set `split={false}`',
+					);
+				}
+			}
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!SKIP_KEYS.has(key)) visit(child, inFunction);
+		}
+	};
+	visit(boundary.ast ?? boundary.node, false);
+}
+
 function validateBoundary(boundary, filename, hookNames) {
 	for (const child of boundary.node.children ?? []) {
 		if (child?.type === 'JSXExpressionContainer' && isFunction(child.expression)) {
@@ -489,20 +651,6 @@ function validateBoundary(boundary, filename, hookNames) {
 				'direct hook calls cannot move into a split child. Call the hook in a child component or set `split={false}`',
 			);
 		}
-		// `directHooks` also marks the owning component's direct render scope: a
-		// scoped <style> there belongs to the style scope it sits in, which
-		// extraction would tear in half (the server stamps that scope's hash on
-		// the elements around the boundary; the split chunk would compile the
-		// sheet under another hash). Styles nested inside functions never joined
-		// the component's scopes, so they move freely.
-		if (directHooks && node.type === 'JSXStyleElement') {
-			throw extractionError(
-				'OCTANE_HYDRATE_SPLIT_STYLE',
-				filename,
-				node,
-				'a scoped <style> cannot move into a split child — its rules belong to the style scope it sits in. Move the <style> outside the boundary, into a child component, or set `split={false}`',
-			);
-		}
 		if (isFunction(node)) {
 			// A nested function keeps hook calls in its own invocation. Ordinary
 			// functions also bind their own receiver; arrows still capture `this`
@@ -530,6 +678,7 @@ function validateBoundary(boundary, filename, hookNames) {
 		}
 	};
 	visit(boundary.node.children);
+	assertHydrateStyleScopes(boundary, filename);
 }
 
 /** Resolve Hydrate boundaries and assign source-order paths under their nearest boundary. */
@@ -1607,6 +1756,7 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 	for (const boundary of analysis.boundaries) {
 		boundary.filename = filename;
 		boundary.hookNames = analysis.imports.hookNames;
+		boundary.ast = analysis.ast;
 	}
 	const request = sameSourceRequest(filename);
 	const moduleMovePlan = createModuleMovePlanAst(analysis, request);

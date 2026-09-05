@@ -27,3 +27,24 @@ export function StyledSplitHydration(props) @{
 		</style>
 	</section>
 }
+
+// Plan S8.5: a complete lexical scope owned by the split child. The block and
+// the hosts it stamps all sit inside the boundary, so the extracted child and
+// the server compile share the authored-position hash.
+export function StyledCompleteSplitHydration(props) @{
+	<section id="styled-complete-split-host">
+		<Hydrate when={props.when} onHydrated={props.onHydrated}>
+			<div>
+				<p class="styled-complete-note" id="styled-complete-note">
+					Inside the boundary
+				</p>
+				<style>
+					.styled-complete-note {
+						color: rgb(20, 120, 80);
+					}
+				</style>
+				<p id="styled-complete-review">Deferred complete-scope review</p>
+			</div>
+		</Hydrate>
+	</section>
+}
