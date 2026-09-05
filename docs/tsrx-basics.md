@@ -397,7 +397,8 @@ JavaScript. Only inject source you trust.
 Strong mode is an optional immutable render-snapshot contract with compiler
 checks for state, refs, Effect Events, and detectable impure render calls. It is
 also an author assertion that rendering is pure, which production memoization
-is allowed to trust without proving every call body.
+is allowed to trust without proving every call body. It also checks where hook
+values and event handlers belong in a template.
 Start with one module by putting `"use strong"` before its imports:
 
 ```tsx
@@ -447,6 +448,59 @@ These patterns become compile errors:
 - Calling unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`,
   or `new Date()` without arguments during render
   (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
+- Declaring a built-in hook value outside the only template arm (`@if`, keyed
+  `@for`, `@switch`, or `@try`) that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
+- Declaring a local callback outside its only native `onX` event attribute
+  (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
+
+### Keep work with its template arm
+
+Each `@if`, keyed `@for`, `@switch`, and `@try` arm has its own render scope.
+When every use of a built-in hook value is in one arm, declare the hook in that
+arm. An effect that observes hook values belonging to that arm goes there too:
+
+```jsx
+"use strong";
+
+import { useEffect, useState } from 'octane';
+
+export function Search({ open }) @{
+	<section>
+		@if (open) {
+			const [query, setQuery] = useState('');
+			useEffect(() => {
+				document.title = query;
+			});
+			<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
+		}
+	</section>
+}
+```
+
+A setup-level `useState` whose value and setter are both used only in that arm
+instead reports `OCTANE_STRONG_HOOK_LOCALITY`, with the target arm and line in
+the error. The same code applies to an effect that belongs with those local
+values. A state value shared by sibling arms stays in their common scope;
+effects with no provable single arm also remain valid there. A local helper that
+captures the hook value must move with it; the diagnostic names that helper.
+Moving state or an effect into a conditional arm changes its lifetime, so split
+independent parent-scope work into a separate effect. The placement check
+recognizes built-in hooks imported from Octane; custom hook calls are outside
+this check.
+
+Put a callback that serves one native event at the attribute where it is used:
+
+```jsx
+<button onClick={() => save(query)}>Save</button>
+```
+
+For example, declaring `const handleClick = () => save(query)` in setup and
+using it only as `<button onClick={handleClick}>` reports
+`OCTANE_STRONG_EVENT_HANDLER_LOCALITY` at the attribute. Callbacks shared by
+several arms, forwarded through component props, or imported from another module
+can retain their named bindings. If several native events in one arm share a local
+callback, declare it in that arm. These placement checks apply only to modules
+that opt into Strong mode; ordinary modules keep their existing behavior.
 
 The checks follow provable synchronous calls through local helpers,
 `useCallback` and `useEffectEvent` results, and functions returned by analyzable

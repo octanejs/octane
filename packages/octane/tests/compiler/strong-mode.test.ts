@@ -12,6 +12,8 @@ const RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
 const RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
 const EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 const DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
+const HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
+const EVENT_HANDLER_LOCALITY = 'OCTANE_STRONG_EVENT_HANDLER_LOCALITY';
 
 describe('Strong mode immutable render inputs', () => {
 	const component = (
@@ -366,6 +368,382 @@ export function Counter() @{
   <button onClick={() => setCount(count + 1)}>{count as string}</button>
 }`;
 }
+
+describe('Strong mode template locality', () => {
+	const armState = `import { useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  <div>
+    @if (props.show) {
+      <button onClick={() => setCount(count + 1)}>{count as string}</button>
+    }
+  </div>
+}`;
+
+	it('locates an outer state hook used only inside one @if arm', () => {
+		const source = `"use strong";\n${armState}`;
+		const start = source.indexOf('useState(0)');
+		let failure: unknown;
+		try {
+			compile(source, '/src/App.tsrx');
+		} catch (error) {
+			failure = error;
+		}
+		expect(failure).toMatchObject({
+			code: HOOK_LOCALITY,
+			filename: '/src/App.tsrx',
+			pos: start,
+		});
+		expect((failure as Error).message).toMatch(/useState.*@if/i);
+		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: HOOK_LOCALITY,
+				severity: 'error',
+				filename: '/src/App.tsrx',
+				start: expect.objectContaining({ offset: start }),
+			}),
+		);
+		expect(() => compile(armState, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('locates an effect tied to state used only inside one @if arm', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  useEffect(() => props.observe(count), [count]);
+  <div>
+    @if (props.show) {
+      <button onClick={() => setCount(count + 1)}>{count as string}</button>
+    }
+  </div>
+}`;
+		const start = source.indexOf('useEffect(');
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		expect(diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: HOOK_LOCALITY,
+				severity: 'error',
+				filename: '/src/App.tsrx',
+				message: expect.stringMatching(/useEffect.*@if/i),
+				start: expect.objectContaining({ offset: start }),
+			}),
+		);
+	});
+
+	it('locates state observed only by an effect inside one @if arm', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [count] = useState(0);
+  <div>@if (props.show) {
+    useEffect(() => props.observe(count), [count]);
+    <span>shown</span>
+  }</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(/useState.*@if/);
+	});
+
+	it('accepts hooks beside the template arm that owns them in client and server output', () => {
+		const source = `import { useEffect, useState } from 'octane';
+export function App(props) @{
+  <div>
+    @if (props.show) {
+      const [count, setCount] = useState(0);
+      useEffect(() => props.observe(count), [count]);
+      <button onClick={() => setCount(count + 1)}>{count as string}</button>
+    }
+  </div>
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			const ordinary = compile(source, '/src/App.tsrx', { mode });
+			const strong = compile(`"use strong";\n${source}`, '/src/App.tsrx', { mode });
+			expect(strong.code).toContain('App');
+			expect(strong.diagnostics).toEqual(ordinary.diagnostics);
+		}
+	});
+
+	it.each([
+		['@for', '@for (const item of props.items; key item.id) { <li>{count + item.id}</li> }'],
+		['@case', '@switch (props.kind) { @case "one": { <li>{count as string}</li> } }'],
+		['@try', '@try { <li>{count as string}</li> } @catch (error) { <li>error</li> }'],
+		[
+			'@if',
+			'@if (props.kind === "one") { <li>one</li> } @else if (props.kind === "two") { <li>{count as string}</li> }',
+		],
+	])('locates state owned by a single %s template arm', (arm, template) => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count] = useState(0);
+  <ul>${template}</ul>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(new RegExp(`useState.*${arm}`));
+	});
+
+	it('keeps state at the common owner when root output or both branches use it', () => {
+		const sources = [
+			`"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  <div>
+    <output>{count as string}</output>
+    @if (props.show) { <button onClick={() => setCount(count + 1)}>increment</button> }
+  </div>
+}`,
+			`"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  <div>
+    @if (props.show) { <button onClick={() => setCount(count + 1)}>increment</button> }
+    @else { <output>{count as string}</output> }
+  </div>
+}`,
+		];
+		for (const source of sources) {
+			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		}
+	});
+
+	it('locates a one-site local handler at its event attribute', () => {
+		const source = `"use strong";
+export function App(props) @{
+  const handle = () => props.onAction();
+  <button onClick={handle}>run</button>
+}`;
+		const start = source.indexOf('onClick={handle}');
+		let failure: unknown;
+		try {
+			compile(source, '/src/App.tsrx');
+		} catch (error) {
+			failure = error;
+		}
+		expect(failure).toMatchObject({
+			code: EVENT_HANDLER_LOCALITY,
+			filename: '/src/App.tsrx',
+			pos: start,
+		});
+		expect((failure as Error).message).toMatch(/inline.*onClick/i);
+		expect(() => compile(source.replace('"use strong";\n', ''), '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('moves a handler shared by events in one arm into that arm', () => {
+		const source = `"use strong";
+export function App(props) @{
+  const handle = () => props.onAction();
+  <div>@if (props.show) { <button onClick={handle} onMouseDown={handle}>run</button> }</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(/event handler.*@if/);
+	});
+
+	it('tracks state through a local event handler or helper used only in an arm', () => {
+		for (const [setup, use] of [
+			['const handle = () => setCount(count + 1);', 'onClick={handle}'],
+			['const handle = () => setCount(count + 1);', 'onClick={() => handle()}'],
+			[
+				'const label = () => count; const handle = () => setCount(label() + 1);',
+				'onClick={handle}',
+			],
+		]) {
+			const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  ${setup}
+  <div>@if (props.show) { <button ${use}>run</button> }</div>
+}`;
+			expect(() => compile(source, '/src/App.tsrx')).toThrow(/useState.*helper.*handle.*@if/);
+		}
+	});
+
+	it('handles repeated helper fanout without expanding every call path', () => {
+		const helpers = ['const h0 = () => count;'];
+		for (let index = 1; index <= 18; index++) {
+			helpers.push(`const h${index} = () => { h${index - 1}(); h${index - 1}(); };`);
+		}
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count] = useState(0);
+  ${helpers.join('\n  ')}
+  <div>@if (props.show) { <button onClick={h18}>run</button> }</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(/useState.*@if/);
+	});
+
+	it('keeps shared, forwarded, and imported callbacks available for events', () => {
+		const sources = [
+			`"use strong";
+export function App(props) @{
+  const handle = () => props.onAction();
+  <div><button onClick={handle}>one</button><button onClick={handle}>two</button></div>
+}`,
+			`"use strong";
+export function App(props) @{ <button onClick={props.onAction}>run</button> }`,
+			`"use strong";
+import { onAction } from './actions';
+export function App() @{ <button onClick={onAction}>run</button> }`,
+			`"use strong";
+export function App(props) @{
+  const handle = () => props.onAction();
+  <button onClick={props.ready ? handle : props.onFallback}>run</button>
+}`,
+			`"use strong";
+function Dialog(props) @{ <button onClick={props.onClose}>close</button> }
+export function App(props) @{
+  const handle = () => props.onAction();
+  <Dialog onClose={handle} />
+}`,
+		];
+		for (const source of sources) {
+			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		}
+	});
+
+	it.each([
+		[
+			'an aliased import',
+			"import { useState as useCounterState } from 'octane';",
+			'useCounterState',
+		],
+		['a namespace import', "import * as Octane from 'octane';", 'Octane.useState'],
+	])('recognizes %s as an owned state hook', (_label, declaration, callee) => {
+		const source = `"use strong";
+${declaration}
+export function App(props) @{
+  const [count, setCount] = ${callee}(0);
+  <div>
+    @if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }
+  </div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
+	});
+
+	it('does not mistake a shadowed function for an Octane hook', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const useState = (initial) => [initial, () => {}];
+  const [count, setCount] = useState(0);
+  <div>
+    @if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }
+  </div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('does not mistake a hoisted local var for an imported hook', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  if (true) { var useState = (value) => [value, () => {}]; }
+  const [count, setCount] = useState(0);
+  <div>@if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('does not hoist a template arm var into the parent hook scope', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count] = useState(0);
+  <div>@if (props.show) { var useState = () => 1; <span>{count as string}</span> }</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(/useState.*@if/);
+	});
+
+	it.each([
+		'try { throw 1; } catch (count) { props.observe(count); }',
+		'for (const count of props.items) { props.observe(count); }',
+		'for (let count = 0; count < props.items.length; count++) { props.observe(count); }',
+		'switch (props.kind) { case "one": const count = 1; props.observe(count); break; default: break; }',
+		'const C = class { count = 1; countMethod() { return 1; } };',
+		'const C = class count { value() { return count; } };',
+		'const C = class { static { let count = 1; props.observe(count); } };',
+		'count: { break count; }',
+	])('respects shadowing in JavaScript control flow: %s', (setup) => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count] = useState(0);
+  <div>@if (props.show) { ${setup} <span /> }</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('treats a state-derived component tag as a template use', () => {
+		for (const tag of ['Component', 'pkg.Component']) {
+			const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [${tag.split('.')[0]}] = useState(() => props.Component);
+  <div>@if (props.show) { <${tag} /> }</div>
+}`;
+			expect(() => compile(source, '/src/App.tsrx')).toThrow(/useState.*@if/);
+		}
+	});
+
+	it('keeps a parent state hook independent of an @for index with the same name', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [index] = useState(0);
+  <ul>@for (const item of props.items; index index; key item.id) { <li>{index as string}</li> }</ul>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		'function Child() @{ <span>{count as string}</span> }',
+		'function Child() { return <span>{count as string}</span>; }',
+		'function Child() { if (props.ready) return <span>{count as string}</span>; return <i />; }',
+		'const Child = () => props.ready ? <span>{count as string}</span> : <i />;',
+		'const Child = () => { const view = <span>{count as string}</span>; return view; };',
+	])('keeps parent state captured by a nested component at its original owner', (child) => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count] = useState(0);
+  ${child}
+  <div>@if (props.show) { <Child /> }</div>
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, '/src/App.tsrx', { mode })).not.toThrow();
+		}
+	});
+
+	it('recognizes capture events but leaves lowercase native attributes alone', () => {
+		const source = `"use strong";
+export function App(props) @{
+  const handle = () => props.onAction();
+  <button onClickCapture={handle}>run</button>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(EVENT_HANDLER_LOCALITY);
+		expect(() =>
+			compile(source.replace('onClickCapture', 'onclick'), '/src/App.tsrx'),
+		).not.toThrow();
+	});
+
+	it.each([
+		{ mode: 'client', dev: true },
+		{ mode: 'client', dev: false },
+		{ mode: 'server', dev: true },
+		{ mode: 'server', dev: false },
+	])('enforces locality in $mode compilation with dev=$dev', (options) => {
+		expect(() => compile(`"use strong";\n${armState}`, '/src/App.tsrx', options)).toThrow(
+			HOOK_LOCALITY,
+		);
+		const event = `"use strong";
+export function App(props) @{
+  const handle = () => props.onAction();
+  <button onClick={handle}>run</button>
+}`;
+		expect(() => compile(event, '/src/App.tsrx', options)).toThrow(EVENT_HANDLER_LOCALITY);
+	});
+});
 
 describe('Strong mode compiler enforcement', () => {
 	it('preserves existing behavior until the compiler or module opts in', () => {

@@ -515,6 +515,20 @@ All user-authored render calls and synchronously invoked callbacks must be pure
 for their witnessed inputs. Function names—including `use*` names—do not change
 that contract or disable the optimization.
 
+Strong mode also checks where compiler-managed work belongs. If a locally
+declared built-in hook value is used only in one template arm (`@if`, keyed
+`@for`, `@switch`, or `@try`), declare it there. Effects observing hook values
+confined to that arm belong there too. A declaration outside its arm reports
+`OCTANE_STRONG_HOOK_LOCALITY` and names the target arm and source line, including
+any local helpers that must move with the value. State and effects shared by
+multiple arms stay in their common scope; effects without a provable single arm
+remain valid. A local callback used by just one native `onX` event belongs inline
+in that JSX attribute (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`). A callback shared
+by several events inside one arm belongs in that arm. Cross-arm, imported, and
+forwarded callbacks remain supported. The placement diagnostics use the authored
+source location in client, server, and editor compilation; they do not move
+declarations or change emitted code for valid modules.
+
 Event handlers, genuinely deferred callbacks, effect cleanup, effects that
 synchronize an external system, and normal DOM or timer refs remain supported.
 Replace prop-driven state resets with `useLinkedState` instead of calling a
