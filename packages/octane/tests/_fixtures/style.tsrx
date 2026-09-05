@@ -293,3 +293,42 @@ export function ScopedGlobalTag() @{
 		</style>
 	</>
 }
+
+// Styled host with a spread and no authored class. The scope hash must merge
+// with `props.class` rather than replace it (later-writer would otherwise keep
+// only the synthesized hash).
+export function ScopedSpreadOnly(props) @{
+	<>
+		<style>
+			.a {
+				color: rgb(200, 0, 0);
+			}
+		</style>
+		<div {...props}>{'x'}</div>
+	</>
+}
+
+// Authored class after a spread: last-writer still owns the class. The hash is
+// baked into the authored value, so the spread's class is replaced.
+export function ScopedSpreadThenAuthored(props) @{
+	<>
+		<style>
+			.a {
+				color: rgb(200, 0, 0);
+			}
+		</style>
+		<div {...props.attrs} class={props.cls}>{'x'}</div>
+	</>
+}
+
+// Authored class before a spread: the later spread still owns the class.
+export function ScopedAuthoredThenSpread(props) @{
+	<>
+		<style>
+			.a {
+				color: rgb(200, 0, 0);
+			}
+		</style>
+		<div class={props.cls} {...props.attrs}>{'x'}</div>
+	</>
+}

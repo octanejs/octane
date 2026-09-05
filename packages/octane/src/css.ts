@@ -30,6 +30,20 @@ export function normalizeClass(value: unknown): string {
 	return str;
 }
 
+/**
+ * Append a later class source onto an earlier one. Used when a synthesized
+ * scope hash must share the element with a spread's class instead of replacing
+ * it. Both sides go through `normalizeClass` so arrays / objects compose the
+ * same way they would as a lone `class` value.
+ */
+export function mergeClass(left: unknown, right: unknown): string {
+	const a = normalizeClass(left);
+	const b = normalizeClass(right);
+	if (!a) return b;
+	if (!b) return a;
+	return a + ' ' + b;
+}
+
 import { hyphenateStyleName } from './dom-tables.js';
 
 /**
