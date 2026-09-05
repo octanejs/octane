@@ -969,35 +969,140 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 	// A callback may safely move beside its sole event even when a hook it
 	// captures is also consumed by the parent or by a sibling block. Determine
 	// handler placement from handler uses separately from hook ownership.
-	function handlerUseRegions(handler) {
-		const regions = [];
-		const seen = new Set();
-		const pending = [handler];
-		while (pending.length > 0) {
-			const current = pending.pop();
-			if (seen.has(current)) continue;
-			seen.add(current);
-			if (componentHandlers.has(current) || current.uses.length === 0) {
-				regions.push(current.region);
+	const eventHandlers = handlers.filter((handler) => handler.uses.some((use) => use.event != null));
+	if (eventHandlers.length === 0) return diagnostics;
+
+	function mergeOwner(left, right) {
+		if (left === undefined) return right;
+		if (right === undefined) return left;
+		return commonAncestor(left, right);
+	}
+	const eventOwners = new Map();
+	if (
+		eventHandlers.length <= 2 ||
+		!handlers.some((handler) => handler.uses.some((use) => use.viaHandler))
+	) {
+		// A couple of walks, or independent handlers, cost less than building
+		// a graph in the common case.
+		for (const handler of eventHandlers) {
+			const seen = new Set();
+			const pending = [handler];
+			let owner;
+			while (pending.length > 0) {
+				const current = pending.pop();
+				if (seen.has(current)) continue;
+				seen.add(current);
+				if (componentHandlers.has(current) || current.uses.length === 0) {
+					owner = mergeOwner(owner, current.region);
+					continue;
+				}
+				for (const use of current.uses) {
+					if (use.viaHandler) pending.push(use.viaHandler);
+					else owner = mergeOwner(owner, use.viaDerived ? current.region : use.region);
+				}
+			}
+			eventOwners.set(handler, owner);
+		}
+	} else {
+		// A helper can be used by several callbacks, including a recursive cycle.
+		// Collapse those cycles, then inherit the common use region through the
+		// resulting DAG once instead of retraversing a chain for every event.
+		const handlerIndex = new Map(handlers.map((handler, index) => [handler, index]));
+		const dependencies = handlers.map(() => []);
+		const dependents = handlers.map(() => []);
+		const directOwners = new Array(handlers.length);
+		for (let index = 0; index < handlers.length; index++) {
+			const handler = handlers[index];
+			if (componentHandlers.has(handler) || handler.uses.length === 0) {
+				directOwners[index] = handler.region;
 				continue;
 			}
-			for (const use of current.uses) {
-				if (use.viaHandler) pending.push(use.viaHandler);
-				else if (use.viaDerived) regions.push(current.region);
-				else regions.push(use.region);
+			for (const use of handler.uses) {
+				if (use.viaHandler) {
+					const target = handlerIndex.get(use.viaHandler);
+					if (target !== undefined) {
+						dependencies[index].push(target);
+						dependents[target].push(index);
+					}
+				} else {
+					directOwners[index] = mergeOwner(
+						directOwners[index],
+						use.viaDerived ? handler.region : use.region,
+					);
+				}
 			}
 		}
-		return regions;
-	}
-	for (const handler of handlers) {
-		if (!handler.uses.some((use) => use.event != null)) continue;
-		const uses = handlerUseRegions(handler);
-		let common = uses[0];
-		for (let index = 1; common != null && index < uses.length; index++) {
-			common = commonAncestor(common, uses[index]);
+		const visitedHandlers = new Uint8Array(handlers.length);
+		const nextDependency = new Uint32Array(handlers.length);
+		const finishOrder = [];
+		for (let index = 0; index < handlers.length; index++) {
+			if (visitedHandlers[index]) continue;
+			visitedHandlers[index] = 1;
+			const pending = [index];
+			while (pending.length > 0) {
+				const current = pending[pending.length - 1];
+				const target = dependencies[current][nextDependency[current]++];
+				if (target !== undefined) {
+					if (!visitedHandlers[target]) {
+						visitedHandlers[target] = 1;
+						pending.push(target);
+					}
+				} else {
+					finishOrder.push(current);
+					pending.pop();
+				}
+			}
 		}
-		let owner = common;
-		while (owner !== null && !canMoveInto(owner, handler.region)) owner = owner.parent;
+		const componentByHandler = new Int32Array(handlers.length).fill(-1);
+		const componentOwners = [];
+		for (let index = finishOrder.length - 1; index >= 0; index--) {
+			const start = finishOrder[index];
+			if (componentByHandler[start] !== -1) continue;
+			const component = componentOwners.length;
+			let owner;
+			const pending = [start];
+			componentByHandler[start] = component;
+			while (pending.length > 0) {
+				const current = pending.pop();
+				owner = mergeOwner(owner, directOwners[current]);
+				for (const previous of dependents[current]) {
+					if (componentByHandler[previous] !== -1) continue;
+					componentByHandler[previous] = component;
+					pending.push(previous);
+				}
+			}
+			componentOwners.push(owner);
+		}
+		const componentDependencies = componentOwners.map(() => new Set());
+		const componentDependents = componentOwners.map(() => []);
+		for (let index = 0; index < handlers.length; index++) {
+			const from = componentByHandler[index];
+			for (const target of dependencies[index]) {
+				const to = componentByHandler[target];
+				if (from === to || componentDependencies[from].has(to)) continue;
+				componentDependencies[from].add(to);
+				componentDependents[to].push(from);
+			}
+		}
+		const remainingDependencies = componentDependencies.map((targets) => targets.size);
+		const ready = [];
+		for (let index = 0; index < remainingDependencies.length; index++) {
+			if (remainingDependencies[index] === 0) ready.push(index);
+		}
+		for (let index = 0; index < ready.length; index++) {
+			const current = ready[index];
+			for (const previous of componentDependents[current]) {
+				componentOwners[previous] = mergeOwner(componentOwners[previous], componentOwners[current]);
+				if (--remainingDependencies[previous] === 0) ready.push(previous);
+			}
+		}
+		for (const handler of eventHandlers) {
+			eventOwners.set(handler, componentOwners[componentByHandler[handlerIndex.get(handler)]]);
+		}
+	}
+	for (const handler of eventHandlers) {
+		let owner = eventOwners.get(handler);
+		while (owner != null && !canMoveInto(owner, handler.region)) owner = owner.parent;
 		if (owner == null || owner === handler.region) continue;
 		if (handler.node.type === 'FunctionDeclaration' && isReassigned(handler.node.id)) continue;
 		const name = handler.node.id?.name;

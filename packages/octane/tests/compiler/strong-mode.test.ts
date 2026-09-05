@@ -919,7 +919,7 @@ export function App(props) @{
 			`"use strong";
 export function App(props) @{
   const onClick = () => props.onAction();
-  <button {onClick}>run</button>
+  <div><button {onClick}>run</button>@{ <span>other block</span> }</div>
 }`,
 			`"use strong";
 export function App(props) @{
@@ -1115,28 +1115,88 @@ export function App() @{
 		);
 	});
 
+	it('locates every event in a long chain of named handlers', () => {
+		const length = 1_600;
+		const helpers = ['const h0 = () => {};'];
+		const buttons = ['<button onClick={h0}>0</button>'];
+		for (let index = 1; index <= length; index++) {
+			helpers.push(`const h${index} = () => h${index - 1}();`);
+			buttons.push(`<button onClick={h${index}}>${index}</button>`);
+		}
+		const source = `"use strong";
+export function App() @{
+  ${helpers.join('\n  ')}
+  <div>@{ <>${buttons.join('')}</> }</div>
+}`;
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		const eventDiagnostics = diagnostics.filter(({ code }) => code === EVENT_HANDLER_LOCALITY);
+		expect(eventDiagnostics).toHaveLength(length + 1);
+		for (const index of [0, Math.floor(length / 2), length]) {
+			expect(eventDiagnostics).toContainEqual(
+				expect.objectContaining({
+					start: expect.objectContaining({ offset: source.indexOf(`h${index} =`) }),
+				}),
+			);
+		}
+	});
+
+	it('keeps shared handler uses and recursive handler cycles in their common scope', () => {
+		const shared = `"use strong";
+export function App(props) @{
+  const shared = () => props.action();
+  const left = () => shared();
+  const right = () => shared();
+  <div>@{ <button onClick={left}>left</button> }@{ <button onClick={right}>right</button> }</div>
+}`;
+		const sharedDiagnostics = compileToVolarMappings(shared, '/src/App.tsrx').diagnostics;
+		expect(sharedDiagnostics.map(({ code }) => code)).toEqual([
+			EVENT_HANDLER_LOCALITY,
+			EVENT_HANDLER_LOCALITY,
+		]);
+		expect(sharedDiagnostics.map(({ start }) => start.offset)).toEqual([
+			shared.indexOf('left ='),
+			shared.indexOf('right ='),
+		]);
+
+		const recursive = `"use strong";
+export function App() @{
+  const first = () => second();
+  const second = () => first();
+  <div>@{ <><button onClick={first}>first</button><button onClick={second}>second</button></> }</div>
+}`;
+		const recursiveDiagnostics = compileToVolarMappings(recursive, '/src/App.tsrx').diagnostics;
+		expect(recursiveDiagnostics.map(({ code }) => code)).toEqual([
+			EVENT_HANDLER_LOCALITY,
+			EVENT_HANDLER_LOCALITY,
+		]);
+		expect(recursiveDiagnostics.map(({ start }) => start.offset)).toEqual([
+			recursive.indexOf('first ='),
+			recursive.indexOf('second ='),
+		]);
+	});
+
 	it('keeps shared, forwarded, and imported callbacks available for events', () => {
 		const sources = [
 			`"use strong";
 export function App(props) @{
   const handle = () => props.onAction();
-  <div><button onClick={handle}>one</button><button onClick={handle}>two</button></div>
+  <div><button onClick={handle}>one</button>@{ <button onClick={handle}>two</button> }</div>
 }`,
 			`"use strong";
-export function App(props) @{ <button onClick={props.onAction}>run</button> }`,
+export function App(props) @{ <div><button onClick={props.onAction}>run</button>@{ <span>other block</span> }</div> }`,
 			`"use strong";
 import { onAction } from './actions';
-export function App() @{ <button onClick={onAction}>run</button> }`,
+export function App() @{ <div><button onClick={onAction}>run</button>@{ <span>other block</span> }</div> }`,
 			`"use strong";
 export function App(props) @{
   const handle = () => props.onAction();
-  <button onClick={props.ready ? handle : props.onFallback}>run</button>
+  <div><button onClick={props.ready ? handle : props.onFallback}>run</button>@{ <span>other block</span> }</div>
 }`,
 			`"use strong";
 function Dialog(props) @{ <button onClick={props.onClose}>close</button> }
 export function App(props) @{
   const handle = () => props.onAction();
-  <Dialog onClose={handle} />
+  <div><Dialog onClose={handle} />@{ <span>other block</span> }</div>
 }`,
 		];
 		for (const source of sources) {
