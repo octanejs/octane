@@ -536,9 +536,24 @@ for (const base of [
 	UNITLESS_STYLE_PROPS.add('o' + c);
 }
 
-/** True if `name` (camelCase, kebab, or vendor-prefixed) is a unitless CSS property. */
+/**
+ * True if `name` (camelCase, kebab, or vendor-prefixed) is a unitless CSS
+ * property.
+ *
+ * Memoized: the key universe is bounded (CSS property names), and numeric
+ * style writes hit this per key per write — at animation frequency the
+ * replaceAll + toLowerCase allocation would dominate. Same rationale as
+ * `styleName` in css.ts. The cache stores the boolean so a miss (`width`)
+ * is as cheap as a hit (`opacity`) after the first lookup.
+ */
+const unitlessStylePropCache = new Map();
+
 export function isUnitlessStyleProp(name) {
-	return UNITLESS_STYLE_PROPS.has(name.replaceAll('-', '').toLowerCase());
+	const cached = unitlessStylePropCache.get(name);
+	if (cached !== undefined) return cached;
+	const result = UNITLESS_STYLE_PROPS.has(name.replaceAll('-', '').toLowerCase());
+	unitlessStylePropCache.set(name, result);
+	return result;
 }
 
 /**

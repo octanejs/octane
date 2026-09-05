@@ -79,6 +79,7 @@ export const BENCHMARK_SUITES = [
 	'radix-collection-order',
 	'router-dispatch',
 	'visx-categorical-scale',
+	'style-unitless',
 	'rspack-css-graph',
 	'floating-tree-navigation',
 	'ink-cursor-update',

@@ -47,6 +47,25 @@ describe('numeric style px — dynamic (runtime)', () => {
 		r.unmount();
 	});
 
+	it('leaves kebab-case unitless properties unitless and still appends px to kebab lengths', function () {
+		const r = mount(DynStyle, { s: { 'line-height': 2, 'font-size': 12 } });
+		const el = r.find('#d') as HTMLElement;
+		expect(el.style.lineHeight).toBe('2');
+		expect(el.style.fontSize).toBe('12px');
+		r.unmount();
+	});
+
+	it('keeps unitless vs px rules after repeated writes of the same keys', function () {
+		const r = mount(DynStyle, { s: { width: 100, opacity: 0.5, 'line-height': 2 } });
+		const el = r.find('#d') as HTMLElement;
+		r.update(DynStyle, { s: { width: 140, opacity: 0.25, 'line-height': 1.5 } });
+		r.update(DynStyle, { s: { width: 80, opacity: 1, 'line-height': 3 } });
+		expect(el.style.width).toBe('80px');
+		expect(el.style.opacity).toBe('1');
+		expect(el.style.lineHeight).toBe('3');
+		r.unmount();
+	});
+
 	it('never adds px to a custom property (`--x`)', () => {
 		const r = mount(DynStyle, { s: { '--gap': 8 } });
 		expect((r.find('#d') as HTMLElement).style.getPropertyValue('--gap')).toBe('8');
@@ -117,6 +136,17 @@ describe('numeric style px — SSR', () => {
 		expect(html).toContain('z-index:5'); // unitless
 		expect(html).toContain('font-size:12px'); // camelCase → kebab + px
 		expect(html).toContain('--gap:8'); // custom prop → no px
+	});
+
+	it('serialises kebab-case and vendor-prefixed numeric styles with the same px rules', async function () {
+		const { html } = await ServerRT.renderToString(server.DynStyle, {
+			s: { 'line-height': 2, 'font-size': 12, WebkitLineClamp: 3 },
+		});
+		expect(html).toContain('line-height:2');
+		expect(html).not.toContain('line-height:2px');
+		expect(html).toContain('font-size:12px');
+		expect(html).toContain('-webkit-line-clamp:3');
+		expect(html).not.toContain('-webkit-line-clamp:3px');
 	});
 
 	it('static object style serialises identically to the client bake', async () => {
