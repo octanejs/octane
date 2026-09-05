@@ -17116,7 +17116,13 @@ export function headBlock(
 	}
 	if (text != null || tag === 'title') {
 		const t = text == null ? '' : String(text);
-		if (el.textContent !== t) el.textContent = t;
+		if (el.textContent !== t) {
+			// textContent replaces child nodes, even when only the text changes.
+			// Retain their identity when a later sibling suspends and this visible
+			// head entry belongs to the held transition boundary.
+			if (TRANSITION_JOURNAL !== null) journalRootRange(el, null, null);
+			el.textContent = t;
+		}
 	}
 }
 

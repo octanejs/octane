@@ -241,7 +241,16 @@ async function evaluateConfigModule(root, configPath, configuredCacheDir) {
 		const temporaryPath = path.join(cacheDir, `.octane.config-${contentHash}-${randomUUID()}.tmp`);
 		try {
 			fs.writeFileSync(temporaryPath, output, { flag: 'wx' });
-			fs.renameSync(temporaryPath, outputPath);
+			try {
+				fs.renameSync(temporaryPath, outputPath);
+			} catch (error) {
+				// Windows cannot replace an existing destination with rename. If a
+				// concurrent writer won this same-hash race, its complete output is
+				// already safe to import. Preserve other publication failures.
+				if (!fs.existsSync(outputPath) || fs.readFileSync(outputPath, 'utf8') !== output) {
+					throw error;
+				}
+			}
 		} finally {
 			fs.rmSync(temporaryPath, { force: true });
 		}

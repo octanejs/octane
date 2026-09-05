@@ -20,6 +20,7 @@ import {
 	TransitionResumeAtomicity,
 	TransitionNamespacedAttr,
 	TransitionHeadAndDefault,
+	TransitionHeadInsideBoundary,
 	TransitionControlledInput,
 	TransitionRadioGroup,
 	TransitionKeyedRemoval,
@@ -1002,6 +1003,37 @@ describe('useTransition — the old screen stays whole', () => {
 		expect(box.checked).toBe(true);
 		expect(box.defaultChecked).toBe(false);
 		r.unmount();
+	});
+
+	it('rolls back a retained title inside the held try body before its sibling suspends', async () => {
+		const first = deferred<string>();
+		const next = deferred<string>();
+		first.resolve('zero');
+		const load = (step: number) => (step === 0 ? first.promise : next.promise);
+		const r = mount(TransitionHeadInsideBoundary, { load });
+		try {
+			await act(() => {});
+			const title = document.head.querySelector('title[data-transition-held-title="yes"]')!;
+			const originalTextNode = title.firstChild;
+			expect(title.textContent).toBe('Old');
+			expect(title.getAttribute('data-old')).toBe('old');
+
+			r.click('#bump');
+			expect(document.head.querySelector('title[data-transition-held-title="yes"]')).toBe(title);
+			expect(title.textContent).toBe('Old');
+			expect(title.firstChild).toBe(originalTextNode);
+			expect(title.getAttribute('data-old')).toBe('old');
+			expect(title.hasAttribute('data-new')).toBe(false);
+			expect(r.findAll('#fallback')).toHaveLength(0);
+
+			await act(() => next.resolve('one'));
+			expect(document.head.querySelector('title[data-transition-held-title="yes"]')).toBe(title);
+			expect(title.textContent).toBe('New');
+			expect(title.hasAttribute('data-old')).toBe(false);
+			expect(title.getAttribute('data-new')).toBe('new');
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('holds a controlled input and checkbox, records included', async () => {
