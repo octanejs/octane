@@ -2607,6 +2607,33 @@ export function ssrAttrs(
 		}
 	}
 
+	if (process.env.NODE_ENV === 'production') {
+		let canonical = true;
+		for (const name of props.keys()) {
+			if (
+				normalizeSsrAttributeName(name, tag, namespace) !== name ||
+				(namespace === 'html' && name.toLowerCase() !== name)
+			) {
+				canonical = false;
+				break;
+			}
+		}
+		// Canonical names cannot alias another raw writer. After all source reads,
+		// the original Map already holds their final values in insertion order.
+		if (canonical) {
+			let out = '';
+			for (const { rawName, value } of props.values()) {
+				if (
+					rawName === 'dangerouslySetInnerHTML' ||
+					(skipFormControls && isAggregatedFormAttribute(tag, rawName))
+				)
+					continue;
+				out += ssrAttrEntry(rawName, value, tag, namespace);
+			}
+			return out;
+		}
+	}
+
 	const resolved = new Map<
 		string,
 		readonly [name: string, value: unknown, firstOrder: number, lastOrder: number]
