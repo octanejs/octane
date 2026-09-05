@@ -8348,8 +8348,8 @@ interface StreamSink {
 	 * Returns a promise only when the transport applies pressure. `terminal`
 	 * permits the final degraded-boundary markers after an external abort; a
 	 * disconnected/cancelled consumer still rejects it. `onUnaccepted` is only
-	 * called when an external abort rejects a web write before enqueueing it;
-	 * Node writes that returned false have already accepted their bytes. The
+	 * called when an external abort rejects before web enqueue or Node
+	 * `dest.write`; Node writes that returned false already accepted bytes. The
 	 * `recovery` mode accepts writes after external abort but respects demand.
 	 */
 	write(
@@ -8658,7 +8658,7 @@ async function runStream(
 				};
 	let signalInjectionFailure: (() => void) | undefined;
 	const failInjection = (err: unknown): void => {
-		// An external abort rejects a web write before it was enqueued. Its
+		// An external abort rejects a sink write before it was accepted. Its
 		// payload is terminal salvage, not a failure of the injection source.
 		if (signal?.aborted && err === signal.reason) return;
 		if (injectionFailed) return;
@@ -8702,8 +8702,8 @@ async function runStream(
 			? undefined
 			: async () => {
 					if (signal?.aborted) {
-						// Pending notification writes reject before enqueue on web
-						// streams. Replay each taken chunk through consumer demand; only
+						// Pending notification writes can reject before web enqueue or
+						// Node dest.write. Replay each taken chunk through demand; only
 						// the final recovery markers bypass pressure.
 						await writeChain;
 						for (const html of unacceptedInjection!) {
@@ -9239,7 +9239,11 @@ export function renderToPipeableStream(
 		}
 	}
 	let destination: Destination | null = null;
-	const buffered: { chunk: string; terminal: boolean }[] = [];
+	const buffered: {
+		chunk: string;
+		terminal: boolean | 'recovery';
+		onUnaccepted?: (chunk: string) => void;
+	}[] = [];
 	let ended = false;
 	let closed = false;
 	let endCalled = false;
@@ -9277,7 +9281,7 @@ export function renderToPipeableStream(
 		}
 	};
 
-	const waitForDrain = (dest: Destination): Promise<void> => {
+	const waitForDrain = (dest: Destination, allowAborted = false): Promise<void> => {
 		if (dest.once === undefined) {
 			return Promise.reject(new TypeError(formatServerError(39)));
 		}
@@ -9315,15 +9319,22 @@ export function renderToPipeableStream(
 			dest.once!('drain', onDrain);
 			dest.once!('error', onError);
 			dest.once!('close', onClose);
-			if (controller.signal.aborted) onAbort();
-			else controller.signal.addEventListener('abort', onAbort, { once: true });
+			if (!allowAborted) {
+				if (controller.signal.aborted) onAbort();
+				else controller.signal.addEventListener('abort', onAbort, { once: true });
+			}
 		});
 	};
 
-	const writeNow = (chunk: string, terminal: boolean): void | Promise<void> => {
+	const writeNow = (
+		chunk: string,
+		terminal: boolean | 'recovery',
+		onUnaccepted?: (chunk: string) => void,
+	): void | Promise<void> => {
 		const dest = destination!;
 		if (closed) return Promise.reject(new Error(formatServerError(40)));
-		if (!terminal && controller.signal.aborted) {
+		if (terminal === false && controller.signal.aborted) {
+			onUnaccepted?.(chunk);
 			return Promise.reject(controller.signal.reason);
 		}
 		let accepted: unknown;
@@ -9336,7 +9347,9 @@ export function renderToPipeableStream(
 		// `write(false)` still accepted the bytes. Normal chunks wait for drain
 		// before rendering more; a terminal recovery marker can call end()
 		// immediately and let the Writable flush its already-buffered final bytes.
-		return accepted === false && !terminal ? waitForDrain(dest) : undefined;
+		return accepted === false && terminal !== true
+			? waitForDrain(dest, terminal === 'recovery')
+			: undefined;
 	};
 
 	const trackWrite = (operation: Promise<void>): Promise<void> => {
@@ -9361,16 +9374,22 @@ export function renderToPipeableStream(
 		return operation;
 	};
 
-	const queueWrite = (chunk: string, terminal = false): void | Promise<void> => {
+	const queueWrite = (
+		chunk: string,
+		terminal: boolean | 'recovery' = false,
+		onUnaccepted?: (chunk: string) => void,
+	): void | Promise<void> => {
 		if (destination === null) {
-			buffered.push({ chunk, terminal });
+			buffered.push(
+				onUnaccepted === undefined ? { chunk, terminal } : { chunk, terminal, onUnaccepted },
+			);
 			return;
 		}
 		if (writeGate !== null) {
-			const operation = writeGate.then(() => writeNow(chunk, terminal));
+			const operation = writeGate.then(() => writeNow(chunk, terminal, onUnaccepted));
 			return trackWrite(operation);
 		}
-		const operation = writeNow(chunk, terminal);
+		const operation = writeNow(chunk, terminal, onUnaccepted);
 		return operation === undefined ? undefined : trackWrite(operation);
 	};
 
@@ -9391,8 +9410,8 @@ export function renderToPipeableStream(
 			props,
 			renderOptions,
 			{
-				write(chunk, terminal) {
-					return queueWrite(chunk, terminal === true || terminal === 'recovery');
+				write(chunk, terminal, onUnaccepted) {
+					return queueWrite(chunk, terminal, onUnaccepted);
 				},
 				shellReady() {
 					options?.onShellReady?.();
@@ -9452,7 +9471,11 @@ export function renderToPipeableStream(
 			// Chunks accepted into the pre-pipe buffer remain deliverable even if
 			// abort() ran meanwhile (the final item is the degraded $OCTRX tail).
 			for (const item of buffered) {
-				queueWrite(item.chunk, item.terminal || controller.signal.aborted);
+				queueWrite(
+					item.chunk,
+					item.terminal === 'recovery' ? 'recovery' : item.terminal || controller.signal.aborted,
+					item.onUnaccepted,
+				);
 			}
 			buffered.length = 0;
 			finishEnd();

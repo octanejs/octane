@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { EventEmitter } from 'node:events';
 import * as ServerRuntime from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
 import {
@@ -403,6 +404,62 @@ describe('streaming injection — document renders', () => {
 });
 
 describe('streaming injection — failure modes', () => {
+	it('retains a queued pipeable injection after abort without duplicating accepted bytes', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+		const aborter = new AbortController();
+		const events = new EventEmitter();
+		const first = '<script data-inject="node-first">window.__first=1</script>';
+		const second = '<script data-inject="node-second">window.__second=1</script>';
+		const chunks: string[] = [];
+		let didEnd = false;
+		let finish!: () => void;
+		const ended = new Promise<void>((resolve) => {
+			finish = () => {
+				didEnd = true;
+				resolve();
+			};
+		});
+		ServerRuntime.renderToPipeableStream(
+			server.DocumentApp,
+			{ promise: value.promise },
+			{ injection: injection.source, signal: aborter.signal },
+		).pipe({
+			write(chunk: string) {
+				chunks.push(chunk);
+				return chunk !== first && chunk !== second;
+			},
+			end: finish,
+			once: events.once.bind(events),
+			off: events.off.bind(events),
+		});
+		await flushMicrotasks();
+		injection.push(first);
+		await flushMicrotasks();
+		expect(chunks).toContain(first);
+		injection.push(second);
+		await flushMicrotasks();
+		const reason = new Error('request timed out');
+		aborter.abort(reason);
+		await flushMicrotasks();
+		expect(chunks).toContain(second);
+		// The recovered write is accepted under pressure; recovery markers and
+		// end() still wait for drain even though the request signal is aborted.
+		expect(chunks.join('')).not.toContain('$OCTRX(');
+		expect(didEnd).toBe(false);
+		events.emit('drain');
+		await ended;
+
+		const html = chunks.join('');
+		expect(html.split(first)).toHaveLength(2);
+		expect(html.split(second)).toHaveLength(2);
+		expect(html.indexOf(first)).toBeLessThan(html.indexOf(second));
+		expect(html.indexOf(second)).toBeLessThan(html.indexOf('$OCTRX('));
+		expect(tailOf(html)).toMatch(DOCUMENT_TAIL);
+		expect(injection.renderCompleteCalls).toBe(1);
+		expect(injection.unsubscribed).toBe(true);
+	});
+
 	it('preserves a pending fragment injection when the source wait is aborted', async () => {
 		const injection = createTestInjection();
 		const aborter = new AbortController();
