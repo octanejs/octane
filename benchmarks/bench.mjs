@@ -486,6 +486,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Node-only numeric style serialization through the production unitless
+		// cache and the prior replaceAll+toLowerCase scan on mixed repeating keys.
+		name: 'style-unitless',
+		cwd: 'style-unitless',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Node-only Rspack CSS-module proof collection and verification with
 		// deterministic graph traversal and yielded-connection counts.
 		name: 'rspack-css-graph',

@@ -701,7 +701,8 @@ resource, or on a `<style>` inside `<head>`, is an error
 Strong mode is an optional immutable render-snapshot contract with compiler
 checks for state, refs, Effect Events, and detectable impure render calls. It is
 also an author assertion that rendering is pure, which production memoization
-is allowed to trust without proving every call body.
+is allowed to trust without proving every call body. It also checks where hook
+values and event handlers belong in a template.
 Start with one module by putting `"use strong"` before its imports:
 
 ```tsx
@@ -751,6 +752,131 @@ These patterns become compile errors:
 - Calling unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`,
   or `new Date()` without arguments during render
   (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
+- Declaring a built-in hook value outside the sole nested `@{…}` block that
+  uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
+- Declaring a named callback outside the sole nested `@{…}` block containing
+  its native `onX` event (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
+
+### Keep work with its nested template block
+
+A nested `@{…}` block can own setup beside its JSX. When every use of a
+built-in hook value is in one nested block, declare the hook there. An effect
+that observes only those local values belongs there too. In this example, both
+calls are outside the sole child block that uses them:
+
+```jsx
+"use strong";
+
+import { useEffect, useState } from 'octane';
+
+export function Counter({ title, observe }) @{
+	const [count, setCount] = useState(0);
+	useEffect(() => observe(count), [count]);
+	<div>
+		<h2>{title as string}</h2>
+		@{
+			const onClick = () => setCount(count + 1);
+			<button {onClick}>{count as string}</button>
+		}
+	</div>
+}
+```
+
+`OCTANE_STRONG_HOOK_LOCALITY` points to both hook calls and names the nested
+block and its source line. Move them beside the handler and button:
+
+```jsx
+"use strong";
+
+import { useEffect, useState } from 'octane';
+
+export function Counter({ title, observe }) @{
+	<div>
+		<h2>{title as string}</h2>
+		@{
+			const [count, setCount] = useState(0);
+			useEffect(() => observe(count), [count]);
+			const onClick = () => setCount(count + 1);
+			<button {onClick}>{count as string}</button>
+		}
+	</div>
+}
+```
+
+For ordinary markup, no nested block is needed. This direct JSX use already
+passes with the hook in root setup:
+
+```jsx
+"use strong";
+
+import { useState } from 'octane';
+
+export function Label() @{
+	const [label] = useState('ready');
+	<div><span>{label as string}</span></div>
+}
+```
+
+Hooks and effects used only by an `@if`, keyed `@for`, `@switch`, or `@try` arm
+may stay in the parent scope. This state persists while the `@if` arm is hidden:
+
+```jsx
+"use strong";
+
+import { useState } from 'octane';
+
+export function Search({ open }) @{
+	const [query, setQuery] = useState('');
+	<section>@if (open) {
+		<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
+	}</section>
+}
+```
+
+Move a hook into an arm when its lifecycle should follow the arm; a keyed
+`@for` row then gives each item its own state.
+A `@{…}` block with only JSX is transparent grouping until it contains setup.
+Moving a hook into that block gives it the block's local lifetime. A state value
+shared by sibling blocks stays in their common scope. A local helper that
+captures a hook value must move with it; the diagnostic names that helper. This
+placement check recognizes built-in hooks imported from Octane; custom hook
+calls are outside it.
+
+An outer named callback also fails if its only native event is inside a child
+block:
+
+```jsx
+"use strong";
+
+export function Save({ save }) @{
+	const onClick = () => save();
+	<div>@{ <button {onClick}>Save</button> }</div>
+}
+```
+
+`OCTANE_STRONG_EVENT_HANDLER_LOCALITY` points to `onClick` and names the
+`@{…}` block and its line. Move the named callback beside its button to pass:
+
+```jsx
+"use strong";
+
+export function Save({ save }) @{
+	<div>@{
+		const onClick = () => save();
+		<button {onClick}>Save</button>
+	}</div>
+}
+```
+
+The one-use alternative is an inline callback:
+`<button onClick={() => save()}>Save</button>`.
+The named form also works as `<button onClick={onClick}>` in the same template
+block, arm, or root template. Declaring the callback outside a child `@{…}`
+block that is its only use reports `OCTANE_STRONG_EVENT_HANDLER_LOCALITY` at the
+declaration and names the owning block. Callbacks shared by several arms,
+forwarded through component props, or imported from another module can retain
+their named bindings. These placement checks apply only to modules that opt into
+Strong mode; ordinary modules keep their existing behavior.
 
 The checks follow provable synchronous calls through local helpers,
 `useCallback` and `useEffectEvent` results, and functions returned by analyzable

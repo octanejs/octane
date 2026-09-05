@@ -3,9 +3,9 @@ import { injectStyle } from '../../src/index.js';
 
 // Plan S3.6 — the client `injectStyle(id, css)` dedupes by id (a per-runtime
 // Set plus a DOM query for `style[data-octane=id]`). A module re-evaluation
-// that keeps a scope hash but changes the CSS (an HMR edit inside a block; the
-// hash is position-derived) reaches the runtime as a second call with the same
-// id. These tests pin what that second call does today.
+// that keeps a scope hash but changes the CSS (an HMR edit inside a later
+// block; the hash is position-derived) reaches the runtime as a second call
+// with the same id. These tests pin what that second call does.
 
 let counter = 0;
 function freshId(): string {
@@ -44,9 +44,10 @@ describe('injectStyle dedupe (S3.6)', () => {
 		serverSheet.remove();
 	});
 
-	// After an HMR re-evaluation the scope hash is unchanged (it derives from the
-	// first block's position and content) but a later block's CSS may differ;
-	// the runtime refreshes the sheet in place instead of keeping the stale one.
+	// After an HMR re-evaluation the scope hash is unchanged (it derives from
+	// the first block's position and content) but a later block's CSS may
+	// differ; the runtime refreshes the sheet in place instead of keeping the
+	// stale one.
 	it('re-injecting an unchanged hash with changed css replaces the sheet', () => {
 		const id = freshId();
 		const before = `.d.${id} { color: rgb(6, 6, 6); }`;
@@ -56,5 +57,22 @@ describe('injectStyle dedupe (S3.6)', () => {
 		const tags = sheets(id);
 		expect(tags).toHaveLength(1);
 		expect(tags[0].textContent).toBe(after);
+	});
+
+	it('records the id without creating a sheet when document is missing', () => {
+		const id = freshId();
+		const first = `.e.${id} { color: rgb(8, 8, 8); }`;
+		const second = `.e.${id} { color: rgb(9, 9, 9); }`;
+		const held = globalThis.document;
+		Reflect.deleteProperty(globalThis, 'document');
+		try {
+			injectStyle(id, first);
+			injectStyle(id, second);
+		} finally {
+			globalThis.document = held;
+		}
+		expect(sheets(id)).toHaveLength(0);
+		injectStyle(id, first);
+		expect(sheets(id)).toHaveLength(0);
 	});
 });

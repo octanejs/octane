@@ -30,20 +30,28 @@ export interface SeoDescriptor {
  * Settings that belong to the app rather than to one declaration. They are
  * registered like any other metadata and merged last-wins, so setting them once
  * near the root applies them to every page's title and URLs.
+ *
+ * Every field admits `undefined` as well as being optional. A caller assembles
+ * this from props that are themselves optional, and the merge in `applyConfig`
+ * reads each field with an `!== undefined` test, so an absent key and a present
+ * `undefined` have always meant the same thing here. Spelling that out is what
+ * lets the object be built in one expression under `exactOptionalPropertyTypes`,
+ * which matters because this package publishes source and the consumer's
+ * compiler options are the ones that compile it.
  */
 export interface SeoConfig {
 	/** Origin used to absolute-ise canonical, og:url, and image URLs. */
-	site?: string;
+	site?: string | undefined;
 	/** `%s` is replaced by the page title, e.g. `'%s · Acme'`. */
-	titleTemplate?: string;
+	titleTemplate?: string | undefined;
 	/**
 	 * Whether an `openGraph`/`twitter` block was declared. Opting in is about
 	 * having asked for the family, not about which tags that produced:
 	 * `openGraph: { publishedTime }` emits only `article:published_time`, which no
 	 * `og:` prefix scan would recognise.
 	 */
-	declaredOpenGraph?: boolean;
-	declaredTwitter?: boolean;
+	declaredOpenGraph?: boolean | undefined;
+	declaredTwitter?: boolean | undefined;
 }
 
 /**

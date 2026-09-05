@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
@@ -27,6 +29,9 @@ import {
 	ScopedKeyframes,
 	ScopedGlobal,
 	ScopedGlobalTag,
+	ScopedSpreadOnly,
+	ScopedSpreadThenAuthored,
+	ScopedAuthoredThenSpread,
 } from './_fixtures/style.tsrx';
 import {
 	MultiBlock,
@@ -1527,5 +1532,190 @@ describe('scoped CSS — :global escape hatch', () => {
 		expect(css).toMatch(new RegExp(`\\.local\\.${hashClass}\\s+em\\b`));
 		expect(css).not.toContain(`${hashClass}em`);
 		r.unmount();
+	});
+});
+
+function scopeHashClass(el: Element): string {
+	const hashClass = Array.from(el.classList).find(function (name) {
+		return name.startsWith('tsrx-');
+	});
+	if (!hashClass) throw new Error('element has no tsrx-<hash> class');
+	return hashClass;
+}
+
+describe('scoped style + spread class', () => {
+	it('keeps a spread class together with the synthesized scope hash', function () {
+		const r = mount(ScopedSpreadOnly, { class: 'from-spread' });
+		const div = r.find('div');
+		const hash = scopeHashClass(div);
+		expect(div.classList.contains('from-spread')).toBe(true);
+		expect(div.className).toBe('from-spread ' + hash);
+		r.unmount();
+	});
+
+	it('keeps a spread className together with the synthesized scope hash', function () {
+		const r = mount(ScopedSpreadOnly, { className: 'alias-spread' });
+		const div = r.find('div');
+		const hash = scopeHashClass(div);
+		expect(div.classList.contains('alias-spread')).toBe(true);
+		expect(div.className).toBe('alias-spread ' + hash);
+		r.unmount();
+	});
+
+	it('composes a spread array class before the synthesized scope hash', function () {
+		const r = mount(ScopedSpreadOnly, { class: ['from-spread', { extra: true }] });
+		const div = r.find('div');
+		const hash = scopeHashClass(div);
+		expect(div.className).toBe('from-spread extra ' + hash);
+		r.unmount();
+	});
+
+	it('keeps only the hash when the spread omits class', function () {
+		const r = mount(ScopedSpreadOnly, { id: 'no-class' });
+		const div = r.find('div');
+		expect(div.getAttribute('id')).toBe('no-class');
+		expect(div.className).toBe(scopeHashClass(div));
+		r.unmount();
+	});
+
+	it('recomposes the spread class across updates while keeping the hash', function () {
+		const r = mount(ScopedSpreadOnly, { class: 'first' });
+		const div = r.find('div');
+		const hash = scopeHashClass(div);
+		expect(div.className).toBe('first ' + hash);
+
+		r.update(ScopedSpreadOnly, { class: 'second' });
+		expect(r.find('div')).toBe(div);
+		expect(div.className).toBe('second ' + hash);
+
+		r.update(ScopedSpreadOnly, { title: 'only-title' });
+		expect(div.className).toBe(hash);
+		expect(div.getAttribute('title')).toBe('only-title');
+		r.unmount();
+	});
+
+	it('lets an authored class after a spread replace the spread class and keep the hash', function () {
+		const r = mount(ScopedSpreadThenAuthored, {
+			attrs: { class: 'from-spread', id: 'after' },
+			cls: 'host',
+		});
+		const div = r.find('div');
+		const hash = scopeHashClass(div);
+		expect(div.classList.contains('from-spread')).toBe(false);
+		expect(div.className).toBe('host ' + hash);
+		expect(div.getAttribute('id')).toBe('after');
+		r.unmount();
+	});
+
+	it('lets a later spread replace an authored class including its baked-in hash', function () {
+		const r = mount(ScopedAuthoredThenSpread, {
+			cls: 'host',
+			attrs: { class: 'from-spread', id: 'before' },
+		});
+		const div = r.find('div');
+		expect(div.className).toBe('from-spread');
+		expect(div.getAttribute('id')).toBe('before');
+		r.unmount();
+	});
+
+	it('merges the hash onto the spread class/className last writer', function () {
+		const classThenAlias = mount(ScopedSpreadOnly, {
+			class: 'from-class',
+			className: 'from-alias',
+		});
+		const aliasWins = classThenAlias.find('div');
+		expect(aliasWins.className).toBe('from-alias ' + scopeHashClass(aliasWins));
+		classThenAlias.unmount();
+
+		const aliasThenClass = mount(ScopedSpreadOnly, {
+			className: 'from-alias',
+			class: 'from-class',
+		});
+		const classWins = aliasThenClass.find('div');
+		expect(classWins.className).toBe('from-class ' + scopeHashClass(classWins));
+		aliasThenClass.unmount();
+	});
+});
+
+const STYLE_FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/style.tsrx');
+const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
+
+function loadStyleFixture(mode: 'server' | 'client'): Record<string, any> {
+	return loadCompiledFixtureSource(readFileSync(STYLE_FIXTURE, 'utf8'), {
+		id: 'style.tsrx',
+		mode,
+		compileOptions: { dev: mode === 'client' && !PROD_COMPILE },
+	});
+}
+
+describe('scoped style + spread class — SSR and hydration', () => {
+	const server = loadStyleFixture('server');
+	const client = loadStyleFixture('client');
+
+	it('serialises the spread class and the scope hash together', async function () {
+		const { html } = await ServerRuntime.renderToString(server.ScopedSpreadOnly, {
+			class: 'from-spread',
+		});
+		expect(html).toMatch(/class="from-spread tsrx-[0-9a-f]+"/);
+		expect(html).toContain('from-spread');
+	});
+
+	it('serialises an authored class after a spread without the spread class', async function () {
+		const { html } = await ServerRuntime.renderToString(server.ScopedSpreadThenAuthored, {
+			attrs: { class: 'from-spread', id: 'after' },
+			cls: 'host',
+		});
+		expect(html).toMatch(/class="host tsrx-[0-9a-f]+"/);
+		expect(html).not.toContain('from-spread');
+		expect(html).toContain('id="after"');
+	});
+
+	it('serialises a later spread class in place of an authored class', async function () {
+		const { html } = await ServerRuntime.renderToString(server.ScopedAuthoredThenSpread, {
+			cls: 'host',
+			attrs: { class: 'from-spread', id: 'before' },
+		});
+		expect(html).toContain('class="from-spread"');
+		expect(html).not.toMatch(/class="[^"]*host/);
+		expect(html).toContain('id="before"');
+	});
+
+	it('hydrates a spread class plus scope hash with no mismatch', async function () {
+		const props = { class: 'from-spread' };
+		const { html } = await ServerRuntime.renderToString(server.ScopedSpreadOnly, props);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const serverDiv = container.querySelector('div')!;
+		const expected = serverDiv.getAttribute('class')!;
+		expect(expected).toMatch(/^from-spread tsrx-[0-9a-f]+$/);
+
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(function () {});
+		const observer = new MutationObserver(function () {});
+		observer.observe(serverDiv, {
+			attributes: true,
+			attributeFilter: ['class'],
+			attributeOldValue: true,
+		});
+
+		hydrateRoot(container, client.ScopedSpreadOnly, props);
+		flushSync(function () {});
+		const classMutations = observer.takeRecords();
+		observer.disconnect();
+
+		const warned = errSpy.mock.calls
+			.map(function (c) {
+				return String(c[0]);
+			})
+			.some(function (m) {
+				return m.includes('hydration');
+			});
+		expect(warned).toBe(false);
+		expect(container.querySelector('div')).toBe(serverDiv);
+		expect(serverDiv.getAttribute('class')).toBe(expected);
+		expect(classMutations).toHaveLength(0);
+
+		errSpy.mockRestore();
+		container.remove();
 	});
 });
