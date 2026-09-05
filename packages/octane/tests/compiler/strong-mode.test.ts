@@ -505,6 +505,48 @@ export function App(props) @{
 		expect(diagnostics.filter(({ code }) => code === HOOK_LOCALITY)).toHaveLength(3);
 	});
 
+	it('keeps state observed by effects belonging to sibling arms in their common scope', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [left] = useState(0);
+  const [right] = useState(0);
+  const [shared] = useState(0);
+  useEffect(() => props.observe(left, shared), [left, shared]);
+  useEffect(() => props.observe(right, shared), [right, shared]);
+  <div>
+    @if (props.left) { <output>{left as string}</output> }
+    @if (props.right) { <output>{right as string}</output> }
+  </div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('shares an effect-only value across nested arms while keeping each effect local', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [outer] = useState(0);
+  const [inner] = useState(0);
+  const [shared] = useState(0);
+  useEffect(() => props.observe(outer, shared), [outer, shared]);
+  useEffect(() => props.observe(inner, shared), [inner, shared]);
+  <div>@if (props.show) {
+    <output>{outer as string}</output>
+    @if (props.nested) { <output>{inner as string}</output> }
+  }</div>
+}`;
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		expect(diagnostics.filter(({ code }) => code === HOOK_LOCALITY)).toHaveLength(5);
+		expect(diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: HOOK_LOCALITY,
+				start: expect.objectContaining({ offset: source.lastIndexOf('useEffect(') }),
+				message: expect.stringMatching(/@if arm at line 11/),
+			}),
+		);
+	});
+
 	it('accepts hooks beside the template arm that owns them in client and server output', () => {
 		const source = `import { useEffect, useState } from 'octane';
 export function App(props) @{

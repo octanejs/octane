@@ -856,42 +856,46 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 				return { blocked: true, owner: null };
 			}
 			if (owner === null) owner = candidate;
-			else if (within(owner, candidate)) owner = candidate;
-			else if (!within(candidate, owner)) return { blocked: true, owner: null };
+			else if (within(candidate, owner)) owner = candidate;
+			else if (!within(owner, candidate)) return { blocked: true, owner: null };
 		}
 		return { blocked: false, owner };
 	}
 
-	// A parent effect that cannot accompany every dependency is itself a
-	// parent use. Pin its dependencies and repeat: another effect may then
-	// become immovable as a result.
+	// Effects that share a value must agree on where it can live. Evaluate all
+	// effects against one ownership snapshot before adding their uses, so a
+	// sibling effect cannot inherit the first effect's provisional arm.
+	const unconstrainedValues = new Set(values.filter((value) => value.uses.length === 0));
 	const anchoredEffects = new Set();
+	const carriedEffects = new Set();
 	let changed;
 	do {
-		changed = false;
 		computeOwners();
+		const toAnchor = [];
+		const toCarry = [];
 		for (const effect of effects) {
-			if (anchoredEffects.has(effect) || !effectOwner(effect).blocked) continue;
+			const { blocked, owner } = effectOwner(effect);
+			if (blocked && !anchoredEffects.has(effect)) toAnchor.push(effect);
+			else if (owner !== null && !carriedEffects.has(effect)) {
+				toCarry.push({ effect, owner });
+			}
+		}
+		changed = toAnchor.length > 0 || toCarry.length > 0;
+		for (const effect of toAnchor) {
 			anchoredEffects.add(effect);
 			for (const dependency of effect.dependencies) {
 				if (dependency.region === effect.region) dependency.uses.push(effect.region);
 			}
-			changed = true;
 		}
-	} while (changed);
-
-	// Values observed only by a movable effect share its template owner.
-	for (const effect of effects) {
-		const { owner } = effectOwner(effect);
-		if (owner === null) continue;
-		for (const dependency of effect.dependencies) {
-			if (dependency.region === effect.region && dependency.uses.length === 0) {
-				dependency.uses.push(owner);
-				changed = true;
+		for (const { effect, owner } of toCarry) {
+			carriedEffects.add(effect);
+			for (const dependency of effect.dependencies) {
+				if (dependency.region === effect.region && unconstrainedValues.has(dependency)) {
+					dependency.uses.push(owner);
+				}
 			}
 		}
-	}
-	if (changed) computeOwners();
+	} while (changed);
 
 	for (const value of values) {
 		const owner = owners.get(value);
