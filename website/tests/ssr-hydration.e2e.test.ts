@@ -440,6 +440,103 @@ async function assertHomepageIntegrationSamples(baseUrl: string) {
 // Hovering a directive or clause keyword marks it in the SOURCE pane; clicking
 // additionally takes the compiled pane to the code it lowered to, favouring the
 // arm's implementation over the identifier that references it.
+/**
+ * Screen point of the `nth` occurrence of `word` in the playground's SOURCE
+ * pane (negative counts from the end). CodeMirror renders only the lines
+ * around its scroll position, so a keyword further down the source has no
+ * DOM node until the editor is scrolled there: sweep the scroller, record
+ * every rendered occurrence by its document-coordinate line top, scroll the
+ * chosen one into the middle of the editor, and read its node after the
+ * re-render. Scroll changes are applied in a DEFERRED measure phase, and a
+ * rect read in the same tick belongs to the PRE-scroll layout, so every
+ * scroll is followed by two animation frames before the DOM is read.
+ */
+async function locateSourceKeyword(page: import('playwright').Page, word: string, index = 0) {
+	return page.evaluate(
+		async ({ word, index }) => {
+			const content = document.querySelectorAll('.pg-editor .cm-content')[0] as
+				HTMLElement | undefined;
+			const scroller = content?.closest('.cm-scroller') as HTMLElement | null | undefined;
+			if (!content || !scroller) return null;
+			const settle = () =>
+				new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+			// `behavior: 'instant'` is load-bearing: the site sets
+			// `scroll-behavior: smooth` on <html> for readers who accept motion
+			// (headless Chromium is one), and an animating scroller is still
+			// moving frames later, so the rect would be measured mid-flight. It
+			// has to be `instant`, not `auto`: `auto` means "use the computed
+			// scroll-behavior", which is the smooth one.
+			content.closest('.cm-editor')?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+			const hits = () => {
+				const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+				const found: { node: Node; at: number; top: number }[] = [];
+				while (walker.nextNode()) {
+					const node = walker.currentNode;
+					const text = node.textContent!;
+					for (let at = text.indexOf(word); at !== -1; at = text.indexOf(word, at + 1)) {
+						const line = (node.parentElement as HTMLElement | null)?.closest('.cm-line');
+						const top =
+							(line?.getBoundingClientRect().top ?? 0) -
+							scroller.getBoundingClientRect().top +
+							scroller.scrollTop;
+						found.push({ node, at, top });
+					}
+				}
+				return found;
+			};
+			// CodeMirror re-renders the viewport in a measure phase after the
+			// scroll event, and a slow runner can take more than two frames to get
+			// there. Wait until the editor has painted a line inside the visible
+			// range at the new position before reading the DOM.
+			const rendered = async () => {
+				const visible = () => {
+					const box = scroller.getBoundingClientRect();
+					return Array.from(content.querySelectorAll('.cm-line')).some((line) => {
+						const rect = line.getBoundingClientRect();
+						return rect.bottom > box.top && rect.top < box.bottom;
+					});
+				};
+				for (let frame = 0; frame < 30; frame++) {
+					await settle();
+					if (visible()) return;
+				}
+			};
+			const occurrences = new Map<string, { top: number; at: number }>();
+			const step = Math.max(120, scroller.clientHeight * 0.5);
+			for (let y = 0; ; y += step) {
+				scroller.scrollTop = y;
+				await rendered();
+				for (const hit of hits()) {
+					occurrences.set(`${Math.round(hit.top)}:${hit.at}`, { top: hit.top, at: hit.at });
+				}
+				if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1) break;
+				if (scroller.scrollTop < y - 1) break;
+			}
+			const ordered = [...occurrences.values()].sort((a, b) => a.top - b.top || a.at - b.at);
+			const target = ordered.at(index);
+			if (!target) return null;
+			scroller.scrollTop = Math.max(0, target.top - scroller.clientHeight / 2);
+			await rendered();
+			let hit = hits().find(
+				(candidate) => Math.abs(candidate.top - target.top) < 2 && candidate.at === target.at,
+			);
+			for (let frame = 0; !hit && frame < 30; frame++) {
+				await settle();
+				hit = hits().find(
+					(candidate) => Math.abs(candidate.top - target.top) < 2 && candidate.at === target.at,
+				);
+			}
+			if (!hit) return null;
+			const range = document.createRange();
+			range.setStart(hit.node, hit.at + 1);
+			range.setEnd(hit.node, hit.at + 2);
+			const rect = range.getBoundingClientRect();
+			return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+		},
+		{ word, index },
+	);
+}
+
 async function assertControlFlowKeywordMapping(baseUrl: string) {
 	// The end-to-end contract behind the compiler's exact-origin channel:
 	// hovering a directive or clause keyword in the source lights up the code
@@ -462,53 +559,7 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 		// that introduces its own directives in a prose comment mentions each
 		// one before using it, and a comment is correctly unmapped.
 		const probeKeyword = async (keyword: string, action: 'hover' | 'click', nth = 0) => {
-			const point = await page.evaluate(
-				async ({ word, index }) => {
-					const find = () => {
-						const content = document.querySelectorAll('.pg-editor .cm-content')[0];
-						const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-						const hits: { node: Node; at: number }[] = [];
-						while (walker.nextNode()) {
-							const node = walker.currentNode;
-							const at = node.textContent!.indexOf(word);
-							if (at !== -1) hits.push({ node, at });
-						}
-						return hits.at(index) ?? null;
-					};
-					const found = find();
-					if (!found) return null;
-					// CodeMirror renders only around its scroll position, so bring the
-					// keyword into view — then let the scroll settle. CodeMirror
-					// applies it in a DEFERRED measure phase, and a rect read in the
-					// same tick belongs to the PRE-scroll layout, which puts the
-					// pointer on whatever line has since moved into that spot.
-					//
-					// `behavior: 'instant'` is load-bearing: the site sets
-					// `scroll-behavior: smooth` on <html> for readers who accept
-					// motion (headless Chromium is one), scrollIntoView scrolls EVERY
-					// ancestor scroller it touches, and an animating one is still
-					// moving frames later — so the rect would be measured mid-flight.
-					// It has to be `instant`, not `auto`: `auto` means "use the
-					// computed scroll-behavior", which is the smooth one.
-					(found.node.parentElement as HTMLElement)?.scrollIntoView({
-						block: 'center',
-						behavior: 'instant',
-					});
-					await new Promise((resolve) =>
-						requestAnimationFrame(() => requestAnimationFrame(resolve)),
-					);
-					// Re-find after the flush: the re-render replaces the nodes the
-					// first walk held.
-					const hit = find();
-					if (!hit) return null;
-					const range = document.createRange();
-					range.setStart(hit.node, hit.at + 1);
-					range.setEnd(hit.node, hit.at + 2);
-					const rect = range.getBoundingClientRect();
-					return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-				},
-				{ word: keyword, index: nth },
-			);
+			const point = await locateSourceKeyword(page, keyword, nth);
 			if (!point) return null;
 			const before = await page.evaluate(
 				() =>
@@ -2321,32 +2372,7 @@ describe(
 									?.querySelectorAll('.cm-mapped') ?? [],
 							).map((mark) => mark.textContent),
 						);
-					const point = await page.evaluate(async () => {
-						const find = () => {
-							const content = document.querySelectorAll('.pg-editor .cm-content')[0];
-							const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-							while (walker.nextNode()) {
-								const at = walker.currentNode.textContent!.indexOf('@if');
-								if (at !== -1) return { node: walker.currentNode, at };
-							}
-							return null;
-						};
-						if (!find()) return null;
-						(find()!.node.parentElement as HTMLElement)?.scrollIntoView({
-							block: 'center',
-							behavior: 'instant',
-						});
-						await new Promise((resolve) =>
-							requestAnimationFrame(() => requestAnimationFrame(resolve)),
-						);
-						const hit = find();
-						if (!hit) return null;
-						const range = document.createRange();
-						range.setStart(hit.node, hit.at + 1);
-						range.setEnd(hit.node, hit.at + 2);
-						const rect = range.getBoundingClientRect();
-						return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-					});
+					const point = await locateSourceKeyword(page, '@if');
 					expect(point, '@if not found in the source pane').not.toBeNull();
 
 					await page.mouse.move(0, 0);

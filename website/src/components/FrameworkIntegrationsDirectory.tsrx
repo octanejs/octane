@@ -2,23 +2,7 @@ import { FRAMEWORK_INTEGRATIONS } from '../content/framework-integrations.ts';
 import { ecosystemPackageGuideHref } from '../lib/ecosystem-presentation.ts';
 
 export function FrameworkIntegrationsDirectory() @{
-	<div class="framework-integration-directory">
-		@for (const integration of FRAMEWORK_INTEGRATIONS; key integration.packageName) {
-			<article class="framework-integration-card">
-				<header>
-					<span class="framework-integration-model">{integration.model as string}</span>
-					<h3>{integration.title as string}</h3>
-				</header>
-				<p>{integration.description as string}</p>
-				<a
-					class="framework-integration-link"
-					href={ecosystemPackageGuideHref(integration.packageName)}
-				>
-					<code>{integration.packageName as string}</code>
-				</a>
-			</article>
-		}
-
+	<>
 		<style>
 			.framework-integration-directory {
 				display: grid;
@@ -89,5 +73,22 @@ export function FrameworkIntegrationsDirectory() @{
 				}
 			}
 		</style>
-	</div>
+		<div class="framework-integration-directory">
+			@for (const integration of FRAMEWORK_INTEGRATIONS; key integration.packageName) {
+				<article class="framework-integration-card">
+					<header>
+						<span class="framework-integration-model">{integration.model as string}</span>
+						<h3>{integration.title as string}</h3>
+					</header>
+					<p>{integration.description as string}</p>
+					<a
+						class="framework-integration-link"
+						href={ecosystemPackageGuideHref(integration.packageName)}
+					>
+						<code>{integration.packageName as string}</code>
+					</a>
+				</article>
+			}
+		</div>
+	</>
 }

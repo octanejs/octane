@@ -73,15 +73,20 @@ export function makePendingView(value$: SignalHandle<string>) {
 	</Suspense>;
 }
 
+// Raw CSS in <style> is TSRX template syntax, so a value factory that returns
+// JSX carries its scoped block inside a nested `@{ … }` container, as a child
+// of that container's output fragment; the block styles the sibling beside it.
 export function StyledDeferredView(props: { count$: SignalHandle<number> }) {
-	return <>
-		<p class="stored-style">{String(props.count$.get())}</p>
-		<style>
-			.stored-style {
-				color: rgb(19, 23, 29);
-			}
-		</style>
-	</>;
+	return <>@{
+		<>
+			<style>
+				.stored-style {
+					color: rgb(19, 23, 29);
+				}
+			</style>
+			<p class="stored-style">{String(props.count$.get())}</p>
+		</>
+	}</>;
 }
 
 export function PlainStaticFragment() {
@@ -89,24 +94,28 @@ export function PlainStaticFragment() {
 }
 
 export function StaticStyledFragment() {
-	return <>
-		<p class="stored-static-style">{'static style'}</p>
-		<style>
-			.stored-static-style {
-				color: rgb(31, 37, 41);
-			}
-		</style>
-	</>;
+	return <>@{
+		<>
+			<style>
+				.stored-static-style {
+					color: rgb(31, 37, 41);
+				}
+			</style>
+			<p class="stored-static-style">{'static style'}</p>
+		</>
+	}</>;
 }
 
 export function EmptyGlobalStyledFragment() {
-	return <>
-		<style>
-			:global(.global-style-target) {
-				color: rgb(43, 47, 53);
-			}
-		</style>
-	</>;
+	return <>@{
+		<>
+			<style>
+				:global(.global-style-target) {
+					color: rgb(43, 47, 53);
+				}
+			</style>
+		</>
+	}</>;
 }
 
 export function GlobalStyleHost(props: { view: OctaneNode }) @{

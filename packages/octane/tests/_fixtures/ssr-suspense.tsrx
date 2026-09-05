@@ -395,19 +395,21 @@ export function IdBoundary(props) @{
 // hydration container's first children are style tags — hydrateRoot must skip
 // them when positioning the adoption cursor.
 export function StyledBoundary(props) @{
-	<div id="sbox" class="frame">
-		@try {
-			const value = use(props.promise);
-			<span class="ok">{value as string}</span>
-		} @pending {
-			<span class="loading">{'loading'}</span>
-		}
+	<>
 		<style>
 			.frame {
 				color: rgb(1, 2, 3);
 			}
 		</style>
-	</div>
+		<div id="sbox" class="frame">
+			@try {
+				const value = use(props.promise);
+				<span class="ok">{value as string}</span>
+			} @pending {
+				<span class="loading">{'loading'}</span>
+			}
+		</div>
+	</>
 }
 
 function LateStyledContent(props) @{

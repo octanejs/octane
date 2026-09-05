@@ -197,189 +197,7 @@ function SearchDialog(props: DialogProps) @{
 		}
 	};
 
-	<div class="search-overlay" onClick={props.onClose} onKeyDown={onKeyDown}>
-		<div
-			class="search-panel"
-			role="dialog"
-			aria-modal="true"
-			aria-label="Search docs, packages, and integrations"
-			onClick={(event: Event) => event.stopPropagation()}
-		>
-			<div class="search-field">
-				<span
-					class="search-field-icon"
-					style={'--icon:url("' + searchUrl + '")'}
-					aria-hidden="true"
-				></span>
-				<input
-					ref={inputEl}
-					type="search"
-					class="search-input"
-					placeholder="Search docs, packages, and integrations"
-					aria-label="Search docs, packages, and integrations"
-					autoComplete="off"
-					spellCheck={false}
-					value={query}
-					onInput={onQuery}
-				/>
-				<kbd class="search-esc">ESC</kbd>
-			</div>
-
-			@if (board.length > 0) {
-				<div class="search-board" role="listbox">
-					@for (const card of board; key card.key) {
-						@if (card.type === 'entity') {
-							<article class="search-entity">
-								<button
-									type="button"
-									class={['search-entity-primary', card.primaryRow === active && 'active']}
-									role="option"
-									aria-selected={card.primaryRow === active}
-									aria-label={'View ' + card.entity.title + ' in the ecosystem directory'}
-									data-search-row={card.primaryRow}
-									onMouseEnter={() => setActive(card.primaryRow)}
-									onFocus={() => setActive(card.primaryRow)}
-									onClick={() => goToEntity(card.entity)}
-								>
-									<span class="search-type">{ecosystemEntityTypeLabel(card.entity) as string}</span>
-									<span class="search-title">{card.entity.title as string}</span>
-									<code class="search-package">{card.entity.packageName as string}</code>
-									<span class="search-context">
-										{card.entity.kind === 'library-binding'
-											? 'Ports ' + card.entity.upstreamPackage + ' · ' + card.entity.category
-											: card.entity.model}
-									</span>
-								</button>
-								<div class="search-entity-actions">
-									<a
-										class={[
-											'search-entity-action',
-											'search-entity-package',
-											card.packageRow === active && 'active',
-										]}
-										href={ecosystemPackageGuideHref(card.entity.packageName)}
-										role="option"
-										aria-selected={card.packageRow === active}
-										aria-label={'Open the ' + card.entity.title + ' package guide'}
-										data-search-row={card.packageRow}
-										onMouseEnter={() => setActive(card.packageRow)}
-										onFocus={() => setActive(card.packageRow)}
-									>
-										Package guide ↗
-									</a>
-									@if (
-										card.entity.kind === 'framework-integration' && card.guideRow !== undefined
-									) {
-										<a
-											class={[
-												'search-entity-action',
-												'search-entity-guide',
-												card.guideRow === active && 'active',
-											]}
-											href={'/docs/framework-integrations#' + card.entity.guideAnchor}
-											role="option"
-											aria-selected={card.guideRow === active}
-											aria-label={'Open the ' + card.entity.title + ' integration guide'}
-											data-search-row={card.guideRow}
-											onMouseEnter={() => setActive(card.guideRow as number)}
-											onFocus={() => setActive(card.guideRow as number)}
-											onClick={(event: Event) => goToIntegrationGuide(card.entity, event)}
-										>
-											Integration guide
-										</a>
-									}
-								</div>
-							</article>
-						} @else if (card.type === 'package') {
-							<a
-								class={['search-package-result', card.row === active && 'active']}
-								href={card.result.url}
-								target={card.result.owner === 'Octane' ? undefined : '_blank'}
-								rel={card.result.owner === 'Octane' ? undefined : 'noreferrer'}
-								role="option"
-								aria-selected={card.row === active}
-								aria-label={'Open external documentation for ' + card.result.title + ' by ' +
-									card.result.owner}
-								data-search-row={card.row}
-								onMouseEnter={() => setActive(card.row)}
-								onFocus={() => setActive(card.row)}
-								onClick={props.onClose}
-							>
-								<span class="search-type">
-									{card.result.owner === 'Octane' ? 'Package' : 'Community package'}
-								</span>
-								<span class="search-title">{card.result.title as string}</span>
-								<code class="search-package-name">{card.result.matchedName as string}</code>
-								<span class="search-package-purpose">{card.result.purpose as string}</span>
-								<span class="search-package-owner">{'By ' + card.result.owner}</span>
-							</a>
-						} @else {
-							<div class="search-card">
-								<button
-									type="button"
-									class={['search-head', card.headRow === active && 'active']}
-									role="option"
-									aria-selected={card.headRow === active}
-									data-search-row={card.headRow}
-									onMouseEnter={() => setActive(card.headRow)}
-									onFocus={() => setActive(card.headRow)}
-									onClick={() => goToDocs(card.group)}
-								>
-									<span class="search-crumb">{card.crumb as string}</span>
-									<span class="search-title">{card.title as string}</span>
-								</button>
-								@if (card.lines.length > 0) {
-									<div class="search-lines">
-										@for (const line of card.lines; key line.key) {
-											<button
-												type="button"
-												class={[
-													'search-line',
-													line.code && 'code',
-													line.row === active && 'active',
-												]}
-												role="option"
-												aria-selected={line.row === active}
-												data-search-row={line.row}
-												onMouseEnter={() => setActive(line.row)}
-												onFocus={() => setActive(line.row)}
-												onClick={() => goToDocs(card.group)}
-											>
-												@for (const part of line.parts; key part.i) {
-													@if (part.hit) {
-														<mark>{part.text as string}</mark>
-													} @else {
-														<span>{part.text as string}</span>
-													}
-												}
-											</button>
-										}
-									</div>
-								}
-							</div>
-						}
-					}
-				</div>
-			} @else {
-				<div class="search-empty">
-					@if (indexFailed) {
-						<>
-							<span>Search could not load.</span>
-							<button type="button" class="search-retry" onClick={retryIndex}>Retry</button>
-						</>
-					} @else if (!index) {
-						<span>Loading the search index…</span>
-					} @else {
-						@if (query.trim().length < 2) {
-							<span>Search the docs, packages, and integrations.</span>
-						} @else {
-							<span>{'No matches for “' + query.trim() + '”.'}</span>
-						}
-					}
-				</div>
-			}
-		</div>
-
+	<>
 		<style>
 			.search-overlay {
 				position: fixed;
@@ -651,7 +469,192 @@ function SearchDialog(props: DialogProps) @{
 				}
 			}
 		</style>
-	</div>
+		<div class="search-overlay" onClick={props.onClose} onKeyDown={onKeyDown}>
+			<div
+				class="search-panel"
+				role="dialog"
+				aria-modal="true"
+				aria-label="Search docs, packages, and integrations"
+				onClick={(event: Event) => event.stopPropagation()}
+			>
+				<div class="search-field">
+					<span
+						class="search-field-icon"
+						style={'--icon:url("' + searchUrl + '")'}
+						aria-hidden="true"
+					></span>
+					<input
+						ref={inputEl}
+						type="search"
+						class="search-input"
+						placeholder="Search docs, packages, and integrations"
+						aria-label="Search docs, packages, and integrations"
+						autoComplete="off"
+						spellCheck={false}
+						value={query}
+						onInput={onQuery}
+					/>
+					<kbd class="search-esc">ESC</kbd>
+				</div>
+
+				@if (board.length > 0) {
+					<div class="search-board" role="listbox">
+						@for (const card of board; key card.key) {
+							@if (card.type === 'entity') {
+								<article class="search-entity">
+									<button
+										type="button"
+										class={['search-entity-primary', card.primaryRow === active && 'active']}
+										role="option"
+										aria-selected={card.primaryRow === active}
+										aria-label={'View ' + card.entity.title + ' in the ecosystem directory'}
+										data-search-row={card.primaryRow}
+										onMouseEnter={() => setActive(card.primaryRow)}
+										onFocus={() => setActive(card.primaryRow)}
+										onClick={() => goToEntity(card.entity)}
+									>
+										<span class="search-type">{ecosystemEntityTypeLabel(
+											card.entity,
+										) as string}</span>
+										<span class="search-title">{card.entity.title as string}</span>
+										<code class="search-package">{card.entity.packageName as string}</code>
+										<span class="search-context">
+											{card.entity.kind === 'library-binding'
+												? 'Ports ' + card.entity.upstreamPackage + ' · ' + card.entity.category
+												: card.entity.model}
+										</span>
+									</button>
+									<div class="search-entity-actions">
+										<a
+											class={[
+												'search-entity-action',
+												'search-entity-package',
+												card.packageRow === active && 'active',
+											]}
+											href={ecosystemPackageGuideHref(card.entity.packageName)}
+											role="option"
+											aria-selected={card.packageRow === active}
+											aria-label={'Open the ' + card.entity.title + ' package guide'}
+											data-search-row={card.packageRow}
+											onMouseEnter={() => setActive(card.packageRow)}
+											onFocus={() => setActive(card.packageRow)}
+										>
+											Package guide ↗
+										</a>
+										@if (
+											card.entity.kind === 'framework-integration' && card.guideRow !== undefined
+										) {
+											<a
+												class={[
+													'search-entity-action',
+													'search-entity-guide',
+													card.guideRow === active && 'active',
+												]}
+												href={'/docs/framework-integrations#' + card.entity.guideAnchor}
+												role="option"
+												aria-selected={card.guideRow === active}
+												aria-label={'Open the ' + card.entity.title + ' integration guide'}
+												data-search-row={card.guideRow}
+												onMouseEnter={() => setActive(card.guideRow as number)}
+												onFocus={() => setActive(card.guideRow as number)}
+												onClick={(event: Event) => goToIntegrationGuide(card.entity, event)}
+											>
+												Integration guide
+											</a>
+										}
+									</div>
+								</article>
+							} @else if (card.type === 'package') {
+								<a
+									class={['search-package-result', card.row === active && 'active']}
+									href={card.result.url}
+									target={card.result.owner === 'Octane' ? undefined : '_blank'}
+									rel={card.result.owner === 'Octane' ? undefined : 'noreferrer'}
+									role="option"
+									aria-selected={card.row === active}
+									aria-label={'Open external documentation for ' + card.result.title + ' by ' +
+										card.result.owner}
+									data-search-row={card.row}
+									onMouseEnter={() => setActive(card.row)}
+									onFocus={() => setActive(card.row)}
+									onClick={props.onClose}
+								>
+									<span class="search-type">
+										{card.result.owner === 'Octane' ? 'Package' : 'Community package'}
+									</span>
+									<span class="search-title">{card.result.title as string}</span>
+									<code class="search-package-name">{card.result.matchedName as string}</code>
+									<span class="search-package-purpose">{card.result.purpose as string}</span>
+									<span class="search-package-owner">{'By ' + card.result.owner}</span>
+								</a>
+							} @else {
+								<div class="search-card">
+									<button
+										type="button"
+										class={['search-head', card.headRow === active && 'active']}
+										role="option"
+										aria-selected={card.headRow === active}
+										data-search-row={card.headRow}
+										onMouseEnter={() => setActive(card.headRow)}
+										onFocus={() => setActive(card.headRow)}
+										onClick={() => goToDocs(card.group)}
+									>
+										<span class="search-crumb">{card.crumb as string}</span>
+										<span class="search-title">{card.title as string}</span>
+									</button>
+									@if (card.lines.length > 0) {
+										<div class="search-lines">
+											@for (const line of card.lines; key line.key) {
+												<button
+													type="button"
+													class={[
+														'search-line',
+														line.code && 'code',
+														line.row === active && 'active',
+													]}
+													role="option"
+													aria-selected={line.row === active}
+													data-search-row={line.row}
+													onMouseEnter={() => setActive(line.row)}
+													onFocus={() => setActive(line.row)}
+													onClick={() => goToDocs(card.group)}
+												>
+													@for (const part of line.parts; key part.i) {
+														@if (part.hit) {
+															<mark>{part.text as string}</mark>
+														} @else {
+															<span>{part.text as string}</span>
+														}
+													}
+												</button>
+											}
+										</div>
+									}
+								</div>
+							}
+						}
+					</div>
+				} @else {
+					<div class="search-empty">
+						@if (indexFailed) {
+							<>
+								<span>Search could not load.</span>
+								<button type="button" class="search-retry" onClick={retryIndex}>Retry</button>
+							</>
+						} @else if (!index) {
+							<span>Loading the search index…</span>
+						} @else {
+							@if (query.trim().length < 2) {
+								<span>Search the docs, packages, and integrations.</span>
+							} @else {
+								<span>{'No matches for “' + query.trim() + '”.'}</span>
+							}
+						}
+					</div>
+				}
+			</div>
+		</div>
+	</>
 }
 
 export function DocsSearch() @{

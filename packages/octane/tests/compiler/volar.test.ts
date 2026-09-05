@@ -603,14 +603,17 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 	});
 
 	it('keeps a component with CSS split across multiple <style> blocks analyzable', () => {
-		// One component scope may split its scoped CSS across several <style>
-		// blocks (tests/_fixtures/return-style.tsrx is the runtime proof). The
-		// unpatched @tsrx/core transform threw "TSRX fragments can only have one
-		// style tag" here, and tsrx-tsc's fallback then presented the raw source
-		// as the virtual TSX — every CSS brace became a TSX parse error.
+		// One scope may split its scoped CSS across several <style> blocks
+		// (tests/_fixtures/style-scopes.tsrx `MultiBlock` is the runtime proof).
+		// The unpatched @tsrx/core transform threw "TSRX fragments can only have
+		// one style tag" here, and tsrx-tsc's fallback then presented the raw
+		// source as the virtual TSX — every CSS brace became a TSX parse error.
+		// Raw CSS in <style> is TSRX template syntax, so the component is a
+		// `@{ … }` body (a plain `return <>…` would be a
+		// `tsrx-style-standalone-outside-template` diagnostic).
 		const src =
-			'export function Split(props: { active: boolean }) {\n' +
-			'\treturn <>\n' +
+			'export function Split(props: { active: boolean }) @{\n' +
+			'\t<>\n' +
 			"\t\t<section class={['mailbox', { active: props.active }]}>{'hi'}</section>\n" +
 			'\t\t<style>\n' +
 			'\t\t\t.mailbox { color: rgb(10, 20, 30); }\n' +
@@ -620,7 +623,7 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 			'\t\t\t\t.active { background-color: rgb(40, 50, 60); }\n' +
 			'\t\t\t</style>\n' +
 			'\t\t</>\n' +
-			'\t</>;\n' +
+			'\t</>\n' +
 			'}\n';
 		const result = compileToVolarMappings(src, 'split-style.tsrx');
 		expect(result.errors).toEqual([]);

@@ -29,19 +29,10 @@ function Counter(props: {
 		}); // the compiler infers [count]
 	}
 
-	// Scoped styles are per-component, so the button's CSS lives HERE: in
-	// HeroDemo's <style> the hashed selector would never match this node.
-	<button
-		type="button"
-		class="demo-count"
-		onClick={() => {
-			props.onIncrement();
-			setCount(count + 1);
-		}}
-	>
-		<span class="demo-count-label">Count</span>
-		<span class="demo-count-value">{`${count}`}</span>
-
+	// Scoped styles are per-component, so the button's CSS sits beside the
+	// button: the block styles the items beside it and everything below them,
+	// and in HeroDemo's <style> the hashed selector would never match this node.
+	<>
 		<style>
 			.demo-count {
 				display: inline-flex;
@@ -91,7 +82,18 @@ function Counter(props: {
 				text-align: center;
 			}
 		</style>
-	</button>
+		<button
+			type="button"
+			class="demo-count"
+			onClick={() => {
+				props.onIncrement();
+				setCount(count + 1);
+			}}
+		>
+			<span class="demo-count-label">Count</span>
+			<span class="demo-count-value">{`${count}`}</span>
+		</button>
+	</>
 }
 
 export function HeroDemo() @{
@@ -126,52 +128,7 @@ export function HeroDemo() @{
 		if (terminal) terminal.scrollTop = terminal.scrollHeight;
 	};
 
-	<div class="demo-shell">
-		<div class="demo">
-			<span class="demo-badge">Live</span>
-			<Counter paused={paused} onIncrement={jumpToLatest} onLog={appendLog} />
-			<label class="demo-toggle">
-				<input
-					type="checkbox"
-					checked={paused}
-					onInput={(event: Event) => setPaused((event.currentTarget as HTMLInputElement).checked)}
-				/>
-				<span>Pause effect</span>
-			</label>
-		</div>
-
-		<section class="demo-terminal" aria-label="Console">
-			<header class="demo-terminal-header">
-				<span class="demo-terminal-title">Console</span>
-				<span class={['demo-terminal-status', paused ? 'paused' : 'running']}>{(paused
-					? 'Effect paused'
-					: 'Effect active') as string}</span>
-				@if (!followingTail) {
-					<button type="button" class="demo-terminal-jump" onClick={jumpToLatest}>
-						Latest ↓
-					</button>
-				}
-			</header>
-			<div
-				class="demo-terminal-body"
-				ref={terminalRef}
-				role="log"
-				aria-live="polite"
-				aria-relevant="additions"
-				tabIndex={0}
-				onScroll={onTerminalScroll}
-			>
-				@for (const entry of entries; key entry.id) {
-					<code class="demo-terminal-line">
-						<span class="demo-terminal-prompt" aria-hidden="true">›</span>
-						<span>{entry.message as string}</span>
-					</code>
-				} @empty {
-					<span class="demo-terminal-empty">Waiting for the effect…</span>
-				}
-			</div>
-		</section>
-
+	<>
 		<style>
 			.demo-shell {
 				border-top: 1px solid var(--border);
@@ -335,5 +292,51 @@ export function HeroDemo() @{
 				}
 			}
 		</style>
-	</div>
+		<div class="demo-shell">
+			<div class="demo">
+				<span class="demo-badge">Live</span>
+				<Counter paused={paused} onIncrement={jumpToLatest} onLog={appendLog} />
+				<label class="demo-toggle">
+					<input
+						type="checkbox"
+						checked={paused}
+						onInput={(event: Event) => setPaused((event.currentTarget as HTMLInputElement).checked)}
+					/>
+					<span>Pause effect</span>
+				</label>
+			</div>
+
+			<section class="demo-terminal" aria-label="Console">
+				<header class="demo-terminal-header">
+					<span class="demo-terminal-title">Console</span>
+					<span class={['demo-terminal-status', paused ? 'paused' : 'running']}>{(paused
+						? 'Effect paused'
+						: 'Effect active') as string}</span>
+					@if (!followingTail) {
+						<button type="button" class="demo-terminal-jump" onClick={jumpToLatest}>
+							Latest ↓
+						</button>
+					}
+				</header>
+				<div
+					class="demo-terminal-body"
+					ref={terminalRef}
+					role="log"
+					aria-live="polite"
+					aria-relevant="additions"
+					tabIndex={0}
+					onScroll={onTerminalScroll}
+				>
+					@for (const entry of entries; key entry.id) {
+						<code class="demo-terminal-line">
+							<span class="demo-terminal-prompt" aria-hidden="true">›</span>
+							<span>{entry.message as string}</span>
+						</code>
+					} @empty {
+						<span class="demo-terminal-empty">Waiting for the effect…</span>
+					}
+				</div>
+			</section>
+		</div>
+	</>
 }

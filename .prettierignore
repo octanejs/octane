@@ -186,3 +186,4 @@ dist-redact
 .content-collections
 # Pristine Vitest caches
 packages/*/.vite-pristine/
+

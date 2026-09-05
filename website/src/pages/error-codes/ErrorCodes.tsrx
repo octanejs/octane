@@ -9,8 +9,7 @@ import {
 import { useTitle } from '../../hooks/use-title.ts';
 
 export function ErrorCodesLayout() @{
-	<div class="errors-layout">
-		<Outlet />
+	<>
 		<style>
 			.errors-layout {
 				width: 100%;
@@ -157,7 +156,10 @@ export function ErrorCodesLayout() @{
 				}
 			}
 		</style>
-	</div>
+		<div class="errors-layout">
+			<Outlet />
+		</div>
+	</>
 }
 
 export function ErrorCodesIndex() @{

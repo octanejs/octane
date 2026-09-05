@@ -3,8 +3,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as ServerRT from 'octane/server';
 import { mount } from './_helpers';
-import { loadCompiledFixtureSource } from './_server-fixture';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
+import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync, normalizeClass } from '../src/index.js';
+import { theme } from './_fixtures/style-theme.tsrx';
+import { SpreadApplied } from './_fixtures/style-theme-consumer.tsrx';
 import {
 	ArrayClass,
 	ObjectClass,
@@ -439,5 +442,70 @@ describe('clsx class composition — hydration parity', () => {
 		expect(container.querySelector('div')!.className).toMatch(/^a tsrx-[0-9a-f]+$/);
 		const warned = errSpy.mock.calls.map((c) => String(c[0])).some((m) => m.includes('hydration'));
 		expect(warned).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// RFC tsrx-org/RFCs#1: a dynamic class under a spread, inside a scope applying
+// an IMPORTED theme, composes as `normalizeClass(value)`, the enclosing scope
+// hashes, then the runtime `theme.$class` read — identically on both sides.
+// ---------------------------------------------------------------------------
+
+const THEME_FIXTURE = 'packages/octane/tests/_fixtures/style-theme.tsrx';
+const CONSUMER_FIXTURE = 'packages/octane/tests/_fixtures/style-theme-consumer.tsrx';
+
+describe('clsx class composition — scope hashes and an imported theme', () => {
+	it('client: spread + array class + theme.$class compose in that order', () => {
+		const r = mount(SpreadApplied, { attrs: { 'data-x': '1' }, cond: true });
+		const div = r.find('#sa-host');
+		expect(div.getAttribute('data-x')).toBe('1');
+		const themeHashes = theme.$class.split(' ');
+		const hash = Array.from(div.classList).find(
+			(c) => c.startsWith('tsrx-') && !themeHashes.includes(c),
+		)!;
+		expect(hash).toBeTruthy();
+		expect(div.className).toBe(`sa on ${hash} ${theme.$class}`);
+		expect(getComputedStyle(div).padding).toBe('1px');
+		r.update(SpreadApplied, { attrs: { 'data-x': '2' }, cond: false });
+		expect(div.getAttribute('data-x')).toBe('2');
+		expect(div.className).toBe(`sa ${hash} ${theme.$class}`);
+		r.unmount();
+	});
+
+	it('compiles to a normalizeClass wrap, then the scope hash, then the theme.$class read', () => {
+		const source = `import { theme } from './theme.tsrx';
+export function S(props) @{
+	<>
+		<style apply={theme}>.sa { padding: 1px; }</style>
+		<div {...props.attrs} class={['a', props.cond && 'b']}>{'x'}</div>
+	</>
+}`;
+		for (const options of [{}, { hmr: false }, { mode: 'server' as const }]) {
+			const { code } = compile(source, 'spread-applied.tsrx', options);
+			expect(code).toMatch(
+				/`\$\{_\$normalizeClass\(\['a', props\.cond && 'b'\]\)\} tsrx-[0-9a-f]+ \$\{theme\.\$class\}`/,
+			);
+		}
+	});
+
+	it('SSR serialises the same composed class as the client', async () => {
+		// Root-relative ids, like the plugin's: hashes derive from positions.
+		const serverTheme = loadServerFixture(THEME_FIXTURE);
+		const server = loadServerFixture(CONSUMER_FIXTURE, {
+			runtimeModules: { './style-theme.tsrx': serverTheme },
+		});
+		// Both compiles derive the theme's `$class` from the same positions.
+		expect(serverTheme.theme.$class).toBe(theme.$class);
+		const { html, css } = await ServerRT.renderToString(server.SpreadApplied, {
+			attrs: { 'data-x': '1' },
+			cond: true,
+		});
+		const hash = html.match(/class="sa on (tsrx-[0-9a-f]+) /)![1];
+		expect(html).toContain(`data-x="1" class="sa on ${hash} ${theme.$class}"`);
+		expect(css).toContain(`.sa.${hash}`);
+
+		const r = mount(SpreadApplied, { attrs: { 'data-x': '1' }, cond: true });
+		expect(r.find('#sa-host').className).toBe(`sa on ${hash} ${theme.$class}`);
+		r.unmount();
 	});
 });

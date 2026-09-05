@@ -5,47 +5,7 @@ import blacksmithOnDarkUrl from '../../../assets/blacksmith-ci-on-dark.svg';
 import blacksmithOnLightUrl from '../../../assets/blacksmith-ci-on-light.svg';
 
 export function Sponsor() @{
-	<section class="sponsor" aria-labelledby="sponsor-heading">
-		<div class="sponsor-inner">
-			<div class="sponsor-copy">
-				<p class="sponsor-kicker">Infrastructure sponsor</p>
-				<h2 id="sponsor-heading" class="sponsor-title">
-					Faster CI for a faster framework.
-				</h2>
-				<p class="sponsor-lead">
-					{'Blacksmith supports Octane with high-performance CI for GitHub Actions. ' +
-						'We’re grateful to the Blacksmith team for supporting open source.'}
-				</p>
-			</div>
-
-			<a
-				class="sponsor-lockup"
-				href="https://blacksmith.sh"
-				target="_blank"
-				rel="noopener noreferrer"
-				aria-label="Visit Blacksmith, Octane’s infrastructure sponsor"
-			>
-				<img
-					class="sponsor-logo sponsor-logo-on-dark"
-					src={blacksmithOnDarkUrl}
-					width={440}
-					height={120}
-					loading="lazy"
-					decoding="async"
-					alt="CI powered by Blacksmith"
-				/>
-				<img
-					class="sponsor-logo sponsor-logo-on-light"
-					src={blacksmithOnLightUrl}
-					width={440}
-					height={120}
-					loading="lazy"
-					decoding="async"
-					alt="CI powered by Blacksmith"
-				/>
-			</a>
-		</div>
-
+	<>
 		<style>
 			.sponsor {
 				border-top: 1px solid var(--border);
@@ -131,5 +91,46 @@ export function Sponsor() @{
 				}
 			}
 		</style>
-	</section>
+		<section class="sponsor" aria-labelledby="sponsor-heading">
+			<div class="sponsor-inner">
+				<div class="sponsor-copy">
+					<p class="sponsor-kicker">Infrastructure sponsor</p>
+					<h2 id="sponsor-heading" class="sponsor-title">
+						Faster CI for a faster framework.
+					</h2>
+					<p class="sponsor-lead">
+						{'Blacksmith supports Octane with high-performance CI for GitHub Actions. ' +
+							'We’re grateful to the Blacksmith team for supporting open source.'}
+					</p>
+				</div>
+
+				<a
+					class="sponsor-lockup"
+					href="https://blacksmith.sh"
+					target="_blank"
+					rel="noopener noreferrer"
+					aria-label="Visit Blacksmith, Octane’s infrastructure sponsor"
+				>
+					<img
+						class="sponsor-logo sponsor-logo-on-dark"
+						src={blacksmithOnDarkUrl}
+						width={440}
+						height={120}
+						loading="lazy"
+						decoding="async"
+						alt="CI powered by Blacksmith"
+					/>
+					<img
+						class="sponsor-logo sponsor-logo-on-light"
+						src={blacksmithOnLightUrl}
+						width={440}
+						height={120}
+						loading="lazy"
+						decoding="async"
+						alt="CI powered by Blacksmith"
+					/>
+				</a>
+			</div>
+		</section>
+	</>
 }

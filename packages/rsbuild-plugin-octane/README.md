@@ -133,3 +133,15 @@ The package forwards normalized `compiler.renderers` registry, filename-rule,
 and renderer-boundary metadata through the same Rspack compiler path used by
 Vite and direct compilation. This enables the experimental universal client
 target; a concrete Lynx runtime and cross-thread transport remain future work.
+
+## Scoped CSS
+
+Scoped `<style>` blocks compile to `injectStyle(hash, css)` calls — one per
+style scope, in lexical order — emitted as module-level statements in the
+`web` environment and inside the component body per request in the `node`
+SSR environment, where the render collects them into the response's
+`<style data-octane>` tags. A theme (`export const theme = <style>…</style>`)
+is an ordinary module value, so importing it injects its sheet ahead of the
+importer's own scopes. There is no virtual CSS module and no CSS HMR path:
+editing a block re-evaluates the module like any other source change. No
+CSS-loader configuration is involved.

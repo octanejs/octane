@@ -3208,7 +3208,7 @@
           "match": "await"
         },
         {
-          "name": "meta.for-of-ripple",
+          "name": "meta.for-of-tsrx",
           "match": "\\(\\s*(?:(let|const|var)\\s+)?([_$[:alpha:]][_$[:alnum:]]*)\\s+(of)\\s+([^;]+?)\\s*;\\s*(?:(index)\\s+([_$[:alpha:]][_$[:alnum:]]*)(?:\\s*;\\s*(key)\\s+([^)]+?))?|(key)\\s+([^)]+?))\\s*\\)",
           "captures": {
             "1": {
@@ -3224,19 +3224,19 @@
               "name": "variable.other.object.js"
             },
             "5": {
-              "name": "keyword.keyword.index.ripple"
+              "name": "keyword.keyword.index.tsrx"
             },
             "6": {
               "name": "variable.other.readwrite.js"
             },
             "7": {
-              "name": "keyword.keyword.key.ripple"
+              "name": "keyword.keyword.key.tsrx"
             },
             "8": {
               "name": "variable.other.object.js"
             },
             "9": {
-              "name": "keyword.keyword.key.ripple"
+              "name": "keyword.keyword.key.tsrx"
             },
             "10": {
               "name": "variable.other.object.js"
@@ -4169,7 +4169,7 @@
           "match": "===|!==|==|!="
         },
         {
-          "name": "keyword.operator.relational.js operator.relational.ripple-force entity.name.operator.relational.ripple",
+          "name": "keyword.operator.relational.js operator.relational.tsrx-force entity.name.operator.relational.tsrx",
           "match": "<=|>=|<>|<|>"
         },
         {
@@ -6450,6 +6450,9 @@
           "include": "#jsx-tag-style"
         },
         {
+          "include": "#jsx-tag-script"
+        },
+        {
           "include": "#jsx-tag-fragment"
         },
         {
@@ -6605,7 +6608,7 @@
     },
     "jsx-tag-style": {
       "name": "style.tag.js",
-      "begin": "(<)\\s*(style)\\b(?![^>]*/>)(?=[^>]*>)",
+      "begin": "(<)\\s*(style)\\b(?=[\\s/>])",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.tag.begin.js"
@@ -6614,15 +6617,18 @@
           "name": "entity.name.tag.js"
         }
       },
-      "end": "(</)(style)(>)",
+      "end": "(/>)|(</)(style)(>)",
       "endCaptures": {
         "1": {
-          "name": "punctuation.definition.tag.begin.js"
+          "name": "punctuation.definition.tag.end.js"
         },
         "2": {
-          "name": "entity.name.tag.js"
+          "name": "punctuation.definition.tag.begin.js"
         },
         "3": {
+          "name": "entity.name.tag.js"
+        },
+        "4": {
           "name": "punctuation.definition.tag.end.js"
         }
       },
@@ -6643,7 +6649,57 @@
           ]
         },
         {
-          "begin": "(?<=<style)(?![^>]*/>)",
+          "begin": "(?<=style)(?=[\\s/>])",
+          "end": "(?=/?>)",
+          "patterns": [
+            {
+              "include": "#jsx-tag-attributes"
+            }
+          ]
+        }
+      ]
+    },
+    "jsx-tag-script": {
+      "name": "script.tag.js",
+      "begin": "(<)\\s*(script)\\b(?![^>]*/>)(?=[^>]*>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.js"
+        },
+        "2": {
+          "name": "entity.name.tag.js"
+        }
+      },
+      "end": "(</)(script)(>)",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.js"
+        },
+        "2": {
+          "name": "entity.name.tag.js"
+        },
+        "3": {
+          "name": "punctuation.definition.tag.end.js"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(>)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.tag.end.js"
+            }
+          },
+          "end": "(?=</script>)",
+          "contentName": "source.ts",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        },
+        {
+          "begin": "(?<=<script)(?![^>]*/>)",
           "end": "(?=>)",
           "patterns": [
             {
@@ -6654,11 +6710,20 @@
       ]
     },
     "jsx-tag-style-in-expression": {
-      "begin": "(?<!\\+\\+|--)(?<=[({\\[,?=>:*]|&&|\\|\\||\\?|\\*\\/|^await|[^\\._$[:alnum:]]await|^return|[^\\._$[:alnum:]]return|^default|[^\\._$[:alnum:]]default|^yield|[^\\._$[:alnum:]]yield|^)\\s*(?=(<)\\s*(style)\\b(?![^>]*/>)(?=[^>]*>))",
-      "end": "(?!(<)\\s*(style)\\b(?![^>]*/>)(?=[^>]*>))",
+      "begin": "(?<!\\+\\+|--)(?<=[({\\[,?=>:*]|&&|\\|\\||\\?|\\*\\/|^await|[^\\._$[:alnum:]]await|^return|[^\\._$[:alnum:]]return|^default|[^\\._$[:alnum:]]default|^yield|[^\\._$[:alnum:]]yield|^)\\s*(?=(<)\\s*(style)\\b(?=[\\s/>]))",
+      "end": "(?!(<)\\s*(style)\\b(?=[\\s/>]))",
       "patterns": [
         {
           "include": "#jsx-tag-style"
+        }
+      ]
+    },
+    "jsx-tag-script-in-expression": {
+      "begin": "(?<!\\+\\+|--)(?<=[({\\[,?=>:*]|&&|\\|\\||\\?|\\*\\/|^await|[^\\._$[:alnum:]]await|^return|[^\\._$[:alnum:]]return|^default|[^\\._$[:alnum:]]default|^yield|[^\\._$[:alnum:]]yield|^)\\s*(?=(<)\\s*(script)\\b(?![^>]*/>)(?=[^>]*>))",
+      "end": "(?!(<)\\s*(script)\\b(?![^>]*/>)(?=[^>]*>))",
+      "patterns": [
+        {
+          "include": "#jsx-tag-script"
         }
       ]
     },
@@ -6874,6 +6939,9 @@
           "include": "#jsx-tag-style"
         },
         {
+          "include": "#jsx-tag-script"
+        },
+        {
           "include": "#jsx-tag-fragment"
         },
         {
@@ -6909,6 +6977,9 @@
         },
         {
           "include": "#jsx-tag-style-in-expression"
+        },
+        {
+          "include": "#jsx-tag-script-in-expression"
         },
         {
           "include": "#jsx-tag-fragment"
@@ -6949,6 +7020,9 @@
         },
         {
           "include": "#jsx-tag-style-in-expression"
+        },
+        {
+          "include": "#jsx-tag-script-in-expression"
         },
         {
           "include": "#jsx-tag-fragment"
@@ -7153,5 +7227,5 @@
       ]
     }
   },
-  "fileTypes": ["ripple"]
+  "fileTypes": ["tsrx"]
 }

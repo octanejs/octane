@@ -196,6 +196,18 @@ export default {
 
 The class plugin is recommended unless another integration owns those concerns.
 
+## Scoped CSS
+
+Scoped `<style>` blocks compile to `injectStyle(hash, css)` calls — one per
+style scope, in lexical order — emitted as module-level statements in client
+compilations and inside the component body per request in server
+compilations, where the render collects them into the response's
+`<style data-octane>` tags. A theme (`export const theme = <style>…</style>`)
+is an ordinary module value, so importing it injects its sheet ahead of the
+importer's own scopes. There is no virtual CSS module and no CSS HMR path:
+editing a block re-evaluates the module like any other source change. Neither
+the plugin nor the loader needs a CSS rule for this.
+
 ## App-level metadata
 
 Transformed Rspack modules receive a serializable `buildInfo.octane` record

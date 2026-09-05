@@ -166,174 +166,7 @@ export function EcosystemDirectory() @{
 
 	const reset = () => updateLocation(() => ({ q: '', kind: '', category: '' }), false);
 
-	<div class="ecosystem-directory">
-		<div class="ecosystem-controls" role="group" aria-label="Filter integrations and bindings">
-			<div class="ecosystem-global-search">
-				<p>
-					<strong>Looking for a specific package?</strong>
-					<span>Search docs, bindings, and integrations from one place.</span>
-				</p>
-				<button type="button" onClick={openDocsSearch}>
-					Search Octane
-					<kbd>⌘/Ctrl K</kbd>
-				</button>
-			</div>
-			<label class="ecosystem-select-field" for="ecosystem-kind">
-				<span class="ecosystem-control-label">Type</span>
-				<select id="ecosystem-kind" value={kind} onChange={onKind}>
-					<option value="">Everything</option>
-					<option value="integration">Framework integrations</option>
-					<option value="binding">Library bindings</option>
-				</select>
-			</label>
-			<label class="ecosystem-select-field" for="ecosystem-category">
-				<span class="ecosystem-control-label">Binding category</span>
-				<select
-					id="ecosystem-category"
-					value={category}
-					disabled={kind === 'integration'}
-					onChange={onCategory}
-				>
-					<option value="">All categories</option>
-					@for (const option of CATEGORIES; key option.id) {
-						<option value={option.id}>{option.title as string}</option>
-					}
-				</select>
-			</label>
-		</div>
-
-		<div class="ecosystem-results-bar" aria-live="polite">
-			<p class="ecosystem-results-summary">
-				@if (searching) {
-					<span>{visible.length + (visible.length === 1 ? ' result' : ' results') + ' for “' +
-						query.trim() +
-						'”' as string}</span>
-				} @else if (queryTooShort) {
-					<span>{visible.length + (visible.length === 1 ? ' package' : ' packages') +
-						' · enter at least 2 characters to search' as string}</span>
-				} @else {
-					<span>{visible.length +
-						(visible.length === 1 ? ' package' : ' packages') as string}</span>
-				}
-			</p>
-			@if (hasSelection) {
-				<button type="button" class="ecosystem-reset" onClick={reset}>
-					Reset search and filters
-				</button>
-			}
-		</div>
-
-		@if (!query && kind !== 'integration' && !category) {
-			<nav class="ecosystem-category-jumps" aria-label="Jump to binding category">
-				<span class="ecosystem-category-jumps-label">Browse categories</span>
-				<div>
-					@for (const option of CATEGORIES; key option.id) {
-						<a href={'#ecosystem-section-' + option.id}>
-							<span>{option.title as string}</span>
-							<small>{option.count + '' as string}</small>
-						</a>
-					}
-				</div>
-			</nav>
-		}
-
-		@if (sections.length > 0) {
-			<div class="ecosystem-sections">
-				@for (const section of sections; key section.id) {
-					<section
-						class={'ecosystem-section ecosystem-section--' + section.layout}
-						aria-labelledby={'ecosystem-section-' + section.id}
-					>
-						<header class="ecosystem-section-header">
-							<div>
-								<h3
-									id={'ecosystem-section-' + section.id}
-									class="ecosystem-section-heading"
-								>{section.title as string}</h3>
-								<p>{section.description as string}</p>
-							</div>
-							<span class="ecosystem-count">{sectionCount(section) as string}</span>
-						</header>
-						@if (section.layout === 'binding-card') {
-							<ul class="binding-list">
-								@for (const entity of section.entities; key entity.id) {
-									<li
-										id={entity.id}
-										class={'ecosystem-entity ' +
-											(entity.kind === 'library-binding'
-												? 'ecosystem-binding-item'
-												: 'ecosystem-integration-item')}
-										data-binding-title={entity.kind === 'library-binding'
-											? entity.title
-											: undefined}
-									>
-										<a
-											class="binding-link"
-											href={ecosystemPackageGuideHref(entity.packageName)}
-											aria-label={'Open the ' + entity.title + ' package guide'}
-										>
-											<code>{entity.packageName as string}</code>
-										</a>
-									</li>
-								}
-							</ul>
-						} @else {
-							<div class="ecosystem-collection ecosystem-collection--mixed">
-								@for (const entity of section.entities; key entity.id) {
-									@if (entity.kind === 'library-binding') {
-										<article
-											id={entity.id}
-											class="ecosystem-entity ecosystem-binding-item"
-											data-binding-title={entity.title}
-										>
-											<a
-												class="binding-link"
-												href={ecosystemPackageGuideHref(entity.packageName)}
-												aria-label={'Open the ' + entity.title + ' package guide'}
-											>
-												<code>{entity.packageName as string}</code>
-											</a>
-										</article>
-									} @else {
-										<article id={entity.id} class="ecosystem-entity ecosystem-integration-card">
-											<div class="ecosystem-entity-copy">
-												<span class="ecosystem-type">{entity.model as string}</span>
-												<h4>{entity.title as string}</h4>
-												<code>{entity.packageName as string}</code>
-												<p>{entity.description as string}</p>
-											</div>
-											<div class="ecosystem-actions">
-												<a
-													class="ecosystem-package-link"
-													href={ecosystemPackageGuideHref(entity.packageName)}
-												>
-													Package guide ↗
-												</a>
-												<a
-													class="ecosystem-guide-link"
-													href={'/docs/framework-integrations#' + entity.guideAnchor}
-												>
-													Integration guide
-												</a>
-											</div>
-										</article>
-									}
-								}
-							</div>
-						}
-					</section>
-				}
-			</div>
-		} @else {
-			<div class="ecosystem-empty">
-				<strong>No matches</strong>
-				<p>Try a package name, broader job, or reset the active filters.</p>
-				<button type="button" class="ecosystem-reset" onClick={reset}>
-					Show the complete directory
-				</button>
-			</div>
-		}
-
+	<>
 		<style>
 			.ecosystem-directory {
 				margin: 1.5rem 0 2rem;
@@ -726,5 +559,173 @@ export function EcosystemDirectory() @{
 				}
 			}
 		</style>
-	</div>
+		<div class="ecosystem-directory">
+			<div class="ecosystem-controls" role="group" aria-label="Filter integrations and bindings">
+				<div class="ecosystem-global-search">
+					<p>
+						<strong>Looking for a specific package?</strong>
+						<span>Search docs, bindings, and integrations from one place.</span>
+					</p>
+					<button type="button" onClick={openDocsSearch}>
+						Search Octane
+						<kbd>⌘/Ctrl K</kbd>
+					</button>
+				</div>
+				<label class="ecosystem-select-field" for="ecosystem-kind">
+					<span class="ecosystem-control-label">Type</span>
+					<select id="ecosystem-kind" value={kind} onChange={onKind}>
+						<option value="">Everything</option>
+						<option value="integration">Framework integrations</option>
+						<option value="binding">Library bindings</option>
+					</select>
+				</label>
+				<label class="ecosystem-select-field" for="ecosystem-category">
+					<span class="ecosystem-control-label">Binding category</span>
+					<select
+						id="ecosystem-category"
+						value={category}
+						disabled={kind === 'integration'}
+						onChange={onCategory}
+					>
+						<option value="">All categories</option>
+						@for (const option of CATEGORIES; key option.id) {
+							<option value={option.id}>{option.title as string}</option>
+						}
+					</select>
+				</label>
+			</div>
+
+			<div class="ecosystem-results-bar" aria-live="polite">
+				<p class="ecosystem-results-summary">
+					@if (searching) {
+						<span>{visible.length + (visible.length === 1 ? ' result' : ' results') + ' for “' +
+							query.trim() +
+							'”' as string}</span>
+					} @else if (queryTooShort) {
+						<span>{visible.length + (visible.length === 1 ? ' package' : ' packages') +
+							' · enter at least 2 characters to search' as string}</span>
+					} @else {
+						<span>{visible.length +
+							(visible.length === 1 ? ' package' : ' packages') as string}</span>
+					}
+				</p>
+				@if (hasSelection) {
+					<button type="button" class="ecosystem-reset" onClick={reset}>
+						Reset search and filters
+					</button>
+				}
+			</div>
+
+			@if (!query && kind !== 'integration' && !category) {
+				<nav class="ecosystem-category-jumps" aria-label="Jump to binding category">
+					<span class="ecosystem-category-jumps-label">Browse categories</span>
+					<div>
+						@for (const option of CATEGORIES; key option.id) {
+							<a href={'#ecosystem-section-' + option.id}>
+								<span>{option.title as string}</span>
+								<small>{option.count + '' as string}</small>
+							</a>
+						}
+					</div>
+				</nav>
+			}
+
+			@if (sections.length > 0) {
+				<div class="ecosystem-sections">
+					@for (const section of sections; key section.id) {
+						<section
+							class={'ecosystem-section ecosystem-section--' + section.layout}
+							aria-labelledby={'ecosystem-section-' + section.id}
+						>
+							<header class="ecosystem-section-header">
+								<div>
+									<h3
+										id={'ecosystem-section-' + section.id}
+										class="ecosystem-section-heading"
+									>{section.title as string}</h3>
+									<p>{section.description as string}</p>
+								</div>
+								<span class="ecosystem-count">{sectionCount(section) as string}</span>
+							</header>
+							@if (section.layout === 'binding-card') {
+								<ul class="binding-list">
+									@for (const entity of section.entities; key entity.id) {
+										<li
+											id={entity.id}
+											class={'ecosystem-entity ' +
+												(entity.kind === 'library-binding'
+													? 'ecosystem-binding-item'
+													: 'ecosystem-integration-item')}
+											data-binding-title={entity.kind === 'library-binding'
+												? entity.title
+												: undefined}
+										>
+											<a
+												class="binding-link"
+												href={ecosystemPackageGuideHref(entity.packageName)}
+												aria-label={'Open the ' + entity.title + ' package guide'}
+											>
+												<code>{entity.packageName as string}</code>
+											</a>
+										</li>
+									}
+								</ul>
+							} @else {
+								<div class="ecosystem-collection ecosystem-collection--mixed">
+									@for (const entity of section.entities; key entity.id) {
+										@if (entity.kind === 'library-binding') {
+											<article
+												id={entity.id}
+												class="ecosystem-entity ecosystem-binding-item"
+												data-binding-title={entity.title}
+											>
+												<a
+													class="binding-link"
+													href={ecosystemPackageGuideHref(entity.packageName)}
+													aria-label={'Open the ' + entity.title + ' package guide'}
+												>
+													<code>{entity.packageName as string}</code>
+												</a>
+											</article>
+										} @else {
+											<article id={entity.id} class="ecosystem-entity ecosystem-integration-card">
+												<div class="ecosystem-entity-copy">
+													<span class="ecosystem-type">{entity.model as string}</span>
+													<h4>{entity.title as string}</h4>
+													<code>{entity.packageName as string}</code>
+													<p>{entity.description as string}</p>
+												</div>
+												<div class="ecosystem-actions">
+													<a
+														class="ecosystem-package-link"
+														href={ecosystemPackageGuideHref(entity.packageName)}
+													>
+														Package guide ↗
+													</a>
+													<a
+														class="ecosystem-guide-link"
+														href={'/docs/framework-integrations#' + entity.guideAnchor}
+													>
+														Integration guide
+													</a>
+												</div>
+											</article>
+										}
+									}
+								</div>
+							}
+						</section>
+					}
+				</div>
+			} @else {
+				<div class="ecosystem-empty">
+					<strong>No matches</strong>
+					<p>Try a package name, broader job, or reset the active filters.</p>
+					<button type="button" class="ecosystem-reset" onClick={reset}>
+						Show the complete directory
+					</button>
+				</div>
+			}
+		</div>
+	</>
 }

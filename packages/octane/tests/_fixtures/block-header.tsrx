@@ -86,7 +86,7 @@ export function DeeplyNested(props) @{
 				</>
 			} @catch (error) {
 				<i class="out">{'caught'}</i>
-			};
+			}
 		}
 	}
 }

@@ -169,11 +169,20 @@ chunk would not be worthwhile:
 
 The compiler recognizes `Hydrate` imported from `octane`, including an import
 alias. Split children must be authored directly inside the boundary. Extraction
-rejects function-as-children, hook calls directly inside the extracted JSX,
-scoped `<style>` elements (their rules belong to the owning component's single
-style scope), and `this` or `super` captures; move that work into a child
-component or opt out with `split={false}`. Ordinary lexical values can be
-captured by the generated child component.
+rejects function-as-children, hook calls directly inside the extracted JSX, and
+`this` or `super` captures; move that work into a child component or opt out
+with `split={false}`. Ordinary lexical values can be captured by the generated
+child component.
+
+A scoped `<style>` whose whole lexical style scope sits inside the split child
+compiles (plan S8.5). The scope is the children list the block is written in:
+its sibling blocks and the host elements they stamp. Both the server compile and
+the extracted child keep the authored-position hash, so hydration adopts the
+server classes. A scope that straddles the boundary — blocks or stamped host
+elements on both sides — is still a compile error (`OCTANE_HYDRATE_SPLIT_STYLE`).
+Keep that scope entirely inside the boundary, move it entirely outside, extract
+a child component, or set `split={false}`. A `<style>` nested in a function
+never joined the enclosing scopes and may move with the split child.
 
 Generated Hydrate chunks are not eagerly module-preloaded. Lazy-module discovery
 for independently suspended siblings never enters a dormant Hydrate boundary,
@@ -265,8 +274,10 @@ When a descendant module is reachable only through a pruned static declaration
 chain, it is absent from the client manifest; a CSS file imported only by that
 module is absent too. Import ordinary stylesheets from an eager route/layout
 module. Scoped `<style>` remains safe: the client compiler retains a directly
-authored style long enough to preserve the surrounding component's scope hash,
-while SSR collects styles owned by removed descendant components and emits them
+authored style long enough to preserve the hash of the sibling scope it sits in
+(the children list that holds the block)
+(so the elements around the boundary keep the same class chain), while SSR
+collects the style scopes owned by removed descendant components and emits them
 with the rendered static content.
 
 For streamed static content, a synchronous unhandled server error still reaches

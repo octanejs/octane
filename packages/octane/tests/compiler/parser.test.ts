@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CompileError, ParseOptions } from '@tsrx/core/types';
 import { parseModule as parseNativeModule } from 'oxc-tsrx/tsrx-core-compat';
+import { parseModule as parseJavaScriptModule } from '../../src/compiler/parser.browser.js';
 import { parseModule } from '../../src/compiler/parser.node.js';
 
 vi.mock('oxc-tsrx/tsrx-core-compat', async (importOriginal) => {
@@ -10,7 +11,15 @@ vi.mock('oxc-tsrx/tsrx-core-compat', async (importOriginal) => {
 	return { ...actual, parseModule: vi.fn(actual.parseModule) };
 });
 
-afterEach(() => vi.mocked(parseNativeModule).mockReset());
+vi.mock('../../src/compiler/parser.browser.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../../src/compiler/parser.browser.js')>();
+	return { ...actual, parseModule: vi.fn(actual.parseModule) };
+});
+
+afterEach(() => {
+	vi.mocked(parseNativeModule).mockReset();
+	vi.mocked(parseJavaScriptModule).mockReset();
+});
 
 function syntaxDiagnostic(message: string): CompileError {
 	return Object.assign(new SyntaxError(message), {
@@ -70,6 +79,46 @@ describe('Node parser compatibility', () => {
 			throw failure;
 		});
 		expect(() => parseModule('export const value = 1;', 'valid.ts')).toThrow(failure);
+	});
+
+	it.each([
+		'export function C(props) { return <section><style>{props.css}</style><p /></section>; }',
+		'export function C(props) @{ <section><style data-x="1">\n\t{props.css}\n</style><p /></section> }',
+	])(
+		'retries the bare Error the native CSS reader raises for a <style> expression child: %s',
+		(source) => {
+			// The compat facade reads every <style> element's raw text as CSS after
+			// its error translation, so `<style>{css}</style>` (an ordinary element,
+			// amendment A1 rule C) escapes as a bare Error rather than a
+			// SyntaxError. The Node entry must still hand the source to the
+			// JavaScript parser; here that parser is stubbed so the test does not
+			// depend on which @tsrx/core version accepts the shape.
+			vi.mocked(parseNativeModule).mockImplementationOnce(() => {
+				throw new Error('Expected identifier');
+			});
+			const accepted = {
+				type: 'Program' as const,
+				sourceType: 'module' as const,
+				body: [{ type: 'ExportNamedDeclaration' as const }],
+			};
+			vi.mocked(parseJavaScriptModule).mockImplementationOnce(() => accepted as any);
+			const program = parseModule(source, 'style-value.tsrx');
+			expect(program).toBe(accepted);
+			expect(vi.mocked(parseNativeModule)).toHaveBeenCalledTimes(1);
+			expect(vi.mocked(parseJavaScriptModule)).toHaveBeenCalledTimes(1);
+			expect(vi.mocked(parseJavaScriptModule).mock.calls[0][0]).toBe(source);
+		},
+	);
+
+	it('keeps a bare native Error visible when the source has no <style> expression child', () => {
+		const failure = new Error('Expected identifier');
+		vi.mocked(parseNativeModule).mockImplementationOnce(() => {
+			throw failure;
+		});
+		expect(() =>
+			parseModule('export function C() @{ <style>.a { color: red; }</style> }', 'block.tsrx'),
+		).toThrow(failure);
+		expect(vi.mocked(parseJavaScriptModule)).not.toHaveBeenCalled();
 	});
 
 	it('keeps native comments and diagnostics on a successful parse', () => {

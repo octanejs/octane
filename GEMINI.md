@@ -11,7 +11,7 @@ rules[4]:
     description: Octane test quality and observation-boundary rules
     applyTo[5]: **/*.test.*,**/*.spec.*,**/tests/**,**/_fixtures/**,benchmarks/**
   - path: @.gemini/memories/tsrx-authoring.md
-    description: "Full .tsrx authoring reference: components, text holes, events, control flow, refs"
+    description: "Full .tsrx authoring reference: components, text holes, events, control flow, refs, scoped styles and themes ($class, apply)"
     applyTo[1]: **/*.tsrx
 
 # Additional Conventions Beyond the Built-in Functions
@@ -22,8 +22,7 @@ As this project's AI coding tool, you must follow the additional conventions bel
 
 Octane is Dominic Gannaway's successor to Inferno: a React-shaped UI framework
 with hooks, `memo`, context, portals, Suspense, and transitions, compiled ahead
-of time from `.tsrx`. The runtime, compiler, SSR, hydration, and large test suite
-work, but this is beta and APIs still move.
+of time from `.tsrx`. It works end to end, but this is beta and APIs still move.
 
 Trust the source over any summary, this file included:
 
@@ -119,7 +118,8 @@ Read a nearby `.tsrx` file first. The parts with no JavaScript equivalent:
   `@for (const x of xs; key x.id)`/`@empty`, `@switch`/`@case`/`@default`, and
   `@try`/`@pending`/`@catch`. Plain JS control flow stays in setup.
 
-Full reference: `.rulesync/rules/tsrx-authoring.md`.
+Full reference, including scoped `<style>` blocks and themes:
+`.rulesync/rules/tsrx-authoring.md`.
 
 ## Types
 

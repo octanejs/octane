@@ -166,6 +166,17 @@ function objectProperty(object: AstNode | undefined, name: string): AstNode | un
 	});
 }
 
+function containsNode(container: AstNode, node: AstNode): boolean {
+	return (
+		typeof container.start === 'number' &&
+		typeof container.end === 'number' &&
+		typeof node.start === 'number' &&
+		typeof node.end === 'number' &&
+		container.start <= node.start &&
+		node.end <= container.end
+	);
+}
+
 type Contract = (ast: AstNode, source: string) => void;
 
 const contracts: Record<string, Contract> = {
@@ -193,6 +204,34 @@ const contracts: Record<string, Contract> = {
 		expect(earlyReturn, 'expected a plain early return before useState').toBeDefined();
 		expect(earlyReturn?.end ?? Infinity).toBeLessThan(stateCall?.start ?? -1);
 	},
+	'tsrx.nested-scope-styles': (ast) => {
+		expectExports(ast, ['App']);
+		const app = functionNamed(ast, 'App');
+		expect(app, 'expected an App function').toBeDefined();
+		const scopes = nodes(app, 'JSXCodeBlock').sort((left, right) => left.start! - right.start!);
+		const [componentScope, ...nestedScopes] = scopes;
+		expect(componentScope, 'expected App to render through a template scope').toBeDefined();
+		expect(nestedScopes.length, 'expected a nested @{ … } template scope').toBeGreaterThan(0);
+		const branches = nodes(app, 'JSXIfExpression');
+		expect(branches.length, 'expected an @if branch').toBeGreaterThan(0);
+
+		const styles = nodes(app, 'JSXStyleElement');
+		expect(styles, 'expected exactly one <style> block per scope').toHaveLength(3);
+		for (const style of styles) expect(jsxAttributes(style, 'apply')).toHaveLength(0);
+		const nestedStyles = styles.filter((style) =>
+			nestedScopes.some((scope) => containsNode(scope, style)),
+		);
+		const branchStyles = styles.filter((style) =>
+			branches.some((branch) => containsNode(branch, style)),
+		);
+		expect(nestedStyles, 'expected one <style> owned by the nested scope').toHaveLength(1);
+		expect(branchStyles, 'expected one <style> owned by the @if branch').toHaveLength(1);
+		expect(nestedStyles[0]).not.toBe(branchStyles[0]);
+		expect(
+			styles.filter((style) => !nestedStyles.includes(style) && !branchStyles.includes(style)),
+			'expected one <style> owned by the component scope',
+		).toHaveLength(1);
+	},
 	'octane.theme-context': (ast) => {
 		expectExports(ast, ['ThemeContext', 'ThemeLabel', 'App']);
 		expect(calls(ast, 'createContext')).toHaveLength(1);
@@ -203,6 +242,53 @@ const contracts: Record<string, Contract> = {
 					attributeExpression(attribute)?.type ?? '',
 				),
 			),
+		).toBe(true);
+	},
+	'octane.theme-apply': (ast) => {
+		expectExports(ast, ['palette', 'spacing', 'theme', 'Card', 'App']);
+		const blocks = new Map(
+			nodes(ast, 'VariableDeclarator')
+				.filter(
+					(declarator) => (declarator.init as AstNode | undefined)?.type === 'JSXStyleElement',
+				)
+				.map((declarator) => [identifierName(declarator.id), declarator] as const),
+		);
+		for (const name of ['palette', 'spacing', 'theme']) {
+			expect(blocks.get(name), `expected ${name} to be an assigned <style> block`).toBeDefined();
+		}
+		const palette = blocks.get('palette')!;
+		const spacing = blocks.get('spacing')!;
+		const theme = blocks.get('theme')!;
+		expect(jsxAttributes(palette.init, 'apply')).toHaveLength(0);
+		expect(jsxAttributes(spacing.init, 'apply')).toHaveLength(0);
+		const composed = attributeExpression(jsxAttributes(theme.init, 'apply')[0]);
+		expect(composed?.type, 'expected theme to compose with apply={[…]}').toBe('ArrayExpression');
+		expect((composed?.elements as AstNode[]).map(identifierName)).toEqual(['palette', 'spacing']);
+		expect(palette.end!).toBeLessThan(theme.start!);
+		expect(spacing.end!).toBeLessThan(theme.start!);
+
+		const card = functionNamed(ast, 'Card');
+		expect(card, 'expected a Card function').toBeDefined();
+		expect(theme.end!, 'expected theme to be declared before Card').toBeLessThan(card!.start!);
+		const applied = nodes(card, 'JSXStyleElement');
+		expect(applied, 'expected Card to apply the theme with one <style />').toHaveLength(1);
+		expect(identifierName(attributeExpression(jsxAttributes(applied[0], 'apply')[0]))).toBe(
+			'theme',
+		);
+		expect((applied[0].openingElement as AstNode).selfClosing).toBe(true);
+
+		const app = functionNamed(ast, 'App');
+		expect(jsxElements(app, 'Card').length).toBeGreaterThan(0);
+		const classChains = jsxAttributes(app, 'class')
+			.map(attributeExpression)
+			.filter((expression): expression is AstNode => expression !== undefined);
+		expect(
+			classChains.some((expression) =>
+				nodes(expression, 'MemberExpression').some(
+					(member) => identifierName(member.object) === 'theme' && memberName(member) === '$class',
+				),
+			),
+			'expected a class prop reading theme.$class',
 		).toBe(true);
 	},
 	'octane.composed-team-board': (ast) => {

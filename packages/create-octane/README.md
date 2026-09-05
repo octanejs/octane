@@ -71,7 +71,10 @@ working starting point rather than a directory of things to delete. The palette,
 typography and card styling are [octanejs.dev](https://octanejs.dev)'s own, so a
 new app and the documentation look like one thing; `src/styles.css` holds the
 tokens and both colour schemes, and each component carries its own scoped
-`<style>`. There is no CSS framework to uninstall.
+`<style>`. The documentation cards' styles are a theme, an assigned `<style>`
+that the landing page's own block applies with `apply={linkTheme}`, so the
+same rules reach that scope without being pasted into it. There is no CSS
+framework to uninstall.
 
 ## What it does
 

@@ -14,55 +14,7 @@ type Direction = 'react-in-octane' | 'octane-in-react';
 export function ReactCompat() @{
 	const [direction, setDirection] = useState<Direction>('react-in-octane');
 
-	<section class="compat" aria-labelledby="compat-heading">
-		<div class="compat-body">
-			<div class="compat-copy">
-				<h2 id="compat-heading" class="compat-title">
-					{'Use React and Octane together. '}
-					<span class="compat-accent">In either direction.</span>
-				</h2>
-				<p class="compat-lead">
-					<code>ReactCompat</code>
-					{' lets an Octane app keep using real React components. '}
-					<code>OctaneCompat</code>
-					{' lets a React app adopt compiled Octane components, one island at a time. ' +
-						'Choose the boundary that fits your app.'}
-				</p>
-				<p class="compat-note">
-					{'Both directions support SSR and hydration. Each renderer keeps its own ' +
-						'events, and parent updates cross the boundary after commit. The guide ' +
-						'covers context sharing, Suspense, and the limits.'}
-				</p>
-				<Link to="/docs/$slug" params={{ slug: 'react-compat' }} class="compat-link">
-					Explore both React integrations →
-				</Link>
-			</div>
-
-			<div class="compat-preview">
-				<div class="compat-choices" role="group" aria-label="React integration example">
-					<button
-						type="button"
-						class="compat-choice"
-						aria-pressed={direction === 'react-in-octane'}
-						aria-controls="compat-example"
-						onClick={() => setDirection('react-in-octane')}
-					>
-						React in Octane
-					</button>
-					<button
-						type="button"
-						class="compat-choice"
-						aria-pressed={direction === 'octane-in-react'}
-						aria-controls="compat-example"
-						onClick={() => setDirection('octane-in-react')}
-					>
-						Octane in React
-					</button>
-				</div>
-				<CompatCode key={direction} direction={direction} />
-			</div>
-		</div>
-
+	<>
 		<style>
 			/* Shares the hairline top border the other lower sections use. */
 			.compat {
@@ -167,7 +119,56 @@ export function ReactCompat() @{
 				}
 			}
 		</style>
-	</section>
+		<section class="compat" aria-labelledby="compat-heading">
+			<div class="compat-body">
+				<div class="compat-copy">
+					<h2 id="compat-heading" class="compat-title">
+						{'Use React and Octane together. '}
+						<span class="compat-accent">In either direction.</span>
+					</h2>
+					<p class="compat-lead">
+						<code>ReactCompat</code>
+						{' lets an Octane app keep using real React components. '}
+						<code>OctaneCompat</code>
+						{' lets a React app adopt compiled Octane components, one island at a time. ' +
+							'Choose the boundary that fits your app.'}
+					</p>
+					<p class="compat-note">
+						{'Both directions support SSR and hydration. Each renderer keeps its own ' +
+							'events, and parent updates cross the boundary after commit. The guide ' +
+							'covers context sharing, Suspense, and the limits.'}
+					</p>
+					<Link to="/docs/$slug" params={{ slug: 'react-compat' }} class="compat-link">
+						Explore both React integrations →
+					</Link>
+				</div>
+
+				<div class="compat-preview">
+					<div class="compat-choices" role="group" aria-label="React integration example">
+						<button
+							type="button"
+							class="compat-choice"
+							aria-pressed={direction === 'react-in-octane'}
+							aria-controls="compat-example"
+							onClick={() => setDirection('react-in-octane')}
+						>
+							React in Octane
+						</button>
+						<button
+							type="button"
+							class="compat-choice"
+							aria-pressed={direction === 'octane-in-react'}
+							aria-controls="compat-example"
+							onClick={() => setDirection('octane-in-react')}
+						>
+							Octane in React
+						</button>
+					</div>
+					<CompatCode key={direction} direction={direction} />
+				</div>
+			</div>
+		</section>
+	</>
 }
 
 function CompatCode(props: { direction: Direction }) @{
@@ -176,38 +177,7 @@ function CompatCode(props: { direction: Direction }) @{
 	const copySample = () => copy(sampleEl.current?.innerText ?? '');
 	const reactInOctane = props.direction === 'react-in-octane';
 
-	<div id="compat-example" class="compat-code">
-		<div class="compat-code-bar">
-			<span class="compat-dot compat-dot-r"></span>
-			<span class="compat-dot compat-dot-y"></span>
-			<span class="compat-dot compat-dot-g"></span>
-			<span class="compat-code-name">
-				{reactInOctane ? 'App.tsrx' : 'App.tsx'}
-			</span>
-			<button
-				type="button"
-				class="compat-code-copy"
-				aria-label="Copy the selected integration sample"
-				onClick={copySample}
-			>
-				<span
-					class="compat-code-copy-icon"
-					style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
-					aria-hidden="true"
-				></span>
-				<span>
-					{copied ? 'Copied' : 'Copy'}
-				</span>
-			</button>
-		</div>
-		<div class="compat-code-body" ref={sampleEl}>
-			@if (reactInOctane) {
-				<ReactSample />
-			} @else {
-				<OctaneSample />
-			}
-		</div>
-
+	<>
 		<style>
 			/* The code panel is the hero's window chrome verbatim, so both editors on
 			   the home page share the same frame, bar height, and traffic-light
@@ -289,5 +259,37 @@ function CompatCode(props: { direction: Direction }) @{
 				line-height: 1.5;
 			}
 		</style>
-	</div>
+		<div id="compat-example" class="compat-code">
+			<div class="compat-code-bar">
+				<span class="compat-dot compat-dot-r"></span>
+				<span class="compat-dot compat-dot-y"></span>
+				<span class="compat-dot compat-dot-g"></span>
+				<span class="compat-code-name">
+					{reactInOctane ? 'App.tsrx' : 'App.tsx'}
+				</span>
+				<button
+					type="button"
+					class="compat-code-copy"
+					aria-label="Copy the selected integration sample"
+					onClick={copySample}
+				>
+					<span
+						class="compat-code-copy-icon"
+						style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
+						aria-hidden="true"
+					></span>
+					<span>
+						{copied ? 'Copied' : 'Copy'}
+					</span>
+				</button>
+			</div>
+			<div class="compat-code-body" ref={sampleEl}>
+				@if (reactInOctane) {
+					<ReactSample />
+				} @else {
+					<OctaneSample />
+				}
+			</div>
+		</div>
+	</>
 }

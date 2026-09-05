@@ -176,12 +176,14 @@ export function Unused() @{
 }
 
 export function Retained() @{
-	<button class="retained-owner-style" onClick={() => {
-		globalThis.__octaneOwnerClicks = (globalThis.__octaneOwnerClicks || 0) + 1;
-	}}>
-		{'retained'}
+	<>
 		<style>.retained-owner-style { color: rgb(0, 0, 255); }</style>
-	</button>
+		<button class="retained-owner-style" onClick={() => {
+			globalThis.__octaneOwnerClicks = (globalThis.__octaneOwnerClicks || 0) + 1;
+		}}>
+			{'retained'}
+		</button>
+	</>
 }
 `,
 			'owned-components.tsrx',
@@ -294,9 +296,10 @@ globalThis.__octaneBeforeComponent = {
 };
 
 export function StyledClickable() @{
-	<button class="timing" onAuxClick={() => {}} onPointerDownCapture={() => {}}>
+	<>
 		<style>.timing { color: red; }</style>
-	</button>
+		<button class="timing" onAuxClick={() => {}} onPointerDownCapture={() => {}}></button>
+	</>
 }
 
 export function Plain() @{ <p /> }

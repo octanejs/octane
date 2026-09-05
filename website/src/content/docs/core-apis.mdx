@@ -1322,8 +1322,13 @@ For a direct SSG script outside Vite, preload the compiler for your runtime:
 The preload compiles imported `.tsrx`/`.tsx` modules and plain TypeScript custom hooks in
 server mode.
 
-Put `html` in the page body and the deduplicated scoped `css` in `<head>`. The streaming
-APIs can send the shell first and reveal Suspense content as it becomes ready.
+Put `html` in the page body and `css` in `<head>`. The `css` string holds every scoped
+`<style>` sheet and theme the rendered components injected during that request,
+deduplicated by hash and in [emission order](/docs/styling#ordering), as ready-to-place
+`<style data-octane="hash">` tags that the client's `injectStyle` recognizes and skips on
+hydration. The streaming APIs have no `css` field: they flush each scoped `<style>` inline
+with the content that uses it, send the shell first, and reveal Suspense content as it
+becomes ready.
 
 <h2 id="api-index">API index by job</h2>
 

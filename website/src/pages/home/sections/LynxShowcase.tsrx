@@ -69,17 +69,7 @@ function ShowcaseCard(props: CardProps) @{
 export function LynxShowcase() @{
 	const pathname = useLocation({ select: (location) => location.pathname });
 
-	<div class="lynx-cards">
-		@for (const example of LYNX_EXAMPLES; key example.id) {
-			<ShowcaseCard
-				id={example.id}
-				title={example.title}
-				summary={example.summary}
-				active={pathname === '/'}
-				autoGesture={example.autoGesture}
-			/>
-		}
-
+	<>
 		<style>
 			/* Two cards, each no wider than its phone plus a readable measure, so
 			   the caption's left edge lines up with the device above it. */
@@ -172,5 +162,16 @@ export function LynxShowcase() @{
 				}
 			}
 		</style>
-	</div>
+		<div class="lynx-cards">
+			@for (const example of LYNX_EXAMPLES; key example.id) {
+				<ShowcaseCard
+					id={example.id}
+					title={example.title}
+					summary={example.summary}
+					active={pathname === '/'}
+					autoGesture={example.autoGesture}
+				/>
+			}
+		</div>
+	</>
 }

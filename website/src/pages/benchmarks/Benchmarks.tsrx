@@ -51,159 +51,7 @@ export function Benchmarks() @{
 	const { mobileMenuOpen, mobileMenuPanel, toggleMobileNavigation, closeMobileNavigation } =
 		useAnimatedMobileNavigation();
 
-	<div class="benchpage">
-		<div class="benchpage-frame">
-			<aside class="benchpage-sidebar">
-				<button
-					type="button"
-					class="benchpage-sidebar-toggle"
-					aria-expanded={mobileMenuOpen}
-					aria-controls="benchmark-sidebar-nav"
-					onClick={toggleMobileNavigation}
-				>
-					<span>Benchmarks</span>
-					<span class="benchpage-sidebar-icon" aria-hidden="true">+</span>
-				</button>
-				<div class={['benchpage-sidebar-panel', mobileMenuOpen && 'is-open']} ref={mobileMenuPanel}>
-					<div class="benchpage-sidebar-panel-inner">
-						<div id="benchmark-sidebar-nav">
-							<a class="benchpage-sidebar-link" href="/benchmarks" aria-current="page">
-								Benchmarks
-							</a>
-							<OnThisPage
-								sections={BENCH_SECTIONS}
-								resetKey="benchmarks"
-								onNavigate={closeMobileNavigation}
-							/>
-						</div>
-					</div>
-				</div>
-			</aside>
-			<div class="benchpage-main">
-				<header class="benchpage-head">
-					<h1 class="benchpage-title">Benchmarks</h1>
-					<p class="benchpage-sub">
-						{'Benchmark score in milliseconds per operation — lower is better. Every chart is the ' +
-							'checked-in baseline from the repo’s own suites: same apps, same hardware, ' +
-							'same run. Every primary React comparison uses the official React Compiler; ' +
-							'memo-wall also shows an explicitly uncompiled control. Reproduce them with '}
-						<code>pnpm bench:all</code>
-						{', and see '}
-						<a
-							href="https://github.com/octanejs/octane/tree/main/benchmarks"
-							target="_blank"
-							rel="noreferrer"
-						>{'benchmarks/'}</a>
-						{' for what each suite measures.'}
-					</p>
-				</header>
-
-				<section class="benchpage-section" aria-labelledby="bench-overview">
-					<h2 id="bench-overview" class="benchpage-h2">Every suite at a glance</h2>
-					<p class="benchpage-note">
-						Start here: each cell is the geometric mean of that suite’s per-operation scores
-						relative to Octane — 1× is Octane, below 1× is faster than Octane. Pick frameworks and a
-						suite for the bar view, or scan the whole grid and re-baseline it to each suite’s
-						fastest framework. The sections below have the full per-operation charts in
-						milliseconds.
-					</p>
-					<BenchmarkExplorer card={OVERVIEW} />
-				</section>
-
-				<section class="benchpage-section" aria-labelledby="bench-frameworks">
-					<h2 id="bench-frameworks" class="benchpage-h2">Octane vs the field</h2>
-					<p class="benchpage-note">
-						Octane compiled from .tsrx and .tsx, against React 19 with the official React Compiler,
-						Preact 10, Solid, Svelte 5, Ripple, Vue Vapor and Inferno 9 — each framework’s fixture
-						written the way its docs recommend. React Compiler is enabled for every primary React
-						comparison; memo-wall also includes a clearly labeled uncompiled React control. The
-						ranked chips on each card are that suite’s one-line reading: every framework’s geometric
-						mean across the card’s operations, relative to Octane, fastest first.
-					</p>
-					<div class="benchpage-grid">
-						@for (const card of FRAMEWORK_CARDS; key card.id) {
-							<div
-								class="benchpage-anchor"
-								id={cardAnchor(card)}
-								role="group"
-								aria-label={card.title}
-							>
-								<BenchBars card={card} />
-							</div>
-						}
-					</div>
-				</section>
-
-				<section class="benchpage-section" aria-labelledby="bench-targets">
-					<h2 id="bench-targets" class="benchpage-h2">Head-to-head targets</h2>
-					<p class="benchpage-note">
-						Suites whose roster is a specific stack rather than the whole field: Octane against
-						React on real HTTP servers, composed async trees and the same TanStack Start app, and
-						the Octane Three renderer against React Three Fiber and hand-written Three.js. These
-						cards stay out of the at-a-glance grid above, which aggregates only the full-roster
-						suites.
-					</p>
-					<div class="benchpage-grid">
-						@for (const card of TARGET_CARDS; key card.id) {
-							<div
-								class="benchpage-anchor"
-								id={cardAnchor(card)}
-								role="group"
-								aria-label={card.title}
-							>
-								<BenchBars card={card} />
-							</div>
-						}
-					</div>
-				</section>
-
-				<section class="benchpage-section" aria-labelledby="bench-lynx">
-					<h2 id="bench-lynx" class="benchpage-h2">Octane on Lynx</h2>
-					<p class="benchpage-note">
-						The dual-thread Lynx renderer on the same cross-framework table app as ReactLynx and
-						both Vue Lynx renderers, measured two ways: wall clock on the Lynx-for-Web host with one
-						shared page driver, and the deterministic wire cost of each commit — command counts
-						against the changed-rows floor, exact and machine-independent, gated in CI. The gap
-						between the wire bars is a KNOWN GAP the lynx-table ratio guards track; fixes tighten
-						the guards and close the bars.
-					</p>
-					<div class="benchpage-grid">
-						@for (const card of LYNX_CARDS; key card.id) {
-							<div
-								class="benchpage-anchor"
-								id={cardAnchor(card)}
-								role="group"
-								aria-label={card.title}
-							>
-								<BenchBars card={card} />
-							</div>
-						}
-					</div>
-				</section>
-
-				<section class="benchpage-section" aria-labelledby="bench-internal">
-					<h2 id="bench-internal" class="benchpage-h2">The authoring cliff</h2>
-					<p class="benchpage-note">
-						Octane against itself: what naively-authored code costs relative to the compiled fast
-						path. The de-opt fixtures render the same apps through plain createElement — the shape
-						every binding produces — so the cliff is a first-class, regression-guarded number.
-					</p>
-					<div class="benchpage-grid">
-						@for (const card of OCTANE_CARDS; key card.id) {
-							<div
-								class="benchpage-anchor"
-								id={cardAnchor(card)}
-								role="group"
-								aria-label={card.title}
-							>
-								<BenchBars card={card} />
-							</div>
-						}
-					</div>
-				</section>
-			</div>
-		</div>
-
+	<>
 		<style>
 			.benchpage {
 				max-width: 1420px;
@@ -371,5 +219,162 @@ export function Benchmarks() @{
 				scroll-margin-top: 5.5rem;
 			}
 		</style>
-	</div>
+		<div class="benchpage">
+			<div class="benchpage-frame">
+				<aside class="benchpage-sidebar">
+					<button
+						type="button"
+						class="benchpage-sidebar-toggle"
+						aria-expanded={mobileMenuOpen}
+						aria-controls="benchmark-sidebar-nav"
+						onClick={toggleMobileNavigation}
+					>
+						<span>Benchmarks</span>
+						<span class="benchpage-sidebar-icon" aria-hidden="true">+</span>
+					</button>
+					<div
+						class={['benchpage-sidebar-panel', mobileMenuOpen && 'is-open']}
+						ref={mobileMenuPanel}
+					>
+						<div class="benchpage-sidebar-panel-inner">
+							<div id="benchmark-sidebar-nav">
+								<a class="benchpage-sidebar-link" href="/benchmarks" aria-current="page">
+									Benchmarks
+								</a>
+								<OnThisPage
+									sections={BENCH_SECTIONS}
+									resetKey="benchmarks"
+									onNavigate={closeMobileNavigation}
+								/>
+							</div>
+						</div>
+					</div>
+				</aside>
+				<div class="benchpage-main">
+					<header class="benchpage-head">
+						<h1 class="benchpage-title">Benchmarks</h1>
+						<p class="benchpage-sub">
+							{'Benchmark score in milliseconds per operation — lower is better. Every chart is the ' +
+								'checked-in baseline from the repo’s own suites: same apps, same hardware, ' +
+								'same run. Every primary React comparison uses the official React Compiler; ' +
+								'memo-wall also shows an explicitly uncompiled control. Reproduce them with '}
+							<code>pnpm bench:all</code>
+							{', and see '}
+							<a
+								href="https://github.com/octanejs/octane/tree/main/benchmarks"
+								target="_blank"
+								rel="noreferrer"
+							>{'benchmarks/'}</a>
+							{' for what each suite measures.'}
+						</p>
+					</header>
+
+					<section class="benchpage-section" aria-labelledby="bench-overview">
+						<h2 id="bench-overview" class="benchpage-h2">Every suite at a glance</h2>
+						<p class="benchpage-note">
+							Start here: each cell is the geometric mean of that suite’s per-operation scores
+							relative to Octane — 1× is Octane, below 1× is faster than Octane. Pick frameworks and
+							a suite for the bar view, or scan the whole grid and re-baseline it to each suite’s
+							fastest framework. The sections below have the full per-operation charts in
+							milliseconds.
+						</p>
+						<BenchmarkExplorer card={OVERVIEW} />
+					</section>
+
+					<section class="benchpage-section" aria-labelledby="bench-frameworks">
+						<h2 id="bench-frameworks" class="benchpage-h2">Octane vs the field</h2>
+						<p class="benchpage-note">
+							Octane compiled from .tsrx and .tsx, against React 19 with the official React
+							Compiler, Preact 10, Solid, Svelte 5, Ripple, Vue Vapor and Inferno 9 — each
+							framework’s fixture written the way its docs recommend. React Compiler is enabled for
+							every primary React comparison; memo-wall also includes a clearly labeled uncompiled
+							React control. The ranked chips on each card are that suite’s one-line reading: every
+							framework’s geometric mean across the card’s operations, relative to Octane, fastest
+							first.
+						</p>
+						<div class="benchpage-grid">
+							@for (const card of FRAMEWORK_CARDS; key card.id) {
+								<div
+									class="benchpage-anchor"
+									id={cardAnchor(card)}
+									role="group"
+									aria-label={card.title}
+								>
+									<BenchBars card={card} />
+								</div>
+							}
+						</div>
+					</section>
+
+					<section class="benchpage-section" aria-labelledby="bench-targets">
+						<h2 id="bench-targets" class="benchpage-h2">Head-to-head targets</h2>
+						<p class="benchpage-note">
+							Suites whose roster is a specific stack rather than the whole field: Octane against
+							React on real HTTP servers, composed async trees and the same TanStack Start app, and
+							the Octane Three renderer against React Three Fiber and hand-written Three.js. These
+							cards stay out of the at-a-glance grid above, which aggregates only the full-roster
+							suites.
+						</p>
+						<div class="benchpage-grid">
+							@for (const card of TARGET_CARDS; key card.id) {
+								<div
+									class="benchpage-anchor"
+									id={cardAnchor(card)}
+									role="group"
+									aria-label={card.title}
+								>
+									<BenchBars card={card} />
+								</div>
+							}
+						</div>
+					</section>
+
+					<section class="benchpage-section" aria-labelledby="bench-lynx">
+						<h2 id="bench-lynx" class="benchpage-h2">Octane on Lynx</h2>
+						<p class="benchpage-note">
+							The dual-thread Lynx renderer on the same cross-framework table app as ReactLynx and
+							both Vue Lynx renderers, measured two ways: wall clock on the Lynx-for-Web host with
+							one shared page driver, and the deterministic wire cost of each commit — command
+							counts against the changed-rows floor, exact and machine-independent, gated in CI. The
+							gap between the wire bars is a KNOWN GAP the lynx-table ratio guards track; fixes
+							tighten the guards and close the bars.
+						</p>
+						<div class="benchpage-grid">
+							@for (const card of LYNX_CARDS; key card.id) {
+								<div
+									class="benchpage-anchor"
+									id={cardAnchor(card)}
+									role="group"
+									aria-label={card.title}
+								>
+									<BenchBars card={card} />
+								</div>
+							}
+						</div>
+					</section>
+
+					<section class="benchpage-section" aria-labelledby="bench-internal">
+						<h2 id="bench-internal" class="benchpage-h2">The authoring cliff</h2>
+						<p class="benchpage-note">
+							Octane against itself: what naively-authored code costs relative to the compiled fast
+							path. The de-opt fixtures render the same apps through plain createElement — the shape
+							every binding produces — so the cliff is a first-class, regression-guarded number.
+						</p>
+						<div class="benchpage-grid">
+							@for (const card of OCTANE_CARDS; key card.id) {
+								<div
+									class="benchpage-anchor"
+									id={cardAnchor(card)}
+									role="group"
+									aria-label={card.title}
+								>
+									<BenchBars card={card} />
+								</div>
+							}
+						</div>
+					</section>
+				</div>
+			</div>
+		</div>
+	</>
 }

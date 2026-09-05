@@ -24,65 +24,7 @@ const ENDPOINTS = [
 ];
 
 export function Landing() @{
-	<main class="landing">
-		<h1>Octane MCP</h1>
-		<p class="lede">
-			The remote MCP server for
-			<a href="https://octanejs.dev">Octane</a>
-			— docs search, real-compiler
-			<code>.tsrx</code>
-			validation, and bindings knowledge for AI agents, no install required.
-		</p>
-
-		<h2>Connect</h2>
-		<p>
-			The MCP endpoint speaks stateless Streamable HTTP at
-			<code>POST https://mcp.octanejs.dev/v1/mcp</code>
-			:
-		</p>
-		<pre>claude mcp add --transport http octane https://mcp.octanejs.dev/v1/mcp</pre>
-
-		<h2>Tools</h2>
-		<dl>
-			@for (const tool of TOOLS; key tool[0]) {
-				<>
-					<dt>
-						<code>{tool[0] as string}</code>
-					</dt>
-					<dd>{tool[1] as string}</dd>
-				</>
-			}
-		</dl>
-
-		<h2>Plain HTTP</h2>
-		<p>No MCP client handy? The same knowledge is served as versioned JSON and text:</p>
-		<dl>
-			@for (const endpoint of ENDPOINTS; key endpoint[0]) {
-				<>
-					<dt>
-						<code>{endpoint[0] as string}</code>
-					</dt>
-					<dd>{endpoint[1] as string}</dd>
-				</>
-			}
-		</dl>
-
-		<h2>Versioning</h2>
-		<p>
-			The
-			<code>/v1</code>
-			prefix is the API contract: tools and response shapes stay stable within it, while the served
-			knowledge tracks the latest Octane release. Breaking changes ship as a new
-			<code>/v2</code>
-			prefix alongside.
-		</p>
-
-		<p class="foot">
-			<a href="https://octanejs.dev/docs">Documentation</a>
-			·
-			<a href="https://github.com/octanejs/octane">GitHub</a>
-		</p>
-
+	<>
 		<style>
 			.landing {
 				max-width: 760px;
@@ -136,5 +78,64 @@ export function Landing() @{
 				color: var(--text-secondary);
 			}
 		</style>
-	</main>
+		<main class="landing">
+			<h1>Octane MCP</h1>
+			<p class="lede">
+				The remote MCP server for
+				<a href="https://octanejs.dev">Octane</a>
+				— docs search, real-compiler
+				<code>.tsrx</code>
+				validation, and bindings knowledge for AI agents, no install required.
+			</p>
+
+			<h2>Connect</h2>
+			<p>
+				The MCP endpoint speaks stateless Streamable HTTP at
+				<code>POST https://mcp.octanejs.dev/v1/mcp</code>
+				:
+			</p>
+			<pre>claude mcp add --transport http octane https://mcp.octanejs.dev/v1/mcp</pre>
+
+			<h2>Tools</h2>
+			<dl>
+				@for (const tool of TOOLS; key tool[0]) {
+					<>
+						<dt>
+							<code>{tool[0] as string}</code>
+						</dt>
+						<dd>{tool[1] as string}</dd>
+					</>
+				}
+			</dl>
+
+			<h2>Plain HTTP</h2>
+			<p>No MCP client handy? The same knowledge is served as versioned JSON and text:</p>
+			<dl>
+				@for (const endpoint of ENDPOINTS; key endpoint[0]) {
+					<>
+						<dt>
+							<code>{endpoint[0] as string}</code>
+						</dt>
+						<dd>{endpoint[1] as string}</dd>
+					</>
+				}
+			</dl>
+
+			<h2>Versioning</h2>
+			<p>
+				The
+				<code>/v1</code>
+				prefix is the API contract: tools and response shapes stay stable within it, while the
+				served knowledge tracks the latest Octane release. Breaking changes ship as a new
+				<code>/v2</code>
+				prefix alongside.
+			</p>
+
+			<p class="foot">
+				<a href="https://octanejs.dev/docs">Documentation</a>
+				·
+				<a href="https://github.com/octanejs/octane">GitHub</a>
+			</p>
+		</main>
+	</>
 }

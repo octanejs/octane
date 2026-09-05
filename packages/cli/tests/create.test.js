@@ -74,6 +74,11 @@ describe('octane create', () => {
 		// template has one page and so no shared frame to route through.
 		expect(read(app, 'src/App.tsrx')).toContain('https://octanejs.dev/docs/quick-start');
 		expect(read(app, 'src/App.tsrx')).not.toContain('Layout.tsrx');
+		// The card styles are a theme the page applies, declared above the
+		// component because a theme has to precede the block that applies it.
+		expect(read(app, 'src/App.tsrx')).toMatch(
+			/const linkTheme = <style>[\s\S]*export function App\(\)[\s\S]*<style apply=\{linkTheme\}>/,
+		);
 		// The theme tokens the page reads, and the shell tag that resolves them.
 		// Linked rather than imported: a CSS import is injected by JavaScript in
 		// dev, so the tokens would land after the markup that reads them.
@@ -128,6 +133,10 @@ describe('octane create', () => {
 		expect(read(app, 'src/Layout.tsrx')).toContain('export function Layout(');
 		expect(read(app, 'src/App.tsrx')).toContain('from "./Layout.tsrx"');
 		expect(read(app, 'src/Counter.tsrx')).toContain('from "./Layout.tsrx"');
+		// The landing page applies the same card theme as the client-only one.
+		expect(read(app, 'src/App.tsrx')).toMatch(
+			/const linkTheme = <style>[\s\S]*export function App\(\)[\s\S]*<style apply=\{linkTheme\}>/,
+		);
 
 		expect(read(app, 'src/styles.css')).toContain('--accent');
 		expect(html).toContain('<link rel="stylesheet" href="/src/styles.css" />');

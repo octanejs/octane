@@ -1181,229 +1181,7 @@ export function Playground() @{
 		};
 	}, []);
 
-	<div class="pg">
-		<div class="pg-toolbar">
-			<div class="pg-toolbar-side">
-				<select
-					class="pg-select"
-					aria-label="Example"
-					disabled={!ready}
-					value={exampleId}
-					onChange={(e) => controllerRef.current.selectExample?.(e.currentTarget.value)}
-				>
-					{/* Static placeholder shown only while the buffer has diverged from
-    every example — always in the DOM (no conditional rendering
-    inside the select) so the option list never reconciles. */}
-					<option value="custom" disabled hidden>Custom</option>
-					@for (const group of EXAMPLE_GROUPS; key group.group) {
-						<optgroup label={group.group}>
-							@for (const example of group.examples; key example.id) {
-								<option value={example.id}>{example.label as string}</option>
-							}
-						</optgroup>
-					}
-				</select>
-				<div class="pg-seg" role="group" aria-label="Source language">
-					<button
-						type="button"
-						class={['pg-seg-btn', lang === 'tsrx' && 'active']}
-						disabled={!ready || !variants.tsrx}
-						title={variants.tsrx ? undefined : 'This example has no TSRX variant'}
-						onClick={() => controllerRef.current.switchLang?.('tsrx')}
-					>
-						TSRX
-					</button>
-					<button
-						type="button"
-						class={['pg-seg-btn', lang === 'tsx' && 'active']}
-						disabled={!ready || !variants.tsx}
-						title={variants.tsx ? undefined : 'This example has no TSX variant'}
-						onClick={() => controllerRef.current.switchLang?.('tsx')}
-					>
-						TSX
-					</button>
-				</div>
-				<button
-					type="button"
-					class="pg-format"
-					disabled={!ready || formatting}
-					title="Format with Prettier (Ctrl/Cmd-Shift-F)"
-					onClick={() => controllerRef.current.formatActive?.()}
-				>{(formatting ? 'Formatting…' : 'Format') as string}</button>
-			</div>
-			<div class="pg-seg pg-view-switch" role="group" aria-label="Result view">
-				<button
-					type="button"
-					class={['pg-seg-btn', view === 'preview' && 'active']}
-					onClick={() => selectView('preview')}
-				>
-					Preview
-				</button>
-				<button
-					type="button"
-					class={['pg-seg-btn', view === 'compiled' && 'active']}
-					onClick={() => selectView('compiled')}
-				>
-					Compiled
-				</button>
-			</div>
-		</div>
-
-		@if (error) {
-			<div class="pg-error" role="alert">{error}</div>
-		}
-		@if (warnings.length > 0) {
-			<section class="pg-warnings" aria-label="Compiler warnings" aria-live="polite">
-				<strong>
-					{warnings.length === 1 ? 'Compiler warning' : 'Compiler warnings'}
-				</strong>
-				<ul>
-					@for (const warning of warnings; key warning.filename + ':' + warning.code + ':' +
-						warning.start.offset) {
-						<li>
-							<code>{warning.code}</code>
-							<span>{warning.message}</span>
-							<span class="pg-warning-location">
-								{warning.filename + ':' + warning.start.line + ':' + (warning.start.column + 1)}
-							</span>
-						</li>
-					}
-				</ul>
-			</section>
-		}
-
-		<div class={['pg-grid', ready && 'ready']}>
-			<section
-				class={['pg-panel', pane !== 'editor' && 'mobile-hidden']}
-				aria-label="Source editor"
-			>
-				<div class="pg-panel-head">
-					@if (files.length > 1) {
-						<div class="pg-tabs" role="tablist" aria-label="Playground files">
-							@for (const name of files; key name) {
-								<button
-									type="button"
-									role="tab"
-									aria-selected={name === activeFile}
-									class={['pg-tab', name === activeFile && 'active']}
-									onClick={() => controllerRef.current.selectFile?.(name)}
-								>{name as string}</button>
-							}
-						</div>
-					} @else {
-						<span>{'Source · ' + (activeFile || '…')}</span>
-					}
-					@if (!ready) {
-						<span class="pg-loading">Loading editor…</span>
-					}
-				</div>
-				<div class="pg-editor" ref={sourceHostRef} />
-			</section>
-
-			<section class={['pg-panel', pane !== 'result' && 'mobile-hidden']} aria-label="Result">
-				<div class="pg-panel-head">
-					<span>
-						{view === 'preview'
-							? 'Live preview'
-							: OUTPUT_TARGET_LABEL[outputTarget] +
-								(compiledMode === 'ast' ? ' AST · ' : ' output · ') +
-								(activeFile || '…')}
-					</span>
-					@if (view === 'compiled') {
-						<div class="pg-compiled-controls">
-							<select
-								class="pg-select pg-output-select"
-								aria-label="Compiler output"
-								value={outputTarget}
-								onChange={(event) => selectOutputTarget(
-									event.currentTarget.value as PlaygroundOutputTarget,
-								)}
-							>
-								<option value="client">Client</option>
-								<option value="server">Server</option>
-								<option value="types">Types</option>
-								@if (compiledMode === 'ast') {
-									<option value="source">Parsed</option>
-								}
-							</select>
-							<div class="pg-seg pg-seg-sm" role="group" aria-label="Output format">
-								<button
-									type="button"
-									class={['pg-seg-btn', compiledMode === 'code' && 'active']}
-									onClick={() => selectCompiledMode('code')}
-								>
-									Code
-								</button>
-								<button
-									type="button"
-									class={['pg-seg-btn', compiledMode === 'ast' && 'active']}
-									onClick={() => selectCompiledMode('ast')}
-								>
-									AST
-								</button>
-							</div>
-						</div>
-					}
-				</div>
-				<div class={['pg-result', view !== 'preview' && 'hidden']}>
-					<div class="pg-preview" ref={previewHostRef} />
-					@if (gated) {
-						<div class="pg-consent" role="alertdialog" aria-label="Run shared code?">
-							<div class="pg-consent-card">
-								<strong>This link contains shared code.</strong>
-								<p>
-									It was written by whoever sent you this link. Review it in the editor (and the
-									compiled output) — it runs in a sandbox, but only after you choose to run it.
-								</p>
-								<button
-									type="button"
-									class="pg-consent-run"
-									disabled={!ready}
-									onClick={() => controllerRef.current.approveRun?.()}
-								>
-									Run code
-								</button>
-							</div>
-						</div>
-					}
-				</div>
-				<div class={['pg-compiled', view !== 'compiled' && 'hidden']}>
-					<div class={['pg-ast-host', compiledMode !== 'ast' && 'hidden']} ref={astHostRef} />
-					<div class={['pg-output', compiledMode !== 'code' && 'hidden']}>
-						<div class="pg-editor" ref={outputHostRef} />
-					</div>
-				</div>
-			</section>
-		</div>
-
-		<div class="pg-mobile-toggle" role="group" aria-label="Visible panel">
-			<button
-				type="button"
-				class={['pg-seg-btn', pane === 'editor' && 'active']}
-				onClick={() => {
-					paneRef.current = 'editor';
-					setPane('editor');
-				}}
-			>
-				Code
-			</button>
-			<button
-				type="button"
-				class={['pg-seg-btn', pane === 'result' && view === 'preview' && 'active']}
-				onClick={openMobilePreview}
-			>
-				Preview
-			</button>
-			<button
-				type="button"
-				class={['pg-seg-btn', pane === 'result' && view === 'compiled' && 'active']}
-				title="Show the compiled output for the current file"
-				onClick={openMobileCompiled}
-			>
-				Inspect
-			</button>
-		</div>
-
+	<>
 		<style>
 			.pg {
 				display: flex;
@@ -1885,5 +1663,228 @@ export function Playground() @{
 				}
 			}
 		</style>
-	</div>
+		<div class="pg">
+			<div class="pg-toolbar">
+				<div class="pg-toolbar-side">
+					<select
+						class="pg-select"
+						aria-label="Example"
+						disabled={!ready}
+						value={exampleId}
+						onChange={(e) => controllerRef.current.selectExample?.(e.currentTarget.value)}
+					>
+						{/* Static placeholder shown only while the buffer has diverged from
+	    every example — always in the DOM (no conditional rendering
+	    inside the select) so the option list never reconciles. */}
+						<option value="custom" disabled hidden>Custom</option>
+						@for (const group of EXAMPLE_GROUPS; key group.group) {
+							<optgroup label={group.group}>
+								@for (const example of group.examples; key example.id) {
+									<option value={example.id}>{example.label as string}</option>
+								}
+							</optgroup>
+						}
+					</select>
+					<div class="pg-seg" role="group" aria-label="Source language">
+						<button
+							type="button"
+							class={['pg-seg-btn', lang === 'tsrx' && 'active']}
+							disabled={!ready || !variants.tsrx}
+							title={variants.tsrx ? undefined : 'This example has no TSRX variant'}
+							onClick={() => controllerRef.current.switchLang?.('tsrx')}
+						>
+							TSRX
+						</button>
+						<button
+							type="button"
+							class={['pg-seg-btn', lang === 'tsx' && 'active']}
+							disabled={!ready || !variants.tsx}
+							title={variants.tsx ? undefined : 'This example has no TSX variant'}
+							onClick={() => controllerRef.current.switchLang?.('tsx')}
+						>
+							TSX
+						</button>
+					</div>
+					<button
+						type="button"
+						class="pg-format"
+						disabled={!ready || formatting}
+						title="Format with Prettier (Ctrl/Cmd-Shift-F)"
+						onClick={() => controllerRef.current.formatActive?.()}
+					>{(formatting ? 'Formatting…' : 'Format') as string}</button>
+				</div>
+				<div class="pg-seg pg-view-switch" role="group" aria-label="Result view">
+					<button
+						type="button"
+						class={['pg-seg-btn', view === 'preview' && 'active']}
+						onClick={() => selectView('preview')}
+					>
+						Preview
+					</button>
+					<button
+						type="button"
+						class={['pg-seg-btn', view === 'compiled' && 'active']}
+						onClick={() => selectView('compiled')}
+					>
+						Compiled
+					</button>
+				</div>
+			</div>
+
+			@if (error) {
+				<div class="pg-error" role="alert">{error}</div>
+			}
+			@if (warnings.length > 0) {
+				<section class="pg-warnings" aria-label="Compiler warnings" aria-live="polite">
+					<strong>
+						{warnings.length === 1 ? 'Compiler warning' : 'Compiler warnings'}
+					</strong>
+					<ul>
+						@for (const warning of warnings; key warning.filename + ':' + warning.code + ':' +
+							warning.start.offset) {
+							<li>
+								<code>{warning.code}</code>
+								<span>{warning.message}</span>
+								<span class="pg-warning-location">
+									{warning.filename + ':' + warning.start.line + ':' + (warning.start.column + 1)}
+								</span>
+							</li>
+						}
+					</ul>
+				</section>
+			}
+
+			<div class={['pg-grid', ready && 'ready']}>
+				<section
+					class={['pg-panel', pane !== 'editor' && 'mobile-hidden']}
+					aria-label="Source editor"
+				>
+					<div class="pg-panel-head">
+						@if (files.length > 1) {
+							<div class="pg-tabs" role="tablist" aria-label="Playground files">
+								@for (const name of files; key name) {
+									<button
+										type="button"
+										role="tab"
+										aria-selected={name === activeFile}
+										class={['pg-tab', name === activeFile && 'active']}
+										onClick={() => controllerRef.current.selectFile?.(name)}
+									>{name as string}</button>
+								}
+							</div>
+						} @else {
+							<span>{'Source · ' + (activeFile || '…')}</span>
+						}
+						@if (!ready) {
+							<span class="pg-loading">Loading editor…</span>
+						}
+					</div>
+					<div class="pg-editor" ref={sourceHostRef} />
+				</section>
+
+				<section class={['pg-panel', pane !== 'result' && 'mobile-hidden']} aria-label="Result">
+					<div class="pg-panel-head">
+						<span>
+							{view === 'preview'
+								? 'Live preview'
+								: OUTPUT_TARGET_LABEL[outputTarget] +
+									(compiledMode === 'ast' ? ' AST · ' : ' output · ') +
+									(activeFile || '…')}
+						</span>
+						@if (view === 'compiled') {
+							<div class="pg-compiled-controls">
+								<select
+									class="pg-select pg-output-select"
+									aria-label="Compiler output"
+									value={outputTarget}
+									onChange={(event) => selectOutputTarget(
+										event.currentTarget.value as PlaygroundOutputTarget,
+									)}
+								>
+									<option value="client">Client</option>
+									<option value="server">Server</option>
+									<option value="types">Types</option>
+									@if (compiledMode === 'ast') {
+										<option value="source">Parsed</option>
+									}
+								</select>
+								<div class="pg-seg pg-seg-sm" role="group" aria-label="Output format">
+									<button
+										type="button"
+										class={['pg-seg-btn', compiledMode === 'code' && 'active']}
+										onClick={() => selectCompiledMode('code')}
+									>
+										Code
+									</button>
+									<button
+										type="button"
+										class={['pg-seg-btn', compiledMode === 'ast' && 'active']}
+										onClick={() => selectCompiledMode('ast')}
+									>
+										AST
+									</button>
+								</div>
+							</div>
+						}
+					</div>
+					<div class={['pg-result', view !== 'preview' && 'hidden']}>
+						<div class="pg-preview" ref={previewHostRef} />
+						@if (gated) {
+							<div class="pg-consent" role="alertdialog" aria-label="Run shared code?">
+								<div class="pg-consent-card">
+									<strong>This link contains shared code.</strong>
+									<p>
+										It was written by whoever sent you this link. Review it in the editor (and the
+										compiled output) — it runs in a sandbox, but only after you choose to run it.
+									</p>
+									<button
+										type="button"
+										class="pg-consent-run"
+										disabled={!ready}
+										onClick={() => controllerRef.current.approveRun?.()}
+									>
+										Run code
+									</button>
+								</div>
+							</div>
+						}
+					</div>
+					<div class={['pg-compiled', view !== 'compiled' && 'hidden']}>
+						<div class={['pg-ast-host', compiledMode !== 'ast' && 'hidden']} ref={astHostRef} />
+						<div class={['pg-output', compiledMode !== 'code' && 'hidden']}>
+							<div class="pg-editor" ref={outputHostRef} />
+						</div>
+					</div>
+				</section>
+			</div>
+
+			<div class="pg-mobile-toggle" role="group" aria-label="Visible panel">
+				<button
+					type="button"
+					class={['pg-seg-btn', pane === 'editor' && 'active']}
+					onClick={() => {
+						paneRef.current = 'editor';
+						setPane('editor');
+					}}
+				>
+					Code
+				</button>
+				<button
+					type="button"
+					class={['pg-seg-btn', pane === 'result' && view === 'preview' && 'active']}
+					onClick={openMobilePreview}
+				>
+					Preview
+				</button>
+				<button
+					type="button"
+					class={['pg-seg-btn', pane === 'result' && view === 'compiled' && 'active']}
+					title="Show the compiled output for the current file"
+					onClick={openMobileCompiled}
+				>
+					Inspect
+				</button>
+			</div>
+		</div>
+	</>
 }

@@ -1,6 +1,6 @@
 # Octane user-apps v1
 
-This is a public training corpus of nineteen realistic requests to build small
+This is a public training corpus of twenty-one realistic requests to build small
 Octane applications. It evaluates framework usage from a consumer's
 perspective—not changes to Octane's source repository.
 
@@ -21,7 +21,10 @@ tasks. The corpus includes:
   templates, and the major TSRX control-flow directives;
 - conditional hooks, inferred dependencies, current-state getters, controlled
   native input, deliberate text commit handling, class composition, ref
-  props/multi-ref, and parallel `use()` as intentional React divergences; and
+  props/multi-ref, and parallel `use()` as intentional React divergences;
+- sibling-scoped `<style>` blocks across nested template and control-flow
+  scopes, exported themes applied with `apply`, theme composition, and
+  `$class`; and
 - consumer applications using Zustand, Hook Form, i18next, and TanStack Query.
 
 ```bash

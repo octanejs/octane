@@ -8,6 +8,7 @@ import BuildTools from './docs/build-tools.mdx';
 import FrameworkIntegrations from './docs/framework-integrations.mdx';
 import Cli from './docs/cli.mdx';
 import CoreApis from './docs/core-apis.mdx';
+import Styling from './docs/styling.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
 import Lynx from './docs/lynx.mdx';
@@ -30,6 +31,7 @@ const components: Record<string, DocEntry['component']> = {
 	'framework-integrations': FrameworkIntegrations,
 	cli: Cli,
 	'core-apis': CoreApis,
+	styling: Styling,
 	'tsrx-vs-tsx': TsrxVsTsx,
 	'differences-from-react': DifferencesFromReact,
 	lynx: Lynx,

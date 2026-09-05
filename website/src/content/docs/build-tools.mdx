@@ -79,6 +79,12 @@ expands a terminal `family/*` rule to matching packages declared by the binding 
 application. This metadata is for raw binding authors; applications consuming the
 binding do not need to repeat it in `vite.config.ts`.
 
+Scoped `<style>` blocks do not become CSS assets. The compiler emits one
+`injectStyle(hash, css)` call per style scope inside the JavaScript module, so Vite's
+CSS pipeline — PostCSS, `css.modules`, `build.cssMinify`, and `?inline` — never sees
+them, and there is no virtual CSS module to import or to list in `manifest.json`.
+Keep global stylesheets in ordinary `.css` files. See [Styling](/docs/styling#ordering).
+
 <h2 id="rspack">Rspack</h2>
 
 The Rspack package is deliberately low-level. It compiles `.tsrx`, eligible
@@ -111,6 +117,12 @@ disable component handoff, or `transpile: false` if another rule already strips
 TypeScript. The loader-only export at `@octanejs/rspack-plugin/loader` is
 available for custom rule composition.
 
+Scoped CSS rides inside the compiled JavaScript: each style scope becomes an
+`injectStyle(hash, css)` call in the module, not a virtual CSS module, so
+`css-loader`, `CssExtractRspackPlugin`, and `experiments.css` do not apply to it
+and no extra rule is needed. Global stylesheets still go through your normal CSS
+rule. See [Styling](/docs/styling#ordering).
+
 <h2 id="rsbuild">Rsbuild</h2>
 
 Rsbuild is the closest equivalent to the full Vite metaframework integration.
@@ -132,6 +144,12 @@ export default defineConfig({
 Without `octane.config.ts`, `pluginOctane()` behaves as a compiler integration
 and preserves your own entries. With routes in `octane.config.ts`, it owns the
 web and Node entries required for SSR and hydration.
+
+As with the other integrations, scoped `<style>` blocks ride `injectStyle` inside
+the compiled module rather than a virtual CSS module: Rsbuild's `output.cssModules`,
+`tools.postcss`, and CSS extraction leave them alone, and the SSR environment
+collects them per request into the render result's `css`. See
+[Styling](/docs/styling#ordering).
 
 The shared `build.target` setting controls both SWC application transforms and
 Rspack's generated runtime. Rsbuild accepts one ES level, `modules`, `false`, or

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
 import { compile } from 'octane/compiler';
-import { Picker, Composed, Switchable, Branded } from './_fixtures/style-map.tsrx';
+import { Picker, Composed, Switchable, Branded, palette } from './_fixtures/style-map.tsrx';
 
 // Style maps: `const styles = <style>...</style>` (or the exported form)
 // becomes a compile-time object whose values are the hashed class strings.
@@ -21,6 +21,13 @@ describe('style maps — module-level <style> assigned to const', () => {
 		const { code } = compile(src, 'sm.tsrx');
 		// The const initializer is now a plain object literal, NOT a JSXStyleElement.
 		expect(code).toMatch(/const\s+styles\s*=\s*\{/);
+		// RFC tsrx-org/RFCs#1: the map opens with the block's scope class
+		// (`$class`), then the authored classes.
+		expect(code).toMatch(/const\s+styles\s*=\s*\{\s*'\$class':\s*'tsrx-[a-z0-9]+',/i);
+		const hash = code.match(/'\$class':\s*'(tsrx-[a-z0-9]+)'/i)![1];
+		expect(code).toContain(`'red': '${hash} red'`);
+		expect(code).toContain(`'blue': '${hash} blue'`);
+		expect(code).toContain(`injectStyle("${hash}"`);
 		// The map values include the hash class + the original class name.
 		expect(code).toMatch(/'red':\s*'tsrx-[a-z0-9]+ red'/i);
 		expect(code).toMatch(/'blue':\s*'tsrx-[a-z0-9]+ blue'/i);
@@ -75,6 +82,112 @@ describe('style maps — module-level <style> assigned to const', () => {
 		expect(span.textContent).toBe('branded');
 		expect(span.className).toContain('accent');
 		expect(getComputedStyle(span).color).toBe('rgb(255, 165, 0)');
+		r.unmount();
+	});
+});
+
+// RFC tsrx-org/RFCs#1: assigned blocks are class maps whose `$class` is the
+// scope class; exported or applied blocks are themes and keep every selector,
+// while an unapplied local block keeps only what its class map exposes.
+describe('style maps — $class, themes, and apply bundles', () => {
+	function injection(code: string, hash: string): string {
+		const match = code.match(new RegExp(`injectStyle\\("${hash}",\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+		if (!match) throw new Error(`no injectStyle for ${hash}`);
+		return match[1];
+	}
+
+	it('an exported theme keeps element selectors; an unapplied local block prunes them', () => {
+		const { code } = compile(
+			`
+      export const theme = <style>
+        .tone { color: red; }
+        div { margin: 0; }
+      </style>;
+      const local = <style>
+        .tone { color: blue; }
+        div { margin: 0; }
+      </style>;
+      export function Foo() @{ <div class={local.tone + ' ' + theme.tone}>{'hi'}</div> }
+    `,
+			'theme-vs-local.tsrx',
+		);
+		const themeHash = code.match(/export const theme = \{ '\$class': '(tsrx-[a-z0-9]+)'/i)![1];
+		const localHash = code.match(/const local = \{ '\$class': '(tsrx-[a-z0-9]+)'/i)![1];
+		expect(themeHash).not.toBe(localHash);
+		expect(injection(code, themeHash)).toContain(`div.${themeHash} { margin: 0; }`);
+		expect(injection(code, themeHash)).not.toContain('(unused)');
+		expect(injection(code, localHash)).toContain(`.tone.${localHash} { color: blue; }`);
+		expect(injection(code, localHash)).toContain('/* (unused) div { margin: 0; }*/');
+	});
+
+	it('a local block becomes a theme once something applies it', () => {
+		const { code } = compile(
+			`
+      const local = <style>
+        .tone { color: blue; }
+        div { margin: 0; }
+      </style>;
+      export function Foo() @{
+        <>
+          <style apply={local} />
+          <div class="box">{'hi'}</div>
+        </>
+      }
+    `,
+			'applied-local.tsrx',
+		);
+		const localHash = code.match(/const local = \{ '\$class': '(tsrx-[a-z0-9]+)'/i)![1];
+		expect(injection(code, localHash)).toContain(`div.${localHash} { margin: 0; }`);
+		expect(injection(code, localHash)).not.toContain('(unused)');
+		// The applying scope has no block of its own: the element carries only
+		// the applied theme's class, as a static literal (same module).
+		expect(code).toContain(`class=\\"box ${localHash}\\"`);
+	});
+
+	it('apply on a self-closed block produces a $class-only bundle', () => {
+		const { code } = compile(
+			`
+      const a = <style>.a { color: red; }</style>;
+      const b = <style>.b { color: blue; }</style>;
+      export const bundle = <style apply={[a, b]} />;
+      export const single = <style apply={b} />;
+    `,
+			'bundle.tsrx',
+		);
+		const aHash = code.match(/const a = \{ '\$class': '(tsrx-[a-z0-9]+)'/i)![1];
+		const bHash = code.match(/const b = \{ '\$class': '(tsrx-[a-z0-9]+)'/i)![1];
+		expect(code).toContain(`export const bundle = { '$class': '${aHash} ${bHash}' };`);
+		expect(code).toContain(`export const single = { '$class': '${bHash}' };`);
+		// A body-less block has no sheet: only the two authored blocks inject.
+		expect(code.match(/injectStyle\(/g)).toHaveLength(2);
+	});
+
+	it('an imported apply target stays a runtime $class read inside the bundle', () => {
+		const { code } = compile(
+			`
+      import { theme } from './theme.tsrx';
+      const a = <style>.a { color: red; }</style>;
+      export const bundle = <style apply={[theme, a]} />;
+      export const themed = <style apply={theme}>.t { color: blue; }</style>;
+    `,
+			'imported-bundle.tsrx',
+		);
+		const aHash = code.match(/const a = \{ '\$class': '(tsrx-[a-z0-9]+)'/i)![1];
+		expect(code).toContain(`export const bundle = { '$class': theme.$class + ' ${aHash}' };`);
+		// With a body, the block's own hash closes the composition.
+		expect(code).toMatch(
+			/export const themed = \{\s*'\$class': theme\.\$class \+ ' tsrx-[a-z0-9]+',\s*'t': 'tsrx-[a-z0-9]+ t'\s*\}/i,
+		);
+	});
+
+	it('palette.$class is the hash every class value of the exported map opens with', () => {
+		expect(palette.$class).toMatch(/^tsrx-[a-z0-9]+$/i);
+		expect(palette.accent).toBe(`${palette.$class} accent`);
+		const r = mount(Branded);
+		expect(r.find('span').className).toBe(palette.accent);
+		const sheet = document.head.querySelector(`style[data-octane="${palette.$class}"]`);
+		expect(sheet).not.toBeNull();
+		expect(sheet!.textContent).toContain(`.accent.${palette.$class}`);
 		r.unmount();
 	});
 });

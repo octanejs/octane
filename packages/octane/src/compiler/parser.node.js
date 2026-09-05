@@ -41,8 +41,40 @@ function publishOutput(options, selected) {
 }
 
 /**
+ * `<style>` with an expression child — `<style>{css}</style>`, an ordinary
+ * element rather than a scoped block. The compat facade reads every `<style>`
+ * element's raw text as CSS after its own error translation, so this shape
+ * surfaces as a bare `Error` from that CSS reader instead of a `SyntaxError`.
+ */
+const STYLE_EXPRESSION_CHILD = /<style\b[^>]*>\s*\{/;
+
+/**
+ * A native rejection the JavaScript parser may still accept: a `SyntaxError`
+ * the facade translated, or the bare `Error` its CSS reader raises for a
+ * `<style>` expression child. Operational failures keep their own name or
+ * code and stay visible, and so does any other bare `Error`: without the
+ * `<style …>{` shape in the source there is nothing the CSS reader could have
+ * rejected.
+ * @param {unknown} error
+ * @param {string} source
+ * @returns {boolean}
+ */
+function isNativeSyntaxRejection(error, source) {
+	if (!(error instanceof Error)) return false;
+	if (error.name === 'ParserOperationalError') return false;
+	if ('code' in error && typeof error.code === 'string' && error.code.startsWith('ERR_TSRX_')) {
+		return false;
+	}
+	if (error instanceof SyntaxError) return true;
+	return (
+		error.name === 'Error' && error.constructor === Error && STYLE_EXPRESSION_CHILD.test(source)
+	);
+}
+
+/**
  * Keep native parsing first while accepting authored syntax already supported
- * by the JavaScript parser, such as literal less-than text in TSRX children.
+ * by the JavaScript parser, such as literal less-than text in TSRX children
+ * or a `<style>` element with an expression child.
  * @param {string} source
  * @param {string} [filename]
  * @param {ParseOptions} [options]
@@ -56,13 +88,7 @@ export function parseModule(source, filename = 'module.tsrx', options) {
 		program = parseNativeModule(source, resolvedFilename, nativeOptions);
 	} catch (nativeError) {
 		// Operational failures must stay visible, even if given a syntax subclass.
-		if (
-			!(nativeError instanceof SyntaxError) ||
-			nativeError.name === 'ParserOperationalError' ||
-			('code' in nativeError &&
-				typeof nativeError.code === 'string' &&
-				nativeError.code.startsWith('ERR_TSRX_'))
-		) {
+		if (!isNativeSyntaxRejection(nativeError, source)) {
 			publishOutput(options, nativeOptions);
 			throw nativeError;
 		}

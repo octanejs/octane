@@ -228,216 +228,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 	};
 	const hide = () => setHovered(null);
 
-	<div class="bx" onMouseMove={onMove}>
-		<>
-			<div class="bx-panel">
-				<div class="bx-controls">
-					<div class="bx-ctl">
-						<span class="bx-ctl-label" id="bx-fw-label">frameworks</span>
-						<div class="bx-chips" role="group" aria-labelledby="bx-fw-label">
-							@for (const s of card.series; key s.key) {
-								<button
-									type="button"
-									class={['bx-chip', { 'bx-chip-on': selected.has(s.key) }]}
-									aria-pressed={selected.has(s.key)}
-									onClick={() => toggleFramework(s.key)}
-								>
-									<span class="bx-swatch" style={'background:' + s.color}></span>
-									{s.label as string}
-								</button>
-							}
-						</div>
-					</div>
-					<div class="bx-ctl">
-						<span class="bx-ctl-label" id="bx-suite-label">suite</span>
-						<div class="bx-suites" role="group" aria-labelledby="bx-suite-label">
-							@for (const r of card.rows; key r.op) {
-								<button
-									type="button"
-									class={['bx-suite', { 'bx-suite-on': r.op === suite }]}
-									aria-pressed={r.op === suite}
-									onClick={() => setSuite(r.op as string)}
-								>{r.op as string}</button>
-							}
-						</div>
-					</div>
-				</div>
-
-				<div
-					class="bx-plot"
-					role="img"
-					aria-label={'Bar chart for the ' + suite + ' suite, × vs Octane, lower is better'}
-				>
-					<div
-						class="bx-refline"
-						style={'left:calc(var(--bx-label) + (100% - var(--bx-label)) * ' + bars.refFraction +
-							')'}
-					>
-						<span class="bx-refcap">1× Octane</span>
-					</div>
-					@for (const item of bars.present; key item.key) {
-						<div
-							class="bx-row"
-							onMouseEnter={(e: MouseEvent) => show(e, {
-								fw: item.label,
-								suite,
-								primary: fmtX(item.value) + ' vs Octane',
-								secondary: item.value < 0.98
-									? 'faster than Octane'
-									: item.value > 1.02
-										? 'slower than Octane'
-										: 'matches Octane',
-								fastest: '',
-							})}
-							onMouseLeave={hide}
-						>
-							<span class="bx-row-label">{item.label as string}</span>
-							<div class="bx-track">
-								<div
-									class="bx-fill"
-									style={'width:' + (item.value / bars.scaleMax) * 100 + '%;background:' +
-										item.color}
-								></div>
-								<span
-									class={['bx-val', item.value / bars.scaleMax > 0.62 ? 'bx-val-in' : 'bx-val-out']}
-									style={'left:' + (item.value / bars.scaleMax) * 100 + '%'}
-								>{fmtX(item.value) as string}</span>
-							</div>
-						</div>
-					}
-					@for (const item of bars.missing; key item.key) {
-						<div class="bx-row bx-row-empty">
-							<span class="bx-row-label">{item.label as string}</span>
-							<div class="bx-track">
-								<span class="bx-val bx-val-out bx-muted" style="left:0">{'—'}</span>
-							</div>
-						</div>
-					}
-					@if (bars.present.length === 0 && bars.missing.length === 0) {
-						<p class="bx-empty">Select at least one framework to compare.</p>
-					}
-				</div>
-			</div>
-
-			<div class="bx-panel">
-				<div class="bx-heat-head">
-					<span class="bx-ctl-label">all suites</span>
-					<div class="bx-seg" role="group" aria-label="Heatmap normalization">
-						<button
-							type="button"
-							class={['bx-seg-btn', { 'bx-seg-on': mode === 'A' }]}
-							aria-pressed={mode === 'A'}
-							onClick={() => setMode('A')}
-						>
-							vs Octane
-						</button>
-						<button
-							type="button"
-							class={['bx-seg-btn', { 'bx-seg-on': mode === 'B' }]}
-							aria-pressed={mode === 'B'}
-							onClick={() => setMode('B')}
-						>
-							vs fastest
-						</button>
-					</div>
-				</div>
-
-				<div class="bx-heat-scroll">
-					<table class="bx-heat">
-						<thead>
-							<tr>
-								<th scope="col" class="bx-corner">suite</th>
-								@for (const s of card.series; key s.key) {
-									<th scope="col">
-										<span class="bx-th">
-											<span class="bx-swatch" style={'background:' + s.color}></span>
-											{s.label as string}
-										</span>
-									</th>
-								}
-							</tr>
-						</thead>
-						<tbody>
-							@for (const r of heat.rows; key r.op) {
-								<tr>
-									<th scope="row" class="bx-rowhead">{r.op as string}</th>
-									@for (const cell of r.cells; key cell.key) {
-										<td
-											class={[
-												'bx-cell',
-												{
-													'bx-cell-null': cell.kind === 'null',
-													'bx-cell-ref': cell.kind === 'ref',
-													'bx-cell-fastest': cell.isFastest,
-												},
-											]}
-											style={cell.kind === 'data' ? 'background:' + cell.tint : undefined}
-											aria-label={cell.kind === 'null' ? 'no data' : undefined}
-											onMouseEnter={(e: MouseEvent) => {
-												if (cell.kind === 'data') show(e, {
-													fw: cell.label,
-													suite: cell.suite,
-													primary: cell.primary,
-													secondary: cell.secondary,
-													fastest: cell.fastest,
-												});
-											}}
-											onMouseLeave={() => {
-												if (cell.kind === 'data') hide();
-											}}
-										>{cell.text as string}</td>
-									}
-								</tr>
-							}
-						</tbody>
-						<tfoot>
-							<tr>
-								<th scope="row" class="bx-rowhead bx-geo-head">geomean</th>
-								@for (const g of heat.geoRow; key g.key) {
-									<td
-										class={['bx-cell', 'bx-geo', { 'bx-cell-ref': g.isRef }]}
-										style={g.tint ? 'background:' + g.tint : ''}
-									>{g.text as string}</td>
-								}
-							</tr>
-						</tfoot>
-					</table>
-				</div>
-				<p class="bx-caption">
-					{mode === 'A'
-						? 'Each cell is that framework’s score relative to Octane (1×), geometric mean across the suite’s operations. Green is faster, red is slower.'
-						: 'Each row is re-baselined so its fastest framework is 1×; every other cell is a multiple of that fastest time. The outlined cell wins the row.'}
-				</p>
-				<div class="bx-legend">
-					<span class="bx-legend-item">
-						<span class="bx-legend-label">Faster</span>
-						<span class="bx-legend-scale" aria-hidden="true"></span>
-						<span class="bx-legend-label">Slower</span>
-					</span>
-					<span class="bx-legend-item">
-						<span class="bx-legend-swatch" aria-hidden="true"></span>
-						Octane = 1× baseline
-					</span>
-				</div>
-			</div>
-
-			@if (hovered) {
-				<div class="bx-tip" role="tooltip" ref={mountTip}>
-					<div class="bx-tip-head">
-						<span class="bx-tip-fw">{hovered.fw as string}</span>
-						<span class="bx-tip-suite">{hovered.suite as string}</span>
-					</div>
-					<div class="bx-tip-primary">{hovered.primary as string}</div>
-					@if (hovered.secondary) {
-						<div class="bx-tip-sec">{hovered.secondary as string}</div>
-					}
-					@if (hovered.fastest) {
-						<div class="bx-tip-fast">{'fastest: ' + hovered.fastest}</div>
-					}
-				</div>
-			}
-		</>
-
+	<>
 		<style>
 			.bx {
 				--bx-label: 8.5rem;
@@ -895,5 +686,218 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				}
 			}
 		</style>
-	</div>
+		<div class="bx" onMouseMove={onMove}>
+			<>
+				<div class="bx-panel">
+					<div class="bx-controls">
+						<div class="bx-ctl">
+							<span class="bx-ctl-label" id="bx-fw-label">frameworks</span>
+							<div class="bx-chips" role="group" aria-labelledby="bx-fw-label">
+								@for (const s of card.series; key s.key) {
+									<button
+										type="button"
+										class={['bx-chip', { 'bx-chip-on': selected.has(s.key) }]}
+										aria-pressed={selected.has(s.key)}
+										onClick={() => toggleFramework(s.key)}
+									>
+										<span class="bx-swatch" style={'background:' + s.color}></span>
+										{s.label as string}
+									</button>
+								}
+							</div>
+						</div>
+						<div class="bx-ctl">
+							<span class="bx-ctl-label" id="bx-suite-label">suite</span>
+							<div class="bx-suites" role="group" aria-labelledby="bx-suite-label">
+								@for (const r of card.rows; key r.op) {
+									<button
+										type="button"
+										class={['bx-suite', { 'bx-suite-on': r.op === suite }]}
+										aria-pressed={r.op === suite}
+										onClick={() => setSuite(r.op as string)}
+									>{r.op as string}</button>
+								}
+							</div>
+						</div>
+					</div>
+
+					<div
+						class="bx-plot"
+						role="img"
+						aria-label={'Bar chart for the ' + suite + ' suite, × vs Octane, lower is better'}
+					>
+						<div
+							class="bx-refline"
+							style={'left:calc(var(--bx-label) + (100% - var(--bx-label)) * ' + bars.refFraction +
+								')'}
+						>
+							<span class="bx-refcap">1× Octane</span>
+						</div>
+						@for (const item of bars.present; key item.key) {
+							<div
+								class="bx-row"
+								onMouseEnter={(e: MouseEvent) => show(e, {
+									fw: item.label,
+									suite,
+									primary: fmtX(item.value) + ' vs Octane',
+									secondary: item.value < 0.98
+										? 'faster than Octane'
+										: item.value > 1.02
+											? 'slower than Octane'
+											: 'matches Octane',
+									fastest: '',
+								})}
+								onMouseLeave={hide}
+							>
+								<span class="bx-row-label">{item.label as string}</span>
+								<div class="bx-track">
+									<div
+										class="bx-fill"
+										style={'width:' + (item.value / bars.scaleMax) * 100 + '%;background:' +
+											item.color}
+									></div>
+									<span
+										class={[
+											'bx-val',
+											item.value / bars.scaleMax > 0.62 ? 'bx-val-in' : 'bx-val-out',
+										]}
+										style={'left:' + (item.value / bars.scaleMax) * 100 + '%'}
+									>{fmtX(item.value) as string}</span>
+								</div>
+							</div>
+						}
+						@for (const item of bars.missing; key item.key) {
+							<div class="bx-row bx-row-empty">
+								<span class="bx-row-label">{item.label as string}</span>
+								<div class="bx-track">
+									<span class="bx-val bx-val-out bx-muted" style="left:0">{'—'}</span>
+								</div>
+							</div>
+						}
+						@if (bars.present.length === 0 && bars.missing.length === 0) {
+							<p class="bx-empty">Select at least one framework to compare.</p>
+						}
+					</div>
+				</div>
+
+				<div class="bx-panel">
+					<div class="bx-heat-head">
+						<span class="bx-ctl-label">all suites</span>
+						<div class="bx-seg" role="group" aria-label="Heatmap normalization">
+							<button
+								type="button"
+								class={['bx-seg-btn', { 'bx-seg-on': mode === 'A' }]}
+								aria-pressed={mode === 'A'}
+								onClick={() => setMode('A')}
+							>
+								vs Octane
+							</button>
+							<button
+								type="button"
+								class={['bx-seg-btn', { 'bx-seg-on': mode === 'B' }]}
+								aria-pressed={mode === 'B'}
+								onClick={() => setMode('B')}
+							>
+								vs fastest
+							</button>
+						</div>
+					</div>
+
+					<div class="bx-heat-scroll">
+						<table class="bx-heat">
+							<thead>
+								<tr>
+									<th scope="col" class="bx-corner">suite</th>
+									@for (const s of card.series; key s.key) {
+										<th scope="col">
+											<span class="bx-th">
+												<span class="bx-swatch" style={'background:' + s.color}></span>
+												{s.label as string}
+											</span>
+										</th>
+									}
+								</tr>
+							</thead>
+							<tbody>
+								@for (const r of heat.rows; key r.op) {
+									<tr>
+										<th scope="row" class="bx-rowhead">{r.op as string}</th>
+										@for (const cell of r.cells; key cell.key) {
+											<td
+												class={[
+													'bx-cell',
+													{
+														'bx-cell-null': cell.kind === 'null',
+														'bx-cell-ref': cell.kind === 'ref',
+														'bx-cell-fastest': cell.isFastest,
+													},
+												]}
+												style={cell.kind === 'data' ? 'background:' + cell.tint : undefined}
+												aria-label={cell.kind === 'null' ? 'no data' : undefined}
+												onMouseEnter={(e: MouseEvent) => {
+													if (cell.kind === 'data') show(e, {
+														fw: cell.label,
+														suite: cell.suite,
+														primary: cell.primary,
+														secondary: cell.secondary,
+														fastest: cell.fastest,
+													});
+												}}
+												onMouseLeave={() => {
+													if (cell.kind === 'data') hide();
+												}}
+											>{cell.text as string}</td>
+										}
+									</tr>
+								}
+							</tbody>
+							<tfoot>
+								<tr>
+									<th scope="row" class="bx-rowhead bx-geo-head">geomean</th>
+									@for (const g of heat.geoRow; key g.key) {
+										<td
+											class={['bx-cell', 'bx-geo', { 'bx-cell-ref': g.isRef }]}
+											style={g.tint ? 'background:' + g.tint : ''}
+										>{g.text as string}</td>
+									}
+								</tr>
+							</tfoot>
+						</table>
+					</div>
+					<p class="bx-caption">
+						{mode === 'A'
+							? 'Each cell is that framework’s score relative to Octane (1×), geometric mean across the suite’s operations. Green is faster, red is slower.'
+							: 'Each row is re-baselined so its fastest framework is 1×; every other cell is a multiple of that fastest time. The outlined cell wins the row.'}
+					</p>
+					<div class="bx-legend">
+						<span class="bx-legend-item">
+							<span class="bx-legend-label">Faster</span>
+							<span class="bx-legend-scale" aria-hidden="true"></span>
+							<span class="bx-legend-label">Slower</span>
+						</span>
+						<span class="bx-legend-item">
+							<span class="bx-legend-swatch" aria-hidden="true"></span>
+							Octane = 1× baseline
+						</span>
+					</div>
+				</div>
+
+				@if (hovered) {
+					<div class="bx-tip" role="tooltip" ref={mountTip}>
+						<div class="bx-tip-head">
+							<span class="bx-tip-fw">{hovered.fw as string}</span>
+							<span class="bx-tip-suite">{hovered.suite as string}</span>
+						</div>
+						<div class="bx-tip-primary">{hovered.primary as string}</div>
+						@if (hovered.secondary) {
+							<div class="bx-tip-sec">{hovered.secondary as string}</div>
+						}
+						@if (hovered.fastest) {
+							<div class="bx-tip-fast">{'fastest: ' + hovered.fastest}</div>
+						}
+					</div>
+				}
+			</>
+		</div>
+	</>
 }

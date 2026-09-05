@@ -8,6 +8,7 @@ import {
 } from 'octane/constants';
 import { condition, idle, interaction, load, never } from 'octane/hydration';
 import type { HydrationStrategy } from 'octane/hydration';
+import { compile } from 'octane/compiler';
 import { renderToStaticMarkup, renderToString } from 'octane/server';
 import { prerender } from 'octane/static';
 import { flushEffects } from '../_helpers.js';
@@ -289,7 +290,16 @@ describe('deferred hydration', () => {
 		const serverNote = container.querySelector('.styled-split-note') as HTMLElement;
 		const serverHostClass = serverHost.className;
 		const serverNoteClass = serverNote.className;
-		expect(serverHostClass).toMatch(/\btsrx-[0-9a-z]+\b/);
+		// The block is an item of the section's children list: it stamps the
+		// note beside it, never the section that contains it.
+		expect(serverHostClass).toBe('');
+		// The scope hash is position-derived from authored coordinates on both
+		// sides: the client module (compiled by the plugin) already injected a
+		// sheet under the very hash the server stamped.
+		const serverScope = serverNote.className.match(/\btsrx-[0-9a-z]+\b/)![0];
+		const clientSheet = document.head.querySelector(`style[data-octane="${serverScope}"]`);
+		expect(clientSheet).not.toBeNull();
+		expect(clientSheet!.textContent).toContain(`.styled-split-note.${serverScope}`);
 
 		root = hydrateRoot(container, styledClient.StyledSplitHydration, props);
 		await vi.waitFor(async () => {
@@ -304,6 +314,61 @@ describe('deferred hydration', () => {
 		expect(serverHost.className).toBe(serverHostClass);
 		expect(serverNote.className).toBe(serverNoteClass);
 		expect(container.querySelector('#styled-split-review')).not.toBeNull();
+	});
+
+	it('adopts server DOM when a complete style scope sits inside a split child', async () => {
+		const onHydrated = vi.fn();
+		const props = { when: load(), onHydrated };
+		const { html } = renderToString(styledServer.StyledCompleteSplitHydration, props);
+		container.innerHTML = html;
+		const serverHost = container.querySelector('#styled-complete-split-host') as HTMLElement;
+		const serverNote = container.querySelector('#styled-complete-note') as HTMLElement;
+		const serverReview = container.querySelector('#styled-complete-review') as HTMLElement;
+		const serverNoteClass = serverNote.className;
+		const serverReviewClass = serverReview.className;
+		const serverScope = serverNote.className.match(/\btsrx-[0-9a-z]+\b/)![0];
+		expect(serverNoteClass).toContain(serverScope);
+		expect(serverReviewClass).toContain(serverScope);
+
+		root = hydrateRoot(container, styledClient.StyledCompleteSplitHydration, props);
+		await vi.waitFor(async () => {
+			await act(() => {});
+			expect(onHydrated).toHaveBeenCalledOnce();
+		});
+
+		// The sheet lives in the split child, so it appears only after the
+		// child chunk runs — under the same authored-position hash the server
+		// stamped.
+		const clientSheet = document.head.querySelector(`style[data-octane="${serverScope}"]`);
+		expect(clientSheet).not.toBeNull();
+		expect(clientSheet!.textContent).toContain(`.styled-complete-note.${serverScope}`);
+		expect(container.querySelector('#styled-complete-split-host')).toBe(serverHost);
+		expect(container.querySelector('#styled-complete-note')).toBe(serverNote);
+		expect(container.querySelector('#styled-complete-review')).toBe(serverReview);
+		expect(serverNote.className).toBe(serverNoteClass);
+		expect(serverReview.className).toBe(serverReviewClass);
+	});
+
+	it('rejects a style scope that straddles a split boundary', () => {
+		const source = `import { Hydrate } from 'octane';
+export function App(props) @{
+	<div>
+		<style>.x { color: red; }</style>
+		<p class="x">outside</p>
+		<Hydrate when={props.when}>
+			<span class="x">inside</span>
+		</Hydrate>
+	</div>
+}`;
+		let thrown: any = null;
+		try {
+			compile(source, 'split-style.tsrx');
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toMatchObject({ code: 'OCTANE_HYDRATE_SPLIT_STYLE' });
+		expect(thrown.message).toContain('straddle a split Hydrate boundary');
+		expect(thrown.message).toContain('split={false}');
 	});
 
 	it('finishes eager hydration when a never split boundary is the last child', async () => {

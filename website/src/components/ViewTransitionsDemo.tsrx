@@ -13,97 +13,7 @@ export function ViewTransitionsDemo() @{
 	const [heroRight, setHeroRight] = useState(false);
 	const [panel, setPanel] = useState(0);
 
-	<section
-		class="vtdemo"
-		data-demo="view-transitions"
-		aria-label="Interactive View Transition examples"
-	>
-		<div class="vtdemo-grid">
-			<section class="vtdemo-block">
-				<h4>{'Enter and exit'}</h4>
-				<button
-					type="button"
-					class="vtdemo-btn"
-					id="vt-toggle-card"
-					onClick={() => startTransition(() => {
-						addTransitionType('card-toggle');
-						setShowCard((current) => !current);
-					})}
-				>
-					{showCard ? 'Remove card' : 'Add card'}
-				</button>
-				<div class="vtdemo-stage">
-					@if (showCard) {
-						<ViewTransition enter={CARD_ENTER} exit={CARD_EXIT} default="none">
-							<div class="vtdemo-card">{'I animate in and out'}</div>
-						</ViewTransition>
-					}
-				</div>
-			</section>
-
-			<section class="vtdemo-block">
-				<h4>{'Shared element'}</h4>
-				<button
-					type="button"
-					class="vtdemo-btn"
-					id="vt-toggle-hero"
-					aria-pressed={heroRight}
-					onClick={() => startTransition(() => {
-						addTransitionType('hero-move');
-						setHeroRight((current) => !current);
-					})}
-				>{'Move hero'}</button>
-				<div class="vtdemo-stage vtdemo-split">
-					@if (heroRight) {
-						<>
-							<div class="vtdemo-slot" />
-							<ViewTransition name="vt-demo-hero" share={HERO_SHARE} default="none">
-								<div class="vtdemo-hero vtdemo-hero-big">{'hero'}</div>
-							</ViewTransition>
-						</>
-					} @else {
-						<>
-							<ViewTransition name="vt-demo-hero" share={HERO_SHARE} default="none">
-								<div class="vtdemo-hero">{'hero'}</div>
-							</ViewTransition>
-							<div class="vtdemo-slot" />
-						</>
-					}
-				</div>
-			</section>
-
-			<section class="vtdemo-block vtdemo-block-wide">
-				<h4>{'Transition types'}</h4>
-				<div class="vtdemo-tabs" role="tablist" aria-label="Example sections">
-					@for (const name of PANELS; key name) {
-						<button
-							type="button"
-							role="tab"
-							aria-selected={panel === PANELS.indexOf(name)}
-							aria-controls="vt-demo-panel"
-							class={panel === PANELS.indexOf(name) ? 'vtdemo-tab active' : 'vtdemo-tab'}
-							onClick={() => {
-								const next = PANELS.indexOf(name);
-								if (next === panel) return;
-								startTransition(() => {
-									addTransitionType(next > panel ? 'nav-forward' : 'nav-back');
-									setPanel(next);
-								});
-							}}
-						>{name}</button>
-					}
-				</div>
-				<div class="vtdemo-stage">
-					<ViewTransition
-						update={{ 'nav-forward': 'vt-slide-fwd', 'nav-back': 'vt-slide-back', default: 'none' }}
-						default="none"
-					>
-						<div class="vtdemo-panel" id="vt-demo-panel" role="tabpanel">{PANELS[panel]}</div>
-					</ViewTransition>
-				</div>
-			</section>
-		</div>
-
+	<>
 		<style>
 			.vtdemo {
 				margin: 1.4rem 0 1.75rem;
@@ -299,5 +209,100 @@ export function ViewTransitionsDemo() @{
 				}
 			}
 		</style>
-	</section>
+		<section
+			class="vtdemo"
+			data-demo="view-transitions"
+			aria-label="Interactive View Transition examples"
+		>
+			<div class="vtdemo-grid">
+				<section class="vtdemo-block">
+					<h4>{'Enter and exit'}</h4>
+					<button
+						type="button"
+						class="vtdemo-btn"
+						id="vt-toggle-card"
+						onClick={() => startTransition(() => {
+							addTransitionType('card-toggle');
+							setShowCard((current) => !current);
+						})}
+					>
+						{showCard ? 'Remove card' : 'Add card'}
+					</button>
+					<div class="vtdemo-stage">
+						@if (showCard) {
+							<ViewTransition enter={CARD_ENTER} exit={CARD_EXIT} default="none">
+								<div class="vtdemo-card">{'I animate in and out'}</div>
+							</ViewTransition>
+						}
+					</div>
+				</section>
+
+				<section class="vtdemo-block">
+					<h4>{'Shared element'}</h4>
+					<button
+						type="button"
+						class="vtdemo-btn"
+						id="vt-toggle-hero"
+						aria-pressed={heroRight}
+						onClick={() => startTransition(() => {
+							addTransitionType('hero-move');
+							setHeroRight((current) => !current);
+						})}
+					>{'Move hero'}</button>
+					<div class="vtdemo-stage vtdemo-split">
+						@if (heroRight) {
+							<>
+								<div class="vtdemo-slot" />
+								<ViewTransition name="vt-demo-hero" share={HERO_SHARE} default="none">
+									<div class="vtdemo-hero vtdemo-hero-big">{'hero'}</div>
+								</ViewTransition>
+							</>
+						} @else {
+							<>
+								<ViewTransition name="vt-demo-hero" share={HERO_SHARE} default="none">
+									<div class="vtdemo-hero">{'hero'}</div>
+								</ViewTransition>
+								<div class="vtdemo-slot" />
+							</>
+						}
+					</div>
+				</section>
+
+				<section class="vtdemo-block vtdemo-block-wide">
+					<h4>{'Transition types'}</h4>
+					<div class="vtdemo-tabs" role="tablist" aria-label="Example sections">
+						@for (const name of PANELS; key name) {
+							<button
+								type="button"
+								role="tab"
+								aria-selected={panel === PANELS.indexOf(name)}
+								aria-controls="vt-demo-panel"
+								class={panel === PANELS.indexOf(name) ? 'vtdemo-tab active' : 'vtdemo-tab'}
+								onClick={() => {
+									const next = PANELS.indexOf(name);
+									if (next === panel) return;
+									startTransition(() => {
+										addTransitionType(next > panel ? 'nav-forward' : 'nav-back');
+										setPanel(next);
+									});
+								}}
+							>{name}</button>
+						}
+					</div>
+					<div class="vtdemo-stage">
+						<ViewTransition
+							update={{
+								'nav-forward': 'vt-slide-fwd',
+								'nav-back': 'vt-slide-back',
+								default: 'none',
+							}}
+							default="none"
+						>
+							<div class="vtdemo-panel" id="vt-demo-panel" role="tabpanel">{PANELS[panel]}</div>
+						</ViewTransition>
+					</div>
+				</section>
+			</div>
+		</section>
+	</>
 }

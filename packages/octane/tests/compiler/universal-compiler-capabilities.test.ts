@@ -211,6 +211,36 @@ describe('universal compiler renderer capabilities', () => {
 			/scoped <style> requires a renderer style\/assets capability\. at \/src\/Scene\.object\.tsrx:/,
 		);
 	});
+
+	it('rejects `<style apply={theme} />` on a renderer without a style capability the same way', () => {
+		// RFC tsrx-org/RFCs#1 themes are scoped styles too: applying an imported
+		// theme trips the same universal diagnostic as an authored block…
+		expect(() =>
+			compile(
+				`import { theme } from './theme.tsrx';
+				export function Scene() @{
+					<><node /><style apply={theme} /></>
+				}`,
+				'/src/Scene.object.tsrx',
+				{ renderer: { ...baseRenderer, text: 'host' }, hmr: false },
+			),
+		).toThrow(
+			/scoped <style> requires a renderer style\/assets capability\. at \/src\/Scene\.object\.tsrx:/,
+		);
+		// …and declaring a theme in the universal module itself is rejected before
+		// the template is even reached (a module-level `<style>` value cannot be
+		// lowered to a universal plan).
+		expect(() =>
+			compile(
+				`export const theme = <style>.node { color: red; }</style>;
+				export function Scene() @{
+					<><node /><style apply={theme} /></>
+				}`,
+				'/src/Scene.object.tsrx',
+				{ renderer: { ...baseRenderer, text: 'host' }, hmr: false },
+			),
+		).toThrow(/Octane universal compiler: .* at \/src\/Scene\.object\.tsrx:1:/);
+	});
 });
 
 describe('component-owned Lynx template rows', () => {

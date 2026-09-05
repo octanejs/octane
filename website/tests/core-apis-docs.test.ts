@@ -169,7 +169,7 @@ describe('Core APIs documentation', () => {
 			'/docs/cli',
 		);
 		expect(container.querySelector('.pagination-link.next')?.getAttribute('href')).toBe(
-			'/docs/tsrx-vs-tsx',
+			'/docs/styling',
 		);
 
 		{

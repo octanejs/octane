@@ -9,8 +9,7 @@ globs: ['**/*']
 
 Octane is Dominic Gannaway's successor to Inferno: a React-shaped UI framework
 with hooks, `memo`, context, portals, Suspense, and transitions, compiled ahead
-of time from `.tsrx`. The runtime, compiler, SSR, hydration, and large test suite
-work, but this is beta and APIs still move.
+of time from `.tsrx`. It works end to end, but this is beta and APIs still move.
 
 Trust the source over any summary, this file included:
 
@@ -106,7 +105,8 @@ Read a nearby `.tsrx` file first. The parts with no JavaScript equivalent:
   `@for (const x of xs; key x.id)`/`@empty`, `@switch`/`@case`/`@default`, and
   `@try`/`@pending`/`@catch`. Plain JS control flow stays in setup.
 
-Full reference: `.rulesync/rules/tsrx-authoring.md`.
+Full reference, including scoped `<style>` blocks and themes:
+`.rulesync/rules/tsrx-authoring.md`.
 
 ## Types
 

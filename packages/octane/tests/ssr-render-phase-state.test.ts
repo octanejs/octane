@@ -86,24 +86,24 @@ export function TwoCells() @{
 }
 
 function DiscardedStyle() @{
-	<div class="discarded-style">
-		{'discarded'}
+	<>
 		<style>
 			.discarded-style {
 				--discarded-render-pass: 1;
 			}
 		</style>
-	</div>
+		<div class="discarded-style">{'discarded'}</div>
+	</>
 }
 function SettledStyle() @{
-	<div class="settled-style">
-		{'settled'}
+	<>
 		<style>
 			.settled-style {
 				--settled-render-pass: 1;
 			}
 		</style>
-	</div>
+		<div class="settled-style">{'settled'}</div>
+	</>
 }
 export function ArtifactUpdater() @{
 	const [phase, setPhase] = useState(0);
