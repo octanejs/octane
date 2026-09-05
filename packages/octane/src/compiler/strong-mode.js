@@ -741,7 +741,6 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 					);
 					arm(node.handler.body, catchScope, region, node, '@catch arm');
 				}
-				arm(node.finalizer, scope, region, node, '@finally arm');
 				return;
 			case 'VariableDeclaration':
 				for (const declaration of node.declarations ?? []) {
