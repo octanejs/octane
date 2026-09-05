@@ -1,8 +1,12 @@
-import type React from 'react';
-
 import type { DateLib } from '../classes/DateLib.js';
 import { useControlledValue } from '../helpers/useControlledValue.js';
-import type { DayPickerProps, Modifiers, PropsMulti, Selection } from '../types/index.js';
+import type {
+	DayPickerProps,
+	DaySelectionEvent,
+	Modifiers,
+	PropsMulti,
+	Selection,
+} from '../types/index.js';
 
 const multiSelectionSlot = Symbol.for('@octanejs/day-picker/useMulti/selection');
 
@@ -34,11 +38,7 @@ export function useMulti<T extends DayPickerProps>(props: T, dateLib: DateLib): 
 
 	const { min, max } = props as PropsMulti;
 
-	const select = (
-		triggerDate: Date,
-		modifiers: Modifiers,
-		e: React.MouseEvent | React.KeyboardEvent,
-	) => {
+	const select = (triggerDate: Date, modifiers: Modifiers, e: DaySelectionEvent) => {
 		let newDates: Date[] | undefined = [...(selected ?? [])];
 		if (isSelected(triggerDate)) {
 			if (selected?.length === min) {

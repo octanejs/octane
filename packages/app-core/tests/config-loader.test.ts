@@ -43,6 +43,45 @@ describe('loadOctaneConfig', () => {
 		expect(loaded.missingDependencies).toEqual([]);
 	});
 
+	it('reevaluates unchanged config source when its environment changes', async () => {
+		write(
+			'octane.config.ts',
+			`export default { build: { outDir: process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR } };\n`,
+		);
+		const previous = process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR;
+		try {
+			process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR = 'first-build';
+			const first = await loadOctaneConfig(fixtureRoot);
+			process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR = 'second-build';
+			const second = await loadOctaneConfig(fixtureRoot);
+			expect(first.build.outDir).toBe('first-build');
+			expect(second.build.outDir).toBe('second-build');
+		} finally {
+			if (previous === undefined) delete process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR;
+			else process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR = previous;
+		}
+	});
+
+	it('keeps concurrent config evaluations isolated when they share a cache directory', async () => {
+		const other = createTempProject('octane-app-config-concurrent');
+		try {
+			write('octane.config.ts', `export default { build: { outDir: 'first-build' } };\n`);
+			fs.writeFileSync(
+				path.join(other.root, 'octane.config.ts'),
+				`export default { build: { outDir: 'second-build' } };\n`,
+			);
+			const cacheDir = path.join(fixtureRoot, '.cache', 'shared');
+			const [first, second] = await Promise.all([
+				loadOctaneConfig(fixtureRoot, { cacheDir }),
+				loadOctaneConfig(other.root, { cacheDir }),
+			]);
+			expect(first.build.outDir).toBe('first-build');
+			expect(second.build.outDir).toBe('second-build');
+		} finally {
+			other.dispose();
+		}
+	});
+
 	it('uses an injected integration module runner without esbuild', async () => {
 		write('octane.config.ts', `export default {};\n`);
 		const dependency = path.join(fixtureRoot, 'config-helper.ts');

@@ -19,6 +19,7 @@ import {
 	TransitionAtomicity,
 	TransitionResumeAtomicity,
 	TransitionNamespacedAttr,
+	TransitionHeadAndDefault,
 	TransitionControlledInput,
 	TransitionRadioGroup,
 	TransitionKeyedRemoval,
@@ -960,6 +961,46 @@ describe('useTransition — the old screen stays whole', () => {
 		expect(use.getAttributeNS(XLINK, 'href')).toBe('#icon-1');
 		expect(use.getAttributeNode('xlink:href')!.namespaceURI).toBe(XLINK);
 		expect(r.find('#value').textContent).toBe('one');
+		r.unmount();
+	});
+
+	it('restores hoisted title attributes and an uncontrolled reset baseline while held', async () => {
+		const entries = new Map<number, Deferred<string>>();
+		const load = (step: number) => {
+			let entry = entries.get(step);
+			if (entry === undefined) {
+				entry = deferred<string>();
+				entries.set(step, entry);
+			}
+			return entry.promise;
+		};
+		load(0);
+		entries.get(0)!.resolve('zero');
+
+		const r = mount(TransitionHeadAndDefault, { load });
+		await act(() => {});
+		const title = document.head.querySelector('title[data-transition-title="yes"]')!;
+		const box = r.find('#default-box') as HTMLInputElement;
+		expect(title.textContent).toBe('Old');
+		expect(title.getAttribute('data-old')).toBe('old');
+		expect(box.checked).toBe(true);
+		expect(box.defaultChecked).toBe(true);
+
+		r.click('#bump');
+		expect(title.textContent).toBe('Old');
+		expect(title.getAttribute('data-old')).toBe('old');
+		expect(title.hasAttribute('data-new')).toBe(false);
+		expect(box.checked).toBe(true);
+		expect(box.defaultChecked).toBe(true);
+		expect(r.findAll('#fallback')).toHaveLength(0);
+
+		await act(() => entries.get(1)!.resolve('one'));
+		expect(document.head.querySelector('title[data-transition-title="yes"]')).toBe(title);
+		expect(title.textContent).toBe('New');
+		expect(title.hasAttribute('data-old')).toBe(false);
+		expect(title.getAttribute('data-new')).toBe('new');
+		expect(box.checked).toBe(true);
+		expect(box.defaultChecked).toBe(false);
 		r.unmount();
 	});
 

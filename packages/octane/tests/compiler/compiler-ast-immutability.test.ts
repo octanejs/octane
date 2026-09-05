@@ -95,6 +95,23 @@ describe('compiler parser-AST immutability (frozen-AST enforcement)', () => {
 		});
 	}
 
+	it('resolves descriptor children shadows without annotating authored JSX nodes', () => {
+		const source = `
+			import { descriptorChildren } from 'octane';
+			function Ordinary(props) { return props.children; }
+			const Marked = descriptorChildren(Ordinary);
+			export function App(Marked) @{
+				<main>
+					<style>main { color: red; }</style>
+					<Marked><button>shadowed</button></Marked>
+				</main>
+			}`;
+		for (const options of [{}, { hmr: false }, { mode: 'server' }] as const) {
+			const result = compile(source, 'marked-shadow-frozen.tsrx', options);
+			expect(result.code).toContain('shadowed');
+		}
+	});
+
 	it('produces the Volar (types) output alongside enforcement', () => {
 		// The Volar pipeline owns its parse (its @tsrx/core lowering is
 		// copy-on-write); this smoke-checks it stays healthy under the same

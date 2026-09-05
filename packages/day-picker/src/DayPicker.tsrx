@@ -1,6 +1,5 @@
-// @ts-nocheck -- React-compatible DOM props cross Octane's stricter event boundary here.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'octane';
-import type { ChangeEvent, FocusEvent, KeyboardEvent, MouseEvent } from 'react';
+import type { ChangeEvent, FocusEvent, KeyboardEvent, MouseEvent } from 'octane';
 import type { CalendarDay } from './classes/CalendarDay.js';
 import { DateLib, defaultLocale } from './classes/DateLib.js';
 import { createGetModifiers } from './helpers/createGetModifiers.js';
@@ -252,7 +251,7 @@ export function DayPicker(initialProps: DayPickerProps) @{
 	}, [goToMonth, nextMonth, onNextClick]);
 
 	const handleDayClick = useCallback(
-		(day: CalendarDay, m: Modifiers) => (e: MouseEvent) => {
+		(day: CalendarDay, m: Modifiers) => (e: MouseEvent<HTMLButtonElement>) => {
 			e.preventDefault();
 			e.stopPropagation();
 			setFocused(day);
@@ -266,7 +265,7 @@ export function DayPicker(initialProps: DayPickerProps) @{
 	);
 
 	const handleDayFocus = useCallback(
-		(day: CalendarDay, m: Modifiers) => (e: FocusEvent) => {
+		(day: CalendarDay, m: Modifiers) => (e: FocusEvent<HTMLButtonElement>) => {
 			setFocused(day);
 			onDayFocus?.(day.date, m, e);
 		},
@@ -274,7 +273,7 @@ export function DayPicker(initialProps: DayPickerProps) @{
 	);
 
 	const handleDayBlur = useCallback(
-		(day: CalendarDay, m: Modifiers) => (e: FocusEvent) => {
+		(day: CalendarDay, m: Modifiers) => (e: FocusEvent<HTMLButtonElement>) => {
 			blur();
 			onDayBlur?.(day.date, m, e);
 		},
@@ -282,7 +281,7 @@ export function DayPicker(initialProps: DayPickerProps) @{
 	);
 
 	const handleDayKeyDown = useCallback(
-		(day: CalendarDay, modifiers: Modifiers) => (e: KeyboardEvent) => {
+		(day: CalendarDay, modifiers: Modifiers) => (e: KeyboardEvent<HTMLButtonElement>) => {
 			const keyMap: Record<string, [MoveFocusBy, MoveFocusDir]> = {
 				ArrowLeft: [e.shiftKey ? 'month' : 'day', props.dir === 'rtl' ? 'after' : 'before'],
 				ArrowRight: [e.shiftKey ? 'month' : 'day', props.dir === 'rtl' ? 'before' : 'after'],
@@ -305,14 +304,14 @@ export function DayPicker(initialProps: DayPickerProps) @{
 	);
 
 	const handleDayMouseEnter = useCallback(
-		(day: CalendarDay, modifiers: Modifiers) => (e: MouseEvent) => {
+		(day: CalendarDay, modifiers: Modifiers) => (e: MouseEvent<HTMLButtonElement>) => {
 			onDayMouseEnter?.(day.date, modifiers, e);
 		},
 		[onDayMouseEnter],
 	);
 
 	const handleDayMouseLeave = useCallback(
-		(day: CalendarDay, modifiers: Modifiers) => (e: MouseEvent) => {
+		(day: CalendarDay, modifiers: Modifiers) => (e: MouseEvent<HTMLButtonElement>) => {
 			onDayMouseLeave?.(day.date, modifiers, e);
 		},
 		[onDayMouseLeave],
@@ -320,7 +319,7 @@ export function DayPicker(initialProps: DayPickerProps) @{
 
 	const handleMonthChange = useCallback(
 		(date: Date, monthOffset: number) => (e: ChangeEvent<HTMLSelectElement>) => {
-			const selectedMonth = Number(e.target.value);
+			const selectedMonth = Number(e.currentTarget.value);
 			const month = dateLib.setMonth(dateLib.startOfMonth(date), selectedMonth);
 			goToMonth(dateLib.addMonths(month, -monthOffset));
 		},
@@ -329,7 +328,7 @@ export function DayPicker(initialProps: DayPickerProps) @{
 
 	const handleYearChange = useCallback(
 		(date: Date, monthOffset: number) => (e: ChangeEvent<HTMLSelectElement>) => {
-			const selectedYear = Number(e.target.value);
+			const selectedYear = Number(e.currentTarget.value);
 			const month = dateLib.setYear(dateLib.startOfMonth(date), selectedYear);
 			goToMonth(dateLib.addMonths(month, -monthOffset));
 		},

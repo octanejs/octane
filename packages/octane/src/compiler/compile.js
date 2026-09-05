@@ -12523,8 +12523,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
 		const opaqueChildren = !activityDescriptor && !isFragmentLongForm(node, ctx);
 		const descriptorChildren =
-			(tagBindingName(node) !== null &&
-				ctx.descriptorChildrenBindings?.has(tagBindingName(node))) ||
+			isDescriptorChildrenTag(node, ctx) ||
 			ctx._tsxValuePos ||
 			(returnedFragmentTemplate && !requiresTemplateNormalization(node, parentNs, true, ctx));
 		if (descriptorChildren) {
@@ -27309,6 +27308,21 @@ function tagBindingName(node) {
 	return name.type === 'Identifier' || name.type === 'JSXIdentifier' ? name.name : null;
 }
 
+// A marked module binding can be shadowed by a parameter, block, or directive
+// item. Keep the name-only fast path for all other tags; a candidate needs the
+// same authored-scope proof used for Activity, shared by client and SSR emits.
+function isDescriptorChildrenTag(node, ctx) {
+	const name = node.openingElement?.name || node.id;
+	if (
+		(name?.type !== 'Identifier' && name?.type !== 'JSXIdentifier') ||
+		!ctx.descriptorChildrenBindings?.has(name.name)
+	) {
+		return false;
+	}
+	const binding = activityReferenceBinding(name, node, ctx);
+	return binding?.scope === ctx.activityLexical?.rootScope;
+}
+
 // React-style render-prop detection: if a component's children are exactly one
 // `{fn}` expression hole whose expression is a function (arrow or function
 // expression) — `<Comp>{(data) => <jsx/>}</Comp>` — return that function node so
@@ -27661,7 +27675,7 @@ function makeCompCall(
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
 		const childrenParentNs =
 			!activityDescriptor && !isFragmentLongForm(node, ctx) ? 'opaque' : parentNs;
-		if (compName !== null && ctx.descriptorChildrenBindings?.has(compName)) {
+		if (compName !== null && isDescriptorChildrenTag(node, ctx)) {
 			const kids = children
 				.map((child) => lowerInspectableJsxChild(child, ctx))
 				.filter((child) => child != null);
