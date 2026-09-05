@@ -89,22 +89,44 @@ export function C(props) @{
 		},
 	);
 
-	it.each(MODES)('style(…) nested in an array class value resolves — %s', (_label, options) => {
-		const { code } = compile(
-			`export function D(props) @{
+	// A `style(…)` that is only PART of a stamped element's class value yields
+	// its value alone; the element's stamp appends the chain once to the
+	// composed value, so the chain is present whichever branch runs (a
+	// `cond && style('b')` that is false still leaves the element stamped) and
+	// never twice.
+	it.each(MODES)(
+		'style(…) nested in a stamped class value yields its value; the stamp adds the chain once — %s',
+		(_label, options) => {
+			const { code } = compile(
+				`export function D(props) @{
 	<>
-		<style>.a { color: red; } .b { color: blue; }</style>
+		<style>.a { color: red; } .b { color: blue; } .c { color: green; }</style>
 		<i class={[style('a'), props.cond && style('b')]}>{'i'}</i>
+		<b class={props.on ? style('a') : 'plain'}>{'b'}</b>
+		<u class={\`\${style('a')} \${props.more}\`}>{'u'}</u>
+		<s class={(style('c') as string)}>{'s'}</s>
 	</>
 }`,
-			'style-nested.tsrx',
-			options,
-		);
-		const hash = hashOf(code);
-		expect(code).not.toMatch(/\bstyle\(/);
-		expect(code).toMatch(new RegExp(`["']${hash} a["']`));
-		expect(code).toMatch(new RegExp(`props\\.cond && ["']${hash} b["']`));
-	});
+				'style-nested.tsrx',
+				options,
+			);
+			const hash = hashOf(code);
+			expect(code).not.toMatch(/\bstyle\(/);
+			const normalized = code.replace(/\\"/g, '"');
+			// Every class expression carries the hash exactly once.
+			const classValues = normalized.match(/_\$normalizeClass\([^\n]*/g) ?? [];
+			expect(classValues.length).toBeGreaterThanOrEqual(3);
+			for (const value of classValues) {
+				expect(value.split(hash).length - 1, value).toBe(1);
+			}
+			expect(normalized).toMatch(new RegExp(`\\['a', props\\.cond && 'b'\\]\\)} ${hash}`));
+			expect(normalized).toMatch(new RegExp(`props\\.on \\? 'a' : 'plain'\\)} ${hash}`));
+			// A wrapper around a whole-value call is transparent: the call carries
+			// the chain and the stamp does not add it again.
+			expect(normalized).toMatch(new RegExp(`["'\`]${hash} c["'\`]`));
+			expect(normalized).not.toContain(`${hash} c ${hash}`);
+		},
+	);
 
 	it.each(MODES)(
 		'a template child hole {style(…)} resolves, its call argument does not — %s',

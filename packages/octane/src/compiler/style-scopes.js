@@ -105,7 +105,10 @@ const DIRECTIVE_TYPES = new Set([
  *   staticClasses: Map<any, string | null>,
  *   appliedParts: Map<any, Array<string | any>>,
  *   runtimeApplied: any[],
- * }} PassState
+ *   stampedHost: boolean,
+ * }} PassState `stampedHost` is set while the attributes of a host element
+ *   the current chain will be stamped on are walked: a `style(expr)` nested in
+ *   that element's class value yields its value alone, the stamp adds the chain.
  */
 
 /**
@@ -139,6 +142,7 @@ export function createStyleScopePass(tools) {
 			staticClasses: new Map(),
 			appliedParts: new Map(),
 			runtimeApplied: [],
+			stampedHost: false,
 		};
 		const node = walk(root, state, 'statement');
 		return { node, cssHash: state.firstHash, runtimeApplied: state.runtimeApplied };
@@ -326,10 +330,18 @@ function withStack(state, stack, run) {
 function walkTemplateNode(node, state) {
 	// Attribute values first — a `style(expr)` in a class value resolves to the
 	// chain before the stamp reads that value — then the stamp itself.
-	let out = rewriteChildren(node, (child, key) =>
-		key === 'children' ? child : walk(child, state, 'expression'),
-	);
-	if (isStampedHost(node, state)) out = addScopeClasses(out, state);
+	const stamped = isStampedHost(node, state);
+	const previousStampedHost = state.stampedHost;
+	state.stampedHost = stamped;
+	let out;
+	try {
+		out = rewriteChildren(node, (child, key) =>
+			key === 'children' ? child : walk(child, state, 'expression'),
+		);
+	} finally {
+		state.stampedHost = previousStampedHost;
+	}
+	if (stamped) out = addScopeClasses(out, state);
 	const children = node.children;
 	if (!Array.isArray(children)) return out;
 	const own = collectOwnBlocks(children);
@@ -452,7 +464,11 @@ function walkListItem(item, state) {
  * A JSX attribute: its value is a class-string position for `style(expr)`
  * unless the attribute is `style` (CSS, never a class list — a `style(...)`
  * there is a user helper), so that one and every other value walk as ordinary
- * expressions.
+ * expressions. In the `class` of an element the chain is stamped on, only a
+ * whole-value `style(expr)` carries the chain itself; a call nested in an
+ * array, conditional, logical, or template there yields its value alone, and
+ * the stamp appends the chain once to the composed value — so the chain is
+ * present whichever branch runs, and never twice.
  *
  * @param {any} attribute
  * @param {PassState} state
@@ -465,9 +481,11 @@ function processAttribute(attribute, state) {
 	}
 	const name = attribute.name;
 	const isStyleAttribute = name?.type === 'JSXIdentifier' && name.name === 'style';
+	const isClassAttribute =
+		name?.type === 'JSXIdentifier' && (name.name === 'class' || name.name === 'className');
 	const expression = isStyleAttribute
 		? walk(value.expression, state, 'expression')
-		: walkStyleValue(value.expression, state);
+		: walkStyleValue(value.expression, state, true, isClassAttribute && state.stampedHost);
 	if (expression === value.expression) return attribute;
 	return { ...attribute, value: { ...value, expression } };
 }
@@ -481,37 +499,45 @@ function processAttribute(attribute, state) {
  *
  * @param {any} node
  * @param {PassState} state
+ * @param {boolean} [whole] whether `node` is the whole value (wrappers are
+ *   transparent), as opposed to a part of an array/conditional/logical/template
+ * @param {boolean} [stamped] whether the value is the class of an element the
+ *   chain is stamped on: a `style(expr)` that is only a PART of it then yields
+ *   its value alone (see processAttribute)
  * @returns {any}
  */
-function walkStyleValue(node, state) {
+function walkStyleValue(node, state, whole = true, stamped = false) {
 	if (node === null || typeof node !== 'object' || typeof node.type !== 'string') return node;
-	if (state.tools.isStyleCall(node)) return resolveStyleCall(node, state);
+	if (state.tools.isStyleCall(node)) {
+		if (stamped && !whole) return walk(node.arguments[0], state, 'expression');
+		return resolveStyleCall(node, state);
+	}
 	switch (node.type) {
 		case 'ArrayExpression': {
 			const elements = mapList(node.elements, (element) =>
 				element?.type === 'SpreadElement'
 					? walk(element, state, 'expression')
-					: walkStyleValue(element, state),
+					: walkStyleValue(element, state, false, stamped),
 			);
 			return elements === node.elements ? node : { ...node, elements };
 		}
 		case 'ConditionalExpression': {
 			const test = walk(node.test, state, 'expression');
-			const consequent = walkStyleValue(node.consequent, state);
-			const alternate = walkStyleValue(node.alternate, state);
+			const consequent = walkStyleValue(node.consequent, state, false, stamped);
+			const alternate = walkStyleValue(node.alternate, state, false, stamped);
 			if (test === node.test && consequent === node.consequent && alternate === node.alternate) {
 				return node;
 			}
 			return { ...node, test, consequent, alternate };
 		}
 		case 'LogicalExpression': {
-			const left = walkStyleValue(node.left, state);
-			const right = walkStyleValue(node.right, state);
+			const left = walkStyleValue(node.left, state, false, stamped);
+			const right = walkStyleValue(node.right, state, false, stamped);
 			return left === node.left && right === node.right ? node : { ...node, left, right };
 		}
 		case 'TemplateLiteral': {
 			const expressions = mapList(node.expressions, (expression) =>
-				walkStyleValue(expression, state),
+				walkStyleValue(expression, state, false, stamped),
 			);
 			return expressions === node.expressions ? node : { ...node, expressions };
 		}
@@ -520,7 +546,7 @@ function walkStyleValue(node, state) {
 		case 'TSSatisfiesExpression':
 		case 'TSNonNullExpression':
 		case 'TSTypeAssertion': {
-			const expression = walkStyleValue(node.expression, state);
+			const expression = walkStyleValue(node.expression, state, whole, stamped);
 			return expression === node.expression ? node : { ...node, expression };
 		}
 		default:
@@ -990,7 +1016,7 @@ function addScopeClasses(element, state) {
 		} else {
 			const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
 			let base;
-			if (tools.isStyleCall(expression) || expression.metadata?.tsrx_style_resolved === true) {
+			if (isResolvedStyleValue(expression, tools)) {
 				// `class={style(expr)}` already resolves to the chain plus the value.
 				return element;
 			}
@@ -1018,6 +1044,33 @@ function addScopeClasses(element, state) {
 	const out = { ...element, openingElement: { ...openingElement, attributes: newAttrs } };
 	if ('attributes' in element) out.attributes = newAttrs;
 	return out;
+}
+
+/**
+ * Whether a class value IS a `style(expr)` — the whole value, through
+ * parenthesized and TS wrapper expressions — and so already carries the chain.
+ * A call that is only a part of the value was lowered to its value alone (see
+ * walkStyleValue) and leaves the stamp to add the chain.
+ *
+ * @param {any} expression
+ * @param {StyleScopeTools} tools
+ * @returns {boolean}
+ */
+function isResolvedStyleValue(expression, tools) {
+	let current = expression;
+	while (
+		current?.type === 'ParenthesizedExpression' ||
+		current?.type === 'TSAsExpression' ||
+		current?.type === 'TSSatisfiesExpression' ||
+		current?.type === 'TSNonNullExpression' ||
+		current?.type === 'TSTypeAssertion'
+	) {
+		current = current.expression;
+	}
+	return (
+		current != null &&
+		(tools.isStyleCall(current) || current.metadata?.tsrx_style_resolved === true)
+	);
 }
 
 /**

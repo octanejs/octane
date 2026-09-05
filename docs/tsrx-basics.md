@@ -667,7 +667,10 @@ inner), applied theme classes`, composed as described in
 [Class composition](#class-composition). `{style(expr)}` in a class position
 resolves to that same chain plus the value: `class={style('row')}` yields
 `"<hashes> row"`, and a dynamic value is concatenated at runtime so the chain is
-always present.
+always present. When the call is only part of a stamped element's class value —
+`class={[style('row'), extra]}`, `class={on ? style('row') : 'plain'}` — it
+yields its value alone and the element's stamp appends the chain once to the
+composed value, so the chain is present whichever branch runs and never twice.
 
 ### Ordering guarantees
 
