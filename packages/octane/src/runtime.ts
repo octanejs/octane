@@ -16940,8 +16940,9 @@ export function setSpread(
 }
 
 // ---------------------------------------------------------------------------
-// Component-scoped <style> injection — idempotent, keyed by the compiled
-// stylesheet hash so repeated mounts (or HMR re-imports) inject once.
+// Component-scoped <style> injection — keyed by the compiled stylesheet hash
+// so repeated mounts inject once. HMR re-imports with the same hash and
+// different CSS refresh the owned sheet in place.
 // ---------------------------------------------------------------------------
 
 const _injectedStyles = new Set<string>();
@@ -17161,18 +17162,33 @@ export function namespaceHeadElement(
 }
 
 export function injectStyle(id: string, css: string, nonce?: string): void {
+	if (typeof document === 'undefined') {
+		_injectedStyles.add(id);
+		return;
+	}
+	const existing = document.querySelector<HTMLStyleElement>(`style[data-octane="${id}"]`);
+	if (existing !== null) {
+		// A scope hash derives from its first block's position and content, so an
+		// HMR re-evaluation after editing a later block of the same scope arrives
+		// with an unchanged id and different css: refresh a sheet this runtime
+		// already owns in place. A sheet seen for the first time was emitted by
+		// the server (its text may differ only in serialization) and is adopted.
+		if (_injectedStyles.has(id)) {
+			if (existing.textContent !== css) existing.textContent = css;
+		} else {
+			_injectedStyles.add(id);
+		}
+		return;
+	}
 	if (_injectedStyles.has(id)) return;
 	// SSR de-dup: the server already emitted this scoped stylesheet (the css of
-	// the RenderResult, a `<style data-octane="hash">` — or, for a React-hosted
-	// island, a React 19 style RESOURCE whose href React serializes as
-	// `data-href="octane-<hash>"`; React drops other attributes from hoisted
-	// resources). On a hydrated page the per-runtime Set is empty, so also
-	// check the DOM before re-injecting — otherwise hydration would append a
-	// duplicate <style>.
-	if (
-		typeof document !== 'undefined' &&
-		document.querySelector(`style[data-octane="${id}"], style[data-href="octane-${id}"]`)
-	) {
+	// the RenderResult, a `<style data-octane="hash">` handled above — or, for a
+	// React-hosted island, a React 19 style RESOURCE whose href React
+	// serializes as `data-href="octane-<hash>"`; React drops other attributes
+	// from hoisted resources). On a hydrated page the per-runtime Set is empty,
+	// so also check the DOM before re-injecting — otherwise hydration would
+	// append a duplicate <style>.
+	if (document.querySelector(`style[data-href="octane-${id}"]`)) {
 		_injectedStyles.add(id);
 		return;
 	}
