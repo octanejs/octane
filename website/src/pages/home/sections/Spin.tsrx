@@ -11,29 +11,7 @@ import { Link } from '@octanejs/tanstack-router';
 import { SpinStage } from './SpinStage.tsrx';
 
 export function Spin() @{
-	<section class="spin" aria-labelledby="spin-heading">
-		<div class="spin-body">
-			<div class="spin-copy">
-				<h2 id="spin-heading" class="spin-title">
-					{'Three.js, '}
-					<span class="spin-accent">on Octane.</span>
-				</h2>
-				<p class="spin-lead">
-					{'This flame is a live Three.js scene rendered by @octanejs/three, a ' +
-						'technical-preview port of React Three Fiber. It loads only when you scroll ' +
-						'near it. Drag it to give it a spin.'}
-				</p>
-				<Link to="/docs/$slug" params={{ slug: 'bindings' }} class="spin-link">
-					Browse all the bindings →
-				</Link>
-			</div>
-			<div class="spin-stage-cell" aria-hidden="true">
-				<Hydrate when={visible()}>
-					<SpinStage />
-				</Hydrate>
-			</div>
-		</div>
-
+	<>
 		<style>
 			/* Shares the hairline top border the other lower sections use. */
 			.spin {
@@ -100,5 +78,28 @@ export function Spin() @{
 				}
 			}
 		</style>
-	</section>
+		<section class="spin" aria-labelledby="spin-heading">
+			<div class="spin-body">
+				<div class="spin-copy">
+					<h2 id="spin-heading" class="spin-title">
+						{'Three.js, '}
+						<span class="spin-accent">on Octane.</span>
+					</h2>
+					<p class="spin-lead">
+						{'This flame is a live Three.js scene rendered by @octanejs/three, a ' +
+							'technical-preview port of React Three Fiber. It loads only when you scroll ' +
+							'near it. Drag it to give it a spin.'}
+					</p>
+					<Link to="/docs/$slug" params={{ slug: 'bindings' }} class="spin-link">
+						Browse all the bindings →
+					</Link>
+				</div>
+				<div class="spin-stage-cell" aria-hidden="true">
+					<Hydrate when={visible()}>
+						<SpinStage />
+					</Hydrate>
+				</div>
+			</div>
+		</section>
+	</>
 }

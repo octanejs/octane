@@ -38,6 +38,9 @@ import {
 	ToggleHost,
 	setSheetVisible,
 } from './_fixtures/float-resources.tsrx';
+import { FloatSibling } from './_fixtures/style-scopes.tsrx';
+import { theme } from './_fixtures/style-theme.tsrx';
+import { SelfClosedApply } from './_fixtures/style-theme-consumer.tsrx';
 import {
 	ParentChild,
 	LateArmAfterSibling,
@@ -155,6 +158,39 @@ describe('Float resources — client', () => {
 		const injected = document.head.querySelector('style[data-octane]');
 		expect(injected).not.toBeNull();
 		expect(injected!.textContent).toContain('.scoped.');
+	});
+
+	it('a scoped block beside a Float style resource: the resource hoists, the block stays scoped', async () => {
+		await act(() => mountInto(FloatSibling));
+		const resource = document.head.querySelector('style[data-href="scope-sibling-tokens"]');
+		expect(resource).not.toBeNull();
+		expect(resource!.getAttribute('data-precedence')).toBe('default');
+		expect(resource!.textContent).toContain('.fs-tokens');
+		// Resources sit outside the scope model: no hash in the sheet.
+		expect(resource!.textContent).not.toContain('tsrx-');
+		const host = document.querySelector('#fs-host')!;
+		const hash = Array.from(host.classList).find((c) => c.startsWith('tsrx-'));
+		expect(hash).toBeTruthy();
+		const scoped = document.head.querySelector(`style[data-octane="${hash}"]`);
+		expect(scoped).not.toBeNull();
+		expect(scoped!.textContent).toContain(`.fs-scoped.${hash}`);
+		expect(scoped!.textContent).not.toContain('.fs-tokens');
+		expect(scoped!.hasAttribute('data-href')).toBe(false);
+		expect(scoped!.hasAttribute('data-precedence')).toBe(false);
+		expect(document.body.querySelector('style')).toBeNull();
+	});
+
+	it('<style apply={theme} /> is a scope stamp, not a Float resource', async () => {
+		await act(() => mountInto(SelfClosedApply));
+		expect(document.head.querySelector('style[data-href]')).toBeNull();
+		expect(document.head.querySelector('[data-precedence]')).toBeNull();
+		expect(document.body.querySelector('style')).toBeNull();
+		const host = document.querySelector('#sca-host')!;
+		// No block of its own: the element carries only the applied theme.
+		expect(host.className).toBe(`sca ${theme.$class}`);
+		for (const hash of theme.$class.split(' ')) {
+			expect(document.head.querySelector(`style[data-octane="${hash}"]`)).not.toBeNull();
+		}
 	});
 
 	it('return-position (value-body) trees classify resources like @{} bodies', async () => {

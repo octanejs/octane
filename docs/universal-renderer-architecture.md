@@ -433,7 +433,8 @@ The executable universal target accepts normal Octane component composition:
   the authored location and only physical host placement is redirected through
   an opaque driver target handle.
 
-Scoped `<style>`, cross-renderer portals, async template collections, and live
+Scoped `<style>` (the sibling-scope style model, where a block styles its
+siblings and everything below them, with `$class` and `apply`, DOM-only today), cross-renderer portals, async template collections, and live
 universal server output remain capability gaps and diagnose rather than
 silently changing targets. Static authored text follows the selected
 descriptor's `host`/`ignore`/`reject` policy; dynamic primitive materialization
@@ -1321,8 +1322,9 @@ target and boundary decisions.
 The remaining foundation limitations are capability/scheduler boundaries:
 
 - live universal host serialization/adoption, cross-renderer portals, async
-  template collections, scoped styles, and neutral live layout measurement are
-  not implemented;
+  template collections, scoped styles (sibling style scopes, `$class`, and
+  `apply` are DOM-only), and neutral live layout measurement are not
+  implemented;
 - mixed-boundary suspension retains committed external content but does not yet
   drive the parent renderer's fallback or transition-hold timing, and a DOM
   Activity does not yet propagate offscreen state into an external root;

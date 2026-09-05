@@ -279,6 +279,8 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'ssrElement',
 		'ssrForBlock',
 		'ssrHeadEl',
+		'styleMap',
+		'touchStyleMap',
 		'ssrInNamespace',
 		'ssrInnerHtml',
 		'ssrInputAttrs',

@@ -40,46 +40,53 @@ export default function App() @{
 		setItems([...items, 'Item #' + (items.length + 1)]);
 	};
 
-	<div class="demo">
-		<h2>{'Count: ' + count}</h2>
-
-		<button onClick={() => setCount(count + 1)}>Increment</button>
-		<button onClick={addItem}>Add item</button>
-
-		@if (count >= 5) {
-			<p class="hot">Count is heating up!</p>
-		}
-
-		<ul>
-			@for (const item of items; key item) {
-				<li>{item}</li>
-			} @empty {
-				<li class="empty">No items yet — add one.</li>
-			}
-		</ul>
-
+	<>
 		<style>
 			.demo {
 				display: grid;
 				gap: 0.5rem;
 				justify-items: start;
 			}
-			button {
-				padding: 0.4rem 0.9rem;
-				border-radius: 8px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			.hot {
-				color: #ff5d72;
-			}
-			.empty {
-				opacity: 0.6;
-			}
 		</style>
-	</div>
+		<div class="demo">
+			<h2>{'Count: ' + count}</h2>
+
+			<button onClick={() => setCount(count + 1)}>Increment</button>
+			<button onClick={addItem}>Add item</button>
+			<style>
+				button {
+					padding: 0.4rem 0.9rem;
+					border-radius: 8px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					cursor: pointer;
+				}
+			</style>
+
+			@if (count >= 5) {
+				<p class="hot">Count is heating up!</p>
+			}
+			<style>
+				.hot {
+					color: #ff5d72;
+				}
+			</style>
+
+			<ul>
+				@for (const item of items; key item) {
+					<li>{item}</li>
+				} @empty {
+					<li class="empty">No items yet — add one.</li>
+				}
+				<style>
+					.empty {
+						opacity: 0.6;
+					}
+				</style>
+			</ul>
+		</div>
+	</>
 }
 `;
 
@@ -130,55 +137,60 @@ export default function App() @{
 		setItems(position === 'start' ? [item, ...items] : [...items, item]);
 	};
 
-	<div class="demo">
-		<div class="row">
-			<button onClick={() => add('start')}>Prepend</button>
-			<button onClick={() => add('end')}>Append</button>
-			<button onClick={() => setItems([...items].reverse())}>Reverse</button>
-			<button onClick={() => setItems([])}>Clear</button>
-		</div>
-
-		<ul>
-			@for (const item of items; key item.id) {
-				<li>
-					{item.label as string}
-					<button onClick={() => setItems(items.filter((x) => x.id !== item.id))}>
-						×
-					</button>
-				</li>
-			} @empty {
-				<li class="empty">Empty — add an item above.</li>
-			}
-		</ul>
-
+	<>
 		<style>
 			.demo {
 				display: grid;
 				gap: 0.75rem;
 			}
-			.row {
-				display: flex;
-				gap: 0.5rem;
-			}
-			button {
-				padding: 0.3rem 0.7rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			li {
-				display: flex;
-				align-items: center;
-				gap: 0.5rem;
-				padding: 0.2rem 0;
-			}
-			.empty {
-				opacity: 0.6;
-			}
 		</style>
-	</div>
+		<div class="demo">
+			<div class="row">
+				<button onClick={() => add('start')}>Prepend</button>
+				<button onClick={() => add('end')}>Append</button>
+				<button onClick={() => setItems([...items].reverse())}>Reverse</button>
+				<button onClick={() => setItems([])}>Clear</button>
+			</div>
+			<style>
+				.row {
+					display: flex;
+					gap: 0.5rem;
+				}
+				button {
+					padding: 0.3rem 0.7rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					cursor: pointer;
+				}
+			</style>
+
+			<ul>
+				@for (const item of items; key item.id) {
+					<li>
+						{item.label as string}
+						<button onClick={() => setItems(items.filter((x) => x.id !== item.id))}>
+							×
+						</button>
+					</li>
+				} @empty {
+					<li class="empty">Empty — add an item above.</li>
+				}
+				<style>
+					li {
+						display: flex;
+						align-items: center;
+						gap: 0.5rem;
+						padding: 0.2rem 0;
+					}
+					.empty {
+						opacity: 0.6;
+					}
+				</style>
+			</ul>
+		</div>
+	</>
 }
 `;
 
@@ -239,75 +251,80 @@ export default function App() @{
 	const [kind, setKind] = useState('plain');
 	const [loud, setLoud] = useState(false);
 
-	<div class="demo">
-		<div class="row">
-			<input value={name} onInput={(e) => setName(e.currentTarget.value)} />
-
-			<select value={kind} onChange={(e) => setKind(e.currentTarget.value)}>
-				<option value="plain">plain</option>
-				<option value="shout">shout</option>
-				<option value="whisper">whisper</option>
-			</select>
-
-			<label class="row">
-				<input
-					type="checkbox"
-					checked={loud}
-					onChange={(e) => setLoud(e.currentTarget.checked)}
-				/>
-				extra loud
-			</label>
-		</div>
-
-		<div class="panel">
-			@switch (kind) {
-				@case 'plain': {
-					<p>{'hello, ' + name}</p>
-				}
-				@case 'shout': {
-					<p class="shout">{'HELLO, ' + name.toUpperCase() + (loud ? '!!!' : '!')}</p>
-				}
-				@case 'whisper': {
-					<p class="whisper">{'hello, ' + name.toLowerCase() + '…'}</p>
-				}
-				@default: {
-					<p>(unknown kind)</p>
-				}
-			}
-		</div>
-
+	<>
 		<style>
 			.demo {
 				display: grid;
 				gap: 0.75rem;
 			}
-			.row {
-				display: flex;
-				gap: 0.5rem;
-				align-items: center;
-			}
-			input,
-			select {
-				padding: 0.3rem 0.5rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-			}
-			.panel {
-				padding: 0.75rem;
-				border: 1px solid #8884;
-				border-radius: 8px;
-			}
-			.shout {
-				font-weight: 700;
-			}
-			.whisper {
-				opacity: 0.6;
-				font-style: italic;
-			}
 		</style>
-	</div>
+		<div class="demo">
+			<div class="row">
+				<input value={name} onInput={(e) => setName(e.currentTarget.value)} />
+
+				<select value={kind} onChange={(e) => setKind(e.currentTarget.value)}>
+					<option value="plain">plain</option>
+					<option value="shout">shout</option>
+					<option value="whisper">whisper</option>
+				</select>
+
+				<label class="row">
+					<input
+						type="checkbox"
+						checked={loud}
+						onChange={(e) => setLoud(e.currentTarget.checked)}
+					/>
+					extra loud
+				</label>
+			</div>
+			<style>
+				.row {
+					display: flex;
+					gap: 0.5rem;
+					align-items: center;
+				}
+				input,
+				select {
+					padding: 0.3rem 0.5rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+				}
+			</style>
+
+			<div class="panel">
+				@switch (kind) {
+					@case 'plain': {
+						<p>{'hello, ' + name}</p>
+					}
+					@case 'shout': {
+						<p class="shout">{'HELLO, ' + name.toUpperCase() + (loud ? '!!!' : '!')}</p>
+					}
+					@case 'whisper': {
+						<p class="whisper">{'hello, ' + name.toLowerCase() + '…'}</p>
+					}
+					@default: {
+						<p>(unknown kind)</p>
+					}
+				}
+			</div>
+			<style>
+				.panel {
+					padding: 0.75rem;
+					border: 1px solid #8884;
+					border-radius: 8px;
+				}
+				.shout {
+					font-weight: 700;
+				}
+				.whisper {
+					opacity: 0.6;
+					font-style: italic;
+				}
+			</style>
+		</div>
+	</>
 }
 `;
 
@@ -322,22 +339,23 @@ const BRANCH_HOOKS_TSRX = `import { useState } from 'octane';
 export default function App() @{
 	const [open, setOpen] = useState(true);
 
-	<div class="demo">
-		<button onClick={() => setOpen(!open)}>
-			{(open ? 'Collapse' : 'Expand') as string}
-		</button>
+	<>
+		<div class="demo">
+			<button onClick={() => setOpen(!open)}>
+				{(open ? 'Collapse' : 'Expand') as string}
+			</button>
 
-		@if (open) {
-			const [bumps, setBumps] = useState(0);
+			@if (open) {
+				const [bumps, setBumps] = useState(0);
 
-			<div class="panel">
-				<p>{'Branch-local bumps: ' + bumps}</p>
-				<button onClick={() => setBumps(bumps + 1)}>Bump</button>
-			</div>
-		} @else {
-			<p class="hint">Collapsed — re-expand and the inner counter starts fresh.</p>
-		}
-
+				<div class="panel">
+					<p>{'Branch-local bumps: ' + bumps}</p>
+					<button onClick={() => setBumps(bumps + 1)}>Bump</button>
+				</div>
+			} @else {
+				<p class="hint">Collapsed — re-expand and the inner counter starts fresh.</p>
+			}
+		</div>
 		<style>
 			.demo {
 				display: grid;
@@ -364,7 +382,7 @@ export default function App() @{
 				opacity: 0.6;
 			}
 		</style>
-	</div>
+	</>
 }
 `;
 
@@ -377,26 +395,44 @@ const Theme = createContext('light');
 function ThemeCard() @{
 	const theme = use(Theme);
 
-	<div class={'card ' + theme}>
-		<p>{'The current theme is ' + theme + '.'}</p>
-	</div>
+	<>
+		<div class={'card ' + theme}>
+			<p>{'The current theme is ' + theme + '.'}</p>
+		</div>
+		<style>
+			.card {
+				padding: 0.75rem 1rem;
+				border-radius: 8px;
+				border: 1px solid #8884;
+			}
+			.card.dark {
+				background: #101318;
+				color: #f4eee8;
+			}
+			.card.light {
+				background: #f6f2ea;
+				color: #1c1b18;
+			}
+		</style>
+	</>
 }
 
 export default function App() @{
 	const [theme, setTheme] = useState('light');
 
-	<div class="demo">
-		<button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
-			Switch theme
-		</button>
+	<>
+		<div class="demo">
+			<button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+				Switch theme
+			</button>
 
-		<Theme.Provider value={theme}>
+			<Theme.Provider value={theme}>
+				<ThemeCard />
+			</Theme.Provider>
+
 			<ThemeCard />
-		</Theme.Provider>
-
-		<ThemeCard />
-		<p class="hint">The second card sits outside the provider, so it sees the fallback.</p>
-
+			<p class="hint">The second card sits outside the provider, so it sees the fallback.</p>
+		</div>
 		<style>
 			.demo {
 				display: grid;
@@ -411,24 +447,11 @@ export default function App() @{
 				color: inherit;
 				cursor: pointer;
 			}
-			.card {
-				padding: 0.75rem 1rem;
-				border-radius: 8px;
-				border: 1px solid #8884;
-			}
-			.card.dark {
-				background: #101318;
-				color: #f4eee8;
-			}
-			.card.light {
-				background: #f6f2ea;
-				color: #1c1b18;
-			}
 			.hint {
 				opacity: 0.6;
 			}
 		</style>
-	</div>
+	</>
 }
 `;
 
@@ -482,10 +505,11 @@ const PORTAL_TSRX = `import { createPortal, useState } from 'octane';
 // — here document.body — while events still bubble through the COMPONENT
 // tree, so the demo's own handlers see clicks from inside the toast.
 function Toast(props: { onDismiss: () => void }) @{
-	<aside class="toast" role="status">
-		<p>Draft saved.</p>
-		<button onClick={props.onDismiss}>Dismiss</button>
-
+	<>
+		<aside class="toast" role="status">
+			<p>Draft saved.</p>
+			<button onClick={props.onDismiss}>Dismiss</button>
+		</aside>
 		<style>
 			.toast {
 				position: fixed;
@@ -510,24 +534,25 @@ function Toast(props: { onDismiss: () => void }) @{
 				cursor: pointer;
 			}
 		</style>
-	</aside>
+	</>
 }
 
 export default function App() @{
 	const [toastOpen, setToastOpen] = useState(false);
 
-	<div class="demo">
-		<button onClick={() => setToastOpen(true)}>Save draft</button>
+	<>
+		<div class="demo">
+			<button onClick={() => setToastOpen(true)}>Save draft</button>
 
-		@if (toastOpen) {
-			{createPortal(Toast, document.body, { onDismiss: () => setToastOpen(false) })}
-		}
+			@if (toastOpen) {
+				{createPortal(Toast, document.body, { onDismiss: () => setToastOpen(false) })}
+			}
 
-		<p class="hint">
-			The toast mounts at the end of document.body — inspect the preview to see it
-			escape this component's DOM.
-		</p>
-
+			<p class="hint">
+				The toast mounts at the end of document.body — inspect the preview to see it
+				escape this component's DOM.
+			</p>
+		</div>
 		<style>
 			.demo {
 				display: grid;
@@ -546,7 +571,7 @@ export default function App() @{
 				opacity: 0.6;
 			}
 		</style>
-	</div>
+	</>
 }
 `;
 
@@ -556,15 +581,45 @@ const DYNAMIC_TSRX = `import { useState } from 'octane';
 // expression remounts just that slot's subtree — the parent never
 // re-renders.
 function Red(props: { label: string }) @{
-	<span class="chip red">{'red: ' + props.label}</span>
+	<>
+		<span class="chip">{'red: ' + props.label}</span>
+		<style>
+			.chip {
+				padding: 0.35rem 0.75rem;
+				border-radius: 6px;
+				background: #fee2e2;
+				color: #991b1b;
+			}
+		</style>
+	</>
 }
 
 function Blue(props: { label: string }) @{
-	<span class="chip blue">{'blue: ' + props.label}</span>
+	<>
+		<span class="chip">{'blue: ' + props.label}</span>
+		<style>
+			.chip {
+				padding: 0.35rem 0.75rem;
+				border-radius: 6px;
+				background: #dbeafe;
+				color: #1e40af;
+			}
+		</style>
+	</>
 }
 
 function Green(props: { label: string }) @{
-	<span class="chip green">{'green: ' + props.label}</span>
+	<>
+		<span class="chip">{'green: ' + props.label}</span>
+		<style>
+			.chip {
+				padding: 0.35rem 0.75rem;
+				border-radius: 6px;
+				background: #d1fae5;
+				color: #065f46;
+			}
+		</style>
+	</>
 }
 
 const CHIPS = { red: Red, blue: Blue, green: Green };
@@ -573,17 +628,18 @@ export default function App() @{
 	const [which, setWhich] = useState<keyof typeof CHIPS>('red');
 	const Chip = CHIPS[which];
 
-	<div class="demo">
-		<div class="row">
-			<button onClick={() => setWhich('red')}>red</button>
-			<button onClick={() => setWhich('blue')}>blue</button>
-			<button onClick={() => setWhich('green')}>green</button>
-		</div>
+	<>
+		<div class="demo">
+			<div class="row">
+				<button onClick={() => setWhich('red')}>red</button>
+				<button onClick={() => setWhich('blue')}>blue</button>
+				<button onClick={() => setWhich('green')}>green</button>
+			</div>
 
-		<div class="panel">
-			<{Chip} label="live swap" />
+			<div class="panel">
+				<{Chip} label="live swap" />
+			</div>
 		</div>
-
 		<style>
 			.demo {
 				display: grid;
@@ -607,24 +663,8 @@ export default function App() @{
 				border: 1px solid #8884;
 				border-radius: 8px;
 			}
-			.chip {
-				padding: 0.35rem 0.75rem;
-				border-radius: 6px;
-			}
-			.red {
-				background: #fee2e2;
-				color: #991b1b;
-			}
-			.blue {
-				background: #dbeafe;
-				color: #1e40af;
-			}
-			.green {
-				background: #d1fae5;
-				color: #065f46;
-			}
 		</style>
-	</div>
+	</>
 }
 `;
 
@@ -650,85 +690,94 @@ function fakeFetch(shouldFail: boolean, attempt: number) {
 function Quote(props: { shouldFail: boolean; attempt: number }) @{
 	const quote = use(fakeFetch(props.shouldFail, props.attempt));
 
-	<p class="quote">{'“' + quote + '”'}</p>
+	<>
+		<p class="quote">{'“' + quote + '”'}</p>
+		<style>
+			.quote {
+				margin: 0;
+			}
+		</style>
+	</>
 }
 
 export default function App() @{
 	const [attempt, setAttempt] = useState(1);
 	const [shouldFail, setShouldFail] = useState(false);
 
-	<div class="demo">
-		<div class="row">
-			<button onClick={() => setAttempt(attempt + 1)}>Refetch</button>
-			<label class="row">
-				<input
-					type="checkbox"
-					checked={shouldFail}
-					onChange={(e) => setShouldFail(e.currentTarget.checked)}
-				/>
-				simulate failure
-			</label>
-		</div>
-
-		<div class="panel">
-			@try {
-				<Quote shouldFail={shouldFail} attempt={attempt} />
-			} @pending {
-				<p class="hint">loading…</p>
-			} @catch (err, reset) {
-				<>
-					<p class="boom">{err.message as string}</p>
-					<button
-						onClick={() => {
-							setShouldFail(false);
-							reset();
-						}}
-					>
-						Reset
-					</button>
-				</>
-			}
-		</div>
-
+	<>
 		<style>
 			.demo {
 				display: grid;
 				gap: 0.75rem;
 			}
-			.row {
-				display: flex;
-				gap: 0.5rem;
-				align-items: center;
-			}
-			button {
-				padding: 0.3rem 0.7rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			.panel {
-				padding: 0.75rem;
-				border: 1px solid #8884;
-				border-radius: 8px;
-				display: grid;
-				gap: 0.5rem;
-				justify-items: start;
-			}
-			.quote {
-				margin: 0;
-			}
-			.hint {
-				opacity: 0.6;
-				margin: 0;
-			}
-			.boom {
-				color: #ff5d72;
-				margin: 0;
-			}
 		</style>
-	</div>
+		<div class="demo">
+			<div class="row">
+				<button onClick={() => setAttempt(attempt + 1)}>Refetch</button>
+				<label class="row">
+					<input
+						type="checkbox"
+						checked={shouldFail}
+						onChange={(e) => setShouldFail(e.currentTarget.checked)}
+					/>
+					simulate failure
+				</label>
+			</div>
+			<style>
+				.row {
+					display: flex;
+					gap: 0.5rem;
+					align-items: center;
+				}
+				button {
+					padding: 0.3rem 0.7rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					cursor: pointer;
+				}
+			</style>
+
+			<div class="panel">
+				@try {
+					<Quote shouldFail={shouldFail} attempt={attempt} />
+				} @pending {
+					<p class="hint">loading…</p>
+				} @catch (err, reset) {
+					<>
+						<p class="boom">{err.message as string}</p>
+						<button
+							onClick={() => {
+								setShouldFail(false);
+								reset();
+							}}
+						>
+							Reset
+						</button>
+					</>
+				}
+			</div>
+			<style>
+				.panel {
+					padding: 0.75rem;
+					border: 1px solid #8884;
+					border-radius: 8px;
+					display: grid;
+					gap: 0.5rem;
+					justify-items: start;
+				}
+				.hint {
+					opacity: 0.6;
+					margin: 0;
+				}
+				.boom {
+					color: #ff5d72;
+					margin: 0;
+				}
+			</style>
+		</div>
+	</>
 }
 `;
 
@@ -805,27 +854,28 @@ export default function App() @{
 	const [attempt, setAttempt] = useState(1);
 	const [startedAt, setStartedAt] = useState(() => performance.now());
 
-	<div class="demo">
-		<button
-			onClick={() => {
-				setStartedAt(performance.now());
-				setAttempt(attempt + 1);
-			}}
-		>
-			Reload both
-		</button>
+	<>
+		<div class="demo">
+			<button
+				onClick={() => {
+					setStartedAt(performance.now());
+					setAttempt(attempt + 1);
+				}}
+			>
+				Reload both
+			</button>
 
-		<div class="panel">
-			@try {
-				<>
-					<Dashboard attempt={attempt} />
-					<Elapsed since={startedAt} />
-				</>
-			} @pending {
-				<p class="hint">loading both…</p>
-			}
+			<div class="panel">
+				@try {
+					<>
+						<Dashboard attempt={attempt} />
+						<Elapsed since={startedAt} />
+					</>
+				} @pending {
+					<p class="hint">loading both…</p>
+				}
+			</div>
 		</div>
-
 		<style>
 			.demo {
 				display: grid;
@@ -850,13 +900,21 @@ export default function App() @{
 				margin: 0;
 			}
 		</style>
-	</div>
+	</>
 }
 
 function Elapsed(props: { since: number }) @{
 	const ms = Math.round(performance.now() - props.since);
 
-	<p class="hint">{'Both resolved after ~' + ms + 'ms — two 700ms fetches, one round.'}</p>
+	<>
+		<p class="hint">{'Both resolved after ~' + ms + 'ms — two 700ms fetches, one round.'}</p>
+		<style>
+			.hint {
+				opacity: 0.6;
+				margin: 0;
+			}
+		</style>
+	</>
 }
 `;
 
@@ -898,6 +956,11 @@ function SlowList(props: { query: string }) @{
 		} @empty {
 			<li class="hint">no matches</li>
 		}
+		<style>
+			.hint {
+				opacity: 0.6;
+			}
+		</style>
 	</ul>
 }
 
@@ -908,61 +971,63 @@ export default function App() @{
 	const [sorted, setSorted] = useState(false);
 	const isStale = query !== deferredQuery;
 
-	<div class="demo">
-		<div class="row">
-			<input
-				placeholder="type to filter 1500 items…"
-				value={query}
-				onInput={(e) => setQuery(e.currentTarget.value)}
-			/>
-			<button onClick={() => startTransition(() => setSorted(!sorted))}>
-				{(isPending ? 'Sorting…' : sorted ? 'Unsort' : 'Sort') as string}
-			</button>
-		</div>
-
-		<div class={'panel' + (isStale ? ' stale' : '')}>
-			<SlowList query={sorted ? deferredQuery.split('').sort().join('') : deferredQuery} />
-		</div>
-
+	<>
 		<style>
 			.demo {
 				display: grid;
 				gap: 0.75rem;
 			}
-			.row {
-				display: flex;
-				gap: 0.5rem;
-			}
-			input {
-				padding: 0.3rem 0.5rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				min-width: 16rem;
-			}
-			button {
-				padding: 0.3rem 0.7rem;
-				border-radius: 6px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			.panel {
-				padding: 0.75rem;
-				border: 1px solid #8884;
-				border-radius: 8px;
-				transition: opacity 0.15s;
-			}
-			.stale {
-				opacity: 0.5;
-			}
-			.hint {
-				opacity: 0.6;
-			}
 		</style>
-	</div>
+		<div class="demo">
+			<div class="row">
+				<input
+					placeholder="type to filter 1500 items…"
+					value={query}
+					onInput={(e) => setQuery(e.currentTarget.value)}
+				/>
+				<button onClick={() => startTransition(() => setSorted(!sorted))}>
+					{(isPending ? 'Sorting…' : sorted ? 'Unsort' : 'Sort') as string}
+				</button>
+			</div>
+			<style>
+				.row {
+					display: flex;
+					gap: 0.5rem;
+				}
+				input {
+					padding: 0.3rem 0.5rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					min-width: 16rem;
+				}
+				button {
+					padding: 0.3rem 0.7rem;
+					border-radius: 6px;
+					border: 1px solid #8886;
+					background: transparent;
+					color: inherit;
+					cursor: pointer;
+				}
+			</style>
+
+			<div class={'panel' + (isStale ? ' stale' : '')}>
+				<SlowList query={sorted ? deferredQuery.split('').sort().join('') : deferredQuery} />
+			</div>
+			<style>
+				.panel {
+					padding: 0.75rem;
+					border: 1px solid #8884;
+					border-radius: 8px;
+					transition: opacity 0.15s;
+				}
+				.stale {
+					opacity: 0.5;
+				}
+			</style>
+		</div>
+	</>
 }
 `;
 
@@ -975,19 +1040,7 @@ const VIEW_TRANSITION_TSRX = `import { useState, startTransition, ViewTransition
 export default function App() @{
 	const [visible, setVisible] = useState(true);
 
-	<div class="demo">
-		<button onClick={() => startTransition(() => setVisible(!visible))}>
-			{(visible ? 'Remove card' : 'Add card') as string}
-		</button>
-
-		<div class="stage">
-			@if (visible) {
-				<ViewTransition enter="card-in" exit="card-out">
-					<div class="card">I animate in and out</div>
-				</ViewTransition>
-			}
-		</div>
-
+	<>
 		<style>
 			.demo {
 				display: grid;
@@ -1030,7 +1083,20 @@ export default function App() @{
 				}
 			}
 		</style>
-	</div>
+		<div class="demo">
+			<button onClick={() => startTransition(() => setVisible(!visible))}>
+				{(visible ? 'Remove card' : 'Add card') as string}
+			</button>
+
+			<div class="stage">
+				@if (visible) {
+					<ViewTransition enter="card-in" exit="card-out">
+						<div class="card">I animate in and out</div>
+					</ViewTransition>
+				}
+			</div>
+		</div>
+	</>
 }
 `;
 
@@ -1053,26 +1119,39 @@ async function saveName(previous: string, formData: FormData) {
 function SubmitButton() @{
 	const status = useFormStatus();
 
-	<button type="submit" disabled={status.pending}>
-		{(status.pending ? 'Saving…' : 'Save') as string}
-	</button>
+	<>
+		<button type="submit" disabled={status.pending}>
+			{(status.pending ? 'Saving…' : 'Save') as string}
+		</button>
+		<style>
+			button {
+				padding: 0.4rem 0.9rem;
+				border-radius: 8px;
+				border: 1px solid #8886;
+				background: transparent;
+				color: inherit;
+				cursor: pointer;
+			}
+		</style>
+	</>
 }
 
 export default function App() @{
 	const [message, submit] = useActionState(saveName, '');
 
-	<form action={submit} class="demo">
-		<label>
-			Name
-			<input name="name" defaultValue="Ada" />
-		</label>
+	<>
+		<form action={submit} class="demo">
+			<label>
+				Name
+				<input name="name" defaultValue="Ada" />
+			</label>
 
-		<SubmitButton />
+			<SubmitButton />
 
-		@if (message) {
-			<p role="status">{message as string}</p>
-		}
-
+			@if (message) {
+				<p role="status">{message as string}</p>
+			}
+		</form>
 		<style>
 			.demo {
 				display: grid;
@@ -1090,16 +1169,8 @@ export default function App() @{
 				background: transparent;
 				color: inherit;
 			}
-			button {
-				padding: 0.4rem 0.9rem;
-				border-radius: 8px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
 		</style>
-	</form>
+	</>
 }
 `;
 
@@ -1119,18 +1190,19 @@ const reset = () => store.setState({ count: 0 });
 export default function App() @{
 	const count = useSyncExternalStore(store.subscribe, () => store.getState().count);
 
-	<div class="demo">
-		<h2>{'Zustand count: ' + count}</h2>
+	<>
+		<div class="demo">
+			<h2>{'Zustand count: ' + count}</h2>
 
-		<div class="row">
-			<button onClick={increment}>Increment</button>
-			<button onClick={reset}>Reset</button>
+			<div class="row">
+				<button onClick={increment}>Increment</button>
+				<button onClick={reset}>Reset</button>
+			</div>
+
+			<p class="hint">
+				The store lives outside octane entirely — any subscriber sees the same state.
+			</p>
 		</div>
-
-		<p class="hint">
-			The store lives outside octane entirely — any subscriber sees the same state.
-		</p>
-
 		<style>
 			.demo {
 				display: grid;
@@ -1153,7 +1225,7 @@ export default function App() @{
 				opacity: 0.6;
 			}
 		</style>
-	</div>
+	</>
 }
 `;
 
@@ -1209,27 +1281,35 @@ function fakeFetch(attempt: number) {
 function IslandData(props: { attempt: number }) @{
 	const data = use(fakeFetch(props.attempt));
 
-	<p class="data">{data as string}</p>
+	<>
+		<p class="data">{data as string}</p>
+		<style>
+			.data {
+				margin: 0;
+			}
+		</style>
+	</>
 }
 
 export function Island(props: { start: number }) @{
 	const [count, setCount] = useState(props.start);
 	const [attempt, setAttempt] = useState(1);
 
-	<section class="island">
-		<h3>Octane island</h3>
+	<>
+		<section class="island">
+			<h3>Octane island</h3>
 
-		<div class="row">
-			<button onClick={() => setCount(count + 1)}>{'clicks: ' + count}</button>
-			<button onClick={() => setAttempt(attempt + 1)}>Refetch</button>
-		</div>
+			<div class="row">
+				<button onClick={() => setCount(count + 1)}>{'clicks: ' + count}</button>
+				<button onClick={() => setAttempt(attempt + 1)}>Refetch</button>
+			</div>
 
-		@try {
-			<IslandData attempt={attempt} />
-		} @pending {
-			<p class="hint">island loading…</p>
-		}
-
+			@try {
+				<IslandData attempt={attempt} />
+			} @pending {
+				<p class="hint">island loading…</p>
+			}
+		</section>
 		<style>
 			.island {
 				padding: 0.9rem 1.1rem;
@@ -1255,15 +1335,12 @@ export function Island(props: { start: number }) @{
 				color: inherit;
 				cursor: pointer;
 			}
-			.data,
 			.hint {
 				margin: 0;
-			}
-			.hint {
 				opacity: 0.6;
 			}
 		</style>
-	</section>
+	</>
 }
 `;
 
@@ -1280,35 +1357,36 @@ export default function App() @{
 	const [reported, setReported] = useState('No count reported yet');
 	const input = useRef<HTMLInputElement | null>(null);
 
-	<main class="demo">
-		<h2>Octane host</h2>
-		<p class="hint">The React island keeps its state when Octane updates its props.</p>
-		<p class="reported">{reported as string}</p>
+	<>
+		<main class="demo">
+			<h2>Octane host</h2>
+			<p class="hint">The React island keeps its state when Octane updates its props.</p>
+			<p class="reported">{reported as string}</p>
 
-		<div class="controls">
-			<button onClick={() => setLabel(label === 'React count' ? 'Renamed count' : 'React count')}>
-				Rename React counter
-			</button>
-			<button onClick={() => setStart(start + 1)}>{'Next initial count: ' + start}</button>
-			<button disabled={!mounted} onClick={() => input.current?.focus()}>Focus React input</button>
-			<button onClick={() => setMounted(!mounted)}>
-				{mounted ? 'Unmount React island' : 'Mount React island'}
-			</button>
-		</div>
+			<div class="controls">
+				<button onClick={() => setLabel(label === 'React count' ? 'Renamed count' : 'React count')}>
+					Rename React counter
+				</button>
+				<button onClick={() => setStart(start + 1)}>{'Next initial count: ' + start}</button>
+				<button disabled={!mounted} onClick={() => input.current?.focus()}>Focus React input</button>
+				<button onClick={() => setMounted(!mounted)}>
+					{mounted ? 'Unmount React island' : 'Mount React island'}
+				</button>
+			</div>
 
-		@if (mounted) {
-			<ReactCompat>
-				<Counter
-					label={label}
-					start={start}
-					ref={input}
-					onCount={(count: number) => setReported('React reported: ' + count)}
-				/>
-			</ReactCompat>
-		}
+			@if (mounted) {
+				<ReactCompat>
+					<Counter
+						label={label}
+						start={start}
+						ref={input}
+						onCount={(count: number) => setReported('React reported: ' + count)}
+					/>
+				</ReactCompat>
+			}
 
-		<p class="hint">The initial count changes on the next mount. Loading stays inside React Suspense.</p>
-
+			<p class="hint">The initial count changes on the next mount. Loading stays inside React Suspense.</p>
+		</main>
 		<style>
 			.demo {
 				display: grid;
@@ -1336,7 +1414,7 @@ export default function App() @{
 				opacity: 0.7;
 			}
 		</style>
-	</main>
+	</>
 }
 `;
 
@@ -1397,6 +1475,159 @@ export function Counter({ label, start, ref, onCount }: CounterProps) {
 }
 `;
 
+// ── Scoped styles & themes ──────────────────────────────────────────────────
+
+const THEME_TSRX = `// A <style> assigned to a variable is a theme: an object with $class
+// (its scope hash) plus one key per class selector. Exported themes keep
+// every selector, element rules included.
+const base = <style>
+	article {
+		font-family: system-ui, sans-serif;
+		border-radius: 12px;
+		padding: 1rem 1.25rem;
+	}
+	h2 {
+		margin: 0 0 0.5rem;
+		font-size: 1.1rem;
+	}
+</style>;
+
+export const light = <style apply={base}>
+	article {
+		background: #f6f7fb;
+		color: #1a1c2c;
+	}
+	.accent {
+		color: #5b4bff;
+	}
+</style>;
+
+export const dark = <style apply={base}>
+	article {
+		background: #1a1c2c;
+		color: #f6f7fb;
+	}
+	.accent {
+		color: #ffb454;
+	}
+</style>;
+`;
+
+const THEME_APP_TSRX = `import { useState } from 'octane';
+import { dark, light } from './theme.tsrx';
+
+// A block is a theme as soon as something reads its $class, even if nothing
+// exports or applies it: \`accent\` keeps its element rules, and only the
+// elements that carry accent.$class pick them up.
+const accent = <style>
+	p {
+		border-left: 3px solid #5b4bff;
+		padding-left: 0.5rem;
+	}
+	strong {
+		color: #5b4bff;
+	}
+</style>;
+
+// A child stamps a passed class on the elements it chooses; its own scope
+// hash follows, so its local rules still reach them.
+function Footnote({ parentClass }: { parentClass: string }) @{
+	<>
+		<style>
+			p {
+				margin: 0;
+				font-size: 0.9rem;
+			}
+		</style>
+		<p class={parentClass}>
+			<strong class={parentClass}>Footnote:</strong> a child opted in through a prop.
+		</p>
+	</>
+}
+
+// Each card applies a theme to its own scope: the theme's article and h2
+// rules reach every element here, while the card's local rules stay local.
+function LightCard() @{
+	<>
+		<style apply={light}>
+			p {
+				margin: 0;
+			}
+		</style>
+		<article>
+			<h2>Light card</h2>
+			<p>{'Accent class: ' + light.accent}</p>
+			<p class={light.accent}>A class-map entry carries its hash.</p>
+		</article>
+	</>
+}
+
+function DarkCard() @{
+	<>
+		<style apply={dark}>
+			p {
+				margin: 0;
+			}
+		</style>
+		<article>
+			<h2>Dark card</h2>
+			<p class={dark.accent}>Same markup, other theme.</p>
+		</article>
+	</>
+}
+
+export default function App() @{
+	const [expanded, setExpanded] = useState(false);
+
+	<>
+		<style>
+			.stack {
+				display: grid;
+				gap: 0.75rem;
+				justify-items: start;
+			}
+			button {
+				padding: 0.4rem 0.9rem;
+				border-radius: 8px;
+				border: 1px solid #8886;
+				background: transparent;
+				color: inherit;
+				cursor: pointer;
+			}
+		</style>
+		<div class="stack">
+			<LightCard />
+			<DarkCard />
+			<p class={accent.$class}>Opted in with accent.$class; apply would stamp every element.</p>
+			<p>An untouched sibling.</p>
+			<Footnote parentClass={accent.$class} />
+			<button onClick={() => setExpanded(!expanded)}>
+				{(expanded ? 'Collapse' : 'Expand') as string}
+			</button>
+			@if (expanded) {
+				<>
+					<style>
+						.note {
+							color: #17803d;
+						}
+					</style>
+					<p class="note">Rules in a directive arm reach only that arm.</p>
+				</>
+			} @else {
+				<>
+					<style>
+						.note {
+							opacity: 0.6;
+						}
+					</style>
+					<p class="note">Same class name, a different scope.</p>
+				</>
+			}
+		</div>
+	</>
+}
+`;
+
 // ── Catalogue ───────────────────────────────────────────────────────────────
 
 export const CUSTOM_EXAMPLE_ID = 'custom';
@@ -1427,6 +1658,20 @@ export const EXAMPLES: PlaygroundExample[] = [
 		group: 'Basics',
 		variants: {
 			tsrx: workspace([{ name: 'App.tsrx', source: INPUTS_TSRX }]),
+		},
+	},
+	{
+		id: 'scoped-styles',
+		label: 'Scoped styles & themes (multi-file)',
+		group: 'Basics',
+		variants: {
+			tsrx: workspace(
+				[
+					{ name: 'App.tsrx', source: THEME_APP_TSRX },
+					{ name: 'theme.tsrx', source: THEME_TSRX },
+				],
+				'App.tsrx',
+			),
 		},
 	},
 	{
