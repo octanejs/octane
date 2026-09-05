@@ -217,6 +217,33 @@ A Strong module cannot:
 - Read a known clock or random source directly while rendering, such as
   `Date.now()` or `Math.random()` (`OCTANE_STRONG_RENDER_IMPURE_CALL`). Lazy state
   initialization may still capture an initial timestamp or random value.
+- Declare a built-in hook value or its dependent effect outside the sole nested
+  `@{…}` block that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
+- Declare a named native event handler outside the sole deeper nested `@{…}`
+  block containing its direct `onX` use (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
+
+A nested `@{…}` can place hooks and named event handlers beside the JSX that
+uses them:
+
+```tsx
+"use strong";
+
+import { useState } from 'octane';
+
+export function Counter() @{
+	<div>@{
+		const [count, setCount] = useState(0);
+		const onClick = () => setCount(count + 1);
+		<button {onClick}>{count as string}</button>
+	}</div>
+}
+```
+
+An inline `onClick` is valid too. Hooks and effects used only by an `@if`, keyed
+`@for`, `@switch`, or `@try` arm may remain in their parent scope. Moving a hook
+into an arm or nested block changes its lifetime; each keyed row can have its
+own state. These locality checks apply to opted-in modules; `strong: true` in
+the app config enables them for all application-owned modules.
 
 These checks follow provable synchronous calls through local helpers,
 `useCallback` and `useEffectEvent` results, and functions returned by analyzable
