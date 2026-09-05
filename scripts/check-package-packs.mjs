@@ -52,7 +52,6 @@ import {
 	renderPackedTsrxConsumerTypeProbe,
 	renderPackedStrictBrowserConsumerTypeProbe,
 	renderPackedStrictBrowserConsumerSource,
-	readInterimBranchDependencyPins,
 } from './package-pack-canaries.mjs';
 import { LYNX_TOOLCHAIN_LANES } from '../packages/rspeedy-plugin-octane/src/toolchain-lanes.js';
 import {
@@ -795,15 +794,6 @@ export function renderProbe() {
 }
 `,
 	);
-	// INTERIM: see renderPackedExampleWorkspace — the packed octane depends on
-	// @tsrx/core from a git branch until its release ships.
-	const interimPins = readInterimBranchDependencyPins();
-	if (Object.keys(interimPins).length > 0) {
-		writeFileSync(
-			path.join(consumerDirectory, 'pnpm-workspace.yaml'),
-			renderPackedExampleWorkspace({}, interimPins),
-		);
-	}
 	writeFileSync(
 		path.join(consumerDirectory, 'tsconfig.json'),
 		JSON.stringify(

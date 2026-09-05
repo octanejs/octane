@@ -1,4 +1,4 @@
-import { readFileSync, realpathSync } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 
 export const NATIVE_GRAPH_FORBIDDEN_MODULE =
@@ -51,37 +51,11 @@ export function createPackedExampleManifest(manifest, archiveSpecs, viteVersion,
 	return packedManifest;
 }
 
-/**
- * INTERIM (tsrx-org/tsrx PR feat/scoped-styles-apply): while `octane` depends
- * on `@tsrx/core` from a git branch, a consumer installing the packed archive
- * needs two things the root workspace already carries — the override pins
- * that make the branch manifest installable (`'@tsrx/core@<version>>dep'`) and
- * `blockExoticSubdeps: false`, because a git dependency below a packed
- * package is an exotic subdependency. Read from the root `pnpm-workspace.yaml`
- * so this disappears with that override block once the release ships.
- *
- * @param {string} [rootDir]
- * @returns {Record<string, string>}
- */
-export function readInterimBranchDependencyPins(rootDir = path.resolve(import.meta.dirname, '..')) {
-	const workspace = readFileSync(path.join(rootDir, 'pnpm-workspace.yaml'), 'utf8');
-	const pins = {};
-	for (const line of workspace.split(/\r?\n/)) {
-		const match = line.match(/^ {2}'(@tsrx\/core@[^']*>[^']+)': (.+)$/);
-		if (match) pins[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
-	}
-	return pins;
-}
-
-export function renderPackedExampleWorkspace(
-	archiveSpecs,
-	interimPins = readInterimBranchDependencyPins(),
-) {
-	const overrides = Object.entries({ ...archiveSpecs, ...interimPins })
+export function renderPackedExampleWorkspace(archiveSpecs) {
+	const overrides = Object.entries(archiveSpecs)
 		.map(([packageName, spec]) => `  ${JSON.stringify(packageName)}: ${JSON.stringify(spec)}`)
 		.join('\n');
-	const settings = Object.keys(interimPins).length > 0 ? 'blockExoticSubdeps: false\n' : '';
-	return `${settings}overrides:\n${overrides}\n`;
+	return `overrides:\n${overrides}\n`;
 }
 
 export const PACKED_COMMONJS_CONSUMER_PACKAGES = [

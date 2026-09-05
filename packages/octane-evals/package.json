@@ -60,7 +60,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
-    "@tsrx/core": "github:tsrx-org/tsrx#feat/scoped-styles-apply&path:packages/tsrx",
+    "@tsrx/core": "catalog:default",
     "@types/node": "catalog:default",
     "typescript": "catalog:default",
     "vitest": "catalog:default"

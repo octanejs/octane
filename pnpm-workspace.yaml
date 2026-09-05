@@ -104,28 +104,6 @@ allowBuilds:
 esrap_common: &esrap_common ^2.3.2
 
 overrides:
-  # INTERIM: packages/octane, packages/octane-evals, and website depend on
-  # @tsrx/core from the tsrx branch that implements sibling-scoped <style>
-  # blocks, $class, and apply (tsrx-org/tsrx PR feat/scoped-styles-apply) until
-  # that release ships. The git spec lives on those package.json files because
-  # a git dependency is not allowed as a subdependency (blockExoticSubdeps);
-  # the pins below make the branch manifest installable. Replace the three
-  # specs with `catalog:default`, bump the catalog entry below, and drop this
-  # block in the same change.
-  # The branch manifest depends on @tsrx/runtime through `workspace:*` and on
-  # its other dependencies through tsrx's `catalog:` protocol; neither resolves
-  # outside the tsrx workspace, so pin them here: the published runtime (the
-  # branch does not change it) and the tsrx catalog's ranges.
-  '@tsrx/core@0.1.65>@tsrx/runtime': ^0.1.4
-  '@tsrx/core@0.1.65>@jridgewell/sourcemap-codec': ^1.5.5
-  '@tsrx/core@0.1.65>@noble/hashes': ^2.2.0
-  '@tsrx/core@0.1.65>@sveltejs/acorn-typescript': ^1.0.13
-  '@tsrx/core@0.1.65>@types/estree-jsx': ^1.0.5
-  '@tsrx/core@0.1.65>@types/estree': ^1.0.8
-  '@tsrx/core@0.1.65>acorn': ^8.17.0
-  '@tsrx/core@0.1.65>esrap': ^2.3.2
-  '@tsrx/core@0.1.65>magic-string': ^0.30.18
-  '@tsrx/core@0.1.65>zimmerframe': ^1.1.2
   # Browser parity tooling and its transitive consumers must share one runner
   # and Chromium revision. Direct dependencies reference the same catalog.
   '@playwright/test': ^1.61.1
@@ -315,14 +293,14 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.1.63
-    '@tsrx/prettier-plugin': ^0.3.128
-    '@tsrx/typescript-plugin': ^0.3.128
+    '@tsrx/core': ^0.1.66
+    '@tsrx/prettier-plugin': ^0.3.132
+    '@tsrx/typescript-plugin': ^0.3.132
     '@tsrx/ripple': ^0.1.62
-    '@tsrx/react': ^0.2.63
-    '@tsrx/solid': ^0.1.63
-    '@tsrx/vite-plugin-react': ^0.0.96
-    '@tsrx/vite-plugin-solid': ^0.0.93
+    '@tsrx/react': ^0.2.66
+    '@tsrx/solid': ^0.1.66
+    '@tsrx/vite-plugin-react': ^0.0.99
+    '@tsrx/vite-plugin-solid': ^0.0.96
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -626,16 +604,18 @@ minimumReleaseAgeExclude:
   - oxc-tsrx@0.5.0
   - '@ripple-ts/adapter@0.3.125'
   - '@ripple-ts/vite-plugin@0.3.125'
-  - '@tsrx/core@0.1.63'
-  - '@tsrx/prettier-plugin@0.3.128'
-  - '@tsrx/react@0.2.63'
+  - '@tsrx/core@0.1.66'
+  - '@tsrx/prettier-plugin@0.3.132'
+  - '@tsrx/react@0.2.66'
   - '@tsrx/ripple@0.1.62'
-  - '@tsrx/solid@0.1.63'
-  - '@tsrx/typescript-plugin@0.3.128'
-  - '@tsrx/vite-plugin-react@0.0.96'
-  - '@tsrx/vite-plugin-solid@0.0.93'
+  - '@tsrx/solid@0.1.66'
+  - '@tsrx/typescript-plugin@0.3.132'
+  - '@tsrx/vite-plugin-react@0.0.99'
+  - '@tsrx/vite-plugin-solid@0.0.96'
   - ripple@0.3.125
-  - '@tsrx/runtime@0.1.4'
+  - '@tsrx/runtime@0.1.5'
+  - '@tsrx/react-runtime@0.1.5'
+  - '@tsrx/solid-runtime@0.1.5'
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

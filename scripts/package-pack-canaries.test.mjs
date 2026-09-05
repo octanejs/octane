@@ -162,30 +162,13 @@ describe('createPackedExampleManifest', () => {
 describe('renderPackedExampleWorkspace', () => {
 	test('pins transitive internal dependencies to the produced archives', () => {
 		assert.equal(
-			renderPackedExampleWorkspace(
-				{
-					'@octanejs/app-core': 'file:/tmp/app-core.tgz',
-					octane: 'file:/tmp/octane.tgz',
-				},
-				{},
-			),
+			renderPackedExampleWorkspace({
+				'@octanejs/app-core': 'file:/tmp/app-core.tgz',
+				octane: 'file:/tmp/octane.tgz',
+			}),
 			`overrides:
   "@octanejs/app-core": "file:/tmp/app-core.tgz"
   "octane": "file:/tmp/octane.tgz"
-`,
-		);
-	});
-
-	test('carries the interim branch-dependency pins and allows the exotic subdependency', () => {
-		assert.equal(
-			renderPackedExampleWorkspace(
-				{ octane: 'file:/tmp/octane.tgz' },
-				{ '@tsrx/core@0.1.65>acorn': '^8.17.0' },
-			),
-			`blockExoticSubdeps: false
-overrides:
-  "octane": "file:/tmp/octane.tgz"
-  "@tsrx/core@0.1.65>acorn": "^8.17.0"
 `,
 		);
 	});

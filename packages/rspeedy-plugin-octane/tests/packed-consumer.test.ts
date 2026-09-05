@@ -71,7 +71,6 @@ function packWorkspacePackages(root: string): Record<keyof typeof PACKAGES, stri
 }
 
 function renderOverrides(archives: Record<keyof typeof PACKAGES, string>): string {
-	// Shared with the pack validator so interim branch-dependency pins apply here too.
 	return renderPackedExampleWorkspace(
 		Object.fromEntries(
 			Object.entries(archives).map(([name, archive]) => [name, `file:${archive}`]),
