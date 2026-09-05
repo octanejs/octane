@@ -87,7 +87,13 @@ import {
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
-import { devWarnStyleCoercion, devWarnStyleProperty, normalizeClass, styleName } from './css.js';
+import {
+	devWarnStyleCoercion,
+	devWarnStyleProperty,
+	mergeClass,
+	normalizeClass,
+	styleName,
+} from './css.js';
 import {
 	invalidHtmlNestingWithAncestor,
 	invalidHtmlNestingWithParent,
@@ -2535,7 +2541,12 @@ function ssrAttrEntry(
 	return '';
 }
 
-type SsrAttributeSource = readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown];
+type SsrAttributeSource = readonly [
+	isSpread: boolean,
+	sourceOrName: unknown,
+	value?: unknown,
+	merge?: boolean,
+];
 
 function normalizeSsrAttributeName(
 	name: string,
@@ -2565,6 +2576,10 @@ function isAggregatedFormAttribute(tag: string | undefined, name: string): boole
  * writes of the same JSX prop retain its first insertion position like
  * Object.assign. Distinct aliases that target one native attr still choose the
  * latest authored writer and retain that winning prop's insertion position.
+ *
+ * A synthesized scope-hash class (4th tuple flag) composes onto the winning
+ * class identity after that last-writer fold, matching the client so a spread
+ * `class` is not replaced by the hash alone.
  */
 export function ssrAttrs(
 	sources: readonly SsrAttributeSource[],
@@ -2580,8 +2595,9 @@ export function ssrAttrs(
 		lastOrder: number;
 	}
 	const props = new Map<string, PropWriter>();
+	let classMerges: Array<{ rawName: string; value: unknown; order: number }> | null = null;
 	let sourceOrder = 0;
-	const record = (rawName: unknown, value: unknown): void => {
+	function record(rawName: unknown, value: unknown): void {
 		if (typeof rawName !== 'string') return;
 		const order = sourceOrder++;
 		const previous = props.get(rawName);
@@ -2591,10 +2607,22 @@ export function ssrAttrs(
 			firstOrder: previous?.firstOrder ?? order,
 			lastOrder: order,
 		});
-	};
+	}
 
-	for (const [isSpread, sourceOrName, directValue] of sources) {
+	for (const [isSpread, sourceOrName, directValue, merge] of sources) {
 		if (!isSpread) {
+			if (
+				merge === true &&
+				typeof sourceOrName === 'string' &&
+				(sourceOrName === 'class' || sourceOrName === 'className')
+			) {
+				(classMerges ??= []).push({
+					rawName: sourceOrName,
+					value: directValue,
+					order: sourceOrder++,
+				});
+				continue;
+			}
 			record(sourceOrName, directValue);
 			continue;
 		}
@@ -2604,6 +2632,33 @@ export function ssrAttrs(
 		}
 		for (const name of Object.keys(Object(source))) {
 			record(name, (source as Record<string, unknown>)[name]);
+		}
+	}
+
+	if (process.env.NODE_ENV === 'production') {
+		let canonical = true;
+		for (const name of props.keys()) {
+			if (
+				normalizeSsrAttributeName(name, tag, namespace) !== name ||
+				(namespace === 'html' && name.toLowerCase() !== name)
+			) {
+				canonical = false;
+				break;
+			}
+		}
+		// Canonical names cannot alias another raw writer. After all source reads,
+		// the original Map already holds their final values in insertion order.
+		if (canonical) {
+			let out = '';
+			for (const { rawName, value } of props.values()) {
+				if (
+					rawName === 'dangerouslySetInnerHTML' ||
+					(skipFormControls && isAggregatedFormAttribute(tag, rawName))
+				)
+					continue;
+				out += ssrAttrEntry(rawName, value, tag, namespace);
+			}
+			return out;
 		}
 	}
 
@@ -2650,6 +2705,24 @@ export function ssrAttrs(
 			firstOrder,
 			lastOrder,
 		]);
+	}
+	if (classMerges !== null) {
+		for (const extra of classMerges) {
+			const name = normalizeSsrAttributeName(extra.rawName, tag, namespace);
+			if (!VALID_ATTR_NAME.test(name)) continue;
+			const identity = namespace === 'html' ? name.toLowerCase() : name;
+			const previous = resolved.get(identity);
+			if (previous !== undefined) {
+				resolved.set(identity, [
+					previous[0],
+					mergeClass(previous[1], extra.value),
+					previous[2],
+					extra.order,
+				]);
+				continue;
+			}
+			resolved.set(identity, [name, extra.value, extra.order, extra.order]);
+		}
 	}
 
 	let out = '';
