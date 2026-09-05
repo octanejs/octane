@@ -242,8 +242,8 @@ export function Counter() @{
 An inline `onClick` is valid too. Hooks and effects used only by an `@if`, keyed
 `@for`, `@switch`, or `@try` arm may remain in their parent scope. Moving a hook
 into an arm or nested block changes its lifetime; each keyed row can have its
-own state. The locality checks require Strong mode, and `strong: true` in the
-app config enables them for all application-owned modules.
+own state. These locality checks apply to opted-in modules; `strong: true` in
+the app config enables them for all application-owned modules.
 
 These checks follow provable synchronous calls through local helpers,
 `useCallback` and `useEffectEvent` results, and functions returned by analyzable
