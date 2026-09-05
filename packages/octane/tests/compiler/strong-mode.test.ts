@@ -444,6 +444,67 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(/useState.*@if/);
 	});
 
+	it('keeps state at the parent when an effect also observes parent-owned state', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const [shared] = useState(0);
+  useEffect(() => props.observe(count, shared), [count, shared]);
+  <div>
+    <output>{shared as string}</output>
+    @if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }
+  </div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps state at the parent when a second effect cannot move with it', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const [shared] = useState(0);
+  useEffect(() => props.observe(count), [count]);
+  useEffect(() => props.observe(count, shared), [count, shared]);
+  <div>
+    <output>{shared as string}</output>
+    @if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }
+  </div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps chained effect dependencies together when one effect must stay at the parent', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const [observed] = useState(0);
+  const [shared] = useState(0);
+  useEffect(() => props.observe(count, observed), [count, observed]);
+  useEffect(() => props.observe(observed, shared), [observed, shared]);
+  <div>
+    <output>{shared as string}</output>
+    @if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }
+  </div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('moves an effect with a state value used only by that effect', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const [observed] = useState(0);
+  useEffect(() => props.observe(count, observed), [count, observed]);
+  <div>@if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }</div>
+}`;
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		expect(diagnostics.filter(({ code }) => code === HOOK_LOCALITY)).toHaveLength(3);
+	});
+
 	it('accepts hooks beside the template arm that owns them in client and server output', () => {
 		const source = `import { useEffect, useState } from 'octane';
 export function App(props) @{
@@ -505,6 +566,33 @@ export function App(props) @{
 		for (const source of sources) {
 			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 		}
+	});
+
+	it.each([
+		['a declaration default', 'const { selected = count } = props.value;'],
+		['a computed declaration key', 'const { [count]: selected } = props.value;'],
+		[
+			'a nested parameter default',
+			'function read({ selected = count } = props.value) { return selected; }',
+		],
+		[
+			'a parameter default shadowed by a body local',
+			'function read({ selected = count } = props.value) { const count = 1; return selected; }',
+		],
+		['a computed parameter key', 'function read({ [count]: selected }) { return selected; }'],
+		[
+			'a catch binding key',
+			'try { props.run(); } catch ({ [count]: selected }) { props.observe(selected); }',
+		],
+	])('keeps state at its parent when read by %s', (_label, setup) => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  ${setup}
+  <div>@if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }</div>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('locates a one-site local handler at its event attribute', () => {

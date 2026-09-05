@@ -503,6 +503,35 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 		);
 	}
 
+	function walkPatternExpressions(pattern, scope, region, effect) {
+		if (pattern == null) return;
+		switch (pattern.type) {
+			case 'AssignmentPattern':
+				walkPatternExpressions(pattern.left, scope, region, effect);
+				walk(pattern.right, scope, region, effect);
+				return;
+			case 'ArrayPattern':
+				for (const element of pattern.elements ?? []) {
+					walkPatternExpressions(element, scope, region, effect);
+				}
+				return;
+			case 'ObjectPattern':
+				for (const property of pattern.properties ?? []) {
+					if (property.type === 'Property') {
+						if (property.computed) walk(property.key, scope, region, effect);
+						walkPatternExpressions(property.value, scope, region, effect);
+					} else walkPatternExpressions(property, scope, region, effect);
+				}
+				return;
+			case 'RestElement':
+				walkPatternExpressions(pattern.argument, scope, region, effect);
+				return;
+			case 'TSParameterProperty':
+				walkPatternExpressions(pattern.parameter, scope, region, effect);
+				return;
+		}
+	}
+
 	function walk(node, scope, region, effect = null, event = null) {
 		if (node == null || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
@@ -550,9 +579,9 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 					if (mayHaveHoistedVars) predeclareNestedVars(body, functionScope);
 					if (node.id?.name) functionScope.bindings.set(node.id.name, OTHER_BINDING);
 					register(statements, functionScope, owner);
+					const parameterScope = createScope(scope, 'function', [], node.params ?? []);
 					for (const parameter of node.params ?? []) {
-						if (parameter.type === 'AssignmentPattern')
-							walk(parameter.right, scope, region, effect);
+						walkPatternExpressions(parameter, parameterScope, region, effect);
 					}
 					if (body?.type === 'BlockStatement' || body?.type === 'JSXCodeBlock') {
 						for (const statement of statements ?? []) walk(statement, functionScope, owner, effect);
@@ -571,6 +600,7 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 				return;
 			case 'CatchClause': {
 				const catchScope = createScope(scope, 'block', [], [node.param]);
+				walkPatternExpressions(node.param, catchScope, region, effect);
 				walk(node.body, catchScope, region, effect);
 				return;
 			}
@@ -642,6 +672,10 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 				walk(node.right, scope, region, effect);
 				const rowScope = createScope(scope, 'function', [node.left]);
 				addPatternNames(node.index, rowScope.bindings, OTHER_BINDING);
+				for (const declaration of node.left?.declarations ?? []) {
+					walkPatternExpressions(declaration.id, rowScope, region, effect);
+				}
+				walkPatternExpressions(node.index, rowScope, region, effect);
 				walk(node.key, rowScope, region, effect);
 				arm(node.body, rowScope, region, node, '@for row');
 				arm(node.empty, scope, region, node, '@empty arm');
@@ -678,6 +712,7 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 				return;
 			case 'VariableDeclaration':
 				for (const declaration of node.declarations ?? []) {
+					walkPatternExpressions(declaration.id, scope, region, effect);
 					const previousHandler = activeHandler;
 					const declared =
 						declaration.id?.type === 'Identifier' ? resolve(scope, declaration.id.name) : null;
@@ -798,11 +833,70 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 	}
 
 	const owners = new Map();
-	for (const value of values) {
-		const helpers = new Set();
-		const owner = nearestOwner(value.uses, value.region, helpers);
+	const helperUses = new Map();
+	function computeOwners() {
+		owners.clear();
+		helperUses.clear();
+		for (const value of values) {
+			const helpers = new Set();
+			const owner = nearestOwner(value.uses, value.region, helpers);
+			if (owner !== null) owners.set(value, owner);
+			helperUses.set(value, helpers);
+		}
+	}
+
+	function effectOwner(effect) {
+		let owner = null;
+		for (const dependency of effect.dependencies) {
+			// An effect is the sole use of an unconstrained value; it can carry
+			// that value into the arm selected by its other dependencies.
+			if (dependency.uses.length === 0) continue;
+			const candidate = owners.get(dependency);
+			if (candidate === undefined || !within(candidate, effect.region)) {
+				return { blocked: true, owner: null };
+			}
+			if (owner === null) owner = candidate;
+			else if (within(owner, candidate)) owner = candidate;
+			else if (!within(candidate, owner)) return { blocked: true, owner: null };
+		}
+		return { blocked: false, owner };
+	}
+
+	// A parent effect that cannot accompany every dependency is itself a
+	// parent use. Pin its dependencies and repeat: another effect may then
+	// become immovable as a result.
+	const anchoredEffects = new Set();
+	let changed;
+	do {
+		changed = false;
+		computeOwners();
+		for (const effect of effects) {
+			if (anchoredEffects.has(effect) || !effectOwner(effect).blocked) continue;
+			anchoredEffects.add(effect);
+			for (const dependency of effect.dependencies) {
+				if (dependency.region === effect.region) dependency.uses.push(effect.region);
+			}
+			changed = true;
+		}
+	} while (changed);
+
+	// Values observed only by a movable effect share its template owner.
+	for (const effect of effects) {
+		const { owner } = effectOwner(effect);
 		if (owner === null) continue;
-		owners.set(value, owner);
+		for (const dependency of effect.dependencies) {
+			if (dependency.region === effect.region && dependency.uses.length === 0) {
+				dependency.uses.push(owner);
+				changed = true;
+			}
+		}
+	}
+	if (changed) computeOwners();
+
+	for (const value of values) {
+		const owner = owners.get(value);
+		if (owner === undefined) continue;
+		const helpers = helperUses.get(value);
 		const toMove = [...helpers].filter(
 			(helper) => helper.region !== owner && within(owner, helper.region),
 		);
@@ -825,21 +919,8 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 	}
 	for (const effect of effects) {
 		if (effect.dependencies.size === 0) continue;
-		let owner = null;
-		for (const dependency of effect.dependencies) {
-			const candidate = owners.get(dependency);
-			if (candidate === undefined || !within(candidate, effect.region)) {
-				owner = null;
-				break;
-			}
-			if (owner === null) owner = candidate;
-			else if (within(owner, candidate)) owner = candidate;
-			else if (!within(candidate, owner)) {
-				owner = null;
-				break;
-			}
-		}
-		if (owner !== null)
+		const { owner } = effectOwner(effect);
+		if (owner !== null && owner !== effect.region)
 			diagnostics.push(
 				diagnostic(
 					STRONG_HOOK_LOCALITY,

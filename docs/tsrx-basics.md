@@ -483,8 +483,10 @@ the error. The same code applies to an effect that belongs with those local
 values. A state value shared by sibling arms stays in their common scope;
 effects with no provable single arm also remain valid there. A local helper that
 captures the hook value must move with it; the diagnostic names that helper.
-Moving state or an effect into a conditional arm changes its lifetime, so split
-independent parent-scope work into a separate effect. The placement check
+Moving state or an effect into a template arm changes its lifetime; a keyed
+`@for` row gives each item its own state. Keep genuinely shared row state in a
+parent scope with a parent template consumer, and split independent parent-scope
+work into a separate effect. The placement check
 recognizes built-in hooks imported from Octane; custom hook calls are outside
 this check.
 
