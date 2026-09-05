@@ -458,7 +458,29 @@ These patterns become compile errors:
 Each `@if`, keyed `@for`, `@switch`, and `@try` arm has its own render scope. A
 nested `@{…}` block gives hooks declared beside its JSX a local scope too. When
 every use of a built-in hook value is in one of these scopes, declare the hook
-there. An effect that observes its local values goes there too:
+there. An effect that observes its local values goes there too. For example,
+this setup-level state and effect fail because the button is only in the `@if`
+arm:
+
+```jsx
+"use strong";
+
+import { useEffect, useState } from 'octane';
+
+export function Search({ open }) @{
+	const [query, setQuery] = useState('');
+	useEffect(() => {
+		document.title = query;
+	});
+	<section>@if (open) {
+		<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
+	}</section>
+}
+```
+
+`OCTANE_STRONG_HOOK_LOCALITY` points to both calls and says to move them into
+the `@if` arm at the reported source line. The passing version declares them
+before that arm's JSX:
 
 ```jsx
 "use strong";
@@ -478,7 +500,24 @@ export function Search({ open }) @{
 }
 ```
 
-Hooks can also sit directly beside their JSX in a nested `@{…}` block:
+The same rule applies to a nested `@{…}` block. This fails when the hook and
+effect stay outside the only block that reads the state:
+
+```jsx
+"use strong";
+
+import { useEffect, useState } from 'octane';
+
+export function Counter({ observe }) @{
+  const [count, setCount] = useState(0);
+  useEffect(() => observe(count), [count]);
+  <div>@{
+    <button onClick={() => setCount(count + 1)}>{count as string}</button>
+  }</div>
+}
+```
+
+Move both hook calls beside that block's JSX to pass:
 
 ```jsx
 "use strong";
@@ -494,13 +533,10 @@ export function Counter({ observe }) @{
 }
 ```
 
-A setup-level `useState` whose value and setter are both used only in that arm
-instead reports `OCTANE_STRONG_HOOK_LOCALITY`, with the target arm and line in
-the error. The same code applies to an effect that belongs with those local
-values. A state value shared by sibling arms or template blocks stays in their
-common scope; effects with no provable single scope also remain valid there. A
-local helper that captures the hook value must move with it; the diagnostic
-names that helper.
+Both placement errors name the arm or block and its opening line. A state value
+shared by sibling arms or template blocks stays in their common scope; effects
+with no provable single scope also remain valid there. A local helper that
+captures the hook value must move with it; the diagnostic names that helper.
 
 Moving state or an effect into an arm or nested `@{…}` block changes its
 lifetime, even when the block previously contained only JSX. A keyed `@for`
@@ -509,17 +545,34 @@ scope with a parent template consumer, and split independent parent-scope work
 into a separate effect. The placement check recognizes built-in hooks
 imported from Octane; custom hook calls are outside this check.
 
-Define a callback that serves one native event inline or beside its JSX:
+An outer named callback also fails if its only native event is inside a child
+block:
 
 ```jsx
-<button onClick={() => save(query)}>Save</button>
+"use strong";
 
-<div>@{
-  const onClick = () => save(query);
-  <button {onClick}>Save</button>
-}</div>
+export function Save({ save }) @{
+  const onClick = () => save();
+  <div>@{ <button {onClick}>Save</button> }</div>
+}
 ```
 
+`OCTANE_STRONG_EVENT_HANDLER_LOCALITY` points to `onClick` and names the
+`@{…}` block and its line. Move the named callback beside its button to pass:
+
+```jsx
+"use strong";
+
+export function Save({ save }) @{
+  <div>@{
+    const onClick = () => save();
+    <button {onClick}>Save</button>
+  }</div>
+}
+```
+
+The one-use alternative is an inline callback:
+`<button onClick={() => save()}>Save</button>`.
 The named form also works as `<button onClick={onClick}>` in the same template
 block, arm, or root template. Declaring the callback outside a child `@{…}`
 block that is its only use reports `OCTANE_STRONG_EVENT_HANDLER_LOCALITY` at the

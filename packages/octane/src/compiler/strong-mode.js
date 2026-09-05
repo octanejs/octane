@@ -919,7 +919,7 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 				STRONG_HOOK_LOCALITY,
 				filename,
 				value.node,
-				`Move ${value.hook}${helperText} into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, where its value is used.`,
+				`Move ${value.hook}${helperText} into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, before the JSX or local effect that uses its value.`,
 			),
 		);
 	}
@@ -932,7 +932,7 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 					STRONG_HOOK_LOCALITY,
 					filename,
 					effect.node,
-					`Move ${effect.hook} into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, with the state it observes.`,
+					`Move ${effect.hook} into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, beside the local hook values it reads and before that scope's JSX output.`,
 				),
 			);
 	}
@@ -940,12 +940,17 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 		if (!handler.uses.some((use) => use.event !== null)) continue;
 		const owner = nearestOwner(handler.uses, handler.region);
 		if (owner !== null) {
+			const name = handler.node.id?.name;
+			const inlineAlternative =
+				handler.uses.length === 1
+					? ' Alternatively, define the callback inline at that event attribute.'
+					: '';
 			diagnostics.push(
 				diagnostic(
 					STRONG_EVENT_HANDLER_LOCALITY,
 					filename,
 					handler.node,
-					`Move this event handler into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, where it is used.`,
+					`Move the ${name ?? 'event'} handler into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, before the JSX event attribute that uses it.${inlineAlternative}`,
 				),
 			);
 		}

@@ -394,7 +394,9 @@ export function App(props) @{
 			filename: '/src/App.tsrx',
 			pos: start,
 		});
-		expect((failure as Error).message).toMatch(/useState.*@if/i);
+		expect((failure as Error).message).toMatch(
+			/Move useState into the @if arm at line 6, before the JSX or local effect that uses its value/,
+		);
 		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toContainEqual(
 			expect.objectContaining({
 				code: HOOK_LOCALITY,
@@ -425,7 +427,9 @@ export function App(props) @{
 				code: HOOK_LOCALITY,
 				severity: 'error',
 				filename: '/src/App.tsrx',
-				message: expect.stringMatching(/useEffect.*@if/i),
+				message: expect.stringMatching(
+					/Move useEffect into the @if arm at line 7, beside the local hook values it reads and before that scope's JSX output/,
+				),
 				start: expect.objectContaining({ offset: start }),
 			}),
 		);
@@ -655,7 +659,16 @@ export function App(props) @{
 			filename: '/src/App.tsrx',
 			pos: start,
 		});
-		expect((failure as Error).message).toMatch(/Move.*handler.*@\{.*line/i);
+		expect((failure as Error).message).toMatch(
+			/Move the handle handler into the @\{\} block at line 4, before the JSX event attribute that uses it\. Alternatively, define the callback inline at that event attribute/,
+		);
+		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: EVENT_HANDLER_LOCALITY,
+				start: expect.objectContaining({ offset: start }),
+				message: expect.stringMatching(/Move the handle handler.*Alternatively.*inline/),
+			}),
+		);
 		expect(() => compile(source.replace('"use strong";\n', ''), '/src/App.tsrx')).not.toThrow();
 	});
 
@@ -716,6 +729,36 @@ export function App() @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
 	});
 
+	it('explains how to move state and its effect beside JSX in a nested template block', () => {
+		const source = `"use strong";
+import { useEffect, useState } from 'octane';
+export function Counter({ observe }) @{
+  const [count, setCount] = useState(0);
+  useEffect(() => observe(count), [count]);
+  <div>@{ <button onClick={() => setCount(count + 1)}>{count as string}</button> }</div>
+}`;
+		const diagnostics = compileToVolarMappings(source, '/src/Counter.tsrx').diagnostics;
+		expect(diagnostics.filter(({ code }) => code === HOOK_LOCALITY)).toHaveLength(2);
+		expect(diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: HOOK_LOCALITY,
+					start: expect.objectContaining({ offset: source.indexOf('useState(0)') }),
+					message: expect.stringMatching(
+						/Move useState into the @\{\} block at line 6, before the JSX or local effect that uses its value/,
+					),
+				}),
+				expect.objectContaining({
+					code: HOOK_LOCALITY,
+					start: expect.objectContaining({ offset: source.indexOf('useEffect(') }),
+					message: expect.stringMatching(
+						/Move useEffect into the @\{\} block at line 6, beside the local hook values it reads and before that scope's JSX output/,
+					),
+				}),
+			]),
+		);
+	});
+
 	it('accepts hooks and effects beside their JSX in a nested template block', () => {
 		const source = `"use strong";
 import { useState, useEffect } from 'octane';
@@ -749,7 +792,17 @@ export function App(props) @{
   const handle = () => props.onAction();
   <div>@if (props.show) { <button onClick={handle} onMouseDown={handle}>run</button> }</div>
 }`;
-		expect(() => compile(source, '/src/App.tsrx')).toThrow(/event handler.*@if/);
+		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
+		expect(diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: EVENT_HANDLER_LOCALITY,
+				message: expect.stringMatching(/Move the handle handler into the @if arm at line 4/),
+			}),
+		);
+		expect(diagnostics.find(({ code }) => code === EVENT_HANDLER_LOCALITY)?.message).not.toMatch(
+			/inline/,
+		);
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(EVENT_HANDLER_LOCALITY);
 	});
 
 	it('tracks state through a local event handler or helper used only in an arm', () => {
