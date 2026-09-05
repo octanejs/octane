@@ -500,36 +500,59 @@ export function Search({ open }) @{
 }
 ```
 
-The same rule applies to a nested `@{…}` block. This fails when the hook and
-effect stay outside the only block that reads the state:
+The same rule applies when a nested `@{…}` block contains local setup for one
+part of the template. Here the named handler is beside its button, but the
+state and effect it needs are still outside that block:
 
 ```jsx
 "use strong";
 
 import { useEffect, useState } from 'octane';
 
-export function Counter({ observe }) @{
+export function Counter({ title, observe }) @{
   const [count, setCount] = useState(0);
   useEffect(() => observe(count), [count]);
-  <div>@{
-    <button onClick={() => setCount(count + 1)}>{count as string}</button>
-  }</div>
+  <div>
+    <h2>{title as string}</h2>
+    @{
+      const onClick = () => setCount(count + 1);
+      <button {onClick}>{count as string}</button>
+    }
+  </div>
 }
 ```
 
-Move both hook calls beside that block's JSX to pass:
+Move both hook calls beside the handler and button to pass:
 
 ```jsx
 "use strong";
 
 import { useEffect, useState } from 'octane';
 
-export function Counter({ observe }) @{
-  <div>@{
-    const [count, setCount] = useState(0);
-    useEffect(() => observe(count), [count]);
-    <button onClick={() => setCount(count + 1)}>{count as string}</button>
-  }</div>
+export function Counter({ title, observe }) @{
+  <div>
+    <h2>{title as string}</h2>
+    @{
+      const [count, setCount] = useState(0);
+      useEffect(() => observe(count), [count]);
+      const onClick = () => setCount(count + 1);
+      <button {onClick}>{count as string}</button>
+    }
+  </div>
+}
+```
+
+For ordinary markup, no nested block is needed. This direct JSX use already
+passes with the hook in root setup:
+
+```jsx
+"use strong";
+
+import { useState } from 'octane';
+
+export function Label() @{
+  const [label] = useState('ready');
+  <div><span>{label}</span></div>
 }
 ```
 
@@ -539,11 +562,11 @@ with no provable single scope also remain valid there. A local helper that
 captures the hook value must move with it; the diagnostic names that helper.
 
 Moving state or an effect into an arm or nested `@{…}` block changes its
-lifetime, even when the block previously contained only JSX. A keyed `@for`
-row gives each item its own state. Keep genuinely shared row state in a parent
-scope with a parent template consumer, and split independent parent-scope work
-into a separate effect. The placement check recognizes built-in hooks
-imported from Octane; custom hook calls are outside this check.
+lifetime. A keyed `@for` row gives each item its own state. Keep genuinely
+shared row state in a parent scope with a parent template consumer, and split
+independent parent-scope work into a separate effect. The placement check
+recognizes built-in hooks imported from Octane; custom hook calls are outside
+this check.
 
 An outer named callback also fails if its only native event is inside a child
 block:

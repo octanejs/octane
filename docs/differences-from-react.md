@@ -529,8 +529,7 @@ child block or arm that uses it reports `OCTANE_STRONG_EVENT_HANDLER_LOCALITY`.
 Cross-arm, imported, and forwarded callbacks remain supported. The diagnostics
 use the authored source location in client, server, and editor compilation;
 they do not move declarations or change emitted code for valid modules.
-Moving a hook into a nested `@{…}` block gives it that block's lifetime, even
-if the block held only JSX before the move.
+Moving a hook into a nested `@{…}` block gives it that block's lifetime.
 
 Event handlers, genuinely deferred callbacks, effect cleanup, effects that
 synchronize an external system, and normal DOM or timer refs remain supported.

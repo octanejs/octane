@@ -711,12 +711,15 @@ export function App(props) @{
 		}
 	});
 
-	it('locates a hook used only by a nested template block without an event', () => {
+	it('locates a hook used only by derived markup in a nested template block', () => {
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App() @{
   const [label] = useState('ready');
-  <div>@{ <span>{label}</span> }</div>
+  <div>@{
+    const displayedLabel = label.toUpperCase();
+    <span>{displayedLabel}</span>
+  }</div>
 }`;
 		const start = source.indexOf("useState('ready')");
 		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toContainEqual(
@@ -729,13 +732,32 @@ export function App() @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
 	});
 
+	it('keeps a hook in root setup when ordinary JSX consumes it directly', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function Label() @{
+  const [label] = useState('ready');
+  <div><span>{label}</span></div>
+}`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, '/src/Label.tsrx', { mode })).not.toThrow();
+		}
+		expect(compileToVolarMappings(source, '/src/Label.tsrx').diagnostics).toEqual([]);
+	});
+
 	it('explains how to move state and its effect beside JSX in a nested template block', () => {
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
-export function Counter({ observe }) @{
+export function Counter({ title, observe }) @{
   const [count, setCount] = useState(0);
   useEffect(() => observe(count), [count]);
-  <div>@{ <button onClick={() => setCount(count + 1)}>{count as string}</button> }</div>
+  <div>
+    <h2>{title as string}</h2>
+    @{
+      const onClick = () => setCount(count + 1);
+      <button {onClick}>{count as string}</button>
+    }
+  </div>
 }`;
 		const diagnostics = compileToVolarMappings(source, '/src/Counter.tsrx').diagnostics;
 		expect(diagnostics.filter(({ code }) => code === HOOK_LOCALITY)).toHaveLength(2);
@@ -745,14 +767,14 @@ export function Counter({ observe }) @{
 					code: HOOK_LOCALITY,
 					start: expect.objectContaining({ offset: source.indexOf('useState(0)') }),
 					message: expect.stringMatching(
-						/Move useState into the @\{\} block at line 6, before the JSX or local effect that uses its value/,
+						/Move useState into the @\{\} block at line 8, before the JSX or local effect that uses its value/,
 					),
 				}),
 				expect.objectContaining({
 					code: HOOK_LOCALITY,
 					start: expect.objectContaining({ offset: source.indexOf('useEffect(') }),
 					message: expect.stringMatching(
-						/Move useEffect into the @\{\} block at line 6, beside the local hook values it reads and before that scope's JSX output/,
+						/Move useEffect into the @\{\} block at line 8, beside the local hook values it reads and before that scope's JSX output/,
 					),
 				}),
 			]),
@@ -762,12 +784,16 @@ export function Counter({ observe }) @{
 	it('accepts hooks and effects beside their JSX in a nested template block', () => {
 		const source = `"use strong";
 import { useState, useEffect } from 'octane';
-export function App(props) @{
-  <div>@{
-    const [count, setCount] = useState(0);
-    useEffect(() => props.observe(count), [count]);
-    <button onClick={() => setCount(count + 1)}>{count as string}</button>
-  }</div>
+export function Counter({ title, observe }) @{
+  <div>
+    <h2>{title as string}</h2>
+    @{
+      const [count, setCount] = useState(0);
+      useEffect(() => observe(count), [count]);
+      const onClick = () => setCount(count + 1);
+      <button {onClick}>{count as string}</button>
+    }
+  </div>
 }`;
 		for (const mode of ['client', 'server'] as const) {
 			for (const dev of [true, false]) {
