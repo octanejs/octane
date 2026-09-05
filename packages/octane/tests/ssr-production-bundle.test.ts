@@ -68,6 +68,230 @@ async function productionServerModule<T extends Record<string, unknown>>(
 }
 
 describe('production-bundled server rendering', () => {
+	it.each([false, true])(
+		'preserves spread reads and winning prop coercion order when coercion throws: %s',
+		async (throws) => {
+			const { render } = await productionServerModule<{
+				render: (props: Record<string, unknown>) => string;
+			}>(
+				`
+import { renderToString } from 'octane/server';
+import { Page } from 'fixture:server-component';
+export const render = (props) => renderToString(Page, props).html;
+`,
+				`
+export function Page(props) @{
+	<div title={props.read('first')} {...props.spread} data-last={props.read('last')} title={props.finalTitle} />
+}
+`,
+			);
+			const trace: string[] = [];
+			const ignored = {
+				toString() {
+					throw new Error('Overwritten or filtered props must not coerce');
+				},
+			};
+			let middle = 'original';
+			const target: Record<PropertyKey, unknown> = {
+				get title() {
+					trace.push('getter:title');
+					return ignored;
+				},
+				'data-middle': {
+					toString() {
+						trace.push('coerce:middle');
+						return middle;
+					},
+				},
+				onclick: ignored,
+				key: ignored,
+				ref: ignored,
+				'bad name': ignored,
+				[Symbol('ignored')]: ignored,
+			};
+			const spread = new Proxy(target, {
+				ownKeys(object) {
+					trace.push('keys');
+					return Reflect.ownKeys(object);
+				},
+				get(object, name) {
+					trace.push(`get:${String(name)}`);
+					return Reflect.get(object, name);
+				},
+			});
+			const failure = new Error('Winning title failed');
+			const props = {
+				spread,
+				read(name: string) {
+					trace.push(`read:${name}`);
+					return name === 'first'
+						? ignored
+						: {
+								toString() {
+									trace.push('coerce:last');
+									return 'last';
+								},
+							};
+				},
+				finalTitle: {
+					toString() {
+						trace.push('coerce:title');
+						if (throws) throw failure;
+						target['data-middle'] = 'replacement';
+						middle = 'mutated <&';
+						return 'final';
+					},
+				},
+			};
+
+			if (throws) expect(() => render(props)).toThrow(failure);
+			else {
+				expect(render(props)).toBe(
+					'<div title="final" data-middle="mutated <&amp;" data-last="last"></div>',
+				);
+			}
+			expect(trace).toEqual([
+				'read:first',
+				'keys',
+				'get:title',
+				'getter:title',
+				'get:data-middle',
+				'get:onclick',
+				'get:key',
+				'get:ref',
+				'get:bad name',
+				'get:Symbol(ignored)',
+				'read:last',
+				'coerce:title',
+				...(throws ? [] : ['coerce:middle', 'coerce:last']),
+			]);
+			expect(render({ spread: {}, read: () => 'next', finalTitle: 'recovered' })).toBe(
+				'<div title="recovered" data-last="next"></div>',
+			);
+		},
+	);
+
+	it('retains winning alias positions and removes attributes with null or false final writers', async () => {
+		const { render } = await productionServerModule<{
+			render: (props: Record<string, unknown>) => string;
+		}>(
+			`
+import { renderToString } from 'octane/server';
+import { Page } from 'fixture:server-component';
+export const render = (props) => renderToString(Page, props).html;
+`,
+			`export function Page(props) @{ <label {...props.first} id={props.id} {...props.last} /> }`,
+		);
+		for (const final of ['final', null, false]) {
+			const trace: string[] = [];
+			const tracked = (value: string) => ({
+				toString() {
+					trace.push(value);
+					return value;
+				},
+			});
+			expect(
+				render({
+					first: {
+						htmlFor: tracked('overwritten'),
+						TITLE: tracked('overwritten'),
+						className: 'old',
+					},
+					id: tracked('id'),
+					last: { for: final === 'final' ? tracked(final) : final, title: null, class: false },
+				}),
+			).toBe(final === 'final' ? '<label id="id" for="final"></label>' : '<label id="id"></label>');
+			expect(trace).toEqual(final === 'final' ? ['id', 'final'] : ['id']);
+		}
+	});
+
+	it('preserves namespace-sensitive names and custom-element attributes across spreads', async () => {
+		const { render } = await productionServerModule<{
+			render: (props: Record<string, unknown>) => string;
+		}>(
+			`
+import { renderToString } from 'octane/server';
+import { Page } from 'fixture:server-component';
+export const render = (props) => renderToString(Page, props).html;
+`,
+			`
+export function Page(props) @{
+	<main>
+		<custom-panel {...props.custom} />
+		<custom-panel {...props.aliases} />
+		<svg {...props.svg} />
+		<svg {...props.svgAliases} />
+		<math {...props.math} />
+	</main>
+}
+`,
+		);
+		expect(
+			render({
+				custom: { onclick: 'custom handler', 'data-ready': false },
+				aliases: { htmlFor: 'verbatim', for: 'native', className: ['a', 'b'] },
+				svg: { viewBox: '0 0 1 1', viewbox: 'lower' },
+				svgAliases: { strokeWidth: '1', 'stroke-width': null },
+				math: { mathvariant: 'bold', mathVariant: 'mixed' },
+			}),
+		).toBe(
+			'<main><custom-panel onclick="custom handler" data-ready="false"></custom-panel>' +
+				'<custom-panel htmlFor="verbatim" for="native" class="a b"></custom-panel>' +
+				'<svg viewBox="0 0 1 1" viewbox="lower"></svg>' +
+				'<svg></svg>' +
+				'<math mathvariant="bold" mathVariant="mixed"></math></main>',
+		);
+	});
+
+	it('projects spread form state and raw content without serializing their control props', async () => {
+		const { render } = await productionServerModule<{
+			render: (props: Record<string, unknown>) => string;
+		}>(
+			`
+import { renderToString } from 'octane/server';
+import { Page } from 'fixture:server-component';
+export const render = (props) => renderToString(Page, props).html;
+`,
+			`
+export function Page(props) @{
+	<main>
+		<input {...props.input} />
+		<textarea {...props.textarea} />
+		<select {...props.select}><option value="a">A</option><option value="b">B</option></select>
+		<div {...props.content} />
+		<svg {...props.svgContent} />
+	</main>
+}
+`,
+		);
+		const document: Document = new JSDOM(
+			render({
+				input: { value: 'controlled', checked: false, title: 'input' },
+				textarea: { value: 'text <&', title: 'textarea' },
+				select: { value: ['b'], multiple: true, title: 'select' },
+				content: { dangerouslySetInnerHTML: { __html: '<strong>raw content</strong>' } },
+				svgContent: { dangerouslySetInnerHTML: { __html: '<circle r="4"></circle>' } },
+			}),
+		).window.document;
+		const input = document.querySelector('input')!;
+		expect(input.value).toBe('controlled');
+		expect(input.checked).toBe(false);
+		expect(input.title).toBe('input');
+		const textarea = document.querySelector('textarea')!;
+		expect(textarea.value).toBe('text <&');
+		expect(textarea.hasAttribute('value')).toBe(false);
+		const select = document.querySelector('select')!;
+		expect(Array.from(select.selectedOptions, (option) => option.value)).toEqual(['b']);
+		expect(select.multiple).toBe(true);
+		expect(select.hasAttribute('value')).toBe(false);
+		const content = document.querySelector('main > div')!;
+		expect(content.innerHTML).toBe('<strong>raw content</strong>');
+		expect(content.getAttributeNames()).toEqual([]);
+		const svg = document.querySelector('svg')!;
+		expect(svg.querySelector('circle')?.getAttribute('r')).toBe('4');
+		expect(svg.getAttributeNames()).toEqual([]);
+	});
+
 	it('renders public client Activity descriptors without retaining the server sentinel export', async () => {
 		const { visible, hidden } = await productionServerModule<{
 			visible: string;
