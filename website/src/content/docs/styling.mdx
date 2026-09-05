@@ -493,14 +493,14 @@ export function Post(props) @{
 
 Reach for `:global` only when a prop cannot do the job. Start from what you want:
 
-| I want to …                                                                        | Use …                                                                                                                   |
-| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Style my own elements                                                              | A block beside them. Nothing global.                                                                                    |
-| Share chrome across several of my own components                                   | Assign a theme and `<style apply={theme} />` in each ([how](#apply)).                                                   |
+| I want to …                                                                        | Use …                                                                                                                                                  |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Style my own elements                                                              | A block beside them. Nothing global.                                                                                                                   |
+| Share chrome across several of my own components                                   | Assign a theme and `<style apply={theme} />` in each ([how](#apply)).                                                                                  |
 | Let a child component pick up my styles                                            | Pass `theme.$class`, or a class-map entry such as `theme.card`, as a prop ([how](#class-opt-in)). A child you own can also take its own sibling block. |
-| Style a child I cannot change (a third-party component, rendered HTML or markdown) | `.wrapper :global(.their-class)`, or `.wrapper { :global { … } }` for several classes, with a scoped selector in front. |
-| React to page-level state (a theme class or attribute on `<html>`)                 | `:global(.theme-dark) .card` or `:global([data-theme='dark']) .card`.                                                   |
-| Write page-wide rules (`body`, resets, fonts)                                      | A `.css` file the page links, not a bare `:global`.                                                                     |
+| Style a child I cannot change (a third-party component, rendered HTML or markdown) | `.wrapper :global(.their-class)`, or `.wrapper { :global { … } }` for several classes, with a scoped selector in front.                                |
+| React to page-level state (a theme class or attribute on `<html>`)                 | `:global(.theme-dark) .card` or `:global([data-theme='dark']) .card`.                                                                                  |
+| Write page-wide rules (`body`, resets, fonts)                                      | A `.css` file the page links, not a bare `:global`.                                                                                                    |
 
 For a child you own, pass the class instead of reaching in with `:global`. With a prop, the
 dependency is visible in code, the child decides which of its elements take the class,
