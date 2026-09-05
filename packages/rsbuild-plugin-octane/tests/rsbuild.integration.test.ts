@@ -84,6 +84,7 @@ async function build(root: string, rsbuildConfig: Record<string, unknown>) {
 }
 
 function writeRoutedApp(root: string, render: 'buffered' | 'streaming' = 'buffered') {
+	const descriptorSlot = render === 'buffered';
 	write(root, 'public/favicon.svg', '<svg data-rsbuild-public="ready"></svg>\n');
 	write(
 		root,
@@ -98,7 +99,7 @@ function writeRoutedApp(root: string, render: 'buffered' | 'streaming' = 'buffer
 	write(
 		root,
 		'src/Page.tsrx',
-		`import { vendorLabel } from './vendor.js';
+		`${descriptorSlot ? "import { Slot } from './slot-barrel.ts';\n" : ''}import { vendorLabel } from './vendor.js';
 import './page.css';
 
 (globalThis as typeof globalThis & {
@@ -106,10 +107,25 @@ import './page.css';
 }).__loadRsbuildDeferredHydrationAsset = () => import('./deferred-hydration.js?octane-hydrate=0');
 
 export function Page() @{
-	<main class="route vendor" data-rsbuild-ssr="ready">Rsbuild route{vendorLabel as string}</main>
+	${descriptorSlot ? '<Slot><main class="route vendor" data-rsbuild-ssr="ready">Rsbuild route{vendorLabel as string}</main></Slot>' : '<main class="route vendor" data-rsbuild-ssr="ready">Rsbuild route{vendorLabel as string}</main>'}
 }
 `,
 	);
+	if (descriptorSlot) {
+		write(
+			root,
+			'src/Slot.tsrx',
+			`import { Children, cloneElement, descriptorChildren } from 'octane';
+
+function Impl(props: { children?: unknown }) {
+	return cloneElement(Children.only(props.children), { 'data-descriptor-slot': 'marked' });
+}
+
+export const Slot = descriptorChildren(Impl);
+`,
+		);
+		write(root, 'src/slot-barrel.ts', `export { Slot } from './Slot.tsrx';\n`);
+	}
 	write(root, 'src/page.css', '.route { color: rebeccapurple; }\n');
 	write(
 		root,
@@ -645,6 +661,7 @@ document.querySelector('#root')!.textContent = typeof Counter;
 		const body = await response.text();
 		expect(response.status).toBe(200);
 		expect(body).toContain('data-rsbuild-ssr="ready"');
+		expect(body).toContain('data-descriptor-slot="marked"');
 		expect(body).toContain('Rsbuild route');
 		expect(body).toContain('rsbuild-layout-deferred-hydration-chunk-proof: 0');
 		for (const cssFile of assetMap['/src/Page.tsrx'].css) expect(body).toContain(cssFile);
