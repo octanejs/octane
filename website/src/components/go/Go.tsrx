@@ -156,149 +156,7 @@ export function Go(props: GoProps) @{
 	const showRefresh = tab === 'web' && canRefresh;
 	const autoGesture = findLynxExample(props.example)?.autoGesture;
 
-	<div class={['go', fullscreen && 'is-fullscreen']} ref={panel}>
-		<div class="go-body" ref={body} style={'--go-preview-width:' + previewWidth + 'px'}>
-			<div class="go-code">
-				<div class="go-files" role="tablist" aria-label="Example source files">
-					@for (const source of sources; key source.path) {
-						<button
-							type="button"
-							role="tab"
-							class={['go-file', source.path === current?.path && 'is-open']}
-							aria-selected={source.path === current?.path}
-							title={source.path}
-							onClick={() => setOpenFile(source.path)}
-						>{fileLabel(source.path) as string}</button>
-					}
-				</div>
-				<div class="go-source">
-					@if (current) {
-						<div class="go-source-code" dangerouslySetInnerHTML={{ __html: current.html }}></div>
-					} @else if (error) {
-						<p class="go-message go-message-error">
-							{'This example could not be loaded. ' + error}
-						</p>
-					} @else {
-						<p class="go-message">Loading the example…</p>
-					}
-				</div>
-			</div>
-
-			{/* A real separator, so the split is adjustable by pointer and by
-    keyboard rather than being a decorative grip. */}
-			<div
-				class="go-separator"
-				role="separator"
-				aria-orientation="vertical"
-				aria-label="Resize the preview"
-				aria-valuenow={Math.round(previewWidth)}
-				aria-valuemin={PREVIEW_MIN}
-				tabIndex={0}
-				onPointerDown={onSeparatorPointerDown}
-				onKeyDown={onSeparatorKeyDown}
-			>
-				<span class="go-separator-grip" aria-hidden="true"></span>
-			</div>
-
-			<div class="go-preview">
-				<div class="go-preview-bar">
-					<div class="go-preview-tabs" role="tablist" aria-label="Preview target">
-						<button
-							type="button"
-							role="tab"
-							class={['go-tab', tab === 'web' && 'is-active']}
-							aria-selected={tab === 'web'}
-							onClick={() => setTab('web')}
-						>Web</button>
-						<button
-							type="button"
-							role="tab"
-							class={['go-tab', tab === 'device' && 'is-active']}
-							aria-selected={tab === 'device'}
-							onClick={() => setTab('device')}
-						>Device</button>
-					</div>
-					<div class="go-actions">
-						@if (showRefresh) {
-							<button
-								type="button"
-								class="go-action"
-								title="Reload the example"
-								aria-label="Reload the example"
-								onClick={() => setReloadKey(reloadKey + 1)}
-							>
-								<svg viewBox="0 0 16 16" aria-hidden="true">
-									<path
-										d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="1.4"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									/>
-								</svg>
-							</button>
-						}
-						<button
-							type="button"
-							class="go-action"
-							title={fullscreen ? 'Exit full screen' : 'Full screen'}
-							aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
-							aria-pressed={fullscreen}
-							onClick={() => setFullscreen(!fullscreen)}
-						>
-							<svg viewBox="0 0 16 16" aria-hidden="true">
-								@if (fullscreen) {
-									<path
-										d="M6.5 2.5v4h-4M9.5 13.5v-4h4"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="1.4"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									/>
-								} @else {
-									<path
-										d="M2.5 6.5v-4h4M13.5 9.5v4h-4"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="1.4"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									/>
-								}
-							</svg>
-						</button>
-					</div>
-				</div>
-				<div class="go-preview-body">
-					{/* Both panes stay mounted: unmounting the web preview to show a
-    QR code would restart the example on every tab switch. */}
-					<div class="go-pane" hidden={tab !== 'web'}>
-						@if (near && webBundle) {
-							<LynxPreview
-								src={`/lynx-examples/${props.example}/${webBundle}`}
-								label={props.label}
-								mode={props.mode}
-								reloadKey={reloadKey}
-								autoGesture={autoGesture}
-								onStateChange={(state) => setCanRefresh(state.canRefresh)}
-							/>
-						} @else if (near && loaded) {
-							<p class="go-message">
-								This example was not built for the web. Use the Device tab to run it.
-							</p>
-						}
-					</div>
-					<div class="go-pane" hidden={tab !== 'device'}>
-						@if (near && nativeBundle) {
-							<DeviceScan url={bundleUrl(props.example, nativeBundle)} />
-						}
-					</div>
-				</div>
-			</div>
-		</div>
-
+	<>
 		<style>
 			/* The site's code-panel frame, widened into two panes. */
 			.go {
@@ -548,7 +406,150 @@ export function Go(props: GoProps) @{
 				}
 			}
 		</style>
-	</div>
+		<div class={['go', fullscreen && 'is-fullscreen']} ref={panel}>
+			<div class="go-body" ref={body} style={'--go-preview-width:' + previewWidth + 'px'}>
+				<div class="go-code">
+					<div class="go-files" role="tablist" aria-label="Example source files">
+						@for (const source of sources; key source.path) {
+							<button
+								type="button"
+								role="tab"
+								class={['go-file', source.path === current?.path && 'is-open']}
+								aria-selected={source.path === current?.path}
+								title={source.path}
+								onClick={() => setOpenFile(source.path)}
+							>{fileLabel(source.path) as string}</button>
+						}
+					</div>
+					<div class="go-source">
+						@if (current) {
+							<div class="go-source-code" dangerouslySetInnerHTML={{ __html: current.html }}></div>
+						} @else if (error) {
+							<p class="go-message go-message-error">
+								{'This example could not be loaded. ' + error}
+							</p>
+						} @else {
+							<p class="go-message">Loading the example…</p>
+						}
+					</div>
+				</div>
+
+				{/* A real separator, so the split is adjustable by pointer and by
+	    keyboard rather than being a decorative grip. */}
+				<div
+					class="go-separator"
+					role="separator"
+					aria-orientation="vertical"
+					aria-label="Resize the preview"
+					aria-valuenow={Math.round(previewWidth)}
+					aria-valuemin={PREVIEW_MIN}
+					tabIndex={0}
+					onPointerDown={onSeparatorPointerDown}
+					onKeyDown={onSeparatorKeyDown}
+				>
+					<span class="go-separator-grip" aria-hidden="true"></span>
+				</div>
+
+				<div class="go-preview">
+					<div class="go-preview-bar">
+						<div class="go-preview-tabs" role="tablist" aria-label="Preview target">
+							<button
+								type="button"
+								role="tab"
+								class={['go-tab', tab === 'web' && 'is-active']}
+								aria-selected={tab === 'web'}
+								onClick={() => setTab('web')}
+							>Web</button>
+							<button
+								type="button"
+								role="tab"
+								class={['go-tab', tab === 'device' && 'is-active']}
+								aria-selected={tab === 'device'}
+								onClick={() => setTab('device')}
+							>Device</button>
+						</div>
+						<div class="go-actions">
+							@if (showRefresh) {
+								<button
+									type="button"
+									class="go-action"
+									title="Reload the example"
+									aria-label="Reload the example"
+									onClick={() => setReloadKey(reloadKey + 1)}
+								>
+									<svg viewBox="0 0 16 16" aria-hidden="true">
+										<path
+											d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.4"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										/>
+									</svg>
+								</button>
+							}
+							<button
+								type="button"
+								class="go-action"
+								title={fullscreen ? 'Exit full screen' : 'Full screen'}
+								aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
+								aria-pressed={fullscreen}
+								onClick={() => setFullscreen(!fullscreen)}
+							>
+								<svg viewBox="0 0 16 16" aria-hidden="true">
+									@if (fullscreen) {
+										<path
+											d="M6.5 2.5v4h-4M9.5 13.5v-4h4"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.4"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										/>
+									} @else {
+										<path
+											d="M2.5 6.5v-4h4M13.5 9.5v4h-4"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.4"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										/>
+									}
+								</svg>
+							</button>
+						</div>
+					</div>
+					<div class="go-preview-body">
+						{/* Both panes stay mounted: unmounting the web preview to show a
+	    QR code would restart the example on every tab switch. */}
+						<div class="go-pane" hidden={tab !== 'web'}>
+							@if (near && webBundle) {
+								<LynxPreview
+									src={`/lynx-examples/${props.example}/${webBundle}`}
+									label={props.label}
+									mode={props.mode}
+									reloadKey={reloadKey}
+									autoGesture={autoGesture}
+									onStateChange={(state) => setCanRefresh(state.canRefresh)}
+								/>
+							} @else if (near && loaded) {
+								<p class="go-message">
+									This example was not built for the web. Use the Device tab to run it.
+								</p>
+							}
+						</div>
+						<div class="go-pane" hidden={tab !== 'device'}>
+							@if (near && nativeBundle) {
+								<DeviceScan url={bundleUrl(props.example, nativeBundle)} />
+							}
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</>
 }
 
 /**

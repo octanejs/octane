@@ -44,6 +44,13 @@ const REQUIRED_COVERAGE = {
 		'parallel-use',
 	],
 	integrations: ['zustand', 'hook-form', 'i18next', 'tanstack-query'],
+	scopedStyles: [
+		'nested-scopes',
+		'control-flow-scopes',
+		'theme-apply',
+		'theme-composition',
+		'class-map',
+	],
 } as const;
 
 function readCatalog(): UserAppCatalog {

@@ -24,8 +24,10 @@ const { html, css } = await prerender(App, props, {
 - `html`: rendered markup with hydration markers, plus an inline suspense seed
   script when anything resolved. Hoisted `<title>/<meta>/<link>` fold in
   (spliced into `<head>` if present, else prepended).
-- `css`: deduped `<style data-octane>` tags from scoped styles; place inside
-  `<head>`.
+- `css`: deduped `<style data-octane>` tags from scoped styles, one per hash;
+  a component contributes one per style scope (nested `@{ … }` and
+  control-flow bodies have their own) plus one per assigned theme block. Place
+  them inside `<head>`.
 - Use `renderToString` (from `octane/server`) for a single synchronous pass that
   leaves `@pending` fallbacks in place; use `prerender` to await the data.
 - Options are optional: `nonce` stamps CSP nonces on the emitted inline tags (all
@@ -54,7 +56,9 @@ hydrateRoot(document.getElementById('app')!, App, props);
 ```
 
 Pass the same component and props on both sides. `useId` and scoped styles are
-hydration-stable; the client adopts server DOM instead of rebuilding it.
+hydration-stable, including the stacked scope hashes and applied theme classes
+(`<style apply={theme} />`, `theme.$class`); the client adopts server DOM
+instead of rebuilding it.
 
 ## Two integration paths
 

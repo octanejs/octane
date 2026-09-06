@@ -307,8 +307,11 @@ with Octane-owned, append-only codes and a link to the [error decoder](/errors);
 Octane does not reuse React's error numbers. User-thrown errors and compiler
 diagnostics keep their original messages and codes.
 
-Buffered server rendering returns `{ html, css }`; the extra `css` field contains
-Octane's scoped styles. Streaming still reveals Suspense content as it becomes ready.
+Buffered server rendering returns `{ html, css }`; the extra `css` field carries the
+[sibling-scoped `<style>` blocks and themes](/docs/styling) (a block styles its siblings
+and everything below them) of the components that rendered, collected per request inside each component body rather than at module
+load, deduplicated by hash. Streaming flushes each scoped `<style>` inline with the
+content that uses it and still reveals Suspense content as it becomes ready.
 During hydration, value mismatches are patched and structural mismatches are rebuilt
 in place with a warning instead of being thrown to a boundary.
 

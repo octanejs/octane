@@ -557,6 +557,7 @@
         "octane-compat",
         "parallel-use",
         "react-host",
+        "scoped-styles",
         "streaming-ssr",
         "transparent-context"
       ],

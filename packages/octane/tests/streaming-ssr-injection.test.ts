@@ -21,6 +21,8 @@ import {
 
 const FIXTURE = 'packages/octane/tests/_fixtures/ssr-injection.tsrx';
 const server = loadServerFixture(FIXTURE);
+const SCOPES_FIXTURE = 'packages/octane/tests/_fixtures/style-scopes.tsrx';
+const scopes = loadServerFixture(SCOPES_FIXTURE);
 
 afterEach(resetStreamRuntimeGlobals);
 
@@ -268,6 +270,57 @@ describe('streaming injection — fragment renders', () => {
 		expect(errors).toContain(abort);
 		expect(injection.renderCompleteCalls).toBe(1);
 		expect(injection.unsubscribed).toBe(true);
+	});
+});
+
+describe('streaming injection — scoped style waves', () => {
+	it('ships each scope hash once even when two waves render the same scoped child', async () => {
+		const a = deferred<string>();
+		const b = deferred<string>();
+		const injection = createTestInjection();
+		const result = collectPipeableStream(
+			scopes.StreamedScopes,
+			{ a: a.promise, b: b.promise },
+			{ injection: injection.source },
+		);
+		await flushMicrotasks();
+		a.resolve('first');
+		await flushMicrotasks();
+		await flushMicrotasks();
+		b.resolve('second');
+		await flushMicrotasks();
+		injection.finish();
+
+		const { html, chunks } = await result;
+		expect(html).toContain('first');
+		expect(html).toContain('second');
+		// Three scopes: the shell, the leaf component, and the `@{}` nested in it.
+		const tags = [...html.matchAll(/data-octane="(tsrx-[a-f0-9]+)"/g)].map((m) => m[1]);
+		expect(tags).toHaveLength(3);
+		expect(new Set(tags).size).toBe(3);
+		// Streamed segments travel JSON-encoded, so their quotes are escaped.
+		const shell = html.match(/id="streamed-scopes" class="shell (tsrx-[a-f0-9]+)"/)![1];
+		const leafClasses = [...html.matchAll(/class=\\?"leaf (tsrx-[a-f0-9]+)\\?"/g)].map((m) => m[1]);
+		const deepClasses = [
+			...html.matchAll(/class=\\?"leaf-deep (tsrx-[a-f0-9]+) (tsrx-[a-f0-9]+)\\?"/g),
+		];
+		// Both reveals render the same child under the same hashes.
+		expect(leafClasses).toHaveLength(2);
+		expect(leafClasses[0]).toBe(leafClasses[1]);
+		expect(deepClasses).toHaveLength(2);
+		const leaf = leafClasses[0];
+		const deep = deepClasses[0][2];
+		for (const match of deepClasses) {
+			expect(match[1]).toBe(leaf);
+			expect(match[2]).toBe(deep);
+		}
+		expect(tags).toEqual([shell, leaf, deep]);
+		// The shell leads with its own sheet, and no later chunk re-ships a hash.
+		expect(chunks[0].startsWith(`<style data-octane="${shell}"`)).toBe(true);
+		for (const hash of tags) {
+			const shipped = chunks.filter((chunk) => chunk.includes(`data-octane="${hash}"`));
+			expect(shipped, hash).toHaveLength(1);
+		}
 	});
 });
 

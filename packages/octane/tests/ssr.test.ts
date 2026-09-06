@@ -139,6 +139,64 @@ describe('SSR Phase 1 — ssr fixture (style / spread / innerHTML / components /
 		expect(css.indexOf('color: blue')).toBeGreaterThan(-1);
 		expect(css.indexOf('color: red')).toBeGreaterThan(css.indexOf('color: blue'));
 	});
+
+	// RFC tsrx-org/RFCs#1 emission order: setup statements ahead of a scope's
+	// first block emit first, so a theme declared in the component body lands
+	// before the sheet of the scope applying it.
+	it('emits a theme declared inside the component body before the scope applying it', () => {
+		const mod = evalServer(
+			`
+				export function Card() @{
+					const theme = <style>
+						.tone { color: red; }
+						div { margin: 0; }
+					</style>;
+					<>
+						<style apply={theme}>.card { color: blue; }</style>
+						<div class="card">{'card'}</div>
+					</>
+				}
+			`,
+			'style-body-theme.tsrx',
+		);
+		const { html, css } = RT.renderToString(mod.Card);
+		const themeHash = css.match(/\.tone\.(tsrx-[a-f0-9]+)/)![1];
+		const scopeHash = css.match(/\.card\.(tsrx-[a-f0-9]+)/)![1];
+		expect(themeHash).not.toBe(scopeHash);
+		// Applied, so the theme keeps its element selector.
+		expect(css).toContain(`div.${themeHash} { margin: 0; }`);
+		const tags = [...css.matchAll(/data-octane="(tsrx-[a-f0-9]+)"/g)].map((m) => m[1]);
+		expect(tags).toEqual([themeHash, scopeHash]);
+		// The element carries its scope hash, then the applied theme's class.
+		expect(html).toContain(`class="card ${scopeHash} ${themeHash}"`);
+	});
+
+	it('orders a theme, the component applying it, and a class map declared after the component', () => {
+		const mod = evalServer(
+			`
+				export const theme = <style>.tone { color: red; }</style>;
+				export function Card() @{
+					<>
+						<style apply={theme}>.card { color: blue; }</style>
+						<div class="card">{'card'}</div>
+						<p class={styles.note}>{'note'}</p>
+					</>
+				}
+				const styles = <style>.note { color: green; }</style>;
+			`,
+			'style-theme-map-order.tsrx',
+		);
+		const { html, css } = RT.renderToString(mod.Card);
+		const themeHash = css.match(/\.tone\.(tsrx-[a-f0-9]+)/)![1];
+		const scopeHash = css.match(/\.card\.(tsrx-[a-f0-9]+)/)![1];
+		const mapHash = css.match(/\.note\.(tsrx-[a-f0-9]+)/)![1];
+		expect(new Set([themeHash, scopeHash, mapHash]).size).toBe(3);
+		const tags = [...css.matchAll(/data-octane="(tsrx-[a-f0-9]+)"/g)].map((m) => m[1]);
+		expect(tags).toEqual([themeHash, scopeHash, mapHash]);
+		expect(html).toContain(`class="card ${scopeHash} ${themeHash}"`);
+		// A map lookup is a dynamic class: normalized first, then the chain.
+		expect(html).toContain(`class="${mapHash} note ${scopeHash} ${themeHash}"`);
+	});
 });
 
 describe.each([

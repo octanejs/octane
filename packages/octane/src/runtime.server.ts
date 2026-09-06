@@ -6120,6 +6120,51 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 	if (CSS !== null) CSS.set(id, nonce === undefined ? { css } : { css, nonce });
 }
 
+/**
+ * A compiled assigned `<style>` block (`const theme = <style>…</style>`) on the
+ * server. Its CSS belongs to whichever request reads the map — a component in
+ * another module applying `theme` or using `theme.card` — so injection happens
+ * on property access into the active render's collector, after the CSS of the
+ * themes this block itself applies (`applied`: every applied map, same-module
+ * or imported, each a wrapper of its own, so a chain injects transitively in
+ * "applied before applier" order and each sheet once). A body-less bundle
+ * (`<style apply={[a, b]} />`) has no sheet — `id` and `css` are `null` — and
+ * only forwards the touch. Reads outside a render are no-ops.
+ */
+export function styleMap<T extends object>(
+	id: string | null,
+	css: string | null,
+	map: T,
+	applied: ReadonlyArray<unknown> = [],
+): T {
+	let touching = false;
+	const touch = () => {
+		if (CSS === null || touching) return;
+		touching = true;
+		try {
+			for (const dependency of applied) touchStyleMap(dependency);
+			if (id !== null && css !== null) injectStyle(id, css);
+		} finally {
+			touching = false;
+		}
+	};
+	return new Proxy(map, {
+		get(target, key, receiver) {
+			touch();
+			return Reflect.get(target, key, receiver);
+		},
+	});
+}
+
+/**
+ * Compiled at the top of a server component body for every imported theme it
+ * applies, before its own `injectStyle` calls: reading the map injects the
+ * theme's CSS first, so the applying scope's rules win the cascade.
+ */
+export function touchStyleMap(map: unknown): void {
+	if (map !== null && typeof map === 'object') void (map as { $class?: unknown }).$class;
+}
+
 // Compiler-emitted for each hoisted `<title>`/`<meta>`/`<link>` (rendered
 // anywhere in a component). Serializes the element inside a paired ownership
 // marker interval that the client's headBlock adopts and appends it to the active

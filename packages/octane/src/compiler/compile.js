@@ -39,6 +39,7 @@ import {
 	strongHash,
 } from '@tsrx/core';
 import { parseModule } from '#octane/compiler-parser';
+import { createStyleScopePass } from './style-scopes.js';
 import { decodeHTMLStrict } from 'entities';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
@@ -88,7 +89,6 @@ import {
 } from './native-read-codegen.js';
 import { createTextTypeFactsLookup } from './text-type-facts.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
-import { applyStyleRefs } from './style-scopes.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -241,6 +241,10 @@ function inheritOriginLoc(root, origin) {
 	if (origin == null || origin.loc == null) return root;
 	const { start, end, loc } = origin;
 	mapAst(root, (node) => {
+		// A parsed `<style>` body is a CSS AST whose positions are relative to the
+		// CSS text, never to the module: stamping module positions onto it would
+		// corrupt the scoped-CSS render (and it is parser-owned, so shared).
+		if (node.type === 'StyleSheet') return node;
 		// Only real AST nodes are stamped — mapAst also visits typeless data
 		// objects (TemplateElement.value, Literal.regex, embedded config), which
 		// must stay untouched (and may be frozen).
@@ -6722,9 +6726,21 @@ function mapCallbackCapturesLexicalReceiver(root) {
 	return walk(root);
 }
 
-// Recognise `{style (expr)}` — TSRX parses it as a plain
-// `CallExpression(style, [expr])` (the dedicated `Style` intrinsic node is
-// gone); resolveStyleExpr rewrites it into a scoped class-string expression.
+// Scoped `<style>` blocks, `$class`, and `apply` (RFC tsrx-org/RFCs#1): one
+// copy-on-write pre-pass per top-level statement, see ./style-scopes.js.
+const { applyStyleScopes } = createStyleScopePass({
+	inheritOriginLoc,
+	markSynthesized,
+	markSynthesizedAttr,
+	headResourceKind,
+	isCompositeJsxTag,
+	isStyleCall,
+});
+
+// Recognise `style(expr)` — a plain `CallExpression(style, [expr])`, Octane's
+// class-string expression. The style-scope pre-pass (./style-scopes.js)
+// resolves it where TSRX reads a class value (attribute values and template
+// child holes, the `style` attribute excepted); anywhere else it is a user call.
 function isStyleCall(node) {
 	return (
 		node &&
@@ -6736,26 +6752,14 @@ function isStyleCall(node) {
 	);
 }
 
-// Resolve a `{style (expr)}` CallExpression (see isStyleCall) into a plain
-// expression that yields a class string, with the component's scoped css hash
-// prepended (so `{style ('row')}` in a component with hash "tsrx-abc" produces
-// "tsrx-abc row"). Literal values inline; dynamic values become a runtime
-// string concat. Components without a <style> block (no hash) — and any other
-// expression shape — pass through untouched.
-function resolveStyleExpr(node, cssHash) {
-	if (!node) return node;
-	if (!isStyleCall(node) || !cssHash) return node;
-	const inner = node.arguments[0];
-	if (inner.type === 'Literal' && typeof inner.value === 'string') {
-		const combined = inner.value ? `${cssHash} ${inner.value}` : cssHash;
-		// The resolved class string maps to the authored `{style (…)}` call.
-		return b.literal(combined, JSON.stringify(combined), node);
-	}
-	// Dynamic: emit `(<hash> + ' ' + (expr))` so absent/null produces "<hash> ".
-	return inheritOriginLoc(
-		b.binary('+', b.literal(cssHash + ' ', JSON.stringify(cssHash + ' ')), inner),
-		node,
-	);
+// The emitters' former `style(expr)` expansion. The pre-pass resolves every
+// class-string position before the emitters run, and a `style(...)` still on
+// the AST here is a user call in another position (a `style={style(p)}` value,
+// a child hole's call argument), which must print as authored — so this is a
+// pass-through kept at its call sites; `cssHash` is only the "this component
+// owns scoped CSS" flag they thread along.
+function resolveStyleExpr(node, _cssHash) {
+	return node;
 }
 
 /**
@@ -9876,16 +9880,11 @@ function compileInternal(
 			// use, custom helpers, etc.) — merged into the single prelude import.
 			addUserImportSpecifiers(ctx, node);
 		} else {
-			// Style maps: rewrite `const x = <style>…</style>` before printing — the
-			// initialiser becomes an ObjectExpression with hashed class names, and
-			// the stylesheet flows through the regular cssInjections pipeline.
-			node = applyStyleMap(node, ctx);
-			// Also handle `export const x = <style>…</style>` (declaration wrapped
-			// in an ExportNamedDeclaration).
-			if (node.type === 'ExportNamedDeclaration' && node.declaration) {
-				const declaration = applyStyleMap(node.declaration, ctx);
-				if (declaration !== node.declaration) node = { ...node, declaration };
-			}
+			// Style blocks anywhere in a non-component statement: assigned blocks
+			// (`const x = <style>…</style>`, exported or nested in a helper) become
+			// class-map objects and their sheets flow through cssInjections; scoped
+			// blocks inside plain functions' templates get their scope hashes.
+			node = applyStyleScopes(node, ctx).node;
 			// HOOKS EVERYWHERE: a plain function (a custom hook, a helper) can hold
 			// octane hooks too — slot them the same way components do, so their base
 			// hooks get a per-call-site symbol (and custom-hook calls inside get one to
@@ -10454,11 +10453,18 @@ function compileServer(
 		let newBody = null;
 		const statements = ast.body;
 		for (let i = 0; i < statements.length; i++) {
-			let node = applyStyleMap(statements[i], ctx);
-			if (node.type === 'ExportNamedDeclaration' && node.declaration) {
-				const declaration = applyStyleMap(node.declaration, ctx);
-				if (declaration !== node.declaration) node = { ...node, declaration };
-			}
+			// Components lower their own scopes inside compileServerComponent so
+			// only the CSS they own is emitted per render; every other statement's
+			// blocks are module-level.
+			const statement = statements[i];
+			const declaration =
+				statement.type === 'ExportDefaultDeclaration' || statement.type === 'ExportNamedDeclaration'
+					? statement.declaration
+					: statement;
+			const node =
+				isComponentFunction(declaration) || isReturnJsxFunction(declaration)
+					? statement
+					: applyStyleScopes(statement, ctx).node;
 			if (newBody === null && node !== statements[i]) newBody = statements.slice(0, i);
 			if (newBody !== null) newBody.push(node);
 		}
@@ -10618,11 +10624,11 @@ function compileServerComponent(node, ctx) {
 	const isExported = !!(node.export || node.default);
 	const isDefault = !!node.default;
 
-	// Scoped <style>: applyCssScoping stamps hash classes + registers cssInjections.
+	// Scoped <style>: applyStyleScopes stamps scope classes + registers cssInjections.
 	// Capture this component's entries to emit injectStyle INSIDE the body (so the
 	// active server render collects CSS only for components it actually renders).
 	const beforeCss = ctx.cssInjections.length;
-	const scoping = applyCssScoping(node, ctx);
+	const scoping = applyStyleScopes(node, ctx);
 	node = scoping.node;
 	const cssHash = scoping.cssHash;
 	const cssEntries = [...ctx.moduleCssInjections, ...ctx.cssInjections.slice(beforeCss)].sort(
@@ -10650,6 +10656,12 @@ function compileServerComponent(node, ctx) {
 			cssEntries,
 			'opaque',
 			node.body?.type === 'JSXCodeBlock',
+			null,
+			false,
+			false,
+			// Imported themes this component applies are touched at the top of
+			// its body (serverThemeTouchStatements) so their CSS precedes its own.
+			scoping.runtimeApplied,
 		);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
@@ -10734,6 +10746,7 @@ function ssrCompileBody(
 	componentNs = null,
 	returnedFragmentTemplate = false,
 	returnedFragmentRoot = false,
+	themeTouches = [],
 	unboxedHtml = false,
 ) {
 	const prevMapTemps = ctx.currentMapTemps;
@@ -10750,6 +10763,7 @@ function ssrCompileBody(
 			componentNs,
 			returnedFragmentTemplate,
 			returnedFragmentRoot,
+			themeTouches,
 			unboxedHtml,
 		);
 	} finally {
@@ -10768,6 +10782,9 @@ function ssrCompileBodyWithMapTemps(
 	componentNs,
 	returnedFragmentTemplate,
 	returnedFragmentRoot,
+	// Imported themes the component's scopes apply — only the component body
+	// itself passes them; nested branch/loop helpers (ssrCompileSub) pass none.
+	themeTouches,
 	unboxedHtml,
 ) {
 	const returnedOutput = node.body?.type === 'JSXCodeBlock' && hasOwnValueReturn(node);
@@ -10922,6 +10939,7 @@ function ssrCompileBodyWithMapTemps(
 	ctx._valueDirectiveLowering = prevValueDirectiveLowering;
 
 	const body = [];
+	body.push(...serverThemeTouchStatements(themeTouches ?? [], ctx, node));
 	if (cssEntries && cssEntries.length) {
 		ctx.runtimeNeeded.add('injectStyle');
 		for (const entry of cssEntries) {
@@ -11143,6 +11161,23 @@ function ssrCall(helper, args, origin) {
 	return inheritOriginLoc(
 		b.call(typeof helper === 'string' ? `_$${helper}` : helper, ...args),
 		origin,
+	);
+}
+
+/**
+ * `_$touchStyleMap(theme)` for every imported theme a server component's
+ * scopes apply, emitted before the component's own `injectStyle` calls so the
+ * theme's CSS (a lazily injecting `_$styleMap`) lands first in the request
+ * collector and the applying scope's rules win the cascade.
+ */
+function serverThemeTouchStatements(runtimeApplied, ctx, origin) {
+	if (!runtimeApplied || runtimeApplied.length === 0) return [];
+	ctx.runtimeNeeded.add('touchStyleMap');
+	return runtimeApplied.map((expression) =>
+		inheritOriginLoc(
+			b.stmt(ssrCall('touchStyleMap', [cloneAstNode(expression)], expression)),
+			origin,
+		),
 	);
 }
 
@@ -12743,6 +12778,8 @@ function ssrCompileSub(
 			componentNs,
 			returnedFragmentTemplate,
 			returnedFragmentRoot,
+			// Nested helpers touch no themes; the component body already did.
+			[],
 			unboxedHtml,
 		);
 	} finally {
@@ -13373,147 +13410,6 @@ function hasModuleStyleMaps(body) {
 	});
 }
 
-// Copy-on-write: returns the (possibly rebuilt) statement; the input is never
-// modified. The core analyze/prepare pipeline mutates the sheet it is given,
-// so it runs over a clone of the (bounded) StyleSheet subtree.
-function applyStyleMap(stmt, ctx) {
-	if (stmt.type !== 'VariableDeclaration') return stmt;
-	let newDeclarations = null;
-	const declarations = stmt.declarations;
-	for (let i = 0; i < declarations.length; i++) {
-		const decl = declarations[i];
-		let next = decl;
-		const styleNode = decl.init && decl.init.type === 'JSXStyleElement' ? decl.init : null;
-		const parsedSheet = styleNode
-			? (styleNode.children || []).find((c) => c && c.type === 'StyleSheet')
-			: null;
-		const hash = parsedSheet
-			? styleNode.metadata?.styleScopeHash || parsedSheet.hash || null
-			: null;
-		if (parsedSheet && hash) {
-			const sheet = cloneAstNode(parsedSheet);
-			// `analyzeCss` marks `:global(...)` selectors (is_global / is_global_block
-			// metadata) so the renderer leaves them UNSCOPED. Without this pass
-			// `:global(a)` would be scoped to `.<hash>a`. Mirrors tsrx-ripple, which
-			// runs analyzeCss(stylesheet) before prepareStylesheetForRender.
-			analyzeCss(sheet);
-			prepareStylesheetForRender(sheet, true);
-			const css = renderStylesheets([sheet]);
-			ctx.cssInjections.push({
-				hash,
-				css,
-				order: styleNode.start ?? stmt.start ?? 0,
-				// The authored `<style>` element. `injectStyle` is emitted at module
-				// scope, so without this the whole block maps to the module origin
-				// and neither the tag nor its CSS is reachable from the output.
-				origin: styleNode,
-			});
-			ctx.runtimeNeeded.add('injectStyle');
-			// Replace the JSXStyleElement init with the class-map ObjectExpression
-			// (built loc-less by the core helper — it maps to the authored <style>).
-			next = {
-				...decl,
-				init: inheritOriginLoc(createStyleClassMapFromStylesheet(sheet), styleNode),
-			};
-		}
-		if (newDeclarations === null && next !== decl) newDeclarations = declarations.slice(0, i);
-		if (newDeclarations !== null) newDeclarations.push(next);
-	}
-	return newDeclarations === null ? stmt : { ...stmt, declarations: newDeclarations };
-}
-
-// Wrap every DYNAMIC `class` / `className` expression in a `normalizeClass(...)` call
-// BEFORE the scoped-CSS hash is appended. `@tsrx/core`'s annotate_with_hash bakes the
-// hash onto a dynamic class via a template literal — `` `${expr} <hash>` `` — which would
-// stringify an array/object clsx value the wrong way (`['a','b']` → "a,b", `{}` →
-// "[object Object]"). Normalizing first makes the interpolated slot a plain string, so
-// the hash concat stays correct AND clsx composition works in scoped components. (It also
-// turns a bare `class={undefined}` in a scoped component from "undefined <hash>" into just
-// "<hash>".) Unscoped components need no wrap — the runtime `setClassName` / `ssrAttr`
-// normalize the raw value directly. String literals are left alone so they keep folding
-// into the static template. Stops at nested component function boundaries (their class
-// exprs belong to a different scope), mirroring annotate_with_hash's own traversal.
-// Copy-on-write: rebuilt spines only where a wrap lands; untouched subtrees
-// are returned by reference and the input node is never written to. Callers
-// must use the return value.
-function wrapScopedClassExprs(node, ctx) {
-	if (!node || typeof node !== 'object') return node;
-	if (Array.isArray(node)) {
-		let out = null;
-		for (let i = 0; i < node.length; i++) {
-			const mapped = wrapScopedClassExprs(node[i], ctx);
-			if (out === null && mapped !== node[i]) out = node.slice(0, i);
-			if (out !== null) out.push(mapped);
-		}
-		return out ?? node;
-	}
-	if (
-		(node.type === 'FunctionDeclaration' ||
-			node.type === 'FunctionExpression' ||
-			node.type === 'ArrowFunctionExpression') &&
-		node.metadata?.tsrx_dynamic_wrapper !== true
-	) {
-		return node;
-	}
-	let working = node;
-	if (node.type === 'JSXElement') {
-		const attrs = node.openingElement?.attributes;
-		if (Array.isArray(attrs)) {
-			let newAttrs = null;
-			for (let i = 0; i < attrs.length; i++) {
-				const attr = attrs[i];
-				let next = attr;
-				if (
-					attr?.type === 'JSXAttribute' &&
-					attr.name?.type === 'JSXIdentifier' &&
-					(attr.name.name === 'class' || attr.name.name === 'className') &&
-					attr.value?.type === 'JSXExpressionContainer'
-				) {
-					const expr = attr.value.expression;
-					// Skip string literals (fold statically) and `{style (…)}` calls
-					// (resolveStyleExpr owns those). Everything else is a runtime value.
-					if (
-						expr &&
-						!(expr.type === 'Literal' && typeof expr.value === 'string') &&
-						!isStyleCall(expr)
-					) {
-						next = {
-							...attr,
-							value: {
-								...attr.value,
-								// The wrapper maps to the class expression it normalizes.
-								expression: inheritOriginLoc(b.call('_$normalizeClass', expr), expr),
-							},
-						};
-						ctx.runtimeNeeded.add('normalizeClass');
-					}
-				}
-				if (newAttrs === null && next !== attr) newAttrs = attrs.slice(0, i);
-				if (newAttrs !== null) newAttrs.push(next);
-			}
-			if (newAttrs !== null) {
-				working = { ...node, openingElement: { ...node.openingElement, attributes: newAttrs } };
-				if ('attributes' in node) working.attributes = newAttrs;
-			}
-		}
-	}
-	// Generic descent AFTER the element-level wrap (mirrors the historical pass
-	// order): nested JSX inside attribute values and children is wrapped too.
-	let out = working === node ? null : working;
-	for (const key of Object.keys(working)) {
-		if (key === 'loc' || key === 'start' || key === 'end' || key === 'parent') continue;
-		if (key === 'metadata' || key === 'css') continue;
-		const v = working[key];
-		if (!v || typeof v !== 'object') continue;
-		const mapped = wrapScopedClassExprs(v, ctx);
-		if (mapped !== v) {
-			if (out === null) out = { ...node };
-			out[key] = mapped;
-		}
-	}
-	return out ?? working;
-}
-
 // Local copy-on-write mirror of @tsrx/core's annotate_with_hash (scoping.js):
 // stamps the scoped-CSS hash class onto native (and dynamic-tag) JSX elements
 // and drops JSXStyleElement nodes from the rendered tree. The core helper
@@ -13526,312 +13422,6 @@ function isCompositeJsxTag(node) {
 	if (node?.type !== 'JSXElement' || !name) return false;
 	if (name.type === 'JSXIdentifier') return /^[A-Z]/.test(name.name);
 	return name.type === 'JSXMemberExpression';
-}
-
-function addHashClassToElement(element, hash, classAttrName) {
-	const openingElement = element.openingElement;
-	const attrs = openingElement?.attributes || [];
-	const index = attrs.findIndex(
-		(attr) =>
-			attr?.type === 'JSXAttribute' &&
-			attr.name?.type === 'JSXIdentifier' &&
-			(attr.name.name === 'class' || attr.name.name === 'className'),
-	);
-	let newAttrs;
-	if (index === -1) {
-		// A synthesized class attribute maps to the element's opening tag — the
-		// loc keeps generated positions inside the element for source maps, but
-		// there is no authored `class` here, so it is marked NOT AUTHORED. Left
-		// unmarked, inspection reports the whole opening tag as the origin of the
-		// scoped class, and a hover on any attribute in that tag (`onClick`, …)
-		// resolves to the class the compiler added.
-		newAttrs = [
-			...attrs,
-			markSynthesizedAttr(
-				inheritOriginLoc(
-					b.jsx_attribute(b.jsx_id(classAttrName), b.literal(hash, JSON.stringify(hash))),
-					openingElement,
-				),
-			),
-		];
-	} else {
-		const existing = attrs[index];
-		const value = existing.value;
-		let newAttr;
-		if (!value) {
-			// The NAME is authored (`class`), the value is not.
-			newAttr = {
-				...existing,
-				value: markSynthesized(inheritOriginLoc(b.literal(hash, JSON.stringify(hash)), existing)),
-			};
-		} else if (value.type === 'Literal' && typeof value.value === 'string') {
-			const merged = `${value.value} ${hash}`;
-			newAttr = { ...existing, value: { ...value, value: merged, raw: JSON.stringify(merged) } };
-		} else {
-			const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
-			// The template-literal bake maps to the authored class value it wraps.
-			newAttr = {
-				...existing,
-				value: inheritOriginLoc(
-					b.jsx_expression_container(
-						b.template([b.quasi('', false), b.quasi(` ${hash}`, true)], [expression]),
-					),
-					value,
-				),
-			};
-		}
-		newAttrs = attrs.slice();
-		newAttrs[index] = newAttr;
-	}
-	// The core helper mirrors the attribute list onto `element.attributes` in
-	// every branch; keep that alias in sync on the rebuilt copy.
-	return {
-		...element,
-		openingElement: { ...openingElement, attributes: newAttrs },
-		attributes: newAttrs,
-	};
-}
-
-function annotateRootWithHash(node, hash, classAttrName) {
-	if (!node || typeof node !== 'object') return node;
-	if (
-		(node.type === 'FunctionDeclaration' ||
-			node.type === 'FunctionExpression' ||
-			node.type === 'ArrowFunctionExpression') &&
-		node.metadata?.tsrx_dynamic_wrapper !== true
-	) {
-		return node;
-	}
-	if (node.type === 'JSXElement') {
-		let working = node;
-		if (!isCompositeJsxTag(node) || node.metadata?.dynamicElement) {
-			working = addHashClassToElement(node, hash, classAttrName);
-		}
-		const children = working.children;
-		if (Array.isArray(children)) {
-			let newChildren = null;
-			for (let i = 0; i < children.length; i++) {
-				const mapped = annotateRootWithHash(children[i], hash, classAttrName);
-				// Dropped style elements are filtered out (core: .filter(Boolean)).
-				if (newChildren === null && (mapped !== children[i] || !mapped)) {
-					newChildren = children.slice(0, i);
-				}
-				if (newChildren !== null && mapped) newChildren.push(mapped);
-			}
-			if (newChildren !== null) {
-				if (working === node) working = { ...node, children: newChildren };
-				else working.children = newChildren;
-			}
-		}
-		return working;
-	}
-	// Scoped-CSS styles leave the render tree here; Float style resources stay —
-	// the HeadHoist partition (normalizeChildren) owns removing them from body DOM.
-	if (node.type === 'JSXStyleElement') return headResourceKind(node) === 'style' ? node : null;
-	let out = null;
-	for (const key of Object.keys(node)) {
-		if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata' || key === 'css') {
-			continue;
-		}
-		const value = node[key];
-		if (!value || typeof value !== 'object') continue;
-		let mapped;
-		if (Array.isArray(value)) {
-			// Core maps generic arrays WITHOUT filtering — a dropped style element
-			// leaves a null slot the downstream child normalization skips.
-			let newArray = null;
-			for (let i = 0; i < value.length; i++) {
-				const item = annotateRootWithHash(value[i], hash, classAttrName);
-				if (newArray === null && item !== value[i]) newArray = value.slice(0, i);
-				if (newArray !== null) newArray.push(item);
-			}
-			mapped = newArray ?? value;
-		} else {
-			mapped = annotateRootWithHash(value, hash, classAttrName);
-		}
-		if (mapped !== value) {
-			if (out === null) out = { ...node };
-			out[key] = mapped;
-		}
-	}
-	return out ?? node;
-}
-
-/**
- * Find the JSX render roots owned by a component. `@{}` components expose one
- * `JSXCodeBlock.render`; React-style functions can return JSX from any block in
- * their own body. Nested functions are separate component/value boundaries and
- * must not donate styles to their enclosing component.
- */
-function componentStyleRoots(componentNode) {
-	const body = componentNode.body;
-	if (!body) return [];
-	if (body.type === 'JSXCodeBlock') {
-		return body.render ? [{ kind: 'render', node: body.render }] : [];
-	}
-	if (body.type !== 'BlockStatement') return [];
-
-	const roots = [];
-	function visit(node) {
-		if (!node || typeof node !== 'object') return;
-		if (Array.isArray(node)) {
-			for (const child of node) visit(child);
-			return;
-		}
-		if (
-			node.type === 'FunctionDeclaration' ||
-			node.type === 'FunctionExpression' ||
-			node.type === 'ArrowFunctionExpression'
-		) {
-			return;
-		}
-		if (node.type === 'ReturnStatement') {
-			if (node.argument && isJsxNode(node.argument)) {
-				roots.push({ kind: 'return', statement: node, node: node.argument });
-			}
-			return;
-		}
-		for (const key of Object.keys(node)) {
-			if (
-				key === 'loc' ||
-				key === 'start' ||
-				key === 'end' ||
-				key === 'parent' ||
-				key === 'metadata' ||
-				key === 'css'
-			)
-				continue;
-			visit(node[key]);
-		}
-	}
-	visit(body);
-	return roots;
-}
-
-/**
- * Walk a component's owned render roots for `JSXStyleElement` nodes. For each
- * one found:
- *   - Pull the pre-parsed `StyleSheet` AST out of its children.
- *   - Run `prepareStylesheetForRender` (rewrites `.foo` → `.foo.<hash>`) over a
- *     clone of the sheet — the core pipeline mutates what it is given.
- *   - Collect into a list rendered via `renderStylesheets` to a CSS string.
- *   - Register `{hash, css}` on `ctx.cssInjections` so a module-level
- *     `injectStyle(hash, css)` is emitted in the prelude.
- *   - Rebuild the render roots via `annotateRootWithHash` (COW) to stamp the
- *     hash class on every native JSX element AND remove the JSXStyleElement
- *     nodes from the rendered tree (they don't contribute DOM in the new model).
- *   - When a stripped block carried `ref={x}`, graft class-map setup onto the
- *     component body so `x` receives `{ card: "hash card", … }` instead of
- *     staying unset.
- *
- * Returns `{ cssHash, node }` — the hash (or `null` when no `<style>` blocks
- * are present) and the possibly-rebuilt component node the caller must use.
- *
- * The first `JSXStyleElement` contributes the canonical hash for the whole
- * component. @tsrx/core hashes individual style tags by source position, so
- * multiple blocks are explicitly rebased onto that canonical component hash
- * before selector rendering. Every rendered root receives the same hash class.
- */
-function applyCssScoping(componentNode, ctx) {
-	const roots = componentStyleRoots(componentNode);
-	if (roots.length === 0) return { cssHash: null, node: componentNode };
-	let cssHash = null;
-	const styles = [];
-	function collect(node) {
-		if (!node || typeof node !== 'object') return;
-		if (Array.isArray(node)) {
-			for (const i of node) collect(i);
-			return;
-		}
-		if (
-			node.type === 'FunctionDeclaration' ||
-			node.type === 'FunctionExpression' ||
-			node.type === 'ArrowFunctionExpression'
-		) {
-			return;
-		}
-		if (node.type === 'JSXStyleElement') {
-			// A Float style resource ships its plain CSS by href identity — it
-			// neither contributes to the component's scope hash nor gets scoped.
-			if (headResourceKind(node) === 'style') return;
-			const sheet = (node.children || []).find((c) => c && c.type === 'StyleSheet');
-			if (sheet) {
-				styles.push({ node, sheet });
-				if (!cssHash) cssHash = node.metadata?.styleScopeHash || sheet.hash || null;
-			}
-			return;
-		}
-		for (const key of Object.keys(node)) {
-			if (
-				key === 'loc' ||
-				key === 'start' ||
-				key === 'end' ||
-				key === 'parent' ||
-				key === 'metadata' ||
-				key === 'css'
-			)
-				continue;
-			const v = node[key];
-			if (v && typeof v === 'object') collect(v);
-		}
-	}
-	for (const root of roots) collect(root.node);
-	if (!cssHash || styles.length === 0) return { cssHash: null, node: componentNode };
-	// A component has one scope even when its CSS is split for readability.
-	// Rebase before analyze/render: selector and keyframe rewriting read
-	// `sheet.hash`, while DOM annotation below uses `cssHash`. The core
-	// analyze/prepare pipeline mutates the sheet it is given, so it runs over a
-	// clone of each (bounded) StyleSheet subtree — the parser-owned sheet nodes
-	// stay pristine.
-	const preparedSheets = styles.map((style) => {
-		const sheet = cloneAstNode(style.sheet);
-		sheet.hash = cssHash;
-		// Mark `:global(...)` selectors before scoping so they render unscoped.
-		analyzeCss(sheet);
-		prepareStylesheetForRender(sheet);
-		return sheet;
-	});
-	const css = renderStylesheets(preparedSheets);
-	ctx.cssInjections.push({
-		hash: cssHash,
-		css,
-		order: styles[0]?.sheet.start ?? styles[0]?.node.start ?? componentNode.start ?? 0,
-		// The authored `<style>` element(s) this stylesheet came from.
-		// `injectStyle` is emitted at module scope, so without an origin the
-		// block maps to the module and neither the tag nor its CSS is reachable.
-		origins: styles.map((style) => style.node).filter(Boolean),
-	});
-	ctx.runtimeNeeded.add('injectStyle');
-	// Rebuild every owned render root copy-on-write: add the canonical hash
-	// class to native elements and strip JSXStyleElement nodes from DOM output.
-	// The rebuilt roots are grafted back through a spine rebuild of the
-	// component node; the received component tree is never modified.
-	let node = componentNode;
-	const returnReplacements = new Map();
-	for (const root of roots) {
-		// Normalize dynamic class exprs BEFORE the hash is appended (see helper), so
-		// clsx array/object values compose correctly alongside the scope hash.
-		const wrapped = wrapScopedClassExprs(root.node, ctx);
-		const annotated = annotateRootWithHash(wrapped, cssHash, 'class');
-		if (annotated === root.node) continue;
-		if (root.kind === 'render') {
-			node = { ...node, body: { ...node.body, render: annotated } };
-		} else {
-			returnReplacements.set(root.statement, { ...root.statement, argument: annotated });
-		}
-	}
-	if (returnReplacements.size > 0) {
-		node = mapAst(node, (n) => returnReplacements.get(n) ?? null);
-	}
-	// `<style ref={x}>` is stripped with the block. Write the class map to `x`
-	// as setup so assignment/callback/`current`/`value` refs are not dropped.
-	node = applyStyleRefs(node, styles, preparedSheets, {
-		inheritOriginLoc,
-		createTempIdentifier: function () {
-			return b.id(allocCompilerName(ctx, '__styleMap'));
-		},
-	});
-	return { cssHash, node };
 }
 
 // Strip comments and plain string literals so prose or route paths cannot
@@ -14063,14 +13653,15 @@ function compileComponent(node, ctx, options) {
 			: null;
 	const firstStyle = ctx.cssInjections.length;
 
-	// Scoped `<style>` block. New TSRX surfaces each style block as a
-	// `JSXStyleElement` child of the rendered tree (parser pre-computes the
-	// content hash + parses CSS into a StyleSheet AST). Collect them, run the
-	// @tsrx/core scoping pipeline (rewrites `.foo` → `.foo.<hash>` AND stamps
-	// the hash class onto every element under this component), emit a single
-	// module-level `injectStyle(hash, css)`, and surface `cssHash` so
-	// resolveStyleExpr can also prefix any `{style (expr)}` class expressions.
-	const scoping = applyCssScoping(node, ctx);
+	// Scoped `<style>` blocks. TSRX surfaces each block as a `JSXStyleElement`
+	// item of the list it is written in (parser pre-computes the content hash
+	// + parses CSS into a StyleSheet AST). The pre-pass gives every list that
+	// holds a block its own hash, rewrites `.foo` → `.foo.<hash>`, stamps the
+	// hash on the list's other items and their descendants (never on the
+	// element that contains the list), emits one `injectStyle(hash, css)` per
+	// scope, and surfaces the first scope's hash as `cssHash` — kept only as a
+	// "this component owns scoped CSS" flag for resolveStyleExpr's fallback.
+	const scoping = applyStyleScopes(node, ctx);
 	node = scoping.node;
 	let cssHash = scoping.cssHash;
 	// Backwards-compat: internal callers (legacy synthetic Component shapes)
@@ -17961,7 +17552,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 	const hookMemoOpaqueOwner = ctx.inlineHookMemo && hasInlineMemoOpaqueDirective(node);
 	recordProfileComponent(ctx, node, name);
 	const beforeCss = ctx.cssInjections.length;
-	const scoping = applyCssScoping(node, ctx);
+	const scoping = applyStyleScopes(node, ctx);
 	node = scoping.node;
 	const cssHash = scoping.cssHash;
 	const cssEntries =
@@ -18083,6 +17674,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 							compInlinedSubs,
 							cssHash,
 							cssEntries,
+							scoping.runtimeApplied,
 						),
 					};
 				}
@@ -18162,6 +17754,10 @@ function compileReturnJsxFunction(node, ctx, options) {
 			}),
 		);
 	}
+	if (ctx.mode === 'server' && !ctx.nativeReads) {
+		// Imported themes inject on read; touch them ahead of this body's own CSS.
+		returnBody.unshift(...serverThemeTouchStatements(scoping.runtimeApplied, ctx, node));
+	}
 	const emittedFunction = b.function_declaration(
 		node.id,
 		node.params,
@@ -18205,7 +17801,15 @@ function compileReturnJsxFunction(node, ctx, options) {
 	return { nodes: [fn] };
 }
 
-function nativeReturnedJsxValue(node, ctx, name, inlinedSubs, cssHash, cssEntries) {
+function nativeReturnedJsxValue(
+	node,
+	ctx,
+	name,
+	inlinedSubs,
+	cssHash,
+	cssEntries,
+	runtimeApplied = [],
+) {
 	let value;
 	if (requiresTemplateNormalization(node, 'html', true, ctx)) {
 		// Head resources, directive roots and other compiler-only syntax keep
@@ -18225,7 +17829,8 @@ function nativeReturnedJsxValue(node, ctx, name, inlinedSubs, cssHash, cssEntrie
 	}
 	// A stored styled value may be constructed outside an SSR render. Its CSS
 	// enters the request collector when interpreted, not a global pending queue.
-	if (cssHash === null && !ctx.nativeModuleStyles) return value;
+	const themeTouches = serverThemeTouchStatements(runtimeApplied, ctx, node);
+	if (cssHash === null && !ctx.nativeModuleStyles && themeTouches.length === 0) return value;
 	const scopedElement = runtimeAliasForContext(ctx, 'nativeCreateScopedElement');
 	const scopedValue = runtimeAliasForContext(ctx, 'nativeCreateScopedValue');
 	// A static styled fragment needs a reader too, even when it only owns a
@@ -18246,15 +17851,18 @@ function nativeReturnedJsxValue(node, ctx, name, inlinedSubs, cssHash, cssEntrie
 			node,
 		);
 	}
-	if (cssEntries.length === 0) return value;
-	ctx.runtimeNeeded.add('injectStyle');
-	const css = cssEntries.map((entry) => {
-		const origin = claimCssOrigins(ctx, entry) ?? node;
-		return inheritOriginLoc(
-			b.stmt(ssrCall('injectStyle', [b.literal(entry.hash), b.literal(entry.css)], origin)),
-			origin,
-		);
-	});
+	if (cssEntries.length === 0 && themeTouches.length === 0) return value;
+	if (cssEntries.length > 0) ctx.runtimeNeeded.add('injectStyle');
+	const css = [
+		...themeTouches,
+		...cssEntries.map((entry) => {
+			const origin = claimCssOrigins(ctx, entry) ?? node;
+			return inheritOriginLoc(
+				b.stmt(ssrCall('injectStyle', [b.literal(entry.hash), b.literal(entry.css)], origin)),
+				origin,
+			);
+		}),
+	];
 	const readerIndex =
 		value.callee?.name === scopedValue ? 0 : value.callee?.name === scopedElement ? 2 : -1;
 	if (readerIndex === -1) {
@@ -18399,10 +18007,21 @@ function requiresTemplateNormalization(
 		t === 'FragmentStart' ||
 		t === 'FragmentEnd' ||
 		t === 'FoldedDirective' ||
-		t === 'HeadHoist' ||
-		t === 'JSXCodeBlock'
+		t === 'HeadHoist'
 	) {
 		return true;
+	}
+	if (t === 'JSXCodeBlock') {
+		// A render-only child block is transparent template grouping (the same
+		// rule normalizeChildren and extractFragment apply): only its render
+		// decides. A setup-bearing or code-only block is a render scope of its
+		// own and needs the compiled-fragment path. A styled static fragment
+		// therefore stays a descriptor when its block only groups the fragment
+		// that holds the `<style>` — the form amendment A1 leaves a value factory
+		// written in plain TSX (raw CSS needs a `@{ … }` container).
+		const body = node.body || [];
+		if (body.length > 0 || !node.render) return true;
+		return requiresTemplateNormalization(node.render, parentNs, allowHeadHoists, ctx);
 	}
 	if (t === 'Fragment' || t === 'JSXFragment' || t === 'Tsx' || t === 'Tsrx') {
 		return (node.children || []).some((child) =>
@@ -21407,7 +21026,7 @@ function normalizeChildren(
 				continue;
 			}
 			// Drop a `<style>` block at child position — its CSS gets registered
-			// via the @tsrx/core scoping pipeline (applyCssScoping / applyStyleMap);
+			// via the style-scope pre-pass (applyStyleScopes, ./style-scopes.js);
 			// it contributes no DOM here.
 			continue;
 		} else if (isWrappedJsxDirective(n)) {

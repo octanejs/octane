@@ -734,3 +734,92 @@ describe.each([
 		});
 	});
 });
+
+// RFC tsrx-org/RFCs#1: one `injectStyle` per SCOPE. Each call anchors on its
+// own scope's first block, and the scope's other blocks alias onto that one —
+// never onto another scope's.
+describe.each([
+	['client', {}],
+	['client prod', { hmr: false as const }],
+	['server', { mode: 'server' as const }],
+])('scoped styles anchor each scope on its own first block — %s', (_label, options) => {
+	const SOURCE = `export default function App() @{
+	<div class="demo">
+		<style>
+			.demo { display: grid; }
+		</style>
+		<p>hi</p>
+		<style>
+			p { margin: 0; }
+		</style>
+		@{
+			<>
+				<style>
+					b { font-weight: 700; }
+				</style>
+				<b>nested</b>
+				<style>
+					i { font-style: italic; }
+				</style>
+			</>
+		}
+	</div>
+}
+`;
+
+	it('maps each injectStyle to its scope, and the other blocks alias onto that block', () => {
+		const result = compile(SOURCE, 'App.tsrx', { ...options, inspect: true }) as ReturnType<
+			typeof compile
+		> & {
+			inspect: {
+				segments: Array<{ srcStart: number; srcEnd: number | null; exact?: boolean }>;
+				aliases: Array<{ srcStart: number; srcEnd: number; ofStart: number }>;
+			};
+		};
+		expect(compile(SOURCE, 'App.tsrx', options).code).toBe(result.code);
+		// Two scopes, two calls.
+		expect(result.code.match(/injectStyle\(/g)).toHaveLength(2);
+
+		const starts = [...SOURCE.matchAll(/<style>/g)].map((m) => m.index!);
+		expect(starts).toHaveLength(4);
+		const ends = starts.map((at) => SOURCE.indexOf('</style>', at) + '</style>'.length);
+		const [outerFirst, outerSecond, nestedFirst, nestedSecond] = starts;
+
+		for (const first of [outerFirst, nestedFirst]) {
+			const claims = result.inspect.segments
+				.filter((segment) => segment.exact === true && segment.srcStart === first)
+				.map((segment) => SOURCE.slice(segment.srcStart, segment.srcEnd!));
+			expect(claims.length, `block at ${first} has no exact segment`).toBeGreaterThan(0);
+			for (const claim of claims) {
+				expect(claim.startsWith('<style>')).toBe(true);
+				expect(claim.endsWith('</style>')).toBe(true);
+			}
+		}
+		for (const other of [outerSecond, nestedSecond]) {
+			expect(
+				result.inspect.segments.some(
+					(segment) => segment.exact === true && segment.srcStart === other,
+				),
+				`block at ${other} should alias, not anchor`,
+			).toBe(false);
+		}
+
+		expect(result.inspect.aliases).toContainEqual({
+			srcStart: outerSecond,
+			srcEnd: ends[1],
+			ofStart: outerFirst,
+		});
+		expect(result.inspect.aliases).toContainEqual({
+			srcStart: nestedSecond,
+			srcEnd: ends[3],
+			ofStart: nestedFirst,
+		});
+		// Aliases never cross scopes.
+		for (const alias of result.inspect.aliases) {
+			if (alias.srcStart === nestedSecond) expect(alias.ofStart).toBe(nestedFirst);
+			if (alias.srcStart === outerSecond) expect(alias.ofStart).toBe(outerFirst);
+			expect(alias.srcStart).not.toBe(nestedFirst);
+			expect(alias.srcStart).not.toBe(outerFirst);
+		}
+	});
+});
