@@ -12,16 +12,7 @@ import { Explorer } from './sections/Explorer.tsrx';
 import { Sponsor } from './sections/Sponsor.tsrx';
 
 export function Home() @{
-	<div class="home">
-		<Hero />
-		<Features />
-		<Proven />
-		<Why />
-		<ReactCompat />
-		<Lynx />
-		<Spin />
-		<Explorer />
-		<Sponsor />
+	<>
 		<style>
 			.home {
 				max-width: 1420px;
@@ -29,5 +20,16 @@ export function Home() @{
 				padding: 0 1.5rem;
 			}
 		</style>
-	</div>
+		<div class="home">
+			<Hero />
+			<Features />
+			<Proven />
+			<Why />
+			<ReactCompat />
+			<Lynx />
+			<Spin />
+			<Explorer />
+			<Sponsor />
+		</div>
+	</>
 }

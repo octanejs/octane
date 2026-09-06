@@ -12,11 +12,7 @@ import { SpinScene } from './SpinScene.three.tsrx';
 import { FLAME_CREAM, FLAME_CREAM_D, FLAME_RED, FLAME_RED_D, FLAME_VIEWBOX } from './flame.ts';
 
 function FlatFlame() @{
-	<div class="spin-flat">
-		<svg viewBox={FLAME_VIEWBOX} aria-hidden="true">
-			<path d={FLAME_CREAM_D} fill={FLAME_CREAM} />
-			<path d={FLAME_RED_D} fill={FLAME_RED} />
-		</svg>
+	<>
 		<style>
 			.spin-flat {
 				position: absolute;
@@ -30,24 +26,17 @@ function FlatFlame() @{
 				filter: drop-shadow(0 1.5rem 3rem rgba(255, 65, 90, 0.25));
 			}
 		</style>
-	</div>
+		<div class="spin-flat">
+			<svg viewBox={FLAME_VIEWBOX} aria-hidden="true">
+				<path d={FLAME_CREAM_D} fill={FLAME_CREAM} />
+				<path d={FLAME_RED_D} fill={FLAME_RED} />
+			</svg>
+		</div>
+	</>
 }
 
 export function SpinStage() @{
-	<div class="spin-stage">
-		@try {
-			<Canvas
-				camera={{ position: [0, 0, 175], fov: 38 }}
-				dpr={[1, 2]}
-				style={{ width: '100%', height: '100%' }}
-			>
-				<SpinScene />
-			</Canvas>
-		} @pending {
-			<FlatFlame />
-		} @catch (error) {
-			<FlatFlame />
-		}
+	<>
 		<style>
 			.spin-stage {
 				position: relative;
@@ -55,5 +44,20 @@ export function SpinStage() @{
 				height: 100%;
 			}
 		</style>
-	</div>
+		<div class="spin-stage">
+			@try {
+				<Canvas
+					camera={{ position: [0, 0, 175], fov: 38 }}
+					dpr={[1, 2]}
+					style={{ width: '100%', height: '100%' }}
+				>
+					<SpinScene />
+				</Canvas>
+			} @pending {
+				<FlatFlame />
+			} @catch (error) {
+				<FlatFlame />
+			}
+		</div>
+	</>
 }

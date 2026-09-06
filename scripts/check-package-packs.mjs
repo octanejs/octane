@@ -483,6 +483,13 @@ async function validatePackedConsumer(tempRoot, archives) {
 			2,
 		) + '\n',
 	);
+	// postcss 8.5.28 makes DeclarationProps extend NodeProps, but tsrx-tsc
+	// cannot resolve that named export from node.d.ts (TS2304). pnpm 11 reads
+	// overrides from pnpm-workspace.yaml, matching the other packed consumers.
+	writeFileSync(
+		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
+		'overrides:\n  postcss: "8.5.26"\n',
+	);
 	writeFileSync(
 		path.join(sourceDirectory, 'App.tsrx'),
 		`import { ApolloClient, InMemoryCache } from '@octanejs/apollo-client';
@@ -865,6 +872,10 @@ export function renderProbe() {
 	);
 
 	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
+	const installedPostcss = consumerRequire('postcss/package.json').version;
+	if (installedPostcss !== '8.5.26') {
+		throw new Error(`packed consumer resolved postcss ${installedPostcss}; expected 8.5.26`);
+	}
 	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
 	// Resolve through real ESM package specifiers from the installed consumer,
 	// not a CommonJS-resolved file URL, so conditional `import` branches remain

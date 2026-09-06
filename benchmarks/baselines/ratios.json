@@ -608,6 +608,14 @@
     "note": "Same-process categorical color lookup across 4,096 domain keys, with index construction included in every sample and first-match duplicate and missing-key gates. Repeated linear scans measured 1.59ms per 1,000 lookups while the first-occurrence index measured 0.04ms, a 0.02x ratio across three normal runs. The 0.08 ceiling leaves more than 3x timing headroom while catching restoration of quadratic lookup work."
   },
   {
+    "suite": "style-unitless",
+    "op": "lookup_per_1000",
+    "target": "cached-mixed",
+    "reference": "scan-mixed",
+    "maxRatio": 0.5,
+    "note": "Same-process numeric cssStyleValue writes through a mixed bag of unitless, px, kebab, vendor-prefixed, and custom-property keys. The linear replaceAll+toLowerCase scan measured at 0.96ms/1,000 lookups; the bounded name cache measured at 0.30ms (~0.31x) on Node 22.22.2. The 0.5 ceiling leaves more than 1.5x timing headroom while catching restoration of per-write string allocation."
+  },
+  {
     "suite": "rspack-css-graph",
     "op": "graph_traversals",
     "target": "sixteen-requests",

@@ -14,68 +14,7 @@ import logoSvg from '../assets/octane-logo.svg?raw';
 export function Header() @{
 	const [menuOpen, setMenuOpen] = useState(false);
 
-	<header class="topnav">
-		<div class="topnav-inner">
-			<div class="nav-left">
-				<button
-					type="button"
-					class="menu-btn"
-					aria-label="Toggle navigation menu"
-					aria-expanded={menuOpen}
-					aria-controls="site-nav"
-					onClick={() => setMenuOpen((open) => !open)}
-				>
-					<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-						@if (menuOpen) {
-							<path
-								d="M6 6l12 12M18 6L6 18"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-							/>
-						} @else {
-							<path
-								d="M4 7h16M4 12h16M4 17h16"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-							/>
-						}
-					</svg>
-				</button>
-				<Link to="/" class="wordmark" aria-label="Octane home">
-					<span
-						class="wordmark-img"
-						aria-hidden="true"
-						dangerouslySetInnerHTML={{ __html: logoSvg }}
-					/>
-				</Link>
-				<nav
-					id="site-nav"
-					class={['navlinks', menuOpen && 'open']}
-					aria-label="Main"
-					onClick={() => setMenuOpen(false)}
-				>
-					<Link to="/docs" activeOptions={{ exact: false }} class="nav-link">Docs</Link>
-					<Link to="/benchmarks" class="nav-link">Benchmarks</Link>
-					<Link to="/playground" class="nav-link">Playground</Link>
-					<a class="nav-link" href="/llms.txt" target="_blank" rel="noreferrer">
-						llms.txt
-					</a>
-					<div class="menu-social">
-						<SocialIcons />
-					</div>
-				</nav>
-			</div>
-			<div class="nav-right">
-				<DocsSearch />
-				<span class="nav-sep" aria-hidden="true"></span>
-				<span class="bar-social">
-					<SocialIcons />
-				</span>
-				<ThemeToggle />
-			</div>
-		</div>
+	<>
 		<style>
 			.topnav {
 				position: sticky;
@@ -245,5 +184,68 @@ export function Header() @{
 				background: rgba(255, 65, 90, 0.14);
 			}
 		</style>
-	</header>
+		<header class="topnav">
+			<div class="topnav-inner">
+				<div class="nav-left">
+					<button
+						type="button"
+						class="menu-btn"
+						aria-label="Toggle navigation menu"
+						aria-expanded={menuOpen}
+						aria-controls="site-nav"
+						onClick={() => setMenuOpen((open) => !open)}
+					>
+						<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+							@if (menuOpen) {
+								<path
+									d="M6 6l12 12M18 6L6 18"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+							} @else {
+								<path
+									d="M4 7h16M4 12h16M4 17h16"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								/>
+							}
+						</svg>
+					</button>
+					<Link to="/" class="wordmark" aria-label="Octane home">
+						<span
+							class="wordmark-img"
+							aria-hidden="true"
+							dangerouslySetInnerHTML={{ __html: logoSvg }}
+						/>
+					</Link>
+					<nav
+						id="site-nav"
+						class={['navlinks', menuOpen && 'open']}
+						aria-label="Main"
+						onClick={() => setMenuOpen(false)}
+					>
+						<Link to="/docs" activeOptions={{ exact: false }} class="nav-link">Docs</Link>
+						<Link to="/benchmarks" class="nav-link">Benchmarks</Link>
+						<Link to="/playground" class="nav-link">Playground</Link>
+						<a class="nav-link" href="/llms.txt" target="_blank" rel="noreferrer">
+							llms.txt
+						</a>
+						<div class="menu-social">
+							<SocialIcons />
+						</div>
+					</nav>
+				</div>
+				<div class="nav-right">
+					<DocsSearch />
+					<span class="nav-sep" aria-hidden="true"></span>
+					<span class="bar-social">
+						<SocialIcons />
+					</span>
+					<ThemeToggle />
+				</div>
+			</div>
+		</header>
+	</>
 }

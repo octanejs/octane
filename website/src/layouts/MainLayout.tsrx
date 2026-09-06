@@ -9,14 +9,7 @@ export function MainLayout() @{
 	const pathname = useLocation({ select: (l) => l.pathname });
 	const showFooter = pathname !== '/playground';
 
-	<div class="shell">
-		<Header />
-		<main class="main">
-			<Outlet />
-		</main>
-		@if (showFooter) {
-			<Footer />
-		}
+	<>
 		<style>
 			.shell {
 				min-height: 100vh;
@@ -28,5 +21,14 @@ export function MainLayout() @{
 				width: 100%;
 			}
 		</style>
-	</div>
+		<div class="shell">
+			<Header />
+			<main class="main">
+				<Outlet />
+			</main>
+			@if (showFooter) {
+				<Footer />
+			}
+		</div>
+	</>
 }

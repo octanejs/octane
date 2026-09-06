@@ -43,19 +43,22 @@ describe('app-core request router', () => {
 		expect(router.match('GET', '/api/posts')).toBeNull();
 	});
 
-	it('uses a same-path render route after a static server method miss', function () {
+	it('falls through to a catch-all when a static server route rejects the method', function () {
 		const getOnly = new ServerRoute({
-			path: '/shared',
+			path: '/api',
 			methods: ['GET'],
 			handler: function () {
 				return new Response();
 			},
 		});
-		const page = new RenderRoute({ path: '/shared', entry: '/src/shared.tsrx' });
-		const router = createRouter([getOnly, page]);
+		const catchAll = new RenderRoute({ path: '/*rest', entry: '/src/fallback.tsrx' });
+		const router = createRouter([getOnly, catchAll]);
 
-		expect(router.match('GET', '/shared')).toEqual({ route: getOnly, params: {} });
-		expect(router.match('POST', '/shared')).toEqual({ route: page, params: {} });
+		expect(router.match('GET', '/api')).toEqual({ route: getOnly, params: {} });
+		expect(router.match('POST', '/api')).toEqual({
+			route: catchAll,
+			params: { rest: 'api' },
+		});
 	});
 
 	it('selects the matching method when several static server routes share a path', function () {
@@ -78,6 +81,21 @@ describe('app-core request router', () => {
 		expect(router.match('GET', '/api/items')).toEqual({ route: getRoute, params: {} });
 		expect(router.match('post', '/api/items')).toEqual({ route: postRoute, params: {} });
 		expect(router.match('DELETE', '/api/items')).toBeNull();
+	});
+
+	it('uses a same-path render route after a static server method miss', function () {
+		const getOnly = new ServerRoute({
+			path: '/shared',
+			methods: ['GET'],
+			handler: function () {
+				return new Response();
+			},
+		});
+		const page = new RenderRoute({ path: '/shared', entry: '/src/shared.tsrx' });
+		const router = createRouter([getOnly, page]);
+
+		expect(router.match('GET', '/shared')).toEqual({ route: getOnly, params: {} });
+		expect(router.match('POST', '/shared')).toEqual({ route: page, params: {} });
 	});
 
 	it('falls through to a catch-all when a dynamic server route rejects the method', function () {

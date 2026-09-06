@@ -251,6 +251,7 @@ internally, get their own baseline and guard namespace.
 | `radix-collection-order` | radix-collection-order | none (Node-only) | production Radix collection ordering versus the prior comparator at 16, 64, 256, and 4,096 items, with missing-ref and stable-order controls |
 | `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and indexed dynamic matching across 1,000-route tables, plus a linear dynamic-scan control |
 | `visx-categorical-scale` | visx-categorical-scale | none (Node-only) | production Visx categorical lookup versus repeated linear scans at 16, 64, and 4,096 domain keys |
+| `style-unitless` | style-unitless | none (Node-only) | production numeric style serialization versus repeated unitless-name normalization on a mixed-repeat key bag |
 | `rspack-css-graph` | rspack-css-graph | none (Node-only) | CSS-module proof collection and verification across zero, one, and sixteen requests, with deterministic module-graph traversal and connection-visit guards |
 | `floating-tree-navigation` | floating-tree-navigation | none (Node-only) | Floating UI deepest-open-node lookup on deep chains, equal-depth forks, and a root-only control, with exact previous-behavior and deterministic node-read gates |
 | `ink-cursor-update` | ink-cursor-update | none (Node-only) | Ink standard/incremental cursor-only updates over equal 20,000-line frames, with exact previous branches, byte/split gates, stable-frame stress scaling, and initial/changed-render controls |

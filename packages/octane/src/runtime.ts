@@ -2959,6 +2959,17 @@ function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): voi
 	}
 }
 
+/** Find a radio's native group in its document, shadow tree, or containing form. */
+function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
+	if (input.form !== null) return input.form.elements;
+	const root = input.getRootNode();
+	// Document.getElementsByName is the common fast path; ShadowRoot and
+	// detached fragments need a tree-local lookup that includes their radios.
+	return root.nodeType === 9
+		? (root as Document).getElementsByName(input.name)
+		: (root as Element | DocumentFragment).querySelectorAll('input[type="radio"]');
+}
+
 /**
  * Record the cousin a radio write is about to clear.
  *
@@ -2975,12 +2986,7 @@ function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): voi
  */
 function journalRadioCousins(input: HTMLInputElement): void {
 	const name = input.name;
-	const group: ArrayLike<Node> =
-		input.form !== null
-			? input.form.elements
-			: typeof document !== 'undefined'
-				? document.getElementsByName(name)
-				: [];
+	const group = radioCousins(input);
 	for (let i = 0; i < group.length; i++) {
 		const other = group[i] as HTMLInputElement;
 		if (
@@ -2988,7 +2994,8 @@ function journalRadioCousins(input: HTMLInputElement): void {
 			!other.checked ||
 			other.localName !== 'input' ||
 			other.type !== 'radio' ||
-			other.name !== name
+			other.name !== name ||
+			other.form !== input.form
 		) {
 			continue;
 		}
@@ -14756,7 +14763,12 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 /** Resolve source-ordered direct/spread raw-HTML writers and apply only the winner. */
 export function setDangerouslySetInnerHTMLSources(
 	el: Element,
-	sources: readonly (readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown])[],
+	sources: readonly (readonly [
+		isSpread: boolean,
+		sourceOrName: unknown,
+		value?: unknown,
+		merge?: boolean,
+	])[],
 	ignoreSourceChildren = false,
 ): void {
 	let foundDanger = false;
@@ -16257,7 +16269,13 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 // clsx-style `class`/`className` composition — shared with the SSR serializer
 // via css.ts so client and server compose byte-equal class strings (hydration
 // parity). Re-exported here because it is part of the semi-public surface.
-import { devWarnStyleCoercion, devWarnStyleProperty, normalizeClass, styleName } from './css.js';
+import {
+	devWarnStyleCoercion,
+	devWarnStyleProperty,
+	mergeClass,
+	normalizeClass,
+	styleName,
+} from './css.js';
 export { normalizeClass };
 
 export function setClassName(el: Element, value: unknown): void {
@@ -16573,7 +16591,12 @@ export function snapshotSpread(value: unknown): Record<string, unknown> | null {
 	return snapshot;
 }
 
-type HostPropSource = readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown];
+type HostPropSource = readonly [
+	isSpread: boolean,
+	sourceOrName: unknown,
+	value?: unknown,
+	merge?: boolean,
+];
 
 function formActionAttributeName(el: Element, name: string): string | null {
 	if (name === 'action' && el.localName === 'form') return 'action';
@@ -16626,6 +16649,12 @@ function normalizedHostProp(
  * property. Canonical identities ensure a vanished earlier source cannot
  * remove an unchanged later winner, and hydration compares only the final
  * client value against the final server value.
+ *
+ * A synthesized scope-hash class (4th tuple flag) is not an authored later
+ * writer: after identity last-writer-wins, it composes onto the winning class
+ * instead of replacing a spread's class. An authored `class` beside a spread
+ * stays last-writer-wins because its hash is baked into that authored value
+ * and carries no merge flag.
  */
 export function setHostPropSources(
 	el: Element,
@@ -16641,8 +16670,9 @@ export function setHostPropSources(
 		lastOrder: number;
 	}
 	const props = new Map<string, PropWriter>();
+	let classMerges: Array<{ rawName: string; value: unknown; order: number }> | null = null;
 	let sourceOrder = 0;
-	const record = (rawName: unknown, value: unknown): void => {
+	function record(rawName: unknown, value: unknown): void {
 		if (typeof rawName !== 'string') return;
 		const order = sourceOrder++;
 		const previous = props.get(rawName);
@@ -16652,11 +16682,20 @@ export function setHostPropSources(
 			firstOrder: previous?.firstOrder ?? order,
 			lastOrder: order,
 		});
-	};
+	}
 
 	for (const source of sources) {
 		if (!source[0]) {
-			record(source[1], source[2]);
+			const rawName = source[1];
+			if (
+				source[3] === true &&
+				typeof rawName === 'string' &&
+				(rawName === 'class' || rawName === 'className')
+			) {
+				(classMerges ??= []).push({ rawName, value: source[2], order: sourceOrder++ });
+				continue;
+			}
+			record(rawName, source[2]);
 			continue;
 		}
 		const spread = source[1];
@@ -16690,6 +16729,22 @@ export function setHostPropSources(
 			writer.firstOrder,
 			writer.lastOrder,
 		]);
+	}
+	if (classMerges !== null) {
+		for (const extra of classMerges) {
+			const [identity, name] = normalizedHostProp(el, extra.rawName);
+			const previous = values.get(identity);
+			if (previous !== undefined) {
+				values.set(identity, [
+					previous[0],
+					mergeClass(previous[1], extra.value),
+					previous[2],
+					extra.order,
+				]);
+				continue;
+			}
+			values.set(identity, [name, extra.value, extra.order, extra.order]);
+		}
 	}
 	const resolved: Record<string, unknown> = Object.create(null);
 	const ordered = [...values.values()];
@@ -16892,8 +16947,9 @@ export function setSpread(
 }
 
 // ---------------------------------------------------------------------------
-// Component-scoped <style> injection — idempotent, keyed by the compiled
-// stylesheet hash so repeated mounts (or HMR re-imports) inject once.
+// Component-scoped <style> injection — keyed by the compiled stylesheet hash
+// so repeated mounts inject once. HMR re-imports with the same hash and
+// different CSS refresh the owned sheet in place.
 // ---------------------------------------------------------------------------
 
 const _injectedStyles = new Set<string>();
@@ -16918,6 +16974,8 @@ interface HeadSlot {
 	el: Element;
 	/** Direct listeners keyed by prop name so capture and bubble phases stay independent. */
 	handlers?: Map<string, EventListener>;
+	/** Authored attribute keys only; never retain the props' values past a render. */
+	attrNames?: string[];
 }
 
 function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | null): void {
@@ -16996,11 +17054,12 @@ export function headBlock(
 		const ownerDocument = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
 		const head = ownerDocument.head;
 		let el = adoptServerHeadEl(head, headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
+		const adopted = el !== null;
 		if (el === null) {
 			el = ownerDocument.createElement(tag);
 			head.appendChild(el);
 		}
-		state = { el };
+		state = { el, attrNames: adopted ? el.getAttributeNames() : undefined };
 		scope.slots[slot] = state;
 		// Removed once, on the owning scope's unmount (NOT between re-renders) —
 		// scope.cleanups fire only on teardown, mirroring the spread-ref cleanup.
@@ -17011,8 +17070,20 @@ export function headBlock(
 		});
 	}
 	const el = state.el;
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(state);
+		journalBag();
+	}
 	if (state.handlers !== undefined) removeHeadEventListeners(state, attrs);
+	const previousNames = state.attrNames;
+	if (previousNames !== undefined) {
+		for (let i = 0; i < previousNames.length; i++) {
+			const name = previousNames[i];
+			if (attrs === null || !(name in attrs)) setAttribute(el, name, null);
+		}
+	}
 	if (attrs !== null) {
+		const names: string[] = [];
 		for (const k in attrs) {
 			// Hoisted head elements live in document.head — OUTSIDE every delegation
 			// root — and their load/error events don't bubble anyway, so on* props
@@ -17036,12 +17107,22 @@ export function headBlock(
 				}
 				continue;
 			}
+			names.push(k);
 			setAttribute(el, k, attrs[k]);
 		}
+		state.attrNames = names;
+	} else {
+		state.attrNames = undefined;
 	}
-	if (text != null) {
-		const t = String(text);
-		if (el.textContent !== t) el.textContent = t;
+	if (text != null || tag === 'title') {
+		const t = text == null ? '' : String(text);
+		if (el.textContent !== t) {
+			// textContent replaces child nodes, even when only the text changes.
+			// Retain their identity when a later sibling suspends and this visible
+			// head entry belongs to the held transition boundary.
+			if (TRANSITION_JOURNAL !== null) journalRootRange(el, null, null);
+			el.textContent = t;
+		}
 	}
 }
 
@@ -17113,18 +17194,35 @@ export function namespaceHeadElement(
 }
 
 export function injectStyle(id: string, css: string, nonce?: string): void {
+	if (typeof document === 'undefined') {
+		_injectedStyles.add(id);
+		return;
+	}
+	const existing = document.querySelector<HTMLStyleElement>(`style[data-octane="${id}"]`);
+	if (existing !== null) {
+		// A scope hash derives from its first block's position and content, so an
+		// HMR re-evaluation after editing a later block of the same scope arrives
+		// with an unchanged id and different css: refresh a sheet this runtime
+		// already owns in place. A sheet seen for the first time was emitted by
+		// the server (its text may differ only in serialization) and is adopted.
+		if (_injectedStyles.has(id)) {
+			if (existing.textContent !== css) existing.textContent = css;
+		} else {
+			_injectedStyles.add(id);
+		}
+		return;
+	}
 	if (_injectedStyles.has(id)) return;
 	// SSR de-dup: the server already emitted this scoped stylesheet (the css of
-	// the RenderResult, a `<style data-octane="hash">` — or, for a React-hosted
-	// island, a React 19 style RESOURCE whose href React serializes as
-	// `data-href="octane-<hash>"`; React drops other attributes from hoisted
-	// resources). On a hydrated page the per-runtime Set is empty, so also
-	// check the DOM before re-injecting — otherwise hydration would append a
-	// duplicate <style>.
-	if (
-		typeof document !== 'undefined' &&
-		document.querySelector(`style[data-octane="${id}"], style[data-href="octane-${id}"]`)
-	) {
+	// the RenderResult, a `<style data-octane="hash">` handled above — or, for a
+	// React-hosted island, a React 19 style RESOURCE whose href React
+	// serializes as `data-href="octane-<hash>"`; React drops other attributes
+	// from hoisted resources). On a hydrated page the per-runtime Set is empty,
+	// so also check the DOM before re-injecting — otherwise hydration would
+	// append a duplicate <style>. React batches same-precedence resources into
+	// one tag whose data-href lists every key (`octane-a octane-b`), so the
+	// resource match is a whitespace-token match, not an exact one.
+	if (document.querySelector(`style[data-href~="octane-${id}"]`)) {
 		_injectedStyles.add(id);
 		return;
 	}
@@ -18670,6 +18768,8 @@ interface ControlledState {
 	 *  controlled↔uncontrolled flip detection). */
 	sawV: boolean;
 	sawC: boolean;
+	/** The first defaultChecked binding has initialized the live checkedness. */
+	sawDC: boolean;
 	/** Last defaultValue. Select defaults project only on mount or a multiple flip. */
 	dvv: unknown;
 	/** True during IME composition and while its final committed input can arrive. */
@@ -18680,9 +18780,6 @@ interface ControlledState {
 	queued: boolean;
 	/** Whether the compiler's spread-aware form aggregation path has committed. */
 	formSeen: boolean;
-	/** Previous final default props, needed for React's removal cascades. */
-	formDefaultValue: unknown;
-	formDefaultChecked: unknown;
 	/** Previous final <select multiple> mode. */
 	formMultiple: boolean;
 }
@@ -18870,13 +18967,12 @@ function armControlledBase(el: Element): ControlledState {
 			sv: null,
 			sawV: false,
 			sawC: false,
+			sawDC: false,
 			dvv: UNCONTROLLED,
 			composing: false,
 			compositionEndTask: undefined,
 			queued: false,
 			formSeen: false,
-			formDefaultValue: UNCONTROLLED,
-			formDefaultChecked: UNCONTROLLED,
 			formMultiple: false,
 		};
 		(el as any).$$ctrl = ctrl;
@@ -19170,11 +19266,18 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		if (process.env.NODE_ENV !== 'production')
 			queueDevFormDiagnostic(input, CURRENT_SCOPE ?? undefined);
 		const hydration = activeHydration();
-		if (hydration !== null && !hydration.isFresh(input)) return;
+		if (hydration !== null && !hydration.isFresh(input)) {
+			// Keep the pre-hydration user selection while separating it from the
+			// server default, including a later controlled → default flip.
+			input.checked = input.checked;
+			ctrl.sawDC = true;
+			return;
+		}
 		// PROPERTY first (marks checkedness dirty — see setValue), then the
 		// attribute baseline (React's cascade: checked wins over defaultChecked).
-		if (input.checked !== b) input.checked = b;
+		input.checked = b;
 		input.defaultChecked = b;
+		ctrl.sawDC = true;
 		return;
 	}
 	if (process.env.NODE_ENV !== 'production' && ctrl.c === -1) devWarnControlledFlip(input, true);
@@ -19207,7 +19310,8 @@ function inActivationWindow(input: HTMLInputElement): boolean {
 		target.type === 'radio' &&
 		input.name !== '' &&
 		input.name === target.name &&
-		input.form === target.form
+		input.form === target.form &&
+		(input.form !== null || input.getRootNode() === target.getRootNode())
 	);
 }
 
@@ -19398,6 +19502,7 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
  * it needs neither a controlled-state record nor edit/composition listeners.
  */
 const DEFAULT_VALUE_BASELINE = Symbol('octane.defaultValue');
+const DEFAULT_CHECKED_INITIALIZED = Symbol('octane.defaultCheckedInitialized');
 
 export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 	const hydration = activeHydration();
@@ -19432,11 +19537,36 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 /** Compiler-emitted binding for `defaultChecked` (uncontrolled checkables). */
 export function setDefaultChecked(el: Element, value: unknown): void {
 	const ctrl = armControlled(el);
+	const input = el as HTMLInputElement;
 	const hydration = activeHydration();
-	if ((hydration !== null && !hydration.isFresh(el)) || value == null) return;
+	const hydrating = hydration !== null && !hydration.isFresh(el);
+	const first = !ctrl.sawDC;
+	if (first) {
+		if (TRANSITION_JOURNAL !== null) {
+			journalObjectOnce(ctrl);
+			journalBag();
+		}
+		ctrl.sawDC = true;
+	}
+	if (hydrating) {
+		// Adopt the user's live choice, but separate it from the server's
+		// pristine default so a later baseline update cannot drag it along.
+		if (first) input.checked = input.checked;
+		return;
+	}
 	// A controlled `checked` owns the attribute baseline (React's cascade).
 	if (ctrl.c !== -1) return;
-	const input = el as HTMLInputElement;
+	// React initInput marks the live checkedness dirty even when the initial
+	// default is absent. Otherwise, the browser would move a still-pristine
+	// checkbox whenever a later defaultChecked update changes its reset target.
+	if (first && !(DEFAULT_CHECKED_INITIALIZED in input)) {
+		if (TRANSITION_JOURNAL !== null) {
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, input, 'checked', input.checked);
+			if (input.type === 'radio' && input.name !== '' && !!value) journalRadioCousins(input);
+		}
+		input.checked = value == null ? input.checked : !!value;
+	}
+	if (value == null) return;
 	const b = !!value;
 	if (input.defaultChecked !== b) {
 		if (TRANSITION_JOURNAL !== null) {
@@ -19457,7 +19587,7 @@ export function setDefaultChecked(el: Element, value: unknown): void {
  */
 export function setFormControlSources(
 	el: Element,
-	sources: ReadonlyArray<readonly [boolean, unknown, unknown?]>,
+	sources: ReadonlyArray<readonly [boolean, unknown, unknown?, boolean?]>,
 ): void {
 	let value: unknown;
 	let defaultValue: unknown;
@@ -19510,15 +19640,12 @@ export function setFormControlSources(
 
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
-	const previousDefaultChecked = ctrl.formDefaultChecked;
 	const previousMultiple = ctrl.formMultiple;
 	if (TRANSITION_JOURNAL !== null) {
 		journalObjectOnce(ctrl);
 		journalBag();
 	}
 	ctrl.formSeen = true;
-	ctrl.formDefaultValue = defaultValue;
-	ctrl.formDefaultChecked = defaultChecked;
 	if (
 		process.env.NODE_ENV !== 'production' &&
 		hasDevFormDiagnosticContext(el, CURRENT_SCOPE ?? undefined)
@@ -19545,15 +19672,8 @@ export function setFormControlSources(
 			setDefaultValue(input, defaultString, first);
 		}
 		setChecked(input, checked);
-		if (checked == null && defaultChecked != null) setDefaultChecked(input, defaultChecked);
-		if (
-			!first &&
-			defaultChecked == null &&
-			previousDefaultChecked !== UNCONTROLLED &&
-			previousDefaultChecked != null
-		) {
-			input.defaultChecked = false;
-		}
+		if (checked == null && (defaultChecked != null || first))
+			setDefaultChecked(input, defaultChecked);
 		return;
 	}
 
@@ -19840,19 +19960,15 @@ function restoreCheckedState(input: HTMLInputElement, ctrl: ControlledState): vo
 
 function restoreRadioCousins(input: HTMLInputElement): void {
 	const name = input.name;
-	const group: ArrayLike<Node> =
-		input.form !== null
-			? input.form.elements
-			: typeof document !== 'undefined'
-				? document.getElementsByName(name)
-				: [];
+	const group = radioCousins(input);
 	for (let i = 0; i < group.length; i++) {
 		const other = group[i] as HTMLInputElement;
 		if (
 			other === input ||
 			other.localName !== 'input' ||
 			other.type !== 'radio' ||
-			other.name !== name
+			other.name !== name ||
+			other.form !== input.form
 		) {
 			continue;
 		}
@@ -22403,11 +22519,21 @@ function hasHostPropContent(descriptor: ElementDescriptor): boolean {
 }
 
 // Route a host descriptor's props onto a FRESH element (first build).
+function markInputCheckedness(input: HTMLInputElement): void {
+	// React initializes even an input with no checked/defaultChecked prop. Mark
+	// its live property dirty so a baseline added on a reused host stays a reset
+	// target rather than changing the user's current choice.
+	input.checked = input.checked;
+	(input as any)[DEFAULT_CHECKED_INITIALIZED] = true;
+}
+
 function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 	if (props == null) {
+		if (el.localName === 'input') markInputCheckedness(el as HTMLInputElement);
 		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
 		return;
 	}
+	let needsCheckedInitialization = el.localName === 'input';
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
 		// `suppressHydrationWarning`: a JS flag (read by the hydration-mismatch paths), never
@@ -22416,8 +22542,15 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 			(el as any).__oct_suppress = props[name] === true;
 			continue;
 		}
-		applyDeoptProp(el, name, props[name], ownerBlock);
+		const value = props[name];
+		if (
+			needsCheckedInitialization &&
+			(name === 'defaultChecked' || (name === 'checked' && value != null))
+		)
+			needsCheckedInitialization = false;
+		applyDeoptProp(el, name, value, ownerBlock);
 	}
+	if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
 }
 
@@ -22558,6 +22691,7 @@ export function hostComponent(
 // while className/style/events/attributes are idempotently re-set.
 function applyHostProps(el: Element, props: any, scope: Scope, state: HostComponentSlot): void {
 	const prev = state.props;
+	let needsCheckedInitialization = prev === undefined && el.localName === 'input';
 	if (ROOT_RENDER_TRANSACTION !== null && prev !== props) journalObjectOnce(state);
 	// REMOVE props/events present last render but gone now, via the shared removeHostProp
 	// (parity with setSpread / patchDeoptProps) — a reused element must not keep stale
@@ -22579,12 +22713,18 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 	}
 	state.props = props;
 	if (props == null) {
+		if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
 		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
 		return;
 	}
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
 		const v = props[name];
+		if (
+			needsCheckedInitialization &&
+			(name === 'defaultChecked' || (name === 'checked' && v != null))
+		)
+			needsCheckedInitialization = false;
 		const actionName = formActionAttributeName(el, name);
 		if (actionName !== null) {
 			setFormAction(el as HTMLFormElement, actionName, v, prev?.[name]);
@@ -22629,6 +22769,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 			}
 		}
 	}
+	if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
 }
 

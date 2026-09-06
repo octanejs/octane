@@ -180,12 +180,11 @@ export function createRouter(routes) {
 		compiledRoutes[i].order = i;
 	}
 
-	// A matching static path always out-scores any dynamic route that could
-	// also match it (100 per static segment vs 10 / 1 for param / catch-all),
-	// so static exact compares run first. After a method miss, matching still
-	// falls through to parameter and catch-all routes.
-	/** @type {CompiledRoute[]} */
-	const staticRoutes = [];
+	// Exact static paths are O(1). A matching static always out-scores a param
+	// or catch-all that could match the same pathname, so the map is consulted
+	// first. After a method miss, matching falls through to the dynamic index.
+	/** @type {Map<string, CompiledRoute[]>} */
+	const staticByPath = new Map();
 	/** @type {Array<Map<string, CompiledRoute[]> | undefined>} */
 	const dynamicByPos = [];
 	/** @type {CompiledRoute[]} */
@@ -194,7 +193,9 @@ export function createRouter(routes) {
 	for (let i = 0; i < compiledRoutes.length; i++) {
 		const compiled = compiledRoutes[i];
 		if (typeof compiled.pattern === 'string') {
-			staticRoutes.push(compiled);
+			const existing = staticByPath.get(compiled.pattern);
+			if (existing === undefined) staticByPath.set(compiled.pattern, [compiled]);
+			else existing.push(compiled);
 			continue;
 		}
 		const last = lastStaticSegment(compiled.route.path);
@@ -221,15 +222,17 @@ export function createRouter(routes) {
 		 */
 		match: function (method, pathname) {
 			let normalizedMethod;
-			for (let i = 0; i < staticRoutes.length; i++) {
-				const compiled = staticRoutes[i];
-				const route = compiled.route;
-				if (route.type === 'server') {
-					const methods = /** @type {ServerRoute} */ (route).methods;
-					if (normalizedMethod === undefined) normalizedMethod = method.toUpperCase();
-					if (!methods.includes(normalizedMethod)) continue;
+			const staticMatches = staticByPath.get(pathname);
+			if (staticMatches !== undefined) {
+				for (let i = 0; i < staticMatches.length; i++) {
+					const route = staticMatches[i].route;
+					if (route.type === 'server') {
+						const methods = /** @type {ServerRoute} */ (route).methods;
+						if (normalizedMethod === undefined) normalizedMethod = method.toUpperCase();
+						if (!methods.includes(normalizedMethod)) continue;
+					}
+					return { route, params: {} };
 				}
-				if (pathname === compiled.pattern) return { route, params: {} };
 			}
 
 			const parts = pathnameSegments(pathname);

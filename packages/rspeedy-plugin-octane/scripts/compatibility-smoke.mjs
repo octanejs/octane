@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 import { LYNX_TOOLCHAIN_LANES } from '../src/toolchain-lanes.js';
 import { verifyCompatibilityConsumer } from './compatibility-consumer.mjs';
+import { renderPackedExampleWorkspace } from '../../../scripts/package-pack-canaries.mjs';
 
 const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
 const FIXTURE = resolve(import.meta.dirname, '../tests/_fixtures/application');
@@ -63,9 +64,11 @@ function packWorkspacePackages(directory) {
 }
 
 function renderOverrides(archives) {
-	return `overrides:\n${Object.entries(archives)
-		.map(([name, archive]) => `  ${JSON.stringify(name)}: ${JSON.stringify(`file:${archive}`)}`)
-		.join('\n')}\n`;
+	return renderPackedExampleWorkspace(
+		Object.fromEntries(
+			Object.entries(archives).map(([name, archive]) => [name, `file:${archive}`]),
+		),
+	);
 }
 
 function installConsumer(root, lane, archives) {

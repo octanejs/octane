@@ -126,48 +126,64 @@ const LOGO = `<svg class="mark" viewBox="0 0 84 108" fill="none" aria-hidden="tr
  * The documentation cards, matching the card treatment on octanejs.dev: the
  * same radius, the same subtle surface, and the same accent-tinted hover rather
  * than a plain border swap.
+ *
+ * An assigned `<style>` is a theme rather than a block scoped to one template:
+ * it keeps every selector and evaluates to a class map. The page applies it by
+ * putting `apply={linkTheme}` on its own `<style>` block, which stamps the
+ * theme's class on the items beside that block and everything below them —
+ * never on the element that contains it, which is why the block and the
+ * page's root are fragment siblings — so these rules reach them the same way
+ * the block's own rules do. One block rather than a self-closed
+ * `<style apply />` beside it: the type-checker's virtual TSX accepts only one
+ * `<style>` per element. The theme sits at module scope, above the component
+ * that applies it, which is the order the compiler requires.
  */
-const LINK_STYLES = `      .links {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-        gap: 0.75rem;
-        width: 100%;
-        max-width: 42rem;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-      }
-      .link {
-        display: block;
-        padding: 1rem;
-        border: 1px solid var(--border);
-        border-radius: 0.9rem;
-        background: var(--surface-subtle);
-        color: var(--text);
-        text-align: left;
-        text-decoration: none;
-        transition:
-          background 0.15s,
-          border-color 0.15s,
-          transform 0.15s;
-      }
-      .link:hover {
-        border-color: var(--card-hover-border);
-        background: var(--card-hover-bg);
-        transform: translateY(-1px);
-      }
-      .link-title {
-        display: block;
-        font-size: 0.95rem;
-        font-weight: 600;
-      }
-      .link-body {
-        display: block;
-        margin-top: 0.15rem;
-        color: var(--text-secondary);
-        font-size: 0.82rem;
-        line-height: 1.4;
-      }`;
+const LINK_THEME = `// The documentation cards. An assigned <style> is a theme: the page's own
+// <style apply={linkTheme}> block below applies it, so its rules reach the
+// items beside that block and everything below them.
+const linkTheme = <style>
+  .links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 42rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .link {
+    display: block;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.9rem;
+    background: var(--surface-subtle);
+    color: var(--text);
+    text-align: left;
+    text-decoration: none;
+    transition:
+      background 0.15s,
+      border-color 0.15s,
+      transform 0.15s;
+  }
+  .link:hover {
+    border-color: var(--card-hover-border);
+    background: var(--card-hover-bg);
+    transform: translateY(-1px);
+  }
+  .link-title {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .link-body {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+</style>;`;
 
 /** Where the landing page sends people next. */
 const DOC_LINKS = `const LINKS = [
@@ -208,6 +224,8 @@ export const appComponent = (mode) =>
 
 ${DOC_LINKS}
 
+${LINK_THEME}
+
 export function App() @{
   <Layout>
     <section class="hero">
@@ -229,7 +247,7 @@ export function App() @{
       </ul>
     </section>
 
-    <style>
+    <style apply={linkTheme}>
       .hero {
         display: flex;
         flex-direction: column;
@@ -253,33 +271,17 @@ export function App() @{
         color: var(--text-secondary);
         font-size: 1.25rem;
       }
-${LINK_STYLES}
     </style>
   </Layout>
 }
 `
 		: `${DOC_LINKS}
 
-export function App() @{
-  <main class="page">
-    ${LOGO}
-    <h1 class="title">octane</h1>
-    <p class="lede">
-      React’s programming model, compiled. Edit src/App.tsrx and save — the page
-      updates without a reload.
-    </p>
-    <ul class="links">
-      @for (const link of LINKS; key link.href) {
-        <li>
-          <a class="link" href={link.href} target="_blank" rel="noreferrer">
-            <span class="link-title">{link.title as string}</span>
-            <span class="link-body">{link.body as string}</span>
-          </a>
-        </li>
-      }
-    </ul>
+${LINK_THEME}
 
-    <style>
+export function App() @{
+  <>
+    <style apply={linkTheme}>
       .page {
         display: flex;
         min-height: 100dvh;
@@ -306,9 +308,26 @@ export function App() @{
         color: var(--text-secondary);
         font-size: 1.25rem;
       }
-${LINK_STYLES}
     </style>
-  </main>
+    <main class="page">
+      ${LOGO}
+      <h1 class="title">octane</h1>
+      <p class="lede">
+        React’s programming model, compiled. Edit src/App.tsrx and save — the page
+        updates without a reload.
+      </p>
+      <ul class="links">
+        @for (const link of LINKS; key link.href) {
+          <li>
+            <a class="link" href={link.href} target="_blank" rel="noreferrer">
+              <span class="link-title">{link.title as string}</span>
+              <span class="link-body">{link.body as string}</span>
+            </a>
+          </li>
+        }
+      </ul>
+    </main>
+  </>
 }
 `;
 
@@ -323,14 +342,7 @@ interface LayoutProps {
 }
 
 export function Layout(props: LayoutProps) @{
-  <div class="shell">
-    <nav class="nav">
-      <a class="nav-link" href="/">Home</a>
-      <a class="nav-link" href="/counter">Counter</a>
-      <a class={["nav-link", "nav-endpoint"]} href="/api/health">/api/health</a>
-    </nav>
-    <main class="main">{props.children}</main>
-
+  <>
     <style>
       .shell {
         display: flex;
@@ -373,7 +385,15 @@ export function Layout(props: LayoutProps) @{
         padding: 3rem 1.5rem;
       }
     </style>
-  </div>
+    <div class="shell">
+      <nav class="nav">
+        <a class="nav-link" href="/">Home</a>
+        <a class="nav-link" href="/counter">Counter</a>
+        <a class={["nav-link", "nav-endpoint"]} href="/api/health">/api/health</a>
+      </nav>
+      <main class="main">{props.children}</main>
+    </div>
+  </>
 }
 `;
 
@@ -391,6 +411,42 @@ export function Counter() @{
   const [count, setCount] = useState(0);
 
   <Layout>
+    <style>
+      .counter {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.25rem;
+        text-align: center;
+      }
+      .title {
+        margin: 0;
+        font-size: 2rem;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+      }
+      .lede {
+        max-width: 34rem;
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 1.25rem;
+      }
+      /* The site's primary action: an accent pill. */
+      .button {
+        padding: 0.7rem 1.4rem;
+        border: none;
+        border-radius: 9999px;
+        background: var(--accent);
+        color: var(--on-accent);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .button:hover {
+        background: var(--accent-hover);
+      }
+    </style>
     <section class="counter">
       <h1 class="title">Server-rendered, then interactive</h1>
       <p class="lede">
@@ -400,43 +456,6 @@ export function Counter() @{
       <button class="button" onClick={() => setCount(count + 1)}>
         {"Pressed " + count + " times"}
       </button>
-
-      <style>
-        .counter {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 1.25rem;
-          text-align: center;
-        }
-        .title {
-          margin: 0;
-          font-size: 2rem;
-          line-height: 1.1;
-          letter-spacing: -0.02em;
-        }
-        .lede {
-          max-width: 34rem;
-          margin: 0;
-          color: var(--text-secondary);
-          font-size: 1.25rem;
-        }
-        /* The site's primary action: an accent pill. */
-        .button {
-          padding: 0.7rem 1.4rem;
-          border: none;
-          border-radius: 9999px;
-          background: var(--accent);
-          color: var(--on-accent);
-          font: inherit;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background 0.15s;
-        }
-        .button:hover {
-          background: var(--accent-hover);
-        }
-      </style>
     </section>
   </Layout>
 }
@@ -462,12 +481,14 @@ export function health(): Response {
  * The reset and the theme tokens every component reads, taken from
  * octanejs.dev so a scaffolded app and the documentation look like one thing.
  *
- * A stylesheet rather than a `<style>` in the shell. A component's own `<style>`
- * is scoped — the compiler appends a scope hash to its selectors — so it can
- * style that component's markup but never `body`, and these custom properties
- * have to resolve for every component at once. Keeping them in a file the shell
- * links, rather than inline in the shell, means `init` still has something to
- * point at when the project brought its own `index.html` and kept it.
+ * A stylesheet rather than a `<style>` in the shell. A `<style>` in a component
+ * styles only the items beside it and everything below them — the compiler
+ * rewrites its selectors with a scope hash — and a theme such as `linkTheme`
+ * reaches only the scopes that apply it, so neither can style `body`, and these custom
+ * properties have to resolve for every component at once. Keeping them in a
+ * file the shell links, rather than inline in the shell, means `init` still has
+ * something to point at when the project brought its own `index.html` and kept
+ * it.
  *
  * Linked from the shell rather than imported by a component on purpose: a CSS
  * import is injected by JavaScript in dev, so the tokens would arrive after the

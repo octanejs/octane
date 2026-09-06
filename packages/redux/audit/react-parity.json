@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "acfa82cb9987059d0fb25e890806a7a44486953d8edbf273d76746aeb43c3789"
     }
   },
   "lanes": [
@@ -78,7 +78,7 @@
         {
           "path": "packages/redux/audit/test-classifications.json",
           "role": "support",
-          "sha256": "15bd6113cbbefba4697ac78e1795710a2c247447901ec6192891f1318c4c7059"
+          "sha256": "e2bebd1372785db130af843f419e07776048c83a78687d466fddae6b65b9d2d6"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
