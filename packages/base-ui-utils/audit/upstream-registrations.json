@@ -1,0 +1,1412 @@
+[
+  {
+    "id": "react-case-v1:baa7baf0bbcc94772f94",
+    "source": "packages/utils/src/addEventListener.spec.ts:4:1",
+    "kind": "type-assertion",
+    "title": "const unsubscribeFromWindowPointerMove = addEventListener(window, 'pointermove', (event) => { expectType<PointerEvent, typeof event>(event); });"
+  },
+  {
+    "id": "react-case-v1:4699495440083b6ff979",
+    "source": "packages/utils/src/addEventListener.spec.ts:7:1",
+    "kind": "type-assertion",
+    "title": "expectType<() => void, typeof unsubscribeFromWindowPointerMove>(unsubscribeFromWindowPointerMove);"
+  },
+  {
+    "id": "react-case-v1:47facdab6f8d7e217498",
+    "source": "packages/utils/src/addEventListener.spec.ts:9:1",
+    "kind": "type-assertion",
+    "title": "const element = document.createElement('div');"
+  },
+  {
+    "id": "react-case-v1:9f387089cc094d3a12fa",
+    "source": "packages/utils/src/addEventListener.spec.ts:10:1",
+    "kind": "type-assertion",
+    "title": "const unsubscribeFromElementKeyDown = addEventListener(element, 'keydown', (event) => { expectType<KeyboardEvent, typeof event>(event); });"
+  },
+  {
+    "id": "react-case-v1:9a246dd29f106c60011b",
+    "source": "packages/utils/src/addEventListener.spec.ts:13:1",
+    "kind": "type-assertion",
+    "title": "expectType<() => void, typeof unsubscribeFromElementKeyDown>(unsubscribeFromElementKeyDown);"
+  },
+  {
+    "id": "react-case-v1:0cb85797c38c1a1ff571",
+    "source": "packages/utils/src/addEventListener.spec.ts:15:1",
+    "kind": "type-assertion",
+    "title": "const genericElement: Element = document.createElement('div');"
+  },
+  {
+    "id": "react-case-v1:dad3334b54a45d9695b4",
+    "source": "packages/utils/src/addEventListener.spec.ts:16:1",
+    "kind": "type-assertion",
+    "title": "const unsubscribeFromGenericElement = addEventListener(genericElement, 'keydown', (event) => { expectType<KeyboardEvent, typeof event>(event); });"
+  },
+  {
+    "id": "react-case-v1:25b6506e4a37d5b882d3",
+    "source": "packages/utils/src/addEventListener.spec.ts:19:1",
+    "kind": "type-assertion",
+    "title": "expectType<() => void, typeof unsubscribeFromGenericElement>(unsubscribeFromGenericElement);"
+  },
+  {
+    "id": "react-case-v1:88b0a96c12dcbb183539",
+    "source": "packages/utils/src/addEventListener.spec.ts:21:1",
+    "kind": "type-assertion",
+    "title": "const mediaQueryList = window.matchMedia('(min-width: 1px)');"
+  },
+  {
+    "id": "react-case-v1:59b8de1d094e52f4c627",
+    "source": "packages/utils/src/addEventListener.spec.ts:22:1",
+    "kind": "type-assertion",
+    "title": "const unsubscribeFromMediaQuery = addEventListener(mediaQueryList, 'change', (event) => { expectType<MediaQueryListEvent, typeof event>(event); });"
+  },
+  {
+    "id": "react-case-v1:0f7822ceb99d2ed28478",
+    "source": "packages/utils/src/addEventListener.spec.ts:25:1",
+    "kind": "type-assertion",
+    "title": "expectType<() => void, typeof unsubscribeFromMediaQuery>(unsubscribeFromMediaQuery);"
+  },
+  {
+    "id": "react-case-v1:e5f5b7f77a80c9d1901d",
+    "source": "packages/utils/src/addEventListener.spec.ts:28:1",
+    "kind": "type-assertion",
+    "title": "const unsubscribeFromGenericTarget = addEventListener(genericTarget, 'custom', (_event) => {});"
+  },
+  {
+    "id": "react-case-v1:08cdeff829052b8c2155",
+    "source": "packages/utils/src/addEventListener.spec.ts:29:1",
+    "kind": "type-assertion",
+    "title": "expectType<() => void, typeof unsubscribeFromGenericTarget>(unsubscribeFromGenericTarget);"
+  },
+  {
+    "id": "react-case-v1:dd2cac3b933d3c6814ae",
+    "source": "packages/utils/src/addEventListener.spec.ts:31:1",
+    "kind": "type-assertion",
+    "title": "function handleKeyboardEvent(event: KeyboardEvent) { expectType<KeyboardEvent, typeof event>(event); }"
+  },
+  {
+    "id": "react-case-v1:2294653930bdaeedce2f",
+    "source": "packages/utils/src/addEventListener.spec.ts:36:1",
+    "kind": "type-assertion",
+    "title": "addEventListener(window, 'pointermove', handleKeyboardEvent);"
+  },
+  {
+    "id": "react-case-v1:798c869d2179e2934661",
+    "source": "packages/utils/src/addEventListener.spec.ts:39:1",
+    "kind": "type-assertion",
+    "title": "addEventListener(element, 'keydown', (event: PointerEvent) => { expectType<PointerEvent, typeof event>(event); });"
+  },
+  {
+    "id": "react-case-v1:f23e4c3255df30e6b428",
+    "source": "packages/utils/src/addEventListener.test.ts:5:3",
+    "kind": "it",
+    "title": "adds the listener and returns an unsubscribe function"
+  },
+  {
+    "id": "react-case-v1:092c5544229e3d06ed91",
+    "source": "packages/utils/src/areArraysEqual.test.ts:5:3",
+    "kind": "it",
+    "title": "returns true for arrays with the same elements in the same order"
+  },
+  {
+    "id": "react-case-v1:45294373ff88c2f5ef44",
+    "source": "packages/utils/src/areArraysEqual.test.ts:9:3",
+    "kind": "it",
+    "title": "returns false when elements differ"
+  },
+  {
+    "id": "react-case-v1:06954bab3eb487793b98",
+    "source": "packages/utils/src/areArraysEqual.test.ts:13:3",
+    "kind": "it",
+    "title": "returns false when lengths differ"
+  },
+  {
+    "id": "react-case-v1:0999a663fa316368659a",
+    "source": "packages/utils/src/areArraysEqual.test.ts:17:3",
+    "kind": "it",
+    "title": "returns true for the same array reference"
+  },
+  {
+    "id": "react-case-v1:14d79087634d9b57a919",
+    "source": "packages/utils/src/areArraysEqual.test.ts:22:3",
+    "kind": "it",
+    "title": "returns true for two empty arrays"
+  },
+  {
+    "id": "react-case-v1:42b08977fcce60da0632",
+    "source": "packages/utils/src/areArraysEqual.test.ts:26:3",
+    "kind": "it",
+    "title": "treats NaN as equal to NaN (Object.is semantics)"
+  },
+  {
+    "id": "react-case-v1:996992d19241249a8572",
+    "source": "packages/utils/src/areArraysEqual.test.ts:30:3",
+    "kind": "it",
+    "title": "treats 0 as different from -0 (Object.is semantics)"
+  },
+  {
+    "id": "react-case-v1:1826c366d1fb6b036668",
+    "source": "packages/utils/src/areArraysEqual.test.ts:34:3",
+    "kind": "it",
+    "title": "compares by reference by default"
+  },
+  {
+    "id": "react-case-v1:705655228ec68c068bd4",
+    "source": "packages/utils/src/areArraysEqual.test.ts:38:3",
+    "kind": "it",
+    "title": "uses the provided comparer"
+  },
+  {
+    "id": "react-case-v1:5c8083c2d38331174662",
+    "source": "packages/utils/src/areArraysEqual.test.ts:45:3",
+    "kind": "it",
+    "title": "lets the provided comparer override Object.is semantics"
+  },
+  {
+    "id": "react-case-v1:272e46e95a771492af48",
+    "source": "packages/utils/src/areArraysEqual.test.ts:49:3",
+    "kind": "it",
+    "title": "consults the provided comparer even for the same array reference"
+  },
+  {
+    "id": "react-case-v1:815288084e44ba588805",
+    "source": "packages/utils/src/clamp.test.ts:5:3",
+    "kind": "it",
+    "title": "clamps a value based on min and max"
+  },
+  {
+    "id": "react-case-v1:6f0949c8a9d6611b1502",
+    "source": "packages/utils/src/createLogOnce.test.ts:13:3",
+    "kind": "it",
+    "title": "creates a logger with a custom prefix"
+  },
+  {
+    "id": "react-case-v1:7fc28ffbc119fa813361",
+    "source": "packages/utils/src/createLogOnce.test.ts:22:3",
+    "kind": "it",
+    "title": "creates a logger without a prefix"
+  },
+  {
+    "id": "react-case-v1:2fdc1a4e92067de517a5",
+    "source": "packages/utils/src/createLogOnce.test.ts:29:3",
+    "kind": "it",
+    "title": "joins multiple messages with a space"
+  },
+  {
+    "id": "react-case-v1:21d808e8802e64552b06",
+    "source": "packages/utils/src/createLogOnce.test.ts:36:3",
+    "kind": "it",
+    "title": "deduplicates each severity independently"
+  },
+  {
+    "id": "react-case-v1:87244078eb3ffd60cddd",
+    "source": "packages/utils/src/createLogOnce.test.ts:45:3",
+    "kind": "it",
+    "title": "logs again after reset"
+  },
+  {
+    "id": "react-case-v1:c4026e98f3170fec9ab7",
+    "source": "packages/utils/src/empty.test.ts:5:3",
+    "kind": "it",
+    "title": "keeps the shared EMPTY_ARRAY frozen"
+  },
+  {
+    "id": "react-case-v1:aa68494dc8cf97af5ce4",
+    "source": "packages/utils/src/empty.test.ts:10:3",
+    "kind": "it",
+    "title": "keeps the shared EMPTY_OBJECT frozen"
+  },
+  {
+    "id": "react-case-v1:a202b0e7606af0cdbb50",
+    "source": "packages/utils/src/formatErrorMessage.test.ts:6:5",
+    "kind": "it",
+    "title": "formats error message with code only"
+  },
+  {
+    "id": "react-case-v1:25f3e065c8fb78229bc4",
+    "source": "packages/utils/src/formatErrorMessage.test.ts:13:5",
+    "kind": "it",
+    "title": "formats error message with code and args"
+  },
+  {
+    "id": "react-case-v1:d861b35f8494bdcce571",
+    "source": "packages/utils/src/formatErrorMessage.test.ts:22:5",
+    "kind": "it",
+    "title": "creates a formatter with custom URL and prefix"
+  },
+  {
+    "id": "react-case-v1:638d44cca1b6917e8274",
+    "source": "packages/utils/src/formatErrorMessage.test.ts:30:5",
+    "kind": "it",
+    "title": "creates a formatter that handles args correctly"
+  },
+  {
+    "id": "react-case-v1:7856a4bbd7b2e606ff0c",
+    "source": "packages/utils/src/formatErrorMessage.test.ts:41:5",
+    "kind": "it",
+    "title": "handles special characters in args"
+  },
+  {
+    "id": "react-case-v1:d168282cf83aa3d5aaa3",
+    "source": "packages/utils/src/formatNumber.test.ts:13:5",
+    "kind": "it",
+    "title": "caches the formatter based on options"
+  },
+  {
+    "id": "react-case-v1:eb4128a7f734695c6879",
+    "source": "packages/utils/src/formatNumber.test.ts:19:5",
+    "kind": "it",
+    "title": "caches different Intl.Locale objects separately"
+  },
+  {
+    "id": "react-case-v1:925a2c600280c30af05b",
+    "source": "packages/utils/src/formatNumber.test.ts:30:5",
+    "kind": "it",
+    "title": "formats a number"
+  },
+  {
+    "id": "react-case-v1:800ba3830b8107dea1c9",
+    "source": "packages/utils/src/formatNumber.test.ts:38:5",
+    "kind": "it",
+    "title": "formats a number with different options"
+  },
+  {
+    "id": "react-case-v1:0bd4f2823708675b4dfc",
+    "source": "packages/utils/src/formatNumber.test.ts:42:5",
+    "kind": "it",
+    "title": "returns an empty string for null"
+  },
+  {
+    "id": "react-case-v1:633095f43d9976952d81",
+    "source": "packages/utils/src/getDefaultFormSubmitter.test.ts:14:3",
+    "kind": "it",
+    "title": "returns the first submit button associated with the form"
+  },
+  {
+    "id": "react-case-v1:10a7e5596dae736a8a6f",
+    "source": "packages/utils/src/getDefaultFormSubmitter.test.ts:26:3",
+    "kind": "it",
+    "title": "returns a disabled submit button when it is first in form.elements"
+  },
+  {
+    "id": "react-case-v1:2b13b73e2e704dcf064d",
+    "source": "packages/utils/src/getDefaultFormSubmitter.test.ts:37:3",
+    "kind": "it",
+    "title": "supports buttons with the default submit type"
+  },
+  {
+    "id": "react-case-v1:55a905a688ab54a93ddd",
+    "source": "packages/utils/src/getDefaultFormSubmitter.test.ts:48:3",
+    "kind": "it",
+    "title": "supports input submitters from form.elements and ignores non-submit controls"
+  },
+  {
+    "id": "react-case-v1:5f01ca3e496a6a1b33c5",
+    "source": "packages/utils/src/getDefaultFormSubmitter.test.ts:60:3",
+    "kind": "it",
+    "title": "returns null when there is no default submitter"
+  },
+  {
+    "id": "react-case-v1:d3d083554679655efe28",
+    "source": "packages/utils/src/getReactElementRef.test.tsx:6:3",
+    "kind": "it",
+    "title": "returns null when not provided a React element"
+  },
+  {
+    "id": "react-case-v1:055f2f861c8cceb4184c",
+    "source": "packages/utils/src/getReactElementRef.test.tsx:15:3",
+    "kind": "it",
+    "title": "returns the ref of a React element"
+  },
+  {
+    "id": "react-case-v1:21e745d8c1ab26104148",
+    "source": "packages/utils/src/getReactElementRef.test.tsx:22:3",
+    "kind": "it",
+    "title": "returns null for a fragment"
+  },
+  {
+    "id": "react-case-v1:c3046211e28a5be134ec",
+    "source": "packages/utils/src/getReactElementRef.test.tsx:33:3",
+    "kind": "it",
+    "title": "returns null for an element without a ref"
+  },
+  {
+    "id": "react-case-v1:c93d00b89bcd52bfc991",
+    "source": "packages/utils/src/mergeCleanups.test.ts:5:3",
+    "kind": "it",
+    "title": "calls each cleanup in order and skips empty values"
+  },
+  {
+    "id": "react-case-v1:44ab24b47e9daf369ed1",
+    "source": "packages/utils/src/shadowDom.test.ts:5:3",
+    "kind": "it",
+    "title": "returns the composed-path target while the event is being dispatched"
+  },
+  {
+    "id": "react-case-v1:5b82013a348b83adfb65",
+    "source": "packages/utils/src/shadowDom.test.ts:21:3",
+    "kind": "it",
+    "title": "falls back to `target` once dispatch has completed"
+  },
+  {
+    "id": "react-case-v1:0c1743c854e02400a44a",
+    "source": "packages/utils/src/store/createSelector.spec.ts:13:1",
+    "kind": "type-assertion",
+    "title": "{ const selector = createSelector( (s: State) => s.value, (s: State) => s.label, (value, label, x1: number, x2: string, x3: boolean) => `${value}${label}${x1}${x2}${x3}`, ); expectType<string, ReturnType<typeof selector>>(selector(state, 1, 'a', true)); }"
+  },
+  {
+    "id": "react-case-v1:71fffaa627119ea8e205",
+    "source": "packages/utils/src/store/createSelector.spec.ts:23:1",
+    "kind": "type-assertion",
+    "title": "createSelector( input, input, input, input, input, input, input, (v1, v2, v3, v4, v5, v6, v7) => v1 + v2 + v3 + v4 + v5 + v6 + v7, );"
+  },
+  {
+    "id": "react-case-v1:e3e1a65159b5f9b3384d",
+    "source": "packages/utils/src/store/createSelector.spec.ts:36:1",
+    "kind": "type-assertion",
+    "title": "createSelector(input, input, input, input, input, input, input, input, (v1: number) => v1);"
+  },
+  {
+    "id": "react-case-v1:0fc0de63136d3530ac17",
+    "source": "packages/utils/src/store/createSelector.spec.ts:40:1",
+    "kind": "type-assertion",
+    "title": "createSelector(input, (value, x1: number, x2: number, x3: number) => value + x1 + x2 + x3);"
+  },
+  {
+    "id": "react-case-v1:b97ae50748ce9b488ca2",
+    "source": "packages/utils/src/store/createSelector.spec.ts:44:1",
+    "kind": "type-assertion",
+    "title": "createSelector(input, (value, x1: number, x2: number, x3: number, x4: number) => value + x4);"
+  },
+  {
+    "id": "react-case-v1:6a5e81ea8e13dee505a2",
+    "source": "packages/utils/src/store/createSelector.spec.ts:48:1",
+    "kind": "type-assertion",
+    "title": "createSelector(input, input, (v1, v2, x1: number, x2: number, x3: number, x4: number) => v1 + v2 + x4);"
+  },
+  {
+    "id": "react-case-v1:3382fdfb7d0e9dec23d8",
+    "source": "packages/utils/src/store/createSelector.spec.ts:52:1",
+    "kind": "type-assertion",
+    "title": "{ const constant = createSelector(() => 42); expectType<number, ReturnType<typeof constant>>(constant()); }"
+  },
+  {
+    "id": "react-case-v1:e7bca6eef79c725ebe4d",
+    "source": "packages/utils/src/store/createSelector.spec.ts:56:1",
+    "kind": "type-assertion",
+    "title": "createSelector((s: State, x1: number, x2: number, x3: number, x4: number) => s.value + x4);"
+  },
+  {
+    "id": "react-case-v1:d1c773ebbf5e7151fc23",
+    "source": "packages/utils/src/store/createSelector.spec.ts:60:1",
+    "kind": "type-assertion",
+    "title": "createSelector(input, (value, x1?: number) => value + (x1 ?? 0));"
+  },
+  {
+    "id": "react-case-v1:27cb077f29c88e4788b9",
+    "source": "packages/utils/src/store/createSelector.test.ts:5:3",
+    "kind": "it",
+    "title": "returns the input function when called with a single selector"
+  },
+  {
+    "id": "react-case-v1:d14a8ace80c0ca0d745e",
+    "source": "packages/utils/src/store/createSelector.test.ts:13:3",
+    "kind": "it",
+    "title": "supports one input selector plus a combiner"
+  },
+  {
+    "id": "react-case-v1:62acad5c495b53e54f22",
+    "source": "packages/utils/src/store/createSelector.test.ts:25:3",
+    "kind": "it",
+    "title": "supports six input selectors plus a combiner"
+  },
+  {
+    "id": "react-case-v1:40904959077d5c71aa34",
+    "source": "packages/utils/src/store/createSelector.test.ts:42:3",
+    "kind": "it",
+    "title": "supports seven input selectors plus a combiner"
+  },
+  {
+    "id": "react-case-v1:7cff37e8bfee2f153d3e",
+    "source": "packages/utils/src/store/createSelector.test.ts:68:3",
+    "kind": "it",
+    "title": "throws when given one more than the maximum (eight input selectors plus a combiner)"
+  },
+  {
+    "id": "react-case-v1:d86228cb88a85d2886a5",
+    "source": "packages/utils/src/store/createSelector.test.ts:77:3",
+    "kind": "it",
+    "title": "passes extra args through to every input selector and to the combiner"
+  },
+  {
+    "id": "react-case-v1:206870d64023da3bf266",
+    "source": "packages/utils/src/store/createSelectorMemoized.spec.ts:15:1",
+    "kind": "type-assertion",
+    "title": "{ const constant = createSelectorMemoized(() => 42); constant(state); // @ts-expect-error The memoized selector requires the state to cache the result. constant(); }"
+  },
+  {
+    "id": "react-case-v1:9b61e298ca96e802d0d5",
+    "source": "packages/utils/src/store/createSelectorMemoized.spec.ts:23:1",
+    "kind": "type-assertion",
+    "title": "createSelectorMemoized((s: State, x1: number, x2: number, x3: number) => s.value + x1 + x2 + x3);"
+  },
+  {
+    "id": "react-case-v1:9f0b83c1ee86bfff293d",
+    "source": "packages/utils/src/store/createSelectorMemoized.spec.ts:27:1",
+    "kind": "type-assertion",
+    "title": "createSelectorMemoized((s: State, x1: number, x2: number, x3: number, x4: number) => s.value + x4);"
+  },
+  {
+    "id": "react-case-v1:26617dd4c73999a54678",
+    "source": "packages/utils/src/store/createSelectorMemoized.spec.ts:30:1",
+    "kind": "type-assertion",
+    "title": "createSelectorMemoized( input, input, input, input, input, input, input, input, (v1, v2, v3, v4, v5, v6, v7, v8) => v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8, );"
+  },
+  {
+    "id": "react-case-v1:868e6c0361f9831c6ce6",
+    "source": "packages/utils/src/store/createSelectorMemoized.spec.ts:43:1",
+    "kind": "type-assertion",
+    "title": "createSelectorMemoizedWithOptions({ memoizeOptions: { resultEqualityCheck: (a: unknown, b: unknown) => a === b }, });"
+  },
+  {
+    "id": "react-case-v1:8c079816c14e40d6d273",
+    "source": "packages/utils/src/store/createSelectorMemoized.spec.ts:49:1",
+    "kind": "type-assertion",
+    "title": "createSelectorMemoizedWithOptions({ memoizeOptions: { equalityCheck: 123 } });"
+  },
+  {
+    "id": "react-case-v1:b73546b34c162675dceb",
+    "source": "packages/utils/src/store/createSelectorMemoized.spec.ts:53:1",
+    "kind": "type-assertion",
+    "title": "createSelectorMemoizedWithOptions({ unknownOption: true });"
+  },
+  {
+    "id": "react-case-v1:b8b99fc7e049464f484b",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:9:3",
+    "kind": "it",
+    "title": "uses an identity input selector when only a combiner is provided"
+  },
+  {
+    "id": "react-case-v1:553aa739704f4ba2376e",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:23:3",
+    "kind": "it",
+    "title": "supports a zero-parameter combiner called with the state"
+  },
+  {
+    "id": "react-case-v1:341847c19180a9726225",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:29:3",
+    "kind": "it",
+    "title": "passes extra arguments to a single combiner alongside the state"
+  },
+  {
+    "id": "react-case-v1:055b5db1629fbbc6e4a6",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:46:3",
+    "kind": "it",
+    "title": "re-runs the combiner when input selector results change"
+  },
+  {
+    "id": "react-case-v1:1df2adff7251facf3a04",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:68:3",
+    "kind": "it",
+    "title": "caches separately per state identity"
+  },
+  {
+    "id": "react-case-v1:0f4a3abde6eca882525c",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:83:3",
+    "kind": "it",
+    "title": "passes one extra argument to the combiner and memoizes on it"
+  },
+  {
+    "id": "react-case-v1:c7d5ff7b4b431e4d42ae",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:100:3",
+    "kind": "it",
+    "title": "passes two extra arguments to the combiner"
+  },
+  {
+    "id": "react-case-v1:7a251774fe26e9ff27e2",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:115:3",
+    "kind": "it",
+    "title": "passes three extra arguments to the combiner"
+  },
+  {
+    "id": "react-case-v1:9a258d58642f241bda5e",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:132:3",
+    "kind": "it",
+    "title": "throws when the combiner takes more than three extra arguments"
+  },
+  {
+    "id": "react-case-v1:ba2ff95865927d0e5805",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:143:3",
+    "kind": "it",
+    "title": "throws when Function.length under-reports the combiner parameters"
+  },
+  {
+    "id": "react-case-v1:373a69dd535fa079f7e3",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:155:3",
+    "kind": "it",
+    "title": "produces a working factory when no options are provided"
+  },
+  {
+    "id": "react-case-v1:dc1e8e38f0831d4d3e7e",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:167:3",
+    "kind": "it",
+    "title": "forwards options through to the underlying reselect creator"
+  },
+  {
+    "id": "react-case-v1:25b588d16dc0563e0cf9",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:190:3",
+    "kind": "it",
+    "title": "merges object memoizeOptions over the Object.is equality default"
+  },
+  {
+    "id": "react-case-v1:25fba60b9f39cf0ce83d",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:211:3",
+    "kind": "it",
+    "title": "does not forward the lruMemoize defaults to a custom memoizer"
+  },
+  {
+    "id": "react-case-v1:93f7a21bd08c4a5e93b3",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:234:3",
+    "kind": "it",
+    "title": "does not break a custom memoizer that defaults its options parameter"
+  },
+  {
+    "id": "react-case-v1:d607c2294efb71854a40",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:265:3",
+    "kind": "it",
+    "title": "forwards custom memoizeOptions to a custom memoizer verbatim"
+  },
+  {
+    "id": "react-case-v1:cff1b94762aea2db42d2",
+    "source": "packages/utils/src/store/createSelectorMemoized.test.ts:288:3",
+    "kind": "it",
+    "title": "preserves the result reference with a resultEqualityCheck option"
+  },
+  {
+    "id": "react-case-v1:96e6648019de6aa9ecc0",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:11:1",
+    "kind": "type-assertion",
+    "title": "const selectors = { count: createSelector((state: TestState) => state.count), text: createSelector((state: TestState) => state.text), textLongerThan(state: TestState, length: number) { return state.text.length > length; }, textLengthBetween(state: TestState, minLength: number, maxLength: number) { return state.text.length >= minLength && state.text.length <= maxLength; }, };"
+  },
+  {
+    "id": "react-case-v1:12dde9abba587be8c26f",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:28:1",
+    "kind": "type-assertion",
+    "title": "store.set('text', 'next');"
+  },
+  {
+    "id": "react-case-v1:ae756871b70fc867dbc2",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:29:1",
+    "kind": "type-assertion",
+    "title": "store.set('count', undefined);"
+  },
+  {
+    "id": "react-case-v1:109728cc204144469ae7",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:30:1",
+    "kind": "type-assertion",
+    "title": "store.update({ text: 'next' });"
+  },
+  {
+    "id": "react-case-v1:19e2fe230cec7306fd99",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:31:1",
+    "kind": "type-assertion",
+    "title": "store.update({ count: undefined });"
+  },
+  {
+    "id": "react-case-v1:feb8da8ea46ff5ef10bf",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:32:1",
+    "kind": "type-assertion",
+    "title": "store.useSyncedValue('text', 'next');"
+  },
+  {
+    "id": "react-case-v1:2d51c78a40931c526f99",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:33:1",
+    "kind": "type-assertion",
+    "title": "store.useSyncedValues({ text: 'next' });"
+  },
+  {
+    "id": "react-case-v1:cbaece7dc38ae9c84c50",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:34:1",
+    "kind": "type-assertion",
+    "title": "store.useControlledProp('text', 'next');"
+  },
+  {
+    "id": "react-case-v1:efc07ac8ec8d74c7428f",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:36:1",
+    "kind": "type-assertion",
+    "title": "const setText = store.useStateSetter('text');"
+  },
+  {
+    "id": "react-case-v1:c85555b04366f36ecc0e",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:37:1",
+    "kind": "type-assertion",
+    "title": "setText('next');"
+  },
+  {
+    "id": "react-case-v1:329edbb312d609da0c72",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:40:1",
+    "kind": "type-assertion",
+    "title": "store.set('text', 1);"
+  },
+  {
+    "id": "react-case-v1:03763ada1ecb22106f8d",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:42:1",
+    "kind": "type-assertion",
+    "title": "store.set('text', undefined);"
+  },
+  {
+    "id": "react-case-v1:4518da577eb7aba19fb4",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:44:1",
+    "kind": "type-assertion",
+    "title": "store.update({ text: undefined });"
+  },
+  {
+    "id": "react-case-v1:e607307db9642be7107a",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:46:1",
+    "kind": "type-assertion",
+    "title": "store.update({ unknown: true });"
+  },
+  {
+    "id": "react-case-v1:bf6ba8ec88afe702bafd",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:48:1",
+    "kind": "type-assertion",
+    "title": "store.useSyncedValue('text', 1);"
+  },
+  {
+    "id": "react-case-v1:11a250e7d54031ee5768",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:50:1",
+    "kind": "type-assertion",
+    "title": "store.useSyncedValues({ text: undefined });"
+  },
+  {
+    "id": "react-case-v1:073d148a0aa2580b3d27",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:52:1",
+    "kind": "type-assertion",
+    "title": "store.useControlledProp('text', 1);"
+  },
+  {
+    "id": "react-case-v1:29f780877e440330f740",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:54:1",
+    "kind": "type-assertion",
+    "title": "setText(1);"
+  },
+  {
+    "id": "react-case-v1:4458c0a4f926cb017192",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:56:1",
+    "kind": "type-assertion",
+    "title": "const count = store.select('count');"
+  },
+  {
+    "id": "react-case-v1:94d3c7a7bd9d3c0f5dc1",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:57:1",
+    "kind": "type-assertion",
+    "title": "expectType<number | undefined, typeof count>(count);"
+  },
+  {
+    "id": "react-case-v1:912c4006984f2258f41f",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:59:1",
+    "kind": "type-assertion",
+    "title": "const text = store.select('text');"
+  },
+  {
+    "id": "react-case-v1:abf1825cf079b25873f8",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:60:1",
+    "kind": "type-assertion",
+    "title": "expectType<string, typeof text>(text);"
+  },
+  {
+    "id": "react-case-v1:aafb30592b7a529f1533",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:62:1",
+    "kind": "type-assertion",
+    "title": "const isTextLongerThan5 = store.select('textLongerThan', 5);"
+  },
+  {
+    "id": "react-case-v1:2eb95da7f7c93ebd1d9e",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:63:1",
+    "kind": "type-assertion",
+    "title": "expectType<boolean, typeof isTextLongerThan5>(isTextLongerThan5);"
+  },
+  {
+    "id": "react-case-v1:8f2d9784d97b0b50fb2a",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:65:1",
+    "kind": "type-assertion",
+    "title": "const isTextLengthBetween3And10 = store.select('textLengthBetween', 3, 10);"
+  },
+  {
+    "id": "react-case-v1:12781da819747404258d",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:66:1",
+    "kind": "type-assertion",
+    "title": "expectType<boolean, typeof isTextLengthBetween3And10>(isTextLengthBetween3And10);"
+  },
+  {
+    "id": "react-case-v1:7b7a2db36a8408668145",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:68:1",
+    "kind": "type-assertion",
+    "title": "const countReactive = store.useState('count');"
+  },
+  {
+    "id": "react-case-v1:8175690894916d486c51",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:69:1",
+    "kind": "type-assertion",
+    "title": "expectType<number | undefined, typeof countReactive>(countReactive);"
+  },
+  {
+    "id": "react-case-v1:740ba7dc4bb135899e26",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:71:1",
+    "kind": "type-assertion",
+    "title": "const textReactive = store.useState('text');"
+  },
+  {
+    "id": "react-case-v1:df365f06edfc47e19296",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:72:1",
+    "kind": "type-assertion",
+    "title": "expectType<string, typeof textReactive>(textReactive);"
+  },
+  {
+    "id": "react-case-v1:08186e1091eff65ce9f0",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:74:1",
+    "kind": "type-assertion",
+    "title": "const isTextLongerThan7Reactive = store.useState('textLongerThan', 7);"
+  },
+  {
+    "id": "react-case-v1:41c6f1edafa3b8807b6c",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:75:1",
+    "kind": "type-assertion",
+    "title": "expectType<boolean, typeof isTextLongerThan7Reactive>(isTextLongerThan7Reactive);"
+  },
+  {
+    "id": "react-case-v1:04f4638c80d067cfcc64",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:77:1",
+    "kind": "type-assertion",
+    "title": "const isTextLengthBetween2And8Reactive = store.useState('textLengthBetween', 2, 8);"
+  },
+  {
+    "id": "react-case-v1:267a8495d072a361e659",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:78:1",
+    "kind": "type-assertion",
+    "title": "expectType<boolean, typeof isTextLengthBetween2And8Reactive>(isTextLengthBetween2And8Reactive);"
+  },
+  {
+    "id": "react-case-v1:de4d821638cebed6e8eb",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:83:1",
+    "kind": "type-assertion",
+    "title": "store.select();"
+  },
+  {
+    "id": "react-case-v1:6c132d85911c3fd8d317",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:85:1",
+    "kind": "type-assertion",
+    "title": "store.select('count', 1);"
+  },
+  {
+    "id": "react-case-v1:b7ffafd8c61f943e917d",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:87:1",
+    "kind": "type-assertion",
+    "title": "store.select('textLongerThan');"
+  },
+  {
+    "id": "react-case-v1:22f0bf0760696b4b7fca",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:89:1",
+    "kind": "type-assertion",
+    "title": "store.select('textLengthBetween', 1);"
+  },
+  {
+    "id": "react-case-v1:653208b8312a08ca435c",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:91:1",
+    "kind": "type-assertion",
+    "title": "store.select('textLongerThan', 2, 3);"
+  },
+  {
+    "id": "react-case-v1:d807d3bb1cde1c4ece26",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:94:1",
+    "kind": "type-assertion",
+    "title": "store.useState();"
+  },
+  {
+    "id": "react-case-v1:3b2bdf1ae6ba76df630f",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:96:1",
+    "kind": "type-assertion",
+    "title": "store.useState('count', 1);"
+  },
+  {
+    "id": "react-case-v1:003526b9ea2e85e457ba",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:98:1",
+    "kind": "type-assertion",
+    "title": "store.useState('textLongerThan');"
+  },
+  {
+    "id": "react-case-v1:694434d780f3e11bae3d",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:100:1",
+    "kind": "type-assertion",
+    "title": "store.useState('textLengthBetween', 1);"
+  },
+  {
+    "id": "react-case-v1:28453206df903e810491",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:102:1",
+    "kind": "type-assertion",
+    "title": "store.useState('textLongerThan', 2, 3);"
+  },
+  {
+    "id": "react-case-v1:168e3fff12e6aa0bf492",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:104:1",
+    "kind": "type-assertion",
+    "title": "const unsubscribeFromCount = store.observe('count', (newValue, oldValue) => { expectType<number | undefined, typeof newValue>(newValue); expectType<number | undefined, typeof oldValue>(oldValue); });"
+  },
+  {
+    "id": "react-case-v1:01dcfe453c93b15aa633",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:108:1",
+    "kind": "type-assertion",
+    "title": "expectType<() => void, typeof unsubscribeFromCount>(unsubscribeFromCount);"
+  },
+  {
+    "id": "react-case-v1:56e57511d813917f46a2",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:110:1",
+    "kind": "type-assertion",
+    "title": "const unsubscribeFromSelector = store.observe( (state) => state.text.length, (newValue, oldValue) => { expectType<number, typeof newValue>(newValue); expectType<number, typeof oldValue>(oldValue); }, );"
+  },
+  {
+    "id": "react-case-v1:38a8bd4c7bed60174c6f",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:117:1",
+    "kind": "type-assertion",
+    "title": "expectType<() => void, typeof unsubscribeFromSelector>(unsubscribeFromSelector);"
+  },
+  {
+    "id": "react-case-v1:1711743ca183a0fb547f",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:119:1",
+    "kind": "type-assertion",
+    "title": "const mismatchedListener = (newValue: string) => { expectType<string, typeof newValue>(newValue); };"
+  },
+  {
+    "id": "react-case-v1:acda6d403ec8dd491628",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:123:1",
+    "kind": "type-assertion",
+    "title": "store.observe((state) => state.text.length, mismatchedListener);"
+  },
+  {
+    "id": "react-case-v1:70963061a27507bbf5eb",
+    "source": "packages/utils/src/store/ReactStore.spec.ts:127:1",
+    "kind": "type-assertion",
+    "title": "{ const degraded = ReactStore.create({ count: 0 }); expectType<Store<{ count: number }>, typeof degraded>(degraded); }"
+  },
+  {
+    "id": "react-case-v1:b8ad539a7f43f1f6a61f",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:18:3",
+    "kind": "it",
+    "title": "create() constructs a fully wired ReactStore instance"
+  },
+  {
+    "id": "react-case-v1:cb878d8f3b896a1552c5",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:27:3",
+    "kind": "it",
+    "title": "syncs internal state from controlled prop"
+  },
+  {
+    "id": "react-case-v1:b76b1c0e2d50d0803b75",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:52:3",
+    "kind": "it",
+    "title": "syncs internal state from controlled prop when the store changes"
+  },
+  {
+    "id": "react-case-v1:426cf6cfcad25d14f1a6",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:69:3",
+    "kind": "it",
+    "title": "warns on switching from uncontrolled to controlled"
+  },
+  {
+    "id": "react-case-v1:a205f4e487e96df68361",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:86:3",
+    "kind": "it",
+    "title": "warns on switching from controlled to uncontrolled"
+  },
+  {
+    "id": "react-case-v1:2e5fb3898323b8cbdb06",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:103:3",
+    "kind": "it",
+    "title": "useProp updates a single key when the passed value changes"
+  },
+  {
+    "id": "react-case-v1:85f6358f2df7ac0fce13",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:119:3",
+    "kind": "it",
+    "title": "useProp syncs the same value when the store changes"
+  },
+  {
+    "id": "react-case-v1:87cec079c42ab306e4de",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:136:3",
+    "kind": "it",
+    "title": "useProps applies multiple keys from a props object"
+  },
+  {
+    "id": "react-case-v1:ef26365dd3e6824f64f4",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:154:3",
+    "kind": "it",
+    "title": "useSyncedValues depends on entries instead of object identity"
+  },
+  {
+    "id": "react-case-v1:3fece735f9f63eee93c3",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:187:3",
+    "kind": "it",
+    "title": "warns if useSyncedValues keys change between renders"
+  },
+  {
+    "id": "react-case-v1:1d9533bcf7400824d6fb",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:208:3",
+    "kind": "it",
+    "title": "useSyncedValueWithCleanup synchronizes value and resets on cleanup"
+  },
+  {
+    "id": "react-case-v1:739648b5084ed7e365a2",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:235:3",
+    "kind": "it",
+    "title": "useStateSetter returns a stable callback that updates the store state"
+  },
+  {
+    "id": "react-case-v1:ef179eba23df8c45b927",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:274:3",
+    "kind": "it",
+    "title": "supports nested stores as state values"
+  },
+  {
+    "id": "react-case-v1:b6dfe3e1f4fa451ff3ba",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:364:3",
+    "kind": "it",
+    "title": "updates useState result when selector arguments change in a fast component"
+  },
+  {
+    "id": "react-case-v1:a5649d213dfa1bcb28ba",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:401:5",
+    "kind": "it",
+    "title": "accepts selector functions"
+  },
+  {
+    "id": "react-case-v1:63e01e8b05772d425a51",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:429:5",
+    "kind": "it",
+    "title": "calls listener immediately with current selector result on subscription"
+  },
+  {
+    "id": "react-case-v1:7a11dd7bb949c401a622",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:445:5",
+    "kind": "it",
+    "title": "calls listener when selector result changes"
+  },
+  {
+    "id": "react-case-v1:e4c403c61f1efb8b5368",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:465:5",
+    "kind": "it",
+    "title": "does not call listener when selector result is unchanged"
+  },
+  {
+    "id": "react-case-v1:3a5568797fd3835566a1",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:482:5",
+    "kind": "it",
+    "title": "calls listener when any dependency of the selector changes"
+  },
+  {
+    "id": "react-case-v1:5c101e11af405e2c061c",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:503:5",
+    "kind": "it",
+    "title": "provides the store instance to the listener"
+  },
+  {
+    "id": "react-case-v1:2cfd491b937031838917",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:518:5",
+    "kind": "it",
+    "title": "returns an unsubscribe function that stops observing"
+  },
+  {
+    "id": "react-case-v1:cfef65a1d99c84614e55",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:539:5",
+    "kind": "it",
+    "title": "supports multiple observers on the same selector"
+  },
+  {
+    "id": "react-case-v1:197b70800a624160e2b7",
+    "source": "packages/utils/src/store/ReactStore.test.tsx:562:5",
+    "kind": "it",
+    "title": "supports observers on different selectors"
+  },
+  {
+    "id": "react-case-v1:2ab6c0810989ecca85b7",
+    "source": "packages/utils/src/store/Store.spec.ts:5:1",
+    "kind": "type-assertion",
+    "title": "{ const store = Store.create({ value: 1 }); expectType<Store<{ value: number }>, typeof store>(store); }"
+  },
+  {
+    "id": "react-case-v1:c3ae3e0c285e96a0224a",
+    "source": "packages/utils/src/store/Store.spec.ts:9:1",
+    "kind": "type-assertion",
+    "title": "{ class SubStore extends Store<{ value: number }> { isSub = true; } const sub = SubStore.create({ value: 1 }); expectType<SubStore, typeof sub>(sub); }"
+  },
+  {
+    "id": "react-case-v1:dffe623a665325c1657b",
+    "source": "packages/utils/src/store/Store.test.ts:8:5",
+    "kind": "it",
+    "title": "returns a Store instance seeded with the given state"
+  },
+  {
+    "id": "react-case-v1:d96ede25fe92060c7650",
+    "source": "packages/utils/src/store/Store.test.ts:15:5",
+    "kind": "it",
+    "title": "produces an independent instance per call"
+  },
+  {
+    "id": "react-case-v1:f3b6a5a26a40b981c72a",
+    "source": "packages/utils/src/store/Store.test.ts:25:5",
+    "kind": "it",
+    "title": "constructs an instance of the subclass it is called on"
+  },
+  {
+    "id": "react-case-v1:a0b78d813dfbfc9d560e",
+    "source": "packages/utils/src/store/Store.test.ts:40:3",
+    "kind": "it",
+    "title": "notifies subscribers with the new state"
+  },
+  {
+    "id": "react-case-v1:18153dd9e886a164bd45",
+    "source": "packages/utils/src/store/Store.test.ts:52:3",
+    "kind": "it",
+    "title": "does not notify when setState receives the current state reference"
+  },
+  {
+    "id": "react-case-v1:989db7eec4d2e1f3cfcc",
+    "source": "packages/utils/src/store/Store.test.ts:62:3",
+    "kind": "it",
+    "title": "unsubscribing stops notifications"
+  },
+  {
+    "id": "react-case-v1:ab5c4a499d355a05e81e",
+    "source": "packages/utils/src/store/Store.test.ts:73:3",
+    "kind": "it",
+    "title": "set() writes a single key and skips same-value writes"
+  },
+  {
+    "id": "react-case-v1:2444ae75082a79e01054",
+    "source": "packages/utils/src/store/Store.test.ts:86:3",
+    "kind": "it",
+    "title": "update() merges changed keys and skips no-op updates"
+  },
+  {
+    "id": "react-case-v1:5ef71e0f5efd6940e37d",
+    "source": "packages/utils/src/store/Store.test.ts:99:3",
+    "kind": "it",
+    "title": "notifyAll() renews the state reference and notifies"
+  },
+  {
+    "id": "react-case-v1:c261bac17c09cb4c967c",
+    "source": "packages/utils/src/store/Store.test.ts:112:3",
+    "kind": "it",
+    "title": "a nested setState from a listener stops the outer notification pass"
+  },
+  {
+    "id": "react-case-v1:ef58805e74ff74670a1d",
+    "source": "packages/utils/src/stringifyLocale.test.ts:5:3",
+    "kind": "it",
+    "title": "stringifies Intl locale arguments for cache keys"
+  },
+  {
+    "id": "react-case-v1:0cf5ae0e1aa4e4e0a12a",
+    "source": "packages/utils/src/useAnimationFrame.test.ts:14:3",
+    "kind": "it",
+    "title": "keeps callback accounting correct when a frame is canceled more than once"
+  },
+  {
+    "id": "react-case-v1:fe62dd74b9762bdde3f6",
+    "source": "packages/utils/src/useControlled.spec.ts:5:1",
+    "kind": "type-assertion",
+    "title": "function AcceptsOptionalDefault(props: { open?: boolean; defaultOpen?: boolean }) { const [open, setOpen] = useControlled({ controlled: props.open, default: props.defaultOpen, name: 'Popup', }); expectType<boolean | undefined, typeof open>(open); expectType<React.Dispatch<React.SetStateAction<boolean | undefined>>, typeof setOpen>(setOpen); }"
+  },
+  {
+    "id": "react-case-v1:f08cdd9cfd89efa6322f",
+    "source": "packages/utils/src/useControlled.spec.ts:16:1",
+    "kind": "type-assertion",
+    "title": "function AcceptsDefinedDefault(props: { open?: boolean }) { const [open, setOpen] = useControlled({ controlled: props.open, default: false, name: 'Popup', }); expectType<boolean, typeof open>(open); expectType<React.Dispatch<React.SetStateAction<boolean>>, typeof setOpen>(setOpen); }"
+  },
+  {
+    "id": "react-case-v1:138ebfc66dbd62520f13",
+    "source": "packages/utils/src/useControlled.spec.ts:27:1",
+    "kind": "type-assertion",
+    "title": "function AcceptsOptionalDefaultWithExplicitType(props: { open?: boolean; defaultOpen?: boolean }) { const [open, setOpen] = useControlled<boolean>({ controlled: props.open, default: props.defaultOpen, name: 'Popup', }); expectType<boolean | undefined, typeof open>(open); expectType<React.Dispatch<React.SetStateAction<boolean | undefined>>, typeof setOpen>(setOpen); }"
+  },
+  {
+    "id": "react-case-v1:b051f91fc2828e361b85",
+    "source": "packages/utils/src/useControlled.spec.ts:38:1",
+    "kind": "type-assertion",
+    "title": "function AcceptsDefinedDefaultWithExplicitType(props: { open?: boolean }) { const [open, setOpen] = useControlled<boolean>({ controlled: props.open, default: false, name: 'Popup', }); expectType<boolean, typeof open>(open); expectType<React.Dispatch<React.SetStateAction<boolean>>, typeof setOpen>(setOpen); }"
+  },
+  {
+    "id": "react-case-v1:e09df9e3b8c7706722d4",
+    "source": "packages/utils/src/useControlled.test.tsx:30:3",
+    "kind": "it",
+    "title": "works correctly when is not controlled"
+  },
+  {
+    "id": "react-case-v1:6548529838ca564ff741",
+    "source": "packages/utils/src/useControlled.test.tsx:51:3",
+    "kind": "it",
+    "title": "works correctly when is controlled"
+  },
+  {
+    "id": "react-case-v1:e2bcb120051bcd1884ea",
+    "source": "packages/utils/src/useControlled.test.tsx:64:3",
+    "kind": "it",
+    "title": "warns when switching from uncontrolled to controlled"
+  },
+  {
+    "id": "react-case-v1:7585ff2468c479145b27",
+    "source": "packages/utils/src/useControlled.test.tsx:77:3",
+    "kind": "it",
+    "title": "warns and falls back to the default when switching from controlled to uncontrolled"
+  },
+  {
+    "id": "react-case-v1:19856c786429a1e91f32",
+    "source": "packages/utils/src/useControlled.test.tsx:120:5",
+    "kind": "it",
+    "title": "warns when changed after initial rendering"
+  },
+  {
+    "id": "react-case-v1:7c91cd703bbeb4dc3ad3",
+    "source": "packages/utils/src/useControlled.test.tsx:134:5",
+    "kind": "it",
+    "title": "does not warn when controlled"
+  },
+  {
+    "id": "react-case-v1:c16c2606abd389e6413a",
+    "source": "packages/utils/src/useControlled.test.tsx:150:5",
+    "kind": "it",
+    "title": "does not warn when NaN"
+  },
+  {
+    "id": "react-case-v1:d57b6cd6d10998c9b0e5",
+    "source": "packages/utils/src/useControlled.test.tsx:156:5",
+    "kind": "it",
+    "title": "does not warn when an array"
+  },
+  {
+    "id": "react-case-v1:e247bb407194b640d03d",
+    "source": "packages/utils/src/useControlled.test.tsx:171:5",
+    "kind": "it",
+    "title": "does not throw when defaultValue has React elements"
+  },
+  {
+    "id": "react-case-v1:e57cf90f60807624e219",
+    "source": "packages/utils/src/useControlled.test.tsx:188:5",
+    "kind": "it",
+    "title": "does not throw when defaultValue has function"
+  },
+  {
+    "id": "react-case-v1:f6bd7ad69f2a8e5d1f28",
+    "source": "packages/utils/src/useControlled.test.tsx:207:5",
+    "kind": "it",
+    "title": "does not throw when defaultValue has bigint"
+  },
+  {
+    "id": "react-case-v1:00f80cd60c9a0ff22d2f",
+    "source": "packages/utils/src/useControlled.test.tsx:222:5",
+    "kind": "it",
+    "title": "should warn only when defaultValue changes"
+  },
+  {
+    "id": "react-case-v1:5d5243c5fddd6fea6f93",
+    "source": "packages/utils/src/useControlled.test.tsx:244:5",
+    "kind": "it",
+    "title": "should warn only when defaultValue has functions/components and changes"
+  },
+  {
+    "id": "react-case-v1:399eff41f1cc3f01c17b",
+    "source": "packages/utils/src/useControlled.test.tsx:280:5",
+    "kind": "it",
+    "title": "should not fail on null values"
+  },
+  {
+    "id": "react-case-v1:d40b4868f77f94ea545a",
+    "source": "packages/utils/src/useId.test.tsx:13:3",
+    "kind": "it",
+    "title": "returns the provided ID"
+  },
+  {
+    "id": "react-case-v1:7a82258915803c51c2c9",
+    "source": "packages/utils/src/useId.test.tsx:28:3",
+    "kind": "it",
+    "title": "generates an ID if one isn't provided"
+  },
+  {
+    "id": "react-case-v1:5d0fc15d00c008ee6e0d",
+    "source": "packages/utils/src/useId.test.tsx:42:3",
+    "kind": "it",
+    "title": "can be suffixed"
+  },
+  {
+    "id": "react-case-v1:085c198c13684ac0006b",
+    "source": "packages/utils/src/useId.test.tsx:64:3",
+    "kind": "it",
+    "title": "can be used in in IDREF attributes"
+  },
+  {
+    "id": "react-case-v1:d7d1c36176b6a86b5f7b",
+    "source": "packages/utils/src/useId.test.tsx:89:3",
+    "kind": "it",
+    "title": "provides an ID on server in React 18"
+  },
+  {
+    "id": "react-case-v1:f3ea34ccbd3625cc4f74",
+    "source": "packages/utils/src/useId.test.tsx:102:3",
+    "kind": "it",
+    "title": "can be prefixed"
+  },
+  {
+    "id": "react-case-v1:a049d8004380504f779d",
+    "source": "packages/utils/src/useIdleCallback.fallback.test.ts:21:3",
+    "kind": "it",
+    "title": "schedules and cancels callbacks when requestIdleCallback is unavailable"
+  },
+  {
+    "id": "react-case-v1:94899a51056dcae4ed67",
+    "source": "packages/utils/src/useIdleCallback.test.tsx:44:5",
+    "kind": "it",
+    "title": "create() returns a new instance each time"
+  },
+  {
+    "id": "react-case-v1:ee54945405b601679f19",
+    "source": "packages/utils/src/useIdleCallback.test.tsx:52:5",
+    "kind": "it",
+    "title": "runs the scheduled callback after the current task"
+  },
+  {
+    "id": "react-case-v1:54e96c4bf969201f9c4a",
+    "source": "packages/utils/src/useIdleCallback.test.tsx:65:5",
+    "kind": "it",
+    "title": "clear() cancels a pending callback"
+  },
+  {
+    "id": "react-case-v1:43628771ec2b4a5d1624",
+    "source": "packages/utils/src/useIdleCallback.test.tsx:76:5",
+    "kind": "it",
+    "title": "start() clears any previously scheduled callback"
+  },
+  {
+    "id": "react-case-v1:5a617c2eacdfb00714c5",
+    "source": "packages/utils/src/useIdleCallback.test.tsx:89:5",
+    "kind": "it",
+    "title": "can be reused after the callback has run"
+  },
+  {
+    "id": "react-case-v1:224d153dd24630bff32a",
+    "source": "packages/utils/src/useIdleCallback.test.tsx:105:5",
+    "kind": "it",
+    "title": "disposeEffect() returns the clear function"
+  },
+  {
+    "id": "react-case-v1:e6a86c28773bdd1ee6ef",
+    "source": "packages/utils/src/useIdleCallback.test.tsx:123:5",
+    "kind": "it",
+    "title": "returns a stable scheduler across re-renders"
+  },
+  {
+    "id": "react-case-v1:2d8b0a9906d4521ec39a",
+    "source": "packages/utils/src/useIdleCallback.test.tsx:139:5",
+    "kind": "it",
+    "title": "cancels a pending callback on unmount"
+  },
+  {
+    "id": "react-case-v1:012d142e35372c0af05b",
+    "source": "packages/utils/src/useMergedRefs.test.tsx:10:3",
+    "kind": "it",
+    "title": "returns a single ref-setter function that forks the ref to its inputs"
+  },
+  {
+    "id": "react-case-v1:a9639ce2a7be8f109f72",
+    "source": "packages/utils/src/useMergedRefs.test.tsx:32:3",
+    "kind": "it",
+    "title": "forks if only one of the branches requires a ref"
+  },
+  {
+    "id": "react-case-v1:28fb81ca970aba8145d2",
+    "source": "packages/utils/src/useMergedRefs.test.tsx:52:3",
+    "kind": "it",
+    "title": "does nothing if none of the forked branches requires a ref"
+  },
+  {
+    "id": "react-case-v1:adcbf96e1f64d91e26ee",
+    "source": "packages/utils/src/useMergedRefs.test.tsx:91:5",
+    "kind": "it",
+    "title": "handles changing from no ref to some ref"
+  },
+  {
+    "id": "react-case-v1:d3e3b05151f90234f69e",
+    "source": "packages/utils/src/useMergedRefs.test.tsx:105:5",
+    "kind": "it",
+    "title": "cleans up detached refs"
+  },
+  {
+    "id": "react-case-v1:909faf28c0ae2136909f",
+    "source": "packages/utils/src/useMergedRefs.test.tsx:127:3",
+    "kind": "test",
+    "title": "calls clean up function if it exists"
+  },
+  {
+    "id": "react-case-v1:cb725744aa60ee349779",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:20:3",
+    "kind": "it",
+    "title": "should return null on the first render"
+  },
+  {
+    "id": "react-case-v1:46d66c77e54ed043466a",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:34:3",
+    "kind": "it",
+    "title": "should return the previous value on subsequent renders"
+  },
+  {
+    "id": "react-case-v1:d02e7b39ed02c167bee1",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:54:3",
+    "kind": "it",
+    "title": "should work with primitive values"
+  },
+  {
+    "id": "react-case-v1:7b6cc5826e28fb8e1332",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:77:3",
+    "kind": "it",
+    "title": "should treat NaN as unchanged"
+  },
+  {
+    "id": "react-case-v1:8e1cb45a10d2d6f188b2",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:94:3",
+    "kind": "it",
+    "title": "should return the previous value when changing to NaN"
+  },
+  {
+    "id": "react-case-v1:218236a2285dd16fbb74",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:109:3",
+    "kind": "it",
+    "title": "should distinguish positive and negative zero"
+  },
+  {
+    "id": "react-case-v1:bb0b9dfca78ac00182e2",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:127:3",
+    "kind": "it",
+    "title": "should ignore renders where the value does not change"
+  },
+  {
+    "id": "react-case-v1:0cecde052922c45118c6",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:147:3",
+    "kind": "it",
+    "title": "should work with object values"
+  },
+  {
+    "id": "react-case-v1:1c240327a3df4321bd34",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:171:3",
+    "kind": "it",
+    "title": "should handle undefined and null values"
+  },
+  {
+    "id": "react-case-v1:e3ea6b652f803b626a8d",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:194:3",
+    "kind": "it",
+    "title": "should handle rapid value changes"
+  },
+  {
+    "id": "react-case-v1:e4c38e918e1098c3384b",
+    "source": "packages/utils/src/usePreviousValue.test.tsx:218:3",
+    "kind": "it",
+    "title": "should maintain type safety"
+  }
+]

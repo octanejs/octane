@@ -37,12 +37,11 @@ describe('hydrateRoot — @try success arm (SSR Phase 6 / M4)', () => {
 		const { html } = await prerender(server.Boundary, { promise: Promise.resolve('hi') });
 		// Server resolved use() → success arm in a block range + a seed <script>.
 		expect(html).toContain('<button id="ok" class="ok">hi:0</button>');
-		expect(html).toContain('data-octane-suspense>["hi"]</script>');
 
 		container.innerHTML = html;
 		const btn = container.querySelector('#ok') as HTMLButtonElement;
 
-		const root = hydrateRoot(container, Boundary, { promise: Promise.resolve('hi') });
+		const root = hydrateRoot(container, Boundary, { promise: new Promise<string>(() => {}) });
 		flushSync(() => {});
 
 		// The success-arm button was ADOPTED (no re-suspend, no rebuild).

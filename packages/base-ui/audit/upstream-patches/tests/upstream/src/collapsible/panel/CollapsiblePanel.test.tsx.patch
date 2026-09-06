@@ -1,0 +1,121 @@
+diff --git a/tests/upstream/src/collapsible/panel/CollapsiblePanel.test.tsx b/tests/upstream/src/collapsible/panel/CollapsiblePanel.test.tsx
+--- a/tests/upstream/src/collapsible/panel/CollapsiblePanel.test.tsx
++++ b/tests/upstream/src/collapsible/panel/CollapsiblePanel.test.tsx
+@@ -1,4 +1,9 @@
+ /** @jsxImportSource octane */
++import { CollapsiblePanelServerCase1, CollapsiblePanelServerCase2 } from './../../../../fixtures/CollapsiblePanel-ssr.tsrx';
++import { CollapsiblePanelServerCase1 as ServerCollapsiblePanelServerCase1, CollapsiblePanelServerCase2 as ServerCollapsiblePanelServerCase2 } from './../../../../fixtures/CollapsiblePanel-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(CollapsiblePanelServerCase1, ServerCollapsiblePanelServerCase1);
++registerServerComponent(CollapsiblePanelServerCase2, ServerCollapsiblePanelServerCase2);
+ import { expect, vi, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import {
+@@ -40,7 +45,7 @@ describe('<Collapsible.Panel />', () => {
+   function getActivity() {
+     type ActivityProps = {
+       mode: 'visible' | 'hidden';
+-      children: React.ReactNode;
++      children: React.OctaneNode;
+     };
+ 
+     return (React as typeof React & { Activity: React.ComponentType<ActivityProps> }).Activity;
+@@ -165,13 +170,12 @@ describe('<Collapsible.Panel />', () => {
+   it('unmounts a panel that mounts after the close has already entered the ending phase', async () => {
+     const renderedStatuses: Array<Collapsible.Panel.State['transitionStatus']> = [];
+ 
+-    const PanelThatMountsDuringEnding = React.forwardRef<
+-      HTMLDivElement,
+-      React.ComponentPropsWithoutRef<'div'> & {
++    const PanelThatMountsDuringEnding = (function PanelThatMountsDuringEnding(propsWithRef: (React.ComponentPropsWithoutRef<'div'> & {
+         open: boolean;
+         transitionStatus: Collapsible.Panel.State['transitionStatus'];
+-      }
+-    >(function PanelThatMountsDuringEnding({ open, transitionStatus, ...props }, ref) {
++      }) & { ref?: React.Ref<HTMLDivElement> }) {
++  const { ref: ref = null, ...propsWithRefRest } = propsWithRef;
++  const { open, transitionStatus, ...props } = propsWithRefRest;
+       renderedStatuses.push(transitionStatus);
+ 
+       if (!open && transitionStatus !== 'ending') {
+@@ -323,10 +327,9 @@ describe('<Collapsible.Panel />', () => {
+     it('supports removing the rendered panel as it closes', async () => {
+       const onOpenChange = vi.fn();
+ 
+-      const RemovablePanel = React.forwardRef<
+-        HTMLDivElement,
+-        React.ComponentPropsWithoutRef<'div'> & { open: boolean }
+-      >(function RemovablePanel({ open, ...props }, ref) {
++      const RemovablePanel = (function RemovablePanel(propsWithRef: (React.ComponentPropsWithoutRef<'div'> & { open: boolean }) & { ref?: React.Ref<HTMLDivElement> }) {
++  const { ref: ref = null, ...propsWithRefRest } = propsWithRef;
++  const { open, ...props } = propsWithRefRest;
+         return open ? <div {...props} ref={ref} /> : null;
+       });
+ 
+@@ -799,30 +802,7 @@ describe('<Collapsible.Panel />', () => {
+   describe('server-side rendering', () => {
+     it('suppresses the initial keyframe animation when rendered open', async () => {
+       await renderToString(
+-        <React.Fragment>
+-          <style>{`
+-            @keyframes panel-slide-down {
+-              from {
+-                height: 0;
+-              }
+-
+-              to {
+-                height: var(--collapsible-panel-height);
+-              }
+-            }
+-
+-            .animation-test-panel[data-open] {
+-              animation: panel-slide-down 100ms linear;
+-            }
+-          `}</style>
+-
+-          <Collapsible.Root defaultOpen>
+-            <Collapsible.Trigger>Trigger</Collapsible.Trigger>
+-            <Collapsible.Panel className="animation-test-panel" data-testid="panel">
+-              {PANEL_CONTENT}
+-            </Collapsible.Panel>
+-          </Collapsible.Root>
+-        </React.Fragment>,
++        <CollapsiblePanelServerCase1 PANEL_CONTENT={PANEL_CONTENT} />,
+       );
+ 
+       expect(screen.getByTestId('panel').style.animationName).toBe('none');
+@@ -830,33 +810,7 @@ describe('<Collapsible.Panel />', () => {
+ 
+     it('suppresses the initial keyframe animation from inline styles when rendered open', async () => {
+       await renderToString(
+-        <React.Fragment>
+-          <style>{`
+-            @keyframes panel-slide-down {
+-              from {
+-                height: 0;
+-              }
+-
+-              to {
+-                height: var(--collapsible-panel-height);
+-              }
+-            }
+-          `}</style>
+-
+-          <Collapsible.Root defaultOpen>
+-            <Collapsible.Trigger>Trigger</Collapsible.Trigger>
+-            <Collapsible.Panel
+-              data-testid="panel"
+-              style={{
+-                animationDuration: '100ms',
+-                animationName: 'panel-slide-down',
+-                animationTimingFunction: 'linear',
+-              }}
+-            >
+-              {PANEL_CONTENT}
+-            </Collapsible.Panel>
+-          </Collapsible.Root>
+-        </React.Fragment>,
++        <CollapsiblePanelServerCase2 PANEL_CONTENT={PANEL_CONTENT} />,
+       );
+ 
+       const panel = screen.getByTestId('panel');

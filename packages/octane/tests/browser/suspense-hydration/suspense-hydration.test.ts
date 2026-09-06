@@ -325,14 +325,21 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 		let state = await snapshot();
 		expect(state.boundarySame).toBe(true);
 		expect(state.outsideSame).toBe(true);
-		expect(state.fallbackCount).toBe(1);
+		expect(state.fallbackCount).toBe(0);
+		expect(state.headingSame).toBe(true);
+		expect(state.headings).toEqual(['initial']);
+		expect(hydrationDiagnostics).toEqual([]);
 
 		await page.locator('#hydration-outside').click();
 		expect((await snapshot()).outsideText).toBe('outside:1');
 		await page.evaluate(() => window.__suspenseHydration.resolve());
 		await page.waitForFunction(() => {
 			const current = window.__suspenseHydration.snapshot();
-			return current.headings.length === 1 && current.fallbackCount === 0;
+			return (
+				current.headings.length === 1 &&
+				current.headings[0] === 'replaced' &&
+				current.fallbackCount === 0
+			);
 		});
 
 		state = await snapshot();

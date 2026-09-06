@@ -1,0 +1,152 @@
+'use client';
+import * as React from 'octane';
+import { useStableCallback } from '@octanejs/base-ui-utils/useStableCallback';
+import type { BaseUIComponentProps } from '../../internals/types';
+import { useRenderElement } from '../../internals/useRenderElement.tsrx';
+import {
+	useComboboxDerivedItemsContext,
+	useComboboxFloatingContext,
+	useComboboxRootContext,
+} from '../root/ComboboxRootContext.tsrx';
+import { useComboboxPositionerContext } from '../positioner/ComboboxPositionerContext.tsrx';
+import { ComboboxCollection } from '../collection/ComboboxCollection.tsrx';
+import { CompositeList } from '../../internals/composite/list/CompositeList.tsrx';
+import { stopEvent } from '../../floating-ui-react/utils';
+import { clickHighlightedItem } from '../utils/parts';
+
+/**
+ * A list container for the items.
+ * Renders a `<div>` element.
+ *
+ * Documentation: [Base UI Combobox](https://base-ui.com/react/components/combobox)
+ */
+export const ComboboxList = function ComboboxList(
+	componentPropsWithRef: React.PropsWithoutRef<ComboboxList.Props> & {
+		ref?: React.Ref<HTMLDivElement>;
+	},
+) {
+	const { ref: forwardedRef = null, ...componentProps } = componentPropsWithRef;
+	const { render, className, style, children, ...elementProps } = componentProps;
+
+	const store = useComboboxRootContext();
+	const floatingRootContext = useComboboxFloatingContext();
+	const hasPositionerContext = Boolean(useComboboxPositionerContext(true));
+	const { filteredItems, hasItems } = useComboboxDerivedItemsContext();
+
+	const selectionMode = store.useState('selectionMode');
+	const grid = store.useState('grid');
+	const readOnly = store.useState('readOnly');
+	const listProps = store.useState('listProps');
+	const virtualized = store.useState('virtualized');
+	const forceMounted = store.useState('forceMounted');
+
+	const multiple = selectionMode === 'multiple';
+	const empty = filteredItems.length === 0;
+
+	const setPositionerElement = useStableCallback((element) => {
+		store.set('positionerElement', element);
+	});
+
+	const setListElement = useStableCallback((element) => {
+		store.set('listElement', element);
+	});
+
+	// Support "closed template" API: if children is a function, implicitly wrap it
+	// with a Combobox.Collection that reads items from context/root.
+	// Ensures this component's `listProps` subscription does not cause <Combobox.Item>
+	// to re-render on every active index change.
+	const resolvedChildren = React.useMemo(() => {
+		if (typeof children === 'function' && !React.isChildrenBlock(children)) {
+			return (
+				<ComboboxCollection>{children as ComboboxCollection.Props['children']}</ComboboxCollection>
+			);
+		}
+		return children;
+	}, [children]);
+
+	const state: ComboboxListState = {
+		empty,
+	};
+
+	const floatingId = floatingRootContext.useState('floatingId');
+
+	const element = useRenderElement('div', componentProps, {
+		state,
+		ref: [forwardedRef, setListElement, hasPositionerContext ? null : setPositionerElement],
+		props: [
+			listProps,
+			{
+				children: resolvedChildren,
+				tabIndex: -1,
+				id: floatingId,
+				role: grid ? 'grid' : 'listbox',
+				'aria-multiselectable': multiple ? 'true' : undefined,
+				// On a grid the attribute describes cell editability, not selection, so it's left to the
+				// combobox element in that mode.
+				'aria-readonly': !grid && readOnly ? true : undefined,
+				onKeyDown(event) {
+					if (store.state.disabled || store.state.readOnly) {
+						return;
+					}
+
+					if (event.key === 'Enter') {
+						const activeIndex = store.state.activeIndex;
+
+						if (activeIndex == null) {
+							// Allow form submission when no item is highlighted.
+							return;
+						}
+
+						stopEvent(event);
+						clickHighlightedItem(store, activeIndex, event);
+					}
+				},
+				onKeyDownCapture() {
+					store.context.keyboardActiveRef.current = true;
+				},
+				onPointerMoveCapture() {
+					store.context.keyboardActiveRef.current = false;
+				},
+			},
+			elementProps,
+		],
+	});
+
+	if (virtualized) {
+		return element;
+	}
+
+	// With the `items` prop, typeahead labels are derived from the items so they survive the list
+	// unmounting (unmounting clears the registered labels). Rendered labels only need to be
+	// registered when the list is force-mounted to match browser autofill against rendered text.
+	const labelsRef = hasItems && !forceMounted ? undefined : store.context.labelsRef;
+
+	return (
+		<CompositeList elementsRef={store.context.listRef} labelsRef={labelsRef}>
+			{element}
+		</CompositeList>
+	);
+};
+
+export interface ComboboxListState {
+	/**
+	 * Whether the list is empty.
+	 */
+	empty: boolean;
+}
+
+export interface ComboboxListProps extends Omit<
+	BaseUIComponentProps<'div', ComboboxListState>,
+	'children'
+> {
+	children?:
+		| NonNullable<React.OctaneNode>
+		| null
+		| undefined
+		| ((item: any, index: number) => React.OctaneNode);
+}
+
+export namespace ComboboxList {
+	export type State = ComboboxListState;
+	export type Props = ComboboxListProps;
+}

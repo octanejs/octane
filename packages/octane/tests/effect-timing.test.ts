@@ -8,9 +8,41 @@ import {
 	CoalescedPassiveArtifact,
 	ManyPassiveEffects,
 	PassiveBeforeCascadeRender,
+	LayoutBeforeObserver,
+	openLayoutPanel,
 } from './_fixtures/effect-timing.tsrx';
 
 describe('effect timing', () => {
+	it.each(['event', 'scheduled'])(
+		'commits %s layout-derived state before notifying DOM mutation observers',
+		async (mode) => {
+			const rendered = mount(LayoutBeforeObserver);
+			const panel = rendered.container.querySelector('[data-testid="panel"]') as HTMLElement;
+			const observedHeights: string[] = [];
+			let observed!: () => void;
+			const firstObservation = new Promise<void>((resolve) => {
+				observed = resolve;
+			});
+			const observer = new MutationObserver(() => {
+				if (panel.hasAttribute('data-open')) {
+					observedHeights.push(panel.style.height);
+					observed();
+				}
+			});
+			observer.observe(panel, { attributes: true });
+			try {
+				if (mode === 'event') rendered.container.querySelector('button')!.click();
+				else openLayoutPanel();
+				await firstObservation;
+				expect(observedHeights.length).toBeGreaterThan(0);
+				expect(observedHeights.every((height) => height === '160px')).toBe(true);
+			} finally {
+				observer.disconnect();
+				rendered.unmount();
+			}
+		},
+	);
+
 	it('phase order on mount: insertion → layout (sync) → passive (post-paint)', async () => {
 		const log: string[] = [];
 		const r = mount(PhaseOrder, { tick: 0, log });

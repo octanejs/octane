@@ -1,5 +1,11 @@
 # Base UI → octane migration plan (`@octanejs/base-ui`)
 
+> This document records the historical 1.6 migration. The current binding targets
+> Base UI 1.8.0 and implements the complete export surface. Public type and packed
+> consumer gates and complete pristine/native unit, browser, and type suites pass. Follow the
+> [current upstream ledger](../packages/base-ui/UPSTREAM.md) and
+> [package status](../packages/base-ui/status.json) for current scope and evidence.
+
 Faithful port of **Base UI** (`@base-ui/react`, base-ui.com) to the octane
 renderer, mirroring the `@octanejs/radix` methodology. Ported from the pinned
 `mui/base-ui` checkout at **`v1.6.0`** (the version installable from this
@@ -795,7 +801,7 @@ when an exported component consumes them.
 - **SSR/hydration**: only closed overlays and static components are covered.
   Open-overlay SSR is untested.
 
-## Remaining plan to full parity
+## Historical remaining plan to full parity
 
 Ordered so that each phase unblocks the next, with the cheap export-surface wins
 pulled forward. Every phase exits on: differential parity for the new components,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from './_helpers';
-import { createElement, createPortal, textSlot } from '../src/index.js';
+import { createElement, createPortal, textSlot, flushSync } from '../src/index.js';
 import {
 	ReturnPortal,
 	TernaryPortal,
@@ -11,11 +11,37 @@ import {
 	FlipApp,
 	MemoPortalApp,
 	TextPortalFlip,
+	PortalCounter,
 } from './_fixtures/portal-value.tsrx';
 
 // A createPortal(...) VALUE should render wherever any renderable value renders —
 // it must NOT require sitting at a host-element child position.
 describe('portal as a value (no host-element wrapper)', () => {
+	it('updates, moves, and cleans up a portal in a shadow root', () => {
+		const host = document.createElement('section');
+		document.body.appendChild(host);
+		const shadow = host.attachShadow({ mode: 'open' });
+		const sibling = document.createElement('p');
+		shadow.appendChild(sibling);
+		const fragment = document.createDocumentFragment();
+		const view = mount(PortalCounter, { target: shadow });
+		try {
+			const button = shadow.querySelector('button')!;
+			expect(button.textContent).toBe('0');
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('1');
+			view.update(PortalCounter, { target: fragment });
+			expect(shadow.querySelector('button')).toBeNull();
+			expect(fragment.querySelector('button')?.textContent).toBe('1');
+			view.unmount();
+			expect(fragment.childNodes).toHaveLength(0);
+			expect(shadow.childNodes).toHaveLength(1);
+			expect(shadow.firstChild).toBe(sibling);
+		} finally {
+			view.unmount();
+			host.remove();
+		}
+	});
 	function withTarget(fn: (target: HTMLElement) => void) {
 		const target = document.createElement('section');
 		document.body.appendChild(target);

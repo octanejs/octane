@@ -14,6 +14,16 @@
 			}
 		},
 		{
+			"files": [
+				"packages/base-ui/src/**/*.tsrx",
+				"packages/base-ui-utils/src/**/*.tsrx",
+				"packages/octane/tests/_fixtures/compiler-generic-interface.tsrx"
+			],
+			"options": {
+				"parser": "typescript"
+			}
+		},
+		{
 			"files": ["**/*.json"],
 			"options": {
 				"useTabs": false

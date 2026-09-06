@@ -1118,8 +1118,8 @@ If a component body does run, its children can render even when the final state
 is unchanged; do not depend on React's incidental render counts. Updates across
 roots share a microtask wave, and an `await` continuation can observe the commit
 after `setState(); await 0`. Cross-component render-time updates join the current
-drain. Ordinary layout cascades continue through the microtask scheduler;
-`flushSync` drains them before returning.
+drain. Finite layout-effect cascades complete before DOM mutation observers run,
+including commits started by the scheduler. `flushSync` drains them before returning.
 
 Commit phases retain Octane's ordering: insertion effects mount with connected
 DOM, refs attach before layout bodies, and layout cleanups can observe DOM

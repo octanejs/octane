@@ -1,0 +1,45 @@
+diff --git a/tests/upstream/test/floating-ui-tests/Navigation.tsx b/tests/upstream/test/floating-ui-tests/Navigation.tsx
+--- a/tests/upstream/test/floating-ui-tests/Navigation.tsx
++++ b/tests/upstream/test/floating-ui-tests/Navigation.tsx
+@@ -26,10 +26,9 @@ interface SubItemProps {
+ }
+ 
+ /** @internal */
+-export const NavigationSubItem = React.forwardRef<
+-  HTMLAnchorElement,
+-  SubItemProps & React.HTMLProps<HTMLAnchorElement>
+->(function NavigationSubItem({ label, href, ...props }, ref) {
++export const NavigationSubItem = (function NavigationSubItem(propsWithRef: (SubItemProps & React.HTMLProps<HTMLAnchorElement>) & { ref?: React.Ref<HTMLAnchorElement> }) {
++  const { ref: ref = null, ...propsWithRefRest } = propsWithRef;
++  const { label, href, ...props } = propsWithRefRest;
+   return (
+     <a {...props} ref={ref} href={href} className={styles.SubItem}>
+       {label}
+@@ -40,14 +39,13 @@ export const NavigationSubItem = React.forwardRef<
+ interface ItemProps {
+   label: string;
+   href: string;
+-  children?: React.ReactNode;
++  children?: React.OctaneNode;
+ }
+ 
+ /** @internal */
+-export const NavigationItem = React.forwardRef<
+-  HTMLAnchorElement,
+-  ItemProps & React.HTMLProps<HTMLAnchorElement>
+->(function NavigationItem({ children, label, href, ...props }, ref) {
++export const NavigationItem = (function NavigationItem(propsWithRef: (ItemProps & React.HTMLProps<HTMLAnchorElement>) & { ref?: React.Ref<HTMLAnchorElement> }) {
++  const { ref: ref = null, ...propsWithRefRest } = propsWithRef;
++  const { children, label, href, ...props } = propsWithRefRest;
+   const [open, setOpen] = React.useState(false);
+   const hasChildren = !!children;
+   const fallbackContext = React.useMemo(() => getEmptyRootContext(), []);
+@@ -111,7 +109,7 @@ export const NavigationItem = React.forwardRef<
+ });
+ 
+ interface NavigationProps {
+-  children?: React.ReactNode;
++  children?: React.OctaneNode;
+ }
+ 
+ /** @internal */

@@ -1,0 +1,81 @@
+'use client';
+import type * as React from 'octane';
+import { useIsoLayoutEffect } from '@octanejs/base-ui-utils/useIsoLayoutEffect';
+import { triggerOpenStateMapping } from '../../utils/collapsibleOpenStateMapping';
+import type { BaseUIComponentProps, NativeButtonProps } from '../../internals/types';
+import { useButton } from '../../internals/use-button';
+import { useCollapsibleRootContext } from '../../collapsible/root/CollapsibleRootContext';
+import type { AccordionItemState } from '../item/AccordionItem.tsrx';
+import { useAccordionItemContext } from '../item/AccordionItemContext';
+import { useRenderElement } from '../../internals/useRenderElement.tsrx';
+
+/**
+ * A button that opens and closes the corresponding panel.
+ * Renders a `<button>` element.
+ *
+ * Documentation: [Base UI Accordion](https://base-ui.com/react/components/accordion)
+ */
+
+export const AccordionTrigger = function AccordionTrigger(
+	componentPropsWithRef: React.PropsWithoutRef<AccordionTrigger.Props> & {
+		ref?: React.Ref<HTMLElement>;
+	},
+) {
+	const { ref: forwardedRef = null, ...componentProps } = componentPropsWithRef;
+	const {
+		disabled: disabledProp,
+		className,
+		id: idProp,
+		render,
+		nativeButton = true,
+		style,
+		...elementProps
+	} = componentProps;
+
+	const { panelId, open, handleTrigger, disabled: contextDisabled } = useCollapsibleRootContext();
+
+	const disabled = disabledProp || contextDisabled;
+
+	const { getButtonProps, buttonRef } = useButton({
+		disabled,
+		focusableWhenDisabled: true,
+		native: nativeButton,
+	});
+
+	const { defaultTriggerId, state, setTriggerId } = useAccordionItemContext();
+	const registeredId = idProp || undefined;
+	const id = registeredId ?? defaultTriggerId;
+
+	useIsoLayoutEffect(() => {
+		setTriggerId((currentId) => registeredId ?? (currentId === null ? undefined : currentId));
+		return () => {
+			setTriggerId((currentId) => (currentId === registeredId ? null : currentId));
+		};
+	}, [registeredId, setTriggerId]);
+
+	const props = {
+		'aria-controls': open ? panelId : undefined,
+		'aria-expanded': open,
+		id,
+		onClick: handleTrigger,
+	};
+
+	const element = useRenderElement('button', componentProps, {
+		state,
+		ref: [forwardedRef, buttonRef],
+		props: [props, elementProps, getButtonProps],
+		stateAttributesMapping: triggerOpenStateMapping,
+	});
+
+	return element;
+};
+
+export interface AccordionTriggerState extends AccordionItemState {}
+
+export interface AccordionTriggerProps
+	extends NativeButtonProps, BaseUIComponentProps<'button', AccordionTriggerState> {}
+
+export namespace AccordionTrigger {
+	export type State = AccordionTriggerState;
+	export type Props = AccordionTriggerProps;
+}

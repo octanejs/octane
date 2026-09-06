@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "project": "base-ui-differential",
   "roots": ["packages/base-ui/tests/differential"],
   "files": ["packages/base-ui/tests/differential/parity.test.ts"],
@@ -494,5 +494,6 @@
       "file": "packages/base-ui/tests/differential/parity.test.ts",
       "fullName": "differential: @octanejs/base-ui vs real Base UI on React useRender: render-prop function form"
     }
-  ]
+  ],
+  "skippedTests": []
 }

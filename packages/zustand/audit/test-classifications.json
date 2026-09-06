@@ -19,7 +19,7 @@
     {
       "path": "packages/zustand/tests/conformance/unstable-selectors.test.ts",
       "disposition": "octane-only-framework-contract",
-      "reason": "Pins Octane's bounded settle for unstable fresh-reference selectors; documented in status.json/UPSTREAM.md, not adapted React parity evidence."
+      "reason": "Checks the shared useSyncExternalStore snapshot stability contract and recovery with shallow selection; not adapted React parity evidence."
     },
     {
       "path": "packages/zustand/tests/differential/parity.test.ts",

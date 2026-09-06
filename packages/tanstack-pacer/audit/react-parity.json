@@ -11,10 +11,7 @@
     "integrity": "sha256:d4055dcec785b5eac078a2c2acde90b80e84e70c0262a174a5065ed92a9be2f0",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "absent",
-    "types": "insufficient"
-  },
+  "upstreamSuites": { "runtime": "absent", "types": "insufficient" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-pacer/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "acfa82cb9987059d0fb25e890806a7a44486953d8edbf273d76746aeb43c3789"
+      "lockfileSha256": "003c260afd05b30f26f56dfc47427e7a1486059a258349db9f9f5ae01bca6a44"
     }
   },
   "lanes": [

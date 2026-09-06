@@ -11,10 +11,7 @@
     "integrity": "sha256:924a64009738996f1a2f32ef950aed338a6aafb0dbf85af548c7c98388deb559",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "insufficient"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "insufficient" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-table/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "acfa82cb9987059d0fb25e890806a7a44486953d8edbf273d76746aeb43c3789"
+      "lockfileSha256": "003c260afd05b30f26f56dfc47427e7a1486059a258349db9f9f5ae01bca6a44"
     }
   },
   "lanes": [
@@ -65,8 +62,8 @@
             },
             {
               "id": "differential:tanstack-table-sorting",
-              "testName": "SortingTable: asc \u2192 desc \u2192 cleared \u2192 replace, byte-identical",
-              "fullName": "differential: @octanejs/tanstack-table vs real @tanstack/react-table SortingTable: asc \u2192 desc \u2192 cleared \u2192 replace, byte-identical"
+              "testName": "SortingTable: asc → desc → cleared → replace, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-table vs real @tanstack/react-table SortingTable: asc → desc → cleared → replace, byte-identical"
             },
             {
               "id": "differential:tanstack-table-filter-pagination",

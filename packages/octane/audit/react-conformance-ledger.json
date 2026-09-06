@@ -71188,11 +71188,11 @@
       "classification": "divergence",
       "owner": "SSR + hydration",
       "workstream": "Fizz streaming",
-      "rationale": "Octane deliberately does not wait for selective server-boundary hydration; matching streamed content that suspends on the client is recovered eagerly with stable visible content.",
+      "rationale": "Octane does not implement React's selective hydration while waiting for incoming server content. The bounded matching-boundary test covers completed server DOM retained until its pending client module can hydrate it, rather than the full upstream selective-hydration sequence.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
-          "testName": "eagerly recovers a matching streamed boundary that suspends during hydration",
+          "testName": "retains a matching streamed boundary while its client module loads",
           "modes": ["server-stream", "hydrate-match", "production-compile"]
         }
       ]

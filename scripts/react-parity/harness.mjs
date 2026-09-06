@@ -9,6 +9,7 @@ import {
 	isVitestLane,
 	loadManifest,
 	requiredExecutableLanes,
+	runVitestCommand,
 	verifyLaneEnvironment,
 	verifyManifestFiles,
 	verifyManifestTestSelections,
@@ -87,17 +88,25 @@ if (action === 'validate') {
 		let stdout = '';
 		for (const [command, ...commandArgs] of runs) {
 			console.log(`running ${lane.id}: ${JSON.stringify([command, ...commandArgs])}`);
-			const exitCode = await new Promise((resolveExit, reject) => {
-				const captureResult = lane.execution?.kind !== 'typescript';
-				const child = spawn(command, commandArgs, {
-					cwd: root,
-					shell: false,
-					stdio: captureResult ? ['inherit', 'pipe', 'inherit'] : 'inherit',
+			let exitCode;
+			if (isVitestLane(lane)) {
+				const result = await runVitestCommand(command, commandArgs, root);
+				exitCode = result.exitCode;
+				if (result.stdout) process.stderr.write(result.stdout);
+				stdout = result.report;
+			} else {
+				exitCode = await new Promise((resolveExit, reject) => {
+					const captureResult = lane.execution?.kind !== 'typescript';
+					const child = spawn(command, commandArgs, {
+						cwd: root,
+						shell: false,
+						stdio: captureResult ? ['inherit', 'pipe', 'inherit'] : 'inherit',
+					});
+					if (captureResult) child.stdout.on('data', (chunk) => (stdout += chunk));
+					child.on('error', reject);
+					child.on('close', (code, signal) => resolveExit(code ?? (signal ? 1 : 0)));
 				});
-				if (captureResult) child.stdout.on('data', (chunk) => (stdout += chunk));
-				child.on('error', reject);
-				child.on('close', (code, signal) => resolveExit(code ?? (signal ? 1 : 0)));
-			});
+			}
 			if (exitCode !== 0) {
 				if (stdout) process.stderr.write(stdout);
 				process.exit(exitCode);

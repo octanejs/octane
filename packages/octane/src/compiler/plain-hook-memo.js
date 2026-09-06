@@ -134,6 +134,38 @@ function slotBaseHooks(ast, state, options) {
 	function visit(node) {
 		if (node === null || typeof node !== 'object') return node;
 		if (Array.isArray(node)) return mapChildren(node, visit);
+		if (!options.manualSlots) {
+			const deleting = node.type === 'UnaryExpression' && node.operator === 'delete';
+			const lowered = lowerHookMethodChain(
+				deleting ? node.argument : node,
+				{
+					locals: options.hookLocals,
+					allocateName: (name) => allocName(state, name),
+					visit,
+					requireReceiver: () => requireHelper(state, 'callWithReceiver'),
+					wrap: (call, origin) =>
+						inheritHookMemoOrigin(
+							b.call(
+								requireHelper(state, 'withSlot', 'octane'),
+								allocateHookSlot(state, origin),
+								b.arrow([], call),
+							),
+							origin,
+						),
+				},
+				deleting,
+			);
+			if (lowered !== null) return inheritHookMemoOrigin(lowered, node);
+		}
+		if (!options.manualSlots && hookMethodName(node, options.hookLocals) !== null) {
+			assertSynchronousHookMethod(node);
+			const slot = allocateHookSlot(state, node);
+			const mapped = mapChildren(node, visit);
+			return inheritHookMemoOrigin(
+				b.call(requireHelper(state, 'withSlot', 'octane'), slot, b.arrow([], mapped)),
+				node,
+			);
+		}
 		if (!options.manualSlots && node.type === 'CallExpression' && node._octaneCustomHookCall) {
 			const slot = allocateHookSlot(state, node);
 			const mapped = mapChildren(node, visit);
@@ -348,3 +380,8 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 		return null;
 	}
 }
+import {
+	hookMethodName,
+	assertSynchronousHookMethod,
+	lowerHookMethodChain,
+} from './hook-methods.js';

@@ -19,7 +19,31 @@ function matches(file, pattern) {
 	return path.matchesGlob(portablePath(file), portablePath(pattern));
 }
 
-export function projectSelectionFailure(project, file) {
+// Vitest resolves test globs against each project's root. Audit them in the
+// repository coordinate system while keeping traversal bounded to that tree.
+function repositoryProject(project, root) {
+	const projectRoot = path.resolve(root, project.root ?? '.');
+	const normalize = (pattern) => {
+		const negative = pattern.startsWith('!');
+		const absolute = path.resolve(projectRoot, negative ? pattern.slice(1) : pattern);
+		const relative = portablePath(path.relative(root, absolute));
+		if (relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+			throw new Error(`Vitest test pattern points outside the repository: ${pattern}`);
+		}
+		return `${negative ? '!' : ''}${relative}`;
+	};
+	return {
+		...project,
+		root,
+		test: {
+			...project.test,
+			include: (project.test?.include ?? []).map(normalize),
+			exclude: (project.test?.exclude ?? []).map(normalize),
+		},
+	};
+}
+
+function repositorySelectionFailure(project, file) {
 	const include = project.test?.include ?? [];
 	const positives = positivePatterns(include);
 	if (!positives.some((pattern) => matches(file, pattern))) {
@@ -33,8 +57,12 @@ export function projectSelectionFailure(project, file) {
 	return null;
 }
 
-export function projectSelects(project, file) {
-	return projectSelectionFailure(project, file) === null;
+export function projectSelectionFailure(project, file, root = process.cwd()) {
+	return repositorySelectionFailure(repositoryProject(project, root), file);
+}
+
+export function projectSelects(project, file, root = process.cwd()) {
+	return projectSelectionFailure(project, file, root) === null;
 }
 
 function literalGlobRoot(pattern) {
@@ -72,6 +100,7 @@ async function walkFiles(target, root, found) {
 }
 
 export async function discoverProjectFiles(project, root) {
+	project = repositoryProject(project, root);
 	const files = new Set();
 	const roots = new Set(
 		positivePatterns(project.test?.include).map((pattern) => literalGlobRoot(pattern)),
@@ -79,7 +108,9 @@ export async function discoverProjectFiles(project, root) {
 	for (const declaredRoot of roots) {
 		await walkFiles(path.resolve(root, declaredRoot), root, files);
 	}
-	return new Set([...files].filter((file) => projectSelects(project, file)).sort());
+	return new Set(
+		[...files].filter((file) => repositorySelectionFailure(project, file) === null).sort(),
+	);
 }
 
 function runnerKind(lane) {
@@ -115,7 +146,7 @@ async function laneClaimedFiles(lane, project, root, inventories) {
 		case 'playwright-full':
 		case 'node-full':
 			return project
-				? lane.files.map((file) => file.path).filter((file) => projectSelects(project, file))
+				? lane.files.map((file) => file.path).filter((file) => projectSelects(project, file, root))
 				: [];
 		default:
 			throw new Error(`lane ${lane.id} has unsupported execution kind ${runnerKind(lane)}`);
@@ -170,6 +201,8 @@ export async function validateVitestContracts({
 	shardedProjects,
 	root,
 }) {
+	baseProjects = baseProjects.map((project) => repositoryProject(project, root));
+	shardedProjects = shardedProjects.map((project) => repositoryProject(project, root));
 	const errors = [];
 	const projects = projectMap(baseProjects, 'base Vitest config', errors);
 	const shards = projectMap(shardedProjects, 'sharded Vitest config', errors);
@@ -208,7 +241,7 @@ export async function validateVitestContracts({
 				continue;
 			}
 			for (const file of claimedFiles) {
-				const selectionFailure = projectSelectionFailure(project, file);
+				const selectionFailure = repositorySelectionFailure(project, file);
 				if (selectionFailure) {
 					errors.push(
 						`${laneLabel(entry, lane)} project ${lane.project} does not select ${file}: ${selectionFailure}`,
@@ -267,7 +300,7 @@ export async function validateVitestContracts({
 
 		for (const file of owned) {
 			for (const candidate of shardedProjects) {
-				if (projectSelects(candidate, file)) {
+				if (repositorySelectionFailure(candidate, file) === null) {
 					errors.push(
 						`project ${name} testExecution owns ${file}, but sharded project ${candidate.test?.name ?? '<unnamed>'} still selects it`,
 					);

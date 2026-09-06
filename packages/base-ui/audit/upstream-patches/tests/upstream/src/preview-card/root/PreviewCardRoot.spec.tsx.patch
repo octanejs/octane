@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/preview-card/root/PreviewCardRoot.spec.tsx b/tests/upstream/src/preview-card/root/PreviewCardRoot.spec.tsx
+--- a/tests/upstream/src/preview-card/root/PreviewCardRoot.spec.tsx
++++ b/tests/upstream/src/preview-card/root/PreviewCardRoot.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { PreviewCard } from '@octanejs/base-ui/preview-card';
+ 
+ const numberPayloadHandle = PreviewCard.createHandle<number>();

@@ -47,6 +47,11 @@
       "reason": "Checks Octane SSR adoption through hydrateRoot."
     },
     {
+      "path": "packages/testing-library/tests/octane-peer-minimum.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the published Octane peer floor required by isInActScope; this is not counted as React parity."
+    },
+    {
       "path": "packages/testing-library/tests/render.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the broader Octane render, query, wrapper, and rerender contract."

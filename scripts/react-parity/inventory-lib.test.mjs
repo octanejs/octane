@@ -181,11 +181,11 @@ describe('extractTestCases', () => {
 		assert.equal(markdownCases.length, 91);
 
 		const baseUiPath = new URL(
-			'../../packages/base-ui/upstream/packages/react/src/select/item/SelectItem.test.tsx',
+			'../../packages/base-ui/upstream/src/select/item/SelectItem.test.tsx',
 			import.meta.url,
 		);
 		const baseUiCases = extractTestCases(readFileSync(baseUiPath, 'utf8'), {
-			file: 'packages/base-ui/upstream/packages/react/src/select/item/SelectItem.test.tsx',
+			file: 'packages/base-ui/upstream/src/select/item/SelectItem.test.tsx',
 		});
 		const keyboardCase = baseUiCases.find(
 			(testCase) => testCase.title === 'navigating with keyboard should focus item',
@@ -273,6 +273,29 @@ describe('extractTestCases', () => {
 		assert.equal(cases[0].estimatedRegistrations, null);
 		assert.equal(cases[0].dynamicExpansion?.kind, 'loop');
 		assert.match(cases[0].manualReviewReason, /inside a loop/);
+	});
+
+	test('counts nested literal forEach registration matrices', () => {
+		const cases = extractTestCases(`
+			[true, false].forEach(native => {
+				['Enter', 'Space'].forEach(key => {
+					it('activates the trigger', () => ({ native, key }));
+				});
+			});
+		`);
+		assert.equal(cases.length, 1);
+		assert.equal(cases[0].estimatedRegistrations, 4);
+		assert.equal(cases[0].manualReviewReason, null);
+		for (const receiver of ['[...keys]', '[, "Enter"]', 'tables[0, 1]']) {
+			const [unknown] = extractTestCases(
+				`${receiver}.forEach(key => { it('activates', () => key); });`,
+			);
+			assert.equal(unknown.estimatedRegistrations, null);
+		}
+		const [typed] = extractTestCases(
+			`(['Enter', 'Space'] as const).forEach(key => { it('activates', () => key); });`,
+		);
+		assert.equal(typed.estimatedRegistrations, 2);
 	});
 
 	test('continues scanning after JSX closing tags', () => {

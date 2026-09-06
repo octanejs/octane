@@ -1,62 +1,136 @@
-// Ported verbatim from .base-ui/packages/react/src/utils/popups/popupTriggerMap.ts (v1.6.0).
-// Tracks a popup's trigger elements by id (a Set for membership + a Map for id lookup). Pure —
-// the dev-only invariant check is dropped (functional outcomes only).
-export class PopupTriggerMap {
-	private elementsSet: Set<Element>;
+/**
+ * Development-only reverse index of element to registered id, keyed by the owning map.
+ *
+ * Registration would otherwise have to scan every entry to detect an element claimed by two ids,
+ * making the mount of many triggers sharing one handle quadratic. Kept module-scoped, lazily
+ * initialized, and read only from `process.env.NODE_ENV` guards so production builds drop it along
+ * with the checks.
+ */
+let devElementIdsByMap: WeakMap<PopupTriggerMap, WeakMap<Element, string>> | undefined;
 
+function getDevElementIds(map: PopupTriggerMap) {
+	devElementIdsByMap ??= new WeakMap();
+
+	let elementIds = devElementIdsByMap.get(map);
+	if (!elementIds) {
+		elementIds = new WeakMap();
+		devElementIdsByMap.set(map, elementIds);
+	}
+	return elementIds;
+}
+
+/**
+ * Data structure to keep track of popup trigger elements by their IDs.
+ *
+ * Element lookups iterate the id map rather than maintaining a parallel Set. Registration is O(1),
+ * while `hasElement` and `hasMatchingElement` are linear in the number of triggers.
+ */
+export class PopupTriggerMap {
 	private idMap: Map<string, Element>;
 
 	constructor() {
-		this.elementsSet = new Set();
 		this.idMap = new Map();
 	}
 
-	add(id: string, element: Element) {
-		const existingElement = this.idMap.get(id);
-		if (existingElement === element) {
-			return;
+	/**
+	 * Adds a trigger element with the given ID.
+	 *
+	 * Note: The provided element is assumed to not be registered under multiple IDs.
+	 */
+	public add(id: string, element: Element) {
+		if (process.env.NODE_ENV !== 'production') {
+			const elementIds = getDevElementIds(this);
+
+			const existingId = elementIds.get(element);
+			if (existingId !== undefined && existingId !== id) {
+				// TODO: fix mui/no-guarded-throw
+				// eslint-disable-next-line mui/no-guarded-throw
+				throw new Error(
+					'Base UI: A trigger element cannot be registered under multiple IDs in PopupTriggerMap.',
+				);
+			}
+
+			// Reusing an id for a different element evicts the previous one, so it must lose its claim
+			// on the id or a later registration under a different id would be reported as a duplicate.
+			const previousElement = this.idMap.get(id);
+			if (previousElement !== undefined && previousElement !== element) {
+				elementIds.delete(previousElement);
+			}
+
+			elementIds.set(element, id);
 		}
-		if (existingElement !== undefined) {
-			this.elementsSet.delete(existingElement);
-		}
-		this.elementsSet.add(element);
+
 		this.idMap.set(id, element);
 	}
 
-	delete(id: string) {
-		const element = this.idMap.get(id);
-		if (element) {
-			this.elementsSet.delete(element);
-			this.idMap.delete(id);
+	/**
+	 * Removes the trigger element with the given ID.
+	 */
+	public delete(id: string) {
+		if (process.env.NODE_ENV !== 'production') {
+			const element = this.idMap.get(id);
+			if (element !== undefined) {
+				devElementIdsByMap?.get(this)?.delete(element);
+			}
 		}
+
+		this.idMap.delete(id);
 	}
 
-	hasElement(element: Element): boolean {
-		return this.elementsSet.has(element);
+	/**
+	 * Whether the given element is registered as a trigger.
+	 */
+	public hasElement(element: Element): boolean {
+		for (const registered of this.idMap.values()) {
+			if (registered === element) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
-	hasMatchingElement(predicate: (el: Element) => boolean): boolean {
-		for (const element of this.elementsSet) {
+	/**
+	 * Whether there is a registered trigger element matching the given predicate.
+	 */
+	public hasMatchingElement(predicate: (el: Element) => boolean): boolean {
+		for (const element of this.idMap.values()) {
 			if (predicate(element)) {
 				return true;
 			}
 		}
+
 		return false;
 	}
 
-	getById(id: string): Element | undefined {
+	/**
+	 * Returns the trigger element associated with the given ID, or undefined if no such element exists.
+	 */
+	public getById(id: string): Element | undefined {
 		return this.idMap.get(id);
 	}
 
-	entries(): IterableIterator<[string, Element]> {
+	/**
+	 * Returns an iterable of all registered trigger entries, where each entry is a tuple of [id, element].
+	 */
+	public entries(): IterableIterator<[string, Element]> {
 		return this.idMap.entries();
 	}
 
-	elements(): IterableIterator<Element> {
-		return this.elementsSet.values();
+	/**
+	 * Returns an iterable of all registered trigger elements.
+	 */
+	public elements(): IterableIterator<Element> {
+		return this.idMap.values();
 	}
 
-	get size(): number {
+	/**
+	 * Returns the number of registered trigger elements.
+	 */
+	public get size(): number {
 		return this.idMap.size;
 	}
 }
+
+// Bundlers replace this expression; keep the build constant local to this module.
+declare const process: { env: { NODE_ENV?: string } };

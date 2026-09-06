@@ -214,6 +214,10 @@ describe('native reads in deferred JSX values', () => {
 			expect(output.html).toContain('title="ready"');
 			expect(output.html).toContain('>ready</p>');
 			expect(output.signals?.scopes).toEqual([scope.serialize()]);
+			const markup = document.createElement('div');
+			markup.innerHTML = output.html;
+			const boundarySeeds = markup.querySelector('script[data-octane-suspense-signals]');
+			expect(JSON.parse(boundarySeeds!.textContent!)).toEqual(output.signals);
 		} finally {
 			rendered?.unmount();
 			scope.dispose();

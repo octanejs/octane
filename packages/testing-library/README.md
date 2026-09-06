@@ -10,6 +10,9 @@ npm install @octanejs/testing-library
 pnpm add @octanejs/testing-library
 ```
 
+This package peers on **Octane `^0.2.5`**. Published 0.2.4 and earlier do not export
+`isInActScope`, which both public entries import.
+
 The split mirrors RTL's own architecture (and
 `docs/react-library-compat-plan.md` §2): **`@testing-library/dom` is
 framework-agnostic and reused verbatim** — every query, `screen`, `within`,
@@ -43,6 +46,11 @@ test('increments', () => {
 - `act` — octane's `act`, re-exported (always async; always `await` it)
 - `screen`, `waitFor`, `within`, … — dom-testing-library, re-exported
 - `fireEvent` — DOM event helpers, with focus/blur pairs for delegated handlers
+
+Multiple `rerender` calls inside one `act` callback commit together when that
+callback finishes. Await `act` before asserting results that depend on promises
+or effects. Promise work settles even when timeout clocks are frozen; advance
+fake timers explicitly when the behavior itself depends on a timer.
 
 ## Octane-specific surface
 
@@ -155,3 +163,10 @@ text commit on `tab()`, checkbox click ordering, `keyboard()`).
 Current scope, known divergences, and verification status are tracked in the
 generated [bindings status table](../../docs/bindings-status.md), sourced from
 this package's [`status.json`](./status.json).
+
+## Runtime requirement
+
+This release requires Octane 0.2.5 or later in the 0.2 line. Upgrade Octane together
+with testing-library so the `isInActScope` API used for nested `act` batching is
+available. The packed-consumer checks exercise that API and rendering inside
+an outer `act` scope.

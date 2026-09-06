@@ -1,0 +1,32 @@
+diff --git a/tests/upstream/test/floating-ui-tests/EmojiPicker.tsx b/tests/upstream/test/floating-ui-tests/EmojiPicker.tsx
+--- a/tests/upstream/test/floating-ui-tests/EmojiPicker.tsx
++++ b/tests/upstream/test/floating-ui-tests/EmojiPicker.tsx
+@@ -66,14 +66,15 @@ type OptionProps = React.HTMLAttributes<HTMLButtonElement> & {
+   name: string;
+   active: boolean;
+   selected: boolean;
+-  children: React.ReactNode;
++  children: React.OctaneNode;
+ };
+ 
+ /** @internal */
+-const Option = React.forwardRef<HTMLButtonElement, OptionProps>(function Option(
+-  { name, active, selected, children, ...props },
+-  ref,
++const Option = (function Option(
++  propsWithRef: (OptionProps) & { ref?: React.Ref<HTMLButtonElement> },
+ ) {
++  const { ref: ref = null, ...propsWithRefRest } = propsWithRef;
++  const { name, active, selected, children, ...props } = propsWithRefRest;
+   const id = useId();
+   return (
+     <button
+@@ -252,7 +253,7 @@ export function Main() {
+                     value={search}
+                     aria-controls={filteredEmojis.length === 0 ? noResultsId : undefined}
+                     {...getInputProps({
+-                      onChange: handleInputChange,
++                      onInput: handleInputChange,
+                       onKeyDown: handleKeyDown,
+                     })}
+                   />

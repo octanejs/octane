@@ -53,6 +53,7 @@ type ClientErrorArguments = {
 	61: [];
 	62: [];
 	63: [];
+	64: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -245,6 +246,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 					'Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.',
 					args,
 				);
+			case 64:
+				return formatDevErrorMessage('Multiple errors were thrown during act.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

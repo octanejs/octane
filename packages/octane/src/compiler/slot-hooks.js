@@ -13,7 +13,7 @@
 // production it reserves a collision-free runtime range because these arbitrary
 // helpers can execute in a Scope alongside code from any other source module.
 
-import { parseModule } from '@tsrx/core';
+import { parseModule, builders as b } from '@tsrx/core';
 import { parseModule as parseFallbackModule } from '#octane/compiler-parser';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
 import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
@@ -23,6 +23,13 @@ import { assertStrongMode } from './strong-mode.js';
 import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
 import { findManualHookProviders, manualHookWrapperParameters } from './manual-hooks.js';
+import { findLeadingJsxImportSourcePragma } from './pragma.js';
+import {
+	hookMethodName,
+	hasHookMethods,
+	assertSynchronousHookMethod,
+	lowerHookMethodChain,
+} from './hook-methods.js';
 
 function importsNativeRenderer(ast) {
 	return ast.body.some(
@@ -40,7 +47,7 @@ function importsNativeRenderer(ast) {
 // Build a cheap import-presence gate. Precise call identity is annotated by the
 // lexical scope analysis in analyzeHookDependencies below; this gate only avoids
 // doing the surgical edit walk for modules that cannot contain an Octane hook.
-function octaneHookLocals(ast, nativeReads = false) {
+function octaneHookLocals(ast, nativeReads = false, explicitlyOwned = false) {
 	const locals = new Map();
 	let importsHook = false;
 	let hasOctaneImport = false;
@@ -90,7 +97,9 @@ function octaneHookLocals(ast, nativeReads = false) {
 	}
 	return {
 		locals,
-		importsHook: importsHook || (hasOctaneImport && importsCustomHook),
+		importsHook:
+			importsHook ||
+			((hasOctaneImport || explicitlyOwned) && (importsCustomHook || hasHookMethods(ast))),
 		hasOctaneImport,
 	};
 }
@@ -836,7 +845,9 @@ function parallelUseCallOfStatement(statement) {
 
 function requireParallelHelper(st, imported) {
 	const request =
-		imported === 'nativePuMemo' || imported === 'enableNativeReadCollection'
+		imported === 'nativePuMemo' ||
+		imported === 'enableNativeReadCollection' ||
+		imported === 'callWithReceiver'
 			? st.environment === 'server'
 				? 'octane/internal/server'
 				: 'octane/internal/client'
@@ -997,6 +1008,102 @@ function callOpenParen(node, source) {
 	return -1;
 }
 
+// Keep this line-preserving text edit within the surgical pass. Authored leaves
+// remain source slices; generated guards never pass through an AST printer.
+function emitHookMethodChain(node, owner, st) {
+	const deleting = node.type === 'UnaryExpression' && node.operator === 'delete';
+	if ((deleting ? node.argument : node)?.type !== 'ChainExpression') return false;
+	const leaves = new WeakMap();
+	const visit = (leaf) => {
+		if (leaf.type === 'SpreadElement') return { ...leaf, argument: visit(leaf.argument) };
+		const outerEdits = st.edits;
+		st.edits = [];
+		let edits;
+		try {
+			walk(leaf, owner, st);
+			edits = st.edits;
+		} finally {
+			st.edits = outerEdits;
+		}
+		let source = st.source.slice(leaf.start, leaf.end);
+		for (const edit of edits.sort((a, b) => b.pos - a.pos)) {
+			source =
+				source.slice(0, edit.pos - leaf.start) +
+				edit.text +
+				source.slice((edit.end ?? edit.pos) - leaf.start);
+		}
+		const opaque = b.id('_source');
+		leaves.set(opaque, source);
+		return opaque;
+	};
+	const lowered = lowerHookMethodChain(
+		deleting ? node.argument : node,
+		{
+			locals: st.locals,
+			allocateName: (name) => allocSlotName(st, name),
+			visit,
+			requireReceiver: () => requireParallelHelper(st, 'callWithReceiver'),
+			wrap: (call, origin, method) =>
+				b.call(
+					requireParallelHelper(st, 'withSlot'),
+					b.id(allocHookSymbol(st, owner, method, method, origin)),
+					b.arrow([], call),
+				),
+		},
+		deleting,
+	);
+	if (lowered === null) return false;
+	// The lowerer produces only these guard/call shapes. Opaque authored leaves
+	// are keyed by node identity, so strings and property names cannot be replaced.
+	function emit(value) {
+		if (leaves.has(value)) return `(${leaves.get(value)})`;
+		switch (value.type) {
+			case 'Identifier':
+				return value.name;
+			case 'PrivateIdentifier':
+				return `#${value.name}`;
+			case 'Super':
+				return 'super';
+			case 'ThisExpression':
+				return 'this';
+			case 'Literal':
+				return JSON.stringify(value.value);
+			case 'SpreadElement':
+				return `...${emit(value.argument)}`;
+			case 'TSNonNullExpression':
+				return `(${emit(value.expression)})!`;
+			case 'MemberExpression': {
+				const object = value.object.type === 'Super' ? 'super' : `(${emit(value.object)})`;
+				return value.computed
+					? `${object}[${emit(value.property)}]`
+					: `${object}.${emit(value.property)}`;
+			}
+			case 'CallExpression': {
+				const types = value.typeArguments
+					? st.source.slice(value.typeArguments.start, value.typeArguments.end)
+					: '';
+				return `(${emit(value.callee)})${types}(${value.arguments.map(emit).join(', ')})`;
+			}
+			case 'ArrowFunctionExpression':
+				return `((${value.params.map(emit).join(', ')}) => ${emit(value.body)})`;
+			case 'BinaryExpression':
+			case 'LogicalExpression':
+				return `(${emit(value.left)} ${value.operator} ${emit(value.right)})`;
+			case 'ConditionalExpression':
+				return `(${emit(value.test)} ? ${emit(value.consequent)} : ${emit(value.alternate)})`;
+			case 'UnaryExpression':
+				return `(${value.operator} ${emit(value.argument)})`;
+			default:
+				throw new Error(`Unexpected optional hook-chain node: ${value.type}`);
+		}
+	}
+	let text = emit(lowered);
+	const originalLines = st.source.slice(node.start, node.end).split('\n').length;
+	text += '\n'.repeat(Math.max(0, originalLines - text.split('\n').length));
+	st.edits.push({ pos: node.start, end: node.end, text });
+	return true;
+}
+
 function walk(node, owner, st) {
 	if (!node || typeof node !== 'object') return;
 	if (Array.isArray(node)) {
@@ -1018,7 +1125,19 @@ function walk(node, owner, st) {
 	const childOwner =
 		node.type === 'FunctionDeclaration' && node.id ? hookOwner(node, node.id.name) : owner;
 
+	if (!st.manualSlots && emitHookMethodChain(node, childOwner, st)) return;
+
 	if (node.type === 'CallExpression') {
+		const method = hookMethodName(node, st.locals);
+		if (!st.manualSlots && method !== null) {
+			assertSynchronousHookMethod(node);
+			const sym = allocHookSymbol(st, owner, method, method, node);
+			const helper = requireParallelHelper(st, 'withSlot');
+			// Keep the complete method expression inside the boundary: receivers,
+			// getters, optional calls, and argument counts retain their semantics.
+			st.edits.push({ pos: node.start, text: `${helper}(${sym}, () => ` });
+			st.edits.push({ pos: node.end, text: ')' });
+		}
 		if (!st.manualSlots && node._octaneCustomHookCall) {
 			const open = callOpenParen(node, st.source);
 			if (open !== -1) {
@@ -1192,7 +1311,11 @@ export function slotHooks(source, id, options) {
 	}
 	assertStrongMode(ast, source, id, options);
 	assertNativeReadDiagnostics(ast, source, id, options);
-	const importInfo = octaneHookLocals(ast, options?.nativeReads === true);
+	const importInfo = octaneHookLocals(
+		ast,
+		options?.nativeReads === true,
+		findLeadingJsxImportSourcePragma(source) === 'octane',
+	);
 	const manualProviders = options?.manualSlots ? findManualHookProviders(ast) : new Map();
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
 	const canSpecializeRoot =
@@ -1240,6 +1363,7 @@ export function slotHooks(source, id, options) {
 		!(canSpecializeRoot && collectVoidRootCandidates(ast).length > 0)
 	) {
 		const inlined = inlinePlainHookMemos(ast, source, id, {
+			hookLocals: importInfo.locals,
 			manualSlots: options?.manualSlots === true,
 			hookNames:
 				options?.nativeReads === true

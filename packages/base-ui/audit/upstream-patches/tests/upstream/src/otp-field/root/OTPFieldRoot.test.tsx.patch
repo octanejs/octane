@@ -1,0 +1,361 @@
+diff --git a/tests/upstream/src/otp-field/root/OTPFieldRoot.test.tsx b/tests/upstream/src/otp-field/root/OTPFieldRoot.test.tsx
+--- a/tests/upstream/src/otp-field/root/OTPFieldRoot.test.tsx
++++ b/tests/upstream/src/otp-field/root/OTPFieldRoot.test.tsx
+@@ -1,4 +1,10 @@
+ /** @jsxImportSource octane */
++import { OTPFieldRootServerCase1, OTPFieldRootServerCase2, OTPFieldRootServerCase3 } from './../../../../fixtures/OTPFieldRoot-ssr.tsrx';
++import { OTPFieldRootServerCase1 as ServerOTPFieldRootServerCase1, OTPFieldRootServerCase2 as ServerOTPFieldRootServerCase2, OTPFieldRootServerCase3 as ServerOTPFieldRootServerCase3 } from './../../../../fixtures/OTPFieldRoot-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(OTPFieldRootServerCase1, ServerOTPFieldRootServerCase1);
++registerServerComponent(OTPFieldRootServerCase2, ServerOTPFieldRootServerCase2);
++registerServerComponent(OTPFieldRootServerCase3, ServerOTPFieldRootServerCase3);
+ import { expect, vi, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { SafeReact } from '@octanejs/base-ui-utils/safeReact';
+@@ -141,7 +147,7 @@ describe('<OTPField.Root />', () => {
+           await render(<OTPField validationType="alpha" />);
+ 
+           const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-          fireEvent.change(firstInput, { target: { value: '1a2b3C' } });
++          fireEvent.input(firstInput, { target: { value: '1a2b3C' } });
+ 
+           expect(getValues()).toBe('abC');
+         });
+@@ -150,7 +156,7 @@ describe('<OTPField.Root />', () => {
+           await render(<OTPField validationType="alphanumeric" />);
+ 
+           const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-          fireEvent.change(firstInput, { target: { value: 'A1-B2c3' } });
++          fireEvent.input(firstInput, { target: { value: 'A1-B2c3' } });
+ 
+           expect(getValues()).toBe('A1B2c3');
+         });
+@@ -167,19 +173,7 @@ describe('<OTPField.Root />', () => {
+       describe('hidden validation input', () => {
+         it('renders the hidden validation input with an alphanumeric pattern during SSR', () => {
+           renderToString(
+-            <OTPFieldBase.Root
+-              name="otp"
+-              required
+-              length={OTP_LENGTH}
+-              validationType="alphanumeric"
+-            >
+-              <OTPFieldBase.Input />
+-              <OTPFieldBase.Input />
+-              <OTPFieldBase.Input />
+-              <OTPFieldBase.Input />
+-              <OTPFieldBase.Input />
+-              <OTPFieldBase.Input />
+-            </OTPFieldBase.Root>,
++            <OTPFieldRootServerCase1 OTP_LENGTH={OTP_LENGTH} />,
+           );
+ 
+           const hiddenInput = document.querySelector<HTMLInputElement>('input[name="otp"]');
+@@ -229,7 +223,7 @@ describe('<OTPField.Root />', () => {
+         );
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: 'ab-12 cd' } });
++        fireEvent.input(firstInput, { target: { value: 'ab-12 cd' } });
+ 
+         expect(getValues()).toBe('AB12CD');
+       });
+@@ -246,7 +240,7 @@ describe('<OTPField.Root />', () => {
+           );
+ 
+           const inputs = screen.getAllByRole<HTMLInputElement>('textbox');
+-          fireEvent.change(inputs[0], { target: { value: 'a!' } });
++          fireEvent.input(inputs[0], { target: { value: 'a!' } });
+ 
+           expect(getValues()).toBe('A');
+           expect(inputs[1]).toHaveFocus();
+@@ -285,7 +279,7 @@ describe('<OTPField.Root />', () => {
+           inputs[2].focus();
+         });
+ 
+-        fireEvent.change(inputs[2], { target: { value: 'a!' } });
++        fireEvent.input(inputs[2], { target: { value: 'a!' } });
+ 
+         expect(getValues()).toBe('12A');
+         expect(inputs[3]).toHaveFocus();
+@@ -299,7 +293,7 @@ describe('<OTPField.Root />', () => {
+         await render(<OTPField onValueChange={onValueChange} />);
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: '1' } });
++        fireEvent.input(firstInput, { target: { value: '1' } });
+ 
+         expect(onValueChange).toHaveBeenCalledTimes(1);
+         expect(onValueChange.mock.calls[0]?.[0]).toBe('1');
+@@ -312,7 +306,7 @@ describe('<OTPField.Root />', () => {
+         await render(<OTPField defaultValue="1" onValueChange={onValueChange} />);
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: '' } });
++        fireEvent.input(firstInput, { target: { value: '' } });
+ 
+         expect(onValueChange).toHaveBeenCalledTimes(1);
+         expect(onValueChange.mock.calls[0]?.[0]).toBe('');
+@@ -327,7 +321,7 @@ describe('<OTPField.Root />', () => {
+         await render(<OTPField onValueInvalid={onValueInvalid} />);
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: '1a' } });
++        fireEvent.input(firstInput, { target: { value: '1a' } });
+ 
+         expect(getValues()).toBe('1');
+         expect(onValueInvalid).toHaveBeenCalledTimes(1);
+@@ -348,7 +342,7 @@ describe('<OTPField.Root />', () => {
+         );
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: '1209' } });
++        fireEvent.input(firstInput, { target: { value: '1209' } });
+ 
+         expect(getValues()).toBe('120');
+         expect(onValueInvalid).toHaveBeenCalledTimes(1);
+@@ -368,7 +362,7 @@ describe('<OTPField.Root />', () => {
+         );
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: '1209' } });
++        fireEvent.input(firstInput, { target: { value: '1209' } });
+ 
+         expect(getValues()).toBe('120');
+         expect(onValueInvalid).toHaveBeenCalledTimes(1);
+@@ -388,7 +382,7 @@ describe('<OTPField.Root />', () => {
+         );
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: '1a' } });
++        fireEvent.input(firstInput, { target: { value: '1a' } });
+ 
+         expect(getValues()).toBe('12');
+         expect(onValueInvalid).toHaveBeenCalledTimes(1);
+@@ -408,7 +402,7 @@ describe('<OTPField.Root />', () => {
+         );
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: '1' } });
++        fireEvent.input(firstInput, { target: { value: '1' } });
+ 
+         expect(getValues()).toBe('');
+         expect(onValueInvalid).toHaveBeenCalledTimes(1);
+@@ -458,7 +452,7 @@ describe('<OTPField.Root />', () => {
+         await render(<OTPField onValueComplete={onValueComplete} />);
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: '123456' } });
++        fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+         expect(onValueComplete).toHaveBeenCalledTimes(1);
+         expect(onValueComplete.mock.calls[0]?.[0]).toBe('123456');
+@@ -539,7 +533,7 @@ describe('<OTPField.Root />', () => {
+         await render(<OTPField onValueComplete={onValueComplete} />);
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-        fireEvent.change(firstInput, { target: { value: '12345' } });
++        fireEvent.input(firstInput, { target: { value: '12345' } });
+ 
+         expect(onValueComplete).not.toHaveBeenCalled();
+       });
+@@ -570,7 +564,7 @@ describe('<OTPField.Root />', () => {
+           await render(<Test />);
+ 
+           const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-          fireEvent.change(firstInput, { target: { value: '123456' } });
++          fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+           await act(async () => {
+             vi.runAllTimers();
+@@ -609,7 +603,7 @@ describe('<OTPField.Root />', () => {
+           await render(<Test />);
+ 
+           const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+-          fireEvent.change(firstInput, { target: { value: '123456' } });
++          fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+           await act(async () => {
+             vi.runAllTimers();
+@@ -699,7 +693,7 @@ describe('<OTPField.Root />', () => {
+       await act(async () => {
+         inputs[0].focus();
+       });
+-      fireEvent.change(inputs[0], { target: { value: '1' } });
++      fireEvent.input(inputs[0], { target: { value: '1' } });
+ 
+       fireEvent.blur(inputs[1], { relatedTarget: inputs[2] });
+       expect(validate).not.toHaveBeenCalled();
+@@ -770,7 +764,7 @@ describe('<OTPField.Root />', () => {
+       expect(firstInput).toBeDisabled();
+       expect(screen.getByRole('group')).toHaveAttribute('data-disabled', '');
+ 
+-      fireEvent.change(firstInput, { target: { value: '1' } });
++      fireEvent.input(firstInput, { target: { value: '1' } });
+ 
+       expect(getValues()).toBe('');
+       expect(onValueChange).not.toHaveBeenCalled();
+@@ -788,7 +782,7 @@ describe('<OTPField.Root />', () => {
+       expect(firstInput).toHaveAttribute('readonly');
+       expect(screen.getByRole('group')).toHaveAttribute('data-readonly', '');
+ 
+-      fireEvent.change(firstInput, { target: { value: '1' } });
++      fireEvent.input(firstInput, { target: { value: '1' } });
+ 
+       expect(getValues()).toBe('');
+       expect(onValueChange).not.toHaveBeenCalled();
+@@ -837,7 +831,7 @@ describe('<OTPField.Root />', () => {
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+ 
+-        fireEvent.change(firstInput, { target: { value: '123456' } });
++        fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+         expect(getValues()).toBe('123456');
+       });
+@@ -847,7 +841,7 @@ describe('<OTPField.Root />', () => {
+ 
+         const inputs = screen.getAllByRole<HTMLInputElement>('textbox');
+ 
+-        fireEvent.change(inputs[2], { target: { value: '99' } });
++        fireEvent.input(inputs[2], { target: { value: '99' } });
+ 
+         expect(getValues()).toBe('129956');
+       });
+@@ -950,7 +944,7 @@ describe('<OTPField.Root />', () => {
+             inputs[0].focus();
+           });
+ 
+-          fireEvent.change(inputs[0], { target: { value: '1' } });
++          fireEvent.input(inputs[0], { target: { value: '1' } });
+ 
+           await act(async () => {
+             vi.runAllTimers();
+@@ -991,7 +985,7 @@ describe('<OTPField.Root />', () => {
+             inputs[0].focus();
+           });
+ 
+-          fireEvent.change(inputs[0], { target: { value: '1' } });
++          fireEvent.input(inputs[0], { target: { value: '1' } });
+ 
+           await act(async () => {
+             vi.runAllTimers();
+@@ -1235,7 +1229,7 @@ describe('<OTPField.Root />', () => {
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+ 
+-        fireEvent.change(firstInput, { target: { value: '123456' } });
++        fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+         expect(getValues()).toBe('123456');
+         expect(handleSubmit).not.toHaveBeenCalled();
+@@ -1257,7 +1251,7 @@ describe('<OTPField.Root />', () => {
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+ 
+-        fireEvent.change(firstInput, { target: { value: '123456' } });
++        fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+         expect(getValues()).toBe('123456');
+         expect(handleSubmit).toHaveBeenCalledTimes(1);
+@@ -1279,7 +1273,7 @@ describe('<OTPField.Root />', () => {
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+         Object.defineProperty(form, 'requestSubmit', { configurable: true, value: undefined });
+ 
+-        fireEvent.change(firstInput, { target: { value: '123456' } });
++        fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+         expect(getValues()).toBe('123456');
+         expect(onValueComplete).toHaveBeenCalledTimes(1);
+@@ -1303,7 +1297,7 @@ describe('<OTPField.Root />', () => {
+ 
+           const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+ 
+-          fireEvent.change(firstInput, { target: { value: '123456' } });
++          fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+           expect(getValues()).toBe('123456');
+           expect(handleSubmit).toHaveBeenCalledTimes(1);
+@@ -1331,7 +1325,7 @@ describe('<OTPField.Root />', () => {
+ 
+           const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+ 
+-          fireEvent.change(firstInput, { target: { value: '123456' } });
++          fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+           expect(getValues()).toBe('123456');
+           expect(handleSubmit).not.toHaveBeenCalled();
+@@ -1361,7 +1355,7 @@ describe('<OTPField.Root />', () => {
+           .getAllByRole<HTMLInputElement>('textbox')
+           .filter((input) => input !== emailInput);
+ 
+-        fireEvent.change(otpInputs[0], { target: { value: '123456' } });
++        fireEvent.input(otpInputs[0], { target: { value: '123456' } });
+ 
+         expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+         expect(emailInput).toHaveFocus();
+@@ -1381,7 +1375,7 @@ describe('<OTPField.Root />', () => {
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+ 
+-        fireEvent.change(firstInput, { target: { value: '12345' } });
++        fireEvent.input(firstInput, { target: { value: '12345' } });
+ 
+         expect(getValues()).toBe('12345');
+         expect(handleSubmit).not.toHaveBeenCalled();
+@@ -1407,7 +1401,7 @@ describe('<OTPField.Root />', () => {
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+ 
+-        fireEvent.change(firstInput, { target: { value: '123456' } });
++        fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+         expect(getValues()).toBe('123456');
+         expect(handleSubmit).toHaveBeenCalledTimes(1);
+@@ -1429,7 +1423,7 @@ describe('<OTPField.Root />', () => {
+ 
+         const [firstInput] = screen.getAllByRole<HTMLInputElement>('textbox');
+ 
+-        fireEvent.change(firstInput, { target: { value: '123456' } });
++        fireEvent.input(firstInput, { target: { value: '123456' } });
+ 
+         expect(getValues()).toBe('123456');
+         expect(handleSubmit).not.toHaveBeenCalled();
+@@ -1439,11 +1433,7 @@ describe('<OTPField.Root />', () => {
+     describe('server-side rendering', () => {
+       it('renders visible inputs with unique IDs', () => {
+         renderToString(
+-          <OTPFieldBase.Root data-testid="root" id="verification-code" length={OTP_LENGTH}>
+-            {Array.from({ length: OTP_LENGTH }, (_, index) => (
+-              <OTPFieldBase.Input key={index} />
+-            ))}
+-          </OTPFieldBase.Root>,
++          <OTPFieldRootServerCase2 OTP_LENGTH={OTP_LENGTH} />,
+         );
+ 
+         const inputs = screen.getByTestId('root').querySelectorAll('input');
+@@ -1460,14 +1450,7 @@ describe('<OTPField.Root />', () => {
+ 
+       it('renders a hidden validation input with the provided length', () => {
+         renderToString(
+-          <OTPFieldBase.Root name="otp" required length={OTP_LENGTH}>
+-            <OTPFieldBase.Input />
+-            <OTPFieldBase.Input />
+-            <OTPFieldBase.Input />
+-            <OTPFieldBase.Input />
+-            <OTPFieldBase.Input />
+-            <OTPFieldBase.Input />
+-          </OTPFieldBase.Root>,
++          <OTPFieldRootServerCase3 OTP_LENGTH={OTP_LENGTH} />,
+         );
+ 
+         const hiddenInput = document.querySelector<HTMLInputElement>('input[name="otp"]');
+@@ -1504,7 +1487,7 @@ describe('<OTPField.Root />', () => {
+ 
+     expect(root).toHaveAttribute('data-focused', '');
+ 
+-    fireEvent.change(firstInput, { target: { value: '1' } });
++    fireEvent.input(firstInput, { target: { value: '1' } });
+ 
+     expect(root).toHaveAttribute('data-filled', '');
+ 

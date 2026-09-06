@@ -1,40 +1,46 @@
-// @octanejs/base-ui — Base UI (@base-ui/react) ported to the octane
-// renderer. Public API mirrors Base UI: deep-subpath imports
-// (`@octanejs/base-ui/separator`, `@octanejs/base-ui/use-render`, …). This barrel
-// re-exports the public surface for convenience as components land.
-export { Separator } from './separator';
-export { Accordion } from './accordion';
-export { AlertDialog } from './alert-dialog';
-export { Avatar } from './avatar';
-export { Button } from './button';
-export { CSPProvider } from './csp-provider';
-export { DirectionProvider, useDirection } from './direction-provider';
-export type { TextDirection } from './direction-provider';
+export * from './accordion';
+export * from './alert-dialog';
+export * from './autocomplete';
+export * from './avatar';
+export * from './button';
+export * from './checkbox';
+export * from './checkbox-group';
+export * from './collapsible';
+export * from './combobox';
+export * from './context-menu';
+export * from './csp-provider';
+export * from './dialog';
+export * from './direction-provider';
+export * from './drawer';
+export * from './field';
+export * from './fieldset';
+export * from './form';
+export * from './input';
+export * from './menu';
+export * from './menubar';
+export * from './merge-props';
+export * from './meter';
+export * from './navigation-menu';
+export * from './number-field';
+export * from './otp-field';
+export * from './popover';
+export * from './preview-card';
+export * from './progress';
+export * from './radio';
+export * from './radio-group';
+export * from './scroll-area';
+export * from './select';
+export * from './separator';
+export * from './slider';
+export * from './switch';
+export * from './tabs';
+export * from './toast';
+export * from './toggle';
+export * from './toggle-group';
+export * from './toolbar';
+export * from './tooltip';
+export * from './use-render';
+// Preserve the original Octane binding's root hook export.
 export { useMediaQuery } from './unstable-use-media-query';
-export { Checkbox } from './checkbox';
-export { Collapsible } from './collapsible';
-export { ContextMenu } from './context-menu';
-export { CheckboxGroup } from './checkbox-group';
-export { Dialog } from './dialog';
-export { Field } from './field';
-export { Fieldset } from './fieldset';
-export { Form } from './form';
-export { Input } from './input';
-export { Menu } from './menu';
-export { Menubar } from './menubar';
-export { Meter } from './meter';
-export { NumberField } from './number-field';
-export { Progress } from './progress';
-export { Radio } from './radio';
-export { RadioGroup } from './radio-group';
-export { Popover } from './popover';
-export { PreviewCard } from './preview-card';
-export { Tooltip } from './tooltip';
-export { Slider } from './slider';
-export { Switch } from './switch';
-export { Toast } from './toast';
-export { Toggle } from './toggle';
-export { ToggleGroup } from './toggle-group';
-export { useRender } from './use-render';
-export { mergeProps, mergePropsN, mergeClassNames } from './merge-props';
-// OCTANE DIVERGENCE[unported-internal-hover][differential:base-ui-tooltip-open]
+
+export type * from './types';

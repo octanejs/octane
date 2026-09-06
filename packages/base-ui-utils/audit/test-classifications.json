@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/base-ui-utils/tests/fast-store.test.tsrx",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises native external-store selection updates and render scheduling."
+    },
+    {
+      "path": "packages/base-ui-utils/tests/native-contracts.test.tsrx",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises native recursive refs, callback cleanup, inert and stable IDs."
+    },
+    {
+      "path": "packages/base-ui-utils/tests/stable-callback-hydration.test.tsrx",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises native hydration effect ordering and stable callbacks."
+    }
+  ]
+}

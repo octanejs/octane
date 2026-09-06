@@ -132,3 +132,27 @@ export function ManyPassiveEffects(props) @{
 	}, [props.log]);
 	<span>{'multi'}</span>
 }
+
+let openPanel = () => {};
+export function openLayoutPanel() {
+	openPanel();
+}
+
+export function LayoutBeforeObserver() {
+	const [open, setOpen] = useState(false);
+	openPanel = () => setOpen(true);
+	const [phase, setPhase] = useState(0);
+	useLayoutEffect(() => {
+		if (open && phase < 3) setPhase(phase + 1);
+	}, [open, phase]);
+	return <div>
+		<button onClick={() => setOpen(true)}>Open</button>
+		<div
+			data-testid="panel"
+			data-open={open ? '' : undefined}
+			style={{ height: phase === 3 ? '160px' : undefined }}
+		>
+			content
+		</div>
+	</div>;
+}

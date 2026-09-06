@@ -1,0 +1,101 @@
+diff --git a/tests/upstream/src/combobox/root/ComboboxRoot.test.tsx b/tests/upstream/src/combobox/root/ComboboxRoot.test.tsx
+--- a/tests/upstream/src/combobox/root/ComboboxRoot.test.tsx
++++ b/tests/upstream/src/combobox/root/ComboboxRoot.test.tsx
+@@ -145,6 +145,13 @@ function isElementOrAncestorInert(element: HTMLElement) {
+   return false;
+ }
+ 
++import { ComboboxInputFixture, ComboboxTriggerFixture, ComboboxLabelFixture } from '../../../../fixtures/combobox-ssr.tsrx';
++import { ComboboxInputFixture as ServerComboboxInputFixture, ComboboxTriggerFixture as ServerComboboxTriggerFixture, ComboboxLabelFixture as ServerComboboxLabelFixture } from '../../../../fixtures/combobox-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from '../../../../support/renderer';
++registerServerComponent(ComboboxInputFixture, ServerComboboxInputFixture);
++registerServerComponent(ComboboxTriggerFixture, ServerComboboxTriggerFixture);
++registerServerComponent(ComboboxLabelFixture, ServerComboboxLabelFixture);
++
+ describe('<Combobox.Root />', () => {
+   beforeEach(() => {
+     globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
+@@ -175,14 +182,7 @@ describe('<Combobox.Root />', () => {
+ 
+   describe('server-side rendering', () => {
+     it('sets combobox aria attributes on the input', () => {
+-      renderToString(
+-        <Combobox.Root>
+-          <Combobox.Input data-testid="input" />
+-          <Combobox.Portal>
+-            <Combobox.Positioner />
+-          </Combobox.Portal>
+-        </Combobox.Root>,
+-      );
++      renderToString(<ComboboxInputFixture />);
+ 
+       const input = screen.getByTestId('input');
+ 
+@@ -193,14 +193,7 @@ describe('<Combobox.Root />', () => {
+     });
+ 
+     it('sets combobox aria attributes on the trigger when input is inside popup', () => {
+-      renderToString(
+-        <Combobox.Root>
+-          <Combobox.Trigger data-testid="trigger" />
+-          <Combobox.Portal>
+-            <Combobox.Positioner />
+-          </Combobox.Portal>
+-        </Combobox.Root>,
+-      );
++      renderToString(<ComboboxTriggerFixture />);
+ 
+       const trigger = screen.getByTestId('trigger');
+ 
+@@ -210,13 +203,7 @@ describe('<Combobox.Root />', () => {
+     });
+ 
+     it('does not link Combobox.Label to trigger before hydration', () => {
+-      renderToString(
+-        <Combobox.Root inline>
+-          <Combobox.Label data-testid="label">Food</Combobox.Label>
+-          <Combobox.Trigger data-testid="trigger">Open</Combobox.Trigger>
+-          <Combobox.Input data-testid="input" />
+-        </Combobox.Root>,
+-      );
++      renderToString(<ComboboxLabelFixture />);
+ 
+       const label = screen.getByTestId('label');
+       const trigger = screen.getByTestId('trigger');
+@@ -8622,7 +8609,7 @@ describe('<Combobox.Root />', () => {
+     );
+ 
+     it.skipIf(isJSDOM)('does not reset a surrounding dialog', async () => {
+-      const dialogRef = React.createRef<HTMLDivElement>();
++      const dialogRef = ({current:null} as React.RefObject<HTMLDivElement | null>);
+       const { user } = await render(
+         <Combobox.Root items={manyItems} open>
+           <div
+@@ -8771,7 +8758,8 @@ describe('<Combobox.Root />', () => {
+ 
+       const input = screen.getByRole<HTMLInputElement>('combobox');
+       fireEvent.compositionStart(input);
+-      fireEvent.change(input, { target: { value: 'ch' } });
++      // OCTANE DIVERGENCE[native-event-semantics]: per-keystroke updates use the native input event.
++      fireEvent.input(input, { target: { value: 'ch' } });
+       fireEvent.compositionEnd(input, { data: 'ch' });
+ 
+       await waitFor(() => expect(screen.getByRole('listbox')).not.toBe(null));
+@@ -12358,7 +12346,7 @@ describe('<Combobox.Root />', () => {
+         return item.id === value.id;
+       });
+ 
+-      const hiddenInputRef = React.createRef<HTMLInputElement>();
++      const hiddenInputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+       const { user } = await render(
+         <Combobox.Root
+@@ -12991,7 +12979,7 @@ describe('<Combobox.Root />', () => {
+     });
+ 
+     it('exposes an action that completes unmount cleanup', async () => {
+-      const actionsRef = React.createRef<Combobox.Root.Actions>();
++      const actionsRef = ({current:null} as React.RefObject<Combobox.Root.Actions | null>);
+       const onOpenChangeComplete = vi.fn();
+       await render(
+         <Combobox.Root

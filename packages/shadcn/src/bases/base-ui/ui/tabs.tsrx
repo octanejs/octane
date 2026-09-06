@@ -2,17 +2,8 @@
 // class strings verbatim. Runs on @octanejs/base-ui's `Tabs`, which was ported for this family:
 // Root / List / Tab / Panel.
 //
-// ONE DEPARTURE FROM THE SOURCE, FORCED BY A VERSION SKEW. Upstream writes its orientation variants
-// as `data-horizontal:` / `data-vertical:` — bare attributes. The pinned @octanejs/base-ui (v1.6.0)
-// converts the orientation state to `data-orientation="horizontal" | "vertical"` instead, so those
-// utilities would match nothing: the root would never switch to a column, and every
-// `group-data-horizontal/tabs:` and `group-data-vertical/tabs:` selector on the trigger would be
-// dead. They are written as `data-[orientation=…]:` here.
-//
-// This is the SAME skew the slider hit, and it is not a porting mistake in either layer — shadcn's
-// Base UI sources target a newer Base UI than the pin this package binds. The primitive stays
-// faithful to its pin; the adaptation belongs here. When the binding moves to a release that emits
-// the bare attributes, these revert to upstream's spelling.
+// Base UI 1.8 emits `data-orientation="horizontal" | "vertical"`, so orientation
+// selectors target the attribute value on the root, list, trigger, and panel.
 //
 // `data-active` on the trigger needs no such treatment: the pin emits it exactly as upstream's
 // classes expect (verified by rendering).
@@ -23,9 +14,9 @@ import { Tabs as TabsPrimitive } from '@octanejs/base-ui/tabs';
 
 import { cn } from '../../../lib/utils';
 
-type Props = { className?: string } & Record<string, unknown>;
+type StyledProps<P> = Omit<P, 'className'> & { className?: string };
 
-export interface TabsProps extends Props {
+export interface TabsProps extends StyledProps<TabsPrimitive.Root.Props> {
 	orientation?: 'horizontal' | 'vertical';
 }
 
@@ -54,7 +45,7 @@ export const tabsListVariants = cva(
 	},
 );
 
-export interface TabsListProps extends Props {
+export interface TabsListProps extends StyledProps<TabsPrimitive.List.Props> {
 	variant?: VariantProps<typeof tabsListVariants>['variant'];
 }
 
@@ -67,7 +58,7 @@ export function TabsList({ className, variant = 'default', ...props }: TabsListP
 	/>
 }
 
-export function TabsTrigger({ className, ...props }: Props) @{
+export function TabsTrigger({ className, ...props }: StyledProps<TabsPrimitive.Tab.Props>) @{
 	<TabsPrimitive.Tab
 		data-slot="tabs-trigger"
 		className={cn(
@@ -81,7 +72,7 @@ export function TabsTrigger({ className, ...props }: Props) @{
 	/>
 }
 
-export function TabsContent({ className, ...props }: Props) @{
+export function TabsContent({ className, ...props }: StyledProps<TabsPrimitive.Panel.Props>) @{
 	<TabsPrimitive.Panel
 		data-slot="tabs-content"
 		className={cn('flex-1 text-sm outline-none', className)}

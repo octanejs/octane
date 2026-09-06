@@ -123,29 +123,9 @@
       "fullName": "locks divergence:react-context-fixture:03"
     },
     {
-      "id": "divergence:ref-scheduling:01",
-      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
-      "fullName": "locks divergence:ref-scheduling:01"
-    },
-    {
       "id": "divergence:ref-scheduling:02",
       "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
       "fullName": "locks divergence:ref-scheduling:02"
-    },
-    {
-      "id": "divergence:ref-scheduling:03",
-      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
-      "fullName": "locks divergence:ref-scheduling:03"
-    },
-    {
-      "id": "divergence:ref-scheduling:04",
-      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
-      "fullName": "locks divergence:ref-scheduling:04"
-    },
-    {
-      "id": "divergence:ref-scheduling:05",
-      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
-      "fullName": "locks divergence:ref-scheduling:05"
     },
     {
       "id": "divergence:render-count:01",

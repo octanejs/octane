@@ -1,30 +1,35 @@
-// Ported from .base-ui/packages/react/src/utils/collapsibleOpenStateMapping.ts (v1.6.0).
-//
-// NAME COLLISION, upstream's not ours: Base UI exports `triggerOpenStateMapping` from BOTH
-// this module and `utils/popupStateMapping.ts`, and they emit DIFFERENT attributes —
-// `data-panel-open` here versus `data-popup-open` there. Each consumer imports the one it
-// means, and the collapsible trigger means this one. This package puts one util per file, so
-// the collapsible variant is renamed rather than shadowing the popup export: importing the
-// wrong one is a silent attribute swap that only a rendered-DOM assertion would catch.
-import type { StateAttributesMapping } from './getStateAttributesProps';
+import type { StateAttributesMapping } from '../internals/getStateAttributesProps';
+import * as CollapsiblePanelDataAttributes from '../collapsible/panel/CollapsiblePanelDataAttributes';
+import * as CollapsibleTriggerDataAttributes from '../collapsible/trigger/CollapsibleTriggerDataAttributes';
 
-// CollapsiblePanelDataAttributes.open / .closed
-const PANEL_OPEN_HOOK = { 'data-open': '' };
-const PANEL_CLOSED_HOOK = { 'data-closed': '' };
+const PANEL_OPEN_HOOK = {
+	[CollapsiblePanelDataAttributes.open]: '',
+};
 
-// CollapsibleTriggerDataAttributes.panelOpen
-const TRIGGER_PANEL_OPEN_HOOK = { 'data-panel-open': '' };
+const PANEL_CLOSED_HOOK = {
+	[CollapsiblePanelDataAttributes.closed]: '',
+};
 
-/** The panel/root mapping: `data-open` when open, `data-closed` when not. */
-export const collapsibleOpenStateMapping: StateAttributesMapping<{ open: boolean }> = {
-	open(value: boolean) {
-		return value ? PANEL_OPEN_HOOK : PANEL_CLOSED_HOOK;
+export const triggerOpenStateMapping: StateAttributesMapping<{
+	open: boolean;
+}> = {
+	open(value) {
+		if (value) {
+			return {
+				[CollapsibleTriggerDataAttributes.panelOpen]: '',
+			};
+		}
+		return null;
 	},
 };
 
-/** Upstream's `triggerOpenStateMapping` from this module: `data-panel-open`, or nothing. */
-export const collapsibleTriggerOpenStateMapping: StateAttributesMapping<{ open: boolean }> = {
-	open(value: boolean) {
-		return value ? TRIGGER_PANEL_OPEN_HOOK : null;
+export const collapsibleOpenStateMapping = {
+	open(value) {
+		if (value) {
+			return PANEL_OPEN_HOOK;
+		}
+		return PANEL_CLOSED_HOOK;
 	},
-};
+} satisfies StateAttributesMapping<{
+	open: boolean;
+}>;

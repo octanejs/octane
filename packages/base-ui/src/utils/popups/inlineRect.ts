@@ -1,9 +1,10 @@
-// Ported from .base-ui/packages/react/src/utils/popups/inlineRect.ts (v1.6.0). Floating UI ships an
-// `inline()` middleware; this local version mirrors its line-rect selection while adding trigger
-// identity checks, delayed-open hit-line reuse, and better left/right edge grouping for Preview
-// Card's reusable trigger model. Pure geometry plus a floating-ui middleware — transcribed as-is,
-// with React's ref types collapsed to plain `{ current }` objects and native event handlers.
-import { isElement } from '../dom';
+import type * as React from 'octane';
+import type { Middleware, VirtualElement } from '@octanejs/floating-ui';
+import { isElement } from '@floating-ui/utils/dom';
+
+// Floating UI ships an `inline()` middleware. This local version mirrors its line-rect
+// selection while adding trigger identity checks, delayed-open hit-line reuse, and
+// improved left/right edge grouping for Preview Card's reusable trigger model.
 
 export interface InlineRectCoords {
 	/** The x position in viewport coordinates. */
@@ -191,23 +192,23 @@ function getInlineReferenceRect(
 	return createRect(left, targetFirstRect.top, right, targetLastRect.bottom);
 }
 
-function getContextElement(reference: any): Element | undefined {
+function getContextElement(reference: Element | VirtualElement): Element | undefined {
 	if ('contextElement' in reference && reference.contextElement) {
 		return reference.contextElement;
 	}
 
-	return isElement(reference) ? (reference as Element) : undefined;
+	return isElement(reference) ? reference : undefined;
 }
 
 export function getInlineRectTriggerProps(
-	coordsRef: { current: InlineRectCoords | undefined },
+	coordsRef: React.RefObject<InlineRectCoords | undefined>,
 	isOpen: boolean,
-): Record<string, any> {
-	function updateCoords(event: MouseEvent) {
-		updateInlineRectCoords(coordsRef, event.currentTarget as Element, event.clientX, event.clientY);
+): Pick<React.HTMLAttributes<Element>, 'onFocus' | 'onMouseEnter' | 'onMouseMove'> {
+	function updateCoords(event: React.MouseEvent<Element>) {
+		updateInlineRectCoords(coordsRef, event.currentTarget, event.clientX, event.clientY);
 	}
 
-	function updateCoordsIfClosed(event: MouseEvent) {
+	function updateCoordsIfClosed(event: React.MouseEvent<Element>) {
 		if (!isOpen) {
 			updateCoords(event);
 		}
@@ -223,7 +224,7 @@ export function getInlineRectTriggerProps(
 }
 
 export function updateInlineRectCoords(
-	coordsRef: { current: InlineRectCoords | undefined },
+	coordsRef: React.RefObject<InlineRectCoords | undefined>,
 	element: Element,
 	clientX: number,
 	clientY: number,
@@ -233,10 +234,12 @@ export function updateInlineRectCoords(
 	return nextCoords;
 }
 
-export function createInlineMiddleware(coordsRef: { current: InlineRectCoords | undefined }): any {
+export function createInlineMiddleware(
+	coordsRef: React.RefObject<InlineRectCoords | undefined>,
+): Middleware {
 	return {
 		name: 'inline',
-		async fn(state: any) {
+		async fn(state) {
 			const reference = state.elements.reference;
 
 			if (

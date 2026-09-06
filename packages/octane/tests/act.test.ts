@@ -7,7 +7,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, createRoot, flushSync, setIsOctaneActEnvironment } from '../src/index.js';
 import { mount } from './_helpers';
-import Counter, { ActLayoutLoop, bump } from './_fixtures/act-warning.tsrx';
+import Counter, {
+	ActLayoutLoop,
+	ActRenderFailure,
+	PreviousProp,
+	bump,
+	failActRender,
+} from './_fixtures/act-warning.tsrx';
 
 describe('act() — React-parity contract', () => {
 	let errSpy: ReturnType<typeof vi.spyOn>;
@@ -140,4 +146,126 @@ describe('act() — React-parity contract', () => {
 		expect(errSpy).not.toHaveBeenCalled();
 		r.unmount();
 	});
+});
+
+// Prop updates are one logical transaction even when helpers use nested act.
+it('batches nested synchronous act callbacks until their outer callback returns', async () => {
+	const container = document.createElement('div');
+	const root = createRoot(container);
+	await act(() => root.render(PreviousProp, { value: 'initial' }));
+	const pending = act(() => {
+		void act(() => root.render(PreviousProp, { value: 'first' }));
+		void act(() => root.render(PreviousProp, { value: 'second' }));
+		root.render(PreviousProp, { value: 'third' });
+	});
+	expect(container.textContent).toBe('initial');
+	await pending;
+	root.unmount();
+});
+
+it('keeps separate synchronous act calls synchronous before their promises settle', async () => {
+	const container = document.createElement('div');
+	const root = createRoot(container);
+	const mount = act(() => root.render(PreviousProp, { value: 'initial' }));
+	const first = act(() => root.render(PreviousProp, { value: 'first' }));
+	expect(container.textContent).toBe('initial');
+	const second = act(() => root.render(PreviousProp, { value: 'second' }));
+	expect(container.textContent).toBe('first');
+	await Promise.all([mount, first, second]);
+	root.unmount();
+});
+
+it.each([
+	{ mode: 'sync', frozen: false },
+	{ mode: 'async', frozen: false },
+	{ mode: 'sync', frozen: true },
+	{ mode: 'async', frozen: true },
+] as const)(
+	'awaited $mode act drains a complete promise checkpoint (frozen timers: $frozen)',
+	async ({ mode, frozen }) => {
+		const rendered = mount(Counter);
+		let pending: Promise<void> = Promise.resolve();
+		try {
+			if (frozen) vi.useFakeTimers();
+			const schedule = () => {
+				let chain = Promise.resolve();
+				// Positioning middleware awaits several independent platform reads before
+				// it finally enqueues a renderer update. No scheduler work exists yet.
+				for (let i = 0; i < 40; i++) chain = chain.then(() => {});
+				pending = chain.then(bump);
+			};
+			await act(mode === 'async' ? async () => schedule() : schedule);
+			expect(rendered.container.textContent).toBe('1');
+		} finally {
+			await pending;
+			if (frozen) vi.useRealTimers();
+			rendered.unmount();
+		}
+	},
+);
+
+it('restores synchronous commits after an async callback rejects', async () => {
+	const container = document.createElement('div');
+	const root = createRoot(container);
+	await act(() => root.render(PreviousProp, { value: 'initial' }));
+	try {
+		await expect(
+			act(async () => {
+				await Promise.resolve();
+				throw new Error('rejected callback');
+			}),
+		).rejects.toThrow('rejected callback');
+		const first = act(() => root.render(PreviousProp, { value: 'first' }));
+		const second = act(() => root.render(PreviousProp, { value: 'second' }));
+		expect(container.textContent).toBe('first');
+		await Promise.all([first, second]);
+	} finally {
+		root.unmount();
+	}
+});
+
+it.each(['sync', 'async'] as const)(
+	'rejects %s act when a promise schedules a failing render',
+	async (mode) => {
+		const container = document.createElement('div');
+		const root = createRoot(container);
+		await act(() => root.render(ActRenderFailure, { message: 'deferred render failed' }));
+		try {
+			const schedule = () => {
+				let chain = Promise.resolve();
+				for (let i = 0; i < 40; i++) chain = chain.then(() => {});
+				void chain.then(failActRender);
+			};
+			await expect(act(mode === 'async' ? async () => schedule() : schedule)).rejects.toThrow(
+				'deferred render failed',
+			);
+			await act(() => root.render(PreviousProp, { value: 'recovered' }));
+			expect(container.textContent).toBe('(none)');
+		} finally {
+			root.unmount();
+		}
+	},
+);
+
+it('preserves render and callback errors when an async act fails in both phases', async () => {
+	const container = document.createElement('div');
+	const root = createRoot(container);
+	const callbackError = new Error('callback failed');
+	await act(() => root.render(ActRenderFailure, { message: 'render failed' }));
+	try {
+		const result = act(async () => {
+			failActRender();
+			await new Promise<void>((resolve) => queueMicrotask(resolve));
+			throw callbackError;
+		});
+		const error = await result.catch((error: unknown) => error);
+		expect(error).toBeInstanceOf(AggregateError);
+		expect((error as AggregateError).errors).toHaveLength(2);
+		expect((error as AggregateError).errors[0].message).toBe('render failed');
+		expect((error as AggregateError).errors[1]).toBe(callbackError);
+		await act(() => root.render(PreviousProp, { value: 'recovered' }));
+		expect(container.textContent).toBe('(none)');
+	} finally {
+		root.unmount();
+	}
 });

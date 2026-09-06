@@ -1,0 +1,33 @@
+diff --git a/tests/upstream/src/fieldset/legend/FieldsetLegend.test.tsx b/tests/upstream/src/fieldset/legend/FieldsetLegend.test.tsx
+--- a/tests/upstream/src/fieldset/legend/FieldsetLegend.test.tsx
++++ b/tests/upstream/src/fieldset/legend/FieldsetLegend.test.tsx
+@@ -1,4 +1,9 @@
+ /** @jsxImportSource octane */
++import { FieldsetLegendServerCase1, FieldsetLegendServerCase2 } from './../../../../fixtures/FieldsetLegend-ssr.tsrx';
++import { FieldsetLegendServerCase1 as ServerFieldsetLegendServerCase1, FieldsetLegendServerCase2 as ServerFieldsetLegendServerCase2 } from './../../../../fixtures/FieldsetLegend-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(FieldsetLegendServerCase1, ServerFieldsetLegendServerCase1);
++registerServerComponent(FieldsetLegendServerCase2, ServerFieldsetLegendServerCase2);
+ import { expect, vi, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { createRenderer, fireEvent, screen, waitFor } from '@mui/internal-test-utils';
+@@ -80,7 +85,7 @@ describe('<Fieldset.Legend />', () => {
+   });
+ 
+   it.skipIf(isJSDOM)('does not set `aria-labelledby` during SSR when legend is absent', () => {
+-    renderToString(<Fieldset.Root data-testid="fieldset" />);
++    renderToString(<FieldsetLegendServerCase1 />);
+ 
+     expect(screen.getByTestId('fieldset')).not.toHaveAttribute('aria-labelledby');
+   });
+@@ -89,9 +94,7 @@ describe('<Fieldset.Legend />', () => {
+     'sets `aria-labelledby` after hydration without a custom legend id',
+     async () => {
+       const { hydrate } = renderToString(
+-        <Fieldset.Root data-testid="fieldset">
+-          <Fieldset.Legend data-testid="legend">Legend</Fieldset.Legend>
+-        </Fieldset.Root>,
++        <FieldsetLegendServerCase2 />,
+       );
+ 
+       const fieldset = screen.getByTestId('fieldset');

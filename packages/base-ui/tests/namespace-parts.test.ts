@@ -1,3 +1,14 @@
+import * as BaseUI from '@octanejs/base-ui';
+import * as LegacyAccordion from '@octanejs/base-ui/accordion';
+import * as LegacyCollapsible from '@octanejs/base-ui/collapsible';
+import * as LegacyTabs from '@octanejs/base-ui/tabs';
+import * as LegacyToast from '@octanejs/base-ui/toast';
+import * as LegacyAlertDialog from '@octanejs/base-ui/alert-dialog';
+import * as LegacyDialog from '@octanejs/base-ui/dialog';
+import * as LegacyMenu from '@octanejs/base-ui/menu';
+import * as LegacyPopover from '@octanejs/base-ui/popover';
+import * as LegacyPreviewCard from '@octanejs/base-ui/preview-card';
+import * as LegacyTooltip from '@octanejs/base-ui/tooltip';
 import { describe, expect, it } from 'vitest';
 import { Dialog } from '@octanejs/base-ui/dialog';
 import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
@@ -179,3 +190,29 @@ describe('@octanejs/base-ui — component namespaces expose every upstream part'
 		});
 	}
 });
+
+// These names were runtime imports in the previous published binding. A
+// type-only export with the same name must not satisfy this consumer contract.
+const legacyEntries: Array<[Record<string, unknown>, string, Record<string, unknown>, string[]]> = [
+	[LegacyAccordion, 'Accordion', BaseUI.Accordion, ['Root', 'Item', 'Header', 'Trigger', 'Panel']],
+	[LegacyCollapsible, 'Collapsible', BaseUI.Collapsible, ['Root', 'Trigger', 'Panel']],
+	[LegacyTabs, 'Tabs', BaseUI.Tabs, ['Root', 'List', 'Tab', 'Panel']],
+	[LegacyAlertDialog, 'AlertDialog', AlertDialog, ['Handle', 'createHandle']],
+	[LegacyDialog, 'Dialog', Dialog, ['Handle', 'createHandle']],
+	[LegacyMenu, 'Menu', Menu, ['Handle', 'createHandle']],
+	[LegacyPopover, 'Popover', Popover, ['Handle', 'createHandle']],
+	[LegacyPreviewCard, 'PreviewCard', PreviewCard, ['Handle', 'createHandle']],
+	[LegacyTooltip, 'Tooltip', Tooltip, ['Handle', 'createHandle']],
+	[LegacyToast, '', Toast, ['useToastManager', 'createToastManager']],
+];
+
+for (const [entry, prefix, namespace, parts] of legacyEntries) {
+	for (const part of parts) {
+		const name = part === 'createHandle' ? `create${prefix}Handle` : `${prefix}${part}`;
+		it(`retains the ${name} runtime import at the root and component entry`, () => {
+			expect(namespace[part]).toBeDefined();
+			expect(entry[name]).toBe(namespace[part]);
+			expect((BaseUI as Record<string, unknown>)[name]).toBe(namespace[part]);
+		});
+	}
+}

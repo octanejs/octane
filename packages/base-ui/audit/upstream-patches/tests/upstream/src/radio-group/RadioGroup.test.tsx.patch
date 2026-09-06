@@ -1,0 +1,78 @@
+diff --git a/tests/upstream/src/radio-group/RadioGroup.test.tsx b/tests/upstream/src/radio-group/RadioGroup.test.tsx
+--- a/tests/upstream/src/radio-group/RadioGroup.test.tsx
++++ b/tests/upstream/src/radio-group/RadioGroup.test.tsx
+@@ -68,7 +68,10 @@ describe('<RadioGroup />', () => {
+       await user.keyboard('{/Shift}');
+ 
+       expect(handleChange.mock.calls.length).toBe(1);
+-      expect(handleChange.mock.results[0]?.value.event.shiftKey).toBe(true);
++      // OCTANE DIVERGENCE[native-event-semantics]: native checkbox/radio change events carry no keyboard modifiers.
++      // Modifier state remains on the native click; the change callback receives its actual event.
++      expect(handleChange.mock.results[0]?.value.event).toBeInstanceOf(Event);
++      expect(handleChange.mock.results[0]?.value.event.type).toBe('change');
+     });
+ 
+     it('should select an item with Space on keyup', async () => {
+@@ -321,7 +324,7 @@ describe('<RadioGroup />', () => {
+   });
+ 
+   it('points inputRef to the checked radio input when present', async () => {
+-    const groupInputRef = React.createRef<HTMLInputElement>();
++    const groupInputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+     await render(
+       <RadioGroup defaultValue="a" inputRef={groupInputRef}>
+@@ -418,7 +421,7 @@ describe('<RadioGroup />', () => {
+   });
+ 
+   it('skips disabled radios when assigning inputRef', async () => {
+-    const groupInputRef = React.createRef<HTMLInputElement>();
++    const groupInputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+     await render(
+       <RadioGroup inputRef={groupInputRef}>
+@@ -434,7 +437,7 @@ describe('<RadioGroup />', () => {
+   });
+ 
+   it('points inputRef to the first radio input when nativeButton wraps a button', async () => {
+-    const groupInputRef = React.createRef<HTMLInputElement>();
++    const groupInputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+     await render(
+       <RadioGroup inputRef={groupInputRef}>
+@@ -467,7 +470,7 @@ describe('<RadioGroup />', () => {
+   });
+ 
+   it('keeps inputRef pointing to the first radio when the value is cleared', async () => {
+-    const groupInputRef = React.createRef<HTMLInputElement>();
++    const groupInputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+     function App() {
+       const [value, setValue] = React.useState<null | string>('a');
+@@ -498,7 +501,7 @@ describe('<RadioGroup />', () => {
+   });
+ 
+   it('detaches inputRef when its current radio unmounts', async () => {
+-    const groupInputRef = React.createRef<HTMLInputElement>();
++    const groupInputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+     function App() {
+       const [showFirst, setShowFirst] = React.useState(true);
+@@ -527,7 +530,7 @@ describe('<RadioGroup />', () => {
+   });
+ 
+   it('detaches inputRef when a radio selected after mount unmounts', async () => {
+-    const groupInputRef = React.createRef<HTMLInputElement>();
++    const groupInputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+     function App() {
+       const [showSecond, setShowSecond] = React.useState(true);
+@@ -1222,7 +1225,7 @@ describe('<RadioGroup />', () => {
+ 
+   describe('Fieldset', () => {
+     it('keeps inputRef available after an ancestor fieldset is enabled', async () => {
+-      const groupInputRef = React.createRef<HTMLInputElement>();
++      const groupInputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+       function App() {
+         const [disabled, setDisabled] = React.useState(true);

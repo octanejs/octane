@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/combobox/positioner/ComboboxPositioner.test.tsx b/tests/upstream/src/combobox/positioner/ComboboxPositioner.test.tsx
+--- a/tests/upstream/src/combobox/positioner/ComboboxPositioner.test.tsx
++++ b/tests/upstream/src/combobox/positioner/ComboboxPositioner.test.tsx
+@@ -121,7 +121,7 @@ describe('<Combobox.Positioner />', () => {
+       const inputWidth = 120;
+       const triggerWidth = 240;
+       let anchorWidth = 0;
+-      const inputRef = React.createRef<HTMLInputElement>();
++      const inputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+       await render(
+         <Combobox.Root open>

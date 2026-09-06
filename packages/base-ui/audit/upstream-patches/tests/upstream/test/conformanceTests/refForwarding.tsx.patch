@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/test/conformanceTests/refForwarding.tsx b/tests/upstream/test/conformanceTests/refForwarding.tsx
+--- a/tests/upstream/test/conformanceTests/refForwarding.tsx
++++ b/tests/upstream/test/conformanceTests/refForwarding.tsx
+@@ -16,7 +16,7 @@ async function verifyRef(
+     throwMissingPropError('render');
+   }
+ 
+-  const ref = React.createRef();
++  const ref: React.RefObject<unknown> = { current: null };
+ 
+   const { container } = await render(
+     <React.Fragment>{React.cloneElement(element, { ref })}</React.Fragment>,

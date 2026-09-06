@@ -229,6 +229,9 @@ export function PopoverClosed() @{
 // remounts the button, which the positioner observes as a transient "trigger change" (sets
 // `data-instant`) — a mount-timing/effect-ordering artifact the rig also can't see. The trigger's
 // open/dismiss flow is covered by the behavior test on `PopoverInteractive` instead.
+// Both markup fixtures share one document. Keep either popup from stealing the
+// other's focus; standalone focus and keyboard behavior is covered by the full
+// upstream browser suite. Tabbability attributes remain part of this comparison.
 export function PopoverOpen() @{
 	const containerRef = useRef(null);
 	<div>
@@ -237,7 +240,7 @@ export function PopoverOpen() @{
 			<Popover.Portal container={containerRef}>
 				<Popover.Backdrop className="pop-backdrop" />
 				<Popover.Positioner className="pop-positioner">
-					<Popover.Popup className="pop-popup">
+					<Popover.Popup className="pop-popup" initialFocus={false}>
 						<Popover.Arrow className="pop-arrow" />
 						<Popover.Title className="pop-title">Title</Popover.Title>
 						<Popover.Description className="pop-desc">Body</Popover.Description>
@@ -770,6 +773,7 @@ export function DialogViewportClosed() @{
 
 // Popover.Viewport — the content-transition container inside the popup. With a single trigger it
 // never transitions, so it renders the current-content container around the children.
+// As above, autofocus is disabled for the two roots sharing this markup rig.
 export function PopoverViewportOpen() @{
 	const containerRef = useRef(null);
 	<div>
@@ -777,7 +781,7 @@ export function PopoverViewportOpen() @{
 		<Popover.Root open modal>
 			<Popover.Portal container={containerRef}>
 				<Popover.Positioner className="pop-positioner">
-					<Popover.Popup className="pop-popup">
+					<Popover.Popup className="pop-popup" initialFocus={false}>
 						<Popover.Viewport className="pop-viewport">
 							<Popover.Title className="pop-title">Title</Popover.Title>
 							<Popover.Close className="pop-close">Close</Popover.Close>

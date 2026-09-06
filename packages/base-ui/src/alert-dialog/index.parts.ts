@@ -1,0 +1,10 @@
+export { AlertDialogRoot as Root } from './root/AlertDialogRoot.tsrx';
+export { DialogBackdrop as Backdrop } from '../dialog/backdrop/DialogBackdrop.tsrx';
+export { DialogClose as Close } from '../dialog/close/DialogClose.tsrx';
+export { DialogDescription as Description } from '../dialog/description/DialogDescription.tsrx';
+export { DialogPopup as Popup } from '../dialog/popup/DialogPopup.tsrx';
+export { DialogPortal as Portal } from '../dialog/portal/DialogPortal.tsrx';
+export { DialogTitle as Title } from '../dialog/title/DialogTitle.tsrx';
+export { AlertDialogTrigger as Trigger } from './trigger/AlertDialogTrigger.tsrx';
+export { DialogViewport as Viewport } from '../dialog/viewport/DialogViewport.tsrx';
+export { AlertDialogHandle as Handle, createAlertDialogHandle as createHandle } from './handle';

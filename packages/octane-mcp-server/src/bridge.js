@@ -68,6 +68,8 @@ export const KNOWN_BINDINGS = {
 	'react-hook-form': '@octanejs/hook-form',
 	'better-auth/react': '@octanejs/better-auth',
 	'@base-ui-components/react': '@octanejs/base-ui',
+	'@base-ui/react': '@octanejs/base-ui',
+	'@base-ui/utils': '@octanejs/base-ui-utils',
 	'@dnd-kit/react': '@octanejs/dnd-kit',
 	'embla-carousel-react': '@octanejs/embla-carousel',
 	'react-dropzone': '@octanejs/dropzone',

@@ -1,3 +1,4 @@
+import { parseModule } from './parser.browser.js';
 /**
  * Volar (IDE language-service) mappings for octane .tsrx files.
  *
@@ -29,7 +30,6 @@ import {
 	createVolarMappingsResult,
 	dedupeMappings,
 	error as collectCompileError,
-	parseModule,
 } from '@tsrx/core';
 import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
@@ -100,6 +100,7 @@ const OCTANE_PLATFORM = {
 };
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
+
 const octaneTransformWithAuthoredSuspense = createJsxTransform({
 	...OCTANE_PLATFORM,
 	hooks: {

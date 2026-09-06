@@ -1,26 +1,23 @@
-// Ported from Base UI's useIsHydrating: the server snapshot must also be used
-// for the first hydration render so layout-dependent slider styles are adopted
-// before the client snapshot makes the hydrated controls visible.
+/** @jsxImportSource octane */
 import { useSyncExternalStore } from 'octane';
+import { NOOP } from '../internals/noop';
 
-import { S, splitSlot, subSlot } from '../internal';
-
-function subscribe(): () => void {
-	return () => {};
+function subscribe() {
+	return NOOP;
 }
 
-function getSnapshot(): boolean {
+function getSnapshot() {
 	return false;
 }
 
-function getServerSnapshot(): boolean {
+function getServerSnapshot() {
 	return true;
 }
 
-export function useIsHydrating(): boolean;
-export function useIsHydrating(slot: symbol | undefined): boolean;
-export function useIsHydrating(...args: unknown[]): boolean {
-	const [, slotArg] = splitSlot(args);
-	const slot = slotArg ?? S('useIsHydrating');
-	return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot, subSlot(slot, 'store'));
+/**
+ * Returns `true` while React is hydrating server-rendered markup and `false`
+ * for fresh client-only mounts.
+ */
+export function useIsHydrating() {
+	return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

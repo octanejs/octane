@@ -1,0 +1,28 @@
+diff --git a/tests/upstream/src/accordion/root/AccordionRoot.test.tsx b/tests/upstream/src/accordion/root/AccordionRoot.test.tsx
+--- a/tests/upstream/src/accordion/root/AccordionRoot.test.tsx
++++ b/tests/upstream/src/accordion/root/AccordionRoot.test.tsx
+@@ -1,4 +1,8 @@
+ /** @jsxImportSource octane */
++import { AccordionRootServerCase1 } from './../../../../fixtures/AccordionRoot-ssr.tsrx';
++import { AccordionRootServerCase1 as ServerAccordionRootServerCase1 } from './../../../../fixtures/AccordionRoot-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(AccordionRootServerCase1, ServerAccordionRootServerCase1);
+ import { expect, vi, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { fireEvent, screen, waitFor } from '@mui/internal-test-utils';
+@@ -219,14 +223,7 @@ describe('<Accordion.Root />', () => {
+ 
+     it.skipIf(isJSDOM)('preserves generated part associations during hydration', async () => {
+       const { hydrate } = renderToString(
+-        <Accordion.Root defaultValue={[0]}>
+-          <Accordion.Item value={0}>
+-            <Accordion.Header>
+-              <Accordion.Trigger>Trigger 1</Accordion.Trigger>
+-            </Accordion.Header>
+-            <Accordion.Panel>{PANEL_CONTENT_1}</Accordion.Panel>
+-          </Accordion.Item>
+-        </Accordion.Root>,
++        <AccordionRootServerCase1 PANEL_CONTENT_1={PANEL_CONTENT_1} />,
+       );
+ 
+       let trigger = screen.getByRole('button', { name: 'Trigger 1' });

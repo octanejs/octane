@@ -1,0 +1,101 @@
+diff --git a/tests/upstream/src/autocomplete/root/AutocompleteRoot.test.tsx b/tests/upstream/src/autocomplete/root/AutocompleteRoot.test.tsx
+--- a/tests/upstream/src/autocomplete/root/AutocompleteRoot.test.tsx
++++ b/tests/upstream/src/autocomplete/root/AutocompleteRoot.test.tsx
+@@ -1,4 +1,10 @@
+ /** @jsxImportSource octane */
++import { AutocompleteRootServerCase1, AutocompleteRootServerCase2, AutocompleteRootServerCase3 } from './../../../../fixtures/AutocompleteRoot-ssr.tsrx';
++import { AutocompleteRootServerCase1 as ServerAutocompleteRootServerCase1, AutocompleteRootServerCase2 as ServerAutocompleteRootServerCase2, AutocompleteRootServerCase3 as ServerAutocompleteRootServerCase3 } from './../../../../fixtures/AutocompleteRoot-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(AutocompleteRootServerCase1, ServerAutocompleteRootServerCase1);
++registerServerComponent(AutocompleteRootServerCase2, ServerAutocompleteRootServerCase2);
++registerServerComponent(AutocompleteRootServerCase3, ServerAutocompleteRootServerCase3);
+ import { expect, vi, describe, beforeEach, it } from 'vitest';
+ import * as React from 'octane';
+ import { act, fireEvent, flushMicrotasks, screen, waitFor } from '@mui/internal-test-utils';
+@@ -1786,21 +1792,7 @@ describe('<Autocomplete.Root />', () => {
+ 
+     it('server-renders only the inline input name for native FormData', () => {
+       renderToString(
+-        <Form>
+-          <Field.Root name="search">
+-            <Autocomplete.Root items={['alpha', 'alpine']} inline>
+-              <Autocomplete.Input data-testid="input" />
+-              <Autocomplete.List>
+-                {(item) => (
+-                  <Autocomplete.Item key={item} value={item}>
+-                    {item}
+-                  </Autocomplete.Item>
+-                )}
+-              </Autocomplete.List>
+-            </Autocomplete.Root>
+-          </Field.Root>
+-          <button type="submit">Submit</button>
+-        </Form>,
++        <AutocompleteRootServerCase1 />,
+       );
+ 
+       const namedInputs = screen
+@@ -1812,30 +1804,7 @@ describe('<Autocomplete.Root />', () => {
+ 
+     it('server-renders only the outside-popup input name for native FormData', () => {
+       renderToString(
+-        <Form>
+-          <Field.Root name="search">
+-            <Autocomplete.Root items={['alpha', 'alpine']}>
+-              <Autocomplete.InputGroup>
+-                <Autocomplete.Input data-testid="input" />
+-                <Autocomplete.Trigger>Open</Autocomplete.Trigger>
+-              </Autocomplete.InputGroup>
+-              <Autocomplete.Portal>
+-                <Autocomplete.Positioner>
+-                  <Autocomplete.Popup>
+-                    <Autocomplete.List>
+-                      {(item) => (
+-                        <Autocomplete.Item key={item} value={item}>
+-                          {item}
+-                        </Autocomplete.Item>
+-                      )}
+-                    </Autocomplete.List>
+-                  </Autocomplete.Popup>
+-                </Autocomplete.Positioner>
+-              </Autocomplete.Portal>
+-            </Autocomplete.Root>
+-          </Field.Root>
+-          <button type="submit">Submit</button>
+-        </Form>,
++        <AutocompleteRootServerCase2 />,
+       );
+ 
+       const namedInputs = screen
+@@ -1888,30 +1857,7 @@ describe('<Autocomplete.Root />', () => {
+ 
+     it('server-renders the default popup input value without a form name before hydration', () => {
+       renderToString(
+-        <Form>
+-          <Field.Root name="search">
+-            <Autocomplete.Root items={['alpha', 'alpine']} defaultValue="alpha">
+-              <Autocomplete.Trigger>
+-                <Autocomplete.Value />
+-              </Autocomplete.Trigger>
+-              <Autocomplete.Portal>
+-                <Autocomplete.Positioner>
+-                  <Autocomplete.Popup>
+-                    <Autocomplete.Input render={<Input data-testid="input" />} />
+-                    <Autocomplete.List>
+-                      {(item) => (
+-                        <Autocomplete.Item key={item} value={item}>
+-                          {item}
+-                        </Autocomplete.Item>
+-                      )}
+-                    </Autocomplete.List>
+-                  </Autocomplete.Popup>
+-                </Autocomplete.Positioner>
+-              </Autocomplete.Portal>
+-            </Autocomplete.Root>
+-          </Field.Root>
+-          <button type="submit">Submit</button>
+-        </Form>,
++        <AutocompleteRootServerCase3 />,
+       );
+ 
+       const namedInputs = screen

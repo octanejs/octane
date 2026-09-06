@@ -1,0 +1,29 @@
+diff --git a/tests/upstream/test/describeConformance.tsx b/tests/upstream/test/describeConformance.tsx
+--- a/tests/upstream/test/describeConformance.tsx
++++ b/tests/upstream/test/describeConformance.tsx
+@@ -1,19 +1,19 @@
+ /** @jsxImportSource octane */
+-import * as React from 'octane';
++import type * as React from 'octane';
+ import {
+-  ConformanceOptions,
+-  MuiRenderResult,
+-  RenderOptions,
++  type ConformanceOptions,
++  type MuiRenderResult,
++  type RenderOptions,
+   createDescribe,
+ } from '@mui/internal-test-utils';
+ import { testPropForwarding } from './conformanceTests/propForwarding';
+ import { testRefForwarding } from './conformanceTests/refForwarding';
+ import { testRenderProp } from './conformanceTests/renderProp';
+ import { testClassName } from './conformanceTests/className';
+-import { BaseUIRenderResult } from './createRenderer';
++import type { BaseUIRenderResult } from './createRenderer';
+ 
+ export type ConformantComponentProps = {
+-  render?: React.ReactElement<unknown> | ((props: Record<string, unknown>) => React.ReactNode);
++  render?: React.ReactElement<unknown> | ((props: Record<string, unknown>) => React.OctaneNode);
+   ref?: React.Ref<unknown>;
+   'data-testid'?: string;
+   className?: string | ((state: unknown) => string);

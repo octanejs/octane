@@ -1,0 +1,39 @@
+diff --git a/tests/upstream/src/menu/radio-item/MenuRadioItem.test.tsx b/tests/upstream/src/menu/radio-item/MenuRadioItem.test.tsx
+--- a/tests/upstream/src/menu/radio-item/MenuRadioItem.test.tsx
++++ b/tests/upstream/src/menu/radio-item/MenuRadioItem.test.tsx
+@@ -62,10 +62,10 @@ describe('<Menu.RadioItem />', () => {
+     const renderItem3Spy = vi.fn();
+     const renderItem4Spy = vi.fn();
+ 
+-    const LoggingRoot = React.forwardRef(function LoggingRoot(
+-      props: any & { renderSpy: () => void },
+-      ref: React.ForwardedRef<HTMLLIElement>,
++    const LoggingRoot = (function LoggingRoot(
++      propsWithRef: (any & { renderSpy: () => void }) & { ref?: React.Ref<HTMLLIElement> },
+     ) {
++  const { ref: ref = null, ...props } = propsWithRef;
+       const { renderSpy, state, ...other } = props;
+       renderSpy();
+       return <li {...other} ref={ref} />;
+@@ -126,18 +126,18 @@ describe('<Menu.RadioItem />', () => {
+ 
+     fireEvent.keyDown(menuItems[0], { key: 'ArrowDown' }); // highlights '2'
+ 
+-    // React renders twice in strict mode, so we expect twice the number of spy calls
++    // Octane invokes each render once; unchanged items must still skip rendering.
+ 
+     await waitFor(
+       () => {
+-        expect(renderItem1Spy.mock.calls.length).toBe(2); // '1' rerenders as it loses highlight
++        expect(renderItem1Spy.mock.calls.length).toBe(1); // '1' rerenders as it loses highlight
+       },
+       { timeout: 1000 },
+     );
+ 
+     await waitFor(
+       () => {
+-        expect(renderItem2Spy.mock.calls.length).toBe(2); // '2' rerenders as it receives highlight
++        expect(renderItem2Spy.mock.calls.length).toBe(1); // '2' rerenders as it receives highlight
+       },
+       { timeout: 1000 },
+     );

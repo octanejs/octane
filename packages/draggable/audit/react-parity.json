@@ -11,10 +11,7 @@
     "integrity": "sha256:f96cf6ee39150b9ac5477ee05e4b8a69fbc766c20697fcbdca23773c8fc5261d",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/draggable/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "acfa82cb9987059d0fb25e890806a7a44486953d8edbf273d76746aeb43c3789"
+      "lockfileSha256": "003c260afd05b30f26f56dfc47427e7a1486059a258349db9f9f5ae01bca6a44"
     }
   },
   "lanes": [
@@ -85,7 +82,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "98a4282d861b978d002c46b843ef60becb452402616df1daf83973857a096693"
+          "sha256": "8092b77be0374936ce7ee2968aa74b92e7ddc629d8efd36e8daa148d79c87507"
         },
         {
           "path": "packages/draggable/tests/upstream-vitest.config.ts",

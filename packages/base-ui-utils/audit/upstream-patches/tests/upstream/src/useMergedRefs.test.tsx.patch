@@ -1,0 +1,78 @@
+diff --git a/tests/upstream/src/useMergedRefs.test.tsx b/tests/upstream/src/useMergedRefs.test.tsx
+--- a/tests/upstream/src/useMergedRefs.test.tsx
++++ b/tests/upstream/src/useMergedRefs.test.tsx
+@@ -1,7 +1,7 @@
+ /** @jsxImportSource octane */
+ import { expect, vi, describe, it, test } from 'vitest';
+ import * as React from 'octane';
+-import { createRenderer, MuiRenderResult, screen } from '@mui/internal-test-utils';
++import { createRenderer, type MuiRenderResult, screen } from '@mui/internal-test-utils';
+ import { getReactElementRef } from './getReactElementRef';
+ import { useMergedRefs } from './useMergedRefs';
+ 
+@@ -22,7 +22,7 @@ describe('useMergedRefs', () => {
+       return <div ref={handleRef}>{ownRefCurrent ? 'has a ref' : 'has no ref'}</div>;
+     }
+ 
+-    const outerRef = React.createRef<HTMLDivElement>();
++    const outerRef = ({ current: null } as React.RefObject<HTMLDivElement | null>);
+ 
+     expect(() => {
+       render(<Component innerRef={outerRef} />);
+@@ -31,7 +31,8 @@ describe('useMergedRefs', () => {
+   });
+ 
+   it('forks if only one of the branches requires a ref', () => {
+-    const Component = React.forwardRef(function Component(props, ref) {
++    const Component = function Component(props: ({}) & { ref?: React.Ref<unknown> }) {
++  const ref = props.ref ?? null;
+       const [hasRef, setHasRef] = React.useState(false);
+       const handleOwnRef = React.useCallback(() => setHasRef(true), []);
+       const handleRef = useMergedRefs(handleOwnRef, ref);
+@@ -41,7 +42,7 @@ describe('useMergedRefs', () => {
+           {String(hasRef)}
+         </div>
+       );
+-    });
++    };
+ 
+     expect(() => {
+       render(<Component />);
+@@ -55,12 +56,13 @@ describe('useMergedRefs', () => {
+       children: React.ReactElement<any>;
+     }
+ 
+-    const Outer = React.forwardRef<HTMLDivElement, TestComponentProps>(function Outer(props, ref) {
++    const Outer = function Outer(props: (TestComponentProps) & { ref?: React.Ref<HTMLDivElement> }) {
++  const ref = props.ref ?? null;
+       const { children } = props;
+       const handleRef = useMergedRefs(getReactElementRef(children), ref);
+ 
+       return React.cloneElement(children, { ref: handleRef });
+-    });
++    };
+ 
+     function Inner() {
+       return <div />;
+@@ -96,7 +98,7 @@ describe('useMergedRefs', () => {
+         view = render(<Div id="test" />);
+       }).not.toErrorDev();
+ 
+-      const ref = React.createRef<HTMLDivElement>();
++      const ref = ({ current: null } as React.RefObject<HTMLDivElement | null>);
+       expect(() => {
+         view.setProps({ leftRef: ref });
+       }).not.toErrorDev();
+@@ -104,9 +106,9 @@ describe('useMergedRefs', () => {
+     });
+ 
+     it('cleans up detached refs', () => {
+-      const firstLeftRef = React.createRef<HTMLDivElement>();
+-      const firstRightRef = React.createRef<HTMLDivElement>();
+-      const secondRightRef = React.createRef<HTMLDivElement>();
++      const firstLeftRef = ({ current: null } as React.RefObject<HTMLDivElement | null>);
++      const firstRightRef = ({ current: null } as React.RefObject<HTMLDivElement | null>);
++      const secondRightRef = ({ current: null } as React.RefObject<HTMLDivElement | null>);
+       let view: MuiRenderResult;
+ 
+       expect(() => {

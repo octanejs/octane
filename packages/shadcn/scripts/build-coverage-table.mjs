@@ -30,10 +30,6 @@ const BASES = [
 // actually portable. `badge`/`breadcrumb`/`item`/`sidebar` are deliberately NOT listed — they
 // need only radix's `Slot`, and Base UI's `render` prop covers that.
 const BLOCKED = {
-	'base-ui/navigation-menu': '@octanejs/base-ui has no navigation-menu primitive',
-	'base-ui/scroll-area': '@octanejs/base-ui has no scroll-area primitive',
-	'base-ui/select': '@octanejs/base-ui has no select primitive',
-	'base-ui/tabs': '@octanejs/base-ui has no tabs primitive',
 	'base-ui/sonner': 'needs next-themes, which has no octane binding',
 	'react-aria/hover-card': 'no counterpart in upstream’s aria base',
 	'react-aria/menubar': 'no counterpart in upstream’s aria base',

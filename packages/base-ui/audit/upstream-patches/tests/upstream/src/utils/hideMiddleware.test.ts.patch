@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/utils/hideMiddleware.test.ts b/tests/upstream/src/utils/hideMiddleware.test.ts
+--- a/tests/upstream/src/utils/hideMiddleware.test.ts
++++ b/tests/upstream/src/utils/hideMiddleware.test.ts
+@@ -4,7 +4,7 @@ import {
+   type MiddlewareState,
+   type Rect,
+   type SideObject,
+-} from '@floating-ui/react-dom';
++} from '@floating-ui/dom';
+ import { hide } from './hideMiddleware';
+ 
+ const floatingRect: Rect = { x: 0, y: 0, width: 5, height: 5 };

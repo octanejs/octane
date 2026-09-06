@@ -47,6 +47,15 @@ function undoFocusInsideDisable(html: string): string {
 	});
 }
 
+// The selection and indicator insertion commit before their entrance frame.
+// Octane retains starting styles through a paint; compare the settled DOM after
+// both renderers have crossed that frame boundary, keeping every attribute in
+// the comparison. Immediate removal remains checked before this wait.
+async function waitForEntrancePaint(): Promise<void> {
+	await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+	await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 /**
  * `d.step` for open menus: drives the step on both runtimes, then byte-compares after undoing the
  * shared-document focus artifact above on both sides.
@@ -318,10 +327,11 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it('Checkbox: uncontrolled — click ticks + mounts the Indicator', async () => {
 		const d = await mountDifferential(FIXTURE, 'CheckboxBasic', undefined, CACHE);
 		await d.step('mount (unchecked, no indicator)', () => {});
-		await d.step('click → checked + indicator', async (i, r) => {
+		await d.observe('click → checked + indicator', async (i, r) => {
 			await i.click('[role="checkbox"]');
 			await r.click('[role="checkbox"]');
 		});
+		await d.step('checked indicator after entrance paint', waitForEntrancePaint);
 		d.unmount();
 	});
 
@@ -447,10 +457,11 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it('RadioGroup: composite roving focus + value → aria-checked; click moves selection', async () => {
 		const d = await mountDifferential(FIXTURE, 'RadioGroupBasic', undefined, CACHE);
 		await d.step('mount (a selected)', () => {});
-		await d.step('click b → selection moves', async (i, r) => {
+		await d.observe('click b → selection moves', async (i, r) => {
 			await i.click('.r:nth-child(3)');
 			await r.click('.r:nth-child(3)');
 		});
+		await d.step('selection after the indicator entrance paint', waitForEntrancePaint);
 		d.unmount();
 	});
 
@@ -675,20 +686,30 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 			await i.click('.menu-check');
 			await r.click('.menu-check');
 		});
-		await stepUndoingFocusDisable(d, 're-check the first item', async (i, r) => {
+		await d.observe('re-check the first item', async (i, r) => {
 			await i.click('.menu-check');
 			await r.click('.menu-check');
 		});
+		await stepUndoingFocusDisable(
+			d,
+			're-checked indicator after entrance paint',
+			waitForEntrancePaint,
+		);
 		d.unmount();
 	});
 
 	it('Menu: selecting a different radio item matches Base UI (indicator moves)', async () => {
 		const d = await mountDifferential(FIXTURE, 'MenuOpenRadioGroup', undefined, CACHE);
 		await stepUndoingFocusDisable(d, 'mount (open, second item selected)');
-		await stepUndoingFocusDisable(d, 'select the first item', async (i, r) => {
+		await d.observe('select the first item', async (i, r) => {
 			await i.click('.menu-radio');
 			await r.click('.menu-radio');
 		});
+		await stepUndoingFocusDisable(
+			d,
+			'selected indicator after entrance paint',
+			waitForEntrancePaint,
+		);
 		d.unmount();
 	});
 

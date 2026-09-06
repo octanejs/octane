@@ -1,10 +1,6 @@
-// Mirrors .base-ui/packages/react/src/utils/popups/index.ts — the popup store engine barrel.
-export * from './store';
+export * from './inlineRect';
+export * from './popupHandle';
 export * from './popupStoreUtils';
 export * from './popupTriggerMap';
-export {
-	createInlineMiddleware,
-	getInlineRectTriggerProps,
-	updateInlineRectCoords,
-	type InlineRectCoords,
-} from './inlineRect';
+export * from './store';
+export * from './usePopupHandleStore';

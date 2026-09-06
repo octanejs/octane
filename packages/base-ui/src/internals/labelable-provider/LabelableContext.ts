@@ -1,0 +1,49 @@
+/** @jsxImportSource octane */
+'use client';
+import * as React from 'octane';
+import { NOOP } from '../noop';
+import type { HTMLProps } from '../types';
+
+export interface LabelableContext {
+	/**
+	 * The `id` of the labelable element.
+	 * When `null` the label omits `htmlFor`, either because the association is implicit or
+	 * because the control takes its name from `aria-labelledby`.
+	 */
+	controlId: string | null | undefined;
+	registerControlId: (source: symbol, id: string | null | undefined) => void;
+	resetControlId: () => void;
+	/**
+	 * The `id` of the label.
+	 */
+	labelId: string | undefined;
+	setLabelId: React.Dispatch<React.SetStateAction<string | undefined>>;
+	/**
+	 * An array of `id`s of elements that provide an accessible description.
+	 */
+	messageIds: string[];
+	setMessageIds: React.Dispatch<React.SetStateAction<string[]>>;
+	getDescriptionProps: <Props extends { 'aria-describedby'?: string }>(
+		externalProps: Props,
+	) => Omit<Props, 'aria-describedby'> & { 'aria-describedby'?: string };
+}
+
+/**
+ * A context for providing [labelable elements](https://html.spec.whatwg.org/multipage/forms.html#category-label)\
+ * with an accessible name (label) and description.
+ */
+export const LabelableContext = React.createContext<LabelableContext>({
+	controlId: undefined,
+	registerControlId: NOOP,
+	resetControlId: NOOP,
+	labelId: undefined,
+	setLabelId: NOOP,
+	messageIds: [],
+	setMessageIds: NOOP,
+	getDescriptionProps: <Props extends { 'aria-describedby'?: string }>(externalProps: Props) =>
+		externalProps,
+});
+
+export function useLabelableContext() {
+	return React.useContext(LabelableContext);
+}

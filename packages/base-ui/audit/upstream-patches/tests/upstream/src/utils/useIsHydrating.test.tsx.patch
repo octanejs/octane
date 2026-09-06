@@ -1,0 +1,24 @@
+diff --git a/tests/upstream/src/utils/useIsHydrating.test.tsx b/tests/upstream/src/utils/useIsHydrating.test.tsx
+--- a/tests/upstream/src/utils/useIsHydrating.test.tsx
++++ b/tests/upstream/src/utils/useIsHydrating.test.tsx
+@@ -3,16 +3,14 @@ import { expect, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { screen, waitFor } from '@mui/internal-test-utils';
+ import { createRenderer } from '#test-utils';
+-import { useIsHydrating } from './useIsHydrating';
++import { HydrationStateFixture as TestComponent } from '../../../fixtures/hydration-state.tsrx';
++import { HydrationStateFixture as ServerTestComponent } from '../../../fixtures/hydration-state.tsrx?octane-ssr';
++import { registerServerComponent } from '../../../support/renderer';
++registerServerComponent(TestComponent, ServerTestComponent);
+ 
+ describe('useIsHydrating', () => {
+   const { render, renderToString } = createRenderer();
+ 
+-  function TestComponent() {
+-    const isHydrating = useIsHydrating();
+-
+-    return <span data-testid="value">{String(isHydrating)}</span>;
+-  }
+ 
+   it('returns false for client-only mounts', async () => {
+     await render(<TestComponent />);

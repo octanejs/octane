@@ -54,6 +54,18 @@ const OCTANE_SINGLETON_CONSUMERS = new Set([
 
 export const OCTANE_BETA_PEER_RANGE = 'workspace:^0.1.51 || ^0.2.0';
 
+// These bindings use the compiler/runtime APIs first released with Octane 0.2.5.
+const OCTANE_025_CONSUMERS = new Set([
+	'@octanejs/base-ui',
+	'@octanejs/base-ui-utils',
+	'@octanejs/shadcn',
+	'@octanejs/testing-library',
+]);
+
+export function octanePeerRangeFor(packageName) {
+	return OCTANE_025_CONSUMERS.has(packageName) ? 'workspace:^0.2.5' : OCTANE_BETA_PEER_RANGE;
+}
+
 function readJson(file) {
 	return JSON.parse(readFileSync(file, 'utf8'));
 }
@@ -443,15 +455,16 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 		}
 
 		const octanePeerRange = pkg.manifest.peerDependencies?.octane;
-		if (octanePeerRange !== undefined && octanePeerRange !== OCTANE_BETA_PEER_RANGE) {
+		const expectedOctanePeerRange = octanePeerRangeFor(pkg.name);
+		if (octanePeerRange !== undefined && octanePeerRange !== expectedOctanePeerRange) {
 			errors.push(
-				`${label} peerDependencies.octane must be ${JSON.stringify(OCTANE_BETA_PEER_RANGE)} (received ${JSON.stringify(octanePeerRange)})`,
+				`${label} peerDependencies.octane must be ${JSON.stringify(expectedOctanePeerRange)} (received ${JSON.stringify(octanePeerRange)})`,
 			);
 		}
 
 		// Hook state is module-global within one Octane runtime instance. Bindings
 		// and the metaframework must therefore consume the application's singleton
-		// runtime as a peer compatible with the final 0.1 and beta 0.2 lines, while
+		// runtime at the package's supported minimum, while
 		// retaining an exact workspace dev dependency for source tests.
 		if (pkg.role === 'framework binding' || OCTANE_SINGLETON_CONSUMERS.has(pkg.name)) {
 			if (pkg.manifest.dependencies?.octane !== undefined) {
@@ -502,7 +515,7 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 				const isOctaneBetaPeer =
 					section === 'peerDependencies' &&
 					dependency === 'octane' &&
-					range === OCTANE_BETA_PEER_RANGE;
+					range === expectedOctanePeerRange;
 				if (!workspaceNames.has(dependency) || range === 'workspace:*' || isOctaneBetaPeer) {
 					continue;
 				}

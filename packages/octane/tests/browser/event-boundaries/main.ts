@@ -3,7 +3,8 @@
 import { createRoot as createOctaneRoot } from '../../../src/index.js';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import { flushSync as flushReactSync } from 'react-dom';
-import { createElement, useState } from 'react';
+import { createElement, useLayoutEffect, useState } from 'react';
+import { LayoutBeforeObserver, openLayoutPanel } from '../../_fixtures/effect-timing.tsrx';
 import * as OctaneFixture from '../../_fixtures/event-boundaries.tsrx';
 import {
 	CommitTiming as OctaneCommitTiming,
@@ -30,6 +31,7 @@ export type ProbeOptions =
 	| { kind: 'shadow'; mode: ShadowRootMode }
 	| { kind: 'slot' }
 	| { kind: 'commit-timing' }
+	| { kind: 'layout-commit' }
 	| { kind: 'controlled-capture'; stop: boolean };
 type HandlerRecord = {
 	label: string;
@@ -166,6 +168,46 @@ function ReactCommitTiming(props: EventProbeProps) {
 	);
 }
 
+const layoutHeights: Record<RuntimeName, string[]> = { octane: [], react: [] };
+let openReactLayoutPanel = () => {};
+
+function ReactLayoutBeforeObserver() {
+	const [open, setOpen] = useState(false);
+	const [phase, setPhase] = useState(0);
+	openReactLayoutPanel = () => setOpen(true);
+	useLayoutEffect(() => {
+		if (open && phase < 3) setPhase(phase + 1);
+	}, [open, phase]);
+	return createElement(
+		'div',
+		null,
+		createElement('button', { onClick: () => setOpen(true) }, 'Open'),
+		createElement(
+			'div',
+			{
+				'data-testid': 'panel',
+				'data-open': open ? '' : undefined,
+				style: { height: phase === 3 ? '160px' : undefined },
+			},
+			'content',
+		),
+	);
+}
+
+function mountLayoutCommit(runtime: RuntimeName): void {
+	const container = containers[runtime];
+	if (runtime === 'octane') createOctaneRoot(container).render(LayoutBeforeObserver);
+	else
+		flushReactSync(() => {
+			createReactRoot(container).render(createElement(ReactLayoutBeforeObserver));
+		});
+	targets[runtime] = container.querySelector('button')!;
+	const panel = container.querySelector<HTMLElement>('[data-testid="panel"]')!;
+	new MutationObserver(() => {
+		if (panel.hasAttribute('data-open')) layoutHeights[runtime].push(panel.style.height);
+	}).observe(panel, { attributes: true });
+}
+
 function mountCommitTiming(runtime: RuntimeName): void {
 	const container = containers[runtime];
 	const props: EventProbeProps = { record: (label, event) => record(runtime, label, event) };
@@ -248,12 +290,18 @@ function mountShadow(options: Extract<ProbeOptions, { kind: 'shadow' | 'slot' }>
 
 window.__eventBoundaries = {
 	logs,
+	layoutHeights,
+	scheduleLayoutOpen(runtime: RuntimeName) {
+		if (runtime === 'octane') openLayoutPanel();
+		else openReactLayoutPanel();
+	},
 	mount(options: ProbeOptions) {
 		if (options.kind === 'shadow' || options.kind === 'slot') mountShadow(options);
 		else {
 			for (const runtime of ['octane', 'react'] as const) {
 				if (options.kind === 'same-root') mountSameRoot(runtime, options.scenario);
 				else if (options.kind === 'commit-timing') mountCommitTiming(runtime);
+				else if (options.kind === 'layout-commit') mountLayoutCommit(runtime);
 				else if (options.kind === 'controlled-capture')
 					mountControlledCapture(runtime, options.stop);
 				else mountNested(runtime, options.stop);
@@ -294,6 +342,8 @@ declare global {
 	interface Window {
 		__eventBoundaries: {
 			logs: Record<RuntimeName, HandlerRecord[]>;
+			layoutHeights: Record<RuntimeName, string[]>;
+			scheduleLayoutOpen(runtime: RuntimeName): void;
 			mount(options: ProbeOptions): void;
 			clickPoint(runtime: RuntimeName): { x: number; y: number };
 			scriptClick(runtime: RuntimeName): void;

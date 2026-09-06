@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/test/floating-ui-tests/renderGridRows.tsx b/tests/upstream/test/floating-ui-tests/renderGridRows.tsx
+--- a/tests/upstream/test/floating-ui-tests/renderGridRows.tsx
++++ b/tests/upstream/test/floating-ui-tests/renderGridRows.tsx
+@@ -3,7 +3,7 @@ import * as React from 'octane';
+ 
+ export const GRID_COLUMN_COUNT = 2;
+ 
+-export function renderGridRows(children: React.ReactNode, grid?: boolean) {
++export function renderGridRows(children: React.OctaneNode, grid?: boolean) {
+   if (!grid) {
+     return children;
+   }

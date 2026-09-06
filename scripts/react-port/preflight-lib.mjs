@@ -1,7 +1,10 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import ts from 'typescript';
+import { verifyNpmProvenance } from './npm-provenance.mjs';
 import { bridgeReportFromSource } from '../../packages/octane-mcp-server/src/bridge.js';
 import {
 	extractTestCases,
@@ -41,8 +44,8 @@ const SOURCE_SKIP_PARTS = new Set([
 	'test',
 	'tests',
 ]);
-const MAX_SOURCE_FILES = 400;
-const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
+const MAX_SOURCE_FILES = 4_000;
+const MAX_SOURCE_BYTES = 64 * 1024 * 1024;
 const TEST_SOURCE_PATTERN = /\.(?:[cm]?[jt]sx?|coffee)$/i;
 const TEST_CONFIG_PATTERN =
 	/^(?:(?:vitest|vite|jest|karma|mocha|ava|webpack)\.config|test(?:s)?\.config)\.[cm]?[jt]s$/i;
@@ -269,11 +272,14 @@ export function assessResolvedEvidence({ input, registry, source }) {
 			'Published repository identity or package subdirectory does not match immutable source.',
 		);
 	}
-	if (!/^[0-9a-f]{40}$/i.test(registry.gitHead ?? '')) {
+	const publishedCommit =
+		registry.gitHead ??
+		(registry.sourceProvenance?.verified === true ? registry.sourceProvenance.commit : undefined);
+	if (!/^[0-9a-f]{40}$/i.test(publishedCommit ?? '')) {
 		blockers.push('Published package metadata does not contain an immutable 40-character gitHead.');
-	} else if (registry.gitHead.toLowerCase() !== source.commit?.toLowerCase()) {
+	} else if (publishedCommit.toLowerCase() !== source.commit?.toLowerCase()) {
 		blockers.push(
-			`Published gitHead ${registry.gitHead} does not match source commit ${source.commit}.`,
+			`Published source commit ${publishedCommit} does not match source commit ${source.commit}.`,
 		);
 	}
 	if (typeof registry.integrity !== 'string' || !registry.integrity) {
@@ -309,6 +315,7 @@ export function assessResolvedEvidence({ input, registry, source }) {
 	};
 	const fingerprintInput = {
 		identity,
+		sourceProvenance: registry.sourceProvenance ?? null,
 		publishedLicense: {
 			spdx: publishedLicense.spdx,
 			evidence: publishedLicense.evidence,
@@ -891,7 +898,92 @@ function containsInlineTestMarker(source, fileName) {
 	return found;
 }
 
-async function immutableTestInventory(tree, subdirectory, manifest, options) {
+function extractTypeAssertionGroups(source, file) {
+	if (
+		!/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|\.(?:spec|test-d|d-test)\.[cm]?tsx?$/i.test(
+			file,
+		)
+	) {
+		return [];
+	}
+	const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+
+	function containsAssertion(node) {
+		if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) return true;
+		if (ts.isCallExpression(node)) return true;
+		if (ts.isSatisfiesExpression(node)) return true;
+		if (ts.isVariableDeclaration(node) && node.type && node.initializer) return true;
+		return ts.forEachChild(node, containsAssertion) ?? false;
+	}
+	return sourceFile.statements
+		.filter((statement) => !ts.isImportDeclaration(statement) && containsAssertion(statement))
+		.map((statement, index) => {
+			const title = statement.getText(sourceFile).replace(/\s+/g, ' ').trim();
+			const id = `react-case-v1:${createHash('sha256').update(`${file}\0type-assertion\0${index}\0${title}`).digest('hex').slice(0, 20)}`;
+			const location = sourceFile.getLineAndCharacterOfPosition(statement.getStart(sourceFile));
+			return {
+				caseId: id,
+				declarationId: id,
+				kind: 'type-assertion',
+				title,
+				line: location.line + 1,
+				column: location.character + 1,
+				estimatedRegistrations: 1,
+				dynamicExpansion: null,
+				helperExpansion: null,
+				manualReviewReason: null,
+			};
+		});
+}
+
+export async function immutableTestInventory(tree, subdirectory, manifest, options) {
+	const profilePath = new URL(
+		`./profiles/${manifest.name?.replace(/^@/, '').replaceAll('/', '-')}-${manifest.version}.json`,
+		import.meta.url,
+	);
+	const profile = existsSync(profilePath) ? JSON.parse(readFileSync(profilePath, 'utf8')) : null;
+	const helperExpansions = {};
+	if (profile) {
+		if (
+			profile.package !== manifest.name ||
+			profile.version !== manifest.version ||
+			profile.commit !== options.sourceCommit
+		)
+			throw new Error('Test helper profile does not match the immutable package identity');
+		for (const helper of profile.helpers) {
+			const sourceCases = [];
+			for (const module of helper.modules) {
+				const entry = tree.find(
+					(entry) => entry.path === module.path && isGitHubRegularBlob(entry),
+				);
+				if (!entry || entry.sha !== module.gitBlob)
+					throw new Error(`Test helper profile source mismatch: ${module.path}`);
+				const bytes = await fetchGitHubBlob(entry, options);
+				if (!module.registrations) continue;
+				for (const testCase of extractTestCases(bytes.toString('utf8'), { file: entry.path })) {
+					if (
+						!Number.isSafeInteger(testCase.estimatedRegistrations) ||
+						testCase.estimatedRegistrations < 1
+					)
+						throw new Error(`Cannot expand pinned test helper ${entry.path}`);
+					for (let i = 0; i < testCase.estimatedRegistrations; i++)
+						sourceCases.push({
+							source: `${entry.path}:${testCase.line}:${testCase.column}`,
+							title: testCase.title ?? testCase.titleExpression,
+							caseId: testCase.caseId,
+							row: i,
+						});
+				}
+			}
+			if (sourceCases.length === 0) throw new Error(`Empty test helper expansion: ${helper.name}`);
+			helperExpansions[helper.name] = {
+				registrations: sourceCases.length,
+				sourceCases,
+				modules: helper.modules,
+			};
+		}
+	}
+
 	const scopePrefix = subdirectory ? `${subdirectory}/` : '';
 	const testScripts = Object.fromEntries(
 		Object.entries(manifest.scripts ?? {}).filter(([name]) => /(?:test|spec|type)/i.test(name)),
@@ -949,9 +1041,17 @@ async function immutableTestInventory(tree, subdirectory, manifest, options) {
 		if (!TEST_SOURCE_PATTERN.test(relativePath) || /(?:^|\/)node_modules\//i.test(relativePath)) {
 			return [];
 		}
+		// Vitest's default discovery selects named test/spec files, not every
+		// module beneath a test/ support directory. Explicit include patterns
+		// still admit nonstandard names, and compile-only specs remain inventoried.
+		const vitestDefaults = Object.values(testScripts).some((command) => /\bvitest\b/.test(command));
+		const conventional =
+			conventionalTestPath(relativePath) &&
+			(!vitestDefaults ||
+				/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(relativePath) ||
+				/(?:^|\/)(?:typetests|type-tests|test-d)\//.test(relativePath));
 		const directTest =
-			conventionalTestPath(relativePath) ||
-			referencedByTestConfiguration(relativePath, configuredTestPatterns);
+			conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
 		const inlineSource = referencedByTestConfiguration(
 			relativePath,
 			configuredInlineSourcePatterns,
@@ -991,7 +1091,13 @@ async function immutableTestInventory(tree, subdirectory, manifest, options) {
 					.join(', ')}`,
 			);
 		}
-		const testCases = extractTestCases(source, { file: entry.path });
+		const runtimeCases = extractTestCases(source, {
+			file: entry.path,
+			...(profile ? { helperExpansions } : {}),
+		});
+		const typeCases =
+			runtimeCases.length === 0 ? extractTypeAssertionGroups(source, entry.path) : [];
+		const testCases = runtimeCases.length > 0 ? runtimeCases : typeCases;
 		if (testCases.length === 0) {
 			throw new Error(`Immutable upstream test ${entry.path} has no countable registrations`);
 		}
@@ -1019,7 +1125,21 @@ async function immutableTestInventory(tree, subdirectory, manifest, options) {
 						testCase.estimatedRegistrations === 1 ? '' : `:registration:${registrationIndex}`
 					}`,
 					kind: testCase.kind,
-					title: testCase.title ?? testCase.declaredTitle ?? testCase.titleExpression,
+					title:
+						testCase.helperExpansion?.sourceCases?.[
+							registrationIndex % testCase.helperExpansion.registrations
+						]?.title ??
+						testCase.title ??
+						testCase.declaredTitle ??
+						testCase.titleExpression,
+					...(testCase.helperExpansion?.sourceCases
+						? {
+								helperSource:
+									testCase.helperExpansion.sourceCases[
+										registrationIndex % testCase.helperExpansion.registrations
+									],
+							}
+						: {}),
 					estimatedRegistrations: testCase.estimatedRegistrations,
 					registrationIndex,
 					dynamicExpansion: testCase.dynamicExpansion,
@@ -1030,11 +1150,13 @@ async function immutableTestInventory(tree, subdirectory, manifest, options) {
 		});
 		inventory.push({
 			path: entry.path,
-			kind: /(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$/i.test(
-				relativePath,
-			)
-				? 'type'
-				: 'runtime',
+			kind:
+				typeCases.length > 0 ||
+				/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$/i.test(
+					relativePath,
+				)
+					? 'type'
+					: 'runtime',
 			gitBlob: entry.sha,
 			size: entry.size ?? 0,
 			registrations,
@@ -1236,11 +1358,31 @@ async function resolveRegistryArtifact(packageName, selector, options) {
 		throw new Error('Published artifact license metadata contradicts registry metadata');
 	}
 
+	let sourceProvenance;
+	if (!metadata.gitHead && options.npmProvenance) {
+		const attestations = await fetchJson(
+			`https://registry.npmjs.org/-/npm/v1/attestations/${encodeURIComponent(packageName)}@${encodeURIComponent(exactVersion)}`,
+			{
+				fetchImpl: options.fetchImpl,
+				allowedHosts: new Set(['registry.npmjs.org']),
+				headers: { ...registryHeaders, accept: 'application/json' },
+				requestTimeoutMs: options.requestTimeoutMs,
+			},
+		);
+		sourceProvenance = await verifyNpmProvenance(attestations, {
+			name: packageName,
+			version: exactVersion,
+			repository: metadataRepository,
+			artifact: artifact.bytes,
+		});
+	}
+
 	return {
 		name: contents.manifest.name,
 		version: contents.manifest.version,
 		repository: metadataRepository,
 		gitHead: metadata.gitHead,
+		sourceProvenance,
 		integrity: metadata.dist.integrity,
 		manifestLicense: contents.manifest.license,
 		licenseFiles: contents.licenseFiles,
@@ -1261,23 +1403,36 @@ export function githubHeaders(options) {
 async function fetchGitHubBlob(entry, options) {
 	if (entry.size > REMOTE_LIMITS.licenseBytes)
 		throw new Error(`Source evidence file is too large: ${entry.path}`);
-	const response = await fetchJson(entry.url, {
-		fetchImpl: options.fetchImpl,
-		allowedHosts: new Set(['api.github.com']),
-		maxBytes: Math.min(REMOTE_LIMITS.jsonBytes, REMOTE_LIMITS.licenseBytes * 2),
-		headers: githubHeaders(options),
-		requestTimeoutMs: options.requestTimeoutMs,
-	});
-	if (response.encoding !== 'base64' || typeof response.content !== 'string') {
-		throw new Error(`GitHub blob is not inline base64 evidence: ${entry.path}`);
+	let bytes;
+	if (options.sourceCheckout) {
+		if (!/^[0-9a-f]{40}$/i.test(entry.sha ?? ''))
+			throw new Error('Invalid immutable blob identity');
+		bytes = execFileSync(
+			'git',
+			['--no-replace-objects', '-C', options.sourceCheckout, 'cat-file', 'blob', entry.sha],
+			{ maxBuffer: REMOTE_LIMITS.licenseBytes, stdio: ['ignore', 'pipe', 'pipe'] },
+		);
+	} else {
+		const response = await fetchJson(entry.url, {
+			fetchImpl: options.fetchImpl,
+			allowedHosts: new Set(['api.github.com']),
+			maxBytes: Math.min(REMOTE_LIMITS.jsonBytes, REMOTE_LIMITS.licenseBytes * 2),
+			headers: githubHeaders(options),
+			requestTimeoutMs: options.requestTimeoutMs,
+		});
+		if (response.encoding !== 'base64' || typeof response.content !== 'string') {
+			throw new Error(`GitHub blob is not inline base64 evidence: ${entry.path}`);
+		}
+		bytes = Buffer.from(response.content.replace(/\s/g, ''), 'base64');
+		if (
+			bytes.length !== entry.size ||
+			(response.size !== undefined && response.size !== bytes.length)
+		) {
+			throw new Error(`GitHub blob size does not match tree evidence: ${entry.path}`);
+		}
 	}
-	const bytes = Buffer.from(response.content.replace(/\s/g, ''), 'base64');
-	if (
-		bytes.length !== entry.size ||
-		(response.size !== undefined && response.size !== bytes.length)
-	) {
-		throw new Error(`GitHub blob size does not match tree evidence: ${entry.path}`);
-	}
+	if (bytes.length !== entry.size)
+		throw new Error(`Git blob size does not match tree evidence: ${entry.path}`);
 	const gitBlobSha = createHash('sha1')
 		.update(`blob ${bytes.length}\0`)
 		.update(bytes)
@@ -1392,7 +1547,7 @@ async function resolveGitHubSource(repository, ref, options) {
 		treeResponse.tree,
 		repository.subdirectory,
 		manifest,
-		options,
+		{ ...options, sourceCommit: commit },
 	);
 
 	return {
@@ -1421,7 +1576,11 @@ export async function resolveRemoteInput(parsedInput, rawInput, options = {}) {
 			parsedInput.selector,
 			resolvedOptions,
 		);
-		source = await resolveGitHubSource(registry.repository, registry.gitHead, resolvedOptions);
+		source = await resolveGitHubSource(
+			registry.repository,
+			registry.gitHead ?? registry.sourceProvenance?.commit,
+			resolvedOptions,
+		);
 	} else {
 		const repository = {
 			owner: parsedInput.owner,
@@ -1449,6 +1608,7 @@ export async function resolveRemoteInput(parsedInput, rawInput, options = {}) {
 			registryManifestSha256: registry.manifestSha256,
 			sourceManifestSha256: source.manifestSha256,
 			artifactUrl: registry.artifactUrl,
+			sourceProvenance: registry.sourceProvenance ?? null,
 		}),
 	};
 }

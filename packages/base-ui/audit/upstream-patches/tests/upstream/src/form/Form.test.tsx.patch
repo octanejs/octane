@@ -1,0 +1,77 @@
+diff --git a/tests/upstream/src/form/Form.test.tsx b/tests/upstream/src/form/Form.test.tsx
+--- a/tests/upstream/src/form/Form.test.tsx
++++ b/tests/upstream/src/form/Form.test.tsx
+@@ -231,14 +231,14 @@ describe('<Form />', () => {
+     const password = screen.getByTestId('password');
+     const confirm = screen.getByTestId('confirm');
+ 
+-    fireEvent.change(password, { target: { value: 'secret' } });
+-    fireEvent.change(confirm, { target: { value: 'typo' } });
++    fireEvent.input(password, { target: { value: 'secret' } });
++    fireEvent.input(confirm, { target: { value: 'typo' } });
+     fireEvent.blur(confirm);
+ 
+     expect(validate).toHaveBeenCalledTimes(1);
+     expect(screen.getByTestId('confirm-error')).toHaveTextContent('Passwords do not match');
+ 
+-    fireEvent.change(password, { target: { value: 'typo' } });
++    fireEvent.input(password, { target: { value: 'typo' } });
+     fireEvent.blur(password);
+ 
+     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+@@ -277,7 +277,7 @@ describe('<Form />', () => {
+       expect(screen.getByTestId('error')).toHaveTextContent('async error');
+     });
+ 
+-    fireEvent.change(control, { target: { value: 'good' } });
++    fireEvent.input(control, { target: { value: 'good' } });
+     fireEvent.click(submit);
+ 
+     expect(onFormSubmit).toHaveBeenCalledTimes(2);
+@@ -306,7 +306,7 @@ describe('<Form />', () => {
+ 
+       const control = screen.getByTestId('control');
+ 
+-      fireEvent.change(control, { target: { value: 'taken' } });
++      fireEvent.input(control, { target: { value: 'taken' } });
+       fireEvent.blur(control);
+       await flushMicrotasks();
+ 
+@@ -742,7 +742,7 @@ describe('<Form />', () => {
+ 
+       expect(name).toHaveFocus();
+ 
+-      fireEvent.change(name, { target: { value: 'John' } });
++      fireEvent.input(name, { target: { value: 'John' } });
+ 
+       expect(age).not.toHaveFocus();
+ 
+@@ -750,7 +750,7 @@ describe('<Form />', () => {
+ 
+       expect(age).toHaveFocus();
+ 
+-      fireEvent.change(age, { target: { value: '42' } });
++      fireEvent.input(age, { target: { value: '42' } });
+ 
+       await user.click(submit);
+ 
+@@ -770,7 +770,7 @@ describe('<Form />', () => {
+ 
+       await user.click(submit);
+ 
+-      fireEvent.change(name, { target: { value: 'John' } });
++      fireEvent.input(name, { target: { value: 'John' } });
+ 
+       expect(age).not.toHaveFocus();
+     });
+@@ -786,8 +786,8 @@ describe('<Form />', () => {
+       expect(screen.queryByTestId('name-error')).not.toBe(null);
+       expect(screen.queryByTestId('age-error')).not.toBe(null);
+ 
+-      fireEvent.change(name, { target: { value: 'John' } });
+-      fireEvent.change(age, { target: { value: '42' } });
++      fireEvent.input(name, { target: { value: 'John' } });
++      fireEvent.input(age, { target: { value: '42' } });
+       expect(screen.queryByTestId('name-error')).toBe(null);
+       expect(screen.queryByTestId('age-error')).toBe(null);
+     });

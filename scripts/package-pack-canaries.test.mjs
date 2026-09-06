@@ -39,6 +39,8 @@ const repositoryRequire = createRequire(import.meta.url);
 describe('packed JavaScript consumers', () => {
 	const archiveSpecs = {
 		'@octanejs/base-ui': 'file:/tmp/base-ui.tgz',
+		'@octanejs/base-ui-utils': 'file:/tmp/base-ui-utils.tgz',
+		'@octanejs/testing-library': 'file:/tmp/testing-library.tgz',
 		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
 		'@octanejs/radix': 'file:/tmp/radix.tgz',
 		'@octanejs/draggable': 'file:/tmp/react-draggable.tgz',
@@ -54,6 +56,14 @@ describe('packed JavaScript consumers', () => {
 			() => createPackedJavascriptConsumerManifest({ ...archiveSpecs, octane: undefined }),
 			/no packed archive was provided for octane/,
 		);
+		assert.throws(
+			() =>
+				createPackedJavascriptConsumerManifest({
+					...archiveSpecs,
+					'@octanejs/base-ui-utils': undefined,
+				}),
+			/no packed archive was provided for @octanejs\/base-ui-utils/,
+		);
 	});
 
 	test('requires every CommonJS package and executes Octane SSR', () => {
@@ -61,7 +71,7 @@ describe('packed JavaScript consumers', () => {
 		assert.match(source, /require\('octane'\)/);
 		assert.match(source, /require\('octane\/server'\)/);
 		assert.match(source, /require\('@octanejs\/floating-ui'\)/);
-		assert.match(source, /require\('@octanejs\/base-ui'\)/);
+		assert.doesNotMatch(source, /require\('@octanejs\/base-ui(?:-utils)?(?:\/[^']*)?'\)/);
 		assert.match(source, /require\('@octanejs\/radix'\)/);
 		assert.doesNotMatch(source, /require\('@octanejs\/draggable'\)/);
 		assert.match(source, /renderToString/);

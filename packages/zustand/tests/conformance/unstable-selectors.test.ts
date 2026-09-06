@@ -1,31 +1,37 @@
-/**
- * Bounded-divergence case for unstable fresh-reference selectors.
- * Stays in ordinary shards (octane-only-divergence); not adapted React parity
- * evidence.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mount, nextPaint } from '../_helpers';
-import { useObj, RawObject } from '../_fixtures/shallow.tsrx';
+import { mount, flushEffects } from '../_helpers';
+import { useObj, RawObject, ShallowObject } from '../_fixtures/shallow.tsrx';
 
 beforeEach(() => {
 	useObj.setState({ a: 0, b: 0 });
 });
 
-describe('unstable selector — divergence from React', () => {
-	// Framework-contract pin for Octane's bounded settle on unstable selectors.
-	// Not harness-linked adapted parity evidence until verified upstream suites land.
-	it('a fresh-object selector does NOT infinite-loop (octane settles; React would loop + warn)', async () => {
-		let renders = 0;
-		const r = mount(RawObject, { onRender: () => renders++ });
-		await nextPaint();
-		// React's useSyncExternalStore would loop forever + console.error
-		// "The result of getSnapshot should be cached". Octane renders a BOUNDED
-		// number of times and settles — no loop, no crash.
-		expect(renders).toBeLessThan(10);
-		expect(r.find('#a').textContent).toBe('0');
-		useObj.getState().bumpB();
-		await nextPaint();
-		expect(r.find('#a').textContent).toBe('0');
-		r.unmount();
+describe('selector snapshot stability', () => {
+	it('rejects uncached snapshots and supports recovery with shallow selection', () => {
+		// useSyncExternalStore requires the same reference until the selection
+		// changes. A fresh object on every read cannot reach a stable commit.
+		let mounted: ReturnType<typeof mount> | undefined;
+		try {
+			expect(() => {
+				mounted = mount(RawObject, { onRender: () => {} });
+				flushEffects();
+			}).toThrow(/Maximum update depth exceeded/);
+		} finally {
+			mounted?.unmount();
+		}
+
+		const recovered = mount(ShallowObject, { onRender: () => {} });
+		try {
+			flushEffects();
+			expect(recovered.find('#a').textContent).toBe('0');
+			useObj.getState().bumpB();
+			flushEffects();
+			expect(recovered.find('#a').textContent).toBe('0');
+			useObj.getState().bumpA();
+			flushEffects();
+			expect(recovered.find('#a').textContent).toBe('1');
+		} finally {
+			recovered.unmount();
+		}
 	});
 });

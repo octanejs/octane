@@ -11,21 +11,10 @@
     "integrity": "sha256:ecff662abb2131f6c2dcd00ba4cce1f78bdd2495e7d607f6d2f4fcb9b3e4a58d",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/lucide/src"],
-      "include": ["\\.ts$"],
-      "exclude": []
-    },
-    "tests": {
-      "roots": ["packages/lucide/tests"],
-      "include": ["\\.test\\.ts$"],
-      "exclude": []
-    }
+    "source": { "roots": ["packages/lucide/src"], "include": ["\\.ts$"], "exclude": [] },
+    "tests": { "roots": ["packages/lucide/tests"], "include": ["\\.test\\.ts$"], "exclude": [] }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,
@@ -40,7 +29,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "acfa82cb9987059d0fb25e890806a7a44486953d8edbf273d76746aeb43c3789"
+      "lockfileSha256": "003c260afd05b30f26f56dfc47427e7a1486059a258349db9f9f5ae01bca6a44"
     }
   },
   "lanes": [

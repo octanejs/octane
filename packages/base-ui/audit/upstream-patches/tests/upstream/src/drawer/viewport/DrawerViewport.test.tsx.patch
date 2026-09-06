@@ -1,0 +1,19 @@
+diff --git a/tests/upstream/src/drawer/viewport/DrawerViewport.test.tsx b/tests/upstream/src/drawer/viewport/DrawerViewport.test.tsx
+--- a/tests/upstream/src/drawer/viewport/DrawerViewport.test.tsx
++++ b/tests/upstream/src/drawer/viewport/DrawerViewport.test.tsx
+@@ -4451,11 +4451,13 @@ describe('<Drawer.Viewport />', () => {
+       configurable: true,
+       value: [createTouch(popup, { clientX: 0, clientY: 100 })],
+     });
+-    touchStart.composedPath = () => [window];
++    // A text node is a real non-element target whose native propagation path
++    // still reaches the viewport. A path containing only window cannot do so.
++    const touchTarget = popup.appendChild(document.createTextNode('Touch target'));
+ 
+     try {
+       await act(async () => {
+-        popup.dispatchEvent(touchStart);
++        touchTarget.dispatchEvent(touchStart);
+         await flushMicrotasks();
+       });
+       fireEvent.touchMove(popup, {

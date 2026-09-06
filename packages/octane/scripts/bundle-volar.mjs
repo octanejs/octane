@@ -118,7 +118,8 @@ function dependencyNotice(input) {
  * manager override in this repository cannot protect published consumers.
  *
  * Bundle the audited build graph, not transformed application source. Octane's
- * relative modules stay shared with the runtime compiler, and virtual TSX still
+ * analysis modules stay shared with the runtime compiler. The parser adapters
+ * join the bundle so their @tsrx/core imports use the audited parser too. Virtual TSX still
  * comes from the same single AST print with its original mappings. Runtime
  * entries and application output are untouched. This costs about 210 KiB gzip
  * of compiler tooling, not application JavaScript. No compiler-source map is
@@ -129,6 +130,9 @@ export async function bundleVolarCompiler({ packageDir, outdir }) {
 	assertVolarDeclaration(root);
 	const compilerDirectory = join(root, 'src/compiler');
 	const entryPoint = join(compilerDirectory, 'volar.js');
+	const parserModules = new Set(
+		['parser.browser.js', 'parser-output.js'].map((name) => join(compilerDirectory, name)),
+	);
 	const outputDirectory = resolve(outdir);
 	const result = await build({
 		absWorkingDir: root,
@@ -147,7 +151,11 @@ export async function bundleVolarCompiler({ packageDir, outdir }) {
 				name: 'preserve-octane-compiler-modules',
 				setup(buildApi) {
 					buildApi.onResolve({ filter: /^\./ }, ({ path, importer }) => {
-						if (isWithin(compilerDirectory, importer)) return { path, external: true };
+						if (
+							isWithin(compilerDirectory, importer) &&
+							!parserModules.has(resolve(dirname(importer), path))
+						)
+							return { path, external: true };
 					});
 				},
 			},
@@ -165,7 +173,7 @@ export async function bundleVolarCompiler({ packageDir, outdir }) {
 	for (const [input, metadata] of Object.entries(output.inputs)) {
 		if (metadata.bytesInOutput === 0) continue;
 		const file = resolve(root, input);
-		if (file === entryPoint) continue;
+		if (file === entryPoint || parserModules.has(file)) continue;
 		if (isWithin(join(root, 'src'), file)) {
 			throw new Error(`Volar bundle must not duplicate an Octane module: ${input}`);
 		}

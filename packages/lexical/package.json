@@ -120,6 +120,7 @@
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "typescript": "catalog:default",
     "vitest": "catalog:default"
   }
 }

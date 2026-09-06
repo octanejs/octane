@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/test/describeGregorianAdapter/describeGregorianAdapter.types.ts b/tests/upstream/test/describeGregorianAdapter/describeGregorianAdapter.types.ts
+--- a/tests/upstream/test/describeGregorianAdapter/describeGregorianAdapter.types.ts
++++ b/tests/upstream/test/describeGregorianAdapter/describeGregorianAdapter.types.ts
+@@ -1,5 +1,5 @@
+ // TODO Temporal: Replace with `@octanejs/base-ui/types` import when Temporal components will become public.
+-import {
++import type {
+   TemporalAdapter,
+   TemporalSupportedObject,
+   TemporalTimezone,

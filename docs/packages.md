@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**121 publishable package(s), including 107 framework binding(s) and 3 framework integration(s).**
+**122 publishable package(s), including 108 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -21,7 +21,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.46` | 3 |
 | `@octanejs/astro` | [`packages/astro`](../packages/astro) | framework integration | `0.0.31` | 5 |
 | `@octanejs/auto-animate` | [`packages/auto-animate`](../packages/auto-animate) | framework binding | `0.0.8` | 3 |
-| `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.50` | 2 |
+| `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.50` | 79 |
+| `@octanejs/base-ui-utils` | [`packages/base-ui-utils`](../packages/base-ui-utils) | framework binding | `0.1.0` | 45 |
 | `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.4` | 1 |
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.8` | 4 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.9` | 2 |

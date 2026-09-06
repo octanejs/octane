@@ -1,0 +1,763 @@
+{
+  "schemaVersion": 2,
+  "project": "base-ui-utils-pristine",
+  "roots": ["packages/base-ui-utils/upstream"],
+  "files": [
+    "packages/base-ui-utils/upstream/src/addEventListener.test.ts",
+    "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+    "packages/base-ui-utils/upstream/src/clamp.test.ts",
+    "packages/base-ui-utils/upstream/src/createLogOnce.test.ts",
+    "packages/base-ui-utils/upstream/src/empty.test.ts",
+    "packages/base-ui-utils/upstream/src/formatErrorMessage.test.ts",
+    "packages/base-ui-utils/upstream/src/formatNumber.test.ts",
+    "packages/base-ui-utils/upstream/src/getDefaultFormSubmitter.test.ts",
+    "packages/base-ui-utils/upstream/src/getReactElementRef.test.tsx",
+    "packages/base-ui-utils/upstream/src/mergeCleanups.test.ts",
+    "packages/base-ui-utils/upstream/src/shadowDom.test.ts",
+    "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+    "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+    "packages/base-ui-utils/upstream/src/store/createSelector.test.ts",
+    "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+    "packages/base-ui-utils/upstream/src/stringifyLocale.test.ts",
+    "packages/base-ui-utils/upstream/src/useAnimationFrame.test.ts",
+    "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+    "packages/base-ui-utils/upstream/src/useId.test.tsx",
+    "packages/base-ui-utils/upstream/src/useIdleCallback.fallback.test.ts",
+    "packages/base-ui-utils/upstream/src/useIdleCallback.test.tsx",
+    "packages/base-ui-utils/upstream/src/useMergedRefs.test.tsx",
+    "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:62ea049706416f3a",
+      "file": "packages/base-ui-utils/upstream/src/addEventListener.test.ts",
+      "fullName": "addEventListener adds the listener and returns an unsubscribe function"
+    },
+    {
+      "id": "runtime:6066cc23477f1e34",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual compares by reference by default"
+    },
+    {
+      "id": "runtime:dbc9bb3cc70d82eb",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual consults the provided comparer even for the same array reference"
+    },
+    {
+      "id": "runtime:22746aa8ffc146ca",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual lets the provided comparer override Object.is semantics"
+    },
+    {
+      "id": "runtime:bb45b394d512c895",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual returns false when elements differ"
+    },
+    {
+      "id": "runtime:d9e36e985e692e84",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual returns false when lengths differ"
+    },
+    {
+      "id": "runtime:b741a68ff0674fe1",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual returns true for arrays with the same elements in the same order"
+    },
+    {
+      "id": "runtime:8ea939a89cdb5791",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual returns true for the same array reference"
+    },
+    {
+      "id": "runtime:9ee603d062515341",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual returns true for two empty arrays"
+    },
+    {
+      "id": "runtime:f34c055fffee170f",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual treats 0 as different from -0 (Object.is semantics)"
+    },
+    {
+      "id": "runtime:67bba44d9e6a73d9",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual treats NaN as equal to NaN (Object.is semantics)"
+    },
+    {
+      "id": "runtime:a03babab213d8377",
+      "file": "packages/base-ui-utils/upstream/src/areArraysEqual.test.ts",
+      "fullName": "areArraysEqual uses the provided comparer"
+    },
+    {
+      "id": "runtime:376c1860ee3e3c35",
+      "file": "packages/base-ui-utils/upstream/src/clamp.test.ts",
+      "fullName": "clamp clamps a value based on min and max"
+    },
+    {
+      "id": "runtime:77a42f07643e141b",
+      "file": "packages/base-ui-utils/upstream/src/createLogOnce.test.ts",
+      "fullName": "createLogOnce creates a logger with a custom prefix"
+    },
+    {
+      "id": "runtime:3a69c1a478592a57",
+      "file": "packages/base-ui-utils/upstream/src/createLogOnce.test.ts",
+      "fullName": "createLogOnce creates a logger without a prefix"
+    },
+    {
+      "id": "runtime:33c9427ddacd7632",
+      "file": "packages/base-ui-utils/upstream/src/createLogOnce.test.ts",
+      "fullName": "createLogOnce deduplicates each severity independently"
+    },
+    {
+      "id": "runtime:cfb73f89595cce80",
+      "file": "packages/base-ui-utils/upstream/src/createLogOnce.test.ts",
+      "fullName": "createLogOnce joins multiple messages with a space"
+    },
+    {
+      "id": "runtime:65482ad59bed5efb",
+      "file": "packages/base-ui-utils/upstream/src/createLogOnce.test.ts",
+      "fullName": "createLogOnce logs again after reset"
+    },
+    {
+      "id": "runtime:93b58e1fd6546fe0",
+      "file": "packages/base-ui-utils/upstream/src/empty.test.ts",
+      "fullName": "empty keeps the shared EMPTY_ARRAY frozen"
+    },
+    {
+      "id": "runtime:34734d9741c04171",
+      "file": "packages/base-ui-utils/upstream/src/empty.test.ts",
+      "fullName": "empty keeps the shared EMPTY_OBJECT frozen"
+    },
+    {
+      "id": "runtime:88ea262a44136f59",
+      "file": "packages/base-ui-utils/upstream/src/formatErrorMessage.test.ts",
+      "fullName": "formatErrorMessage createFormatErrorMessage creates a formatter that handles args correctly"
+    },
+    {
+      "id": "runtime:6f1191f3d34488fd",
+      "file": "packages/base-ui-utils/upstream/src/formatErrorMessage.test.ts",
+      "fullName": "formatErrorMessage createFormatErrorMessage creates a formatter with custom URL and prefix"
+    },
+    {
+      "id": "runtime:b70e9643384eac7c",
+      "file": "packages/base-ui-utils/upstream/src/formatErrorMessage.test.ts",
+      "fullName": "formatErrorMessage createFormatErrorMessage handles special characters in args"
+    },
+    {
+      "id": "runtime:dae08f8eb94ae1cf",
+      "file": "packages/base-ui-utils/upstream/src/formatErrorMessage.test.ts",
+      "fullName": "formatErrorMessage default export formats error message with code and args"
+    },
+    {
+      "id": "runtime:28b2f703a8b6ce6d",
+      "file": "packages/base-ui-utils/upstream/src/formatErrorMessage.test.ts",
+      "fullName": "formatErrorMessage default export formats error message with code only"
+    },
+    {
+      "id": "runtime:c35a5782aa51ab24",
+      "file": "packages/base-ui-utils/upstream/src/formatNumber.test.ts",
+      "fullName": "formatNumber formatNumber formats a number"
+    },
+    {
+      "id": "runtime:546dd5cd572ef74f",
+      "file": "packages/base-ui-utils/upstream/src/formatNumber.test.ts",
+      "fullName": "formatNumber formatNumber formats a number with different options"
+    },
+    {
+      "id": "runtime:cad11e7cbe428921",
+      "file": "packages/base-ui-utils/upstream/src/formatNumber.test.ts",
+      "fullName": "formatNumber formatNumber returns an empty string for null"
+    },
+    {
+      "id": "runtime:55460f432777dde5",
+      "file": "packages/base-ui-utils/upstream/src/formatNumber.test.ts",
+      "fullName": "formatNumber getFormatter caches different Intl.Locale objects separately"
+    },
+    {
+      "id": "runtime:2a3f087c99426058",
+      "file": "packages/base-ui-utils/upstream/src/formatNumber.test.ts",
+      "fullName": "formatNumber getFormatter caches the formatter based on options"
+    },
+    {
+      "id": "runtime:157a6eacef931722",
+      "file": "packages/base-ui-utils/upstream/src/getDefaultFormSubmitter.test.ts",
+      "fullName": "getDefaultFormSubmitter returns a disabled submit button when it is first in form.elements"
+    },
+    {
+      "id": "runtime:9d023a1c5520ccff",
+      "file": "packages/base-ui-utils/upstream/src/getDefaultFormSubmitter.test.ts",
+      "fullName": "getDefaultFormSubmitter returns null when there is no default submitter"
+    },
+    {
+      "id": "runtime:48e33ddf8994291f",
+      "file": "packages/base-ui-utils/upstream/src/getDefaultFormSubmitter.test.ts",
+      "fullName": "getDefaultFormSubmitter returns the first submit button associated with the form"
+    },
+    {
+      "id": "runtime:796cc3c0be5bd176",
+      "file": "packages/base-ui-utils/upstream/src/getDefaultFormSubmitter.test.ts",
+      "fullName": "getDefaultFormSubmitter supports buttons with the default submit type"
+    },
+    {
+      "id": "runtime:5dafa8ecbb7a35af",
+      "file": "packages/base-ui-utils/upstream/src/getDefaultFormSubmitter.test.ts",
+      "fullName": "getDefaultFormSubmitter supports input submitters from form.elements and ignores non-submit controls"
+    },
+    {
+      "id": "runtime:bc95fdd370a9e799",
+      "file": "packages/base-ui-utils/upstream/src/getReactElementRef.test.tsx",
+      "fullName": "getReactElementRef returns null for a fragment"
+    },
+    {
+      "id": "runtime:b354421e65e81628",
+      "file": "packages/base-ui-utils/upstream/src/getReactElementRef.test.tsx",
+      "fullName": "getReactElementRef returns null for an element without a ref"
+    },
+    {
+      "id": "runtime:3a3fd33f0e25558c",
+      "file": "packages/base-ui-utils/upstream/src/getReactElementRef.test.tsx",
+      "fullName": "getReactElementRef returns null when not provided a React element"
+    },
+    {
+      "id": "runtime:7683fc76a9eb7dc6",
+      "file": "packages/base-ui-utils/upstream/src/getReactElementRef.test.tsx",
+      "fullName": "getReactElementRef returns the ref of a React element"
+    },
+    {
+      "id": "runtime:838f74d2cfc24103",
+      "file": "packages/base-ui-utils/upstream/src/mergeCleanups.test.ts",
+      "fullName": "mergeCleanups calls each cleanup in order and skips empty values"
+    },
+    {
+      "id": "runtime:cec4c61ef75c0819",
+      "file": "packages/base-ui-utils/upstream/src/shadowDom.test.ts",
+      "fullName": "getTarget falls back to `target` once dispatch has completed"
+    },
+    {
+      "id": "runtime:39b9e0d3198034d7",
+      "file": "packages/base-ui-utils/upstream/src/shadowDom.test.ts",
+      "fullName": "getTarget returns the composed-path target while the event is being dispatched"
+    },
+    {
+      "id": "runtime:57660512cb4885c5",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore create() constructs a fully wired ReactStore instance"
+    },
+    {
+      "id": "runtime:cf523ce69ea37a5c",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore observeSelector accepts selector functions"
+    },
+    {
+      "id": "runtime:eed54451f2e7447b",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore observeSelector calls listener immediately with current selector result on subscription"
+    },
+    {
+      "id": "runtime:7dd381633cc5aad9",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore observeSelector calls listener when any dependency of the selector changes"
+    },
+    {
+      "id": "runtime:323ac67ab3a34a56",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore observeSelector calls listener when selector result changes"
+    },
+    {
+      "id": "runtime:995c10228851f727",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore observeSelector does not call listener when selector result is unchanged"
+    },
+    {
+      "id": "runtime:1eeca7e1d360de3b",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore observeSelector provides the store instance to the listener"
+    },
+    {
+      "id": "runtime:5f96775fadffd3ce",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore observeSelector returns an unsubscribe function that stops observing"
+    },
+    {
+      "id": "runtime:e6b04dde73aa4c96",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore observeSelector supports multiple observers on the same selector"
+    },
+    {
+      "id": "runtime:31187623bfb22934",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore observeSelector supports observers on different selectors"
+    },
+    {
+      "id": "runtime:7d7bd999cdb41624",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore supports nested stores as state values"
+    },
+    {
+      "id": "runtime:e56d811b35db766a",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore syncs internal state from controlled prop"
+    },
+    {
+      "id": "runtime:40c655e82ad4f19a",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore syncs internal state from controlled prop when the store changes"
+    },
+    {
+      "id": "runtime:be70b0aa2d357cfb",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore updates useState result when selector arguments change in a fast component"
+    },
+    {
+      "id": "runtime:c215e01c389c2979",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore useProp syncs the same value when the store changes"
+    },
+    {
+      "id": "runtime:9ca0b5ffaf247b56",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore useProp updates a single key when the passed value changes"
+    },
+    {
+      "id": "runtime:4fa14c9188996425",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore useProps applies multiple keys from a props object"
+    },
+    {
+      "id": "runtime:e884504f36145d02",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore useStateSetter returns a stable callback that updates the store state"
+    },
+    {
+      "id": "runtime:ec3fb92f34e0b329",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore useSyncedValueWithCleanup synchronizes value and resets on cleanup"
+    },
+    {
+      "id": "runtime:a8a7221f17762ca6",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore useSyncedValues depends on entries instead of object identity"
+    },
+    {
+      "id": "runtime:54238e739237b44e",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore warns if useSyncedValues keys change between renders"
+    },
+    {
+      "id": "runtime:68f1390819ac87b5",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore warns on switching from controlled to uncontrolled"
+    },
+    {
+      "id": "runtime:bec9ccaec665af9e",
+      "file": "packages/base-ui-utils/upstream/src/store/ReactStore.test.tsx",
+      "fullName": "ReactStore warns on switching from uncontrolled to controlled"
+    },
+    {
+      "id": "runtime:3d805e5715a0a5d8",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store Store.create constructs an instance of the subclass it is called on"
+    },
+    {
+      "id": "runtime:2c9fc62923175286",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store Store.create produces an independent instance per call"
+    },
+    {
+      "id": "runtime:f6a656b6dcf42d37",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store Store.create returns a Store instance seeded with the given state"
+    },
+    {
+      "id": "runtime:8409cb45fc7dfb14",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store a nested setState from a listener stops the outer notification pass"
+    },
+    {
+      "id": "runtime:e0c5075d17df630f",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store does not notify when setState receives the current state reference"
+    },
+    {
+      "id": "runtime:52e814b41d3669f7",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store notifies subscribers with the new state"
+    },
+    {
+      "id": "runtime:b0fd3eed6e563916",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store notifyAll() renews the state reference and notifies"
+    },
+    {
+      "id": "runtime:0d054933a61fc8f3",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store set() writes a single key and skips same-value writes"
+    },
+    {
+      "id": "runtime:d7c443b6e5c65745",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store unsubscribing stops notifications"
+    },
+    {
+      "id": "runtime:ecfc0e33049ad3c9",
+      "file": "packages/base-ui-utils/upstream/src/store/Store.test.ts",
+      "fullName": "Store update() merges changed keys and skips no-op updates"
+    },
+    {
+      "id": "runtime:b5c066cd2f8a9180",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelector.test.ts",
+      "fullName": "createSelector passes extra args through to every input selector and to the combiner"
+    },
+    {
+      "id": "runtime:7af2987c8dc127ee",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelector.test.ts",
+      "fullName": "createSelector returns the input function when called with a single selector"
+    },
+    {
+      "id": "runtime:ea57a1958417ec0d",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelector.test.ts",
+      "fullName": "createSelector supports one input selector plus a combiner"
+    },
+    {
+      "id": "runtime:c1a24a7d40bafc5e",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelector.test.ts",
+      "fullName": "createSelector supports seven input selectors plus a combiner"
+    },
+    {
+      "id": "runtime:14e37673ee63830b",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelector.test.ts",
+      "fullName": "createSelector supports six input selectors plus a combiner"
+    },
+    {
+      "id": "runtime:f433e2555bb58ca2",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelector.test.ts",
+      "fullName": "createSelector throws when given one more than the maximum (eight input selectors plus a combiner)"
+    },
+    {
+      "id": "runtime:959ef4c6927aeb63",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized caches separately per state identity"
+    },
+    {
+      "id": "runtime:a1b45c9426f47603",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized passes extra arguments to a single combiner alongside the state"
+    },
+    {
+      "id": "runtime:731d9f0aa7958d02",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized passes one extra argument to the combiner and memoizes on it"
+    },
+    {
+      "id": "runtime:793f433b80c2575e",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized passes three extra arguments to the combiner"
+    },
+    {
+      "id": "runtime:a2352fd9bffebe9a",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized passes two extra arguments to the combiner"
+    },
+    {
+      "id": "runtime:db5f3b17ef4115d7",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized re-runs the combiner when input selector results change"
+    },
+    {
+      "id": "runtime:0e88b21f04f3097a",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized supports a zero-parameter combiner called with the state"
+    },
+    {
+      "id": "runtime:45e6a3e8937f3565",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized throws when Function.length under-reports the combiner parameters"
+    },
+    {
+      "id": "runtime:a9f7e7dd94b676ff",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized throws when the combiner takes more than three extra arguments"
+    },
+    {
+      "id": "runtime:9f720c9520946844",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoized uses an identity input selector when only a combiner is provided"
+    },
+    {
+      "id": "runtime:6d6628f27ee09023",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoizedWithOptions does not break a custom memoizer that defaults its options parameter"
+    },
+    {
+      "id": "runtime:ee8e0efabfceb4ad",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoizedWithOptions does not forward the lruMemoize defaults to a custom memoizer"
+    },
+    {
+      "id": "runtime:f5f1e82acbcf0c0a",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoizedWithOptions forwards custom memoizeOptions to a custom memoizer verbatim"
+    },
+    {
+      "id": "runtime:1ef71d9ed8544593",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoizedWithOptions forwards options through to the underlying reselect creator"
+    },
+    {
+      "id": "runtime:82b70b82535f17b0",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoizedWithOptions merges object memoizeOptions over the Object.is equality default"
+    },
+    {
+      "id": "runtime:1846db59bb2d1f98",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoizedWithOptions preserves the result reference with a resultEqualityCheck option"
+    },
+    {
+      "id": "runtime:d557abc13c86f048",
+      "file": "packages/base-ui-utils/upstream/src/store/createSelectorMemoized.test.ts",
+      "fullName": "createSelectorMemoizedWithOptions produces a working factory when no options are provided"
+    },
+    {
+      "id": "runtime:4d7f89bab82d3fca",
+      "file": "packages/base-ui-utils/upstream/src/stringifyLocale.test.ts",
+      "fullName": "stringifyLocale stringifies Intl locale arguments for cache keys"
+    },
+    {
+      "id": "runtime:8f8de3c4d1a8acbc",
+      "file": "packages/base-ui-utils/upstream/src/useAnimationFrame.test.ts",
+      "fullName": "AnimationFrame keeps callback accounting correct when a frame is canceled more than once"
+    },
+    {
+      "id": "runtime:9625b8dd52147d32",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue does not throw when defaultValue has React elements"
+    },
+    {
+      "id": "runtime:35711ac5d337521a",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue does not throw when defaultValue has bigint"
+    },
+    {
+      "id": "runtime:ffb207975ea6d418",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue does not throw when defaultValue has function"
+    },
+    {
+      "id": "runtime:b548869c317c30a8",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue does not warn when NaN"
+    },
+    {
+      "id": "runtime:433d3884ab1e7a26",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue does not warn when an array"
+    },
+    {
+      "id": "runtime:fdfb72b59b7de48a",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue does not warn when controlled"
+    },
+    {
+      "id": "runtime:ab7217c00e1a544d",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue should not fail on null values"
+    },
+    {
+      "id": "runtime:580c84b26882adec",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue should warn only when defaultValue changes"
+    },
+    {
+      "id": "runtime:c3c5d92eb95c9269",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue should warn only when defaultValue has functions/components and changes"
+    },
+    {
+      "id": "runtime:3197d8dfb2532f92",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled prop: defaultValue warns when changed after initial rendering"
+    },
+    {
+      "id": "runtime:d5902a360096616b",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled warns and falls back to the default when switching from controlled to uncontrolled"
+    },
+    {
+      "id": "runtime:7cbd934e44ad34c4",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled warns when switching from uncontrolled to controlled"
+    },
+    {
+      "id": "runtime:e0f84d01a54bc878",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled works correctly when is controlled"
+    },
+    {
+      "id": "runtime:20292c4010e8d04f",
+      "file": "packages/base-ui-utils/upstream/src/useControlled.test.tsx",
+      "fullName": "useControlled works correctly when is not controlled"
+    },
+    {
+      "id": "runtime:faab105e08859027",
+      "file": "packages/base-ui-utils/upstream/src/useId.test.tsx",
+      "fullName": "useId can be prefixed"
+    },
+    {
+      "id": "runtime:f482967d07353d26",
+      "file": "packages/base-ui-utils/upstream/src/useId.test.tsx",
+      "fullName": "useId can be suffixed"
+    },
+    {
+      "id": "runtime:17bdbaa98d197a57",
+      "file": "packages/base-ui-utils/upstream/src/useId.test.tsx",
+      "fullName": "useId can be used in in IDREF attributes"
+    },
+    {
+      "id": "runtime:fc47e969f1fe71eb",
+      "file": "packages/base-ui-utils/upstream/src/useId.test.tsx",
+      "fullName": "useId generates an ID if one isn't provided"
+    },
+    {
+      "id": "runtime:d9d15944ea902e73",
+      "file": "packages/base-ui-utils/upstream/src/useId.test.tsx",
+      "fullName": "useId provides an ID on server in React 18"
+    },
+    {
+      "id": "runtime:d81084eb1bbf5947",
+      "file": "packages/base-ui-utils/upstream/src/useId.test.tsx",
+      "fullName": "useId returns the provided ID"
+    },
+    {
+      "id": "runtime:ff3a56a3a4fe07b5",
+      "file": "packages/base-ui-utils/upstream/src/useIdleCallback.fallback.test.ts",
+      "fullName": "IdleCallback fallback schedules and cancels callbacks when requestIdleCallback is unavailable"
+    },
+    {
+      "id": "runtime:3c6b9700f4311c00",
+      "file": "packages/base-ui-utils/upstream/src/useIdleCallback.test.tsx",
+      "fullName": "IdleCallback IdleCallback class can be reused after the callback has run"
+    },
+    {
+      "id": "runtime:cd51d436df4e44ae",
+      "file": "packages/base-ui-utils/upstream/src/useIdleCallback.test.tsx",
+      "fullName": "IdleCallback IdleCallback class clear() cancels a pending callback"
+    },
+    {
+      "id": "runtime:7f6de1882bf7bc47",
+      "file": "packages/base-ui-utils/upstream/src/useIdleCallback.test.tsx",
+      "fullName": "IdleCallback IdleCallback class create() returns a new instance each time"
+    },
+    {
+      "id": "runtime:bd1dd6d455baed81",
+      "file": "packages/base-ui-utils/upstream/src/useIdleCallback.test.tsx",
+      "fullName": "IdleCallback IdleCallback class disposeEffect() returns the clear function"
+    },
+    {
+      "id": "runtime:fa8787f038da8f65",
+      "file": "packages/base-ui-utils/upstream/src/useIdleCallback.test.tsx",
+      "fullName": "IdleCallback IdleCallback class runs the scheduled callback after the current task"
+    },
+    {
+      "id": "runtime:b75d99671cf31aa2",
+      "file": "packages/base-ui-utils/upstream/src/useIdleCallback.test.tsx",
+      "fullName": "IdleCallback IdleCallback class start() clears any previously scheduled callback"
+    },
+    {
+      "id": "runtime:1409f8da15b336b6",
+      "file": "packages/base-ui-utils/upstream/src/useIdleCallback.test.tsx",
+      "fullName": "IdleCallback useIdleCallback cancels a pending callback on unmount"
+    },
+    {
+      "id": "runtime:4ba01c6c3eba8995",
+      "file": "packages/base-ui-utils/upstream/src/useIdleCallback.test.tsx",
+      "fullName": "IdleCallback useIdleCallback returns a stable scheduler across re-renders"
+    },
+    {
+      "id": "runtime:a9de92a59b292a5a",
+      "file": "packages/base-ui-utils/upstream/src/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs calls clean up function if it exists"
+    },
+    {
+      "id": "runtime:b74069f243cf96b3",
+      "file": "packages/base-ui-utils/upstream/src/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs changing refs cleans up detached refs"
+    },
+    {
+      "id": "runtime:06b5981a0d8d11c0",
+      "file": "packages/base-ui-utils/upstream/src/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs changing refs handles changing from no ref to some ref"
+    },
+    {
+      "id": "runtime:1cc689995f8586cd",
+      "file": "packages/base-ui-utils/upstream/src/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs does nothing if none of the forked branches requires a ref"
+    },
+    {
+      "id": "runtime:63bd7cc8db8cd4f0",
+      "file": "packages/base-ui-utils/upstream/src/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs forks if only one of the branches requires a ref"
+    },
+    {
+      "id": "runtime:a9712a8d582443ba",
+      "file": "packages/base-ui-utils/upstream/src/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs returns a single ref-setter function that forks the ref to its inputs"
+    },
+    {
+      "id": "runtime:cf393afce39b4697",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should distinguish positive and negative zero"
+    },
+    {
+      "id": "runtime:dafaa27cd3eb3335",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should handle rapid value changes"
+    },
+    {
+      "id": "runtime:010e3baafbab451e",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should handle undefined and null values"
+    },
+    {
+      "id": "runtime:278a244e63f3b4b1",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should ignore renders where the value does not change"
+    },
+    {
+      "id": "runtime:9c795a4c09008b66",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should maintain type safety"
+    },
+    {
+      "id": "runtime:8987836840326f56",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should return null on the first render"
+    },
+    {
+      "id": "runtime:b8579f543d78f9fd",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should return the previous value on subsequent renders"
+    },
+    {
+      "id": "runtime:62af0e13254f6b74",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should return the previous value when changing to NaN"
+    },
+    {
+      "id": "runtime:c74c502cc55f096d",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should treat NaN as unchanged"
+    },
+    {
+      "id": "runtime:cbfb035f785c56e7",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should work with object values"
+    },
+    {
+      "id": "runtime:dab5d899773e37dd",
+      "file": "packages/base-ui-utils/upstream/src/usePreviousValue.test.tsx",
+      "fullName": "usePrevious should work with primitive values"
+    }
+  ],
+  "skippedTests": []
+}

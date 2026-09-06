@@ -1,0 +1,86 @@
+diff --git a/tests/upstream/src/number-field/increment/NumberFieldIncrement.test.tsx b/tests/upstream/src/number-field/increment/NumberFieldIncrement.test.tsx
+--- a/tests/upstream/src/number-field/increment/NumberFieldIncrement.test.tsx
++++ b/tests/upstream/src/number-field/increment/NumberFieldIncrement.test.tsx
+@@ -488,7 +488,7 @@ describe('<NumberField.Increment />', () => {
+       expect(input).toHaveValue('10');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '-' } });
++      fireEvent.input(input, { target: { value: '-' } });
+       expect(input).toHaveValue('-');
+ 
+       cancelNextChange = true;
+@@ -651,7 +651,7 @@ describe('<NumberField.Increment />', () => {
+ 
+     await act(() => input.focus());
+ 
+-    fireEvent.change(input, { target: { value: '100' } });
++    fireEvent.input(input, { target: { value: '100' } });
+     fireEvent.click(screen.getByRole('button'));
+ 
+     expect(input).toHaveValue('101');
+@@ -669,7 +669,7 @@ describe('<NumberField.Increment />', () => {
+ 
+     await act(() => input.focus());
+ 
+-    fireEvent.change(input, { target: { value: '100' } });
++    fireEvent.input(input, { target: { value: '100' } });
+     fireEvent.pointerDown(screen.getByRole('button'));
+ 
+     expect(input).toHaveValue('101');
+@@ -691,7 +691,7 @@ describe('<NumberField.Increment />', () => {
+ 
+     await act(() => input.focus());
+ 
+-    fireEvent.change(input, { target: { value: '100' } });
++    fireEvent.input(input, { target: { value: '100' } });
+     onValueChange.mockClear();
+ 
+     fireEvent.pointerDown(screen.getByRole('button'), { button: 1 });
+@@ -720,7 +720,7 @@ describe('<NumberField.Increment />', () => {
+ 
+     await act(() => input.focus());
+ 
+-    fireEvent.change(input, { target: { value: '100' } });
++    fireEvent.input(input, { target: { value: '100' } });
+     // A keyboard/AT activation reaches `onClick` without a preceding `pointerdown`.
+     fireEvent.click(screen.getByRole('button'));
+ 
+@@ -831,7 +831,7 @@ describe('<NumberField.Increment />', () => {
+       const button = screen.getByRole('button');
+       await act(async () => input.focus());
+ 
+-      fireEvent.change(input, { target: { value: '7' } });
++      fireEvent.input(input, { target: { value: '7' } });
+       onValueChange.mockClear();
+       fireEvent.click(button);
+ 
+@@ -868,12 +868,12 @@ describe('<NumberField.Increment />', () => {
+ 
+       expect(screen.getByRole('textbox')).toHaveValue('2');
+ 
+-      fireEvent.change(screen.getByRole('textbox'), { target: { value: '1.9' } });
++      fireEvent.input(screen.getByRole('textbox'), { target: { value: '1.9' } });
+       fireEvent.click(button);
+ 
+       expect(screen.getByRole('textbox')).toHaveValue('2');
+ 
+-      fireEvent.change(screen.getByRole('textbox'), { target: { value: '-0.2' } });
++      fireEvent.input(screen.getByRole('textbox'), { target: { value: '-0.2' } });
+       fireEvent.click(button);
+ 
+       expect(screen.getByRole('textbox')).toHaveValue('0');
+@@ -910,11 +910,11 @@ describe('<NumberField.Increment />', () => {
+       fireEvent.click(button);
+       expect(input).toHaveValue('5');
+ 
+-      fireEvent.change(input, { target: { value: '1.112' } });
++      fireEvent.input(input, { target: { value: '1.112' } });
+       fireEvent.click(button);
+       expect(input).toHaveValue('3');
+ 
+-      fireEvent.change(input, { target: { value: '0.999' } });
++      fireEvent.input(input, { target: { value: '0.999' } });
+       fireEvent.click(button);
+       expect(input).toHaveValue('1');
+     });

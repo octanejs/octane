@@ -69,13 +69,14 @@ export function buildParityVitestProjects({ baseProjects, lanes, root }) {
 
 		const include = laneVitestFiles(lane, root);
 		for (const file of include) {
-			const previousLane = selectedFiles.get(file);
+			const key = `${lane.project}\0${file}`;
+			const previousLane = selectedFiles.get(key);
 			if (previousLane) {
 				throw new Error(
 					`Vitest file ${file} is selected by both ${previousLane.id} and ${lane.id}`,
 				);
 			}
-			selectedFiles.set(file, lane);
+			selectedFiles.set(key, lane);
 		}
 
 		const testNamePattern = laneTestNamePattern(lane);
@@ -84,7 +85,7 @@ export function buildParityVitestProjects({ baseProjects, lanes, root }) {
 			testExecution: undefined,
 			test: {
 				...project.test,
-				include,
+				include: project.root ? include.map((file) => resolve(root, file)) : include,
 				...(testNamePattern === undefined ? {} : { testNamePattern }),
 				...(lane.execution?.fileParallelism === undefined
 					? {}
@@ -141,43 +142,54 @@ function vitestOwnerByFile(lanes, root) {
 	const ownerByFile = new Map();
 	for (const lane of lanes) {
 		for (const file of laneVitestFiles(lane, root)) {
-			const previousLane = ownerByFile.get(file);
+			let projects = ownerByFile.get(file);
+			if (!projects) ownerByFile.set(file, (projects = new Map()));
+			const previousLane = projects.get(lane.project);
 			if (previousLane) {
 				throw new Error(`Vitest file ${file} is owned by both ${previousLane.id} and ${lane.id}`);
 			}
-			ownerByFile.set(file, lane);
+			projects.set(lane.project, lane);
 		}
 	}
 	return ownerByFile;
 }
 
+function resolveVitestOwner(ownerByFile, suite, root) {
+	if (typeof suite.name !== 'string')
+		throw new Error('parity-wide Vitest run returned a test result without a file name');
+	const absoluteFile = isAbsolute(suite.name) ? suite.name : resolve(root, suite.name);
+	const file = portablePath(relative(root, absoluteFile));
+	const projects = ownerByFile.get(file);
+	if (!projects) throw new Error(`parity-wide Vitest run executed undeclared file ${file}`);
+	if (suite.projectName === undefined && projects.size > 1)
+		throw new Error(`parity-wide Vitest result for ${file} requires a project name`);
+	const owner =
+		suite.projectName === undefined
+			? projects.values().next().value
+			: projects.get(suite.projectName);
+	if (!owner)
+		throw new Error(
+			`parity-wide Vitest run executed undeclared project ${suite.projectName} for ${file}`,
+		);
+	return { file, owner, key: `${owner.project}\0${file}` };
+}
+
 export function verifyBatchedVitestShardResult(lanes, stdout, root) {
 	const result = parseBatchedVitestResult(stdout);
 	const ownerByFile = vitestOwnerByFile(lanes, root);
-	const expectedTests = new Map(
-		lanes.flatMap((lane) =>
-			[...laneExpectedTestsByFile(lane, root)].map(([file, fullNames]) => [file, fullNames]),
-		),
-	);
+	const expectedTests = new Map(lanes.map((lane) => [lane, laneExpectedTestsByFile(lane, root)]));
 	const seenFiles = new Set();
 	const selectedResults = [];
 	for (const suite of result.testResults) {
-		if (typeof suite.name !== 'string') {
-			throw new Error('parity-wide Vitest run returned a test result without a file name');
-		}
-		const absoluteFile = isAbsolute(suite.name) ? suite.name : resolve(root, suite.name);
-		const file = portablePath(relative(root, absoluteFile));
-		if (!ownerByFile.has(file)) {
-			throw new Error(`parity-wide Vitest run executed undeclared file ${file}`);
-		}
-		if (seenFiles.has(file)) {
+		const { file, owner, key } = resolveVitestOwner(ownerByFile, suite, root);
+		if (seenFiles.has(key)) {
 			throw new Error(`parity-wide Vitest shard reported ${file} more than once`);
 		}
-		seenFiles.add(file);
+		seenFiles.add(key);
 		const selectedAssertions = [];
 		for (const assertion of suite.assertionResults ?? []) {
 			const fullName = assertion.fullName?.replaceAll(' > ', ' ');
-			if (!expectedTests.get(file)?.has(fullName)) {
+			if (!expectedTests.get(owner).get(file)?.has(fullName)) {
 				if (['pending', 'skipped', 'todo', 'disabled'].includes(assertion.status)) continue;
 				throw new Error(
 					`parity-wide Vitest run executed undeclared test ${file} :: ${fullName} [${assertion.status}]`,
@@ -205,13 +217,7 @@ export function verifyBatchedVitestResult(lanes, reports, root) {
 
 	const resultsByLane = new Map(lanes.map((lane) => [lane, []]));
 	for (const suite of result.testResults) {
-		if (typeof suite.name !== 'string') {
-			throw new Error('parity-wide Vitest run returned a test result without a file name');
-		}
-		const absoluteFile = isAbsolute(suite.name) ? suite.name : resolve(root, suite.name);
-		const file = portablePath(relative(root, absoluteFile));
-		const owner = ownerByFile.get(file);
-		if (!owner) throw new Error(`parity-wide Vitest run executed undeclared file ${file}`);
+		const { owner } = resolveVitestOwner(ownerByFile, suite, root);
 		resultsByLane.get(owner).push(suite);
 	}
 

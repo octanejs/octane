@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/utils/useRegisteredLabelId.test.tsx b/tests/upstream/src/utils/useRegisteredLabelId.test.tsx
+--- a/tests/upstream/src/utils/useRegisteredLabelId.test.tsx
++++ b/tests/upstream/src/utils/useRegisteredLabelId.test.tsx
+@@ -15,7 +15,7 @@ describe('useRegisteredLabelId', () => {
+   }: {
+     id: string;
+     setLabelId: React.Dispatch<React.SetStateAction<string | undefined>>;
+-    children: React.ReactNode;
++    children: React.OctaneNode;
+   }) {
+     const registeredId = useRegisteredLabelId(id, setLabelId);
+     return <span id={registeredId}>{children}</span>;

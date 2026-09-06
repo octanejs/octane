@@ -1,0 +1,90 @@
+diff --git a/tests/upstream/src/tabs/indicator/TabsIndicator.test.tsx b/tests/upstream/src/tabs/indicator/TabsIndicator.test.tsx
+--- a/tests/upstream/src/tabs/indicator/TabsIndicator.test.tsx
++++ b/tests/upstream/src/tabs/indicator/TabsIndicator.test.tsx
+@@ -1,8 +1,13 @@
+ /** @jsxImportSource octane */
++import { TabsIndicatorServerCase1, TabsIndicatorServerCase2 } from './../../../../fixtures/TabsIndicator-ssr.tsrx';
++import { TabsIndicatorServerCase1 as ServerTabsIndicatorServerCase1, TabsIndicatorServerCase2 as ServerTabsIndicatorServerCase2 } from './../../../../fixtures/TabsIndicator-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(TabsIndicatorServerCase1, ServerTabsIndicatorServerCase1);
++registerServerComponent(TabsIndicatorServerCase2, ServerTabsIndicatorServerCase2);
+ import { afterEach, expect, vi, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { Tabs } from '@octanejs/base-ui/tabs';
+-import { CSPProvider } from '@octanejs/base-ui/csp-provider';
++import type { CSPProvider } from '@octanejs/base-ui/csp-provider';
+ import { act, waitFor, screen } from '@mui/internal-test-utils';
+ import { createRenderer, describeConformance, isJSDOM } from '#test-utils';
+ import { getCssDimensions } from '../../utils/getCssDimensions';
+@@ -736,10 +741,10 @@ describe('<Tabs.Indicator />', () => {
+     it('perf: single tab resize does not fan out excessive indicator rerenders', async () => {
+       const renderIndicatorSpy = vi.fn();
+ 
+-      const LoggingIndicator = React.forwardRef(function LoggingIndicator(
+-        props: any & { renderSpy: () => void },
+-        ref: React.ForwardedRef<HTMLSpanElement>,
++      const LoggingIndicator = (function LoggingIndicator(
++        propsWithRef: (any & { renderSpy: () => void }) & { ref?: React.Ref<HTMLSpanElement> },
+       ) {
++  const { ref: ref = null, ...props } = propsWithRef;
+         const { renderSpy, state, ...other } = props;
+         renderSpy();
+         return <span {...other} ref={ref} />;
+@@ -792,12 +797,7 @@ describe('<Tabs.Indicator />', () => {
+   describe('pre-hydration rendering', () => {
+     it('renders the inline pre-hydration script during server-side rendering', async () => {
+       const { container } = await renderToString(
+-        <Tabs.Root value={1}>
+-          <Tabs.List>
+-            <Tabs.Tab value={1}>One</Tabs.Tab>
+-            <Tabs.Indicator renderBeforeHydration />
+-          </Tabs.List>
+-        </Tabs.Root>,
++        <TabsIndicatorServerCase1 />,
+       );
+ 
+       // eslint-disable-next-line testing-library/no-container -- script elements have no accessible role
+@@ -808,12 +808,7 @@ describe('<Tabs.Indicator />', () => {
+     // through the `browser` condition; only jsdom resolves the real script like a server does.
+     it.skipIf(!isJSDOM)('inlines the script contents during server-side rendering', async () => {
+       const { container } = await renderToString(
+-        <Tabs.Root value={1}>
+-          <Tabs.List>
+-            <Tabs.Tab value={1}>One</Tabs.Tab>
+-            <Tabs.Indicator renderBeforeHydration />
+-          </Tabs.List>
+-        </Tabs.Root>,
++        <TabsIndicatorServerCase1 />,
+       );
+ 
+       // eslint-disable-next-line testing-library/no-container -- script elements have no accessible role
+@@ -824,14 +819,7 @@ describe('<Tabs.Indicator />', () => {
+ 
+     it('applies the CSP nonce to the pre-hydration script', async () => {
+       const { container } = await renderToString(
+-        <CSPProvider nonce="test-nonce">
+-          <Tabs.Root value={1}>
+-            <Tabs.List>
+-              <Tabs.Tab value={1}>One</Tabs.Tab>
+-              <Tabs.Indicator renderBeforeHydration />
+-            </Tabs.List>
+-          </Tabs.Root>
+-        </CSPProvider>,
++        <TabsIndicatorServerCase2 />,
+       );
+ 
+       // eslint-disable-next-line testing-library/no-container -- script elements have no accessible role
+@@ -844,12 +832,7 @@ describe('<Tabs.Indicator />', () => {
+     // which `vitest-fail-on-console` turns into a test failure.
+     it.skipIf(!isJSDOM)('keeps the script during hydration and removes it afterwards', async () => {
+       const { container, hydrate } = await renderToString(
+-        <Tabs.Root value={1}>
+-          <Tabs.List>
+-            <Tabs.Tab value={1}>One</Tabs.Tab>
+-            <Tabs.Indicator renderBeforeHydration />
+-          </Tabs.List>
+-        </Tabs.Root>,
++        <TabsIndicatorServerCase1 />,
+       );
+ 
+       // eslint-disable-next-line testing-library/no-container -- script elements have no accessible role

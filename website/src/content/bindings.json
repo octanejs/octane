@@ -8,8 +8,16 @@
         "title": "Alien Signals",
         "tags": ["signals", "reactivity"]
       },
-      { "packageName": "@octanejs/jotai", "title": "Jotai", "tags": ["atoms"] },
-      { "packageName": "@octanejs/mobx", "title": "MobX", "tags": ["observables", "reactivity"] },
+      {
+        "packageName": "@octanejs/jotai",
+        "title": "Jotai",
+        "tags": ["atoms"]
+      },
+      {
+        "packageName": "@octanejs/mobx",
+        "title": "MobX",
+        "tags": ["observables", "reactivity"]
+      },
       {
         "packageName": "@octanejs/redux",
         "title": "React Redux",
@@ -21,16 +29,36 @@
         "title": "Redux Toolkit",
         "tags": ["redux", "rtk query"]
       },
-      { "packageName": "@octanejs/rxjs", "title": "RxJS", "tags": ["streams", "observables"] },
-      { "packageName": "@octanejs/tanstack-store", "title": "TanStack Store", "tags": ["store"] },
-      { "packageName": "@octanejs/valtio", "title": "Valtio", "tags": ["proxy", "store"] },
-      { "packageName": "@octanejs/xstate", "title": "XState", "tags": ["state machines"] },
+      {
+        "packageName": "@octanejs/rxjs",
+        "title": "RxJS",
+        "tags": ["streams", "observables"]
+      },
+      {
+        "packageName": "@octanejs/tanstack-store",
+        "title": "TanStack Store",
+        "tags": ["store"]
+      },
+      {
+        "packageName": "@octanejs/valtio",
+        "title": "Valtio",
+        "tags": ["proxy", "store"]
+      },
+      {
+        "packageName": "@octanejs/xstate",
+        "title": "XState",
+        "tags": ["state machines"]
+      },
       {
         "packageName": "@octanejs/xstate-store",
         "title": "XState Store",
         "tags": ["state machines", "store"]
       },
-      { "packageName": "@octanejs/zustand", "title": "Zustand", "tags": ["store"] }
+      {
+        "packageName": "@octanejs/zustand",
+        "title": "Zustand",
+        "tags": ["store"]
+      }
     ]
   },
   {
@@ -89,7 +117,11 @@
         "title": "Inertia.js",
         "tags": ["routing", "server driven"]
       },
-      { "packageName": "@octanejs/nuqs", "title": "nuqs", "tags": ["url state", "search params"] },
+      {
+        "packageName": "@octanejs/nuqs",
+        "title": "nuqs",
+        "tags": ["url state", "search params"]
+      },
       {
         "packageName": "@octanejs/remix-router",
         "title": "React Router",
@@ -107,7 +139,11 @@
         "title": "TanStack Router SSR Query",
         "tags": ["routing", "ssr", "server state"]
       },
-      { "packageName": "@octanejs/wouter", "title": "Wouter", "tags": ["routing"] }
+      {
+        "packageName": "@octanejs/wouter",
+        "title": "Wouter",
+        "tags": ["routing"]
+      }
     ]
   },
   {
@@ -146,7 +182,11 @@
         "title": "Base UI",
         "tags": ["components", "primitives", "headless"]
       },
-      { "packageName": "@octanejs/cmdk", "title": "cmdk", "tags": ["command menu", "components"] },
+      {
+        "packageName": "@octanejs/cmdk",
+        "title": "cmdk",
+        "tags": ["command menu", "components"]
+      },
       {
         "packageName": "@octanejs/embla-carousel",
         "title": "Embla Carousel",
@@ -215,13 +255,21 @@
     "title": "Animation",
     "description": "Motion, transitions, springs, timelines, and automatic layout animation.",
     "packages": [
-      { "packageName": "@octanejs/animejs", "title": "Anime.js", "tags": ["motion", "timeline"] },
+      {
+        "packageName": "@octanejs/animejs",
+        "title": "Anime.js",
+        "tags": ["motion", "timeline"]
+      },
       {
         "packageName": "@octanejs/auto-animate",
         "title": "AutoAnimate",
         "tags": ["motion", "layout"]
       },
-      { "packageName": "@octanejs/gsap", "title": "GSAP", "tags": ["motion", "timeline"] },
+      {
+        "packageName": "@octanejs/gsap",
+        "title": "GSAP",
+        "tags": ["motion", "timeline"]
+      },
       {
         "packageName": "@octanejs/motion",
         "title": "Motion",
@@ -248,6 +296,11 @@
     "title": "UI Utilities",
     "description": "Browser hooks, positioning, drag interactions, keyboard input, layout helpers, and event pacing.",
     "packages": [
+      {
+        "packageName": "@octanejs/base-ui-utils",
+        "title": "Base UI Utils",
+        "tags": ["utilities", "hooks", "browser"]
+      },
       {
         "packageName": "@octanejs/dnd-kit",
         "title": "DnD Kit",
@@ -329,7 +382,11 @@
     "title": "Icons",
     "description": "Icon component libraries for application interfaces.",
     "packages": [
-      { "packageName": "@octanejs/lucide", "title": "Lucide", "tags": ["icons", "components"] },
+      {
+        "packageName": "@octanejs/lucide",
+        "title": "Lucide",
+        "tags": ["icons", "components"]
+      },
       {
         "packageName": "@octanejs/phosphor-icons",
         "title": "Phosphor Icons",
@@ -341,7 +398,11 @@
     "title": "Forms",
     "description": "Form state, validation, one-time passwords, and file acquisition.",
     "packages": [
-      { "packageName": "@octanejs/formisch", "title": "Formisch", "tags": ["forms", "validation"] },
+      {
+        "packageName": "@octanejs/formisch",
+        "title": "Formisch",
+        "tags": ["forms", "validation"]
+      },
       {
         "packageName": "@octanejs/input-otp",
         "title": "Input OTP",
@@ -391,8 +452,16 @@
         "title": "react-i18next",
         "tags": ["localization", "translations", "i18n"]
       },
-      { "packageName": "@octanejs/lexical", "title": "Lexical", "tags": ["editor", "rich text"] },
-      { "packageName": "@octanejs/mdx", "title": "MDX", "tags": ["markdown", "content"] },
+      {
+        "packageName": "@octanejs/lexical",
+        "title": "Lexical",
+        "tags": ["editor", "rich text"]
+      },
+      {
+        "packageName": "@octanejs/mdx",
+        "title": "MDX",
+        "tags": ["markdown", "content"]
+      },
       {
         "packageName": "@octanejs/monaco-editor",
         "title": "Monaco Editor",
@@ -403,7 +472,11 @@
         "title": "React Markdown",
         "tags": ["markdown", "rendering"]
       },
-      { "packageName": "@octanejs/pdf", "title": "React PDF", "tags": ["pdf", "documents"] },
+      {
+        "packageName": "@octanejs/pdf",
+        "title": "React PDF",
+        "tags": ["pdf", "documents"]
+      },
       {
         "packageName": "@octanejs/syntax-highlighter",
         "title": "React Syntax Highlighter",
@@ -414,7 +487,11 @@
         "title": "Streamdown",
         "tags": ["markdown", "streaming", "ai"]
       },
-      { "packageName": "@octanejs/tiptap", "title": "Tiptap", "tags": ["editor", "rich text"] }
+      {
+        "packageName": "@octanejs/tiptap",
+        "title": "Tiptap",
+        "tags": ["editor", "rich text"]
+      }
     ]
   },
   {
@@ -489,14 +566,22 @@
         "title": "Recharts",
         "tags": ["charts", "data visualization"]
       },
-      { "packageName": "@octanejs/visx", "title": "visx", "tags": ["charts", "data visualization"] }
+      {
+        "packageName": "@octanejs/visx",
+        "title": "visx",
+        "tags": ["charts", "data visualization"]
+      }
     ]
   },
   {
     "title": "3D",
     "description": "React Three Fiber-style scene graphs on Octane's universal renderer.",
     "packages": [
-      { "packageName": "@octanejs/drei", "title": "Drei", "tags": ["three.js", "3d", "helpers"] },
+      {
+        "packageName": "@octanejs/drei",
+        "title": "Drei",
+        "tags": ["three.js", "3d", "helpers"]
+      },
       {
         "packageName": "@octanejs/three",
         "title": "React Three Fiber",
@@ -531,7 +616,11 @@
         "title": "Electron",
         "tags": ["desktop", "native apps"]
       },
-      { "packageName": "@octanejs/tauri", "title": "Tauri", "tags": ["desktop", "native apps"] }
+      {
+        "packageName": "@octanejs/tauri",
+        "title": "Tauri",
+        "tags": ["desktop", "native apps"]
+      }
     ]
   },
   {

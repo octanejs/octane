@@ -11,7 +11,11 @@ import {
 	fixtureIdentity,
 	fixtureTreeEntries,
 } from './__fixtures__/materialize-fixtures.mjs';
-import { UPSTREAM_LOCK_RELATIVE_PATH, gitBlobSha1 } from './materialize-lib.mjs';
+import {
+	UPSTREAM_LOCK_RELATIVE_PATH,
+	gitBlobSha1,
+	upstreamLockFingerprint,
+} from './materialize-lib.mjs';
 import { main } from './materialize.mjs';
 import { createBatchManifest } from './state-lib.mjs';
 
@@ -130,6 +134,33 @@ const LOCK_ARGUMENTS = (context) => [
 ];
 
 describe('materialize CLI lifecycle', () => {
+	test('reuses verified pristine bytes offline when only adapted header rules change', async () => {
+		const context = scenario();
+		await runCli(LOCK_ARGUMENTS(context));
+		await runCli(['run', '--package-dir', context.packageDirectory]);
+		const lockPath = path.join(context.packageDirectory, UPSTREAM_LOCK_RELATIVE_PATH);
+		const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+		lock.adaptedRewrites = [{ include: '\\.js$', prepend: '// mechanical header\n' }];
+		lock.fingerprint = upstreamLockFingerprint(lock);
+		writeFileSync(lockPath, JSON.stringify(lock));
+		const noNetwork = {
+			fetchImpl() {
+				throw new Error('network is unavailable');
+			},
+		};
+		const ran = await runCli(['run', '--package-dir', context.packageDirectory], noNetwork);
+		assert.equal(ran.exitCode, 0, ran.stderr);
+		const adapted = path.join(context.packageDirectory, 'tests/upstream/index.test.js');
+		assert.equal(
+			readFileSync(adapted, 'utf8'),
+			'// mechanical header\n' + FIXTURE_SOURCES.get('tests/index.test.js'),
+		);
+		const clean = await runCli(['diff', '--package-dir', context.packageDirectory], noNetwork);
+		assert.deepEqual(JSON.parse(clean.stdout).patchesWritten, []);
+		writeFileSync(path.join(context.packageDirectory, 'upstream/tests/index.test.js'), 'corrupt');
+		const corrupt = await runCli(['run', '--package-dir', context.packageDirectory], noNetwork);
+		assert.equal(corrupt.exitCode, 2);
+	});
 	test('lock, run, diff, and check complete an offline round trip', async () => {
 		const context = scenario();
 		const locked = await runCli(LOCK_ARGUMENTS(context));

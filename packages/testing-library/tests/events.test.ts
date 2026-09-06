@@ -11,11 +11,32 @@
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@octanejs/testing-library';
-import { Counter, EffectfulCounter, InputEcho } from './_fixtures/counter.tsrx';
+import { Counter, EffectfulCounter, InputEcho, DerivedCounter } from './_fixtures/counter.tsrx';
+import { getIsOctaneActEnvironment, setOctaneActEnvironment } from '../src/act-environment';
 
 afterEach(cleanup);
 
 describe('fireEvent + state updates', () => {
+	it('owns passive-effect updates while retaining warnings for unwrapped events', () => {
+		const previous = getIsOctaneActEnvironment();
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		setOctaneActEnvironment(true);
+		try {
+			render(DerivedCounter);
+			const button = screen.getByRole('button');
+			fireEvent.click(button);
+			expect(button.textContent).toBe('1:1');
+			expect(errors).not.toHaveBeenCalled();
+			button.click();
+			expect(
+				errors.mock.calls.some((args) => String(args[0]).includes('was not wrapped in act')),
+			).toBe(true);
+		} finally {
+			setOctaneActEnvironment(previous);
+			cleanup();
+			errors.mockRestore();
+		}
+	});
 	// Per react-testing-library src/__tests__/events.js:216 ("calling `fireEvent`
 	// directly works too") — click through the generic entry point.
 	it('fireEvent(node, event) dispatches and commits synchronously', () => {

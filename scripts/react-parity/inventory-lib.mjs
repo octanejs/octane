@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import ts from 'typescript';
+import { staticArrayInventory } from './static-array-inventory.mjs';
 
 export const INVENTORY_SCHEMA_VERSION = 1;
 
@@ -393,7 +394,7 @@ function pragmaGate(source, comments, callStart) {
 	return expressions.length ? { kind: 'pragma', expressions } : null;
 }
 
-function describeEachContexts(source, tokens, pairs) {
+function describeEachContexts(source, tokens, pairs, staticCounts) {
 	const contexts = [];
 	for (let index = 0; index + 4 < tokens.length; index++) {
 		if (
@@ -410,7 +411,10 @@ function describeEachContexts(source, tokens, pairs) {
 			tableEnd = pairs.get(cursor);
 			if (tableEnd === undefined) continue;
 			const tableArgs = splitArguments(tokens, cursor, tableEnd);
-			if (tableArgs.length === 1) rowCount = staticArrayRows(tokens, ...tableArgs[0], pairs);
+			if (tableArgs.length === 1)
+				rowCount =
+					staticCounts.get(tokens[index + 2].start) ??
+					staticArrayRows(tokens, ...tableArgs[0], pairs);
 			cursor = tableEnd + 1;
 		} else if (tokens[cursor]?.type === 'template') {
 			rowCount = taggedTemplateRows(tokens[cursor]);
@@ -443,15 +447,17 @@ function describeEachContexts(source, tokens, pairs) {
 	return contexts;
 }
 
-function loopContexts(source, tokens, pairs) {
+function loopContexts(source, tokens, pairs, staticCounts) {
 	const contexts = [];
-	const addBody = (kind, labelStart, searchStart, searchEnd) => {
+
+	const addBody = (kind, labelStart, searchStart, searchEnd, rowCount = null) => {
 		for (let index = searchStart; index < searchEnd; index++) {
 			if (tokens[index]?.value !== '{') continue;
 			const close = pairs.get(index);
 			if (close === undefined || close > searchEnd) continue;
 			contexts.push({
 				kind,
+				rowCount,
 				start: tokens[index].end,
 				end: tokens[close].start,
 				source: source
@@ -482,22 +488,25 @@ function loopContexts(source, tokens, pairs) {
 				(token, tokenIndex) =>
 					tokenIndex > index + 1 && tokenIndex < invocationEnd && token.value === '=>',
 			);
-			addBody('forEach', index, arrow === -1 ? index + 2 : arrow + 1, invocationEnd);
+			const rowCount = staticCounts.get(tokens[index].start) ?? null;
+			addBody('forEach', index, arrow === -1 ? index + 2 : arrow + 1, invocationEnd, rowCount);
 		}
 	}
 	return contexts;
 }
 
-function eachInvocation(tokens, pairs, startIndex) {
+function eachInvocation(tokens, pairs, startIndex, staticCounts) {
 	let cursor = startIndex + 1;
 	const modifiers = [];
 	let each = null;
+	let eachOffset;
 	let conditional = null;
 	while (tokens[cursor]?.value === '.' && tokens[cursor + 1]?.type === 'identifier') {
 		const modifier = tokens[cursor + 1].value;
 		cursor += 2;
 		if (modifier === 'each') {
 			each = true;
+			eachOffset = tokens[cursor - 1].start;
 		} else {
 			modifiers.push(modifier);
 			if (CURRIED_CONDITIONAL_MODIFIERS.has(modifier)) {
@@ -532,7 +541,7 @@ function eachInvocation(tokens, pairs, startIndex) {
 		if (tableClose === undefined) return { invocationOpen: null, modifiers, each: null };
 		const tableArgs = splitArguments(tokens, cursor, tableClose);
 		if (tableArgs.length === 1) {
-			rowCount = staticArrayRows(tokens, ...tableArgs[0], pairs);
+			rowCount = staticCounts.get(eachOffset) ?? staticArrayRows(tokens, ...tableArgs[0], pairs);
 			rows = staticArrayValues(tokens, ...tableArgs[0], pairs);
 		}
 		cursor = tableClose + 1;
@@ -637,8 +646,9 @@ export function extractTestCases(
 	if (file.endsWith('.coffee')) return extractCoffeeScriptTestCases(source, file);
 	const { tokens, comments } = tokenizeJavaScript(source);
 	const pairs = buildPairMap(tokens);
-	const describeContexts = describeEachContexts(source, tokens, pairs);
-	const loops = loopContexts(source, tokens, pairs);
+	const staticCounts = staticArrayInventory(source, file);
+	const describeContexts = describeEachContexts(source, tokens, pairs, staticCounts);
+	const loops = loopContexts(source, tokens, pairs, staticCounts);
 	const nodeSubtestOffsets = nodeSubtestRegistrarOffsets(source, file);
 	const cases = [];
 	const occurrences = new Map();
@@ -659,7 +669,7 @@ export function extractTestCases(
 		)
 			continue;
 		const parsed = isDirect
-			? eachInvocation(tokens, pairs, index)
+			? eachInvocation(tokens, pairs, index, staticCounts)
 			: {
 					invocationOpen: tokens[index + 1]?.value === '(' ? index + 1 : null,
 					modifiers: [],
@@ -694,7 +704,8 @@ export function extractTestCases(
 					: parsed.each.rowCount
 				: 1;
 		const factors = [
-			outerLoops.length ? null : primaryFactor,
+			primaryFactor,
+			...outerLoops.map((context) => context.rowCount),
 			...outerEach.map((context) => context.rowCount),
 		];
 		const estimatedRegistrations = factors.some((factor) => factor === null)
@@ -765,7 +776,7 @@ export function extractTestCases(
 				manualReviewReason:
 					rowVariant.title === null
 						? 'The upstream title is a dynamic expression.'
-						: outerLoops.length
+						: outerLoops.some((context) => context.rowCount === null)
 							? 'The test is registered inside a loop with an unknown expansion count.'
 							: estimatedRegistrations === null
 								? 'The upstream parameter matrix has a dynamic row count.'

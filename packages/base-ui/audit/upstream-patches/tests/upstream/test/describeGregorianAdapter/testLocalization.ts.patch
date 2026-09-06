@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/test/describeGregorianAdapter/testLocalization.ts b/tests/upstream/test/describeGregorianAdapter/testLocalization.ts
+--- a/tests/upstream/test/describeGregorianAdapter/testLocalization.ts
++++ b/tests/upstream/test/describeGregorianAdapter/testLocalization.ts
+@@ -1,5 +1,5 @@
+ import { expect } from 'vitest';
+-import { DescribeGregorianAdapterTestSuite } from './describeGregorianAdapter.types';
++import type { DescribeGregorianAdapterTestSuite } from './describeGregorianAdapter.types';
+ 
+ export const testLocalization: DescribeGregorianAdapterTestSuite = ({ adapter }) => {
+   it('Method: getCurrentLocaleCode', () => {

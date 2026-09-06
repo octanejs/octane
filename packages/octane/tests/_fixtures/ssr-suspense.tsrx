@@ -1,6 +1,25 @@
 import { Hydrate, Suspense, use, useId, useState } from 'octane';
 import { Suspense as RetrySiblingSuspense, type HydrateProps } from 'octane';
 
+type HydrationGate = { pending: boolean; promise: Promise<void> };
+function DelayedHydrationButton({ gate }: { gate: HydrationGate }) {
+	if (gate.pending) throw gate.promise;
+	const [count, setCount] = useState(0);
+	return <button
+		data-delayed-hydration=""
+		onClick={() => setCount(count + 1)}
+	>{count as number}</button>;
+}
+
+export function DelayedHydrationBoundary({ gate }: { gate: HydrationGate }) {
+	return <>
+		<span>Shell</span>
+		<Suspense fallback="Loading">
+			<DelayedHydrationButton gate={gate} />
+		</Suspense>
+	</>;
+}
+
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the
 // value is serialized into an inline <script> that the client seeds on hydrate
@@ -306,6 +325,44 @@ export function NestedRejectionBoundary(props) @{
 			<span class="nested-error">{String(err) as string}</span>
 		}
 	</div>
+}
+
+// Wayfinder-shaped streamed rejection: the try arm calls a factory through
+// use(), so the compiler emits seedOrCreate. Hydration must adopt the streamed
+// @catch DOM instead of minting a second alert beside it.
+async function loadFactoryForecast(scenario: string, attempt: number): Promise<string> {
+	await Promise.resolve();
+	if (scenario === 'weather-failure' && attempt === 0) {
+		throw new Error('The Kyoto forecast desk did not answer.');
+	}
+	return 'Clear mornings, cool after dusk.';
+}
+
+export function FactoryRejectionBoundary(props: { scenario: string }) @{
+	const [attempt, setAttempt] = useState(0);
+	<section class="weather-card">
+		@try {
+			const summary = use(loadFactoryForecast(props.scenario, attempt));
+			<h2 class="factory-ok">{summary}</h2>
+		} @pending {
+			<p class="factory-pending">Checking the local weather…</p>
+		} @catch (_error, reset) {
+			<div class="factory-error weather-error" role="alert">
+				<h2>The local weather desk did not answer.</h2>
+				<button
+					type="button"
+					onClick={function () {
+						setAttempt(function (current) {
+							return current + 1;
+						});
+						reset();
+					}}
+				>
+					Retry local forecast
+				</button>
+			</div>
+		}
+	</section>
 }
 
 // The inner catch deliberately rethrows the raw reason. Hydration must retain

@@ -1,0 +1,33 @@
+diff --git a/tests/upstream/src/popover/root/PopoverRoot.test.tsx b/tests/upstream/src/popover/root/PopoverRoot.test.tsx
+--- a/tests/upstream/src/popover/root/PopoverRoot.test.tsx
++++ b/tests/upstream/src/popover/root/PopoverRoot.test.tsx
+@@ -1400,7 +1400,7 @@ describe('<Popover.Root />', () => {
+       });
+ 
+       it('closes the popover when the `close` method is called', async () => {
+-        const actionsRef = React.createRef<Popover.Root.Actions>();
++        const actionsRef = ({current:null} as React.RefObject<Popover.Root.Actions | null>);
+         await render(<TestPopover rootProps={{ defaultOpen: true, actionsRef }} />);
+ 
+         await act(async () => {
+@@ -1764,7 +1764,8 @@ describe('<Popover.Root />', () => {
+           expect(screen.queryByTestId('popover-popup')).not.toBe(null);
+         });
+ 
+-        expect(onOpenChangeComplete.mock.calls.length).toBe(2);
++        // Octane does not replay mount effects in Strict Mode (renderer contract).
++        expect(onOpenChangeComplete.mock.calls.length).toBe(1);
+         expect(onOpenChangeComplete.mock.calls[0][0]).toBe(true);
+       });
+ 
+@@ -2220,8 +2221,8 @@ type TestPopoverProps = {
+   positionerProps?: Popover.Positioner.Props;
+   popupProps?: Popover.Popup.Props;
+   triggerPlacement?: 'before-content' | 'after-content';
+-  beforeTrigger?: React.ReactNode;
+-  afterTrigger?: React.ReactNode;
++  beforeTrigger?: React.OctaneNode;
++  afterTrigger?: React.OctaneNode;
+   includeTrigger?: boolean;
+ };
+ 

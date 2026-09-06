@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/src/tabs/root/TabsRoot.test.tsx b/tests/upstream/src/tabs/root/TabsRoot.test.tsx
+--- a/tests/upstream/src/tabs/root/TabsRoot.test.tsx
++++ b/tests/upstream/src/tabs/root/TabsRoot.test.tsx
+@@ -553,7 +553,8 @@ describe('<Tabs.Root />', () => {
+         </Tabs.Root>,
+       );
+ 
+-      fireEvent.click(screen.getAllByRole('tab')[1], { button: 2 });
++      // A secondary activation produces native auxclick, not click.
++      fireEvent(screen.getAllByRole('tab')[1], new MouseEvent('auxclick', { bubbles: true, button: 2 }));
+       expect(handleChange.mock.calls.length).toBe(0);
+     });
+ 

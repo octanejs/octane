@@ -22,7 +22,7 @@ const runtimeCrosswalk = JSON.parse(
 };
 
 // OCTANE DIVERGENCE[floating-ui-ref-as-prop][types:floating-ui-adapted-react]
-// OCTANE DIVERGENCE[floating-ui-ref-scheduling][divergence:ref-scheduling:01]
+// OCTANE DIVERGENCE[floating-ui-ref-scheduling][divergence:ref-scheduling:02]
 // OCTANE DIVERGENCE[floating-ui-focus-scheduling][divergence:focus-scheduling:01]
 // OCTANE DIVERGENCE[floating-ui-effect-scheduling][divergence:effect-scheduling:01]
 // OCTANE DIVERGENCE[floating-ui-iframe-realm][divergence:iframe-realm:01]
@@ -48,17 +48,9 @@ function assertExecutableNegativeControl(id: string): void {
 	);
 }
 
-// @parity-case divergence:ref-scheduling:01
-it('locks divergence:ref-scheduling:01', () =>
-	assertExecutableNegativeControl('divergence:ref-scheduling:01'));
-
 // @parity-case divergence:ref-scheduling:02
 it('locks divergence:ref-scheduling:02', () =>
 	assertExecutableNegativeControl('divergence:ref-scheduling:02'));
-
-// @parity-case divergence:ref-scheduling:03
-it('locks divergence:ref-scheduling:03', () =>
-	assertExecutableNegativeControl('divergence:ref-scheduling:03'));
 
 // @parity-case divergence:focus-scheduling:01
 it('locks divergence:focus-scheduling:01', () =>
@@ -115,14 +107,6 @@ it('locks divergence:render-count:01', () =>
 // @parity-case divergence:effect-scheduling:01
 it('locks divergence:effect-scheduling:01', () =>
 	assertExecutableNegativeControl('divergence:effect-scheduling:01'));
-
-// @parity-case divergence:ref-scheduling:04
-it('locks divergence:ref-scheduling:04', () =>
-	assertExecutableNegativeControl('divergence:ref-scheduling:04'));
-
-// @parity-case divergence:ref-scheduling:05
-it('locks divergence:ref-scheduling:05', () =>
-	assertExecutableNegativeControl('divergence:ref-scheduling:05'));
 
 // @parity-case divergence:effect-scheduling:02
 it('locks divergence:effect-scheduling:02', () =>

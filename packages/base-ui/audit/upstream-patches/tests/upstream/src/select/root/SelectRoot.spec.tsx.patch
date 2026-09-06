@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/src/select/root/SelectRoot.spec.tsx b/tests/upstream/src/select/root/SelectRoot.spec.tsx
+--- a/tests/upstream/src/select/root/SelectRoot.spec.tsx
++++ b/tests/upstream/src/select/root/SelectRoot.spec.tsx
+@@ -1,8 +1,8 @@
+ /** @jsxImportSource octane */
+ import * as React from 'octane';
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Select } from '@octanejs/base-ui/select';
+-import { mergeProps } from '../../merge-props';
++import { mergeProps } from "../../../../../src/merge-props/index.ts";
+ 
+ const objectItems = [
+   { value: 'a', label: 'apple' },

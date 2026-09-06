@@ -5,7 +5,12 @@ import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
 import { hydrateRoot, flushSync } from '../src/index.js';
-import { ThrownResourceBoundary as ClientThrownResourceBoundary } from './_fixtures/ssr-suspense.tsrx';
+import {
+	Boundary as ClientBoundary,
+	Nested as ClientNested,
+	Siblings as ClientSiblings,
+	ThrownResourceBoundary as ClientThrownResourceBoundary,
+} from './_fixtures/ssr-suspense.tsrx';
 import {
 	activateStreamedMarkup,
 	createPipeableCollector,
@@ -39,6 +44,28 @@ const OPEN = '<!--[-->';
 const CLOSE = '<!--]-->';
 const seed = (json: string) =>
 	`<script type="application/json" data-octane-suspense>${json}</script>`;
+
+function expectSeededHydration(
+	html: string,
+	body: Parameters<typeof hydrateRoot>[1],
+	props: Record<string, unknown>,
+	expected: string,
+) {
+	const container = document.createElement('div');
+	document.body.append(container);
+	container.innerHTML = html;
+	const hosts = [...container.querySelectorAll('*:not(script)')];
+	const root = hydrateRoot(container, body, props);
+	try {
+		flushSync(() => {});
+		expect([...container.querySelectorAll('*:not(script)')]).toEqual(hosts);
+		expect(container.innerHTML.replace(/<!--[\s\S]*?-->/g, '')).toBe(expected);
+	} finally {
+		root.unmount();
+		container.remove();
+	}
+}
+const clientPending = () => new Promise<string>(() => {});
 
 function deferred<T>() {
 	let resolve!: (v: T) => void;
@@ -556,10 +583,11 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 
 	it('@try awaits use(promise) and renders the resolved success arm + seed', async () => {
 		const out = await prerender(m.Boundary, { promise: Promise.resolve('hi') });
-		// Nested ranges: outer = try-slot, inner = the resolved success arm.
-		expect(out.html).toBe(
-			`<div id="box">${OPEN}${OPEN}<span class="ok">hi</span>${CLOSE}${CLOSE}</div>` +
-				seed('["hi"]'),
+		expectSeededHydration(
+			out.html,
+			ClientBoundary,
+			{ promise: clientPending() },
+			'<div id="box"><span class="ok">hi</span></div>',
 		);
 	});
 
@@ -583,10 +611,11 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 			outer: Promise.resolve('O'),
 			inner: Promise.resolve('I'),
 		});
-		// Two nested @try, each = slot + arm → four nested ranges around the span.
-		expect(out.html).toBe(
-			`<div id="outer">${OPEN}${OPEN}${OPEN}${OPEN}<span class="both">O:I</span>${CLOSE}${CLOSE}${CLOSE}${CLOSE}</div>` +
-				seed('["O","I"]'),
+		expectSeededHydration(
+			out.html,
+			ClientNested,
+			{ outer: clientPending(), inner: clientPending() },
+			'<div id="outer"><span class="both">O:I</span></div>',
 		);
 	});
 
@@ -595,21 +624,26 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 			a: Promise.resolve('A'),
 			b: Promise.resolve('B'),
 		});
-		expect(out.html).toBe(
-			`<div id="sibs">${OPEN}${OPEN}<span class="a">A</span>${CLOSE}${CLOSE}${OPEN}${OPEN}<span class="b">B</span>${CLOSE}${CLOSE}</div>` +
-				seed('["A","B"]'),
+		expectSeededHydration(
+			out.html,
+			ClientSiblings,
+			{ a: clientPending(), b: clientPending() },
+			'<div id="sibs"><span class="a">A</span><span class="b">B</span></div>',
 		);
 	});
 
-	it('seeds values in render (depth-first) order', async () => {
-		// The seed array order is what the client consumes by cursor on hydrate, so
-		// it must match the order use() is reached during render.
+	it('hydrates nested boundaries with their own server data', async () => {
+		// Pending client resources must adopt each boundary's own server data.
 		const out = await prerender(m.Nested, {
 			outer: Promise.resolve('first'),
 			inner: Promise.resolve('second'),
 		});
-		const json = out.html.match(/data-octane-suspense>(.*?)<\/script>/)![1];
-		expect(JSON.parse(json)).toEqual(['first', 'second']);
+		expectSeededHydration(
+			out.html,
+			ClientNested,
+			{ outer: clientPending(), inner: clientPending() },
+			'<div id="outer"><span class="both">first:second</span></div>',
+		);
 	});
 
 	it('escapes `<` in the serialized seed payload so it cannot break out of <script>', async () => {
@@ -634,9 +668,11 @@ describe('SSR Phase 4 — render() awaits use(promise)', () => {
 		dB.resolve('B1');
 		dA.resolve('A1');
 		const [a, b] = await Promise.all([pA, pB]);
-		expect(a.html).toBe(
-			`<div id="sibs">${OPEN}${OPEN}<span class="a">A1</span>${CLOSE}${CLOSE}${OPEN}${OPEN}<span class="b">A2</span>${CLOSE}${CLOSE}</div>` +
-				seed('["A1","A2"]'),
+		expectSeededHydration(
+			a.html,
+			ClientSiblings,
+			{ a: clientPending(), b: clientPending() },
+			'<div id="sibs"><span class="a">A1</span><span class="b">A2</span></div>',
 		);
 		// b must contain ONLY its own seed — not A's values leaking through SERIAL.
 		expect(b.html).toBe('<div id="leaf">B1</div>' + seed('["B1"]'));

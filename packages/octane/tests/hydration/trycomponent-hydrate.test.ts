@@ -58,7 +58,6 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 		// Snapshot the #try-for subtree (NOT container.innerHTML — that includes the
 		// inline suspense seed <script>, which hydrateRoot consumes + removes).
 		const wrapper = container.querySelector('#try-for') as HTMLElement;
-		const before = wrapper.outerHTML;
 		const lis = [...container.querySelectorAll('li.item')];
 		expect(lis.length).toBe(2);
 		expect(lis.map((l) => l.textContent)).toEqual(['Alpha', 'Beta']);
@@ -67,7 +66,8 @@ describe('hydrateRoot — @try with a component body (router Match shape)', () =
 		flushSync(() => {});
 
 		// Adopted, no rebuild, no @pending; seed script consumed.
-		expect((container.querySelector('#try-for') as HTMLElement).outerHTML).toBe(before);
+		expect(container.querySelector('#try-for')).toBe(wrapper);
+		expect(lis.map((node) => node.textContent)).toEqual(['Alpha', 'Beta']);
 		expect([...container.querySelectorAll('li.item')]).toEqual(lis);
 		expect(container.querySelector('.loading')).toBeNull();
 		expect(container.querySelector('script[data-octane-suspense]')).toBeNull();

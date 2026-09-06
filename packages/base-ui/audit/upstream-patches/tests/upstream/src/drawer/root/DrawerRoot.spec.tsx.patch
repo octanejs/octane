@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/src/drawer/root/DrawerRoot.spec.tsx b/tests/upstream/src/drawer/root/DrawerRoot.spec.tsx
+--- a/tests/upstream/src/drawer/root/DrawerRoot.spec.tsx
++++ b/tests/upstream/src/drawer/root/DrawerRoot.spec.tsx
+@@ -1,8 +1,8 @@
+ /** @jsxImportSource octane */
+ import * as React from 'octane';
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Drawer } from '@octanejs/base-ui/drawer';
+-import { REASONS } from '../../internals/reasons';
++import { REASONS } from "../../../../../src/internals/reasons.ts";
+ 
+ type DrawerChangeHandler = NonNullable<Drawer.Root.Props['onOpenChange']>;
+ type DrawerChangeDetails = Parameters<DrawerChangeHandler>[1];

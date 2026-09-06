@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/src/combobox/input/ComboboxInput.test.tsx b/tests/upstream/src/combobox/input/ComboboxInput.test.tsx
+--- a/tests/upstream/src/combobox/input/ComboboxInput.test.tsx
++++ b/tests/upstream/src/combobox/input/ComboboxInput.test.tsx
+@@ -861,7 +861,7 @@ describe('<Combobox.Input />', () => {
+ 
+       const input = screen.getByRole('combobox');
+       fireEvent.compositionStart(input);
+-      fireEvent.change(input, { target: { value: '' } });
++      fireEvent.input(input, { target: { value: '' } });
+ 
+       await waitFor(() => {
+         expect(screen.queryByRole('listbox')).toBe(null);
+@@ -894,7 +894,7 @@ describe('<Combobox.Input />', () => {
+       expect(input).toHaveAttribute('aria-activedescendant');
+ 
+       fireEvent.compositionStart(input);
+-      fireEvent.change(input, { target: { value: '' } });
++      fireEvent.input(input, { target: { value: '' } });
+ 
+       expect(screen.getByRole('listbox')).not.toBe(null);
+       expect(input).not.toHaveAttribute('aria-activedescendant');

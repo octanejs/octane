@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/menubar/Menubar.test.tsx b/tests/upstream/src/menubar/Menubar.test.tsx
+--- a/tests/upstream/src/menubar/Menubar.test.tsx
++++ b/tests/upstream/src/menubar/Menubar.test.tsx
+@@ -1264,7 +1264,7 @@ function ContainedTriggerMenubar(props: Menubar.Props) {
+   );
+ }
+ 
+-function DynamicMenu(props: { handle?: Menu.Handle<MenuDefinition>; children?: React.ReactNode }) {
++function DynamicMenu(props: { handle?: Menu.Handle<MenuDefinition>; children?: React.OctaneNode }) {
+   const { handle, children } = props;
+ 
+   return (

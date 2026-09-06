@@ -203,6 +203,57 @@ describe('batch state', () => {
 		);
 	});
 
+	test('accepts only explicitly adopted paths into a resumed baseline', () => {
+		const previous = fixtureManifest();
+		previous.baseline = {
+			'packages/adopt/removed.ts': 'old',
+			'packages/other/a.ts': 'old',
+			'packages/adopt-neighbor/a.ts': 'old',
+		};
+		const next = fixtureManifest();
+		next.nodes['pkg:adopt'] = {
+			state: 'ready',
+			action: 'adopt-binding',
+			bindingDirectory: 'packages/adopt',
+			evidenceFingerprint: 'adopt',
+			dependsOn: [],
+		};
+		next.baseline = {
+			'packages/adopt/a.ts': 'accepted',
+			'packages/other/a.ts': 'new',
+			'packages/adopt-neighbor/a.ts': 'new',
+		};
+		const result = reconcileBatchManifest(previous, next);
+		assert.deepEqual(result.baseline, {
+			'packages/adopt/a.ts': 'accepted',
+			'packages/other/a.ts': 'old',
+			'packages/adopt-neighbor/a.ts': 'old',
+		});
+		assert.deepEqual(
+			detectWorktreeCollisions({
+				plannedPaths: ['packages/adopt/a.ts'],
+				baseline: result.baseline,
+				current: { 'packages/adopt/a.ts': 'changed-later' },
+			}),
+			['packages/adopt/a.ts'],
+		);
+	});
+
+	for (const action of ['create-binding', 'extend-binding']) {
+		test(`does not accept changed paths during ordinary ${action} resume`, () => {
+			const previous = fixtureManifest();
+			const next = fixtureManifest();
+			next.nodes['pkg:leaf'] = {
+				...next.nodes['pkg:leaf'],
+				state: 'ready',
+				action,
+				bindingDirectory: 'packages/fixture',
+			};
+			next.baseline['packages/fixture/package.json'] = 'changed';
+			assert.deepEqual(reconcileBatchManifest(previous, next).baseline, previous.baseline);
+		});
+	}
+
 	test('detects overlapping writes without treating unrelated worktree changes as collisions', () => {
 		assert.deepEqual(
 			detectWorktreeCollisions({

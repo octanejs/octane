@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/src/popover/root/PopoverRoot.detached-triggers.test.tsx b/tests/upstream/src/popover/root/PopoverRoot.detached-triggers.test.tsx
+--- a/tests/upstream/src/popover/root/PopoverRoot.detached-triggers.test.tsx
++++ b/tests/upstream/src/popover/root/PopoverRoot.detached-triggers.test.tsx
+@@ -16,10 +16,9 @@ describe('<Popover.Root />', () => {
+ 
+   // Stands in for ref mergers like `@rc-component/util`'s `useComposeRef`, which retain the
+   // callback they were first given.
+-  const StaleRefButton = React.forwardRef<
+-    HTMLButtonElement,
+-    React.ComponentPropsWithoutRef<'button'> & { nodeKey?: string }
+-  >(function StaleRefButton({ nodeKey, ...props }, forwardedRef) {
++  const StaleRefButton = (function StaleRefButton(propsWithRef: (React.ComponentPropsWithoutRef<'button'> & { nodeKey?: string }) & { ref?: React.Ref<HTMLButtonElement> }) {
++  const { ref: forwardedRef = null, ...propsWithRefRest } = propsWithRef;
++  const { nodeKey, ...props } = propsWithRefRest;
+     const staleRef = React.useRef(forwardedRef).current;
+     return <button key={nodeKey} {...props} ref={staleRef} />;
+   });

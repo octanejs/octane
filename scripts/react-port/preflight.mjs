@@ -29,6 +29,8 @@ Options:
   --batch <id>               Use a stable batch identifier (derived by default)
   --work-root <directory>    Store state below this directory (default: .react-port-work)
   --recover-stale-lock       Explicitly recover a lock older than 30 minutes
+  --source-checkout <path>  Read hash-verified Git blobs from an existing source checkout
+  --npm-provenance           Verify signed npm provenance when gitHead is missing
   --no-state                 Print a report without writing resumable state
   -h, --help                 Show this help
 `;
@@ -41,6 +43,8 @@ function parseArguments(arguments_) {
 	let batchId = null;
 	let workRoot = path.join(process.cwd(), '.react-port-work');
 	let noState = false;
+	let npmProvenance = false;
+	let sourceCheckout;
 	let recoverStaleLock = false;
 	const dependencyClassifications = {};
 	const adoptedBindings = [];
@@ -107,6 +111,15 @@ function parseArguments(arguments_) {
 			recoverStaleLock = true;
 			continue;
 		}
+		if (argument === '--source-checkout') {
+			if (!arguments_[index + 1]) throw new Error('--source-checkout requires a path');
+			sourceCheckout = path.resolve(arguments_[++index]);
+			continue;
+		}
+		if (argument === '--npm-provenance') {
+			npmProvenance = true;
+			continue;
+		}
 		if (argument === '--no-state') {
 			noState = true;
 			continue;
@@ -124,17 +137,12 @@ function parseArguments(arguments_) {
 		recoverStaleLock,
 		dependencyClassifications,
 		adoptedBindings,
+		npmProvenance,
+		sourceCheckout,
 	};
 }
 
-export async function main({
-	argumentsList = process.argv.slice(2),
-	resolve = (parsedInput, rawInput) =>
-		resolveRemoteInput(parsedInput, rawInput, {
-			githubToken: process.env.GITHUB_TOKEN,
-			npmToken: process.env.NODE_AUTH_TOKEN ?? process.env.NPM_TOKEN,
-		}),
-} = {}) {
+export async function main({ argumentsList = process.argv.slice(2), resolve } = {}) {
 	let parsedArguments;
 	try {
 		parsedArguments = parseArguments(argumentsList);
@@ -155,7 +163,15 @@ export async function main({
 
 	const report = await runPreflight({
 		inputs: [...parsedArguments.inputs, ...parsedArguments.prerequisiteInputs],
-		resolve,
+		resolve:
+			resolve ??
+			((parsedInput, rawInput) =>
+				resolveRemoteInput(parsedInput, rawInput, {
+					githubToken: process.env.GITHUB_TOKEN,
+					npmToken: process.env.NODE_AUTH_TOKEN ?? process.env.NPM_TOKEN,
+					npmProvenance: parsedArguments.npmProvenance,
+					sourceCheckout: parsedArguments.sourceCheckout,
+				})),
 	});
 	for (const [index, target] of report.targets.entries()) {
 		target.requested = index < parsedArguments.inputs.length;

@@ -30,7 +30,26 @@ export default class ReactParityJsonReporter extends JsonReporter {
 	}
 
 	onTestRunEnd(testModules, ...rest) {
+		// The pinned JsonReporter emits modules in this order but omits their
+		// project. Preserve it so one file can run in both DOM and browser lanes.
+		this.moduleProjects = testModules.map((module) => ({
+			file: module.task.filepath,
+			projectName: module.project._parent?.name ?? module.project.name,
+		}));
 		for (const testModule of testModules) repairTaskErrors(testModule.task);
 		return super.onTestRunEnd(testModules, ...rest);
+	}
+
+	writeReport(report) {
+		const result = JSON.parse(report);
+		if (result.testResults.length !== this.moduleProjects.length)
+			throw new Error('Vitest JSON report lost its project identity mapping');
+		for (const [index, suite] of result.testResults.entries()) {
+			const module = this.moduleProjects[index];
+			if (suite.name !== module.file)
+				throw new Error('Vitest JSON report reordered its project identity mapping');
+			suite.projectName = module.projectName;
+		}
+		return super.writeReport(JSON.stringify(result));
 	}
 }

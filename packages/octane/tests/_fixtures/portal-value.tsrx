@@ -1,5 +1,13 @@
 import { useState, createPortal, createContext, use, memo } from 'octane';
 
+export function PortalCounter(props: { target: Element | DocumentFragment }) {
+	const [count, setCount] = useState(0);
+	return createPortal(
+		<button onClick={() => setCount(count + 1)}>{count as string}</button>,
+		props.target,
+	);
+}
+
 export const Theme = createContext('light');
 
 function ModalBody(props) @{

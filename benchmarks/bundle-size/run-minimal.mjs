@@ -40,7 +40,7 @@ const bindingScenarios = [
 		id: 'binding-base-ui',
 		extension: 'ts',
 		package: '@octanejs/base-ui',
-		forbidden: /\/packages\/base-ui\/src\/(?:dialog|popover)\.ts$/,
+		forbidden: /\/packages\/base-ui\/src\/(?:dialog|popover)(?:\.ts$|\/)/,
 	},
 	{
 		id: 'binding-aria',

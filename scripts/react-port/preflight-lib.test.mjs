@@ -516,7 +516,7 @@ describe('resolved evidence', () => {
 
 	test('marks feasibility evidence truncated at the shipped-source file bound', () => {
 		const sourceFiles = Object.fromEntries(
-			Array.from({ length: 401 }, (_, index) => [`package/src/file-${index}.js`, 'export {};']),
+			Array.from({ length: 4001 }, (_, index) => [`package/src/file-${index}.js`, 'export {};']),
 		);
 		const result = collectArchiveEvidence(
 			gzipSync(
@@ -532,7 +532,7 @@ describe('resolved evidence', () => {
 			),
 		);
 
-		assert.equal(result.sourceAnalysis.filesScanned, 400);
+		assert.equal(result.sourceAnalysis.filesScanned, 4000);
 		assert.equal(result.sourceAnalysis.truncated, true);
 	});
 
@@ -829,6 +829,48 @@ describe('resolved evidence', () => {
 		assert.equal(fromGitHub.identity.packageName, 'react-widget');
 		assert.equal(fromGitHub.identity.commit, commit);
 		assert.deepEqual(fromGitHub.license.source.notices, []);
+
+		const typeTestBytes = Buffer.from(`import { expectType } from '#test-utils';
+import { Widget } from 'react-widget';
+const fixture = ['a'];
+<Widget value={fixture} onChange={value => { expectType<string[], typeof value>(value); }} />;
+// @ts-expect-error invalid explicit value
+<Widget<number> value="invalid" />;
+export function Wrapper(props: Widget.Props<string>) { return <Widget {...props} />; }
+`);
+		responses.set(
+			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
+			githubTreeResponse(
+				sourceTree.map((entry) =>
+					entry.path === 'packages/react-widget/quality/widget.behavior.ts'
+						? {
+								...entry,
+								path: 'packages/react-widget/src/Widget.spec.tsx',
+								size: typeTestBytes.length,
+								sha: gitBlobSha(typeTestBytes),
+							}
+						: entry,
+				),
+			),
+		);
+		responses.set(
+			'https://api.github.com/repos/example/widgets/git/blobs/test',
+			Response.json({
+				encoding: 'base64',
+				content: typeTestBytes.toString('base64'),
+				size: typeTestBytes.length,
+			}),
+		);
+		const typeResult = await resolveRemoteInput(parseInput(githubInput), githubInput, {
+			fetchImpl,
+		});
+		const typeInventory = typeResult.upstreamTestInventory.find((entry) => entry.kind === 'type');
+		assert.equal(typeInventory.path, 'packages/react-widget/src/Widget.spec.tsx');
+		assert.equal(typeInventory.gitBlob, gitBlobSha(typeTestBytes));
+		assert.equal(typeInventory.registrations.length, 3);
+		assert.equal(new Set(typeInventory.registrations.map(({ id }) => id)).size, 3);
+		assert.ok(typeInventory.registrations.every(({ kind }) => kind === 'type-assertion'));
+		assert.match(typeInventory.registrations[1].title, /invalid/);
 
 		const dynamicTestBytes = Buffer.from("test.each(rows)('renders %s', value => value);\n");
 		responses.set(

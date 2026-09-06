@@ -1,0 +1,65 @@
+'use client';
+import * as React from 'octane';
+import { useComboboxRootContext } from '../root/ComboboxRootContext.tsrx';
+import {
+	resolveMultipleLabels,
+	resolveSelectedLabel,
+} from '../../internals/resolveValueLabel.tsrx';
+
+/**
+ * The current value of the combobox.
+ * Doesn't render its own HTML element.
+ *
+ * Documentation: [Base UI Combobox](https://base-ui.com/react/components/combobox)
+ */
+export function ComboboxValue(props: ComboboxValue.Props): React.ReactElement {
+	const { children: childrenProp, placeholder } = props;
+
+	const store = useComboboxRootContext();
+
+	const itemToStringLabel = store.useState('itemToStringLabel');
+	const selectedValue = store.useState('selectedValue');
+	const items = store.useState('items');
+	const multiple = store.useState('selectionMode') === 'multiple';
+	const hasSelectedValue = store.useState('hasSelectedValue');
+
+	const shouldCheckNullItemLabel = !hasSelectedValue && placeholder != null && childrenProp == null;
+	const hasNullLabel = store.useState('hasNullItemLabel', shouldCheckNullItemLabel);
+
+	let children = null;
+	if (typeof childrenProp === 'function' && !React.isChildrenBlock(childrenProp)) {
+		children = childrenProp(selectedValue);
+	} else if (childrenProp != null) {
+		children = childrenProp;
+	} else if (!hasSelectedValue && placeholder != null && !hasNullLabel) {
+		children = placeholder;
+	} else if (multiple && Array.isArray(selectedValue)) {
+		children = resolveMultipleLabels(selectedValue, items, itemToStringLabel);
+	} else {
+		children = resolveSelectedLabel(selectedValue, items, itemToStringLabel);
+	}
+
+	return <React.Fragment>{children}</React.Fragment>;
+}
+
+export interface ComboboxValueState {}
+
+export interface ComboboxValueProps {
+	/**
+	 * Accepts a function that returns a `ReactNode` to format the selected value.
+	 * Treat the value as read-only: in `multiple` mode it may be a shared frozen array
+	 * when nothing is selected.
+	 */
+	children?:
+		NonNullable<React.OctaneNode> | null | undefined | ((selectedValue: any) => React.OctaneNode);
+	/**
+	 * The placeholder value to display when no value is selected.
+	 * This is overridden by `children` if specified, or by a null item's label in `items`.
+	 */
+	placeholder?: React.OctaneNode;
+}
+
+export namespace ComboboxValue {
+	export type State = ComboboxValueState;
+	export type Props = ComboboxValueProps;
+}

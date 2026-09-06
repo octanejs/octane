@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**29 active pin(s) across 107 binding package(s).**
+**25 active pin(s) across 108 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -21,6 +21,7 @@ surface and evidence.
 | `@octanejs/aria` | 0 |
 | `@octanejs/auto-animate` | 0 |
 | `@octanejs/base-ui` | 0 |
+| `@octanejs/base-ui-utils` | 0 |
 | `@octanejs/better-auth` | 0 |
 | `@octanejs/calendar` | 0 |
 | `@octanejs/cmdk` | 0 |
@@ -37,7 +38,7 @@ surface and evidence.
 | `@octanejs/email` | 0 |
 | `@octanejs/email-cli` | 0 |
 | `@octanejs/embla-carousel` | 0 |
-| `@octanejs/floating-ui` | 29 |
+| `@octanejs/floating-ui` | 25 |
 | `@octanejs/formisch` | 0 |
 | `@octanejs/gsap` | 0 |
 | `@octanejs/hook-form` | 0 |
@@ -127,9 +128,7 @@ surface and evidence.
 
 ### packages/floating-ui/tests/upstream/react-dom/index.test.tsx
 
-- **middleware is always fresh and does not cause an infinite loop**
 - **calls the cleanup function**
-- **unstable callback refs**
 
 ### packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx
 
@@ -153,11 +152,6 @@ surface and evidence.
 ### packages/floating-ui/tests/upstream/react/unit/useClientPoint.test.tsx
 
 - **cleans up window listener when closing or disabling**
-
-### packages/floating-ui/tests/upstream/react/unit/useFloating.test.tsx
-
-- **handles unstable reference prop**
-- **handles real virtual element**
 
 ### packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx
 

@@ -1,0 +1,45 @@
+diff --git a/tests/upstream/src/field/error/FieldError.test.tsx b/tests/upstream/src/field/error/FieldError.test.tsx
+--- a/tests/upstream/src/field/error/FieldError.test.tsx
++++ b/tests/upstream/src/field/error/FieldError.test.tsx
+@@ -46,8 +46,8 @@ describe('<Field.Error />', () => {
+     const input = screen.getByRole<HTMLInputElement>('textbox');
+ 
+     fireEvent.focus(input);
+-    fireEvent.change(input, { target: { value: 'a' } });
+-    fireEvent.change(input, { target: { value: '' } });
++    fireEvent.input(input, { target: { value: 'a' } });
++    fireEvent.input(input, { target: { value: '' } });
+     fireEvent.blur(input);
+     expect(screen.queryByText('Message')).toBe(null);
+ 
+@@ -75,10 +75,10 @@ describe('<Field.Error />', () => {
+       const input = screen.getByRole<HTMLInputElement>('textbox');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: 'a' } });
++      fireEvent.input(input, { target: { value: 'a' } });
+       expect(screen.queryByText('Message')).toBe(null);
+ 
+-      fireEvent.change(input, { target: { value: '' } });
++      fireEvent.input(input, { target: { value: '' } });
+       expect(screen.queryByText('Message')).not.toBe(null);
+     });
+ 
+@@ -96,7 +96,7 @@ describe('<Field.Error />', () => {
+       const input = screen.getByRole<HTMLInputElement>('textbox');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: 'a' } });
++      fireEvent.input(input, { target: { value: 'a' } });
+       fireEvent.blur(input);
+       expect(screen.queryByText('Message')).toBe(null);
+ 
+@@ -161,7 +161,7 @@ describe('<Field.Error />', () => {
+       expect(control).toHaveAttribute('aria-invalid', 'true');
+       expect(screen.getByTestId('default-error')).toHaveTextContent('Email is already taken');
+ 
+-      fireEvent.change(control, { target: { value: 'next@example.com' } });
++      fireEvent.input(control, { target: { value: 'next@example.com' } });
+ 
+       expect(control).not.toHaveAttribute('aria-invalid');
+       expect(screen.queryByTestId('default-error')).toBe(null);

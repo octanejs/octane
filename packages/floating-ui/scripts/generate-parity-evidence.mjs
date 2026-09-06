@@ -225,9 +225,9 @@ const expectedFailureDocument = JSON.parse(
 const expectedFailureKeys = new Set(
 	expectedFailureDocument.tests.map((test) => `${test.file}\0${test.fullName}`),
 );
-if (expectedFailureKeys.size !== 29) {
+if (expectedFailureKeys.size !== 25) {
 	throw new Error(
-		`expected 29 distinct adapted negative controls, got ${expectedFailureKeys.size}`,
+		`expected 25 distinct adapted negative controls, got ${expectedFailureKeys.size}`,
 	);
 }
 
@@ -436,6 +436,11 @@ const ordinaryClassifications = [
 		reason: 'Fail-closed setup coverage for the exact declared differential fixture.',
 	},
 	{
+		path: 'packages/floating-ui/tests/nodes.test.ts',
+		disposition: 'octane-only-framework-contract',
+		reason: 'Port-authored floating-tree selection, closed-branch, and depth-tie contracts.',
+	},
+	{
 		path: 'packages/floating-ui/tests/positioning.test.ts',
 		disposition: 'octane-only-framework-contract',
 		reason: 'Port-authored positioning and interaction contracts under Octane scheduling.',
@@ -561,8 +566,8 @@ const manifest = {
 		},
 	},
 	adaptedRuntimeSummary: {
-		inventoryEntries: 30,
-		uniqueIdentities: 30,
+		inventoryEntries: expectedFailureKeys.size + 1,
+		uniqueIdentities: expectedFailureKeys.size + 1,
 		duplicateEntriesWithinLanes: 0,
 		identitiesSharedAcrossLanes: 0,
 	},
@@ -609,7 +614,7 @@ const manifest = {
 			project: 'floating-ui-adapted',
 			evidenceOrigin: 'upstream-suite',
 			notes:
-				'One-for-one adapted suite on the same Vitest 3.0.9 runner: 272 compatible passes plus 29 executable expected-failure negative controls, crosswalked to every pristine executed identity.',
+				'One-for-one adapted suite on the same Vitest 3.0.9 runner: 276 compatible passes plus 25 executable expected-failure negative controls, crosswalked to every pristine executed identity.',
 			execution: {
 				kind: 'vitest-full',
 				inventory: 'packages/floating-ui/audit/adapted-wrapper-runtime.json',

@@ -16,6 +16,15 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
+import { assertTsrxTypecheckSucceeded } from '../tsrx-typecheck.mjs';
+import { createTypeEvidenceProgram } from './type-program.mjs';
+import { assertMaterializedTypeEvidence } from './materialized-type-evidence.mjs';
+import { publicCompatibilityExport } from './public-compatibility.mjs';
+import {
+	pinnedPublicEntries,
+	pinnedPublicExport,
+	newOpaquePublicSymbol,
+} from './pinned-public-types.mjs';
 import {
 	auditShippedClosure,
 	assertCurrentEvidenceMatrix,
@@ -208,13 +217,19 @@ function hasTypeProjectMarker(relativeProject, marker) {
 }
 
 function isTypeProjectCommand(commandArguments, bindingDirectory, gateId, compiler) {
+	const prefix = commandArguments.slice(0, -1);
 	if (
-		commandArguments.length !== 6 ||
-		!isExactCommand(commandArguments.slice(0, 5), ['pnpm', 'exec', compiler, '--noEmit', '-p'])
+		!isExactCommand(prefix, ['pnpm', 'exec', compiler, '--noEmit', '-p']) &&
+		!isExactCommand(prefix, [`./node_modules/.bin/${compiler}`, '--noEmit', '-p']) &&
+		!isExactCommand(prefix, [
+			`./${bindingDirectory}/node_modules/.bin/${compiler}`,
+			'--noEmit',
+			'-p',
+		])
 	) {
 		return false;
 	}
-	const projectPath = commandArguments[5].replaceAll('\\', '/').replace(/^\.\//, '');
+	const projectPath = commandArguments.at(-1).replaceAll('\\', '/').replace(/^\.\//, '');
 	if (!projectPath.startsWith(`${bindingDirectory}/`) || !projectPath.endsWith('.json')) {
 		return false;
 	}
@@ -1045,9 +1060,13 @@ function analyzeTypeEvidence(
 	parsed,
 	expectedSpecifiers,
 	trustedTypeAssertionModulePath,
+	pinnedEntries,
 ) {
 	const checkerFiles = programFiles.filter((filePath) => !filePath.endsWith('.tsrx'));
-	const program = ts.createProgram({ rootNames: checkerFiles, options: parsed.options });
+	const program = createTypeEvidenceProgram(
+		[...checkerFiles, ...(pinnedEntries?.values() ?? [])],
+		parsed.options,
+	);
 	const checker = program.getTypeChecker();
 	const expected = new Set(expectedSpecifiers);
 	const importedEntries = new Set();
@@ -1157,6 +1176,15 @@ function analyzeTypeEvidence(
 		const moduleSymbol = checker.getSymbolAtLocation(record.moduleSpecifier);
 		if (!moduleSymbol) throw new Error(`Type project cannot resolve public entry ${specifier}`);
 		const exports = checker.getExportsOfModule(moduleSymbol);
+		let pinnedExports;
+		if (pinnedEntries) {
+			const witness = program.getSourceFile(pinnedEntries.get(specifier));
+			const witnessModule = witness && checker.getSymbolAtLocation(witness);
+			if (!witnessModule) throw new Error(`No pinned public declaration for ${specifier}`);
+			pinnedExports = new Map(
+				checker.getExportsOfModule(witnessModule).map((symbol) => [symbol.name, symbol]),
+			);
+		}
 		if (!record.namespace) {
 			const omitted = exports
 				.map((symbol) => symbol.name)
@@ -1184,7 +1212,22 @@ function analyzeTypeEvidence(
 					`Type project cannot inspect public export ${specifier}.${symbol.name}: ${error instanceof Error ? error.message : String(error)}`,
 				);
 			}
-			if (
+			if (pinnedExports) {
+				const witness = publicCompatibilityExport(specifier, symbol.name)
+					? pinnedPublicExport(pinnedEntries, program, checker, specifier, symbol.name)
+					: pinnedExports.get(symbol.name);
+				if (!witness)
+					throw new Error(
+						`Export ${specifier}.${symbol.name} is absent from the pinned public API`,
+					);
+				const failure = newOpaquePublicSymbol(symbol, witness, checker, {
+					internalMembers: pinnedEntries.internalMembers,
+				});
+				if (failure)
+					throw new Error(
+						`Imported public type ${specifier}.${symbol.name} introduces any or unknown: ${failure}`,
+					);
+			} else if (
 				typeContainsUnsafe(type, checker) ||
 				declarationsContainUnsafeTypeParameters(symbol, checker)
 			) {
@@ -1319,7 +1362,7 @@ function structurallyMappedRegistrations(programFiles, analysis) {
 
 function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoot) {
 	const packageDirectory = bindingPackageDirectory(node, workspaceRoot);
-	const projectPath = path.resolve(workspaceRoot, commandArguments[5]);
+	const projectPath = path.resolve(workspaceRoot, commandArguments.at(-1));
 	const relativeProject = path.relative(packageDirectory, projectPath);
 	if (relativeProject.startsWith('..') || path.isAbsolute(relativeProject)) {
 		throw new Error(`Type project for ${gateId} escapes the binding package`);
@@ -1332,6 +1375,8 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 	if (parsed.errors.length > 0) {
 		throw new Error(`Type project for ${gateId} cannot be parsed`);
 	}
+	if (parsed.options.noCheck)
+		throw new Error(`Type project for ${gateId} must not disable checking with noCheck`);
 	if (parsed.options.strict !== true || parsed.options.skipLibCheck !== false) {
 		throw new Error(`Type project for ${gateId} must enable strict and disable skipLibCheck`);
 	}
@@ -1379,6 +1424,9 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 				parsed,
 				concretePublicSpecifiers(packageDirectory, node.binding),
 				trustedTypeAssertionModulePath,
+				loaded.config.reactPortEvidence?.publicMode === 'pinned'
+					? pinnedPublicEntries(packageDirectory, node)
+					: undefined,
 			);
 			if (!semantics.hasPositiveAssertion) {
 				throw new Error('Public type project must contain a positive type assertion');
@@ -1396,7 +1444,8 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 		}
 	}
 	if (gateId.startsWith('upstream-types-')) {
-		if (!within('tests/types') && !within('typetests')) {
+		const materialized = loaded.config.reactPortEvidence?.upstreamMode === 'materialized';
+		if (!materialized && !within('tests/types') && !within('typetests')) {
 			throw new Error('Upstream type project must compile package-local upstream type sources');
 		}
 		const expectedRegistrations = (node.upstreamTestInventory ?? [])
@@ -1411,6 +1460,10 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			throw new Error(
 				`Type project for ${gateId} is not bound to the pinned immutable type inventory`,
 			);
+		}
+		if (materialized) {
+			assertMaterializedTypeEvidence({ gateId, node, packageDirectory, programFiles });
+			return;
 		}
 		const expectedImport = gateId === 'upstream-types-pristine' ? node.packageName : node.binding;
 		if (!expectedImport) {
@@ -1699,6 +1752,13 @@ async function operate(
 					windowsHide: true,
 				},
 			);
+			if (
+				gateIds.some((gateId) =>
+					['authored-source-types', 'public-types', 'upstream-types-adapted'].includes(gateId),
+				)
+			) {
+				assertTsrxTypecheckSucceeded({ status: 0, stdout, stderr }, executedArguments.at(-1));
+			}
 			if (packageTestPlan) {
 				assertPackageTestReport(packageTestPlan, reportDirectory);
 			}

@@ -1,0 +1,72 @@
+'use client';
+import type * as React from 'octane';
+import type { BaseUIComponentProps, NativeButtonProps } from '../../internals/types';
+import { useToastRootContext } from '../root/ToastRootContext';
+import { useButton } from '../../internals/use-button/useButton';
+import { useRenderElement } from '../../internals/useRenderElement.tsrx';
+import { hasRenderableChildren } from '../utils/isRenderableNode';
+
+/**
+ * Performs an action when clicked.
+ * Renders a `<button>` element.
+ *
+ * Documentation: [Base UI Toast](https://base-ui.com/react/components/toast)
+ */
+export const ToastAction = function ToastAction(
+	componentPropsWithRef: React.PropsWithoutRef<ToastAction.Props> & {
+		ref?: React.Ref<HTMLButtonElement>;
+	},
+) {
+	const { ref: forwardedRef = null, ...componentProps } = componentPropsWithRef;
+	const {
+		render,
+		className,
+		style,
+		disabled,
+		nativeButton = true,
+		...elementProps
+	} = componentProps;
+
+	const { toast } = useToastRootContext();
+
+	const computedChildren = toast.actionProps?.children ?? elementProps.children;
+
+	const { getButtonProps, buttonRef } = useButton({
+		disabled,
+		native: nativeButton,
+	});
+
+	const state: ToastActionState = {
+		type: toast.type,
+	};
+
+	const element = useRenderElement('button', componentProps, {
+		ref: [forwardedRef, buttonRef],
+		state,
+		props: [
+			elementProps,
+			toast.actionProps,
+			getButtonProps,
+			{
+				children: computedChildren,
+			},
+		],
+	});
+
+	return hasRenderableChildren(element) ? element : null;
+};
+
+export interface ToastActionState {
+	/**
+	 * The type of the toast.
+	 */
+	type: string | undefined;
+}
+
+export interface ToastActionProps
+	extends NativeButtonProps, BaseUIComponentProps<'button', ToastActionState> {}
+
+export namespace ToastAction {
+	export type State = ToastActionState;
+	export type Props = ToastActionProps;
+}

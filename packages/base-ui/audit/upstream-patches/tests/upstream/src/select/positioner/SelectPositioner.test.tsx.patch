@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/src/select/positioner/SelectPositioner.test.tsx b/tests/upstream/src/select/positioner/SelectPositioner.test.tsx
+--- a/tests/upstream/src/select/positioner/SelectPositioner.test.tsx
++++ b/tests/upstream/src/select/positioner/SelectPositioner.test.tsx
+@@ -5,10 +5,10 @@ import { Select } from '@octanejs/base-ui/select';
+ import { screen, waitFor } from '@mui/internal-test-utils';
+ import { createRenderer, describeConformance, isJSDOM } from '#test-utils';
+ 
+-const Trigger = React.forwardRef(function Trigger(
+-  props: Select.Trigger.Props,
+-  ref: React.ForwardedRef<HTMLButtonElement>,
++const Trigger = (function Trigger(
++  propsWithRef: (Select.Trigger.Props) & { ref?: React.Ref<HTMLButtonElement> },
+ ) {
++  const { ref: ref = null, ...props } = propsWithRef;
+   return <Select.Trigger {...props} ref={ref} />;
+ });
+ 
