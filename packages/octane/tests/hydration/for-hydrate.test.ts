@@ -96,6 +96,28 @@ describe('hydrateRoot — @for list (SSR Phase 6 / M2)', () => {
 		root.unmount();
 	});
 
+	it('clears an adopted direct-host list and accepts new rows in the same parent', () => {
+		const items = Array.from({ length: 1000 }, (_, id) => ({ id, name: `row-${id}` }));
+		const onPick = vi.fn();
+		container.innerHTML = ServerRT.renderToString(server.List, { items, onPick }).html;
+		const list = container.querySelector('#list');
+		const first = container.querySelector('li.row');
+		const root = hydrateRoot(container, List, { items, onPick });
+		try {
+			expect(container.querySelector('li.row')).toBe(first);
+			flushSync(() => root.render(List, { items: [], onPick }));
+			expect(container.querySelector('#list')).toBe(list);
+			expect(container.querySelectorAll('li.row')).toHaveLength(0);
+			flushSync(() => root.render(List, { items: [{ id: 1000, name: 'new' }], onPick }));
+			const button = container.querySelector('li.row button') as HTMLButtonElement;
+			expect(button.textContent).toBe('pick');
+			flushSync(() => button.click());
+			expect(onPick).toHaveBeenCalledExactlyOnceWith(1000);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('also adopts legacy per-item pairs when the client can self-delimit rows', () => {
 		const items = [
 			{ id: 1, name: 'Alpha' },

@@ -3122,11 +3122,34 @@ function journalForSlot(state: ForSlot): void {
 	});
 }
 
+/**
+ * Full clears leave the old item chain untouched. Retain its map and links by
+ * reference for rollback, then give any same-attempt refill a fresh key map.
+ * The generic journal still snapshots reordered/partially changed lists.
+ */
+function journalForOwnedListClear(state: ForSlot): void {
+	const seen = TRANSITION_JOURNAL_BAGS!;
+	const oldItems = state.items;
+	seen.set(state, TRANSITION_JOURNAL!.length);
+	const snapshot = {
+		head: state.head,
+		tail: state.tail,
+		size: state.size,
+		empty: state.emptyBlock,
+		entries: oldItems,
+	};
+	journalUndo(() => {
+		restoreForSlot(state, snapshot, null);
+		seen.delete(state);
+	});
+	state.items = new Map();
+}
+
 /** Put a keyed list back the way it was, rows and order together. */
 function restoreForSlot(
 	state: ForSlot,
 	snapshot: any,
-	chain: Array<[Block, Block | null, Block | null]>,
+	chain: Array<[Block, Block | null, Block | null]> | null,
 ): void {
 	// Rows the aborted attempt freshly mounted are not in the snapshot, so
 	// restoring the old chain would simply forget them. Their DOM goes with the
@@ -3134,11 +3157,14 @@ function restoreForSlot(
 	// them unreachable: the disposed stamp is what keeps their queued mount
 	// effects and ref attaches from firing for a row that never reached the
 	// screen, and it runs the render-time cleanups they registered. Parked rows
-	// are never on the chain, so this reaches exactly the fresh mounts.
-	const kept = new Set<Block>();
-	for (let i = 0; i < chain.length; i++) kept.add(chain[i][0]);
+	// are never on the chain, so this reaches exactly the fresh mounts. For a
+	// map-swap clear the original chain cannot become live before its own undo:
+	// later windows undo first, and later fills use the replacement map.
+	const preservedMap: Map<any, Block> | null = chain === null ? snapshot.entries : null;
+	const kept: Set<Block> | null = chain === null ? null : new Set<Block>();
+	if (chain !== null) for (let i = 0; i < chain.length; i++) kept!.add(chain[i][0]);
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		if (!kept.has(b)) unmountBlock(b, false);
+		if (preservedMap !== null || !kept!.has(b)) unmountBlock(b, false);
 	}
 	// Those teardowns dispatch their cleanup errors immediately, and an error
 	// routed to the enclosing boundary flips it to @catch — disposing this
@@ -3149,13 +3175,17 @@ function restoreForSlot(
 	state.head = snapshot.head;
 	state.tail = snapshot.tail;
 	state.size = snapshot.size;
-	state.items.clear();
-	for (let i = 0; i < snapshot.entries.length; i++) {
-		state.items.set(snapshot.entries[i][0], snapshot.entries[i][1]);
-	}
-	for (let i = 0; i < chain.length; i++) {
-		chain[i][0].nextSibling = chain[i][1];
-		chain[i][0].prevSibling = chain[i][2];
+	if (preservedMap !== null) state.items = preservedMap;
+	else {
+		const originalChain = chain!;
+		state.items.clear();
+		for (let i = 0; i < snapshot.entries.length; i++) {
+			state.items.set(snapshot.entries[i][0], snapshot.entries[i][1]);
+		}
+		for (let i = 0; i < originalChain.length; i++) {
+			originalChain[i][0].nextSibling = originalChain[i][1];
+			originalChain[i][0].prevSibling = originalChain[i][2];
+		}
 	}
 	// Collect the committed ranges before removing speculative nodes. Root
 	// transactions left outgoing rows connected; hold-only callers may have
@@ -33025,8 +33055,14 @@ function reconcileKeyed<T>(
 	if (process.env.NODE_ENV !== 'production') getKey = checkedListKey(getKey);
 	// Fast path: clear all.
 	if (newLen === 0) {
-		if (journalShape) journalForSlot(state);
-		batchClearItems(state, oldItems);
+		const ownedRootClear = journalShape && canDeferRootOwnedListClear(state);
+		if (
+			ownedRootClear &&
+			(TRANSITION_JOURNAL_BAGS!.get(state) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
+		)
+			journalForOwnedListClear(state);
+		else if (journalShape) journalForSlot(state);
+		batchClearItems(state, ownedRootClear ? state.items : oldItems, ownedRootClear);
 		state.head = null;
 		state.tail = null;
 		state.size = 0;
@@ -33484,6 +33520,111 @@ function reconcileKeyed<T>(
 const RANGE_CLEAR_MIN_ITEMS = 512;
 
 /**
+ * Keep an owned list's inert rows connected until the root accepts its render,
+ * then release their scopes and remove their host nodes in one DOM operation.
+ * Rows with lifecycle work stay on the ordinary parked-item path so their
+ * cleanup order and connected-DOM observations remain unchanged.
+ */
+function canDeferRootOwnedListClear(state: ForSlot): boolean {
+	const transaction = ROOT_RENDER_TRANSACTION;
+	const parent = state.start.parentNode;
+	if (
+		transaction === null ||
+		transaction.aborted ||
+		ROOT_RENDER_ROLLBACK ||
+		transaction.hydrating === true ||
+		state.adopt !== null ||
+		state.size < 16 ||
+		parent === null ||
+		(parent.nodeType !== 1 && parent.nodeType !== 11) ||
+		state.end.parentNode !== parent ||
+		state.start.previousSibling !== null ||
+		state.end.nextSibling !== null
+	)
+		return false;
+	const oldHead = state.head;
+	for (let block = oldHead; block !== null; block = block.nextSibling) {
+		if (
+			!block.mounted ||
+			block.idState.renderOwner !== transaction.owner ||
+			block.startMarker === null ||
+			block.startMarker !== block.endMarker ||
+			block.hooks !== null ||
+			block.effectSlots !== null ||
+			block.cleanups !== null ||
+			block.children !== null ||
+			block._slots !== null ||
+			block.refFields !== null ||
+			block.deoptNode !== null ||
+			block.vt !== null
+		)
+			return false;
+	}
+	return true;
+}
+
+function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): boolean {
+	if (!certified && !canDeferRootOwnedListClear(state)) return false;
+	const transaction = ROOT_RENDER_TRANSACTION!;
+	const parent = state.start.parentNode!;
+	const oldHead = state.head;
+	const retired = (transaction.retired ??= new Set<Block>());
+	const newlyRetired: Block[] = [];
+	for (let block = oldHead; block !== null; block = block.nextSibling) {
+		if (!retired.has(block)) {
+			retired.add(block);
+			newlyRetired.push(block);
+		}
+		if (block.pending) {
+			journalRootProperty(block, 'pending');
+			block.pending = false;
+		}
+	}
+	let cancelled = false;
+	journalUndo(() => {
+		cancelled = true;
+		for (let i = 0; i < newlyRetired.length; i++) retired.delete(newlyRetired[i]);
+	});
+	const start = state.start;
+	const end = state.end;
+	(transaction.commit ??= []).push(() => {
+		if (cancelled) return;
+		// A later render may have inserted new rows, or outside code may have
+		// changed this parent. Only clear wholesale while these exact old nodes
+		// still occupy its complete content between the original two markers.
+		let wholeParent =
+			state.size === 0 &&
+			start.parentNode === parent &&
+			end.parentNode === parent &&
+			start.previousSibling === null &&
+			end.nextSibling === null;
+		if (wholeParent) {
+			let node = start.nextSibling;
+			for (let block = oldHead; block !== null; block = block.nextSibling) {
+				if (node !== block.startMarker) {
+					wholeParent = false;
+					break;
+				}
+				node = node!.nextSibling;
+			}
+			if (node !== end) wholeParent = false;
+		}
+		for (let block = oldHead; block !== null; block = block.nextSibling) block.disposed = true;
+		if (wholeParent) {
+			parent.textContent = '';
+			parent.appendChild(start);
+			parent.appendChild(end);
+		} else {
+			for (let block = oldHead; block !== null; block = block.nextSibling) {
+				const node = block.startMarker!;
+				if (node.parentNode !== null) node.parentNode.removeChild(node);
+			}
+		}
+	});
+	return true;
+}
+
+/**
  * Bulk-clear a forBlock's items. When the forBlock owns its parent (markers
  * bracket the entire content), uses `textContent = ''` — the fastest DOM clear
  * on Chromium per Ripple's measured advantage on the `clear` op. A shared
@@ -33499,13 +33640,20 @@ const RANGE_CLEAR_MIN_ITEMS = 512;
  * skipped because the batch clear already removed the whole range. Plain
  * template rows (the common bulk-clear case) hit only the three-field guard.
  */
-function batchClearItems(state: ForSlot, oldItems: Map<any, Block>): void {
-	// The bulk paths below drop the nodes wholesale, which cannot be undone.
-	// While a hold is still possible AND this list's shape is journaled (see
-	// forSlotParkable — reconcileKeyed and the @empty flip journal before they
-	// clear; teardownChildForSlot never does), take each row individually so
-	// its nodes are kept and its teardown waits for the outcome.
+function batchClearItems(
+	state: ForSlot,
+	oldItems: Map<any, Block>,
+	ownedRootClear: boolean = false,
+): void {
+	// An immediate bulk DOM removal cannot be undone after a suspended render.
+	// A journaled clear remains undoable until the attempt commits. Root-owned
+	// inert rows can stay connected and clear together at commit; all other
+	// rows park individually so their cleanup and ref behavior stays intact.
 	if (forSlotParkable(state)) {
+		if (deferRootOwnedListClear(state, ownedRootClear)) {
+			oldItems.clear();
+			return;
+		}
 		let next: Block | null;
 		for (let b: Block | null = state.head; b !== null; b = next) {
 			next = b.nextSibling;

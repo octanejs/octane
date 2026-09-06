@@ -138,11 +138,9 @@ function summarize(samples) {
 	return summarizeSamples(samples);
 }
 
-// Reset to a fresh 1k table. Every target either commits synchronously on the
-// discrete click (octane flushes on the event; react/ripple wrap in flushSync;
-// solid calls flush()) or exposes `window.__benchFlush` (vue-vapor — microtask
-// scheduler, no public sync flush; see run.mjs's timeClick note), so the count
-// is checkable once the evaluate resolves.
+// Reset to a fresh 1k table. Octane flushes via its public flushSync, Vue
+// awaits nextTick, and the remaining targets commit on click. The count is
+// checkable once the evaluate resolves.
 async function resetRows(page) {
 	const cnt = await page.evaluate(async () => {
 		document.getElementById('run').click();
@@ -253,6 +251,11 @@ async function scratchStorageGate(page, targetName) {
 		const phases = [];
 		const readRows = () => Array.from(document.querySelectorAll('tbody tr'));
 		const rowId = (row) => row.firstElementChild.textContent;
+		const clickAndFlush = (button) => {
+			document.getElementById(button).click();
+			// This gate only runs against Octane; its fixture callback is synchronous.
+			window.__benchFlush?.();
+		};
 
 		function measure(button, repetitions) {
 			const before = readRows();
@@ -260,7 +263,7 @@ async function scratchStorageGate(page, targetName) {
 			const expected = before.map(rowId);
 			const firstAllocation = allocations.length;
 			for (let iteration = 0; iteration < repetitions; iteration++) {
-				document.getElementById(button).click();
+				clickAndFlush(button);
 				if (button === 'reverse') expected.reverse();
 				else if (button === 'rotateb') expected.push(expected.shift());
 				else if (button === 'rotatef') expected.unshift(expected.pop());
@@ -313,7 +316,7 @@ async function scratchStorageGate(page, targetName) {
 			});
 
 			// The first reverse is explicitly outside each steady-state budget.
-			document.getElementById('reverse').click();
+			clickAndFlush('reverse');
 			measure('reverse', 4);
 			measure('rotateb', 8);
 			measure('rotatef', 4);
@@ -322,7 +325,7 @@ async function scratchStorageGate(page, targetName) {
 
 			const beforeAppend = readRows();
 			const appendStart = allocations.length;
-			document.getElementById('append100').click();
+			clickAndFlush('append100');
 			const afterAppend = readRows();
 			if (
 				afterAppend.length !== beforeAppend.length + 100 ||
@@ -334,23 +337,23 @@ async function scratchStorageGate(page, targetName) {
 				throw new Error('append100 allocated typed reorder scratch');
 			}
 
-			document.getElementById('runlots').click();
+			clickAndFlush('runlots');
 			if (readRows().length !== 10000) throw new Error('runlots did not produce 10000 rows');
-			document.getElementById('reverse').click();
+			clickAndFlush('reverse');
 			measure('reverse', 2);
 			measure('rotateb', 4);
 			measure('shuffle', 2);
 			measure('swaprows', 2);
 
 			// An oversized one-shot must not evict the bounded reusable buffers.
-			for (let index = 0; index < 8; index++) document.getElementById('add').click();
+			for (let index = 0; index < 8; index++) clickAndFlush('add');
 			const oversizedBefore = readRows();
 			if (oversizedBefore.length !== 18000) {
 				throw new Error('oversized control expected 18000 rows');
 			}
 			const oversizedStart = allocations.length;
-			document.getElementById('rotateb').click();
-			document.getElementById('rotateb').click();
+			clickAndFlush('rotateb');
+			clickAndFlush('rotateb');
 			const oversizedAfter = readRows();
 			if (
 				oversizedAfter.length !== oversizedBefore.length ||
@@ -361,7 +364,7 @@ async function scratchStorageGate(page, targetName) {
 			if (allocations.length - oversizedStart !== 4) {
 				throw new Error('oversized rotations unexpectedly retained reusable scratch');
 			}
-			document.getElementById('run').click();
+			clickAndFlush('run');
 			if (readRows().length !== 1000) throw new Error('shrink control expected 1000 rows');
 			measure('rotateb', 4);
 		} finally {
