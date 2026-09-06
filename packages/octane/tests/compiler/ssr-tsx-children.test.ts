@@ -248,6 +248,25 @@ describe('descriptorChildren component marker', () => {
 		}
 	});
 
+	it('keeps a local shadow of an imported marked binding on the ordinary template path', () => {
+		const source = `
+			import { Slottable as Alias } from './slot.tsrx';
+			export function App(Alias) @{ <Alias><button>ordinary</button></Alias> }`;
+		for (const mode of [undefined, 'server'] as const) {
+			const code = compile(source, 'consumer.tsrx', {
+				...(mode ? { mode } : null),
+				isDescriptorChildrenImport: (request: string, imported: string) =>
+					request === './slot.tsrx' && imported === 'Slottable',
+			} as any).code;
+			const blocks = runtimeImports(code, ['markChildrenBlock']);
+			expect(
+				childrenValues(code).some(
+					(value) => value.type === 'CallExpression' && blocks.has(value.callee?.name),
+				),
+			).toBe(true);
+		}
+	});
+
 	it('tags marked static sibling children as positional in client and server output', () => {
 		const source = `
 			import { descriptorChildren } from 'octane';

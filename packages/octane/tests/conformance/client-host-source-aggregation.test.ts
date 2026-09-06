@@ -175,8 +175,9 @@ describe('conformance: final host props across JSX sources', () => {
 	});
 
 	// Per ReactDOMInput-test.js:1035 and ReactDOMTextarea-test.js:186. Removing
-	// defaults clears the reset baseline without overwriting a dirty live value.
-	it('removes spread defaults without clobbering user edits', () => {
+	// text defaults clears their reset baselines without overwriting dirty live
+	// values; React retains the last defaultChecked baseline when it disappears.
+	it('removes spread text defaults while retaining the last checkbox baseline', () => {
 		const result = mount(MutableFormSpreads, {
 			input: { defaultValue: 'seed' },
 			textarea: { defaultValue: 'seed' },
@@ -203,8 +204,8 @@ describe('conformance: final host props across JSX sources', () => {
 			expect(textarea.defaultValue).toBe('');
 			expect(textarea.textContent).toBe('');
 			expect(checkbox.checked).toBe(false);
-			expect(checkbox.defaultChecked).toBe(false);
-			expect(checkbox.hasAttribute('checked')).toBe(false);
+			expect(checkbox.defaultChecked).toBe(true);
+			expect(checkbox.hasAttribute('checked')).toBe(true);
 		} finally {
 			result.unmount();
 		}

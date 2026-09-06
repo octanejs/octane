@@ -2,10 +2,11 @@ import type {
 	ComponentProps,
 	CSSProperties,
 	HTMLAttributes,
-	ReactElement,
-	ReactNode,
+	Key,
+	OctaneElement,
+	OctaneNode,
 	Ref,
-} from 'react';
+} from 'octane';
 import type { TagNames } from '../../types.js';
 
 export type DynamicRowHeight = {
@@ -22,13 +23,13 @@ type ExcludeForbiddenKeys<Type> = {
 
 export type ListProps<RowProps extends object, TagName extends TagNames = 'div'> = Omit<
 	HTMLAttributes<HTMLDivElement>,
-	'onResize'
+	'onResize' | 'style'
 > & {
 	/**
 	 * Additional content to be rendered within the list (above cells).
 	 * This property can be used to render things like overlays or tooltips.
 	 */
-	children?: ReactNode;
+	children?: OctaneNode;
 
 	/**
 	 * CSS class name.
@@ -111,7 +112,7 @@ export type ListProps<RowProps extends object, TagName extends TagNames = 'div'>
 			index: number;
 			style: CSSProperties;
 		} & RowProps,
-	) => ReactElement | null;
+	) => OctaneElement | null;
 
 	/**
 	 * Number of items to be rendered in the list.
@@ -141,7 +142,7 @@ export type ListProps<RowProps extends object, TagName extends TagNames = 'div'>
 	 * ⚠️ This prop cannot be auto-memoized because it is called during render.
 	 * It is important to always `useCallback` for this prop; do not use an inline function.
 	 */
-	rowKey?: (index: number, data: RowProps) => React.Key;
+	rowKey?: (index: number, data: RowProps) => Key;
 
 	/**
 	 * Additional props to be passed to the row-rendering component.

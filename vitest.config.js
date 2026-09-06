@@ -2777,7 +2777,10 @@ export default defineConfig({
 					name: 'redux',
 					include: ['packages/redux/tests/**/*.test.ts'],
 					environment: 'jsdom',
-					exclude: ['packages/redux/tests/differential/**/*.test.ts'],
+					exclude: [
+						'packages/redux/tests/differential/**/*.test.ts',
+						'packages/redux/tests/ssr/**/*.test.ts',
+					],
 					// Differential precompile: rewrites `@octanejs/redux` →
 					// `react-redux` so the React side runs the real binding.
 					globals: false,
@@ -2792,6 +2795,27 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/redux\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/redux/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'redux-ssr',
+					include: ['packages/redux/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/redux$/,
+							replacement: resolve(import.meta.dirname, 'packages/redux/src/index.ts'),
 						},
 					],
 				},

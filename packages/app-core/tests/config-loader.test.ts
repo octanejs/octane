@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { build } from 'esbuild';
@@ -41,6 +41,71 @@ describe('loadOctaneConfig', () => {
 		expect(loaded.dependencies).toContain(path.join(fixtureRoot, 'octane.config.ts'));
 		expect(loaded.dependencies).toContain(path.join(fixtureRoot, 'settings.ts'));
 		expect(loaded.missingDependencies).toEqual([]);
+	});
+
+	it('reevaluates unchanged config source when its environment changes', async () => {
+		write(
+			'octane.config.ts',
+			`export default { build: { outDir: process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR } };\n`,
+		);
+		const previous = process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR;
+		try {
+			process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR = 'first-build';
+			const first = await loadOctaneConfig(fixtureRoot);
+			process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR = 'second-build';
+			const second = await loadOctaneConfig(fixtureRoot);
+			expect(first.build.outDir).toBe('first-build');
+			expect(second.build.outDir).toBe('second-build');
+		} finally {
+			if (previous === undefined) delete process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR;
+			else process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR = previous;
+		}
+	});
+
+	it('keeps concurrent config evaluations isolated when they share a cache directory', async () => {
+		const other = createTempProject('octane-app-config-concurrent');
+		try {
+			write('octane.config.ts', `export default { build: { outDir: 'first-build' } };\n`);
+			fs.writeFileSync(
+				path.join(other.root, 'octane.config.ts'),
+				`export default { build: { outDir: 'second-build' } };\n`,
+			);
+			const cacheDir = path.join(fixtureRoot, '.cache', 'shared');
+			const [first, second] = await Promise.all([
+				loadOctaneConfig(fixtureRoot, { cacheDir }),
+				loadOctaneConfig(other.root, { cacheDir }),
+			]);
+			expect(first.build.outDir).toBe('first-build');
+			expect(second.build.outDir).toBe('second-build');
+		} finally {
+			other.dispose();
+		}
+	});
+
+	it('accepts an identical config already published when rename cannot replace it', async () => {
+		write('octane.config.ts', `export default { build: { outDir: 'shared-build' } };\n`);
+		const cacheDir = path.join(fixtureRoot, '.cache', 'shared');
+		expect((await loadOctaneConfig(fixtureRoot, { cacheDir })).build.outDir).toBe('shared-build');
+		const [filename] = fs.readdirSync(cacheDir).filter((name) => name.endsWith('.mjs'));
+		const outputPath = path.join(cacheDir, filename);
+		fs.rmSync(outputPath);
+
+		// Emulate a second process completing the same-hash publish just before
+		// Windows rejects rename onto its newly-created destination.
+		const originalRenameSync = fs.renameSync.bind(fs);
+		const rename = vi.spyOn(fs, 'renameSync').mockImplementation((source, destination) => {
+			if (destination === outputPath) {
+				fs.copyFileSync(source, destination);
+				throw Object.assign(new Error('Destination exists'), { code: 'EEXIST' });
+			}
+			return originalRenameSync(source, destination);
+		});
+		try {
+			expect((await loadOctaneConfig(fixtureRoot, { cacheDir })).build.outDir).toBe('shared-build');
+			expect(fs.readFileSync(outputPath, 'utf8')).toContain('shared-build');
+		} finally {
+			rename.mockRestore();
+		}
 	});
 
 	it('uses an injected integration module runner without esbuild', async () => {
