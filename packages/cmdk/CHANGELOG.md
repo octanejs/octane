@@ -1,5 +1,11 @@
 # @octanejs/cmdk
 
+## 0.1.36
+
+### Patch Changes
+
+- @octanejs/radix@0.1.52
+
 ## 0.1.35
 
 ### Patch Changes
