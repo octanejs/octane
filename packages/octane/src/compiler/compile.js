@@ -18326,6 +18326,15 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			// `{/* … */}` is a `JSXEmptyExpression` container — a JSX comment, which
 			// renders to nothing (React drops it). Skip it so it never becomes a hole.
 			if (!expr || expr.type === 'JSXEmptyExpression') continue;
+			// String literals (`{" "}`, `{"hello"}`) are static text, same as JSXText.
+			// The .tsrx and server paths fold them via staticTextLiteral; hoisting one
+			// as hN here made .tsx client templates grow an extra text hole while the
+			// server baked the string, so hydration consumed the next sibling (duplicate
+			// elements). Leave the container in place so emitElementHtml bakes it.
+			if (staticTextLiteral(expr) !== null) {
+				newChildren.push(child);
+				continue;
+			}
 			const hn = `h${holeProps.length}`;
 			if (expr && expr.type === 'TSAsExpression') {
 				// Preserve the `as T` cast in the renderer (it marks a dynamic TEXT hole).
