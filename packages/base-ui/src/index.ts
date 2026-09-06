@@ -40,5 +40,8 @@ export * from './toggle-group';
 export * from './toolbar';
 export * from './tooltip';
 export * from './use-render';
+// Compatibility with the previous Octane barrel. Upstream 1.8 keeps this hook
+// on the unstable-use-media-query subpath only.
+export { useMediaQuery } from './unstable-use-media-query';
 
 export type * from './types';

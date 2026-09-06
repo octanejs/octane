@@ -9,6 +9,7 @@ import {
 	ScrollArea,
 	Select,
 	Toolbar,
+	useMediaQuery,
 } from '@octanejs/base-ui';
 import { type Assert, type Equal } from '../../../../scripts/react-port/type-assertions';
 
@@ -129,3 +130,15 @@ const buttonRef: { current: HTMLButtonElement | null } = { current: null };
 </Combobox.List>;
 <Select.Value>{(value) => String(value)}</Select.Value>;
 <Combobox.Value>{(value) => String(value)}</Combobox.Value>;
+
+// Previous barrel surface: root import and a single-argument call.
+function previousBarrelMediaQuery(): boolean {
+	return useMediaQuery('(min-width: 600px)');
+}
+type OptionalMediaQueryOptions = undefined extends Parameters<typeof useMediaQuery>[1]
+	? true
+	: false;
+type OptionalMediaQueryOptionsContract = Assert<Equal<OptionalMediaQueryOptions, true>>;
+type PreviousBarrelMediaQueryReturn = Assert<
+	Equal<ReturnType<typeof previousBarrelMediaQuery>, boolean>
+>;

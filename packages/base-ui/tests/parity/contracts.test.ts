@@ -10,7 +10,13 @@ describe('@octanejs/base-ui parity audit contracts', () => {
 	});
 
 	it('preserves the upstream runtime export names and component parts', () => {
-		expect(Object.keys(BaseUI).sort()).toEqual(Object.keys(ReactBaseUI).sort());
+		expect(typeof BaseUI.useMediaQuery).toBe('function');
+		const nativeKeys = Object.keys(BaseUI)
+			.filter(function (name) {
+				return name !== 'useMediaQuery';
+			})
+			.sort();
+		expect(nativeKeys).toEqual(Object.keys(ReactBaseUI).sort());
 		const source = readFileSync(
 			resolve(import.meta.dirname, '../../upstream/src/index.ts'),
 			'utf8',

@@ -53,6 +53,28 @@ const OCTANE_SINGLETON_CONSUMERS = new Set([
 ]);
 
 export const OCTANE_BETA_PEER_RANGE = 'workspace:^0.1.51 || ^0.2.0';
+// Packages that statically import APIs added after published 0.2.3, or that
+// compile Base UI 1.8 method/transitive hooks, must require that release.
+export const OCTANE_CURRENT_PEER_RANGE = 'workspace:^0.2.4';
+export const OCTANE_CURRENT_PEER_PACKAGES = new Set([
+	'@octanejs/testing-library',
+	'@octanejs/base-ui',
+	'@octanejs/base-ui-utils',
+]);
+
+export function expectedOctanePeerRange(packageName) {
+	return OCTANE_CURRENT_PEER_PACKAGES.has(packageName)
+		? OCTANE_CURRENT_PEER_RANGE
+		: OCTANE_BETA_PEER_RANGE;
+}
+
+export function isAllowedWorkspaceOctanePeerRange(range) {
+	return range === OCTANE_BETA_PEER_RANGE || range === OCTANE_CURRENT_PEER_RANGE;
+}
+
+export function publishedOctanePeerRange(workspaceRange) {
+	return workspaceRange.replace(/^workspace:/, '');
+}
 
 function readJson(file) {
 	return JSON.parse(readFileSync(file, 'utf8'));
@@ -443,16 +465,17 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 		}
 
 		const octanePeerRange = pkg.manifest.peerDependencies?.octane;
-		if (octanePeerRange !== undefined && octanePeerRange !== OCTANE_BETA_PEER_RANGE) {
+		const expectedOctanePeer = expectedOctanePeerRange(pkg.name);
+		if (octanePeerRange !== undefined && octanePeerRange !== expectedOctanePeer) {
 			errors.push(
-				`${label} peerDependencies.octane must be ${JSON.stringify(OCTANE_BETA_PEER_RANGE)} (received ${JSON.stringify(octanePeerRange)})`,
+				`${label} peerDependencies.octane must be ${JSON.stringify(expectedOctanePeer)} (received ${JSON.stringify(octanePeerRange)})`,
 			);
 		}
 
 		// Hook state is module-global within one Octane runtime instance. Bindings
 		// and the metaframework must therefore consume the application's singleton
-		// runtime as a peer compatible with the final 0.1 and beta 0.2 lines, while
-		// retaining an exact workspace dev dependency for source tests.
+		// runtime as a peer. Most packages stay compatible with the final 0.1 and
+		// earlier 0.2 lines; packages that import newer APIs raise the floor.
 		if (pkg.role === 'framework binding' || OCTANE_SINGLETON_CONSUMERS.has(pkg.name)) {
 			if (pkg.manifest.dependencies?.octane !== undefined) {
 				errors.push(`${label} must not install octane as a regular dependency`);
@@ -499,11 +522,11 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 		// release job's frozen install.
 		for (const section of ['dependencies', 'devDependencies', 'peerDependencies']) {
 			for (const [dependency, range] of Object.entries(pkg.manifest[section] ?? {})) {
-				const isOctaneBetaPeer =
+				const isOctaneWorkspacePeer =
 					section === 'peerDependencies' &&
 					dependency === 'octane' &&
-					range === OCTANE_BETA_PEER_RANGE;
-				if (!workspaceNames.has(dependency) || range === 'workspace:*' || isOctaneBetaPeer) {
+					isAllowedWorkspaceOctanePeerRange(range);
+				if (!workspaceNames.has(dependency) || range === 'workspace:*' || isOctaneWorkspacePeer) {
 					continue;
 				}
 				errors.push(

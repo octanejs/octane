@@ -10,6 +10,9 @@ npm install @octanejs/testing-library
 pnpm add @octanejs/testing-library
 ```
 
+This package peers on **Octane `^0.2.4`**. Published 0.2.3 does not export
+`isInActScope`, which both public entries import.
+
 The split mirrors RTL's own architecture (and
 `docs/react-library-compat-plan.md` §2): **`@testing-library/dom` is
 framework-agnostic and reused verbatim** — every query, `screen`, `within`,

@@ -3,7 +3,7 @@ import * as React from 'octane';
 import { addEventListener } from '@octanejs/base-ui-utils/addEventListener';
 import { useSyncExternalStore } from 'octane';
 
-export function useMediaQuery(query: string, options: useMediaQuery.Options): boolean {
+export function useMediaQuery(query: string, options: useMediaQuery.Options = {}): boolean {
 	// Wait for jsdom to support the match media feature.
 	// All the browsers Base UI support have this built-in.
 	// This defensive check is here for simplicity.

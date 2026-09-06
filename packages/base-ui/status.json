@@ -12,7 +12,7 @@
     "Base UI style composition accepts object styles, including functions returning objects."
   ],
   "ssr": "Native SSR/hydration, initial suspended hydration, focus and portal regressions pass, including installed Select/Combobox server form rendering.",
-  "docs": ["docs/base-ui-migration-plan.md"],
+  "docs": ["docs/base-ui-migration-plan.md", "packages/base-ui/MIGRATION.md"],
   "provenance": {
     "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
     "license": "MIT",
