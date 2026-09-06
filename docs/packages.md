@@ -12,12 +12,12 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
 | Package | Directory | Role | Version | Exported entry points |
 | --- | --- | --- | --- | --- |
-| `@octanejs/adapter-cloudflare` | [`packages/adapter-cloudflare`](../packages/adapter-cloudflare) | deployment adapter | `0.0.42` | 1 |
-| `@octanejs/adapter-vercel` | [`packages/adapter-vercel`](../packages/adapter-vercel) | deployment adapter | `0.0.49` | 1 |
+| `@octanejs/adapter-cloudflare` | [`packages/adapter-cloudflare`](../packages/adapter-cloudflare) | deployment adapter | `0.0.43` | 1 |
+| `@octanejs/adapter-vercel` | [`packages/adapter-vercel`](../packages/adapter-vercel) | deployment adapter | `0.0.50` | 1 |
 | `@octanejs/alien-signals` | [`packages/alien-signals`](../packages/alien-signals) | framework binding | `0.0.18` | 1 |
 | `@octanejs/animejs` | [`packages/animejs`](../packages/animejs) | framework binding | `0.0.22` | 2 |
 | `@octanejs/apollo-client` | [`packages/apollo-client`](../packages/apollo-client) | framework binding | `0.1.47` | 6 |
-| `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.48` | 9 |
+| `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.49` | 9 |
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.46` | 3 |
 | `@octanejs/astro` | [`packages/astro`](../packages/astro) | framework integration | `0.0.31` | 5 |
 | `@octanejs/auto-animate` | [`packages/auto-animate`](../packages/auto-animate) | framework binding | `0.0.8` | 3 |
@@ -28,11 +28,11 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.35` | 1 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.18` | 1 |
 | `@octanejs/content-loader` | [`packages/content-loader`](../packages/content-loader) | framework binding | `0.0.8` | 2 |
-| `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.18` | 12 |
+| `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.19` | 12 |
 | `@octanejs/devtools` | [`packages/devtools`](../packages/devtools) | framework binding | `0.0.40` | 1 |
 | `@octanejs/dexie` | [`packages/dexie`](../packages/dexie) | framework binding | `0.1.46` | 1 |
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.47` | 4 |
-| `@octanejs/docusaurus` | [`packages/docusaurus`](../packages/docusaurus) | framework integration | `0.0.36` | 8 |
+| `@octanejs/docusaurus` | [`packages/docusaurus`](../packages/docusaurus) | framework integration | `0.0.37` | 8 |
 | `@octanejs/draggable` | [`packages/draggable`](../packages/draggable) | framework binding | `0.0.18` | 2 |
 | `@octanejs/drei` | [`packages/drei`](../packages/drei) | framework binding | `0.0.18` | 5 |
 | `@octanejs/dropzone` | [`packages/dropzone`](../packages/dropzone) | framework binding | `0.0.18` | 2 |
@@ -73,19 +73,19 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/rainbowkit` | [`packages/rainbowkit`](../packages/rainbowkit) | framework binding | `0.0.33` | 2 |
 | `@octanejs/react-error-boundary` | [`packages/react-error-boundary`](../packages/react-error-boundary) | framework binding | `0.1.33` | 2 |
 | `@octanejs/react-map-gl` | [`packages/react-map-gl`](../packages/react-map-gl) | framework binding | `0.0.24` | 2 |
-| `@octanejs/recharts` | [`packages/recharts`](../packages/recharts) | framework binding | `0.1.49` | 1 |
-| `@octanejs/redux` | [`packages/redux`](../packages/redux) | framework binding | `0.1.49` | 1 |
-| `@octanejs/redux-toolkit` | [`packages/redux-toolkit`](../packages/redux-toolkit) | framework binding | `0.1.47` | 4 |
+| `@octanejs/recharts` | [`packages/recharts`](../packages/recharts) | framework binding | `0.1.50` | 1 |
+| `@octanejs/redux` | [`packages/redux`](../packages/redux) | framework binding | `0.1.50` | 1 |
+| `@octanejs/redux-toolkit` | [`packages/redux-toolkit`](../packages/redux-toolkit) | framework binding | `0.1.48` | 4 |
 | `@octanejs/remix-router` | [`packages/remix-router`](../packages/remix-router) | framework binding | `0.1.48` | 2 |
 | `@octanejs/resizable-panels` | [`packages/resizable-panels`](../packages/resizable-panels) | framework binding | `0.0.10` | 1 |
-| `@octanejs/rsbuild-plugin` | [`packages/rsbuild-plugin-octane`](../packages/rsbuild-plugin-octane) | metaframework | `0.1.47` | 3 |
-| `@octanejs/rspack-plugin` | [`packages/rspack-plugin-octane`](../packages/rspack-plugin-octane) | compiler integration | `0.1.47` | 2 |
+| `@octanejs/rsbuild-plugin` | [`packages/rsbuild-plugin-octane`](../packages/rsbuild-plugin-octane) | metaframework | `0.1.48` | 3 |
+| `@octanejs/rspack-plugin` | [`packages/rspack-plugin-octane`](../packages/rspack-plugin-octane) | compiler integration | `0.1.48` | 2 |
 | `@octanejs/rxjs` | [`packages/rxjs`](../packages/rxjs) | framework binding | `0.1.32` | 2 |
 | `@octanejs/sanity-icons` | [`packages/sanity-icons`](../packages/sanity-icons) | framework binding | `0.1.2` | 238 |
 | `@octanejs/sanity-loader` | [`packages/sanity-loader`](../packages/sanity-loader) | framework binding | `0.1.2` | 3 |
 | `@octanejs/sanity-logos` | [`packages/sanity-logos`](../packages/sanity-logos) | framework binding | `0.1.2` | 2 |
 | `@octanejs/select` | [`packages/select`](../packages/select) | framework binding | `0.1.3` | 6 |
-| `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.37` | 1 |
+| `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.38` | 1 |
 | `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.37` | 121 |
 | `@octanejs/solana-kit` | [`packages/solana-kit`](../packages/solana-kit) | framework binding | `0.0.22` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.47` | 2 |
@@ -99,15 +99,15 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.46` | 1 |
 | `@octanejs/tanstack-db` | [`packages/tanstack-db`](../packages/tanstack-db) | framework binding | `0.0.15` | 1 |
 | `@octanejs/tanstack-devtools` | [`packages/tanstack-devtools`](../packages/tanstack-devtools) | framework binding | `0.0.46` | 1 |
-| `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.47` | 1 |
-| `@octanejs/tanstack-hotkeys` | [`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) | framework binding | `0.0.42` | 1 |
-| `@octanejs/tanstack-pacer` | [`packages/tanstack-pacer`](../packages/tanstack-pacer) | framework binding | `0.0.42` | 15 |
+| `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.48` | 1 |
+| `@octanejs/tanstack-hotkeys` | [`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) | framework binding | `0.0.43` | 1 |
+| `@octanejs/tanstack-pacer` | [`packages/tanstack-pacer`](../packages/tanstack-pacer) | framework binding | `0.0.43` | 15 |
 | `@octanejs/tanstack-query` | [`packages/tanstack-query`](../packages/tanstack-query) | framework binding | `0.1.52` | 1 |
-| `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.52` | 6 |
-| `@octanejs/tanstack-router-ssr-query` | [`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) | framework binding | `0.0.42` | 1 |
-| `@octanejs/tanstack-start` | [`packages/tanstack-start`](../packages/tanstack-start) | framework integration | `0.1.42` | 13 |
-| `@octanejs/tanstack-store` | [`packages/tanstack-store`](../packages/tanstack-store) | framework binding | `0.0.47` | 1 |
-| `@octanejs/tanstack-table` | [`packages/tanstack-table`](../packages/tanstack-table) | framework binding | `0.1.50` | 5 |
+| `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.53` | 6 |
+| `@octanejs/tanstack-router-ssr-query` | [`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) | framework binding | `0.0.43` | 1 |
+| `@octanejs/tanstack-start` | [`packages/tanstack-start`](../packages/tanstack-start) | framework integration | `0.1.43` | 13 |
+| `@octanejs/tanstack-store` | [`packages/tanstack-store`](../packages/tanstack-store) | framework binding | `0.0.48` | 1 |
+| `@octanejs/tanstack-table` | [`packages/tanstack-table`](../packages/tanstack-table) | framework binding | `0.1.51` | 5 |
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.49` | 1 |
 | `@octanejs/tauri` | [`packages/tauri`](../packages/tauri) | framework binding | `0.0.35` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.50` | 2 |
@@ -121,10 +121,10 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.35` | 5 |
 | `@octanejs/vaul` | [`packages/vaul`](../packages/vaul) | framework binding | `0.0.18` | 3 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.47` | 49 |
-| `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.52` | 3 |
+| `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.53` | 3 |
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.33` | 3 |
 | `@octanejs/waypoint` | [`packages/waypoint`](../packages/waypoint) | framework binding | `0.0.7` | 1 |
-| `@octanejs/window` | [`packages/window`](../packages/window) | framework binding | `0.0.18` | 1 |
+| `@octanejs/window` | [`packages/window`](../packages/window) | framework binding | `0.0.19` | 1 |
 | `@octanejs/wouter` | [`packages/wouter`](../packages/wouter) | framework binding | `0.0.8` | 5 |
 | `@octanejs/xstate` | [`packages/xstate`](../packages/xstate) | framework binding | `0.0.10` | 2 |
 | `@octanejs/xstate-store` | [`packages/xstate-store`](../packages/xstate-store) | framework binding | `0.0.10` | 2 |
@@ -132,7 +132,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.18` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.51` | 6 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.9` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.2.3` | 28 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.2.4` | 28 |
 
 ## Private packages
 

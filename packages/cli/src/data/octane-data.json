@@ -202,7 +202,7 @@
     },
     {
       "name": "@octanejs/day-picker",
-      "version": "0.0.18",
+      "version": "0.0.19",
       "category": "UI Libraries",
       "upstream": {
         "package": "react-day-picker",
@@ -834,7 +834,7 @@
     },
     {
       "name": "@octanejs/recharts",
-      "version": "0.1.49",
+      "version": "0.1.50",
       "category": "Visualization",
       "upstream": { "package": "recharts", "version": "3.9.2" },
       "surface": "Broad runtime support across cartesian, polar, hierarchical, tooltip, legend, responsive-container, shape, and chart-state surfaces. `Brush` and `Treemap` remain intentionally unsupported.",
@@ -846,7 +846,7 @@
     },
     {
       "name": "@octanejs/redux",
-      "version": "0.1.49",
+      "version": "0.1.50",
       "category": "State Management",
       "upstream": { "package": "react-redux", "version": "9.3.0" },
       "surface": "The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Upstream runtime-export completeness is pinned by test.",
@@ -860,7 +860,7 @@
     },
     {
       "name": "@octanejs/redux-toolkit",
-      "version": "0.1.47",
+      "version": "0.1.48",
       "category": "State Management",
       "upstream": { "package": "@reduxjs/toolkit", "version": "2.12.0" },
       "surface": "Complete four-entry-point port: the framework-agnostic Toolkit and RTK Query core are re-exported verbatim; `/query/react` provides generated query, lazy-query, mutation, infinite-query, prefetch hooks and `ApiProvider`; `/react` provides the dynamic-middleware dispatch-hook integration.",
@@ -1204,7 +1204,7 @@
     },
     {
       "name": "@octanejs/tanstack-form",
-      "version": "0.0.47",
+      "version": "0.0.48",
       "category": "Forms",
       "upstream": { "package": "@tanstack/react-form", "version": "1.33.2" },
       "surface": "Ports the complete @tanstack/react-form 1.33.2 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.2 unchanged and using @octanejs/tanstack-store for subscriptions.",
@@ -1218,7 +1218,7 @@
     },
     {
       "name": "@octanejs/tanstack-hotkeys",
-      "version": "0.0.42",
+      "version": "0.0.43",
       "category": "UI Utilities",
       "upstream": { "package": "@tanstack/react-hotkeys", "version": "0.10.0" },
       "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.",
@@ -1230,7 +1230,7 @@
     },
     {
       "name": "@octanejs/tanstack-pacer",
-      "version": "0.0.42",
+      "version": "0.0.43",
       "category": "UI Utilities",
       "upstream": { "package": "@tanstack/react-pacer", "version": "0.22.1" },
       "surface": "Surface-present for all 15 runtime/type entrypoints from `@tanstack/react-pacer@0.22.1`, plus the byte-identical `@tanstack/pacer@0.21.1` core re-export. Repo-authored adapted-octane and differential lanes cover a representative debounce/throttle/batching/teardown lifecycle; upstream has no runtime suite and insufficient type evidence, so provenance remains `recorded-unverified` with nearly every export still `surface-present-unverified`.",
@@ -1254,7 +1254,7 @@
     },
     {
       "name": "@octanejs/tanstack-router",
-      "version": "0.1.52",
+      "version": "0.1.53",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
       "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
@@ -1268,7 +1268,7 @@
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",
-      "version": "0.0.42",
+      "version": "0.0.43",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
       "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
@@ -1278,7 +1278,7 @@
     },
     {
       "name": "@octanejs/tanstack-store",
-      "version": "0.0.47",
+      "version": "0.0.48",
       "category": "State Management",
       "upstream": { "package": "@tanstack/react-store", "version": "0.11.0" },
       "surface": "Re-exports `@tanstack/store@0.11.0` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.",
@@ -1290,7 +1290,7 @@
     },
     {
       "name": "@octanejs/tanstack-table",
-      "version": "0.1.50",
+      "version": "0.1.51",
       "category": "Tables",
       "upstream": { "package": "@tanstack/react-table", "version": "9.0.0-beta.58" },
       "surface": "Complete port of the v9 adapter: the framework-agnostic `@tanstack/table-core` (constructTable + every tree-shakeable feature and row model) is reused verbatim, and the adapter — `useTable`, `Subscribe`, `flexRender`/`FlexRender`, `createTableHook`, `createTableHookContexts` — is transcribed onto octane hooks. Table state lives in TanStack Store atoms via the `coreReactivityFeature` bindings, and `useSelector` drives re-renders from the selected slice. Every store primitive (hooks, `createAtom`, `batch`, `shallow`, and the atom/store types) is imported from @octanejs/tanstack-store, which re-exports all of @tanstack/store — the binding takes no direct dependency on the store core, so there is only one path to it and atom identity cannot be split across duplicate copies.",
@@ -1542,7 +1542,7 @@
     },
     {
       "name": "@octanejs/window",
-      "version": "0.0.18",
+      "version": "0.0.19",
       "category": "Tables",
       "upstream": { "package": "react-window", "version": "2.3.0" },
       "surface": "Provisional complete exact port of the react-window 2.3.0 root surface: List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types. The byte-locked pristine React suite and generated Octane adaptation each execute all 14 upstream files and all 117 cases; shared differential, SSR, hydration, and assertion-level public type lanes are required by the React parity manifest. Final Chromium/Firefox browser and executable CommonJS package-condition evidence remain pending shared infrastructure PRs #548 and #550.",

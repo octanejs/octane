@@ -344,7 +344,7 @@ Scope/evidence last checked: 2026-08-20.
 
 ## @octanejs/day-picker
 
-[`packages/day-picker`](../packages/day-picker) `0.0.18` — ports `react-day-picker@10.0.1`. Status data: [`packages/day-picker/status.json`](../packages/day-picker/status.json).
+[`packages/day-picker`](../packages/day-picker) `0.0.19` — ports `react-day-picker@10.0.1`. Status data: [`packages/day-picker/status.json`](../packages/day-picker/status.json).
 
 DayPicker, public components, hooks, date classes, helpers, labels, formatters, locales, styles, and public types.
 
@@ -1087,7 +1087,7 @@ See also: [`docs/react-map-gl-port-plan.md`](react-map-gl-port-plan.md), [`packa
 
 ## @octanejs/recharts
 
-[`packages/recharts`](../packages/recharts) `0.1.49` — ports `recharts@3.9.2`. Status data: [`packages/recharts/status.json`](../packages/recharts/status.json).
+[`packages/recharts`](../packages/recharts) `0.1.50` — ports `recharts@3.9.2`. Status data: [`packages/recharts/status.json`](../packages/recharts/status.json).
 
 Broad runtime support across cartesian, polar, hierarchical, tooltip, legend, responsive-container, shape, and chart-state surfaces. `Brush` and `Treemap` remain intentionally unsupported.
 
@@ -1105,7 +1105,7 @@ See also: [`docs/recharts-port-plan.md`](recharts-port-plan.md)
 
 ## @octanejs/redux
 
-[`packages/redux`](../packages/redux) `0.1.49` — ports `react-redux@9.3.0`. Status data: [`packages/redux/status.json`](../packages/redux/status.json).
+[`packages/redux`](../packages/redux) `0.1.50` — ports `react-redux@9.3.0`. Status data: [`packages/redux/status.json`](../packages/redux/status.json).
 
 The hooks + `Provider` surface of react-redux 9.3.0 (`useSelector`, `useDispatch`, `useStore`, and the custom-context factory variants) on octane's `useSyncExternalStore`; works with any Redux 5 / Redux Toolkit store. Upstream runtime-export completeness is pinned by test.
 
@@ -1123,7 +1123,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/redux-toolkit
 
-[`packages/redux-toolkit`](../packages/redux-toolkit) `0.1.47` — ports `@reduxjs/toolkit@2.12.0`. Status data: [`packages/redux-toolkit/status.json`](../packages/redux-toolkit/status.json).
+[`packages/redux-toolkit`](../packages/redux-toolkit) `0.1.48` — ports `@reduxjs/toolkit@2.12.0`. Status data: [`packages/redux-toolkit/status.json`](../packages/redux-toolkit/status.json).
 
 Complete four-entry-point port: the framework-agnostic Toolkit and RTK Query core are re-exported verbatim; `/query/react` provides generated query, lazy-query, mutation, infinite-query, prefetch hooks and `ApiProvider`; `/react` provides the dynamic-middleware dispatch-hook integration.
 
@@ -1547,7 +1547,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-form
 
-[`packages/tanstack-form`](../packages/tanstack-form) `0.0.47` — ports `@tanstack/react-form@1.33.2`. Status data: [`packages/tanstack-form/status.json`](../packages/tanstack-form/status.json).
+[`packages/tanstack-form`](../packages/tanstack-form) `0.0.48` — ports `@tanstack/react-form@1.33.2`. Status data: [`packages/tanstack-form/status.json`](../packages/tanstack-form/status.json).
 
 Ports the complete @tanstack/react-form 1.33.2 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.2 unchanged and using @octanejs/tanstack-store for subscriptions.
 
@@ -1568,7 +1568,7 @@ Scope/evidence last checked: 2026-08-09.
 
 ## @octanejs/tanstack-hotkeys
 
-[`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) `0.0.42` — ports `@tanstack/react-hotkeys@0.10.0`. Status data: [`packages/tanstack-hotkeys/status.json`](../packages/tanstack-hotkeys/status.json).
+[`packages/tanstack-hotkeys`](../packages/tanstack-hotkeys) `0.0.43` — ports `@tanstack/react-hotkeys@0.10.0`. Status data: [`packages/tanstack-hotkeys/status.json`](../packages/tanstack-hotkeys/status.json).
 
 Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.
 
@@ -1585,7 +1585,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-pacer
 
-[`packages/tanstack-pacer`](../packages/tanstack-pacer) `0.0.42` — ports `@tanstack/react-pacer@0.22.1`. Status data: [`packages/tanstack-pacer/status.json`](../packages/tanstack-pacer/status.json).
+[`packages/tanstack-pacer`](../packages/tanstack-pacer) `0.0.43` — ports `@tanstack/react-pacer@0.22.1`. Status data: [`packages/tanstack-pacer/status.json`](../packages/tanstack-pacer/status.json).
 
 Surface-present for all 15 runtime/type entrypoints from `@tanstack/react-pacer@0.22.1`, plus the byte-identical `@tanstack/pacer@0.21.1` core re-export. Repo-authored adapted-octane and differential lanes cover a representative debounce/throttle/batching/teardown lifecycle; upstream has no runtime suite and insufficient type evidence, so provenance remains `recorded-unverified` with nearly every export still `surface-present-unverified`.
 
@@ -1618,7 +1618,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router
 
-[`packages/tanstack-router`](../packages/tanstack-router) `0.1.52` — ports `@tanstack/react-router@1.170.18`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
+[`packages/tanstack-router`](../packages/tanstack-router) `0.1.53` — ports `@tanstack/react-router@1.170.18`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
 
 Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.
 
@@ -1641,7 +1641,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router-ssr-query
 
-[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.42` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
+[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.0.43` — ports `@tanstack/react-router-ssr-query@1.167.1`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
 
 Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.
 
@@ -1653,7 +1653,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/tanstack-store
 
-[`packages/tanstack-store`](../packages/tanstack-store) `0.0.47` — ports `@tanstack/react-store@0.11.0`. Status data: [`packages/tanstack-store/status.json`](../packages/tanstack-store/status.json).
+[`packages/tanstack-store`](../packages/tanstack-store) `0.0.48` — ports `@tanstack/react-store@0.11.0`. Status data: [`packages/tanstack-store/status.json`](../packages/tanstack-store/status.json).
 
 Re-exports `@tanstack/store@0.11.0` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.
 
@@ -1671,7 +1671,7 @@ Scope/evidence last checked: 2026-08-09.
 
 ## @octanejs/tanstack-table
 
-[`packages/tanstack-table`](../packages/tanstack-table) `0.1.50` — ports `@tanstack/react-table@9.0.0-beta.58`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
+[`packages/tanstack-table`](../packages/tanstack-table) `0.1.51` — ports `@tanstack/react-table@9.0.0-beta.58`. Status data: [`packages/tanstack-table/status.json`](../packages/tanstack-table/status.json).
 
 Complete port of the v9 adapter: the framework-agnostic `@tanstack/table-core` (constructTable + every tree-shakeable feature and row model) is reused verbatim, and the adapter — `useTable`, `Subscribe`, `flexRender`/`FlexRender`, `createTableHook`, `createTableHookContexts` — is transcribed onto octane hooks. Table state lives in TanStack Store atoms via the `coreReactivityFeature` bindings, and `useSelector` drives re-renders from the selected slice. Every store primitive (hooks, `createAtom`, `batch`, `shallow`, and the atom/store types) is imported from @octanejs/tanstack-store, which re-exports all of @tanstack/store — the binding takes no direct dependency on the store core, so there is only one path to it and atom identity cannot be split across duplicate copies.
 
@@ -1968,7 +1968,7 @@ Scope/evidence last checked: 2026-08-24.
 
 ## @octanejs/window
 
-[`packages/window`](../packages/window) `0.0.18` — ports `react-window@2.3.0`. Status data: [`packages/window/status.json`](../packages/window/status.json).
+[`packages/window`](../packages/window) `0.0.19` — ports `react-window@2.3.0`. Status data: [`packages/window/status.json`](../packages/window/status.json).
 
 Provisional complete exact port of the react-window 2.3.0 root surface: List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types. The byte-locked pristine React suite and generated Octane adaptation each execute all 14 upstream files and all 117 cases; shared differential, SSR, hydration, and assertion-level public type lanes are required by the React parity manifest. Final Chromium/Firefox browser and executable CommonJS package-condition evidence remain pending shared infrastructure PRs #548 and #550.
 
