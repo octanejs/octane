@@ -336,4 +336,20 @@ describe('@octanejs/tanstack-router core seam', () => {
 		expect(r.findAll('.posts-index').length).toBe(1); // posts index (3rd match)
 		r.unmount();
 	});
+
+	it('navigating sibling table routes updates the nested Outlet', async () => {
+		const router = makeRouter('/tables/users');
+		await router.load();
+		const r = mount(RouterProvider as any, { router });
+		await flush();
+		expect(r.find('.table-id').textContent).toBe('users');
+		expect(r.find('.table-rows').textContent).toBe('rows-users');
+
+		await router.navigate({ to: '/tables/orders' });
+		await flush();
+
+		expect(r.find('.table-id').textContent).toBe('orders');
+		expect(r.find('.table-rows').textContent).toBe('rows-orders');
+		r.unmount();
+	});
 });

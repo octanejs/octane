@@ -45,21 +45,35 @@ export function useStore(...args: any[]): any {
 		subSlot(slot, 'us:cb'),
 	);
 
-	// Memoize selector output: same store input → same output; structurally-equal
-	// output keeps its previous reference (so useSyncExternalStore doesn't loop).
-	const cache = useRef<{ in: unknown; out: unknown } | null>(null, subSlot(slot, 'us:cache'));
-	const getSnapshot = (): unknown => {
+	// A cached snapshot belongs to its atom, selector, and comparator as well as
+	// its input. Route parameters captured by a new selector must be re-evaluated
+	// even when the atom has already published the current match-id list.
+	// Structurally-equal output keeps its previous reference so
+	// useSyncExternalStore does not loop on allocating selectors.
+	const cache = useRef<{
+		atom: Atom<unknown>;
+		in: unknown;
+		selector: typeof selector;
+		compare: typeof compare;
+		out: unknown;
+	} | null>(null, subSlot(slot, 'us:cache'));
+	function getSnapshot(): unknown {
 		const input = atom.get();
 		const prev = cache.current;
-		if (prev && Object.is(prev.in, input)) return prev.out;
-		const next = selector(input);
-		if (prev && compare(prev.out, next)) {
-			cache.current = { in: input, out: prev.out };
+		if (
+			prev &&
+			prev.atom === atom &&
+			prev.selector === selector &&
+			prev.compare === compare &&
+			Object.is(prev.in, input)
+		) {
 			return prev.out;
 		}
-		cache.current = { in: input, out: next };
-		return next;
-	};
+		const next = selector(input);
+		const out = prev && compare(prev.out, next) ? prev.out : next;
+		cache.current = { atom, in: input, selector, compare, out };
+		return out;
+	}
 
 	return useSyncExternalStore(subscribe, getSnapshot, getSnapshot, subSlot(slot, 'us:uses'));
 }

@@ -60,6 +60,22 @@ function PostsIndex() @{
 	<p class="posts-index">{'All posts'}</p>
 }
 
+// Sibling table routes share a parameterized layout Outlet. Match ids include
+// the interpolated path, so navigating /tables/users → /tables/orders changes
+// the layout's parentId after matchesId has already published.
+function TablesLayout() @{
+	const params = useParams({ strict: false });
+	<section class="tables">
+		<h2 class="table-id">{params.tableId as string}</h2>
+		<Outlet />
+	</section>
+}
+
+function TableRows() @{
+	const params = useParams({ strict: false });
+	<p class="table-rows">{'rows-' + params.tableId as string}</p>
+}
+
 // A fresh router (+ fresh route tree) per call so tests don't share router state.
 export function makeRouter(initial: string) {
 	const rootRoute = createRootRoute({ component: RootLayout });
@@ -112,6 +128,16 @@ export function makeRouter(initial: string) {
 		path: '/',
 		component: PostsIndex,
 	});
+	const tablesRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: 'tables/$tableId',
+		component: TablesLayout,
+	});
+	const tablesIndexRoute = createRoute({
+		getParentRoute: () => tablesRoute,
+		path: '/',
+		component: TableRows,
+	});
 	return createRouter({
 		routeTree: rootRoute.addChildren([
 			indexRoute,
@@ -121,6 +147,7 @@ export function makeRouter(initial: string) {
 			enterFailureRoute,
 			itemRoute,
 			postsRoute.addChildren([postsIndexRoute]),
+			tablesRoute.addChildren([tablesIndexRoute]),
 		]),
 		history: createMemoryHistory({ initialEntries: [initial] }),
 	});
