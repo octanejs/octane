@@ -71,6 +71,7 @@ import {
 	buildStyleClassMap,
 	builders as b,
 	clone_ast_node as cloneAstNode,
+	createScopeRoot,
 	createStyleClassMapFromStylesheet,
 	prepareStylesheetForRender,
 	pruneCss,
@@ -666,7 +667,10 @@ function prepareScope(own, state, items) {
 	let hash = null;
 	if (sheets.length > 0) {
 		hash = sheets[0].node.metadata?.styleScopeHash || sheets[0].sheet.hash || null;
-		const elements = collectPrunableElements(cloneAstNode(items), [], []);
+		const scopeItems = cloneAstNode(items);
+		// A fragment exposes root siblings without making the scope's container
+		// match ancestor selectors. Keep it on the private pruning tree.
+		const elements = collectPrunableElements(scopeItems, [], [createScopeRoot(scopeItems)]);
 		const prepared = sheets.map(({ node, sheet }) => {
 			const regionHash = node.metadata?.styleScopeHash || sheet.hash;
 			const clone = cloneAstNode(sheet);

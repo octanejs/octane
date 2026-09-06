@@ -293,14 +293,14 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.1.66
-    '@tsrx/prettier-plugin': ^0.3.132
-    '@tsrx/typescript-plugin': ^0.3.132
+    '@tsrx/core': ^0.1.67
+    '@tsrx/prettier-plugin': ^0.3.133
+    '@tsrx/typescript-plugin': ^0.3.133
     '@tsrx/ripple': ^0.1.62
-    '@tsrx/react': ^0.2.66
-    '@tsrx/solid': ^0.1.66
-    '@tsrx/vite-plugin-react': ^0.0.99
-    '@tsrx/vite-plugin-solid': ^0.0.96
+    '@tsrx/react': ^0.2.67
+    '@tsrx/solid': ^0.1.67
+    '@tsrx/vite-plugin-react': ^0.0.100
+    '@tsrx/vite-plugin-solid': ^0.0.97
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -605,13 +605,14 @@ minimumReleaseAgeExclude:
   - '@ripple-ts/adapter@0.3.125'
   - '@ripple-ts/vite-plugin@0.3.125'
   - '@tsrx/core@0.1.66'
-  - '@tsrx/prettier-plugin@0.3.132'
-  - '@tsrx/react@0.2.66'
+  - '@tsrx/core@0.1.67'
+  - '@tsrx/prettier-plugin@0.3.133'
+  - '@tsrx/react@0.2.67'
   - '@tsrx/ripple@0.1.62'
-  - '@tsrx/solid@0.1.66'
-  - '@tsrx/typescript-plugin@0.3.132'
-  - '@tsrx/vite-plugin-react@0.0.99'
-  - '@tsrx/vite-plugin-solid@0.0.96'
+  - '@tsrx/solid@0.1.67'
+  - '@tsrx/typescript-plugin@0.3.133'
+  - '@tsrx/vite-plugin-react@0.0.100'
+  - '@tsrx/vite-plugin-solid@0.0.97'
   - ripple@0.3.125
   - '@tsrx/runtime@0.1.5'
   - '@tsrx/react-runtime@0.1.5'
