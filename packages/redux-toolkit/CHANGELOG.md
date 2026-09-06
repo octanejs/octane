@@ -1,5 +1,12 @@
 # @octanejs/redux-toolkit
 
+## 0.1.48
+
+### Patch Changes
+
+- Updated dependencies [aec5373]
+  - @octanejs/redux@0.1.50
+
 ## 0.1.47
 
 ### Patch Changes

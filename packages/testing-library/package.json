@@ -44,7 +44,7 @@
     "@testing-library/dom": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.2.4"
+    "octane": "workspace:^0.2.5"
   },
   "devDependencies": {
     "@testing-library/user-event": "^14.6.1",

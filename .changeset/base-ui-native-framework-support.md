@@ -39,7 +39,7 @@ Enforce the existing external-store snapshot stability contract during commit
 cascades. Uncached Zustand object selectors reach the update-depth guard; use
 `useShallow` to cache their selected values.
 
-Require Octane 0.2.4 for the updated Base UI, Base UI Utils, shadcn, and
+Require Octane 0.2.5 for the updated Base UI, Base UI Utils, shadcn, and
 testing-library packages so the compiler and `isInActScope` API are available.
 Preserve exact server catch-node adoption when an initially resolved Suspense
 arm contains a rejected resource.

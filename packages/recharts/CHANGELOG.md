@@ -1,5 +1,12 @@
 # @octanejs/recharts
 
+## 0.1.50
+
+### Patch Changes
+
+- Updated dependencies [aec5373]
+  - @octanejs/redux@0.1.50
+
 ## 0.1.49
 
 ### Patch Changes

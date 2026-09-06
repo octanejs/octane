@@ -60,7 +60,7 @@ pnpm --dir packages/base-ui upstream:verify
 
 ## Migrating from the Base UI 1.6 binding
 
-Upgrade `octane` to **0.2.4 or later in the 0.2 line** together with this binding,
+Upgrade `octane` to **0.2.5 or later in the 0.2 line** together with this binding,
 `@octanejs/base-ui-utils`, `@octanejs/testing-library`, and `@octanejs/shadcn` when
 used. These packages require the compiler, hydration, and `act` support released
 in that coordinated patch. Earlier Octane 0.1 and 0.2 releases are not supported.

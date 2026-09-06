@@ -54,8 +54,8 @@ const OCTANE_SINGLETON_CONSUMERS = new Set([
 
 export const OCTANE_BETA_PEER_RANGE = 'workspace:^0.1.51 || ^0.2.0';
 
-// These bindings use the compiler/runtime APIs first released with Octane 0.2.4.
-const OCTANE_024_CONSUMERS = new Set([
+// These bindings use the compiler/runtime APIs first released with Octane 0.2.5.
+const OCTANE_025_CONSUMERS = new Set([
 	'@octanejs/base-ui',
 	'@octanejs/base-ui-utils',
 	'@octanejs/shadcn',
@@ -63,7 +63,7 @@ const OCTANE_024_CONSUMERS = new Set([
 ]);
 
 export function octanePeerRangeFor(packageName) {
-	return OCTANE_024_CONSUMERS.has(packageName) ? 'workspace:^0.2.4' : OCTANE_BETA_PEER_RANGE;
+	return OCTANE_025_CONSUMERS.has(packageName) ? 'workspace:^0.2.5' : OCTANE_BETA_PEER_RANGE;
 }
 
 function readJson(file) {

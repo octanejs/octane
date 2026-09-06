@@ -49,7 +49,8 @@ for (const name of ['base-ui', 'base-ui-utils', 'shadcn', 'testing-library']) {
 		const range = manifest.peerDependencies.octane.replace(/^workspace:/, '');
 		assert.equal(semver.satisfies('0.1.51', range), false);
 		assert.equal(semver.satisfies('0.2.3', range), false);
-		assert.equal(semver.satisfies('0.2.4', range), true);
+		assert.equal(semver.satisfies('0.2.4', range), false);
+		assert.equal(semver.satisfies('0.2.5', range), true);
 		assert.equal(semver.satisfies('0.3.0', range), false);
 		const correct = workspacePackage(manifest.name, {
 			peerDependencies: { octane: manifest.peerDependencies.octane },

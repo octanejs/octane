@@ -169,7 +169,7 @@
     "tailwind-merge": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.2.4"
+    "octane": "workspace:^0.2.5"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

@@ -441,7 +441,7 @@
     "@floating-ui/utils": "^0.2.12"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.2.4",
+    "octane": "workspace:^0.2.5",
     "date-fns": "^4.0.0",
     "@date-fns/tz": "^1.2.0",
     "luxon": "^3.7.2"
