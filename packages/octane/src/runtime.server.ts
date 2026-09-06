@@ -2635,7 +2635,7 @@ export function ssrAttrs(
 		}
 	}
 
-	if (process.env.NODE_ENV === 'production') {
+	if (process.env.NODE_ENV === 'production' && classMerges === null) {
 		let canonical = true;
 		for (const name of props.keys()) {
 			if (
