@@ -2970,6 +2970,17 @@ function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): voi
 	}
 }
 
+/** Find a radio's native group in its document, shadow tree, or containing form. */
+function radioCousins(input: HTMLInputElement): ArrayLike<Element> {
+	if (input.form !== null) return input.form.elements;
+	const root = input.getRootNode();
+	// Document.getElementsByName is the common fast path; ShadowRoot and
+	// detached fragments need a tree-local lookup that includes their radios.
+	return root.nodeType === 9
+		? (root as Document).getElementsByName(input.name)
+		: (root as Element | DocumentFragment).querySelectorAll('input[type="radio"]');
+}
+
 /**
  * Record the cousin a radio write is about to clear.
  *
@@ -2986,12 +2997,7 @@ function journalDefaultValue(input: HTMLInputElement | HTMLTextAreaElement): voi
  */
 function journalRadioCousins(input: HTMLInputElement): void {
 	const name = input.name;
-	const group: ArrayLike<Node> =
-		input.form !== null
-			? input.form.elements
-			: typeof document !== 'undefined'
-				? document.getElementsByName(name)
-				: [];
+	const group = radioCousins(input);
 	for (let i = 0; i < group.length; i++) {
 		const other = group[i] as HTMLInputElement;
 		if (
@@ -2999,7 +3005,8 @@ function journalRadioCousins(input: HTMLInputElement): void {
 			!other.checked ||
 			other.localName !== 'input' ||
 			other.type !== 'radio' ||
-			other.name !== name
+			other.name !== name ||
+			other.form !== input.form
 		) {
 			continue;
 		}
@@ -17148,6 +17155,8 @@ interface HeadSlot {
 	el: Element;
 	/** Direct listeners keyed by prop name so capture and bubble phases stay independent. */
 	handlers?: Map<string, EventListener>;
+	/** Authored attribute keys only; never retain the props' values past a render. */
+	attrNames?: string[];
 }
 
 function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | null): void {
@@ -17226,11 +17235,12 @@ export function headBlock(
 		const ownerDocument = parent.nodeType === 9 ? (parent as Document) : parent.ownerDocument!;
 		const head = ownerDocument.head;
 		let el = adoptServerHeadEl(head, headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
+		const adopted = el !== null;
 		if (el === null) {
 			el = ownerDocument.createElement(tag);
 			head.appendChild(el);
 		}
-		state = { el };
+		state = { el, attrNames: adopted ? el.getAttributeNames() : undefined };
 		scope.slots[slot] = state;
 		// Removed once, on the owning scope's unmount (NOT between re-renders) —
 		// scope.cleanups fire only on teardown, mirroring the spread-ref cleanup.
@@ -17241,8 +17251,20 @@ export function headBlock(
 		});
 	}
 	const el = state.el;
+	if (TRANSITION_JOURNAL !== null) {
+		journalObjectOnce(state);
+		journalBag();
+	}
 	if (state.handlers !== undefined) removeHeadEventListeners(state, attrs);
+	const previousNames = state.attrNames;
+	if (previousNames !== undefined) {
+		for (let i = 0; i < previousNames.length; i++) {
+			const name = previousNames[i];
+			if (attrs === null || !(name in attrs)) setAttribute(el, name, null);
+		}
+	}
 	if (attrs !== null) {
+		const names: string[] = [];
 		for (const k in attrs) {
 			// Hoisted head elements live in document.head — OUTSIDE every delegation
 			// root — and their load/error events don't bubble anyway, so on* props
@@ -17266,12 +17288,22 @@ export function headBlock(
 				}
 				continue;
 			}
+			names.push(k);
 			setAttribute(el, k, attrs[k]);
 		}
+		state.attrNames = names;
+	} else {
+		state.attrNames = undefined;
 	}
-	if (text != null) {
-		const t = String(text);
-		if (el.textContent !== t) el.textContent = t;
+	if (text != null || tag === 'title') {
+		const t = text == null ? '' : String(text);
+		if (el.textContent !== t) {
+			// textContent replaces child nodes, even when only the text changes.
+			// Retain their identity when a later sibling suspends and this visible
+			// head entry belongs to the held transition boundary.
+			if (TRANSITION_JOURNAL !== null) journalRootRange(el, null, null);
+			el.textContent = t;
+		}
 	}
 }
 
@@ -18931,6 +18963,8 @@ interface ControlledState {
 	 *  controlled↔uncontrolled flip detection). */
 	sawV: boolean;
 	sawC: boolean;
+	/** The first defaultChecked binding has initialized the live checkedness. */
+	sawDC: boolean;
 	/** Last defaultValue. Select defaults project only on mount or a multiple flip. */
 	dvv: unknown;
 	/** True during IME composition and while its final committed input can arrive. */
@@ -18941,9 +18975,6 @@ interface ControlledState {
 	queued: boolean;
 	/** Whether the compiler's spread-aware form aggregation path has committed. */
 	formSeen: boolean;
-	/** Previous final default props, needed for React's removal cascades. */
-	formDefaultValue: unknown;
-	formDefaultChecked: unknown;
 	/** Previous final <select multiple> mode. */
 	formMultiple: boolean;
 }
@@ -19131,13 +19162,12 @@ function armControlledBase(el: Element): ControlledState {
 			sv: null,
 			sawV: false,
 			sawC: false,
+			sawDC: false,
 			dvv: UNCONTROLLED,
 			composing: false,
 			compositionEndTask: undefined,
 			queued: false,
 			formSeen: false,
-			formDefaultValue: UNCONTROLLED,
-			formDefaultChecked: UNCONTROLLED,
 			formMultiple: false,
 		};
 		(el as any).$$ctrl = ctrl;
@@ -19431,11 +19461,18 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		if (process.env.NODE_ENV !== 'production')
 			queueDevFormDiagnostic(input, CURRENT_SCOPE ?? undefined);
 		const hydration = activeHydration();
-		if (hydration !== null && !hydration.isFresh(input)) return;
+		if (hydration !== null && !hydration.isFresh(input)) {
+			// Keep the pre-hydration user selection while separating it from the
+			// server default, including a later controlled → default flip.
+			input.checked = input.checked;
+			ctrl.sawDC = true;
+			return;
+		}
 		// PROPERTY first (marks checkedness dirty — see setValue), then the
 		// attribute baseline (React's cascade: checked wins over defaultChecked).
-		if (input.checked !== b) input.checked = b;
+		input.checked = b;
 		input.defaultChecked = b;
+		ctrl.sawDC = true;
 		return;
 	}
 	if (process.env.NODE_ENV !== 'production' && ctrl.c === -1) devWarnControlledFlip(input, true);
@@ -19468,7 +19505,8 @@ function inActivationWindow(input: HTMLInputElement): boolean {
 		target.type === 'radio' &&
 		input.name !== '' &&
 		input.name === target.name &&
-		input.form === target.form
+		input.form === target.form &&
+		(input.form !== null || input.getRootNode() === target.getRootNode())
 	);
 }
 
@@ -19659,6 +19697,7 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
  * it needs neither a controlled-state record nor edit/composition listeners.
  */
 const DEFAULT_VALUE_BASELINE = Symbol('octane.defaultValue');
+const DEFAULT_CHECKED_INITIALIZED = Symbol('octane.defaultCheckedInitialized');
 
 export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 	const hydration = activeHydration();
@@ -19693,11 +19732,36 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 /** Compiler-emitted binding for `defaultChecked` (uncontrolled checkables). */
 export function setDefaultChecked(el: Element, value: unknown): void {
 	const ctrl = armControlled(el);
+	const input = el as HTMLInputElement;
 	const hydration = activeHydration();
-	if ((hydration !== null && !hydration.isFresh(el)) || value == null) return;
+	const hydrating = hydration !== null && !hydration.isFresh(el);
+	const first = !ctrl.sawDC;
+	if (first) {
+		if (TRANSITION_JOURNAL !== null) {
+			journalObjectOnce(ctrl);
+			journalBag();
+		}
+		ctrl.sawDC = true;
+	}
+	if (hydrating) {
+		// Adopt the user's live choice, but separate it from the server's
+		// pristine default so a later baseline update cannot drag it along.
+		if (first) input.checked = input.checked;
+		return;
+	}
 	// A controlled `checked` owns the attribute baseline (React's cascade).
 	if (ctrl.c !== -1) return;
-	const input = el as HTMLInputElement;
+	// React initInput marks the live checkedness dirty even when the initial
+	// default is absent. Otherwise, the browser would move a still-pristine
+	// checkbox whenever a later defaultChecked update changes its reset target.
+	if (first && !(DEFAULT_CHECKED_INITIALIZED in input)) {
+		if (TRANSITION_JOURNAL !== null) {
+			TRANSITION_JOURNAL.push(JOURNAL_PROP, input, 'checked', input.checked);
+			if (input.type === 'radio' && input.name !== '' && !!value) journalRadioCousins(input);
+		}
+		input.checked = value == null ? input.checked : !!value;
+	}
+	if (value == null) return;
 	const b = !!value;
 	if (input.defaultChecked !== b) {
 		if (TRANSITION_JOURNAL !== null) {
@@ -19771,15 +19835,12 @@ export function setFormControlSources(
 
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
-	const previousDefaultChecked = ctrl.formDefaultChecked;
 	const previousMultiple = ctrl.formMultiple;
 	if (TRANSITION_JOURNAL !== null) {
 		journalObjectOnce(ctrl);
 		journalBag();
 	}
 	ctrl.formSeen = true;
-	ctrl.formDefaultValue = defaultValue;
-	ctrl.formDefaultChecked = defaultChecked;
 	if (
 		process.env.NODE_ENV !== 'production' &&
 		hasDevFormDiagnosticContext(el, CURRENT_SCOPE ?? undefined)
@@ -19806,15 +19867,8 @@ export function setFormControlSources(
 			setDefaultValue(input, defaultString, first);
 		}
 		setChecked(input, checked);
-		if (checked == null && defaultChecked != null) setDefaultChecked(input, defaultChecked);
-		if (
-			!first &&
-			defaultChecked == null &&
-			previousDefaultChecked !== UNCONTROLLED &&
-			previousDefaultChecked != null
-		) {
-			input.defaultChecked = false;
-		}
+		if (checked == null && (defaultChecked != null || first))
+			setDefaultChecked(input, defaultChecked);
 		return;
 	}
 
@@ -20101,19 +20155,15 @@ function restoreCheckedState(input: HTMLInputElement, ctrl: ControlledState): vo
 
 function restoreRadioCousins(input: HTMLInputElement): void {
 	const name = input.name;
-	const group: ArrayLike<Node> =
-		input.form !== null
-			? input.form.elements
-			: typeof document !== 'undefined'
-				? document.getElementsByName(name)
-				: [];
+	const group = radioCousins(input);
 	for (let i = 0; i < group.length; i++) {
 		const other = group[i] as HTMLInputElement;
 		if (
 			other === input ||
 			other.localName !== 'input' ||
 			other.type !== 'radio' ||
-			other.name !== name
+			other.name !== name ||
+			other.form !== input.form
 		) {
 			continue;
 		}
@@ -22664,11 +22714,21 @@ function hasHostPropContent(descriptor: ElementDescriptor): boolean {
 }
 
 // Route a host descriptor's props onto a FRESH element (first build).
+function markInputCheckedness(input: HTMLInputElement): void {
+	// React initializes even an input with no checked/defaultChecked prop. Mark
+	// its live property dirty so a baseline added on a reused host stays a reset
+	// target rather than changing the user's current choice.
+	input.checked = input.checked;
+	(input as any)[DEFAULT_CHECKED_INITIALIZED] = true;
+}
+
 function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 	if (props == null) {
+		if (el.localName === 'input') markInputCheckedness(el as HTMLInputElement);
 		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
 		return;
 	}
+	let needsCheckedInitialization = el.localName === 'input';
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
 		// `suppressHydrationWarning`: a JS flag (read by the hydration-mismatch paths), never
@@ -22677,8 +22737,15 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 			(el as any).__oct_suppress = props[name] === true;
 			continue;
 		}
-		applyDeoptProp(el, name, props[name], ownerBlock);
+		const value = props[name];
+		if (
+			needsCheckedInitialization &&
+			(name === 'defaultChecked' || (name === 'checked' && value != null))
+		)
+			needsCheckedInitialization = false;
+		applyDeoptProp(el, name, value, ownerBlock);
 	}
+	if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
 }
 
@@ -22819,6 +22886,7 @@ export function hostComponent(
 // while className/style/events/attributes are idempotently re-set.
 function applyHostProps(el: Element, props: any, scope: Scope, state: HostComponentSlot): void {
 	const prev = state.props;
+	let needsCheckedInitialization = prev === undefined && el.localName === 'input';
 	if (ROOT_RENDER_TRANSACTION !== null && prev !== props) journalObjectOnce(state);
 	// REMOVE props/events present last render but gone now, via the shared removeHostProp
 	// (parity with setSpread / patchDeoptProps) — a reused element must not keep stale
@@ -22840,12 +22908,18 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 	}
 	state.props = props;
 	if (props == null) {
+		if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
 		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
 		return;
 	}
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
 		const v = props[name];
+		if (
+			needsCheckedInitialization &&
+			(name === 'defaultChecked' || (name === 'checked' && v != null))
+		)
+			needsCheckedInitialization = false;
 		const actionName = formActionAttributeName(el, name);
 		if (actionName !== null) {
 			setFormAction(el as HTMLFormElement, actionName, v, prev?.[name]);
@@ -22890,6 +22964,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 			}
 		}
 	}
+	if (needsCheckedInitialization) markInputCheckedness(el as HTMLInputElement);
 	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
 }
 

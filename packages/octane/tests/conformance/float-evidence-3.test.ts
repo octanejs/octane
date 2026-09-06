@@ -34,6 +34,7 @@ import {
 	NonceStyle,
 	PlainLinkPage,
 	TitleUpdate,
+	TitleSpread,
 } from '../_fixtures/float-evidence-3.tsrx';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -367,6 +368,56 @@ describe('Float evidence (slice 3) — style-resource nonce and hoistable lifecy
 
 		m.unmount();
 		expect(title.isConnected).toBe(false);
+	});
+
+	it('removes attributes omitted by a retained hoisted title', () => {
+		const m = mount(TitleSpread as any, {
+			text: 'Original',
+			attrs: { title: 'hint', 'data-old': 'old' },
+		});
+		const title = document.head.querySelector('title')!;
+		try {
+			expect(title.getAttribute('title')).toBe('hint');
+			expect(title.getAttribute('data-old')).toBe('old');
+			m.update(TitleSpread as any, { text: 'Changed', attrs: { 'data-new': 'new' } });
+			expect(document.head.querySelector('title')).toBe(title);
+			expect(title.textContent).toBe('Changed');
+			expect(title.hasAttribute('title')).toBe(false);
+			expect(title.hasAttribute('data-old')).toBe(false);
+			expect(title.getAttribute('data-new')).toBe('new');
+			m.update(TitleSpread as any, { text: 'Empty', attrs: {} });
+			expect(title.hasAttribute('data-new')).toBe(false);
+			m.update(TitleSpread as any, { text: null, attrs: {} });
+			expect(title.textContent).toBe('');
+		} finally {
+			m.unmount();
+		}
+	});
+
+	it('adopts a hoisted title and reconciles omitted server attributes', async () => {
+		const result = await Server.renderToString(srv.TitleSpread, {
+			text: 'Owned',
+			attrs: { 'data-server-only': 'stale' },
+		});
+		const bodyStart = result.html.indexOf('<main');
+		document.head.innerHTML = result.html.slice(0, bodyStart);
+		const c = document.createElement('div');
+		document.body.appendChild(c);
+		containers.push(c);
+		c.innerHTML = result.html.slice(bodyStart);
+		const title = document.head.querySelector('title')!;
+		const root = hydrateRoot(c, TitleSpread as any, {
+			text: 'Owned',
+			attrs: { 'data-client-only': 'current' },
+		});
+		try {
+			flushSync(() => {});
+			expect(document.head.querySelector('title')).toBe(title);
+			expect(title.hasAttribute('data-server-only')).toBe(false);
+			expect(title.getAttribute('data-client-only')).toBe('current');
+		} finally {
+			root.unmount();
+		}
 	});
 
 	// Per ReactDOMFloat-test.js:9085 — 'prioritizes ordering for certain

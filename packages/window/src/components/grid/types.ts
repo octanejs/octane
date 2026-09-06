@@ -2,10 +2,11 @@ import type {
 	ComponentProps,
 	CSSProperties,
 	HTMLAttributes,
-	ReactElement,
-	ReactNode,
+	Key,
+	OctaneElement,
+	OctaneNode,
 	Ref,
-} from 'react';
+} from 'octane';
 import type { TagNames } from '../../types.js';
 
 type ForbiddenKeys = 'ariaAttributes' | 'columnIndex' | 'rowIndex' | 'style';
@@ -15,7 +16,7 @@ type ExcludeForbiddenKeys<Type> = {
 
 export type GridProps<CellProps extends object, TagName extends TagNames = 'div'> = Omit<
 	HTMLAttributes<HTMLDivElement>,
-	'onResize'
+	'onResize' | 'style'
 > & {
 	/**
 	 * React component responsible for rendering a cell.
@@ -35,7 +36,7 @@ export type GridProps<CellProps extends object, TagName extends TagNames = 'div'
 			rowIndex: number;
 			style: CSSProperties;
 		} & CellProps,
-	) => ReactElement | null;
+	) => OctaneElement | null;
 
 	/**
 	 * Additional props to be passed to the cell-rendering component.
@@ -49,7 +50,7 @@ export type GridProps<CellProps extends object, TagName extends TagNames = 'div'
 	 * Additional content to be rendered within the grid (above cells).
 	 * This property can be used to render things like overlays or tooltips.
 	 */
-	children?: ReactNode;
+	children?: OctaneNode;
 
 	/**
 	 * CSS class name.
@@ -72,7 +73,7 @@ export type GridProps<CellProps extends object, TagName extends TagNames = 'div'
 	 * ⚠️ This prop cannot be auto-memoized because it is called during render.
 	 * It is important to always `useCallback` for this prop; do not use an inline function.
 	 */
-	columnKey?: (args: { columnIndex: number; data: CellProps; rowIndex: number }) => React.Key;
+	columnKey?: (args: { columnIndex: number; data: CellProps; rowIndex: number }) => Key;
 
 	/**
 	 * Column width; the following formats are supported:
@@ -219,7 +220,7 @@ export type GridProps<CellProps extends object, TagName extends TagNames = 'div'
 	 * ⚠️ This prop cannot be auto-memoized because it is called during render.
 	 * It is important to always `useCallback` for this prop; do not use an inline function.
 	 */
-	rowKey?: (args: { data: CellProps; rowIndex: number }) => React.Key;
+	rowKey?: (args: { data: CellProps; rowIndex: number }) => Key;
 
 	/**
 	 * Optional CSS properties.

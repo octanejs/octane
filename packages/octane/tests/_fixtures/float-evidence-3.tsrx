@@ -125,6 +125,13 @@ export function TitleUpdate(props: { text: string; foo: string }) @{
 	</>
 }
 
+export function TitleSpread(props: { text: string; attrs: Record<string, string> }) @{
+	<>
+		<title {...props.attrs}>{props.text as string}</title>
+		<main>{'body' as string}</main>
+	</>
+}
+
 // Head content authored in deliberately unprioritized order: charset last,
 // viewport second-to-last, ordinary metadata first.
 export function PriorityHead() @{

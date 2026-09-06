@@ -119,6 +119,23 @@ describe('compiler parser-AST immutability (frozen-AST enforcement)', () => {
 		});
 	}
 
+	it('resolves descriptor children shadows without annotating authored JSX nodes', () => {
+		const source = `
+			import { descriptorChildren } from 'octane';
+			function Ordinary(props) { return props.children; }
+			const Marked = descriptorChildren(Ordinary);
+			export function App(Marked) @{
+				<main>
+					<style>main { color: red; }</style>
+					<Marked><button>shadowed</button></Marked>
+				</main>
+			}`;
+		for (const options of [{}, { hmr: false }, { mode: 'server' }] as const) {
+			const result = compile(source, 'marked-shadow-frozen.tsrx', options);
+			expect(result.code).toContain('shadowed');
+		}
+	});
+
 	// RFC tsrx-org/RFCs#1 scoped-style fixtures: every scope shape (multi-block
 	// scopes, nested `@{}`, directive branches, assigned templates, assigned
 	// blocks in every declaration position, `apply` in every form) runs the

@@ -158,4 +158,82 @@ describe('differential: controlled-forms-diff.tsrx — controlled semantics matc
 		});
 		d.unmount();
 	});
+
+	it('DefaultCheckedUpdate: changing the reset baseline preserves live checkedness', async () => {
+		const d = await mountDifferential(FIX, 'DefaultCheckedUpdate', {
+			initial: true,
+			next: false,
+		});
+		try {
+			await d.step('initial baseline', (i, r) => {
+				for (const side of [i, r]) {
+					const input = side.find('input') as HTMLInputElement;
+					expect(input.checked).toBe(true);
+					expect(input.defaultChecked).toBe(true);
+				}
+			});
+			await d.step('change baseline without interacting with the checkbox', async (i, r) => {
+				await i.click('button');
+				await r.click('button');
+				const octaneInput = i.find('input') as HTMLInputElement;
+				const reactInput = r.find('input') as HTMLInputElement;
+				expect(octaneInput.checked).toBe(reactInput.checked);
+				expect(octaneInput.checked).toBe(true);
+				expect(octaneInput.defaultChecked).toBe(reactInput.defaultChecked);
+				expect(octaneInput.defaultChecked).toBe(false);
+			});
+			await d.step('reset uses the new baseline', (i, r) => {
+				for (const side of [i, r]) {
+					const form = side.find('form') as HTMLFormElement;
+					form.reset();
+					const input = side.find('input') as HTMLInputElement;
+					expect(input.checked).toBe(false);
+					expect(input.defaultChecked).toBe(false);
+				}
+			});
+		} finally {
+			d.unmount();
+		}
+	});
+
+	it('DefaultCheckedUpdate: adding a reset baseline preserves an untouched checkbox', async () => {
+		const d = await mountDifferential(FIX, 'DefaultCheckedUpdate', { next: true });
+		try {
+			await d.step('without a baseline', (i, r) => {
+				for (const side of [i, r]) {
+					const input = side.find('input') as HTMLInputElement;
+					expect(input.checked).toBe(false);
+					expect(input.defaultChecked).toBe(false);
+				}
+			});
+			await d.step('add a baseline', async (i, r) => {
+				await i.click('button');
+				await r.click('button');
+				for (const side of [i, r]) {
+					const input = side.find('input') as HTMLInputElement;
+					expect(input.checked).toBe(false);
+					expect(input.defaultChecked).toBe(true);
+				}
+			});
+		} finally {
+			d.unmount();
+		}
+	});
+
+	it('SpreadDefaultCheckedRemoval: omitting the default prop preserves the reset baseline', async () => {
+		const d = await mountDifferential(FIX, 'SpreadDefaultCheckedRemoval');
+		try {
+			await d.step('remove defaultChecked from a spread', async (i, r) => {
+				await i.click('button');
+				await r.click('button');
+				for (const side of [i, r]) {
+					const input = side.find('input') as HTMLInputElement;
+					expect(input.checked).toBe(true);
+					expect(input.defaultChecked).toBe(true);
+				}
+			});
+		} finally {
+			d.unmount();
+		}
+	});
 });
