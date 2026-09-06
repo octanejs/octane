@@ -1,5 +1,25 @@
 # @octanejs/shadcn
 
+## 0.0.38
+
+### Patch Changes
+
+- 1846318: Keep the Base UI wrappers compatible with the complete 1.8 binding. Derive
+  positioning and required value props from the primitives, preserve dialog,
+  slider, and toggle-group composition in native templates, and check sources and
+  consumer examples with Octane's compiler.
+
+  Preserve Slider value inference for scalar, mutable range, and readonly range
+  values, including controlled state setters and commit callbacks.
+
+- Updated dependencies [1846318]
+- Updated dependencies [1846318]
+  - @octanejs/base-ui@0.1.51
+  - @octanejs/aria@0.0.46
+  - @octanejs/lucide@0.1.47
+  - @octanejs/radix@0.1.52
+  - @octanejs/sonner@0.1.47
+
 ## 0.0.37
 
 ### Patch Changes

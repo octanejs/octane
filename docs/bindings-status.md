@@ -222,7 +222,7 @@ Scope/evidence last checked: 2026-08-20.
 
 ## @octanejs/base-ui
 
-[`packages/base-ui`](../packages/base-ui) `0.1.50` — ports `@base-ui/react@1.8.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
+[`packages/base-ui`](../packages/base-ui) `0.1.51` — ports `@base-ui/react@1.8.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
 
 All 79 upstream export entries are implemented, including Select, Combobox, Autocomplete, Drawer, Navigation Menu, OTP Field, Scroll Area, Toolbar, and the remaining parts of existing components.
 
@@ -242,7 +242,7 @@ See also: [`docs/base-ui-migration-plan.md`](base-ui-migration-plan.md), [`packa
 
 ## @octanejs/base-ui-utils
 
-[`packages/base-ui-utils`](../packages/base-ui-utils) `0.1.0` — ports `@base-ui/utils@0.4.0`. Status data: [`packages/base-ui-utils/status.json`](../packages/base-ui-utils/status.json).
+[`packages/base-ui-utils`](../packages/base-ui-utils) `0.1.1` — ports `@base-ui/utils@0.4.0`. Status data: [`packages/base-ui-utils/status.json`](../packages/base-ui-utils/status.json).
 
 All 45 published Base UI utility entries and 85 entry/export pairs match the pinned 0.4.0 release.
 
@@ -288,7 +288,7 @@ Scope/evidence last checked: 2026-08-20.
 
 ## @octanejs/cmdk
 
-[`packages/cmdk`](../packages/cmdk) `0.1.35` — ports `cmdk@1.1.1`. Status data: [`packages/cmdk/status.json`](../packages/cmdk/status.json).
+[`packages/cmdk`](../packages/cmdk) `0.1.36` — ports `cmdk@1.1.1`. Status data: [`packages/cmdk/status.json`](../packages/cmdk/status.json).
 
 Complete against the published `cmdk@1.1.1` public surface: `Command` (the root itself) and the `CommandRoot` named export, `Command.Input`, `Command.List`, `Command.Item`, `Command.Group`, `Command.Separator`, `Command.Dialog`, `Command.Empty`, `Command.Loading`, the flat `CommandX` aliases, `useCommandState`, and `defaultFilter` — with the DOM-authoritative store and item/group registration, `useValue` text-content inference, `onInput`-driven search, score filtering plus item and group DOM sorting, keyboard navigation (arrows/Home/End/vim/Enter), controlled `value`/`onValueChange`/`loop`/`shouldFilter`/custom `filter`/`forceMount`, the `--cmdk-list-height` ResizeObserver, and a Radix-backed `Command.Dialog`. `asChild` is the one unsupported prop (see divergences).
 
@@ -437,7 +437,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/drei
 
-[`packages/drei`](../packages/drei) `0.0.18` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
+[`packages/drei`](../packages/drei) `0.0.19` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
 
 Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.
 
@@ -542,7 +542,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/floating-ui
 
-[`packages/floating-ui`](../packages/floating-ui) `0.1.51` — ports `@floating-ui/react@0.27.19`. Status data: [`packages/floating-ui/status.json`](../packages/floating-ui/status.json).
+[`packages/floating-ui`](../packages/floating-ui) `0.1.52` — ports `@floating-ui/react@0.27.19`. Status data: [`packages/floating-ui/status.json`](../packages/floating-ui/status.json).
 
 Complete @floating-ui/react 0.27.19 export surface: positioning (`useFloating`, ref-aware `arrow`, and the framework-neutral middleware re-exports), floating tree and list primitives, every interaction hook, portals/overlays/focus management/arrows/composites, transitions, both delay-group APIs, and the deprecated `inner`/`useInnerOffset` pair. Runtime parity is executable and bounded: 276 adapted assertions pass compatibly, 25 remain executable expected-failure negative controls, and 6 upstream-declared skips are non-evidence.
 
@@ -736,7 +736,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/lexical
 
-[`packages/lexical`](../packages/lexical) `0.1.51` — ports `@lexical/react@0.46.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
+[`packages/lexical`](../packages/lexical) `0.1.52` — ports `@lexical/react@0.46.0`. Status data: [`packages/lexical/status.json`](../packages/lexical/status.json).
 
 The 35 legacy `@lexical/react` modules represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set, and the `useLexical*` hooks. The 0.46.0 extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.
 
@@ -1030,7 +1030,7 @@ See also: [`docs/sanity-react-port-research.md`](sanity-react-port-research.md)
 
 ## @octanejs/radix
 
-[`packages/radix`](../packages/radix) `0.1.51` — ports `radix-ui@1.6.4`. Status data: [`packages/radix/status.json`](../packages/radix/status.json).
+[`packages/radix`](../packages/radix) `0.1.52` — ports `radix-ui@1.6.4`. Status data: [`packages/radix/status.json`](../packages/radix/status.json).
 
 Surface-present against the unified `radix-ui@1.6.4` component exports. Sixteen repo-authored differential cases compare representative primitives and interactions against the real package; the complete 38-file canonical upstream suite is preserved but not adapted, so the binding remains recorded-unverified.
 
@@ -1287,7 +1287,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/shadcn
 
-[`packages/shadcn`](../packages/shadcn) `0.0.37` — ports `shadcn-ui/ui (radix base)@4baadbc6517070ae8f8feb2c97037adc2b305544 + shadcn@4.14.1`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
+[`packages/shadcn`](../packages/shadcn) `0.0.38` — ports `shadcn-ui/ui (radix base)@4baadbc6517070ae8f8feb2c97037adc2b305544 + shadcn@4.14.1`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
 
 Three primitive bases. RADIX base (default, reached at the bare subpaths): tiers 1-2 complete plus the first tier-3 composites — 44 component families. REACT ARIA base (@octanejs/shadcn/react-aria/<Family>): 33 families over @octanejs/aria/components, taken from upstream's aria-nova style and verified class-string identical to it; not ported are select and sonner (need input-group and next-themes), while hover-card, menubar and navigation-menu do not exist in upstream's aria base. Sources live at src/bases/<base>/ui/ with lib/hooks/styles shared. DISTRIBUTION is registry-first with per-family subpath exports; the monolithic root entry is removed. STYLING FLAVOR: the radix base is mid-migration from the pinned cn-* semantic-hook system to the default-Tailwind utilities-inlined flavor (user-directed); the react-aria base is uniformly the utilities-inlined aria-nova output. THE REGISTRY NOW COVERS ALL THREE BASES, using shadcn's own mechanism rather than a namespace: base and visual style compose into components.json's single `style` field, which the CLI substitutes into the registry URL (`{style}` and `{name}` are the only placeholders shadcn@4.14.1 substitutes, and it never parses the style string). Emitted as registry/styles/<style>/<name>.json for base-nova (default, @octanejs/base-ui), radix-nova and aria-nova, plus an un-styled copy of the default so a URL without {style} still resolves. Base-agnostic items (utils/types/theme/use-mobile) are emitted into every style tree because registryDependencies resolve through the same templated URL. `registry:serve` serves it locally — the port the playground's components.json always referenced but which nothing previously served. Verified end to end by installing with the real shadcn CLI: each style yields its own primitive. BASE UI base (@octanejs/shadcn/base-ui/<Family>): 40 of 44 families. Existing wrappers target the Base UI 1.8.0 binding. Positioner props and required item/tab values derive from the primitive types; dialogs, sliders, and toggle groups compose through native templates. Styles target Base UI's state attributes and positioning variables. Select, Combobox, Navigation Menu, and Scroll Area primitives are available in @octanejs/base-ui, but their shadcn Base UI wrappers remain unported. Existing source headers distinguish transcribed upstream styles from derived styles whose upstream fidelity remains unverified.
 
@@ -1744,7 +1744,7 @@ Scope/evidence last checked: 2026-07-27.
 
 ## @octanejs/testing-library
 
-[`packages/testing-library`](../packages/testing-library) `0.1.50` — ports `@testing-library/react@16.3.2`. Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
+[`packages/testing-library`](../packages/testing-library) `0.1.51` — ports `@testing-library/react@16.3.2`. Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
 
 `render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. Focus and blur helpers additionally emit their bubbling native counterparts.
 
@@ -1916,7 +1916,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/vaul
 
-[`packages/vaul`](../packages/vaul) `0.0.18` — ports `vaul@1.1.2`. Status data: [`packages/vaul/status.json`](../packages/vaul/status.json).
+[`packages/vaul`](../packages/vaul) `0.0.19` — ports `vaul@1.1.2`. Status data: [`packages/vaul/status.json`](../packages/vaul/status.json).
 
 Drawer, Root, NestedRoot, Portal, Overlay, Content, Handle, public props, and style.css.
 
@@ -1930,7 +1930,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/visx
 
-[`packages/visx`](../packages/visx) `0.1.47` — ports `@visx/visx@4.0.0 + master@485c035`. Status data: [`packages/visx/status.json`](../packages/visx/status.json).
+[`packages/visx`](../packages/visx) `0.1.48` — ports `@visx/visx@4.0.0 + master@485c035`. Status data: [`packages/visx/status.json`](../packages/visx/status.json).
 
 Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies.
 
@@ -2055,7 +2055,7 @@ Scope/evidence last checked: 2026-08-15.
 
 ## @octanejs/xyflow
 
-[`packages/xyflow`](../packages/xyflow) `0.1.3` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
+[`packages/xyflow`](../packages/xyflow) `0.1.4` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
 
 ReactFlow, ReactFlowProvider, Handle, hooks (useReactFlow, useNodes, useEdges, …), change helpers, and node/edge utilities from @xyflow/react@12.11.2.
 
@@ -2095,7 +2095,7 @@ See also: [`packages/zag/UPSTREAM.md`](../packages/zag/UPSTREAM.md)
 
 ## @octanejs/zustand
 
-[`packages/zustand`](../packages/zustand) `0.1.51` — ports `zustand@5.0.14`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
+[`packages/zustand`](../packages/zustand) `0.1.52` — ports `zustand@5.0.14`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
 
 Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).
 
