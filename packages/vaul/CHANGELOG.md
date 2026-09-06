@@ -1,5 +1,11 @@
 # @octanejs/vaul
 
+## 0.0.19
+
+### Patch Changes
+
+- @octanejs/radix@0.1.52
+
 ## 0.0.18
 
 ### Patch Changes

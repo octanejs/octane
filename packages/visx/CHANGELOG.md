@@ -1,5 +1,12 @@
 # @octanejs/visx
 
+## 0.1.48
+
+### Patch Changes
+
+- Updated dependencies [1846318]
+  - @octanejs/floating-ui@0.1.52
+
 ## 0.1.47
 
 ### Patch Changes

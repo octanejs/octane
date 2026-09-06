@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/radix@0.1.51",
+    "@octanejs/radix@0.1.52",
     "class-variance-authority"
   ],
   "registryDependencies": [

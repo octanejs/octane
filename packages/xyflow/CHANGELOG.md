@@ -1,5 +1,12 @@
 # @octanejs/xyflow
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [1846318]
+  - @octanejs/zustand@0.1.52
+
 ## 0.1.3
 
 ### Patch Changes

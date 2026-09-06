@@ -88,7 +88,7 @@
     },
     {
       "name": "@octanejs/base-ui",
-      "version": "0.1.50",
+      "version": "0.1.51",
       "category": "UI Libraries",
       "upstream": {
         "package": "@base-ui/react",
@@ -107,7 +107,7 @@
     },
     {
       "name": "@octanejs/base-ui-utils",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "category": "UI Utilities",
       "upstream": {
         "package": "@base-ui/utils",
@@ -153,7 +153,7 @@
     },
     {
       "name": "@octanejs/cmdk",
-      "version": "0.1.35",
+      "version": "0.1.36",
       "category": "UI Libraries",
       "upstream": { "package": "cmdk", "version": "1.1.1" },
       "surface": "Complete against the published `cmdk@1.1.1` public surface: `Command` (the root itself) and the `CommandRoot` named export, `Command.Input`, `Command.List`, `Command.Item`, `Command.Group`, `Command.Separator`, `Command.Dialog`, `Command.Empty`, `Command.Loading`, the flat `CommandX` aliases, `useCommandState`, and `defaultFilter` — with the DOM-authoritative store and item/group registration, `useValue` text-content inference, `onInput`-driven search, score filtering plus item and group DOM sorting, keyboard navigation (arrows/Home/End/vim/Enter), controlled `value`/`onValueChange`/`loop`/`shouldFilter`/custom `filter`/`forceMount`, the `--cmdk-list-height` ResizeObserver, and a Radix-backed `Command.Dialog`. `asChild` is the one unsupported prop (see divergences).",
@@ -287,7 +287,7 @@
     },
     {
       "name": "@octanejs/drei",
-      "version": "0.0.18",
+      "version": "0.0.19",
       "category": "3D",
       "upstream": { "package": "@react-three/drei", "version": "10.7.7" },
       "surface": "Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.",
@@ -374,7 +374,7 @@
     },
     {
       "name": "@octanejs/floating-ui",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "UI Utilities",
       "upstream": { "package": "@floating-ui/react", "version": "0.27.19" },
       "surface": "Complete @floating-ui/react 0.27.19 export surface: positioning (`useFloating`, ref-aware `arrow`, and the framework-neutral middleware re-exports), floating tree and list primitives, every interaction hook, portals/overlays/focus management/arrows/composites, transitions, both delay-group APIs, and the deprecated `inner`/`useInnerOffset` pair. Runtime parity is executable and bounded: 276 adapted assertions pass compatibly, 25 remain executable expected-failure negative controls, and 6 upstream-declared skips are non-evidence.",
@@ -562,7 +562,7 @@
     },
     {
       "name": "@octanejs/lexical",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "Content",
       "upstream": { "package": "@lexical/react", "version": "0.46.0" },
       "surface": "The 35 legacy `@lexical/react` modules represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set, and the `useLexical*` hooks. The 0.46.0 extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md.",
@@ -795,7 +795,7 @@
     },
     {
       "name": "@octanejs/radix",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "UI Libraries",
       "upstream": { "package": "radix-ui", "version": "1.6.4" },
       "surface": "Surface-present against the unified `radix-ui@1.6.4` component exports. Sixteen repo-authored differential cases compare representative primitives and interactions against the real package; the complete 38-file canonical upstream suite is preserved but not adapted, so the binding remains recorded-unverified.",
@@ -1006,7 +1006,7 @@
     },
     {
       "name": "@octanejs/shadcn",
-      "version": "0.0.37",
+      "version": "0.0.38",
       "category": "UI Libraries",
       "upstream": {
         "package": "shadcn-ui/ui (radix base)",
@@ -1352,7 +1352,7 @@
     },
     {
       "name": "@octanejs/testing-library",
-      "version": "0.1.50",
+      "version": "0.1.51",
       "category": "Testing",
       "upstream": { "package": "@testing-library/react", "version": "16.3.2" },
       "surface": "`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. Focus and blur helpers additionally emit their bubbling native counterparts.",
@@ -1494,7 +1494,7 @@
     },
     {
       "name": "@octanejs/vaul",
-      "version": "0.0.18",
+      "version": "0.0.19",
       "category": "UI Libraries",
       "upstream": {
         "package": "vaul",
@@ -1510,7 +1510,7 @@
     },
     {
       "name": "@octanejs/visx",
-      "version": "0.1.47",
+      "version": "0.1.48",
       "category": "Visualization",
       "upstream": { "package": "@visx/visx", "version": "4.0.0 + master@485c035" },
       "surface": "Complete current Visx 4.x web runtime surface: the exact 35-namespace aggregate, all 40 feature entry points, and the eight public a11y/react, a11y/server, axis/react, scale/react, shape/react, theme/react, tooltip/floating, and voronoi/react subpaths. Released-only packages chord, delaunay, react-spring, sankey, and stats remain directly importable exactly as upstream specifies.",
@@ -1623,7 +1623,7 @@
     },
     {
       "name": "@octanejs/xyflow",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "category": "Visualization",
       "upstream": { "package": "@xyflow/react", "version": "12.11.2" },
       "surface": "ReactFlow, ReactFlowProvider, Handle, hooks (useReactFlow, useNodes, useEdges, …), change helpers, and node/edge utilities from @xyflow/react@12.11.2.",
@@ -1650,7 +1650,7 @@
     },
     {
       "name": "@octanejs/zustand",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "State Management",
       "upstream": { "package": "zustand", "version": "5.0.14" },
       "surface": "Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).",
