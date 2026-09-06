@@ -134,7 +134,7 @@ async function main() {
 	// The page-wide post-paint MessageChannel remains reusable for the lifetime
 	// of a browser page. End this disposable Node DOM host after its assertions.
 	process.stdout.write(
-		'Packed CommonJS Select selection and form submission, Combobox filtering and selection, Store Inspector export, shared Octane instance, and cleanup passed; React modules loaded: 0.\n',
+		'Consumer-compiled Select selection and form submission, Combobox filtering and selection, Store Inspector export, shared Octane instance, and cleanup passed; React modules loaded: 0.\n',
 		() => process.exit(0),
 	);
 }

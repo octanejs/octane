@@ -3,35 +3,7 @@
 import { COMMUNITY_BINDING_GROUPS } from '../content/community-bindings.ts';
 
 export function CommunityBindingsDirectory() @{
-	<div class="community-binding-directory">
-		@for (const group of COMMUNITY_BINDING_GROUPS; key group.id) {
-			<section
-				class="community-binding-card"
-				aria-labelledby={'community-binding-group-' + group.id}
-			>
-				<header class="community-binding-card-header">
-					<h3 id={'community-binding-group-' + group.id}>{group.title as string}</h3>
-					<span class="community-binding-count">{group.entries.length + '+ ' +
-						(group.entries.length === 1 ? 'binding' : 'bindings') as string}</span>
-				</header>
-				<ul class="community-binding-list">
-					@for (const entry of group.entries; key entry.id) {
-						<li id={'community-binding-' + entry.id}>
-							<a
-								class="community-binding-link"
-								href={entry.destination}
-								target="_blank"
-								rel="noreferrer"
-								aria-label={`Open ${entry.name} official documentation in a new tab`}
-							>
-								<code>{entry.searchNames[0] as string}</code>
-							</a>
-						</li>
-					}
-				</ul>
-			</section>
-		}
-
+	<>
 		<style>
 			.community-binding-directory {
 				display: grid;
@@ -118,5 +90,34 @@ export function CommunityBindingsDirectory() @{
 				}
 			}
 		</style>
-	</div>
+		<div class="community-binding-directory">
+			@for (const group of COMMUNITY_BINDING_GROUPS; key group.id) {
+				<section
+					class="community-binding-card"
+					aria-labelledby={'community-binding-group-' + group.id}
+				>
+					<header class="community-binding-card-header">
+						<h3 id={'community-binding-group-' + group.id}>{group.title as string}</h3>
+						<span class="community-binding-count">{group.entries.length + '+ ' +
+							(group.entries.length === 1 ? 'binding' : 'bindings') as string}</span>
+					</header>
+					<ul class="community-binding-list">
+						@for (const entry of group.entries; key entry.id) {
+							<li id={'community-binding-' + entry.id}>
+								<a
+									class="community-binding-link"
+									href={entry.destination}
+									target="_blank"
+									rel="noreferrer"
+									aria-label={`Open ${entry.name} official documentation in a new tab`}
+								>
+									<code>{entry.searchNames[0] as string}</code>
+								</a>
+							</li>
+						}
+					</ul>
+				</section>
+			}
+		</div>
+	</>
 }

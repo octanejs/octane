@@ -18,7 +18,7 @@ this source commit because the registry metadata omits `gitHead`.
 The immutable `packages/utils` source, tests and metadata are materialized under
 `upstream/` from the pinned commit. Adapted native source is in `src/`, and the
 retained adapted tests are in `tests/upstream/`. The published package contains
-native source, compiled CommonJS modules, documentation and both MIT notices.
+native source, documentation and both MIT notices.
 
 The registration crosswalk accounts for all 235 immutable source registrations:
 146 runtime registrations and 89 type assertions. Execution is verified separately.

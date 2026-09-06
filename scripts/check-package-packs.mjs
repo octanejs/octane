@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
-import { createOctaneSourcePlugin } from './build-package-commonjs.mjs';
+import { createOctaneSourcePlugin } from './packed-source-compiler.mjs';
 import {
 	cpSync,
 	existsSync,
@@ -1415,7 +1415,24 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 			timeout: 30_000,
 		}),
 	);
-	execFileSync(process.execPath, ['base-ui-behavior.cjs'], {
+	await build({
+		absWorkingDir: consumerDirectory,
+		entryPoints: ['base-ui-behavior.cjs'],
+		outfile: 'base-ui-behavior-bundle.cjs',
+		bundle: true,
+		format: 'cjs',
+		platform: 'node',
+		target: 'node22',
+		external: ['octane', 'octane/*'],
+		plugins: [
+			await createOctaneSourcePlugin(
+				consumerDirectory,
+				pathToFileURL(consumerRequire.resolve('octane/compiler/bundler')).href,
+			),
+		],
+		logLevel: 'silent',
+	});
+	execFileSync(process.execPath, ['base-ui-behavior-bundle.cjs'], {
 		cwd: consumerDirectory,
 		encoding: 'utf8',
 		stdio: ['ignore', 'pipe', 'pipe'],
@@ -1513,7 +1530,7 @@ console.log('Packed Select and Combobox server form values passed without a DOM.
 	);
 	assertRequiredPublicValueExports('.', commonjsSurface.octane);
 	assertRequiredPublicValueExports('.', esmSurface.octane);
-	for (const packageName of ['base', 'floating', 'radix']) {
+	for (const packageName of ['floating', 'radix']) {
 		if (!Array.isArray(commonjsSurface[packageName]) || commonjsSurface[packageName].length === 0) {
 			throw new Error(`packed CommonJS ${packageName} surface is empty`);
 		}
@@ -1521,10 +1538,13 @@ console.log('Packed Select and Combobox server form values passed without a DOM.
 			throw new Error(`packed ESM ${packageName} surface is empty`);
 		}
 	}
+	if (!Array.isArray(esmSurface.base) || esmSurface.base.length === 0) {
+		throw new Error('packed ESM Base UI surface is empty');
+	}
 	if (!Array.isArray(esmSurface.draggable) || esmSurface.draggable.length === 0) {
 		throw new Error('packed ESM draggable surface is empty');
 	}
-	for (const packageName of ['base', 'floating', 'octane', 'radix']) {
+	for (const packageName of ['floating', 'octane', 'radix']) {
 		if (
 			JSON.stringify([...commonjsSurface[packageName]].sort()) !==
 			JSON.stringify([...esmSurface[packageName]].sort())
@@ -1536,7 +1556,7 @@ console.log('Packed Select and Combobox server form values passed without a DOM.
 		throw new Error('packed ESM and CommonJS SSR output differs');
 	}
 	console.log(
-		'installed packed Octane, Floating UI, Base UI, Radix, and Draggable without React; CommonJS packages selected require conditions and Draggable compiled through its ESM source entry',
+		'installed packed Octane, Floating UI, Base UI, Radix, and Draggable without React; CommonJS packages selected require conditions and Base UI and Draggable compiled through their authored source entries',
 	);
 }
 

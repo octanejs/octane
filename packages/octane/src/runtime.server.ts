@@ -6135,6 +6135,51 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 	if (CSS !== null) CSS.set(id, nonce === undefined ? { css } : { css, nonce });
 }
 
+/**
+ * A compiled assigned `<style>` block (`const theme = <style>…</style>`) on the
+ * server. Its CSS belongs to whichever request reads the map — a component in
+ * another module applying `theme` or using `theme.card` — so injection happens
+ * on property access into the active render's collector, after the CSS of the
+ * themes this block itself applies (`applied`: every applied map, same-module
+ * or imported, each a wrapper of its own, so a chain injects transitively in
+ * "applied before applier" order and each sheet once). A body-less bundle
+ * (`<style apply={[a, b]} />`) has no sheet — `id` and `css` are `null` — and
+ * only forwards the touch. Reads outside a render are no-ops.
+ */
+export function styleMap<T extends object>(
+	id: string | null,
+	css: string | null,
+	map: T,
+	applied: ReadonlyArray<unknown> = [],
+): T {
+	let touching = false;
+	const touch = () => {
+		if (CSS === null || touching) return;
+		touching = true;
+		try {
+			for (const dependency of applied) touchStyleMap(dependency);
+			if (id !== null && css !== null) injectStyle(id, css);
+		} finally {
+			touching = false;
+		}
+	};
+	return new Proxy(map, {
+		get(target, key, receiver) {
+			touch();
+			return Reflect.get(target, key, receiver);
+		},
+	});
+}
+
+/**
+ * Compiled at the top of a server component body for every imported theme it
+ * applies, before its own `injectStyle` calls: reading the map injects the
+ * theme's CSS first, so the applying scope's rules win the cascade.
+ */
+export function touchStyleMap(map: unknown): void {
+	if (map !== null && typeof map === 'object') void (map as { $class?: unknown }).$class;
+}
+
 // Compiler-emitted for each hoisted `<title>`/`<meta>`/`<link>` (rendered
 // anywhere in a component). Serializes the element inside a paired ownership
 // marker interval that the client's headBlock adopts and appends it to the active
@@ -8381,9 +8426,16 @@ interface StreamSink {
 	/**
 	 * Returns a promise only when the transport applies pressure. `terminal`
 	 * permits the final degraded-boundary markers after an external abort; a
-	 * disconnected/cancelled consumer still rejects it.
+	 * disconnected/cancelled consumer still rejects it. `onUnaccepted` is only
+	 * called when an external abort rejects before web enqueue or Node
+	 * `dest.write`; Node writes that returned false already accepted bytes. The
+	 * `recovery` mode accepts writes after external abort but respects demand.
 	 */
-	write(chunk: string, terminal?: boolean): void | Promise<void>;
+	write(
+		chunk: string,
+		terminal?: boolean | 'recovery',
+		onUnaccepted?: (chunk: string) => void,
+	): void | Promise<void>;
 	shellReady(): void;
 	shellError(err: unknown): void;
 	allReady(): void;
@@ -8664,11 +8716,30 @@ async function runStream(
 	// Early fatal paths can return before `done` is awaited; observe it up
 	// front so a later rejection never surfaces as an unhandled rejection.
 	if (injection !== undefined) injection.done.then(NOOP, NOOP);
+	let injectionCompleted = false;
+	const completeInjection: () => void =
+		injection === undefined
+			? NOOP
+			: () => {
+					if (injectionCompleted) return;
+					injectionCompleted = true;
+					injection.renderComplete?.();
+				};
 	let injectionUnsubscribe: (() => void) | undefined;
 	let injectionFailure: unknown;
 	let injectionFailed = false;
+	const unacceptedInjection: string[] | undefined = injection === undefined ? undefined : [];
+	const rememberUnaccepted: (chunk: string) => void =
+		injection === undefined
+			? NOOP
+			: (chunk) => {
+					unacceptedInjection!.push(chunk);
+				};
 	let signalInjectionFailure: (() => void) | undefined;
 	const failInjection = (err: unknown): void => {
+		// An external abort rejects a sink write before it was accepted. Its
+		// payload is terminal salvage, not a failure of the injection source.
+		if (signal?.aborted && err === signal.reason) return;
 		if (injectionFailed) return;
 		injectionFailed = true;
 		injectionFailure = err;
@@ -8681,11 +8752,15 @@ async function runStream(
 	// its caller. Without injection, writes go to the sink directly — the
 	// established path, no chain, no extra microtasks.
 	let writeChain: Promise<void> | null = injection === undefined ? null : Promise.resolve();
-	const write: (chunk: string, terminal?: boolean) => void | Promise<void> =
+	const write: (
+		chunk: string,
+		terminal?: boolean | 'recovery',
+		onUnaccepted?: (chunk: string) => void,
+	) => void | Promise<void> =
 		injection === undefined
 			? (chunk, terminal) => sink.write(chunk, terminal)
-			: (chunk, terminal) => {
-					const operation = writeChain!.then(() => sink.write(chunk, terminal));
+			: (chunk, terminal, onUnaccepted) => {
+					const operation = writeChain!.then(() => sink.write(chunk, terminal, onUnaccepted));
 					writeChain = operation.then(NOOP, NOOP);
 					return operation;
 				};
@@ -8699,14 +8774,42 @@ async function runStream(
 			return;
 		}
 		if (!html) return;
-		return write(html);
+		return write(html, false, rememberUnaccepted);
 	};
+	const recoveryInjection: (() => Promise<string>) | undefined =
+		injection === undefined
+			? undefined
+			: async () => {
+					if (signal?.aborted) {
+						// Pending notification writes can reject before web enqueue or
+						// Node dest.write. Replay each taken chunk through demand; only
+						// the final recovery markers bypass pressure.
+						await writeChain;
+						for (const html of unacceptedInjection!) {
+							const replay = write(html, 'recovery');
+							if (replay !== undefined) await replay;
+						}
+						unacceptedInjection!.length = 0;
+					}
+					if (injectionFailed) return '';
+					let queued: string;
+					try {
+						queued = injection.take();
+					} catch {
+						return '';
+					}
+					if (queued !== '' && signal?.aborted) {
+						const replay = write(queued, 'recovery');
+						if (replay !== undefined) await replay;
+						return '';
+					}
+					return queued;
+				};
 	const notifyInjection = (): void => {
 		const drained = drainInjection();
-		// A transport failure here is re-observed by the next awaited render
-		// write (or the completion wait); the notify path only must not
-		// produce an unhandled rejection.
-		if (drained !== undefined) drained.catch(NOOP);
+		// Notifications write outside the render loop; surface their transport
+		// failure even when no later render chunk needs to pass through the gate.
+		if (drained !== undefined) drained.catch(failInjection);
 	};
 	/** Resolves when `done` settles; rejects on abort, take() failure, or done rejection. */
 	const waitForInjectionDone = (): Promise<void> =>
@@ -8828,12 +8931,26 @@ async function runStream(
 		}
 		pruneStreamBoundariesAbsentFromShell(stream, shellBoundaryKeys);
 	} catch (err) {
+		try {
+			completeInjection();
+		} catch {
+			// Keep the shell failure; source finalization is best effort here.
+		}
 		const reports = signal?.aborted ? Math.max(1, preShellSuspended.length) : 1;
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
 		sink.shellError(err);
 		return;
 	}
-	reportRecoverableBoundaryErrors();
+	try {
+		reportRecoverableBoundaryErrors();
+	} catch (err) {
+		try {
+			completeInjection();
+		} catch {
+			// The callback already failed; still release the injection source.
+		}
+		throw err;
+	}
 	// SHELL: styles first (so painted fallbacks are styled), hoisted head, body,
 	// the shell-scope seed script, then the swap runtime iff anything is pending.
 	// Every Float sheet the shell pass collected rides the shell head fold
@@ -8874,7 +8991,18 @@ async function runStream(
 	// The shell is vt-stripped as a whole below, so the withheld head is stripped
 	// here to keep both channels equivalent to the folded shell.
 	const separateHead = options?.headChannel === 'separate';
-	if (separateHead) options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head);
+	if (separateHead) {
+		try {
+			options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head);
+		} catch (err) {
+			try {
+				completeInjection();
+			} catch {
+				// The head callback already failed; still release the source.
+			}
+			throw err;
+		}
+	}
 	const shellHead = separateHead ? '' : pass.head;
 	const documentRoot = isDocumentRoot(pass.body);
 	let shell = documentRoot ? '<!DOCTYPE html>' : '';
@@ -8906,11 +9034,25 @@ async function runStream(
 		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
+		try {
+			completeInjection();
+		} catch {
+			// The shell write already failed; source finalization is best effort.
+		}
 		options?.onError?.(err);
 		sink.shellError(err);
 		return;
 	}
-	sink.shellReady();
+	try {
+		sink.shellReady();
+	} catch (err) {
+		try {
+			completeInjection();
+		} catch {
+			// Preserve the shell callback failure for the stream's rejection.
+		}
+		throw err;
+	}
 	if (injection !== undefined) {
 		// Subscribe only once the shell is on the wire: injected HTML must never
 		// precede it. HTML queued before this point is picked up by the initial
@@ -9046,20 +9188,17 @@ async function runStream(
 			injectionUnsubscribe?.();
 			injectionUnsubscribe = undefined;
 			try {
-				injection.renderComplete?.();
+				completeInjection();
 			} catch {
 				// The stream is already failing; the source's error cannot improve it.
 			}
 		}
 		let tail = '';
-		if (injection !== undefined && !injectionFailed) {
-			// Terminal salvage: queued injection HTML (typically the source's
-			// just-flushed serialization remainder) still ships, ahead of the
-			// recovery markers and the held tail.
+		if (recoveryInjection !== undefined) {
 			try {
-				tail += injection.take();
+				tail = await recoveryInjection();
 			} catch {
-				// A failing source forfeits its remainder; the terminal write goes on.
+				// A disconnected consumer cannot receive the remaining HTML.
 			}
 		}
 		for (const b of stream.boundaries.values()) {
@@ -9086,7 +9225,7 @@ async function runStream(
 		// `done` settles; abort and source failures route through the same
 		// degraded terminal path as a mid-render abort.
 		try {
-			injection.renderComplete?.();
+			completeInjection();
 		} catch (err) {
 			failInjection(err);
 		}
@@ -9094,13 +9233,18 @@ async function runStream(
 			await waitForInjectionDone();
 			const finalDrain = drainInjection();
 			if (finalDrain !== undefined) await finalDrain;
+			// A notification may already have taken the last HTML while its write
+			// waits for consumer demand. No final drain remains to await in that case.
+			await writeChain;
 			if (injectionFailed) throw injectionFailure;
 			if (heldDocumentTail !== '') {
-				// Cleared before awaiting: a post-acceptance rejection (abort racing
-				// the drain wait) must not resend the tail through the catch below.
+				// Restore the held tail only if the transport rejected before
+				// enqueueing it; Node may reject after accepting bytes under pressure.
 				const tailChunk = heldDocumentTail;
 				heldDocumentTail = '';
-				const tailWrite = write(tailChunk);
+				const tailWrite = write(tailChunk, false, (unaccepted) => {
+					heldDocumentTail = unaccepted;
+				});
 				if (tailWrite !== undefined) await tailWrite;
 			}
 		} catch (err) {
@@ -9110,14 +9254,10 @@ async function runStream(
 			injectionUnsubscribe?.();
 			injectionUnsubscribe = undefined;
 			let terminal = '';
-			if (!injectionFailed) {
-				// Terminal salvage: the source may have queued HTML (e.g. its
-				// serialization remainder) between the failure and this close.
-				try {
-					terminal = injection.take();
-				} catch {
-					// A failing source forfeits its remainder; the tail still ships.
-				}
+			try {
+				terminal = await recoveryInjection!();
+			} catch {
+				// A disconnected consumer cannot receive the remaining HTML.
 			}
 			terminal += heldDocumentTail;
 			if (terminal !== '') {
@@ -9178,7 +9318,11 @@ export function renderToPipeableStream(
 		}
 	}
 	let destination: Destination | null = null;
-	const buffered: { chunk: string; terminal: boolean }[] = [];
+	const buffered: {
+		chunk: string;
+		terminal: boolean | 'recovery';
+		onUnaccepted?: (chunk: string) => void;
+	}[] = [];
 	let ended = false;
 	let closed = false;
 	let endCalled = false;
@@ -9216,7 +9360,10 @@ export function renderToPipeableStream(
 		}
 	};
 
-	const waitForDrain = (dest: Destination): Promise<void> => {
+	const waitForDrain = (dest: Destination, allowAborted = false): Promise<void> => {
+		// A recovery write can close the destination synchronously inside
+		// dest.write(false), before these one-shot listeners are installed.
+		if (allowAborted && closed) return Promise.reject(new Error(formatServerError(38)));
 		if (dest.once === undefined) {
 			return Promise.reject(new TypeError(formatServerError(39)));
 		}
@@ -9254,15 +9401,22 @@ export function renderToPipeableStream(
 			dest.once!('drain', onDrain);
 			dest.once!('error', onError);
 			dest.once!('close', onClose);
-			if (controller.signal.aborted) onAbort();
-			else controller.signal.addEventListener('abort', onAbort, { once: true });
+			if (!allowAborted) {
+				if (controller.signal.aborted) onAbort();
+				else controller.signal.addEventListener('abort', onAbort, { once: true });
+			}
 		});
 	};
 
-	const writeNow = (chunk: string, terminal: boolean): void | Promise<void> => {
+	const writeNow = (
+		chunk: string,
+		terminal: boolean | 'recovery',
+		onUnaccepted?: (chunk: string) => void,
+	): void | Promise<void> => {
 		const dest = destination!;
 		if (closed) return Promise.reject(new Error(formatServerError(40)));
-		if (!terminal && controller.signal.aborted) {
+		if (terminal === false && controller.signal.aborted) {
+			onUnaccepted?.(chunk);
 			return Promise.reject(controller.signal.reason);
 		}
 		let accepted: unknown;
@@ -9275,7 +9429,9 @@ export function renderToPipeableStream(
 		// `write(false)` still accepted the bytes. Normal chunks wait for drain
 		// before rendering more; a terminal recovery marker can call end()
 		// immediately and let the Writable flush its already-buffered final bytes.
-		return accepted === false && !terminal ? waitForDrain(dest) : undefined;
+		return accepted === false && terminal !== true
+			? waitForDrain(dest, terminal === 'recovery')
+			: undefined;
 	};
 
 	const trackWrite = (operation: Promise<void>): Promise<void> => {
@@ -9300,16 +9456,22 @@ export function renderToPipeableStream(
 		return operation;
 	};
 
-	const queueWrite = (chunk: string, terminal = false): void | Promise<void> => {
+	const queueWrite = (
+		chunk: string,
+		terminal: boolean | 'recovery' = false,
+		onUnaccepted?: (chunk: string) => void,
+	): void | Promise<void> => {
 		if (destination === null) {
-			buffered.push({ chunk, terminal });
+			buffered.push(
+				onUnaccepted === undefined ? { chunk, terminal } : { chunk, terminal, onUnaccepted },
+			);
 			return;
 		}
 		if (writeGate !== null) {
-			const operation = writeGate.then(() => writeNow(chunk, terminal));
+			const operation = writeGate.then(() => writeNow(chunk, terminal, onUnaccepted));
 			return trackWrite(operation);
 		}
-		const operation = writeNow(chunk, terminal);
+		const operation = writeNow(chunk, terminal, onUnaccepted);
 		return operation === undefined ? undefined : trackWrite(operation);
 	};
 
@@ -9330,8 +9492,8 @@ export function renderToPipeableStream(
 			props,
 			renderOptions,
 			{
-				write(chunk, terminal) {
-					return queueWrite(chunk, terminal);
+				write(chunk, terminal, onUnaccepted) {
+					return queueWrite(chunk, terminal, onUnaccepted);
 				},
 				shellReady() {
 					options?.onShellReady?.();
@@ -9391,7 +9553,11 @@ export function renderToPipeableStream(
 			// Chunks accepted into the pre-pipe buffer remain deliverable even if
 			// abort() ran meanwhile (the final item is the degraded $OCTRX tail).
 			for (const item of buffered) {
-				queueWrite(item.chunk, item.terminal || controller.signal.aborted);
+				queueWrite(
+					item.chunk,
+					item.terminal === 'recovery' ? 'recovery' : item.terminal || controller.signal.aborted,
+					item.onUnaccepted,
+				);
 			}
 			buffered.length = 0;
 			finishEnd();
@@ -9471,8 +9637,11 @@ export function renderToReadableStream(
 		}) as ReadableStream<Uint8Array> & { allReady: Promise<void> };
 		stream.allReady = allReady;
 		let shellDone = false;
+		let terminal = false;
+		let released = false;
+		let callbackFailure: { error: unknown } | undefined;
 
-		const waitForDemand = (): Promise<void> =>
+		const waitForDemand = (allowAborted = false): Promise<void> =>
 			new Promise<void>((resolve, reject) => {
 				let settled = false;
 				const cleanup = (): void => {
@@ -9488,19 +9657,26 @@ export function renderToReadableStream(
 				const onDemand = () => finish(resolve);
 				const onAbort = () => finish(() => reject(renderController.signal.reason));
 				wakeDemand = onDemand;
-				if (renderController.signal.aborted) onAbort();
-				else renderController.signal.addEventListener('abort', onAbort, { once: true });
+				if (!allowAborted) {
+					if (renderController.signal.aborted) onAbort();
+					else renderController.signal.addEventListener('abort', onAbort, { once: true });
+				}
 			});
 
-		const writeReadable = (chunk: string, terminal = false): void | Promise<void> => {
+		const writeReadable = (
+			chunk: string,
+			terminal: boolean | 'recovery' = false,
+			onUnaccepted?: (chunk: string) => void,
+		): void | Promise<void> => {
 			if (closed || consumerCancelled) {
 				return Promise.reject(cancelReason ?? new Error(formatServerError(44)));
 			}
-			if (!terminal && renderController.signal.aborted) {
+			if (terminal === false && renderController.signal.aborted) {
+				onUnaccepted?.(chunk);
 				return Promise.reject(renderController.signal.reason);
 			}
 			const bytes = encoder.encode(chunk);
-			if (terminal) {
+			if (terminal === true) {
 				// Recovery is the sole bounded-pressure exception: enqueue at most one
 				// final $OCTRX chunk even when the shell fills the high-water mark. That
 				// keeps abort/error `allReady` rejection deterministic without losing
@@ -9513,13 +9689,18 @@ export function renderToReadableStream(
 				return;
 			}
 			return (async () => {
-				while ((readableController.desiredSize ?? 0) <= 0) {
-					await waitForDemand();
-					if (closed || consumerCancelled) {
-						throw cancelReason ?? new Error(formatServerError(44));
+				try {
+					while ((readableController.desiredSize ?? 0) <= 0) {
+						await waitForDemand(terminal === 'recovery');
+						if (closed || consumerCancelled) {
+							throw cancelReason ?? new Error(formatServerError(44));
+						}
 					}
+					readableController.enqueue(bytes);
+				} catch (err) {
+					if (!consumerCancelled && renderController.signal.aborted) onUnaccepted?.(chunk);
+					throw err;
 				}
-				readableController.enqueue(bytes);
 			})();
 		};
 
@@ -9536,46 +9717,82 @@ export function renderToReadableStream(
 		};
 
 		const renderOptions = { ...options, signal: renderController.signal };
+		if (options?.onError !== undefined) {
+			// An observer must not interrupt the renderer's recovery or leave the
+			// shell/allReady promises pending. Keep its first failure for settlement.
+			renderOptions.onError = (error) => {
+				try {
+					options.onError!(error);
+				} catch (err) {
+					callbackFailure ??= { error: err };
+				}
+			};
+		}
 		const resolved = newResolvedMap(renderOptions);
+		const release = (): void => {
+			if (released) return;
+			released = true;
+			releaseServerRenderResources(resolved);
+		};
+		const settleFailure = (error: unknown): void => {
+			if (terminal) return;
+			terminal = true;
+			try {
+				release();
+			} catch (err) {
+				error = err;
+			}
+			const reason = callbackFailure === undefined ? error : callbackFailure.error;
+			if (!shellDone) rejectShell(reason);
+			allReadyReject(reason);
+			closeReadable();
+		};
 		runStream(
 			component,
 			props,
 			renderOptions,
 			{
-				write(chunk, terminal) {
-					return writeReadable(chunk, terminal);
+				write(chunk, terminal, onUnaccepted) {
+					return writeReadable(chunk, terminal, onUnaccepted);
 				},
 				shellReady() {
-					shellDone = true;
 					options?.onShellReady?.();
+					shellDone = true;
 					resolveShell(stream);
 				},
 				shellError(err) {
-					releaseServerRenderResources(resolved);
-					options?.onShellError?.(err);
-					if (!shellDone) rejectShell(err);
-					allReadyReject(err);
-					closeReadable();
+					try {
+						release();
+						options?.onShellError?.(err);
+					} catch (callbackError) {
+						settleFailure(callbackError);
+						return;
+					}
+					settleFailure(err);
 				},
 				allReady() {
-					releaseServerRenderResources(resolved);
-					options?.onAllReady?.();
-					allReadyResolve();
+					if (terminal) return;
+					try {
+						release();
+						options?.onAllReady?.();
+					} catch (err) {
+						renderOptions.onError?.(err);
+						settleFailure(err);
+						return;
+					}
+					terminal = true;
+					if (callbackFailure === undefined) allReadyResolve();
+					else allReadyReject(callbackFailure.error);
 					closeReadable();
 				},
 				fatal(err) {
-					releaseServerRenderResources(resolved);
-					allReadyReject(err);
-					closeReadable();
+					settleFailure(err);
 				},
 			},
 			resolved,
 		).catch((err) => {
-			releaseServerRenderResources(resolved);
-			options?.onError?.(err);
-			if (!shellDone) rejectShell(err);
-			allReadyReject(err);
-			closeReadable();
+			renderOptions.onError?.(err);
+			settleFailure(err);
 		});
 	});
 }

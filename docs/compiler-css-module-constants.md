@@ -25,6 +25,14 @@ to prove that property constant. Octane does not infer immutability from a CSS
 filename, TypeScript `readonly`, a literal object initializer, or conventional
 CSS-module usage.
 
+Scoped `<style>` blocks are the contrast. An assigned block
+(`const theme = <style>…</style>`) compiles to a class map whose strings the
+compiler itself produced — `{ $class: '<hash>', dark: '<hash> dark' }` — so
+`class={theme.dark}` in the same module is already a proven literal and needs
+no provider contract; the compiler inlines it and keeps the template hoisted.
+Only a theme imported from another `.tsrx` module stays a runtime `$class` read.
+See [tsrx-basics.md](./tsrx-basics.md#assigned-blocks-and-class-maps).
+
 ## Immutable CSS providers
 
 A CSS provider that guarantees immutable exports can opt in through the Vite
@@ -99,7 +107,9 @@ export default {
 
 `true` accepts initialized named-string exports from a completely pure final
 JavaScript CSS module. This includes the `var` aliases emitted by
-`css-loader` and `CssExtractRspackPlugin` when named exports are enabled. A
+`css-loader` and `CssExtractRspackPlugin` when named exports are enabled. (A
+`.tsrx` module exporting assigned `<style>` themes is not a CSS module; its
+class maps are compiler output and never pass through this proof.) A
 callback can additionally authenticate immutable exports using the same
 `OctaneCssModuleConstants` result type exported by `octane/compiler`:
 
@@ -150,7 +160,10 @@ their existing CSS-loading boundary. The integration does not change the CSS
 provider's side-effect flags or execute a provider's application module.
 
 Custom compiler hosts can supply
-`resolveCssModuleConstant(request, imported, property)` directly. A named string
+`resolveCssModuleConstant(request, imported, property)` directly. It is asked
+about CSS-module imports only: a same-module `<style>` class map is inlined by
+the compiler without it, and an imported `.tsrx` theme is read as
+`theme.$class` at runtime rather than resolved here. A named string
 uses `property: null`; a namespace read uses `imported: '*'`; a default-map read
 uses `imported: 'default'`. Hosts that rely on ordinary CSS import reachability
 must also supply `preserveCssModuleReferences` with the affected authored module

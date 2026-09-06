@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { resolve, sep } from 'node:path';
 import { build } from 'esbuild';
 import { describe, expect, it } from 'vitest';
-import { createOctaneSourcePlugin } from '../../../scripts/build-package-commonjs.mjs';
+import { createOctaneSourcePlugin } from '../../../scripts/packed-source-compiler.mjs';
 import { octane } from '../../octane/src/compiler/vite.js';
 
 interface BrowserRealm {

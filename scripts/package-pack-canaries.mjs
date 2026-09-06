@@ -59,18 +59,20 @@ export function renderPackedExampleWorkspace(archiveSpecs) {
 }
 
 export const PACKED_COMMONJS_CONSUMER_PACKAGES = [
-	'@octanejs/base-ui',
 	'@octanejs/floating-ui',
 	'@octanejs/radix',
 	'octane',
 ];
 
-export const PACKED_ESM_ONLY_CONSUMER_PACKAGES = ['@octanejs/draggable'];
+export const PACKED_ESM_ONLY_CONSUMER_PACKAGES = [
+	'@octanejs/draggable',
+	'@octanejs/base-ui',
+	'@octanejs/base-ui-utils',
+];
 
 export const PACKED_JAVASCRIPT_CONSUMER_PACKAGES = [
 	...PACKED_COMMONJS_CONSUMER_PACKAGES,
 	...PACKED_ESM_ONLY_CONSUMER_PACKAGES,
-	'@octanejs/base-ui-utils',
 ];
 
 export function createPackedJavascriptConsumerManifest(archiveSpecs) {
@@ -95,22 +97,15 @@ export function renderPackedCommonjsConsumerSource() {
 const octane = require('octane');
 const server = require('octane/server');
 const floating = require('@octanejs/floating-ui');
-const base = require('@octanejs/base-ui');
-const { StoreInspector } = require('@octanejs/base-ui-utils/store');
 const radix = require('@octanejs/radix');
 
 assert.equal(typeof octane.createElement, 'function');
 assert.equal(typeof server.renderToString, 'function');
 assert.equal(typeof floating.useFloating, 'function');
-assert.equal(typeof base.Button, 'function');
-assert.equal(typeof base.Select.Root, 'function');
-assert.equal(typeof base.Combobox.Root, 'function');
-assert.equal(typeof StoreInspector, 'function');
 assert.equal(typeof radix.Accordion, 'object');
 const ssr = server.renderToString(() => 'conditions');
 assert.deepEqual(ssr, { html: 'conditions', css: '' });
 process.stdout.write(JSON.stringify({
-	base: Object.keys(base),
 	floating: Object.keys(floating),
 	octane: Object.keys(octane),
 	radix: Object.keys(radix),

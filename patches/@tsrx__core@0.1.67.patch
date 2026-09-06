@@ -1,7 +1,7 @@
 diff --git a/src/plugin.js b/src/plugin.js
 --- a/src/plugin.js
 +++ b/src/plugin.js
-@@ -2773,7 +2773,11 @@
+@@ -2887,7 +2887,11 @@
  			 */
  			reportReservedArrowTypeParam(node) {
  				// Allow <T>() => {} syntax without requiring trailing comma
@@ -17,7 +17,7 @@ diff --git a/src/plugin.js b/src/plugin.js
 diff --git a/src/transform/jsx/helpers.js b/src/transform/jsx/helpers.js
 --- a/src/transform/jsx/helpers.js
 +++ b/src/transform/jsx/helpers.js
-@@ -308,6 +308,9 @@ const TOOLING_LOCATION_WRAPPED_NODE_TYPES = new Set([
+@@ -309,6 +309,9 @@
  	'ExportDefaultDeclaration',
  	'ExportAllDeclaration',
  	'TSPropertySignature',

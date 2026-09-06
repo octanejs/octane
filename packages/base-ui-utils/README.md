@@ -18,8 +18,7 @@ import { Store } from '@octanejs/base-ui-utils/store';
 ```
 
 The package uses Octane hooks and native DOM events. Compile its ES module source
-with the application's Octane compiler. CommonJS exports contain compiled client
-modules. React is used only as the test oracle.
+with the application's Octane compiler. React is used only as the test oracle.
 
 The pinned source and verification status are recorded in [UPSTREAM.md](./UPSTREAM.md)
 and [status.json](./status.json).

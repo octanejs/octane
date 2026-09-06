@@ -18,7 +18,7 @@ see [UPSTREAM.md](./UPSTREAM.md) for the pinned source and evidence.
 
 Use it in an Octane application with the Octane compiler enabled. ES module
 exports ship authored source so the application compiler selects client or server
-output. CommonJS exports contain compiled client modules.
+output. Compile these source entries with the consuming application’s Octane toolchain.
 
 ## API
 

@@ -40,7 +40,7 @@ export function Comment({ id, depth }: { id: number; depth: number }) @{
 					<Comment id={kid} depth={depth + 1} />
 				} @pending {
 					<div {...stylex.props(styles.comment)}>{'…'}</div>
-				};
+				}
 			}
 		}
 	</div>

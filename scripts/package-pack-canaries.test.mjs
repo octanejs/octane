@@ -70,7 +70,7 @@ describe('packed JavaScript consumers', () => {
 		assert.match(source, /require\('octane'\)/);
 		assert.match(source, /require\('octane\/server'\)/);
 		assert.match(source, /require\('@octanejs\/floating-ui'\)/);
-		assert.match(source, /require\('@octanejs\/base-ui'\)/);
+		assert.doesNotMatch(source, /require\('@octanejs\/base-ui(?:-utils)?(?:\/[^']*)?'\)/);
 		assert.match(source, /require\('@octanejs\/radix'\)/);
 		assert.doesNotMatch(source, /require\('@octanejs\/draggable'\)/);
 		assert.match(source, /renderToString/);

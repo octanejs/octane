@@ -14,7 +14,7 @@ for (const name of ['base-ui', 'base-ui-utils']) {
 	const shipped = inspectShippedSources(packageRoot);
 	const sourceLedger = shipped.files.map((path) => ({
 		path,
-		// Native source and its compiled output retain upstream attribution.
+		// Native source retains upstream attribution.
 		// package.json is the Octane package's authored export/build manifest.
 		origin: path === 'package.json' ? 'authored' : 'adapted',
 		sha256: createHash('sha256')
