@@ -27826,7 +27826,19 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 	// A new client error instead replaces the old server primary.
 	if (!adoptServerCatch) removeRange(initial.start.nextSibling, initial.end);
 	const outerHydration = currentHydration;
-	if (adoptServerCatch) currentHydration = hydration;
+	if (adoptServerCatch) {
+		// The failed try-body attempt used `hydration` as its root and may have
+		// claimed the streamed catch nodes. Adopt through a fresh cursor so the
+		// catch arm does not mint a second tree beside the server DOM.
+		const catchHydration = new HydrationCapability(
+			state.parentBlock,
+			initial.start.nextSibling,
+			hydration.seeds,
+		);
+		catchHydration.claimRootRemainder(initial.end);
+		catchHydration.protectRootAnchor(initial.end);
+		currentHydration = catchHydration;
+	}
 	try {
 		switchToCatch(
 			state,
