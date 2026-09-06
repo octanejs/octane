@@ -44,6 +44,9 @@ and expose the same button + table contract:
   **same** `forBlock` fast path (the compiler recognizes a keyed JSX `.map` and
   compiles it like `@for`), so the jsx/tsrx ratio is ~1.0 — the React-JSX
   backwards-compat path carries no list-reconciliation penalty here.
+- Both Octane fixtures expose `window.__benchFlush` through public `flushSync`.
+  The harness calls it inside each timed click so a scheduled Octane commit is
+  included in the duration.
 - **`react`** — the canonical [keyed react-hooks][rh] implementation, the
   reference VDOM baseline. `dispatch` is wrapped in `flushSync` so React commits
   inside the discrete click (the harness times only the synchronous click; React
@@ -98,13 +101,29 @@ machine-readable copy of the results when `BENCH_JSON=<path>` is set
 (milliseconds; one `ops` map per target; a failed gate still writes the file
 with a top-level `"failed"` field).
 
+For the older **1,000-row clear** comparison, use `CLEAR_1K=1` with `run.mjs`.
+It defaults to 5 warmups and 15 measured samples. Set `CPU_THROTTLE=4` to apply
+Chromium's 4× CPU throttle to every target:
+
+```bash
+CLEAR_1K=1 CPU_THROTTLE=4 TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5176/","ready":"#run"}]' node benchmarks/js-framework/run.mjs
+```
+
+This diagnostic reports `clear_1k` under the separate `js-framework-clear-1k`
+suite name. The canonical `clear` operation still starts from 10,000 rows.
+This local in-page click timer excludes paint and browser automation latency;
+its numbers should not be compared directly with the official benchmark's
+Chrome timeline measurements.
+
 Output is a table of median + min millis per operation: `run`, `replace`,
 `add`, `update`, `select`, `swap`, `remove`, `runlots`, `select_lots`, `clear`.
 The harness uses `page.evaluate(el.click)` to fire clicks synchronously inside
 the page — avoids per-click CDP IPC overhead (~10ms each on Chromium) so the
-numbers reflect the renderer's wall time, not Playwright transport. Before
-warmup, each target receives the same seeded `Math.random` stream so generated
-label lengths and allocation patterns cannot drift between dialects.
+numbers reflect the renderer's wall time, not Playwright transport. Each timed
+click also verifies its DOM change immediately after its timer ends, before
+another scheduler turn can commit. Before warmup, each target receives the same
+seeded `Math.random` stream so generated label lengths and allocation patterns
+cannot drift between dialects.
 
 Selection samples alternate between the fifth and sixth rows so every click
 changes the selected key instead of measuring an equal-value state bailout.

@@ -31,9 +31,17 @@ import { chromium } from 'playwright';
 import { deterministicCount } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
-const ITER = parseInt(process.argv[2] || '8', 10);
+// Opt-in diagnostic matching the older 1k clear comparison. Keep the canonical
+// 10k suite and its historical baseline unchanged.
+const CLEAR_1K = process.env.CLEAR_1K === '1';
+const ITER = parseInt(process.argv[2] || (CLEAR_1K ? '15' : '8'), 10);
+const WARMUP = CLEAR_1K ? 5 : 3;
 const ROW_COUNT = 1000;
 const ROW_COUNT_LARGE = 10000; // matches the canonical suite's runlots / clear table size
+const CPU_THROTTLE = Number(process.env.CPU_THROTTLE || 1);
+if (!Number.isFinite(CPU_THROTTLE) || CPU_THROTTLE < 1) {
+	throw new Error('CPU_THROTTLE must be a number >= 1');
+}
 
 const TARGETS = process.env.TARGETS
 	? JSON.parse(process.env.TARGETS)
@@ -49,7 +57,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'inferno', url: 'http://localhost:5320/', ready: '#run' },
 		];
 
-const OPS = [
+const CANONICAL_OPS = [
 	{ name: 'run', pre: 'empty', click: '#run' },
 	{ name: 'replace', pre: 'rows', click: '#run' },
 	// Canonical krausest "append 1,000 rows to a table of 1,000 rows". The
@@ -78,6 +86,7 @@ const OPS = [
 	// the upstream suite. Use `rows-large` to ensure the 10K state first.
 	{ name: 'clear', pre: 'rows-large', click: '#clear' },
 ];
+const OPS = CLEAR_1K ? [{ name: 'clear_1k', pre: 'rows', click: '#clear' }] : CANONICAL_OPS;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -128,29 +137,63 @@ async function ensureState(page, pre) {
 	await sleep(20);
 }
 
-// Time ONLY the click handler's commit: the target commits its DOM mutation
-// synchronously on the discrete click (octane flushes on the event), so the
-// post-click rAF + task wait was pure noise — ~16ms of frame latency + the paint
-// of up to 10K rows, which swamped and destabilised the real JS work. A gc()
-// right before each sample keeps a surprise collection from inflating it.
+// Time the click and its DOM commit without adding a frame or paint wait. A
+// gc() right before each sample keeps a surprise collection from inflating it.
 //
-// Any TARGETS added here must either commit synchronously on click
-// (react/ripple flushSync, solid flush()) or — for frameworks with no public
-// sync flush (vue-vapor) — expose `window.__benchFlush = () => <promise that
-// resolves once the scheduler has flushed>`; the timed window then extends
-// until that promise settles, so the framework's own microtask scheduling cost
-// stays inside the measurement.
-async function timeClick(page, sel) {
-	return await page.evaluate(async (sel) => {
-		const el = document.querySelector(sel);
-		if (!el) throw new Error('selector not found: ' + sel);
-		const flush = window.__benchFlush;
-		(window.gc || (() => {}))();
-		const t0 = performance.now();
-		el.click();
-		if (flush) await flush();
-		return performance.now() - t0;
-	}, sel);
+// Targets that schedule a later commit expose window.__benchFlush: Octane uses
+// public flushSync and Vue awaits nextTick. The call stays in the timed window.
+// Verify the resulting DOM after t1, before any further async work, so this
+// semantic gate cannot inflate the timing or accidentally observe a later commit.
+async function timeClick(page, op, selector) {
+	return await page.evaluate(
+		async ({ op, selector }) => {
+			const el = document.querySelector(selector);
+			if (!el) throw new Error('selector not found: ' + selector);
+			const tbody = document.querySelector('tbody');
+			const firstRow = tbody?.querySelector('tr');
+			const secondRow = op === 'swap' ? tbody?.rows[1] : null;
+			const removedRow = op === 'remove' ? el.closest('tr') : null;
+			const oldLabel =
+				op === 'update' ? firstRow?.querySelector('td:nth-child(2) a')?.textContent : null;
+			const flush = window.__benchFlush;
+			(window.gc || (() => {}))();
+			const t0 = performance.now();
+			el.click();
+			if (flush) await flush();
+			const elapsed = performance.now() - t0;
+			const expectedRows = {
+				run: 1000,
+				replace: 1000,
+				add: 2000,
+				update: 1000,
+				select: 1000,
+				swap: 1000,
+				remove: 999,
+				runlots: 10000,
+				select_lots: 10000,
+				clear: 0,
+				clear_1k: 0,
+			}[op];
+			if (tbody?.rows.length !== expectedRows) {
+				throw new Error(
+					`${op}: commit was not inside timed click (expected ${expectedRows} rows, found ${tbody?.rows.length})`,
+				);
+			}
+			if (
+				(op === 'replace' && firstRow === tbody.rows[0]) ||
+				(op === 'update' &&
+					oldLabel === tbody.rows[0]?.querySelector('td:nth-child(2) a')?.textContent) ||
+				(op === 'swap' && secondRow !== tbody.rows[998]) ||
+				(op === 'remove' && removedRow?.isConnected) ||
+				((op === 'select' || op === 'select_lots') &&
+					!el.closest('tr')?.classList.contains('danger'))
+			) {
+				throw new Error(`${op}: the expected DOM change was not committed inside the timed click`);
+			}
+			return elapsed;
+		},
+		{ op: op.name, selector },
+	);
 }
 
 async function verifySelection(page, selector) {
@@ -313,7 +356,7 @@ async function countProductionMountCalls(target) {
 		}
 		if (calls === 0) throw new Error('mount gate: no production asset call coverage');
 
-		await page.evaluate((expectedRows) => {
+		await page.evaluate(async (expectedRows) => {
 			const rows = Array.from(document.querySelectorAll('tbody tr'));
 			if (rows.length !== expectedRows) {
 				throw new Error(`mount gate: profiled mount produced ${rows.length} rows`);
@@ -326,6 +369,7 @@ async function countProductionMountCalls(target) {
 			}
 			const row = rows[4];
 			row.querySelector('td:nth-child(2) a').click();
+			if (window.__benchFlush) await window.__benchFlush();
 			const selected = document.querySelectorAll('tbody tr.danger');
 			if (selected.length !== 1 || selected[0] !== row) {
 				throw new Error('mount gate: profiled row event or selection failed');
@@ -350,12 +394,16 @@ async function runTarget(t) {
 	});
 	const context = await browser.newContext();
 	const page = await context.newPage();
+	if (CPU_THROTTLE > 1) {
+		const cdp = await context.newCDPSession(page);
+		await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_THROTTLE });
+	}
 	await page.goto(t.url, { waitUntil: 'load' });
 	await page.waitForSelector(t.ready, { timeout: 10000 });
 	await seedRandom(page);
 
 	// Warmup — let JIT settle.
-	for (let i = 0; i < 3; i++) {
+	for (let i = 0; i < WARMUP; i++) {
 		await page.evaluate(() => document.getElementById('run').click());
 		await sleep(120);
 		await page.evaluate(() => document.getElementById('clear').click());
@@ -368,7 +416,7 @@ async function runTarget(t) {
 		for (let i = 0; i < ITER; i++) {
 			await ensureState(page, op.pre);
 			const selector = i % 2 === 1 && op.alternateClick ? op.alternateClick : op.click;
-			const dt = await timeClick(page, selector);
+			const dt = await timeClick(page, op, selector);
 			if (op.alternateClick) await verifySelection(page, selector);
 			samples.push(dt);
 			await sleep(60);
@@ -376,7 +424,7 @@ async function runTarget(t) {
 		results[op.name] = summarizeSamples(samples);
 	}
 
-	if (t.name === 'octane-tsrx' || t.name === 'octane-jsx') {
+	if (!CLEAR_1K && (t.name === 'octane-tsrx' || t.name === 'octane-jsx')) {
 		for (const operation of [
 			{ name: '1k', button: 'run', initialRows: 0, addedRows: ROW_COUNT },
 			{ name: '10k', button: 'runlots', initialRows: 0, addedRows: ROW_COUNT_LARGE },
@@ -482,7 +530,7 @@ async function runTarget(t) {
 	// in the benchmarks README): milliseconds, one ops map per target.
 	if (process.env.BENCH_JSON) {
 		const payload = {
-			suite: 'js-framework',
+			suite: CLEAR_1K ? 'js-framework-clear-1k' : 'js-framework',
 			iterations: ITER,
 			targets: TARGETS.map((t) => ({
 				name: t.name,
