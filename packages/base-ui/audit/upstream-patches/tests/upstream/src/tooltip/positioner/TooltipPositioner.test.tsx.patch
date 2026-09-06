@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/src/tooltip/positioner/TooltipPositioner.test.tsx b/tests/upstream/src/tooltip/positioner/TooltipPositioner.test.tsx
+--- a/tests/upstream/src/tooltip/positioner/TooltipPositioner.test.tsx
++++ b/tests/upstream/src/tooltip/positioner/TooltipPositioner.test.tsx
+@@ -5,10 +5,10 @@ import { Tooltip } from '@octanejs/base-ui/tooltip';
+ import { screen, waitFor } from '@mui/internal-test-utils';
+ import { createRenderer, describeConformance, isJSDOM, waitForPositioned } from '#test-utils';
+ 
+-const Trigger = React.forwardRef(function Trigger(
+-  props: Tooltip.Trigger.Props,
+-  ref: React.ForwardedRef<any>,
++const Trigger = (function Trigger(
++  propsWithRef: (Tooltip.Trigger.Props) & { ref?: React.Ref<any> },
+ ) {
++  const { ref: ref = null, ...props } = propsWithRef;
+   return <Tooltip.Trigger {...props} ref={ref} render={<div />} />;
+ });
+ 

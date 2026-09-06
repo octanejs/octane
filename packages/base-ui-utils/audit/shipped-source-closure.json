@@ -1,0 +1,427 @@
+{
+  "runtimeDependencies": ["@floating-ui/utils", "octane", "reselect"],
+  "adaptedSources": [
+    {
+      "packageName": "@base-ui/utils",
+      "paths": [
+        "src/addEventListener.ts",
+        "src/areArraysEqual.ts",
+        "src/clamp.ts",
+        "src/createLogOnce.ts",
+        "src/empty.ts",
+        "src/error.ts",
+        "src/fastHooks.ts",
+        "src/fastObjectShallowCompare.ts",
+        "src/formatErrorMessage.ts",
+        "src/formatNumber.ts",
+        "src/generateId.ts",
+        "src/getDefaultFormSubmitter.ts",
+        "src/getReactElementRef.ts",
+        "src/inertValue.ts",
+        "src/isElementDisabled.ts",
+        "src/isMouseWithinBounds.ts",
+        "src/mergeCleanups.ts",
+        "src/mergeObjects.ts",
+        "src/owner.ts",
+        "src/platform/engine.ts",
+        "src/platform/env.ts",
+        "src/platform/index.ts",
+        "src/platform/media-query.ts",
+        "src/platform/os.ts",
+        "src/platform/parts.ts",
+        "src/platform/screen-reader.ts",
+        "src/platform/shared.ts",
+        "src/reactVersion.ts",
+        "src/safeReact.ts",
+        "src/shadowDom.ts",
+        "src/store/ReactStore.ts",
+        "src/store/Store.ts",
+        "src/store/StoreInspector.tsrx",
+        "src/store/createSelector.ts",
+        "src/store/createSelectorMemoized.ts",
+        "src/store/index.ts",
+        "src/store/useStore.ts",
+        "src/stringifyLocale.ts",
+        "src/testUtils.ts",
+        "src/useAnimationFrame.ts",
+        "src/useControlled.ts",
+        "src/useEnhancedClickHandler.ts",
+        "src/useForcedRerendering.ts",
+        "src/useId.ts",
+        "src/useIdleCallback.ts",
+        "src/useInterval.ts",
+        "src/useIsoLayoutEffect.ts",
+        "src/useMergedRefs.ts",
+        "src/useOnFirstRender.ts",
+        "src/useOnMount.ts",
+        "src/usePreviousValue.ts",
+        "src/useRefWithInit.ts",
+        "src/useScrollLock.ts",
+        "src/useStableCallback.ts",
+        "src/useTimeout.ts",
+        "src/useValueAsRef.ts",
+        "src/visuallyHidden.ts",
+        "src/warn.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/addEventListener.ts",
+      "origin": "adapted",
+      "sha256": "aaa1b7426f55b81e87a0958b15aafdb5a3584c3b45a5b3cc2b9935eb51572219",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/areArraysEqual.ts",
+      "origin": "adapted",
+      "sha256": "d518591dc71efa1522d598e34ea426a821056faf1a0998bf083686b429a32505",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/clamp.ts",
+      "origin": "adapted",
+      "sha256": "5a487873607dd5b3ca4691f2808400169981ed929f4efa66e5511e23dfdceb9e",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/createLogOnce.ts",
+      "origin": "adapted",
+      "sha256": "3faa9946dfcc79f6b2cd18a5afe8d880a5969eff82fb039a3a4e3d63336f97df",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/empty.ts",
+      "origin": "adapted",
+      "sha256": "7d7c8625346dc2344dc551004c5c5da82878ab814818b7a8df4ad7082979ead6",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/error.ts",
+      "origin": "adapted",
+      "sha256": "957b3369d680d50a26cce3b4e9add608b2e829cb299636bde056e76297002847",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/fastHooks.ts",
+      "origin": "adapted",
+      "sha256": "9c98f5aec0313889699e0bf1d431c3595e0caca632aa6474a36798f09c6290e2",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/fastObjectShallowCompare.ts",
+      "origin": "adapted",
+      "sha256": "2f4e6f04c58cb8ef4c4c5c6825648b8778f6a9c9b4de328396cf5d94f4610fb0",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/formatErrorMessage.ts",
+      "origin": "adapted",
+      "sha256": "3a89837ac6b4e4b4e72974950626f0fa0ba8c2faed1084e0fdcc687acc913c70",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/formatNumber.ts",
+      "origin": "adapted",
+      "sha256": "2311e42059e7bb79dbfe0741d249bf9a6751e5edc889d2554e38e698fdf75145",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/generateId.ts",
+      "origin": "adapted",
+      "sha256": "3cb39d20b329f6e4e444bd04e65bfde4f11a36204a2d428f5a507c52d5ab5ed0",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/getDefaultFormSubmitter.ts",
+      "origin": "adapted",
+      "sha256": "ee452e8c7861c87a51358a7bf4cff21b759dd41e2ddac09cc9e8e54bd97ac667",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/getReactElementRef.ts",
+      "origin": "adapted",
+      "sha256": "f9870d241183aee1c7ec203a16c558b75f9dc6faf4cb2285ba4d0c5ba5d34e08",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/inertValue.ts",
+      "origin": "adapted",
+      "sha256": "7d95f0b8a38ef3e78b7cf069b849a07f933fe8f707a1c2dbf79d1f9bd6a6dfb8",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/isElementDisabled.ts",
+      "origin": "adapted",
+      "sha256": "71441e609d081552ae70355007e1a51f58b4bf171b945eb555c25304051ed5e3",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/isMouseWithinBounds.ts",
+      "origin": "adapted",
+      "sha256": "11920ff91fc898639589ef7a34a7f29563f1f4c78b5736f534fa083439483723",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/mergeCleanups.ts",
+      "origin": "adapted",
+      "sha256": "aac7dfc19c1f56ebdab634ec727b151bfc9db5de604e08b03c6db1d186073dc0",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/mergeObjects.ts",
+      "origin": "adapted",
+      "sha256": "38879d27e088453199facd3eda475072b41a8d32fdfdc4a8b8df7d63e7900c40",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/owner.ts",
+      "origin": "adapted",
+      "sha256": "14d58c010b2b803fbf966b69f8b63da6ee65d1a1750e56fb5ed20f7187c8ff53",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/platform/engine.ts",
+      "origin": "adapted",
+      "sha256": "a6a132ac9faf90482f8f7910b37b60b8e9e6e8ce5889187e537f281948edd581",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/platform/env.ts",
+      "origin": "adapted",
+      "sha256": "4e06a24df446a27d2b282491ebdf5a213c9c3c155a11ba2007d47dbb675dd438",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/platform/index.ts",
+      "origin": "adapted",
+      "sha256": "8f801696b9cd0c681fc4ec36dca1e0eecfafee3f28c73729ec9c3501dbaf6ddb",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/platform/media-query.ts",
+      "origin": "adapted",
+      "sha256": "cb5f9941ec4c24667d7d4061392fbe2b57064c333cf4e94435d2239a0ed45a65",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/platform/os.ts",
+      "origin": "adapted",
+      "sha256": "ff660f2ef20ba3b785acb23cd6eea6b3710792d6d1da8c8a06341ae73673717b",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/platform/parts.ts",
+      "origin": "adapted",
+      "sha256": "5102b62f441c8d8710a3db052e1dfcf0b4498eb3e9d533b1c444321b989eceb2",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/platform/screen-reader.ts",
+      "origin": "adapted",
+      "sha256": "36dd99107aca1638e9520f0136dd294a03f3268ab8d44d0202f7be601c892f7a",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/platform/shared.ts",
+      "origin": "adapted",
+      "sha256": "34ea118dd9d11135796fdbe77624028815ad01cca2b1cece192c720b0509354f",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/reactVersion.ts",
+      "origin": "adapted",
+      "sha256": "1acc0560ad4870a08e2e00e47a82f6080e6e803e2eec667678818e4bb2a418aa",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/safeReact.ts",
+      "origin": "adapted",
+      "sha256": "4c5fb72a5e6607e4e0b7b80e87c6ba624aba164ea8d7a0144362ee75365a497e",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/shadowDom.ts",
+      "origin": "adapted",
+      "sha256": "2bee28f0fe900be5083cb6839e7f537e7ef0e3da6e77b82335fdda8bfefd0275",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/store/ReactStore.ts",
+      "origin": "adapted",
+      "sha256": "eb35f2c2342b7700c97c5e2dfbd306a7da76eec89149bce5f929e7a680cd1bfb",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/store/Store.ts",
+      "origin": "adapted",
+      "sha256": "02c2f6d2b1230abc1a904cb369b20d70fe1db19468cdd550b005a87889401e8a",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/store/StoreInspector.tsrx",
+      "origin": "adapted",
+      "sha256": "ad91bee3a2a1259691a3172594214b21354f6025ebccd9d37f7f5ec35a597bf1",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/store/createSelector.ts",
+      "origin": "adapted",
+      "sha256": "b8102d2bee8c02aac14ada285b4f6f838bcaaf8ffdd2c5f910e0e2c22da252b9",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/store/createSelectorMemoized.ts",
+      "origin": "adapted",
+      "sha256": "db310db1f262d54d975ecf433e00cee3ed18de9dc2c11a97f5fbb7a47cf917fe",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/store/index.ts",
+      "origin": "adapted",
+      "sha256": "8d1495c5f7a74c63dcde5f1c01f0409b63c1207260fd769864a399b454f410d0",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/store/useStore.ts",
+      "origin": "adapted",
+      "sha256": "03aa6ef08d3f5d3d9bb0b9f233862e3633181cef584d4cb8fe1c0fb8429c884b",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/stringifyLocale.ts",
+      "origin": "adapted",
+      "sha256": "9932b46be5c16ed47af1fa9b88e1cbb7946c50108c173e2e6cb058e4de42da75",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/testUtils.ts",
+      "origin": "adapted",
+      "sha256": "d9dcf32bb9aa0f3b1c616c136b719e00765f2b9a4038cc3020df112489f0b872",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useAnimationFrame.ts",
+      "origin": "adapted",
+      "sha256": "9df2c212cdd1b9c79d94e87e5d0d5acaa0969c5afb49503c0e8399200c747c5c",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useControlled.ts",
+      "origin": "adapted",
+      "sha256": "536a9933ab9e0a43c21a302468412082b93318feaabeda170ddba3c3fb41d4c2",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useEnhancedClickHandler.ts",
+      "origin": "adapted",
+      "sha256": "ff3383ad836f04a0cfc731c81b1455fccd3320e270ebc8db3278aecca286f047",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useForcedRerendering.ts",
+      "origin": "adapted",
+      "sha256": "49963d2103b04c6ea94c7fa695e2d92b3f44e1f90c7c9015eac2bd40fe7aa4af",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useId.ts",
+      "origin": "adapted",
+      "sha256": "383bdd95b3bc2fd3a4f15650a92296506268b7f800e52c132a637e9cee3f4107",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useIdleCallback.ts",
+      "origin": "adapted",
+      "sha256": "d4f015c27b4c8bcd043bef9393ed10077118e19d6387c5725206db37e1442d5a",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useInterval.ts",
+      "origin": "adapted",
+      "sha256": "2752a06bfafaeb807105c69a95f58c84fdc8d8ed0253f97c063fb392623b7fb0",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useIsoLayoutEffect.ts",
+      "origin": "adapted",
+      "sha256": "a34c8378bf80a9999d3fb36933607119d6a47d2c7b0b1ec68946e5c0e0b05ca3",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useMergedRefs.ts",
+      "origin": "adapted",
+      "sha256": "4b303e6433df8b51436acb5bf95a2a4b94e03994b4c3da4479e2364643548cce",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useOnFirstRender.ts",
+      "origin": "adapted",
+      "sha256": "bafb79c35c0fad368a48c352c87b71eaacd0e90893c3dc119f484acaf141835b",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useOnMount.ts",
+      "origin": "adapted",
+      "sha256": "82108f63436a691eba7652cf4e6860e6280d81394ca636fd3fa2d929aa9176cc",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/usePreviousValue.ts",
+      "origin": "adapted",
+      "sha256": "41b6c6b56b01aaa23f2da840646171b99909ff94fc454065af6242e669c959bb",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useRefWithInit.ts",
+      "origin": "adapted",
+      "sha256": "b54a48ce8543ca48f4c383261dfcd3f587a94f3487bbd5ff6492e255e22e75c7",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useScrollLock.ts",
+      "origin": "adapted",
+      "sha256": "6c23c9a3cf307fa41ab0b51399348fb872859e0b26e9b4b741fdc03384f619db",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useStableCallback.ts",
+      "origin": "adapted",
+      "sha256": "d4de9b10fdad3853dff6e693423e73415300dfc506eedfbec0222b4766ccf3bf",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useTimeout.ts",
+      "origin": "adapted",
+      "sha256": "068b148f11431e61b3b235a899356173fd22c55a5e162ed969eaa7200c5ce92c",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/useValueAsRef.ts",
+      "origin": "adapted",
+      "sha256": "c9d1fb927b7075ab09e1b1ef1614f521822a8f50455a606814babd21103fd6c8",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/visuallyHidden.ts",
+      "origin": "adapted",
+      "sha256": "1f4a827581ff27e15315d814b87c1acff399bc04d3b5ecee83d4477fff577240",
+      "packageName": "@base-ui/utils"
+    },
+    {
+      "path": "src/warn.ts",
+      "origin": "adapted",
+      "sha256": "4e5565f4957742aaa2795bae3f37bfbc88dac51528550b3406ed5cef92474c00",
+      "packageName": "@base-ui/utils"
+    }
+  ],
+  "reimplementedDependencies": [
+    {
+      "packageName": "use-sync-external-store",
+      "publicBehaviors": [
+        "Native store subscriptions render the latest values of every selector after consecutive updates."
+      ],
+      "localEvidence": ["tests/fast-store.test.tsrx"]
+    }
+  ]
+}

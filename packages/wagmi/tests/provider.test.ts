@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createConfig, http } from '@wagmi/core';
 import { mock } from '@wagmi/connectors/mock';
 import { mainnet } from 'viem/chains';
@@ -45,9 +45,10 @@ describe('WagmiProvider connection lifecycle', () => {
 		releaseConnect();
 		await act(async () => {
 			await connectGate;
-			await new Promise((resolve) => setTimeout(resolve, 0));
 		});
-		expect(mounted.find('#status').textContent).toBe('connected');
+		await vi.waitFor(() => {
+			expect(mounted!.find('#status').textContent).toBe('connected');
+		});
 		expect(mounted.find('#address').textContent).toBe(account);
 	});
 
@@ -69,11 +70,10 @@ describe('WagmiProvider connection lifecycle', () => {
 		});
 		flushEffects();
 		mounted.click('#connect');
-		await act(async () => {
-			await new Promise((resolve) => setTimeout(resolve, 0));
+		await vi.waitFor(() => {
+			expect(mounted!.find('#connect-mutation-status').textContent).toBe('error');
 		});
 		expect(attempts).toBe(1);
-		expect(mounted.find('#connect-mutation-status').textContent).toBe('error');
 	});
 
 	it('resets the connect mutation after connected → disconnected', async () => {
@@ -88,10 +88,9 @@ describe('WagmiProvider connection lifecycle', () => {
 		});
 		flushEffects();
 		mounted.click('#connect');
-		await act(async () => {
-			await new Promise((resolve) => setTimeout(resolve, 0));
+		await vi.waitFor(() => {
+			expect(mounted!.find('#connect-mutation-status').textContent).toBe('success');
 		});
-		expect(mounted.find('#connect-mutation-status').textContent).toBe('success');
 		act(() => {
 			config.setState((state) => ({
 				...state,

@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/src/field/control/FieldControl.spec.tsx b/tests/upstream/src/field/control/FieldControl.spec.tsx
+--- a/tests/upstream/src/field/control/FieldControl.spec.tsx
++++ b/tests/upstream/src/field/control/FieldControl.spec.tsx
+@@ -3,6 +3,6 @@ import * as React from 'octane';
+ import { Field } from '@octanejs/base-ui/field';
+ 
+ function App() {
+-  const ref = React.useRef<HTMLTextAreaElement>(null);
++  const ref = React.useRef<HTMLTextAreaElement | null>(null);
+   return <Field.Control ref={ref} render={<textarea />} />;
+ }

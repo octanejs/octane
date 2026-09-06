@@ -1,50 +1,44 @@
-// Ported from .base-ui/packages/react/src/utils/useAnchoredPopupScrollLock.ts (v1.6.0),
-// octane-adapted (slot-threaded). Touch-opened popups normally skip scroll lock so a swipe outside
-// can still dismiss; this re-enables scroll lock only when the popup is effectively full-width
-// (leaving too little outside space for a reliable swipe).
-import { useState, useLayoutEffect } from 'octane';
+/** @jsxImportSource octane */
+'use client';
+import * as React from 'octane';
+import { ownerDocument } from '@octanejs/base-ui-utils/owner';
+import { useScrollLock } from '@octanejs/base-ui-utils/useScrollLock';
+import { useIsoLayoutEffect } from '@octanejs/base-ui-utils/useIsoLayoutEffect';
 
-import { S, subSlot } from '../internal';
-import { ownerDocument } from './owner';
-import { useScrollLock } from './useScrollLock';
-
+// Touch-opened popups normally avoid scroll locking so users can still swipe outside to dismiss.
+// This hook re-enables scroll lock only when the popup is effectively full-width.
+// Treat popups with up to 20px of total horizontal gutter as full-width so common ~10px side
+// padding still locks scroll, since that leaves too little outside space for a reliable swipe.
 const VIEWPORT_WIDTH_TOLERANCE_PX = 20;
 
+/**
+ * Manages scroll lock for anchored popups. For non-touch opens, scroll lock is applied when
+ * enabled. For touch opens, scroll lock is applied only when the positioner width is effectively
+ * viewport-sized.
+ */
 export function useAnchoredPopupScrollLock(
 	enabled: boolean,
 	touchOpen: boolean,
 	positionerElement: HTMLElement | null,
 	referenceElement: Element | null,
-): void {
-	const slot = S('useAnchoredPopupScrollLock');
-	const [touchOpenShouldLockScroll, setTouchOpenShouldLockScroll] = useState(
-		false,
-		subSlot(slot, 'lock'),
-	);
+) {
+	const [touchOpenShouldLockScroll, setTouchOpenShouldLockScroll] = React.useState(false);
 
-	useLayoutEffect(
-		() => {
-			if (!enabled || !touchOpen || positionerElement == null) {
-				setTouchOpenShouldLockScroll(false);
-				return;
-			}
+	useIsoLayoutEffect(() => {
+		if (!enabled || !touchOpen || positionerElement == null) {
+			setTouchOpenShouldLockScroll(false);
+			return;
+		}
 
-			const viewportWidth = ownerDocument(positionerElement).documentElement.clientWidth;
-			const popupWidth = positionerElement.offsetWidth;
+		const viewportWidth = ownerDocument(positionerElement).documentElement.clientWidth;
+		const popupWidth = positionerElement.offsetWidth;
 
-			setTouchOpenShouldLockScroll(
-				viewportWidth > 0 &&
-					popupWidth > 0 &&
-					popupWidth >= viewportWidth - VIEWPORT_WIDTH_TOLERANCE_PX,
-			);
-		},
-		[enabled, touchOpen, positionerElement],
-		subSlot(slot, 'eff'),
-	);
+		setTouchOpenShouldLockScroll(
+			viewportWidth > 0 &&
+				popupWidth > 0 &&
+				popupWidth >= viewportWidth - VIEWPORT_WIDTH_TOLERANCE_PX,
+		);
+	}, [enabled, touchOpen, positionerElement]);
 
-	useScrollLock(
-		enabled && (!touchOpen || touchOpenShouldLockScroll),
-		referenceElement,
-		subSlot(slot, 'scroll'),
-	);
+	useScrollLock(enabled && (!touchOpen || touchOpenShouldLockScroll), referenceElement);
 }

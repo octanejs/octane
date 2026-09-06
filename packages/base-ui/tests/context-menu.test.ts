@@ -80,9 +80,10 @@ describe('@octanejs/base-ui — ContextMenu behavior', () => {
 		// menu is absolute), because it is anchored to a point in the viewport, not to an element.
 		const positioner = m.find('.ctx-positioner') as HTMLElement;
 		expect(positioner.style.position).toBe('fixed');
+		// The pinned React control in react-controls/menu-contracts.test.jsx verifies these origins.
 		// The anchor is a synthetic zero-size rect at the cursor, held on `ContextMenu.Root` and
 		// repointed by the trigger on every gesture, so the computed origin tracks the pointer.
-		expect(positioner.style.getPropertyValue('--transform-origin')).toBe('1px 74px');
+		expect(positioner.style.getPropertyValue('--transform-origin')).toBe('1px 75px');
 
 		m.unmount();
 
@@ -95,7 +96,7 @@ describe('@octanejs/base-ui — ContextMenu behavior', () => {
 		await settle();
 		expect(
 			(m2.find('.ctx-positioner') as HTMLElement).style.getPropertyValue('--transform-origin'),
-		).toBe('1px 294px');
+		).toBe('1px 295px');
 
 		m2.unmount();
 	});

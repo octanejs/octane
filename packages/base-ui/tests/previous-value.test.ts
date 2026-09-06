@@ -1,17 +1,16 @@
+/** @jsxImportSource octane */
 import { describe, expect, it } from 'vitest';
 import { createElement, Suspense, use } from 'octane';
 import { mount } from '../../octane/tests/_helpers';
-import { usePreviousValue } from '../src/utils/usePreviousValue';
+import { usePreviousValue } from '@octanejs/base-ui-utils/usePreviousValue';
 
 interface PreviousValueProps {
 	value: string | number;
 	resource?: Promise<void> | null;
 }
 
-const PREVIOUS_VALUE_SLOT = Symbol('base-ui-previous-value');
-
 function PreviousValue(props: PreviousValueProps) {
-	const previous = usePreviousValue<string | number>(props.value, PREVIOUS_VALUE_SLOT);
+	const previous = usePreviousValue<string | number>(props.value);
 	if (props.resource != null) use(props.resource);
 	return createElement('output', { 'data-testid': 'previous-value' }, previous ?? 'initial');
 }
@@ -43,11 +42,11 @@ describe('@octanejs/base-ui — previous distinct value', () => {
 		}
 	});
 
-	it('does not treat positive and negative zero as distinct values', () => {
+	it('treats positive and negative zero as distinct values, matching Object.is upstream', () => {
 		const result = mount(PreviousValueBoundary, { value: 0 });
 		try {
 			result.update(PreviousValueBoundary, { value: -0 });
-			expect(result.find('[data-testid="previous-value"]').textContent).toBe('initial');
+			expect(result.find('[data-testid="previous-value"]').textContent).toBe('0');
 		} finally {
 			result.unmount();
 		}

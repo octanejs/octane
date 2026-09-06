@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/src/store/Store.spec.ts b/tests/upstream/src/store/Store.spec.ts
+--- a/tests/upstream/src/store/Store.spec.ts
++++ b/tests/upstream/src/store/Store.spec.ts
+@@ -1,5 +1,5 @@
+-import { expectType } from '../testUtils';
+-import { Store } from './Store';
++import { expectType } from "../../../../src/testUtils.ts";
++import { Store } from "../../../../src/store/Store.ts";
+ 
+ // Store.create returns an instance of the class it is called on.
+ {

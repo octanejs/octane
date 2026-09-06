@@ -154,7 +154,7 @@ describe('hydrateRoot — <Activity>', () => {
 		root.unmount();
 	});
 
-	it('re-hides try content freshly mounted by a hydration resume inside a hidden Activity', async () => {
+	it('keeps a preserved hydration arm hidden until its Activity becomes visible', async () => {
 		const { html } = ServerRT.renderToString(server.ActivitySuspenseHydration, {
 			mode: 'visible',
 			suspend: false,
@@ -173,13 +173,13 @@ describe('hydrateRoot — <Activity>', () => {
 		});
 		flushSync(() => {});
 
-		const pending = container.querySelector('#activity-resume-pending') as HTMLElement;
-		expect(container.querySelector('#activity-resumed-content')).toBeNull();
-		expect(pending.style.display).toBe('none');
+		expect(container.querySelector('#activity-resume-pending')).toBeNull();
+		expect(container.querySelector('#activity-resumed-content')).toBe(serverContent);
+		expect((serverContent as HTMLElement).style.display).toBe('none');
 		await act(() => resolve('client'));
 
 		const resumed = container.querySelector('#activity-resumed-content') as HTMLElement;
-		expect(resumed).not.toBe(serverContent);
+		expect(resumed).toBe(serverContent);
 		expect(resumed.textContent).toBe('client');
 		expect(resumed.style.display).toBe('none');
 

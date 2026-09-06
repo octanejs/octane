@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "React Testing Library for the octane renderer — reuses the framework-agnostic @testing-library/dom verbatim and ports only react-testing-library's thin React layer (render/cleanup/renderHook) onto octane's createRoot + act.",
+  "description": "React Testing Library for the octane renderer \u2014 reuses the framework-agnostic @testing-library/dom verbatim and ports only react-testing-library's thin React layer (render/cleanup/renderHook) onto octane's createRoot + act.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -44,13 +44,15 @@
     "@testing-library/dom": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0"
+    "octane": "workspace:^0.2.5"
   },
   "devDependencies": {
     "@testing-library/user-event": "^14.6.1",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "semver": "7.8.5",
     "vitest": "catalog:default"
   }
 }

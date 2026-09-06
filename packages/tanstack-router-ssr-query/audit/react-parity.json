@@ -11,10 +11,7 @@
     "integrity": "sha256:14b0cc524faad53c9e0d68fb2277bdd66147f0589048762fde82dda6aa7fa743",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "absent",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "absent", "types": "present" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-router-ssr-query/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "acfa82cb9987059d0fb25e890806a7a44486953d8edbf273d76746aeb43c3789"
+      "lockfileSha256": "003c260afd05b30f26f56dfc47427e7a1486059a258349db9f9f5ae01bca6a44"
     }
   },
   "lanes": [
@@ -109,7 +106,7 @@
       "environment": "workspace-node",
       "project": "tanstack-router-ssr-query-pristine-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Invokes the vendored upstream tsconfig.build.json under typescript55\u2013typescript60, matching upstream test:types accept/reject evidence (no dedicated expectType artifacts).",
+      "notes": "Invokes the vendored upstream tsconfig.build.json under typescript55–typescript60, matching upstream test:types accept/reject evidence (no dedicated expectType artifacts).",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",

@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/toast/title/ToastTitle.test.tsx b/tests/upstream/src/toast/title/ToastTitle.test.tsx
+--- a/tests/upstream/src/toast/title/ToastTitle.test.tsx
++++ b/tests/upstream/src/toast/title/ToastTitle.test.tsx
+@@ -201,7 +201,7 @@ describe('<Toast.Title />', () => {
+ 
+   it('clears aria-labelledby from the root when the title content is removed', async () => {
+     function Fixture() {
+-      const [title, setTitle] = React.useState<React.ReactNode>('Toast title');
++      const [title, setTitle] = React.useState<React.OctaneNode>('Toast title');
+       return (
+         <Toast.Provider>
+           <Toast.Viewport>

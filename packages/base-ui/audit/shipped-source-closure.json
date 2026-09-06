@@ -1,0 +1,4629 @@
+{
+  "runtimeDependencies": [
+    "@date-fns/tz",
+    "@floating-ui/utils",
+    "@octanejs/base-ui-utils",
+    "@octanejs/floating-ui",
+    "date-fns",
+    "luxon",
+    "octane"
+  ],
+  "adaptedSources": [
+    {
+      "packageName": "@base-ui/react",
+      "paths": [
+        "src/accordion/header/AccordionHeader.tsrx",
+        "src/accordion/index.parts.ts",
+        "src/accordion/index.ts",
+        "src/accordion/item/AccordionItem.tsrx",
+        "src/accordion/item/AccordionItemContext.ts",
+        "src/accordion/item/AccordionItemDataAttributes.ts",
+        "src/accordion/item/stateAttributesMapping.ts",
+        "src/accordion/panel/AccordionPanel.tsrx",
+        "src/accordion/panel/AccordionPanelCssVars.ts",
+        "src/accordion/root/AccordionRoot.tsrx",
+        "src/accordion/root/AccordionRootContext.ts",
+        "src/accordion/trigger/AccordionTrigger.tsrx",
+        "src/alert-dialog/handle.ts",
+        "src/alert-dialog/index.parts.ts",
+        "src/alert-dialog/index.ts",
+        "src/alert-dialog/root/AlertDialogRoot.tsrx",
+        "src/alert-dialog/trigger/AlertDialogTrigger.tsrx",
+        "src/autocomplete/index.parts.ts",
+        "src/autocomplete/index.ts",
+        "src/autocomplete/input-group/AutocompleteInputGroup.tsrx",
+        "src/autocomplete/item/AutocompleteItem.tsrx",
+        "src/autocomplete/root/AutocompleteRoot.tsrx",
+        "src/autocomplete/separator/AutocompleteSeparator.tsrx",
+        "src/autocomplete/trigger/AutocompleteTrigger.tsrx",
+        "src/autocomplete/value/AutocompleteValue.tsrx",
+        "src/avatar/fallback/AvatarFallback.tsrx",
+        "src/avatar/image/AvatarImage.tsrx",
+        "src/avatar/image/useImageLoadingStatus.ts",
+        "src/avatar/index.parts.ts",
+        "src/avatar/index.ts",
+        "src/avatar/root/AvatarRoot.tsrx",
+        "src/avatar/root/AvatarRootContext.ts",
+        "src/avatar/root/stateAttributesMapping.ts",
+        "src/button/Button.tsrx",
+        "src/button/index.ts",
+        "src/checkbox-group/CheckboxGroup.tsrx",
+        "src/checkbox-group/CheckboxGroupContext.ts",
+        "src/checkbox-group/index.ts",
+        "src/checkbox-group/useCheckboxGroupParent.ts",
+        "src/checkbox/index.parts.ts",
+        "src/checkbox/index.ts",
+        "src/checkbox/indicator/CheckboxIndicator.tsrx",
+        "src/checkbox/root/CheckboxRoot.tsrx",
+        "src/checkbox/root/CheckboxRootContext.ts",
+        "src/checkbox/root/CheckboxRootDataAttributes.ts",
+        "src/checkbox/utils/getCheckboxStateAttributesMapping.ts",
+        "src/collapsible/index.parts.ts",
+        "src/collapsible/index.ts",
+        "src/collapsible/panel/CollapsiblePanel.tsrx",
+        "src/collapsible/panel/CollapsiblePanelCssVars.ts",
+        "src/collapsible/panel/CollapsiblePanelDataAttributes.ts",
+        "src/collapsible/panel/useCollapsiblePanel.ts",
+        "src/collapsible/root/CollapsibleRoot.tsrx",
+        "src/collapsible/root/CollapsibleRootContext.ts",
+        "src/collapsible/root/stateAttributesMapping.ts",
+        "src/collapsible/root/useCollapsibleRoot.ts",
+        "src/collapsible/trigger/CollapsibleTrigger.tsrx",
+        "src/collapsible/trigger/CollapsibleTriggerDataAttributes.ts",
+        "src/combobox/arrow/ComboboxArrow.tsrx",
+        "src/combobox/backdrop/ComboboxBackdrop.tsrx",
+        "src/combobox/chip-remove/ComboboxChipRemove.tsrx",
+        "src/combobox/chip/ComboboxChip.tsrx",
+        "src/combobox/chip/ComboboxChipContext.ts",
+        "src/combobox/chips/ComboboxChips.tsrx",
+        "src/combobox/chips/ComboboxChipsContext.ts",
+        "src/combobox/clear/ComboboxClear.tsrx",
+        "src/combobox/collection/ComboboxCollection.tsrx",
+        "src/combobox/collection/GroupCollectionContext.tsrx",
+        "src/combobox/empty/ComboboxEmpty.tsrx",
+        "src/combobox/group-label/ComboboxGroupLabel.tsrx",
+        "src/combobox/group/ComboboxGroup.tsrx",
+        "src/combobox/group/ComboboxGroupContext.ts",
+        "src/combobox/icon/ComboboxIcon.tsrx",
+        "src/combobox/index.parts.ts",
+        "src/combobox/index.ts",
+        "src/combobox/input-group/ComboboxInputGroup.tsrx",
+        "src/combobox/input/ComboboxInput.tsrx",
+        "src/combobox/input/ComboboxInputDataAttributes.ts",
+        "src/combobox/item-indicator/ComboboxItemIndicator.tsrx",
+        "src/combobox/item/ComboboxItem.tsrx",
+        "src/combobox/item/ComboboxItemContext.ts",
+        "src/combobox/items/createItems.ts",
+        "src/combobox/items/itemCollection.ts",
+        "src/combobox/label/ComboboxLabel.tsrx",
+        "src/combobox/list/ComboboxList.tsrx",
+        "src/combobox/popup/ComboboxPopup.tsrx",
+        "src/combobox/portal/ComboboxPortal.tsrx",
+        "src/combobox/portal/ComboboxPortalContext.tsrx",
+        "src/combobox/positioner/ComboboxPositioner.tsrx",
+        "src/combobox/positioner/ComboboxPositionerContext.tsrx",
+        "src/combobox/root/AriaCombobox.tsrx",
+        "src/combobox/root/ComboboxRoot.tsrx",
+        "src/combobox/root/ComboboxRootContext.tsrx",
+        "src/combobox/root/utils/constants.ts",
+        "src/combobox/root/utils/index.ts",
+        "src/combobox/root/utils/useFilter.ts",
+        "src/combobox/root/utils/useFilteredItems.ts",
+        "src/combobox/row/ComboboxRow.tsrx",
+        "src/combobox/row/ComboboxRowContext.ts",
+        "src/combobox/separator/ComboboxSeparator.tsrx",
+        "src/combobox/status/ComboboxStatus.tsrx",
+        "src/combobox/store.ts",
+        "src/combobox/trigger/ComboboxTrigger.tsrx",
+        "src/combobox/utils/ComboboxInternalDismissButton.tsrx",
+        "src/combobox/utils/handleInputPress.ts",
+        "src/combobox/utils/parts.ts",
+        "src/combobox/utils/stateAttributesMapping.ts",
+        "src/combobox/utils/useInitialLiveRegionTextMutation.ts",
+        "src/combobox/value/ComboboxValue.tsrx",
+        "src/context-menu/index.parts.ts",
+        "src/context-menu/index.ts",
+        "src/context-menu/positioner/ContextMenuPositioner.tsrx",
+        "src/context-menu/root/ContextMenuRoot.tsrx",
+        "src/context-menu/root/ContextMenuRootContext.ts",
+        "src/context-menu/trigger/ContextMenuTrigger.tsrx",
+        "src/csp-provider/CSPProvider.tsrx",
+        "src/csp-provider/index.parts.ts",
+        "src/csp-provider/index.ts",
+        "src/dialog/backdrop/DialogBackdrop.tsrx",
+        "src/dialog/close/DialogClose.tsrx",
+        "src/dialog/description/DialogDescription.tsrx",
+        "src/dialog/index.parts.ts",
+        "src/dialog/index.ts",
+        "src/dialog/popup/DialogPopup.tsrx",
+        "src/dialog/popup/DialogPopupCssVars.ts",
+        "src/dialog/popup/DialogPopupDataAttributes.ts",
+        "src/dialog/portal/DialogPortal.tsrx",
+        "src/dialog/portal/DialogPortalContext.ts",
+        "src/dialog/root/DialogRoot.tsrx",
+        "src/dialog/root/DialogRootContext.ts",
+        "src/dialog/root/useDialogRoot.ts",
+        "src/dialog/root/useRenderDialogRoot.tsrx",
+        "src/dialog/store/DialogHandle.ts",
+        "src/dialog/store/DialogStore.ts",
+        "src/dialog/title/DialogTitle.tsrx",
+        "src/dialog/trigger/DialogTrigger.tsrx",
+        "src/dialog/utils/stateAttributesMapping.ts",
+        "src/dialog/viewport/DialogViewport.tsrx",
+        "src/dialog/viewport/DialogViewportDataAttributes.ts",
+        "src/direction-provider/DirectionProvider.tsrx",
+        "src/direction-provider/index.parts.ts",
+        "src/direction-provider/index.ts",
+        "src/drawer/backdrop/DrawerBackdrop.tsrx",
+        "src/drawer/backdrop/DrawerBackdropCssVars.ts",
+        "src/drawer/close/DrawerClose.tsrx",
+        "src/drawer/content/DrawerContent.tsrx",
+        "src/drawer/content/drawerContentAttribute.ts",
+        "src/drawer/description/DrawerDescription.tsrx",
+        "src/drawer/handle.ts",
+        "src/drawer/indent-background/DrawerIndentBackground.tsrx",
+        "src/drawer/indent/DrawerIndent.tsrx",
+        "src/drawer/index.parts.ts",
+        "src/drawer/index.ts",
+        "src/drawer/popup/DrawerPopup.tsrx",
+        "src/drawer/popup/DrawerPopupCssVars.ts",
+        "src/drawer/popup/DrawerPopupDataAttributes.ts",
+        "src/drawer/portal/DrawerPortal.tsrx",
+        "src/drawer/provider/DrawerProvider.tsrx",
+        "src/drawer/provider/DrawerProviderContext.ts",
+        "src/drawer/root/DrawerRoot.tsrx",
+        "src/drawer/root/DrawerRootContext.ts",
+        "src/drawer/root/useDrawerSnapPoints.ts",
+        "src/drawer/swipe-area/DrawerSwipeArea.tsrx",
+        "src/drawer/swipe-area/DrawerSwipeAreaDataAttributes.ts",
+        "src/drawer/title/DrawerTitle.tsrx",
+        "src/drawer/trigger/DrawerTrigger.tsrx",
+        "src/drawer/viewport/DrawerViewport.tsrx",
+        "src/drawer/viewport/DrawerViewportContext.tsrx",
+        "src/drawer/viewport/DrawerViewportCssVars.ts",
+        "src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardContext.tsrx",
+        "src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsrx",
+        "src/field/control/FieldControl.tsrx",
+        "src/field/control/FieldControlDataAttributes.ts",
+        "src/field/description/FieldDescription.tsrx",
+        "src/field/error/FieldError.tsrx",
+        "src/field/index.parts.ts",
+        "src/field/index.ts",
+        "src/field/item/FieldItem.tsrx",
+        "src/field/item/FieldItemContext.ts",
+        "src/field/label/FieldLabel.tsrx",
+        "src/field/root/FieldRoot.tsrx",
+        "src/field/root/useFieldValidation.ts",
+        "src/field/utils/getCombinedFieldValidityData.ts",
+        "src/field/validity/FieldValidity.tsrx",
+        "src/fieldset/index.parts.ts",
+        "src/fieldset/index.ts",
+        "src/fieldset/legend/FieldsetLegend.tsrx",
+        "src/fieldset/root/FieldsetRoot.tsrx",
+        "src/fieldset/root/FieldsetRootContext.ts",
+        "src/floating-ui-react/components/FloatingDelayGroup.tsrx",
+        "src/floating-ui-react/components/FloatingFocusManager.tsrx",
+        "src/floating-ui-react/components/FloatingPortal.tsrx",
+        "src/floating-ui-react/components/FloatingRootStore.ts",
+        "src/floating-ui-react/components/FloatingTree.tsrx",
+        "src/floating-ui-react/components/FloatingTreeStore.ts",
+        "src/floating-ui-react/hooks/gridNavigation.ts",
+        "src/floating-ui-react/hooks/useClick.ts",
+        "src/floating-ui-react/hooks/useClientPoint.ts",
+        "src/floating-ui-react/hooks/useDismiss.ts",
+        "src/floating-ui-react/hooks/useFloating.ts",
+        "src/floating-ui-react/hooks/useFloatingRootContext.ts",
+        "src/floating-ui-react/hooks/useFocus.ts",
+        "src/floating-ui-react/hooks/useHover.ts",
+        "src/floating-ui-react/hooks/useHoverFloatingInteraction.ts",
+        "src/floating-ui-react/hooks/useHoverInteractionSharedState.ts",
+        "src/floating-ui-react/hooks/useHoverReferenceInteraction.ts",
+        "src/floating-ui-react/hooks/useHoverShared.ts",
+        "src/floating-ui-react/hooks/useListNavigation.ts",
+        "src/floating-ui-react/hooks/useSyncedFloatingRootContext.ts",
+        "src/floating-ui-react/hooks/useTypeahead.ts",
+        "src/floating-ui-react/index.ts",
+        "src/floating-ui-react/middleware/arrow.ts",
+        "src/floating-ui-react/middleware/positioning.ts",
+        "src/floating-ui-react/safePolygon.ts",
+        "src/floating-ui-react/utils.ts",
+        "src/floating-ui-react/utils/composite.ts",
+        "src/floating-ui-react/utils/constants.ts",
+        "src/floating-ui-react/utils/createAttribute.ts",
+        "src/floating-ui-react/utils/createEventEmitter.ts",
+        "src/floating-ui-react/utils/element.ts",
+        "src/floating-ui-react/utils/enqueueFocus.ts",
+        "src/floating-ui-react/utils/event.ts",
+        "src/floating-ui-react/utils/getEmptyRootContext.ts",
+        "src/floating-ui-react/utils/markOthers.ts",
+        "src/floating-ui-react/utils/nodes.ts",
+        "src/floating-ui-react/utils/tabbable.ts",
+        "src/form/Form.tsrx",
+        "src/form/index.ts",
+        "src/index.ts",
+        "src/input/Input.tsrx",
+        "src/input/index.ts",
+        "src/internals/PrehydrationScript.tsrx",
+        "src/internals/RequestQueue.ts",
+        "src/internals/TimeoutManager.ts",
+        "src/internals/TransitionStatusDataAttributes.ts",
+        "src/internals/composite/composite.ts",
+        "src/internals/composite/constants.ts",
+        "src/internals/composite/index.ts",
+        "src/internals/composite/item/CompositeItem.tsrx",
+        "src/internals/composite/item/useCompositeItem.ts",
+        "src/internals/composite/list/CompositeList.tsrx",
+        "src/internals/composite/list/CompositeListContext.ts",
+        "src/internals/composite/list/useCompositeListItem.ts",
+        "src/internals/composite/root/CompositeRoot.tsrx",
+        "src/internals/composite/root/CompositeRootContext.ts",
+        "src/internals/composite/root/gridNavigation.ts",
+        "src/internals/composite/root/useCompositeRoot.ts",
+        "src/internals/constants.ts",
+        "src/internals/createBaseUIEventDetails.ts",
+        "src/internals/csp-context/CSPContext.tsrx",
+        "src/internals/csp-context/index.ts",
+        "src/internals/direction-context/DirectionContext.tsrx",
+        "src/internals/direction-context/index.ts",
+        "src/internals/field-constants/constants.ts",
+        "src/internals/field-constants/index.ts",
+        "src/internals/field-register-control/index.ts",
+        "src/internals/field-register-control/useFieldControlRegistration.ts",
+        "src/internals/field-register-control/useRegisterFieldControl.ts",
+        "src/internals/field-root-context/FieldRootContext.ts",
+        "src/internals/field-root-context/index.ts",
+        "src/internals/filter.ts",
+        "src/internals/form-context/FormContext.ts",
+        "src/internals/form-context/index.ts",
+        "src/internals/getDisabledMountTransitionStyles.ts",
+        "src/internals/getStateAttributesProps.ts",
+        "src/internals/itemEquality.ts",
+        "src/internals/labelable-provider/LabelableContext.ts",
+        "src/internals/labelable-provider/LabelableProvider.tsrx",
+        "src/internals/labelable-provider/index.ts",
+        "src/internals/labelable-provider/useAriaLabelledBy.ts",
+        "src/internals/labelable-provider/useLabel.ts",
+        "src/internals/labelable-provider/useLabelableId.ts",
+        "src/internals/noop.ts",
+        "src/internals/prehydrationScript.stub.ts",
+        "src/internals/reason-parts.ts",
+        "src/internals/reasons.ts",
+        "src/internals/resolveValueLabel.tsrx",
+        "src/internals/serializeValue.ts",
+        "src/internals/stateAttributesMapping.ts",
+        "src/internals/temporal-adapter-date-fns/TemporalAdapterDateFns.ts",
+        "src/internals/temporal-adapter-date-fns/index.ts",
+        "src/internals/temporal-adapter-luxon/TemporalAdapterLuxon.ts",
+        "src/internals/temporal-adapter-luxon/index.ts",
+        "src/internals/temporal/index.ts",
+        "src/internals/temporal/temporal-adapter.ts",
+        "src/internals/temporal/temporal.ts",
+        "src/internals/types.ts",
+        "src/internals/use-button/index.ts",
+        "src/internals/use-button/useButton.ts",
+        "src/internals/useAnchorPositioning.ts",
+        "src/internals/useAnimationsFinished.ts",
+        "src/internals/useBaseUiId.ts",
+        "src/internals/useOpenChangeComplete.tsrx",
+        "src/internals/usePressAndHold.ts",
+        "src/internals/useRenderElement.tsrx",
+        "src/internals/useTransitionStatus.ts",
+        "src/internals/useValueChanged.ts",
+        "src/menu/arrow/MenuArrow.tsrx",
+        "src/menu/backdrop/MenuBackdrop.tsrx",
+        "src/menu/checkbox-item-indicator/MenuCheckboxItemIndicator.tsrx",
+        "src/menu/checkbox-item/MenuCheckboxItem.tsrx",
+        "src/menu/checkbox-item/MenuCheckboxItemContext.ts",
+        "src/menu/checkbox-item/MenuCheckboxItemDataAttributes.ts",
+        "src/menu/group-label/MenuGroupLabel.tsrx",
+        "src/menu/group/MenuGroup.tsrx",
+        "src/menu/group/MenuGroupContext.ts",
+        "src/menu/index.parts.ts",
+        "src/menu/index.ts",
+        "src/menu/item/MenuItem.tsrx",
+        "src/menu/item/useMenuItem.ts",
+        "src/menu/item/useMenuItemCommonProps.ts",
+        "src/menu/link-item/MenuLinkItem.tsrx",
+        "src/menu/popup/MenuPopup.tsrx",
+        "src/menu/portal/MenuPortal.tsrx",
+        "src/menu/portal/MenuPortalContext.ts",
+        "src/menu/positioner/MenuPositioner.tsrx",
+        "src/menu/positioner/MenuPositionerContext.ts",
+        "src/menu/radio-group/MenuRadioGroup.tsrx",
+        "src/menu/radio-group/MenuRadioGroupContext.ts",
+        "src/menu/radio-item-indicator/MenuRadioItemIndicator.tsrx",
+        "src/menu/radio-item/MenuRadioItem.tsrx",
+        "src/menu/radio-item/MenuRadioItemContext.ts",
+        "src/menu/root/MenuRoot.tsrx",
+        "src/menu/root/MenuRootContext.ts",
+        "src/menu/store/MenuHandle.ts",
+        "src/menu/store/MenuStore.ts",
+        "src/menu/submenu-root/MenuSubmenuRoot.tsrx",
+        "src/menu/submenu-root/MenuSubmenuRootContext.ts",
+        "src/menu/submenu-trigger/MenuSubmenuTrigger.tsrx",
+        "src/menu/trigger/MenuTrigger.tsrx",
+        "src/menu/utils/findRootOwnerId.ts",
+        "src/menu/utils/stateAttributesMapping.ts",
+        "src/menu/viewport/MenuViewport.tsrx",
+        "src/menubar/Menubar.tsrx",
+        "src/menubar/MenubarContext.ts",
+        "src/menubar/MenubarDataAttributes.ts",
+        "src/menubar/index.ts",
+        "src/merge-props/index.ts",
+        "src/merge-props/mergeProps.ts",
+        "src/meter/index.parts.ts",
+        "src/meter/index.ts",
+        "src/meter/indicator/MeterIndicator.tsrx",
+        "src/meter/label/MeterLabel.tsrx",
+        "src/meter/root/MeterRoot.tsrx",
+        "src/meter/root/MeterRootContext.ts",
+        "src/meter/track/MeterTrack.tsrx",
+        "src/meter/value/MeterValue.tsrx",
+        "src/navigation-menu/arrow/NavigationMenuArrow.tsrx",
+        "src/navigation-menu/backdrop/NavigationMenuBackdrop.tsrx",
+        "src/navigation-menu/content/NavigationMenuContent.tsrx",
+        "src/navigation-menu/content/NavigationMenuContentDataAttributes.ts",
+        "src/navigation-menu/icon/NavigationMenuIcon.tsrx",
+        "src/navigation-menu/index.parts.ts",
+        "src/navigation-menu/index.ts",
+        "src/navigation-menu/item/NavigationMenuItem.tsrx",
+        "src/navigation-menu/item/NavigationMenuItemContext.ts",
+        "src/navigation-menu/link/NavigationMenuLink.tsrx",
+        "src/navigation-menu/list/NavigationMenuDismissContext.ts",
+        "src/navigation-menu/list/NavigationMenuList.tsrx",
+        "src/navigation-menu/popup/NavigationMenuPopup.tsrx",
+        "src/navigation-menu/popup/NavigationMenuPopupCssVars.ts",
+        "src/navigation-menu/portal/NavigationMenuPortal.tsrx",
+        "src/navigation-menu/portal/NavigationMenuPortalContext.ts",
+        "src/navigation-menu/positioner/NavigationMenuPositioner.tsrx",
+        "src/navigation-menu/positioner/NavigationMenuPositionerContext.ts",
+        "src/navigation-menu/positioner/NavigationMenuPositionerCssVars.ts",
+        "src/navigation-menu/root/NavigationMenuRoot.tsrx",
+        "src/navigation-menu/root/NavigationMenuRootContext.ts",
+        "src/navigation-menu/trigger/NavigationMenuTrigger.tsrx",
+        "src/navigation-menu/utils/constants.ts",
+        "src/navigation-menu/utils/isOutsideMenuEvent.ts",
+        "src/navigation-menu/utils/setSharedFixedSize.ts",
+        "src/navigation-menu/utils/useNavigationMenuAnchorPositioning.ts",
+        "src/navigation-menu/viewport/NavigationMenuViewport.tsrx",
+        "src/number-field/decrement/NumberFieldDecrement.tsrx",
+        "src/number-field/group/NumberFieldGroup.tsrx",
+        "src/number-field/increment/NumberFieldIncrement.tsrx",
+        "src/number-field/index.parts.ts",
+        "src/number-field/index.ts",
+        "src/number-field/input/NumberFieldInput.tsrx",
+        "src/number-field/root/NumberFieldRoot.tsrx",
+        "src/number-field/root/NumberFieldRootContext.ts",
+        "src/number-field/root/useNumberFieldStepperButton.ts",
+        "src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursor.tsrx",
+        "src/number-field/scrub-area/NumberFieldScrubArea.tsrx",
+        "src/number-field/scrub-area/NumberFieldScrubAreaContext.ts",
+        "src/number-field/utils/getViewportRect.ts",
+        "src/number-field/utils/parse.ts",
+        "src/number-field/utils/stateAttributesMapping.ts",
+        "src/number-field/utils/validate.ts",
+        "src/otp-field/index.parts.ts",
+        "src/otp-field/index.ts",
+        "src/otp-field/input/OTPFieldInput.tsrx",
+        "src/otp-field/root/OTPFieldRoot.tsrx",
+        "src/otp-field/root/OTPFieldRootContext.ts",
+        "src/otp-field/utils/otp.ts",
+        "src/otp-field/utils/stateAttributesMapping.ts",
+        "src/popover/arrow/PopoverArrow.tsrx",
+        "src/popover/backdrop/PopoverBackdrop.tsrx",
+        "src/popover/close/PopoverClose.tsrx",
+        "src/popover/description/PopoverDescription.tsrx",
+        "src/popover/index.parts.ts",
+        "src/popover/index.ts",
+        "src/popover/popup/PopoverPopup.tsrx",
+        "src/popover/portal/PopoverPortal.tsrx",
+        "src/popover/portal/PopoverPortalContext.ts",
+        "src/popover/positioner/PopoverPositioner.tsrx",
+        "src/popover/positioner/PopoverPositionerContext.ts",
+        "src/popover/root/PopoverRoot.tsrx",
+        "src/popover/root/PopoverRootContext.ts",
+        "src/popover/store/PopoverHandle.ts",
+        "src/popover/store/PopoverStore.ts",
+        "src/popover/title/PopoverTitle.tsrx",
+        "src/popover/trigger/PopoverTrigger.tsrx",
+        "src/popover/utils/constants.ts",
+        "src/popover/viewport/PopoverViewport.tsrx",
+        "src/preview-card/arrow/PreviewCardArrow.tsrx",
+        "src/preview-card/backdrop/PreviewCardBackdrop.tsrx",
+        "src/preview-card/index.parts.ts",
+        "src/preview-card/index.ts",
+        "src/preview-card/popup/PreviewCardPopup.tsrx",
+        "src/preview-card/portal/PreviewCardPortal.tsrx",
+        "src/preview-card/portal/PreviewCardPortalContext.ts",
+        "src/preview-card/positioner/PreviewCardPositioner.tsrx",
+        "src/preview-card/positioner/PreviewCardPositionerContext.ts",
+        "src/preview-card/root/PreviewCardContext.ts",
+        "src/preview-card/root/PreviewCardRoot.tsrx",
+        "src/preview-card/store/PreviewCardHandle.ts",
+        "src/preview-card/store/PreviewCardStore.ts",
+        "src/preview-card/trigger/PreviewCardTrigger.tsrx",
+        "src/preview-card/utils/constants.ts",
+        "src/preview-card/viewport/PreviewCardViewport.tsrx",
+        "src/progress/index.parts.ts",
+        "src/progress/index.ts",
+        "src/progress/indicator/ProgressIndicator.tsrx",
+        "src/progress/label/ProgressLabel.tsrx",
+        "src/progress/root/ProgressRoot.tsrx",
+        "src/progress/root/ProgressRootContext.tsrx",
+        "src/progress/root/ProgressRootDataAttributes.ts",
+        "src/progress/root/stateAttributesMapping.ts",
+        "src/progress/track/ProgressTrack.tsrx",
+        "src/progress/value/ProgressValue.tsrx",
+        "src/radio-group/RadioGroup.tsrx",
+        "src/radio-group/RadioGroupContext.ts",
+        "src/radio-group/index.ts",
+        "src/radio/index.parts.ts",
+        "src/radio/index.ts",
+        "src/radio/indicator/RadioIndicator.tsrx",
+        "src/radio/root/RadioRoot.tsrx",
+        "src/radio/root/RadioRootContext.ts",
+        "src/radio/root/RadioRootDataAttributes.ts",
+        "src/radio/utils/stateAttributesMapping.ts",
+        "src/scroll-area/constants.ts",
+        "src/scroll-area/content/ScrollAreaContent.tsrx",
+        "src/scroll-area/corner/ScrollAreaCorner.tsrx",
+        "src/scroll-area/index.parts.ts",
+        "src/scroll-area/index.ts",
+        "src/scroll-area/root/ScrollAreaRoot.tsrx",
+        "src/scroll-area/root/ScrollAreaRootContext.ts",
+        "src/scroll-area/root/ScrollAreaRootCssVars.ts",
+        "src/scroll-area/root/ScrollAreaRootDataAttributes.ts",
+        "src/scroll-area/root/stateAttributes.ts",
+        "src/scroll-area/scrollbar/ScrollAreaScrollbar.tsrx",
+        "src/scroll-area/scrollbar/ScrollAreaScrollbarContext.ts",
+        "src/scroll-area/scrollbar/ScrollAreaScrollbarCssVars.ts",
+        "src/scroll-area/scrollbar/ScrollAreaScrollbarDataAttributes.ts",
+        "src/scroll-area/thumb/ScrollAreaThumb.tsrx",
+        "src/scroll-area/utils/getOffset.ts",
+        "src/scroll-area/viewport/ScrollAreaViewport.tsrx",
+        "src/scroll-area/viewport/ScrollAreaViewportContext.ts",
+        "src/scroll-area/viewport/ScrollAreaViewportCssVars.ts",
+        "src/select/arrow/SelectArrow.tsrx",
+        "src/select/backdrop/SelectBackdrop.tsrx",
+        "src/select/group-label/SelectGroupLabel.tsrx",
+        "src/select/group/SelectGroup.tsrx",
+        "src/select/group/SelectGroupContext.ts",
+        "src/select/icon/SelectIcon.tsrx",
+        "src/select/index.parts.ts",
+        "src/select/index.ts",
+        "src/select/item-indicator/SelectItemIndicator.tsrx",
+        "src/select/item-text/SelectItemText.tsrx",
+        "src/select/item/SelectItem.tsrx",
+        "src/select/item/SelectItemContext.ts",
+        "src/select/label/SelectLabel.tsrx",
+        "src/select/list/SelectList.tsrx",
+        "src/select/popup/SelectPopup.tsrx",
+        "src/select/popup/utils.ts",
+        "src/select/portal/SelectPortal.tsrx",
+        "src/select/positioner/SelectPositioner.tsrx",
+        "src/select/positioner/SelectPositionerContext.ts",
+        "src/select/positioner/SelectPositionerCssVars.ts",
+        "src/select/root/SelectRoot.tsrx",
+        "src/select/root/SelectRootContext.ts",
+        "src/select/scroll-arrow/SelectScrollArrow.tsrx",
+        "src/select/scroll-down-arrow/SelectScrollDownArrow.tsrx",
+        "src/select/scroll-up-arrow/SelectScrollUpArrow.tsrx",
+        "src/select/separator/SelectSeparator.tsrx",
+        "src/select/store.ts",
+        "src/select/trigger/SelectTrigger.tsrx",
+        "src/select/trigger/SelectTriggerDataAttributes.ts",
+        "src/select/value/SelectValue.tsrx",
+        "src/separator/Separator.tsrx",
+        "src/separator/index.ts",
+        "src/slider/control/SliderControl.tsrx",
+        "src/slider/index.parts.ts",
+        "src/slider/index.ts",
+        "src/slider/indicator/SliderIndicator.tsrx",
+        "src/slider/label/SliderLabel.tsrx",
+        "src/slider/root/SliderRoot.tsrx",
+        "src/slider/root/SliderRootContext.ts",
+        "src/slider/root/stateAttributesMapping.ts",
+        "src/slider/thumb/SliderThumb.tsrx",
+        "src/slider/thumb/SliderThumbDataAttributes.ts",
+        "src/slider/thumb/prehydrationScript.min.ts",
+        "src/slider/track/SliderTrack.tsrx",
+        "src/slider/utils/asc.ts",
+        "src/slider/utils/getMidpoint.ts",
+        "src/slider/utils/getPushedThumbValues.ts",
+        "src/slider/utils/getSliderValue.ts",
+        "src/slider/utils/resolveThumbCollision.ts",
+        "src/slider/utils/roundValueToStep.ts",
+        "src/slider/utils/validateMinimumDistance.ts",
+        "src/slider/value/SliderValue.tsrx",
+        "src/switch/index.parts.ts",
+        "src/switch/index.ts",
+        "src/switch/root/SwitchRoot.tsrx",
+        "src/switch/root/SwitchRootContext.ts",
+        "src/switch/root/SwitchRootDataAttributes.ts",
+        "src/switch/stateAttributesMapping.ts",
+        "src/switch/thumb/SwitchThumb.tsrx",
+        "src/tabs/index.parts.ts",
+        "src/tabs/index.ts",
+        "src/tabs/indicator/TabsIndicator.tsrx",
+        "src/tabs/indicator/TabsIndicatorCssVars.ts",
+        "src/tabs/indicator/prehydrationScript.min.ts",
+        "src/tabs/list/TabsList.tsrx",
+        "src/tabs/list/TabsListContext.ts",
+        "src/tabs/panel/TabsPanel.tsrx",
+        "src/tabs/panel/TabsPanelDataAttributes.ts",
+        "src/tabs/root/TabsRoot.tsrx",
+        "src/tabs/root/TabsRootContext.ts",
+        "src/tabs/root/TabsRootDataAttributes.ts",
+        "src/tabs/root/stateAttributesMapping.ts",
+        "src/tabs/tab/TabsTab.tsrx",
+        "src/toast/action/ToastAction.tsrx",
+        "src/toast/arrow/ToastArrow.tsrx",
+        "src/toast/close/ToastClose.tsrx",
+        "src/toast/content/ToastContent.tsrx",
+        "src/toast/createToastManager.ts",
+        "src/toast/description/ToastDescription.tsrx",
+        "src/toast/index.parts.ts",
+        "src/toast/index.ts",
+        "src/toast/portal/ToastPortal.tsrx",
+        "src/toast/positioner/ToastPositioner.tsrx",
+        "src/toast/positioner/ToastPositionerContext.ts",
+        "src/toast/provider/ToastProvider.tsrx",
+        "src/toast/provider/ToastProviderContext.ts",
+        "src/toast/root/ToastRoot.tsrx",
+        "src/toast/root/ToastRootContext.ts",
+        "src/toast/root/ToastRootCssVars.ts",
+        "src/toast/root/ToastRootDataAttributes.ts",
+        "src/toast/store.ts",
+        "src/toast/title/ToastTitle.tsrx",
+        "src/toast/useToastManager.ts",
+        "src/toast/utils/focusVisible.ts",
+        "src/toast/utils/isRenderableNode.ts",
+        "src/toast/utils/resolvePromiseOptions.ts",
+        "src/toast/utils/useToastLabelPart.ts",
+        "src/toast/viewport/ToastViewport.tsrx",
+        "src/toast/viewport/ToastViewportCssVars.ts",
+        "src/toggle-group/ToggleGroup.tsrx",
+        "src/toggle-group/ToggleGroupContext.ts",
+        "src/toggle-group/index.ts",
+        "src/toggle/Toggle.tsrx",
+        "src/toggle/index.ts",
+        "src/toolbar/button/ToolbarButton.tsrx",
+        "src/toolbar/group/ToolbarGroup.tsrx",
+        "src/toolbar/group/ToolbarGroupContext.ts",
+        "src/toolbar/index.parts.ts",
+        "src/toolbar/index.ts",
+        "src/toolbar/input/ToolbarInput.tsrx",
+        "src/toolbar/link/ToolbarLink.tsrx",
+        "src/toolbar/root/ToolbarRoot.tsrx",
+        "src/toolbar/root/ToolbarRootContext.ts",
+        "src/toolbar/separator/ToolbarSeparator.tsrx",
+        "src/tooltip/arrow/TooltipArrow.tsrx",
+        "src/tooltip/index.parts.ts",
+        "src/tooltip/index.ts",
+        "src/tooltip/popup/TooltipPopup.tsrx",
+        "src/tooltip/portal/TooltipPortal.tsrx",
+        "src/tooltip/portal/TooltipPortalContext.ts",
+        "src/tooltip/positioner/TooltipPositioner.tsrx",
+        "src/tooltip/positioner/TooltipPositionerContext.ts",
+        "src/tooltip/provider/TooltipProvider.tsrx",
+        "src/tooltip/provider/TooltipProviderContext.ts",
+        "src/tooltip/root/TooltipRoot.tsrx",
+        "src/tooltip/root/TooltipRootContext.ts",
+        "src/tooltip/store/TooltipHandle.ts",
+        "src/tooltip/store/TooltipStore.ts",
+        "src/tooltip/trigger/TooltipTrigger.tsrx",
+        "src/tooltip/trigger/TooltipTriggerDataAttributes.ts",
+        "src/tooltip/utils/constants.ts",
+        "src/tooltip/viewport/TooltipViewport.tsrx",
+        "src/types/index.ts",
+        "src/unstable-use-media-query/index.ts",
+        "src/use-render/index.ts",
+        "src/use-render/useRender.ts",
+        "src/utils/CommonPopupCssVars.ts",
+        "src/utils/CommonPopupDataAttributes.ts",
+        "src/utils/CommonPositionerCssVars.ts",
+        "src/utils/CommonTriggerDataAttributes.ts",
+        "src/utils/CommonViewportDataAttributes.ts",
+        "src/utils/FloatingPortalLite.tsrx",
+        "src/utils/FocusGuard.tsrx",
+        "src/utils/InternalBackdrop.tsrx",
+        "src/utils/NullStore.ts",
+        "src/utils/adaptiveOriginConstants.ts",
+        "src/utils/adaptiveOriginMiddleware.ts",
+        "src/utils/closePart.tsrx",
+        "src/utils/collapsibleOpenStateMapping.ts",
+        "src/utils/dispatchClickWithModifiers.ts",
+        "src/utils/getCssDimensions.ts",
+        "src/utils/getElementAtPoint.ts",
+        "src/utils/getElementTransform.ts",
+        "src/utils/getPseudoElementBounds.ts",
+        "src/utils/hideMiddleware.ts",
+        "src/utils/listbox-separator/ListboxSeparator.tsrx",
+        "src/utils/mergeStyles.ts",
+        "src/utils/popupStateMapping.ts",
+        "src/utils/popups/index.ts",
+        "src/utils/popups/inlineRect.ts",
+        "src/utils/popups/popupHandle.ts",
+        "src/utils/popups/popupStoreUtils.ts",
+        "src/utils/popups/popupTriggerMap.ts",
+        "src/utils/popups/store.ts",
+        "src/utils/popups/usePopupHandleStore.ts",
+        "src/utils/popups/useTriggerFocusGuards.ts",
+        "src/utils/resolveAriaLabelledBy.ts",
+        "src/utils/resolveClassName.ts",
+        "src/utils/resolveRef.ts",
+        "src/utils/resolveStyle.ts",
+        "src/utils/scrollEdges.ts",
+        "src/utils/scrollable.ts",
+        "src/utils/styles.tsrx",
+        "src/utils/useAnchoredPopupScrollLock.ts",
+        "src/utils/useFocusableWhenDisabled.ts",
+        "src/utils/useIsHydrating.ts",
+        "src/utils/useMixedToggleClickHandler.ts",
+        "src/utils/useOpenInteractionType.ts",
+        "src/utils/usePopupAutoResize.ts",
+        "src/utils/usePopupViewport.tsrx",
+        "src/utils/usePositioner.tsrx",
+        "src/utils/useRegisteredLabelId.ts",
+        "src/utils/useSwipeDismiss.ts",
+        "src/utils/valueToPercent.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/accordion/header/AccordionHeader.tsrx",
+      "origin": "adapted",
+      "sha256": "5dd35d52e6c58463f2a5b69143c7e949aefec859a765b59aa7a9662aa48b42b7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "d12f6b610b77df3e3b03e430bc9d2c1a99d27f80d6ab859243a4a523507063fb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/index.ts",
+      "origin": "adapted",
+      "sha256": "efa6d26410e9480eef493ab445683ecf57f3240c355d2304b35c5e59b89b4ef7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/item/AccordionItem.tsrx",
+      "origin": "adapted",
+      "sha256": "470a82e1287cb9e9cfe109109917760010698e8f4d711bee8b32033b37421070",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/item/AccordionItemContext.ts",
+      "origin": "adapted",
+      "sha256": "3f8bdcfeb73cf4e335bcbd983b8c6b4e768cc90ddde175d250a26f5bcee40e45",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/item/AccordionItemDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "a4fe5e82dd6a45635747accb5ea125728a585bf9f0706f96b82fe2a6cfe25ada",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/item/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "d3d716872fb413d972605fc479535ae33faf2a533721d6da16e1eecd2e884981",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/panel/AccordionPanel.tsrx",
+      "origin": "adapted",
+      "sha256": "9945dfcd84df30ca7f7010a7979c42189d8109388faaacc89139ac5285f2ca26",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/panel/AccordionPanelCssVars.ts",
+      "origin": "adapted",
+      "sha256": "0c9da032e98ab98ccfde4c07fb77bbd8d98408b067793c783e8c483ca7b6b7d6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/root/AccordionRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "f1e61e832ca09bfa7f8db29371bbe0e73ee951baaffa19609ab704d3a5be918d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/root/AccordionRootContext.ts",
+      "origin": "adapted",
+      "sha256": "5f7d9ee90aa3ce556fec8c9588bbdd911dbfd698755111def39d62f7ebec61c8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/accordion/trigger/AccordionTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "ef8e8a78e39d3a23844a39ff841bb57c30b3ee4cf274abf91b1ef1d3a130f8f1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/alert-dialog/handle.ts",
+      "origin": "adapted",
+      "sha256": "79669d2d4b9c6964701cf1747e20f8b2fb4413899a28207762ccb1fa8296510b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/alert-dialog/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "5e9dd9419557600147cdc7856761bce0e094e5c051b27051280b46ddfa6e2a90",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/alert-dialog/index.ts",
+      "origin": "adapted",
+      "sha256": "53d2f37aea867ac439a68973a6be4ba3f029cf9619de95c6959dddb3d115bbe5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/alert-dialog/root/AlertDialogRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "34b95c0f78b7556b95a05fce428f7a1feb1d7112c8152b8e50fe7819d7ade9a3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/alert-dialog/trigger/AlertDialogTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "5c07f4dc0f0dbb047cda315fb460790a4a1fe60314bef7e834d7ca64a91f717a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/autocomplete/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "68af32f988084ef01dfed28943d5ba7ff0e063f616c34170d7752b73e33a32b4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/autocomplete/index.ts",
+      "origin": "adapted",
+      "sha256": "3e3b273bfa5d217335df2abb99967785b17ebbceee11c903e68d2509f9cfd035",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/autocomplete/input-group/AutocompleteInputGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "454517781a209aaf84f2661bb31c2f279648bcebd6527667ba6bff9ba3284a14",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/autocomplete/item/AutocompleteItem.tsrx",
+      "origin": "adapted",
+      "sha256": "a37f6d6f60d4489ae63e75ae15fba1f554c5991ae40f2900ea7cbc8c14c646ed",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/autocomplete/root/AutocompleteRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "feaba1ae1d099df190c4ad7e727622031273f983bd17fc3c3526634662d2104a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/autocomplete/separator/AutocompleteSeparator.tsrx",
+      "origin": "adapted",
+      "sha256": "93a1d8718d4e926a5b860c9a701e9854b7cdd9be4a0a568eb6a7d36d900dfd1e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/autocomplete/trigger/AutocompleteTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "c4f5ec307d92ed0384cd04d12528970b2139736155dc5f4c50b86463dd378288",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/autocomplete/value/AutocompleteValue.tsrx",
+      "origin": "adapted",
+      "sha256": "35eedac3bee5719ba3bbced226621f95e88f64f64d6b22bbd99d07ea547442dd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/avatar/fallback/AvatarFallback.tsrx",
+      "origin": "adapted",
+      "sha256": "de8941896570bfc8ac92c1e36060ffe98836679794fa62a72146cc318fba7cd7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/avatar/image/AvatarImage.tsrx",
+      "origin": "adapted",
+      "sha256": "8052b308ae93899212551ab575c92c792597cbb6a5ee5d64cfa54dcabbf4ca0e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/avatar/image/useImageLoadingStatus.ts",
+      "origin": "adapted",
+      "sha256": "d47312ae2b837f0f4040c061cd5b6c88d528ec4a1d0a41fccd0bef902197cdb0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/avatar/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "a3c630887765f34e3d2f78cbebc30acafe1c78afc6d67ea77e68fcefbf9dc280",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/avatar/index.ts",
+      "origin": "adapted",
+      "sha256": "ed9b5c9cdfbb05b0a3bc4f0fb78853603178faff919a5f99ada889eb41bd00c0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/avatar/root/AvatarRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "93d26587c9a2f9446505a4e2a35ad0f6bd52c31483704a22e2719e97496aaddd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/avatar/root/AvatarRootContext.ts",
+      "origin": "adapted",
+      "sha256": "b3ec5029b627221afccf4c774f44fe8d6a4b4043d094502ad5a6c1152a4d97a5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/avatar/root/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "8a00ae713dfd6658a2d367f4e7f6483031c9ffa0a791a7d0bbfb460662f3adef",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/button/Button.tsrx",
+      "origin": "adapted",
+      "sha256": "18ea0a7e332a2426b162dc0c054eac8f12355a3595147a85ea836b28762c927d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/button/index.ts",
+      "origin": "adapted",
+      "sha256": "95c6fd4dd1d6fac8decb4ce108d3e6dfc8dc692cf5d2d2ec2fcb8662bf7d3106",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox-group/CheckboxGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "b3ea48ee056b5f41f8f22505e9e774309a05a72fc4a14bc6ef8f825e3c8b4e2f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox-group/CheckboxGroupContext.ts",
+      "origin": "adapted",
+      "sha256": "74f15f9414acdb17249db0d6e83674c25c73b1abde7ca1b00fa93b851ac81bf5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox-group/index.ts",
+      "origin": "adapted",
+      "sha256": "3228f54f45943f420d129aa945388d6da24a42e672303c084bc2d54dcee38e4b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox-group/useCheckboxGroupParent.ts",
+      "origin": "adapted",
+      "sha256": "6ceb80672e11dad631637b318b75069f298963a8c6debe5e8409d1eac6a072b0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "13f50b967441713e255a03f7f289a6974c38b356f7380735cbae21f4d4723777",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox/index.ts",
+      "origin": "adapted",
+      "sha256": "8ed0be3be072095b538d7d398965be5fe32ee30f7ba35fafbf9a33aa71a1eba5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox/indicator/CheckboxIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "eec41bb0996d0ab395d3385ddac9617435c87d2a59983b707473977205975a2f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox/root/CheckboxRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "b784fe99249d077350ebb3b2c5b8efdf93ca8620cf6a46f5b73e6a5fa145a317",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox/root/CheckboxRootContext.ts",
+      "origin": "adapted",
+      "sha256": "64be596d50aca9052064aa1a0ccd9174d0ebd71def7c1ae7b3739dab75a99260",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox/root/CheckboxRootDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "36e308e793f426ad5805e8b2768e52a23af3de6724e436739207e666d241fca4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/checkbox/utils/getCheckboxStateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "a27783123fa656fb04b11c92fa49bc0cd573c56ad9c3c10ada8118d072efca10",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "512a58a67551a3a1deb18323f866458c617cbefff45b942aa0862f2315394650",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/index.ts",
+      "origin": "adapted",
+      "sha256": "7b816b52e9d185ecd44d9a0b2dd5e4e99d2cef25e312126096b5bac39617ac8f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/panel/CollapsiblePanel.tsrx",
+      "origin": "adapted",
+      "sha256": "63dec64e458a8a777f6e16213350878cb30757dc7f911e965e1fa7bd4cc8a22d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/panel/CollapsiblePanelCssVars.ts",
+      "origin": "adapted",
+      "sha256": "a0dbd3f727fb2cebd5a1163722269991ee6c92f7c371ab68c6cc5e5d37824d77",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/panel/CollapsiblePanelDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "dc5173421a0cd805c6f736b93a50dd8ab5b3e51da7374ae9e05d76b12b5602eb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/panel/useCollapsiblePanel.ts",
+      "origin": "adapted",
+      "sha256": "7935bffe3a26566c118b9757454b84774eec760eb0b235ac0427cb15f3d6cded",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/root/CollapsibleRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "9360e3ed05efd93562d879428355da0478803d0e1f403e2c2ae0675337e5c4a1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/root/CollapsibleRootContext.ts",
+      "origin": "adapted",
+      "sha256": "1b62b1c3ffea65efc4521b4772037ce005b9228308aa55c406e80bab896a5b88",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/root/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "9ff21a38b03162a132fb48bd63a4525adcca3791efcf7b5594de3da9f1cf36c2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/root/useCollapsibleRoot.ts",
+      "origin": "adapted",
+      "sha256": "58403039bf9b5d43e8c0f5df6bd413fb4fea27ce7ee7ebb076596780ea36454b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/trigger/CollapsibleTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "eb5d509ec932cff37c8591eaba6ae6fe27d379157c6bea452a66ea38b61ada8f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/collapsible/trigger/CollapsibleTriggerDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "f137ea2f8075f667078a8ade395d6802c9cd0cf1d489207198ad3bb1fc291de5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/arrow/ComboboxArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "843ab84eaec840665592d11e49d5eb05e2a969d11b612acf074aa4e0dffe2080",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/backdrop/ComboboxBackdrop.tsrx",
+      "origin": "adapted",
+      "sha256": "fc9f87b185a35743f192cfd435c7344caf3bfec5f4a162d6bdba6f0181b1bb3c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/chip-remove/ComboboxChipRemove.tsrx",
+      "origin": "adapted",
+      "sha256": "f1707a587e1899d864de003e073953fe5599f6e75702cfa205d0806c0d6bd122",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/chip/ComboboxChip.tsrx",
+      "origin": "adapted",
+      "sha256": "1d29efc2cb0d55c3a0308bf7179e1ef8f982fc8fbcef863ee4a4dc1f7f6795d1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/chip/ComboboxChipContext.ts",
+      "origin": "adapted",
+      "sha256": "0f7096414ea6da337c15cdcdae8ee50fed448a46722e5b03ccbc679c85cb7a6e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/chips/ComboboxChips.tsrx",
+      "origin": "adapted",
+      "sha256": "50dc1b64081c3a205f881100df81b621bdc4b33a5d13b513691907c3c62280f4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/chips/ComboboxChipsContext.ts",
+      "origin": "adapted",
+      "sha256": "b7a0b4dda80b79a91f68eff389147e4bd321ca415cef100f92ac3bee4765e157",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/clear/ComboboxClear.tsrx",
+      "origin": "adapted",
+      "sha256": "0f9c374a46f398ac4def7c5854af371941d3e77e14e7378af6a40b0943f383f7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/collection/ComboboxCollection.tsrx",
+      "origin": "adapted",
+      "sha256": "d44b82c3b00a4324b1ae9bae3ebf1179e522336035cadfb4b5759b925faaa1d5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/collection/GroupCollectionContext.tsrx",
+      "origin": "adapted",
+      "sha256": "a5bc33e783106d19ac65c67e39d0f42c2dcad69b4589b56095692bc32f81e582",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/empty/ComboboxEmpty.tsrx",
+      "origin": "adapted",
+      "sha256": "c1b3d589009fb6557765a6a9be9a9e9757f7f6fb26113a47402bd0a15374abd1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/group-label/ComboboxGroupLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "755554f0a4a985f5afa81b3fcb31b1f44e4da8cf80274b4cd246289468bf5845",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/group/ComboboxGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "1045c735926decf3cb91f677662db499058287b78adb3e510954210ced15b201",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/group/ComboboxGroupContext.ts",
+      "origin": "adapted",
+      "sha256": "6d23a4d29eab2dc869808150d91d4303de462369e0d19f16c9b66c907c4e054f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/icon/ComboboxIcon.tsrx",
+      "origin": "adapted",
+      "sha256": "120f02af3a1d1f6dd0649846377f42c5ecb8e3da0c534b78b28c04e2aed50922",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "104fc7bb47722d87946c414fd7ade3e3cf30e7c2740a7c8db9c75af94ff35adb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/index.ts",
+      "origin": "adapted",
+      "sha256": "fa1053cdeba3046d84d6bd236ac293afc88997d8562ba2dcefe655663d05ea72",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/input-group/ComboboxInputGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "bd92fdff4b6ad9edc91647c2d017bc9c1dcb5b7a654532fbc20cec1b9c9520bc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/input/ComboboxInput.tsrx",
+      "origin": "adapted",
+      "sha256": "946557209737064bd058f8f48621d673d4fce39a30e0710ef8d8cef4ae8c23e9",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/input/ComboboxInputDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "96ca9088e79bf6b687a650c77f7e6136c7abaafd57f3e8e6177768efb97994c7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/item-indicator/ComboboxItemIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "29cddaa8445f6d0cd2a73124635083eeebbb9382949b86363ee793b1d1627f1f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/item/ComboboxItem.tsrx",
+      "origin": "adapted",
+      "sha256": "cc82c79da283e34c868dfb4d860718030eb6dce33936c7777fb13a352589feff",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/item/ComboboxItemContext.ts",
+      "origin": "adapted",
+      "sha256": "771b8186bc8e1308eb40cb4d3e91d52980f3b3d7f271a0424fbb7e783f8970b7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/items/createItems.ts",
+      "origin": "adapted",
+      "sha256": "920f2df705133503e0dec9b1f8887d8bb84fc039fc8a99881f627f20521eab18",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/items/itemCollection.ts",
+      "origin": "adapted",
+      "sha256": "35422001d8f2bec63f445dbe3a39e1ffc4352bdd436719aee5a19abffed98f61",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/label/ComboboxLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "55c208b792d49033caf59e07f2ec9b3140e50e8705a6eb80e60991287108a689",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/list/ComboboxList.tsrx",
+      "origin": "adapted",
+      "sha256": "2453147ae6dc7be209365eda870ce5461797f3707387177e4cdb3785246a15a2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/popup/ComboboxPopup.tsrx",
+      "origin": "adapted",
+      "sha256": "6f0fe59317931ffdba0f85c88ce120289c2c2092eb2d77d317fd94f64d111c73",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/portal/ComboboxPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "7a17e56876b98e533fe7747f69b9828b0109f4af02dfc90dbce771ed72bbeea5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/portal/ComboboxPortalContext.tsrx",
+      "origin": "adapted",
+      "sha256": "c2d8905487b81ec11f2e36688d670fa1aa65280264a27d171fb30faf28fbcd77",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/positioner/ComboboxPositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "ef7d8190b754bc6032fa687eade3e93857eb25a894f46f927c7a19d78388b88e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/positioner/ComboboxPositionerContext.tsrx",
+      "origin": "adapted",
+      "sha256": "cc83667d15c14ebe8c51a59382b56673c9cd0388225ff68e78ee215507bbcb59",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/root/AriaCombobox.tsrx",
+      "origin": "adapted",
+      "sha256": "013c86625dbbf46e589bb3ddd35cba903b8d64c22fb1b1de9cffd551dff07c29",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/root/ComboboxRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "4a799fef6b5e2f96a1f8c9a3461f3c00b8caaa0c03d5d658502bf2a4088afab5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/root/ComboboxRootContext.tsrx",
+      "origin": "adapted",
+      "sha256": "acd8cfc3951d72c73f09e03af6f38c70b1d162f805a778428f2be929e43acb46",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/root/utils/constants.ts",
+      "origin": "adapted",
+      "sha256": "2a7b6952b4645cf36396c7d3417ee3034730e9a418f3ae81da451ca1b732568c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/root/utils/index.ts",
+      "origin": "adapted",
+      "sha256": "0ae0f213d26fc057516ca5bd1ced892cc47ec35bb3d65047ba0c4e88066232f0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/root/utils/useFilter.ts",
+      "origin": "adapted",
+      "sha256": "a7f1fc406c7c46f98c7b70cdeb71e641a607eb2087fc1b4e304906727bb8c56f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/root/utils/useFilteredItems.ts",
+      "origin": "adapted",
+      "sha256": "414930773218e5d87d680155148997d1b048ea8930d28c0d6c2e573dc168cc38",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/row/ComboboxRow.tsrx",
+      "origin": "adapted",
+      "sha256": "8aee0eaeabf2c86bd44d1822bd13f2823fd76dda8de6f40d168188bed5beb55a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/row/ComboboxRowContext.ts",
+      "origin": "adapted",
+      "sha256": "8b9dff31a7205e14b8fc2d1414819e765718e57fe28c6336ec211d8b07ec1710",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/separator/ComboboxSeparator.tsrx",
+      "origin": "adapted",
+      "sha256": "40b46144e8012f411ff33278f8be7c876123c9711ed3fc64b0ba2179b31c15a4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/status/ComboboxStatus.tsrx",
+      "origin": "adapted",
+      "sha256": "c0395c8207f7a8da434b0970a346794cd6e916a121a9b02ab0a88493f941de59",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/store.ts",
+      "origin": "adapted",
+      "sha256": "ff9280e5adb523f23a1b67f934e35799f930193144eaec2645e36b137fd90e37",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/trigger/ComboboxTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "ed63782739d04149d65c4646918ddc11f5f93276e0c3395dec39ab2ff161ce83",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/utils/ComboboxInternalDismissButton.tsrx",
+      "origin": "adapted",
+      "sha256": "d6878fab2233655fb4f0f4765d27c1071d1c58974fa5183fb34a467496e43a56",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/utils/handleInputPress.ts",
+      "origin": "adapted",
+      "sha256": "7fcc7e3a9dabe8c43f5a25fe096397bd5935db22d2da0d8f404a35de00f31ff4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/utils/parts.ts",
+      "origin": "adapted",
+      "sha256": "3588b2fb4c566522abb55421b694d026bb8fc7634d88de3b2e455fb4fb045e5b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/utils/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "e0b14817fb72eee51bb6bc570af9741d386117521d0886c4db8a5653141e4d9d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/utils/useInitialLiveRegionTextMutation.ts",
+      "origin": "adapted",
+      "sha256": "a16dccd23b97ee85512f6065d7a67cfb34bb86ba9d0835e124f972a44450b57d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/combobox/value/ComboboxValue.tsrx",
+      "origin": "adapted",
+      "sha256": "82aeffc09d2e23e2d5ecb8e2b2a0644c2d423f51195ffec736c5d922a3eef17b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/context-menu/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "fa4013ad8bdc24f434bfcb0aa4b1ac6559de3bf66a269a7ae38b48b7789315e8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/context-menu/index.ts",
+      "origin": "adapted",
+      "sha256": "c59b1ec8adff42d4b6517bb0fe38bba07d2709665be89f3de833c6d038ddbd32",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/context-menu/positioner/ContextMenuPositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "79b917c92917f2f53c46a29fa55d5191c8b59588b603c1ad3bb214329934dba7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/context-menu/root/ContextMenuRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "fe57c20b689fbd6b3cb870e97de8a5191adb01bbbf10eb4ebe5eaee004f59f75",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/context-menu/root/ContextMenuRootContext.ts",
+      "origin": "adapted",
+      "sha256": "fc94ca89b32bfe5760d47411bdfe8b319df965aedde0b373de745311b0b6617f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/context-menu/trigger/ContextMenuTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "0b2a72621da5bfc7e0be3b1a8b2b1094a7c764b4a12284203867e1714bb97257",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/csp-provider/CSPProvider.tsrx",
+      "origin": "adapted",
+      "sha256": "459f21638d6c8a366e020c47ebfc6c495192af789082693ccdba4cf3f16c0d51",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/csp-provider/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "5de24592e953955cce2c5e755978919f3906dd0a7eb0652c31983b9b82f26df0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/csp-provider/index.ts",
+      "origin": "adapted",
+      "sha256": "86b6907e36897eaa647fec06ac62081ed4d14ed76813771848a73973af7a39e3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/backdrop/DialogBackdrop.tsrx",
+      "origin": "adapted",
+      "sha256": "e3636b222ab1cef5b2f31fc2468d3595f4cfe9cb1056c4313cd0524b25a3f504",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/close/DialogClose.tsrx",
+      "origin": "adapted",
+      "sha256": "28d73c0a759844e81781c57b64e8bb9d1dfa4ab7c8bcb75a5098430237a8c012",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/description/DialogDescription.tsrx",
+      "origin": "adapted",
+      "sha256": "09006fc64e243e54f448102267f2861e7a1e87b3efb8ccabcc5323f899576ec4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "b81004730d6e7f43666ea7fac1d706cf1a104a8290ad8b063469d50c1092adf1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/index.ts",
+      "origin": "adapted",
+      "sha256": "92cce92a59ae6efa58d62892d56fa96a9bad199d4b11412721b16fd734896dec",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/popup/DialogPopup.tsrx",
+      "origin": "adapted",
+      "sha256": "8fc0174205282e1dad2361ada811ee69cdb47bbfee1dc1d86483a4edf9c84da6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/popup/DialogPopupCssVars.ts",
+      "origin": "adapted",
+      "sha256": "013e4fb9491762259f31aea2d99350a10f03d315809b69d86f88ef00152543f5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/popup/DialogPopupDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "c86c6ead0d79f0912bccf2800e3fc43f64dfdc5076350c332871ef794d780102",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/portal/DialogPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "cca393bd76cc1f5644a01181e63c9e7d62fff775044ee46f48aa846bf589b291",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/portal/DialogPortalContext.ts",
+      "origin": "adapted",
+      "sha256": "0a72f0b520422bac793a318b224d3bbc82985220e7821207a61603c1b3e4f682",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/root/DialogRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "765248fad6226fb8f9896bd7ed4ee2fc9d5995a6fec52676d35cc0c2b770a361",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/root/DialogRootContext.ts",
+      "origin": "adapted",
+      "sha256": "c457932240898be8164bd474a98040f7fad829e946d563f1f3861c7d6b45b877",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/root/useDialogRoot.ts",
+      "origin": "adapted",
+      "sha256": "4102c987c55bf72e903163a990b9ff57b249623624613d8469d70b7ad0d87a0b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/root/useRenderDialogRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "b75ea353a463e20a9ba4e299259c8ae78b600d448f4d7d9022528b76bc5eb052",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/store/DialogHandle.ts",
+      "origin": "adapted",
+      "sha256": "6a6f94ac7c4d5cba415eeb57e0b59187fd2b1c1dfab8e5e5e69032c780a0acfc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/store/DialogStore.ts",
+      "origin": "adapted",
+      "sha256": "049428a3d4dd8a668a571e4c75efa2e37dcea1d70fb5e9aee91e69828f184fc4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/title/DialogTitle.tsrx",
+      "origin": "adapted",
+      "sha256": "dbc69a201838170b3471d400b1a15ae8019ae29e6d048f585a9cdcfbb275d1c0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/trigger/DialogTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "ec064123c0b397c4325fdaf375f2b06e74a3eebe62739980ace7edc8cf709ad8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/utils/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "42a6b07dab2a2c19fc74c4e2b3e55a073f2f3e1290dbfdd3439992dab837404e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/viewport/DialogViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "440ad32ea5dfd64d6c4f832c0fc2ec61f409695a142ebb1f973f46a46cc584c3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/dialog/viewport/DialogViewportDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "c86c6ead0d79f0912bccf2800e3fc43f64dfdc5076350c332871ef794d780102",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/direction-provider/DirectionProvider.tsrx",
+      "origin": "adapted",
+      "sha256": "1a9f0e04938166db4a4125c6e4557952f62078d96291fcc4969801ea87c07b5a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/direction-provider/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "06d7d20e326774b73e28c79a6fffc96780d045de8b05b234967e930e33f2dbc7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/direction-provider/index.ts",
+      "origin": "adapted",
+      "sha256": "7a7182d52741315ca4c0f2543bbb30100d0ca067be9f280bb4f8d9b37c627f0d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/backdrop/DrawerBackdrop.tsrx",
+      "origin": "adapted",
+      "sha256": "324dec96241b0de8ae2b6eda76e74a2f3f641f5e4635ac5f2fb29415462a4b78",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/backdrop/DrawerBackdropCssVars.ts",
+      "origin": "adapted",
+      "sha256": "f1da2adf6b740a881b00f9ff9cf4245d53bad81f45bd7f0270ed718aaedce17e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/close/DrawerClose.tsrx",
+      "origin": "adapted",
+      "sha256": "f70208b2686ed010dcb441ff3a160801d6d80e332d105f944073777dc14d2fe6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/content/DrawerContent.tsrx",
+      "origin": "adapted",
+      "sha256": "34d0a5753f853a14d97ea91f7994fa9ea73b13d6ab79d2176c23878205246f02",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/content/drawerContentAttribute.ts",
+      "origin": "adapted",
+      "sha256": "7efa7e46af29524a80d5c0250e7a1362da88d8a831bfab2bb0d231e0d17d74b4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/description/DrawerDescription.tsrx",
+      "origin": "adapted",
+      "sha256": "e71a8425b8bd781c72a32557a0c7c3abc6aa30fcaecc6ed11d68b1e29ee151ac",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/handle.ts",
+      "origin": "adapted",
+      "sha256": "69476ffbde1b7a6892c584bdfbbb502fd32cd2a5cbdac8fb8cb71fd1dd0cf483",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/indent-background/DrawerIndentBackground.tsrx",
+      "origin": "adapted",
+      "sha256": "776f4e64a527e6d5ce1a62d06b05744df37e7d6c8a30d163688f942cfd1998b7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/indent/DrawerIndent.tsrx",
+      "origin": "adapted",
+      "sha256": "89d17d4a1fb070fd2b2ea8bf60cb104f69916053d86fc29c5254153a222f395b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "3f53c235f64a1bd34adec457187f542a9023be6ae61c2d2106aeec53963526fc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/index.ts",
+      "origin": "adapted",
+      "sha256": "a89c693864cb0e75292815545bfcfbed240c6a3428a9d538923102054a8a1d60",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/popup/DrawerPopup.tsrx",
+      "origin": "adapted",
+      "sha256": "427662ca68ceaf10a935b0bfe8e03bdf054811a445b7f11c1eb0afcc0ef65613",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/popup/DrawerPopupCssVars.ts",
+      "origin": "adapted",
+      "sha256": "9769ca44a0632e4496156f00a08a0d3052a19108c38e31fd7835788265a992b2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/popup/DrawerPopupDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "e23a4bc06ac08e5e9c9020058ecd845289bc828d22dbea5239f6f25093094f8c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/portal/DrawerPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "0d928a30560ce8673c8594a18af0eb23f68c24519a45227b8496ce90970f5cab",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/provider/DrawerProvider.tsrx",
+      "origin": "adapted",
+      "sha256": "6eff10ac3aacef57f58f640ab5940a088b6370b9d3bb63df293dce8d058cbaae",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/provider/DrawerProviderContext.ts",
+      "origin": "adapted",
+      "sha256": "b26928ca1cbc063c2c1078d6a64e04977d96cf949ec7663bf1c4ca4065264faa",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/root/DrawerRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "73e988950ce07c0d6074b6276625dbfba2a95d494eb3911fd55e7e93d5b52a9c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/root/DrawerRootContext.ts",
+      "origin": "adapted",
+      "sha256": "9d30e793277d8623283a956cece191a7842d4c8396d5581a2358ed7bef31ea28",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/root/useDrawerSnapPoints.ts",
+      "origin": "adapted",
+      "sha256": "7f835fb5b44c156e68f12b071d774e143d02822aef97628cf4a0526b014c2506",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/swipe-area/DrawerSwipeArea.tsrx",
+      "origin": "adapted",
+      "sha256": "0a2627d3e77b78fb3070d7c138858fc28d6a9c211e8d5a800214ce83e90903db",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/swipe-area/DrawerSwipeAreaDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "b942e60208fe314de6cd13ec4b94a2365e4ee7185c5a9a9bd7f25582467dd73e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/title/DrawerTitle.tsrx",
+      "origin": "adapted",
+      "sha256": "4a9945e4b899fd1ba4ba3fa15dc43cb30460eed76875912b6ca2d5d4f9935a88",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/trigger/DrawerTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "7389f1551a446e01e53df2090b8ca07080c203845577e3ae3f8d940e7dab8e49",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/viewport/DrawerViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "f55dd594342a9ce7303651a8a4597667f065f7a8b63a90b862b09e410015f91c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/viewport/DrawerViewportContext.tsrx",
+      "origin": "adapted",
+      "sha256": "8cb5b9f39ed6c55d419e35fd4081e9f8a78b9263c94911796a9c0379fe58b026",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/viewport/DrawerViewportCssVars.ts",
+      "origin": "adapted",
+      "sha256": "364cafee211fd5d4fb3db0b13ee1230f01424536bf3637e3126fe1cdea91938a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardContext.tsrx",
+      "origin": "adapted",
+      "sha256": "921e4bf44a9f387590df701bba19c7b1a039ae62efd61c0bfa0b4026801321cf",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsrx",
+      "origin": "adapted",
+      "sha256": "cab272efa9e4f4be789b203c5a7a4c18a149d3f76d41b677fee63707a820488a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/control/FieldControl.tsrx",
+      "origin": "adapted",
+      "sha256": "ddc2e1388be16d276130abbc14fc90e905a76abe954d99b8827a15214f85e780",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/control/FieldControlDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "cbdf610a0e3492927587685b1d4f9bf8ae5ac2cba01e5f39e4001de9f9d0b1d3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/description/FieldDescription.tsrx",
+      "origin": "adapted",
+      "sha256": "da9e27030afc99b2c80bd9110dc92f50b16eb5578e84c130d2a6f05d23f21578",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/error/FieldError.tsrx",
+      "origin": "adapted",
+      "sha256": "948b865db0f09b9e2c663285a8ada7d12ab05c39196122c191f49d07a4b0acea",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "297662a45440244b172c7c464893d063ade9da1d761385cf75cddcae855ef02d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/index.ts",
+      "origin": "adapted",
+      "sha256": "e27887962e519f218cec40fa317af589aa375e7fc07a167fce06637c511080d5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/item/FieldItem.tsrx",
+      "origin": "adapted",
+      "sha256": "9e6c8e957b902b1d49c6930d3dd372b5e036c33bfd942181f6060086b27939b2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/item/FieldItemContext.ts",
+      "origin": "adapted",
+      "sha256": "2fd73d505fa2ae4e8b0fbcee4fb9e725194c7ec416602271c1cabc46a0808bc4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/label/FieldLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "47cb72d1e963c8b6e590e397e7527d4e7189b2b99011919e76960ed1af1afdbd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/root/FieldRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "f9e6a52e63531e59dabf508a0237d40164b56a665e23655e63a4bad6c8ad0354",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/root/useFieldValidation.ts",
+      "origin": "adapted",
+      "sha256": "85c5a81732dbb5b077e8c1aca87e75585c52935f38b968e6cb5357d0257fd3cb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/utils/getCombinedFieldValidityData.ts",
+      "origin": "adapted",
+      "sha256": "2692183f4ca174a096a8f0b5071db518b26300d80beb7fb995b8526ac7e27343",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/field/validity/FieldValidity.tsrx",
+      "origin": "adapted",
+      "sha256": "55037a5c5ea18d2949884ce9e219c420bec1e1b301e39642fbb0c1925828b8c0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/fieldset/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "8c37f351c23b38d8a811035e54abdfad655c7133883fb3990859fb0850488e49",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/fieldset/index.ts",
+      "origin": "adapted",
+      "sha256": "310c90aed3952cf49c132cfc039b3860166de9c397adac00d30628e9b4058e89",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/fieldset/legend/FieldsetLegend.tsrx",
+      "origin": "adapted",
+      "sha256": "1613b5a5e80904feb254ae233d9ebb7ea22afe023a749cb409693b0059f1ba1c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/fieldset/root/FieldsetRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "092a9ec22a7dc01f1d47169b7aa197f5fc34a265e9d60291da0d9007959bd7ab",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/fieldset/root/FieldsetRootContext.ts",
+      "origin": "adapted",
+      "sha256": "c4e762abcbb8f51d2289b4b4e0ef0fd4a97b21f6993a6b2accc76bfb2624411c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/components/FloatingDelayGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "1ee4133fbe36897b16b43e04adc47b510858a6bfbbb882ecf6929b68fb2b9ef9",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/components/FloatingFocusManager.tsrx",
+      "origin": "adapted",
+      "sha256": "4c181164d237920a0c675ecd29f7d5b6e0ce3bb988aaecbdd19581bff9e9629f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/components/FloatingPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "b80ab9506f8483b56e44a353e54c1ccd2cfc065c09ee75ef282d0dbccb4db32c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/components/FloatingRootStore.ts",
+      "origin": "adapted",
+      "sha256": "67b5267b07a6334d43396d69499902edf2ed652325a8195c9859e5d371c171d5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/components/FloatingTree.tsrx",
+      "origin": "adapted",
+      "sha256": "a4e81c6df4e1c6710608b8c30532ced6846051d0831e1806ed46d4038066fcd4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/components/FloatingTreeStore.ts",
+      "origin": "adapted",
+      "sha256": "92a059013d73c44d34e839a13e907cd2a09a65d7ca5eb6f663e1917e3335274f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/gridNavigation.ts",
+      "origin": "adapted",
+      "sha256": "7399c0c9afa83d6240ad15c77c3128984190bc3818889e7b2e5e11d27e740749",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useClick.ts",
+      "origin": "adapted",
+      "sha256": "ba029baa1a36941cf5f9cd3ed3b97390be4ff7bf21b7797bbfac485bac97053a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useClientPoint.ts",
+      "origin": "adapted",
+      "sha256": "40c72dc0a693cef556b2a03d1d337bed7ccd3c0da428bf39872e6f2f35730ccd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useDismiss.ts",
+      "origin": "adapted",
+      "sha256": "01cfab87979fd173825ab7d41c70f923f17b45a2dd0064d97a089b17444e84bb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useFloating.ts",
+      "origin": "adapted",
+      "sha256": "6fcefd49d083342f628137c7b26b7e34f8b3483c2a32371a4fd1aca437b29bbe",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useFloatingRootContext.ts",
+      "origin": "adapted",
+      "sha256": "1e281c4736a545c3c312e18e7803eed29c160505ff842f564115a3524a22a53f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useFocus.ts",
+      "origin": "adapted",
+      "sha256": "253613282a9607698bd4fda4508c45613d8694acf5abeeb8cb5cb7559b3d02fc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useHover.ts",
+      "origin": "adapted",
+      "sha256": "21403cd6974838a8979c880c8d265bdd2007ceda4ebbb027ae832756856677ea",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useHoverFloatingInteraction.ts",
+      "origin": "adapted",
+      "sha256": "11543b53db2df5877df63a7c10ea44f372469b2c0fb2f08c13f0986754e73907",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useHoverInteractionSharedState.ts",
+      "origin": "adapted",
+      "sha256": "fc165931b18863b97c51af54fc5bb08138a8dffa1dbe1a33e25e19bc098b4732",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useHoverReferenceInteraction.ts",
+      "origin": "adapted",
+      "sha256": "9dfc3e0c4c369c73f4c36c00b6f0e4ea65a1914050e7452ccf6c3cb02e1ae149",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useHoverShared.ts",
+      "origin": "adapted",
+      "sha256": "e80b1529d81b794a92140c0554df4441c06f7a3425df1e66e5ef77ba35dc0890",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useListNavigation.ts",
+      "origin": "adapted",
+      "sha256": "d3d480b275bcfb1ce472361c28faf23724a92913dad01d98fe6e540f222b0929",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useSyncedFloatingRootContext.ts",
+      "origin": "adapted",
+      "sha256": "7b58862b27d4c57b3925745a2f64d7ffe4fa52783874fa8ef7e99d2831a2660c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/hooks/useTypeahead.ts",
+      "origin": "adapted",
+      "sha256": "4b0d3dd8159bb47f78aeef7beb1ec280a67d1518a314e9abeef8d3e2b119f15e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/index.ts",
+      "origin": "adapted",
+      "sha256": "c0c7a3d45ebe62d2af6760aef0fb2a5912a7768bb07ae4a7e515aa24e78ac66b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/middleware/arrow.ts",
+      "origin": "adapted",
+      "sha256": "b5ee578993ef65f1d25a053d02c8db88d56048ba301043c63bbdaee9f73ecd89",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/middleware/positioning.ts",
+      "origin": "adapted",
+      "sha256": "2b87f478d2dcff9c69b1bdee3721d9aef219a47e55d738acafd0e7a110f883c5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/safePolygon.ts",
+      "origin": "adapted",
+      "sha256": "3721f862a27a5e95d93955f246dda00a6e279a2b33f92bb99499f89997afd741",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils.ts",
+      "origin": "adapted",
+      "sha256": "9e46e6faa5dfb04b8be61311426c25cf3f69351bbd2e27fd3af523b99ba5a20d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/composite.ts",
+      "origin": "adapted",
+      "sha256": "8b5cc9d0d11cc59423f9faff81538efac4d47c826cf774a6aac8a9cd8d157e11",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/constants.ts",
+      "origin": "adapted",
+      "sha256": "f1bdeead480d1c650b4f0c1869494b43d84ff813ff4d797a1de756e472aecdd4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/createAttribute.ts",
+      "origin": "adapted",
+      "sha256": "2944bc4058e691175d325d0b7b1f878340bcd4ef768842eb0766e9fe2064135c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/createEventEmitter.ts",
+      "origin": "adapted",
+      "sha256": "d1853a28578faab4dbf458e88eb634fe94161585cccea6b7a358a74bb09ffbe5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/element.ts",
+      "origin": "adapted",
+      "sha256": "6a10e59f7b4ee8b5c72c9d2b1cc9546b7f8448c133c7f1311bae9f3961c37c7e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/enqueueFocus.ts",
+      "origin": "adapted",
+      "sha256": "f9a20b4f46a06ed38b6ba56461610483ace26f57c7d0bfcc3b9e2f122dd734e0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/event.ts",
+      "origin": "adapted",
+      "sha256": "cc1eea5647ffd93dc3619040f3c8e51364828e7606624670121d8fedacc94096",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/getEmptyRootContext.ts",
+      "origin": "adapted",
+      "sha256": "f53b501ec093d45c2aea0093c6e1bc62fd1b884a4dcd76251b6b8cac1c660356",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/markOthers.ts",
+      "origin": "adapted",
+      "sha256": "12104d82aeb5b6adc0aaf9ad4f5c34abe867c26ba476ef64dd38e9f2471e1c75",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/nodes.ts",
+      "origin": "adapted",
+      "sha256": "48f92df165975e43398cb18d284c9a8dfad631f0f2da9a305ccc3fc6a1444ffb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/floating-ui-react/utils/tabbable.ts",
+      "origin": "adapted",
+      "sha256": "dc4334563419317a08a03f4d2d408a0618ce58c30bc38d2c1afbbc67665610fb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/form/Form.tsrx",
+      "origin": "adapted",
+      "sha256": "b336e4ec9fc9078e1c681560656b098781eca5ecbd2ef27aac1e22f0a7a1e847",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/form/index.ts",
+      "origin": "adapted",
+      "sha256": "50bb400dc2d425bd91b643ee2696e68d382528fc836d97322e274509cd15c124",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "sha256": "e32aac45a8712670777f4934d42ab3b70bdf319b2c7997f2884a39db2f9ed7b5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/input/Input.tsrx",
+      "origin": "adapted",
+      "sha256": "8c6ed6a7dd3c191f0cce94eb492241860b2a8551acd5aa50e55a06b79b8a164e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/input/index.ts",
+      "origin": "adapted",
+      "sha256": "360ba9b134d3579868b6bf2477cdc377189f6cf1a713b0068ab5c15cfdbfc946",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/PrehydrationScript.tsrx",
+      "origin": "adapted",
+      "sha256": "b48dec887177d503a0fa5c7204cf25e97a135d56bab952d04d73f3945195c950",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/RequestQueue.ts",
+      "origin": "adapted",
+      "sha256": "36eb4d82ae8eeeba662c0e8d4d29e38c0fda87f2bfeb605a961f564c10742378",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/TimeoutManager.ts",
+      "origin": "adapted",
+      "sha256": "6bacefeed2d2399076b1725fb6a15e12e4cd3f4b4f72ba9d5f16191505cc59d5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/TransitionStatusDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "cf240c33e54cbfae687b7f9b1bdaf7329c1cda7630481ca68d105723d75440d7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/composite.ts",
+      "origin": "adapted",
+      "sha256": "dfda217f36167a4048c3958171d584915eaf02e291b56dc00c6b19fc083ce2e4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/constants.ts",
+      "origin": "adapted",
+      "sha256": "494b3845bb2c22da3ef9e8d3856ee582ee3a7b2cadbbe14bef9dcd6968bbf415",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/index.ts",
+      "origin": "adapted",
+      "sha256": "1ea9f4059ff620c55e0ff2beb59418655a349385ccc8d2a8403611480b5530b3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/item/CompositeItem.tsrx",
+      "origin": "adapted",
+      "sha256": "0713d5ba770cbd4354ab8134a465f2e74a129655dcc53cb347942c9a62f71d67",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/item/useCompositeItem.ts",
+      "origin": "adapted",
+      "sha256": "f7c60f4e76a860da75659acd4e61bc8c7e7fdbb12d7e26d5fe64fecc48c95cbb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/list/CompositeList.tsrx",
+      "origin": "adapted",
+      "sha256": "918fca9c9e2cf78e9f44738962ee97cdd698f3906c2cf9d28736b41727b33cdc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/list/CompositeListContext.ts",
+      "origin": "adapted",
+      "sha256": "9f5a13c45a1cf16f0443a7848171634d1e8776826a1b4ca98cf3d8c58bd6378a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/list/useCompositeListItem.ts",
+      "origin": "adapted",
+      "sha256": "41ccab0e52b8fead42075dcff72091100dac04aa28fcc10ed52fbf6d99e20266",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/root/CompositeRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "8c564545f96877b86e8bfe786f74100f530d791ecd535ac49cb0a07d1fa8b553",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/root/CompositeRootContext.ts",
+      "origin": "adapted",
+      "sha256": "c151e5d830b29064b72fcda4608f69c8b66cdab9a79c60f0ed498076fd395319",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/root/gridNavigation.ts",
+      "origin": "adapted",
+      "sha256": "d0f22b3bcb3cd000666dd0c39de5d7db92354a0b9a74a3a9f2773b0ee8249a17",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/composite/root/useCompositeRoot.ts",
+      "origin": "adapted",
+      "sha256": "575f2c543a254da2ebe3d5633cb5eae3341b37c62a23e33fd586568d4e75b32e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/constants.ts",
+      "origin": "adapted",
+      "sha256": "096e3607fb1040f9dc7daa2880c4b24aa5dca961e3b40d795f481f098c47ae94",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/createBaseUIEventDetails.ts",
+      "origin": "adapted",
+      "sha256": "f1a306d6ef5a029597dffa4ab2c8103f934c2f29f3b14aa28dc9b70d6c86e8e6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/csp-context/CSPContext.tsrx",
+      "origin": "adapted",
+      "sha256": "c37562b5dc85b2203650e5fd5550a9acce2836f5173f70964a6ace7c7b1f0d44",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/csp-context/index.ts",
+      "origin": "adapted",
+      "sha256": "2ce8c09ac9524c256ad0a7f6d8e8fb308fc0cc1df83ad1bd667ddae4a8af8687",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/direction-context/DirectionContext.tsrx",
+      "origin": "adapted",
+      "sha256": "735d1052280128c3fcebf14b98f30984d39330be3141c6e219ec9bed3e25b312",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/direction-context/index.ts",
+      "origin": "adapted",
+      "sha256": "c71aa537a99ea18dab37936261c461cfedf0afbe64d6a3f338d25e089a52eead",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/field-constants/constants.ts",
+      "origin": "adapted",
+      "sha256": "5bfbd94f87054a19c2b8a07f74e894a3bbb535a910691c24cca0493d9735b41c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/field-constants/index.ts",
+      "origin": "adapted",
+      "sha256": "e06127819037b63f3f69f7fe0ac1340af39d8e4e719e5fab5a4c8a2e60fda187",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/field-register-control/index.ts",
+      "origin": "adapted",
+      "sha256": "ebf9ba3e1fa3b848adbe4651a08ce10ff214239749a0a19cd7f546f935ef3b88",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/field-register-control/useFieldControlRegistration.ts",
+      "origin": "adapted",
+      "sha256": "d2d79a1e1390b26d62966f4d8f269b6c45a51976d5e9f915ff8a635a87778d0a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/field-register-control/useRegisterFieldControl.ts",
+      "origin": "adapted",
+      "sha256": "3b3bec04b5dfa2a6fec9f396bab52fc00a96cee38591ca2ded44a41c93409042",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/field-root-context/FieldRootContext.ts",
+      "origin": "adapted",
+      "sha256": "5fb3cf00c86456f71025761ca37a117596e425195f0545252b57283f118d5073",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/field-root-context/index.ts",
+      "origin": "adapted",
+      "sha256": "cf33eeac03f351225983574c8cb2ab0482002e8fb8470f7d1d53ab36bedd97c1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/filter.ts",
+      "origin": "adapted",
+      "sha256": "d47a7af7152bf41fa8030ff3a4662e39e83e458e6ddd32a0e3ad0d53fb8d57d7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/form-context/FormContext.ts",
+      "origin": "adapted",
+      "sha256": "7bf249b50f1777cd96ef9da6e24f32610ec862084f924bb07822b76b0b4e3ca1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/form-context/index.ts",
+      "origin": "adapted",
+      "sha256": "0d2a3d71d47c3db1e4cfeeea019f194be74edf0f5434d55cb1418d3804ab0616",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/getDisabledMountTransitionStyles.ts",
+      "origin": "adapted",
+      "sha256": "057f46cd44a8449cda034debd7490655e045843f2506fdf8aff084e442d54deb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/getStateAttributesProps.ts",
+      "origin": "adapted",
+      "sha256": "64bdc6d02af89a79de99c8aa2cdb1c1f139a32b2961a977d18ff888fb568a395",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/itemEquality.ts",
+      "origin": "adapted",
+      "sha256": "fdc1c0451139d5927c88a87e4136fdac6777eed6676000a8dab1c15dd97db8b4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/labelable-provider/LabelableContext.ts",
+      "origin": "adapted",
+      "sha256": "37c86a0a062cb359aaf2752e6eb8c23e14421375c2d902451f0fad722bf97cda",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/labelable-provider/LabelableProvider.tsrx",
+      "origin": "adapted",
+      "sha256": "593ff55afae3302fc93e9ce1dc58025a90bbc7a6d8f111b1ee56530f811e0cbc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/labelable-provider/index.ts",
+      "origin": "adapted",
+      "sha256": "a391886ee9da640a87c18f9e796044f89d52a597ad687787b55a6b7c3c667600",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/labelable-provider/useAriaLabelledBy.ts",
+      "origin": "adapted",
+      "sha256": "70a7d8e48cdf2dc0853ed5aa48f7539309f09d1df4a58f253ee388b9f94305a6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/labelable-provider/useLabel.ts",
+      "origin": "adapted",
+      "sha256": "6627c495edd6f981ba635f05396ebd7ff4a5f226b90c35ac34481c26211a28a9",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/labelable-provider/useLabelableId.ts",
+      "origin": "adapted",
+      "sha256": "8cad99343cae89f922d7849dcccc2b76aaf505042127faed8456f7fcd3d1cebf",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/noop.ts",
+      "origin": "adapted",
+      "sha256": "7ecbcc296af4e3394cbba1dbbea057b9574a34845302ac27965ed601aa211793",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/prehydrationScript.stub.ts",
+      "origin": "adapted",
+      "sha256": "cdfce5dc08cedf6761d750511bf13cb73682cb167c49af1d0156b914bcdff49d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/reason-parts.ts",
+      "origin": "adapted",
+      "sha256": "1cddfb9a98326bc5e586c2bdb66fb3a58913038f8ee7368ec57bbaf972521e06",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/reasons.ts",
+      "origin": "adapted",
+      "sha256": "694b1512f2dd9c999e97899e1fe9ea0f189fbe8476fcbc0f957cd786806c4abf",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/resolveValueLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "0646d4c7866c218aa194317a252891cef21de937b61142211ffe818c838f0ad6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/serializeValue.ts",
+      "origin": "adapted",
+      "sha256": "e471c31343823aec3c3708415dcc86c1fbcdb328ed32c48d4b40efe177ec86e9",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "f233571e83b39dd8df938db5438cee393bbeda729c923e81a1d33786f4c7d425",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/temporal-adapter-date-fns/TemporalAdapterDateFns.ts",
+      "origin": "adapted",
+      "sha256": "fb694005fd87470f84fe3388d0984bf9e781befc7863c1c4ec3321ed642b3705",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/temporal-adapter-date-fns/index.ts",
+      "origin": "adapted",
+      "sha256": "5789c115a77a1de56ba4bb7429e83e98d3fe314712c11cde8982ee23733bf89e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/temporal-adapter-luxon/TemporalAdapterLuxon.ts",
+      "origin": "adapted",
+      "sha256": "2254a3a8fd17810dbcf8a9379221afc420c6b34faf739ee6730cc93b33293934",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/temporal-adapter-luxon/index.ts",
+      "origin": "adapted",
+      "sha256": "df7c98064d263dabc04b572871c90511fd19c7b287651b26b4fa6a15991434ed",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/temporal/index.ts",
+      "origin": "adapted",
+      "sha256": "40eacb1880c5be47b22b09538985a212645a627f4692fb224e115419a72ea6e6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/temporal/temporal-adapter.ts",
+      "origin": "adapted",
+      "sha256": "39ee6f0da8fa6e01d39a9324e51b02fb80fd69925f2f3d43661fdc35fc5fedc1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/temporal/temporal.ts",
+      "origin": "adapted",
+      "sha256": "42a9d01a0f4a2e166f11546563662eed0a712e572adfeda40b547ae305f6e4ba",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/types.ts",
+      "origin": "adapted",
+      "sha256": "3040f61176c8fc3120328a6e9ec7551ddfe07e047d568af58a899bb6dd69376a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/use-button/index.ts",
+      "origin": "adapted",
+      "sha256": "bfd5490017aa66ebc7d42c86e9309e15109eb1a0d5058fed586704adf93c8d23",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/use-button/useButton.ts",
+      "origin": "adapted",
+      "sha256": "d7009fc33640f8d48530a06396ecad5294b7e1265555366a155461942a23d712",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/useAnchorPositioning.ts",
+      "origin": "adapted",
+      "sha256": "685a2b3aeaf9b9f9eaa1428bea2a06b1edfc7ecdaf94c2460064296ee1689978",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/useAnimationsFinished.ts",
+      "origin": "adapted",
+      "sha256": "55f38737fc1bf0cc76140ca72c872e71f324446728d6c746167ef17e070639af",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/useBaseUiId.ts",
+      "origin": "adapted",
+      "sha256": "cf28d28945b1b3f41482e2494769b0d6b818a64a4f42b924cfcb8c28da684e07",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/useOpenChangeComplete.tsrx",
+      "origin": "adapted",
+      "sha256": "529e9109aa32686eda999c4ba8a07c2ddd8b0c1f984e5df432e7509a71534689",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/usePressAndHold.ts",
+      "origin": "adapted",
+      "sha256": "a8825d6d29a7dfe001ff351df232fb17cf89607be2d51400133772a299ddab70",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/useRenderElement.tsrx",
+      "origin": "adapted",
+      "sha256": "77abaa91b488dcfb383b64442d083d3b06f7bdf5d9e26de67f1090cd79fd3a13",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/useTransitionStatus.ts",
+      "origin": "adapted",
+      "sha256": "ff1e295f90514c72b0713ed740ba515b6b109ae49e5f77b35c869b067c3c88bd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/internals/useValueChanged.ts",
+      "origin": "adapted",
+      "sha256": "3569ef9bf6bc5c85f4179786fa5a4354fd6984c9d5421137e7c52ab8c7c3dc4e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/arrow/MenuArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "463db2fe507f12420d2e045f44665d0a80dc0a79c0ac47d51f362912ab5b9cf7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/backdrop/MenuBackdrop.tsrx",
+      "origin": "adapted",
+      "sha256": "f2e0ababed0ab9bdc4a6c321eeac926e543b9281fd6220745ddca4181d776cd0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/checkbox-item-indicator/MenuCheckboxItemIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "82d11ca73f47e64a634d14854c581148ae2e3b58cac71fc1e792c884677927f5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/checkbox-item/MenuCheckboxItem.tsrx",
+      "origin": "adapted",
+      "sha256": "9e6e3c5958f07e080a91a405028f223ac2e8cdc3fb3ff11439673af7abf999a0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/checkbox-item/MenuCheckboxItemContext.ts",
+      "origin": "adapted",
+      "sha256": "af31da09ba275e06c38db38f7bee85f77ff3d5399f8d7be1a6025e4227a6266d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/checkbox-item/MenuCheckboxItemDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "ce062d85444b398bccbcbfeb6fbd4db200d1ba513b98adb68d20fa884320e89f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/group-label/MenuGroupLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "fc0fa86e8c92e601158e9630994f26af41ae6eb0cf7561c22db7e09d6e0a0194",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/group/MenuGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "7c0b8c179f7271ef3497bc6847fefc513fda3950edc2890e4a6edc99266ab90a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/group/MenuGroupContext.ts",
+      "origin": "adapted",
+      "sha256": "e0b6d87fab32d02bb030f0ddf19569cdfb2c6f6d84cad3e7592ef2b96a353d89",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "8e6e0c71830c2a91d7fa7d684fd847934c23474dcef50e06986cb47b45628731",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/index.ts",
+      "origin": "adapted",
+      "sha256": "c0be4d25a79cee4d1b8ab765018cd3c99052fde48b713d3ed3f249827c09297e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/item/MenuItem.tsrx",
+      "origin": "adapted",
+      "sha256": "c8ad225fb790dba2e7b0008174744e5f5f859f4da2cbf00f1883a640d5c311fd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/item/useMenuItem.ts",
+      "origin": "adapted",
+      "sha256": "ef69d9b767b2f63d4b7b0b0e496b908ec6bdd23e72fccdd0261b38089452014f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/item/useMenuItemCommonProps.ts",
+      "origin": "adapted",
+      "sha256": "c34634947ce53e9c25bb2bb868c7016c8a238a08fa3548b3b96e8feb70ab1387",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/link-item/MenuLinkItem.tsrx",
+      "origin": "adapted",
+      "sha256": "db981f104f633163ec1ead787e603a09f72184f160e88e7d697d2496e66c9407",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/popup/MenuPopup.tsrx",
+      "origin": "adapted",
+      "sha256": "0301bedf8d356b04e95761e1051956649bb13307b2821250bbd3f2fe61932a58",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/portal/MenuPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "3821b2de3ab059023b33e9e2e5c7681073a82ab6cd2ee06d772a1a67af39d08e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/portal/MenuPortalContext.ts",
+      "origin": "adapted",
+      "sha256": "b2150c31b15d509e2f686868186a474e579d6cbc8ba6095426b5da4938ff9450",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/positioner/MenuPositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "f612f2974503b1e8f53e1794c746d0fb2025832549038227dde05116979e8325",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/positioner/MenuPositionerContext.ts",
+      "origin": "adapted",
+      "sha256": "fb10e3b9327a11ea467ec5541b810a4c40b37972312339e6023d4f82e5a8efcd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/radio-group/MenuRadioGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "ee5a86b5a951541c8a64c753874d2078dee00f390df58fea51b119ce788d92b0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/radio-group/MenuRadioGroupContext.ts",
+      "origin": "adapted",
+      "sha256": "0dd86315ccb235d21f261f0c16d64e18e7d7e3475a9491911f8a2fd4d1e966b4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/radio-item-indicator/MenuRadioItemIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "8abd86c4b59dd9376cc22b4d9e86d6562f836c0e5cb4fc822023e66db7c7750d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/radio-item/MenuRadioItem.tsrx",
+      "origin": "adapted",
+      "sha256": "97c405276fd6f8a078812a19eabb3de4a09e7d9c0f43afd9a22cf9614a6a5fad",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/radio-item/MenuRadioItemContext.ts",
+      "origin": "adapted",
+      "sha256": "06b578b3ef570903c63c8bbfcffcb75dffd372ff60dfa836e587b23b8769ced5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/root/MenuRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "eae577dfc1a78485038ccfe1f0705077154cad1a09ed9f784d4b1f54fd2cd691",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/root/MenuRootContext.ts",
+      "origin": "adapted",
+      "sha256": "3d32b68e5b73725a58d5f2181ba63cca226f50361658b1a8074a02720d3336a1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/store/MenuHandle.ts",
+      "origin": "adapted",
+      "sha256": "fc1ac0d38043b80b6e9998f8f7ceb4a034a533f41396e69c976bfe00e101065c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/store/MenuStore.ts",
+      "origin": "adapted",
+      "sha256": "4d8c241093dbd10968c248bf88818784b20c0ae52f230b2ff9d9993c956d545e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/submenu-root/MenuSubmenuRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "75207506aa890de7365e2151507e48b3c03b961194f788d6543935ed2ef17fca",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/submenu-root/MenuSubmenuRootContext.ts",
+      "origin": "adapted",
+      "sha256": "20755756ee1d4b749a973ff1059da6e1888583b234a151de5c8e42c52e7c8c29",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/submenu-trigger/MenuSubmenuTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "6e94569d8e464c7b9ae95ac067c0b0c6cd08ce6688aa629dab79c6466e7fe24c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/trigger/MenuTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "5754f9cb6125a6c239555166b4d620c0cdb4b83178c0809a82994d66c7c81279",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/utils/findRootOwnerId.ts",
+      "origin": "adapted",
+      "sha256": "7db72a3acfdc24dc80ccf22fe68b38d2854e9ebbc92fe90b8fdff3a83f9e30fd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/utils/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "6f9ac2058002126e66ec132a3770256b2cc1b6a68779018a364e5b8380818b42",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menu/viewport/MenuViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "e7b923d3ebf5209a0b7a8025a4a2d05e6747caea50b85739f4bf95d66e2958fd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menubar/Menubar.tsrx",
+      "origin": "adapted",
+      "sha256": "68a486a27c5e09f873eddc6f34543b43759cf7490b324d24be6673dbc6ef8f03",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menubar/MenubarContext.ts",
+      "origin": "adapted",
+      "sha256": "def1d88cc1d7894ad3c7db953e0d00f7f749285c38c0c07c32da45a5a0531743",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menubar/MenubarDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "68352c65c60b48ca6c504a950e38524f903228a80de90c0281f7b773b5b3d163",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/menubar/index.ts",
+      "origin": "adapted",
+      "sha256": "06d608bf6c37946f6821fd05a4d92345ba68d5c79e89fce338cb5757cb25763d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/merge-props/index.ts",
+      "origin": "adapted",
+      "sha256": "4881819e46f8b81cc6e90add34bc5a87cf924596e007785da31eed500414222f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/merge-props/mergeProps.ts",
+      "origin": "adapted",
+      "sha256": "d47f161b7c5916ba69804f36e24131e784f4dc3416d6f84cacafebadaa868644",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/meter/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "762a6a30ff93b158b1947cbf5c9bb5905ffe86fa2bf2baf261d1ebfbd68b94bb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/meter/index.ts",
+      "origin": "adapted",
+      "sha256": "1ac986f49c9d1887312807d8d25390f51c435d754a643d76229ed12c40bbd74e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/meter/indicator/MeterIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "c87e95cb0ff48fdfcf8d27697e84f4a9b37782c2ba640e4c5a9ab8726056685e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/meter/label/MeterLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "ef1a0beb2bba45cd0c42199a8615b584fb1c41f74faa27ccab7b5ff4b8428eee",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/meter/root/MeterRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "8bd0c7d9e5c330c26c111124d0871c2e4099d74f99ad696ae52fa97196ad30a1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/meter/root/MeterRootContext.ts",
+      "origin": "adapted",
+      "sha256": "07d4309b85fe0987cedc1f7fc91146ec4a9b9f5a0e21da9d3c74b4a2ded187f1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/meter/track/MeterTrack.tsrx",
+      "origin": "adapted",
+      "sha256": "06e2ff394f771ae1cd2be4fae34caa9e7aba809612d7d676546013ea30907ad5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/meter/value/MeterValue.tsrx",
+      "origin": "adapted",
+      "sha256": "9a767036ee3e67d38c4191f7d98281223017d0a3694e04d425f322ef4e929402",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/arrow/NavigationMenuArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "828d34af86d2276062cf9b1fc5b4a92062267ec73e67306ea44a57f64dd96670",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/backdrop/NavigationMenuBackdrop.tsrx",
+      "origin": "adapted",
+      "sha256": "211e4a65fbd52e9aebbcf12fa923a972e30816a0c5fdeeb421308aa8c0fdae2f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/content/NavigationMenuContent.tsrx",
+      "origin": "adapted",
+      "sha256": "cf67f8c087e5926554396e85be4f067306828356fe42e8ef450e2e699aae4272",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/content/NavigationMenuContentDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "e32b2ac0cf56e4740330d3145957a7f2ef84653f105168d89ee4d59274462e5f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/icon/NavigationMenuIcon.tsrx",
+      "origin": "adapted",
+      "sha256": "a9c8584a5071b30116e1d13af919c76286a8b7ec1c61372d66f1d067944a4614",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "a3ffcd066a687629298595bc4cceb65db0c38143310b1fefe8cb0ce5aeb000dd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/index.ts",
+      "origin": "adapted",
+      "sha256": "8eb15f84681c9d70415934649975a0f0e12548cd4c625bd37f18695059f98c5c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/item/NavigationMenuItem.tsrx",
+      "origin": "adapted",
+      "sha256": "1b9347c150c3d443ec246a1f000615c6e80fa845e2de9026af87f1b70797caed",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/item/NavigationMenuItemContext.ts",
+      "origin": "adapted",
+      "sha256": "104f3d2ffd9dc277a6f76fb16ecad5643e4175b5dbcea7a9c28218c93b93f503",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/link/NavigationMenuLink.tsrx",
+      "origin": "adapted",
+      "sha256": "033a12f38173463bae6ce4ff167732b04307468e5a0c785ff25e3874be290969",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/list/NavigationMenuDismissContext.ts",
+      "origin": "adapted",
+      "sha256": "324cb1dbfec8c4d90d117b9c8a22bed82e12e6c04750c87e8dad08cd92fd9ad9",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/list/NavigationMenuList.tsrx",
+      "origin": "adapted",
+      "sha256": "e3d6c9b152c9eae18fb0bad9cab865d5aa7ead229f75e3c6209b3dea82c17271",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/popup/NavigationMenuPopup.tsrx",
+      "origin": "adapted",
+      "sha256": "813a93e535fec1d33e9f2eaaead37c6a258c62f9b4ab52eb974e7782f35f6a69",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/popup/NavigationMenuPopupCssVars.ts",
+      "origin": "adapted",
+      "sha256": "a85fe6f73ce4c1121aadf057f26525c0d0e28adb6af3b31fe549e497837b9c40",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/portal/NavigationMenuPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "37e21dff35cf99418396a8d25595d9d204af50d471fa068344c26dbe18af627d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/portal/NavigationMenuPortalContext.ts",
+      "origin": "adapted",
+      "sha256": "828c346d4207803ae0adc7452a815d8cb70ccf759945408cdf3b155cc79d2db5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/positioner/NavigationMenuPositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "0c9a4b0dd372a19520e04339f08ed23c2923ab8f42a2c79e42ba2ae5eab069b0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/positioner/NavigationMenuPositionerContext.ts",
+      "origin": "adapted",
+      "sha256": "19f54bd59bc3380691be8128b1d8eec5c19a7a476e5e1d070dfb007399758a08",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/positioner/NavigationMenuPositionerCssVars.ts",
+      "origin": "adapted",
+      "sha256": "84ea53255177ace917bc12437ba4a4f8d0d8783c50b122c6a17bcc9d42ef2e03",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/root/NavigationMenuRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "87e4105e5d05f8d533c1afcc94c128a852da54219269ed4af8ca9c0c28399c31",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/root/NavigationMenuRootContext.ts",
+      "origin": "adapted",
+      "sha256": "1641c0f5f24b25208ad21945afd56718994198be22e46455fdac261ba2c7d21d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/trigger/NavigationMenuTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "f94e769715e8bc2839e1a0dd8de9d2e4b5ec0072b197a6e6a83dc5713958b00d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/utils/constants.ts",
+      "origin": "adapted",
+      "sha256": "a2bd47f20cec542958b264cc85b559d880e6bbcd9215b239e33812af2987c5ec",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/utils/isOutsideMenuEvent.ts",
+      "origin": "adapted",
+      "sha256": "6c8cef75ba470506f1023f65dc2e6eeb4e6abaedc0f6ca2fc1f4d822f5907a0a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/utils/setSharedFixedSize.ts",
+      "origin": "adapted",
+      "sha256": "387fdd62b9474344e06e61af7376f69668e72d32b11423483851bb98c8af72f3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/utils/useNavigationMenuAnchorPositioning.ts",
+      "origin": "adapted",
+      "sha256": "5b13dc14fc064d1d4a9a3c6fd7b60c8384f2cb43abe2c04efda628ca4daa1321",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/navigation-menu/viewport/NavigationMenuViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "8e2bba84895ba3794648e96bdc72c10bd898a4908b2e134753be984ca671700e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/decrement/NumberFieldDecrement.tsrx",
+      "origin": "adapted",
+      "sha256": "d3658b056ab6bea0dc6e8d578e2d4f784390904e50036b591af373c27bf6e0cc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/group/NumberFieldGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "30d252faceb6a99fe9c79b16ba592b2da4426d9434411347f3e338a2c32e49d2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/increment/NumberFieldIncrement.tsrx",
+      "origin": "adapted",
+      "sha256": "35a2c521602ade51d1ef47ee019f4f97096dcea18cc64d5c6a397b2af0a584a8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "bf4db6edf440864805ee6b4606f56e286d07367e3cfd73d332d4343c58a8f31a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/index.ts",
+      "origin": "adapted",
+      "sha256": "5068516966835acd194eb2fb972deea68816c8ab040b3a106a12b8a8bbefc773",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/input/NumberFieldInput.tsrx",
+      "origin": "adapted",
+      "sha256": "7fedb3aca793c2141ee088bd85706f79f1031c1ff7712fe848746ef266c0ed2e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/root/NumberFieldRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "e0c250c64f48332630d56b255bbf0a8d24f183932cfd38338f81c06fa6e03dc7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/root/NumberFieldRootContext.ts",
+      "origin": "adapted",
+      "sha256": "e32f2d4b982e2ff9fd1f8190a1f0a550a0a557b3dd7f041c582a9dcbf478b302",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/root/useNumberFieldStepperButton.ts",
+      "origin": "adapted",
+      "sha256": "a6593d93ae9bdc9cf02c1e3a7d06b6d95ea3acc3871e83b7f38b009b3639ed94",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursor.tsrx",
+      "origin": "adapted",
+      "sha256": "cf640a3b0c19816554bb81eb62e89d421ffb40db07e84e50116d75e19323cc41",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/scrub-area/NumberFieldScrubArea.tsrx",
+      "origin": "adapted",
+      "sha256": "ffa1dc37aa957006f1a79b01c80e8c24e16ed9230452cc5b9d628296c47a9efb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/scrub-area/NumberFieldScrubAreaContext.ts",
+      "origin": "adapted",
+      "sha256": "8deddb59d5d5f43bb178ec4dcdd3f53911bd9e7788882a784665853e8fe9e524",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/utils/getViewportRect.ts",
+      "origin": "adapted",
+      "sha256": "4b4330ccf3b0ca588e6a98287f2e124ef0b437cd75b039f96297cf793eaa8f8f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/utils/parse.ts",
+      "origin": "adapted",
+      "sha256": "030f50820cb13d419bec209ce42e897a015180f3daec94c3864251c08655a8dc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/utils/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "89d84d862304e320d94802caf5dc2daab163bff52761f39dd3141d77853a4218",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/utils/validate.ts",
+      "origin": "adapted",
+      "sha256": "8f73e7199e6822e447e2df48c5233076237a80a6b47e705747e0eab31e6626e1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/otp-field/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "6aa59571999fd354b5ac83e10fbe228b548fb37a6bda66166646e928b72429b6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/otp-field/index.ts",
+      "origin": "adapted",
+      "sha256": "3726f4b2bca900b9e020f92b7be4129d334c044957b6c711239611ccb9de400e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/otp-field/input/OTPFieldInput.tsrx",
+      "origin": "adapted",
+      "sha256": "0199b8f44329516a79221db8ce0839bf53699541bd19472434e3a126dc9280b6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/otp-field/root/OTPFieldRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "f57cf1eda0a01b0a6830014db1c57134eb7c6c73ed29473c3a2061feab9a2eb6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/otp-field/root/OTPFieldRootContext.ts",
+      "origin": "adapted",
+      "sha256": "2bd77133e0e9c8773de6c872ab09ed6b335d558e70b4c2708743a653a2020a84",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/otp-field/utils/otp.ts",
+      "origin": "adapted",
+      "sha256": "eb0a14299773b92bf23e0c5f8b478b18168304c9822023bb98d1a031b5c1f71e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/otp-field/utils/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "6c8bece4ec121118209fe1db5609a06916e1143cf9d837903f8048f4aeebfd77",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/arrow/PopoverArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "2ec3d6b38c81f2a513c5e19410171f4c049dcf5daecf54a7f750e3c6d0600a6c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/backdrop/PopoverBackdrop.tsrx",
+      "origin": "adapted",
+      "sha256": "cef3b9b4555179a8f89a0847470a03cfb9ddbfc1e98f915f9c7c70ce779e8b20",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/close/PopoverClose.tsrx",
+      "origin": "adapted",
+      "sha256": "67b85c5cb61d1f3d152faa4a9edf20dfef869e3ef969dbbf65dc9f21bd38bc64",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/description/PopoverDescription.tsrx",
+      "origin": "adapted",
+      "sha256": "53f2c8960a9c00b3f9fb832768a758b11f0312648217a957a8b2c80ccf7462cd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "74f7b22a68651756e3472e7c88a16f613b25bf266487295ce3746ae3cc046fe5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/index.ts",
+      "origin": "adapted",
+      "sha256": "d528986fe43d89ab8ecdde7a5b7bdb3be3c7a2fd167174c4c9df619c4a6d1939",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/popup/PopoverPopup.tsrx",
+      "origin": "adapted",
+      "sha256": "81a49d739243189abf249f61af347b7e5b7fb3d1a28f0d7f5c79279d789a10ec",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/portal/PopoverPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "fee9e481a6b83c36fb7617afb590464f7eba9ffc41b46cc2093aba8246277fc9",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/portal/PopoverPortalContext.ts",
+      "origin": "adapted",
+      "sha256": "0ff06f9d9427f8d759bd2e58c2602a545218fb184130829b492893e1bc8f4bdd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/positioner/PopoverPositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "c8bc1d1a44c09e07dc6dfc449cd4f43a4c23a4fa446cc276ab090c31f6caba74",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/positioner/PopoverPositionerContext.ts",
+      "origin": "adapted",
+      "sha256": "35e0d218d2c9cfc3671162f79929fb62c0554d8dabc1292ff88073023c4f8fc3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/root/PopoverRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "03fbe2997a4ed171c2bbc343f7d7ed98a2f042c2a62bdf357fbe5ca696d43693",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/root/PopoverRootContext.ts",
+      "origin": "adapted",
+      "sha256": "3f6e062edbc0a175d841be2cf023ffe3af88612c141ac54187405993275d3a73",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/store/PopoverHandle.ts",
+      "origin": "adapted",
+      "sha256": "3661b0b06e407719cf405b930ec90017a87f2f7a2752fc8a5248c022b654364e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/store/PopoverStore.ts",
+      "origin": "adapted",
+      "sha256": "ee430817bc8798a65c2fde2a054e6ae79c058d56bf0507933195605d9ed4d1dc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/title/PopoverTitle.tsrx",
+      "origin": "adapted",
+      "sha256": "752e3e83887946dd5e08959d02ec976cbeb36e756203ef23533d128223ae4290",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/trigger/PopoverTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "57902f5646c908fc0bdc6c2ba760d9cb24379df6f83511180de43c0622b92f9a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/utils/constants.ts",
+      "origin": "adapted",
+      "sha256": "1af64be98556f0ed1e2a6b700b04dd576fb081bac7f6a1fe2e08cdc38dd86bd4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/popover/viewport/PopoverViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "ae5967c0a320bec2dbd93156637f4fafa52562ee8243ab43a1c79362ce0ee6e4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/arrow/PreviewCardArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "3b299f4d1b09ce92a7e62b0779326ea07fa4067357bb7f2a9081aea07b4e66f3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/backdrop/PreviewCardBackdrop.tsrx",
+      "origin": "adapted",
+      "sha256": "ff006f56653b7153ff7c42e504dcbaa82af6c463898f7cf651d9f922016b624f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "ea1005a4d37fd4cc303af88e99b149e3cdfcda187421a87cfe81ab69d0e2afe7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/index.ts",
+      "origin": "adapted",
+      "sha256": "423aa9aa8f0ea131cf169aa6aa44c8658ba5707e46f2989a7b55fb8ff1223359",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/popup/PreviewCardPopup.tsrx",
+      "origin": "adapted",
+      "sha256": "4291573d93e33be8db002b36edc0a36ba9be889cd7490bf6590dd38f16fce19c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/portal/PreviewCardPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "c94fa371d79dfb4d305157c20b1aba4a279f777a53434d4a180412003e38458f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/portal/PreviewCardPortalContext.ts",
+      "origin": "adapted",
+      "sha256": "ce7c9523981abb56d2c70ffe24566acfc8ddf2498162db0eef1e33d4c24dfb78",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/positioner/PreviewCardPositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "a2c4f1bd6d2981692f20dc2ed2d8fa328e5c8a96b77be0fda0758d559cf0e043",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/positioner/PreviewCardPositionerContext.ts",
+      "origin": "adapted",
+      "sha256": "0b440d4693c0981d4ecfce04ba62d3c383bbe2bb900a6ebe98491f3451f74517",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/root/PreviewCardContext.ts",
+      "origin": "adapted",
+      "sha256": "65e011ecf75022333e92024cb74af2754c00c273dd802e9fce75cee43c0307f3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/root/PreviewCardRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "a3d87c2e251a03619e0889ee79ea0ed226a6ec84a2ea0d81fe96ed89949f7d19",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/store/PreviewCardHandle.ts",
+      "origin": "adapted",
+      "sha256": "69549d67755d1881e066383ed03ed02bd42b6905b22aa581e6583f778d991c96",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/store/PreviewCardStore.ts",
+      "origin": "adapted",
+      "sha256": "b3893061b384cafe4cc4546cf5f3b21b9cbaf1eff1f88be823e0188c04fb6084",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/trigger/PreviewCardTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "d101ef29a30a291adaf42cc71a7b072f7a21dbcd3e7a98f49851dc25681a3520",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/utils/constants.ts",
+      "origin": "adapted",
+      "sha256": "ab1a2b8ffe25726235573efc1309e8ad6c0029b13ed45fba7621785cd6cf9b9f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/preview-card/viewport/PreviewCardViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "d1c5095731c872d02dfb679620b8be156c80e423e3fedd1f885efeeb8a6a7862",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "3e3ea465720c2e1bc37530f6d16c2316785213c3dec43bedc85faac7349ee638",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/index.ts",
+      "origin": "adapted",
+      "sha256": "bad586ca969988d27092c06414122e329e8ba965c1ece951035c0296face4aed",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/indicator/ProgressIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "3e41d9c66870d904acb127f413bf5c3e4070038f4f6c9be0700fded94d7c56fd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/label/ProgressLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "2b43bc9b40b7feced6acef0c3a8f174e9b8f9d1ffe81814dcc241050cc9d1bde",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/root/ProgressRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "8a98c0a361ba9476eb0edea2d7edaf38af4c93760c388b97378c373cc49eddc0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/root/ProgressRootContext.tsrx",
+      "origin": "adapted",
+      "sha256": "b83a6a752c4b09de777d906956efd02d7047a30e72988004a8f17dd9579c224c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/root/ProgressRootDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "6b1c14a3826577855a1d1aff522b1118cd65863c8a2555da6e967849de42582d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/root/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "b49c97a3c932e123fad882fe76feee25c8dabb75d5f0e5fa6f5d79c047788f38",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/track/ProgressTrack.tsrx",
+      "origin": "adapted",
+      "sha256": "7af4e5af983b1af49e10062eb66dd6d9c577d1c47a7c8d428769a842853b3f85",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/progress/value/ProgressValue.tsrx",
+      "origin": "adapted",
+      "sha256": "6ba1f933422ecbac87c6090d13f35c0330387727fdfe702a4569f865799b53fc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio-group/RadioGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "6ecf0c0b219c98177e9c0d71742f7bb1b0d0498d8e853dd37b88d46f6e6840c7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio-group/RadioGroupContext.ts",
+      "origin": "adapted",
+      "sha256": "cb458b49e764198bc12e663ec116e09682ac0337aa8a907490a61ed5a8e57f41",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio-group/index.ts",
+      "origin": "adapted",
+      "sha256": "a794d25d91613d521ba68449dcb4a452f4eb3c237e7a7040a0af36824f9ab0fe",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "d2f55e27e12bd9f3959a9730e40649917581b7078180a4b9048db0275a8dbcf3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio/index.ts",
+      "origin": "adapted",
+      "sha256": "66fc6286fb7a9ef96c8da60f5cb4d91ffbbb03804dd8159c95be6418853742cd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio/indicator/RadioIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "c769f91f64233d90d9f68f7075ecfe2cb1d99503cbf201e7395e8761e1e11f9a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio/root/RadioRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "0e74e039a477ec4c36942ebb9a61b6851159c8ce66846b0e4c6d1d0c98e965e2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio/root/RadioRootContext.ts",
+      "origin": "adapted",
+      "sha256": "5f10483c2927815dc9b5510ff3917ef1740ab2559fa7622a7e79e6137b34121f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio/root/RadioRootDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "86dbdc2f8ced5bf964263446fb9bb165904628d8f8c3d7c21c327fd7ee503629",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/radio/utils/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "55210d6b4a44c5d8c132747f192ee169c334e8b0cabb4482cec01bc53f1985bd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/constants.ts",
+      "origin": "adapted",
+      "sha256": "9fc45414ac2ce0857c5ee7100a7a66bfd9955afe56afd8ea5d5851f365f8928c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/content/ScrollAreaContent.tsrx",
+      "origin": "adapted",
+      "sha256": "a4c7004dc3e8b5797bdbb7b859ac860133661214ead72c3f934135d68cfe6edd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/corner/ScrollAreaCorner.tsrx",
+      "origin": "adapted",
+      "sha256": "fc48d5ef76fba454741d79a21f02a0f23d067c770e76cfc39ad7567223f7a5b0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "f7222cf1cf7db8c698bf885f8b2af6830ad2ed30313de99071d74ab05ca84e44",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/index.ts",
+      "origin": "adapted",
+      "sha256": "02e007f08a81a419627fe2fd82703fcc67c839ec109ed919ca5d8f37c4f3073a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/root/ScrollAreaRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "adc46b4b3247651a38935c36b7b655ee226019aef2bb03337ccc23a49c1e70d2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/root/ScrollAreaRootContext.ts",
+      "origin": "adapted",
+      "sha256": "386c576c32a1de83b50a18b02706a5df5e87bf4d1581b83ebd5f5a493f6dcfb8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/root/ScrollAreaRootCssVars.ts",
+      "origin": "adapted",
+      "sha256": "535d285bcd1bb34b7ce25d373ba13c6e8accd3fc6b2e08a0086df7c596beb5d5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/root/ScrollAreaRootDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "a23e652655c84bf1dbb90e7fa90d3dc258cc5991984d53d49b4be978c07b2835",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/root/stateAttributes.ts",
+      "origin": "adapted",
+      "sha256": "16a75ce11caa05bc137d40128699ea41430bf972dad05d912ae6a81f62050803",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/scrollbar/ScrollAreaScrollbar.tsrx",
+      "origin": "adapted",
+      "sha256": "807046d69d9bf4a4e51bdfc66b8412db223c22f69aafb58640360a6379e248d7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/scrollbar/ScrollAreaScrollbarContext.ts",
+      "origin": "adapted",
+      "sha256": "bbd198e489311bfdfabd32f56b982589ec4d9ffbf66efe109ecf8375b9a39621",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/scrollbar/ScrollAreaScrollbarCssVars.ts",
+      "origin": "adapted",
+      "sha256": "edb143dcc673bdb78ef872153782c8a774abfbccf9b7dc17c969c311dd63b451",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/scrollbar/ScrollAreaScrollbarDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "d013ba88480f60bc63c6e0ee46bf727865c046e126383e04430d2d2d34d1f910",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/thumb/ScrollAreaThumb.tsrx",
+      "origin": "adapted",
+      "sha256": "4f8d644b7933ac64a31ccbe6640ccb25f1f65c6de7f45c3f519d17ee21834e48",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/utils/getOffset.ts",
+      "origin": "adapted",
+      "sha256": "67ff7d68d29fbcac715f25f9aac3da7fdb704c82d11b92a6210dddb7d8d03b07",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/viewport/ScrollAreaViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "43e4620686168a3e0939280ae9d5b96a14e844b6d1d53f93b24d4f6e3f62ad58",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/viewport/ScrollAreaViewportContext.ts",
+      "origin": "adapted",
+      "sha256": "067d02894ffae508fc771c07c15393c66aa7f2753a31bc22a8dbe7da8337fd4f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/scroll-area/viewport/ScrollAreaViewportCssVars.ts",
+      "origin": "adapted",
+      "sha256": "0077446eeee60231ffdf1091fa62de9d107741064ea2b3f8cb734f0e8551e7c5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/arrow/SelectArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "e0967299b5ea32fdf58af9ff94930cdf979d4614a5cdc29f318bbc405f11da5d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/backdrop/SelectBackdrop.tsrx",
+      "origin": "adapted",
+      "sha256": "f77581b4744472eca49dc0b9a80a126c4a407582272163beec35085ac155b45d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/group-label/SelectGroupLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "049c91745ec912a70a36b9e4275c3ed3a0f53869427d05c234a820887139607d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/group/SelectGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "86cae830e020a3133218b217611c1508c6e03160806cbc6552a2346993bf97b0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/group/SelectGroupContext.ts",
+      "origin": "adapted",
+      "sha256": "5f09835e86642bafdd4c9fde897a190bb88ee1775a44507cc7369e0d7bf6042e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/icon/SelectIcon.tsrx",
+      "origin": "adapted",
+      "sha256": "680a620adee32b0b95b10502317778a3b3bb8951edb315b69d6808a09c29dd8b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "638cf7ac9abdaa37545f9340f3e76b399ce1423514fbdbe52ce97dfa81937422",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/index.ts",
+      "origin": "adapted",
+      "sha256": "7c09d007a3e6387477c2bbd80a988a65bd4464172483a2a934a0506a92c5f69b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/item-indicator/SelectItemIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "b5398db72e3807ec6f2f8998d3c0f72b14fd08c7ec77672ae20b8f3af06aa636",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/item-text/SelectItemText.tsrx",
+      "origin": "adapted",
+      "sha256": "6e69dc8540c060e8a96ea51dea33a1687eeda7363ae228b5d7354363ce9ca754",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/item/SelectItem.tsrx",
+      "origin": "adapted",
+      "sha256": "74a6094250bf3b1abad3849523676d179d384bf94ebf45b847b4d0dcc35b48c2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/item/SelectItemContext.ts",
+      "origin": "adapted",
+      "sha256": "adcee617dbed32738f9188a7095b9787771b19b2bfdaf0bf1e3682a0d162bab0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/label/SelectLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "87200c105df43540b2d9a293eba7408ba8cd1ac0c8b7b7b96969c20c168bf38b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/list/SelectList.tsrx",
+      "origin": "adapted",
+      "sha256": "d3f01f907ece8e0c23b4f784b6d1dcdb9169f33e60148a3ebd03fb5544f8326a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/popup/SelectPopup.tsrx",
+      "origin": "adapted",
+      "sha256": "dc93fafa5c109f5214fe87591694e5b9088063e6b2f6f8c1521d7e4858481e2f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/popup/utils.ts",
+      "origin": "adapted",
+      "sha256": "ecae1f8b36a99d93dcd37d1e2e8e2ebad8b423348ca2bb2d1c40262114c0d51d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/portal/SelectPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "87e63ac147c79ff12e2181246745c48d10dbe6b1287b56181429a6095012b8f2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/positioner/SelectPositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "ac0ab7228acad72862cd6a7a889324d9fa682068ca08e8c344af4c104b4f9198",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/positioner/SelectPositionerContext.ts",
+      "origin": "adapted",
+      "sha256": "c71f20540f04a9c26407d2b6fb7f4414d0d8db1c2f7bbfd8c6de6d78ed013a96",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/positioner/SelectPositionerCssVars.ts",
+      "origin": "adapted",
+      "sha256": "fc4043ecb07253036102c0832cc8ff85b56c640242603cb806824af34b2f73b7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/root/SelectRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "2ffc33f32e335fd0fd094c091af8fa279d9b401cc42441a14aa2e3cca6ca18c4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/root/SelectRootContext.ts",
+      "origin": "adapted",
+      "sha256": "cfa20183c52e399fec18ef22ed9ae437e1eddfaa16667077f554a25973747cb1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/scroll-arrow/SelectScrollArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "d84abf9a4e61cf0ab0c5b99ce833f7660566748c959c64f72b8b7083c3136215",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/scroll-down-arrow/SelectScrollDownArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "3cac2c820094676a86b70c25308781d9dece4bd237c573b72114ff0f36aadb7b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/scroll-up-arrow/SelectScrollUpArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "f3bc640670ef8f9407a2e387c3446302d8692b1751043c946b370ea6fbe50078",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/separator/SelectSeparator.tsrx",
+      "origin": "adapted",
+      "sha256": "b58a3db736514a79bac7d5053d90d8a965c43dd4036732c68b0c5433537ac834",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/store.ts",
+      "origin": "adapted",
+      "sha256": "a11a86b28b90bcd4f4c0cac17a4b02f241bfb1404b0d3dcf8d1a11378c2c4f04",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/trigger/SelectTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "eb20eeceac5b2bff2908557e5087cd016771c1a9ffde9f994f1e88ccdfe2d42a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/trigger/SelectTriggerDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "d4b2a9f69c69fe1934c31d889f6b92b6dd435c152614f22b6a947e07367af479",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/select/value/SelectValue.tsrx",
+      "origin": "adapted",
+      "sha256": "a9c230b143c9d5bbfd7afb2bbeb3a542772d2511437a4acf77b7ccd805ac32bc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/separator/Separator.tsrx",
+      "origin": "adapted",
+      "sha256": "09260330dc3e3b211881fac7c062abeb63d99fca9340d44710efb09236a268a5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/separator/index.ts",
+      "origin": "adapted",
+      "sha256": "08a3eae23d38e7b5c2bcf30247bd077d2ab8665eedfd97658020e2ab3cd9abcb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/control/SliderControl.tsrx",
+      "origin": "adapted",
+      "sha256": "7a889dd8d50a1dd1e161acb781e6a143010283bc3174fbdeae4c7c54cf29261c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "b25540db82401195c24bae061cc509c022d0ed780f4432337367ddf58aba83b2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/index.ts",
+      "origin": "adapted",
+      "sha256": "0a627ac2bf22ea3bdeb2b3520af7537720296ff38cea77ff8db07ddb0837a07a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/indicator/SliderIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "70460982195f0ccb84a4e837eb173a73e38a8e8feee1d44fd9a03c28117e72ab",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/label/SliderLabel.tsrx",
+      "origin": "adapted",
+      "sha256": "d24d1dc8574a837e6a3748429d8fa304276345a07bc55b706f9966b5fa29052a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/root/SliderRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "8a643230c7e92e09d61726ed18cead3fabd47c68bfaa0123a52f9253c748806c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/root/SliderRootContext.ts",
+      "origin": "adapted",
+      "sha256": "08f9f933f1a69c0b153c92ade4977ee67730ed7b1342f36484125cca0e42fa24",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/root/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "b5d6bc8c53462c9696b6c4368d665fa07702733a8b23f9fd23735753eb99355f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/thumb/SliderThumb.tsrx",
+      "origin": "adapted",
+      "sha256": "9b70872ef58bae155c521570e8fc1989261ba7238f173e167ecfb6a40285707f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/thumb/SliderThumbDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "824c20dd43f143383bba6bf19b0f2021102b0654aaae2107b3d3facec0eb43c0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/thumb/prehydrationScript.min.ts",
+      "origin": "adapted",
+      "sha256": "8415a801f5b88dc80de1542253661fdecb22769fbbd6b53e60914630c6716b69",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/track/SliderTrack.tsrx",
+      "origin": "adapted",
+      "sha256": "8e9721540280b757eea8100079ed6b120255aa367514b9016cce23e0825b74cf",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/utils/asc.ts",
+      "origin": "adapted",
+      "sha256": "abbfa7669578c3a970c9bf01a80ff116b019bdbe6e0b7d4320dc0de1a7e30b2f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/utils/getMidpoint.ts",
+      "origin": "adapted",
+      "sha256": "db9637f65539a1226fdcc840e49f41fd191411790ebd2fc6e1c9fe18cb1d4a74",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/utils/getPushedThumbValues.ts",
+      "origin": "adapted",
+      "sha256": "3240919631ddae28ec1076047a8e6011c949fe6cf88183b72de6b3be580b4605",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/utils/getSliderValue.ts",
+      "origin": "adapted",
+      "sha256": "56778b796aec5c94109994de9703b9d5ee94ea559026f8d7bd139542efff6408",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/utils/resolveThumbCollision.ts",
+      "origin": "adapted",
+      "sha256": "f6898bf367c4ff99877ef5ce0b0e4c23e9cbd666388193a052ade5e5008ba45b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/utils/roundValueToStep.ts",
+      "origin": "adapted",
+      "sha256": "1251da8471580ebfe74ddeafc4c63776edd0c9d41204720771d2733427556fd8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/utils/validateMinimumDistance.ts",
+      "origin": "adapted",
+      "sha256": "d555b6bd4349908c85f9d4347550bf9e9012b78675bf491e42425ed5eb162766",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/slider/value/SliderValue.tsrx",
+      "origin": "adapted",
+      "sha256": "197efdf4f8851c7b3b5ebe0a659e515253b0c58c0a6a2a556e8d7497b69807da",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/switch/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "496cd5bb0d6126e08f7c32cbd2aded5fa77a5ba072259c6c9a4629915c88cf7d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/switch/index.ts",
+      "origin": "adapted",
+      "sha256": "c3569ca63ae7297231bcee789f30600144643572e4440de5bb0e01fa563a261c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/switch/root/SwitchRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "38a6316e0181b83fd3beb57820f683470aa58bd7bd703bab7bf797f623a34799",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/switch/root/SwitchRootContext.ts",
+      "origin": "adapted",
+      "sha256": "634143b5275c8f592e373d15eef451f34b34495b28d056af59b0c1bfc2c5739b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/switch/root/SwitchRootDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "d6a154138888fee92d80ddb62dd286d40d362bc445949cdba42991a5ff5899a6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/switch/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "54bee153b54fe3689ec24d911ec6c76b48221b77c2e6e65402f04369a72bc5e9",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/switch/thumb/SwitchThumb.tsrx",
+      "origin": "adapted",
+      "sha256": "93b4c92c520c011911c89115aa41b50e65ab69565314cdb11eeb74df0906c3a2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "89091219a5b56943314ca4b6ee581b8ab03d9e63c076ca0aba21810c2d75dd6e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/index.ts",
+      "origin": "adapted",
+      "sha256": "d895e0f287abf7c622621843560985173e9444ab08e8a382a74d48c7253513a4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/indicator/TabsIndicator.tsrx",
+      "origin": "adapted",
+      "sha256": "0a878db0ba5c1ffe629d336972a4dee4b7d10e06716c4ebb3696f2f0e0f2af30",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/indicator/TabsIndicatorCssVars.ts",
+      "origin": "adapted",
+      "sha256": "8845d542898d04d9d9bc730bd454c25e61d79483461535534c7dc6d2b446d903",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/indicator/prehydrationScript.min.ts",
+      "origin": "adapted",
+      "sha256": "c0b2e929d4eacad065521a8fb1fc82f65595a83634336ad8d5c650d8380556f7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/list/TabsList.tsrx",
+      "origin": "adapted",
+      "sha256": "73ed66998b6a58fde54b83ca81a72e008d7abcc70601e4efac8ef83f506fe8e3",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/list/TabsListContext.ts",
+      "origin": "adapted",
+      "sha256": "cd4b42f37dc6c6ec713f1c00a2ccb239e74f9b71aa989b7dd40459553a8b3cb6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/panel/TabsPanel.tsrx",
+      "origin": "adapted",
+      "sha256": "e37822504cfb194e0a0cf2d29ed55166ef0412e2f0fe278400eda520f639a09c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/panel/TabsPanelDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "5e2b8f74048f260400cf9612082e78b4e8cc39aa935835174ec9f67aa7168b4b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/root/TabsRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "4cdf78a68b34eb8d26acff45086e2adcdfbda7f4605cdb8bcf0a3a30bed50396",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/root/TabsRootContext.ts",
+      "origin": "adapted",
+      "sha256": "7ff7f962d3ba1b29d5f5a4571408a3887798344ae4ddb87ea73c2473cc524d99",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/root/TabsRootDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "88114cee4b4f0a11978d579d1d7f0aeab30c580b5b7a2263bd345213d65df615",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/root/stateAttributesMapping.ts",
+      "origin": "adapted",
+      "sha256": "62209f598a9dc1ca07d2e595b70ac6b38393120fb7caf6ff02f921b055c8dd2e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tabs/tab/TabsTab.tsrx",
+      "origin": "adapted",
+      "sha256": "18055e25fe91fbe9fce682bd4704b2de264e2035c0b90b03af40d97fd7e709a0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/action/ToastAction.tsrx",
+      "origin": "adapted",
+      "sha256": "09e2e89df9c8eb176af24b5e53458f7fc3f2e0b1b865ad0b978f4abc3129a40f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/arrow/ToastArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "f2f846ab8aaeffbd53a9d8989e432c73459897149c004419a42913b82717f88f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/close/ToastClose.tsrx",
+      "origin": "adapted",
+      "sha256": "7608bfa2da0f5e44123258b23056aa448f811be4340af055e2f4e7b16b1e5a6b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/content/ToastContent.tsrx",
+      "origin": "adapted",
+      "sha256": "c063ed85801433e8a2ea0bffe4c1dde4294c5941950f96af74f67875ff65169b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/createToastManager.ts",
+      "origin": "adapted",
+      "sha256": "905388a14a743cc4862c9dbcdfccff30bef96ef65d02a2d9e35d27bf61309d69",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/description/ToastDescription.tsrx",
+      "origin": "adapted",
+      "sha256": "db84b967ed937add23292a2e92198643a30b16cb0ced624969f1f24604ad300c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "db19d46472b65272d2268ad8a453e845b95514dee4fe492edb0e71ce9d824000",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/index.ts",
+      "origin": "adapted",
+      "sha256": "9b9fa7f27fb62b06b1060a7a369240411f3f58354d61d46f13523a1fe42a1900",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/portal/ToastPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "04fb51c1f846d060f41c71a681f17f96eab04108e8c10854ddb3f04b68403576",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/positioner/ToastPositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "d385c00ebdf7c482ec7eee4f2b9308a9198ba40f761087856228aac0371fdb33",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/positioner/ToastPositionerContext.ts",
+      "origin": "adapted",
+      "sha256": "69efc61756d23759aec230d5538a078404f9f0a996e625d389ebc4a6ce95790d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/provider/ToastProvider.tsrx",
+      "origin": "adapted",
+      "sha256": "abd96a01adc421e924531aedbbfb56b87ebadd01295749f39ea3777d6f63fb89",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/provider/ToastProviderContext.ts",
+      "origin": "adapted",
+      "sha256": "67c239c68f151d2bebbbca36948fb903c3a20e1080773b09b1b810c8cf00dead",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/root/ToastRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "db955fbcc6b7be4938ef6e8245e0076b226dafbeb66659004d8475e11a61024d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/root/ToastRootContext.ts",
+      "origin": "adapted",
+      "sha256": "21e261cb6d1f4191f50d31b28e4406efc1a3ea3296440f47afde055d5e4eb61a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/root/ToastRootCssVars.ts",
+      "origin": "adapted",
+      "sha256": "14494ea787cb89f506fd86038ea2475fa95ffc1e1ca576828c782efa819dc492",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/root/ToastRootDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "b73051bda0f26a2fe608b4366efa056ee55d9a22385b7a6c4f0c246f91ec225b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/store.ts",
+      "origin": "adapted",
+      "sha256": "1aaf12a2920926936f6b10fb2acf0673f927cbcbac9920712fee5e8f1dc770c8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/title/ToastTitle.tsrx",
+      "origin": "adapted",
+      "sha256": "765c9be82ef1cffb3d463006c80da575068cb4a137b67367f504f88722860e95",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/useToastManager.ts",
+      "origin": "adapted",
+      "sha256": "01f6073fea2930e5abaa602d1b0d5b6af2a1ee90a53e4c8098fa00d4b6c18f3a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/utils/focusVisible.ts",
+      "origin": "adapted",
+      "sha256": "578860990b282d8d5de0e401e3d2bcfe99997ab756b3014375c301a1864d54be",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/utils/isRenderableNode.ts",
+      "origin": "adapted",
+      "sha256": "b0dc9871a103d5ef57c3ec2fb31c8a0e96726a22481f2b790029d787c780e26c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/utils/resolvePromiseOptions.ts",
+      "origin": "adapted",
+      "sha256": "b1bf8feda70d554d7bd2f4e04cd7cc8ac658da2c5bfc8c903b1498e8ad6fe005",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/utils/useToastLabelPart.ts",
+      "origin": "adapted",
+      "sha256": "432199afe599c00c3cfc21484fc4418ccc1dd1a0f4f557f288c20ff9fe87fe7a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/viewport/ToastViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "0459383b030a009e91e914fa90d8868d6f0c902ab616ec11d0d24b806a7226d7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toast/viewport/ToastViewportCssVars.ts",
+      "origin": "adapted",
+      "sha256": "40a8a7e4425f15546740f687404e584025010ec0a9d11b48096c89f1dc44f948",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toggle-group/ToggleGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "096048c88b1395fbd1f27a20687cdcd3fcf33a172282131fa2b472b262c38f53",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toggle-group/ToggleGroupContext.ts",
+      "origin": "adapted",
+      "sha256": "a8b7d9e4d168018767f7a882825ea65f5fa795fa53270a08f9ad31a258a15888",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toggle-group/index.ts",
+      "origin": "adapted",
+      "sha256": "1c72ebff47b570a06caa04b5eac7ce3ea950dcf8aa00da50f954a575f86f2a5b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toggle/Toggle.tsrx",
+      "origin": "adapted",
+      "sha256": "7b38a5be755d390b4de99e6e824eb9236449d3dada4f580d704efd3eec25c77e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toggle/index.ts",
+      "origin": "adapted",
+      "sha256": "ab25dc0827a1c2dbb4839fa5f68b01f0985868b78ab0c8b96d4a038af9d17496",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/button/ToolbarButton.tsrx",
+      "origin": "adapted",
+      "sha256": "160f62eb4c6089071c0913f01c0ffa74622254b194f49d62fa3516e3683a12bf",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/group/ToolbarGroup.tsrx",
+      "origin": "adapted",
+      "sha256": "8e09943704230a1e51295997187f39962dc66b12e6dd6a36da8669ad4fe786ae",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/group/ToolbarGroupContext.ts",
+      "origin": "adapted",
+      "sha256": "e22416e85c35226976b9ecaeb0602db0477ebc9127ba9bd2d37e7c9aff1c13b4",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "5bbd0b1db2a3171a9ffb5e0008a464204b468c731357b055ea0c070e6b5690f0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/index.ts",
+      "origin": "adapted",
+      "sha256": "a8e0ed8282daaf85c990093800f0b198208a6e8dfd8c4b913a43e0d343270bfc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/input/ToolbarInput.tsrx",
+      "origin": "adapted",
+      "sha256": "3776d74e39210042dbf0d37b33518f47725b12b8817bec0cc9652c99652ccfe2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/link/ToolbarLink.tsrx",
+      "origin": "adapted",
+      "sha256": "8f77bcd58d0b977c429d94832977325ef95b71fb33ca0a1f46d994af4ed99aa8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/root/ToolbarRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "29e0ab385a96bc4b69d10dca11b819eb76d05bb5eab83ff27404e62dccc02fc0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/root/ToolbarRootContext.ts",
+      "origin": "adapted",
+      "sha256": "9b316b4fc607df4f47c47607a74a57d804c4df7385b05f9ee8a3bf9ece2793ab",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/toolbar/separator/ToolbarSeparator.tsrx",
+      "origin": "adapted",
+      "sha256": "1d2883a9a6637726f265534a29c7be317c972e9fd4dba2ae274d7d6561e28cbc",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/arrow/TooltipArrow.tsrx",
+      "origin": "adapted",
+      "sha256": "9e616dc998abcbd83dc98c79be4f67d924ff5b9664bdade23d0e1c9c1090ff1c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/index.parts.ts",
+      "origin": "adapted",
+      "sha256": "69d9e02e0983fb507ed21a658c99c806f08acf85324050dca1ecf344de33d8b6",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/index.ts",
+      "origin": "adapted",
+      "sha256": "1c0e53b14812eae7f6de145d2136abe05ebfabfe66708287caf33ed2277d5e25",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/popup/TooltipPopup.tsrx",
+      "origin": "adapted",
+      "sha256": "196a7172a347662a646eeaeb14bf00f7ce5ed044e4cebfe739ca302f702a6812",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/portal/TooltipPortal.tsrx",
+      "origin": "adapted",
+      "sha256": "333788ec3614e2fc8bd28e98092f0675de59c432b5b2b92c25e81c398ff39adb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/portal/TooltipPortalContext.ts",
+      "origin": "adapted",
+      "sha256": "6d15a5557da323d6ba089dfc0ae8d360746ac576a211f6b6df291a57a9b1fa04",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/positioner/TooltipPositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "155244a99b14088fce49d9ba82464f22e00ea88da4791669f007cc52e8d70fe5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/positioner/TooltipPositionerContext.ts",
+      "origin": "adapted",
+      "sha256": "aa771faf928d613d5156bec266cd11ec3e9ddacbb280291ceae8820913295703",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/provider/TooltipProvider.tsrx",
+      "origin": "adapted",
+      "sha256": "908a7d0544dba9b0daff9be83f23c1558d7cc9c1939f4d18ddea5fef2e373ee5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/provider/TooltipProviderContext.ts",
+      "origin": "adapted",
+      "sha256": "c10afbc986d14e340814497e1b1b5e136e6b19f3b8c96bcc632f2c50b56c4c4d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/root/TooltipRoot.tsrx",
+      "origin": "adapted",
+      "sha256": "2018354a00cb1508b022198830d83857a8105b86674eb6d2f07dd557180d5764",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/root/TooltipRootContext.ts",
+      "origin": "adapted",
+      "sha256": "455fe79ee1257046c165ed51264ef88da9a4fc8359fb1ae1a8cdbe217f37b483",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/store/TooltipHandle.ts",
+      "origin": "adapted",
+      "sha256": "79ee137dfdb2016c069694c0db0058ad11cd775541eccd11cd160591e15e328d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/store/TooltipStore.ts",
+      "origin": "adapted",
+      "sha256": "92686be868bee9f4266dc6e581045ddd9bbac9a994303fbd2e17732e1292d20a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/trigger/TooltipTrigger.tsrx",
+      "origin": "adapted",
+      "sha256": "f4d5c8879fddb49004f581ea2d460ba57d72a7471acaae6f3ed094b620aa0f82",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/trigger/TooltipTriggerDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "862b7dc7f1e0ba84331e9003fdafdf4352fb83defca1bd76789a98ff785b4b73",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/utils/constants.ts",
+      "origin": "adapted",
+      "sha256": "390247a9bd9a973786a81cc5827fbed23bcbb3e572af20e6daf6130b0951163f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/tooltip/viewport/TooltipViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "59e9392f6e2ad95ca02b494c361f626e60834ddfa4ce1cb6cfd20ebd4cff3dcd",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/types/index.ts",
+      "origin": "adapted",
+      "sha256": "24218694784cbf45f44df196a78b652c5ae7c87857b7460901ae258ace8200c8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/unstable-use-media-query/index.ts",
+      "origin": "adapted",
+      "sha256": "fd0a07a2eabde22be15169f23e568e276a79a41e54b2101770a2483578467a6f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/use-render/index.ts",
+      "origin": "adapted",
+      "sha256": "9a0b9e3da75874af319ab27621c80575023af33bb926a8cd2074a6a77616692f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/use-render/useRender.ts",
+      "origin": "adapted",
+      "sha256": "b03908569128b2548f032c4dc479565e1cbaee994b291165582ea2e8961d4f12",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/CommonPopupCssVars.ts",
+      "origin": "adapted",
+      "sha256": "f9dddda047401345f05809796e771f5a204664ff6c828c82e0eb314198a1c57a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/CommonPopupDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "619d78f85d65a83fb5a62868357893b08a7a7a69b81b7a1228599c90513d3146",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/CommonPositionerCssVars.ts",
+      "origin": "adapted",
+      "sha256": "457560d32ec1afda1f3880e9b284bd162f6923348830bf8983fb3a5d050ab74e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/CommonTriggerDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "0fd89dd6f186d143114b4bcca4e6ed529856949b954a897da3066c16e96128c7",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/CommonViewportDataAttributes.ts",
+      "origin": "adapted",
+      "sha256": "b2b2ff787608db21ef5e579b026e6fd38c180046c2584acaa3b76c66e398d394",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/FloatingPortalLite.tsrx",
+      "origin": "adapted",
+      "sha256": "6e88104fb97450f763313f6055aa94a8312599dfff106b2e120bef97c6d8c272",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/FocusGuard.tsrx",
+      "origin": "adapted",
+      "sha256": "eee3ecbc4edf68e5044aa4bbcc2b51ecd44a4dd19be7ceefd12bc2e3edb981e1",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/InternalBackdrop.tsrx",
+      "origin": "adapted",
+      "sha256": "fadaa5a28375492e10549ac228fed1a3df0eb964fab6762a0944088e4c02768f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/NullStore.ts",
+      "origin": "adapted",
+      "sha256": "a2632ef25db435de96a90406ff63f95145486551214daad3fc344113c77bc294",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/adaptiveOriginConstants.ts",
+      "origin": "adapted",
+      "sha256": "354e4d71f850711f05b28c0b95225a2fbb4750fb6db8ddba738e1edf3c04432f",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/adaptiveOriginMiddleware.ts",
+      "origin": "adapted",
+      "sha256": "098dcacb8d5b2eabc32145411cbf08b3ef166d4946bb6a74c622601a8a8be197",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/closePart.tsrx",
+      "origin": "adapted",
+      "sha256": "30579a213d88f7a7602739854b03c43fb5636d09253925ef5c6718af6b4244c2",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/collapsibleOpenStateMapping.ts",
+      "origin": "adapted",
+      "sha256": "38eb5874bd1dc0ac4002e27d70828bd209dbba1c10424be7ddab7726205e411e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/dispatchClickWithModifiers.ts",
+      "origin": "adapted",
+      "sha256": "17598e9d6183a21e1d32bef61ec0dcfd083868a7c171d718791b16ea3c227403",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/getCssDimensions.ts",
+      "origin": "adapted",
+      "sha256": "335754ee0fe9b591a8b50209052924b08bb01d2b89d5a8619425ea349b7d0d19",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/getElementAtPoint.ts",
+      "origin": "adapted",
+      "sha256": "3afc6a73ffb8ccb33f5a737bd23bb8f7cf8418604f2301dea994b1f0fcb619bb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/getElementTransform.ts",
+      "origin": "adapted",
+      "sha256": "54e725d627440776f3c4c2d769b1bd95bbede5423e0320d18c058aa9419a8265",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/getPseudoElementBounds.ts",
+      "origin": "adapted",
+      "sha256": "591356f4515ffa829e6fd82b16c38a6f1ba1694e829fc65039a3ed2483ef809e",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/hideMiddleware.ts",
+      "origin": "adapted",
+      "sha256": "dcf6a4f9d684bd6ffc11a1f3ad7cc632859b985273a2e92b938b1620c204c8fb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/listbox-separator/ListboxSeparator.tsrx",
+      "origin": "adapted",
+      "sha256": "ee35f6fe7155b5e247b63074c3f691e4ccbd54fc23f94d9f9813ceafd34383ba",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/mergeStyles.ts",
+      "origin": "adapted",
+      "sha256": "ba9f2384a25e495ef472098fc6331d78285ac2f4e8f92eca2f53da0d99ce6d81",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/popupStateMapping.ts",
+      "origin": "adapted",
+      "sha256": "2268039bf852671ea93805b9a7cad1a29bc7aa52c1d0b206221ffc7201174d16",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/popups/index.ts",
+      "origin": "adapted",
+      "sha256": "fa35d774e4e8e1ad60d1f96e7a5a0fef3715e154ce5c1d466c4e9a957043dc7a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/popups/inlineRect.ts",
+      "origin": "adapted",
+      "sha256": "3a87d2af688074d3db6169fb6b865adb01c29acf3bd4121aa0348cbc14862e4a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/popups/popupHandle.ts",
+      "origin": "adapted",
+      "sha256": "6b12a633afd83d926f7ed139548256d1ca17a2e9dc991822a044466ffe3890e5",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/popups/popupStoreUtils.ts",
+      "origin": "adapted",
+      "sha256": "d8a812c8078bf7bcccdcb064c1c248407fa426e84c411eb872cc34c4c8111003",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/popups/popupTriggerMap.ts",
+      "origin": "adapted",
+      "sha256": "97c6fd61908b6bb17c4ece04111b0dcf11711c5af49b2e448a7026f948e15255",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/popups/store.ts",
+      "origin": "adapted",
+      "sha256": "5a471678f5ca84debbe7e2d18d0b3c0e4d2ca947c88be2af89cfd2125176470b",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/popups/usePopupHandleStore.ts",
+      "origin": "adapted",
+      "sha256": "6c0b75e7a1340b7f13163ffed2f8f49e69d81837775fd88287841185f4624720",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/popups/useTriggerFocusGuards.ts",
+      "origin": "adapted",
+      "sha256": "84d7464065aa6c15e113776debcc7fa745cea6922fb46abc0d45a2c3a45a3b52",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/resolveAriaLabelledBy.ts",
+      "origin": "adapted",
+      "sha256": "80bc32c408144ccbccc4379ec5c10e70268af776afc777a7257ea5f6ac9b428c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/resolveClassName.ts",
+      "origin": "adapted",
+      "sha256": "dcc3acbf9b8d3dfe01b549748296e865a3a49ef021703ea4c5f91a909ae9941d",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/resolveRef.ts",
+      "origin": "adapted",
+      "sha256": "423eca307dca4341aab1c16324dcd81acf432622127e91a5cc017c0e3442b0ae",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/resolveStyle.ts",
+      "origin": "adapted",
+      "sha256": "d54fca0c6cf5acac6863bcef4f923b3e755483882748664dc8e329d725475471",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/scrollEdges.ts",
+      "origin": "adapted",
+      "sha256": "a3f09326a0c75c3aa69918098d282d076338926543a636671cde77b3a827d072",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/scrollable.ts",
+      "origin": "adapted",
+      "sha256": "14d03d7eedf0d393ec3e4e0c4f900e57dee282758a965313194633e9af064725",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/styles.tsrx",
+      "origin": "adapted",
+      "sha256": "e0ac083272488b8aaf956ea4997f83f43c6f6d0c8129169b9294a64f3f3cfb7c",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/useAnchoredPopupScrollLock.ts",
+      "origin": "adapted",
+      "sha256": "ff5755cba0f2adbdf50485badfd249b02f8fa51434373ee1b30f71ed89e2289a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/useFocusableWhenDisabled.ts",
+      "origin": "adapted",
+      "sha256": "a7d24ec36f3e293a61b18a84a6ec5a11d68ad30768834d3dcf8dcbb718b556a0",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/useIsHydrating.ts",
+      "origin": "adapted",
+      "sha256": "e6bcdc964a9c0cabca7fbc47ac51a92d9458b94aad857de8ef8a4a3a350528d8",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/useMixedToggleClickHandler.ts",
+      "origin": "adapted",
+      "sha256": "2ee4d6693127fc7321eccca003cb65952167ba0efe4ee93b6f237b3867abbe84",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/useOpenInteractionType.ts",
+      "origin": "adapted",
+      "sha256": "a99cf4bed90711e9e208f1b029484d8cf36cdb866e43207ce6bdf6f511feac5a",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/usePopupAutoResize.ts",
+      "origin": "adapted",
+      "sha256": "9f068e75437b16028902ae7a989dc387a4233d9246f57a86718dc2da25b5cedb",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/usePopupViewport.tsrx",
+      "origin": "adapted",
+      "sha256": "a7ef380e5ff0b7740d8b052719cc93c34626bcfd8ecc4a0829436300b95d6835",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/usePositioner.tsrx",
+      "origin": "adapted",
+      "sha256": "e67ad9e7130fd97a5cb9351b480d48c41e5833598659d9b58b16581e81341c70",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/useRegisteredLabelId.ts",
+      "origin": "adapted",
+      "sha256": "f601b96548dc9d55e0dccf463671f4bd463d9f718e839d013bf362aa03451a50",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/useSwipeDismiss.ts",
+      "origin": "adapted",
+      "sha256": "b61986741dbdb934bc8c2d3c81f4b812996c20a599de61cc9bd4ca9b40163d01",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/utils/valueToPercent.ts",
+      "origin": "adapted",
+      "sha256": "f4c0955ff56b99f5c9885354192eba035c8317c3089839064ef9e3a79b79a338",
+      "packageName": "@base-ui/react"
+    }
+  ],
+  "reimplementedDependencies": [
+    {
+      "packageName": "@floating-ui/react-dom",
+      "publicBehaviors": [
+        "Anchor positioning and popup placement use the existing native Octane floating primitive."
+      ],
+      "localEvidence": [
+        "tests/differential/parity.test.ts",
+        "tests/popover.test.ts",
+        "tests/tooltip.test.ts"
+      ]
+    },
+    {
+      "packageName": "use-sync-external-store",
+      "publicBehaviors": [
+        "Use the server hydration snapshot, switch to the client snapshot after commit, and render popup-store updates through native subscriptions."
+      ],
+      "localEvidence": [
+        "tests/ssr/ssr.test.ts",
+        "tests/hydration.test.ts",
+        "tests/differential/parity.test.ts"
+      ]
+    }
+  ]
+}

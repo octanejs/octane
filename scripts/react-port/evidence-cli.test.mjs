@@ -24,6 +24,74 @@ const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const MIT_TEXT =
 	'MIT License Copyright Fixture. Permission is hereby granted, free of charge, to any person obtaining a copy. The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY.';
 
+test('accepts the workspace native compiler executable with the same strict project checks', () => {
+	const { workspaceRoot } = createReadyBatch();
+	const packageDirectory = createCompletePackage(workspaceRoot);
+	const command = [
+		'./node_modules/.bin/tsrx-tsc',
+		'--noEmit',
+		'-p',
+		'packages/widget/tsconfig.json',
+	];
+	const node = { binding: '@octanejs/widget', bindingDirectory: 'packages/widget' };
+	assert.doesNotThrow(() =>
+		assertApprovedGateCommand(['authored-source-types'], command, node, { workspaceRoot }),
+	);
+	assert.doesNotThrow(() =>
+		assertApprovedGateCommand(
+			['authored-source-types'],
+			['./packages/widget/node_modules/.bin/tsrx-tsc', ...command.slice(1)],
+			node,
+			{ workspaceRoot },
+		),
+	);
+	for (const executable of [
+		'./packages/sibling/node_modules/.bin/tsrx-tsc',
+		'./packages/widget/../widget/node_modules/.bin/tsrx-tsc',
+	]) {
+		assert.throws(
+			() =>
+				assertApprovedGateCommand(
+					['authored-source-types'],
+					[executable, ...command.slice(1)],
+					node,
+					{ workspaceRoot },
+				),
+			/approved command/,
+		);
+	}
+	const configPath = path.join(packageDirectory, 'tsconfig.json');
+	const config = JSON.parse(readFileSync(configPath, 'utf8'));
+	config.compilerOptions.noCheck = true;
+	writeFileSync(configPath, JSON.stringify(config));
+	assert.throws(
+		() => assertApprovedGateCommand(['authored-source-types'], command, node, { workspaceRoot }),
+		/noCheck/,
+	);
+	delete config.compilerOptions.noCheck;
+	config.compilerOptions.skipLibCheck = true;
+	writeFileSync(configPath, JSON.stringify(config));
+	assert.throws(
+		() => assertApprovedGateCommand(['authored-source-types'], command, node, { workspaceRoot }),
+		/disable skipLibCheck/,
+	);
+	for (const executable of [
+		'./node_modules/.bin/tsc',
+		'/tmp/tsrx-tsc',
+		'./node_modules/.bin/tsrx-tsc;true',
+	]) {
+		assert.throws(
+			() =>
+				assertApprovedGateCommand(
+					['authored-source-types'],
+					[executable, ...command.slice(1)],
+					node,
+				),
+			/approved command/,
+		);
+	}
+});
+
 function sha256(content) {
 	return createHash('sha256').update(content).digest('hex');
 }
@@ -2750,6 +2818,38 @@ describe('evidence CLI', () => {
 		assert.equal(symlinkResult.status, 2);
 		assert.match(symlinkResult.stderr, /symlink.*packages\/widget/i);
 	});
+
+	for (const stream of ['FIXTURE_STDOUT', 'FIXTURE_STDERR']) {
+		test(`rejects a zero-exit source typecheck with parser diagnostics on ${stream}`, () => {
+			const { workspaceRoot, workRoot, batchDirectory } = createReadyBatch();
+			const common = ['--work-root', workRoot, '--batch', 'fixture-batch', '--node', 'pkg:widget'];
+			assert.equal(runEvidence(['init', ...common, '--category', 'thin-core']).status, 0);
+			createCompletePackage(workspaceRoot);
+			const diagnostic = '[tsrx-tsc] Widget.tsrx: invalid generic arrow';
+			const result = runEvidence(
+				[
+					'run',
+					...common,
+					'--gate',
+					'authored-source-types',
+					'--',
+					'pnpm',
+					'exec',
+					'tsrx-tsc',
+					'--noEmit',
+					'-p',
+					'packages/widget/tsconfig.json',
+				],
+				{ env: { [stream]: diagnostic } },
+			);
+			assert.equal(result.status, 2, result.stderr);
+			const manifest = JSON.parse(readFileSync(path.join(batchDirectory, 'manifest.json'), 'utf8'));
+			const gate = manifest.nodes['pkg:widget'].evidenceMatrix.gates['authored-source-types'];
+			assert.equal(gate.status, 'failed');
+			assert.match(gate.observed, /parser diagnostics/);
+			assert.ok(gate.observed.includes(diagnostic));
+		});
+	}
 
 	test('passes shell metacharacters as literal argv data', () => {
 		const { workspaceRoot, workRoot, batchDirectory } = createReadyBatch();

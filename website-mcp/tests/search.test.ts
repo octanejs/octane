@@ -82,10 +82,11 @@ describe('docs search over the snapshot', () => {
 		});
 	});
 
-	it('resolves concrete wildcard imports without treating arbitrary suffixes as aliases', () => {
+	it('resolves exact and wildcard exports without inventing package subpaths', () => {
 		const cases = [
 			['@octanejs/lucide/icons/foo', '@octanejs/lucide', '@octanejs/lucide/icons/*'],
-			['@octanejs/base-ui/foo', '@octanejs/base-ui', '@octanejs/base-ui/*'],
+			['@octanejs/base-ui/select', '@octanejs/base-ui', '@octanejs/base-ui/select'],
+			['@octanejs/base-ui/combobox', '@octanejs/base-ui', '@octanejs/base-ui/combobox'],
 		] as const;
 
 		for (const [query, title, matchedName] of cases) {
@@ -97,6 +98,9 @@ describe('docs search over the snapshot', () => {
 		}
 		expect(search('icons/foo').some((result) => result.title === '@octanejs/lucide')).toBe(false);
 		expect(search('foo').some((result) => result.title === '@octanejs/base-ui')).toBe(false);
+		expect(
+			search('@octanejs/base-ui/foo').some((result) => result.title === '@octanejs/base-ui'),
+		).toBe(false);
 	});
 
 	it('returns a successful empty result for an unmatched query', () => {

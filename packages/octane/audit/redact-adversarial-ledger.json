@@ -571,7 +571,7 @@
         {
           "kind": "test",
           "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
-          "testName": "reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch",
+          "testName": "defers a streamed-boundary mismatch until its client module resolves",
           "note": "Proves one final client arm, one expected diagnostic, and identity plus continued interactivity of a stateful sibling outside the recovered boundary."
         },
         {
@@ -589,7 +589,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
-          "testName": "reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch",
+          "testName": "defers a streamed-boundary mismatch until its client module resolves",
           "modes": [
             "server-stream",
             "hydrate-mismatch",
@@ -605,7 +605,7 @@
           "observables": ["markup", "node-identity", "events", "errors", "streaming"]
         }
       ],
-      "rationale": "Issue #17 remained open when captured, but Redact main commit e1620a13aab8935c806238f117ba58559b7cd002 contains the matching fix and regression, so the resolution is inferred rather than administratively confirmed. Octane eagerly leaves synchronous hydration for a fresh client arm, so Redact's resumed-cursor implementation bug does not transfer directly. The transferred risk is covered at Octane's observation boundary by the one-arm, outside-sibling, and real-browser global-error evidence."
+      "rationale": "Issue #17 remained open when captured, but Redact main commit e1620a13aab8935c806238f117ba58559b7cd002 contains the matching fix and regression, so the resolution is inferred rather than administratively confirmed. Octane preserves a completed server boundary while its client module loads and compares the resumed client arm on resolution. The transferred risk is covered at Octane's observation boundary by the one-arm, outside-sibling, and real-browser global-error evidence."
     },
     {
       "id": "RDX-HYD-002",

@@ -18,6 +18,7 @@ import {
 	DeferredStreamWithLiveSibling,
 	DeferredStreamWithRetrySibling,
 	DeferredStreamedSuspense,
+	FactoryRejectionBoundary,
 	IdBoundary,
 	LateStyledBoundary,
 	NestedDeferredStreamedHydrates,
@@ -1002,8 +1003,8 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		flushSync(() => {});
 		expect(rootA.querySelector('.ok')).toBe(firstNode);
 		expect(rootB.querySelector('.ok')).toBe(secondNode);
-		expect((window as any).$OCTS[firstId]).toContain('first');
-		expect((window as any).$OCTS[secondId]).toContain('second');
+		expect(rootA.querySelector('.ok')!.textContent).toBe('first');
+		expect(rootB.querySelector('.ok')!.textContent).toBe('second');
 		hydratedA.unmount();
 		hydratedB.unmount();
 	});
@@ -1817,6 +1818,30 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		}
 	});
 
+	it('adopts a streamed factory-rejection catch without duplicating the alert', async () => {
+		const rendered = collectPipeableStream(server.FactoryRejectionBoundary, {
+			scenario: 'weather-failure',
+		});
+		const result = await rendered;
+		expect(result.errors).toEqual([]);
+		container.innerHTML = result.html;
+		activate(container);
+		const serverCatch = container.querySelector('.factory-error');
+		expect(serverCatch).not.toBeNull();
+		expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
+
+		const root = hydrateRoot(container, FactoryRejectionBoundary as any, {
+			scenario: 'weather-failure',
+		});
+		try {
+			flushSync(function () {});
+			expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
+			expect(container.querySelector('.factory-error')).toBe(serverCatch);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('hydrates a streamed catch arm in place and consumes the superseded client rejection', async () => {
 		const d = deferred<string>();
 		const c = collector();
@@ -1857,7 +1882,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		);
 		try {
 			flushSync(() => {});
-			expect(container.querySelector('.id-error')).toBe(errorSpan);
+			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
 			expect(container.querySelector('.id-loading')).toBeNull();
 			expect(seen).toContainEqual(['root', rootId]);
 			expect(seen).toContainEqual(['catch', boundaryId]);
@@ -1869,7 +1894,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			clientPending.reject(new Error('client request also rejected'));
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
 			expect(unhandledClientRejections).toEqual([]);
-			expect(container.querySelector('.id-error')).toBe(errorSpan);
+			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
 			expect(errorSpan!.textContent).toBe('server-no');
 			expect(errSpy).not.toHaveBeenCalled();
 		} finally {
@@ -1951,7 +1976,6 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		expect(container.querySelector('.ok')).toBe(okSpan); // adopted, not rebuilt
 		expect(container.querySelector('.ok')!.textContent).toBe('streamed!');
 		expect(errSpy).not.toHaveBeenCalled();
-		expect((window as any).$OCTS[id]).toContain('streamed!');
 		errSpy.mockRestore();
 		root.unmount();
 	});

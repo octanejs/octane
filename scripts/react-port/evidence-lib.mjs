@@ -9,7 +9,7 @@ import {
 	isRecognizableMitText,
 } from './preflight-lib.mjs';
 import { hasObservablePackageTests } from './package-tests-lib.mjs';
-import { OCTANE_BETA_PEER_RANGE } from '../workspace-packages.mjs';
+import { octanePeerRangeFor } from '../workspace-packages.mjs';
 
 const EVIDENCE_STATUSES = new Set(['required', 'passed', 'failed', 'blocked', 'inapplicable']);
 const CROSSWALK_CLASSIFICATIONS = new Set([
@@ -244,7 +244,10 @@ export function recordEvidence(matrix, gateId, evidence) {
 		if (!gate.allowInapplicable) throw new Error(`Evidence gate ${gateId} cannot be inapplicable`);
 		if (!evidence.reason) throw new Error(`Inapplicable evidence gate ${gateId} requires a reason`);
 	}
-	matrix.gates[gateId] = { ...gate, ...structuredClone(evidence), id: gateId };
+	// A new terminal result supersedes the old blocker. Keep its reason only
+	// when the new evidence supplies one, so reports cannot request a resolved repair.
+	const { reason: previousReason, repair: previousRepair, ...definition } = gate;
+	matrix.gates[gateId] = { ...definition, ...structuredClone(evidence), id: gateId };
 	return matrix.gates[gateId];
 }
 
@@ -522,8 +525,9 @@ export function inspectBindingPackage(
 				}
 			}
 		}
-		if (manifest.peerDependencies?.octane !== OCTANE_BETA_PEER_RANGE) {
-			issues.push(`octane peer must be ${OCTANE_BETA_PEER_RANGE}`);
+		const expectedOctanePeerRange = octanePeerRangeFor(manifest.name);
+		if (manifest.peerDependencies?.octane !== expectedOctanePeerRange) {
+			issues.push(`octane peer must be ${expectedOctanePeerRange}`);
 		}
 		if (manifest.devDependencies?.octane !== 'workspace:*')
 			issues.push('octane dev dependency must be workspace:*');
@@ -556,7 +560,7 @@ export function inspectBindingPackage(
 			issues.push('status.json upstream identity does not match preflight');
 		}
 		if (!/^\d{4}-\d{2}-\d{2}$/.test(status.verified ?? '')) {
-			issues.push('status.json verified must be a YYYY-MM-DD completion date');
+			issues.push('status.json verified must be a YYYY-MM-DD scope audit date');
 		}
 		if (!status.surface) issues.push('status.json must describe the verified surface');
 	}
@@ -715,8 +719,7 @@ function resolveRelativeSource(fromFile, specifier) {
 	);
 }
 
-function deriveShippedClosure(packageDirectory, sourceLedger) {
-	const issues = [];
+export function inspectShippedSources(packageDirectory) {
 	const resolvedPackageDirectory = realpathSync(packageDirectory);
 	const manifest = JSON.parse(
 		readFileSync(path.join(resolvedPackageDirectory, 'package.json'), 'utf8'),
@@ -745,7 +748,14 @@ function deriveShippedClosure(packageDirectory, sourceLedger) {
 		}
 		reachableFiles.add(resolvedFile);
 		for (const specifier of staticModuleSpecifiers(resolvedFile)) {
-			if (specifier.startsWith('.') || specifier.startsWith('/')) {
+			if (specifier.startsWith('#') && manifest.imports?.[specifier] !== undefined) {
+				// Package imports resolve from the package root. Audit all export
+				// conditions, including browser stubs and server prehydration scripts.
+				for (const target of collectExportTargets(manifest.imports[specifier])) {
+					if (target.startsWith('./')) queue.push(path.resolve(resolvedPackageDirectory, target));
+					else runtimeDependencies.add(packageRoot(target));
+				}
+			} else if (specifier.startsWith('.') || specifier.startsWith('/')) {
 				const dependencyFile = resolveRelativeSource(resolvedFile, specifier);
 				if (dependencyFile) queue.push(dependencyFile);
 			} else {
@@ -754,6 +764,18 @@ function deriveShippedClosure(packageDirectory, sourceLedger) {
 		}
 	}
 
+	return {
+		runtimeDependencies: [...new Set([...runtimeDependencies].map(packageRoot))].sort(),
+		files: [...reachableFiles]
+			.map((file) => path.relative(resolvedPackageDirectory, file).split(path.sep).join('/'))
+			.sort(),
+	};
+}
+
+function deriveShippedClosure(packageDirectory, sourceLedger) {
+	const issues = [];
+	const resolvedPackageDirectory = realpathSync(packageDirectory);
+	const shipped = inspectShippedSources(resolvedPackageDirectory);
 	const ledger = Array.isArray(sourceLedger) ? sourceLedger : [];
 	const ledgerByPath = new Map();
 	for (const entry of ledger) {
@@ -772,11 +794,8 @@ function deriveShippedClosure(packageDirectory, sourceLedger) {
 		ledgerByPath.set(entry.path, entry);
 	}
 	const adaptedByPackage = new Map();
-	for (const filePath of [...reachableFiles].sort()) {
-		const relativePath = path
-			.relative(resolvedPackageDirectory, filePath)
-			.split(path.sep)
-			.join('/');
+	for (const relativePath of shipped.files) {
+		const filePath = path.join(resolvedPackageDirectory, relativePath);
 		const entry = ledgerByPath.get(relativePath);
 		if (!entry) {
 			issues.push(`Reachable shipped source ${relativePath} is missing from the source ledger.`);
@@ -797,7 +816,7 @@ function deriveShippedClosure(packageDirectory, sourceLedger) {
 	}
 	return {
 		issues,
-		runtimeDependencies: [...new Set([...runtimeDependencies].map(packageRoot))].sort(),
+		runtimeDependencies: shipped.runtimeDependencies,
 		adaptedSources: [...adaptedByPackage]
 			.map(([packageName, paths]) => ({ packageName, paths: paths.sort() }))
 			.sort((left, right) => left.packageName.localeCompare(right.packageName)),

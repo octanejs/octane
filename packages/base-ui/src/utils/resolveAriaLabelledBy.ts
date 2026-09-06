@@ -1,4 +1,5 @@
-// Ported verbatim from .base-ui/packages/react/src/utils/resolveAriaLabelledBy.ts.
+'use client';
+
 export function getDefaultLabelId(id: string | null | undefined) {
 	return id == null ? undefined : `${id}-label`;
 }

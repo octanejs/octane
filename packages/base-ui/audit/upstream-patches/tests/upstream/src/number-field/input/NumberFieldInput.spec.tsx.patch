@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/number-field/input/NumberFieldInput.spec.tsx b/tests/upstream/src/number-field/input/NumberFieldInput.spec.tsx
+--- a/tests/upstream/src/number-field/input/NumberFieldInput.spec.tsx
++++ b/tests/upstream/src/number-field/input/NumberFieldInput.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { NumberField } from '@octanejs/base-ui/number-field';
+ 
+ // `NumberField.Input` exposes the native `<input>` props in its `render` callback.

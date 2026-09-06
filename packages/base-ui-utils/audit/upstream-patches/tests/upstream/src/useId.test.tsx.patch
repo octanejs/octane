@@ -1,0 +1,50 @@
+diff --git a/tests/upstream/src/useId.test.tsx b/tests/upstream/src/useId.test.tsx
+--- a/tests/upstream/src/useId.test.tsx
++++ b/tests/upstream/src/useId.test.tsx
+@@ -1,4 +1,7 @@
+ /** @jsxImportSource octane */
++import { IdFixture as TestComponent } from '../../fixtures/id.tsrx';
++import { IdFixture as ServerIdFixture } from '../../fixtures/id.tsrx?octane-ssr';
++import { registerServerComponent } from '../../support/renderer';
+ import { expect, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { createRenderer, screen } from '@mui/internal-test-utils';
+@@ -8,14 +11,12 @@ interface TestComponentProps {
+   id?: string;
+ }
+ 
++registerServerComponent(TestComponent, ServerIdFixture);
++
+ describe('useId', () => {
+   const { render, renderToString } = createRenderer();
+ 
+   it('returns the provided ID', () => {
+-    function TestComponent({ id: idProp }: TestComponentProps) {
+-      const id = useId(idProp);
+-      return <span data-testid="target" id={id} />;
+-    }
+     const { hydrate } = renderToString(<TestComponent id="some-id" />);
+     const { setProps } = hydrate();
+ 
+@@ -27,10 +28,6 @@ describe('useId', () => {
+   });
+ 
+   it("generates an ID if one isn't provided", () => {
+-    function TestComponent({ id: idProp }: TestComponentProps) {
+-      const id = useId(idProp);
+-      return <span data-testid="target" id={id} />;
+-    }
+     const { hydrate } = renderToString(<TestComponent />);
+     const { setProps } = hydrate();
+ 
+@@ -91,10 +88,6 @@ describe('useId', () => {
+     if (React.useId === undefined) {
+       skip();
+     }
+-    function TestComponent() {
+-      const id = useId();
+-      return <span data-testid="target" id={id} />;
+-    }
+     renderToString(<TestComponent />);
+ 
+     expect(screen.getByTestId('target').id).not.toBe('');

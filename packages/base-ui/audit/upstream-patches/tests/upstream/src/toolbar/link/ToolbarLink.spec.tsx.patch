@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/toolbar/link/ToolbarLink.spec.tsx b/tests/upstream/src/toolbar/link/ToolbarLink.spec.tsx
+--- a/tests/upstream/src/toolbar/link/ToolbarLink.spec.tsx
++++ b/tests/upstream/src/toolbar/link/ToolbarLink.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Toolbar } from '@octanejs/base-ui/toolbar';
+ 
+ // `Toolbar.Link` exposes the native `<a>` props in its `render` callback.

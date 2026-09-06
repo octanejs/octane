@@ -1,0 +1,66 @@
+diff --git a/tests/upstream/src/internals/composite/root/CompositeRoot.test.tsx b/tests/upstream/src/internals/composite/root/CompositeRoot.test.tsx
+--- a/tests/upstream/src/internals/composite/root/CompositeRoot.test.tsx
++++ b/tests/upstream/src/internals/composite/root/CompositeRoot.test.tsx
+@@ -180,14 +180,10 @@ describe('Composite', () => {
+       input.type = 'text';
+       input.value = 'abcd';
+       input.setSelectionRange(2, 2);
+-
+-      const focusEvent = new FocusEvent('focusin', { bubbles: true });
+-      Object.defineProperty(focusEvent, 'composedPath', {
+-        configurable: true,
+-        value: () => [input, host],
+-      });
+-
+-      fireEvent(host, focusEvent);
++      // Use a real retargeted native event. The composed path must include the
++      // composite and its delegation root as well as the shadow input and host.
++      host.attachShadow({ mode: 'open' }).appendChild(input);
++      fireEvent(input, new FocusEvent('focusin', { bubbles: true, composed: true }));
+ 
+       // Focusing a native input within a composite selects the whole value so
+       // the first arrow key returns control to the textbox before moving focus.
+@@ -202,13 +198,9 @@ describe('Composite', () => {
+         key: 'ArrowRight',
+         bubbles: true,
+         cancelable: true,
++        composed: true,
+       });
+-      Object.defineProperty(keyDownEvent, 'composedPath', {
+-        configurable: true,
+-        value: () => [input, host],
+-      });
+-
+-      fireEvent(host, keyDownEvent);
++      fireEvent(input, keyDownEvent);
+       await flushMicrotasks();
+ 
+       expect(item1).toHaveFocus();
+@@ -1299,10 +1291,10 @@ const UNFOCUSABLE_DISABLED: NestedItemMetadata = {
+   focusableWhenDisabled: false,
+ };
+ 
+-const NestedItem = React.forwardRef(function NestedItem(
+-  props: React.ComponentPropsWithoutRef<'button'>,
+-  forwardedRef: React.ForwardedRef<HTMLButtonElement>,
++const NestedItem = (function NestedItem(
++  propsWithRef: (React.ComponentPropsWithoutRef<'button'>) & { ref?: React.Ref<HTMLButtonElement> },
+ ) {
++  const { ref: forwardedRef = null, ...props } = propsWithRef;
+   return (
+     <CompositeItem tag="button" metadata={UNFOCUSABLE_DISABLED} refs={[forwardedRef]} {...props} />
+   );
+@@ -1345,10 +1337,10 @@ function NestedItemsRoot() {
+   );
+ }
+ 
+-const DynamicNestedItem = React.forwardRef(function DynamicNestedItem(
+-  props: React.ComponentPropsWithoutRef<'button'> & { revision: number },
+-  forwardedRef: React.ForwardedRef<HTMLButtonElement>,
++const DynamicNestedItem = (function DynamicNestedItem(
++  propsWithRef: (React.ComponentPropsWithoutRef<'button'> & { revision: number }) & { ref?: React.Ref<HTMLButtonElement> },
+ ) {
++  const { ref: forwardedRef = null, ...props } = propsWithRef;
+   const { revision, ...other } = props;
+   // Only the inner registration data changes; the outer item's stays put.
+   const metadata = React.useMemo(() => ({ ...UNFOCUSABLE_DISABLED, revision }), [revision]);

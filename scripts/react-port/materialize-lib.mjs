@@ -108,6 +108,26 @@ function validateAdaptedRewrites(adaptedRewrites) {
 		throw new Error('Upstream lock adaptedRewrites must be an array');
 	}
 	for (const rewrite of adaptedRewrites) {
+		if (rewrite && Object.hasOwn(rewrite, 'prepend')) {
+			if (
+				typeof rewrite.prepend !== 'string' ||
+				!rewrite.prepend ||
+				typeof rewrite.include !== 'string' ||
+				!rewrite.include ||
+				Object.hasOwn(rewrite, 'find') ||
+				Object.hasOwn(rewrite, 'replace')
+			) {
+				throw new Error(
+					'Upstream lock prepend rewrite requires a nonempty prepend and include pattern',
+				);
+			}
+			try {
+				new RegExp(rewrite.include);
+			} catch {
+				throw new Error('Upstream lock prepend rewrite has an invalid include pattern');
+			}
+			continue;
+		}
 		if (
 			!rewrite ||
 			typeof rewrite.find !== 'string' ||
@@ -122,10 +142,15 @@ function validateAdaptedRewrites(adaptedRewrites) {
 // Ordered, mechanical source rewrites applied to every mapped pristine file
 // before its patch: import repointing and similar package-wide conversions are
 // declared once here so committed patches carry only genuine divergences.
-export function applyAdaptedRewrites(text, adaptedRewrites = []) {
+export function applyAdaptedRewrites(text, adaptedRewrites = [], targetPath) {
 	let rewritten = text;
-	for (const { find, replace } of adaptedRewrites) {
-		rewritten = rewritten.split(find).join(replace);
+	for (const rewrite of adaptedRewrites) {
+		if (Object.hasOwn(rewrite, 'prepend')) {
+			if (!targetPath) throw new Error('A scoped adapted rewrite requires its target path');
+			if (new RegExp(rewrite.include).test(targetPath)) rewritten = rewrite.prepend + rewritten;
+		} else {
+			rewritten = rewritten.split(rewrite.find).join(rewrite.replace);
+		}
 	}
 	return rewritten;
 }

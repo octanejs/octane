@@ -1,0 +1,49 @@
+diff --git a/tests/upstream/src/checkbox/indicator/CheckboxIndicator.test.tsx b/tests/upstream/src/checkbox/indicator/CheckboxIndicator.test.tsx
+--- a/tests/upstream/src/checkbox/indicator/CheckboxIndicator.test.tsx
++++ b/tests/upstream/src/checkbox/indicator/CheckboxIndicator.test.tsx
+@@ -329,6 +329,12 @@ describe('<Checkbox.Indicator />', () => {
+       `;
+ 
+       const indicatorCounts: number[] = [];
++      // Octane publishes host refs after the DOM mutation phase. Observe that
++      // same completed commit at each indicator attach/detach, including the
++      // commit that removes the indicator itself.
++      const observeIndicatorCommit = () => {
++        indicatorCounts.push(document.querySelectorAll('[data-testid^="indicator-"]').length);
++      };
+ 
+       function Test() {
+         const [checked, setChecked] = React.useState(true);
+@@ -342,29 +348,23 @@ describe('<Checkbox.Indicator />', () => {
+             {/* eslint-disable-next-line react/no-danger */}
+             <style dangerouslySetInnerHTML={{ __html: style }} />
+             <button onClick={handleUncheck}>Uncheck</button>
+-            <React.Profiler
+-              id="checkboxes"
+-              onRender={() => {
+-                indicatorCounts.push(
+-                  document.querySelectorAll('[data-testid^="indicator-"]').length,
+-                );
+-              }}
+-            >
+               {Array.from({ length: 10 }, (_, index) => (
+                 <Checkbox.Root checked={checked} key={index}>
+                   <Checkbox.Indicator
++                    ref={observeIndicatorCommit}
+                     className="animation-test-indicator"
+                     data-testid={`indicator-${index}`}
+                   />
+                 </Checkbox.Root>
+               ))}
+-            </React.Profiler>
++
+           </div>
+         );
+       }
+ 
+       const { user } = await render(<Test />);
+ 
++      expect(indicatorCounts).toContain(10);
+       const commitsBeforeUncheck = indicatorCounts.length;
+ 
+       await user.click(screen.getByText('Uncheck'));

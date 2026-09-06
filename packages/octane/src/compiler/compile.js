@@ -7583,6 +7583,18 @@ function isTypeOnlyStatement(node) {
 	}
 	// `declare const/let/var/function/class/module/namespace …` — ambient, no emit.
 	if (node.declare === true) return true;
+	// Component/type declaration merging often uses a namespace containing only
+	// types. Like an interface, it must disappear from the emitted JavaScript.
+	// Keep value namespaces and Octane's `module server` dialect on their own paths.
+	if (node.type === 'TSModuleDeclaration' && node.kind === 'namespace') {
+		if (node.body?.type === 'TSModuleDeclaration') return isTypeOnlyStatement(node.body);
+		if (node.body?.type === 'TSModuleBlock') {
+			return node.body.body.every(
+				(statement) =>
+					isTypeOnlyStatement(statement) || stripTypeOnlySpecifiers(statement) === null,
+			);
+		}
+	}
 	// `import type { … } from …`
 	if (node.type === 'ImportDeclaration' && node.importKind === 'type') return true;
 	// `export type { … }`, `export type X = …`, `export interface I {}`

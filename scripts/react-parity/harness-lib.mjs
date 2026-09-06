@@ -1,11 +1,36 @@
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+
+export async function runVitestCommand(command, args, cwd) {
+	// Vite startup notices share stdout with reporters. A fresh file keeps
+	// structured evidence independent of logs and prevents stale report reuse.
+	const directory = mkdtempSync(resolve(tmpdir(), 'octane-parity-report-'));
+	const reportPath = resolve(directory, 'result.json');
+	let stdout = '';
+	try {
+		const exitCode = await new Promise((resolveExit, reject) => {
+			const child = spawn(command, [...args, '--outputFile', reportPath], {
+				cwd,
+				shell: false,
+				stdio: ['inherit', 'pipe', 'inherit'],
+			});
+			child.stdout.on('data', (chunk) => (stdout += chunk));
+			child.on('error', reject);
+			child.on('close', (code, signal) => resolveExit(code ?? (signal ? 1 : 0)));
+		});
+		const report = exitCode === 0 || existsSync(reportPath) ? readFileSync(reportPath, 'utf8') : '';
+		return { exitCode, stdout, report };
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+}
 
 const LANE_TYPES = new Set([
 	'pristine-upstream',
@@ -44,6 +69,7 @@ const ROOT_KEYS = new Set([
 	'upstreamSuites',
 	'adaptedRoots',
 	'adaptedRuntimeSummary',
+	'materializedTests',
 ]);
 const PROVENANCE_KEYS = new Set([...PROVENANCE_FIELDS, 'verification']);
 const ENVIRONMENT_KEYS = new Set(ENVIRONMENT_FIELDS);
@@ -231,6 +257,12 @@ export function validateManifest(manifest) {
 	if (manifest.schemaVersion !== 1) fail('schemaVersion must be 1');
 	for (const key of Object.keys(manifest))
 		if (!ROOT_KEYS.has(key)) fail(`root has unknown key "${key}"`);
+	if (
+		manifest.materializedTests !== undefined &&
+		(typeof manifest.materializedTests !== 'string' ||
+			!/^packages\/[a-z0-9][a-z0-9-]*$/.test(manifest.materializedTests))
+	)
+		fail('materializedTests must name one repository package');
 
 	for (const field of PROVENANCE_FIELDS)
 		requiredString(manifest.provenance?.[field], `provenance.${field}`);
@@ -629,6 +661,11 @@ export async function verifyManifestFiles(manifest, root) {
 				await readFile(resolve(absoluteRoot, lane.execution.inventory), 'utf8'),
 			);
 			fullVitestInventories.push({ lane, inventory: fullVitestInventory });
+			if (fullVitestInventory.schemaVersion === 2) {
+				if (!manifest.materializedTests)
+					throw new Error(`lane ${lane.id} skip accounting requires verified materialized tests`);
+				validateRuntimeInventory(fullVitestInventory, lane, fullVitestInventory.roots);
+			}
 		}
 		if (
 			lane.oracle === 'required' &&
@@ -688,6 +725,22 @@ export async function verifyManifestFiles(manifest, root) {
 		}
 	}
 	const discoveredTests = await discoverAdaptedFiles(absoluteRoot, manifest.adaptedRoots.tests);
+	let materializedTests = new Set();
+	if (manifest.materializedTests) {
+		// Report aggregation uses this module without installing the compiler or
+		// materializing source trees. Load provenance tooling only for file checks.
+		const { verifyMaterializedAdaptedEvidence } = await import('./materialized-upstream-lib.mjs');
+		materializedTests = verifyMaterializedAdaptedEvidence(
+			absoluteRoot,
+			manifest.materializedTests,
+			manifest.provenance,
+		);
+	}
+	if (
+		manifest.materializedTests &&
+		[...discoveredTests].some((file) => !materializedTests.has(file))
+	)
+		throw new Error('adapted test roots contain files outside verified materialized provenance');
 	const inventoried = new Set();
 	for (const inventory of adaptedRuntimeInventories) {
 		for (const path of inventory.files) inventoried.add(path);
@@ -790,8 +843,13 @@ export async function verifyManifestFiles(manifest, root) {
 				);
 			markerCounts.set(match[1], (markerCounts.get(match[1]) ?? 0) + 1);
 		}
-		if (/OCTANE DIVERGENCE\[[^\]]+\](?!\[)/.test(source))
-			throw new Error(`${path}: divergence markers must bind a declared case id`);
+		for (const match of source.matchAll(/OCTANE DIVERGENCE\[([^\]]+)\](?!\[)/g)) {
+			if (!materializedTests.has(path))
+				throw new Error(`${path}: divergence markers must bind a declared case id`);
+			if (!manifest.divergences.some((entry) => entry.id === match[1]))
+				throw new Error(`${path}: undeclared divergence marker "${match[1]}"`);
+			markerCounts.set(match[1], (markerCounts.get(match[1]) ?? 0) + 1);
+		}
 	}
 	for (const divergence of manifest.divergences) {
 		if (!markerCounts.has(divergence.id))
@@ -852,21 +910,36 @@ function assertParityCaseBindings(path, source, cases) {
 	}
 }
 
-function validateRuntimeInventory(inventory, lane, expectedRoots) {
+export function validateRuntimeInventory(inventory, lane, expectedRoots) {
 	if (
-		inventory?.schemaVersion !== 1 ||
+		![1, 2].includes(inventory?.schemaVersion) ||
 		inventory.project !== lane.project ||
 		JSON.stringify(inventory.roots) !== JSON.stringify(expectedRoots) ||
 		!Array.isArray(inventory.files) ||
 		!Array.isArray(inventory.tests)
 	)
 		throw new Error(`lane ${lane.id} has an invalid runtime inventory schema or project`);
+	if (
+		inventory.schemaVersion === 2 &&
+		(!Array.isArray(inventory.skippedTests) ||
+			inventory.skippedTests.some(
+				(test) =>
+					!['run', 'skip', 'todo'].includes(test.mode) ||
+					typeof test.rationale !== 'string' ||
+					!test.rationale.trim(),
+			))
+	)
+		throw new Error(`lane ${lane.id} has invalid skip dispositions`);
 	if (new Set(inventory.files).size !== inventory.files.length)
 		throw new Error(`lane ${lane.id} runtime inventory has duplicate files`);
-	const ids = inventory.tests.map((test) => test.id);
+	const allTests = [
+		...inventory.tests,
+		...(inventory.schemaVersion === 2 ? inventory.skippedTests : []),
+	];
+	const ids = allTests.map((test) => test.id);
 	if (
 		new Set(ids).size !== ids.length ||
-		inventory.tests.some(
+		allTests.some(
 			(test) => !inventory.files.includes(test.file) || typeof test.fullName !== 'string',
 		)
 	)
@@ -975,26 +1048,43 @@ export async function verifyManifestTestSelections(manifest, root) {
 				candidate.execution?.kind,
 			),
 	)) {
-		let collectedTests = testsByProject.get(lane.project);
+		const inventory =
+			lane.execution?.kind === 'vitest-full'
+				? JSON.parse(await readFile(resolve(root, lane.execution.inventory), 'utf8'))
+				: null;
+		const complete = inventory?.schemaVersion === 2;
+		const collectionKey = `${lane.project}:${complete}`;
+		let collectedTests = testsByProject.get(collectionKey);
 		if (!collectedTests) {
 			const { stdout } = await execFileAsync(
 				process.execPath,
-				['node_modules/vitest/vitest.mjs', 'list', '--project', lane.project, '--json'],
+				complete
+					? ['scripts/react-parity/collect-vitest-tests.mjs', root, lane.project]
+					: ['node_modules/vitest/vitest.mjs', 'list', '--project', lane.project, '--json'],
 				{ cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
 			);
 			collectedTests = JSON.parse(stdout);
-			testsByProject.set(lane.project, collectedTests);
+			testsByProject.set(collectionKey, collectedTests);
 		}
 		if (lane.execution?.kind === 'vitest-full') {
-			const inventory = JSON.parse(await readFile(resolve(root, lane.execution.inventory), 'utf8'));
 			const collected = collectedTests
 				.filter((test) => inventory.files.includes(toPortablePath(relative(root, test.file))))
 				.map((test) => ({
 					file: toPortablePath(relative(root, test.file)),
 					fullName: test.name.replaceAll(' > ', ' '),
+					...(complete ? { mode: test.mode } : {}),
 				}))
 				.sort(compareTestIdentities);
-			const expected = inventory.tests.map(({ file, fullName }) => ({ file, fullName }));
+			const expected = [
+				...inventory.tests.map(({ file, fullName }) => ({
+					file,
+					fullName,
+					...(complete ? { mode: 'run' } : {}),
+				})),
+				...(complete
+					? inventory.skippedTests.map(({ file, fullName, mode }) => ({ file, fullName, mode }))
+					: []),
+			].sort(compareTestIdentities);
 			if (JSON.stringify(collected) !== JSON.stringify(expected))
 				throw new Error(`lane ${lane.id} collected test identities drifted from its inventory`);
 		} else {
@@ -1124,15 +1214,30 @@ function vitestRunIdentities(lane, result, root) {
 
 export function verifyLaneRunResult(lane, stdout, root = process.cwd()) {
 	if (lane.execution?.kind === 'typescript') return true;
-	const result = JSON.parse(stdout);
+	// Vite may retry its inspector/browser port before the JSON reporter runs.
+	// Accept only that known prelude; arbitrary output still invalidates evidence.
+	const report = (lane.execution?.kind ?? 'vitest').startsWith('vitest')
+		? stdout.replace(/^(?:Port \d+ is in use, trying another one\.\.\.\r?\n)+/, '')
+		: stdout;
+	const result = JSON.parse(report);
 	if (lane.execution?.kind === 'vitest-full') {
 		const inventory = JSON.parse(readFileSync(resolve(root, lane.execution.inventory), 'utf8'));
+		if (inventory.schemaVersion === 2) validateRuntimeInventory(inventory, lane, inventory.roots);
 		const executed = vitestRunIdentities(lane, result, root).sort(compareTestIdentities);
-		const expected = inventory.tests.map(({ file, fullName }) => ({
-			file,
-			fullName,
-			status: 'passed',
-		}));
+		const expected = [
+			...inventory.tests.map(({ file, fullName }) => ({
+				file,
+				fullName,
+				status: 'passed',
+			})),
+			...(inventory.schemaVersion === 2
+				? inventory.skippedTests.map(({ file, fullName, mode }) => ({
+						file,
+						fullName,
+						status: mode === 'todo' ? 'todo' : 'skipped',
+					}))
+				: []),
+		].sort(compareTestIdentities);
 		if (JSON.stringify(executed) !== JSON.stringify(expected))
 			throw new Error(
 				`lane ${lane.id} did not execute every inventoried test identity exactly once:\n  ${describeTestIdentityMismatch(expected, executed)}`,

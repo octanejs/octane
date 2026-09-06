@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/src/toast/useToastManager.spec.tsx b/tests/upstream/src/toast/useToastManager.spec.tsx
+--- a/tests/upstream/src/toast/useToastManager.spec.tsx
++++ b/tests/upstream/src/toast/useToastManager.spec.tsx
+@@ -1,7 +1,7 @@
+ /** @jsxImportSource octane */
+ /* eslint-disable react-hooks/rules-of-hooks */
+-import { expectType } from '#test-utils';
+-import { useToastManager } from './useToastManager';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
++import { useToastManager } from "../../../../src/toast/useToastManager.ts";
+ 
+ type ToastPayload = {
+   id: string;

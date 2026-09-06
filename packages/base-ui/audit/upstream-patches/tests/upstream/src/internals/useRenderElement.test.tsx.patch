@@ -1,0 +1,192 @@
+diff --git a/tests/upstream/src/internals/useRenderElement.test.tsx b/tests/upstream/src/internals/useRenderElement.test.tsx
+--- a/tests/upstream/src/internals/useRenderElement.test.tsx
++++ b/tests/upstream/src/internals/useRenderElement.test.tsx
+@@ -11,10 +11,10 @@ import { useRenderElement } from './useRenderElement';
+ describe('useRenderElement', () => {
+   const { render } = createRenderer();
+ 
+-  const TestComponent = React.forwardRef(function TestComponent(
+-    componentProps: BaseUIComponentProps<'div', { active?: boolean }> & { active?: boolean },
+-    forwardedRef: React.ForwardedRef<HTMLDivElement>,
++  const TestComponent = function TestComponent(
++    componentProps: (BaseUIComponentProps<'div', { active?: boolean }> & { active?: boolean }) & { ref?: React.Ref<HTMLDivElement> },
+   ) {
++  const forwardedRef = componentProps.ref ?? null;
+     const { className, render: renderProp, active, style, ...elementProps } = componentProps;
+ 
+     const state = { active };
+@@ -26,12 +26,12 @@ describe('useRenderElement', () => {
+     });
+ 
+     return element;
+-  });
++  };
+ 
+-  const DirectPropsTestComponent = React.forwardRef(function DirectPropsTestComponent(
+-    componentProps: BaseUIComponentProps<'div', { active?: boolean }> & { active?: boolean },
+-    forwardedRef: React.ForwardedRef<HTMLDivElement>,
++  const DirectPropsTestComponent = function DirectPropsTestComponent(
++    componentProps: (BaseUIComponentProps<'div', { active?: boolean }> & { active?: boolean }) & { ref?: React.Ref<HTMLDivElement> },
+   ) {
++  const forwardedRef = componentProps.ref ?? null;
+     const { className, render: renderProp, active, style, ...elementProps } = componentProps;
+ 
+     return useRenderElement('div', componentProps, {
+@@ -39,12 +39,12 @@ describe('useRenderElement', () => {
+       ref: forwardedRef,
+       props: elementProps,
+     });
+-  });
++  };
+ 
+-  const ArrayPropsTestComponent = React.forwardRef(function ArrayPropsTestComponent(
+-    componentProps: BaseUIComponentProps<'div', { active?: boolean }> & { active?: boolean },
+-    forwardedRef: React.ForwardedRef<HTMLDivElement>,
++  const ArrayPropsTestComponent = function ArrayPropsTestComponent(
++    componentProps: (BaseUIComponentProps<'div', { active?: boolean }> & { active?: boolean }) & { ref?: React.Ref<HTMLDivElement> },
+   ) {
++  const forwardedRef = componentProps.ref ?? null;
+     const { className, render: renderProp, active, style, ...elementProps } = componentProps;
+ 
+     return useRenderElement('div', componentProps, {
+@@ -52,7 +52,7 @@ describe('useRenderElement', () => {
+       ref: forwardedRef,
+       props: [elementProps, { className: 'test-component' }],
+     });
+-  });
++  };
+ 
+   function DisabledPropsTestComponent(props: {
+     propsGetter: () => React.ComponentPropsWithRef<'div'>;
+@@ -210,7 +210,7 @@ describe('useRenderElement', () => {
+   });
+ 
+   it('handles enabled toggles across rerenders', async () => {
+-    const ref = React.createRef<HTMLDivElement>();
++    const ref = ({current:null} as React.RefObject<HTMLDivElement | null>);
+     const handleClick = vi.fn();
+     const { rerender } = await render(
+       <RerenderTestComponent enabled={false} refs={ref} onClick={handleClick} />,
+@@ -236,8 +236,8 @@ describe('useRenderElement', () => {
+   });
+ 
+   it('updates merged refs and event handlers when ref shape changes across rerenders', async () => {
+-    const primaryRef = React.createRef<HTMLDivElement>();
+-    const secondaryRef = React.createRef<HTMLDivElement>();
++    const primaryRef = ({current:null} as React.RefObject<HTMLDivElement | null>);
++    const secondaryRef = ({current:null} as React.RefObject<HTMLDivElement | null>);
+     const firstHandleClick = vi.fn();
+     const secondHandleClick = vi.fn();
+     const { rerender } = await render(
+@@ -398,11 +398,10 @@ describe('useRenderElement', () => {
+     });
+ 
+     it('accepts render as a React element and clones it with merged props', async () => {
+-      const CustomElement = React.forwardRef<HTMLSpanElement, React.ComponentPropsWithRef<'span'>>(
+-        function CustomElement(props, ref) {
++      const CustomElement = function CustomElement(props: (React.ComponentPropsWithRef<'span'>) & { ref?: React.Ref<HTMLSpanElement> }) {
++  const ref = props.ref ?? null;
+           return <span ref={ref} {...props} />;
+-        },
+-      );
++        };
+ 
+       const { container } = await render(
+         <TestComponent active render={<CustomElement data-active="true" />} data-testid="custom" />,
+@@ -416,13 +415,12 @@ describe('useRenderElement', () => {
+     });
+ 
+     it('forwards ref to render element', async () => {
+-      const CustomElement = React.forwardRef<HTMLDivElement, React.ComponentPropsWithRef<'div'>>(
+-        function CustomElement(props, ref) {
++      const CustomElement = function CustomElement(props: (React.ComponentPropsWithRef<'div'>) & { ref?: React.Ref<HTMLDivElement> }) {
++  const ref = props.ref ?? null;
+           return <div ref={ref} {...props} />;
+-        },
+-      );
++        };
+ 
+-      const ref = React.createRef<HTMLDivElement>();
++      const ref = ({current:null} as React.RefObject<HTMLDivElement | null>);
+       const { container } = await render(<TestComponent ref={ref} render={<CustomElement />} />);
+       const element = container.firstElementChild;
+       expect(ref.current).toBe(element);
+@@ -493,11 +491,10 @@ describe('useRenderElement', () => {
+     it('handles lazy elements', async () => {
+       const LazyComponent = React.lazy(() =>
+         Promise.resolve({
+-          default: React.forwardRef<HTMLDivElement, React.ComponentPropsWithRef<'div'>>(
+-            function LazyDiv(props, ref) {
++          default: function LazyDiv(props: (React.ComponentPropsWithRef<'div'>) & { ref?: React.Ref<HTMLDivElement> }) {
++  const ref = props.ref ?? null;
+               return <div ref={ref} data-lazy="true" {...props} />;
+             },
+-          ),
+         }),
+       );
+ 
+@@ -517,7 +514,9 @@ describe('useRenderElement', () => {
+     // The Flight client hands a Client Component a `react.lazy` wrapper in place of a
+     // render element created in a Server Component. Skipped below React 19, whose
+     // Children.toArray() is the first to unwrap lazy elements.
+-    describe.skipIf(reactMajor < 19)('lazy-wrapped render element (Flight shape)', () => {
++    // Octane has no React Server Components/Flight wire format. Native lazy
++    // element composition remains covered immediately above this disposition.
++    describe.skip('lazy-wrapped render element (Flight shape)', () => {
+       function wrapLazy(
+         element: React.ReactElement,
+         init: (payload: unknown) => unknown = (payload) => payload,
+@@ -549,8 +548,8 @@ describe('useRenderElement', () => {
+       });
+ 
+       it('attaches the render element ref', async () => {
+-        const renderRef = React.createRef<HTMLDivElement>();
+-        const componentRef = React.createRef<HTMLDivElement>();
++        const renderRef = ({current:null} as React.RefObject<HTMLDivElement | null>);
++        const componentRef = ({current:null} as React.RefObject<HTMLDivElement | null>);
+ 
+         const { container } = await render(
+           <TestComponent ref={componentRef} render={wrapLazy(<div ref={renderRef} />)} />,
+@@ -633,14 +632,13 @@ describe('useRenderElement', () => {
+     );
+ 
+     it('handles render element with existing ref', async () => {
+-      const CustomElement = React.forwardRef<HTMLDivElement, React.ComponentPropsWithRef<'div'>>(
+-        function CustomElement(props, ref) {
++      const CustomElement = function CustomElement(props: (React.ComponentPropsWithRef<'div'>) & { ref?: React.Ref<HTMLDivElement> }) {
++  const ref = props.ref ?? null;
+           return <div ref={ref} {...props} />;
+-        },
+-      );
++        };
+ 
+-      const renderRef = React.createRef<HTMLDivElement>();
+-      const componentRef = React.createRef<HTMLDivElement>();
++      const renderRef = ({current:null} as React.RefObject<HTMLDivElement | null>);
++      const componentRef = ({current:null} as React.RefObject<HTMLDivElement | null>);
+ 
+       await render(<TestComponent ref={componentRef} render={<CustomElement ref={renderRef} />} />);
+ 
+@@ -653,10 +651,10 @@ describe('useRenderElement', () => {
+   describe('EMPTY_OBJECT mutation safety', () => {
+     // This test verifies that the hook doesn't attempt to mutate EMPTY_OBJECT
+     // which would throw a TypeError in strict mode since it's frozen.
+-    const MinimalComponent = React.forwardRef(function MinimalComponent(
+-      componentProps: BaseUIComponentProps<'div', Record<string, never>>,
+-      forwardedRef: React.ForwardedRef<HTMLDivElement>,
++    const MinimalComponent = function MinimalComponent(
++      componentProps: (BaseUIComponentProps<'div', Record<string, never>>) & { ref?: React.Ref<HTMLDivElement> },
+     ) {
++  const forwardedRef = componentProps.ref ?? null;
+       // Using EMPTY_OBJECT as state and no additional props simulates the edge case
+       // where mergeObjects might return undefined and fall back to EMPTY_OBJECT
+       const element = useRenderElement('div', componentProps, {
+@@ -666,7 +664,7 @@ describe('useRenderElement', () => {
+       });
+ 
+       return element;
+-    });
++    };
+ 
+     it('does not throw when className is provided with minimal props', async () => {
+       const { container } = await render(<MinimalComponent className="test-class" />);

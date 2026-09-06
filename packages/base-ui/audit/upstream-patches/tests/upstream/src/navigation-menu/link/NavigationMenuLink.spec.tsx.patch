@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/navigation-menu/link/NavigationMenuLink.spec.tsx b/tests/upstream/src/navigation-menu/link/NavigationMenuLink.spec.tsx
+--- a/tests/upstream/src/navigation-menu/link/NavigationMenuLink.spec.tsx
++++ b/tests/upstream/src/navigation-menu/link/NavigationMenuLink.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { NavigationMenu } from '@octanejs/base-ui/navigation-menu';
+ 
+ // `NavigationMenu.Link` exposes the native `<a>` props in its `render` callback.

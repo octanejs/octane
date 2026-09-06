@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/context-menu/trigger/ContextMenuTrigger.test.tsx b/tests/upstream/src/context-menu/trigger/ContextMenuTrigger.test.tsx
+--- a/tests/upstream/src/context-menu/trigger/ContextMenuTrigger.test.tsx
++++ b/tests/upstream/src/context-menu/trigger/ContextMenuTrigger.test.tsx
+@@ -327,7 +327,7 @@ describe('<ContextMenu.Trigger />', () => {
+   });
+ 
+   it('blocks native context menus in a portal mounted inside the trigger DOM subtree', async () => {
+-    const portalContainerRef = React.createRef<HTMLDivElement>();
++    const portalContainerRef = ({current:null} as React.RefObject<HTMLDivElement | null>);
+ 
+     await render(
+       <ContextMenu.Root defaultOpen>

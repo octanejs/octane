@@ -1,9 +1,7 @@
 # @octanejs/shadcn
 
-shadcn/ui for the [octane](https://github.com/octanejs/octane) renderer — a port
-of the **Radix base** of [shadcn-ui/ui](https://github.com/shadcn-ui/ui) onto
-octane's hooks and native events, built on
-[`@octanejs/radix`](../radix).
+shadcn/ui for the [octane](https://github.com/octanejs/octane) renderer, with
+Base UI, Radix, and React Aria bases adapted to octane's hooks and native events.
 
 ## Installation
 
@@ -16,7 +14,7 @@ Upstream pin: `shadcn-ui/ui@4baadbc6` + CLI `shadcn@4.14.1`.
 
 ## What ships
 
-- **40 component families (~185 exports)**: the full Tier-1 static set, all 24
+- **44 component families across three bases**: the full Tier-1 static set, all 24
   radix-backed Tier-2 components, and the first Tier-3 composites (Sidebar with
   `useSidebar`/`useIsMobile`, Field), plus `cn()` and the default neutral theme
   tokens (`@octanejs/shadcn/theme.css`).
@@ -34,9 +32,13 @@ Upstream pin: `shadcn-ui/ui@4baadbc6` + CLI `shadcn@4.14.1`.
 
 ## Component coverage
 
-Each primitive base ships the families its primitives support, exactly as upstream's do.
+The coverage table tracks the families ported for each primitive base.
 Switching `style` changes which primitive a component is built on — the `data-slot` contract and
 component names stay identical.
+
+The Base UI wrappers target `@octanejs/base-ui`'s Base UI 1.8.0 API. Select,
+Combobox, Navigation Menu, and Scroll Area primitives are available from
+`@octanejs/base-ui`; their shadcn Base UI wrappers have not been ported yet.
 
 <!-- BEGIN COVERAGE -->
 
@@ -69,13 +71,13 @@ component names stay identical.
 | `label` | ✅ | ✅ | ✅ |
 | `menubar` | ✅ | ⛔ | ✅ |
 | `native-select` | ✅ | ✅ | ✅ |
-| `navigation-menu` | ✅ | ⛔ | ⛔ |
+| `navigation-menu` | ✅ | ⛔ | — |
 | `pagination` | ✅ | ✅ | ✅ |
 | `popover` | ✅ | ✅ | ✅ |
 | `progress` | ✅ | ⛔ | ✅ |
 | `radio-group` | ✅ | ✅ | ✅ |
-| `scroll-area` | ✅ | ✅ | ⛔ |
-| `select` | ✅ | ⛔ | ⛔ |
+| `scroll-area` | ✅ | ✅ | — |
+| `select` | ✅ | ⛔ | — |
 | `separator` | ✅ | ✅ | ✅ |
 | `sheet` | ✅ | ✅ | ✅ |
 | `sidebar` | ✅ | ⛔ | ✅ |
@@ -95,9 +97,6 @@ component names stay identical.
 
 | Base | Family | Reason |
 | --- | --- | --- |
-| Base UI | `navigation-menu` | @octanejs/base-ui has no navigation-menu primitive |
-| Base UI | `scroll-area` | @octanejs/base-ui has no scroll-area primitive |
-| Base UI | `select` | @octanejs/base-ui has no select primitive |
 | Base UI | `sonner` | needs next-themes, which has no octane binding |
 | React Aria | `context-menu` | no counterpart in upstream’s aria base |
 | React Aria | `dropdown-menu` | no counterpart in upstream’s aria base |
@@ -143,12 +142,12 @@ same mechanism shadcn uses upstream, where its own registry is
 
 | `style` | Primitives | Families |
 | --- | --- | --- |
-| `base-nova` *(default)* | `@octanejs/base-ui` | 21 |
+| `base-nova` *(default)* | `@octanejs/base-ui` | 40 |
 | `radix-nova` | `@octanejs/radix` | 44 |
 | `aria-nova` | `@octanejs/aria` | 33 |
 
-The bases deliberately ship different family counts, exactly as upstream's do — a base only
-has the families its primitives support. Switching `style` changes which primitive a component
+The bases currently ship different family counts; see the coverage table for remaining ports.
+Switching `style` changes which primitive a component
 is built on; the `data-slot` contract and component names stay identical, so your markup and
 styling do not change.
 

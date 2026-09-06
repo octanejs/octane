@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
+import { createOctaneSourcePlugin } from './packed-source-compiler.mjs';
 import {
 	cpSync,
 	existsSync,
@@ -17,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
 	getWorkspacePackages,
-	OCTANE_BETA_PEER_RANGE,
+	octanePeerRangeFor,
 	REPO_ROOT,
 	validateWorkspacePackages,
 } from './workspace-packages.mjs';
@@ -118,7 +119,6 @@ const packedExampleCanaries = [
 // enrolled automatically. The five bindings reported in #721 must stay enrolled.
 const packedTsrxSourceExceptions = new Map([
 	['@octanejs/aria', 'its browser source still reads process.env.NODE_ENV'],
-	['@octanejs/base-ui', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/cmdk', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/dnd-kit', 'its browser source still reads process.env.NODE_ENV'],
 	[
@@ -234,7 +234,7 @@ function validatePackedPackage(pkg, manifest, files, executableFiles) {
 		if (manifest.dependencies?.octane !== undefined) {
 			errors.push('packed manifest installs a duplicate octane runtime dependency');
 		}
-		const expectedOctane = OCTANE_BETA_PEER_RANGE.replace(/^workspace:/, '');
+		const expectedOctane = octanePeerRangeFor(pkg.name).replace(/^workspace:/, '');
 		if (manifest.peerDependencies?.octane !== expectedOctane) {
 			errors.push(
 				`packed octane peer is ${JSON.stringify(manifest.peerDependencies?.octane)}, expected ${JSON.stringify(expectedOctane)}`,
@@ -1351,6 +1351,10 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 	);
 	writeFileSync(path.join(consumerDirectory, 'require.cjs'), renderPackedCommonjsConsumerSource());
 	writeFileSync(path.join(consumerDirectory, 'import.mjs'), renderPackedEsmConsumerSource());
+	cpSync(
+		path.join(REPO_ROOT, 'scripts/fixtures/packed-base-ui-consumer.cjs'),
+		path.join(consumerDirectory, 'base-ui-behavior.cjs'),
+	);
 	writeFileSync(
 		path.join(consumerDirectory, 'draggable-import.mjs'),
 		renderPackedDraggableEsmConsumerSource(),
@@ -1413,12 +1417,42 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 	);
 	await build({
 		absWorkingDir: consumerDirectory,
+		entryPoints: ['base-ui-behavior.cjs'],
+		outfile: 'base-ui-behavior-bundle.cjs',
+		bundle: true,
+		format: 'cjs',
+		platform: 'node',
+		target: 'node22',
+		external: ['octane', 'octane/*'],
+		plugins: [
+			await createOctaneSourcePlugin(
+				consumerDirectory,
+				pathToFileURL(consumerRequire.resolve('octane/compiler/bundler')).href,
+			),
+		],
+		logLevel: 'silent',
+	});
+	execFileSync(process.execPath, ['base-ui-behavior-bundle.cjs'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+		timeout: 30_000,
+		env: { ...process.env, OCTANE_PACK_CHECK_JSDOM: repositoryRequire.resolve('jsdom') },
+	});
+	await build({
+		absWorkingDir: consumerDirectory,
 		entryPoints: ['import.mjs'],
 		outfile: 'import-bundle.mjs',
 		bundle: true,
 		format: 'esm',
 		platform: 'node',
 		target: 'node22',
+		plugins: [
+			await createOctaneSourcePlugin(
+				consumerDirectory,
+				pathToFileURL(consumerRequire.resolve('octane/compiler/bundler')).href,
+			),
+		],
 		logLevel: 'silent',
 	});
 	const esmSurface = JSON.parse(
@@ -1432,6 +1466,45 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 	const compilerPluginEntry = consumerRequire.resolve('octane/compiler/vite');
 	const { octane } = await import(pathToFileURL(compilerPluginEntry).href);
 	const { build: viteBuild } = await import(pathToFileURL(viteToolRequire.resolve('vite')).href);
+	cpSync(
+		path.join(REPO_ROOT, 'scripts/fixtures/packed-base-ui-server.tsrx'),
+		path.join(consumerDirectory, 'base-ui-server.tsrx'),
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'base-ui-server.mjs'),
+		`
+import assert from 'node:assert/strict';
+import { renderToString } from 'octane/server';
+import { PackedBindingForm } from './base-ui-server.tsrx';
+const { html } = renderToString(PackedBindingForm);
+assert.match(html, /name="selected"[^>]*value="pear"|value="pear"[^>]*name="selected"/);
+assert.match(html, /name="search"[^>]*value="Apple"|value="Apple"[^>]*name="search"/);
+assert.match(html, /Pear/);
+assert.match(html, /aria-label="Search fruit"/);
+assert.equal(typeof globalThis.document, 'undefined');
+console.log('Packed Select and Combobox server form values passed without a DOM.');
+`,
+	);
+	await viteBuild({
+		root: consumerDirectory,
+		configFile: false,
+		logLevel: 'silent',
+		plugins: [octane({ hmr: false })],
+		ssr: { noExternal: ['@octanejs/base-ui', '@octanejs/base-ui-utils', '@octanejs/floating-ui'] },
+		build: {
+			ssr: 'base-ui-server.mjs',
+			outDir: 'dist-base-ui-server',
+			target: 'node22',
+			rollupOptions: { output: { entryFileNames: 'base-ui-server.mjs' } },
+		},
+	});
+	execFileSync(process.execPath, ['dist-base-ui-server/base-ui-server.mjs'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+		timeout: 30_000,
+	});
+
 	await viteBuild({
 		root: consumerDirectory,
 		configFile: false,
@@ -1457,7 +1530,7 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 	);
 	assertRequiredPublicValueExports('.', commonjsSurface.octane);
 	assertRequiredPublicValueExports('.', esmSurface.octane);
-	for (const packageName of ['base', 'floating', 'radix']) {
+	for (const packageName of ['floating', 'radix']) {
 		if (!Array.isArray(commonjsSurface[packageName]) || commonjsSurface[packageName].length === 0) {
 			throw new Error(`packed CommonJS ${packageName} surface is empty`);
 		}
@@ -1465,10 +1538,13 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 			throw new Error(`packed ESM ${packageName} surface is empty`);
 		}
 	}
+	if (!Array.isArray(esmSurface.base) || esmSurface.base.length === 0) {
+		throw new Error('packed ESM Base UI surface is empty');
+	}
 	if (!Array.isArray(esmSurface.draggable) || esmSurface.draggable.length === 0) {
 		throw new Error('packed ESM draggable surface is empty');
 	}
-	for (const packageName of ['base', 'floating', 'octane', 'radix']) {
+	for (const packageName of ['floating', 'octane', 'radix']) {
 		if (
 			JSON.stringify([...commonjsSurface[packageName]].sort()) !==
 			JSON.stringify([...esmSurface[packageName]].sort())
@@ -1480,7 +1556,7 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 		throw new Error('packed ESM and CommonJS SSR output differs');
 	}
 	console.log(
-		'installed packed Octane, Floating UI, Base UI, Radix, and Draggable without React; CommonJS packages selected require conditions and Draggable compiled through its ESM source entry',
+		'installed packed Octane, Floating UI, Base UI, Radix, and Draggable without React; CommonJS packages selected require conditions and Base UI and Draggable compiled through their authored source entries',
 	);
 }
 

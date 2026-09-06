@@ -128,6 +128,15 @@ Each binding parity manifest lives at
 `packages/<name>/audit/react-parity.json`. `pnpm react-parity:check` discovers
 these manifests automatically; the workflow must not enumerate packages.
 
+A lock-derived adapted suite can declare `materializedTests: "packages/<name>"`.
+The verifier requires the same version and commit as the manifest and regenerates
+every adapted byte from the verified pristine tree, mechanical rewrites and
+committed patches. Such test copies may use `OCTANE DIVERGENCE[id]` rationale
+comments without per-case citations; the manifest still binds the divergence to
+declared evidence cases. This exception does not extend to authored source or
+files outside the verified mappings. Altered assertions, unknown divergence IDs
+and changed pristine bytes fail validation.
+
 For each Vitest-backed lane:
 
 - `lane.project` must equal the corresponding `test.name` in
@@ -187,6 +196,29 @@ while the live project remains the runner configuration source:
   }
 }
 ```
+
+The same test file may belong to separate unit and browser projects. Each project
+has one owning parity lane. The JSON reporter records the project name, and the
+batch verifier uses both project and filename when partitioning results. An
+ambiguous result without a project name fails; neither environment can supply
+the other environment's missing evidence. Inventory paths remain relative to the
+repository even when a Vitest project uses a package directory as its root.
+
+Materialized upstream suites may use a version-2 runtime inventory to account
+for every skip and todo as well as every required pass. Set `schemaVersion: 2`
+and keep required passing identities in `tests`. Put skipped identities in
+`skippedTests`, each with its unique `id`, `file`, `fullName`, collection `mode`
+(`run`, `skip`, or `todo`), and a specific `rationale`. A runtime-only skip has
+collection mode `run`; its rationale must identify why the pinned test skips in
+that environment. Skips and todos never count as passing evidence.
+
+The complete collector retains inherited skips and todos without executing test
+bodies. The harness checks those collection modes against the inventory, then
+requires the execution report to contain exactly the declared passes, skips,
+and todos. Missing cases, additional skips, duplicate outcomes, failures, and
+unexpectedly passing skipped cases fail the gate. Version-2 inventories require
+the manifest's verified `materializedTests` boundary. Legacy version-1
+inventories continue to require every inventoried case to pass.
 
 Direct TypeScript, Jest, Node, and Playwright lanes retain their declared
 runners. When a direct runner replaces a Vitest wrapper, list that wrapper as

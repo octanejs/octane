@@ -10,7 +10,7 @@
 //
 // UNVERIFIED PROVENANCE: class strings come from this package's radix base rather than
 // transcribed from upstream's Base UI source.
-import { createElement, type OctaneNode } from 'octane';
+import { type OctaneNode } from 'octane';
 import { Dialog as DialogPrimitive } from '@octanejs/base-ui/dialog';
 import { XIcon } from '@octanejs/lucide';
 
@@ -46,7 +46,8 @@ export function DialogOverlay({ className, ...props }: Props) @{
 	/>
 }
 
-export interface DialogContentProps extends Props {
+export interface DialogContentProps extends Omit<DialogPrimitive.Popup.Props, 'className'> {
+	className?: string;
 	showCloseButton?: boolean;
 }
 
@@ -55,38 +56,30 @@ export function DialogContent({
 	children,
 	showCloseButton = true,
 	...props
-}: DialogContentProps) {
-	return createElement(
-		DialogPrimitive.Portal,
-		{ 'data-slot': 'dialog-portal' },
-		createElement(DialogOverlay, { key: 'overlay' }),
-		createElement(
-			DialogPrimitive.Popup,
-			{
-				key: 'content',
-				'data-slot': 'dialog-content',
-				className: cn(
-					'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
-					className,
-				),
-				...props,
-			},
-			children,
-			showCloseButton
-				? createElement(DialogPrimitive.Close, {
-						key: 'close',
-						'data-slot': 'dialog-close',
-						className: 'absolute top-2 right-2',
-						render: createElement(
-							Button,
-							{ variant: 'ghost', size: 'icon-sm' },
-							createElement(XIcon, { key: 'icon' }),
-							createElement('span', { key: 'sr', className: 'sr-only' }, 'Close'),
-						),
-					})
-				: null,
-		),
-	);
+}: DialogContentProps) @{
+	<DialogPrimitive.Portal data-slot="dialog-portal">
+		<DialogOverlay />
+		<DialogPrimitive.Popup
+			data-slot="dialog-content"
+			className={cn(
+				'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+				className,
+			)}
+			{...props}
+		>
+			{children}
+			@if (showCloseButton) {
+				<DialogPrimitive.Close
+					data-slot="dialog-close"
+					className="absolute top-2 right-2"
+					render={<Button variant="ghost" size="icon-sm">
+						<XIcon />
+						<span className="sr-only">Close</span>
+					</Button>}
+				/>
+			}
+		</DialogPrimitive.Popup>
+	</DialogPrimitive.Portal>
 }
 
 export function DialogHeader({ className, ...props }: Props) @{
@@ -109,11 +102,9 @@ export function DialogFooter(props: DialogFooterProps) @{
 		{...rest}
 	>
 		{props.children}
-		{showCloseButton
-			? createElement(DialogPrimitive.Close, {
-					render: createElement(Button, { variant: 'outline' }, 'Close'),
-				})
-			: null}
+		@if (showCloseButton) {
+			<DialogPrimitive.Close render={<Button variant="outline">Close</Button>} />
+		}
 	</div>
 }
 

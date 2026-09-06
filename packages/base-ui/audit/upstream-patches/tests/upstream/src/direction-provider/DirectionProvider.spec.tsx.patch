@@ -1,0 +1,15 @@
+diff --git a/tests/upstream/src/direction-provider/DirectionProvider.spec.tsx b/tests/upstream/src/direction-provider/DirectionProvider.spec.tsx
+--- a/tests/upstream/src/direction-provider/DirectionProvider.spec.tsx
++++ b/tests/upstream/src/direction-provider/DirectionProvider.spec.tsx
+@@ -1,9 +1,9 @@
+ /** @jsxImportSource octane */
+ import * as React from 'octane';
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import {
+   DirectionProvider,
+-  useDirection,
++  type useDirection,
+   type DirectionProviderProps,
+   type TextDirection,
+ } from '@octanejs/base-ui/direction-provider';

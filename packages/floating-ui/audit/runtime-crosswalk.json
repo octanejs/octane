@@ -4,8 +4,8 @@
   "adaptedInventory": "packages/floating-ui/audit/adapted-runtime.json",
   "summary": {
     "crosswalked": 301,
-    "compatible": 272,
-    "expectedFailureNegativeControls": 29
+    "compatible": 276,
+    "expectedFailureNegativeControls": 25
   },
   "tests": [
     {
@@ -78,9 +78,7 @@
       "fullName": "middleware is always fresh and does not cause an infinite loop",
       "pristineId": "runtime:0042e890d5940f7a",
       "adaptedId": "runtime:1267e42a88e83e87",
-      "disposition": "expected-failure-negative-control",
-      "divergenceId": "floating-ui-ref-scheduling",
-      "divergenceCaseId": "divergence:ref-scheduling:01"
+      "disposition": "compatible"
     },
     {
       "id": "crosswalk:fdfaa0c44e3b3150",
@@ -88,9 +86,7 @@
       "fullName": "unstable callback refs",
       "pristineId": "runtime:f9a8c9a4f241bf10",
       "adaptedId": "runtime:8613f8b624d186e6",
-      "disposition": "expected-failure-negative-control",
-      "divergenceId": "floating-ui-ref-scheduling",
-      "divergenceCaseId": "divergence:ref-scheduling:03"
+      "disposition": "compatible"
     },
     {
       "id": "crosswalk:5b1a8afa9a335ddd",
@@ -1520,9 +1516,7 @@
       "fullName": "positionReference handles real virtual element",
       "pristineId": "runtime:a14eb9d50eb226f7",
       "adaptedId": "runtime:f650cdb9137fa120",
-      "disposition": "expected-failure-negative-control",
-      "divergenceId": "floating-ui-ref-scheduling",
-      "divergenceCaseId": "divergence:ref-scheduling:05"
+      "disposition": "compatible"
     },
     {
       "id": "crosswalk:ea20c4b217c642b2",
@@ -1530,9 +1524,7 @@
       "fullName": "positionReference handles unstable reference prop",
       "pristineId": "runtime:889f865852423f8d",
       "adaptedId": "runtime:ebdbe8c83bf6ab1c",
-      "disposition": "expected-failure-negative-control",
-      "divergenceId": "floating-ui-ref-scheduling",
-      "divergenceCaseId": "divergence:ref-scheduling:04"
+      "disposition": "compatible"
     },
     {
       "id": "crosswalk:70a0991f03df9cf4",

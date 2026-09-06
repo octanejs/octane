@@ -1299,7 +1299,13 @@ class OctaneBundlerCompiler {
 				return passThrough();
 			}
 			const manualSlots = this._hasManualHookSlots(file, collected);
-			if (!hasHookRuntimeImport && !manualSlots) return passThrough();
+			if (
+				!hasHookRuntimeImport &&
+				!manualSlots &&
+				!pragmaOwned &&
+				!this._pragmaClaimsOwnership(code)
+			)
+				return passThrough();
 			const inlinePlainMemo =
 				inlineHookMemo &&
 				environment === 'client' &&

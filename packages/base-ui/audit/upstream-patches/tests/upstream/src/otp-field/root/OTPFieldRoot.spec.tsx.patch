@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/src/otp-field/root/OTPFieldRoot.spec.tsx b/tests/upstream/src/otp-field/root/OTPFieldRoot.spec.tsx
+--- a/tests/upstream/src/otp-field/root/OTPFieldRoot.spec.tsx
++++ b/tests/upstream/src/otp-field/root/OTPFieldRoot.spec.tsx
+@@ -1,7 +1,7 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { OTPField } from '@octanejs/base-ui/otp-field';
+-import { REASONS } from '../../internals/reasons';
++import { REASONS } from "../../../../../src/internals/reasons.ts";
+ 
+ type OTPFieldChangeHandler = NonNullable<OTPField.Root.Props['onValueChange']>;
+ type OTPFieldChangeDetails = Parameters<OTPFieldChangeHandler>[1];

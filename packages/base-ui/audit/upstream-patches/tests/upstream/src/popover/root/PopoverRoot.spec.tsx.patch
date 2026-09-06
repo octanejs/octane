@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/popover/root/PopoverRoot.spec.tsx b/tests/upstream/src/popover/root/PopoverRoot.spec.tsx
+--- a/tests/upstream/src/popover/root/PopoverRoot.spec.tsx
++++ b/tests/upstream/src/popover/root/PopoverRoot.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Popover } from '@octanejs/base-ui/popover';
+ 
+ const numberPayloadHandle = Popover.createHandle<number>();

@@ -8,7 +8,7 @@
 // dispatching script yields. Octane follows the same policy; the React 19
 // oracle at the bottom runs the identical scenario through react-dom so the two
 // cannot drift apart unnoticed.
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as React from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import { act, mount } from './_helpers';
@@ -20,6 +20,7 @@ import {
 	ControlledInput,
 	RejectedInput,
 	ResetForm,
+	SubmitCompletedInput,
 } from './_fixtures/dispatch-commit-timing.tsrx';
 
 const nativeListeners: Array<() => void> = [];
@@ -36,6 +37,22 @@ function setNativeValue(input: HTMLInputElement, value: string): void {
 }
 
 describe('discrete dispatch commit timing (React batchedUpdates parity)', () => {
+	it('commits a layout-triggered form submission and restores the final controlled value', () => {
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(SubmitCompletedInput);
+		try {
+			const input = r.find('#code') as HTMLInputElement;
+			setNativeValue(input, '1234');
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			expect(r.find('#submitted').textContent).toBe('1234');
+			expect(input.value).toBe('');
+			expect(errors).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+			errors.mockRestore();
+		}
+	});
+
 	it('a script-dispatched click commits in the microtask, not before dispatchEvent returns', async () => {
 		const r = mount(Counter);
 		const btn = r.find('#counter') as HTMLButtonElement;

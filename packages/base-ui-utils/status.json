@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "@base-ui/utils",
+    "version": "0.4.0",
+    "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
+    "license": "MIT"
+  },
+  "provenance": {
+    "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
+    "license": "MIT",
+    "verification": "verified"
+  },
+  "surface": "All 45 published Base UI utility entries and 85 entry/export pairs match the pinned 0.4.0 release.",
+  "divergences": ["Refs are ordinary props and host callbacks receive native DOM events."],
+  "ssr": "Server and hydration behavior is verified through native Base UI integration and installed-consumer checks.",
+  "verified": "2026-09-06",
+  "notes": [
+    "Complete pristine and adapted runtime/type suites, installed consumer checks, and native integration tests pass against the pinned upstream release."
+  ]
+}

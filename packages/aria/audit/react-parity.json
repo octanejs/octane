@@ -11,16 +11,9 @@
     "integrity": "sha256:dcad3293f0f7438705f72cdd7df03351476aeaba7d0d2743c7ad6d8130aff56f",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/aria/src"],
-      "include": ["\\.(?:ts|tsx|tsrx)$"],
-      "exclude": []
-    },
+    "source": { "roots": ["packages/aria/src"], "include": ["\\.(?:ts|tsx|tsrx)$"], "exclude": [] },
     "tests": {
       "roots": ["packages/aria/tests"],
       "include": ["\\.test\\.(?:ts|tsx|tsrx)$"],
@@ -40,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "acfa82cb9987059d0fb25e890806a7a44486953d8edbf273d76746aeb43c3789"
+      "lockfileSha256": "003c260afd05b30f26f56dfc47427e7a1486059a258349db9f9f5ae01bca6a44"
     }
   },
   "lanes": [

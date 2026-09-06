@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/src/useControlled.spec.ts b/tests/upstream/src/useControlled.spec.ts
+--- a/tests/upstream/src/useControlled.spec.ts
++++ b/tests/upstream/src/useControlled.spec.ts
+@@ -1,6 +1,7 @@
+-import * as React from 'octane';
+-import { expectType } from './testUtils';
+-import { useControlled } from './useControlled';
++/** @jsxImportSource octane */
++import type * as React from 'octane';
++import { expectType } from "../../../src/testUtils.ts";
++import { useControlled } from "../../../src/useControlled.ts";
+ 
+ function AcceptsOptionalDefault(props: { open?: boolean; defaultOpen?: boolean }) {
+   const [open, setOpen] = useControlled({

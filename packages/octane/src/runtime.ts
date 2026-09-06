@@ -21,6 +21,9 @@ declare const process: { env: { NODE_ENV?: string } };
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
+	SUSPENSE_RESOLVED_COMMENT,
+	SUSPENSE_RESOLVED_SEED_ATTR,
+	SUSPENSE_RESOLVED_NATIVE_ATTR,
 	HYDRATE_STATIC_ID_COUNT_PREFIX,
 	HYDRATE_STATIC_END,
 	HYDRATE_ID_ATTR,
@@ -2556,6 +2559,14 @@ function journalRootRange(parent: Node, before: Node | null, after: Node | null)
 	)
 		nodes.push(node);
 	journalUndo(() => {
+		// A newer undo can already have removed a speculative slot, including its
+		// markers. That bounded snapshot no longer owns a range in this parent;
+		// falling back to firstChild/null would erase unrelated committed siblings.
+		if (
+			(before !== null && before.parentNode !== parent) ||
+			(after !== null && after.parentNode !== parent)
+		)
+			return;
 		let node =
 			before !== null && before.parentNode === parent ? before.nextSibling : parent.firstChild;
 		const anchor = after !== null && after.parentNode === parent ? after : null;
@@ -4130,6 +4141,16 @@ function reapplyFragmentBindings(): void {
 // ─────────────────────────────────────────────────────────────────────────────
 let IS_OCTANE_ACT_ENVIRONMENT = false;
 let actScopeDepth = 0;
+// Active callback transactions are distinct from the asynchronous drain of an
+// already-returned synchronous act call. Only the former batch nested helpers.
+let actCallbackDepth = 0;
+let asyncActCallbackDepth = 0;
+let actErrors: unknown[] | null = null;
+
+/** Whether a testing helper is executing within an active act callback. */
+export function isInActScope(): boolean {
+	return actCallbackDepth !== 0 || asyncActCallbackDepth !== 0;
+}
 
 /**
  * Test-environment opt-in. When true, scheduleRender() calls that happen
@@ -4649,8 +4670,16 @@ function flush(): void {
 	}
 	// The optional driver owns all concrete ViewTransition state/implementation.
 	// A client that never retains the feature sees only this null check.
-	if (VIEW_TRANSITION_DRIVER?.routeFlush() === true) return;
-	flushWork();
+	try {
+		if (VIEW_TRANSITION_DRIVER?.routeFlush() === true) return;
+		flushWork();
+	} catch (error) {
+		// Promise-driven renders can run before act's task checkpoint. Preserve
+		// their errors for the awaited act result instead of reporting an uncaught
+		// microtask error while resolving the test helper successfully.
+		if (actScopeDepth === 0) throw error;
+		(actErrors ??= []).push(error);
+	}
 }
 
 interface FocusSelectionSnapshot {
@@ -4997,6 +5026,24 @@ function captureFocusedMovement(parent: Node, snapshots: Exclude<FocusSelectionB
 	(renderingFocusMoves ??= []).push({ snapshot, ancestors });
 }
 
+function drainLayoutUpdates(pendingError: { err: any } | null): { err: any } | null {
+	for (
+		let guard = 0;
+		(QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && guard < LAYOUT_CASCADE_LIMIT;
+		guard++
+	) {
+		// Layout-driven updates belong to the same commit, including when the
+		// scheduler started it. Publish their final DOM before observer delivery.
+		drainPassivesBeforeRender();
+		const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
+		const error = drainQueueWithFocus(focused);
+		if (focused !== null) restoreQueuedFocusSelection(focused);
+		if (error !== null && pendingError === null) pendingError = error;
+		commitEffects();
+	}
+	return pendingError;
+}
+
 /**
  * The flush body proper — render+mutate drain plus the effect commit. Shared
  * verbatim by the plain flush() path and the view-transition update callback
@@ -5023,9 +5070,11 @@ function flushWork(): void {
 		// and letting a child observe an event announcing its own mount.
 		if (QUEUE.length > 0) drainPassivesBeforeRender();
 		const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
-		const pendingError = drainQueueWithFocus(focused);
+		let pendingError = drainQueueWithFocus(focused);
 		if (focused !== null) restoreQueuedFocusSelection(focused);
 		commitEffects();
+		if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0)
+			pendingError = drainLayoutUpdates(pendingError);
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
 		inFlush = false;
@@ -5350,44 +5399,13 @@ export function flushSync<T>(fn: () => T): T {
 			// renders. While `syncFlush` is set, scheduleRender pushes to QUEUE without arming a
 			// microtask. React's flushSync drains such layout-effect cascades SYNCHRONOUSLY —
 			// needed so derived layout state (e.g. a presence/exit-animation gate) is committed
-			// before flushSync returns. Non-convergent commit cascades (for example an
-			// unstable `useSyncExternalStore` snapshot or an every-render layout update)
-			// must not monopolize this synchronous stack. Discriminate by CONVERGENCE:
-			// keep draining while each pass schedules only blocks not yet seen in this flushSync
-			// (a finite cascade propagating through the tree — it exhausts quickly since
-			// Object.is-equal setStates bail); the moment a block re-schedules ITSELF a second
-			// time, the cascade is non-convergent — stop and hand the remainder to the async
-			// scheduler. Commit-spawned updates retain their per-chain count across those
-			// microtasks and surface MaximumUpdateDepthError at the bounded limit instead of
-			// starving the event loop. LAYOUT_CASCADE_LIMIT backstops pathological
-			// wide-but-finite chains.
+			// before flushSync returns. Revisiting a block does not prove a loop:
+			// finite layout measurements can update the same parent several times.
+			// Drain those passes before DOM observers can see intermediate state.
+			// The existing nested-update guard and LAYOUT_CASCADE_LIMIT bound loops;
+			// any remaining work retains its per-chain count in the async scheduler.
 			if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) {
-				const seen = new Set<Block>(QUEUE);
-				let defer = false;
-				for (
-					let guard = 0;
-					(QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) &&
-					!defer &&
-					guard < LAYOUT_CASCADE_LIMIT;
-					guard++
-				) {
-					// Each convergence iteration is a new render pass — flush pending passives
-					// first (React's rule; see flush()).
-					drainPassivesBeforeRender();
-					const focused = QUEUE.length === 0 ? null : captureQueuedFocusSelection();
-					const err = drainQueueWithFocus(focused);
-					if (focused !== null) restoreQueuedFocusSelection(focused);
-					if (err !== null && pendingError === null) pendingError = err;
-					commitEffects();
-					for (let i = 0; i < QUEUE.length; i++) {
-						const b = QUEUE[i];
-						if (seen.has(b)) {
-							defer = true;
-							break;
-						}
-						seen.add(b);
-					}
-				}
+				pendingError = drainLayoutUpdates(pendingError);
 			}
 		} finally {
 			inFlush = false;
@@ -5405,8 +5423,7 @@ export function flushSync<T>(fn: () => T): T {
 	}
 }
 
-// Backstop bound on synchronous render→layout-effect→render passes inside flushSync (the
-// convergence check above is the primary brake; this catches wide-but-finite chains).
+// Bound render→layout-effect→render passes without mistaking a repeated block for a loop.
 const LAYOUT_CASCADE_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
@@ -5612,6 +5629,47 @@ function drainRefAttaches(): void {
 	}
 }
 
+// Callback replacement detaches and reattaches in one commit. Defer scheduling
+// eager state writes until both phases finish, so null -> the same node does not
+// perpetually replace an inline ref. Values themselves remain immediately visible.
+interface RefStateUpdate {
+	block: Block;
+	previous: unknown;
+	profileSlot?: HookSlot;
+}
+let refStateUpdates: Map<StateSlot<unknown>, RefStateUpdate> | null = null;
+let collectingRefStateUpdates = false;
+
+function drainCommitRefs(): void {
+	const previousUpdates = refStateUpdates;
+	const previousCollecting = collectingRefStateUpdates;
+	refStateUpdates = null;
+	collectingRefStateUpdates = true;
+	try {
+		drainRefDetaches();
+		drainRefAttaches();
+	} finally {
+		const updates = refStateUpdates as Map<StateSlot<unknown>, RefStateUpdate> | null;
+		refStateUpdates = previousUpdates;
+		collectingRefStateUpdates = previousCollecting;
+		if (updates !== null) {
+			// These are still ref-caused updates even though the callbacks have
+			// returned. Preserve their recursion budget and profiling provenance.
+			REF_CALLBACK_DEPTH++;
+			try {
+				for (const [state, update] of updates) {
+					if (update.block.disposed || Object.is(state.value, update.previous)) continue;
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__profileSchedule(update.block, 'state', update.profileSlot);
+					scheduleRender(update.block);
+				}
+			} finally {
+				REF_CALLBACK_DEPTH--;
+			}
+		}
+	}
+}
+
 /** True if `block` or any of its ancestors has been disposed (unmounted). */
 function blockSubtreeDisposed(block: Block | null): boolean {
 	let b: Block | null = block;
@@ -5723,8 +5781,7 @@ function commitEffects(): void {
 		const mutationBatch = drainMutationEffects();
 		// Teardown ref detaches fire before this commit's attaches (mutation → layout),
 		// so a ref moving between elements cycles null → new-node in one commit.
-		drainRefDetaches();
-		drainRefAttaches();
+		drainCommitRefs();
 		reapplyFragmentBindings();
 		// Layout phase (React's commitLayoutEffects): bodies only — every layout
 		// cleanup already fired in the mutation walk, ref attaches just landed, so a
@@ -5823,18 +5880,45 @@ function drainEffectEventUpdates(): void {
 	}
 }
 
+function throwPendingActErrors(): void {
+	const errors = actErrors;
+	actErrors = null;
+	if (errors !== null)
+		throw errors.length === 1 ? errors[0] : new AggregateError(errors, formatClientError(64));
+}
+
+function mergePendingActErrors(error: unknown): unknown {
+	const errors = actErrors;
+	actErrors = null;
+	return errors === null ? error : new AggregateError([...errors, error], formatClientError(64));
+}
+
+function actCheckpoint(): Promise<void> {
+	// A task runs after the entire promise queue, regardless of middleware chain
+	// depth. MessageChannel also remains live when a test freezes timeout clocks.
+	return new Promise((resolve) => {
+		const channel = new MessageChannel();
+		channel.port1.onmessage = () => {
+			channel.port1.close();
+			channel.port2.close();
+			resolve();
+		};
+		channel.port2.postMessage(null);
+	});
+}
+
 /**
- * React-parity `act(...)`. Wrap test code that triggers updates so all of
+ * Wrap test code that triggers updates so all of
  * the scheduled work commits before the assertion phase runs.
  *
- * TWO modes, matching React exactly:
+ * Two callback modes:
  *  - SYNC callback → all scheduled work (renders + INSERTION/LAYOUT/PASSIVE
  *    effects) is flushed SYNCHRONOUSLY before act returns, so
  *    `act(() => setState(...)); expect(...)` works WITHOUT awaiting — the
- *    dominant pattern in ported React test suites. The returned (already
- *    resolved) promise still carries the callback's result; a callback throw
- *    REJECTS the promise rather than throwing synchronously (React's act is
- *    a thenable with the same contract).
+ *    dominant pattern in ported React test suites. Nested callbacks join the
+ *    outer callback's transaction. The returned promise also drains promise
+ *    work and carries the callback's result. Callback and render errors reject
+ *    it rather than escaping through the scheduler.
  *  - ASYNC callback (returns a thenable) → awaited, then the scheduler is
  *    drained across microtask ticks until quiescent (renders, effects, and
  *    microtask chains from `use(promise)` / transition retries).
@@ -5843,33 +5927,52 @@ function drainEffectEventUpdates(): void {
  * dev warning is suppressed (see `IS_OCTANE_ACT_ENVIRONMENT` and
  * `setIsOctaneActEnvironment`).
  *
- * The async double-loop (5 microtask ticks × up to ACT_DRAIN_LIMIT iterations)
+ * Complete promise checkpoints, bounded by ACT_DRAIN_LIMIT iterations,
  * drains cascades like `use(promise)` → status flip → retry → renderBlock
  * that wouldn't settle in a single tick.
  */
 export function act<T>(fn: () => T | Promise<T>): Promise<T> {
+	const nested = isInActScope();
 	actScopeDepth++;
+	actCallbackDepth++;
 	let result: T | Promise<T>;
 	try {
 		result = fn();
 	} catch (err) {
 		actScopeDepth--;
-		return Promise.reject(err);
+		return Promise.reject(mergePendingActErrors(err));
+	} finally {
+		actCallbackDepth--;
 	}
 	if (result !== null && typeof result === 'object' && typeof (result as any).then === 'function') {
+		asyncActCallbackDepth++;
 		return (async () => {
 			try {
-				const value = await (result as Promise<T>);
+				let value: T;
+				try {
+					value = await (result as Promise<T>);
+				} finally {
+					asyncActCallbackDepth--;
+				}
+				if (nested) return value;
 				for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
-					for (let j = 0; j < 5; j++) await Promise.resolve();
+					await actCheckpoint();
+					throwPendingActErrors();
+					const hadWork = hasPendingWork();
 					drainPassiveEffects();
-					if (!hasPendingWork()) return value;
+					if (!hadWork && !hasPendingWork()) return value;
 				}
 				throw new Error(formatClientError(14, ACT_DRAIN_LIMIT));
+			} catch (error) {
+				throw mergePendingActErrors(error);
 			} finally {
 				actScopeDepth--;
 			}
 		})();
+	}
+	if (nested) {
+		actScopeDepth--;
+		return Promise.resolve(result as T);
 	}
 	// Sync callback: flush synchronously BEFORE returning (flushSync drains the
 	// render queue + commit-phase effects; drainPassiveEffects the post-paint
@@ -5888,6 +5991,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 			// async act form, which drains through the scheduled microtask flush).
 			if (VIEW_TRANSITION_DRIVER?.wouldWrap() === true) flush();
 			else flushSync(() => {});
+			throwPendingActErrors();
 			drainPassiveEffects();
 			if (!hasPendingWork()) break;
 			if (i === ACT_DRAIN_LIMIT - 1) {
@@ -5899,16 +6003,20 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 		// failures. Balance the scope here because the async continuation below
 		// is never created on this path.
 		actScopeDepth--;
-		return Promise.reject(err);
+		return Promise.reject(mergePendingActErrors(err));
 	}
 	return (async () => {
 		try {
 			for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
-				for (let j = 0; j < 5; j++) await Promise.resolve();
+				await actCheckpoint();
+				throwPendingActErrors();
+				const hadWork = hasPendingWork();
 				drainPassiveEffects();
-				if (!hasPendingWork()) return result as T;
+				if (!hadWork && !hasPendingWork()) return result as T;
 			}
 			throw new Error(formatClientError(14, ACT_DRAIN_LIMIT));
+		} catch (error) {
+			throw mergePendingActErrors(error);
 		} finally {
 			actScopeDepth--;
 		}
@@ -6574,19 +6682,65 @@ function createBlock(
 	return block;
 }
 
+type RenderPhaseCell = {
+	value: unknown;
+	updates?: unknown[];
+	renderPhaseActions?: unknown[];
+};
+type RenderPhaseSnapshot = {
+	value: unknown;
+	queue: unknown[] | undefined;
+	key: 'updates' | 'renderPhaseActions';
+};
+let renderPhaseOwner: Block | null = null;
+let renderPhaseUpdates: Map<RenderPhaseCell, RenderPhaseSnapshot> | null = null;
+
+function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapshot['key']): void {
+	const updates = (renderPhaseUpdates ??= new Map());
+	if (!updates.has(cell)) updates.set(cell, { value: cell.value, queue: cell[key]?.slice(), key });
+}
+
 export function renderBlock(block: Block): void {
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.owns(block)) {
 		hydration.suspend(() => renderBlock(block));
 		return;
 	}
-	let retries = 0;
-	while (renderBlockInner(block)) {
-		if (block.nestedUpdateError) {
-			block.nestedUpdateError = false;
-			throw maximumUpdateDepthError();
+	const previousOwner = renderPhaseOwner;
+	let previousUpdates = renderPhaseUpdates;
+	renderPhaseOwner = block;
+	renderPhaseUpdates = null;
+	try {
+		let retries = 0;
+		while (renderBlockInner(block)) {
+			if (block.nestedUpdateError) {
+				block.nestedUpdateError = false;
+				throw maximumUpdateDepthError();
+			}
+			if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
 		}
-		if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
+		// Completed descendants still belong to their enclosing render attempt.
+		// A nested independent root commits separately and does not transfer state.
+		const updates = renderPhaseUpdates as Map<RenderPhaseCell, RenderPhaseSnapshot> | null;
+		if (updates !== null && previousOwner !== null && blockIsAncestorOf(previousOwner, block)) {
+			previousUpdates ??= new Map();
+			for (const [cell, snapshot] of updates) {
+				if (!previousUpdates.has(cell)) previousUpdates.set(cell, snapshot);
+			}
+		}
+	} catch (error) {
+		const updates = renderPhaseUpdates as Map<RenderPhaseCell, RenderPhaseSnapshot> | null;
+		if (updates !== null) {
+			for (const [cell, snapshot] of updates) {
+				cell.value = snapshot.value;
+				cell[snapshot.key] = snapshot.queue;
+			}
+			if (!block.crossRenderUpdate) block.pending = false;
+		}
+		throw error;
+	} finally {
+		renderPhaseOwner = previousOwner;
+		renderPhaseUpdates = previousUpdates;
 	}
 }
 
@@ -7760,6 +7914,15 @@ export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: stri
 	return provider as F;
 }
 
+/** Invoke a cached optional-chain method without consulting its call/bind properties. */
+export function callWithReceiver<T>(
+	fn: (...args: any[]) => T,
+	receiver: unknown,
+	...args: any[]
+): T {
+	return NATIVE_REFLECT_APPLY(fn, receiver, args);
+}
+
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
 	const driver = MANUAL_HOOK_DRIVER;
@@ -7890,6 +8053,7 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 						(block.pending && typeof next === 'function')) &&
 					transitionActionBatchForUpdate() === null
 				) {
+					if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(s!, 'updates');
 					(s!.updates ??= []).push(next);
 					scheduleRender(block);
 					return;
@@ -7904,6 +8068,7 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 					// render so the component's error boundary owns the exception. An
 					// Action keeps the failure staged until the Action itself settles.
 					if (transitionActionBatchForUpdate() === null) {
+						if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(s!, 'updates');
 						(s!.updates ??= []).push(next);
 						scheduleRender(block);
 						return;
@@ -7935,6 +8100,19 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 					}
 					return;
 				}
+				if (collectingRefStateUpdates && REF_CALLBACK_DEPTH > 0 && !forceRender) {
+					const updates = (refStateUpdates ??= new Map());
+					const state = s! as StateSlot<unknown>;
+					if (!updates.has(state)) {
+						const update: RefStateUpdate = { block, previous: s!.value };
+						if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+							update.profileSlot = slot;
+						updates.set(state, update);
+					}
+					s!.value = computed;
+					return;
+				}
+				if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(s!, 'updates');
 				s!.value = computed;
 				if (
 					!block.disposed &&
@@ -8515,6 +8693,7 @@ export function useReducer<S, A, I = S>(
 				// reducer supplied by the replaying render. Reducing eagerly here uses
 				// the previous pass's reducer when that reducer changes alongside state.
 				if (CURRENT_BLOCK === block || transitionActionBatchForUpdate() === null) {
+					if (CURRENT_BLOCK === block) captureRenderPhaseUpdate(s!, 'renderPhaseActions');
 					if (s!.pendingActionBatch !== undefined && transitionActionBatchForUpdate() === null)
 						recordUrgentActionUpdate(s!, (value) => s!.reducer(value, action));
 					const actions = (s!.renderPhaseActions ??= []);
@@ -13451,10 +13630,12 @@ class HydrationCapability {
 	nativeAdoption?: NativeAdoptionState;
 
 	constructor(
-		readonly rootBlock: Block,
+		public rootBlock: Block,
 		public node: Node | null,
 		public seeds: unknown[] | null,
-	) {}
+	) {
+		initialSuspenseHydrationRenderer = renderInitialSuspenseHydration;
+	}
 
 	isActive(): boolean {
 		return this.depth === 0 && !this.abandoned;
@@ -18139,6 +18320,14 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 // surfaces through the global error event (window.onerror) like an uncaught
 // listener exception; console.error is the non-browser fallback.
 function fireEventSlot(slot: EventSlot, event: Event): void {
+	// DOM writes can synchronously dispatch native events (for example blur when
+	// disabling a focused input). Their handlers are outside component rendering,
+	// even when the compiled DOM patch is still on the render stack. Restore that
+	// stack afterwards so the remainder of the component keeps its own hook slots.
+	const previousScope = CURRENT_SCOPE;
+	const previousBlock = CURRENT_BLOCK;
+	CURRENT_SCOPE = null;
+	CURRENT_BLOCK = null;
 	try {
 		if (typeof slot === 'function') {
 			slot(event);
@@ -18169,6 +18358,9 @@ function fireEventSlot(slot: EventSlot, event: Event): void {
 		invokeInvalidEventListener(`${event.type} event`, slot, event);
 	} catch (err) {
 		reportListenerError(err);
+	} finally {
+		CURRENT_SCOPE = previousScope;
+		CURRENT_BLOCK = previousBlock;
 	}
 }
 
@@ -18219,7 +18411,10 @@ function maybeFlushDiscrete(type: string): void {
 	if (_dispatchDepth === 0 && DISCRETE_EVENTS.has(type) && pendingRestores.length > 0) {
 		// Commit handler-scheduled work first, so the controlled restore below
 		// compares the DOM against the values the handlers just rendered.
-		if (hasPendingWork()) {
+		if (!inFlush && hasPendingWork()) {
+			// Native events can fire from commit-phase DOM mutations or effects.
+			// The ambient flush already owns their updates; calling public flushSync
+			// here would only hit its reentrancy backstop and emit a spurious warning.
 			// A transition-only queue in an app armed for ViewTransition must reach the
 			// regular flush controller. flushSync deliberately skips animations; using
 			// it here meant the canonical onInput={() => startTransition(...)} pattern
@@ -20123,7 +20318,7 @@ function reassertControlledIn(form: HTMLFormElement): void {
 interface PortalSlot {
 	__kind: 'portalSlotSlot';
 	block: Block | null;
-	target: Element | null;
+	target: Element | DocumentFragment | null;
 	key: string | null;
 	host: Node;
 	start: Comment | null;
@@ -20169,7 +20364,7 @@ function unregisterPortalEventRange(target: Node, portal: PortalSlot): void {
 export function portal(
 	parentScope: Scope,
 	slotKey: number,
-	target: Element,
+	target: Element | DocumentFragment,
 	body: ComponentBody,
 	props: any,
 	host?: Node,
@@ -20416,7 +20611,7 @@ function registerValuePortalFragmentOwners(
 function renderPortalState(
 	prev: PortalSlot | null,
 	parentBlock: Block,
-	target: Element,
+	target: Element | DocumentFragment,
 	rawBody: ComponentBody | unknown,
 	rawProps: any,
 	host: Node,
@@ -20592,13 +20787,13 @@ export interface PortalDescriptor {
 	// or any other renderable (host/array/text). normalizePortalBody resolves it to a
 	// ComponentBody + props when the portal Block renders.
 	body: ComponentBody | ElementDescriptor | unknown;
-	target: Element;
+	target: Element | DocumentFragment;
 	props: any;
 }
 /* @__NO_SIDE_EFFECTS__ */
 export function createPortal(
 	body: ComponentBody | ElementDescriptor | unknown,
-	target: Element,
+	target: Element | DocumentFragment,
 	props: any = undefined,
 ): PortalDescriptor {
 	const key = portalKey(props);
@@ -26590,6 +26785,7 @@ function releaseHiddenText(text: Text, restore = true): void {
 // Keep Suspense-specific teardown out of the always-live generic slot walk.
 // The visible arm must still unmount before its preserved hidden primary.
 function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
+	initialSuspenseHydrations?.delete(state);
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	if (state.block !== null) unmountBlock(state.block, detachDom);
@@ -27267,6 +27463,15 @@ export function tryBlock(
 		state.env = env;
 	}
 	const s = state;
+	let initial = initialSuspenseHydrations?.get(s);
+	if (initial === undefined && hydration !== null && s.branch === -1 && !s.propagateSuspense) {
+		initial = takeInitialSuspenseHydration(s, hydration) ?? undefined;
+		if (initial !== undefined) (initialSuspenseHydrations ??= new WeakMap()).set(s, initial);
+	}
+	if (initial !== undefined) {
+		initialSuspenseHydrationRenderer!(s, initial);
+		return s.reset;
+	}
 	if (s.passthrough) {
 		renderPassthroughTry(s);
 		return s.reset;
@@ -27408,6 +27613,237 @@ function mountHiddenTryBody(state: TrySlot): Block {
 	state.detachedRefs = [];
 	hideTryBlock(state);
 	return block;
+}
+
+interface InitialSuspenseHydration {
+	metadata: ChildNode[];
+	consume?: () => void;
+	start: Comment;
+	end: Comment;
+	idStart: number;
+	seedRaw: string | null;
+	nativeRaw: string | null;
+}
+
+// Server metadata gives each resolved arm an independent adoption scope. The
+// map retains only boundaries whose first client attempt has not completed.
+let initialSuspenseHydrations: WeakMap<TrySlot, InitialSuspenseHydration> | null = null;
+// Transfer streamed payloads off the document-global stash as soon as hydration
+// claims them. A weak DOM owner survives discarded nested attempts, but cannot
+// retain a removed boundary for the remaining lifetime of the page.
+let initialStreamedPayloads: WeakMap<
+	Comment,
+	{
+		seedRaw: string | null;
+		nativeRaw: string | null;
+	}
+> | null = null;
+
+// Initialized by the hydration capability so client-only Suspense cannot make
+// the hydrator and its seed parser reachable in the shipped bundle.
+let initialSuspenseHydrationRenderer: typeof renderInitialSuspenseHydration | null = null;
+
+function takeInitialSuspenseHydration(
+	state: TrySlot,
+	hydration: HydrationCapability,
+): InitialSuspenseHydration | null {
+	const marker = state.start.nextSibling;
+	if (marker?.nodeType !== 8) return null;
+	const text = (marker as Comment).data;
+	if (text.startsWith(STREAM_SEED_COMMENT)) {
+		const boundaryId = text.slice(STREAM_SEED_COMMENT.length);
+		const start = marker.nextSibling;
+		if (!hydration.isOpen(start)) return null;
+		const end = hydration.close(start);
+		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
+		const owner = marker as Comment;
+		let payload = initialStreamedPayloads?.get(owner);
+		if (payload === undefined) {
+			payload = {
+				seedRaw: typeof stash?.[boundaryId] === 'string' ? stash[boundaryId] : null,
+				nativeRaw:
+					typeof stash?.[boundaryId + '$signals'] === 'string'
+						? stash[boundaryId + '$signals']
+						: null,
+			};
+			(initialStreamedPayloads ??= new WeakMap()).set(owner, payload);
+			if (stash !== undefined) {
+				delete stash[boundaryId];
+				delete stash[boundaryId + '$signals'];
+			}
+		}
+		state.idState = {
+			prefix: state.parentBlock.idState.prefix + 'b' + boundaryId + '-',
+			next: 0,
+			renderOwner: state.parentBlock.idState.renderOwner,
+		};
+		return {
+			metadata: [marker as ChildNode],
+			start,
+			end,
+			idStart: 0,
+			...payload,
+			consume: () => {
+				initialStreamedPayloads?.delete(owner);
+			},
+		};
+	}
+	if (!text.startsWith(SUSPENSE_RESOLVED_COMMENT)) return null;
+	const rawCount = text.slice(SUSPENSE_RESOLVED_COMMENT.length);
+	if (!/^(?:0|[1-9]\d*)$/.test(rawCount)) return null;
+	const count = Number(rawCount);
+	if (!Number.isSafeInteger(count)) return null;
+	let cursor = marker.nextSibling;
+	let seedRaw: string | null = null;
+	let nativeRaw: string | null = null;
+	const sidecars: Element[] = [];
+	for (const attr of [SUSPENSE_RESOLVED_SEED_ATTR, SUSPENSE_RESOLVED_NATIVE_ATTR]) {
+		if (cursor?.nodeType !== 1) continue;
+		const script = cursor as Element;
+		if (
+			script.localName !== 'script' ||
+			script.getAttribute('type') !== 'application/json' ||
+			!script.hasAttribute(attr)
+		)
+			continue;
+		if (attr === SUSPENSE_RESOLVED_SEED_ATTR) seedRaw = script.textContent;
+		else nativeRaw = script.textContent;
+		sidecars.push(script);
+		cursor = script.nextSibling;
+	}
+	if (!hydration.isOpen(cursor)) return null;
+	const end = hydration.close(cursor);
+	const rootIds = state.idState;
+	const idStart = rootIds.next;
+	reserveHydrationIds(rootIds, count);
+	state.idState = {
+		prefix: rootIds.prefix,
+		next: idStart,
+		limit: idStart + count,
+		overflow: rootIds,
+		renderOwner: rootIds.renderOwner,
+	};
+	return {
+		metadata: [marker as ChildNode, ...sidecars],
+		start: cursor,
+		end,
+		idStart,
+		seedRaw,
+		nativeRaw,
+	};
+}
+
+function finishInitialSuspenseHydration(
+	initial: InitialSuspenseHydration,
+	hydration: HydrationCapability,
+): void {
+	for (const node of initial.metadata) node.remove();
+	initial.consume?.();
+	if (hydration.hasAdjacentRangePair) hydration.coalesce();
+}
+
+function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspenseHydration): void {
+	state.pendingThenable = null;
+	state.idState.next = initial.idStart;
+	const block = createTryBody(state, initial.start, initial.end);
+	state.block = block;
+	setTryBranch(state, 1);
+	const hydration = new HydrationCapability(block, initial.start.nextSibling, null);
+	if (initial.seedRaw !== null) hydration.seeds = hydration.parseSeeds(initial.seedRaw);
+	// This capability owns one exact arm, never the surrounding root siblings.
+	hydration.claimRootRemainder(initial.end);
+	hydration.protectRootAnchor(initial.end);
+	const previousHydration = currentHydration;
+	const previousCapture = WIP_CAPTURE;
+	const capture = createOffscreenCapture();
+	currentHydration = hydration;
+	WIP_CAPTURE = capture;
+	const previousNative = setNativeAdoptionResolver(null);
+	let suspended: TrackedThenable<unknown> | null = null;
+	let failed = false;
+	let failure: unknown;
+	try {
+		if (initial.nativeRaw !== null) {
+			hydration.nativeAdoption = ownNativeAdoption(
+				block,
+				parseNativeSignalManifest(initial.nativeRaw),
+			);
+			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
+		}
+		renderBlock(block);
+		drainHydrationRenderPhaseUpdates(block);
+		hydration.flushClassWrites();
+		hydration.flushTextWarnings();
+		state.hasResolved = true;
+	} catch (error) {
+		failed = true;
+		failure = error;
+		if (isSuspenseException(error)) suspended = error.thenable;
+		// None of this attempt's refs or effects committed. Dispose its scopes
+		// without detaching the actual server nodes that the next attempt adopts.
+		const refs: SuspenseRefEntry[] = [];
+		collectVisibleSubtreeRefs(block, refs);
+		withRefDetachSuppression(refs, () => unmountBlock(block, false));
+		state.block = null;
+		state.tryBlock = null;
+		discardOffscreenCapture(capture);
+	} finally {
+		setNativeAdoptionResolver(previousNative);
+		WIP_CAPTURE = previousCapture;
+		currentHydration = previousHydration;
+		if (previousHydration !== null) previousHydration.node = state.end;
+	}
+	if (!failed) {
+		initialSuspenseHydrations?.delete(state);
+		// An enclosing boundary may still suspend after this arm rendered. Leave
+		// its server metadata and ranges replayable until that capture commits.
+		(capture.renderCleanups ??= []).push((discarded) => {
+			if (discarded) return;
+			finishInitialSuspenseHydration(initial, hydration);
+		});
+		spliceOffscreenCapture(capture);
+		return;
+	}
+	if (suspended !== null) {
+		state.pendingThenable = suspended;
+		const resume = () => {
+			if (
+				state.parentBlock.disposed ||
+				state.pendingThenable !== suspended ||
+				initialSuspenseHydrations?.get(state) !== initial
+			)
+				return;
+			scheduleRender(state.parentBlock);
+		};
+		suspended.then(resume, resume);
+		return;
+	}
+	initialSuspenseHydrations?.delete(state);
+	if (failure instanceof NativeAdoptionMiss || isHostContextRequest(failure)) throw failure;
+	const adoptServerCatch = hydration.isRejection(failure);
+	// A server rejection already rendered the catch arm in this range. Adopt
+	// it with the arm's ID/data scope, including retries outside root hydration.
+	// A new client error instead replaces the old server primary.
+	if (!adoptServerCatch) removeRange(initial.start.nextSibling, initial.end);
+	const outerHydration = currentHydration;
+	if (adoptServerCatch) currentHydration = hydration;
+	try {
+		switchToCatch(
+			state,
+			failure,
+			true,
+			adoptServerCatch ? initial.start : undefined,
+			adoptServerCatch ? initial.end : undefined,
+		);
+		if (WIP_CAPTURE === null) finishInitialSuspenseHydration(initial, hydration);
+		else
+			(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
+				if (!discarded) finishInitialSuspenseHydration(initial, hydration);
+			});
+	} finally {
+		currentHydration = outerHydration;
+		if (outerHydration !== null) outerHydration.node = state.end;
+	}
 }
 
 function mountTry(state: TrySlot): void {
@@ -29839,6 +30275,18 @@ function switchToCatchInner(
 	);
 	b.idState = state.idState;
 	state.block = b;
+	if (
+		adopting &&
+		hydration !== null &&
+		hydration.rootBlock.disposed &&
+		hydration.rootBlock.startMarker === bStart &&
+		hydration.rootBlock.endMarker === bEnd
+	) {
+		// An initially resolved arm scoped adoption to its discarded try block.
+		// Its catch replaces that exact range; transfer ownership to this sibling
+		// so adoption stays local without treating the catch as a fresh render.
+		hydration.rootBlock = b;
+	}
 	try {
 		// A client-fresh catch build during hydration must not read the adoption
 		// cursor — the server rendered the try arm here, so adopting would consume
@@ -31595,7 +32043,7 @@ export function forBlock<T>(
 	parentScope: Scope,
 	slotKey: number,
 	domParent: Node,
-	items: ArrayLike<T>,
+	inputItems: ArrayLike<T> | Iterable<T>,
 	getKey: (item: T, index: number) => any,
 	itemBody: (item: T, scope: Scope) => void,
 	flags?: number,
@@ -31610,6 +32058,10 @@ export function forBlock<T>(
 	// The iterable expression can queue a self-update before this call starts.
 	// Do not mount or remove items from an output the owner will replay.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+	// SSR snapshots arbitrary iterable inputs before rendering any rows. Do the
+	// same before mutating the client slot: a throwing iterator must not leave a
+	// partly accepted list. Arrays keep their identity and allocate nothing here.
+	const items: ArrayLike<T> = Array.isArray(inputItems) ? inputItems : Array.from(inputItems);
 	// flags bitfield: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item
 	// Comment markers), bit 2 = depEligible (compare `deps` to cachedDeps and
 	// promote body to PURE when unchanged), bit 3 = indexIndependent (the body

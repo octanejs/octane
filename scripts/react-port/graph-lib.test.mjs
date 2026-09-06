@@ -268,6 +268,40 @@ describe('union prerequisite graph', () => {
 		assert.equal(graph.nodes['pkg:react-widget'].action, 'adopt-binding');
 	});
 
+	test('honors explicit provenance-matched adoption for a known source binding', () => {
+		const inventory = fixtureInventory();
+		Object.assign(inventory.bindings['@octanejs/partial'].status.upstream, {
+			commit: 'a'.repeat(40),
+			license: 'MIT',
+		});
+		const graph = planPortGraph({
+			targets: [licensedTarget('react-partial', '1.0.0')],
+			inventory,
+			adoptedBindings: ['react-partial'],
+		});
+		assert.equal(graph.nodes['pkg:react-partial'].action, 'adopt-binding');
+		assert.equal(graph.nodes['pkg:react-partial'].state, 'ready');
+	});
+
+	test('does not treat a scope audit date as complete verification when provenance is explicitly unverified', () => {
+		const inventory = fixtureInventory();
+		const status = inventory.bindings['@octanejs/covered'].status;
+		Object.assign(status.upstream, { commit: 'a'.repeat(40), license: 'MIT' });
+		status.provenance = { verification: 'recorded-unverified' };
+		const options = {
+			targets: [licensedTarget('react-covered', '2.4.0')],
+			inventory,
+			adoptedBindings: ['react-covered'],
+		};
+		const partial = planPortGraph(options).nodes['pkg:react-covered'];
+		assert.equal(partial.action, 'adopt-binding');
+		assert.equal(partial.state, 'ready');
+		status.provenance.verification = 'verified';
+		const complete = planPortGraph(options).nodes['pkg:react-covered'];
+		assert.equal(complete.action, 'reuse-binding');
+		assert.equal(complete.state, 'verified');
+	});
+
 	test('does not adopt a binding whose recorded provenance does not match', () => {
 		const inventory = fixtureInventory();
 		inventory.bindings['@octanejs/widget'] = {

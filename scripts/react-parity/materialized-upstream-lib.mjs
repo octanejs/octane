@@ -8,8 +8,30 @@ import {
 	validateUpstreamLock,
 	verifyPristineTree,
 } from '../react-port/materialize-lib.mjs';
+import { checkAdaptedTree } from '../react-port/materialize.mjs';
 
 const MATERIALIZE_CLI = 'scripts/react-port/materialize.mjs';
+
+/** Test annotations may rely on patch provenance only after complete regeneration. */
+export function verifyMaterializedAdaptedEvidence(root, packagePath, provenance) {
+	if (!/^packages\/[a-z0-9][a-z0-9-]*$/.test(packagePath)) {
+		throw new Error('materializedTests must name one repository package');
+	}
+	verifyMaterializedUpstreamEvidence(root, packagePath);
+	const packageRoot = resolve(root, packagePath);
+	const lock = validateUpstreamLock(
+		JSON.parse(readFileSync(join(packageRoot, UPSTREAM_LOCK_RELATIVE_PATH), 'utf8')),
+	);
+	if (
+		lock.identity.version !== provenance.version ||
+		lock.identity.commit !== provenance.commit ||
+		`https://github.com/${lock.identity.repository.owner}/${lock.identity.repository.repo}.git` !==
+			provenance.repo
+	) {
+		throw new Error(`${packagePath}: materialized test pin differs from manifest provenance`);
+	}
+	return new Set(checkAdaptedTree(lock, packageRoot).map((file) => `${packagePath}/${file}`));
+}
 
 /**
  * Packages whose upstream evidence is pinned by audit/upstream.lock.json and

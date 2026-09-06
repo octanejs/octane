@@ -1,0 +1,70 @@
+diff --git a/tests/upstream/src/avatar/image/AvatarImage.test.tsx b/tests/upstream/src/avatar/image/AvatarImage.test.tsx
+--- a/tests/upstream/src/avatar/image/AvatarImage.test.tsx
++++ b/tests/upstream/src/avatar/image/AvatarImage.test.tsx
+@@ -1,4 +1,10 @@
+ /** @jsxImportSource octane */
++import { AvatarImageServerCase1, AvatarImageServerCase2, AvatarImageServerCase3 } from './../../../../fixtures/AvatarImage-ssr.tsrx';
++import { AvatarImageServerCase1 as ServerAvatarImageServerCase1, AvatarImageServerCase2 as ServerAvatarImageServerCase2, AvatarImageServerCase3 as ServerAvatarImageServerCase3 } from './../../../../fixtures/AvatarImage-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(AvatarImageServerCase1, ServerAvatarImageServerCase1);
++registerServerComponent(AvatarImageServerCase2, ServerAvatarImageServerCase2);
++registerServerComponent(AvatarImageServerCase3, ServerAvatarImageServerCase3);
+ import { expect, vi, describe, beforeEach, afterEach, it } from 'vitest';
+ import * as React from 'octane';
+ import { Avatar } from '@octanejs/base-ui/avatar';
+@@ -443,15 +449,7 @@ describe('<Avatar.Image />', () => {
+         });
+ 
+         const { hydrate } = renderToString(
+-          <Avatar.Root>
+-            <Avatar.Image
+-              data-testid="image"
+-              keepMounted
+-              src={TRANSPARENT_IMAGE_DATA_URI}
+-              alt="Jane Doe"
+-            />
+-            <Avatar.Fallback>JD</Avatar.Fallback>
+-          </Avatar.Root>,
++          <AvatarImageServerCase1 TRANSPARENT_IMAGE_DATA_URI={TRANSPARENT_IMAGE_DATA_URI} />,
+         );
+ 
+         // Unlike the default mode, the image is part of the server HTML, so the
+@@ -752,11 +750,10 @@ describe('<Avatar.Image />', () => {
+         restoreImage = () => {};
+         const onLoadingStatusChange = vi.fn();
+ 
+-        const DetachedRefImage = React.forwardRef(function DetachedRefImage(
+-          props: React.ComponentProps<'img'>,
+-          // The ref is deliberately dropped: some image wrappers keep it for themselves.
+-          _ref: React.ForwardedRef<HTMLImageElement>,
++        const DetachedRefImage = (function DetachedRefImage(
++          propsWithRef: (React.ComponentProps<'img'>) & { ref?: React.Ref<HTMLImageElement> },
+         ) {
++  const { ref: _ref = null, ...props } = propsWithRef;
+           return <img alt="" {...props} />;
+         });
+ 
+@@ -1076,10 +1073,7 @@ describe('<Avatar.Image />', () => {
+       });
+ 
+       const { hydrate } = renderToString(
+-        <Avatar.Root>
+-          <Avatar.Image data-testid="image" keepMounted src={TRANSPARENT_IMAGE_DATA_URI} alt="" />
+-          <Avatar.Fallback>JD</Avatar.Fallback>
+-        </Avatar.Root>,
++        <AvatarImageServerCase2 TRANSPARENT_IMAGE_DATA_URI={TRANSPARENT_IMAGE_DATA_URI} />,
+       );
+ 
+       await waitFor(() => {
+@@ -1112,10 +1106,7 @@ describe('<Avatar.Image />', () => {
+ 
+       // Server render: layout effects don't run, so fallback is in the HTML
+       const { hydrate } = renderToString(
+-        <Avatar.Root>
+-          <Avatar.Image src={DATA_URI} alt="Jane Doe" />
+-          <Avatar.Fallback>JD</Avatar.Fallback>
+-        </Avatar.Root>,
++        <AvatarImageServerCase3 DATA_URI={DATA_URI} />,
+       );
+ 
+       expect(screen.getByText('JD')).toBeVisible();

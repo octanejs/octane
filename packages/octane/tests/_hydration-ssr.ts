@@ -127,7 +127,7 @@ function bindingAliases(binding: HydrationBinding) {
 
 	return [
 		{ find: /^@octanejs\/base-ui$/, replacement: resolve(source, 'index.ts') },
-		{ find: /^@octanejs\/base-ui\/(.*)$/, replacement: `${source}/$1.ts` },
+		{ find: /^@octanejs\/base-ui\/(.*)$/, replacement: `${source}/$1` },
 		{
 			find: /^@octanejs\/floating-ui$/,
 			replacement: resolve(repositoryRoot, 'packages/floating-ui/src/index.ts'),
@@ -146,6 +146,12 @@ async function withHydrationServer<T>(
 		logLevel: 'silent',
 		appType: 'custom',
 		plugins: [octane({ ssr: true })],
+		ssr: {
+			noExternal:
+				binding === 'base-ui'
+					? ['@octanejs/base-ui', '@octanejs/base-ui-utils', '@octanejs/floating-ui']
+					: [],
+		},
 		resolve: {
 			alias: [
 				{ find: /^octane$/, replacement: serverRuntime },

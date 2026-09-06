@@ -1,63 +1,77 @@
-// Ported from .base-ui/packages/react/src/utils/popups/useTriggerFocusGuards.ts (v1.6.0), octane-
-// adapted (native events; `ReactDOM.flushSync` → octane `flushSync`; the ref threads a slot). Focus
-// guards placed around an OPEN popup's trigger (Popover/Menu): tabbing out of the trigger closes the
-// popup and moves focus to the right neighbour.
-import { useRef, flushSync } from 'octane';
-
-import { subSlot } from '../../internal';
-import { contains } from '../floating/element';
+/** @jsxImportSource octane */
+'use client';
+import * as React from 'octane';
+import * as ReactDOM from 'octane';
 import {
+	contains,
+	type FocusableElement,
 	getNextTabbable,
 	getTabbableAfterElement,
 	getTabbableBeforeElement,
 	isOutsideEvent,
-	type FocusableElement,
-} from '../floating/tabbable';
-import { createChangeEventDetails, REASONS } from '../createChangeEventDetails';
+} from '../../floating-ui-react/utils';
+import {
+	type BaseUIChangeEventDetails,
+	createChangeEventDetails,
+} from '../../internals/createBaseUIEventDetails';
+import { REASONS } from '../../internals/reasons';
 
+/**
+ * Minimal store interface required by the focus guard hook.
+ * Both PopoverStore and MenuStore satisfy this interface.
+ */
 interface TriggerFocusGuardStore {
-	setOpen(open: boolean, eventDetails: any): void;
+	setOpen(open: boolean, eventDetails: BaseUIChangeEventDetails<typeof REASONS.focusOut>): void;
 	select(key: 'positionerElement'): HTMLElement | null;
 	context: {
-		readonly beforeContentFocusGuardRef: { current: HTMLElement | null };
-		readonly triggerFocusTargetRef: { current: HTMLElement | null };
+		readonly beforeContentFocusGuardRef: React.RefObject<HTMLElement | null>;
+		readonly triggerFocusTargetRef: React.RefObject<HTMLElement | null>;
 	};
 }
 
+/**
+ * Provides focus guard handlers for popup triggers (Popover, Menu).
+ *
+ * When the popup is open, invisible focus guard elements are placed before and after
+ * the trigger. These handlers close the popup and move focus to the appropriate
+ * tabbable element when the guards receive focus (i.e. when the user tabs out).
+ */
 export function useTriggerFocusGuards(
 	store: TriggerFocusGuardStore,
-	triggerElementRef: { current: HTMLElement | null },
-	slot: symbol | undefined,
+	triggerElementRef: React.RefObject<HTMLElement | null>,
 ) {
-	const preFocusGuardRef = useRef<HTMLElement | null>(null, subSlot(slot, 'pre'));
+	const preFocusGuardRef = React.useRef<HTMLElement | null>(null);
 
-	function handlePreFocusGuardFocus(event: any) {
-		flushSync(() => {
+	function handlePreFocusGuardFocus(event: React.FocusEvent) {
+		ReactDOM.flushSync(() => {
 			store.setOpen(
 				false,
 				createChangeEventDetails(REASONS.focusOut, event, event.currentTarget as HTMLElement),
 			);
 		});
+
 		const previousTabbable: FocusableElement | null = getTabbableBeforeElement(
 			preFocusGuardRef.current,
 		);
 		previousTabbable?.focus();
 	}
 
-	function handleFocusTargetFocus(event: any) {
+	function handleFocusTargetFocus(event: React.FocusEvent) {
 		const positionerElement = store.select('positionerElement');
 		if (positionerElement && isOutsideEvent(event, positionerElement)) {
 			store.context.beforeContentFocusGuardRef.current?.focus();
 		} else {
-			flushSync(() => {
+			ReactDOM.flushSync(() => {
 				store.setOpen(
 					false,
 					createChangeEventDetails(REASONS.focusOut, event, event.currentTarget as HTMLElement),
 				);
 			});
+
 			let nextTabbable = getTabbableAfterElement(
 				store.context.triggerFocusTargetRef.current || triggerElementRef.current,
 			);
+
 			while (nextTabbable !== null && contains(positionerElement, nextTabbable)) {
 				const prevTabbable = nextTabbable;
 				nextTabbable = getNextTabbable(nextTabbable);
@@ -65,6 +79,7 @@ export function useTriggerFocusGuards(
 					break;
 				}
 			}
+
 			nextTabbable?.focus();
 		}
 	}

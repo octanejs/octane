@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/store/createSelectorMemoized.spec.ts b/tests/upstream/src/store/createSelectorMemoized.spec.ts
+--- a/tests/upstream/src/store/createSelectorMemoized.spec.ts
++++ b/tests/upstream/src/store/createSelectorMemoized.spec.ts
+@@ -1,7 +1,7 @@
+ import {
+   createSelectorMemoized,
+   createSelectorMemoizedWithOptions,
+-} from './createSelectorMemoized';
++} from "../../../../src/store/createSelectorMemoized.ts";
+ 
+ interface State {
+   value: number;

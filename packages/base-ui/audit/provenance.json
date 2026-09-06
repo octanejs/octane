@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/react-1.8.0.tgz",
+      "sha256": "699d86811d03011bd2b1f8eba6f8945b1c9912a635ddda6b31edcdd6e5d2cf7b"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "07fc1b39d69d14bc7d40482a628f47226258eb01265db68ae684944b916beb2a"
+    }
+  ],
+  "requiredFiles": [
+    "audit/upstream.lock.json",
+    "tests/types/published-contract.ts",
+    "tsconfig.pristine-specs.json",
+    "tsconfig.adapted-specs.json"
+  ],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@base-ui/react",
+    "version": "1.8.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "upstream", "upstream-artifact"]
+}

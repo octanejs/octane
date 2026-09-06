@@ -1,20 +1,11 @@
-// Ported verbatim from .base-ui/packages/react/src/utils/adaptiveOriginMiddleware.ts (v1.6.0).
-// Pure @floating-ui middleware (no React) — used only when a popup is anchored to a viewport
-// (`hasViewport`). Rewrites the resolved x/y into `right`/`bottom` origins on the sides that need
-// it so CSS transforms scale from the correct corner. `DEFAULT_SIDES` is the fallback used when the
-// middleware doesn't run (no transition, or `adaptiveOrigin` disabled).
+import { ownerDocument, ownerWindow } from '@octanejs/base-ui-utils/owner';
 import { getSide } from '@floating-ui/utils';
+import type { Middleware } from '../floating-ui-react';
+import { DEFAULT_SIDES } from './adaptiveOriginConstants';
 
-import { ownerDocument, ownerWindow } from './owner';
-
-export const DEFAULT_SIDES = {
-	sideX: 'left',
-	sideY: 'top',
-} as const;
-
-export const adaptiveOrigin: any = {
+export const adaptiveOrigin: Middleware = {
 	name: 'adaptiveOrigin',
-	async fn(state: any) {
+	async fn(state) {
 		const {
 			x: rawX,
 			y: rawY,
