@@ -1,5 +1,11 @@
 # @octanejs/rspack-plugin
 
+## 0.1.48
+
+### Patch Changes
+
+- 1f19beb: Prevent production API errors and static-file symlinks from disclosing server details or files outside the built asset tree. Preserve injected HTML and settle streaming SSR when callbacks fail, and compile imported descriptor-children components correctly through Rspack and Rsbuild.
+
 ## 0.1.47
 
 ### Patch Changes

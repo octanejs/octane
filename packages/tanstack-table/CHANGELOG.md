@@ -1,5 +1,28 @@
 # @octanejs/tanstack-table
 
+## 0.1.51
+
+### Patch Changes
+
+- d3020df: Build atom options only when table-core supplies a comparator.
+
+  The reactivity bindings forwarded `{ compare: options?.compare }` into
+  `createAtom` for every atom, including the ones table-core creates without a
+  comparator. `AtomOptions.compare` is declared optional without `undefined`, so
+  that object is not an `AtomOptions` under `exactOptionalPropertyTypes`, and the
+  error is worse than it looks: the failure knocks out the second `createAtom`
+  overload, so `createWritableAtom` was reported as returning a `ReadonlyAtom`
+  that does not satisfy the `TableReactivityBindings` contract.
+
+  This package publishes `src/`, so those are the consumer's compiler options.
+  An application with the flag on could not build it. The options object is now
+  constructed only when there is a comparator to put in it. `createAtom` reads
+  `options?.compare ?? Object.is`, so an omitted object and one holding
+  `undefined` produce the same atom.
+
+- Updated dependencies [1ee2773]
+  - @octanejs/tanstack-store@0.0.48
+
 ## 0.1.50
 
 ### Patch Changes

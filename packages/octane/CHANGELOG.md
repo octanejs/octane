@@ -1,5 +1,30 @@
 # octane
 
+## 0.2.4
+
+### Patch Changes
+
+- aec5373: Reevaluate Octane app configs safely across environment changes and concurrent builds. Correct form controls, hoisted head metadata, and descriptor-children lexical shadowing. Align Window and Day Picker bindings with Octane's types and native events, and honor falsy Redux server state.
+- 1f19beb: Prevent production API errors and static-file symlinks from disclosing server details or files outside the built asset tree. Preserve injected HTML and settle streaming SSR when callbacks fail, and compile imported descriptor-children components correctly through Rspack and Rsbuild.
+- d38cd81: Allow a scoped `<style>` inside a split `<Hydrate>` child when its whole lexical style scope — the block and the host elements it stamps — sits inside the boundary. Client and server keep the authored-position hash. A scope that straddles the boundary is still `OCTANE_HYDRATE_SPLIT_STYLE`.
+- a059b46: Refresh an already-injected scoped stylesheet when `injectStyle` is called again with the same hash and different CSS, so HMR updates take effect.
+- a40dae1: Speed up production server rendering of elements with canonical attribute names
+  by avoiding redundant attribute aggregation while preserving spread precedence,
+  value coercion order, and rendered output.
+- d38cd81: Scope `<style>` blocks to their siblings (RFC tsrx-org/RFCs#1): a block styles its siblings and everything below them — the children list of the element or fragment it is written in, including the fragment a nested `@{ … }` block, a control-flow branch body, or an assigned element/fragment template renders — sibling blocks share one hash and one `injectStyle` call, nested scopes get their own hash and CSS is injected in lexical order, `<style>` may sit beside the output node in a code block or directive body, assigned blocks lower anywhere a declaration is legal and expose `$class`, exported or applied blocks keep every selector, `<style apply={theme} />` stamps a theme's classes on a scope, and `{style(expr)}` resolves to the full scope chain.
+
+  Amendment A1 to the scope model: a standalone `<style>` block is a child of an element or a fragment and styles the items beside it and everything below them — never the element that contains it. Every children list that holds a block is a scope with its own hash; two blocks among the same children share one, and a block in an element's children no longer stamps that element or any ancestor. To style an element, make the block and the element fragment siblings (`<><style>…</style><div>…</div></>`), inside `@{ … }` and directive bodies too: a body holds exactly one output node, so a block beside the output node is the multiple-outputs parser error and a lone block as the output is the new `tsrx-style-standalone-needs-fragment` diagnostic. Raw CSS in `<style>` is TSRX template syntax: a standalone block outside every `@{ … }` or `@if`/`@for`/`@switch`/`@try` body — a plain function returning JSX, an element assigned at module scope — is the new `tsrx-style-standalone-outside-template` diagnostic, and plain TSX keeps its own rule, where `<style>{css}</style>` is an ordinary element the client and server emitters pass through untouched (the Node parser entry now retries that shape in the JavaScript parser when the native facade's CSS reader rejects it). `apply` on a standalone block reaches the same elements as its CSS, and a standalone block's selectors are pruned against those elements: a rule that reaches none of them — one aimed at the containing element, say — survives only as a `/* (unused) … */` comment, as it does in `@tsrx/core`. A value factory written in plain TSX keeps its scoped CSS in a render-only `@{ <>…</> }` inside the returned fragment; that block is transparent grouping in value position too, so the returned styled fragment stays a static `Fragment` descriptor rather than lowering to a compiled renderer. `style(expr)` resolves to the scope chain only where TSRX reads a class value — the expression of a JSX attribute value (the `style` attribute excepted) or of a template child hole, directly or nested in array/conditional/logical/template expressions there (nested in the class value of an element the chain is stamped on, the call yields its value alone and the stamp adds the chain once, so a composed class never carries a hash twice); a `style(...)` call anywhere else (a statement, a declaration initializer, a call argument, a callback body, a `style={style(p)}` value) is a user call and prints as authored.
+
+- c6516c0: In opt-in Strong mode, add compiler errors when a built-in hook value and its dependent effect are declared outside the sole nested `@{…}` block that uses them, or a named native event handler is declared outside the sole deeper block containing its direct event use. Permit parent-owned hooks in conditional and keyed arms, plus inline and same-scope named handlers, including shorthand event attributes. Report the source declaration and suggested block location in compiler and editor diagnostics.
+- 3988e85: Memoize unitless CSS property classification so numeric style writes skip repeated string allocation.
+- 20e2c96: Keep a spread `class` when a styled host adds its scope hash.
+
+  A synthesized scope class now merges with a preceding spread's class instead of
+  replacing it, so `props.class` reaches the DOM on both client and SSR.
+
+- eb32683: Fold `.tsx` string-literal expression children such as Prettier's `{" "}` into the client template, matching the server and `.tsrx` compilers so hydration no longer duplicates the following element.
+- 3c5d2df: Update the TSRX compiler dependency to `@tsrx/core@0.1.67` from tsrx-org/tsrx#74 and preserve matching sibling selectors (`+` and `~`) at the top of a style scope and inside branch fragments. Unmatched selectors remain pruned, and a scoped block still never styles its containing element.
+
 ## 0.2.3
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @octanejs/app-core
 
+## 0.0.49
+
+### Patch Changes
+
+- aec5373: Reevaluate Octane app configs safely across environment changes and concurrent builds. Correct form controls, hoisted head metadata, and descriptor-children lexical shadowing. Align Window and Day Picker bindings with Octane's types and native events, and honor falsy Redux server state.
+- 1f19beb: Prevent production API errors and static-file symlinks from disclosing server details or files outside the built asset tree. Preserve injected HTML and settle streaming SSR when callbacks fail, and compile imported descriptor-children components correctly through Rspack and Rsbuild.
+- ab7bbc1: Index dynamic routes by their last static segment so parameter and catch-all matching is O(candidates that share that spine) instead of a linear RegExp scan, while preserving specificity and equal-spec insertion order.
+- 56c850e: Index static routes by exact path so request matching is O(1) instead of a linear scan, while still falling through to parameter and catch-all routes after a method miss.
+
 ## 0.0.48
 
 ### Patch Changes
