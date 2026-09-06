@@ -10,7 +10,45 @@ describe('@octanejs/base-ui parity audit contracts', () => {
 	});
 
 	it('preserves the upstream runtime export names and component parts', () => {
-		expect(Object.keys(BaseUI).sort()).toEqual(Object.keys(ReactBaseUI).sort());
+		expect(typeof BaseUI.useMediaQuery).toBe('function');
+		// The Octane binding retains these previously published runtime names in
+		// addition to the exact pinned upstream surface.
+		const compatibilityExports = {
+			AccordionRoot: BaseUI.Accordion.Root,
+			AccordionItem: BaseUI.Accordion.Item,
+			AccordionHeader: BaseUI.Accordion.Header,
+			AccordionTrigger: BaseUI.Accordion.Trigger,
+			AccordionPanel: BaseUI.Accordion.Panel,
+			CollapsibleRoot: BaseUI.Collapsible.Root,
+			CollapsibleTrigger: BaseUI.Collapsible.Trigger,
+			CollapsiblePanel: BaseUI.Collapsible.Panel,
+			TabsRoot: BaseUI.Tabs.Root,
+			TabsList: BaseUI.Tabs.List,
+			TabsTab: BaseUI.Tabs.Tab,
+			TabsPanel: BaseUI.Tabs.Panel,
+			AlertDialogHandle: BaseUI.AlertDialog.Handle,
+			createAlertDialogHandle: BaseUI.AlertDialog.createHandle,
+			DialogHandle: BaseUI.Dialog.Handle,
+			createDialogHandle: BaseUI.Dialog.createHandle,
+			MenuHandle: BaseUI.Menu.Handle,
+			createMenuHandle: BaseUI.Menu.createHandle,
+			PopoverHandle: BaseUI.Popover.Handle,
+			createPopoverHandle: BaseUI.Popover.createHandle,
+			PreviewCardHandle: BaseUI.PreviewCard.Handle,
+			createPreviewCardHandle: BaseUI.PreviewCard.createHandle,
+			TooltipHandle: BaseUI.Tooltip.Handle,
+			createTooltipHandle: BaseUI.Tooltip.createHandle,
+			useToastManager: BaseUI.Toast.useToastManager,
+			createToastManager: BaseUI.Toast.createToastManager,
+			useMediaQuery: BaseUI.useMediaQuery,
+		};
+		for (const [name, value] of Object.entries(compatibilityExports)) {
+			expect(value, name).toBeDefined();
+			expect(BaseUI[name as keyof typeof BaseUI], name).toBe(value);
+		}
+		expect(Object.keys(BaseUI).sort()).toEqual(
+			[...new Set([...Object.keys(ReactBaseUI), ...Object.keys(compatibilityExports)])].sort(),
+		);
 		const source = readFileSync(
 			resolve(import.meta.dirname, '../../upstream/src/index.ts'),
 			'utf8',

@@ -137,3 +137,15 @@ const rootMediaMatch = useMediaQuery('(min-width: 600px)');
 const subpathMediaMatch = useSubpathMediaQuery('(min-width: 600px)');
 type RootMediaMatch = Assert<Equal<typeof rootMediaMatch, boolean>>;
 type SubpathMediaMatch = Assert<Equal<typeof subpathMediaMatch, boolean>>;
+
+// Previous barrel surface: root import and a single-argument call.
+function previousBarrelMediaQuery(): boolean {
+	return useMediaQuery('(min-width: 600px)');
+}
+type OptionalMediaQueryOptions = undefined extends Parameters<typeof useMediaQuery>[1]
+	? true
+	: false;
+type OptionalMediaQueryOptionsContract = Assert<Equal<OptionalMediaQueryOptions, true>>;
+type PreviousBarrelMediaQueryReturn = Assert<
+	Equal<ReturnType<typeof previousBarrelMediaQuery>, boolean>
+>;

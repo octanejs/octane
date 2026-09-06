@@ -18,6 +18,7 @@ import {
 	DeferredStreamWithLiveSibling,
 	DeferredStreamWithRetrySibling,
 	DeferredStreamedSuspense,
+	FactoryRejectionBoundary,
 	IdBoundary,
 	LateStyledBoundary,
 	NestedDeferredStreamedHydrates,
@@ -1814,6 +1815,30 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			root.unmount();
 			render.abort(new Error('test complete'));
 			await c.ended;
+		}
+	});
+
+	it('adopts a streamed factory-rejection catch without duplicating the alert', async () => {
+		const rendered = collectPipeableStream(server.FactoryRejectionBoundary, {
+			scenario: 'weather-failure',
+		});
+		const result = await rendered;
+		expect(result.errors).toEqual([]);
+		container.innerHTML = result.html;
+		activate(container);
+		const serverCatch = container.querySelector('.factory-error');
+		expect(serverCatch).not.toBeNull();
+		expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
+
+		const root = hydrateRoot(container, FactoryRejectionBoundary as any, {
+			scenario: 'weather-failure',
+		});
+		try {
+			flushSync(function () {});
+			expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
+			expect(container.querySelector('.factory-error')).toBe(serverCatch);
+		} finally {
+			root.unmount();
 		}
 	});
 

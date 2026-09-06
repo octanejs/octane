@@ -238,7 +238,7 @@ Scope/evidence last checked: 2026-09-06.
 
 - Complete pristine and adapted runtime/type suites, installed consumer checks, and native integration tests pass against the pinned upstream release.
 
-See also: [`docs/base-ui-migration-plan.md`](base-ui-migration-plan.md)
+See also: [`docs/base-ui-migration-plan.md`](base-ui-migration-plan.md), [`packages/base-ui/MIGRATION.md`](../packages/base-ui/MIGRATION.md)
 
 ## @octanejs/base-ui-utils
 

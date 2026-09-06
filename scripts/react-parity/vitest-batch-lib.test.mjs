@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 import {
 	buildParityVitestProjects,
@@ -240,4 +242,34 @@ test('distinguishes the same file and test identity in unit and browser projects
 		() => verifyBatchedVitestResult(lanes, JSON.stringify(wrongProject), '/repo'),
 		/undeclared project/,
 	);
+});
+
+// The aggregate CI job checks downloaded reports without installing dependencies.
+test('verifies shard reports in a checkout without materialization dependencies', async (t) => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-aggregate-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	for (const file of ['vitest-batch-lib.mjs', 'harness-lib.mjs']) {
+		await copyFile(new URL(file, import.meta.url), join(root, file));
+	}
+	const selectedLane = lane('example', 'example', 'example.test.ts');
+	const report = JSON.stringify({
+		testResults: [
+			{
+				name: join(root, 'example.test.ts'),
+				assertionResults: [{ fullName: 'example works', status: 'passed' }],
+			},
+		],
+	});
+	const script = `
+		import assert from 'node:assert/strict';
+		import { verifyBatchedVitestResult } from ${JSON.stringify(pathToFileURL(join(root, 'vitest-batch-lib.mjs')).href)};
+		const lanes = ${JSON.stringify([selectedLane])};
+		const reports = ${JSON.stringify([report])};
+		assert.equal(verifyBatchedVitestResult(lanes, reports, ${JSON.stringify(root)}), true);
+		assert.throws(() => verifyBatchedVitestResult(lanes, [], ${JSON.stringify(root)}));
+	`;
+	execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+		cwd: root,
+		stdio: 'pipe',
+	});
 });

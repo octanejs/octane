@@ -5,7 +5,6 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { verifyMaterializedAdaptedEvidence } from './materialized-upstream-lib.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -726,13 +725,17 @@ export async function verifyManifestFiles(manifest, root) {
 		}
 	}
 	const discoveredTests = await discoverAdaptedFiles(absoluteRoot, manifest.adaptedRoots.tests);
-	const materializedTests = manifest.materializedTests
-		? verifyMaterializedAdaptedEvidence(
-				absoluteRoot,
-				manifest.materializedTests,
-				manifest.provenance,
-			)
-		: new Set();
+	let materializedTests = new Set();
+	if (manifest.materializedTests) {
+		// Report aggregation uses this module without installing the compiler or
+		// materializing source trees. Load provenance tooling only for file checks.
+		const { verifyMaterializedAdaptedEvidence } = await import('./materialized-upstream-lib.mjs');
+		materializedTests = verifyMaterializedAdaptedEvidence(
+			absoluteRoot,
+			manifest.materializedTests,
+			manifest.provenance,
+		);
+	}
 	if (
 		manifest.materializedTests &&
 		[...discoveredTests].some((file) => !materializedTests.has(file))
