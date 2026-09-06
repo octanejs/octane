@@ -25,6 +25,50 @@ const dynamicRoutes = Array.from({ length: ROUTE_COUNT }, (_, index) => ({
 	path: `/:value/dynamic-${index}`,
 }));
 
+// Linear RegExp scan of the same dynamic table. Production `createRouter`
+// indexes last static segments; this control keeps the pre-index matcher so
+// the suite can ratio-guard the indexed path against a restored full scan.
+function createLinearScanRouter(routes) {
+	const compiled = routes.map(function (route) {
+		const paramNames = [];
+		const regexString = route.path
+			.split('/')
+			.map(function (segment) {
+				if (!segment) return '';
+				if (segment.startsWith('*')) {
+					paramNames.push(segment.slice(1));
+					return '(.+)';
+				}
+				if (segment.startsWith(':')) {
+					paramNames.push(segment.slice(1));
+					return '([^/]+)';
+				}
+				return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			})
+			.join('/');
+		return {
+			route,
+			pattern: new RegExp(`^${regexString}$`),
+			paramNames,
+		};
+	});
+	return {
+		match: function (method, pathname) {
+			for (let i = 0; i < compiled.length; i++) {
+				const match = compiled[i].pattern.exec(pathname);
+				if (match === null) continue;
+				const params = {};
+				const names = compiled[i].paramNames;
+				for (let p = 0; p < names.length; p++) {
+					params[names[p]] = decodeURIComponent(match[p + 1]);
+				}
+				return { route: compiled[i].route, params };
+			}
+			return null;
+		},
+	};
+}
+
 const scenarios = [
 	{
 		name: 'static-routes',
@@ -47,6 +91,15 @@ const scenarios = [
 	{
 		name: 'dynamic-routes',
 		router: createRouter(dynamicRoutes),
+		method: 'GET',
+		pathname: '/hello%20world/dynamic-999',
+		verify(match) {
+			return match?.route === dynamicRoutes[999] && match.params.value === 'hello world';
+		},
+	},
+	{
+		name: 'dynamic-scan',
+		router: createLinearScanRouter(dynamicRoutes),
 		method: 'GET',
 		pathname: '/hello%20world/dynamic-999',
 		verify(match) {
