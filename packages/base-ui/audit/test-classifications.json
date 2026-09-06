@@ -57,6 +57,11 @@
       "reason": "Retains the earlier port-authored integration regressions alongside the complete pinned adapted suite; these are not counted as pristine upstream tests."
     },
     {
+      "path": "packages/base-ui/tests/media-query-compat.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins the retained barrel useMediaQuery export and optional options contract; this is not counted as React parity."
+    },
+    {
       "path": "packages/base-ui/tests/menu.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane component integration and is not counted as React parity."
@@ -75,6 +80,11 @@
       "path": "packages/base-ui/tests/number-field.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Pins Octane native-event integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/base-ui/tests/octane-peer-minimum.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the published Octane peer floor required by Base UI 1.8; this is not counted as React parity."
     },
     {
       "path": "packages/base-ui/tests/parity/contracts.test.ts",
