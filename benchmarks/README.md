@@ -249,7 +249,7 @@ internally, get their own baseline and guard namespace.
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `radix-collection-order` | radix-collection-order | none (Node-only) | production Radix collection ordering versus the prior comparator at 16, 64, 256, and 4,096 items, with missing-ref and stable-order controls |
-| `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
+| `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and indexed dynamic matching across 1,000-route tables, plus a linear dynamic-scan control |
 | `visx-categorical-scale` | visx-categorical-scale | none (Node-only) | production Visx categorical lookup versus repeated linear scans at 16, 64, and 4,096 domain keys |
 | `style-unitless` | style-unitless | none (Node-only) | production numeric style serialization versus repeated unitless-name normalization on a mixed-repeat key bag |
 | `rspack-css-graph` | rspack-css-graph | none (Node-only) | CSS-module proof collection and verification across zero, one, and sixteen requests, with deterministic module-graph traversal and connection-visit guards |

@@ -11,6 +11,8 @@ export default defineConfig({
 	root: packageRoot,
 	test: {
 		name: 'base-ui-utils-adapted',
+		// Preserve the pinned upstream vitest.shared.mts CI retry policy.
+		retry: process.env.CI ? 1 : 0,
 		include: ['tests/upstream/src/**/*.test.{ts,tsx}'],
 		environment: resolve(repoRoot, 'scripts/react-parity/base-ui-jsdom-environment.mjs'),
 		globals: true,

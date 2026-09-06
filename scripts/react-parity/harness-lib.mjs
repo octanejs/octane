@@ -1,12 +1,37 @@
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { verifyMaterializedAdaptedEvidence } from './materialized-upstream-lib.mjs';
 
 const execFileAsync = promisify(execFile);
+
+export async function runVitestCommand(command, args, cwd) {
+	// Vite startup notices share stdout with reporters. A fresh file keeps
+	// structured evidence independent of logs and prevents stale report reuse.
+	const directory = mkdtempSync(resolve(tmpdir(), 'octane-parity-report-'));
+	const reportPath = resolve(directory, 'result.json');
+	let stdout = '';
+	try {
+		const exitCode = await new Promise((resolveExit, reject) => {
+			const child = spawn(command, [...args, '--outputFile', reportPath], {
+				cwd,
+				shell: false,
+				stdio: ['inherit', 'pipe', 'inherit'],
+			});
+			child.stdout.on('data', (chunk) => (stdout += chunk));
+			child.on('error', reject);
+			child.on('close', (code, signal) => resolveExit(code ?? (signal ? 1 : 0)));
+		});
+		const report = exitCode === 0 || existsSync(reportPath) ? readFileSync(reportPath, 'utf8') : '';
+		return { exitCode, stdout, report };
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+}
 
 const LANE_TYPES = new Set([
 	'pristine-upstream',

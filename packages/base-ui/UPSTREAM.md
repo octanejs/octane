@@ -22,6 +22,11 @@ The pristine runtime uses React 19.2.8. The upstream `typescript` command resolv
 TypeScript 7.0.2 through its `@typescript/native` alias; its separate TypeScript 6
 package only provides `tsc6`. Pristine and adapted type suites use separate programs.
 
+Both runtime runners preserve the pinned `vitest.shared.mts` policy: one retry
+in CI and none otherwise. The byte-exact configuration is retained under
+`audit/repository-fixtures/`. Test identities, assertions, skips, and todos remain
+subject to the same strict report validation after retries.
+
 Native source and adapted type tests pass strict `tsrx-tsc` checks with declaration
 checking enabled. The formal public type gate also passes. All 79 Base UI public entries and 2,042 entry/export pairs have consumer assertions.
 The gate verifies the npm tarball integrity and installed declaration bytes before

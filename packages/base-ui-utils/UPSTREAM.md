@@ -26,6 +26,10 @@ The registration crosswalk accounts for all 235 immutable source registrations:
 ## Verification
 
 The source boundary contains 23 runtime test files and 6 type-test files.
+Both runtime runners preserve upstream's one-retry CI policy and default to no
+retries locally. The pinned configuration is retained in Base UI's
+`audit/repository-fixtures/vitest.shared.mts`.
+
 The pristine runtime uses React 19.2.8. The upstream `typescript` command resolves
 TypeScript 7.0.2 through its `@typescript/native` alias; its separate TypeScript 6
 package only provides `tsc6`. Pristine and adapted type suites use separate programs.

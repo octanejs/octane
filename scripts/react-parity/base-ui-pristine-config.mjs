@@ -42,6 +42,8 @@ export function baseUIPristineConfig(packageRoot, name) {
 		define: { 'process.env.NODE_ENV': JSON.stringify('test') },
 		test: {
 			name: `${name}-pristine`,
+			// Preserve the pinned upstream vitest.shared.mts CI retry policy.
+			retry: process.env.CI ? 1 : 0,
 			include: [
 				resolve(runRoot, 'src/**/*.test.{ts,tsx}'),
 				resolve(runRoot, 'test/**/*.test.{ts,tsx}'),

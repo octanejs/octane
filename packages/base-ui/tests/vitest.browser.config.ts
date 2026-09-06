@@ -5,8 +5,6 @@ import base from './vitest.config.ts';
 
 export default defineConfig({
 	...base,
-	// Keep Vite startup notices out of the harness's strict JSON evidence stream.
-	logLevel: 'error',
 	optimizeDeps: {
 		exclude: ['@mui/internal-test-utils', '@octanejs/testing-library', '@testing-library/react'],
 		include: [

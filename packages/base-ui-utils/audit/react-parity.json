@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "bd240609bdbe396c126d1c9170b6402c4152d5de738d93d611362fee947b01d7"
+      "lockfileSha256": "16ba238f84551bf0a132a153b9ded08f147119d260d1e527d82cfa0b8b503b50"
     }
   },
   "lanes": [
@@ -107,7 +107,7 @@
         {
           "path": "scripts/react-parity/base-ui-pristine-config.mjs",
           "role": "support",
-          "sha256": "da706b3eb3f1b08d2b2ce5847968bf853c881d611b10a9d84e5a33bdc3bf8ac8"
+          "sha256": "87e828ef56540913957b25dec93023ab85be41439ff0129536ff9f1ef2a769ae"
         }
       ]
     },
@@ -172,7 +172,7 @@
         {
           "path": "packages/base-ui-utils/tests/vitest.config.ts",
           "role": "support",
-          "sha256": "b6b5e6e16dfb0680dcc137dd469fa81038a0f436bb48285b323247a224c8dfd9"
+          "sha256": "48ee36ddaf8b6bf7e75687cb97ced6ede5501f0685739cea7cd1e86501812a98"
         },
         {
           "path": "packages/base-ui-utils/tests/support/renderer.ts",

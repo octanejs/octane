@@ -6,8 +6,6 @@ import { baseUIPristineConfig } from '../../../scripts/react-parity/base-ui-pris
 const config = baseUIPristineConfig(resolve(import.meta.dirname, '..'), 'base-ui');
 export default defineConfig({
 	...config,
-	// Keep Vite startup notices out of the harness's strict JSON evidence stream.
-	logLevel: 'error',
 	resolve: {
 		...config.resolve,
 		dedupe: ['vitest', '@vitest/runner', '@vitest/expect', '@vitest/snapshot'],
