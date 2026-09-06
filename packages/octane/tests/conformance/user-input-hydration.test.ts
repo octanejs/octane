@@ -12,7 +12,7 @@ import * as ServerRT from 'octane/server';
 //
 // Since 2026-07-08 octane has REAL controlled components (React semantics on native
 // events). The hydration policy is React parity: a controlled binding ADOPTS + ARMS
-// during hydration with ZERO writes and no warnings — so pre-hydration input survives
+// during hydration without changing the user's live value and with no warnings — so pre-hydration input survives
 // adoption — and the rendered value is then reasserted at the element's first real
 // commit or first discrete edit event. Uncontrolled fields (defaultValue/defaultChecked
 // or native content) keep the user's input indefinitely, exactly like React.
@@ -98,7 +98,7 @@ describe('conformance: hydration must not blow away user input (ReactDOMServerIn
 		root.unmount();
 	});
 
-	it('CONTROLLED text input adopts without writes (Per :300)', () =>
+	it('CONTROLLED text input adopts the live edit (Per :300)', () =>
 		preserveUserInput('DynamicTextInput', 'value', 'Hello', 'Goodbye', {
 			v: 'Hello',
 			onInput: () => {},
@@ -136,7 +136,65 @@ describe('conformance: hydration must not blow away user input (ReactDOMServerIn
 	it('uncontrolled checkbox (Per :333)', () =>
 		preserveUserInput('Checkbox', 'checked', true, false));
 
-	it('CONTROLLED checkbox adopts without writes', () =>
+	it('a hydrated pristine checkbox keeps its live selection when its default changes', async () => {
+		const { html } = await ServerRT.renderToString(server.DynamicDefaultCheckbox, { c: true });
+		container.innerHTML = html;
+		const field = container.querySelector('#fi') as HTMLInputElement;
+		const root = hydrateRoot(container, client.DynamicDefaultCheckbox, { c: true });
+		flushSync(() => {});
+		expect(container.querySelector('#fi')).toBe(field);
+		expect(field.checked).toBe(true);
+		root.render(client.DynamicDefaultCheckbox, { c: false });
+		flushSync(() => {});
+		expect(field.checked).toBe(true);
+		expect(field.defaultChecked).toBe(false);
+		root.unmount();
+	});
+
+	it('a pre-hydration radio choice survives adoption and subsequent default changes', async () => {
+		const initial = { first: true, second: false };
+		const { html } = await ServerRT.renderToString(server.DynamicDefaultRadios, initial);
+		container.innerHTML = html;
+		const first = container.querySelector('#first') as HTMLInputElement;
+		const second = container.querySelector('#second') as HTMLInputElement;
+		second.click();
+		expect(first.checked).toBe(false);
+		expect(second.checked).toBe(true);
+		const root = hydrateRoot(container, client.DynamicDefaultRadios, initial);
+		flushSync(() => {});
+		expect(container.querySelector('#first')).toBe(first);
+		expect(container.querySelector('#second')).toBe(second);
+		expect(first.checked).toBe(false);
+		expect(second.checked).toBe(true);
+		root.render(client.DynamicDefaultRadios, { first: false, second: false });
+		flushSync(() => {});
+		expect(first.checked).toBe(false);
+		expect(second.checked).toBe(true);
+		expect(second.defaultChecked).toBe(false);
+		root.unmount();
+	});
+
+	it('a hydrated controlled checkbox keeps a user choice when it becomes defaulted', async () => {
+		const { html } = await ServerRT.renderToString(server.ControlledToDefaultCheckbox, {
+			controlled: true,
+		});
+		container.innerHTML = html;
+		const field = container.querySelector('#fi') as HTMLInputElement;
+		field.checked = false;
+		const root = hydrateRoot(container, client.ControlledToDefaultCheckbox, {
+			controlled: true,
+		});
+		flushSync(() => {});
+		expect(container.querySelector('#fi')).toBe(field);
+		expect(field.checked).toBe(false);
+		root.render(client.ControlledToDefaultCheckbox, { controlled: false });
+		flushSync(() => {});
+		expect(field.checked).toBe(false);
+		expect(field.defaultChecked).toBe(true);
+		root.unmount();
+	});
+
+	it('CONTROLLED checkbox adopts the live selection', () =>
 		preserveUserInput('ControlledCheckbox', 'checked', true, false, {
 			c: true,
 			onClick: () => {},

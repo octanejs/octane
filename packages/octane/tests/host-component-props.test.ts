@@ -31,6 +31,25 @@ describe('hostComponent — no stale props/events on the reused element', () => 
 		r.unmount();
 	});
 
+	it('keeps an input selection when a reused host gains a defaultChecked prop', () => {
+		const r = mount(HostBody as any, {
+			tag: 'input',
+			hp: { id: 'host-default', type: 'checkbox' },
+		});
+		try {
+			const input = r.find('#host-default') as HTMLInputElement;
+			r.update(HostBody as any, {
+				tag: 'input',
+				hp: { id: 'host-default', type: 'checkbox', defaultChecked: true },
+			});
+			expect(r.find('#host-default')).toBe(input);
+			expect(input.checked).toBe(false);
+			expect(input.defaultChecked).toBe(true);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('removes an event handler that disappears across renders', () => {
 		let clicks = 0;
 		const h = () => clicks++;

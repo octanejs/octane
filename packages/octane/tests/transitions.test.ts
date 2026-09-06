@@ -19,6 +19,8 @@ import {
 	TransitionAtomicity,
 	TransitionResumeAtomicity,
 	TransitionNamespacedAttr,
+	TransitionHeadAndDefault,
+	TransitionHeadInsideBoundary,
 	TransitionControlledInput,
 	TransitionRadioGroup,
 	TransitionKeyedRemoval,
@@ -961,6 +963,77 @@ describe('useTransition — the old screen stays whole', () => {
 		expect(use.getAttributeNode('xlink:href')!.namespaceURI).toBe(XLINK);
 		expect(r.find('#value').textContent).toBe('one');
 		r.unmount();
+	});
+
+	it('restores hoisted title attributes and an uncontrolled reset baseline while held', async () => {
+		const entries = new Map<number, Deferred<string>>();
+		const load = (step: number) => {
+			let entry = entries.get(step);
+			if (entry === undefined) {
+				entry = deferred<string>();
+				entries.set(step, entry);
+			}
+			return entry.promise;
+		};
+		load(0);
+		entries.get(0)!.resolve('zero');
+
+		const r = mount(TransitionHeadAndDefault, { load });
+		await act(() => {});
+		const title = document.head.querySelector('title[data-transition-title="yes"]')!;
+		const box = r.find('#default-box') as HTMLInputElement;
+		expect(title.textContent).toBe('Old');
+		expect(title.getAttribute('data-old')).toBe('old');
+		expect(box.checked).toBe(true);
+		expect(box.defaultChecked).toBe(true);
+
+		r.click('#bump');
+		expect(title.textContent).toBe('Old');
+		expect(title.getAttribute('data-old')).toBe('old');
+		expect(title.hasAttribute('data-new')).toBe(false);
+		expect(box.checked).toBe(true);
+		expect(box.defaultChecked).toBe(true);
+		expect(r.findAll('#fallback')).toHaveLength(0);
+
+		await act(() => entries.get(1)!.resolve('one'));
+		expect(document.head.querySelector('title[data-transition-title="yes"]')).toBe(title);
+		expect(title.textContent).toBe('New');
+		expect(title.hasAttribute('data-old')).toBe(false);
+		expect(title.getAttribute('data-new')).toBe('new');
+		expect(box.checked).toBe(true);
+		expect(box.defaultChecked).toBe(false);
+		r.unmount();
+	});
+
+	it('rolls back a retained title inside the held try body before its sibling suspends', async () => {
+		const first = deferred<string>();
+		const next = deferred<string>();
+		first.resolve('zero');
+		const load = (step: number) => (step === 0 ? first.promise : next.promise);
+		const r = mount(TransitionHeadInsideBoundary, { load });
+		try {
+			await act(() => {});
+			const title = document.head.querySelector('title[data-transition-held-title="yes"]')!;
+			const originalTextNode = title.firstChild;
+			expect(title.textContent).toBe('Old');
+			expect(title.getAttribute('data-old')).toBe('old');
+
+			r.click('#bump');
+			expect(document.head.querySelector('title[data-transition-held-title="yes"]')).toBe(title);
+			expect(title.textContent).toBe('Old');
+			expect(title.firstChild).toBe(originalTextNode);
+			expect(title.getAttribute('data-old')).toBe('old');
+			expect(title.hasAttribute('data-new')).toBe(false);
+			expect(r.findAll('#fallback')).toHaveLength(0);
+
+			await act(() => next.resolve('one'));
+			expect(document.head.querySelector('title[data-transition-held-title="yes"]')).toBe(title);
+			expect(title.textContent).toBe('New');
+			expect(title.hasAttribute('data-old')).toBe(false);
+			expect(title.getAttribute('data-new')).toBe('new');
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('holds a controlled input and checkbox, records included', async () => {

@@ -1,3 +1,4 @@
+import type { FocusEvent, KeyboardEvent, MouseEvent } from 'octane';
 import type React from 'react';
 import type { DateLib, DayPickerLocale } from '../classes/DateLib.js';
 
@@ -6,6 +7,7 @@ import type {
 	CustomComponents,
 	DateRange,
 	DayEventHandler,
+	DaySelectionEvent,
 	Formatters,
 	Labels,
 	Matcher,
@@ -469,17 +471,17 @@ export interface PropsBase {
 	 */
 	onPrevClick?: MonthChangeEventHandler;
 	/** Event handler when a day is clicked. */
-	onDayClick?: DayEventHandler<React.MouseEvent>;
+	onDayClick?: DayEventHandler<MouseEvent<HTMLButtonElement>>;
 	/** Event handler when a day is focused. */
-	onDayFocus?: DayEventHandler<React.FocusEvent>;
+	onDayFocus?: DayEventHandler<FocusEvent<HTMLButtonElement>>;
 	/** Event handler when a day is blurred. */
-	onDayBlur?: DayEventHandler<React.FocusEvent>;
+	onDayBlur?: DayEventHandler<FocusEvent<HTMLButtonElement>>;
 	/** Event handler when a key is pressed on a day. */
-	onDayKeyDown?: DayEventHandler<React.KeyboardEvent>;
+	onDayKeyDown?: DayEventHandler<KeyboardEvent<HTMLButtonElement>>;
 	/** Event handler when the mouse enters a day. */
-	onDayMouseEnter?: DayEventHandler<React.MouseEvent>;
+	onDayMouseEnter?: DayEventHandler<MouseEvent<HTMLButtonElement>>;
 	/** Event handler when the mouse leaves a day. */
-	onDayMouseLeave?: DayEventHandler<React.MouseEvent>;
+	onDayMouseLeave?: DayEventHandler<MouseEvent<HTMLButtonElement>>;
 
 	/**
 	 * Replace the default date library with a custom one. Experimental: not
@@ -511,13 +513,13 @@ export interface PropsBase {
  * @param {Date} triggerDate - The date when the event was triggered. This is
  *   typically the day clicked or interacted with.
  * @param {Modifiers} modifiers - The modifiers associated with the event.
- * @param {React.MouseEvent | React.KeyboardEvent} e - The event object.
+ * @param {DaySelectionEvent} e - The native event object.
  */
 export type OnSelectHandler<T> = (
 	selected: T,
 	triggerDate: Date,
 	modifiers: Modifiers,
-	e: React.MouseEvent | React.KeyboardEvent,
+	e: DaySelectionEvent,
 ) => void;
 
 /**

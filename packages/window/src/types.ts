@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import type { JSX } from 'octane';
 
 export type Align = 'auto' | 'center' | 'end' | 'smart' | 'start';
 

@@ -1,6 +1,5 @@
-import type React from 'react';
 import type { DayPickerProps } from './props.js';
-import type { DateRange, Mode, Modifiers } from './shared.js';
+import type { DateRange, DaySelectionEvent, Mode, Modifiers } from './shared.js';
 
 /** Selection state and helpers for the active selection mode. */
 export type Selection<T extends DayPickerProps> = {
@@ -56,21 +55,21 @@ export type SelectedValue<T> = T extends { mode: 'single'; required?: boolean }
 export type SelectHandlerSingle<T extends { required?: boolean | undefined }> = (
 	triggerDate: Date,
 	modifiers: Modifiers,
-	e: React.MouseEvent | React.KeyboardEvent,
+	e: DaySelectionEvent,
 ) => T['required'] extends true ? Date : Date | undefined;
 
 /** Selection handler for multiple selection mode. */
 export type SelectHandlerMulti<T extends { required?: boolean | undefined }> = (
 	triggerDate: Date,
 	modifiers: Modifiers,
-	e: React.MouseEvent | React.KeyboardEvent,
+	e: DaySelectionEvent,
 ) => T['required'] extends true ? Date[] : Date[] | undefined;
 
 /** Selection handler for range selection mode. */
 export type SelectHandlerRange<T extends { required?: boolean | undefined }> = (
 	triggerDate: Date,
 	modifiers: Modifiers,
-	e: React.MouseEvent | React.KeyboardEvent,
+	e: DaySelectionEvent,
 ) => T['required'] extends true ? DateRange : DateRange | undefined;
 
 /**

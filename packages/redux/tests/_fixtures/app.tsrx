@@ -1,4 +1,5 @@
 import { createContext } from 'octane';
+import type { Store } from 'redux';
 import {
 	Provider,
 	useSelector,
@@ -87,4 +88,15 @@ export function NoProviderApp() @{
 function NoProviderReader() @{
 	const v = useSelector((s: any) => s);
 	<span>{String(v)}</span>
+}
+
+function ServerStateReader() @{
+	const value = useSelector((state: number) => state * 2);
+	<output id="server-state">{'selected=' + value}</output>
+}
+
+export function ServerStateApp(props: { store: Store<number>; serverState?: number }) @{
+	<Provider store={props.store} serverState={props.serverState}>
+		<ServerStateReader />
+	</Provider>
 }

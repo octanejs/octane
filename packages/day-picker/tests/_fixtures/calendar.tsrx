@@ -1,4 +1,3 @@
-// @ts-nocheck -- fixtures intentionally exercise React-compatible DOM prop boundaries.
 import { useState } from 'octane';
 import {
 	DayPicker,
@@ -34,12 +33,43 @@ export function CalendarFixture() @{
 	</main>
 }
 
+export const nativeDayEvents: {
+	click: MouseEvent | null;
+	selection: MouseEvent | KeyboardEvent | null;
+	keyDown: KeyboardEvent | null;
+} = { click: null, selection: null, keyDown: null };
+
+export function NativeEventFixture() @{
+	<DayPicker
+		mode="single"
+		month={new Date(2026, 7, 1)}
+		onSelect={(_selected, _day, _modifiers, event) => {
+			nativeDayEvents.selection = event;
+		}}
+		onDayClick={(_day, _modifiers, event) => {
+			nativeDayEvents.click = event;
+		}}
+		onDayKeyDown={(_day, _modifiers, event) => {
+			nativeDayEvents.keyDown = event;
+		}}
+	/>
+}
+
 export function ServerCalendarFixture() @{
 	<DayPicker month={new Date(2026, 7, 1)} />
 }
 
 export function NavigationFixture() @{
 	<DayPicker defaultMonth={new Date(2026, 7, 1)} />
+}
+
+export function DropdownNavigationFixture() @{
+	<DayPicker
+		captionLayout="dropdown-months"
+		defaultMonth={new Date(2026, 7, 1)}
+		startMonth={new Date(2026, 0, 1)}
+		endMonth={new Date(2026, 11, 1)}
+	/>
 }
 
 export function ControlledNavigationFixture() @{
@@ -92,7 +122,7 @@ export function MultipleFixture() @{
 			mode="multiple"
 			month={new Date(2026, 7, 1)}
 			selected={selected}
-			onSelect={setSelected}
+			onSelect={(next) => setSelected(next ?? [])}
 		/>
 	</main>
 }

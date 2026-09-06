@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount } from '../_helpers';
+import { createElement, createRoot, flushSync } from '../../src/index.js';
 import {
 	ControlledInput,
 	AcceptingInput,
@@ -204,6 +205,27 @@ describe('conformance: controlled checkbox / radio', () => {
 		expect(ra.checked).toBe(false);
 		r.unmount();
 	});
+
+	it('a rejected radio pick restores its cousin inside a ShadowRoot', () => {
+		const host = document.createElement('section');
+		document.body.appendChild(host);
+		const shadow = host.attachShadow({ mode: 'open' });
+		const root = createRoot(shadow);
+		try {
+			root.render(RadioGroup, { initial: 'a', accept: false });
+			flushSync(() => {});
+			const ra = shadow.querySelector<HTMLInputElement>('#ra')!;
+			const rb = shadow.querySelector<HTMLInputElement>('#rb')!;
+			expect(ra.checked).toBe(true);
+			expect(rb.checked).toBe(false);
+			flushSync(() => rb.click());
+			expect(ra.checked).toBe(true);
+			expect(rb.checked).toBe(false);
+		} finally {
+			root.unmount();
+			host.remove();
+		}
+	});
 });
 
 describe('conformance: controlled ↔ uncontrolled transitions', () => {
@@ -295,6 +317,22 @@ describe('conformance: defaultValue / defaultChecked (uncontrolled)', () => {
 		r.click('#dci');
 		expect(el.checked).toBe(false); // uncontrolled: platform toggle sticks
 		r.unmount();
+	});
+
+	it('a reused descriptor input keeps its selection when a default is added later', () => {
+		const Input = (props: { defaultChecked?: boolean }) =>
+			createElement('input', { type: 'checkbox', ...props });
+		const r = mount(Input as any, {});
+		try {
+			const input = r.find('input') as HTMLInputElement;
+			expect(input.checked).toBe(false);
+			r.update(Input as any, { defaultChecked: true });
+			expect(r.find('input')).toBe(input);
+			expect(input.checked).toBe(false);
+			expect(input.defaultChecked).toBe(true);
+		} finally {
+			r.unmount();
+		}
 	});
 });
 

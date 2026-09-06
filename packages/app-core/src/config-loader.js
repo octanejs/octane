@@ -14,7 +14,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { builtinModules, createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
@@ -229,16 +229,36 @@ async function evaluateConfigModule(root, configPath, configuredCacheDir) {
 	const cacheDir = configuredCacheDir
 		? path.resolve(root, configuredCacheDir)
 		: path.join(root, 'node_modules/.cache/octane/config');
-	const outputPath = path.join(cacheDir, 'octane.config.mjs');
+	// A content-addressed path keeps concurrent evaluations from overwriting
+	// one another. A fresh import URL also reevaluates unchanged source when
+	// its top-level code reads a changing environment value.
+	const contentHash = createHash('sha256').update(output).digest('hex');
+	const outputPath = path.join(cacheDir, `octane.config-${contentHash}.mjs`);
 	fs.mkdirSync(cacheDir, { recursive: true });
-	if (!fs.existsSync(outputPath) || fs.readFileSync(outputPath, 'utf8') !== output) {
-		fs.writeFileSync(outputPath, output);
+	if (!fs.existsSync(outputPath)) {
+		// Publish only a complete file: another config load may import the same
+		// hash while this one writes it, including from a separate process.
+		const temporaryPath = path.join(cacheDir, `.octane.config-${contentHash}-${randomUUID()}.tmp`);
+		try {
+			fs.writeFileSync(temporaryPath, output, { flag: 'wx' });
+			try {
+				fs.renameSync(temporaryPath, outputPath);
+			} catch (error) {
+				// Windows cannot replace an existing destination with rename. If a
+				// concurrent writer won this same-hash race, its complete output is
+				// already safe to import. Preserve other publication failures.
+				if (!fs.existsSync(outputPath) || fs.readFileSync(outputPath, 'utf8') !== output) {
+					throw error;
+				}
+			}
+		} finally {
+			fs.rmSync(temporaryPath, { force: true });
+		}
 	}
-	const contentHash = createHash('sha256').update(output).digest('hex').slice(0, 16);
 	let configModule;
 	try {
 		configModule = await import(
-			/* @vite-ignore */ `${pathToFileURL(outputPath).href}?v=${contentHash}`
+			/* @vite-ignore */ `${pathToFileURL(outputPath).href}?evaluation=${randomUUID()}`
 		);
 	} catch (error) {
 		attachDependencyMetadata(error, dependencies, missingDependencies);

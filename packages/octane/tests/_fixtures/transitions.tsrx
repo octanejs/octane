@@ -472,6 +472,52 @@ export function TransitionNamespacedAttr(props) @{
 	</div>
 }
 
+export function TransitionHeadAndDefault(props) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<title
+			data-transition-title="yes"
+			{...(step === 0 ? { 'data-old': 'old' } : { 'data-new': 'new' })}
+		>{(step === 0 ? 'Old' : 'New') as string}</title>
+		@try {
+			<>
+				<input id="default-box" type="checkbox" defaultChecked={step === 0} />
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+function TransitionHeadTitle(props: { step: number }) @{
+	<title
+		data-transition-held-title="yes"
+		{...(props.step === 0 ? { 'data-old': 'old' } : { 'data-new': 'new' })}
+	>{(props.step === 0 ? 'Old' : 'New') as string}</title>
+}
+
+// The head entry is owned by the first child of the visible try body. A later
+// sibling suspends after that child changed the title, so holding the body must
+// undo the title's text and attributes without replacing its retained element.
+export function TransitionHeadInsideBoundary(props: {
+	load: (step: number) => PromiseLike<string>;
+}) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<TransitionHeadTitle step={step} />
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
 // ---------------------------------------------------------------------------
 // A controlled input and checkbox inside a boundary. Their values live on the
 // DOM properties AND in a per-element record, so a suspended transition has to

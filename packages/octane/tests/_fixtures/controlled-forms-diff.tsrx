@@ -101,3 +101,21 @@ export function Area() @{
 export function Defaulted() @{
 	<input id="df" defaultValue="seed" />
 }
+
+// Changing the reset baseline of an untouched checkbox must not change its
+// current selection. A later form reset should use the new baseline.
+export function DefaultCheckedUpdate(props: { initial?: boolean; next: boolean }) @{
+	const [baseline, setBaseline] = useState(props.initial);
+	<form>
+		<input id="update-dc" type="checkbox" defaultChecked={baseline} />
+		<button type="button" onClick={() => setBaseline(props.next)}>Change baseline</button>
+	</form>
+}
+
+export function SpreadDefaultCheckedRemoval() @{
+	const [included, setIncluded] = useState(true);
+	<form>
+		<input id="spread-dc" type="checkbox" {...(included ? { defaultChecked: true } : {})} />
+		<button type="button" onClick={() => setIncluded(false)}>Remove baseline prop</button>
+	</form>
+}

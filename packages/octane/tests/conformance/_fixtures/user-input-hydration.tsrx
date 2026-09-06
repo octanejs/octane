@@ -5,7 +5,7 @@
 // `defaultValue`/`defaultChecked` are the uncontrolled escape hatch. The
 // uncontrolled fixtures below therefore use the default* props; the
 // controlled fixtures pin the React-parity hydration policy: ADOPT the
-// server DOM without writes (pre-hydration input survives), then the first
+// server DOM without changing the live value (pre-hydration input survives), then the first
 // real commit / first discrete event reasserts the rendered value.
 
 // Uncontrolled text input (Per :297).
@@ -19,7 +19,7 @@ export function DynamicDefaultTextInput(props) @{
 	<input id="fi" defaultValue={props.v} />
 }
 
-// CONTROLLED text input (value binding arms at hydration mount, zero writes).
+// CONTROLLED text input (value binding arms at hydration mount, keeping live input).
 export function DynamicTextInput(props) @{
 	<input id="fi" value={props.v} onInput={props.onInput} />
 }
@@ -32,6 +32,26 @@ export function RangeInput(props) @{
 // Uncontrolled checkbox (Per :333).
 export function Checkbox(props) @{
 	<input id="fi" type="checkbox" defaultChecked />
+}
+
+export function DynamicDefaultCheckbox(props) @{
+	<input id="fi" type="checkbox" defaultChecked={props.c} />
+}
+
+export function DynamicDefaultRadios(props) @{
+	<div>
+		<input id="first" type="radio" name="hydrated-choice" defaultChecked={props.first} />
+		<input id="second" type="radio" name="hydrated-choice" defaultChecked={props.second} />
+	</div>
+}
+
+export function ControlledToDefaultCheckbox(props) @{
+	<input
+		id="fi"
+		type="checkbox"
+		{...(props.controlled ? { checked: true } : { defaultChecked: true })}
+		onClick={() => {}}
+	/>
 }
 
 // CONTROLLED checkbox.
