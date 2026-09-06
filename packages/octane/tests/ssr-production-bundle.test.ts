@@ -68,6 +68,69 @@ async function productionServerModule<T extends Record<string, unknown>>(
 }
 
 describe('production-bundled server rendering', () => {
+	it.each([
+		{ name: 'class', attrs: { class: 'spread' }, classes: ['spread'] },
+		{ name: 'className', attrs: { className: 'spread' }, classes: ['spread'] },
+		{
+			name: 'an array class',
+			attrs: { class: ['spread', { extra: true }] },
+			classes: ['spread', 'extra'],
+		},
+		{ name: 'an empty spread', attrs: {}, classes: [] },
+		{ name: 'a null class', attrs: { class: null }, classes: [] },
+		{ name: 'a false class', attrs: { class: false }, classes: [] },
+	])('keeps scoped styles and authored class precedence with $name', async ({ attrs, classes }) => {
+		const { render } = await productionServerModule<{
+			render: (attrs: Record<string, unknown>) => { html: string; css: string };
+		}>(
+			`
+import { renderToString } from 'octane/server';
+import { Page } from 'fixture:server-component';
+export const render = (attrs) => renderToString(Page, { attrs });
+`,
+			`
+export function Page(props: { attrs: Record<string, unknown> }) @{
+	<main>
+		<style>
+			div { color: red; }
+		</style>
+		<div data-case="spread" {...props.attrs}>{'Spread'}</div>
+		<div data-case="after" {...props.attrs} class="authored">{'After'}</div>
+		<div data-case="before" class="authored" {...props.attrs}>{'Before'}</div>
+	</main>
+}
+`,
+		);
+		const { html, css } = render(attrs);
+		const browser = new JSDOM(`<html><head>${css}</head><body>${html}</body></html>`);
+		try {
+			const document = browser.window.document;
+			const rule = document.styleSheets[0].cssRules[0] as CSSStyleRule;
+			const spread = document.querySelector('[data-case="spread"]')!;
+			const after = document.querySelector('[data-case="after"]')!;
+			const before = document.querySelector('[data-case="before"]')!;
+
+			expect(rule.style.getPropertyValue('color')).toBe('red');
+			expect(spread.matches(rule.selectorText)).toBe(true);
+			for (const name of classes) expect(spread.classList.contains(name)).toBe(true);
+
+			expect(after.matches(rule.selectorText)).toBe(true);
+			expect(after.classList.contains('authored')).toBe(true);
+			for (const name of classes) expect(after.classList.contains(name)).toBe(false);
+
+			if ('class' in attrs || 'className' in attrs) {
+				// A later spread still replaces the earlier authored class, including its scope.
+				expect(before.className).toBe(classes.join(' '));
+				expect(before.matches(rule.selectorText)).toBe(false);
+			} else {
+				expect(before.className).toBe(after.className);
+				expect(before.matches(rule.selectorText)).toBe(true);
+			}
+		} finally {
+			browser.window.close();
+		}
+	});
+
 	it.each([false, true])(
 		'preserves spread reads and winning prop coercion order when coercion throws: %s',
 		async (throws) => {
