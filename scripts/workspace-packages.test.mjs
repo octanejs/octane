@@ -43,7 +43,7 @@ test('rejects an Octane peer range that can recreate major dependent releases', 
 	]);
 });
 
-test('requires the current Octane floor for packages that import post-0.2.3 APIs', () => {
+test('requires the current Octane floor for packages that import post-0.2.4 APIs', () => {
 	const errors = validateWorkspacePackages([
 		workspacePackage('octane'),
 		workspacePackage('@octanejs/testing-library', {
@@ -52,7 +52,7 @@ test('requires the current Octane floor for packages that import post-0.2.3 APIs
 	]);
 
 	assert.deepEqual(errors, [
-		'packages/@octanejs-testing-library peerDependencies.octane must be "workspace:^0.2.4" (received "workspace:^0.1.51 || ^0.2.0")',
+		`packages/@octanejs-testing-library peerDependencies.octane must be ${JSON.stringify(OCTANE_CURRENT_PEER_RANGE)} (received ${JSON.stringify(OCTANE_BETA_PEER_RANGE)})`,
 	]);
 });
 

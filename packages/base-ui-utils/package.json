@@ -260,7 +260,7 @@
     "reselect": "^5.2.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.2.4"
+    "octane": "workspace:^0.2.5"
   },
   "devDependencies": {
     "octane": "workspace:*",

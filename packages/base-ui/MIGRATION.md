@@ -4,11 +4,11 @@ This binding now targets Base UI 1.8.0 and ships a companion `@octanejs/base-ui-
 
 ## Required Octane versions
 
-`@octanejs/base-ui`, `@octanejs/base-ui-utils`, and `@octanejs/testing-library` now peer on **Octane `^0.2.4`**.
+`@octanejs/base-ui`, `@octanejs/base-ui-utils`, and `@octanejs/testing-library` now peer on **Octane `^0.2.5`**.
 
-Published Octane **0.2.3** is not enough:
+Published Octane **0.2.4** is not enough:
 
-- `@octanejs/testing-library` statically imports `isInActScope`, which 0.2.3 does not export.
+- `@octanejs/testing-library` statically imports `isInActScope`, which the published 0.2.4 tarball does not export.
 - The Base UI 1.8 source needs the compiler and runtime from this release (method and transitive hook compilation, typed namespaces, act batching, layout cascades, fragment portals, and resolved Suspense hydration).
 
 Upgrade Octane in the same release as these bindings. Other `@octanejs/*` packages still accept `^0.1.51 || ^0.2.0` unless they pull in the packages above.

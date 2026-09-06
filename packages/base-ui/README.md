@@ -13,7 +13,7 @@ pnpm add @octanejs/base-ui
 
 This binding targets Base UI **1.8.0**. The complete export surface is implemented,
 including Select, Combobox, Autocomplete, Drawer, Navigation Menu, OTP Field,
-Scroll Area, and Toolbar. It peers on **Octane `^0.2.4`**; see
+Scroll Area, and Toolbar. It peers on **Octane `^0.2.5`**; see
 [MIGRATION.md](./MIGRATION.md) for added, replaced, and removed surfaces.
 Pristine and native unit, browser, type, and hydration checks pass;
 see [UPSTREAM.md](./UPSTREAM.md) for the pinned source and evidence.

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "callableArity": {
+    "@octanejs/base-ui/unstable-use-media-query#useMediaQuery": {
+      "length": "1 | 2",
+      "reason": "options defaults to {} so one- and two-argument calls typecheck. Upstream 1.8 requires the options argument."
+    }
+  },
+  "additionalExports": {
+    "@octanejs/base-ui#useMediaQuery": {
+      "arity": "1 | 2",
+      "reason": "root barrel export retained from the previous Octane binding. Upstream 1.8 only documents the unstable-use-media-query subpath."
+    }
+  }
+}

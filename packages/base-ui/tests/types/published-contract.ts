@@ -8533,7 +8533,8 @@ type Contract2028 = Assert<
 type Contract2029 = Assert<
 	Equal<keyof Pick<Native76.BaseUIEvent<MouseEvent>, PublishedKeys230>, PublishedKeys230>
 >;
-type Contract2030 = Assert<Equal<Parameters<typeof Native77.useMediaQuery>['length'], 2>>;
+// Octane compatibility: options defaults to {} so one- and two-argument calls typecheck. Upstream 1.8 requires the options argument.
+type Contract2030 = Assert<Equal<Parameters<typeof Native77.useMediaQuery>['length'], 1 | 2>>;
 type Contract2031 = Assert<
 	Equal<keyof Pick<Native77.UseMediaQueryOptions, PublishedKeys277>, PublishedKeys277>
 >;
@@ -8565,3 +8566,5 @@ type Contract2040 = Assert<
 	Equal<keyof Pick<Native78.UseRenderReturnValue<true>, PublishedKeys229>, PublishedKeys229>
 >;
 type Contract2041 = Assert<Equal<keyof Native78.UseRenderState, never>>;
+// Octane compatibility: root barrel export retained from the previous Octane binding. Upstream 1.8 only documents the unstable-use-media-query subpath.
+type ContractExtra0 = Assert<Equal<Parameters<typeof Native0.useMediaQuery>['length'], 1 | 2>>;

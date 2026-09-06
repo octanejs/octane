@@ -12,6 +12,7 @@
   ],
   "requiredFiles": [
     "audit/upstream.lock.json",
+    "audit/published-contract-extensions.json",
     "tests/types/published-contract.ts",
     "tsconfig.pristine-specs.json",
     "tsconfig.adapted-specs.json"

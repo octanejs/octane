@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { createTypeEvidenceProgram } from './type-program.mjs';
@@ -9,6 +9,30 @@ import { pinnedPublicEntries, publicSymbolType } from './pinned-public-types.mjs
 const directory = path.resolve(process.argv[2]);
 const manifest = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'));
 const lock = JSON.parse(readFileSync(path.join(directory, 'audit/upstream.lock.json'), 'utf8'));
+const extensionsPath = path.join(directory, 'audit/published-contract-extensions.json');
+const extensions = existsSync(extensionsPath)
+	? JSON.parse(readFileSync(extensionsPath, 'utf8'))
+	: {};
+const callableArityExtensions = extensions.callableArity ?? {};
+const additionalExports = extensions.additionalExports ?? {};
+
+function literalUnion(type, checker) {
+	const parts = type.isUnion?.() ? type.types : [type];
+	return parts
+		.map(function (part) {
+			return checker.typeToString(part, undefined, ts.TypeFormatFlags.NoTruncation);
+		})
+		.sort()
+		.join(' | ');
+}
+
+function unionMembers(union) {
+	return new Set(
+		union.split('|').map(function (part) {
+			return part.trim();
+		}),
+	);
+}
 const entries = pinnedPublicEntries(directory, { identity: lock.identity, binding: manifest.name });
 const specifiers = concretePublicSpecifiers(directory, manifest.name);
 const folder = path.join(directory, 'tests/types');
@@ -71,6 +95,7 @@ try {
 		'',
 	];
 	let count = 0;
+	const extraProofs = [];
 	for (const [index, specifier] of specifiers.entries()) {
 		const statement = program.getSourceFile(probe).statements[index * 2];
 		const module = checker.getSymbolAtLocation(statement.moduleSpecifier);
@@ -81,8 +106,20 @@ try {
 		);
 		for (const symbol of checker.getExportsOfModule(module)) {
 			const original = originals.get(symbol.name);
-			if (!original)
+			if (!original) {
+				const extra = additionalExports[`${specifier}#${symbol.name}`];
+				if (extra) {
+					extraProofs.push({
+						id: `Extra${extraProofs.length}`,
+						native: `typeof Native${index}.${symbol.name}`,
+						length: extra.arity ?? extra.length,
+						reason: extra.reason,
+						name: symbol.name,
+					});
+					continue;
+				}
 				throw new Error(`Export absent from the pinned npm contract: ${specifier}.${symbol.name}`);
+			}
 			const resolved =
 				symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
 			const typeOnly = Boolean(
@@ -116,22 +153,33 @@ try {
 				id: count++,
 				native,
 				right,
+				nativeArityRight: callable ? `Parameters<${native}>['length']` : undefined,
 				callable,
 				name: symbol.name,
+				specifier,
 				context,
 				platform,
 			});
 		}
 	}
-	writeFileSync(
-		probe,
-		[...imports, ...assertions.map(({ id, right }) => `type Witness${id} = ${right};`)].join('\n'),
-	);
+	const witnessAliases = [];
+	for (const assertion of assertions) {
+		witnessAliases.push(`type Witness${assertion.id} = ${assertion.right};`);
+		if (assertion.nativeArityRight) {
+			witnessAliases.push(`type NativeArity${assertion.id} = ${assertion.nativeArityRight};`);
+		}
+	}
+	writeFileSync(probe, [...imports, ...witnessAliases].join('\n'));
 	const witnessProgram = createTypeEvidenceProgram([probe, ...entries.values()], parsed.options);
 	const witnessChecker = witnessProgram.getTypeChecker();
-	const witnesses = witnessProgram
-		.getSourceFile(probe)
-		.statements.filter(ts.isTypeAliasDeclaration);
+	const witnessByName = new Map(
+		witnessProgram
+			.getSourceFile(probe)
+			.statements.filter(ts.isTypeAliasDeclaration)
+			.map(function (statement) {
+				return [statement.name.text, statement];
+			}),
+	);
 	const keySets = new Map();
 	const syntheticKeys = new Set([
 		'nativeEvent',
@@ -140,7 +188,11 @@ try {
 		'isPropagationStopped',
 	]);
 	for (const assertion of assertions) {
-		const witness = witnessChecker.getTypeFromTypeNode(witnesses[assertion.id].type);
+		const witnessNode = witnessByName.get(`Witness${assertion.id}`);
+		if (!witnessNode) {
+			throw new Error(`Missing public contract witness for ${assertion.name}`);
+		}
+		const witness = witnessChecker.getTypeFromTypeNode(witnessNode.type);
 		const parts = witness.isUnion?.() ? witness.types : [witness];
 		const filtered = parts.filter((part) => {
 			if (part.value === '$$typeof' || (assertion.context && part.value !== 'Provider'))
@@ -169,7 +221,7 @@ try {
 				`Public witness did not resolve to concrete keys or arity: ${assertion.name}`,
 			);
 		}
-		const expected =
+		let expected =
 			filtered
 				.map((part) =>
 					part.flags & ts.TypeFlags.UniqueESSymbol &&
@@ -179,6 +231,37 @@ try {
 				)
 				.sort()
 				.join(' | ') || 'never';
+		if (assertion.callable) {
+			const nativeArityNode = witnessByName.get(`NativeArity${assertion.id}`);
+			if (!nativeArityNode) {
+				throw new Error(`Missing native arity witness for ${assertion.name}`);
+			}
+			const nativeArity = literalUnion(
+				witnessChecker.getTypeFromTypeNode(nativeArityNode.type),
+				witnessChecker,
+			);
+			const extensionKey = `${assertion.specifier}#${assertion.name}`;
+			const extension = callableArityExtensions[extensionKey];
+			if (extension) {
+				const documented = extension.length;
+				if (nativeArity !== documented) {
+					throw new Error(
+						`Documented arity ${documented} does not match native ${nativeArity} for ${extensionKey}`,
+					);
+				}
+				for (const value of unionMembers(expected)) {
+					if (!unionMembers(documented).has(value)) {
+						throw new Error(`Documented arity for ${extensionKey} dropped upstream arity ${value}`);
+					}
+				}
+				expected = documented;
+				assertion.extensionReason = extension.reason;
+			} else if (nativeArity !== expected) {
+				throw new Error(
+					`Native arity ${nativeArity} differs from upstream ${expected} for ${extensionKey}; record audit/published-contract-extensions.json`,
+				);
+			}
+		}
 		let left;
 		if (assertion.callable) left = `Parameters<${assertion.native}>['length']`;
 		else if (expected === 'never') left = `keyof ${assertion.native}`;
@@ -186,9 +269,12 @@ try {
 			if (!keySets.has(expected)) keySets.set(expected, `PublishedKeys${keySets.size}`);
 			left = `keyof Pick<${assertion.native}, ${keySets.get(expected)}>`;
 		}
-		assertion.proof = assertion.platform
+		const contract = assertion.platform
 			? `type Contract${assertion.id} = Assert<Equal<${assertion.native}, ${assertion.platform}>>;`
 			: `type Contract${assertion.id} = Assert<Equal<${left}, ${keySets.get(expected) ?? expected}>>;`;
+		assertion.proof = assertion.extensionReason
+			? `// Octane compatibility: ${assertion.extensionReason}\n${contract}`
+			: contract;
 	}
 	// Factor identical membership patterns, so the many component contracts share
 	// their literal HTML attribute keys without repeating thousands of lines.
@@ -215,6 +301,13 @@ try {
 		...[...pieces].map(([name, parts]) => `type ${name} = ${parts.join(' | ')};`),
 		'',
 		...assertions.map(({ proof }) => proof),
+		...extraProofs.map(function (extra) {
+			if (!extra.length) {
+				throw new Error(`Additional export ${extra.name} is missing a documented arity`);
+			}
+			const contract = `type Contract${extra.id} = Assert<Equal<Parameters<${extra.native}>['length'], ${extra.length}>>;`;
+			return extra.reason ? `// Octane compatibility: ${extra.reason}\n${contract}` : contract;
+		}),
 	);
 	const destination = path.join(folder, 'published-contract.ts');
 	const { format } = await import('prettier');

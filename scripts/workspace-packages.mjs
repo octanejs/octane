@@ -53,9 +53,9 @@ const OCTANE_SINGLETON_CONSUMERS = new Set([
 ]);
 
 export const OCTANE_BETA_PEER_RANGE = 'workspace:^0.1.51 || ^0.2.0';
-// Packages that statically import APIs added after published 0.2.3, or that
+// Packages that statically import APIs added after published 0.2.4, or that
 // compile Base UI 1.8 method/transitive hooks, must require that release.
-export const OCTANE_CURRENT_PEER_RANGE = 'workspace:^0.2.4';
+export const OCTANE_CURRENT_PEER_RANGE = 'workspace:^0.2.5';
 export const OCTANE_CURRENT_PEER_PACKAGES = new Set([
 	'@octanejs/testing-library',
 	'@octanejs/base-ui',

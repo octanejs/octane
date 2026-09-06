@@ -5,5 +5,6 @@
 '@octanejs/base-ui-utils': patch
 ---
 
-Require Octane 0.2.4 or newer for testing-library and the Base UI 1.8 binding.
-Restore the root `useMediaQuery` export and keep its options argument optional.
+Require Octane 0.2.5 or newer for testing-library and the Base UI 1.8 binding.
+Published 0.2.4 does not export `isInActScope`. Restore the root `useMediaQuery`
+export and keep its options argument optional.
