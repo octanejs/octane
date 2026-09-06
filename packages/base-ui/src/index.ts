@@ -40,5 +40,7 @@ export * from './toggle-group';
 export * from './toolbar';
 export * from './tooltip';
 export * from './use-render';
+// Preserve the original Octane binding's root hook export.
+export { useMediaQuery } from './unstable-use-media-query';
 
 export type * from './types';

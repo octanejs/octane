@@ -31,3 +31,9 @@ export type {
 	DialogViewportProps as AlertDialogViewportProps,
 	DialogViewportState as AlertDialogViewportState,
 } from '../dialog/viewport/DialogViewport.tsrx';
+
+// Retain the named runtime exports of the previous Octane binding.
+export {
+	Handle as AlertDialogHandle,
+	createHandle as createAlertDialogHandle,
+} from './index.parts';

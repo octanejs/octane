@@ -4,7 +4,12 @@ import path from 'node:path';
 import ts from 'typescript';
 import { createTypeEvidenceProgram } from './type-program.mjs';
 import { concretePublicSpecifiers } from './public-exports.mjs';
-import { pinnedPublicEntries, publicSymbolType } from './pinned-public-types.mjs';
+import { publicCompatibilityExport } from './public-compatibility.mjs';
+import {
+	pinnedPublicEntries,
+	pinnedPublicExport,
+	publicSymbolType,
+} from './pinned-public-types.mjs';
 
 const directory = path.resolve(process.argv[2]);
 const manifest = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'));
@@ -80,7 +85,10 @@ try {
 			checker.getExportsOfModule(originalModule).map((symbol) => [symbol.name, symbol]),
 		);
 		for (const symbol of checker.getExportsOfModule(module)) {
-			const original = originals.get(symbol.name);
+			const compatibility = publicCompatibilityExport(specifier, symbol.name);
+			const original = compatibility
+				? pinnedPublicExport(entries, program, checker, specifier, symbol.name)
+				: originals.get(symbol.name);
 			if (!original)
 				throw new Error(`Export absent from the pinned npm contract: ${specifier}.${symbol.name}`);
 			const resolved =
@@ -94,12 +102,16 @@ try {
 				'MouseEvent',
 				"import('react').MouseEvent<HTMLElement>",
 			);
-			const upstream = `${typeOnly ? '' : 'typeof '}Upstream${index}.${symbol.name}${upstreamArguments}`;
+			const upstreamIndex = compatibility ? specifiers.indexOf(compatibility.specifier) : index;
+			const upstreamPath = compatibility?.path ?? symbol.name;
+			const upstream = `${typeOnly ? '' : 'typeof '}Upstream${upstreamIndex}.${upstreamPath}${upstreamArguments}`;
 			const type = publicSymbolType(original, checker);
 			const context = (type.aliasSymbol ?? type.symbol)?.name === 'Context';
 			const callable =
 				!context && checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0;
-			const right = callable ? `Parameters<${upstream}>['length']` : `keyof ${upstream}`;
+			const right = callable
+				? `${compatibility?.additionalArity === undefined ? '' : `${compatibility.additionalArity} | `}Parameters<${upstream}>['length']`
+				: `keyof ${upstream}`;
 			const originalSymbol =
 				original.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(original) : original;
 			const originalDeclaration =

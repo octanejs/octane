@@ -563,7 +563,7 @@ describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 		});
 		flushSync(() => {});
 
-		expect(container.querySelector('#seeded-error')).toBe(serverCatch);
+		expect(Array.from(container.querySelectorAll('#seeded-error'))).toEqual([serverCatch]);
 		expect(serverCatch?.textContent).toBe('server-rejection');
 		expect(clientLoad).not.toHaveBeenCalled();
 		root.unmount();

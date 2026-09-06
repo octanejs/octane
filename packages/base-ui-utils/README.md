@@ -33,3 +33,8 @@ pnpm --dir packages/base-ui-utils test:upstream # Adapted upstream suite
 pnpm --dir packages/base-ui-utils test:pristine # Immutable React oracle
 pnpm --dir packages/base-ui-utils upstream:verify
 ```
+
+## Runtime requirement
+
+Use Octane 0.2.4 or later in the 0.2 line. This binding relies on the coordinated
+release’s transitive hook compilation and runtime support.

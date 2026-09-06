@@ -9,7 +9,9 @@ import {
 	ScrollArea,
 	Select,
 	Toolbar,
+	useMediaQuery,
 } from '@octanejs/base-ui';
+import { useMediaQuery as useSubpathMediaQuery } from '@octanejs/base-ui/unstable-use-media-query';
 import { type Assert, type Equal } from '../../../../scripts/react-port/type-assertions';
 
 interface Fruit {
@@ -129,3 +131,9 @@ const buttonRef: { current: HTMLButtonElement | null } = { current: null };
 </Combobox.List>;
 <Select.Value>{(value) => String(value)}</Select.Value>;
 <Combobox.Value>{(value) => String(value)}</Combobox.Value>;
+
+// Both previously published import paths accept the one-argument call.
+const rootMediaMatch = useMediaQuery('(min-width: 600px)');
+const subpathMediaMatch = useSubpathMediaQuery('(min-width: 600px)');
+type RootMediaMatch = Assert<Equal<typeof rootMediaMatch, boolean>>;
+type SubpathMediaMatch = Assert<Equal<typeof subpathMediaMatch, boolean>>;

@@ -1788,7 +1788,8 @@ type PublishedKeys18 =
 	| 'style'
 	| 'title'
 	| 'container';
-type PublishedKeys19 =
+type PublishedKeys19 = 'prototype';
+type PublishedKeys20 =
 	| 'children'
 	| 'open'
 	| 'onOpenChange'
@@ -1797,9 +1798,9 @@ type PublishedKeys19 =
 	| SharedKeys10
 	| 'handle'
 	| 'onOpenChangeComplete';
-type PublishedKeys20 = 'close' | 'unmount';
-type PublishedKeys21 = SharedKeys6 | 'event' | 'reason' | 'preventUnmountOnClose';
-type PublishedKeys22 =
+type PublishedKeys21 = 'close' | 'unmount';
+type PublishedKeys22 = SharedKeys6 | 'event' | 'reason' | 'preventUnmountOnClose';
+type PublishedKeys23 =
 	| 'disabled'
 	| 'value'
 	| SharedKeys2
@@ -1822,8 +1823,8 @@ type PublishedKeys22 =
 	| 'type'
 	| 'handle'
 	| 'payload';
-type PublishedKeys23 = 'disabled' | 'open';
-type PublishedKeys24 =
+type PublishedKeys24 = 'disabled' | 'open';
+type PublishedKeys25 =
 	| 'Item'
 	| 'Root'
 	| 'Trigger'
@@ -1839,7 +1840,7 @@ type PublishedKeys24 =
 	| 'List'
 	| 'Separator'
 	| 'Value';
-type PublishedKeys25 =
+type PublishedKeys26 =
 	| 'orientation'
 	| SharedKeys2
 	| 'children'
@@ -1854,8 +1855,8 @@ type PublishedKeys25 =
 	| 'render'
 	| 'style'
 	| 'title';
-type PublishedKeys26 = 'orientation';
-type PublishedKeys27 =
+type PublishedKeys27 = 'orientation';
+type PublishedKeys28 =
 	| 'disabled'
 	| 'value'
 	| SharedKeys2
@@ -1887,7 +1888,7 @@ type PublishedKeys27 =
 	| 'required'
 	| 'step'
 	| 'width';
-type PublishedKeys28 =
+type PublishedKeys29 =
 	| 'disabled'
 	| 'open'
 	| 'readOnly'
@@ -1896,7 +1897,7 @@ type PublishedKeys28 =
 	| 'listEmpty'
 	| 'popupSide'
 	| 'valid';
-type PublishedKeys29 =
+type PublishedKeys30 =
 	| 'disabled'
 	| 'value'
 	| SharedKeys2
@@ -1918,9 +1919,9 @@ type PublishedKeys29 =
 	| 'name'
 	| 'nativeButton'
 	| 'type';
-type PublishedKeys30 = 'disabled' | 'open' | 'transitionStatus' | 'visible';
-type PublishedKeys31 = 'open' | 'transitionStatus' | SharedKeys18 | 'anchorHidden' | 'empty';
-type PublishedKeys32 =
+type PublishedKeys31 = 'disabled' | 'open' | 'transitionStatus' | 'visible';
+type PublishedKeys32 = 'open' | 'transitionStatus' | SharedKeys18 | 'anchorHidden' | 'empty';
+type PublishedKeys33 =
 	| SharedKeys2
 	| 'children'
 	| 'className'
@@ -1937,10 +1938,10 @@ type PublishedKeys32 =
 	| 'anchor'
 	| SharedKeys18
 	| SharedKeys19;
-type PublishedKeys33 = 'open' | SharedKeys18 | 'anchorHidden' | 'empty';
-type PublishedKeys34 = 'empty';
-type PublishedKeys35 = 'open' | SharedKeys18 | 'uncentered';
-type PublishedKeys36 =
+type PublishedKeys34 = 'open' | SharedKeys18 | 'anchorHidden' | 'empty';
+type PublishedKeys35 = 'empty';
+type PublishedKeys36 = 'open' | SharedKeys18 | 'uncentered';
+type PublishedKeys37 =
 	| SharedKeys2
 	| 'children'
 	| 'className'
@@ -1955,12 +1956,12 @@ type PublishedKeys36 =
 	| 'style'
 	| 'title'
 	| 'items';
-type PublishedKeys37 = 'children';
-type PublishedKeys38 = SharedKeys5 | 'contains';
-type PublishedKeys39 = SharedKeys20 | 'locale';
-type PublishedKeys40 = 'unmount';
-type PublishedKeys41 = 'event' | 'reason' | 'index';
-type PublishedKeys42 =
+type PublishedKeys38 = 'children';
+type PublishedKeys39 = SharedKeys5 | 'contains';
+type PublishedKeys40 = SharedKeys20 | 'locale';
+type PublishedKeys41 = 'unmount';
+type PublishedKeys42 = 'event' | 'reason' | 'index';
+type PublishedKeys43 =
 	| 'filter'
 	| 'disabled'
 	| 'value'
@@ -1989,8 +1990,8 @@ type PublishedKeys42 =
 	| SharedKeys22
 	| 'limit'
 	| 'modal';
-type PublishedKeys43 = 'disabled' | 'highlighted';
-type PublishedKeys44 =
+type PublishedKeys44 = 'disabled' | 'highlighted';
+type PublishedKeys45 =
 	| 'disabled'
 	| 'value'
 	| SharedKeys2
@@ -2007,10 +2008,10 @@ type PublishedKeys44 =
 	| 'title'
 	| 'index'
 	| 'nativeButton';
-type PublishedKeys45 = 'Root' | SharedKeys23;
-type PublishedKeys46 = 'imageLoadingStatus';
-type PublishedKeys47 = 'transitionStatus' | 'imageLoadingStatus';
-type PublishedKeys48 =
+type PublishedKeys46 = 'Root' | SharedKeys23;
+type PublishedKeys47 = 'imageLoadingStatus';
+type PublishedKeys48 = 'transitionStatus' | 'imageLoadingStatus';
+type PublishedKeys49 =
 	| SharedKeys2
 	| 'children'
 	| 'className'
@@ -2031,7 +2032,7 @@ type PublishedKeys48 =
 	| SharedKeys24
 	| 'loading'
 	| 'referrerPolicy';
-type PublishedKeys49 =
+type PublishedKeys50 =
 	| SharedKeys2
 	| 'children'
 	| 'className'
@@ -2046,7 +2047,7 @@ type PublishedKeys49 =
 	| 'style'
 	| 'title'
 	| 'delay';
-type PublishedKeys50 =
+type PublishedKeys51 =
 	| 'disabled'
 	| 'value'
 	| SharedKeys2
@@ -2068,8 +2069,8 @@ type PublishedKeys50 =
 	| 'nativeButton'
 	| 'type'
 	| 'focusableWhenDisabled';
-type PublishedKeys51 = 'Root' | 'Indicator';
-type PublishedKeys52 =
+type PublishedKeys52 = 'Root' | 'Indicator';
+type PublishedKeys53 =
 	| 'disabled'
 	| 'checked'
 	| 'readOnly'
@@ -2078,7 +2079,7 @@ type PublishedKeys52 =
 	| SharedKeys17
 	| 'valid'
 	| 'indeterminate';
-type PublishedKeys53 =
+type PublishedKeys54 =
 	| 'disabled'
 	| 'value'
 	| SharedKeys2
@@ -2105,7 +2106,7 @@ type PublishedKeys53 =
 	| 'onCheckedChange'
 	| 'parent'
 	| 'uncheckedValue';
-type PublishedKeys54 =
+type PublishedKeys55 =
 	| 'disabled'
 	| 'transitionStatus'
 	| 'checked'
@@ -2115,7 +2116,7 @@ type PublishedKeys54 =
 	| SharedKeys17
 	| 'valid'
 	| 'indeterminate';
-type PublishedKeys55 =
+type PublishedKeys56 =
 	| SharedKeys2
 	| 'children'
 	| 'className'
@@ -2130,8 +2131,8 @@ type PublishedKeys55 =
 	| 'render'
 	| 'style'
 	| 'title';
-type PublishedKeys56 = 'disabled' | SharedKeys16 | SharedKeys17 | 'valid';
-type PublishedKeys57 =
+type PublishedKeys57 = 'disabled' | SharedKeys16 | SharedKeys17 | 'valid';
+type PublishedKeys58 =
 	| 'disabled'
 	| 'value'
 	| SharedKeys2
@@ -2150,9 +2151,9 @@ type PublishedKeys57 =
 	| 'style'
 	| 'title'
 	| 'allValues';
-type PublishedKeys58 = 'Panel' | 'Root' | 'Trigger';
-type PublishedKeys59 = 'disabled' | 'open' | 'transitionStatus';
-type PublishedKeys60 =
+type PublishedKeys59 = 'Panel' | 'Root' | 'Trigger';
+type PublishedKeys60 = 'disabled' | 'open' | 'transitionStatus';
+type PublishedKeys61 =
 	| 'disabled'
 	| SharedKeys2
 	| 'children'
@@ -2170,7 +2171,7 @@ type PublishedKeys60 =
 	| 'open'
 	| 'onOpenChange'
 	| 'defaultOpen';
-type PublishedKeys61 =
+type PublishedKeys62 =
 	| 'Item'
 	| 'Root'
 	| 'Trigger'
@@ -2189,10 +2190,9 @@ type PublishedKeys61 =
 	| SharedKeys25
 	| 'ItemIndicator'
 	| 'Label';
-type PublishedKeys62 = 'value' | 'multiple' | SharedKeys20 | 'locale';
-type PublishedKeys63 = 'valueOf';
-type PublishedKeys64 = 'getLabel' | 'getValue';
-type PublishedKeys65 = 'prototype';
+type PublishedKeys63 = 'value' | 'multiple' | SharedKeys20 | 'locale';
+type PublishedKeys64 = 'valueOf';
+type PublishedKeys65 = 'getLabel' | 'getValue';
 type PublishedKeys66 =
 	| 'filter'
 	| 'disabled'
@@ -3265,8 +3265,9 @@ type PublishedKeys178 =
 	| 'onCheckedChange'
 	| 'uncheckedValue';
 type PublishedKeys179 = 'Panel' | 'Root' | 'List' | 'Indicator' | 'Tab';
-type PublishedKeys180 = 'orientation' | 'tabActivationDirection';
-type PublishedKeys181 =
+type PublishedKeys180 = number | string | symbol;
+type PublishedKeys181 = 'orientation' | 'tabActivationDirection';
+type PublishedKeys182 =
 	| 'orientation'
 	| 'value'
 	| SharedKeys2
@@ -3284,9 +3285,9 @@ type PublishedKeys181 =
 	| 'render'
 	| 'style'
 	| 'title';
-type PublishedKeys182 = SharedKeys6 | 'event' | 'reason' | 'activationDirection';
-type PublishedKeys183 = 'orientation' | 'tabActivationDirection' | SharedKeys46;
-type PublishedKeys184 =
+type PublishedKeys183 = SharedKeys6 | 'event' | 'reason' | 'activationDirection';
+type PublishedKeys184 = 'orientation' | 'tabActivationDirection' | SharedKeys46;
+type PublishedKeys185 =
 	| SharedKeys2
 	| 'children'
 	| 'className'
@@ -3301,7 +3302,6 @@ type PublishedKeys184 =
 	| 'style'
 	| 'title'
 	| 'renderBeforeHydration';
-type PublishedKeys185 = number | string | symbol;
 type PublishedKeys186 = SharedKeys47;
 type PublishedKeys187 = 'disabled' | 'value' | 'id';
 type PublishedKeys188 = 'disabled' | 'orientation' | 'active' | 'tabActivationDirection';
@@ -3709,2024 +3709,2053 @@ type PublishedKeys275 =
 type PublishedKeys276 = 'className' | 'render' | 'style';
 type PublishedKeys277 = SharedKeys84;
 
-type Contract0 = Assert<
+type Contract0 = Assert<Equal<Parameters<typeof Native0.useMediaQuery>['length'], 1 | 2>>;
+type Contract1 = Assert<
 	Equal<keyof Pick<typeof Native0.Accordion, PublishedKeys0>, PublishedKeys0>
 >;
-type Contract1 = Assert<Equal<Parameters<typeof Native0.AccordionRoot>['length'], 1>>;
-type Contract2 = Assert<Equal<keyof Pick<Native0.AccordionValue, PublishedKeys1>, PublishedKeys1>>;
-type Contract3 = Assert<
+type Contract2 = Assert<Equal<Parameters<typeof Native0.AccordionRoot>['length'], 1>>;
+type Contract3 = Assert<Equal<Parameters<typeof Native0.AccordionItem>['length'], 1>>;
+type Contract4 = Assert<Equal<Parameters<typeof Native0.AccordionHeader>['length'], 1>>;
+type Contract5 = Assert<Equal<Parameters<typeof Native0.AccordionTrigger>['length'], 1>>;
+type Contract6 = Assert<Equal<Parameters<typeof Native0.AccordionPanel>['length'], 1>>;
+type Contract7 = Assert<Equal<keyof Pick<Native0.AccordionValue, PublishedKeys1>, PublishedKeys1>>;
+type Contract8 = Assert<
 	Equal<keyof Pick<Native0.AccordionRootState, PublishedKeys2>, PublishedKeys2>
 >;
-type Contract4 = Assert<
+type Contract9 = Assert<
 	Equal<keyof Pick<Native0.AccordionRootProps, PublishedKeys3>, PublishedKeys3>
 >;
-type Contract5 = Assert<
+type Contract10 = Assert<
 	Equal<keyof Pick<Native0.AccordionRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract6 = Assert<
+type Contract11 = Assert<
 	Equal<keyof Pick<Native0.AccordionRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract7 = Assert<Equal<Parameters<typeof Native0.AccordionItem>['length'], 1>>;
-type Contract8 = Assert<
+type Contract12 = Assert<
 	Equal<keyof Pick<Native0.AccordionItemState, PublishedKeys6>, PublishedKeys6>
 >;
-type Contract9 = Assert<
+type Contract13 = Assert<
 	Equal<keyof Pick<Native0.AccordionItemProps, PublishedKeys7>, PublishedKeys7>
 >;
-type Contract10 = Assert<
+type Contract14 = Assert<
 	Equal<keyof Pick<Native0.AccordionItemChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract11 = Assert<
+type Contract15 = Assert<
 	Equal<keyof Pick<Native0.AccordionItemChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract12 = Assert<Equal<Parameters<typeof Native0.AccordionHeader>['length'], 1>>;
-type Contract13 = Assert<
+type Contract16 = Assert<
 	Equal<keyof Pick<Native0.AccordionHeaderState, PublishedKeys6>, PublishedKeys6>
 >;
-type Contract14 = Assert<
+type Contract17 = Assert<
 	Equal<keyof Pick<Native0.AccordionHeaderProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract15 = Assert<Equal<Parameters<typeof Native0.AccordionTrigger>['length'], 1>>;
-type Contract16 = Assert<
+type Contract18 = Assert<
 	Equal<keyof Pick<Native0.AccordionTriggerState, PublishedKeys6>, PublishedKeys6>
 >;
-type Contract17 = Assert<
+type Contract19 = Assert<
 	Equal<keyof Pick<Native0.AccordionTriggerProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract18 = Assert<Equal<Parameters<typeof Native0.AccordionPanel>['length'], 1>>;
-type Contract19 = Assert<
+type Contract20 = Assert<
 	Equal<keyof Pick<Native0.AccordionPanelState, PublishedKeys10>, PublishedKeys10>
 >;
-type Contract20 = Assert<
+type Contract21 = Assert<
 	Equal<keyof Pick<Native0.AccordionPanelProps, PublishedKeys11>, PublishedKeys11>
 >;
-type Contract21 = Assert<
+type Contract22 = Assert<
 	Equal<keyof Pick<typeof Native0.AlertDialog, PublishedKeys12>, PublishedKeys12>
 >;
-type Contract22 = Assert<
+type Contract23 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogBackdropProps, PublishedKeys13>, PublishedKeys13>
 >;
-type Contract23 = Assert<
+type Contract24 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract24 = Assert<
+type Contract25 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract25 = Assert<
+type Contract26 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogCloseState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract26 = Assert<
+type Contract27 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract27 = Assert<Equal<keyof Native0.AlertDialogDescriptionState, never>>;
-type Contract28 = Assert<
+type Contract28 = Assert<Equal<keyof Native0.AlertDialogDescriptionState, never>>;
+type Contract29 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogPopupProps, PublishedKeys16>, PublishedKeys16>
 >;
-type Contract29 = Assert<
+type Contract30 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogPopupState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract30 = Assert<
+type Contract31 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract31 = Assert<Equal<keyof Native0.AlertDialogPortalState, never>>;
-type Contract32 = Assert<
+type Contract32 = Assert<Equal<keyof Native0.AlertDialogPortalState, never>>;
+type Contract33 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract33 = Assert<Equal<keyof Native0.AlertDialogTitleState, never>>;
-type Contract34 = Assert<
+type Contract34 = Assert<Equal<keyof Native0.AlertDialogTitleState, never>>;
+type Contract35 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract35 = Assert<
+type Contract36 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogViewportState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract36 = Assert<Equal<Parameters<typeof Native0.AlertDialogRoot>['length'], 1>>;
-type Contract37 = Assert<Equal<keyof Native0.AlertDialogRootState, never>>;
-type Contract38 = Assert<
-	Equal<keyof Pick<Native0.AlertDialogRootProps, PublishedKeys19>, PublishedKeys19>
+type Contract37 = Assert<
+	Equal<keyof Pick<typeof Native0.AlertDialogHandle, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract39 = Assert<
-	Equal<keyof Pick<Native0.AlertDialogRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract38 = Assert<Equal<Parameters<typeof Native0.createAlertDialogHandle>['length'], 0>>;
+type Contract39 = Assert<Equal<Parameters<typeof Native0.AlertDialogRoot>['length'], 1>>;
+type Contract40 = Assert<Equal<keyof Native0.AlertDialogRootState, never>>;
+type Contract41 = Assert<
+	Equal<keyof Pick<Native0.AlertDialogRootProps, PublishedKeys20>, PublishedKeys20>
 >;
-type Contract40 = Assert<
+type Contract42 = Assert<
+	Equal<keyof Pick<Native0.AlertDialogRootActions, PublishedKeys21>, PublishedKeys21>
+>;
+type Contract43 = Assert<
 	Equal<keyof Pick<Native0.AlertDialogRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract41 = Assert<
-	Equal<keyof Pick<Native0.AlertDialogRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
->;
-type Contract42 = Assert<Equal<Parameters<Native0.AlertDialogTrigger>['length'], 1>>;
-type Contract43 = Assert<
-	Equal<keyof Pick<Native0.AlertDialogTriggerProps, PublishedKeys22>, PublishedKeys22>
->;
 type Contract44 = Assert<
-	Equal<keyof Pick<Native0.AlertDialogTriggerState, PublishedKeys23>, PublishedKeys23>
+	Equal<keyof Pick<Native0.AlertDialogRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract45 = Assert<
-	Equal<keyof Pick<typeof Native0.Autocomplete, PublishedKeys24>, PublishedKeys24>
->;
+type Contract45 = Assert<Equal<Parameters<Native0.AlertDialogTrigger>['length'], 1>>;
 type Contract46 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteSeparatorProps, PublishedKeys25>, PublishedKeys25>
+	Equal<keyof Pick<Native0.AlertDialogTriggerProps, PublishedKeys23>, PublishedKeys23>
 >;
 type Contract47 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteSeparatorState, PublishedKeys26>, PublishedKeys26>
+	Equal<keyof Pick<Native0.AlertDialogTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
 type Contract48 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteInputProps, PublishedKeys27>, PublishedKeys27>
+	Equal<keyof Pick<typeof Native0.Autocomplete, PublishedKeys25>, PublishedKeys25>
 >;
 type Contract49 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteInputState, PublishedKeys28>, PublishedKeys28>
+	Equal<keyof Pick<Native0.AutocompleteSeparatorProps, PublishedKeys26>, PublishedKeys26>
 >;
 type Contract50 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteIconProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.AutocompleteSeparatorState, PublishedKeys27>, PublishedKeys27>
 >;
-type Contract51 = Assert<Equal<keyof Native0.AutocompleteIconState, never>>;
+type Contract51 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteInputProps, PublishedKeys28>, PublishedKeys28>
+>;
 type Contract52 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteClearProps, PublishedKeys29>, PublishedKeys29>
+	Equal<keyof Pick<Native0.AutocompleteInputState, PublishedKeys29>, PublishedKeys29>
 >;
 type Contract53 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteClearState, PublishedKeys30>, PublishedKeys30>
+	Equal<keyof Pick<Native0.AutocompleteIconProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract54 = Assert<
-	Equal<keyof Pick<Native0.AutocompletePopupProps, PublishedKeys16>, PublishedKeys16>
->;
+type Contract54 = Assert<Equal<keyof Native0.AutocompleteIconState, never>>;
 type Contract55 = Assert<
-	Equal<keyof Pick<Native0.AutocompletePopupState, PublishedKeys31>, PublishedKeys31>
+	Equal<keyof Pick<Native0.AutocompleteClearProps, PublishedKeys30>, PublishedKeys30>
 >;
 type Contract56 = Assert<
-	Equal<keyof Pick<Native0.AutocompletePositionerProps, PublishedKeys32>, PublishedKeys32>
+	Equal<keyof Pick<Native0.AutocompleteClearState, PublishedKeys31>, PublishedKeys31>
 >;
 type Contract57 = Assert<
-	Equal<keyof Pick<Native0.AutocompletePositionerState, PublishedKeys33>, PublishedKeys33>
+	Equal<keyof Pick<Native0.AutocompletePopupProps, PublishedKeys16>, PublishedKeys16>
 >;
 type Contract58 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteListProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.AutocompletePopupState, PublishedKeys32>, PublishedKeys32>
 >;
 type Contract59 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteListState, PublishedKeys34>, PublishedKeys34>
+	Equal<keyof Pick<Native0.AutocompletePositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
 type Contract60 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteRowProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.AutocompletePositionerState, PublishedKeys34>, PublishedKeys34>
 >;
-type Contract61 = Assert<Equal<keyof Native0.AutocompleteRowState, never>>;
+type Contract61 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteListProps, PublishedKeys8>, PublishedKeys8>
+>;
 type Contract62 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteArrowProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.AutocompleteListState, PublishedKeys35>, PublishedKeys35>
 >;
 type Contract63 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteArrowState, PublishedKeys35>, PublishedKeys35>
+	Equal<keyof Pick<Native0.AutocompleteRowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract64 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteBackdropProps, PublishedKeys8>, PublishedKeys8>
->;
+type Contract64 = Assert<Equal<keyof Native0.AutocompleteRowState, never>>;
 type Contract65 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteBackdropState, PublishedKeys14>, PublishedKeys14>
+	Equal<keyof Pick<Native0.AutocompleteArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
 type Contract66 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteArrowState, PublishedKeys36>, PublishedKeys36>
+>;
+type Contract67 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteBackdropProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract68 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteBackdropState, PublishedKeys14>, PublishedKeys14>
+>;
+type Contract69 = Assert<
 	Equal<keyof Pick<Native0.AutocompletePortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract67 = Assert<Equal<keyof Native0.AutocompletePortalState, never>>;
-type Contract68 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteGroupProps, PublishedKeys36>, PublishedKeys36>
+type Contract70 = Assert<Equal<keyof Native0.AutocompletePortalState, never>>;
+type Contract71 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteGroupProps, PublishedKeys37>, PublishedKeys37>
 >;
-type Contract69 = Assert<Equal<keyof Native0.AutocompleteGroupState, never>>;
-type Contract70 = Assert<
+type Contract72 = Assert<Equal<keyof Native0.AutocompleteGroupState, never>>;
+type Contract73 = Assert<
 	Equal<keyof Pick<Native0.AutocompleteGroupLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract71 = Assert<Equal<keyof Native0.AutocompleteGroupLabelState, never>>;
-type Contract72 = Assert<
+type Contract74 = Assert<Equal<keyof Native0.AutocompleteGroupLabelState, never>>;
+type Contract75 = Assert<
 	Equal<keyof Pick<Native0.AutocompleteEmptyProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract73 = Assert<Equal<keyof Native0.AutocompleteEmptyState, never>>;
-type Contract74 = Assert<
+type Contract76 = Assert<Equal<keyof Native0.AutocompleteEmptyState, never>>;
+type Contract77 = Assert<
 	Equal<keyof Pick<Native0.AutocompleteStatusProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract75 = Assert<Equal<keyof Native0.AutocompleteStatusState, never>>;
-type Contract76 = Assert<Equal<keyof Native0.AutocompleteCollectionState, never>>;
-type Contract77 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteCollectionProps, PublishedKeys37>, PublishedKeys37>
+type Contract78 = Assert<Equal<keyof Native0.AutocompleteStatusState, never>>;
+type Contract79 = Assert<Equal<keyof Native0.AutocompleteCollectionState, never>>;
+type Contract80 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteCollectionProps, PublishedKeys38>, PublishedKeys38>
 >;
-type Contract78 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteFilter, PublishedKeys38>, PublishedKeys38>
+type Contract81 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteFilter, PublishedKeys39>, PublishedKeys39>
 >;
-type Contract79 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteFilterOptions, PublishedKeys39>, PublishedKeys39>
->;
-type Contract80 = Assert<Equal<Parameters<typeof Native0.AutocompleteRoot>['length'], 1>>;
-type Contract81 = Assert<Equal<keyof Native0.AutocompleteRootState, never>>;
 type Contract82 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteRootActions, PublishedKeys40>, PublishedKeys40>
+	Equal<keyof Pick<Native0.AutocompleteFilterOptions, PublishedKeys40>, PublishedKeys40>
 >;
-type Contract83 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract84 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
->;
+type Contract83 = Assert<Equal<Parameters<typeof Native0.AutocompleteRoot>['length'], 1>>;
+type Contract84 = Assert<Equal<keyof Native0.AutocompleteRootState, never>>;
 type Contract85 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteRootHighlightEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native0.AutocompleteRootActions, PublishedKeys41>, PublishedKeys41>
 >;
 type Contract86 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteRootHighlightEventDetails, PublishedKeys41>, PublishedKeys41>
+	Equal<keyof Pick<Native0.AutocompleteRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract87 = Assert<
-	Equal<
-		keyof Pick<Native0.AutocompleteRootProps<{ sample: string }>, PublishedKeys42>,
-		PublishedKeys42
-	>
+	Equal<keyof Pick<Native0.AutocompleteRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract88 = Assert<Equal<Parameters<Native0.AutocompleteTrigger>['length'], 1>>;
+type Contract88 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteRootHighlightEventReason, PublishedKeys4>, PublishedKeys4>
+>;
 type Contract89 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteTriggerState, PublishedKeys28>, PublishedKeys28>
+	Equal<keyof Pick<Native0.AutocompleteRootHighlightEventDetails, PublishedKeys42>, PublishedKeys42>
 >;
 type Contract90 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteTriggerProps, PublishedKeys9>, PublishedKeys9>
->;
-type Contract91 = Assert<Equal<Parameters<Native0.AutocompleteInputGroup>['length'], 1>>;
-type Contract92 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteInputGroupState, PublishedKeys28>, PublishedKeys28>
->;
-type Contract93 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteInputGroupProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract94 = Assert<Equal<Parameters<Native0.AutocompleteItem>['length'], 1>>;
-type Contract95 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteItemState, PublishedKeys43>, PublishedKeys43>
->;
-type Contract96 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteItemProps, PublishedKeys44>, PublishedKeys44>
->;
-type Contract97 = Assert<Equal<Parameters<typeof Native0.AutocompleteValue>['length'], 1>>;
-type Contract98 = Assert<Equal<keyof Native0.AutocompleteValueState, never>>;
-type Contract99 = Assert<
-	Equal<keyof Pick<Native0.AutocompleteValueProps, PublishedKeys37>, PublishedKeys37>
->;
-type Contract100 = Assert<
-	Equal<keyof Pick<typeof Native0.Avatar, PublishedKeys45>, PublishedKeys45>
->;
-type Contract101 = Assert<Equal<Parameters<typeof Native0.AvatarRoot>['length'], 1>>;
-type Contract102 = Assert<
-	Equal<keyof Pick<Native0.ImageLoadingStatus, PublishedKeys4>, PublishedKeys4>
->;
-type Contract103 = Assert<
-	Equal<keyof Pick<Native0.AvatarRootState, PublishedKeys46>, PublishedKeys46>
->;
-type Contract104 = Assert<
-	Equal<keyof Pick<Native0.AvatarRootProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract105 = Assert<Equal<Parameters<typeof Native0.AvatarImage>['length'], 1>>;
-type Contract106 = Assert<
-	Equal<keyof Pick<Native0.AvatarImageState, PublishedKeys47>, PublishedKeys47>
->;
-type Contract107 = Assert<
-	Equal<keyof Pick<Native0.AvatarImageProps, PublishedKeys48>, PublishedKeys48>
->;
-type Contract108 = Assert<Equal<Parameters<typeof Native0.AvatarFallback>['length'], 1>>;
-type Contract109 = Assert<
-	Equal<keyof Pick<Native0.AvatarFallbackState, PublishedKeys46>, PublishedKeys46>
->;
-type Contract110 = Assert<
-	Equal<keyof Pick<Native0.AvatarFallbackProps, PublishedKeys49>, PublishedKeys49>
->;
-type Contract111 = Assert<Equal<Parameters<typeof Native0.Button>['length'], 1>>;
-type Contract112 = Assert<Equal<keyof Pick<Native0.ButtonState, PublishedKeys15>, PublishedKeys15>>;
-type Contract113 = Assert<Equal<keyof Pick<Native0.ButtonProps, PublishedKeys50>, PublishedKeys50>>;
-type Contract114 = Assert<
-	Equal<keyof Pick<typeof Native0.Checkbox, PublishedKeys51>, PublishedKeys51>
->;
-type Contract115 = Assert<
-	Equal<keyof Pick<typeof Native0.PARENT_CHECKBOX, PublishedKeys4>, PublishedKeys4>
->;
-type Contract116 = Assert<Equal<Parameters<typeof Native0.CheckboxRoot>['length'], 1>>;
-type Contract117 = Assert<
-	Equal<keyof Pick<Native0.CheckboxRootState, PublishedKeys52>, PublishedKeys52>
->;
-type Contract118 = Assert<
-	Equal<keyof Pick<Native0.CheckboxRootProps, PublishedKeys53>, PublishedKeys53>
->;
-type Contract119 = Assert<
-	Equal<keyof Pick<Native0.CheckboxRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract120 = Assert<
-	Equal<keyof Pick<Native0.CheckboxRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
->;
-type Contract121 = Assert<Equal<Parameters<typeof Native0.CheckboxIndicator>['length'], 1>>;
-type Contract122 = Assert<
-	Equal<keyof Pick<Native0.CheckboxIndicatorState, PublishedKeys54>, PublishedKeys54>
->;
-type Contract123 = Assert<
-	Equal<keyof Pick<Native0.CheckboxIndicatorProps, PublishedKeys55>, PublishedKeys55>
->;
-type Contract124 = Assert<Equal<Parameters<typeof Native0.CheckboxGroup>['length'], 1>>;
-type Contract125 = Assert<
-	Equal<keyof Pick<Native0.CheckboxGroupState, PublishedKeys56>, PublishedKeys56>
->;
-type Contract126 = Assert<
-	Equal<keyof Pick<Native0.CheckboxGroupProps, PublishedKeys57>, PublishedKeys57>
->;
-type Contract127 = Assert<
-	Equal<keyof Pick<Native0.CheckboxGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract128 = Assert<
-	Equal<keyof Pick<Native0.CheckboxGroupChangeEventDetails, PublishedKeys5>, PublishedKeys5>
->;
-type Contract129 = Assert<
-	Equal<keyof Pick<typeof Native0.Collapsible, PublishedKeys58>, PublishedKeys58>
->;
-type Contract130 = Assert<Equal<Parameters<typeof Native0.CollapsibleRoot>['length'], 1>>;
-type Contract131 = Assert<
-	Equal<keyof Pick<Native0.CollapsibleRootState, PublishedKeys59>, PublishedKeys59>
->;
-type Contract132 = Assert<
-	Equal<keyof Pick<Native0.CollapsibleRootProps, PublishedKeys60>, PublishedKeys60>
->;
-type Contract133 = Assert<
-	Equal<keyof Pick<Native0.CollapsibleRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract134 = Assert<
-	Equal<keyof Pick<Native0.CollapsibleRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
->;
-type Contract135 = Assert<Equal<Parameters<typeof Native0.CollapsibleTrigger>['length'], 1>>;
-type Contract136 = Assert<
-	Equal<keyof Pick<Native0.CollapsibleTriggerState, PublishedKeys59>, PublishedKeys59>
->;
-type Contract137 = Assert<
-	Equal<keyof Pick<Native0.CollapsibleTriggerProps, PublishedKeys9>, PublishedKeys9>
->;
-type Contract138 = Assert<Equal<Parameters<typeof Native0.CollapsiblePanel>['length'], 1>>;
-type Contract139 = Assert<
-	Equal<keyof Pick<Native0.CollapsiblePanelState, PublishedKeys59>, PublishedKeys59>
->;
-type Contract140 = Assert<
-	Equal<keyof Pick<Native0.CollapsiblePanelProps, PublishedKeys11>, PublishedKeys11>
->;
-type Contract141 = Assert<
-	Equal<keyof Pick<typeof Native0.Combobox, PublishedKeys61>, PublishedKeys61>
->;
-type Contract142 = Assert<
-	Equal<keyof Pick<Native0.ComboboxFilter, PublishedKeys38>, PublishedKeys38>
->;
-type Contract143 = Assert<
-	Equal<keyof Pick<Native0.ComboboxFilterOptions, PublishedKeys62>, PublishedKeys62>
->;
-type Contract144 = Assert<
-	Equal<keyof Pick<Native0.ComboboxPrimitiveValue, PublishedKeys63>, PublishedKeys63>
->;
-type Contract145 = Assert<
 	Equal<
-		keyof Pick<Native0.CreateComboboxItemsOptions<{ sample: string }>, PublishedKeys64>,
-		PublishedKeys64
+		keyof Pick<Native0.AutocompleteRootProps<{ sample: string }>, PublishedKeys43>,
+		PublishedKeys43
 	>
 >;
-type Contract146 = Assert<
-	Equal<keyof Pick<typeof Native0.ComboboxItemCollection, PublishedKeys65>, PublishedKeys65>
+type Contract91 = Assert<Equal<Parameters<Native0.AutocompleteTrigger>['length'], 1>>;
+type Contract92 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteTriggerState, PublishedKeys29>, PublishedKeys29>
 >;
-type Contract147 = Assert<Equal<Parameters<typeof Native0.ComboboxRoot>['length'], 1>>;
+type Contract93 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteTriggerProps, PublishedKeys9>, PublishedKeys9>
+>;
+type Contract94 = Assert<Equal<Parameters<Native0.AutocompleteInputGroup>['length'], 1>>;
+type Contract95 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteInputGroupState, PublishedKeys29>, PublishedKeys29>
+>;
+type Contract96 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteInputGroupProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract97 = Assert<Equal<Parameters<Native0.AutocompleteItem>['length'], 1>>;
+type Contract98 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteItemState, PublishedKeys44>, PublishedKeys44>
+>;
+type Contract99 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteItemProps, PublishedKeys45>, PublishedKeys45>
+>;
+type Contract100 = Assert<Equal<Parameters<typeof Native0.AutocompleteValue>['length'], 1>>;
+type Contract101 = Assert<Equal<keyof Native0.AutocompleteValueState, never>>;
+type Contract102 = Assert<
+	Equal<keyof Pick<Native0.AutocompleteValueProps, PublishedKeys38>, PublishedKeys38>
+>;
+type Contract103 = Assert<
+	Equal<keyof Pick<typeof Native0.Avatar, PublishedKeys46>, PublishedKeys46>
+>;
+type Contract104 = Assert<Equal<Parameters<typeof Native0.AvatarRoot>['length'], 1>>;
+type Contract105 = Assert<
+	Equal<keyof Pick<Native0.ImageLoadingStatus, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract106 = Assert<
+	Equal<keyof Pick<Native0.AvatarRootState, PublishedKeys47>, PublishedKeys47>
+>;
+type Contract107 = Assert<
+	Equal<keyof Pick<Native0.AvatarRootProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract108 = Assert<Equal<Parameters<typeof Native0.AvatarImage>['length'], 1>>;
+type Contract109 = Assert<
+	Equal<keyof Pick<Native0.AvatarImageState, PublishedKeys48>, PublishedKeys48>
+>;
+type Contract110 = Assert<
+	Equal<keyof Pick<Native0.AvatarImageProps, PublishedKeys49>, PublishedKeys49>
+>;
+type Contract111 = Assert<Equal<Parameters<typeof Native0.AvatarFallback>['length'], 1>>;
+type Contract112 = Assert<
+	Equal<keyof Pick<Native0.AvatarFallbackState, PublishedKeys47>, PublishedKeys47>
+>;
+type Contract113 = Assert<
+	Equal<keyof Pick<Native0.AvatarFallbackProps, PublishedKeys50>, PublishedKeys50>
+>;
+type Contract114 = Assert<Equal<Parameters<typeof Native0.Button>['length'], 1>>;
+type Contract115 = Assert<Equal<keyof Pick<Native0.ButtonState, PublishedKeys15>, PublishedKeys15>>;
+type Contract116 = Assert<Equal<keyof Pick<Native0.ButtonProps, PublishedKeys51>, PublishedKeys51>>;
+type Contract117 = Assert<
+	Equal<keyof Pick<typeof Native0.Checkbox, PublishedKeys52>, PublishedKeys52>
+>;
+type Contract118 = Assert<
+	Equal<keyof Pick<typeof Native0.PARENT_CHECKBOX, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract119 = Assert<Equal<Parameters<typeof Native0.CheckboxRoot>['length'], 1>>;
+type Contract120 = Assert<
+	Equal<keyof Pick<Native0.CheckboxRootState, PublishedKeys53>, PublishedKeys53>
+>;
+type Contract121 = Assert<
+	Equal<keyof Pick<Native0.CheckboxRootProps, PublishedKeys54>, PublishedKeys54>
+>;
+type Contract122 = Assert<
+	Equal<keyof Pick<Native0.CheckboxRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract123 = Assert<
+	Equal<keyof Pick<Native0.CheckboxRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+>;
+type Contract124 = Assert<Equal<Parameters<typeof Native0.CheckboxIndicator>['length'], 1>>;
+type Contract125 = Assert<
+	Equal<keyof Pick<Native0.CheckboxIndicatorState, PublishedKeys55>, PublishedKeys55>
+>;
+type Contract126 = Assert<
+	Equal<keyof Pick<Native0.CheckboxIndicatorProps, PublishedKeys56>, PublishedKeys56>
+>;
+type Contract127 = Assert<Equal<Parameters<typeof Native0.CheckboxGroup>['length'], 1>>;
+type Contract128 = Assert<
+	Equal<keyof Pick<Native0.CheckboxGroupState, PublishedKeys57>, PublishedKeys57>
+>;
+type Contract129 = Assert<
+	Equal<keyof Pick<Native0.CheckboxGroupProps, PublishedKeys58>, PublishedKeys58>
+>;
+type Contract130 = Assert<
+	Equal<keyof Pick<Native0.CheckboxGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract131 = Assert<
+	Equal<keyof Pick<Native0.CheckboxGroupChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+>;
+type Contract132 = Assert<
+	Equal<keyof Pick<typeof Native0.Collapsible, PublishedKeys59>, PublishedKeys59>
+>;
+type Contract133 = Assert<Equal<Parameters<typeof Native0.CollapsibleRoot>['length'], 1>>;
+type Contract134 = Assert<Equal<Parameters<typeof Native0.CollapsibleTrigger>['length'], 1>>;
+type Contract135 = Assert<Equal<Parameters<typeof Native0.CollapsiblePanel>['length'], 1>>;
+type Contract136 = Assert<
+	Equal<keyof Pick<Native0.CollapsibleRootState, PublishedKeys60>, PublishedKeys60>
+>;
+type Contract137 = Assert<
+	Equal<keyof Pick<Native0.CollapsibleRootProps, PublishedKeys61>, PublishedKeys61>
+>;
+type Contract138 = Assert<
+	Equal<keyof Pick<Native0.CollapsibleRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract139 = Assert<
+	Equal<keyof Pick<Native0.CollapsibleRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+>;
+type Contract140 = Assert<
+	Equal<keyof Pick<Native0.CollapsibleTriggerState, PublishedKeys60>, PublishedKeys60>
+>;
+type Contract141 = Assert<
+	Equal<keyof Pick<Native0.CollapsibleTriggerProps, PublishedKeys9>, PublishedKeys9>
+>;
+type Contract142 = Assert<
+	Equal<keyof Pick<Native0.CollapsiblePanelState, PublishedKeys60>, PublishedKeys60>
+>;
+type Contract143 = Assert<
+	Equal<keyof Pick<Native0.CollapsiblePanelProps, PublishedKeys11>, PublishedKeys11>
+>;
+type Contract144 = Assert<
+	Equal<keyof Pick<typeof Native0.Combobox, PublishedKeys62>, PublishedKeys62>
+>;
+type Contract145 = Assert<
+	Equal<keyof Pick<Native0.ComboboxFilter, PublishedKeys39>, PublishedKeys39>
+>;
+type Contract146 = Assert<
+	Equal<keyof Pick<Native0.ComboboxFilterOptions, PublishedKeys63>, PublishedKeys63>
+>;
+type Contract147 = Assert<
+	Equal<keyof Pick<Native0.ComboboxPrimitiveValue, PublishedKeys64>, PublishedKeys64>
+>;
 type Contract148 = Assert<
+	Equal<
+		keyof Pick<Native0.CreateComboboxItemsOptions<{ sample: string }>, PublishedKeys65>,
+		PublishedKeys65
+	>
+>;
+type Contract149 = Assert<
+	Equal<keyof Pick<typeof Native0.ComboboxItemCollection, PublishedKeys19>, PublishedKeys19>
+>;
+type Contract150 = Assert<Equal<Parameters<typeof Native0.ComboboxRoot>['length'], 1>>;
+type Contract151 = Assert<
 	Equal<keyof Pick<Native0.ComboboxRootProps<{ sample: string }>, PublishedKeys66>, PublishedKeys66>
 >;
-type Contract149 = Assert<Equal<keyof Native0.ComboboxRootState, never>>;
-type Contract150 = Assert<
-	Equal<keyof Pick<Native0.ComboboxRootActions, PublishedKeys40>, PublishedKeys40>
->;
-type Contract151 = Assert<
-	Equal<keyof Pick<Native0.ComboboxRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract152 = Assert<
-	Equal<keyof Pick<Native0.ComboboxRootChangeEventDetails, PublishedKeys67>, PublishedKeys67>
->;
+type Contract152 = Assert<Equal<keyof Native0.ComboboxRootState, never>>;
 type Contract153 = Assert<
-	Equal<keyof Pick<Native0.ComboboxRootHighlightEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native0.ComboboxRootActions, PublishedKeys41>, PublishedKeys41>
 >;
 type Contract154 = Assert<
-	Equal<keyof Pick<Native0.ComboboxRootHighlightEventDetails, PublishedKeys41>, PublishedKeys41>
+	Equal<keyof Pick<Native0.ComboboxRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract155 = Assert<Equal<Parameters<typeof Native0.ComboboxLabel>['length'], 1>>;
+type Contract155 = Assert<
+	Equal<keyof Pick<Native0.ComboboxRootChangeEventDetails, PublishedKeys67>, PublishedKeys67>
+>;
 type Contract156 = Assert<
-	Equal<keyof Pick<Native0.ComboboxLabelState, PublishedKeys56>, PublishedKeys56>
+	Equal<keyof Pick<Native0.ComboboxRootHighlightEventReason, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract157 = Assert<
-	Equal<keyof Pick<Native0.ComboboxLabelProps, PublishedKeys68>, PublishedKeys68>
+	Equal<keyof Pick<Native0.ComboboxRootHighlightEventDetails, PublishedKeys42>, PublishedKeys42>
 >;
-type Contract158 = Assert<Equal<Parameters<typeof Native0.ComboboxTrigger>['length'], 1>>;
+type Contract158 = Assert<Equal<Parameters<typeof Native0.ComboboxLabel>['length'], 1>>;
 type Contract159 = Assert<
-	Equal<keyof Pick<Native0.ComboboxTriggerState, PublishedKeys69>, PublishedKeys69>
+	Equal<keyof Pick<Native0.ComboboxLabelState, PublishedKeys57>, PublishedKeys57>
 >;
 type Contract160 = Assert<
-	Equal<keyof Pick<Native0.ComboboxTriggerProps, PublishedKeys9>, PublishedKeys9>
+	Equal<keyof Pick<Native0.ComboboxLabelProps, PublishedKeys68>, PublishedKeys68>
 >;
-type Contract161 = Assert<Equal<Parameters<typeof Native0.ComboboxInput>['length'], 1>>;
+type Contract161 = Assert<Equal<Parameters<typeof Native0.ComboboxTrigger>['length'], 1>>;
 type Contract162 = Assert<
-	Equal<keyof Pick<Native0.ComboboxInputState, PublishedKeys28>, PublishedKeys28>
+	Equal<keyof Pick<Native0.ComboboxTriggerState, PublishedKeys69>, PublishedKeys69>
 >;
 type Contract163 = Assert<
-	Equal<keyof Pick<Native0.ComboboxInputProps, PublishedKeys27>, PublishedKeys27>
+	Equal<keyof Pick<Native0.ComboboxTriggerProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract164 = Assert<Equal<Parameters<typeof Native0.ComboboxInputGroup>['length'], 1>>;
+type Contract164 = Assert<Equal<Parameters<typeof Native0.ComboboxInput>['length'], 1>>;
 type Contract165 = Assert<
-	Equal<keyof Pick<Native0.ComboboxInputGroupState, PublishedKeys69>, PublishedKeys69>
+	Equal<keyof Pick<Native0.ComboboxInputState, PublishedKeys29>, PublishedKeys29>
 >;
 type Contract166 = Assert<
-	Equal<keyof Pick<Native0.ComboboxInputGroupProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.ComboboxInputProps, PublishedKeys28>, PublishedKeys28>
 >;
-type Contract167 = Assert<Equal<Parameters<typeof Native0.ComboboxPopup>['length'], 1>>;
+type Contract167 = Assert<Equal<Parameters<typeof Native0.ComboboxInputGroup>['length'], 1>>;
 type Contract168 = Assert<
-	Equal<keyof Pick<Native0.ComboboxPopupState, PublishedKeys31>, PublishedKeys31>
+	Equal<keyof Pick<Native0.ComboboxInputGroupState, PublishedKeys69>, PublishedKeys69>
 >;
 type Contract169 = Assert<
-	Equal<keyof Pick<Native0.ComboboxPopupProps, PublishedKeys16>, PublishedKeys16>
+	Equal<keyof Pick<Native0.ComboboxInputGroupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract170 = Assert<Equal<Parameters<typeof Native0.ComboboxPositioner>['length'], 1>>;
+type Contract170 = Assert<Equal<Parameters<typeof Native0.ComboboxPopup>['length'], 1>>;
 type Contract171 = Assert<
-	Equal<keyof Pick<Native0.ComboboxPositionerState, PublishedKeys33>, PublishedKeys33>
+	Equal<keyof Pick<Native0.ComboboxPopupState, PublishedKeys32>, PublishedKeys32>
 >;
 type Contract172 = Assert<
-	Equal<keyof Pick<Native0.ComboboxPositionerProps, PublishedKeys32>, PublishedKeys32>
+	Equal<keyof Pick<Native0.ComboboxPopupProps, PublishedKeys16>, PublishedKeys16>
 >;
-type Contract173 = Assert<Equal<Parameters<typeof Native0.ComboboxList>['length'], 1>>;
+type Contract173 = Assert<Equal<Parameters<typeof Native0.ComboboxPositioner>['length'], 1>>;
 type Contract174 = Assert<
-	Equal<keyof Pick<Native0.ComboboxListState, PublishedKeys34>, PublishedKeys34>
+	Equal<keyof Pick<Native0.ComboboxPositionerState, PublishedKeys34>, PublishedKeys34>
 >;
 type Contract175 = Assert<
-	Equal<keyof Pick<Native0.ComboboxListProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.ComboboxPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract176 = Assert<Equal<Parameters<typeof Native0.ComboboxItem>['length'], 1>>;
+type Contract176 = Assert<Equal<Parameters<typeof Native0.ComboboxList>['length'], 1>>;
 type Contract177 = Assert<
-	Equal<keyof Pick<Native0.ComboboxItemState, PublishedKeys70>, PublishedKeys70>
+	Equal<keyof Pick<Native0.ComboboxListState, PublishedKeys35>, PublishedKeys35>
 >;
 type Contract178 = Assert<
-	Equal<keyof Pick<Native0.ComboboxItemProps, PublishedKeys44>, PublishedKeys44>
+	Equal<keyof Pick<Native0.ComboboxListProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract179 = Assert<Equal<Parameters<typeof Native0.ComboboxItemIndicator>['length'], 1>>;
+type Contract179 = Assert<Equal<Parameters<typeof Native0.ComboboxItem>['length'], 1>>;
 type Contract180 = Assert<
-	Equal<keyof Pick<Native0.ComboboxItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+	Equal<keyof Pick<Native0.ComboboxItemState, PublishedKeys70>, PublishedKeys70>
 >;
 type Contract181 = Assert<
+	Equal<keyof Pick<Native0.ComboboxItemProps, PublishedKeys45>, PublishedKeys45>
+>;
+type Contract182 = Assert<Equal<Parameters<typeof Native0.ComboboxItemIndicator>['length'], 1>>;
+type Contract183 = Assert<
+	Equal<keyof Pick<Native0.ComboboxItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
+>;
+type Contract184 = Assert<
 	Equal<keyof Pick<Native0.ComboboxItemIndicatorState, PublishedKeys71>, PublishedKeys71>
 >;
-type Contract182 = Assert<Equal<Parameters<typeof Native0.ComboboxValue>['length'], 1>>;
-type Contract183 = Assert<Equal<keyof Native0.ComboboxValueState, never>>;
-type Contract184 = Assert<
+type Contract185 = Assert<Equal<Parameters<typeof Native0.ComboboxValue>['length'], 1>>;
+type Contract186 = Assert<Equal<keyof Native0.ComboboxValueState, never>>;
+type Contract187 = Assert<
 	Equal<keyof Pick<Native0.ComboboxValueProps, PublishedKeys72>, PublishedKeys72>
 >;
-type Contract185 = Assert<Equal<Parameters<typeof Native0.ComboboxIcon>['length'], 1>>;
-type Contract186 = Assert<Equal<keyof Native0.ComboboxIconState, never>>;
-type Contract187 = Assert<
+type Contract188 = Assert<Equal<Parameters<typeof Native0.ComboboxIcon>['length'], 1>>;
+type Contract189 = Assert<Equal<keyof Native0.ComboboxIconState, never>>;
+type Contract190 = Assert<
 	Equal<keyof Pick<Native0.ComboboxIconProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract188 = Assert<Equal<Parameters<typeof Native0.ComboboxArrow>['length'], 1>>;
-type Contract189 = Assert<
-	Equal<keyof Pick<Native0.ComboboxArrowState, PublishedKeys35>, PublishedKeys35>
->;
-type Contract190 = Assert<
-	Equal<keyof Pick<Native0.ComboboxArrowProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract191 = Assert<Equal<Parameters<typeof Native0.ComboboxBackdrop>['length'], 1>>;
+type Contract191 = Assert<Equal<Parameters<typeof Native0.ComboboxArrow>['length'], 1>>;
 type Contract192 = Assert<
-	Equal<keyof Pick<Native0.ComboboxBackdropProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.ComboboxArrowState, PublishedKeys36>, PublishedKeys36>
 >;
 type Contract193 = Assert<
+	Equal<keyof Pick<Native0.ComboboxArrowProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract194 = Assert<Equal<Parameters<typeof Native0.ComboboxBackdrop>['length'], 1>>;
+type Contract195 = Assert<
+	Equal<keyof Pick<Native0.ComboboxBackdropProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract196 = Assert<
 	Equal<keyof Pick<Native0.ComboboxBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract194 = Assert<Equal<Parameters<typeof Native0.ComboboxPortal>['length'], 1>>;
-type Contract195 = Assert<Equal<keyof Native0.ComboboxPortalState, never>>;
-type Contract196 = Assert<
+type Contract197 = Assert<Equal<Parameters<typeof Native0.ComboboxPortal>['length'], 1>>;
+type Contract198 = Assert<Equal<keyof Native0.ComboboxPortalState, never>>;
+type Contract199 = Assert<
 	Equal<keyof Pick<Native0.ComboboxPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract197 = Assert<Equal<Parameters<typeof Native0.ComboboxEmpty>['length'], 1>>;
-type Contract198 = Assert<Equal<keyof Native0.ComboboxEmptyState, never>>;
-type Contract199 = Assert<
+type Contract200 = Assert<Equal<Parameters<typeof Native0.ComboboxEmpty>['length'], 1>>;
+type Contract201 = Assert<Equal<keyof Native0.ComboboxEmptyState, never>>;
+type Contract202 = Assert<
 	Equal<keyof Pick<Native0.ComboboxEmptyProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract200 = Assert<Equal<Parameters<typeof Native0.ComboboxGroup>['length'], 1>>;
-type Contract201 = Assert<Equal<keyof Native0.ComboboxGroupState, never>>;
-type Contract202 = Assert<
-	Equal<keyof Pick<Native0.ComboboxGroupProps, PublishedKeys36>, PublishedKeys36>
->;
-type Contract203 = Assert<Equal<Parameters<typeof Native0.ComboboxGroupLabel>['length'], 1>>;
-type Contract204 = Assert<Equal<keyof Native0.ComboboxGroupLabelState, never>>;
+type Contract203 = Assert<Equal<Parameters<typeof Native0.ComboboxGroup>['length'], 1>>;
+type Contract204 = Assert<Equal<keyof Native0.ComboboxGroupState, never>>;
 type Contract205 = Assert<
+	Equal<keyof Pick<Native0.ComboboxGroupProps, PublishedKeys37>, PublishedKeys37>
+>;
+type Contract206 = Assert<Equal<Parameters<typeof Native0.ComboboxGroupLabel>['length'], 1>>;
+type Contract207 = Assert<Equal<keyof Native0.ComboboxGroupLabelState, never>>;
+type Contract208 = Assert<
 	Equal<keyof Pick<Native0.ComboboxGroupLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract206 = Assert<Equal<Parameters<typeof Native0.ComboboxRow>['length'], 1>>;
-type Contract207 = Assert<Equal<keyof Native0.ComboboxRowState, never>>;
-type Contract208 = Assert<
+type Contract209 = Assert<Equal<Parameters<typeof Native0.ComboboxRow>['length'], 1>>;
+type Contract210 = Assert<Equal<keyof Native0.ComboboxRowState, never>>;
+type Contract211 = Assert<
 	Equal<keyof Pick<Native0.ComboboxRowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract209 = Assert<Equal<Parameters<typeof Native0.ComboboxChips>['length'], 1>>;
-type Contract210 = Assert<Equal<keyof Native0.ComboboxChipsState, never>>;
-type Contract211 = Assert<
+type Contract212 = Assert<Equal<Parameters<typeof Native0.ComboboxChips>['length'], 1>>;
+type Contract213 = Assert<Equal<keyof Native0.ComboboxChipsState, never>>;
+type Contract214 = Assert<
 	Equal<keyof Pick<Native0.ComboboxChipsProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract212 = Assert<Equal<Parameters<typeof Native0.ComboboxChip>['length'], 1>>;
-type Contract213 = Assert<
+type Contract215 = Assert<Equal<Parameters<typeof Native0.ComboboxChip>['length'], 1>>;
+type Contract216 = Assert<
 	Equal<keyof Pick<Native0.ComboboxChipState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract214 = Assert<
+type Contract217 = Assert<
 	Equal<keyof Pick<Native0.ComboboxChipProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract215 = Assert<Equal<Parameters<typeof Native0.ComboboxChipRemove>['length'], 1>>;
-type Contract216 = Assert<
+type Contract218 = Assert<Equal<Parameters<typeof Native0.ComboboxChipRemove>['length'], 1>>;
+type Contract219 = Assert<
 	Equal<keyof Pick<Native0.ComboboxChipRemoveState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract217 = Assert<
+type Contract220 = Assert<
 	Equal<keyof Pick<Native0.ComboboxChipRemoveProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract218 = Assert<Equal<Parameters<typeof Native0.ComboboxClear>['length'], 1>>;
-type Contract219 = Assert<
-	Equal<keyof Pick<Native0.ComboboxClearState, PublishedKeys30>, PublishedKeys30>
+type Contract221 = Assert<Equal<Parameters<typeof Native0.ComboboxClear>['length'], 1>>;
+type Contract222 = Assert<
+	Equal<keyof Pick<Native0.ComboboxClearState, PublishedKeys31>, PublishedKeys31>
 >;
-type Contract220 = Assert<
-	Equal<keyof Pick<Native0.ComboboxClearProps, PublishedKeys29>, PublishedKeys29>
->;
-type Contract221 = Assert<Equal<Parameters<typeof Native0.ComboboxStatus>['length'], 1>>;
-type Contract222 = Assert<Equal<keyof Native0.ComboboxStatusState, never>>;
 type Contract223 = Assert<
+	Equal<keyof Pick<Native0.ComboboxClearProps, PublishedKeys30>, PublishedKeys30>
+>;
+type Contract224 = Assert<Equal<Parameters<typeof Native0.ComboboxStatus>['length'], 1>>;
+type Contract225 = Assert<Equal<keyof Native0.ComboboxStatusState, never>>;
+type Contract226 = Assert<
 	Equal<keyof Pick<Native0.ComboboxStatusProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract224 = Assert<Equal<Parameters<typeof Native0.ComboboxCollection>['length'], 1>>;
-type Contract225 = Assert<Equal<keyof Native0.ComboboxCollectionState, never>>;
-type Contract226 = Assert<
-	Equal<keyof Pick<Native0.ComboboxCollectionProps, PublishedKeys37>, PublishedKeys37>
+type Contract227 = Assert<Equal<Parameters<typeof Native0.ComboboxCollection>['length'], 1>>;
+type Contract228 = Assert<Equal<keyof Native0.ComboboxCollectionState, never>>;
+type Contract229 = Assert<
+	Equal<keyof Pick<Native0.ComboboxCollectionProps, PublishedKeys38>, PublishedKeys38>
 >;
-type Contract227 = Assert<
-	Equal<keyof Pick<Native0.ComboboxSeparatorProps, PublishedKeys25>, PublishedKeys25>
->;
-type Contract228 = Assert<
-	Equal<keyof Pick<Native0.ComboboxSeparatorState, PublishedKeys26>, PublishedKeys26>
->;
-type Contract229 = Assert<Equal<Parameters<typeof Native0.ComboboxSeparator>['length'], 1>>;
 type Contract230 = Assert<
-	Equal<keyof Pick<typeof Native0.ContextMenu, PublishedKeys73>, PublishedKeys73>
+	Equal<keyof Pick<Native0.ComboboxSeparatorProps, PublishedKeys26>, PublishedKeys26>
 >;
 type Contract231 = Assert<
+	Equal<keyof Pick<Native0.ComboboxSeparatorState, PublishedKeys27>, PublishedKeys27>
+>;
+type Contract232 = Assert<Equal<Parameters<typeof Native0.ComboboxSeparator>['length'], 1>>;
+type Contract233 = Assert<
+	Equal<keyof Pick<typeof Native0.ContextMenu, PublishedKeys73>, PublishedKeys73>
+>;
+type Contract234 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract232 = Assert<
+type Contract235 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract233 = Assert<
+type Contract236 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract234 = Assert<Equal<keyof Native0.ContextMenuPortalState, never>>;
-type Contract235 = Assert<
+type Contract237 = Assert<Equal<keyof Native0.ContextMenuPortalState, never>>;
+type Contract238 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuPopupProps, PublishedKeys74>, PublishedKeys74>
 >;
-type Contract236 = Assert<
+type Contract239 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuPopupState, PublishedKeys75>, PublishedKeys75>
 >;
-type Contract237 = Assert<
+type Contract240 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract238 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuArrowState, PublishedKeys35>, PublishedKeys35>
+type Contract241 = Assert<
+	Equal<keyof Pick<Native0.ContextMenuArrowState, PublishedKeys36>, PublishedKeys36>
 >;
-type Contract239 = Assert<
+type Contract242 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuGroupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract240 = Assert<Equal<keyof Native0.ContextMenuGroupState, never>>;
-type Contract241 = Assert<
+type Contract243 = Assert<Equal<keyof Native0.ContextMenuGroupState, never>>;
+type Contract244 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuGroupLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract242 = Assert<Equal<keyof Native0.ContextMenuGroupLabelState, never>>;
-type Contract243 = Assert<
+type Contract245 = Assert<Equal<keyof Native0.ContextMenuGroupLabelState, never>>;
+type Contract246 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuItemProps, PublishedKeys76>, PublishedKeys76>
 >;
-type Contract244 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuItemState, PublishedKeys43>, PublishedKeys43>
->;
-type Contract245 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuLinkItemProps, PublishedKeys77>, PublishedKeys77>
->;
-type Contract246 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuLinkItemState, PublishedKeys78>, PublishedKeys78>
->;
 type Contract247 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuCheckboxItemProps, PublishedKeys79>, PublishedKeys79>
+	Equal<keyof Pick<Native0.ContextMenuItemState, PublishedKeys44>, PublishedKeys44>
 >;
 type Contract248 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuCheckboxItemState, PublishedKeys80>, PublishedKeys80>
+	Equal<keyof Pick<Native0.ContextMenuLinkItemProps, PublishedKeys77>, PublishedKeys77>
 >;
 type Contract249 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuCheckboxItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+	Equal<keyof Pick<Native0.ContextMenuLinkItemState, PublishedKeys78>, PublishedKeys78>
 >;
 type Contract250 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuCheckboxItemIndicatorState, PublishedKeys81>, PublishedKeys81>
+	Equal<keyof Pick<Native0.ContextMenuCheckboxItemProps, PublishedKeys79>, PublishedKeys79>
 >;
 type Contract251 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuRadioGroupProps, PublishedKeys82>, PublishedKeys82>
+	Equal<keyof Pick<Native0.ContextMenuCheckboxItemState, PublishedKeys80>, PublishedKeys80>
 >;
 type Contract252 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuRadioGroupState, PublishedKeys15>, PublishedKeys15>
+	Equal<keyof Pick<Native0.ContextMenuCheckboxItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
 type Contract253 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuRadioItemProps, PublishedKeys83>, PublishedKeys83>
+	Equal<keyof Pick<Native0.ContextMenuCheckboxItemIndicatorState, PublishedKeys81>, PublishedKeys81>
 >;
 type Contract254 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuRadioItemState, PublishedKeys80>, PublishedKeys80>
+	Equal<keyof Pick<Native0.ContextMenuRadioGroupProps, PublishedKeys82>, PublishedKeys82>
 >;
 type Contract255 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuRadioItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+	Equal<keyof Pick<Native0.ContextMenuRadioGroupState, PublishedKeys15>, PublishedKeys15>
 >;
 type Contract256 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuRadioItemIndicatorState, PublishedKeys81>, PublishedKeys81>
+	Equal<keyof Pick<Native0.ContextMenuRadioItemProps, PublishedKeys83>, PublishedKeys83>
 >;
 type Contract257 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuSubmenuRootProps, PublishedKeys84>, PublishedKeys84>
+	Equal<keyof Pick<Native0.ContextMenuRadioItemState, PublishedKeys80>, PublishedKeys80>
 >;
-type Contract258 = Assert<Equal<keyof Native0.ContextMenuSubmenuRootState, never>>;
+type Contract258 = Assert<
+	Equal<keyof Pick<Native0.ContextMenuRadioItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
+>;
 type Contract259 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuSubmenuTriggerProps, PublishedKeys85>, PublishedKeys85>
+	Equal<keyof Pick<Native0.ContextMenuRadioItemIndicatorState, PublishedKeys81>, PublishedKeys81>
 >;
 type Contract260 = Assert<
+	Equal<keyof Pick<Native0.ContextMenuSubmenuRootProps, PublishedKeys84>, PublishedKeys84>
+>;
+type Contract261 = Assert<Equal<keyof Native0.ContextMenuSubmenuRootState, never>>;
+type Contract262 = Assert<
+	Equal<keyof Pick<Native0.ContextMenuSubmenuTriggerProps, PublishedKeys85>, PublishedKeys85>
+>;
+type Contract263 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuSubmenuTriggerState, PublishedKeys86>, PublishedKeys86>
 >;
-type Contract261 = Assert<Equal<Parameters<typeof Native0.ContextMenuRoot>['length'], 1>>;
-type Contract262 = Assert<Equal<keyof Native0.ContextMenuRootState, never>>;
-type Contract263 = Assert<
+type Contract264 = Assert<Equal<Parameters<typeof Native0.ContextMenuRoot>['length'], 1>>;
+type Contract265 = Assert<Equal<keyof Native0.ContextMenuRootState, never>>;
+type Contract266 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuRootProps, PublishedKeys84>, PublishedKeys84>
 >;
-type Contract264 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract267 = Assert<
+	Equal<keyof Pick<Native0.ContextMenuRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract265 = Assert<
+type Contract268 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract266 = Assert<
+type Contract269 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract267 = Assert<Equal<Parameters<typeof Native0.ContextMenuTrigger>['length'], 1>>;
-type Contract268 = Assert<
+type Contract270 = Assert<Equal<Parameters<typeof Native0.ContextMenuTrigger>['length'], 1>>;
+type Contract271 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuTriggerState, PublishedKeys87>, PublishedKeys87>
 >;
-type Contract269 = Assert<
+type Contract272 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuTriggerProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract270 = Assert<
+type Contract273 = Assert<
 	Equal<keyof Pick<Native0.ContextMenuPositionerState, PublishedKeys88>, PublishedKeys88>
 >;
-type Contract271 = Assert<Equal<Parameters<typeof Native0.ContextMenuPositioner>['length'], 1>>;
-type Contract272 = Assert<
-	Equal<keyof Pick<Native0.ContextMenuPositionerProps, PublishedKeys32>, PublishedKeys32>
->;
-type Contract273 = Assert<Equal<Parameters<typeof Native0.CSPProvider>['length'], 1>>;
-type Contract274 = Assert<Equal<keyof Native0.CSPProviderState, never>>;
+type Contract274 = Assert<Equal<Parameters<typeof Native0.ContextMenuPositioner>['length'], 1>>;
 type Contract275 = Assert<
+	Equal<keyof Pick<Native0.ContextMenuPositionerProps, PublishedKeys33>, PublishedKeys33>
+>;
+type Contract276 = Assert<Equal<Parameters<typeof Native0.CSPProvider>['length'], 1>>;
+type Contract277 = Assert<Equal<keyof Native0.CSPProviderState, never>>;
+type Contract278 = Assert<
 	Equal<keyof Pick<Native0.CSPProviderProps, PublishedKeys89>, PublishedKeys89>
 >;
-type Contract276 = Assert<
+type Contract279 = Assert<
 	Equal<keyof Pick<typeof Native0.Dialog, PublishedKeys12>, PublishedKeys12>
 >;
-type Contract277 = Assert<Equal<Parameters<typeof Native0.DialogRoot>['length'], 1>>;
-type Contract278 = Assert<Equal<keyof Native0.DialogRootState, never>>;
-type Contract279 = Assert<
+type Contract280 = Assert<
+	Equal<keyof Pick<typeof Native0.DialogHandle, PublishedKeys19>, PublishedKeys19>
+>;
+type Contract281 = Assert<Equal<Parameters<typeof Native0.createDialogHandle>['length'], 0>>;
+type Contract282 = Assert<Equal<Parameters<typeof Native0.DialogRoot>['length'], 1>>;
+type Contract283 = Assert<Equal<keyof Native0.DialogRootState, never>>;
+type Contract284 = Assert<
 	Equal<keyof Pick<Native0.DialogRootProps, PublishedKeys90>, PublishedKeys90>
 >;
-type Contract280 = Assert<
-	Equal<keyof Pick<Native0.DialogRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract285 = Assert<
+	Equal<keyof Pick<Native0.DialogRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract281 = Assert<
+type Contract286 = Assert<
 	Equal<keyof Pick<Native0.DialogRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract282 = Assert<
-	Equal<keyof Pick<Native0.DialogRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract287 = Assert<
+	Equal<keyof Pick<Native0.DialogRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract283 = Assert<Equal<Parameters<Native0.DialogTrigger>['length'], 1>>;
-type Contract284 = Assert<
-	Equal<keyof Pick<Native0.DialogTriggerProps, PublishedKeys22>, PublishedKeys22>
+type Contract288 = Assert<Equal<Parameters<Native0.DialogTrigger>['length'], 1>>;
+type Contract289 = Assert<
+	Equal<keyof Pick<Native0.DialogTriggerProps, PublishedKeys23>, PublishedKeys23>
 >;
-type Contract285 = Assert<
-	Equal<keyof Pick<Native0.DialogTriggerState, PublishedKeys23>, PublishedKeys23>
+type Contract290 = Assert<
+	Equal<keyof Pick<Native0.DialogTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
-type Contract286 = Assert<Equal<Parameters<typeof Native0.DialogPortal>['length'], 1>>;
-type Contract287 = Assert<Equal<keyof Native0.DialogPortalState, never>>;
-type Contract288 = Assert<
+type Contract291 = Assert<Equal<Parameters<typeof Native0.DialogPortal>['length'], 1>>;
+type Contract292 = Assert<Equal<keyof Native0.DialogPortalState, never>>;
+type Contract293 = Assert<
 	Equal<keyof Pick<Native0.DialogPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract289 = Assert<Equal<Parameters<typeof Native0.DialogPopup>['length'], 1>>;
-type Contract290 = Assert<
+type Contract294 = Assert<Equal<Parameters<typeof Native0.DialogPopup>['length'], 1>>;
+type Contract295 = Assert<
 	Equal<keyof Pick<Native0.DialogPopupProps, PublishedKeys16>, PublishedKeys16>
 >;
-type Contract291 = Assert<
+type Contract296 = Assert<
 	Equal<keyof Pick<Native0.DialogPopupState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract292 = Assert<Equal<Parameters<typeof Native0.DialogBackdrop>['length'], 1>>;
-type Contract293 = Assert<
+type Contract297 = Assert<Equal<Parameters<typeof Native0.DialogBackdrop>['length'], 1>>;
+type Contract298 = Assert<
 	Equal<keyof Pick<Native0.DialogBackdropProps, PublishedKeys13>, PublishedKeys13>
 >;
-type Contract294 = Assert<
+type Contract299 = Assert<
 	Equal<keyof Pick<Native0.DialogBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract295 = Assert<Equal<Parameters<typeof Native0.DialogTitle>['length'], 1>>;
-type Contract296 = Assert<
+type Contract300 = Assert<Equal<Parameters<typeof Native0.DialogTitle>['length'], 1>>;
+type Contract301 = Assert<
 	Equal<keyof Pick<Native0.DialogTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract297 = Assert<Equal<keyof Native0.DialogTitleState, never>>;
-type Contract298 = Assert<Equal<Parameters<typeof Native0.DialogDescription>['length'], 1>>;
-type Contract299 = Assert<
+type Contract302 = Assert<Equal<keyof Native0.DialogTitleState, never>>;
+type Contract303 = Assert<Equal<Parameters<typeof Native0.DialogDescription>['length'], 1>>;
+type Contract304 = Assert<
 	Equal<keyof Pick<Native0.DialogDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract300 = Assert<Equal<keyof Native0.DialogDescriptionState, never>>;
-type Contract301 = Assert<Equal<Parameters<typeof Native0.DialogClose>['length'], 1>>;
-type Contract302 = Assert<
+type Contract305 = Assert<Equal<keyof Native0.DialogDescriptionState, never>>;
+type Contract306 = Assert<Equal<Parameters<typeof Native0.DialogClose>['length'], 1>>;
+type Contract307 = Assert<
 	Equal<keyof Pick<Native0.DialogCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract303 = Assert<
+type Contract308 = Assert<
 	Equal<keyof Pick<Native0.DialogCloseState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract304 = Assert<Equal<Parameters<typeof Native0.DialogViewport>['length'], 1>>;
-type Contract305 = Assert<
+type Contract309 = Assert<Equal<Parameters<typeof Native0.DialogViewport>['length'], 1>>;
+type Contract310 = Assert<
 	Equal<keyof Pick<Native0.DialogViewportState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract306 = Assert<
+type Contract311 = Assert<
 	Equal<keyof Pick<Native0.DialogViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract307 = Assert<Equal<Parameters<typeof Native0.DirectionProvider>['length'], 1>>;
-type Contract308 = Assert<Equal<Parameters<typeof Native0.useDirection>['length'], 0>>;
-type Contract309 = Assert<Equal<keyof Pick<Native0.TextDirection, PublishedKeys4>, PublishedKeys4>>;
-type Contract310 = Assert<
+type Contract312 = Assert<Equal<Parameters<typeof Native0.DirectionProvider>['length'], 1>>;
+type Contract313 = Assert<Equal<Parameters<typeof Native0.useDirection>['length'], 0>>;
+type Contract314 = Assert<Equal<keyof Pick<Native0.TextDirection, PublishedKeys4>, PublishedKeys4>>;
+type Contract315 = Assert<
 	Equal<keyof Pick<Native0.DirectionProviderProps, PublishedKeys91>, PublishedKeys91>
 >;
-type Contract311 = Assert<
+type Contract316 = Assert<
 	Equal<keyof Pick<typeof Native0.Drawer, PublishedKeys92>, PublishedKeys92>
 >;
-type Contract312 = Assert<Equal<Parameters<typeof Native0.DrawerRoot>['length'], 1>>;
-type Contract313 = Assert<Equal<keyof Native0.DrawerRootState, never>>;
-type Contract314 = Assert<
+type Contract317 = Assert<Equal<Parameters<typeof Native0.DrawerRoot>['length'], 1>>;
+type Contract318 = Assert<Equal<keyof Native0.DrawerRootState, never>>;
+type Contract319 = Assert<
 	Equal<keyof Pick<Native0.DrawerRootProps, PublishedKeys93>, PublishedKeys93>
 >;
-type Contract315 = Assert<
-	Equal<keyof Pick<Native0.DrawerRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract320 = Assert<
+	Equal<keyof Pick<Native0.DrawerRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract316 = Assert<
+type Contract321 = Assert<
 	Equal<keyof Pick<Native0.DrawerRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract317 = Assert<
-	Equal<keyof Pick<Native0.DrawerRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract322 = Assert<
+	Equal<keyof Pick<Native0.DrawerRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract318 = Assert<
+type Contract323 = Assert<
 	Equal<keyof Pick<Native0.DrawerRootSnapPointChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract319 = Assert<
+type Contract324 = Assert<
 	Equal<keyof Pick<Native0.DrawerRootSnapPointChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract320 = Assert<Equal<Parameters<typeof Native0.DrawerProvider>['length'], 1>>;
-type Contract321 = Assert<Equal<keyof Native0.DrawerProviderState, never>>;
-type Contract322 = Assert<
-	Equal<keyof Pick<Native0.DrawerProviderProps, PublishedKeys37>, PublishedKeys37>
+type Contract325 = Assert<Equal<Parameters<typeof Native0.DrawerProvider>['length'], 1>>;
+type Contract326 = Assert<Equal<keyof Native0.DrawerProviderState, never>>;
+type Contract327 = Assert<
+	Equal<keyof Pick<Native0.DrawerProviderProps, PublishedKeys38>, PublishedKeys38>
 >;
-type Contract323 = Assert<Equal<Parameters<typeof Native0.DrawerIndent>['length'], 1>>;
-type Contract324 = Assert<
+type Contract328 = Assert<Equal<Parameters<typeof Native0.DrawerIndent>['length'], 1>>;
+type Contract329 = Assert<
 	Equal<keyof Pick<Native0.DrawerIndentState, PublishedKeys94>, PublishedKeys94>
 >;
-type Contract325 = Assert<
+type Contract330 = Assert<
 	Equal<keyof Pick<Native0.DrawerIndentProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract326 = Assert<Equal<Parameters<typeof Native0.DrawerIndentBackground>['length'], 1>>;
-type Contract327 = Assert<
+type Contract331 = Assert<Equal<Parameters<typeof Native0.DrawerIndentBackground>['length'], 1>>;
+type Contract332 = Assert<
 	Equal<keyof Pick<Native0.DrawerIndentBackgroundState, PublishedKeys94>, PublishedKeys94>
 >;
-type Contract328 = Assert<
+type Contract333 = Assert<
 	Equal<keyof Pick<Native0.DrawerIndentBackgroundProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract329 = Assert<Equal<Parameters<Native0.DrawerTrigger>['length'], 1>>;
-type Contract330 = Assert<
-	Equal<keyof Pick<Native0.DrawerTriggerProps, PublishedKeys22>, PublishedKeys22>
+type Contract334 = Assert<Equal<Parameters<Native0.DrawerTrigger>['length'], 1>>;
+type Contract335 = Assert<
+	Equal<keyof Pick<Native0.DrawerTriggerProps, PublishedKeys23>, PublishedKeys23>
 >;
-type Contract331 = Assert<
-	Equal<keyof Pick<Native0.DrawerTriggerState, PublishedKeys23>, PublishedKeys23>
+type Contract336 = Assert<
+	Equal<keyof Pick<Native0.DrawerTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
-type Contract332 = Assert<Equal<Parameters<Native0.DrawerPortal>['length'], 1>>;
-type Contract333 = Assert<Equal<keyof Native0.DrawerPortalState, never>>;
-type Contract334 = Assert<
+type Contract337 = Assert<Equal<Parameters<Native0.DrawerPortal>['length'], 1>>;
+type Contract338 = Assert<Equal<keyof Native0.DrawerPortalState, never>>;
+type Contract339 = Assert<
 	Equal<keyof Pick<Native0.DrawerPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract335 = Assert<Equal<Parameters<typeof Native0.DrawerPopup>['length'], 1>>;
-type Contract336 = Assert<
+type Contract340 = Assert<Equal<Parameters<typeof Native0.DrawerPopup>['length'], 1>>;
+type Contract341 = Assert<
 	Equal<keyof Pick<Native0.DrawerPopupProps, PublishedKeys16>, PublishedKeys16>
 >;
-type Contract337 = Assert<
+type Contract342 = Assert<
 	Equal<keyof Pick<Native0.DrawerPopupState, PublishedKeys95>, PublishedKeys95>
 >;
-type Contract338 = Assert<Equal<Parameters<typeof Native0.DrawerSwipeArea>['length'], 1>>;
-type Contract339 = Assert<
+type Contract343 = Assert<Equal<Parameters<typeof Native0.DrawerSwipeArea>['length'], 1>>;
+type Contract344 = Assert<
 	Equal<keyof Pick<Native0.DrawerSwipeAreaProps, PublishedKeys96>, PublishedKeys96>
 >;
-type Contract340 = Assert<
+type Contract345 = Assert<
 	Equal<keyof Pick<Native0.DrawerSwipeAreaState, PublishedKeys97>, PublishedKeys97>
 >;
-type Contract341 = Assert<Equal<Parameters<typeof Native0.DrawerContent>['length'], 1>>;
-type Contract342 = Assert<
+type Contract346 = Assert<Equal<Parameters<typeof Native0.DrawerContent>['length'], 1>>;
+type Contract347 = Assert<
 	Equal<keyof Pick<Native0.DrawerContentProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract343 = Assert<Equal<keyof Native0.DrawerContentState, never>>;
-type Contract344 = Assert<Equal<Parameters<typeof Native0.DrawerBackdrop>['length'], 1>>;
-type Contract345 = Assert<
+type Contract348 = Assert<Equal<keyof Native0.DrawerContentState, never>>;
+type Contract349 = Assert<Equal<Parameters<typeof Native0.DrawerBackdrop>['length'], 1>>;
+type Contract350 = Assert<
 	Equal<keyof Pick<Native0.DrawerBackdropProps, PublishedKeys13>, PublishedKeys13>
 >;
-type Contract346 = Assert<
+type Contract351 = Assert<
 	Equal<keyof Pick<Native0.DrawerBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract347 = Assert<Equal<Parameters<typeof Native0.DrawerViewport>['length'], 1>>;
-type Contract348 = Assert<
+type Contract352 = Assert<Equal<Parameters<typeof Native0.DrawerViewport>['length'], 1>>;
+type Contract353 = Assert<
 	Equal<keyof Pick<Native0.DrawerViewportState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract349 = Assert<
+type Contract354 = Assert<
 	Equal<keyof Pick<Native0.DrawerViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract350 = Assert<Equal<Parameters<Native0.DrawerTitle>['length'], 1>>;
-type Contract351 = Assert<
+type Contract355 = Assert<Equal<Parameters<Native0.DrawerTitle>['length'], 1>>;
+type Contract356 = Assert<
 	Equal<keyof Pick<Native0.DrawerTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract352 = Assert<Equal<keyof Native0.DrawerTitleState, never>>;
-type Contract353 = Assert<Equal<Parameters<Native0.DrawerDescription>['length'], 1>>;
-type Contract354 = Assert<
+type Contract357 = Assert<Equal<keyof Native0.DrawerTitleState, never>>;
+type Contract358 = Assert<Equal<Parameters<Native0.DrawerDescription>['length'], 1>>;
+type Contract359 = Assert<
 	Equal<keyof Pick<Native0.DrawerDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract355 = Assert<Equal<keyof Native0.DrawerDescriptionState, never>>;
-type Contract356 = Assert<Equal<Parameters<Native0.DrawerClose>['length'], 1>>;
-type Contract357 = Assert<
+type Contract360 = Assert<Equal<keyof Native0.DrawerDescriptionState, never>>;
+type Contract361 = Assert<Equal<Parameters<Native0.DrawerClose>['length'], 1>>;
+type Contract362 = Assert<
 	Equal<keyof Pick<Native0.DrawerCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract358 = Assert<
+type Contract363 = Assert<
 	Equal<keyof Pick<Native0.DrawerCloseState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract359 = Assert<
+type Contract364 = Assert<
 	Equal<Parameters<typeof Native0.DrawerVirtualKeyboardProvider>['length'], 1>
 >;
-type Contract360 = Assert<Equal<keyof Native0.DrawerVirtualKeyboardProviderState, never>>;
-type Contract361 = Assert<
-	Equal<keyof Pick<Native0.DrawerVirtualKeyboardProviderProps, PublishedKeys37>, PublishedKeys37>
->;
-type Contract362 = Assert<
-	Equal<keyof Pick<typeof Native0.Field, PublishedKeys98>, PublishedKeys98>
->;
-type Contract363 = Assert<Equal<Parameters<typeof Native0.FieldRoot>['length'], 1>>;
-type Contract364 = Assert<
-	Equal<keyof Pick<Native0.FieldValidityData, PublishedKeys99>, PublishedKeys99>
->;
-type Contract365 = Assert<
-	Equal<keyof Pick<Native0.FieldRootActions, PublishedKeys100>, PublishedKeys100>
->;
+type Contract365 = Assert<Equal<keyof Native0.DrawerVirtualKeyboardProviderState, never>>;
 type Contract366 = Assert<
-	Equal<keyof Pick<Native0.FieldRootState, PublishedKeys56>, PublishedKeys56>
+	Equal<keyof Pick<Native0.DrawerVirtualKeyboardProviderProps, PublishedKeys38>, PublishedKeys38>
 >;
 type Contract367 = Assert<
-	Equal<keyof Pick<Native0.FieldRootProps, PublishedKeys101>, PublishedKeys101>
+	Equal<keyof Pick<typeof Native0.Field, PublishedKeys98>, PublishedKeys98>
 >;
-type Contract368 = Assert<Equal<Parameters<typeof Native0.FieldLabel>['length'], 1>>;
+type Contract368 = Assert<Equal<Parameters<typeof Native0.FieldRoot>['length'], 1>>;
 type Contract369 = Assert<
-	Equal<keyof Pick<Native0.FieldLabelState, PublishedKeys56>, PublishedKeys56>
+	Equal<keyof Pick<Native0.FieldValidityData, PublishedKeys99>, PublishedKeys99>
 >;
 type Contract370 = Assert<
+	Equal<keyof Pick<Native0.FieldRootActions, PublishedKeys100>, PublishedKeys100>
+>;
+type Contract371 = Assert<
+	Equal<keyof Pick<Native0.FieldRootState, PublishedKeys57>, PublishedKeys57>
+>;
+type Contract372 = Assert<
+	Equal<keyof Pick<Native0.FieldRootProps, PublishedKeys101>, PublishedKeys101>
+>;
+type Contract373 = Assert<Equal<Parameters<typeof Native0.FieldLabel>['length'], 1>>;
+type Contract374 = Assert<
+	Equal<keyof Pick<Native0.FieldLabelState, PublishedKeys57>, PublishedKeys57>
+>;
+type Contract375 = Assert<
 	Equal<keyof Pick<Native0.FieldLabelProps, PublishedKeys102>, PublishedKeys102>
 >;
-type Contract371 = Assert<Equal<Parameters<typeof Native0.FieldDescription>['length'], 1>>;
-type Contract372 = Assert<
-	Equal<keyof Pick<Native0.FieldDescriptionState, PublishedKeys56>, PublishedKeys56>
+type Contract376 = Assert<Equal<Parameters<typeof Native0.FieldDescription>['length'], 1>>;
+type Contract377 = Assert<
+	Equal<keyof Pick<Native0.FieldDescriptionState, PublishedKeys57>, PublishedKeys57>
 >;
-type Contract373 = Assert<
+type Contract378 = Assert<
 	Equal<keyof Pick<Native0.FieldDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract374 = Assert<Equal<Parameters<typeof Native0.FieldError>['length'], 1>>;
-type Contract375 = Assert<
+type Contract379 = Assert<Equal<Parameters<typeof Native0.FieldError>['length'], 1>>;
+type Contract380 = Assert<
 	Equal<keyof Pick<Native0.FieldErrorState, PublishedKeys103>, PublishedKeys103>
 >;
-type Contract376 = Assert<
+type Contract381 = Assert<
 	Equal<keyof Pick<Native0.FieldErrorProps, PublishedKeys104>, PublishedKeys104>
 >;
-type Contract377 = Assert<Equal<Parameters<typeof Native0.FieldControl>['length'], 1>>;
-type Contract378 = Assert<
-	Equal<keyof Pick<Native0.FieldControlState, PublishedKeys56>, PublishedKeys56>
->;
-type Contract379 = Assert<
-	Equal<keyof Pick<Native0.FieldControlProps, PublishedKeys105>, PublishedKeys105>
->;
-type Contract380 = Assert<
-	Equal<keyof Pick<Native0.FieldControlChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract381 = Assert<
-	Equal<keyof Pick<Native0.FieldControlChangeEventDetails, PublishedKeys5>, PublishedKeys5>
->;
-type Contract382 = Assert<Equal<Parameters<typeof Native0.FieldValidity>['length'], 1>>;
+type Contract382 = Assert<Equal<Parameters<typeof Native0.FieldControl>['length'], 1>>;
 type Contract383 = Assert<
-	Equal<keyof Pick<Native0.FieldValidityState, PublishedKeys106>, PublishedKeys106>
+	Equal<keyof Pick<Native0.FieldControlState, PublishedKeys57>, PublishedKeys57>
 >;
 type Contract384 = Assert<
-	Equal<keyof Pick<Native0.FieldValidityProps, PublishedKeys37>, PublishedKeys37>
+	Equal<keyof Pick<Native0.FieldControlProps, PublishedKeys105>, PublishedKeys105>
 >;
-type Contract385 = Assert<Equal<Parameters<typeof Native0.FieldItem>['length'], 1>>;
+type Contract385 = Assert<
+	Equal<keyof Pick<Native0.FieldControlChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
 type Contract386 = Assert<
-	Equal<keyof Pick<Native0.FieldItemState, PublishedKeys56>, PublishedKeys56>
+	Equal<keyof Pick<Native0.FieldControlChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract387 = Assert<
+type Contract387 = Assert<Equal<Parameters<typeof Native0.FieldValidity>['length'], 1>>;
+type Contract388 = Assert<
+	Equal<keyof Pick<Native0.FieldValidityState, PublishedKeys106>, PublishedKeys106>
+>;
+type Contract389 = Assert<
+	Equal<keyof Pick<Native0.FieldValidityProps, PublishedKeys38>, PublishedKeys38>
+>;
+type Contract390 = Assert<Equal<Parameters<typeof Native0.FieldItem>['length'], 1>>;
+type Contract391 = Assert<
+	Equal<keyof Pick<Native0.FieldItemState, PublishedKeys57>, PublishedKeys57>
+>;
+type Contract392 = Assert<
 	Equal<keyof Pick<Native0.FieldItemProps, PublishedKeys107>, PublishedKeys107>
 >;
-type Contract388 = Assert<
+type Contract393 = Assert<
 	Equal<keyof Pick<typeof Native0.Fieldset, PublishedKeys108>, PublishedKeys108>
 >;
-type Contract389 = Assert<Equal<Parameters<typeof Native0.FieldsetRoot>['length'], 1>>;
-type Contract390 = Assert<
+type Contract394 = Assert<Equal<Parameters<typeof Native0.FieldsetRoot>['length'], 1>>;
+type Contract395 = Assert<
 	Equal<keyof Pick<Native0.FieldsetRootState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract391 = Assert<
+type Contract396 = Assert<
 	Equal<keyof Pick<Native0.FieldsetRootProps, PublishedKeys109>, PublishedKeys109>
 >;
-type Contract392 = Assert<Equal<Parameters<typeof Native0.FieldsetLegend>['length'], 1>>;
-type Contract393 = Assert<
+type Contract397 = Assert<Equal<Parameters<typeof Native0.FieldsetLegend>['length'], 1>>;
+type Contract398 = Assert<
 	Equal<keyof Pick<Native0.FieldsetLegendState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract394 = Assert<
+type Contract399 = Assert<
 	Equal<keyof Pick<Native0.FieldsetLegendProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract395 = Assert<Equal<Parameters<typeof Native0.Form>['length'], 1>>;
-type Contract396 = Assert<
+type Contract400 = Assert<Equal<Parameters<typeof Native0.Form>['length'], 1>>;
+type Contract401 = Assert<
 	Equal<keyof Pick<Native0.FormSubmitEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract397 = Assert<
+type Contract402 = Assert<
 	Equal<keyof Pick<Native0.FormSubmitEventDetails, PublishedKeys110>, PublishedKeys110>
 >;
-type Contract398 = Assert<
+type Contract403 = Assert<
 	Equal<keyof Pick<Native0.FormValidationMode, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract399 = Assert<
+type Contract404 = Assert<
 	Equal<keyof Pick<Native0.FormActions, PublishedKeys100>, PublishedKeys100>
 >;
-type Contract400 = Assert<Equal<keyof Native0.FormState, never>>;
-type Contract401 = Assert<Equal<keyof Pick<Native0.FormProps, PublishedKeys111>, PublishedKeys111>>;
-type Contract402 = Assert<Equal<Parameters<typeof Native0.Input>['length'], 1>>;
-type Contract403 = Assert<
+type Contract405 = Assert<Equal<keyof Native0.FormState, never>>;
+type Contract406 = Assert<Equal<keyof Pick<Native0.FormProps, PublishedKeys111>, PublishedKeys111>>;
+type Contract407 = Assert<Equal<Parameters<typeof Native0.Input>['length'], 1>>;
+type Contract408 = Assert<
 	Equal<keyof Pick<Native0.InputProps, PublishedKeys105>, PublishedKeys105>
 >;
-type Contract404 = Assert<Equal<keyof Pick<Native0.InputState, PublishedKeys56>, PublishedKeys56>>;
-type Contract405 = Assert<
+type Contract409 = Assert<Equal<keyof Pick<Native0.InputState, PublishedKeys57>, PublishedKeys57>>;
+type Contract410 = Assert<
 	Equal<keyof Pick<Native0.InputChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract406 = Assert<
+type Contract411 = Assert<
 	Equal<keyof Pick<Native0.InputChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract407 = Assert<
+type Contract412 = Assert<
 	Equal<keyof Pick<typeof Native0.Menu, PublishedKeys112>, PublishedKeys112>
 >;
-type Contract408 = Assert<Equal<Parameters<typeof Native0.MenuRoot>['length'], 1>>;
-type Contract409 = Assert<Equal<keyof Native0.MenuRootState, never>>;
-type Contract410 = Assert<
+type Contract413 = Assert<
+	Equal<keyof Pick<typeof Native0.MenuHandle, PublishedKeys19>, PublishedKeys19>
+>;
+type Contract414 = Assert<Equal<Parameters<typeof Native0.createMenuHandle>['length'], 0>>;
+type Contract415 = Assert<Equal<Parameters<typeof Native0.MenuRoot>['length'], 1>>;
+type Contract416 = Assert<Equal<keyof Native0.MenuRootState, never>>;
+type Contract417 = Assert<
 	Equal<keyof Pick<Native0.MenuRootProps, PublishedKeys113>, PublishedKeys113>
 >;
-type Contract411 = Assert<
-	Equal<keyof Pick<Native0.MenuRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract418 = Assert<
+	Equal<keyof Pick<Native0.MenuRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract412 = Assert<
+type Contract419 = Assert<
 	Equal<keyof Pick<Native0.MenuRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract413 = Assert<
-	Equal<keyof Pick<Native0.MenuRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
->;
-type Contract414 = Assert<
-	Equal<keyof Pick<Native0.MenuRootOrientation, PublishedKeys4>, PublishedKeys4>
->;
-type Contract415 = Assert<
-	Equal<keyof Pick<Native0.MenuParent, PublishedKeys114>, PublishedKeys114>
->;
-type Contract416 = Assert<Equal<Parameters<typeof Native0.MenuArrow>['length'], 1>>;
-type Contract417 = Assert<
-	Equal<keyof Pick<Native0.MenuArrowState, PublishedKeys35>, PublishedKeys35>
->;
-type Contract418 = Assert<
-	Equal<keyof Pick<Native0.MenuArrowProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract419 = Assert<Equal<Parameters<typeof Native0.MenuBackdrop>['length'], 1>>;
 type Contract420 = Assert<
-	Equal<keyof Pick<Native0.MenuBackdropState, PublishedKeys14>, PublishedKeys14>
+	Equal<keyof Pick<Native0.MenuRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
 type Contract421 = Assert<
-	Equal<keyof Pick<Native0.MenuBackdropProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.MenuRootOrientation, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract422 = Assert<Equal<Parameters<typeof Native0.MenuCheckboxItem>['length'], 1>>;
-type Contract423 = Assert<
-	Equal<keyof Pick<Native0.MenuCheckboxItemState, PublishedKeys80>, PublishedKeys80>
+type Contract422 = Assert<
+	Equal<keyof Pick<Native0.MenuParent, PublishedKeys114>, PublishedKeys114>
 >;
+type Contract423 = Assert<Equal<Parameters<typeof Native0.MenuArrow>['length'], 1>>;
 type Contract424 = Assert<
-	Equal<keyof Pick<Native0.MenuCheckboxItemProps, PublishedKeys79>, PublishedKeys79>
+	Equal<keyof Pick<Native0.MenuArrowState, PublishedKeys36>, PublishedKeys36>
 >;
 type Contract425 = Assert<
+	Equal<keyof Pick<Native0.MenuArrowProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract426 = Assert<Equal<Parameters<typeof Native0.MenuBackdrop>['length'], 1>>;
+type Contract427 = Assert<
+	Equal<keyof Pick<Native0.MenuBackdropState, PublishedKeys14>, PublishedKeys14>
+>;
+type Contract428 = Assert<
+	Equal<keyof Pick<Native0.MenuBackdropProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract429 = Assert<Equal<Parameters<typeof Native0.MenuCheckboxItem>['length'], 1>>;
+type Contract430 = Assert<
+	Equal<keyof Pick<Native0.MenuCheckboxItemState, PublishedKeys80>, PublishedKeys80>
+>;
+type Contract431 = Assert<
+	Equal<keyof Pick<Native0.MenuCheckboxItemProps, PublishedKeys79>, PublishedKeys79>
+>;
+type Contract432 = Assert<
 	Equal<keyof Pick<Native0.MenuCheckboxItemChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract426 = Assert<
-	Equal<keyof Pick<Native0.MenuCheckboxItemChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract433 = Assert<
+	Equal<keyof Pick<Native0.MenuCheckboxItemChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract427 = Assert<Equal<Parameters<typeof Native0.MenuCheckboxItemIndicator>['length'], 1>>;
-type Contract428 = Assert<
-	Equal<keyof Pick<Native0.MenuCheckboxItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+type Contract434 = Assert<Equal<Parameters<typeof Native0.MenuCheckboxItemIndicator>['length'], 1>>;
+type Contract435 = Assert<
+	Equal<keyof Pick<Native0.MenuCheckboxItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract429 = Assert<
+type Contract436 = Assert<
 	Equal<keyof Pick<Native0.MenuCheckboxItemIndicatorState, PublishedKeys81>, PublishedKeys81>
 >;
-type Contract430 = Assert<Equal<Parameters<typeof Native0.MenuGroupLabel>['length'], 1>>;
-type Contract431 = Assert<
+type Contract437 = Assert<Equal<Parameters<typeof Native0.MenuGroupLabel>['length'], 1>>;
+type Contract438 = Assert<
 	Equal<keyof Pick<Native0.MenuGroupLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract432 = Assert<Equal<keyof Native0.MenuGroupLabelState, never>>;
-type Contract433 = Assert<Equal<Parameters<typeof Native0.MenuGroup>['length'], 1>>;
-type Contract434 = Assert<
+type Contract439 = Assert<Equal<keyof Native0.MenuGroupLabelState, never>>;
+type Contract440 = Assert<Equal<Parameters<typeof Native0.MenuGroup>['length'], 1>>;
+type Contract441 = Assert<
 	Equal<keyof Pick<Native0.MenuGroupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract435 = Assert<Equal<keyof Native0.MenuGroupState, never>>;
-type Contract436 = Assert<Equal<Parameters<typeof Native0.MenuItem>['length'], 1>>;
-type Contract437 = Assert<
-	Equal<keyof Pick<Native0.MenuItemState, PublishedKeys43>, PublishedKeys43>
+type Contract442 = Assert<Equal<keyof Native0.MenuGroupState, never>>;
+type Contract443 = Assert<Equal<Parameters<typeof Native0.MenuItem>['length'], 1>>;
+type Contract444 = Assert<
+	Equal<keyof Pick<Native0.MenuItemState, PublishedKeys44>, PublishedKeys44>
 >;
-type Contract438 = Assert<
+type Contract445 = Assert<
 	Equal<keyof Pick<Native0.MenuItemProps, PublishedKeys76>, PublishedKeys76>
 >;
-type Contract439 = Assert<Equal<Parameters<typeof Native0.MenuLinkItem>['length'], 1>>;
-type Contract440 = Assert<
+type Contract446 = Assert<Equal<Parameters<typeof Native0.MenuLinkItem>['length'], 1>>;
+type Contract447 = Assert<
 	Equal<keyof Pick<Native0.MenuLinkItemState, PublishedKeys78>, PublishedKeys78>
 >;
-type Contract441 = Assert<
+type Contract448 = Assert<
 	Equal<keyof Pick<Native0.MenuLinkItemProps, PublishedKeys77>, PublishedKeys77>
 >;
-type Contract442 = Assert<Equal<Parameters<typeof Native0.MenuPopup>['length'], 1>>;
-type Contract443 = Assert<
+type Contract449 = Assert<Equal<Parameters<typeof Native0.MenuPopup>['length'], 1>>;
+type Contract450 = Assert<
 	Equal<keyof Pick<Native0.MenuPopupProps, PublishedKeys74>, PublishedKeys74>
 >;
-type Contract444 = Assert<
+type Contract451 = Assert<
 	Equal<keyof Pick<Native0.MenuPopupState, PublishedKeys75>, PublishedKeys75>
 >;
-type Contract445 = Assert<Equal<Parameters<typeof Native0.MenuPortal>['length'], 1>>;
-type Contract446 = Assert<Equal<keyof Native0.MenuPortalState, never>>;
-type Contract447 = Assert<
+type Contract452 = Assert<Equal<Parameters<typeof Native0.MenuPortal>['length'], 1>>;
+type Contract453 = Assert<Equal<keyof Native0.MenuPortalState, never>>;
+type Contract454 = Assert<
 	Equal<keyof Pick<Native0.MenuPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract448 = Assert<Equal<Parameters<typeof Native0.MenuPositioner>['length'], 1>>;
-type Contract449 = Assert<
+type Contract455 = Assert<Equal<Parameters<typeof Native0.MenuPositioner>['length'], 1>>;
+type Contract456 = Assert<
 	Equal<keyof Pick<Native0.MenuPositionerState, PublishedKeys88>, PublishedKeys88>
 >;
-type Contract450 = Assert<
-	Equal<keyof Pick<Native0.MenuPositionerProps, PublishedKeys32>, PublishedKeys32>
+type Contract457 = Assert<
+	Equal<keyof Pick<Native0.MenuPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract451 = Assert<Equal<Parameters<typeof Native0.MenuRadioGroup>['length'], 1>>;
-type Contract452 = Assert<
+type Contract458 = Assert<Equal<Parameters<typeof Native0.MenuRadioGroup>['length'], 1>>;
+type Contract459 = Assert<
 	Equal<keyof Pick<Native0.MenuRadioGroupProps, PublishedKeys82>, PublishedKeys82>
 >;
-type Contract453 = Assert<
+type Contract460 = Assert<
 	Equal<keyof Pick<Native0.MenuRadioGroupState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract454 = Assert<
+type Contract461 = Assert<
 	Equal<keyof Pick<Native0.MenuRadioGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract455 = Assert<
-	Equal<keyof Pick<Native0.MenuRadioGroupChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract462 = Assert<
+	Equal<keyof Pick<Native0.MenuRadioGroupChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract456 = Assert<Equal<Parameters<typeof Native0.MenuRadioItem>['length'], 1>>;
-type Contract457 = Assert<
+type Contract463 = Assert<Equal<Parameters<typeof Native0.MenuRadioItem>['length'], 1>>;
+type Contract464 = Assert<
 	Equal<keyof Pick<Native0.MenuRadioItemState, PublishedKeys80>, PublishedKeys80>
 >;
-type Contract458 = Assert<
+type Contract465 = Assert<
 	Equal<keyof Pick<Native0.MenuRadioItemProps, PublishedKeys83>, PublishedKeys83>
 >;
-type Contract459 = Assert<Equal<Parameters<typeof Native0.MenuRadioItemIndicator>['length'], 1>>;
-type Contract460 = Assert<
-	Equal<keyof Pick<Native0.MenuRadioItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+type Contract466 = Assert<Equal<Parameters<typeof Native0.MenuRadioItemIndicator>['length'], 1>>;
+type Contract467 = Assert<
+	Equal<keyof Pick<Native0.MenuRadioItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract461 = Assert<
+type Contract468 = Assert<
 	Equal<keyof Pick<Native0.MenuRadioItemIndicatorState, PublishedKeys81>, PublishedKeys81>
 >;
-type Contract462 = Assert<Equal<Parameters<typeof Native0.MenuSubmenuRoot>['length'], 1>>;
-type Contract463 = Assert<Equal<Parameters<typeof Native0.useMenuSubmenuRootContext>['length'], 0>>;
-type Contract464 = Assert<
+type Contract469 = Assert<Equal<Parameters<typeof Native0.MenuSubmenuRoot>['length'], 1>>;
+type Contract470 = Assert<Equal<Parameters<typeof Native0.useMenuSubmenuRootContext>['length'], 0>>;
+type Contract471 = Assert<
 	Equal<keyof Pick<Native0.MenuSubmenuRootProps, PublishedKeys84>, PublishedKeys84>
 >;
-type Contract465 = Assert<Equal<keyof Native0.MenuSubmenuRootState, never>>;
-type Contract466 = Assert<
+type Contract472 = Assert<Equal<keyof Native0.MenuSubmenuRootState, never>>;
+type Contract473 = Assert<
 	Equal<keyof Pick<Native0.MenuSubmenuRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract467 = Assert<
-	Equal<keyof Pick<Native0.MenuSubmenuRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract474 = Assert<
+	Equal<keyof Pick<Native0.MenuSubmenuRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract468 = Assert<Equal<Parameters<Native0.MenuTrigger>['length'], 1>>;
-type Contract469 = Assert<
+type Contract475 = Assert<Equal<Parameters<Native0.MenuTrigger>['length'], 1>>;
+type Contract476 = Assert<
 	Equal<keyof Pick<Native0.MenuTriggerProps, PublishedKeys115>, PublishedKeys115>
 >;
-type Contract470 = Assert<
-	Equal<keyof Pick<Native0.MenuTriggerState, PublishedKeys23>, PublishedKeys23>
+type Contract477 = Assert<
+	Equal<keyof Pick<Native0.MenuTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
-type Contract471 = Assert<Equal<Parameters<typeof Native0.MenuSubmenuTrigger>['length'], 1>>;
-type Contract472 = Assert<
+type Contract478 = Assert<Equal<Parameters<typeof Native0.MenuSubmenuTrigger>['length'], 1>>;
+type Contract479 = Assert<
 	Equal<keyof Pick<Native0.MenuSubmenuTriggerState, PublishedKeys86>, PublishedKeys86>
 >;
-type Contract473 = Assert<
+type Contract480 = Assert<
 	Equal<keyof Pick<Native0.MenuSubmenuTriggerProps, PublishedKeys85>, PublishedKeys85>
 >;
-type Contract474 = Assert<Equal<Parameters<typeof Native0.MenuViewport>['length'], 1>>;
-type Contract475 = Assert<
+type Contract481 = Assert<Equal<Parameters<typeof Native0.MenuViewport>['length'], 1>>;
+type Contract482 = Assert<
 	Equal<keyof Pick<Native0.MenuViewportState, PublishedKeys116>, PublishedKeys116>
 >;
-type Contract476 = Assert<
+type Contract483 = Assert<
 	Equal<keyof Pick<Native0.MenuViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract477 = Assert<Equal<Parameters<typeof Native0.Menubar>['length'], 1>>;
-type Contract478 = Assert<
+type Contract484 = Assert<Equal<Parameters<typeof Native0.Menubar>['length'], 1>>;
+type Contract485 = Assert<
 	Equal<keyof Pick<Native0.MenubarState, PublishedKeys117>, PublishedKeys117>
 >;
-type Contract479 = Assert<
+type Contract486 = Assert<
 	Equal<keyof Pick<Native0.MenubarProps, PublishedKeys118>, PublishedKeys118>
 >;
-type Contract480 = Assert<Equal<Parameters<typeof Native0.mergeProps>['length'], 2>>;
-type Contract481 = Assert<Equal<Parameters<typeof Native0.mergePropsN>['length'], 1>>;
-type Contract482 = Assert<Equal<Parameters<typeof Native0.makeEventPreventable>['length'], 1>>;
-type Contract483 = Assert<Equal<Parameters<typeof Native0.mergeClassNames>['length'], 2>>;
-type Contract484 = Assert<
+type Contract487 = Assert<Equal<Parameters<typeof Native0.mergeProps>['length'], 2>>;
+type Contract488 = Assert<Equal<Parameters<typeof Native0.mergePropsN>['length'], 1>>;
+type Contract489 = Assert<Equal<Parameters<typeof Native0.makeEventPreventable>['length'], 1>>;
+type Contract490 = Assert<Equal<Parameters<typeof Native0.mergeClassNames>['length'], 2>>;
+type Contract491 = Assert<
 	Equal<keyof Pick<typeof Native0.Meter, PublishedKeys119>, PublishedKeys119>
 >;
-type Contract485 = Assert<Equal<Parameters<typeof Native0.MeterRoot>['length'], 1>>;
-type Contract486 = Assert<Equal<keyof Native0.MeterRootState, never>>;
-type Contract487 = Assert<
+type Contract492 = Assert<Equal<Parameters<typeof Native0.MeterRoot>['length'], 1>>;
+type Contract493 = Assert<Equal<keyof Native0.MeterRootState, never>>;
+type Contract494 = Assert<
 	Equal<keyof Pick<Native0.MeterRootProps, PublishedKeys120>, PublishedKeys120>
 >;
-type Contract488 = Assert<Equal<Parameters<typeof Native0.MeterIndicator>['length'], 1>>;
-type Contract489 = Assert<Equal<keyof Native0.MeterIndicatorState, never>>;
-type Contract490 = Assert<
+type Contract495 = Assert<Equal<Parameters<typeof Native0.MeterIndicator>['length'], 1>>;
+type Contract496 = Assert<Equal<keyof Native0.MeterIndicatorState, never>>;
+type Contract497 = Assert<
 	Equal<keyof Pick<Native0.MeterIndicatorProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract491 = Assert<Equal<Parameters<typeof Native0.MeterLabel>['length'], 1>>;
-type Contract492 = Assert<Equal<keyof Native0.MeterLabelState, never>>;
-type Contract493 = Assert<
+type Contract498 = Assert<Equal<Parameters<typeof Native0.MeterLabel>['length'], 1>>;
+type Contract499 = Assert<Equal<keyof Native0.MeterLabelState, never>>;
+type Contract500 = Assert<
 	Equal<keyof Pick<Native0.MeterLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract494 = Assert<Equal<Parameters<typeof Native0.MeterTrack>['length'], 1>>;
-type Contract495 = Assert<Equal<keyof Native0.MeterTrackState, never>>;
-type Contract496 = Assert<
+type Contract501 = Assert<Equal<Parameters<typeof Native0.MeterTrack>['length'], 1>>;
+type Contract502 = Assert<Equal<keyof Native0.MeterTrackState, never>>;
+type Contract503 = Assert<
 	Equal<keyof Pick<Native0.MeterTrackProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract497 = Assert<Equal<Parameters<typeof Native0.MeterValue>['length'], 1>>;
-type Contract498 = Assert<Equal<keyof Native0.MeterValueState, never>>;
-type Contract499 = Assert<
+type Contract504 = Assert<Equal<Parameters<typeof Native0.MeterValue>['length'], 1>>;
+type Contract505 = Assert<Equal<keyof Native0.MeterValueState, never>>;
+type Contract506 = Assert<
 	Equal<keyof Pick<Native0.MeterValueProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract500 = Assert<
+type Contract507 = Assert<
 	Equal<keyof Pick<typeof Native0.NavigationMenu, PublishedKeys121>, PublishedKeys121>
 >;
-type Contract501 = Assert<Equal<Parameters<typeof Native0.NavigationMenuRoot>['length'], 1>>;
-type Contract502 = Assert<
+type Contract508 = Assert<Equal<Parameters<typeof Native0.NavigationMenuRoot>['length'], 1>>;
+type Contract509 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuRootState, PublishedKeys122>, PublishedKeys122>
 >;
-type Contract503 = Assert<
+type Contract510 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuRootProps, PublishedKeys123>, PublishedKeys123>
 >;
-type Contract504 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuRootActions, PublishedKeys40>, PublishedKeys40>
+type Contract511 = Assert<
+	Equal<keyof Pick<Native0.NavigationMenuRootActions, PublishedKeys41>, PublishedKeys41>
 >;
-type Contract505 = Assert<
+type Contract512 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract506 = Assert<
+type Contract513 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract507 = Assert<Equal<Parameters<typeof Native0.NavigationMenuTrigger>['length'], 1>>;
-type Contract508 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuTriggerState, PublishedKeys23>, PublishedKeys23>
+type Contract514 = Assert<Equal<Parameters<typeof Native0.NavigationMenuTrigger>['length'], 1>>;
+type Contract515 = Assert<
+	Equal<keyof Pick<Native0.NavigationMenuTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
-type Contract509 = Assert<
+type Contract516 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuTriggerProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract510 = Assert<Equal<Parameters<typeof Native0.NavigationMenuPortal>['length'], 1>>;
-type Contract511 = Assert<Equal<keyof Native0.NavigationMenuPortalState, never>>;
-type Contract512 = Assert<
+type Contract517 = Assert<Equal<Parameters<typeof Native0.NavigationMenuPortal>['length'], 1>>;
+type Contract518 = Assert<Equal<keyof Native0.NavigationMenuPortalState, never>>;
+type Contract519 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract513 = Assert<Equal<Parameters<typeof Native0.NavigationMenuPositioner>['length'], 1>>;
-type Contract514 = Assert<
+type Contract520 = Assert<Equal<Parameters<typeof Native0.NavigationMenuPositioner>['length'], 1>>;
+type Contract521 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuPositionerState, PublishedKeys124>, PublishedKeys124>
 >;
-type Contract515 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuPositionerProps, PublishedKeys32>, PublishedKeys32>
+type Contract522 = Assert<
+	Equal<keyof Pick<Native0.NavigationMenuPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract516 = Assert<Equal<Parameters<typeof Native0.NavigationMenuViewport>['length'], 1>>;
-type Contract517 = Assert<Equal<keyof Native0.NavigationMenuViewportState, never>>;
-type Contract518 = Assert<
+type Contract523 = Assert<Equal<Parameters<typeof Native0.NavigationMenuViewport>['length'], 1>>;
+type Contract524 = Assert<Equal<keyof Native0.NavigationMenuViewportState, never>>;
+type Contract525 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract519 = Assert<Equal<Parameters<typeof Native0.NavigationMenuList>['length'], 1>>;
-type Contract520 = Assert<
+type Contract526 = Assert<Equal<Parameters<typeof Native0.NavigationMenuList>['length'], 1>>;
+type Contract527 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuListState, PublishedKeys87>, PublishedKeys87>
 >;
-type Contract521 = Assert<
+type Contract528 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuListProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract522 = Assert<Equal<Parameters<typeof Native0.NavigationMenuItem>['length'], 1>>;
-type Contract523 = Assert<Equal<keyof Native0.NavigationMenuItemState, never>>;
-type Contract524 = Assert<
+type Contract529 = Assert<Equal<Parameters<typeof Native0.NavigationMenuItem>['length'], 1>>;
+type Contract530 = Assert<Equal<keyof Native0.NavigationMenuItemState, never>>;
+type Contract531 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuItemProps, PublishedKeys125>, PublishedKeys125>
 >;
-type Contract525 = Assert<Equal<Parameters<typeof Native0.NavigationMenuContent>['length'], 1>>;
-type Contract526 = Assert<
+type Contract532 = Assert<Equal<Parameters<typeof Native0.NavigationMenuContent>['length'], 1>>;
+type Contract533 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuContentState, PublishedKeys126>, PublishedKeys126>
 >;
-type Contract527 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuContentProps, PublishedKeys55>, PublishedKeys55>
+type Contract534 = Assert<
+	Equal<keyof Pick<Native0.NavigationMenuContentProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract528 = Assert<Equal<Parameters<typeof Native0.NavigationMenuPopup>['length'], 1>>;
-type Contract529 = Assert<
+type Contract535 = Assert<Equal<Parameters<typeof Native0.NavigationMenuPopup>['length'], 1>>;
+type Contract536 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuPopupState, PublishedKeys127>, PublishedKeys127>
 >;
-type Contract530 = Assert<
+type Contract537 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuPopupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract531 = Assert<Equal<Parameters<typeof Native0.NavigationMenuBackdrop>['length'], 1>>;
-type Contract532 = Assert<
+type Contract538 = Assert<Equal<Parameters<typeof Native0.NavigationMenuBackdrop>['length'], 1>>;
+type Contract539 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract533 = Assert<
+type Contract540 = Assert<
 	Equal<keyof Pick<Native0.NavigationMenuBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract534 = Assert<Equal<Parameters<typeof Native0.NavigationMenuArrow>['length'], 1>>;
-type Contract535 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuArrowState, PublishedKeys35>, PublishedKeys35>
->;
-type Contract536 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuArrowProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract537 = Assert<Equal<Parameters<typeof Native0.NavigationMenuLink>['length'], 1>>;
-type Contract538 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuLinkState, PublishedKeys94>, PublishedKeys94>
->;
-type Contract539 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuLinkProps, PublishedKeys128>, PublishedKeys128>
->;
-type Contract540 = Assert<Equal<Parameters<typeof Native0.NavigationMenuIcon>['length'], 1>>;
-type Contract541 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuIconState, PublishedKeys87>, PublishedKeys87>
->;
+type Contract541 = Assert<Equal<Parameters<typeof Native0.NavigationMenuArrow>['length'], 1>>;
 type Contract542 = Assert<
-	Equal<keyof Pick<Native0.NavigationMenuIconProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.NavigationMenuArrowState, PublishedKeys36>, PublishedKeys36>
 >;
 type Contract543 = Assert<
-	Equal<keyof Pick<typeof Native0.NumberField, PublishedKeys129>, PublishedKeys129>
+	Equal<keyof Pick<Native0.NavigationMenuArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract544 = Assert<Equal<Parameters<typeof Native0.NumberFieldRoot>['length'], 1>>;
+type Contract544 = Assert<Equal<Parameters<typeof Native0.NavigationMenuLink>['length'], 1>>;
 type Contract545 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldRootProps, PublishedKeys130>, PublishedKeys130>
+	Equal<keyof Pick<Native0.NavigationMenuLinkState, PublishedKeys94>, PublishedKeys94>
 >;
 type Contract546 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldRootState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native0.NavigationMenuLinkProps, PublishedKeys128>, PublishedKeys128>
 >;
-type Contract547 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
+type Contract547 = Assert<Equal<Parameters<typeof Native0.NavigationMenuIcon>['length'], 1>>;
 type Contract548 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldRootChangeEventDetails, PublishedKeys132>, PublishedKeys132>
+	Equal<keyof Pick<Native0.NavigationMenuIconState, PublishedKeys87>, PublishedKeys87>
 >;
 type Contract549 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldRootCommitEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native0.NavigationMenuIconProps, PublishedKeys8>, PublishedKeys8>
 >;
 type Contract550 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldRootCommitEventDetails, PublishedKeys110>, PublishedKeys110>
+	Equal<keyof Pick<typeof Native0.NumberField, PublishedKeys129>, PublishedKeys129>
 >;
-type Contract551 = Assert<Equal<Parameters<typeof Native0.NumberFieldGroup>['length'], 1>>;
+type Contract551 = Assert<Equal<Parameters<typeof Native0.NumberFieldRoot>['length'], 1>>;
 type Contract552 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldGroupState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native0.NumberFieldRootProps, PublishedKeys130>, PublishedKeys130>
 >;
 type Contract553 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldGroupProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.NumberFieldRootState, PublishedKeys131>, PublishedKeys131>
 >;
-type Contract554 = Assert<Equal<Parameters<typeof Native0.NumberFieldIncrement>['length'], 1>>;
+type Contract554 = Assert<
+	Equal<keyof Pick<Native0.NumberFieldRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
 type Contract555 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldIncrementState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native0.NumberFieldRootChangeEventDetails, PublishedKeys132>, PublishedKeys132>
 >;
 type Contract556 = Assert<
+	Equal<keyof Pick<Native0.NumberFieldRootCommitEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract557 = Assert<
+	Equal<keyof Pick<Native0.NumberFieldRootCommitEventDetails, PublishedKeys110>, PublishedKeys110>
+>;
+type Contract558 = Assert<Equal<Parameters<typeof Native0.NumberFieldGroup>['length'], 1>>;
+type Contract559 = Assert<
+	Equal<keyof Pick<Native0.NumberFieldGroupState, PublishedKeys131>, PublishedKeys131>
+>;
+type Contract560 = Assert<
+	Equal<keyof Pick<Native0.NumberFieldGroupProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract561 = Assert<Equal<Parameters<typeof Native0.NumberFieldIncrement>['length'], 1>>;
+type Contract562 = Assert<
+	Equal<keyof Pick<Native0.NumberFieldIncrementState, PublishedKeys131>, PublishedKeys131>
+>;
+type Contract563 = Assert<
 	Equal<keyof Pick<Native0.NumberFieldIncrementProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract557 = Assert<Equal<Parameters<typeof Native0.NumberFieldDecrement>['length'], 1>>;
-type Contract558 = Assert<
+type Contract564 = Assert<Equal<Parameters<typeof Native0.NumberFieldDecrement>['length'], 1>>;
+type Contract565 = Assert<
 	Equal<keyof Pick<Native0.NumberFieldDecrementState, PublishedKeys131>, PublishedKeys131>
 >;
-type Contract559 = Assert<
+type Contract566 = Assert<
 	Equal<keyof Pick<Native0.NumberFieldDecrementProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract560 = Assert<Equal<Parameters<typeof Native0.NumberFieldInput>['length'], 1>>;
-type Contract561 = Assert<
+type Contract567 = Assert<Equal<Parameters<typeof Native0.NumberFieldInput>['length'], 1>>;
+type Contract568 = Assert<
 	Equal<keyof Pick<Native0.NumberFieldInputState, PublishedKeys131>, PublishedKeys131>
 >;
-type Contract562 = Assert<
-	Equal<keyof Pick<Native0.NumberFieldInputProps, PublishedKeys27>, PublishedKeys27>
+type Contract569 = Assert<
+	Equal<keyof Pick<Native0.NumberFieldInputProps, PublishedKeys28>, PublishedKeys28>
 >;
-type Contract563 = Assert<Equal<Parameters<typeof Native0.NumberFieldScrubArea>['length'], 1>>;
-type Contract564 = Assert<
+type Contract570 = Assert<Equal<Parameters<typeof Native0.NumberFieldScrubArea>['length'], 1>>;
+type Contract571 = Assert<
 	Equal<keyof Pick<Native0.NumberFieldScrubAreaState, PublishedKeys131>, PublishedKeys131>
 >;
-type Contract565 = Assert<
+type Contract572 = Assert<
 	Equal<keyof Pick<Native0.NumberFieldScrubAreaProps, PublishedKeys133>, PublishedKeys133>
 >;
-type Contract566 = Assert<
+type Contract573 = Assert<
 	Equal<Parameters<typeof Native0.NumberFieldScrubAreaCursor>['length'], 1>
 >;
-type Contract567 = Assert<
+type Contract574 = Assert<
 	Equal<keyof Pick<Native0.NumberFieldScrubAreaCursorState, PublishedKeys131>, PublishedKeys131>
 >;
-type Contract568 = Assert<
+type Contract575 = Assert<
 	Equal<keyof Pick<Native0.NumberFieldScrubAreaCursorProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract569 = Assert<
+type Contract576 = Assert<
 	Equal<keyof Pick<typeof Native0.OTPField, PublishedKeys134>, PublishedKeys134>
 >;
-type Contract570 = Assert<Equal<Parameters<typeof Native0.OTPFieldRoot>['length'], 1>>;
-type Contract571 = Assert<
+type Contract577 = Assert<Equal<Parameters<typeof Native0.OTPFieldRoot>['length'], 1>>;
+type Contract578 = Assert<
 	Equal<keyof Pick<Native0.OTPFieldRootProps, PublishedKeys135>, PublishedKeys135>
 >;
-type Contract572 = Assert<
+type Contract579 = Assert<
 	Equal<keyof Pick<Native0.OTPFieldRootState, PublishedKeys136>, PublishedKeys136>
 >;
-type Contract573 = Assert<
+type Contract580 = Assert<
 	Equal<keyof Pick<Native0.OTPFieldRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract574 = Assert<
+type Contract581 = Assert<
 	Equal<keyof Pick<Native0.OTPFieldRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract575 = Assert<
+type Contract582 = Assert<
 	Equal<keyof Pick<Native0.OTPFieldRootInvalidEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract576 = Assert<
+type Contract583 = Assert<
 	Equal<keyof Pick<Native0.OTPFieldRootInvalidEventDetails, PublishedKeys110>, PublishedKeys110>
 >;
-type Contract577 = Assert<
+type Contract584 = Assert<
 	Equal<keyof Pick<Native0.OTPFieldRootCompleteEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract578 = Assert<
+type Contract585 = Assert<
 	Equal<keyof Pick<Native0.OTPFieldRootCompleteEventDetails, PublishedKeys110>, PublishedKeys110>
 >;
-type Contract579 = Assert<Equal<Parameters<typeof Native0.OTPFieldInput>['length'], 1>>;
-type Contract580 = Assert<
+type Contract586 = Assert<Equal<Parameters<typeof Native0.OTPFieldInput>['length'], 1>>;
+type Contract587 = Assert<
 	Equal<keyof Pick<Native0.OTPFieldInputState, PublishedKeys137>, PublishedKeys137>
 >;
-type Contract581 = Assert<
-	Equal<keyof Pick<Native0.OTPFieldInputProps, PublishedKeys27>, PublishedKeys27>
+type Contract588 = Assert<
+	Equal<keyof Pick<Native0.OTPFieldInputProps, PublishedKeys28>, PublishedKeys28>
 >;
-type Contract582 = Assert<
+type Contract589 = Assert<
 	Equal<keyof Pick<typeof Native0.Popover, PublishedKeys138>, PublishedKeys138>
 >;
-type Contract583 = Assert<Equal<Parameters<typeof Native0.PopoverRoot>['length'], 1>>;
-type Contract584 = Assert<Equal<keyof Native0.PopoverRootState, never>>;
-type Contract585 = Assert<
+type Contract590 = Assert<
+	Equal<keyof Pick<typeof Native0.PopoverHandle, PublishedKeys19>, PublishedKeys19>
+>;
+type Contract591 = Assert<Equal<Parameters<typeof Native0.createPopoverHandle>['length'], 0>>;
+type Contract592 = Assert<Equal<Parameters<typeof Native0.PopoverRoot>['length'], 1>>;
+type Contract593 = Assert<Equal<keyof Native0.PopoverRootState, never>>;
+type Contract594 = Assert<
 	Equal<keyof Pick<Native0.PopoverRootProps, PublishedKeys139>, PublishedKeys139>
 >;
-type Contract586 = Assert<
-	Equal<keyof Pick<Native0.PopoverRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract595 = Assert<
+	Equal<keyof Pick<Native0.PopoverRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract587 = Assert<
+type Contract596 = Assert<
 	Equal<keyof Pick<Native0.PopoverRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract588 = Assert<
-	Equal<keyof Pick<Native0.PopoverRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
->;
-type Contract589 = Assert<Equal<Parameters<Native0.PopoverTrigger>['length'], 1>>;
-type Contract590 = Assert<
-	Equal<keyof Pick<Native0.PopoverTriggerState, PublishedKeys23>, PublishedKeys23>
->;
-type Contract591 = Assert<
-	Equal<keyof Pick<Native0.PopoverTriggerProps, PublishedKeys115>, PublishedKeys115>
->;
-type Contract592 = Assert<Equal<Parameters<typeof Native0.PopoverPortal>['length'], 1>>;
-type Contract593 = Assert<Equal<keyof Native0.PopoverPortalState, never>>;
-type Contract594 = Assert<
-	Equal<keyof Pick<Native0.PopoverPortalProps, PublishedKeys18>, PublishedKeys18>
->;
-type Contract595 = Assert<Equal<Parameters<typeof Native0.PopoverPositioner>['length'], 1>>;
-type Contract596 = Assert<
-	Equal<keyof Pick<Native0.PopoverPositionerState, PublishedKeys124>, PublishedKeys124>
->;
 type Contract597 = Assert<
-	Equal<keyof Pick<Native0.PopoverPositionerProps, PublishedKeys32>, PublishedKeys32>
+	Equal<keyof Pick<Native0.PopoverRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract598 = Assert<Equal<Parameters<typeof Native0.PopoverPopup>['length'], 1>>;
+type Contract598 = Assert<Equal<Parameters<Native0.PopoverTrigger>['length'], 1>>;
 type Contract599 = Assert<
-	Equal<keyof Pick<Native0.PopoverPopupState, PublishedKeys140>, PublishedKeys140>
+	Equal<keyof Pick<Native0.PopoverTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
 type Contract600 = Assert<
-	Equal<keyof Pick<Native0.PopoverPopupProps, PublishedKeys16>, PublishedKeys16>
+	Equal<keyof Pick<Native0.PopoverTriggerProps, PublishedKeys115>, PublishedKeys115>
 >;
-type Contract601 = Assert<Equal<Parameters<typeof Native0.PopoverArrow>['length'], 1>>;
-type Contract602 = Assert<
-	Equal<keyof Pick<Native0.PopoverArrowState, PublishedKeys35>, PublishedKeys35>
->;
+type Contract601 = Assert<Equal<Parameters<typeof Native0.PopoverPortal>['length'], 1>>;
+type Contract602 = Assert<Equal<keyof Native0.PopoverPortalState, never>>;
 type Contract603 = Assert<
-	Equal<keyof Pick<Native0.PopoverArrowProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.PopoverPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract604 = Assert<Equal<Parameters<typeof Native0.PopoverBackdrop>['length'], 1>>;
+type Contract604 = Assert<Equal<Parameters<typeof Native0.PopoverPositioner>['length'], 1>>;
 type Contract605 = Assert<
-	Equal<keyof Pick<Native0.PopoverBackdropState, PublishedKeys14>, PublishedKeys14>
+	Equal<keyof Pick<Native0.PopoverPositionerState, PublishedKeys124>, PublishedKeys124>
 >;
 type Contract606 = Assert<
+	Equal<keyof Pick<Native0.PopoverPositionerProps, PublishedKeys33>, PublishedKeys33>
+>;
+type Contract607 = Assert<Equal<Parameters<typeof Native0.PopoverPopup>['length'], 1>>;
+type Contract608 = Assert<
+	Equal<keyof Pick<Native0.PopoverPopupState, PublishedKeys140>, PublishedKeys140>
+>;
+type Contract609 = Assert<
+	Equal<keyof Pick<Native0.PopoverPopupProps, PublishedKeys16>, PublishedKeys16>
+>;
+type Contract610 = Assert<Equal<Parameters<typeof Native0.PopoverArrow>['length'], 1>>;
+type Contract611 = Assert<
+	Equal<keyof Pick<Native0.PopoverArrowState, PublishedKeys36>, PublishedKeys36>
+>;
+type Contract612 = Assert<
+	Equal<keyof Pick<Native0.PopoverArrowProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract613 = Assert<Equal<Parameters<typeof Native0.PopoverBackdrop>['length'], 1>>;
+type Contract614 = Assert<
+	Equal<keyof Pick<Native0.PopoverBackdropState, PublishedKeys14>, PublishedKeys14>
+>;
+type Contract615 = Assert<
 	Equal<keyof Pick<Native0.PopoverBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract607 = Assert<Equal<Parameters<typeof Native0.PopoverTitle>['length'], 1>>;
-type Contract608 = Assert<Equal<keyof Native0.PopoverTitleState, never>>;
-type Contract609 = Assert<
+type Contract616 = Assert<Equal<Parameters<typeof Native0.PopoverTitle>['length'], 1>>;
+type Contract617 = Assert<Equal<keyof Native0.PopoverTitleState, never>>;
+type Contract618 = Assert<
 	Equal<keyof Pick<Native0.PopoverTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract610 = Assert<Equal<Parameters<typeof Native0.PopoverDescription>['length'], 1>>;
-type Contract611 = Assert<Equal<keyof Native0.PopoverDescriptionState, never>>;
-type Contract612 = Assert<
+type Contract619 = Assert<Equal<Parameters<typeof Native0.PopoverDescription>['length'], 1>>;
+type Contract620 = Assert<Equal<keyof Native0.PopoverDescriptionState, never>>;
+type Contract621 = Assert<
 	Equal<keyof Pick<Native0.PopoverDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract613 = Assert<Equal<Parameters<typeof Native0.PopoverClose>['length'], 1>>;
-type Contract614 = Assert<Equal<keyof Native0.PopoverCloseState, never>>;
-type Contract615 = Assert<
+type Contract622 = Assert<Equal<Parameters<typeof Native0.PopoverClose>['length'], 1>>;
+type Contract623 = Assert<Equal<keyof Native0.PopoverCloseState, never>>;
+type Contract624 = Assert<
 	Equal<keyof Pick<Native0.PopoverCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract616 = Assert<Equal<Parameters<typeof Native0.PopoverViewport>['length'], 1>>;
-type Contract617 = Assert<
+type Contract625 = Assert<Equal<Parameters<typeof Native0.PopoverViewport>['length'], 1>>;
+type Contract626 = Assert<
 	Equal<keyof Pick<Native0.PopoverViewportState, PublishedKeys116>, PublishedKeys116>
 >;
-type Contract618 = Assert<
+type Contract627 = Assert<
 	Equal<keyof Pick<Native0.PopoverViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract619 = Assert<
+type Contract628 = Assert<
 	Equal<keyof Pick<typeof Native0.PreviewCard, PublishedKeys141>, PublishedKeys141>
 >;
-type Contract620 = Assert<Equal<Parameters<typeof Native0.PreviewCardRoot>['length'], 1>>;
-type Contract621 = Assert<Equal<keyof Native0.PreviewCardRootState, never>>;
-type Contract622 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardRootProps, PublishedKeys19>, PublishedKeys19>
+type Contract629 = Assert<
+	Equal<keyof Pick<typeof Native0.PreviewCardHandle, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract623 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardRootActions, PublishedKeys20>, PublishedKeys20>
->;
-type Contract624 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract625 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
->;
-type Contract626 = Assert<Equal<Parameters<Native0.PreviewCardTrigger>['length'], 1>>;
-type Contract627 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardTriggerState, PublishedKeys87>, PublishedKeys87>
->;
-type Contract628 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardTriggerProps, PublishedKeys142>, PublishedKeys142>
->;
-type Contract629 = Assert<Equal<Parameters<typeof Native0.PreviewCardPortal>['length'], 1>>;
-type Contract630 = Assert<Equal<keyof Native0.PreviewCardPortalState, never>>;
-type Contract631 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardPortalProps, PublishedKeys18>, PublishedKeys18>
->;
-type Contract632 = Assert<Equal<Parameters<typeof Native0.PreviewCardPositioner>['length'], 1>>;
+type Contract630 = Assert<Equal<Parameters<typeof Native0.createPreviewCardHandle>['length'], 0>>;
+type Contract631 = Assert<Equal<Parameters<typeof Native0.PreviewCardRoot>['length'], 1>>;
+type Contract632 = Assert<Equal<keyof Native0.PreviewCardRootState, never>>;
 type Contract633 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardPositionerState, PublishedKeys124>, PublishedKeys124>
+	Equal<keyof Pick<Native0.PreviewCardRootProps, PublishedKeys20>, PublishedKeys20>
 >;
 type Contract634 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardPositionerProps, PublishedKeys32>, PublishedKeys32>
+	Equal<keyof Pick<Native0.PreviewCardRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract635 = Assert<Equal<Parameters<typeof Native0.PreviewCardPopup>['length'], 1>>;
+type Contract635 = Assert<
+	Equal<keyof Pick<Native0.PreviewCardRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
 type Contract636 = Assert<
+	Equal<keyof Pick<Native0.PreviewCardRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
+>;
+type Contract637 = Assert<Equal<Parameters<Native0.PreviewCardTrigger>['length'], 1>>;
+type Contract638 = Assert<
+	Equal<keyof Pick<Native0.PreviewCardTriggerState, PublishedKeys87>, PublishedKeys87>
+>;
+type Contract639 = Assert<
+	Equal<keyof Pick<Native0.PreviewCardTriggerProps, PublishedKeys142>, PublishedKeys142>
+>;
+type Contract640 = Assert<Equal<Parameters<typeof Native0.PreviewCardPortal>['length'], 1>>;
+type Contract641 = Assert<Equal<keyof Native0.PreviewCardPortalState, never>>;
+type Contract642 = Assert<
+	Equal<keyof Pick<Native0.PreviewCardPortalProps, PublishedKeys18>, PublishedKeys18>
+>;
+type Contract643 = Assert<Equal<Parameters<typeof Native0.PreviewCardPositioner>['length'], 1>>;
+type Contract644 = Assert<
+	Equal<keyof Pick<Native0.PreviewCardPositionerState, PublishedKeys124>, PublishedKeys124>
+>;
+type Contract645 = Assert<
+	Equal<keyof Pick<Native0.PreviewCardPositionerProps, PublishedKeys33>, PublishedKeys33>
+>;
+type Contract646 = Assert<Equal<Parameters<typeof Native0.PreviewCardPopup>['length'], 1>>;
+type Contract647 = Assert<
 	Equal<keyof Pick<Native0.PreviewCardPopupState, PublishedKeys140>, PublishedKeys140>
 >;
-type Contract637 = Assert<
+type Contract648 = Assert<
 	Equal<keyof Pick<Native0.PreviewCardPopupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract638 = Assert<Equal<Parameters<typeof Native0.PreviewCardArrow>['length'], 1>>;
-type Contract639 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardArrowState, PublishedKeys35>, PublishedKeys35>
->;
-type Contract640 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardArrowProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract641 = Assert<Equal<Parameters<typeof Native0.PreviewCardViewport>['length'], 1>>;
-type Contract642 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardViewportState, PublishedKeys116>, PublishedKeys116>
->;
-type Contract643 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardViewportProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract644 = Assert<Equal<Parameters<typeof Native0.PreviewCardBackdrop>['length'], 1>>;
-type Contract645 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardBackdropState, PublishedKeys14>, PublishedKeys14>
->;
-type Contract646 = Assert<
-	Equal<keyof Pick<Native0.PreviewCardBackdropProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract647 = Assert<
-	Equal<keyof Pick<typeof Native0.Progress, PublishedKeys119>, PublishedKeys119>
->;
-type Contract648 = Assert<Equal<Parameters<typeof Native0.ProgressRoot>['length'], 1>>;
-type Contract649 = Assert<
-	Equal<keyof Pick<Native0.ProgressStatus, PublishedKeys4>, PublishedKeys4>
->;
+type Contract649 = Assert<Equal<Parameters<typeof Native0.PreviewCardArrow>['length'], 1>>;
 type Contract650 = Assert<
-	Equal<keyof Pick<Native0.ProgressRootState, PublishedKeys143>, PublishedKeys143>
+	Equal<keyof Pick<Native0.PreviewCardArrowState, PublishedKeys36>, PublishedKeys36>
 >;
 type Contract651 = Assert<
-	Equal<keyof Pick<Native0.ProgressRootProps, PublishedKeys120>, PublishedKeys120>
+	Equal<keyof Pick<Native0.PreviewCardArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract652 = Assert<Equal<Parameters<typeof Native0.ProgressIndicator>['length'], 1>>;
+type Contract652 = Assert<Equal<Parameters<typeof Native0.PreviewCardViewport>['length'], 1>>;
 type Contract653 = Assert<
-	Equal<keyof Pick<Native0.ProgressIndicatorState, PublishedKeys143>, PublishedKeys143>
+	Equal<keyof Pick<Native0.PreviewCardViewportState, PublishedKeys116>, PublishedKeys116>
 >;
 type Contract654 = Assert<
-	Equal<keyof Pick<Native0.ProgressIndicatorProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.PreviewCardViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract655 = Assert<Equal<Parameters<typeof Native0.ProgressLabel>['length'], 1>>;
+type Contract655 = Assert<Equal<Parameters<typeof Native0.PreviewCardBackdrop>['length'], 1>>;
 type Contract656 = Assert<
-	Equal<keyof Pick<Native0.ProgressLabelState, PublishedKeys143>, PublishedKeys143>
+	Equal<keyof Pick<Native0.PreviewCardBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
 type Contract657 = Assert<
+	Equal<keyof Pick<Native0.PreviewCardBackdropProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract658 = Assert<
+	Equal<keyof Pick<typeof Native0.Progress, PublishedKeys119>, PublishedKeys119>
+>;
+type Contract659 = Assert<Equal<Parameters<typeof Native0.ProgressRoot>['length'], 1>>;
+type Contract660 = Assert<
+	Equal<keyof Pick<Native0.ProgressStatus, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract661 = Assert<
+	Equal<keyof Pick<Native0.ProgressRootState, PublishedKeys143>, PublishedKeys143>
+>;
+type Contract662 = Assert<
+	Equal<keyof Pick<Native0.ProgressRootProps, PublishedKeys120>, PublishedKeys120>
+>;
+type Contract663 = Assert<Equal<Parameters<typeof Native0.ProgressIndicator>['length'], 1>>;
+type Contract664 = Assert<
+	Equal<keyof Pick<Native0.ProgressIndicatorState, PublishedKeys143>, PublishedKeys143>
+>;
+type Contract665 = Assert<
+	Equal<keyof Pick<Native0.ProgressIndicatorProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract666 = Assert<Equal<Parameters<typeof Native0.ProgressLabel>['length'], 1>>;
+type Contract667 = Assert<
+	Equal<keyof Pick<Native0.ProgressLabelState, PublishedKeys143>, PublishedKeys143>
+>;
+type Contract668 = Assert<
 	Equal<keyof Pick<Native0.ProgressLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract658 = Assert<Equal<Parameters<typeof Native0.ProgressTrack>['length'], 1>>;
-type Contract659 = Assert<
+type Contract669 = Assert<Equal<Parameters<typeof Native0.ProgressTrack>['length'], 1>>;
+type Contract670 = Assert<
 	Equal<keyof Pick<Native0.ProgressTrackState, PublishedKeys143>, PublishedKeys143>
 >;
-type Contract660 = Assert<
+type Contract671 = Assert<
 	Equal<keyof Pick<Native0.ProgressTrackProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract661 = Assert<Equal<Parameters<typeof Native0.ProgressValue>['length'], 1>>;
-type Contract662 = Assert<
+type Contract672 = Assert<Equal<Parameters<typeof Native0.ProgressValue>['length'], 1>>;
+type Contract673 = Assert<
 	Equal<keyof Pick<Native0.ProgressValueState, PublishedKeys143>, PublishedKeys143>
 >;
-type Contract663 = Assert<
+type Contract674 = Assert<
 	Equal<keyof Pick<Native0.ProgressValueProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract664 = Assert<
-	Equal<keyof Pick<typeof Native0.Radio, PublishedKeys51>, PublishedKeys51>
+type Contract675 = Assert<
+	Equal<keyof Pick<typeof Native0.Radio, PublishedKeys52>, PublishedKeys52>
 >;
-type Contract665 = Assert<Equal<Parameters<typeof Native0.RadioRoot>['length'], 1>>;
-type Contract666 = Assert<
+type Contract676 = Assert<Equal<Parameters<typeof Native0.RadioRoot>['length'], 1>>;
+type Contract677 = Assert<
 	Equal<keyof Pick<Native0.RadioRootState, PublishedKeys144>, PublishedKeys144>
 >;
-type Contract667 = Assert<
+type Contract678 = Assert<
 	Equal<keyof Pick<Native0.RadioRootProps, PublishedKeys145>, PublishedKeys145>
 >;
-type Contract668 = Assert<Equal<Parameters<typeof Native0.RadioIndicator>['length'], 1>>;
-type Contract669 = Assert<
-	Equal<keyof Pick<Native0.RadioIndicatorProps, PublishedKeys55>, PublishedKeys55>
+type Contract679 = Assert<Equal<Parameters<typeof Native0.RadioIndicator>['length'], 1>>;
+type Contract680 = Assert<
+	Equal<keyof Pick<Native0.RadioIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract670 = Assert<
+type Contract681 = Assert<
 	Equal<keyof Pick<Native0.RadioIndicatorState, PublishedKeys146>, PublishedKeys146>
 >;
-type Contract671 = Assert<Equal<Parameters<typeof Native0.RadioGroup>['length'], 1>>;
-type Contract672 = Assert<
+type Contract682 = Assert<Equal<Parameters<typeof Native0.RadioGroup>['length'], 1>>;
+type Contract683 = Assert<
 	Equal<keyof Pick<Native0.RadioGroupState, PublishedKeys147>, PublishedKeys147>
 >;
-type Contract673 = Assert<
+type Contract684 = Assert<
 	Equal<keyof Pick<Native0.RadioGroupProps, PublishedKeys148>, PublishedKeys148>
 >;
-type Contract674 = Assert<
+type Contract685 = Assert<
 	Equal<keyof Pick<Native0.RadioGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract675 = Assert<
+type Contract686 = Assert<
 	Equal<keyof Pick<Native0.RadioGroupChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract676 = Assert<
+type Contract687 = Assert<
 	Equal<keyof Pick<typeof Native0.ScrollArea, PublishedKeys149>, PublishedKeys149>
 >;
-type Contract677 = Assert<
+type Contract688 = Assert<
 	Equal<keyof Pick<Native0.HiddenState, PublishedKeys150>, PublishedKeys150>
 >;
-type Contract678 = Assert<
+type Contract689 = Assert<
 	Equal<keyof Pick<Native0.OverflowEdges, PublishedKeys151>, PublishedKeys151>
 >;
-type Contract679 = Assert<Equal<keyof Pick<Native0.Size, PublishedKeys152>, PublishedKeys152>>;
-type Contract680 = Assert<Equal<keyof Pick<Native0.Coords, PublishedKeys153>, PublishedKeys153>>;
-type Contract681 = Assert<Equal<Parameters<typeof Native0.ScrollAreaRoot>['length'], 1>>;
-type Contract682 = Assert<
+type Contract690 = Assert<Equal<keyof Pick<Native0.Size, PublishedKeys152>, PublishedKeys152>>;
+type Contract691 = Assert<Equal<keyof Pick<Native0.Coords, PublishedKeys153>, PublishedKeys153>>;
+type Contract692 = Assert<Equal<Parameters<typeof Native0.ScrollAreaRoot>['length'], 1>>;
+type Contract693 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaRootState, PublishedKeys154>, PublishedKeys154>
 >;
-type Contract683 = Assert<
+type Contract694 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaRootProps, PublishedKeys155>, PublishedKeys155>
 >;
-type Contract684 = Assert<Equal<Parameters<typeof Native0.ScrollAreaViewport>['length'], 1>>;
-type Contract685 = Assert<
+type Contract695 = Assert<Equal<Parameters<typeof Native0.ScrollAreaViewport>['length'], 1>>;
+type Contract696 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract686 = Assert<
+type Contract697 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaViewportState, PublishedKeys154>, PublishedKeys154>
 >;
-type Contract687 = Assert<Equal<Parameters<typeof Native0.ScrollAreaScrollbar>['length'], 1>>;
-type Contract688 = Assert<
+type Contract698 = Assert<Equal<Parameters<typeof Native0.ScrollAreaScrollbar>['length'], 1>>;
+type Contract699 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaScrollbarState, PublishedKeys156>, PublishedKeys156>
 >;
-type Contract689 = Assert<
+type Contract700 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaScrollbarProps, PublishedKeys157>, PublishedKeys157>
 >;
-type Contract690 = Assert<Equal<Parameters<typeof Native0.ScrollAreaContent>['length'], 1>>;
-type Contract691 = Assert<
+type Contract701 = Assert<Equal<Parameters<typeof Native0.ScrollAreaContent>['length'], 1>>;
+type Contract702 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaContentState, PublishedKeys154>, PublishedKeys154>
 >;
-type Contract692 = Assert<
+type Contract703 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaContentProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract693 = Assert<Equal<Parameters<typeof Native0.ScrollAreaThumb>['length'], 1>>;
-type Contract694 = Assert<
+type Contract704 = Assert<Equal<Parameters<typeof Native0.ScrollAreaThumb>['length'], 1>>;
+type Contract705 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaThumbState, PublishedKeys158>, PublishedKeys158>
 >;
-type Contract695 = Assert<
+type Contract706 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaThumbProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract696 = Assert<Equal<Parameters<typeof Native0.ScrollAreaCorner>['length'], 1>>;
-type Contract697 = Assert<Equal<keyof Native0.ScrollAreaCornerState, never>>;
-type Contract698 = Assert<
+type Contract707 = Assert<Equal<Parameters<typeof Native0.ScrollAreaCorner>['length'], 1>>;
+type Contract708 = Assert<Equal<keyof Native0.ScrollAreaCornerState, never>>;
+type Contract709 = Assert<
 	Equal<keyof Pick<Native0.ScrollAreaCornerProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract699 = Assert<
+type Contract710 = Assert<
 	Equal<keyof Pick<typeof Native0.Select, PublishedKeys159>, PublishedKeys159>
 >;
-type Contract700 = Assert<Equal<Parameters<typeof Native0.SelectRoot>['length'], 1>>;
-type Contract701 = Assert<
+type Contract711 = Assert<Equal<Parameters<typeof Native0.SelectRoot>['length'], 1>>;
+type Contract712 = Assert<
 	Equal<keyof Pick<Native0.SelectRootProps<{ sample: string }>, PublishedKeys160>, PublishedKeys160>
 >;
-type Contract702 = Assert<Equal<keyof Native0.SelectRootState, never>>;
-type Contract703 = Assert<
-	Equal<keyof Pick<Native0.SelectRootActions, PublishedKeys40>, PublishedKeys40>
+type Contract713 = Assert<Equal<keyof Native0.SelectRootState, never>>;
+type Contract714 = Assert<
+	Equal<keyof Pick<Native0.SelectRootActions, PublishedKeys41>, PublishedKeys41>
 >;
-type Contract704 = Assert<
+type Contract715 = Assert<
 	Equal<keyof Pick<Native0.SelectRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract705 = Assert<
+type Contract716 = Assert<
 	Equal<keyof Pick<Native0.SelectRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract706 = Assert<Equal<Parameters<typeof Native0.SelectLabel>['length'], 1>>;
-type Contract707 = Assert<
-	Equal<keyof Pick<Native0.SelectLabelState, PublishedKeys56>, PublishedKeys56>
+type Contract717 = Assert<Equal<Parameters<typeof Native0.SelectLabel>['length'], 1>>;
+type Contract718 = Assert<
+	Equal<keyof Pick<Native0.SelectLabelState, PublishedKeys57>, PublishedKeys57>
 >;
-type Contract708 = Assert<
+type Contract719 = Assert<
 	Equal<keyof Pick<Native0.SelectLabelProps, PublishedKeys68>, PublishedKeys68>
 >;
-type Contract709 = Assert<Equal<Parameters<typeof Native0.SelectTrigger>['length'], 1>>;
-type Contract710 = Assert<
+type Contract720 = Assert<Equal<Parameters<typeof Native0.SelectTrigger>['length'], 1>>;
+type Contract721 = Assert<
 	Equal<keyof Pick<Native0.SelectTriggerState, PublishedKeys161>, PublishedKeys161>
 >;
-type Contract711 = Assert<
+type Contract722 = Assert<
 	Equal<keyof Pick<Native0.SelectTriggerProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract712 = Assert<Equal<Parameters<typeof Native0.SelectValue>['length'], 1>>;
-type Contract713 = Assert<
+type Contract723 = Assert<Equal<Parameters<typeof Native0.SelectValue>['length'], 1>>;
+type Contract724 = Assert<
 	Equal<keyof Pick<Native0.SelectValueState, PublishedKeys162>, PublishedKeys162>
 >;
-type Contract714 = Assert<
+type Contract725 = Assert<
 	Equal<keyof Pick<Native0.SelectValueProps, PublishedKeys163>, PublishedKeys163>
 >;
-type Contract715 = Assert<Equal<Parameters<typeof Native0.SelectIcon>['length'], 1>>;
-type Contract716 = Assert<
+type Contract726 = Assert<Equal<Parameters<typeof Native0.SelectIcon>['length'], 1>>;
+type Contract727 = Assert<
 	Equal<keyof Pick<Native0.SelectIconState, PublishedKeys87>, PublishedKeys87>
 >;
-type Contract717 = Assert<
+type Contract728 = Assert<
 	Equal<keyof Pick<Native0.SelectIconProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract718 = Assert<Equal<Parameters<typeof Native0.SelectPortal>['length'], 1>>;
-type Contract719 = Assert<Equal<keyof Native0.SelectPortalState, never>>;
-type Contract720 = Assert<
+type Contract729 = Assert<Equal<Parameters<typeof Native0.SelectPortal>['length'], 1>>;
+type Contract730 = Assert<Equal<keyof Native0.SelectPortalState, never>>;
+type Contract731 = Assert<
 	Equal<keyof Pick<Native0.SelectPortalProps, PublishedKeys164>, PublishedKeys164>
 >;
-type Contract721 = Assert<Equal<Parameters<typeof Native0.SelectBackdrop>['length'], 1>>;
-type Contract722 = Assert<
+type Contract732 = Assert<Equal<Parameters<typeof Native0.SelectBackdrop>['length'], 1>>;
+type Contract733 = Assert<
 	Equal<keyof Pick<Native0.SelectBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract723 = Assert<
+type Contract734 = Assert<
 	Equal<keyof Pick<Native0.SelectBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract724 = Assert<Equal<Parameters<typeof Native0.SelectPositioner>['length'], 1>>;
-type Contract725 = Assert<
+type Contract735 = Assert<Equal<Parameters<typeof Native0.SelectPositioner>['length'], 1>>;
+type Contract736 = Assert<
 	Equal<keyof Pick<Native0.SelectPositionerState, PublishedKeys165>, PublishedKeys165>
 >;
-type Contract726 = Assert<
+type Contract737 = Assert<
 	Equal<keyof Pick<Native0.SelectPositionerProps, PublishedKeys166>, PublishedKeys166>
 >;
-type Contract727 = Assert<Equal<Parameters<typeof Native0.SelectPopup>['length'], 1>>;
-type Contract728 = Assert<
+type Contract738 = Assert<Equal<Parameters<typeof Native0.SelectPopup>['length'], 1>>;
+type Contract739 = Assert<
 	Equal<keyof Pick<Native0.SelectPopupProps, PublishedKeys74>, PublishedKeys74>
 >;
-type Contract729 = Assert<
+type Contract740 = Assert<
 	Equal<keyof Pick<Native0.SelectPopupState, PublishedKeys167>, PublishedKeys167>
 >;
-type Contract730 = Assert<Equal<Parameters<typeof Native0.SelectList>['length'], 1>>;
-type Contract731 = Assert<
+type Contract741 = Assert<Equal<Parameters<typeof Native0.SelectList>['length'], 1>>;
+type Contract742 = Assert<
 	Equal<keyof Pick<Native0.SelectListProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract732 = Assert<Equal<keyof Native0.SelectListState, never>>;
-type Contract733 = Assert<Equal<Parameters<typeof Native0.SelectItem>['length'], 1>>;
-type Contract734 = Assert<
+type Contract743 = Assert<Equal<keyof Native0.SelectListState, never>>;
+type Contract744 = Assert<Equal<Parameters<typeof Native0.SelectItem>['length'], 1>>;
+type Contract745 = Assert<
 	Equal<keyof Pick<Native0.SelectItemState, PublishedKeys70>, PublishedKeys70>
 >;
-type Contract735 = Assert<
+type Contract746 = Assert<
 	Equal<keyof Pick<Native0.SelectItemProps, PublishedKeys168>, PublishedKeys168>
 >;
-type Contract736 = Assert<Equal<Parameters<typeof Native0.SelectItemIndicator>['length'], 1>>;
-type Contract737 = Assert<
+type Contract747 = Assert<Equal<Parameters<typeof Native0.SelectItemIndicator>['length'], 1>>;
+type Contract748 = Assert<
 	Equal<keyof Pick<Native0.SelectItemIndicatorState, PublishedKeys71>, PublishedKeys71>
 >;
-type Contract738 = Assert<
-	Equal<keyof Pick<Native0.SelectItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+type Contract749 = Assert<
+	Equal<keyof Pick<Native0.SelectItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract739 = Assert<Equal<Parameters<typeof Native0.SelectItemText>['length'], 1>>;
-type Contract740 = Assert<Equal<keyof Native0.SelectItemTextState, never>>;
-type Contract741 = Assert<
+type Contract750 = Assert<Equal<Parameters<typeof Native0.SelectItemText>['length'], 1>>;
+type Contract751 = Assert<Equal<keyof Native0.SelectItemTextState, never>>;
+type Contract752 = Assert<
 	Equal<keyof Pick<Native0.SelectItemTextProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract742 = Assert<Equal<Parameters<typeof Native0.SelectArrow>['length'], 1>>;
-type Contract743 = Assert<
-	Equal<keyof Pick<Native0.SelectArrowState, PublishedKeys35>, PublishedKeys35>
+type Contract753 = Assert<Equal<Parameters<typeof Native0.SelectArrow>['length'], 1>>;
+type Contract754 = Assert<
+	Equal<keyof Pick<Native0.SelectArrowState, PublishedKeys36>, PublishedKeys36>
 >;
-type Contract744 = Assert<
+type Contract755 = Assert<
 	Equal<keyof Pick<Native0.SelectArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract745 = Assert<Equal<Parameters<typeof Native0.SelectScrollDownArrow>['length'], 1>>;
-type Contract746 = Assert<Equal<keyof Native0.SelectScrollDownArrowState, never>>;
-type Contract747 = Assert<
-	Equal<keyof Pick<Native0.SelectScrollDownArrowProps, PublishedKeys55>, PublishedKeys55>
+type Contract756 = Assert<Equal<Parameters<typeof Native0.SelectScrollDownArrow>['length'], 1>>;
+type Contract757 = Assert<Equal<keyof Native0.SelectScrollDownArrowState, never>>;
+type Contract758 = Assert<
+	Equal<keyof Pick<Native0.SelectScrollDownArrowProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract748 = Assert<Equal<Parameters<typeof Native0.SelectScrollUpArrow>['length'], 1>>;
-type Contract749 = Assert<Equal<keyof Native0.SelectScrollUpArrowState, never>>;
-type Contract750 = Assert<
-	Equal<keyof Pick<Native0.SelectScrollUpArrowProps, PublishedKeys55>, PublishedKeys55>
+type Contract759 = Assert<Equal<Parameters<typeof Native0.SelectScrollUpArrow>['length'], 1>>;
+type Contract760 = Assert<Equal<keyof Native0.SelectScrollUpArrowState, never>>;
+type Contract761 = Assert<
+	Equal<keyof Pick<Native0.SelectScrollUpArrowProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract751 = Assert<Equal<Parameters<typeof Native0.SelectGroup>['length'], 1>>;
-type Contract752 = Assert<Equal<keyof Native0.SelectGroupState, never>>;
-type Contract753 = Assert<
+type Contract762 = Assert<Equal<Parameters<typeof Native0.SelectGroup>['length'], 1>>;
+type Contract763 = Assert<Equal<keyof Native0.SelectGroupState, never>>;
+type Contract764 = Assert<
 	Equal<keyof Pick<Native0.SelectGroupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract754 = Assert<Equal<Parameters<typeof Native0.SelectGroupLabel>['length'], 1>>;
-type Contract755 = Assert<Equal<keyof Native0.SelectGroupLabelState, never>>;
-type Contract756 = Assert<
+type Contract765 = Assert<Equal<Parameters<typeof Native0.SelectGroupLabel>['length'], 1>>;
+type Contract766 = Assert<Equal<keyof Native0.SelectGroupLabelState, never>>;
+type Contract767 = Assert<
 	Equal<keyof Pick<Native0.SelectGroupLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract757 = Assert<
-	Equal<keyof Pick<Native0.SelectSeparatorProps, PublishedKeys25>, PublishedKeys25>
+type Contract768 = Assert<
+	Equal<keyof Pick<Native0.SelectSeparatorProps, PublishedKeys26>, PublishedKeys26>
 >;
-type Contract758 = Assert<
-	Equal<keyof Pick<Native0.SelectSeparatorState, PublishedKeys26>, PublishedKeys26>
+type Contract769 = Assert<
+	Equal<keyof Pick<Native0.SelectSeparatorState, PublishedKeys27>, PublishedKeys27>
 >;
-type Contract759 = Assert<Equal<Parameters<typeof Native0.SelectSeparator>['length'], 1>>;
-type Contract760 = Assert<Equal<Parameters<typeof Native0.Separator>['length'], 1>>;
-type Contract761 = Assert<
-	Equal<keyof Pick<Native0.SeparatorProps, PublishedKeys25>, PublishedKeys25>
+type Contract770 = Assert<Equal<Parameters<typeof Native0.SelectSeparator>['length'], 1>>;
+type Contract771 = Assert<Equal<Parameters<typeof Native0.Separator>['length'], 1>>;
+type Contract772 = Assert<
+	Equal<keyof Pick<Native0.SeparatorProps, PublishedKeys26>, PublishedKeys26>
 >;
-type Contract762 = Assert<
-	Equal<keyof Pick<Native0.SeparatorState, PublishedKeys26>, PublishedKeys26>
+type Contract773 = Assert<
+	Equal<keyof Pick<Native0.SeparatorState, PublishedKeys27>, PublishedKeys27>
 >;
-type Contract763 = Assert<
+type Contract774 = Assert<
 	Equal<keyof Pick<typeof Native0.Slider, PublishedKeys169>, PublishedKeys169>
 >;
-type Contract764 = Assert<Equal<Parameters<typeof Native0.SliderRoot>['length'], 1>>;
-type Contract765 = Assert<
+type Contract775 = Assert<Equal<Parameters<typeof Native0.SliderRoot>['length'], 1>>;
+type Contract776 = Assert<
 	Equal<keyof Pick<Native0.SliderRootState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract766 = Assert<
+type Contract777 = Assert<
 	Equal<keyof Pick<Native0.SliderRootProps, PublishedKeys171>, PublishedKeys171>
 >;
-type Contract767 = Assert<
+type Contract778 = Assert<
 	Equal<
 		keyof Pick<Native0.SliderRootChangeEventCustomProperties, PublishedKeys172>,
 		PublishedKeys172
 	>
 >;
-type Contract768 = Assert<
+type Contract779 = Assert<
 	Equal<keyof Pick<Native0.SliderRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract769 = Assert<
+type Contract780 = Assert<
 	Equal<keyof Pick<Native0.SliderRootChangeEventDetails, PublishedKeys173>, PublishedKeys173>
 >;
-type Contract770 = Assert<
+type Contract781 = Assert<
 	Equal<keyof Pick<Native0.SliderRootCommitEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract771 = Assert<
+type Contract782 = Assert<
 	Equal<keyof Pick<Native0.SliderRootCommitEventDetails, PublishedKeys110>, PublishedKeys110>
 >;
-type Contract772 = Assert<Equal<Parameters<typeof Native0.SliderLabel>['length'], 1>>;
-type Contract773 = Assert<
+type Contract783 = Assert<Equal<Parameters<typeof Native0.SliderLabel>['length'], 1>>;
+type Contract784 = Assert<
 	Equal<keyof Pick<Native0.SliderLabelState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract774 = Assert<
+type Contract785 = Assert<
 	Equal<keyof Pick<Native0.SliderLabelProps, PublishedKeys68>, PublishedKeys68>
 >;
-type Contract775 = Assert<Equal<Parameters<typeof Native0.SliderValue>['length'], 1>>;
-type Contract776 = Assert<
+type Contract786 = Assert<Equal<Parameters<typeof Native0.SliderValue>['length'], 1>>;
+type Contract787 = Assert<
 	Equal<keyof Pick<Native0.SliderValueState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract777 = Assert<
+type Contract788 = Assert<
 	Equal<keyof Pick<Native0.SliderValueProps, PublishedKeys174>, PublishedKeys174>
 >;
-type Contract778 = Assert<Equal<Parameters<typeof Native0.SliderControl>['length'], 1>>;
-type Contract779 = Assert<
+type Contract789 = Assert<Equal<Parameters<typeof Native0.SliderControl>['length'], 1>>;
+type Contract790 = Assert<
 	Equal<keyof Pick<Native0.SliderControlState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract780 = Assert<
+type Contract791 = Assert<
 	Equal<keyof Pick<Native0.SliderControlProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract781 = Assert<Equal<Parameters<typeof Native0.SliderTrack>['length'], 1>>;
-type Contract782 = Assert<
+type Contract792 = Assert<Equal<Parameters<typeof Native0.SliderTrack>['length'], 1>>;
+type Contract793 = Assert<
 	Equal<keyof Pick<Native0.SliderTrackState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract783 = Assert<
+type Contract794 = Assert<
 	Equal<keyof Pick<Native0.SliderTrackProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract784 = Assert<Equal<Parameters<typeof Native0.SliderThumb>['length'], 1>>;
-type Contract785 = Assert<
+type Contract795 = Assert<Equal<Parameters<typeof Native0.SliderThumb>['length'], 1>>;
+type Contract796 = Assert<
 	Equal<keyof Pick<Native0.ThumbMetadata, PublishedKeys175>, PublishedKeys175>
 >;
-type Contract786 = Assert<
+type Contract797 = Assert<
 	Equal<keyof Pick<Native0.SliderThumbState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract787 = Assert<
+type Contract798 = Assert<
 	Equal<keyof Pick<Native0.SliderThumbProps, PublishedKeys176>, PublishedKeys176>
 >;
-type Contract788 = Assert<Equal<Parameters<typeof Native0.SliderIndicator>['length'], 1>>;
-type Contract789 = Assert<
+type Contract799 = Assert<Equal<Parameters<typeof Native0.SliderIndicator>['length'], 1>>;
+type Contract800 = Assert<
 	Equal<keyof Pick<Native0.SliderIndicatorState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract790 = Assert<
+type Contract801 = Assert<
 	Equal<keyof Pick<Native0.SliderIndicatorProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract791 = Assert<
+type Contract802 = Assert<
 	Equal<keyof Pick<typeof Native0.Switch, PublishedKeys177>, PublishedKeys177>
 >;
-type Contract792 = Assert<Equal<Parameters<typeof Native0.SwitchRoot>['length'], 1>>;
-type Contract793 = Assert<
+type Contract803 = Assert<Equal<Parameters<typeof Native0.SwitchRoot>['length'], 1>>;
+type Contract804 = Assert<
 	Equal<keyof Pick<Native0.SwitchRootState, PublishedKeys144>, PublishedKeys144>
 >;
-type Contract794 = Assert<
+type Contract805 = Assert<
 	Equal<keyof Pick<Native0.SwitchRootProps, PublishedKeys178>, PublishedKeys178>
 >;
-type Contract795 = Assert<
+type Contract806 = Assert<
 	Equal<keyof Pick<Native0.SwitchRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract796 = Assert<
+type Contract807 = Assert<
 	Equal<keyof Pick<Native0.SwitchRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract797 = Assert<Equal<Parameters<typeof Native0.SwitchThumb>['length'], 1>>;
-type Contract798 = Assert<
+type Contract808 = Assert<Equal<Parameters<typeof Native0.SwitchThumb>['length'], 1>>;
+type Contract809 = Assert<
 	Equal<keyof Pick<Native0.SwitchThumbProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract799 = Assert<
+type Contract810 = Assert<
 	Equal<keyof Pick<Native0.SwitchThumbState, PublishedKeys144>, PublishedKeys144>
 >;
-type Contract800 = Assert<
+type Contract811 = Assert<
 	Equal<keyof Pick<typeof Native0.Tabs, PublishedKeys179>, PublishedKeys179>
 >;
-type Contract801 = Assert<Equal<Parameters<typeof Native0.TabsRoot>['length'], 1>>;
-type Contract802 = Assert<
+type Contract812 = Assert<Equal<Parameters<typeof Native0.TabsRoot>['length'], 1>>;
+type Contract813 = Assert<Equal<Parameters<typeof Native0.TabsList>['length'], 1>>;
+type Contract814 = Assert<Equal<Parameters<typeof Native0.TabsTab>['length'], 1>>;
+type Contract815 = Assert<Equal<Parameters<typeof Native0.TabsPanel>['length'], 1>>;
+type Contract816 = Assert<Equal<keyof Pick<Native0.TabsValue, PublishedKeys180>, PublishedKeys180>>;
+type Contract817 = Assert<
+	Equal<keyof Pick<Native0.TabsActivationDirection, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract818 = Assert<
+	Equal<keyof Pick<Native0.TabsOrientation, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract819 = Assert<
 	Equal<keyof Pick<Native0.TabsRootOrientation, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract803 = Assert<
-	Equal<keyof Pick<Native0.TabsRootState, PublishedKeys180>, PublishedKeys180>
->;
-type Contract804 = Assert<
-	Equal<keyof Pick<Native0.TabsRootProps, PublishedKeys181>, PublishedKeys181>
->;
-type Contract805 = Assert<
-	Equal<keyof Pick<Native0.TabsRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract806 = Assert<
-	Equal<keyof Pick<Native0.TabsRootChangeEventDetails, PublishedKeys182>, PublishedKeys182>
->;
-type Contract807 = Assert<Equal<Parameters<typeof Native0.TabsIndicator>['length'], 1>>;
-type Contract808 = Assert<
-	Equal<keyof Pick<Native0.TabsIndicatorState, PublishedKeys183>, PublishedKeys183>
->;
-type Contract809 = Assert<
-	Equal<keyof Pick<Native0.TabsIndicatorProps, PublishedKeys184>, PublishedKeys184>
->;
-type Contract810 = Assert<Equal<Parameters<typeof Native0.TabsTab>['length'], 1>>;
-type Contract811 = Assert<
-	Equal<keyof Pick<Native0.TabsTabValue, PublishedKeys185>, PublishedKeys185>
->;
-type Contract812 = Assert<
-	Equal<keyof Pick<Native0.TabsTabActivationDirection, PublishedKeys4>, PublishedKeys4>
->;
-type Contract813 = Assert<
-	Equal<keyof Pick<Native0.TabsTabPosition, PublishedKeys186>, PublishedKeys186>
->;
-type Contract814 = Assert<
-	Equal<keyof Pick<Native0.TabsTabSize, PublishedKeys152>, PublishedKeys152>
->;
-type Contract815 = Assert<
-	Equal<keyof Pick<Native0.TabsTabMetadata, PublishedKeys187>, PublishedKeys187>
->;
-type Contract816 = Assert<
-	Equal<keyof Pick<Native0.TabsTabState, PublishedKeys188>, PublishedKeys188>
->;
-type Contract817 = Assert<Equal<keyof Pick<Native0.TabsTabProps, PublishedKeys9>, PublishedKeys9>>;
-type Contract818 = Assert<Equal<Parameters<typeof Native0.TabsPanel>['length'], 1>>;
-type Contract819 = Assert<
-	Equal<keyof Pick<Native0.TabsPanelMetadata, PublishedKeys189>, PublishedKeys189>
->;
 type Contract820 = Assert<
-	Equal<keyof Pick<Native0.TabsPanelState, PublishedKeys190>, PublishedKeys190>
+	Equal<keyof Pick<Native0.TabsRootState, PublishedKeys181>, PublishedKeys181>
 >;
 type Contract821 = Assert<
-	Equal<keyof Pick<Native0.TabsPanelProps, PublishedKeys191>, PublishedKeys191>
+	Equal<keyof Pick<Native0.TabsRootProps, PublishedKeys182>, PublishedKeys182>
 >;
-type Contract822 = Assert<Equal<Parameters<typeof Native0.TabsList>['length'], 1>>;
+type Contract822 = Assert<
+	Equal<keyof Pick<Native0.TabsRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
 type Contract823 = Assert<
-	Equal<keyof Pick<Native0.TabsListState, PublishedKeys180>, PublishedKeys180>
+	Equal<keyof Pick<Native0.TabsRootChangeEventDetails, PublishedKeys183>, PublishedKeys183>
 >;
-type Contract824 = Assert<
-	Equal<keyof Pick<Native0.TabsListProps, PublishedKeys192>, PublishedKeys192>
->;
+type Contract824 = Assert<Equal<Parameters<typeof Native0.TabsIndicator>['length'], 1>>;
 type Contract825 = Assert<
-	Equal<keyof Pick<typeof Native0.Toast, PublishedKeys193>, PublishedKeys193>
+	Equal<keyof Pick<Native0.TabsIndicatorState, PublishedKeys184>, PublishedKeys184>
 >;
 type Contract826 = Assert<
+	Equal<keyof Pick<Native0.TabsIndicatorProps, PublishedKeys185>, PublishedKeys185>
+>;
+type Contract827 = Assert<
+	Equal<keyof Pick<Native0.TabsTabValue, PublishedKeys180>, PublishedKeys180>
+>;
+type Contract828 = Assert<
+	Equal<keyof Pick<Native0.TabsTabActivationDirection, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract829 = Assert<
+	Equal<keyof Pick<Native0.TabsTabPosition, PublishedKeys186>, PublishedKeys186>
+>;
+type Contract830 = Assert<
+	Equal<keyof Pick<Native0.TabsTabSize, PublishedKeys152>, PublishedKeys152>
+>;
+type Contract831 = Assert<
+	Equal<keyof Pick<Native0.TabsTabMetadata, PublishedKeys187>, PublishedKeys187>
+>;
+type Contract832 = Assert<
+	Equal<keyof Pick<Native0.TabsTabState, PublishedKeys188>, PublishedKeys188>
+>;
+type Contract833 = Assert<Equal<keyof Pick<Native0.TabsTabProps, PublishedKeys9>, PublishedKeys9>>;
+type Contract834 = Assert<
+	Equal<keyof Pick<Native0.TabsPanelMetadata, PublishedKeys189>, PublishedKeys189>
+>;
+type Contract835 = Assert<
+	Equal<keyof Pick<Native0.TabsPanelState, PublishedKeys190>, PublishedKeys190>
+>;
+type Contract836 = Assert<
+	Equal<keyof Pick<Native0.TabsPanelProps, PublishedKeys191>, PublishedKeys191>
+>;
+type Contract837 = Assert<
+	Equal<keyof Pick<Native0.TabsListState, PublishedKeys181>, PublishedKeys181>
+>;
+type Contract838 = Assert<
+	Equal<keyof Pick<Native0.TabsListProps, PublishedKeys192>, PublishedKeys192>
+>;
+type Contract839 = Assert<
+	Equal<keyof Pick<typeof Native0.Toast, PublishedKeys193>, PublishedKeys193>
+>;
+type Contract840 = Assert<Equal<Parameters<typeof Native0.useToastManager>['length'], 0>>;
+type Contract841 = Assert<Equal<Parameters<typeof Native0.createToastManager>['length'], 0>>;
+type Contract842 = Assert<
 	Equal<
 		keyof Pick<typeof Native0.toastRootStateAttributesMapping, PublishedKeys194>,
 		PublishedKeys194
 	>
 >;
-type Contract827 = Assert<Equal<Parameters<typeof Native0.ToastRoot>['length'], 1>>;
-type Contract828 = Assert<
+type Contract843 = Assert<Equal<Parameters<typeof Native0.ToastRoot>['length'], 1>>;
+type Contract844 = Assert<
 	Equal<keyof Pick<Native0.ToastRootToastObject, PublishedKeys195>, PublishedKeys195>
 >;
-type Contract829 = Assert<
+type Contract845 = Assert<
 	Equal<keyof Pick<Native0.ToastRootState, PublishedKeys194>, PublishedKeys194>
 >;
-type Contract830 = Assert<
+type Contract846 = Assert<
 	Equal<keyof Pick<Native0.ToastRootProps, PublishedKeys196>, PublishedKeys196>
 >;
-type Contract831 = Assert<Equal<Parameters<typeof Native0.ToastProvider>['length'], 1>>;
-type Contract832 = Assert<Equal<keyof Native0.ToastProviderState, never>>;
-type Contract833 = Assert<
+type Contract847 = Assert<Equal<Parameters<typeof Native0.ToastProvider>['length'], 1>>;
+type Contract848 = Assert<Equal<keyof Native0.ToastProviderState, never>>;
+type Contract849 = Assert<
 	Equal<keyof Pick<Native0.ToastProviderProps, PublishedKeys197>, PublishedKeys197>
 >;
-type Contract834 = Assert<Equal<Parameters<typeof Native0.ToastViewport>['length'], 1>>;
-type Contract835 = Assert<
+type Contract850 = Assert<Equal<Parameters<typeof Native0.ToastViewport>['length'], 1>>;
+type Contract851 = Assert<
 	Equal<keyof Pick<Native0.ToastViewportState, PublishedKeys198>, PublishedKeys198>
 >;
-type Contract836 = Assert<
+type Contract852 = Assert<
 	Equal<keyof Pick<Native0.ToastViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract837 = Assert<Equal<Parameters<typeof Native0.ToastContent>['length'], 1>>;
-type Contract838 = Assert<
+type Contract853 = Assert<Equal<Parameters<typeof Native0.ToastContent>['length'], 1>>;
+type Contract854 = Assert<
 	Equal<keyof Pick<Native0.ToastContentState, PublishedKeys199>, PublishedKeys199>
 >;
-type Contract839 = Assert<
+type Contract855 = Assert<
 	Equal<keyof Pick<Native0.ToastContentProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract840 = Assert<Equal<Parameters<typeof Native0.ToastDescription>['length'], 1>>;
-type Contract841 = Assert<
+type Contract856 = Assert<Equal<Parameters<typeof Native0.ToastDescription>['length'], 1>>;
+type Contract857 = Assert<
 	Equal<keyof Pick<Native0.ToastDescriptionState, PublishedKeys114>, PublishedKeys114>
 >;
-type Contract842 = Assert<
+type Contract858 = Assert<
 	Equal<keyof Pick<Native0.ToastDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract843 = Assert<Equal<Parameters<typeof Native0.ToastTitle>['length'], 1>>;
-type Contract844 = Assert<
+type Contract859 = Assert<Equal<Parameters<typeof Native0.ToastTitle>['length'], 1>>;
+type Contract860 = Assert<
 	Equal<keyof Pick<Native0.ToastTitleState, PublishedKeys114>, PublishedKeys114>
 >;
-type Contract845 = Assert<
+type Contract861 = Assert<
 	Equal<keyof Pick<Native0.ToastTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract846 = Assert<Equal<Parameters<typeof Native0.ToastClose>['length'], 1>>;
-type Contract847 = Assert<
+type Contract862 = Assert<Equal<Parameters<typeof Native0.ToastClose>['length'], 1>>;
+type Contract863 = Assert<
 	Equal<keyof Pick<Native0.ToastCloseState, PublishedKeys114>, PublishedKeys114>
 >;
-type Contract848 = Assert<
+type Contract864 = Assert<
 	Equal<keyof Pick<Native0.ToastCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract849 = Assert<Equal<Parameters<typeof Native0.ToastAction>['length'], 1>>;
-type Contract850 = Assert<
+type Contract865 = Assert<Equal<Parameters<typeof Native0.ToastAction>['length'], 1>>;
+type Contract866 = Assert<
 	Equal<keyof Pick<Native0.ToastActionState, PublishedKeys114>, PublishedKeys114>
 >;
-type Contract851 = Assert<
+type Contract867 = Assert<
 	Equal<keyof Pick<Native0.ToastActionProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract852 = Assert<Equal<Parameters<typeof Native0.ToastPortal>['length'], 1>>;
-type Contract853 = Assert<Equal<keyof Native0.ToastPortalState, never>>;
-type Contract854 = Assert<
+type Contract868 = Assert<Equal<Parameters<typeof Native0.ToastPortal>['length'], 1>>;
+type Contract869 = Assert<Equal<keyof Native0.ToastPortalState, never>>;
+type Contract870 = Assert<
 	Equal<keyof Pick<Native0.ToastPortalProps, PublishedKeys164>, PublishedKeys164>
 >;
-type Contract855 = Assert<Equal<Parameters<typeof Native0.ToastPositioner>['length'], 1>>;
-type Contract856 = Assert<
+type Contract871 = Assert<Equal<Parameters<typeof Native0.ToastPositioner>['length'], 1>>;
+type Contract872 = Assert<
 	Equal<keyof Pick<Native0.ToastPositionerState, PublishedKeys200>, PublishedKeys200>
 >;
-type Contract857 = Assert<
+type Contract873 = Assert<
 	Equal<keyof Pick<Native0.ToastPositionerProps, PublishedKeys201>, PublishedKeys201>
 >;
-type Contract858 = Assert<Equal<Parameters<typeof Native0.ToastArrow>['length'], 1>>;
-type Contract859 = Assert<
+type Contract874 = Assert<Equal<Parameters<typeof Native0.ToastArrow>['length'], 1>>;
+type Contract875 = Assert<
 	Equal<keyof Pick<Native0.ToastArrowState, PublishedKeys202>, PublishedKeys202>
 >;
-type Contract860 = Assert<
+type Contract876 = Assert<
 	Equal<keyof Pick<Native0.ToastArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract861 = Assert<Equal<Parameters<typeof Native0.useToastManager>['length'], 0>>;
-type Contract862 = Assert<
+type Contract877 = Assert<
 	Equal<keyof Pick<Native0.ToastObject<{ sample: string }>, PublishedKeys195>, PublishedKeys195>
 >;
-type Contract863 = Assert<
-	Equal<keyof Pick<Native0.ToastManagerPositionerProps, PublishedKeys32>, PublishedKeys32>
+type Contract878 = Assert<
+	Equal<keyof Pick<Native0.ToastManagerPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract864 = Assert<
+type Contract879 = Assert<
 	Equal<keyof Pick<Native0.UseToastManagerReturnValue, PublishedKeys203>, PublishedKeys203>
 >;
-type Contract865 = Assert<
+type Contract880 = Assert<
 	Equal<
 		keyof Pick<Native0.ToastManagerAddOptions<{ sample: string }>, PublishedKeys204>,
 		PublishedKeys204
 	>
 >;
-type Contract866 = Assert<
+type Contract881 = Assert<
 	Equal<
 		keyof Pick<Native0.ToastManagerUpdateOptions<{ sample: string }>, PublishedKeys205>,
 		PublishedKeys205
 	>
 >;
-type Contract867 = Assert<
+type Contract882 = Assert<
 	Equal<
 		keyof Pick<
 			Native0.ToastManagerPromiseOptions<{ sample: string }, { sample: string }>,
@@ -5735,166 +5764,169 @@ type Contract867 = Assert<
 		PublishedKeys206
 	>
 >;
-type Contract868 = Assert<Equal<Parameters<typeof Native0.createToastManager>['length'], 0>>;
-type Contract869 = Assert<
+type Contract883 = Assert<
 	Equal<keyof Pick<Native0.ToastManager, PublishedKeys207>, PublishedKeys207>
 >;
-type Contract870 = Assert<
+type Contract884 = Assert<
 	Equal<keyof Pick<Native0.ToastManagerEvent, PublishedKeys208>, PublishedKeys208>
 >;
-type Contract871 = Assert<Equal<Parameters<typeof Native0.Toggle>['length'], 1>>;
-type Contract872 = Assert<
+type Contract885 = Assert<Equal<Parameters<typeof Native0.Toggle>['length'], 1>>;
+type Contract886 = Assert<
 	Equal<keyof Pick<Native0.ToggleState, PublishedKeys209>, PublishedKeys209>
 >;
-type Contract873 = Assert<
+type Contract887 = Assert<
 	Equal<keyof Pick<Native0.ToggleProps<'sample'>, PublishedKeys210>, PublishedKeys210>
 >;
-type Contract874 = Assert<
+type Contract888 = Assert<
 	Equal<keyof Pick<Native0.ToggleChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract875 = Assert<
+type Contract889 = Assert<
 	Equal<keyof Pick<Native0.ToggleChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract876 = Assert<Equal<Parameters<typeof Native0.ToggleGroup>['length'], 1>>;
-type Contract877 = Assert<
+type Contract890 = Assert<Equal<Parameters<typeof Native0.ToggleGroup>['length'], 1>>;
+type Contract891 = Assert<
 	Equal<keyof Pick<Native0.ToggleGroupState, PublishedKeys211>, PublishedKeys211>
 >;
-type Contract878 = Assert<
+type Contract892 = Assert<
 	Equal<keyof Pick<Native0.ToggleGroupProps<'sample'>, PublishedKeys212>, PublishedKeys212>
 >;
-type Contract879 = Assert<
+type Contract893 = Assert<
 	Equal<keyof Pick<Native0.ToggleGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract880 = Assert<
+type Contract894 = Assert<
 	Equal<keyof Pick<Native0.ToggleGroupChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract881 = Assert<
+type Contract895 = Assert<
 	Equal<keyof Pick<typeof Native0.Toolbar, PublishedKeys213>, PublishedKeys213>
 >;
-type Contract882 = Assert<Equal<keyof Pick<Native0.Orientation, PublishedKeys4>, PublishedKeys4>>;
-type Contract883 = Assert<Equal<Parameters<typeof Native0.ToolbarRoot>['length'], 1>>;
-type Contract884 = Assert<
+type Contract896 = Assert<Equal<keyof Pick<Native0.Orientation, PublishedKeys4>, PublishedKeys4>>;
+type Contract897 = Assert<Equal<Parameters<typeof Native0.ToolbarRoot>['length'], 1>>;
+type Contract898 = Assert<
 	Equal<keyof Pick<Native0.ToolbarRootItemMetadata, PublishedKeys214>, PublishedKeys214>
 >;
-type Contract885 = Assert<
+type Contract899 = Assert<
 	Equal<keyof Pick<Native0.ToolbarRootOrientation, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract886 = Assert<
+type Contract900 = Assert<
 	Equal<keyof Pick<Native0.ToolbarRootState, PublishedKeys215>, PublishedKeys215>
 >;
-type Contract887 = Assert<
+type Contract901 = Assert<
 	Equal<keyof Pick<Native0.ToolbarRootProps, PublishedKeys216>, PublishedKeys216>
 >;
-type Contract888 = Assert<Equal<Parameters<typeof Native0.ToolbarGroup>['length'], 1>>;
-type Contract889 = Assert<
+type Contract902 = Assert<Equal<Parameters<typeof Native0.ToolbarGroup>['length'], 1>>;
+type Contract903 = Assert<
 	Equal<keyof Pick<Native0.ToolbarGroupState, PublishedKeys215>, PublishedKeys215>
 >;
-type Contract890 = Assert<
+type Contract904 = Assert<
 	Equal<keyof Pick<Native0.ToolbarGroupProps, PublishedKeys107>, PublishedKeys107>
 >;
-type Contract891 = Assert<Equal<Parameters<typeof Native0.ToolbarButton>['length'], 1>>;
-type Contract892 = Assert<
+type Contract905 = Assert<Equal<Parameters<typeof Native0.ToolbarButton>['length'], 1>>;
+type Contract906 = Assert<
 	Equal<keyof Pick<Native0.ToolbarButtonState, PublishedKeys217>, PublishedKeys217>
 >;
-type Contract893 = Assert<
-	Equal<keyof Pick<Native0.ToolbarButtonProps, PublishedKeys50>, PublishedKeys50>
+type Contract907 = Assert<
+	Equal<keyof Pick<Native0.ToolbarButtonProps, PublishedKeys51>, PublishedKeys51>
 >;
-type Contract894 = Assert<Equal<Parameters<typeof Native0.ToolbarLink>['length'], 1>>;
-type Contract895 = Assert<
-	Equal<keyof Pick<Native0.ToolbarLinkState, PublishedKeys26>, PublishedKeys26>
->;
-type Contract896 = Assert<
-	Equal<keyof Pick<Native0.ToolbarLinkProps, PublishedKeys218>, PublishedKeys218>
->;
-type Contract897 = Assert<Equal<Parameters<typeof Native0.ToolbarInput>['length'], 1>>;
-type Contract898 = Assert<
-	Equal<keyof Pick<Native0.ToolbarInputState, PublishedKeys217>, PublishedKeys217>
->;
-type Contract899 = Assert<
-	Equal<keyof Pick<Native0.ToolbarInputProps, PublishedKeys219>, PublishedKeys219>
->;
-type Contract900 = Assert<Equal<Parameters<typeof Native0.ToolbarSeparator>['length'], 1>>;
-type Contract901 = Assert<
-	Equal<keyof Pick<Native0.ToolbarSeparatorState, PublishedKeys26>, PublishedKeys26>
->;
-type Contract902 = Assert<
-	Equal<keyof Pick<Native0.ToolbarSeparatorProps, PublishedKeys25>, PublishedKeys25>
->;
-type Contract903 = Assert<
-	Equal<keyof Pick<typeof Native0.Tooltip, PublishedKeys220>, PublishedKeys220>
->;
-type Contract904 = Assert<Equal<Parameters<typeof Native0.TooltipProvider>['length'], 1>>;
-type Contract905 = Assert<Equal<keyof Native0.TooltipProviderState, never>>;
-type Contract906 = Assert<
-	Equal<keyof Pick<Native0.TooltipProviderProps, PublishedKeys221>, PublishedKeys221>
->;
-type Contract907 = Assert<Equal<Parameters<typeof Native0.TooltipRoot>['length'], 1>>;
-type Contract908 = Assert<Equal<keyof Native0.TooltipRootState, never>>;
+type Contract908 = Assert<Equal<Parameters<typeof Native0.ToolbarLink>['length'], 1>>;
 type Contract909 = Assert<
-	Equal<keyof Pick<Native0.TooltipRootProps, PublishedKeys222>, PublishedKeys222>
+	Equal<keyof Pick<Native0.ToolbarLinkState, PublishedKeys27>, PublishedKeys27>
 >;
 type Contract910 = Assert<
-	Equal<keyof Pick<Native0.TooltipRootActions, PublishedKeys20>, PublishedKeys20>
+	Equal<keyof Pick<Native0.ToolbarLinkProps, PublishedKeys218>, PublishedKeys218>
 >;
-type Contract911 = Assert<
-	Equal<keyof Pick<Native0.TooltipRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
+type Contract911 = Assert<Equal<Parameters<typeof Native0.ToolbarInput>['length'], 1>>;
 type Contract912 = Assert<
-	Equal<keyof Pick<Native0.TooltipRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+	Equal<keyof Pick<Native0.ToolbarInputState, PublishedKeys217>, PublishedKeys217>
 >;
-type Contract913 = Assert<Equal<Parameters<Native0.TooltipTrigger>['length'], 1>>;
-type Contract914 = Assert<
-	Equal<keyof Pick<Native0.TooltipTriggerState, PublishedKeys87>, PublishedKeys87>
+type Contract913 = Assert<
+	Equal<keyof Pick<Native0.ToolbarInputProps, PublishedKeys219>, PublishedKeys219>
 >;
+type Contract914 = Assert<Equal<Parameters<typeof Native0.ToolbarSeparator>['length'], 1>>;
 type Contract915 = Assert<
-	Equal<keyof Pick<Native0.TooltipTriggerProps, PublishedKeys223>, PublishedKeys223>
+	Equal<keyof Pick<Native0.ToolbarSeparatorState, PublishedKeys27>, PublishedKeys27>
 >;
-type Contract916 = Assert<Equal<Parameters<typeof Native0.TooltipPortal>['length'], 1>>;
-type Contract917 = Assert<Equal<keyof Native0.TooltipPortalState, never>>;
+type Contract916 = Assert<
+	Equal<keyof Pick<Native0.ToolbarSeparatorProps, PublishedKeys26>, PublishedKeys26>
+>;
+type Contract917 = Assert<
+	Equal<keyof Pick<typeof Native0.Tooltip, PublishedKeys220>, PublishedKeys220>
+>;
 type Contract918 = Assert<
-	Equal<keyof Pick<Native0.TooltipPortalProps, PublishedKeys18>, PublishedKeys18>
+	Equal<keyof Pick<typeof Native0.TooltipHandle, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract919 = Assert<Equal<Parameters<typeof Native0.TooltipPositioner>['length'], 1>>;
-type Contract920 = Assert<
-	Equal<keyof Pick<Native0.TooltipPositionerState, PublishedKeys124>, PublishedKeys124>
+type Contract919 = Assert<Equal<Parameters<typeof Native0.createTooltipHandle>['length'], 0>>;
+type Contract920 = Assert<Equal<Parameters<typeof Native0.TooltipProvider>['length'], 1>>;
+type Contract921 = Assert<Equal<keyof Native0.TooltipProviderState, never>>;
+type Contract922 = Assert<
+	Equal<keyof Pick<Native0.TooltipProviderProps, PublishedKeys221>, PublishedKeys221>
 >;
-type Contract921 = Assert<
-	Equal<keyof Pick<Native0.TooltipPositionerProps, PublishedKeys32>, PublishedKeys32>
+type Contract923 = Assert<Equal<Parameters<typeof Native0.TooltipRoot>['length'], 1>>;
+type Contract924 = Assert<Equal<keyof Native0.TooltipRootState, never>>;
+type Contract925 = Assert<
+	Equal<keyof Pick<Native0.TooltipRootProps, PublishedKeys222>, PublishedKeys222>
 >;
-type Contract922 = Assert<Equal<Parameters<typeof Native0.TooltipPopup>['length'], 1>>;
-type Contract923 = Assert<
-	Equal<keyof Pick<Native0.TooltipPopupState, PublishedKeys140>, PublishedKeys140>
->;
-type Contract924 = Assert<
-	Equal<keyof Pick<Native0.TooltipPopupProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract925 = Assert<Equal<Parameters<typeof Native0.TooltipViewport>['length'], 1>>;
 type Contract926 = Assert<
-	Equal<keyof Pick<Native0.TooltipViewportState, PublishedKeys116>, PublishedKeys116>
+	Equal<keyof Pick<Native0.TooltipRootActions, PublishedKeys21>, PublishedKeys21>
 >;
 type Contract927 = Assert<
-	Equal<keyof Pick<Native0.TooltipViewportProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.TooltipRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract928 = Assert<Equal<Parameters<typeof Native0.TooltipArrow>['length'], 1>>;
-type Contract929 = Assert<
-	Equal<keyof Pick<Native0.TooltipArrowState, PublishedKeys224>, PublishedKeys224>
+type Contract928 = Assert<
+	Equal<keyof Pick<Native0.TooltipRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
+type Contract929 = Assert<Equal<Parameters<Native0.TooltipTrigger>['length'], 1>>;
 type Contract930 = Assert<
-	Equal<keyof Pick<Native0.TooltipArrowProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native0.TooltipTriggerState, PublishedKeys87>, PublishedKeys87>
 >;
-type Contract931 = Assert<Equal<keyof Pick<Native0.HTMLProps, PublishedKeys225>, PublishedKeys225>>;
-type Contract932 = Assert<
-	Equal<Parameters<Native0.ComponentRenderFn<{ sample: string }, { sample: string }>>['length'], 2>
+type Contract931 = Assert<
+	Equal<keyof Pick<Native0.TooltipTriggerProps, PublishedKeys223>, PublishedKeys223>
 >;
-type Contract933 = Assert<Equal<Parameters<typeof Native0.useRender>['length'], 1>>;
-type Contract934 = Assert<Equal<keyof Native0.UseRenderRenderProp, never>>;
-type Contract935 = Assert<
-	Equal<keyof Pick<Native0.UseRenderElementProps<'div'>, PublishedKeys226>, PublishedKeys226>
+type Contract932 = Assert<Equal<Parameters<typeof Native0.TooltipPortal>['length'], 1>>;
+type Contract933 = Assert<Equal<keyof Native0.TooltipPortalState, never>>;
+type Contract934 = Assert<
+	Equal<keyof Pick<Native0.TooltipPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
+type Contract935 = Assert<Equal<Parameters<typeof Native0.TooltipPositioner>['length'], 1>>;
 type Contract936 = Assert<
-	Equal<keyof Pick<Native0.UseRenderComponentProps<'div'>, PublishedKeys227>, PublishedKeys227>
+	Equal<keyof Pick<Native0.TooltipPositionerState, PublishedKeys124>, PublishedKeys124>
 >;
 type Contract937 = Assert<
+	Equal<keyof Pick<Native0.TooltipPositionerProps, PublishedKeys33>, PublishedKeys33>
+>;
+type Contract938 = Assert<Equal<Parameters<typeof Native0.TooltipPopup>['length'], 1>>;
+type Contract939 = Assert<
+	Equal<keyof Pick<Native0.TooltipPopupState, PublishedKeys140>, PublishedKeys140>
+>;
+type Contract940 = Assert<
+	Equal<keyof Pick<Native0.TooltipPopupProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract941 = Assert<Equal<Parameters<typeof Native0.TooltipViewport>['length'], 1>>;
+type Contract942 = Assert<
+	Equal<keyof Pick<Native0.TooltipViewportState, PublishedKeys116>, PublishedKeys116>
+>;
+type Contract943 = Assert<
+	Equal<keyof Pick<Native0.TooltipViewportProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract944 = Assert<Equal<Parameters<typeof Native0.TooltipArrow>['length'], 1>>;
+type Contract945 = Assert<
+	Equal<keyof Pick<Native0.TooltipArrowState, PublishedKeys224>, PublishedKeys224>
+>;
+type Contract946 = Assert<
+	Equal<keyof Pick<Native0.TooltipArrowProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract947 = Assert<Equal<keyof Pick<Native0.HTMLProps, PublishedKeys225>, PublishedKeys225>>;
+type Contract948 = Assert<
+	Equal<Parameters<Native0.ComponentRenderFn<{ sample: string }, { sample: string }>>['length'], 2>
+>;
+type Contract949 = Assert<Equal<Parameters<typeof Native0.useRender>['length'], 1>>;
+type Contract950 = Assert<Equal<keyof Native0.UseRenderRenderProp, never>>;
+type Contract951 = Assert<
+	Equal<keyof Pick<Native0.UseRenderElementProps<'div'>, PublishedKeys226>, PublishedKeys226>
+>;
+type Contract952 = Assert<
+	Equal<keyof Pick<Native0.UseRenderComponentProps<'div'>, PublishedKeys227>, PublishedKeys227>
+>;
+type Contract953 = Assert<
 	Equal<
 		keyof Pick<
 			Native0.UseRenderParameters<{ sample: string }, HTMLDivElement, true>,
@@ -5903,1362 +5935,1370 @@ type Contract937 = Assert<
 		PublishedKeys228
 	>
 >;
-type Contract938 = Assert<
+type Contract954 = Assert<
 	Equal<keyof Pick<Native0.UseRenderReturnValue<true>, PublishedKeys229>, PublishedKeys229>
 >;
-type Contract939 = Assert<Equal<keyof Native0.UseRenderState, never>>;
-type Contract940 = Assert<
+type Contract955 = Assert<Equal<keyof Native0.UseRenderState, never>>;
+type Contract956 = Assert<
 	Equal<keyof Pick<Native0.BaseUIChangeEventDetails<'sample'>, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract941 = Assert<
+type Contract957 = Assert<
 	Equal<keyof Pick<Native0.BaseUIGenericEventDetails<'sample'>, PublishedKeys110>, PublishedKeys110>
 >;
-type Contract942 = Assert<
+type Contract958 = Assert<
 	Equal<keyof Pick<Native0.BaseUIEvent<MouseEvent>, PublishedKeys230>, PublishedKeys230>
 >;
-type Contract943 = Assert<
+type Contract959 = Assert<
 	Equal<keyof Pick<typeof Native1.Accordion, PublishedKeys0>, PublishedKeys0>
 >;
-type Contract944 = Assert<Equal<Parameters<typeof Native1.AccordionRoot>['length'], 1>>;
-type Contract945 = Assert<
+type Contract960 = Assert<Equal<Parameters<typeof Native1.AccordionRoot>['length'], 1>>;
+type Contract961 = Assert<Equal<Parameters<typeof Native1.AccordionItem>['length'], 1>>;
+type Contract962 = Assert<Equal<Parameters<typeof Native1.AccordionHeader>['length'], 1>>;
+type Contract963 = Assert<Equal<Parameters<typeof Native1.AccordionTrigger>['length'], 1>>;
+type Contract964 = Assert<Equal<Parameters<typeof Native1.AccordionPanel>['length'], 1>>;
+type Contract965 = Assert<
 	Equal<keyof Pick<Native1.AccordionValue, PublishedKeys1>, PublishedKeys1>
 >;
-type Contract946 = Assert<
+type Contract966 = Assert<
 	Equal<keyof Pick<Native1.AccordionRootState, PublishedKeys2>, PublishedKeys2>
 >;
-type Contract947 = Assert<
+type Contract967 = Assert<
 	Equal<keyof Pick<Native1.AccordionRootProps, PublishedKeys3>, PublishedKeys3>
 >;
-type Contract948 = Assert<
+type Contract968 = Assert<
 	Equal<keyof Pick<Native1.AccordionRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract949 = Assert<
+type Contract969 = Assert<
 	Equal<keyof Pick<Native1.AccordionRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract950 = Assert<Equal<Parameters<typeof Native1.AccordionItem>['length'], 1>>;
-type Contract951 = Assert<
+type Contract970 = Assert<
 	Equal<keyof Pick<Native1.AccordionItemState, PublishedKeys6>, PublishedKeys6>
 >;
-type Contract952 = Assert<
+type Contract971 = Assert<
 	Equal<keyof Pick<Native1.AccordionItemProps, PublishedKeys7>, PublishedKeys7>
 >;
-type Contract953 = Assert<
+type Contract972 = Assert<
 	Equal<keyof Pick<Native1.AccordionItemChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract954 = Assert<
+type Contract973 = Assert<
 	Equal<keyof Pick<Native1.AccordionItemChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract955 = Assert<Equal<Parameters<typeof Native1.AccordionHeader>['length'], 1>>;
-type Contract956 = Assert<
+type Contract974 = Assert<
 	Equal<keyof Pick<Native1.AccordionHeaderState, PublishedKeys6>, PublishedKeys6>
 >;
-type Contract957 = Assert<
+type Contract975 = Assert<
 	Equal<keyof Pick<Native1.AccordionHeaderProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract958 = Assert<Equal<Parameters<typeof Native1.AccordionTrigger>['length'], 1>>;
-type Contract959 = Assert<
+type Contract976 = Assert<
 	Equal<keyof Pick<Native1.AccordionTriggerState, PublishedKeys6>, PublishedKeys6>
 >;
-type Contract960 = Assert<
+type Contract977 = Assert<
 	Equal<keyof Pick<Native1.AccordionTriggerProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract961 = Assert<Equal<Parameters<typeof Native1.AccordionPanel>['length'], 1>>;
-type Contract962 = Assert<
+type Contract978 = Assert<
 	Equal<keyof Pick<Native1.AccordionPanelState, PublishedKeys10>, PublishedKeys10>
 >;
-type Contract963 = Assert<
+type Contract979 = Assert<
 	Equal<keyof Pick<Native1.AccordionPanelProps, PublishedKeys11>, PublishedKeys11>
 >;
-type Contract964 = Assert<
+type Contract980 = Assert<
 	Equal<keyof Pick<typeof Native2.AlertDialog, PublishedKeys12>, PublishedKeys12>
 >;
-type Contract965 = Assert<
+type Contract981 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogBackdropProps, PublishedKeys13>, PublishedKeys13>
 >;
-type Contract966 = Assert<
+type Contract982 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract967 = Assert<
+type Contract983 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract968 = Assert<
+type Contract984 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogCloseState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract969 = Assert<
+type Contract985 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract970 = Assert<Equal<keyof Native2.AlertDialogDescriptionState, never>>;
-type Contract971 = Assert<
+type Contract986 = Assert<Equal<keyof Native2.AlertDialogDescriptionState, never>>;
+type Contract987 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogPopupProps, PublishedKeys16>, PublishedKeys16>
 >;
-type Contract972 = Assert<
+type Contract988 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogPopupState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract973 = Assert<
+type Contract989 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract974 = Assert<Equal<keyof Native2.AlertDialogPortalState, never>>;
-type Contract975 = Assert<
+type Contract990 = Assert<Equal<keyof Native2.AlertDialogPortalState, never>>;
+type Contract991 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract976 = Assert<Equal<keyof Native2.AlertDialogTitleState, never>>;
-type Contract977 = Assert<
+type Contract992 = Assert<Equal<keyof Native2.AlertDialogTitleState, never>>;
+type Contract993 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract978 = Assert<
+type Contract994 = Assert<
 	Equal<keyof Pick<Native2.AlertDialogViewportState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract979 = Assert<Equal<Parameters<typeof Native2.AlertDialogRoot>['length'], 1>>;
-type Contract980 = Assert<Equal<keyof Native2.AlertDialogRootState, never>>;
-type Contract981 = Assert<
-	Equal<keyof Pick<Native2.AlertDialogRootProps, PublishedKeys19>, PublishedKeys19>
->;
-type Contract982 = Assert<
-	Equal<keyof Pick<Native2.AlertDialogRootActions, PublishedKeys20>, PublishedKeys20>
->;
-type Contract983 = Assert<
-	Equal<keyof Pick<Native2.AlertDialogRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract984 = Assert<
-	Equal<keyof Pick<Native2.AlertDialogRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
->;
-type Contract985 = Assert<Equal<Parameters<Native2.AlertDialogTrigger>['length'], 1>>;
-type Contract986 = Assert<
-	Equal<keyof Pick<Native2.AlertDialogTriggerProps, PublishedKeys22>, PublishedKeys22>
->;
-type Contract987 = Assert<
-	Equal<keyof Pick<Native2.AlertDialogTriggerState, PublishedKeys23>, PublishedKeys23>
->;
-type Contract988 = Assert<
-	Equal<keyof Pick<typeof Native3.Autocomplete, PublishedKeys24>, PublishedKeys24>
->;
-type Contract989 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteSeparatorProps, PublishedKeys25>, PublishedKeys25>
->;
-type Contract990 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteSeparatorState, PublishedKeys26>, PublishedKeys26>
->;
-type Contract991 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteInputProps, PublishedKeys27>, PublishedKeys27>
->;
-type Contract992 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteInputState, PublishedKeys28>, PublishedKeys28>
->;
-type Contract993 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteIconProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract994 = Assert<Equal<keyof Native3.AutocompleteIconState, never>>;
 type Contract995 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteClearProps, PublishedKeys29>, PublishedKeys29>
+	Equal<keyof Pick<typeof Native2.AlertDialogHandle, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract996 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteClearState, PublishedKeys30>, PublishedKeys30>
->;
-type Contract997 = Assert<
-	Equal<keyof Pick<Native3.AutocompletePopupProps, PublishedKeys16>, PublishedKeys16>
->;
-type Contract998 = Assert<
-	Equal<keyof Pick<Native3.AutocompletePopupState, PublishedKeys31>, PublishedKeys31>
->;
+type Contract996 = Assert<Equal<Parameters<typeof Native2.createAlertDialogHandle>['length'], 0>>;
+type Contract997 = Assert<Equal<Parameters<typeof Native2.AlertDialogRoot>['length'], 1>>;
+type Contract998 = Assert<Equal<keyof Native2.AlertDialogRootState, never>>;
 type Contract999 = Assert<
-	Equal<keyof Pick<Native3.AutocompletePositionerProps, PublishedKeys32>, PublishedKeys32>
+	Equal<keyof Pick<Native2.AlertDialogRootProps, PublishedKeys20>, PublishedKeys20>
 >;
 type Contract1000 = Assert<
-	Equal<keyof Pick<Native3.AutocompletePositionerState, PublishedKeys33>, PublishedKeys33>
+	Equal<keyof Pick<Native2.AlertDialogRootActions, PublishedKeys21>, PublishedKeys21>
 >;
 type Contract1001 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteListProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native2.AlertDialogRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract1002 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteListState, PublishedKeys34>, PublishedKeys34>
+	Equal<keyof Pick<Native2.AlertDialogRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract1003 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteRowProps, PublishedKeys8>, PublishedKeys8>
+type Contract1003 = Assert<Equal<Parameters<Native2.AlertDialogTrigger>['length'], 1>>;
+type Contract1004 = Assert<
+	Equal<keyof Pick<Native2.AlertDialogTriggerProps, PublishedKeys23>, PublishedKeys23>
 >;
-type Contract1004 = Assert<Equal<keyof Native3.AutocompleteRowState, never>>;
 type Contract1005 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteArrowProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native2.AlertDialogTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
 type Contract1006 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteArrowState, PublishedKeys35>, PublishedKeys35>
+	Equal<keyof Pick<typeof Native3.Autocomplete, PublishedKeys25>, PublishedKeys25>
 >;
 type Contract1007 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteBackdropProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native3.AutocompleteSeparatorProps, PublishedKeys26>, PublishedKeys26>
 >;
 type Contract1008 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteBackdropState, PublishedKeys14>, PublishedKeys14>
+	Equal<keyof Pick<Native3.AutocompleteSeparatorState, PublishedKeys27>, PublishedKeys27>
 >;
 type Contract1009 = Assert<
-	Equal<keyof Pick<Native3.AutocompletePortalProps, PublishedKeys18>, PublishedKeys18>
+	Equal<keyof Pick<Native3.AutocompleteInputProps, PublishedKeys28>, PublishedKeys28>
 >;
-type Contract1010 = Assert<Equal<keyof Native3.AutocompletePortalState, never>>;
+type Contract1010 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteInputState, PublishedKeys29>, PublishedKeys29>
+>;
 type Contract1011 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteGroupProps, PublishedKeys36>, PublishedKeys36>
+	Equal<keyof Pick<Native3.AutocompleteIconProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1012 = Assert<Equal<keyof Native3.AutocompleteGroupState, never>>;
+type Contract1012 = Assert<Equal<keyof Native3.AutocompleteIconState, never>>;
 type Contract1013 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteGroupLabelProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native3.AutocompleteClearProps, PublishedKeys30>, PublishedKeys30>
 >;
-type Contract1014 = Assert<Equal<keyof Native3.AutocompleteGroupLabelState, never>>;
+type Contract1014 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteClearState, PublishedKeys31>, PublishedKeys31>
+>;
 type Contract1015 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteEmptyProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native3.AutocompletePopupProps, PublishedKeys16>, PublishedKeys16>
 >;
-type Contract1016 = Assert<Equal<keyof Native3.AutocompleteEmptyState, never>>;
+type Contract1016 = Assert<
+	Equal<keyof Pick<Native3.AutocompletePopupState, PublishedKeys32>, PublishedKeys32>
+>;
 type Contract1017 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteStatusProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native3.AutocompletePositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract1018 = Assert<Equal<keyof Native3.AutocompleteStatusState, never>>;
-type Contract1019 = Assert<Equal<keyof Native3.AutocompleteCollectionState, never>>;
+type Contract1018 = Assert<
+	Equal<keyof Pick<Native3.AutocompletePositionerState, PublishedKeys34>, PublishedKeys34>
+>;
+type Contract1019 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteListProps, PublishedKeys8>, PublishedKeys8>
+>;
 type Contract1020 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteCollectionProps, PublishedKeys37>, PublishedKeys37>
+	Equal<keyof Pick<Native3.AutocompleteListState, PublishedKeys35>, PublishedKeys35>
 >;
 type Contract1021 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteFilter, PublishedKeys38>, PublishedKeys38>
+	Equal<keyof Pick<Native3.AutocompleteRowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1022 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteFilterOptions, PublishedKeys39>, PublishedKeys39>
+type Contract1022 = Assert<Equal<keyof Native3.AutocompleteRowState, never>>;
+type Contract1023 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1023 = Assert<Equal<Parameters<typeof Native3.AutocompleteRoot>['length'], 1>>;
-type Contract1024 = Assert<Equal<keyof Native3.AutocompleteRootState, never>>;
+type Contract1024 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteArrowState, PublishedKeys36>, PublishedKeys36>
+>;
 type Contract1025 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteRootActions, PublishedKeys40>, PublishedKeys40>
+	Equal<keyof Pick<Native3.AutocompleteBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
 type Contract1026 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native3.AutocompleteBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
 type Contract1027 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+	Equal<keyof Pick<Native3.AutocompletePortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract1028 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteRootHighlightEventReason, PublishedKeys4>, PublishedKeys4>
->;
+type Contract1028 = Assert<Equal<keyof Native3.AutocompletePortalState, never>>;
 type Contract1029 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteRootHighlightEventDetails, PublishedKeys41>, PublishedKeys41>
+	Equal<keyof Pick<Native3.AutocompleteGroupProps, PublishedKeys37>, PublishedKeys37>
 >;
-type Contract1030 = Assert<
-	Equal<
-		keyof Pick<Native3.AutocompleteRootProps<{ sample: string }>, PublishedKeys42>,
-		PublishedKeys42
-	>
+type Contract1030 = Assert<Equal<keyof Native3.AutocompleteGroupState, never>>;
+type Contract1031 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteGroupLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1031 = Assert<Equal<Parameters<Native3.AutocompleteTrigger>['length'], 1>>;
-type Contract1032 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteTriggerState, PublishedKeys28>, PublishedKeys28>
->;
+type Contract1032 = Assert<Equal<keyof Native3.AutocompleteGroupLabelState, never>>;
 type Contract1033 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteTriggerProps, PublishedKeys9>, PublishedKeys9>
+	Equal<keyof Pick<Native3.AutocompleteEmptyProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1034 = Assert<Equal<Parameters<Native3.AutocompleteInputGroup>['length'], 1>>;
+type Contract1034 = Assert<Equal<keyof Native3.AutocompleteEmptyState, never>>;
 type Contract1035 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteInputGroupState, PublishedKeys28>, PublishedKeys28>
+	Equal<keyof Pick<Native3.AutocompleteStatusProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1036 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteInputGroupProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1037 = Assert<Equal<Parameters<Native3.AutocompleteItem>['length'], 1>>;
+type Contract1036 = Assert<Equal<keyof Native3.AutocompleteStatusState, never>>;
+type Contract1037 = Assert<Equal<keyof Native3.AutocompleteCollectionState, never>>;
 type Contract1038 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteItemState, PublishedKeys43>, PublishedKeys43>
+	Equal<keyof Pick<Native3.AutocompleteCollectionProps, PublishedKeys38>, PublishedKeys38>
 >;
 type Contract1039 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteItemProps, PublishedKeys44>, PublishedKeys44>
+	Equal<keyof Pick<Native3.AutocompleteFilter, PublishedKeys39>, PublishedKeys39>
 >;
-type Contract1040 = Assert<Equal<Parameters<typeof Native3.AutocompleteValue>['length'], 1>>;
-type Contract1041 = Assert<Equal<keyof Native3.AutocompleteValueState, never>>;
-type Contract1042 = Assert<
-	Equal<keyof Pick<Native3.AutocompleteValueProps, PublishedKeys37>, PublishedKeys37>
+type Contract1040 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteFilterOptions, PublishedKeys40>, PublishedKeys40>
 >;
+type Contract1041 = Assert<Equal<Parameters<typeof Native3.AutocompleteRoot>['length'], 1>>;
+type Contract1042 = Assert<Equal<keyof Native3.AutocompleteRootState, never>>;
 type Contract1043 = Assert<
-	Equal<keyof Pick<typeof Native4.Avatar, PublishedKeys45>, PublishedKeys45>
+	Equal<keyof Pick<Native3.AutocompleteRootActions, PublishedKeys41>, PublishedKeys41>
 >;
-type Contract1044 = Assert<Equal<Parameters<typeof Native4.AvatarRoot>['length'], 1>>;
+type Contract1044 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
 type Contract1045 = Assert<
-	Equal<keyof Pick<Native4.ImageLoadingStatus, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native3.AutocompleteRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
 type Contract1046 = Assert<
-	Equal<keyof Pick<Native4.AvatarRootState, PublishedKeys46>, PublishedKeys46>
+	Equal<keyof Pick<Native3.AutocompleteRootHighlightEventReason, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract1047 = Assert<
-	Equal<keyof Pick<Native4.AvatarRootProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native3.AutocompleteRootHighlightEventDetails, PublishedKeys42>, PublishedKeys42>
 >;
-type Contract1048 = Assert<Equal<Parameters<typeof Native4.AvatarImage>['length'], 1>>;
-type Contract1049 = Assert<
-	Equal<keyof Pick<Native4.AvatarImageState, PublishedKeys47>, PublishedKeys47>
+type Contract1048 = Assert<
+	Equal<
+		keyof Pick<Native3.AutocompleteRootProps<{ sample: string }>, PublishedKeys43>,
+		PublishedKeys43
+	>
 >;
+type Contract1049 = Assert<Equal<Parameters<Native3.AutocompleteTrigger>['length'], 1>>;
 type Contract1050 = Assert<
-	Equal<keyof Pick<Native4.AvatarImageProps, PublishedKeys48>, PublishedKeys48>
+	Equal<keyof Pick<Native3.AutocompleteTriggerState, PublishedKeys29>, PublishedKeys29>
 >;
-type Contract1051 = Assert<Equal<Parameters<typeof Native4.AvatarFallback>['length'], 1>>;
-type Contract1052 = Assert<
-	Equal<keyof Pick<Native4.AvatarFallbackState, PublishedKeys46>, PublishedKeys46>
+type Contract1051 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteTriggerProps, PublishedKeys9>, PublishedKeys9>
 >;
+type Contract1052 = Assert<Equal<Parameters<Native3.AutocompleteInputGroup>['length'], 1>>;
 type Contract1053 = Assert<
-	Equal<keyof Pick<Native4.AvatarFallbackProps, PublishedKeys49>, PublishedKeys49>
+	Equal<keyof Pick<Native3.AutocompleteInputGroupState, PublishedKeys29>, PublishedKeys29>
 >;
-type Contract1054 = Assert<Equal<Parameters<typeof Native5.Button>['length'], 1>>;
-type Contract1055 = Assert<
-	Equal<keyof Pick<Native5.ButtonState, PublishedKeys15>, PublishedKeys15>
+type Contract1054 = Assert<
+	Equal<keyof Pick<Native3.AutocompleteInputGroupProps, PublishedKeys8>, PublishedKeys8>
 >;
+type Contract1055 = Assert<Equal<Parameters<Native3.AutocompleteItem>['length'], 1>>;
 type Contract1056 = Assert<
-	Equal<keyof Pick<Native5.ButtonProps, PublishedKeys50>, PublishedKeys50>
+	Equal<keyof Pick<Native3.AutocompleteItemState, PublishedKeys44>, PublishedKeys44>
 >;
 type Contract1057 = Assert<
-	Equal<keyof Pick<typeof Native6.Checkbox, PublishedKeys51>, PublishedKeys51>
+	Equal<keyof Pick<Native3.AutocompleteItemProps, PublishedKeys45>, PublishedKeys45>
 >;
-type Contract1058 = Assert<
-	Equal<keyof Pick<typeof Native6.PARENT_CHECKBOX, PublishedKeys4>, PublishedKeys4>
->;
-type Contract1059 = Assert<Equal<Parameters<typeof Native6.CheckboxRoot>['length'], 1>>;
+type Contract1058 = Assert<Equal<Parameters<typeof Native3.AutocompleteValue>['length'], 1>>;
+type Contract1059 = Assert<Equal<keyof Native3.AutocompleteValueState, never>>;
 type Contract1060 = Assert<
-	Equal<keyof Pick<Native6.CheckboxRootState, PublishedKeys52>, PublishedKeys52>
+	Equal<keyof Pick<Native3.AutocompleteValueProps, PublishedKeys38>, PublishedKeys38>
 >;
 type Contract1061 = Assert<
-	Equal<keyof Pick<Native6.CheckboxRootProps, PublishedKeys53>, PublishedKeys53>
+	Equal<keyof Pick<typeof Native4.Avatar, PublishedKeys46>, PublishedKeys46>
 >;
-type Contract1062 = Assert<
-	Equal<keyof Pick<Native6.CheckboxRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
+type Contract1062 = Assert<Equal<Parameters<typeof Native4.AvatarRoot>['length'], 1>>;
 type Contract1063 = Assert<
-	Equal<keyof Pick<Native6.CheckboxRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+	Equal<keyof Pick<Native4.ImageLoadingStatus, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1064 = Assert<Equal<Parameters<typeof Native6.CheckboxIndicator>['length'], 1>>;
+type Contract1064 = Assert<
+	Equal<keyof Pick<Native4.AvatarRootState, PublishedKeys47>, PublishedKeys47>
+>;
 type Contract1065 = Assert<
-	Equal<keyof Pick<Native6.CheckboxIndicatorState, PublishedKeys54>, PublishedKeys54>
+	Equal<keyof Pick<Native4.AvatarRootProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1066 = Assert<
-	Equal<keyof Pick<Native6.CheckboxIndicatorProps, PublishedKeys55>, PublishedKeys55>
+type Contract1066 = Assert<Equal<Parameters<typeof Native4.AvatarImage>['length'], 1>>;
+type Contract1067 = Assert<
+	Equal<keyof Pick<Native4.AvatarImageState, PublishedKeys48>, PublishedKeys48>
 >;
-type Contract1067 = Assert<Equal<Parameters<typeof Native7.CheckboxGroup>['length'], 1>>;
 type Contract1068 = Assert<
-	Equal<keyof Pick<Native7.CheckboxGroupState, PublishedKeys56>, PublishedKeys56>
+	Equal<keyof Pick<Native4.AvatarImageProps, PublishedKeys49>, PublishedKeys49>
 >;
-type Contract1069 = Assert<
-	Equal<keyof Pick<Native7.CheckboxGroupProps, PublishedKeys57>, PublishedKeys57>
->;
+type Contract1069 = Assert<Equal<Parameters<typeof Native4.AvatarFallback>['length'], 1>>;
 type Contract1070 = Assert<
-	Equal<keyof Pick<Native7.CheckboxGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native4.AvatarFallbackState, PublishedKeys47>, PublishedKeys47>
 >;
 type Contract1071 = Assert<
-	Equal<keyof Pick<Native7.CheckboxGroupChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+	Equal<keyof Pick<Native4.AvatarFallbackProps, PublishedKeys50>, PublishedKeys50>
 >;
-type Contract1072 = Assert<
-	Equal<keyof Pick<typeof Native8.Collapsible, PublishedKeys58>, PublishedKeys58>
+type Contract1072 = Assert<Equal<Parameters<typeof Native5.Button>['length'], 1>>;
+type Contract1073 = Assert<
+	Equal<keyof Pick<Native5.ButtonState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract1073 = Assert<Equal<Parameters<typeof Native8.CollapsibleRoot>['length'], 1>>;
 type Contract1074 = Assert<
-	Equal<keyof Pick<Native8.CollapsibleRootState, PublishedKeys59>, PublishedKeys59>
+	Equal<keyof Pick<Native5.ButtonProps, PublishedKeys51>, PublishedKeys51>
 >;
 type Contract1075 = Assert<
-	Equal<keyof Pick<Native8.CollapsibleRootProps, PublishedKeys60>, PublishedKeys60>
+	Equal<keyof Pick<typeof Native6.Checkbox, PublishedKeys52>, PublishedKeys52>
 >;
 type Contract1076 = Assert<
-	Equal<keyof Pick<Native8.CollapsibleRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<typeof Native6.PARENT_CHECKBOX, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1077 = Assert<
-	Equal<keyof Pick<Native8.CollapsibleRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+type Contract1077 = Assert<Equal<Parameters<typeof Native6.CheckboxRoot>['length'], 1>>;
+type Contract1078 = Assert<
+	Equal<keyof Pick<Native6.CheckboxRootState, PublishedKeys53>, PublishedKeys53>
 >;
-type Contract1078 = Assert<Equal<Parameters<typeof Native8.CollapsibleTrigger>['length'], 1>>;
 type Contract1079 = Assert<
-	Equal<keyof Pick<Native8.CollapsibleTriggerState, PublishedKeys59>, PublishedKeys59>
+	Equal<keyof Pick<Native6.CheckboxRootProps, PublishedKeys54>, PublishedKeys54>
 >;
 type Contract1080 = Assert<
-	Equal<keyof Pick<Native8.CollapsibleTriggerProps, PublishedKeys9>, PublishedKeys9>
+	Equal<keyof Pick<Native6.CheckboxRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1081 = Assert<Equal<Parameters<typeof Native8.CollapsiblePanel>['length'], 1>>;
-type Contract1082 = Assert<
-	Equal<keyof Pick<Native8.CollapsiblePanelState, PublishedKeys59>, PublishedKeys59>
+type Contract1081 = Assert<
+	Equal<keyof Pick<Native6.CheckboxRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
+type Contract1082 = Assert<Equal<Parameters<typeof Native6.CheckboxIndicator>['length'], 1>>;
 type Contract1083 = Assert<
-	Equal<keyof Pick<Native8.CollapsiblePanelProps, PublishedKeys11>, PublishedKeys11>
+	Equal<keyof Pick<Native6.CheckboxIndicatorState, PublishedKeys55>, PublishedKeys55>
 >;
 type Contract1084 = Assert<
-	Equal<keyof Pick<typeof Native9.Combobox, PublishedKeys61>, PublishedKeys61>
+	Equal<keyof Pick<Native6.CheckboxIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract1085 = Assert<
-	Equal<keyof Pick<Native9.ComboboxFilter, PublishedKeys38>, PublishedKeys38>
->;
+type Contract1085 = Assert<Equal<Parameters<typeof Native7.CheckboxGroup>['length'], 1>>;
 type Contract1086 = Assert<
-	Equal<keyof Pick<Native9.ComboboxFilterOptions, PublishedKeys62>, PublishedKeys62>
+	Equal<keyof Pick<Native7.CheckboxGroupState, PublishedKeys57>, PublishedKeys57>
 >;
 type Contract1087 = Assert<
-	Equal<keyof Pick<Native9.ComboboxPrimitiveValue, PublishedKeys63>, PublishedKeys63>
+	Equal<keyof Pick<Native7.CheckboxGroupProps, PublishedKeys58>, PublishedKeys58>
 >;
 type Contract1088 = Assert<
-	Equal<
-		keyof Pick<Native9.CreateComboboxItemsOptions<{ sample: string }>, PublishedKeys64>,
-		PublishedKeys64
-	>
+	Equal<keyof Pick<Native7.CheckboxGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract1089 = Assert<
-	Equal<keyof Pick<typeof Native9.ComboboxItemCollection, PublishedKeys65>, PublishedKeys65>
+	Equal<keyof Pick<Native7.CheckboxGroupChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1090 = Assert<Equal<Parameters<typeof Native9.ComboboxRoot>['length'], 1>>;
-type Contract1091 = Assert<
-	Equal<keyof Pick<Native9.ComboboxRootProps<{ sample: string }>, PublishedKeys66>, PublishedKeys66>
+type Contract1090 = Assert<
+	Equal<keyof Pick<typeof Native8.Collapsible, PublishedKeys59>, PublishedKeys59>
 >;
-type Contract1092 = Assert<Equal<keyof Native9.ComboboxRootState, never>>;
-type Contract1093 = Assert<
-	Equal<keyof Pick<Native9.ComboboxRootActions, PublishedKeys40>, PublishedKeys40>
->;
+type Contract1091 = Assert<Equal<Parameters<typeof Native8.CollapsibleRoot>['length'], 1>>;
+type Contract1092 = Assert<Equal<Parameters<typeof Native8.CollapsibleTrigger>['length'], 1>>;
+type Contract1093 = Assert<Equal<Parameters<typeof Native8.CollapsiblePanel>['length'], 1>>;
 type Contract1094 = Assert<
-	Equal<keyof Pick<Native9.ComboboxRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native8.CollapsibleRootState, PublishedKeys60>, PublishedKeys60>
 >;
 type Contract1095 = Assert<
-	Equal<keyof Pick<Native9.ComboboxRootChangeEventDetails, PublishedKeys67>, PublishedKeys67>
+	Equal<keyof Pick<Native8.CollapsibleRootProps, PublishedKeys61>, PublishedKeys61>
 >;
 type Contract1096 = Assert<
-	Equal<keyof Pick<Native9.ComboboxRootHighlightEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native8.CollapsibleRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract1097 = Assert<
-	Equal<keyof Pick<Native9.ComboboxRootHighlightEventDetails, PublishedKeys41>, PublishedKeys41>
+	Equal<keyof Pick<Native8.CollapsibleRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1098 = Assert<Equal<Parameters<typeof Native9.ComboboxLabel>['length'], 1>>;
+type Contract1098 = Assert<
+	Equal<keyof Pick<Native8.CollapsibleTriggerState, PublishedKeys60>, PublishedKeys60>
+>;
 type Contract1099 = Assert<
-	Equal<keyof Pick<Native9.ComboboxLabelState, PublishedKeys56>, PublishedKeys56>
+	Equal<keyof Pick<Native8.CollapsibleTriggerProps, PublishedKeys9>, PublishedKeys9>
 >;
 type Contract1100 = Assert<
-	Equal<keyof Pick<Native9.ComboboxLabelProps, PublishedKeys68>, PublishedKeys68>
+	Equal<keyof Pick<Native8.CollapsiblePanelState, PublishedKeys60>, PublishedKeys60>
 >;
-type Contract1101 = Assert<Equal<Parameters<typeof Native9.ComboboxTrigger>['length'], 1>>;
+type Contract1101 = Assert<
+	Equal<keyof Pick<Native8.CollapsiblePanelProps, PublishedKeys11>, PublishedKeys11>
+>;
 type Contract1102 = Assert<
-	Equal<keyof Pick<Native9.ComboboxTriggerState, PublishedKeys69>, PublishedKeys69>
+	Equal<keyof Pick<typeof Native9.Combobox, PublishedKeys62>, PublishedKeys62>
 >;
 type Contract1103 = Assert<
-	Equal<keyof Pick<Native9.ComboboxTriggerProps, PublishedKeys9>, PublishedKeys9>
+	Equal<keyof Pick<Native9.ComboboxFilter, PublishedKeys39>, PublishedKeys39>
 >;
-type Contract1104 = Assert<Equal<Parameters<typeof Native9.ComboboxInput>['length'], 1>>;
+type Contract1104 = Assert<
+	Equal<keyof Pick<Native9.ComboboxFilterOptions, PublishedKeys63>, PublishedKeys63>
+>;
 type Contract1105 = Assert<
-	Equal<keyof Pick<Native9.ComboboxInputState, PublishedKeys28>, PublishedKeys28>
+	Equal<keyof Pick<Native9.ComboboxPrimitiveValue, PublishedKeys64>, PublishedKeys64>
 >;
 type Contract1106 = Assert<
-	Equal<keyof Pick<Native9.ComboboxInputProps, PublishedKeys27>, PublishedKeys27>
->;
-type Contract1107 = Assert<Equal<Parameters<typeof Native9.ComboboxInputGroup>['length'], 1>>;
-type Contract1108 = Assert<
-	Equal<keyof Pick<Native9.ComboboxInputGroupState, PublishedKeys69>, PublishedKeys69>
->;
-type Contract1109 = Assert<
-	Equal<keyof Pick<Native9.ComboboxInputGroupProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1110 = Assert<Equal<Parameters<typeof Native9.ComboboxPopup>['length'], 1>>;
-type Contract1111 = Assert<
-	Equal<keyof Pick<Native9.ComboboxPopupState, PublishedKeys31>, PublishedKeys31>
->;
-type Contract1112 = Assert<
-	Equal<keyof Pick<Native9.ComboboxPopupProps, PublishedKeys16>, PublishedKeys16>
->;
-type Contract1113 = Assert<Equal<Parameters<typeof Native9.ComboboxPositioner>['length'], 1>>;
-type Contract1114 = Assert<
-	Equal<keyof Pick<Native9.ComboboxPositionerState, PublishedKeys33>, PublishedKeys33>
->;
-type Contract1115 = Assert<
-	Equal<keyof Pick<Native9.ComboboxPositionerProps, PublishedKeys32>, PublishedKeys32>
->;
-type Contract1116 = Assert<Equal<Parameters<typeof Native9.ComboboxList>['length'], 1>>;
-type Contract1117 = Assert<
-	Equal<keyof Pick<Native9.ComboboxListState, PublishedKeys34>, PublishedKeys34>
->;
-type Contract1118 = Assert<
-	Equal<keyof Pick<Native9.ComboboxListProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1119 = Assert<Equal<Parameters<typeof Native9.ComboboxItem>['length'], 1>>;
-type Contract1120 = Assert<
-	Equal<keyof Pick<Native9.ComboboxItemState, PublishedKeys70>, PublishedKeys70>
->;
-type Contract1121 = Assert<
-	Equal<keyof Pick<Native9.ComboboxItemProps, PublishedKeys44>, PublishedKeys44>
->;
-type Contract1122 = Assert<Equal<Parameters<typeof Native9.ComboboxItemIndicator>['length'], 1>>;
-type Contract1123 = Assert<
-	Equal<keyof Pick<Native9.ComboboxItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
->;
-type Contract1124 = Assert<
-	Equal<keyof Pick<Native9.ComboboxItemIndicatorState, PublishedKeys71>, PublishedKeys71>
->;
-type Contract1125 = Assert<Equal<Parameters<typeof Native9.ComboboxValue>['length'], 1>>;
-type Contract1126 = Assert<Equal<keyof Native9.ComboboxValueState, never>>;
-type Contract1127 = Assert<
-	Equal<keyof Pick<Native9.ComboboxValueProps, PublishedKeys72>, PublishedKeys72>
->;
-type Contract1128 = Assert<Equal<Parameters<typeof Native9.ComboboxIcon>['length'], 1>>;
-type Contract1129 = Assert<Equal<keyof Native9.ComboboxIconState, never>>;
-type Contract1130 = Assert<
-	Equal<keyof Pick<Native9.ComboboxIconProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1131 = Assert<Equal<Parameters<typeof Native9.ComboboxArrow>['length'], 1>>;
-type Contract1132 = Assert<
-	Equal<keyof Pick<Native9.ComboboxArrowState, PublishedKeys35>, PublishedKeys35>
->;
-type Contract1133 = Assert<
-	Equal<keyof Pick<Native9.ComboboxArrowProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1134 = Assert<Equal<Parameters<typeof Native9.ComboboxBackdrop>['length'], 1>>;
-type Contract1135 = Assert<
-	Equal<keyof Pick<Native9.ComboboxBackdropProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1136 = Assert<
-	Equal<keyof Pick<Native9.ComboboxBackdropState, PublishedKeys14>, PublishedKeys14>
->;
-type Contract1137 = Assert<Equal<Parameters<typeof Native9.ComboboxPortal>['length'], 1>>;
-type Contract1138 = Assert<Equal<keyof Native9.ComboboxPortalState, never>>;
-type Contract1139 = Assert<
-	Equal<keyof Pick<Native9.ComboboxPortalProps, PublishedKeys18>, PublishedKeys18>
->;
-type Contract1140 = Assert<Equal<Parameters<typeof Native9.ComboboxEmpty>['length'], 1>>;
-type Contract1141 = Assert<Equal<keyof Native9.ComboboxEmptyState, never>>;
-type Contract1142 = Assert<
-	Equal<keyof Pick<Native9.ComboboxEmptyProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1143 = Assert<Equal<Parameters<typeof Native9.ComboboxGroup>['length'], 1>>;
-type Contract1144 = Assert<Equal<keyof Native9.ComboboxGroupState, never>>;
-type Contract1145 = Assert<
-	Equal<keyof Pick<Native9.ComboboxGroupProps, PublishedKeys36>, PublishedKeys36>
->;
-type Contract1146 = Assert<Equal<Parameters<typeof Native9.ComboboxGroupLabel>['length'], 1>>;
-type Contract1147 = Assert<Equal<keyof Native9.ComboboxGroupLabelState, never>>;
-type Contract1148 = Assert<
-	Equal<keyof Pick<Native9.ComboboxGroupLabelProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1149 = Assert<Equal<Parameters<typeof Native9.ComboboxRow>['length'], 1>>;
-type Contract1150 = Assert<Equal<keyof Native9.ComboboxRowState, never>>;
-type Contract1151 = Assert<
-	Equal<keyof Pick<Native9.ComboboxRowProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1152 = Assert<Equal<Parameters<typeof Native9.ComboboxChips>['length'], 1>>;
-type Contract1153 = Assert<Equal<keyof Native9.ComboboxChipsState, never>>;
-type Contract1154 = Assert<
-	Equal<keyof Pick<Native9.ComboboxChipsProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1155 = Assert<Equal<Parameters<typeof Native9.ComboboxChip>['length'], 1>>;
-type Contract1156 = Assert<
-	Equal<keyof Pick<Native9.ComboboxChipState, PublishedKeys15>, PublishedKeys15>
->;
-type Contract1157 = Assert<
-	Equal<keyof Pick<Native9.ComboboxChipProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1158 = Assert<Equal<Parameters<typeof Native9.ComboboxChipRemove>['length'], 1>>;
-type Contract1159 = Assert<
-	Equal<keyof Pick<Native9.ComboboxChipRemoveState, PublishedKeys15>, PublishedKeys15>
->;
-type Contract1160 = Assert<
-	Equal<keyof Pick<Native9.ComboboxChipRemoveProps, PublishedKeys9>, PublishedKeys9>
->;
-type Contract1161 = Assert<Equal<Parameters<typeof Native9.ComboboxClear>['length'], 1>>;
-type Contract1162 = Assert<
-	Equal<keyof Pick<Native9.ComboboxClearState, PublishedKeys30>, PublishedKeys30>
->;
-type Contract1163 = Assert<
-	Equal<keyof Pick<Native9.ComboboxClearProps, PublishedKeys29>, PublishedKeys29>
->;
-type Contract1164 = Assert<Equal<Parameters<typeof Native9.ComboboxStatus>['length'], 1>>;
-type Contract1165 = Assert<Equal<keyof Native9.ComboboxStatusState, never>>;
-type Contract1166 = Assert<
-	Equal<keyof Pick<Native9.ComboboxStatusProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1167 = Assert<Equal<Parameters<typeof Native9.ComboboxCollection>['length'], 1>>;
-type Contract1168 = Assert<Equal<keyof Native9.ComboboxCollectionState, never>>;
-type Contract1169 = Assert<
-	Equal<keyof Pick<Native9.ComboboxCollectionProps, PublishedKeys37>, PublishedKeys37>
->;
-type Contract1170 = Assert<
-	Equal<keyof Pick<Native9.ComboboxSeparatorProps, PublishedKeys25>, PublishedKeys25>
->;
-type Contract1171 = Assert<
-	Equal<keyof Pick<Native9.ComboboxSeparatorState, PublishedKeys26>, PublishedKeys26>
->;
-type Contract1172 = Assert<Equal<Parameters<typeof Native9.ComboboxSeparator>['length'], 1>>;
-type Contract1173 = Assert<
-	Equal<keyof Pick<typeof Native10.ContextMenu, PublishedKeys73>, PublishedKeys73>
->;
-type Contract1174 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuBackdropProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1175 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuBackdropState, PublishedKeys14>, PublishedKeys14>
->;
-type Contract1176 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuPortalProps, PublishedKeys18>, PublishedKeys18>
->;
-type Contract1177 = Assert<Equal<keyof Native10.ContextMenuPortalState, never>>;
-type Contract1178 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuPopupProps, PublishedKeys74>, PublishedKeys74>
->;
-type Contract1179 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuPopupState, PublishedKeys75>, PublishedKeys75>
->;
-type Contract1180 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuArrowProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1181 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuArrowState, PublishedKeys35>, PublishedKeys35>
->;
-type Contract1182 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuGroupProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1183 = Assert<Equal<keyof Native10.ContextMenuGroupState, never>>;
-type Contract1184 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuGroupLabelProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1185 = Assert<Equal<keyof Native10.ContextMenuGroupLabelState, never>>;
-type Contract1186 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuItemProps, PublishedKeys76>, PublishedKeys76>
->;
-type Contract1187 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuItemState, PublishedKeys43>, PublishedKeys43>
->;
-type Contract1188 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuLinkItemProps, PublishedKeys77>, PublishedKeys77>
->;
-type Contract1189 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuLinkItemState, PublishedKeys78>, PublishedKeys78>
->;
-type Contract1190 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuCheckboxItemProps, PublishedKeys79>, PublishedKeys79>
->;
-type Contract1191 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuCheckboxItemState, PublishedKeys80>, PublishedKeys80>
->;
-type Contract1192 = Assert<
 	Equal<
-		keyof Pick<Native10.ContextMenuCheckboxItemIndicatorProps, PublishedKeys55>,
-		PublishedKeys55
+		keyof Pick<Native9.CreateComboboxItemsOptions<{ sample: string }>, PublishedKeys65>,
+		PublishedKeys65
 	>
 >;
+type Contract1107 = Assert<
+	Equal<keyof Pick<typeof Native9.ComboboxItemCollection, PublishedKeys19>, PublishedKeys19>
+>;
+type Contract1108 = Assert<Equal<Parameters<typeof Native9.ComboboxRoot>['length'], 1>>;
+type Contract1109 = Assert<
+	Equal<keyof Pick<Native9.ComboboxRootProps<{ sample: string }>, PublishedKeys66>, PublishedKeys66>
+>;
+type Contract1110 = Assert<Equal<keyof Native9.ComboboxRootState, never>>;
+type Contract1111 = Assert<
+	Equal<keyof Pick<Native9.ComboboxRootActions, PublishedKeys41>, PublishedKeys41>
+>;
+type Contract1112 = Assert<
+	Equal<keyof Pick<Native9.ComboboxRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract1113 = Assert<
+	Equal<keyof Pick<Native9.ComboboxRootChangeEventDetails, PublishedKeys67>, PublishedKeys67>
+>;
+type Contract1114 = Assert<
+	Equal<keyof Pick<Native9.ComboboxRootHighlightEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract1115 = Assert<
+	Equal<keyof Pick<Native9.ComboboxRootHighlightEventDetails, PublishedKeys42>, PublishedKeys42>
+>;
+type Contract1116 = Assert<Equal<Parameters<typeof Native9.ComboboxLabel>['length'], 1>>;
+type Contract1117 = Assert<
+	Equal<keyof Pick<Native9.ComboboxLabelState, PublishedKeys57>, PublishedKeys57>
+>;
+type Contract1118 = Assert<
+	Equal<keyof Pick<Native9.ComboboxLabelProps, PublishedKeys68>, PublishedKeys68>
+>;
+type Contract1119 = Assert<Equal<Parameters<typeof Native9.ComboboxTrigger>['length'], 1>>;
+type Contract1120 = Assert<
+	Equal<keyof Pick<Native9.ComboboxTriggerState, PublishedKeys69>, PublishedKeys69>
+>;
+type Contract1121 = Assert<
+	Equal<keyof Pick<Native9.ComboboxTriggerProps, PublishedKeys9>, PublishedKeys9>
+>;
+type Contract1122 = Assert<Equal<Parameters<typeof Native9.ComboboxInput>['length'], 1>>;
+type Contract1123 = Assert<
+	Equal<keyof Pick<Native9.ComboboxInputState, PublishedKeys29>, PublishedKeys29>
+>;
+type Contract1124 = Assert<
+	Equal<keyof Pick<Native9.ComboboxInputProps, PublishedKeys28>, PublishedKeys28>
+>;
+type Contract1125 = Assert<Equal<Parameters<typeof Native9.ComboboxInputGroup>['length'], 1>>;
+type Contract1126 = Assert<
+	Equal<keyof Pick<Native9.ComboboxInputGroupState, PublishedKeys69>, PublishedKeys69>
+>;
+type Contract1127 = Assert<
+	Equal<keyof Pick<Native9.ComboboxInputGroupProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1128 = Assert<Equal<Parameters<typeof Native9.ComboboxPopup>['length'], 1>>;
+type Contract1129 = Assert<
+	Equal<keyof Pick<Native9.ComboboxPopupState, PublishedKeys32>, PublishedKeys32>
+>;
+type Contract1130 = Assert<
+	Equal<keyof Pick<Native9.ComboboxPopupProps, PublishedKeys16>, PublishedKeys16>
+>;
+type Contract1131 = Assert<Equal<Parameters<typeof Native9.ComboboxPositioner>['length'], 1>>;
+type Contract1132 = Assert<
+	Equal<keyof Pick<Native9.ComboboxPositionerState, PublishedKeys34>, PublishedKeys34>
+>;
+type Contract1133 = Assert<
+	Equal<keyof Pick<Native9.ComboboxPositionerProps, PublishedKeys33>, PublishedKeys33>
+>;
+type Contract1134 = Assert<Equal<Parameters<typeof Native9.ComboboxList>['length'], 1>>;
+type Contract1135 = Assert<
+	Equal<keyof Pick<Native9.ComboboxListState, PublishedKeys35>, PublishedKeys35>
+>;
+type Contract1136 = Assert<
+	Equal<keyof Pick<Native9.ComboboxListProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1137 = Assert<Equal<Parameters<typeof Native9.ComboboxItem>['length'], 1>>;
+type Contract1138 = Assert<
+	Equal<keyof Pick<Native9.ComboboxItemState, PublishedKeys70>, PublishedKeys70>
+>;
+type Contract1139 = Assert<
+	Equal<keyof Pick<Native9.ComboboxItemProps, PublishedKeys45>, PublishedKeys45>
+>;
+type Contract1140 = Assert<Equal<Parameters<typeof Native9.ComboboxItemIndicator>['length'], 1>>;
+type Contract1141 = Assert<
+	Equal<keyof Pick<Native9.ComboboxItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
+>;
+type Contract1142 = Assert<
+	Equal<keyof Pick<Native9.ComboboxItemIndicatorState, PublishedKeys71>, PublishedKeys71>
+>;
+type Contract1143 = Assert<Equal<Parameters<typeof Native9.ComboboxValue>['length'], 1>>;
+type Contract1144 = Assert<Equal<keyof Native9.ComboboxValueState, never>>;
+type Contract1145 = Assert<
+	Equal<keyof Pick<Native9.ComboboxValueProps, PublishedKeys72>, PublishedKeys72>
+>;
+type Contract1146 = Assert<Equal<Parameters<typeof Native9.ComboboxIcon>['length'], 1>>;
+type Contract1147 = Assert<Equal<keyof Native9.ComboboxIconState, never>>;
+type Contract1148 = Assert<
+	Equal<keyof Pick<Native9.ComboboxIconProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1149 = Assert<Equal<Parameters<typeof Native9.ComboboxArrow>['length'], 1>>;
+type Contract1150 = Assert<
+	Equal<keyof Pick<Native9.ComboboxArrowState, PublishedKeys36>, PublishedKeys36>
+>;
+type Contract1151 = Assert<
+	Equal<keyof Pick<Native9.ComboboxArrowProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1152 = Assert<Equal<Parameters<typeof Native9.ComboboxBackdrop>['length'], 1>>;
+type Contract1153 = Assert<
+	Equal<keyof Pick<Native9.ComboboxBackdropProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1154 = Assert<
+	Equal<keyof Pick<Native9.ComboboxBackdropState, PublishedKeys14>, PublishedKeys14>
+>;
+type Contract1155 = Assert<Equal<Parameters<typeof Native9.ComboboxPortal>['length'], 1>>;
+type Contract1156 = Assert<Equal<keyof Native9.ComboboxPortalState, never>>;
+type Contract1157 = Assert<
+	Equal<keyof Pick<Native9.ComboboxPortalProps, PublishedKeys18>, PublishedKeys18>
+>;
+type Contract1158 = Assert<Equal<Parameters<typeof Native9.ComboboxEmpty>['length'], 1>>;
+type Contract1159 = Assert<Equal<keyof Native9.ComboboxEmptyState, never>>;
+type Contract1160 = Assert<
+	Equal<keyof Pick<Native9.ComboboxEmptyProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1161 = Assert<Equal<Parameters<typeof Native9.ComboboxGroup>['length'], 1>>;
+type Contract1162 = Assert<Equal<keyof Native9.ComboboxGroupState, never>>;
+type Contract1163 = Assert<
+	Equal<keyof Pick<Native9.ComboboxGroupProps, PublishedKeys37>, PublishedKeys37>
+>;
+type Contract1164 = Assert<Equal<Parameters<typeof Native9.ComboboxGroupLabel>['length'], 1>>;
+type Contract1165 = Assert<Equal<keyof Native9.ComboboxGroupLabelState, never>>;
+type Contract1166 = Assert<
+	Equal<keyof Pick<Native9.ComboboxGroupLabelProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1167 = Assert<Equal<Parameters<typeof Native9.ComboboxRow>['length'], 1>>;
+type Contract1168 = Assert<Equal<keyof Native9.ComboboxRowState, never>>;
+type Contract1169 = Assert<
+	Equal<keyof Pick<Native9.ComboboxRowProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1170 = Assert<Equal<Parameters<typeof Native9.ComboboxChips>['length'], 1>>;
+type Contract1171 = Assert<Equal<keyof Native9.ComboboxChipsState, never>>;
+type Contract1172 = Assert<
+	Equal<keyof Pick<Native9.ComboboxChipsProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1173 = Assert<Equal<Parameters<typeof Native9.ComboboxChip>['length'], 1>>;
+type Contract1174 = Assert<
+	Equal<keyof Pick<Native9.ComboboxChipState, PublishedKeys15>, PublishedKeys15>
+>;
+type Contract1175 = Assert<
+	Equal<keyof Pick<Native9.ComboboxChipProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1176 = Assert<Equal<Parameters<typeof Native9.ComboboxChipRemove>['length'], 1>>;
+type Contract1177 = Assert<
+	Equal<keyof Pick<Native9.ComboboxChipRemoveState, PublishedKeys15>, PublishedKeys15>
+>;
+type Contract1178 = Assert<
+	Equal<keyof Pick<Native9.ComboboxChipRemoveProps, PublishedKeys9>, PublishedKeys9>
+>;
+type Contract1179 = Assert<Equal<Parameters<typeof Native9.ComboboxClear>['length'], 1>>;
+type Contract1180 = Assert<
+	Equal<keyof Pick<Native9.ComboboxClearState, PublishedKeys31>, PublishedKeys31>
+>;
+type Contract1181 = Assert<
+	Equal<keyof Pick<Native9.ComboboxClearProps, PublishedKeys30>, PublishedKeys30>
+>;
+type Contract1182 = Assert<Equal<Parameters<typeof Native9.ComboboxStatus>['length'], 1>>;
+type Contract1183 = Assert<Equal<keyof Native9.ComboboxStatusState, never>>;
+type Contract1184 = Assert<
+	Equal<keyof Pick<Native9.ComboboxStatusProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1185 = Assert<Equal<Parameters<typeof Native9.ComboboxCollection>['length'], 1>>;
+type Contract1186 = Assert<Equal<keyof Native9.ComboboxCollectionState, never>>;
+type Contract1187 = Assert<
+	Equal<keyof Pick<Native9.ComboboxCollectionProps, PublishedKeys38>, PublishedKeys38>
+>;
+type Contract1188 = Assert<
+	Equal<keyof Pick<Native9.ComboboxSeparatorProps, PublishedKeys26>, PublishedKeys26>
+>;
+type Contract1189 = Assert<
+	Equal<keyof Pick<Native9.ComboboxSeparatorState, PublishedKeys27>, PublishedKeys27>
+>;
+type Contract1190 = Assert<Equal<Parameters<typeof Native9.ComboboxSeparator>['length'], 1>>;
+type Contract1191 = Assert<
+	Equal<keyof Pick<typeof Native10.ContextMenu, PublishedKeys73>, PublishedKeys73>
+>;
+type Contract1192 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuBackdropProps, PublishedKeys8>, PublishedKeys8>
+>;
 type Contract1193 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuBackdropState, PublishedKeys14>, PublishedKeys14>
+>;
+type Contract1194 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuPortalProps, PublishedKeys18>, PublishedKeys18>
+>;
+type Contract1195 = Assert<Equal<keyof Native10.ContextMenuPortalState, never>>;
+type Contract1196 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuPopupProps, PublishedKeys74>, PublishedKeys74>
+>;
+type Contract1197 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuPopupState, PublishedKeys75>, PublishedKeys75>
+>;
+type Contract1198 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuArrowProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1199 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuArrowState, PublishedKeys36>, PublishedKeys36>
+>;
+type Contract1200 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuGroupProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1201 = Assert<Equal<keyof Native10.ContextMenuGroupState, never>>;
+type Contract1202 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuGroupLabelProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1203 = Assert<Equal<keyof Native10.ContextMenuGroupLabelState, never>>;
+type Contract1204 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuItemProps, PublishedKeys76>, PublishedKeys76>
+>;
+type Contract1205 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuItemState, PublishedKeys44>, PublishedKeys44>
+>;
+type Contract1206 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuLinkItemProps, PublishedKeys77>, PublishedKeys77>
+>;
+type Contract1207 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuLinkItemState, PublishedKeys78>, PublishedKeys78>
+>;
+type Contract1208 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuCheckboxItemProps, PublishedKeys79>, PublishedKeys79>
+>;
+type Contract1209 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuCheckboxItemState, PublishedKeys80>, PublishedKeys80>
+>;
+type Contract1210 = Assert<
+	Equal<
+		keyof Pick<Native10.ContextMenuCheckboxItemIndicatorProps, PublishedKeys56>,
+		PublishedKeys56
+	>
+>;
+type Contract1211 = Assert<
 	Equal<
 		keyof Pick<Native10.ContextMenuCheckboxItemIndicatorState, PublishedKeys81>,
 		PublishedKeys81
 	>
 >;
-type Contract1194 = Assert<
+type Contract1212 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuRadioGroupProps, PublishedKeys82>, PublishedKeys82>
 >;
-type Contract1195 = Assert<
+type Contract1213 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuRadioGroupState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract1196 = Assert<
+type Contract1214 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuRadioItemProps, PublishedKeys83>, PublishedKeys83>
 >;
-type Contract1197 = Assert<
+type Contract1215 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuRadioItemState, PublishedKeys80>, PublishedKeys80>
 >;
-type Contract1198 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuRadioItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+type Contract1216 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuRadioItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract1199 = Assert<
+type Contract1217 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuRadioItemIndicatorState, PublishedKeys81>, PublishedKeys81>
 >;
-type Contract1200 = Assert<
+type Contract1218 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuSubmenuRootProps, PublishedKeys84>, PublishedKeys84>
 >;
-type Contract1201 = Assert<Equal<keyof Native10.ContextMenuSubmenuRootState, never>>;
-type Contract1202 = Assert<
+type Contract1219 = Assert<Equal<keyof Native10.ContextMenuSubmenuRootState, never>>;
+type Contract1220 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuSubmenuTriggerProps, PublishedKeys85>, PublishedKeys85>
 >;
-type Contract1203 = Assert<
+type Contract1221 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuSubmenuTriggerState, PublishedKeys86>, PublishedKeys86>
 >;
-type Contract1204 = Assert<Equal<Parameters<typeof Native10.ContextMenuRoot>['length'], 1>>;
-type Contract1205 = Assert<Equal<keyof Native10.ContextMenuRootState, never>>;
-type Contract1206 = Assert<
+type Contract1222 = Assert<Equal<Parameters<typeof Native10.ContextMenuRoot>['length'], 1>>;
+type Contract1223 = Assert<Equal<keyof Native10.ContextMenuRootState, never>>;
+type Contract1224 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuRootProps, PublishedKeys84>, PublishedKeys84>
 >;
-type Contract1207 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract1225 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract1208 = Assert<
+type Contract1226 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1209 = Assert<
+type Contract1227 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1210 = Assert<Equal<Parameters<typeof Native10.ContextMenuTrigger>['length'], 1>>;
-type Contract1211 = Assert<
+type Contract1228 = Assert<Equal<Parameters<typeof Native10.ContextMenuTrigger>['length'], 1>>;
+type Contract1229 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuTriggerState, PublishedKeys87>, PublishedKeys87>
 >;
-type Contract1212 = Assert<
+type Contract1230 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuTriggerProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1213 = Assert<
+type Contract1231 = Assert<
 	Equal<keyof Pick<Native10.ContextMenuPositionerState, PublishedKeys88>, PublishedKeys88>
 >;
-type Contract1214 = Assert<Equal<Parameters<typeof Native10.ContextMenuPositioner>['length'], 1>>;
-type Contract1215 = Assert<
-	Equal<keyof Pick<Native10.ContextMenuPositionerProps, PublishedKeys32>, PublishedKeys32>
+type Contract1232 = Assert<Equal<Parameters<typeof Native10.ContextMenuPositioner>['length'], 1>>;
+type Contract1233 = Assert<
+	Equal<keyof Pick<Native10.ContextMenuPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract1216 = Assert<Equal<Parameters<typeof Native11.CSPProvider>['length'], 1>>;
-type Contract1217 = Assert<Equal<keyof Native11.CSPProviderState, never>>;
-type Contract1218 = Assert<
+type Contract1234 = Assert<Equal<Parameters<typeof Native11.CSPProvider>['length'], 1>>;
+type Contract1235 = Assert<Equal<keyof Native11.CSPProviderState, never>>;
+type Contract1236 = Assert<
 	Equal<keyof Pick<Native11.CSPProviderProps, PublishedKeys89>, PublishedKeys89>
 >;
-type Contract1219 = Assert<
+type Contract1237 = Assert<
 	Equal<keyof Pick<typeof Native12.Dialog, PublishedKeys12>, PublishedKeys12>
 >;
-type Contract1220 = Assert<Equal<Parameters<typeof Native12.DialogRoot>['length'], 1>>;
-type Contract1221 = Assert<Equal<keyof Native12.DialogRootState, never>>;
-type Contract1222 = Assert<
+type Contract1238 = Assert<
+	Equal<keyof Pick<typeof Native12.DialogHandle, PublishedKeys19>, PublishedKeys19>
+>;
+type Contract1239 = Assert<Equal<Parameters<typeof Native12.createDialogHandle>['length'], 0>>;
+type Contract1240 = Assert<Equal<Parameters<typeof Native12.DialogRoot>['length'], 1>>;
+type Contract1241 = Assert<Equal<keyof Native12.DialogRootState, never>>;
+type Contract1242 = Assert<
 	Equal<keyof Pick<Native12.DialogRootProps, PublishedKeys90>, PublishedKeys90>
 >;
-type Contract1223 = Assert<
-	Equal<keyof Pick<Native12.DialogRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract1243 = Assert<
+	Equal<keyof Pick<Native12.DialogRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract1224 = Assert<
+type Contract1244 = Assert<
 	Equal<keyof Pick<Native12.DialogRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1225 = Assert<
-	Equal<keyof Pick<Native12.DialogRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract1245 = Assert<
+	Equal<keyof Pick<Native12.DialogRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract1226 = Assert<Equal<Parameters<Native12.DialogTrigger>['length'], 1>>;
-type Contract1227 = Assert<
-	Equal<keyof Pick<Native12.DialogTriggerProps, PublishedKeys22>, PublishedKeys22>
+type Contract1246 = Assert<Equal<Parameters<Native12.DialogTrigger>['length'], 1>>;
+type Contract1247 = Assert<
+	Equal<keyof Pick<Native12.DialogTriggerProps, PublishedKeys23>, PublishedKeys23>
 >;
-type Contract1228 = Assert<
-	Equal<keyof Pick<Native12.DialogTriggerState, PublishedKeys23>, PublishedKeys23>
+type Contract1248 = Assert<
+	Equal<keyof Pick<Native12.DialogTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
-type Contract1229 = Assert<Equal<Parameters<typeof Native12.DialogPortal>['length'], 1>>;
-type Contract1230 = Assert<Equal<keyof Native12.DialogPortalState, never>>;
-type Contract1231 = Assert<
+type Contract1249 = Assert<Equal<Parameters<typeof Native12.DialogPortal>['length'], 1>>;
+type Contract1250 = Assert<Equal<keyof Native12.DialogPortalState, never>>;
+type Contract1251 = Assert<
 	Equal<keyof Pick<Native12.DialogPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract1232 = Assert<Equal<Parameters<typeof Native12.DialogPopup>['length'], 1>>;
-type Contract1233 = Assert<
+type Contract1252 = Assert<Equal<Parameters<typeof Native12.DialogPopup>['length'], 1>>;
+type Contract1253 = Assert<
 	Equal<keyof Pick<Native12.DialogPopupProps, PublishedKeys16>, PublishedKeys16>
 >;
-type Contract1234 = Assert<
+type Contract1254 = Assert<
 	Equal<keyof Pick<Native12.DialogPopupState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract1235 = Assert<Equal<Parameters<typeof Native12.DialogBackdrop>['length'], 1>>;
-type Contract1236 = Assert<
+type Contract1255 = Assert<Equal<Parameters<typeof Native12.DialogBackdrop>['length'], 1>>;
+type Contract1256 = Assert<
 	Equal<keyof Pick<Native12.DialogBackdropProps, PublishedKeys13>, PublishedKeys13>
 >;
-type Contract1237 = Assert<
+type Contract1257 = Assert<
 	Equal<keyof Pick<Native12.DialogBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract1238 = Assert<Equal<Parameters<typeof Native12.DialogTitle>['length'], 1>>;
-type Contract1239 = Assert<
+type Contract1258 = Assert<Equal<Parameters<typeof Native12.DialogTitle>['length'], 1>>;
+type Contract1259 = Assert<
 	Equal<keyof Pick<Native12.DialogTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1240 = Assert<Equal<keyof Native12.DialogTitleState, never>>;
-type Contract1241 = Assert<Equal<Parameters<typeof Native12.DialogDescription>['length'], 1>>;
-type Contract1242 = Assert<
+type Contract1260 = Assert<Equal<keyof Native12.DialogTitleState, never>>;
+type Contract1261 = Assert<Equal<Parameters<typeof Native12.DialogDescription>['length'], 1>>;
+type Contract1262 = Assert<
 	Equal<keyof Pick<Native12.DialogDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1243 = Assert<Equal<keyof Native12.DialogDescriptionState, never>>;
-type Contract1244 = Assert<Equal<Parameters<typeof Native12.DialogClose>['length'], 1>>;
-type Contract1245 = Assert<
+type Contract1263 = Assert<Equal<keyof Native12.DialogDescriptionState, never>>;
+type Contract1264 = Assert<Equal<Parameters<typeof Native12.DialogClose>['length'], 1>>;
+type Contract1265 = Assert<
 	Equal<keyof Pick<Native12.DialogCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1246 = Assert<
+type Contract1266 = Assert<
 	Equal<keyof Pick<Native12.DialogCloseState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract1247 = Assert<Equal<Parameters<typeof Native12.DialogViewport>['length'], 1>>;
-type Contract1248 = Assert<
+type Contract1267 = Assert<Equal<Parameters<typeof Native12.DialogViewport>['length'], 1>>;
+type Contract1268 = Assert<
 	Equal<keyof Pick<Native12.DialogViewportState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract1249 = Assert<
+type Contract1269 = Assert<
 	Equal<keyof Pick<Native12.DialogViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1250 = Assert<Equal<Parameters<typeof Native13.DirectionProvider>['length'], 1>>;
-type Contract1251 = Assert<Equal<Parameters<typeof Native13.useDirection>['length'], 0>>;
-type Contract1252 = Assert<
+type Contract1270 = Assert<Equal<Parameters<typeof Native13.DirectionProvider>['length'], 1>>;
+type Contract1271 = Assert<Equal<Parameters<typeof Native13.useDirection>['length'], 0>>;
+type Contract1272 = Assert<
 	Equal<keyof Pick<Native13.TextDirection, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1253 = Assert<
+type Contract1273 = Assert<
 	Equal<keyof Pick<Native13.DirectionProviderProps, PublishedKeys91>, PublishedKeys91>
 >;
-type Contract1254 = Assert<
+type Contract1274 = Assert<
 	Equal<keyof Pick<typeof Native14.Drawer, PublishedKeys92>, PublishedKeys92>
 >;
-type Contract1255 = Assert<Equal<Parameters<typeof Native14.DrawerRoot>['length'], 1>>;
-type Contract1256 = Assert<Equal<keyof Native14.DrawerRootState, never>>;
-type Contract1257 = Assert<
+type Contract1275 = Assert<Equal<Parameters<typeof Native14.DrawerRoot>['length'], 1>>;
+type Contract1276 = Assert<Equal<keyof Native14.DrawerRootState, never>>;
+type Contract1277 = Assert<
 	Equal<keyof Pick<Native14.DrawerRootProps, PublishedKeys93>, PublishedKeys93>
 >;
-type Contract1258 = Assert<
-	Equal<keyof Pick<Native14.DrawerRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract1278 = Assert<
+	Equal<keyof Pick<Native14.DrawerRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract1259 = Assert<
+type Contract1279 = Assert<
 	Equal<keyof Pick<Native14.DrawerRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1260 = Assert<
-	Equal<keyof Pick<Native14.DrawerRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract1280 = Assert<
+	Equal<keyof Pick<Native14.DrawerRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract1261 = Assert<
+type Contract1281 = Assert<
 	Equal<keyof Pick<Native14.DrawerRootSnapPointChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1262 = Assert<
+type Contract1282 = Assert<
 	Equal<keyof Pick<Native14.DrawerRootSnapPointChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1263 = Assert<Equal<Parameters<typeof Native14.DrawerProvider>['length'], 1>>;
-type Contract1264 = Assert<Equal<keyof Native14.DrawerProviderState, never>>;
-type Contract1265 = Assert<
-	Equal<keyof Pick<Native14.DrawerProviderProps, PublishedKeys37>, PublishedKeys37>
+type Contract1283 = Assert<Equal<Parameters<typeof Native14.DrawerProvider>['length'], 1>>;
+type Contract1284 = Assert<Equal<keyof Native14.DrawerProviderState, never>>;
+type Contract1285 = Assert<
+	Equal<keyof Pick<Native14.DrawerProviderProps, PublishedKeys38>, PublishedKeys38>
 >;
-type Contract1266 = Assert<Equal<Parameters<typeof Native14.DrawerIndent>['length'], 1>>;
-type Contract1267 = Assert<
+type Contract1286 = Assert<Equal<Parameters<typeof Native14.DrawerIndent>['length'], 1>>;
+type Contract1287 = Assert<
 	Equal<keyof Pick<Native14.DrawerIndentState, PublishedKeys94>, PublishedKeys94>
 >;
-type Contract1268 = Assert<
+type Contract1288 = Assert<
 	Equal<keyof Pick<Native14.DrawerIndentProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1269 = Assert<Equal<Parameters<typeof Native14.DrawerIndentBackground>['length'], 1>>;
-type Contract1270 = Assert<
+type Contract1289 = Assert<Equal<Parameters<typeof Native14.DrawerIndentBackground>['length'], 1>>;
+type Contract1290 = Assert<
 	Equal<keyof Pick<Native14.DrawerIndentBackgroundState, PublishedKeys94>, PublishedKeys94>
 >;
-type Contract1271 = Assert<
+type Contract1291 = Assert<
 	Equal<keyof Pick<Native14.DrawerIndentBackgroundProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1272 = Assert<Equal<Parameters<Native14.DrawerTrigger>['length'], 1>>;
-type Contract1273 = Assert<
-	Equal<keyof Pick<Native14.DrawerTriggerProps, PublishedKeys22>, PublishedKeys22>
+type Contract1292 = Assert<Equal<Parameters<Native14.DrawerTrigger>['length'], 1>>;
+type Contract1293 = Assert<
+	Equal<keyof Pick<Native14.DrawerTriggerProps, PublishedKeys23>, PublishedKeys23>
 >;
-type Contract1274 = Assert<
-	Equal<keyof Pick<Native14.DrawerTriggerState, PublishedKeys23>, PublishedKeys23>
+type Contract1294 = Assert<
+	Equal<keyof Pick<Native14.DrawerTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
-type Contract1275 = Assert<Equal<Parameters<Native14.DrawerPortal>['length'], 1>>;
-type Contract1276 = Assert<Equal<keyof Native14.DrawerPortalState, never>>;
-type Contract1277 = Assert<
+type Contract1295 = Assert<Equal<Parameters<Native14.DrawerPortal>['length'], 1>>;
+type Contract1296 = Assert<Equal<keyof Native14.DrawerPortalState, never>>;
+type Contract1297 = Assert<
 	Equal<keyof Pick<Native14.DrawerPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract1278 = Assert<Equal<Parameters<typeof Native14.DrawerPopup>['length'], 1>>;
-type Contract1279 = Assert<
+type Contract1298 = Assert<Equal<Parameters<typeof Native14.DrawerPopup>['length'], 1>>;
+type Contract1299 = Assert<
 	Equal<keyof Pick<Native14.DrawerPopupProps, PublishedKeys16>, PublishedKeys16>
 >;
-type Contract1280 = Assert<
+type Contract1300 = Assert<
 	Equal<keyof Pick<Native14.DrawerPopupState, PublishedKeys95>, PublishedKeys95>
 >;
-type Contract1281 = Assert<Equal<Parameters<typeof Native14.DrawerSwipeArea>['length'], 1>>;
-type Contract1282 = Assert<
+type Contract1301 = Assert<Equal<Parameters<typeof Native14.DrawerSwipeArea>['length'], 1>>;
+type Contract1302 = Assert<
 	Equal<keyof Pick<Native14.DrawerSwipeAreaProps, PublishedKeys96>, PublishedKeys96>
 >;
-type Contract1283 = Assert<
+type Contract1303 = Assert<
 	Equal<keyof Pick<Native14.DrawerSwipeAreaState, PublishedKeys97>, PublishedKeys97>
 >;
-type Contract1284 = Assert<Equal<Parameters<typeof Native14.DrawerContent>['length'], 1>>;
-type Contract1285 = Assert<
+type Contract1304 = Assert<Equal<Parameters<typeof Native14.DrawerContent>['length'], 1>>;
+type Contract1305 = Assert<
 	Equal<keyof Pick<Native14.DrawerContentProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1286 = Assert<Equal<keyof Native14.DrawerContentState, never>>;
-type Contract1287 = Assert<Equal<Parameters<typeof Native14.DrawerBackdrop>['length'], 1>>;
-type Contract1288 = Assert<
+type Contract1306 = Assert<Equal<keyof Native14.DrawerContentState, never>>;
+type Contract1307 = Assert<Equal<Parameters<typeof Native14.DrawerBackdrop>['length'], 1>>;
+type Contract1308 = Assert<
 	Equal<keyof Pick<Native14.DrawerBackdropProps, PublishedKeys13>, PublishedKeys13>
 >;
-type Contract1289 = Assert<
+type Contract1309 = Assert<
 	Equal<keyof Pick<Native14.DrawerBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract1290 = Assert<Equal<Parameters<typeof Native14.DrawerViewport>['length'], 1>>;
-type Contract1291 = Assert<
+type Contract1310 = Assert<Equal<Parameters<typeof Native14.DrawerViewport>['length'], 1>>;
+type Contract1311 = Assert<
 	Equal<keyof Pick<Native14.DrawerViewportState, PublishedKeys17>, PublishedKeys17>
 >;
-type Contract1292 = Assert<
+type Contract1312 = Assert<
 	Equal<keyof Pick<Native14.DrawerViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1293 = Assert<Equal<Parameters<Native14.DrawerTitle>['length'], 1>>;
-type Contract1294 = Assert<
+type Contract1313 = Assert<Equal<Parameters<Native14.DrawerTitle>['length'], 1>>;
+type Contract1314 = Assert<
 	Equal<keyof Pick<Native14.DrawerTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1295 = Assert<Equal<keyof Native14.DrawerTitleState, never>>;
-type Contract1296 = Assert<Equal<Parameters<Native14.DrawerDescription>['length'], 1>>;
-type Contract1297 = Assert<
+type Contract1315 = Assert<Equal<keyof Native14.DrawerTitleState, never>>;
+type Contract1316 = Assert<Equal<Parameters<Native14.DrawerDescription>['length'], 1>>;
+type Contract1317 = Assert<
 	Equal<keyof Pick<Native14.DrawerDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1298 = Assert<Equal<keyof Native14.DrawerDescriptionState, never>>;
-type Contract1299 = Assert<Equal<Parameters<Native14.DrawerClose>['length'], 1>>;
-type Contract1300 = Assert<
+type Contract1318 = Assert<Equal<keyof Native14.DrawerDescriptionState, never>>;
+type Contract1319 = Assert<Equal<Parameters<Native14.DrawerClose>['length'], 1>>;
+type Contract1320 = Assert<
 	Equal<keyof Pick<Native14.DrawerCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1301 = Assert<
+type Contract1321 = Assert<
 	Equal<keyof Pick<Native14.DrawerCloseState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract1302 = Assert<
+type Contract1322 = Assert<
 	Equal<Parameters<typeof Native14.DrawerVirtualKeyboardProvider>['length'], 1>
 >;
-type Contract1303 = Assert<Equal<keyof Native14.DrawerVirtualKeyboardProviderState, never>>;
-type Contract1304 = Assert<
-	Equal<keyof Pick<Native14.DrawerVirtualKeyboardProviderProps, PublishedKeys37>, PublishedKeys37>
+type Contract1323 = Assert<Equal<keyof Native14.DrawerVirtualKeyboardProviderState, never>>;
+type Contract1324 = Assert<
+	Equal<keyof Pick<Native14.DrawerVirtualKeyboardProviderProps, PublishedKeys38>, PublishedKeys38>
 >;
-type Contract1305 = Assert<
+type Contract1325 = Assert<
 	Equal<keyof Pick<typeof Native15.Field, PublishedKeys98>, PublishedKeys98>
 >;
-type Contract1306 = Assert<Equal<Parameters<typeof Native15.FieldRoot>['length'], 1>>;
-type Contract1307 = Assert<
+type Contract1326 = Assert<Equal<Parameters<typeof Native15.FieldRoot>['length'], 1>>;
+type Contract1327 = Assert<
 	Equal<keyof Pick<Native15.FieldValidityData, PublishedKeys99>, PublishedKeys99>
 >;
-type Contract1308 = Assert<
+type Contract1328 = Assert<
 	Equal<keyof Pick<Native15.FieldRootActions, PublishedKeys100>, PublishedKeys100>
 >;
-type Contract1309 = Assert<
-	Equal<keyof Pick<Native15.FieldRootState, PublishedKeys56>, PublishedKeys56>
->;
-type Contract1310 = Assert<
-	Equal<keyof Pick<Native15.FieldRootProps, PublishedKeys101>, PublishedKeys101>
->;
-type Contract1311 = Assert<Equal<Parameters<typeof Native15.FieldLabel>['length'], 1>>;
-type Contract1312 = Assert<
-	Equal<keyof Pick<Native15.FieldLabelState, PublishedKeys56>, PublishedKeys56>
->;
-type Contract1313 = Assert<
-	Equal<keyof Pick<Native15.FieldLabelProps, PublishedKeys102>, PublishedKeys102>
->;
-type Contract1314 = Assert<Equal<Parameters<typeof Native15.FieldDescription>['length'], 1>>;
-type Contract1315 = Assert<
-	Equal<keyof Pick<Native15.FieldDescriptionState, PublishedKeys56>, PublishedKeys56>
->;
-type Contract1316 = Assert<
-	Equal<keyof Pick<Native15.FieldDescriptionProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1317 = Assert<Equal<Parameters<typeof Native15.FieldError>['length'], 1>>;
-type Contract1318 = Assert<
-	Equal<keyof Pick<Native15.FieldErrorState, PublishedKeys103>, PublishedKeys103>
->;
-type Contract1319 = Assert<
-	Equal<keyof Pick<Native15.FieldErrorProps, PublishedKeys104>, PublishedKeys104>
->;
-type Contract1320 = Assert<Equal<Parameters<typeof Native15.FieldControl>['length'], 1>>;
-type Contract1321 = Assert<
-	Equal<keyof Pick<Native15.FieldControlState, PublishedKeys56>, PublishedKeys56>
->;
-type Contract1322 = Assert<
-	Equal<keyof Pick<Native15.FieldControlProps, PublishedKeys105>, PublishedKeys105>
->;
-type Contract1323 = Assert<
-	Equal<keyof Pick<Native15.FieldControlChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract1324 = Assert<
-	Equal<keyof Pick<Native15.FieldControlChangeEventDetails, PublishedKeys5>, PublishedKeys5>
->;
-type Contract1325 = Assert<Equal<Parameters<typeof Native15.FieldValidity>['length'], 1>>;
-type Contract1326 = Assert<
-	Equal<keyof Pick<Native15.FieldValidityState, PublishedKeys106>, PublishedKeys106>
->;
-type Contract1327 = Assert<
-	Equal<keyof Pick<Native15.FieldValidityProps, PublishedKeys37>, PublishedKeys37>
->;
-type Contract1328 = Assert<Equal<Parameters<typeof Native15.FieldItem>['length'], 1>>;
 type Contract1329 = Assert<
-	Equal<keyof Pick<Native15.FieldItemState, PublishedKeys56>, PublishedKeys56>
+	Equal<keyof Pick<Native15.FieldRootState, PublishedKeys57>, PublishedKeys57>
 >;
 type Contract1330 = Assert<
-	Equal<keyof Pick<Native15.FieldItemProps, PublishedKeys107>, PublishedKeys107>
+	Equal<keyof Pick<Native15.FieldRootProps, PublishedKeys101>, PublishedKeys101>
 >;
-type Contract1331 = Assert<
-	Equal<keyof Pick<typeof Native16.Fieldset, PublishedKeys108>, PublishedKeys108>
+type Contract1331 = Assert<Equal<Parameters<typeof Native15.FieldLabel>['length'], 1>>;
+type Contract1332 = Assert<
+	Equal<keyof Pick<Native15.FieldLabelState, PublishedKeys57>, PublishedKeys57>
 >;
-type Contract1332 = Assert<Equal<Parameters<typeof Native16.FieldsetRoot>['length'], 1>>;
 type Contract1333 = Assert<
-	Equal<keyof Pick<Native16.FieldsetRootState, PublishedKeys15>, PublishedKeys15>
+	Equal<keyof Pick<Native15.FieldLabelProps, PublishedKeys102>, PublishedKeys102>
 >;
-type Contract1334 = Assert<
-	Equal<keyof Pick<Native16.FieldsetRootProps, PublishedKeys109>, PublishedKeys109>
+type Contract1334 = Assert<Equal<Parameters<typeof Native15.FieldDescription>['length'], 1>>;
+type Contract1335 = Assert<
+	Equal<keyof Pick<Native15.FieldDescriptionState, PublishedKeys57>, PublishedKeys57>
 >;
-type Contract1335 = Assert<Equal<Parameters<typeof Native16.FieldsetLegend>['length'], 1>>;
 type Contract1336 = Assert<
-	Equal<keyof Pick<Native16.FieldsetLegendState, PublishedKeys15>, PublishedKeys15>
+	Equal<keyof Pick<Native15.FieldDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1337 = Assert<
-	Equal<keyof Pick<Native16.FieldsetLegendProps, PublishedKeys8>, PublishedKeys8>
+type Contract1337 = Assert<Equal<Parameters<typeof Native15.FieldError>['length'], 1>>;
+type Contract1338 = Assert<
+	Equal<keyof Pick<Native15.FieldErrorState, PublishedKeys103>, PublishedKeys103>
 >;
-type Contract1338 = Assert<Equal<Parameters<typeof Native17.Form>['length'], 1>>;
 type Contract1339 = Assert<
-	Equal<keyof Pick<Native17.FormSubmitEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native15.FieldErrorProps, PublishedKeys104>, PublishedKeys104>
 >;
-type Contract1340 = Assert<
-	Equal<keyof Pick<Native17.FormSubmitEventDetails, PublishedKeys110>, PublishedKeys110>
->;
+type Contract1340 = Assert<Equal<Parameters<typeof Native15.FieldControl>['length'], 1>>;
 type Contract1341 = Assert<
-	Equal<keyof Pick<Native17.FormValidationMode, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native15.FieldControlState, PublishedKeys57>, PublishedKeys57>
 >;
 type Contract1342 = Assert<
-	Equal<keyof Pick<Native17.FormActions, PublishedKeys100>, PublishedKeys100>
+	Equal<keyof Pick<Native15.FieldControlProps, PublishedKeys105>, PublishedKeys105>
 >;
-type Contract1343 = Assert<Equal<keyof Native17.FormState, never>>;
+type Contract1343 = Assert<
+	Equal<keyof Pick<Native15.FieldControlChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
 type Contract1344 = Assert<
-	Equal<keyof Pick<Native17.FormProps, PublishedKeys111>, PublishedKeys111>
+	Equal<keyof Pick<Native15.FieldControlChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1345 = Assert<Equal<Parameters<typeof Native18.Input>['length'], 1>>;
+type Contract1345 = Assert<Equal<Parameters<typeof Native15.FieldValidity>['length'], 1>>;
 type Contract1346 = Assert<
-	Equal<keyof Pick<Native18.InputProps, PublishedKeys105>, PublishedKeys105>
+	Equal<keyof Pick<Native15.FieldValidityState, PublishedKeys106>, PublishedKeys106>
 >;
 type Contract1347 = Assert<
-	Equal<keyof Pick<Native18.InputState, PublishedKeys56>, PublishedKeys56>
+	Equal<keyof Pick<Native15.FieldValidityProps, PublishedKeys38>, PublishedKeys38>
 >;
-type Contract1348 = Assert<
-	Equal<keyof Pick<Native18.InputChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
+type Contract1348 = Assert<Equal<Parameters<typeof Native15.FieldItem>['length'], 1>>;
 type Contract1349 = Assert<
-	Equal<keyof Pick<Native18.InputChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+	Equal<keyof Pick<Native15.FieldItemState, PublishedKeys57>, PublishedKeys57>
 >;
 type Contract1350 = Assert<
-	Equal<keyof Pick<Native19.RequestStatus, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native15.FieldItemProps, PublishedKeys107>, PublishedKeys107>
 >;
 type Contract1351 = Assert<
+	Equal<keyof Pick<typeof Native16.Fieldset, PublishedKeys108>, PublishedKeys108>
+>;
+type Contract1352 = Assert<Equal<Parameters<typeof Native16.FieldsetRoot>['length'], 1>>;
+type Contract1353 = Assert<
+	Equal<keyof Pick<Native16.FieldsetRootState, PublishedKeys15>, PublishedKeys15>
+>;
+type Contract1354 = Assert<
+	Equal<keyof Pick<Native16.FieldsetRootProps, PublishedKeys109>, PublishedKeys109>
+>;
+type Contract1355 = Assert<Equal<Parameters<typeof Native16.FieldsetLegend>['length'], 1>>;
+type Contract1356 = Assert<
+	Equal<keyof Pick<Native16.FieldsetLegendState, PublishedKeys15>, PublishedKeys15>
+>;
+type Contract1357 = Assert<
+	Equal<keyof Pick<Native16.FieldsetLegendProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1358 = Assert<Equal<Parameters<typeof Native17.Form>['length'], 1>>;
+type Contract1359 = Assert<
+	Equal<keyof Pick<Native17.FormSubmitEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract1360 = Assert<
+	Equal<keyof Pick<Native17.FormSubmitEventDetails, PublishedKeys110>, PublishedKeys110>
+>;
+type Contract1361 = Assert<
+	Equal<keyof Pick<Native17.FormValidationMode, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract1362 = Assert<
+	Equal<keyof Pick<Native17.FormActions, PublishedKeys100>, PublishedKeys100>
+>;
+type Contract1363 = Assert<Equal<keyof Native17.FormState, never>>;
+type Contract1364 = Assert<
+	Equal<keyof Pick<Native17.FormProps, PublishedKeys111>, PublishedKeys111>
+>;
+type Contract1365 = Assert<Equal<Parameters<typeof Native18.Input>['length'], 1>>;
+type Contract1366 = Assert<
+	Equal<keyof Pick<Native18.InputProps, PublishedKeys105>, PublishedKeys105>
+>;
+type Contract1367 = Assert<
+	Equal<keyof Pick<Native18.InputState, PublishedKeys57>, PublishedKeys57>
+>;
+type Contract1368 = Assert<
+	Equal<keyof Pick<Native18.InputChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract1369 = Assert<
+	Equal<keyof Pick<Native18.InputChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+>;
+type Contract1370 = Assert<
+	Equal<keyof Pick<Native19.RequestStatus, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract1371 = Assert<
 	Equal<
 		keyof Pick<Native19.RequestQueueOptions<{ sample: string }>, PublishedKeys231>,
 		PublishedKeys231
 	>
 >;
-type Contract1352 = Assert<
-	Equal<keyof Pick<typeof Native19.RequestQueue, PublishedKeys65>, PublishedKeys65>
+type Contract1372 = Assert<
+	Equal<keyof Pick<typeof Native19.RequestQueue, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract1353 = Assert<
-	Equal<keyof Pick<typeof Native20.TimeoutManager, PublishedKeys65>, PublishedKeys65>
+type Contract1373 = Assert<
+	Equal<keyof Pick<typeof Native20.TimeoutManager, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract1354 = Assert<Equal<Parameters<typeof Native21.CompositeItem>['length'], 1>>;
-type Contract1355 = Assert<Equal<Parameters<typeof Native21.CompositeList>['length'], 1>>;
-type Contract1356 = Assert<
+type Contract1374 = Assert<Equal<Parameters<typeof Native21.CompositeItem>['length'], 1>>;
+type Contract1375 = Assert<Equal<Parameters<typeof Native21.CompositeList>['length'], 1>>;
+type Contract1376 = Assert<
 	Equal<
 		keyof Pick<Native21.CompositeMetadata<{ sample: string }>, PublishedKeys232>,
 		PublishedKeys232
 	>
 >;
-type Contract1357 = Assert<
+type Contract1377 = Assert<
 	Equal<keyof Pick<typeof Native21.CompositeListContext, PublishedKeys233>, PublishedKeys233>
 >;
-type Contract1358 = Assert<Equal<Parameters<typeof Native21.useCompositeListContext>['length'], 0>>;
-type Contract1359 = Assert<
+type Contract1378 = Assert<Equal<Parameters<typeof Native21.useCompositeListContext>['length'], 0>>;
+type Contract1379 = Assert<
 	Equal<
 		keyof Pick<Native21.CompositeListContextValue<{ sample: string }>, PublishedKeys234>,
 		PublishedKeys234
 	>
 >;
-type Contract1360 = Assert<Equal<Parameters<typeof Native21.CompositeRoot>['length'], 1>>;
-type Contract1361 = Assert<
+type Contract1380 = Assert<Equal<Parameters<typeof Native21.CompositeRoot>['length'], 1>>;
+type Contract1381 = Assert<
 	Equal<Parameters<typeof Native21.useCompositeListItem>['length'], 0 | 1>
 >;
-type Contract1362 = Assert<
+type Contract1382 = Assert<
 	Equal<
 		keyof Pick<Native21.UseCompositeListItemParameters<{ sample: string }>, PublishedKeys235>,
 		PublishedKeys235
 	>
 >;
-type Contract1363 = Assert<Equal<Parameters<typeof Native21.useCompositeRoot>['length'], 1>>;
-type Contract1364 = Assert<
+type Contract1383 = Assert<Equal<Parameters<typeof Native21.useCompositeRoot>['length'], 1>>;
+type Contract1384 = Assert<
 	Equal<keyof Pick<Native21.UseCompositeRootParameters, PublishedKeys236>, PublishedKeys236>
 >;
-type Contract1365 = Assert<Equal<Parameters<typeof Native21.gridNavigation>['length'], 1>>;
-type Contract1366 = Assert<
+type Contract1385 = Assert<Equal<Parameters<typeof Native21.gridNavigation>['length'], 1>>;
+type Contract1386 = Assert<
 	Equal<keyof Pick<Native21.CompositeGridConfig, PublishedKeys237>, PublishedKeys237>
 >;
-type Contract1367 = Assert<
+type Contract1387 = Assert<
 	Equal<keyof Pick<Native21.CompositeGridItemSize, PublishedKeys152>, PublishedKeys152>
 >;
-type Contract1368 = Assert<
+type Contract1388 = Assert<
 	Equal<keyof Pick<Native21.CompositeGridNavigationState, PublishedKeys238>, PublishedKeys238>
 >;
-type Contract1369 = Assert<Equal<Parameters<Native21.CompositeGridNavigator>['length'], 1>>;
-type Contract1370 = Assert<Equal<Parameters<typeof Native21.scrollIntoViewIfNeeded>['length'], 4>>;
-type Contract1371 = Assert<
+type Contract1389 = Assert<Equal<Parameters<Native21.CompositeGridNavigator>['length'], 1>>;
+type Contract1390 = Assert<Equal<Parameters<typeof Native21.scrollIntoViewIfNeeded>['length'], 4>>;
+type Contract1391 = Assert<
 	Equal<Parameters<typeof Native21.findNonDisabledListIndex>['length'], 1 | 2>
 >;
-type Contract1372 = Assert<Equal<Parameters<typeof Native21.isListIndexDisabled>['length'], 2 | 3>>;
-type Contract1373 = Assert<
+type Contract1392 = Assert<Equal<Parameters<typeof Native21.isListIndexDisabled>['length'], 2 | 3>>;
+type Contract1393 = Assert<
 	Equal<keyof Pick<typeof Native22.TYPEAHEAD_RESET_MS, PublishedKeys239>, PublishedKeys239>
 >;
-type Contract1374 = Assert<
+type Contract1394 = Assert<
 	Equal<keyof Pick<typeof Native22.PATIENT_CLICK_THRESHOLD, PublishedKeys239>, PublishedKeys239>
 >;
-type Contract1375 = Assert<
+type Contract1395 = Assert<
 	Equal<keyof Pick<typeof Native22.DISABLED_TRANSITIONS_STYLE, PublishedKeys240>, PublishedKeys240>
 >;
-type Contract1376 = Assert<
+type Contract1396 = Assert<
 	Equal<keyof Pick<typeof Native22.CLICK_TRIGGER_IDENTIFIER, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1377 = Assert<
+type Contract1397 = Assert<
 	Equal<keyof Pick<typeof Native22.BASE_UI_SWIPE_IGNORE_ATTRIBUTE, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1378 = Assert<
+type Contract1398 = Assert<
 	Equal<keyof Pick<typeof Native22.LEGACY_SWIPE_IGNORE_ATTRIBUTE, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1379 = Assert<
+type Contract1399 = Assert<
 	Equal<keyof Pick<typeof Native22.BASE_UI_SWIPE_IGNORE_SELECTOR, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1380 = Assert<
+type Contract1400 = Assert<
 	Equal<keyof Pick<typeof Native22.LEGACY_SWIPE_IGNORE_SELECTOR, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1381 = Assert<
+type Contract1401 = Assert<
 	Equal<
 		keyof Pick<typeof Native22.DROPDOWN_COLLISION_AVOIDANCE, PublishedKeys241>,
 		PublishedKeys241
 	>
 >;
-type Contract1382 = Assert<
+type Contract1402 = Assert<
 	Equal<keyof Pick<typeof Native22.POPUP_COLLISION_AVOIDANCE, PublishedKeys241>, PublishedKeys241>
 >;
-type Contract1383 = Assert<
+type Contract1403 = Assert<
 	Equal<keyof Pick<typeof Native22.ownerVisuallyHidden, PublishedKeys242>, PublishedKeys242>
 >;
-type Contract1384 = Assert<
+type Contract1404 = Assert<
 	Equal<Parameters<typeof Native23.createChangeEventDetails>['length'], 1 | 2 | 3 | 4>
 >;
-type Contract1385 = Assert<
+type Contract1405 = Assert<
 	Equal<Parameters<typeof Native23.createGenericEventDetails>['length'], 1 | 2 | 3>
 >;
-type Contract1386 = Assert<
+type Contract1406 = Assert<
 	Equal<keyof Pick<Native23.ReasonToEvent<'sample'>, PublishedKeys243>, PublishedKeys243>
 >;
-type Contract1387 = Assert<
+type Contract1407 = Assert<
 	Equal<keyof Pick<Native23.BaseUIChangeEventDetails<'sample'>, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1388 = Assert<
+type Contract1408 = Assert<
 	Equal<
 		keyof Pick<Native23.BaseUIGenericEventDetails<'sample'>, PublishedKeys110>,
 		PublishedKeys110
 	>
 >;
-type Contract1389 = Assert<
+type Contract1409 = Assert<
 	Equal<keyof Pick<typeof Native24.CSPContext, PublishedKeys233>, PublishedKeys233>
 >;
-type Contract1390 = Assert<Equal<Parameters<typeof Native24.useCSPContext>['length'], 0>>;
-type Contract1391 = Assert<
+type Contract1410 = Assert<Equal<Parameters<typeof Native24.useCSPContext>['length'], 0>>;
+type Contract1411 = Assert<
 	Equal<keyof Pick<Native24.CSPContextValue, PublishedKeys244>, PublishedKeys244>
 >;
-type Contract1392 = Assert<
+type Contract1412 = Assert<
 	Equal<keyof Pick<Native25.DirectionContext, PublishedKeys245>, PublishedKeys245>
 >;
-type Contract1393 = Assert<Equal<Parameters<typeof Native25.useDirection>['length'], 0>>;
-type Contract1394 = Assert<
+type Contract1413 = Assert<Equal<Parameters<typeof Native25.useDirection>['length'], 0>>;
+type Contract1414 = Assert<
 	Equal<keyof Pick<Native25.TextDirection, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1395 = Assert<
+type Contract1415 = Assert<
 	Equal<keyof Pick<Native25.DirectionContextType, PublishedKeys245>, PublishedKeys245>
 >;
-type Contract1396 = Assert<
+type Contract1416 = Assert<
 	Equal<keyof Pick<typeof Native26.DEFAULT_VALIDITY_STATE, PublishedKeys246>, PublishedKeys246>
 >;
-type Contract1397 = Assert<
+type Contract1417 = Assert<
 	Equal<
 		keyof Pick<typeof Native26.DEFAULT_FIELD_STATE_ATTRIBUTES, PublishedKeys247>,
 		PublishedKeys247
 	>
 >;
-type Contract1398 = Assert<
-	Equal<keyof Pick<typeof Native26.DEFAULT_FIELD_ROOT_STATE, PublishedKeys56>, PublishedKeys56>
+type Contract1418 = Assert<
+	Equal<keyof Pick<typeof Native26.DEFAULT_FIELD_ROOT_STATE, PublishedKeys57>, PublishedKeys57>
 >;
-type Contract1399 = Assert<
+type Contract1419 = Assert<
 	Equal<keyof Pick<typeof Native26.fieldValidityMapping, PublishedKeys248>, PublishedKeys248>
 >;
-type Contract1400 = Assert<
+type Contract1420 = Assert<
 	Equal<Parameters<typeof Native27.useRegisterFieldControl>['length'], 3 | 4 | 5 | 6>
 >;
-type Contract1401 = Assert<
+type Contract1421 = Assert<
 	Equal<Parameters<typeof Native27.useFieldControlRegistration>['length'], 1>
 >;
-type Contract1402 = Assert<
+type Contract1422 = Assert<
 	Equal<keyof Pick<Native27.FieldControlRegistration, PublishedKeys249>, PublishedKeys249>
 >;
-type Contract1403 = Assert<
+type Contract1423 = Assert<
 	Equal<
 		keyof Pick<Native27.UseFieldControlRegistrationParameters, PublishedKeys250>,
 		PublishedKeys250
 	>
 >;
-type Contract1404 = Assert<
+type Contract1424 = Assert<
 	Equal<keyof Pick<Native28.FieldRootContext, PublishedKeys251>, PublishedKeys251>
 >;
-type Contract1405 = Assert<Equal<Parameters<typeof Native28.useFieldRootContext>['length'], 0 | 1>>;
-type Contract1406 = Assert<
+type Contract1425 = Assert<Equal<Parameters<typeof Native28.useFieldRootContext>['length'], 0 | 1>>;
+type Contract1426 = Assert<
 	Equal<keyof Pick<Native28.FieldRootContextType, PublishedKeys251>, PublishedKeys251>
 >;
-type Contract1407 = Assert<Equal<Parameters<typeof Native29.getFilter>['length'], 0 | 1>>;
-type Contract1408 = Assert<
-	Equal<keyof Pick<Native29.GetFilterParameters, PublishedKeys39>, PublishedKeys39>
+type Contract1427 = Assert<Equal<Parameters<typeof Native29.getFilter>['length'], 0 | 1>>;
+type Contract1428 = Assert<
+	Equal<keyof Pick<Native29.GetFilterParameters, PublishedKeys40>, PublishedKeys40>
 >;
-type Contract1409 = Assert<Equal<keyof Pick<Native29.Filter, PublishedKeys38>, PublishedKeys38>>;
-type Contract1410 = Assert<
+type Contract1429 = Assert<Equal<keyof Pick<Native29.Filter, PublishedKeys39>, PublishedKeys39>>;
+type Contract1430 = Assert<
 	Equal<keyof Pick<Native30.FormContext, PublishedKeys252>, PublishedKeys252>
 >;
-type Contract1411 = Assert<Equal<Parameters<typeof Native30.useFormContext>['length'], 0>>;
-type Contract1412 = Assert<Equal<keyof Pick<Native30.Errors, PublishedKeys253>, PublishedKeys253>>;
-type Contract1413 = Assert<
+type Contract1431 = Assert<Equal<Parameters<typeof Native30.useFormContext>['length'], 0>>;
+type Contract1432 = Assert<Equal<keyof Pick<Native30.Errors, PublishedKeys253>, PublishedKeys253>>;
+type Contract1433 = Assert<
 	Equal<Parameters<typeof Native31.getDisabledMountTransitionStyles>['length'], 1>
 >;
-type Contract1414 = Assert<
+type Contract1434 = Assert<
 	Equal<Parameters<typeof Native32.getStateAttributesProps>['length'], 1 | 2>
 >;
-type Contract1415 = Assert<
+type Contract1435 = Assert<
 	Equal<
 		keyof Pick<Native32.StateAttributesMapping<{ sample: string }>, PublishedKeys254>,
 		PublishedKeys254
 	>
 >;
-type Contract1416 = Assert<Equal<Parameters<typeof Native33.compareItemEquality>['length'], 3>>;
-type Contract1417 = Assert<Equal<Parameters<typeof Native33.isSelectedValueDirty>['length'], 3>>;
-type Contract1418 = Assert<Equal<Parameters<typeof Native33.selectedValueIncludes>['length'], 3>>;
-type Contract1419 = Assert<Equal<Parameters<typeof Native33.findItemIndex>['length'], 3>>;
-type Contract1420 = Assert<Equal<Parameters<typeof Native33.findSelectionIndex>['length'], 4>>;
-type Contract1421 = Assert<Equal<Parameters<typeof Native33.resolveSelectedIndex>['length'], 6>>;
-type Contract1422 = Assert<Equal<Parameters<typeof Native33.removeItem>['length'], 3>>;
-type Contract1423 = Assert<Equal<Parameters<Native33.ItemEqualityComparer>['length'], 2>>;
-type Contract1424 = Assert<Equal<Parameters<typeof Native33.defaultItemEquality>['length'], 2>>;
-type Contract1425 = Assert<
+type Contract1436 = Assert<Equal<Parameters<typeof Native33.compareItemEquality>['length'], 3>>;
+type Contract1437 = Assert<Equal<Parameters<typeof Native33.isSelectedValueDirty>['length'], 3>>;
+type Contract1438 = Assert<Equal<Parameters<typeof Native33.selectedValueIncludes>['length'], 3>>;
+type Contract1439 = Assert<Equal<Parameters<typeof Native33.findItemIndex>['length'], 3>>;
+type Contract1440 = Assert<Equal<Parameters<typeof Native33.findSelectionIndex>['length'], 4>>;
+type Contract1441 = Assert<Equal<Parameters<typeof Native33.resolveSelectedIndex>['length'], 6>>;
+type Contract1442 = Assert<Equal<Parameters<typeof Native33.removeItem>['length'], 3>>;
+type Contract1443 = Assert<Equal<Parameters<Native33.ItemEqualityComparer>['length'], 2>>;
+type Contract1444 = Assert<Equal<Parameters<typeof Native33.defaultItemEquality>['length'], 2>>;
+type Contract1445 = Assert<
 	Equal<Parameters<typeof Native34.useAriaLabelledBy>['length'], 3 | 4 | 5>
 >;
-type Contract1426 = Assert<Equal<Parameters<typeof Native34.useLabelableContext>['length'], 0>>;
-type Contract1427 = Assert<Equal<Parameters<typeof Native34.useLabelableId>['length'], 0 | 1>>;
-type Contract1428 = Assert<Equal<Parameters<typeof Native34.useLabel>['length'], 0 | 1>>;
-type Contract1429 = Assert<
+type Contract1446 = Assert<Equal<Parameters<typeof Native34.useLabelableContext>['length'], 0>>;
+type Contract1447 = Assert<Equal<Parameters<typeof Native34.useLabelableId>['length'], 0 | 1>>;
+type Contract1448 = Assert<Equal<Parameters<typeof Native34.useLabel>['length'], 0 | 1>>;
+type Contract1449 = Assert<
 	Equal<keyof Pick<Native34.UseLabelParameters, PublishedKeys255>, PublishedKeys255>
 >;
-type Contract1430 = Assert<
+type Contract1450 = Assert<
 	Equal<keyof Pick<Native34.UseLabelReturnValue, PublishedKeys256>, PublishedKeys256>
 >;
-type Contract1431 = Assert<Equal<Parameters<typeof Native34.LabelableProvider>['length'], 1>>;
-type Contract1432 = Assert<Equal<keyof Native34.LabelableProviderState, never>>;
-type Contract1433 = Assert<
-	Equal<keyof Pick<Native34.LabelableProviderProps, PublishedKeys37>, PublishedKeys37>
+type Contract1451 = Assert<Equal<Parameters<typeof Native34.LabelableProvider>['length'], 1>>;
+type Contract1452 = Assert<Equal<keyof Native34.LabelableProviderState, never>>;
+type Contract1453 = Assert<
+	Equal<keyof Pick<Native34.LabelableProviderProps, PublishedKeys38>, PublishedKeys38>
 >;
-type Contract1434 = Assert<Equal<Parameters<typeof Native35.NOOP>['length'], 0>>;
-type Contract1435 = Assert<
+type Contract1454 = Assert<Equal<Parameters<typeof Native35.NOOP>['length'], 0>>;
+type Contract1455 = Assert<
 	Equal<keyof Pick<typeof Native36.REASONS, PublishedKeys257>, PublishedKeys257>
 >;
-type Contract1436 = Assert<
+type Contract1456 = Assert<
 	Equal<keyof Pick<Native36.BaseUIEventReasons, PublishedKeys257>, PublishedKeys257>
 >;
-type Contract1437 = Assert<
+type Contract1457 = Assert<
 	Equal<keyof Pick<Native36.BaseUIEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1438 = Assert<Equal<Parameters<typeof Native37.isGroupedItems>['length'], 1>>;
-type Contract1439 = Assert<Equal<Parameters<typeof Native37.flattenLeafItems>['length'], 1>>;
-type Contract1440 = Assert<Equal<Parameters<typeof Native37.hasNullItemLabel>['length'], 1>>;
-type Contract1441 = Assert<Equal<Parameters<typeof Native37.stringifyAsLabel>['length'], 1 | 2>>;
-type Contract1442 = Assert<Equal<Parameters<typeof Native37.stringifyAsValue>['length'], 1 | 2>>;
-type Contract1443 = Assert<
+type Contract1458 = Assert<Equal<Parameters<typeof Native37.isGroupedItems>['length'], 1>>;
+type Contract1459 = Assert<Equal<Parameters<typeof Native37.flattenLeafItems>['length'], 1>>;
+type Contract1460 = Assert<Equal<Parameters<typeof Native37.hasNullItemLabel>['length'], 1>>;
+type Contract1461 = Assert<Equal<Parameters<typeof Native37.stringifyAsLabel>['length'], 1 | 2>>;
+type Contract1462 = Assert<Equal<Parameters<typeof Native37.stringifyAsValue>['length'], 1 | 2>>;
+type Contract1463 = Assert<
 	Equal<Parameters<typeof Native37.resolveSelectedLabel>['length'], 2 | 3>
 >;
-type Contract1444 = Assert<
+type Contract1464 = Assert<
 	Equal<Parameters<typeof Native37.resolveMultipleLabels>['length'], 2 | 3>
 >;
-type Contract1445 = Assert<Equal<keyof Pick<Native37.Group, PublishedKeys258>, PublishedKeys258>>;
-type Contract1446 = Assert<Equal<Parameters<typeof Native38.serializeValue>['length'], 1>>;
-type Contract1447 = Assert<
+type Contract1465 = Assert<Equal<keyof Pick<Native37.Group, PublishedKeys258>, PublishedKeys258>>;
+type Contract1466 = Assert<Equal<Parameters<typeof Native38.serializeValue>['length'], 1>>;
+type Contract1467 = Assert<
 	Equal<
 		keyof Pick<typeof Native39.TransitionStatusDataAttributes, PublishedKeys259>,
 		PublishedKeys259
 	>
 >;
-type Contract1448 = Assert<
+type Contract1468 = Assert<
 	Equal<keyof Pick<typeof Native39.transitionStatusMapping, PublishedKeys260>, PublishedKeys260>
 >;
-type Contract1449 = Assert<
+type Contract1469 = Assert<
 	Equal<keyof Pick<Native40.TemporalSupportedObjectLookup, PublishedKeys261>, PublishedKeys261>
 >;
-type Contract1450 = Assert<
+type Contract1470 = Assert<
 	Equal<keyof Pick<Native40.TemporalAdapterFormats, PublishedKeys262>, PublishedKeys262>
 >;
-type Contract1451 = Assert<
+type Contract1471 = Assert<
 	Equal<keyof Pick<Native40.DateBuilderReturnType<'sample'>, PublishedKeys263>, PublishedKeys263>
 >;
-type Contract1452 = Assert<
+type Contract1472 = Assert<
 	Equal<keyof Pick<Native40.TemporalAdapter, PublishedKeys264>, PublishedKeys264>
 >;
-type Contract1453 = Assert<
+type Contract1473 = Assert<
 	Equal<keyof Pick<Native40.TemporalSupportedObject, PublishedKeys263>, PublishedKeys263>
 >;
-type Contract1454 = Assert<
+type Contract1474 = Assert<
 	Equal<keyof Pick<Native40.TemporalTimezone, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1455 = Assert<Equal<keyof Native40.TemporalValue, never>>;
-type Contract1456 = Assert<
+type Contract1475 = Assert<Equal<keyof Native40.TemporalValue, never>>;
+type Contract1476 = Assert<
 	Equal<keyof Pick<Native40.TemporalRangeValue, PublishedKeys265>, PublishedKeys265>
 >;
-type Contract1457 = Assert<Equal<keyof Native40.TemporalSupportedValue, never>>;
-type Contract1458 = Assert<
+type Contract1477 = Assert<Equal<keyof Native40.TemporalSupportedValue, never>>;
+type Contract1478 = Assert<
 	Equal<keyof Pick<Native40.TemporalNonNullableRangeValue, PublishedKeys265>, PublishedKeys265>
 >;
-type Contract1459 = Assert<
+type Contract1479 = Assert<
 	Equal<keyof Pick<Native40.TemporalNonNullableValue<Date>, PublishedKeys263>, PublishedKeys263>
 >;
-type Contract1460 = Assert<
-	Equal<keyof Pick<typeof Native41.TemporalAdapterDateFns, PublishedKeys65>, PublishedKeys65>
+type Contract1480 = Assert<
+	Equal<keyof Pick<typeof Native41.TemporalAdapterDateFns, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract1461 = Assert<
-	Equal<keyof Pick<typeof Native42.TemporalAdapterLuxon, PublishedKeys65>, PublishedKeys65>
+type Contract1481 = Assert<
+	Equal<keyof Pick<typeof Native42.TemporalAdapterLuxon, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract1462 = Assert<
+type Contract1482 = Assert<
 	Equal<keyof Pick<Native43.HTMLProps, PublishedKeys225>, PublishedKeys225>
 >;
-type Contract1463 = Assert<
+type Contract1483 = Assert<
 	Equal<keyof Pick<Native43.BaseUIEvent<MouseEvent>, PublishedKeys230>, PublishedKeys230>
 >;
-type Contract1464 = Assert<
+type Contract1484 = Assert<
 	Equal<Parameters<Native43.ComponentRenderFn<{ sample: string }, { sample: string }>>['length'], 2>
 >;
-type Contract1465 = Assert<
+type Contract1485 = Assert<
 	Equal<keyof Pick<Native43.MaybeBaseUIEvent<MouseEvent>, PublishedKeys230>, PublishedKeys230>
 >;
-type Contract1466 = Assert<
+type Contract1486 = Assert<
 	Equal<keyof Pick<Native43.FloatingUIOpenChangeDetails, PublishedKeys266>, PublishedKeys266>
 >;
-type Contract1467 = Assert<
+type Contract1487 = Assert<
 	Equal<
 		keyof Pick<Native43.WithBaseUIEvent<{ sample: string }>, PublishedKeys254>,
 		PublishedKeys254
 	>
 >;
-type Contract1468 = Assert<
+type Contract1488 = Assert<
 	Equal<
 		keyof Pick<Native43.BaseUIComponentProps<'div', { sample: string }>, PublishedKeys8>,
 		PublishedKeys8
 	>
 >;
-type Contract1469 = Assert<
+type Contract1489 = Assert<
 	Equal<keyof Pick<Native43.NativeButtonProps, PublishedKeys267>, PublishedKeys267>
 >;
-type Contract1470 = Assert<
+type Contract1490 = Assert<
 	Equal<keyof Pick<Native43.NonNativeButtonProps, PublishedKeys267>, PublishedKeys267>
 >;
-type Contract1471 = Assert<
+type Contract1491 = Assert<
 	Equal<keyof Pick<Native43.Simplify<{ sample: string }>, PublishedKeys254>, PublishedKeys254>
 >;
-type Contract1472 = Assert<
+type Contract1492 = Assert<
 	Equal<
 		keyof Pick<Native43.RequiredExcept<{ sample: string }, 'sample'>, PublishedKeys254>,
 		PublishedKeys254
 	>
 >;
-type Contract1473 = Assert<Equal<keyof Pick<Native43.Orientation, PublishedKeys4>, PublishedKeys4>>;
-type Contract1474 = Assert<Equal<Parameters<typeof Native44.useButton>['length'], 0 | 1>>;
-type Contract1475 = Assert<Equal<Parameters<typeof Native45.useAnchorPositioning>['length'], 1>>;
-type Contract1476 = Assert<
+type Contract1493 = Assert<Equal<keyof Pick<Native43.Orientation, PublishedKeys4>, PublishedKeys4>>;
+type Contract1494 = Assert<Equal<Parameters<typeof Native44.useButton>['length'], 0 | 1>>;
+type Contract1495 = Assert<Equal<Parameters<typeof Native45.useAnchorPositioning>['length'], 1>>;
+type Contract1496 = Assert<
 	Equal<Parameters<typeof Native45.useAnchorPositioningWithHook>['length'], 2>
 >;
-type Contract1477 = Assert<Equal<keyof Pick<Native45.Side, PublishedKeys4>, PublishedKeys4>>;
-type Contract1478 = Assert<Equal<keyof Pick<Native45.Align, PublishedKeys4>, PublishedKeys4>>;
-type Contract1479 = Assert<Equal<keyof Native45.Boundary, never>>;
-type Contract1480 = Assert<Equal<Parameters<Native45.OffsetFunction>['length'], 1>>;
-type Contract1481 = Assert<
+type Contract1497 = Assert<Equal<keyof Pick<Native45.Side, PublishedKeys4>, PublishedKeys4>>;
+type Contract1498 = Assert<Equal<keyof Pick<Native45.Align, PublishedKeys4>, PublishedKeys4>>;
+type Contract1499 = Assert<Equal<keyof Native45.Boundary, never>>;
+type Contract1500 = Assert<Equal<Parameters<Native45.OffsetFunction>['length'], 1>>;
+type Contract1501 = Assert<
 	Equal<keyof Pick<Native45.CollisionAvoidance, PublishedKeys268>, PublishedKeys268>
 >;
-type Contract1482 = Assert<
+type Contract1502 = Assert<
 	Equal<
 		keyof Pick<Native45.UseAnchorPositioningSharedParameters, PublishedKeys269>,
 		PublishedKeys269
 	>
 >;
-type Contract1483 = Assert<
+type Contract1503 = Assert<
 	Equal<keyof Pick<Native45.UseAnchorPositioningParameters, PublishedKeys270>, PublishedKeys270>
 >;
-type Contract1484 = Assert<
+type Contract1504 = Assert<
 	Equal<keyof Pick<Native45.UseAnchorPositioningReturnValue, PublishedKeys271>, PublishedKeys271>
 >;
-type Contract1485 = Assert<
+type Contract1505 = Assert<
 	Equal<Parameters<typeof Native46.useAnimationsFinished>['length'], 1 | 2 | 3>
 >;
-type Contract1486 = Assert<Equal<Parameters<typeof Native47.useBaseUiId>['length'], 0 | 1>>;
-type Contract1487 = Assert<Equal<Parameters<typeof Native48.useOpenChangeComplete>['length'], 1>>;
-type Contract1488 = Assert<
+type Contract1506 = Assert<Equal<Parameters<typeof Native47.useBaseUiId>['length'], 0 | 1>>;
+type Contract1507 = Assert<Equal<Parameters<typeof Native48.useOpenChangeComplete>['length'], 1>>;
+type Contract1508 = Assert<
 	Equal<keyof Pick<Native48.UseOpenChangeCompleteParameters, PublishedKeys272>, PublishedKeys272>
 >;
-type Contract1489 = Assert<Equal<keyof Native48.UseOpenChangeCompleteState, never>>;
-type Contract1490 = Assert<Equal<Parameters<typeof Native49.isTouchLikePointerType>['length'], 1>>;
-type Contract1491 = Assert<Equal<Parameters<typeof Native49.usePressAndHold>['length'], 1>>;
-type Contract1492 = Assert<
+type Contract1509 = Assert<Equal<keyof Native48.UseOpenChangeCompleteState, never>>;
+type Contract1510 = Assert<Equal<Parameters<typeof Native49.isTouchLikePointerType>['length'], 1>>;
+type Contract1511 = Assert<Equal<Parameters<typeof Native49.usePressAndHold>['length'], 1>>;
+type Contract1512 = Assert<
 	Equal<keyof Pick<Native49.UsePressAndHoldParameters, PublishedKeys273>, PublishedKeys273>
 >;
-type Contract1493 = Assert<
+type Contract1513 = Assert<
 	Equal<keyof Pick<Native49.UsePressAndHoldReturnValue, PublishedKeys274>, PublishedKeys274>
 >;
-type Contract1494 = Assert<Equal<Parameters<typeof Native50.useRenderElement>['length'], 2 | 3>>;
-type Contract1495 = Assert<
+type Contract1514 = Assert<Equal<Parameters<typeof Native50.useRenderElement>['length'], 2 | 3>>;
+type Contract1515 = Assert<
 	Equal<
 		keyof Pick<
 			Native50.UseRenderElementParameters<
@@ -7272,1094 +7312,1116 @@ type Contract1495 = Assert<
 		PublishedKeys275
 	>
 >;
-type Contract1496 = Assert<
+type Contract1516 = Assert<
 	Equal<
 		keyof Pick<Native50.UseRenderElementComponentProps<{ sample: string }>, PublishedKeys276>,
 		PublishedKeys276
 	>
 >;
-type Contract1497 = Assert<Equal<keyof Native50.UseRenderElementState, never>>;
-type Contract1498 = Assert<
+type Contract1517 = Assert<Equal<keyof Native50.UseRenderElementState, never>>;
+type Contract1518 = Assert<
 	Equal<Parameters<typeof Native51.useTransitionStatus>['length'], 1 | 2 | 3 | 4>
 >;
-type Contract1499 = Assert<Equal<keyof Native51.TransitionStatus, never>>;
-type Contract1500 = Assert<Equal<Parameters<typeof Native52.useValueChanged>['length'], 2>>;
-type Contract1501 = Assert<
+type Contract1519 = Assert<Equal<keyof Native51.TransitionStatus, never>>;
+type Contract1520 = Assert<Equal<Parameters<typeof Native52.useValueChanged>['length'], 2>>;
+type Contract1521 = Assert<
 	Equal<keyof Pick<typeof Native53.Menu, PublishedKeys112>, PublishedKeys112>
 >;
-type Contract1502 = Assert<Equal<Parameters<typeof Native53.MenuRoot>['length'], 1>>;
-type Contract1503 = Assert<Equal<keyof Native53.MenuRootState, never>>;
-type Contract1504 = Assert<
+type Contract1522 = Assert<
+	Equal<keyof Pick<typeof Native53.MenuHandle, PublishedKeys19>, PublishedKeys19>
+>;
+type Contract1523 = Assert<Equal<Parameters<typeof Native53.createMenuHandle>['length'], 0>>;
+type Contract1524 = Assert<Equal<Parameters<typeof Native53.MenuRoot>['length'], 1>>;
+type Contract1525 = Assert<Equal<keyof Native53.MenuRootState, never>>;
+type Contract1526 = Assert<
 	Equal<keyof Pick<Native53.MenuRootProps, PublishedKeys113>, PublishedKeys113>
 >;
-type Contract1505 = Assert<
-	Equal<keyof Pick<Native53.MenuRootActions, PublishedKeys20>, PublishedKeys20>
+type Contract1527 = Assert<
+	Equal<keyof Pick<Native53.MenuRootActions, PublishedKeys21>, PublishedKeys21>
 >;
-type Contract1506 = Assert<
+type Contract1528 = Assert<
 	Equal<keyof Pick<Native53.MenuRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1507 = Assert<
-	Equal<keyof Pick<Native53.MenuRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract1529 = Assert<
+	Equal<keyof Pick<Native53.MenuRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract1508 = Assert<
+type Contract1530 = Assert<
 	Equal<keyof Pick<Native53.MenuRootOrientation, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1509 = Assert<
+type Contract1531 = Assert<
 	Equal<keyof Pick<Native53.MenuParent, PublishedKeys114>, PublishedKeys114>
 >;
-type Contract1510 = Assert<Equal<Parameters<typeof Native53.MenuArrow>['length'], 1>>;
-type Contract1511 = Assert<
-	Equal<keyof Pick<Native53.MenuArrowState, PublishedKeys35>, PublishedKeys35>
+type Contract1532 = Assert<Equal<Parameters<typeof Native53.MenuArrow>['length'], 1>>;
+type Contract1533 = Assert<
+	Equal<keyof Pick<Native53.MenuArrowState, PublishedKeys36>, PublishedKeys36>
 >;
-type Contract1512 = Assert<
+type Contract1534 = Assert<
 	Equal<keyof Pick<Native53.MenuArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1513 = Assert<Equal<Parameters<typeof Native53.MenuBackdrop>['length'], 1>>;
-type Contract1514 = Assert<
+type Contract1535 = Assert<Equal<Parameters<typeof Native53.MenuBackdrop>['length'], 1>>;
+type Contract1536 = Assert<
 	Equal<keyof Pick<Native53.MenuBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract1515 = Assert<
+type Contract1537 = Assert<
 	Equal<keyof Pick<Native53.MenuBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1516 = Assert<Equal<Parameters<typeof Native53.MenuCheckboxItem>['length'], 1>>;
-type Contract1517 = Assert<
+type Contract1538 = Assert<Equal<Parameters<typeof Native53.MenuCheckboxItem>['length'], 1>>;
+type Contract1539 = Assert<
 	Equal<keyof Pick<Native53.MenuCheckboxItemState, PublishedKeys80>, PublishedKeys80>
 >;
-type Contract1518 = Assert<
+type Contract1540 = Assert<
 	Equal<keyof Pick<Native53.MenuCheckboxItemProps, PublishedKeys79>, PublishedKeys79>
 >;
-type Contract1519 = Assert<
+type Contract1541 = Assert<
 	Equal<keyof Pick<Native53.MenuCheckboxItemChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1520 = Assert<
-	Equal<keyof Pick<Native53.MenuCheckboxItemChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract1542 = Assert<
+	Equal<keyof Pick<Native53.MenuCheckboxItemChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract1521 = Assert<
+type Contract1543 = Assert<
 	Equal<Parameters<typeof Native53.MenuCheckboxItemIndicator>['length'], 1>
 >;
-type Contract1522 = Assert<
-	Equal<keyof Pick<Native53.MenuCheckboxItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+type Contract1544 = Assert<
+	Equal<keyof Pick<Native53.MenuCheckboxItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract1523 = Assert<
+type Contract1545 = Assert<
 	Equal<keyof Pick<Native53.MenuCheckboxItemIndicatorState, PublishedKeys81>, PublishedKeys81>
 >;
-type Contract1524 = Assert<Equal<Parameters<typeof Native53.MenuGroupLabel>['length'], 1>>;
-type Contract1525 = Assert<
+type Contract1546 = Assert<Equal<Parameters<typeof Native53.MenuGroupLabel>['length'], 1>>;
+type Contract1547 = Assert<
 	Equal<keyof Pick<Native53.MenuGroupLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1526 = Assert<Equal<keyof Native53.MenuGroupLabelState, never>>;
-type Contract1527 = Assert<Equal<Parameters<typeof Native53.MenuGroup>['length'], 1>>;
-type Contract1528 = Assert<
+type Contract1548 = Assert<Equal<keyof Native53.MenuGroupLabelState, never>>;
+type Contract1549 = Assert<Equal<Parameters<typeof Native53.MenuGroup>['length'], 1>>;
+type Contract1550 = Assert<
 	Equal<keyof Pick<Native53.MenuGroupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1529 = Assert<Equal<keyof Native53.MenuGroupState, never>>;
-type Contract1530 = Assert<Equal<Parameters<typeof Native53.MenuItem>['length'], 1>>;
-type Contract1531 = Assert<
-	Equal<keyof Pick<Native53.MenuItemState, PublishedKeys43>, PublishedKeys43>
+type Contract1551 = Assert<Equal<keyof Native53.MenuGroupState, never>>;
+type Contract1552 = Assert<Equal<Parameters<typeof Native53.MenuItem>['length'], 1>>;
+type Contract1553 = Assert<
+	Equal<keyof Pick<Native53.MenuItemState, PublishedKeys44>, PublishedKeys44>
 >;
-type Contract1532 = Assert<
+type Contract1554 = Assert<
 	Equal<keyof Pick<Native53.MenuItemProps, PublishedKeys76>, PublishedKeys76>
 >;
-type Contract1533 = Assert<Equal<Parameters<typeof Native53.MenuLinkItem>['length'], 1>>;
-type Contract1534 = Assert<
+type Contract1555 = Assert<Equal<Parameters<typeof Native53.MenuLinkItem>['length'], 1>>;
+type Contract1556 = Assert<
 	Equal<keyof Pick<Native53.MenuLinkItemState, PublishedKeys78>, PublishedKeys78>
 >;
-type Contract1535 = Assert<
+type Contract1557 = Assert<
 	Equal<keyof Pick<Native53.MenuLinkItemProps, PublishedKeys77>, PublishedKeys77>
 >;
-type Contract1536 = Assert<Equal<Parameters<typeof Native53.MenuPopup>['length'], 1>>;
-type Contract1537 = Assert<
+type Contract1558 = Assert<Equal<Parameters<typeof Native53.MenuPopup>['length'], 1>>;
+type Contract1559 = Assert<
 	Equal<keyof Pick<Native53.MenuPopupProps, PublishedKeys74>, PublishedKeys74>
 >;
-type Contract1538 = Assert<
+type Contract1560 = Assert<
 	Equal<keyof Pick<Native53.MenuPopupState, PublishedKeys75>, PublishedKeys75>
 >;
-type Contract1539 = Assert<Equal<Parameters<typeof Native53.MenuPortal>['length'], 1>>;
-type Contract1540 = Assert<Equal<keyof Native53.MenuPortalState, never>>;
-type Contract1541 = Assert<
+type Contract1561 = Assert<Equal<Parameters<typeof Native53.MenuPortal>['length'], 1>>;
+type Contract1562 = Assert<Equal<keyof Native53.MenuPortalState, never>>;
+type Contract1563 = Assert<
 	Equal<keyof Pick<Native53.MenuPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract1542 = Assert<Equal<Parameters<typeof Native53.MenuPositioner>['length'], 1>>;
-type Contract1543 = Assert<
+type Contract1564 = Assert<Equal<Parameters<typeof Native53.MenuPositioner>['length'], 1>>;
+type Contract1565 = Assert<
 	Equal<keyof Pick<Native53.MenuPositionerState, PublishedKeys88>, PublishedKeys88>
 >;
-type Contract1544 = Assert<
-	Equal<keyof Pick<Native53.MenuPositionerProps, PublishedKeys32>, PublishedKeys32>
+type Contract1566 = Assert<
+	Equal<keyof Pick<Native53.MenuPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract1545 = Assert<Equal<Parameters<typeof Native53.MenuRadioGroup>['length'], 1>>;
-type Contract1546 = Assert<
+type Contract1567 = Assert<Equal<Parameters<typeof Native53.MenuRadioGroup>['length'], 1>>;
+type Contract1568 = Assert<
 	Equal<keyof Pick<Native53.MenuRadioGroupProps, PublishedKeys82>, PublishedKeys82>
 >;
-type Contract1547 = Assert<
+type Contract1569 = Assert<
 	Equal<keyof Pick<Native53.MenuRadioGroupState, PublishedKeys15>, PublishedKeys15>
 >;
-type Contract1548 = Assert<
+type Contract1570 = Assert<
 	Equal<keyof Pick<Native53.MenuRadioGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1549 = Assert<
-	Equal<keyof Pick<Native53.MenuRadioGroupChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract1571 = Assert<
+	Equal<keyof Pick<Native53.MenuRadioGroupChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract1550 = Assert<Equal<Parameters<typeof Native53.MenuRadioItem>['length'], 1>>;
-type Contract1551 = Assert<
+type Contract1572 = Assert<Equal<Parameters<typeof Native53.MenuRadioItem>['length'], 1>>;
+type Contract1573 = Assert<
 	Equal<keyof Pick<Native53.MenuRadioItemState, PublishedKeys80>, PublishedKeys80>
 >;
-type Contract1552 = Assert<
+type Contract1574 = Assert<
 	Equal<keyof Pick<Native53.MenuRadioItemProps, PublishedKeys83>, PublishedKeys83>
 >;
-type Contract1553 = Assert<Equal<Parameters<typeof Native53.MenuRadioItemIndicator>['length'], 1>>;
-type Contract1554 = Assert<
-	Equal<keyof Pick<Native53.MenuRadioItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+type Contract1575 = Assert<Equal<Parameters<typeof Native53.MenuRadioItemIndicator>['length'], 1>>;
+type Contract1576 = Assert<
+	Equal<keyof Pick<Native53.MenuRadioItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract1555 = Assert<
+type Contract1577 = Assert<
 	Equal<keyof Pick<Native53.MenuRadioItemIndicatorState, PublishedKeys81>, PublishedKeys81>
 >;
-type Contract1556 = Assert<Equal<Parameters<typeof Native53.MenuSubmenuRoot>['length'], 1>>;
-type Contract1557 = Assert<
+type Contract1578 = Assert<Equal<Parameters<typeof Native53.MenuSubmenuRoot>['length'], 1>>;
+type Contract1579 = Assert<
 	Equal<Parameters<typeof Native53.useMenuSubmenuRootContext>['length'], 0>
 >;
-type Contract1558 = Assert<
+type Contract1580 = Assert<
 	Equal<keyof Pick<Native53.MenuSubmenuRootProps, PublishedKeys84>, PublishedKeys84>
 >;
-type Contract1559 = Assert<Equal<keyof Native53.MenuSubmenuRootState, never>>;
-type Contract1560 = Assert<
+type Contract1581 = Assert<Equal<keyof Native53.MenuSubmenuRootState, never>>;
+type Contract1582 = Assert<
 	Equal<keyof Pick<Native53.MenuSubmenuRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1561 = Assert<
-	Equal<keyof Pick<Native53.MenuSubmenuRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract1583 = Assert<
+	Equal<keyof Pick<Native53.MenuSubmenuRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract1562 = Assert<Equal<Parameters<Native53.MenuTrigger>['length'], 1>>;
-type Contract1563 = Assert<
+type Contract1584 = Assert<Equal<Parameters<Native53.MenuTrigger>['length'], 1>>;
+type Contract1585 = Assert<
 	Equal<keyof Pick<Native53.MenuTriggerProps, PublishedKeys115>, PublishedKeys115>
 >;
-type Contract1564 = Assert<
-	Equal<keyof Pick<Native53.MenuTriggerState, PublishedKeys23>, PublishedKeys23>
+type Contract1586 = Assert<
+	Equal<keyof Pick<Native53.MenuTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
-type Contract1565 = Assert<Equal<Parameters<typeof Native53.MenuSubmenuTrigger>['length'], 1>>;
-type Contract1566 = Assert<
+type Contract1587 = Assert<Equal<Parameters<typeof Native53.MenuSubmenuTrigger>['length'], 1>>;
+type Contract1588 = Assert<
 	Equal<keyof Pick<Native53.MenuSubmenuTriggerState, PublishedKeys86>, PublishedKeys86>
 >;
-type Contract1567 = Assert<
+type Contract1589 = Assert<
 	Equal<keyof Pick<Native53.MenuSubmenuTriggerProps, PublishedKeys85>, PublishedKeys85>
 >;
-type Contract1568 = Assert<Equal<Parameters<typeof Native53.MenuViewport>['length'], 1>>;
-type Contract1569 = Assert<
+type Contract1590 = Assert<Equal<Parameters<typeof Native53.MenuViewport>['length'], 1>>;
+type Contract1591 = Assert<
 	Equal<keyof Pick<Native53.MenuViewportState, PublishedKeys116>, PublishedKeys116>
 >;
-type Contract1570 = Assert<
+type Contract1592 = Assert<
 	Equal<keyof Pick<Native53.MenuViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1571 = Assert<Equal<Parameters<typeof Native54.Menubar>['length'], 1>>;
-type Contract1572 = Assert<
+type Contract1593 = Assert<Equal<Parameters<typeof Native54.Menubar>['length'], 1>>;
+type Contract1594 = Assert<
 	Equal<keyof Pick<Native54.MenubarState, PublishedKeys117>, PublishedKeys117>
 >;
-type Contract1573 = Assert<
+type Contract1595 = Assert<
 	Equal<keyof Pick<Native54.MenubarProps, PublishedKeys118>, PublishedKeys118>
 >;
-type Contract1574 = Assert<Equal<Parameters<typeof Native55.mergeProps>['length'], 2>>;
-type Contract1575 = Assert<Equal<Parameters<typeof Native55.mergePropsN>['length'], 1>>;
-type Contract1576 = Assert<Equal<Parameters<typeof Native55.makeEventPreventable>['length'], 1>>;
-type Contract1577 = Assert<Equal<Parameters<typeof Native55.mergeClassNames>['length'], 2>>;
-type Contract1578 = Assert<
+type Contract1596 = Assert<Equal<Parameters<typeof Native55.mergeProps>['length'], 2>>;
+type Contract1597 = Assert<Equal<Parameters<typeof Native55.mergePropsN>['length'], 1>>;
+type Contract1598 = Assert<Equal<Parameters<typeof Native55.makeEventPreventable>['length'], 1>>;
+type Contract1599 = Assert<Equal<Parameters<typeof Native55.mergeClassNames>['length'], 2>>;
+type Contract1600 = Assert<
 	Equal<keyof Pick<typeof Native56.Meter, PublishedKeys119>, PublishedKeys119>
 >;
-type Contract1579 = Assert<Equal<Parameters<typeof Native56.MeterRoot>['length'], 1>>;
-type Contract1580 = Assert<Equal<keyof Native56.MeterRootState, never>>;
-type Contract1581 = Assert<
+type Contract1601 = Assert<Equal<Parameters<typeof Native56.MeterRoot>['length'], 1>>;
+type Contract1602 = Assert<Equal<keyof Native56.MeterRootState, never>>;
+type Contract1603 = Assert<
 	Equal<keyof Pick<Native56.MeterRootProps, PublishedKeys120>, PublishedKeys120>
 >;
-type Contract1582 = Assert<Equal<Parameters<typeof Native56.MeterIndicator>['length'], 1>>;
-type Contract1583 = Assert<Equal<keyof Native56.MeterIndicatorState, never>>;
-type Contract1584 = Assert<
+type Contract1604 = Assert<Equal<Parameters<typeof Native56.MeterIndicator>['length'], 1>>;
+type Contract1605 = Assert<Equal<keyof Native56.MeterIndicatorState, never>>;
+type Contract1606 = Assert<
 	Equal<keyof Pick<Native56.MeterIndicatorProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1585 = Assert<Equal<Parameters<typeof Native56.MeterLabel>['length'], 1>>;
-type Contract1586 = Assert<Equal<keyof Native56.MeterLabelState, never>>;
-type Contract1587 = Assert<
+type Contract1607 = Assert<Equal<Parameters<typeof Native56.MeterLabel>['length'], 1>>;
+type Contract1608 = Assert<Equal<keyof Native56.MeterLabelState, never>>;
+type Contract1609 = Assert<
 	Equal<keyof Pick<Native56.MeterLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1588 = Assert<Equal<Parameters<typeof Native56.MeterTrack>['length'], 1>>;
-type Contract1589 = Assert<Equal<keyof Native56.MeterTrackState, never>>;
-type Contract1590 = Assert<
+type Contract1610 = Assert<Equal<Parameters<typeof Native56.MeterTrack>['length'], 1>>;
+type Contract1611 = Assert<Equal<keyof Native56.MeterTrackState, never>>;
+type Contract1612 = Assert<
 	Equal<keyof Pick<Native56.MeterTrackProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1591 = Assert<Equal<Parameters<typeof Native56.MeterValue>['length'], 1>>;
-type Contract1592 = Assert<Equal<keyof Native56.MeterValueState, never>>;
-type Contract1593 = Assert<
+type Contract1613 = Assert<Equal<Parameters<typeof Native56.MeterValue>['length'], 1>>;
+type Contract1614 = Assert<Equal<keyof Native56.MeterValueState, never>>;
+type Contract1615 = Assert<
 	Equal<keyof Pick<Native56.MeterValueProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1594 = Assert<
+type Contract1616 = Assert<
 	Equal<keyof Pick<typeof Native57.NavigationMenu, PublishedKeys121>, PublishedKeys121>
 >;
-type Contract1595 = Assert<Equal<Parameters<typeof Native57.NavigationMenuRoot>['length'], 1>>;
-type Contract1596 = Assert<
+type Contract1617 = Assert<Equal<Parameters<typeof Native57.NavigationMenuRoot>['length'], 1>>;
+type Contract1618 = Assert<
 	Equal<keyof Pick<Native57.NavigationMenuRootState, PublishedKeys122>, PublishedKeys122>
 >;
-type Contract1597 = Assert<
+type Contract1619 = Assert<
 	Equal<keyof Pick<Native57.NavigationMenuRootProps, PublishedKeys123>, PublishedKeys123>
 >;
-type Contract1598 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuRootActions, PublishedKeys40>, PublishedKeys40>
->;
-type Contract1599 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract1600 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
->;
-type Contract1601 = Assert<Equal<Parameters<typeof Native57.NavigationMenuTrigger>['length'], 1>>;
-type Contract1602 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuTriggerState, PublishedKeys23>, PublishedKeys23>
->;
-type Contract1603 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuTriggerProps, PublishedKeys9>, PublishedKeys9>
->;
-type Contract1604 = Assert<Equal<Parameters<typeof Native57.NavigationMenuPortal>['length'], 1>>;
-type Contract1605 = Assert<Equal<keyof Native57.NavigationMenuPortalState, never>>;
-type Contract1606 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuPortalProps, PublishedKeys18>, PublishedKeys18>
->;
-type Contract1607 = Assert<
-	Equal<Parameters<typeof Native57.NavigationMenuPositioner>['length'], 1>
->;
-type Contract1608 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuPositionerState, PublishedKeys124>, PublishedKeys124>
->;
-type Contract1609 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuPositionerProps, PublishedKeys32>, PublishedKeys32>
->;
-type Contract1610 = Assert<Equal<Parameters<typeof Native57.NavigationMenuViewport>['length'], 1>>;
-type Contract1611 = Assert<Equal<keyof Native57.NavigationMenuViewportState, never>>;
-type Contract1612 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuViewportProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1613 = Assert<Equal<Parameters<typeof Native57.NavigationMenuList>['length'], 1>>;
-type Contract1614 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuListState, PublishedKeys87>, PublishedKeys87>
->;
-type Contract1615 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuListProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1616 = Assert<Equal<Parameters<typeof Native57.NavigationMenuItem>['length'], 1>>;
-type Contract1617 = Assert<Equal<keyof Native57.NavigationMenuItemState, never>>;
-type Contract1618 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuItemProps, PublishedKeys125>, PublishedKeys125>
->;
-type Contract1619 = Assert<Equal<Parameters<typeof Native57.NavigationMenuContent>['length'], 1>>;
 type Contract1620 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuContentState, PublishedKeys126>, PublishedKeys126>
+	Equal<keyof Pick<Native57.NavigationMenuRootActions, PublishedKeys41>, PublishedKeys41>
 >;
 type Contract1621 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuContentProps, PublishedKeys55>, PublishedKeys55>
+	Equal<keyof Pick<Native57.NavigationMenuRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1622 = Assert<Equal<Parameters<typeof Native57.NavigationMenuPopup>['length'], 1>>;
-type Contract1623 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuPopupState, PublishedKeys127>, PublishedKeys127>
+type Contract1622 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
+type Contract1623 = Assert<Equal<Parameters<typeof Native57.NavigationMenuTrigger>['length'], 1>>;
 type Contract1624 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuPopupProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native57.NavigationMenuTriggerState, PublishedKeys24>, PublishedKeys24>
 >;
-type Contract1625 = Assert<Equal<Parameters<typeof Native57.NavigationMenuBackdrop>['length'], 1>>;
-type Contract1626 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuBackdropState, PublishedKeys14>, PublishedKeys14>
+type Contract1625 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuTriggerProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1627 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuBackdropProps, PublishedKeys8>, PublishedKeys8>
+type Contract1626 = Assert<Equal<Parameters<typeof Native57.NavigationMenuPortal>['length'], 1>>;
+type Contract1627 = Assert<Equal<keyof Native57.NavigationMenuPortalState, never>>;
+type Contract1628 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract1628 = Assert<Equal<Parameters<typeof Native57.NavigationMenuArrow>['length'], 1>>;
 type Contract1629 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuArrowState, PublishedKeys35>, PublishedKeys35>
+	Equal<Parameters<typeof Native57.NavigationMenuPositioner>['length'], 1>
 >;
 type Contract1630 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuArrowProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native57.NavigationMenuPositionerState, PublishedKeys124>, PublishedKeys124>
 >;
-type Contract1631 = Assert<Equal<Parameters<typeof Native57.NavigationMenuLink>['length'], 1>>;
-type Contract1632 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuLinkState, PublishedKeys94>, PublishedKeys94>
+type Contract1631 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract1633 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuLinkProps, PublishedKeys128>, PublishedKeys128>
+type Contract1632 = Assert<Equal<Parameters<typeof Native57.NavigationMenuViewport>['length'], 1>>;
+type Contract1633 = Assert<Equal<keyof Native57.NavigationMenuViewportState, never>>;
+type Contract1634 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1634 = Assert<Equal<Parameters<typeof Native57.NavigationMenuIcon>['length'], 1>>;
-type Contract1635 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuIconState, PublishedKeys87>, PublishedKeys87>
->;
+type Contract1635 = Assert<Equal<Parameters<typeof Native57.NavigationMenuList>['length'], 1>>;
 type Contract1636 = Assert<
-	Equal<keyof Pick<Native57.NavigationMenuIconProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native57.NavigationMenuListState, PublishedKeys87>, PublishedKeys87>
 >;
 type Contract1637 = Assert<
-	Equal<keyof Pick<typeof Native58.NumberField, PublishedKeys129>, PublishedKeys129>
+	Equal<keyof Pick<Native57.NavigationMenuListProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1638 = Assert<Equal<Parameters<typeof Native58.NumberFieldRoot>['length'], 1>>;
-type Contract1639 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldRootProps, PublishedKeys130>, PublishedKeys130>
->;
+type Contract1638 = Assert<Equal<Parameters<typeof Native57.NavigationMenuItem>['length'], 1>>;
+type Contract1639 = Assert<Equal<keyof Native57.NavigationMenuItemState, never>>;
 type Contract1640 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldRootState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native57.NavigationMenuItemProps, PublishedKeys125>, PublishedKeys125>
 >;
-type Contract1641 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
+type Contract1641 = Assert<Equal<Parameters<typeof Native57.NavigationMenuContent>['length'], 1>>;
 type Contract1642 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldRootChangeEventDetails, PublishedKeys132>, PublishedKeys132>
+	Equal<keyof Pick<Native57.NavigationMenuContentState, PublishedKeys126>, PublishedKeys126>
 >;
 type Contract1643 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldRootCommitEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native57.NavigationMenuContentProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract1644 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldRootCommitEventDetails, PublishedKeys110>, PublishedKeys110>
+type Contract1644 = Assert<Equal<Parameters<typeof Native57.NavigationMenuPopup>['length'], 1>>;
+type Contract1645 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuPopupState, PublishedKeys127>, PublishedKeys127>
 >;
-type Contract1645 = Assert<Equal<Parameters<typeof Native58.NumberFieldGroup>['length'], 1>>;
 type Contract1646 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldGroupState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native57.NavigationMenuPopupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1647 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldGroupProps, PublishedKeys8>, PublishedKeys8>
+type Contract1647 = Assert<Equal<Parameters<typeof Native57.NavigationMenuBackdrop>['length'], 1>>;
+type Contract1648 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract1648 = Assert<Equal<Parameters<typeof Native58.NumberFieldIncrement>['length'], 1>>;
 type Contract1649 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldIncrementState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native57.NavigationMenuBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1650 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldIncrementProps, PublishedKeys9>, PublishedKeys9>
+type Contract1650 = Assert<Equal<Parameters<typeof Native57.NavigationMenuArrow>['length'], 1>>;
+type Contract1651 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuArrowState, PublishedKeys36>, PublishedKeys36>
 >;
-type Contract1651 = Assert<Equal<Parameters<typeof Native58.NumberFieldDecrement>['length'], 1>>;
 type Contract1652 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldDecrementState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native57.NavigationMenuArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1653 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldDecrementProps, PublishedKeys9>, PublishedKeys9>
+type Contract1653 = Assert<Equal<Parameters<typeof Native57.NavigationMenuLink>['length'], 1>>;
+type Contract1654 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuLinkState, PublishedKeys94>, PublishedKeys94>
 >;
-type Contract1654 = Assert<Equal<Parameters<typeof Native58.NumberFieldInput>['length'], 1>>;
 type Contract1655 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldInputState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native57.NavigationMenuLinkProps, PublishedKeys128>, PublishedKeys128>
 >;
-type Contract1656 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldInputProps, PublishedKeys27>, PublishedKeys27>
+type Contract1656 = Assert<Equal<Parameters<typeof Native57.NavigationMenuIcon>['length'], 1>>;
+type Contract1657 = Assert<
+	Equal<keyof Pick<Native57.NavigationMenuIconState, PublishedKeys87>, PublishedKeys87>
 >;
-type Contract1657 = Assert<Equal<Parameters<typeof Native58.NumberFieldScrubArea>['length'], 1>>;
 type Contract1658 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldScrubAreaState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native57.NavigationMenuIconProps, PublishedKeys8>, PublishedKeys8>
 >;
 type Contract1659 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldScrubAreaProps, PublishedKeys133>, PublishedKeys133>
+	Equal<keyof Pick<typeof Native58.NumberField, PublishedKeys129>, PublishedKeys129>
 >;
-type Contract1660 = Assert<
-	Equal<Parameters<typeof Native58.NumberFieldScrubAreaCursor>['length'], 1>
->;
+type Contract1660 = Assert<Equal<Parameters<typeof Native58.NumberFieldRoot>['length'], 1>>;
 type Contract1661 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldScrubAreaCursorState, PublishedKeys131>, PublishedKeys131>
+	Equal<keyof Pick<Native58.NumberFieldRootProps, PublishedKeys130>, PublishedKeys130>
 >;
 type Contract1662 = Assert<
-	Equal<keyof Pick<Native58.NumberFieldScrubAreaCursorProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native58.NumberFieldRootState, PublishedKeys131>, PublishedKeys131>
 >;
 type Contract1663 = Assert<
-	Equal<keyof Pick<typeof Native59.OTPField, PublishedKeys134>, PublishedKeys134>
+	Equal<keyof Pick<Native58.NumberFieldRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1664 = Assert<Equal<Parameters<typeof Native59.OTPFieldRoot>['length'], 1>>;
+type Contract1664 = Assert<
+	Equal<keyof Pick<Native58.NumberFieldRootChangeEventDetails, PublishedKeys132>, PublishedKeys132>
+>;
 type Contract1665 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldRootProps, PublishedKeys135>, PublishedKeys135>
+	Equal<keyof Pick<Native58.NumberFieldRootCommitEventReason, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract1666 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldRootState, PublishedKeys136>, PublishedKeys136>
+	Equal<keyof Pick<Native58.NumberFieldRootCommitEventDetails, PublishedKeys110>, PublishedKeys110>
 >;
-type Contract1667 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
+type Contract1667 = Assert<Equal<Parameters<typeof Native58.NumberFieldGroup>['length'], 1>>;
 type Contract1668 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+	Equal<keyof Pick<Native58.NumberFieldGroupState, PublishedKeys131>, PublishedKeys131>
 >;
 type Contract1669 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldRootInvalidEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native58.NumberFieldGroupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1670 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldRootInvalidEventDetails, PublishedKeys110>, PublishedKeys110>
->;
+type Contract1670 = Assert<Equal<Parameters<typeof Native58.NumberFieldIncrement>['length'], 1>>;
 type Contract1671 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldRootCompleteEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native58.NumberFieldIncrementState, PublishedKeys131>, PublishedKeys131>
 >;
 type Contract1672 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldRootCompleteEventDetails, PublishedKeys110>, PublishedKeys110>
+	Equal<keyof Pick<Native58.NumberFieldIncrementProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1673 = Assert<Equal<Parameters<typeof Native59.OTPFieldInput>['length'], 1>>;
+type Contract1673 = Assert<Equal<Parameters<typeof Native58.NumberFieldDecrement>['length'], 1>>;
 type Contract1674 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldInputState, PublishedKeys137>, PublishedKeys137>
+	Equal<keyof Pick<Native58.NumberFieldDecrementState, PublishedKeys131>, PublishedKeys131>
 >;
 type Contract1675 = Assert<
-	Equal<keyof Pick<Native59.OTPFieldInputProps, PublishedKeys27>, PublishedKeys27>
+	Equal<keyof Pick<Native58.NumberFieldDecrementProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1676 = Assert<
-	Equal<keyof Pick<typeof Native60.Popover, PublishedKeys138>, PublishedKeys138>
+type Contract1676 = Assert<Equal<Parameters<typeof Native58.NumberFieldInput>['length'], 1>>;
+type Contract1677 = Assert<
+	Equal<keyof Pick<Native58.NumberFieldInputState, PublishedKeys131>, PublishedKeys131>
 >;
-type Contract1677 = Assert<Equal<Parameters<typeof Native60.PopoverRoot>['length'], 1>>;
-type Contract1678 = Assert<Equal<keyof Native60.PopoverRootState, never>>;
-type Contract1679 = Assert<
-	Equal<keyof Pick<Native60.PopoverRootProps, PublishedKeys139>, PublishedKeys139>
+type Contract1678 = Assert<
+	Equal<keyof Pick<Native58.NumberFieldInputProps, PublishedKeys28>, PublishedKeys28>
 >;
+type Contract1679 = Assert<Equal<Parameters<typeof Native58.NumberFieldScrubArea>['length'], 1>>;
 type Contract1680 = Assert<
-	Equal<keyof Pick<Native60.PopoverRootActions, PublishedKeys20>, PublishedKeys20>
+	Equal<keyof Pick<Native58.NumberFieldScrubAreaState, PublishedKeys131>, PublishedKeys131>
 >;
 type Contract1681 = Assert<
-	Equal<keyof Pick<Native60.PopoverRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native58.NumberFieldScrubAreaProps, PublishedKeys133>, PublishedKeys133>
 >;
 type Contract1682 = Assert<
-	Equal<keyof Pick<Native60.PopoverRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+	Equal<Parameters<typeof Native58.NumberFieldScrubAreaCursor>['length'], 1>
 >;
-type Contract1683 = Assert<Equal<Parameters<Native60.PopoverTrigger>['length'], 1>>;
+type Contract1683 = Assert<
+	Equal<keyof Pick<Native58.NumberFieldScrubAreaCursorState, PublishedKeys131>, PublishedKeys131>
+>;
 type Contract1684 = Assert<
-	Equal<keyof Pick<Native60.PopoverTriggerState, PublishedKeys23>, PublishedKeys23>
+	Equal<keyof Pick<Native58.NumberFieldScrubAreaCursorProps, PublishedKeys8>, PublishedKeys8>
 >;
 type Contract1685 = Assert<
-	Equal<keyof Pick<Native60.PopoverTriggerProps, PublishedKeys115>, PublishedKeys115>
+	Equal<keyof Pick<typeof Native59.OTPField, PublishedKeys134>, PublishedKeys134>
 >;
-type Contract1686 = Assert<Equal<Parameters<typeof Native60.PopoverPortal>['length'], 1>>;
-type Contract1687 = Assert<Equal<keyof Native60.PopoverPortalState, never>>;
+type Contract1686 = Assert<Equal<Parameters<typeof Native59.OTPFieldRoot>['length'], 1>>;
+type Contract1687 = Assert<
+	Equal<keyof Pick<Native59.OTPFieldRootProps, PublishedKeys135>, PublishedKeys135>
+>;
 type Contract1688 = Assert<
-	Equal<keyof Pick<Native60.PopoverPortalProps, PublishedKeys18>, PublishedKeys18>
+	Equal<keyof Pick<Native59.OTPFieldRootState, PublishedKeys136>, PublishedKeys136>
 >;
-type Contract1689 = Assert<Equal<Parameters<typeof Native60.PopoverPositioner>['length'], 1>>;
+type Contract1689 = Assert<
+	Equal<keyof Pick<Native59.OTPFieldRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
 type Contract1690 = Assert<
-	Equal<keyof Pick<Native60.PopoverPositionerState, PublishedKeys124>, PublishedKeys124>
+	Equal<keyof Pick<Native59.OTPFieldRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
 type Contract1691 = Assert<
-	Equal<keyof Pick<Native60.PopoverPositionerProps, PublishedKeys32>, PublishedKeys32>
+	Equal<keyof Pick<Native59.OTPFieldRootInvalidEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1692 = Assert<Equal<Parameters<typeof Native60.PopoverPopup>['length'], 1>>;
+type Contract1692 = Assert<
+	Equal<keyof Pick<Native59.OTPFieldRootInvalidEventDetails, PublishedKeys110>, PublishedKeys110>
+>;
 type Contract1693 = Assert<
-	Equal<keyof Pick<Native60.PopoverPopupState, PublishedKeys140>, PublishedKeys140>
+	Equal<keyof Pick<Native59.OTPFieldRootCompleteEventReason, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract1694 = Assert<
-	Equal<keyof Pick<Native60.PopoverPopupProps, PublishedKeys16>, PublishedKeys16>
+	Equal<keyof Pick<Native59.OTPFieldRootCompleteEventDetails, PublishedKeys110>, PublishedKeys110>
 >;
-type Contract1695 = Assert<Equal<Parameters<typeof Native60.PopoverArrow>['length'], 1>>;
+type Contract1695 = Assert<Equal<Parameters<typeof Native59.OTPFieldInput>['length'], 1>>;
 type Contract1696 = Assert<
-	Equal<keyof Pick<Native60.PopoverArrowState, PublishedKeys35>, PublishedKeys35>
+	Equal<keyof Pick<Native59.OTPFieldInputState, PublishedKeys137>, PublishedKeys137>
 >;
 type Contract1697 = Assert<
-	Equal<keyof Pick<Native60.PopoverArrowProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native59.OTPFieldInputProps, PublishedKeys28>, PublishedKeys28>
 >;
-type Contract1698 = Assert<Equal<Parameters<typeof Native60.PopoverBackdrop>['length'], 1>>;
+type Contract1698 = Assert<
+	Equal<keyof Pick<typeof Native60.Popover, PublishedKeys138>, PublishedKeys138>
+>;
 type Contract1699 = Assert<
-	Equal<keyof Pick<Native60.PopoverBackdropState, PublishedKeys14>, PublishedKeys14>
+	Equal<keyof Pick<typeof Native60.PopoverHandle, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract1700 = Assert<
-	Equal<keyof Pick<Native60.PopoverBackdropProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1701 = Assert<Equal<Parameters<typeof Native60.PopoverTitle>['length'], 1>>;
-type Contract1702 = Assert<Equal<keyof Native60.PopoverTitleState, never>>;
+type Contract1700 = Assert<Equal<Parameters<typeof Native60.createPopoverHandle>['length'], 0>>;
+type Contract1701 = Assert<Equal<Parameters<typeof Native60.PopoverRoot>['length'], 1>>;
+type Contract1702 = Assert<Equal<keyof Native60.PopoverRootState, never>>;
 type Contract1703 = Assert<
-	Equal<keyof Pick<Native60.PopoverTitleProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native60.PopoverRootProps, PublishedKeys139>, PublishedKeys139>
 >;
-type Contract1704 = Assert<Equal<Parameters<typeof Native60.PopoverDescription>['length'], 1>>;
-type Contract1705 = Assert<Equal<keyof Native60.PopoverDescriptionState, never>>;
+type Contract1704 = Assert<
+	Equal<keyof Pick<Native60.PopoverRootActions, PublishedKeys21>, PublishedKeys21>
+>;
+type Contract1705 = Assert<
+	Equal<keyof Pick<Native60.PopoverRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
 type Contract1706 = Assert<
-	Equal<keyof Pick<Native60.PopoverDescriptionProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native60.PopoverRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract1707 = Assert<Equal<Parameters<typeof Native60.PopoverClose>['length'], 1>>;
-type Contract1708 = Assert<Equal<keyof Native60.PopoverCloseState, never>>;
+type Contract1707 = Assert<Equal<Parameters<Native60.PopoverTrigger>['length'], 1>>;
+type Contract1708 = Assert<
+	Equal<keyof Pick<Native60.PopoverTriggerState, PublishedKeys24>, PublishedKeys24>
+>;
 type Contract1709 = Assert<
-	Equal<keyof Pick<Native60.PopoverCloseProps, PublishedKeys9>, PublishedKeys9>
+	Equal<keyof Pick<Native60.PopoverTriggerProps, PublishedKeys115>, PublishedKeys115>
 >;
-type Contract1710 = Assert<Equal<Parameters<typeof Native60.PopoverViewport>['length'], 1>>;
-type Contract1711 = Assert<
-	Equal<keyof Pick<Native60.PopoverViewportState, PublishedKeys116>, PublishedKeys116>
->;
+type Contract1710 = Assert<Equal<Parameters<typeof Native60.PopoverPortal>['length'], 1>>;
+type Contract1711 = Assert<Equal<keyof Native60.PopoverPortalState, never>>;
 type Contract1712 = Assert<
-	Equal<keyof Pick<Native60.PopoverViewportProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native60.PopoverPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract1713 = Assert<
-	Equal<keyof Pick<typeof Native61.PreviewCard, PublishedKeys141>, PublishedKeys141>
+type Contract1713 = Assert<Equal<Parameters<typeof Native60.PopoverPositioner>['length'], 1>>;
+type Contract1714 = Assert<
+	Equal<keyof Pick<Native60.PopoverPositionerState, PublishedKeys124>, PublishedKeys124>
 >;
-type Contract1714 = Assert<Equal<Parameters<typeof Native61.PreviewCardRoot>['length'], 1>>;
-type Contract1715 = Assert<Equal<keyof Native61.PreviewCardRootState, never>>;
-type Contract1716 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardRootProps, PublishedKeys19>, PublishedKeys19>
+type Contract1715 = Assert<
+	Equal<keyof Pick<Native60.PopoverPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
+type Contract1716 = Assert<Equal<Parameters<typeof Native60.PopoverPopup>['length'], 1>>;
 type Contract1717 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardRootActions, PublishedKeys20>, PublishedKeys20>
+	Equal<keyof Pick<Native60.PopoverPopupState, PublishedKeys140>, PublishedKeys140>
 >;
 type Contract1718 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native60.PopoverPopupProps, PublishedKeys16>, PublishedKeys16>
 >;
-type Contract1719 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
+type Contract1719 = Assert<Equal<Parameters<typeof Native60.PopoverArrow>['length'], 1>>;
+type Contract1720 = Assert<
+	Equal<keyof Pick<Native60.PopoverArrowState, PublishedKeys36>, PublishedKeys36>
 >;
-type Contract1720 = Assert<Equal<Parameters<Native61.PreviewCardTrigger>['length'], 1>>;
 type Contract1721 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardTriggerState, PublishedKeys87>, PublishedKeys87>
+	Equal<keyof Pick<Native60.PopoverArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1722 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardTriggerProps, PublishedKeys142>, PublishedKeys142>
+type Contract1722 = Assert<Equal<Parameters<typeof Native60.PopoverBackdrop>['length'], 1>>;
+type Contract1723 = Assert<
+	Equal<keyof Pick<Native60.PopoverBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract1723 = Assert<Equal<Parameters<typeof Native61.PreviewCardPortal>['length'], 1>>;
-type Contract1724 = Assert<Equal<keyof Native61.PreviewCardPortalState, never>>;
-type Contract1725 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardPortalProps, PublishedKeys18>, PublishedKeys18>
+type Contract1724 = Assert<
+	Equal<keyof Pick<Native60.PopoverBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1726 = Assert<Equal<Parameters<typeof Native61.PreviewCardPositioner>['length'], 1>>;
+type Contract1725 = Assert<Equal<Parameters<typeof Native60.PopoverTitle>['length'], 1>>;
+type Contract1726 = Assert<Equal<keyof Native60.PopoverTitleState, never>>;
 type Contract1727 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardPositionerState, PublishedKeys124>, PublishedKeys124>
+	Equal<keyof Pick<Native60.PopoverTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1728 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardPositionerProps, PublishedKeys32>, PublishedKeys32>
->;
-type Contract1729 = Assert<Equal<Parameters<typeof Native61.PreviewCardPopup>['length'], 1>>;
+type Contract1728 = Assert<Equal<Parameters<typeof Native60.PopoverDescription>['length'], 1>>;
+type Contract1729 = Assert<Equal<keyof Native60.PopoverDescriptionState, never>>;
 type Contract1730 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardPopupState, PublishedKeys140>, PublishedKeys140>
+	Equal<keyof Pick<Native60.PopoverDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1731 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardPopupProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract1732 = Assert<Equal<Parameters<typeof Native61.PreviewCardArrow>['length'], 1>>;
+type Contract1731 = Assert<Equal<Parameters<typeof Native60.PopoverClose>['length'], 1>>;
+type Contract1732 = Assert<Equal<keyof Native60.PopoverCloseState, never>>;
 type Contract1733 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardArrowState, PublishedKeys35>, PublishedKeys35>
+	Equal<keyof Pick<Native60.PopoverCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1734 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardArrowProps, PublishedKeys8>, PublishedKeys8>
+type Contract1734 = Assert<Equal<Parameters<typeof Native60.PopoverViewport>['length'], 1>>;
+type Contract1735 = Assert<
+	Equal<keyof Pick<Native60.PopoverViewportState, PublishedKeys116>, PublishedKeys116>
 >;
-type Contract1735 = Assert<Equal<Parameters<typeof Native61.PreviewCardViewport>['length'], 1>>;
 type Contract1736 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardViewportState, PublishedKeys116>, PublishedKeys116>
+	Equal<keyof Pick<Native60.PopoverViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
 type Contract1737 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardViewportProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<typeof Native61.PreviewCard, PublishedKeys141>, PublishedKeys141>
 >;
-type Contract1738 = Assert<Equal<Parameters<typeof Native61.PreviewCardBackdrop>['length'], 1>>;
-type Contract1739 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardBackdropState, PublishedKeys14>, PublishedKeys14>
+type Contract1738 = Assert<
+	Equal<keyof Pick<typeof Native61.PreviewCardHandle, PublishedKeys19>, PublishedKeys19>
 >;
-type Contract1740 = Assert<
-	Equal<keyof Pick<Native61.PreviewCardBackdropProps, PublishedKeys8>, PublishedKeys8>
+type Contract1739 = Assert<Equal<Parameters<typeof Native61.createPreviewCardHandle>['length'], 0>>;
+type Contract1740 = Assert<Equal<Parameters<typeof Native61.PreviewCardRoot>['length'], 1>>;
+type Contract1741 = Assert<Equal<keyof Native61.PreviewCardRootState, never>>;
+type Contract1742 = Assert<
+	Equal<keyof Pick<Native61.PreviewCardRootProps, PublishedKeys20>, PublishedKeys20>
 >;
-type Contract1741 = Assert<
-	Equal<keyof Pick<typeof Native62.Progress, PublishedKeys119>, PublishedKeys119>
->;
-type Contract1742 = Assert<Equal<Parameters<typeof Native62.ProgressRoot>['length'], 1>>;
 type Contract1743 = Assert<
-	Equal<keyof Pick<Native62.ProgressStatus, PublishedKeys4>, PublishedKeys4>
+	Equal<keyof Pick<Native61.PreviewCardRootActions, PublishedKeys21>, PublishedKeys21>
 >;
 type Contract1744 = Assert<
-	Equal<keyof Pick<Native62.ProgressRootState, PublishedKeys143>, PublishedKeys143>
+	Equal<keyof Pick<Native61.PreviewCardRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract1745 = Assert<
-	Equal<keyof Pick<Native62.ProgressRootProps, PublishedKeys120>, PublishedKeys120>
+	Equal<keyof Pick<Native61.PreviewCardRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
 >;
-type Contract1746 = Assert<Equal<Parameters<typeof Native62.ProgressIndicator>['length'], 1>>;
+type Contract1746 = Assert<Equal<Parameters<Native61.PreviewCardTrigger>['length'], 1>>;
 type Contract1747 = Assert<
-	Equal<keyof Pick<Native62.ProgressIndicatorState, PublishedKeys143>, PublishedKeys143>
+	Equal<keyof Pick<Native61.PreviewCardTriggerState, PublishedKeys87>, PublishedKeys87>
 >;
 type Contract1748 = Assert<
-	Equal<keyof Pick<Native62.ProgressIndicatorProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native61.PreviewCardTriggerProps, PublishedKeys142>, PublishedKeys142>
 >;
-type Contract1749 = Assert<Equal<Parameters<typeof Native62.ProgressLabel>['length'], 1>>;
-type Contract1750 = Assert<
-	Equal<keyof Pick<Native62.ProgressLabelState, PublishedKeys143>, PublishedKeys143>
->;
+type Contract1749 = Assert<Equal<Parameters<typeof Native61.PreviewCardPortal>['length'], 1>>;
+type Contract1750 = Assert<Equal<keyof Native61.PreviewCardPortalState, never>>;
 type Contract1751 = Assert<
-	Equal<keyof Pick<Native62.ProgressLabelProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native61.PreviewCardPortalProps, PublishedKeys18>, PublishedKeys18>
 >;
-type Contract1752 = Assert<Equal<Parameters<typeof Native62.ProgressTrack>['length'], 1>>;
+type Contract1752 = Assert<Equal<Parameters<typeof Native61.PreviewCardPositioner>['length'], 1>>;
 type Contract1753 = Assert<
-	Equal<keyof Pick<Native62.ProgressTrackState, PublishedKeys143>, PublishedKeys143>
+	Equal<keyof Pick<Native61.PreviewCardPositionerState, PublishedKeys124>, PublishedKeys124>
 >;
 type Contract1754 = Assert<
-	Equal<keyof Pick<Native62.ProgressTrackProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native61.PreviewCardPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract1755 = Assert<Equal<Parameters<typeof Native62.ProgressValue>['length'], 1>>;
+type Contract1755 = Assert<Equal<Parameters<typeof Native61.PreviewCardPopup>['length'], 1>>;
 type Contract1756 = Assert<
-	Equal<keyof Pick<Native62.ProgressValueState, PublishedKeys143>, PublishedKeys143>
+	Equal<keyof Pick<Native61.PreviewCardPopupState, PublishedKeys140>, PublishedKeys140>
 >;
 type Contract1757 = Assert<
-	Equal<keyof Pick<Native62.ProgressValueProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native61.PreviewCardPopupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1758 = Assert<
-	Equal<keyof Pick<typeof Native63.Radio, PublishedKeys51>, PublishedKeys51>
+type Contract1758 = Assert<Equal<Parameters<typeof Native61.PreviewCardArrow>['length'], 1>>;
+type Contract1759 = Assert<
+	Equal<keyof Pick<Native61.PreviewCardArrowState, PublishedKeys36>, PublishedKeys36>
 >;
-type Contract1759 = Assert<Equal<Parameters<typeof Native63.RadioRoot>['length'], 1>>;
 type Contract1760 = Assert<
-	Equal<keyof Pick<Native63.RadioRootState, PublishedKeys144>, PublishedKeys144>
+	Equal<keyof Pick<Native61.PreviewCardArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1761 = Assert<
-	Equal<keyof Pick<Native63.RadioRootProps, PublishedKeys145>, PublishedKeys145>
+type Contract1761 = Assert<Equal<Parameters<typeof Native61.PreviewCardViewport>['length'], 1>>;
+type Contract1762 = Assert<
+	Equal<keyof Pick<Native61.PreviewCardViewportState, PublishedKeys116>, PublishedKeys116>
 >;
-type Contract1762 = Assert<Equal<Parameters<typeof Native63.RadioIndicator>['length'], 1>>;
 type Contract1763 = Assert<
-	Equal<keyof Pick<Native63.RadioIndicatorProps, PublishedKeys55>, PublishedKeys55>
+	Equal<keyof Pick<Native61.PreviewCardViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1764 = Assert<
-	Equal<keyof Pick<Native63.RadioIndicatorState, PublishedKeys146>, PublishedKeys146>
+type Contract1764 = Assert<Equal<Parameters<typeof Native61.PreviewCardBackdrop>['length'], 1>>;
+type Contract1765 = Assert<
+	Equal<keyof Pick<Native61.PreviewCardBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract1765 = Assert<Equal<Parameters<typeof Native64.RadioGroup>['length'], 1>>;
 type Contract1766 = Assert<
-	Equal<keyof Pick<Native64.RadioGroupState, PublishedKeys147>, PublishedKeys147>
+	Equal<keyof Pick<Native61.PreviewCardBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
 type Contract1767 = Assert<
-	Equal<keyof Pick<Native64.RadioGroupProps, PublishedKeys148>, PublishedKeys148>
+	Equal<keyof Pick<typeof Native62.Progress, PublishedKeys119>, PublishedKeys119>
 >;
-type Contract1768 = Assert<
-	Equal<keyof Pick<Native64.RadioGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
+type Contract1768 = Assert<Equal<Parameters<typeof Native62.ProgressRoot>['length'], 1>>;
 type Contract1769 = Assert<
-	Equal<keyof Pick<Native64.RadioGroupChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+	Equal<keyof Pick<Native62.ProgressStatus, PublishedKeys4>, PublishedKeys4>
 >;
 type Contract1770 = Assert<
-	Equal<keyof Pick<typeof Native65.ScrollArea, PublishedKeys149>, PublishedKeys149>
+	Equal<keyof Pick<Native62.ProgressRootState, PublishedKeys143>, PublishedKeys143>
 >;
 type Contract1771 = Assert<
-	Equal<keyof Pick<Native65.HiddenState, PublishedKeys150>, PublishedKeys150>
+	Equal<keyof Pick<Native62.ProgressRootProps, PublishedKeys120>, PublishedKeys120>
 >;
-type Contract1772 = Assert<
-	Equal<keyof Pick<Native65.OverflowEdges, PublishedKeys151>, PublishedKeys151>
+type Contract1772 = Assert<Equal<Parameters<typeof Native62.ProgressIndicator>['length'], 1>>;
+type Contract1773 = Assert<
+	Equal<keyof Pick<Native62.ProgressIndicatorState, PublishedKeys143>, PublishedKeys143>
 >;
-type Contract1773 = Assert<Equal<keyof Pick<Native65.Size, PublishedKeys152>, PublishedKeys152>>;
-type Contract1774 = Assert<Equal<keyof Pick<Native65.Coords, PublishedKeys153>, PublishedKeys153>>;
-type Contract1775 = Assert<Equal<Parameters<typeof Native65.ScrollAreaRoot>['length'], 1>>;
+type Contract1774 = Assert<
+	Equal<keyof Pick<Native62.ProgressIndicatorProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1775 = Assert<Equal<Parameters<typeof Native62.ProgressLabel>['length'], 1>>;
 type Contract1776 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaRootState, PublishedKeys154>, PublishedKeys154>
+	Equal<keyof Pick<Native62.ProgressLabelState, PublishedKeys143>, PublishedKeys143>
 >;
 type Contract1777 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaRootProps, PublishedKeys155>, PublishedKeys155>
+	Equal<keyof Pick<Native62.ProgressLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1778 = Assert<Equal<Parameters<typeof Native65.ScrollAreaViewport>['length'], 1>>;
+type Contract1778 = Assert<Equal<Parameters<typeof Native62.ProgressTrack>['length'], 1>>;
 type Contract1779 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaViewportProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native62.ProgressTrackState, PublishedKeys143>, PublishedKeys143>
 >;
 type Contract1780 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaViewportState, PublishedKeys154>, PublishedKeys154>
+	Equal<keyof Pick<Native62.ProgressTrackProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1781 = Assert<Equal<Parameters<typeof Native65.ScrollAreaScrollbar>['length'], 1>>;
+type Contract1781 = Assert<Equal<Parameters<typeof Native62.ProgressValue>['length'], 1>>;
 type Contract1782 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaScrollbarState, PublishedKeys156>, PublishedKeys156>
+	Equal<keyof Pick<Native62.ProgressValueState, PublishedKeys143>, PublishedKeys143>
 >;
 type Contract1783 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaScrollbarProps, PublishedKeys157>, PublishedKeys157>
+	Equal<keyof Pick<Native62.ProgressValueProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1784 = Assert<Equal<Parameters<typeof Native65.ScrollAreaContent>['length'], 1>>;
-type Contract1785 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaContentState, PublishedKeys154>, PublishedKeys154>
+type Contract1784 = Assert<
+	Equal<keyof Pick<typeof Native63.Radio, PublishedKeys52>, PublishedKeys52>
 >;
+type Contract1785 = Assert<Equal<Parameters<typeof Native63.RadioRoot>['length'], 1>>;
 type Contract1786 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaContentProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native63.RadioRootState, PublishedKeys144>, PublishedKeys144>
 >;
-type Contract1787 = Assert<Equal<Parameters<typeof Native65.ScrollAreaThumb>['length'], 1>>;
-type Contract1788 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaThumbState, PublishedKeys158>, PublishedKeys158>
+type Contract1787 = Assert<
+	Equal<keyof Pick<Native63.RadioRootProps, PublishedKeys145>, PublishedKeys145>
 >;
+type Contract1788 = Assert<Equal<Parameters<typeof Native63.RadioIndicator>['length'], 1>>;
 type Contract1789 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaThumbProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native63.RadioIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract1790 = Assert<Equal<Parameters<typeof Native65.ScrollAreaCorner>['length'], 1>>;
-type Contract1791 = Assert<Equal<keyof Native65.ScrollAreaCornerState, never>>;
+type Contract1790 = Assert<
+	Equal<keyof Pick<Native63.RadioIndicatorState, PublishedKeys146>, PublishedKeys146>
+>;
+type Contract1791 = Assert<Equal<Parameters<typeof Native64.RadioGroup>['length'], 1>>;
 type Contract1792 = Assert<
-	Equal<keyof Pick<Native65.ScrollAreaCornerProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native64.RadioGroupState, PublishedKeys147>, PublishedKeys147>
 >;
 type Contract1793 = Assert<
+	Equal<keyof Pick<Native64.RadioGroupProps, PublishedKeys148>, PublishedKeys148>
+>;
+type Contract1794 = Assert<
+	Equal<keyof Pick<Native64.RadioGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract1795 = Assert<
+	Equal<keyof Pick<Native64.RadioGroupChangeEventDetails, PublishedKeys5>, PublishedKeys5>
+>;
+type Contract1796 = Assert<
+	Equal<keyof Pick<typeof Native65.ScrollArea, PublishedKeys149>, PublishedKeys149>
+>;
+type Contract1797 = Assert<
+	Equal<keyof Pick<Native65.HiddenState, PublishedKeys150>, PublishedKeys150>
+>;
+type Contract1798 = Assert<
+	Equal<keyof Pick<Native65.OverflowEdges, PublishedKeys151>, PublishedKeys151>
+>;
+type Contract1799 = Assert<Equal<keyof Pick<Native65.Size, PublishedKeys152>, PublishedKeys152>>;
+type Contract1800 = Assert<Equal<keyof Pick<Native65.Coords, PublishedKeys153>, PublishedKeys153>>;
+type Contract1801 = Assert<Equal<Parameters<typeof Native65.ScrollAreaRoot>['length'], 1>>;
+type Contract1802 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaRootState, PublishedKeys154>, PublishedKeys154>
+>;
+type Contract1803 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaRootProps, PublishedKeys155>, PublishedKeys155>
+>;
+type Contract1804 = Assert<Equal<Parameters<typeof Native65.ScrollAreaViewport>['length'], 1>>;
+type Contract1805 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaViewportProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1806 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaViewportState, PublishedKeys154>, PublishedKeys154>
+>;
+type Contract1807 = Assert<Equal<Parameters<typeof Native65.ScrollAreaScrollbar>['length'], 1>>;
+type Contract1808 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaScrollbarState, PublishedKeys156>, PublishedKeys156>
+>;
+type Contract1809 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaScrollbarProps, PublishedKeys157>, PublishedKeys157>
+>;
+type Contract1810 = Assert<Equal<Parameters<typeof Native65.ScrollAreaContent>['length'], 1>>;
+type Contract1811 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaContentState, PublishedKeys154>, PublishedKeys154>
+>;
+type Contract1812 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaContentProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1813 = Assert<Equal<Parameters<typeof Native65.ScrollAreaThumb>['length'], 1>>;
+type Contract1814 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaThumbState, PublishedKeys158>, PublishedKeys158>
+>;
+type Contract1815 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaThumbProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1816 = Assert<Equal<Parameters<typeof Native65.ScrollAreaCorner>['length'], 1>>;
+type Contract1817 = Assert<Equal<keyof Native65.ScrollAreaCornerState, never>>;
+type Contract1818 = Assert<
+	Equal<keyof Pick<Native65.ScrollAreaCornerProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract1819 = Assert<
 	Equal<keyof Pick<typeof Native66.Select, PublishedKeys159>, PublishedKeys159>
 >;
-type Contract1794 = Assert<Equal<Parameters<typeof Native66.SelectRoot>['length'], 1>>;
-type Contract1795 = Assert<
+type Contract1820 = Assert<Equal<Parameters<typeof Native66.SelectRoot>['length'], 1>>;
+type Contract1821 = Assert<
 	Equal<
 		keyof Pick<Native66.SelectRootProps<{ sample: string }>, PublishedKeys160>,
 		PublishedKeys160
 	>
 >;
-type Contract1796 = Assert<Equal<keyof Native66.SelectRootState, never>>;
-type Contract1797 = Assert<
-	Equal<keyof Pick<Native66.SelectRootActions, PublishedKeys40>, PublishedKeys40>
+type Contract1822 = Assert<Equal<keyof Native66.SelectRootState, never>>;
+type Contract1823 = Assert<
+	Equal<keyof Pick<Native66.SelectRootActions, PublishedKeys41>, PublishedKeys41>
 >;
-type Contract1798 = Assert<
+type Contract1824 = Assert<
 	Equal<keyof Pick<Native66.SelectRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1799 = Assert<
+type Contract1825 = Assert<
 	Equal<keyof Pick<Native66.SelectRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1800 = Assert<Equal<Parameters<typeof Native66.SelectLabel>['length'], 1>>;
-type Contract1801 = Assert<
-	Equal<keyof Pick<Native66.SelectLabelState, PublishedKeys56>, PublishedKeys56>
+type Contract1826 = Assert<Equal<Parameters<typeof Native66.SelectLabel>['length'], 1>>;
+type Contract1827 = Assert<
+	Equal<keyof Pick<Native66.SelectLabelState, PublishedKeys57>, PublishedKeys57>
 >;
-type Contract1802 = Assert<
+type Contract1828 = Assert<
 	Equal<keyof Pick<Native66.SelectLabelProps, PublishedKeys68>, PublishedKeys68>
 >;
-type Contract1803 = Assert<Equal<Parameters<typeof Native66.SelectTrigger>['length'], 1>>;
-type Contract1804 = Assert<
+type Contract1829 = Assert<Equal<Parameters<typeof Native66.SelectTrigger>['length'], 1>>;
+type Contract1830 = Assert<
 	Equal<keyof Pick<Native66.SelectTriggerState, PublishedKeys161>, PublishedKeys161>
 >;
-type Contract1805 = Assert<
+type Contract1831 = Assert<
 	Equal<keyof Pick<Native66.SelectTriggerProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1806 = Assert<Equal<Parameters<typeof Native66.SelectValue>['length'], 1>>;
-type Contract1807 = Assert<
+type Contract1832 = Assert<Equal<Parameters<typeof Native66.SelectValue>['length'], 1>>;
+type Contract1833 = Assert<
 	Equal<keyof Pick<Native66.SelectValueState, PublishedKeys162>, PublishedKeys162>
 >;
-type Contract1808 = Assert<
+type Contract1834 = Assert<
 	Equal<keyof Pick<Native66.SelectValueProps, PublishedKeys163>, PublishedKeys163>
 >;
-type Contract1809 = Assert<Equal<Parameters<typeof Native66.SelectIcon>['length'], 1>>;
-type Contract1810 = Assert<
+type Contract1835 = Assert<Equal<Parameters<typeof Native66.SelectIcon>['length'], 1>>;
+type Contract1836 = Assert<
 	Equal<keyof Pick<Native66.SelectIconState, PublishedKeys87>, PublishedKeys87>
 >;
-type Contract1811 = Assert<
+type Contract1837 = Assert<
 	Equal<keyof Pick<Native66.SelectIconProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1812 = Assert<Equal<Parameters<typeof Native66.SelectPortal>['length'], 1>>;
-type Contract1813 = Assert<Equal<keyof Native66.SelectPortalState, never>>;
-type Contract1814 = Assert<
+type Contract1838 = Assert<Equal<Parameters<typeof Native66.SelectPortal>['length'], 1>>;
+type Contract1839 = Assert<Equal<keyof Native66.SelectPortalState, never>>;
+type Contract1840 = Assert<
 	Equal<keyof Pick<Native66.SelectPortalProps, PublishedKeys164>, PublishedKeys164>
 >;
-type Contract1815 = Assert<Equal<Parameters<typeof Native66.SelectBackdrop>['length'], 1>>;
-type Contract1816 = Assert<
+type Contract1841 = Assert<Equal<Parameters<typeof Native66.SelectBackdrop>['length'], 1>>;
+type Contract1842 = Assert<
 	Equal<keyof Pick<Native66.SelectBackdropState, PublishedKeys14>, PublishedKeys14>
 >;
-type Contract1817 = Assert<
+type Contract1843 = Assert<
 	Equal<keyof Pick<Native66.SelectBackdropProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1818 = Assert<Equal<Parameters<typeof Native66.SelectPositioner>['length'], 1>>;
-type Contract1819 = Assert<
+type Contract1844 = Assert<Equal<Parameters<typeof Native66.SelectPositioner>['length'], 1>>;
+type Contract1845 = Assert<
 	Equal<keyof Pick<Native66.SelectPositionerState, PublishedKeys165>, PublishedKeys165>
 >;
-type Contract1820 = Assert<
+type Contract1846 = Assert<
 	Equal<keyof Pick<Native66.SelectPositionerProps, PublishedKeys166>, PublishedKeys166>
 >;
-type Contract1821 = Assert<Equal<Parameters<typeof Native66.SelectPopup>['length'], 1>>;
-type Contract1822 = Assert<
+type Contract1847 = Assert<Equal<Parameters<typeof Native66.SelectPopup>['length'], 1>>;
+type Contract1848 = Assert<
 	Equal<keyof Pick<Native66.SelectPopupProps, PublishedKeys74>, PublishedKeys74>
 >;
-type Contract1823 = Assert<
+type Contract1849 = Assert<
 	Equal<keyof Pick<Native66.SelectPopupState, PublishedKeys167>, PublishedKeys167>
 >;
-type Contract1824 = Assert<Equal<Parameters<typeof Native66.SelectList>['length'], 1>>;
-type Contract1825 = Assert<
+type Contract1850 = Assert<Equal<Parameters<typeof Native66.SelectList>['length'], 1>>;
+type Contract1851 = Assert<
 	Equal<keyof Pick<Native66.SelectListProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1826 = Assert<Equal<keyof Native66.SelectListState, never>>;
-type Contract1827 = Assert<Equal<Parameters<typeof Native66.SelectItem>['length'], 1>>;
-type Contract1828 = Assert<
+type Contract1852 = Assert<Equal<keyof Native66.SelectListState, never>>;
+type Contract1853 = Assert<Equal<Parameters<typeof Native66.SelectItem>['length'], 1>>;
+type Contract1854 = Assert<
 	Equal<keyof Pick<Native66.SelectItemState, PublishedKeys70>, PublishedKeys70>
 >;
-type Contract1829 = Assert<
+type Contract1855 = Assert<
 	Equal<keyof Pick<Native66.SelectItemProps, PublishedKeys168>, PublishedKeys168>
 >;
-type Contract1830 = Assert<Equal<Parameters<typeof Native66.SelectItemIndicator>['length'], 1>>;
-type Contract1831 = Assert<
+type Contract1856 = Assert<Equal<Parameters<typeof Native66.SelectItemIndicator>['length'], 1>>;
+type Contract1857 = Assert<
 	Equal<keyof Pick<Native66.SelectItemIndicatorState, PublishedKeys71>, PublishedKeys71>
 >;
-type Contract1832 = Assert<
-	Equal<keyof Pick<Native66.SelectItemIndicatorProps, PublishedKeys55>, PublishedKeys55>
+type Contract1858 = Assert<
+	Equal<keyof Pick<Native66.SelectItemIndicatorProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract1833 = Assert<Equal<Parameters<typeof Native66.SelectItemText>['length'], 1>>;
-type Contract1834 = Assert<Equal<keyof Native66.SelectItemTextState, never>>;
-type Contract1835 = Assert<
+type Contract1859 = Assert<Equal<Parameters<typeof Native66.SelectItemText>['length'], 1>>;
+type Contract1860 = Assert<Equal<keyof Native66.SelectItemTextState, never>>;
+type Contract1861 = Assert<
 	Equal<keyof Pick<Native66.SelectItemTextProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1836 = Assert<Equal<Parameters<typeof Native66.SelectArrow>['length'], 1>>;
-type Contract1837 = Assert<
-	Equal<keyof Pick<Native66.SelectArrowState, PublishedKeys35>, PublishedKeys35>
+type Contract1862 = Assert<Equal<Parameters<typeof Native66.SelectArrow>['length'], 1>>;
+type Contract1863 = Assert<
+	Equal<keyof Pick<Native66.SelectArrowState, PublishedKeys36>, PublishedKeys36>
 >;
-type Contract1838 = Assert<
+type Contract1864 = Assert<
 	Equal<keyof Pick<Native66.SelectArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1839 = Assert<Equal<Parameters<typeof Native66.SelectScrollDownArrow>['length'], 1>>;
-type Contract1840 = Assert<Equal<keyof Native66.SelectScrollDownArrowState, never>>;
-type Contract1841 = Assert<
-	Equal<keyof Pick<Native66.SelectScrollDownArrowProps, PublishedKeys55>, PublishedKeys55>
+type Contract1865 = Assert<Equal<Parameters<typeof Native66.SelectScrollDownArrow>['length'], 1>>;
+type Contract1866 = Assert<Equal<keyof Native66.SelectScrollDownArrowState, never>>;
+type Contract1867 = Assert<
+	Equal<keyof Pick<Native66.SelectScrollDownArrowProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract1842 = Assert<Equal<Parameters<typeof Native66.SelectScrollUpArrow>['length'], 1>>;
-type Contract1843 = Assert<Equal<keyof Native66.SelectScrollUpArrowState, never>>;
-type Contract1844 = Assert<
-	Equal<keyof Pick<Native66.SelectScrollUpArrowProps, PublishedKeys55>, PublishedKeys55>
+type Contract1868 = Assert<Equal<Parameters<typeof Native66.SelectScrollUpArrow>['length'], 1>>;
+type Contract1869 = Assert<Equal<keyof Native66.SelectScrollUpArrowState, never>>;
+type Contract1870 = Assert<
+	Equal<keyof Pick<Native66.SelectScrollUpArrowProps, PublishedKeys56>, PublishedKeys56>
 >;
-type Contract1845 = Assert<Equal<Parameters<typeof Native66.SelectGroup>['length'], 1>>;
-type Contract1846 = Assert<Equal<keyof Native66.SelectGroupState, never>>;
-type Contract1847 = Assert<
+type Contract1871 = Assert<Equal<Parameters<typeof Native66.SelectGroup>['length'], 1>>;
+type Contract1872 = Assert<Equal<keyof Native66.SelectGroupState, never>>;
+type Contract1873 = Assert<
 	Equal<keyof Pick<Native66.SelectGroupProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1848 = Assert<Equal<Parameters<typeof Native66.SelectGroupLabel>['length'], 1>>;
-type Contract1849 = Assert<Equal<keyof Native66.SelectGroupLabelState, never>>;
-type Contract1850 = Assert<
+type Contract1874 = Assert<Equal<Parameters<typeof Native66.SelectGroupLabel>['length'], 1>>;
+type Contract1875 = Assert<Equal<keyof Native66.SelectGroupLabelState, never>>;
+type Contract1876 = Assert<
 	Equal<keyof Pick<Native66.SelectGroupLabelProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1851 = Assert<
-	Equal<keyof Pick<Native66.SelectSeparatorProps, PublishedKeys25>, PublishedKeys25>
+type Contract1877 = Assert<
+	Equal<keyof Pick<Native66.SelectSeparatorProps, PublishedKeys26>, PublishedKeys26>
 >;
-type Contract1852 = Assert<
-	Equal<keyof Pick<Native66.SelectSeparatorState, PublishedKeys26>, PublishedKeys26>
+type Contract1878 = Assert<
+	Equal<keyof Pick<Native66.SelectSeparatorState, PublishedKeys27>, PublishedKeys27>
 >;
-type Contract1853 = Assert<Equal<Parameters<typeof Native66.SelectSeparator>['length'], 1>>;
-type Contract1854 = Assert<Equal<Parameters<typeof Native67.Separator>['length'], 1>>;
-type Contract1855 = Assert<
-	Equal<keyof Pick<Native67.SeparatorProps, PublishedKeys25>, PublishedKeys25>
+type Contract1879 = Assert<Equal<Parameters<typeof Native66.SelectSeparator>['length'], 1>>;
+type Contract1880 = Assert<Equal<Parameters<typeof Native67.Separator>['length'], 1>>;
+type Contract1881 = Assert<
+	Equal<keyof Pick<Native67.SeparatorProps, PublishedKeys26>, PublishedKeys26>
 >;
-type Contract1856 = Assert<
-	Equal<keyof Pick<Native67.SeparatorState, PublishedKeys26>, PublishedKeys26>
+type Contract1882 = Assert<
+	Equal<keyof Pick<Native67.SeparatorState, PublishedKeys27>, PublishedKeys27>
 >;
-type Contract1857 = Assert<
+type Contract1883 = Assert<
 	Equal<keyof Pick<typeof Native68.Slider, PublishedKeys169>, PublishedKeys169>
 >;
-type Contract1858 = Assert<Equal<Parameters<typeof Native68.SliderRoot>['length'], 1>>;
-type Contract1859 = Assert<
+type Contract1884 = Assert<Equal<Parameters<typeof Native68.SliderRoot>['length'], 1>>;
+type Contract1885 = Assert<
 	Equal<keyof Pick<Native68.SliderRootState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract1860 = Assert<
+type Contract1886 = Assert<
 	Equal<keyof Pick<Native68.SliderRootProps, PublishedKeys171>, PublishedKeys171>
 >;
-type Contract1861 = Assert<
+type Contract1887 = Assert<
 	Equal<
 		keyof Pick<Native68.SliderRootChangeEventCustomProperties, PublishedKeys172>,
 		PublishedKeys172
 	>
 >;
-type Contract1862 = Assert<
+type Contract1888 = Assert<
 	Equal<keyof Pick<Native68.SliderRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1863 = Assert<
+type Contract1889 = Assert<
 	Equal<keyof Pick<Native68.SliderRootChangeEventDetails, PublishedKeys173>, PublishedKeys173>
 >;
-type Contract1864 = Assert<
+type Contract1890 = Assert<
 	Equal<keyof Pick<Native68.SliderRootCommitEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1865 = Assert<
+type Contract1891 = Assert<
 	Equal<keyof Pick<Native68.SliderRootCommitEventDetails, PublishedKeys110>, PublishedKeys110>
 >;
-type Contract1866 = Assert<Equal<Parameters<typeof Native68.SliderLabel>['length'], 1>>;
-type Contract1867 = Assert<
+type Contract1892 = Assert<Equal<Parameters<typeof Native68.SliderLabel>['length'], 1>>;
+type Contract1893 = Assert<
 	Equal<keyof Pick<Native68.SliderLabelState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract1868 = Assert<
+type Contract1894 = Assert<
 	Equal<keyof Pick<Native68.SliderLabelProps, PublishedKeys68>, PublishedKeys68>
 >;
-type Contract1869 = Assert<Equal<Parameters<typeof Native68.SliderValue>['length'], 1>>;
-type Contract1870 = Assert<
+type Contract1895 = Assert<Equal<Parameters<typeof Native68.SliderValue>['length'], 1>>;
+type Contract1896 = Assert<
 	Equal<keyof Pick<Native68.SliderValueState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract1871 = Assert<
+type Contract1897 = Assert<
 	Equal<keyof Pick<Native68.SliderValueProps, PublishedKeys174>, PublishedKeys174>
 >;
-type Contract1872 = Assert<Equal<Parameters<typeof Native68.SliderControl>['length'], 1>>;
-type Contract1873 = Assert<
+type Contract1898 = Assert<Equal<Parameters<typeof Native68.SliderControl>['length'], 1>>;
+type Contract1899 = Assert<
 	Equal<keyof Pick<Native68.SliderControlState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract1874 = Assert<
+type Contract1900 = Assert<
 	Equal<keyof Pick<Native68.SliderControlProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1875 = Assert<Equal<Parameters<typeof Native68.SliderTrack>['length'], 1>>;
-type Contract1876 = Assert<
+type Contract1901 = Assert<Equal<Parameters<typeof Native68.SliderTrack>['length'], 1>>;
+type Contract1902 = Assert<
 	Equal<keyof Pick<Native68.SliderTrackState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract1877 = Assert<
+type Contract1903 = Assert<
 	Equal<keyof Pick<Native68.SliderTrackProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1878 = Assert<Equal<Parameters<typeof Native68.SliderThumb>['length'], 1>>;
-type Contract1879 = Assert<
+type Contract1904 = Assert<Equal<Parameters<typeof Native68.SliderThumb>['length'], 1>>;
+type Contract1905 = Assert<
 	Equal<keyof Pick<Native68.ThumbMetadata, PublishedKeys175>, PublishedKeys175>
 >;
-type Contract1880 = Assert<
+type Contract1906 = Assert<
 	Equal<keyof Pick<Native68.SliderThumbState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract1881 = Assert<
+type Contract1907 = Assert<
 	Equal<keyof Pick<Native68.SliderThumbProps, PublishedKeys176>, PublishedKeys176>
 >;
-type Contract1882 = Assert<Equal<Parameters<typeof Native68.SliderIndicator>['length'], 1>>;
-type Contract1883 = Assert<
+type Contract1908 = Assert<Equal<Parameters<typeof Native68.SliderIndicator>['length'], 1>>;
+type Contract1909 = Assert<
 	Equal<keyof Pick<Native68.SliderIndicatorState, PublishedKeys170>, PublishedKeys170>
 >;
-type Contract1884 = Assert<
+type Contract1910 = Assert<
 	Equal<keyof Pick<Native68.SliderIndicatorProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1885 = Assert<
+type Contract1911 = Assert<
 	Equal<keyof Pick<typeof Native69.Switch, PublishedKeys177>, PublishedKeys177>
 >;
-type Contract1886 = Assert<Equal<Parameters<typeof Native69.SwitchRoot>['length'], 1>>;
-type Contract1887 = Assert<
+type Contract1912 = Assert<Equal<Parameters<typeof Native69.SwitchRoot>['length'], 1>>;
+type Contract1913 = Assert<
 	Equal<keyof Pick<Native69.SwitchRootState, PublishedKeys144>, PublishedKeys144>
 >;
-type Contract1888 = Assert<
+type Contract1914 = Assert<
 	Equal<keyof Pick<Native69.SwitchRootProps, PublishedKeys178>, PublishedKeys178>
 >;
-type Contract1889 = Assert<
+type Contract1915 = Assert<
 	Equal<keyof Pick<Native69.SwitchRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1890 = Assert<
+type Contract1916 = Assert<
 	Equal<keyof Pick<Native69.SwitchRootChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1891 = Assert<Equal<Parameters<typeof Native69.SwitchThumb>['length'], 1>>;
-type Contract1892 = Assert<
+type Contract1917 = Assert<Equal<Parameters<typeof Native69.SwitchThumb>['length'], 1>>;
+type Contract1918 = Assert<
 	Equal<keyof Pick<Native69.SwitchThumbProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1893 = Assert<
+type Contract1919 = Assert<
 	Equal<keyof Pick<Native69.SwitchThumbState, PublishedKeys144>, PublishedKeys144>
 >;
-type Contract1894 = Assert<
+type Contract1920 = Assert<
 	Equal<keyof Pick<typeof Native70.Tabs, PublishedKeys179>, PublishedKeys179>
 >;
-type Contract1895 = Assert<Equal<Parameters<typeof Native70.TabsRoot>['length'], 1>>;
-type Contract1896 = Assert<
+type Contract1921 = Assert<Equal<Parameters<typeof Native70.TabsRoot>['length'], 1>>;
+type Contract1922 = Assert<Equal<Parameters<typeof Native70.TabsList>['length'], 1>>;
+type Contract1923 = Assert<Equal<Parameters<typeof Native70.TabsTab>['length'], 1>>;
+type Contract1924 = Assert<Equal<Parameters<typeof Native70.TabsPanel>['length'], 1>>;
+type Contract1925 = Assert<
+	Equal<keyof Pick<Native70.TabsValue, PublishedKeys180>, PublishedKeys180>
+>;
+type Contract1926 = Assert<
+	Equal<keyof Pick<Native70.TabsActivationDirection, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract1927 = Assert<
+	Equal<keyof Pick<Native70.TabsOrientation, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract1928 = Assert<
 	Equal<keyof Pick<Native70.TabsRootOrientation, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1897 = Assert<
-	Equal<keyof Pick<Native70.TabsRootState, PublishedKeys180>, PublishedKeys180>
+type Contract1929 = Assert<
+	Equal<keyof Pick<Native70.TabsRootState, PublishedKeys181>, PublishedKeys181>
 >;
-type Contract1898 = Assert<
-	Equal<keyof Pick<Native70.TabsRootProps, PublishedKeys181>, PublishedKeys181>
+type Contract1930 = Assert<
+	Equal<keyof Pick<Native70.TabsRootProps, PublishedKeys182>, PublishedKeys182>
 >;
-type Contract1899 = Assert<
+type Contract1931 = Assert<
 	Equal<keyof Pick<Native70.TabsRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1900 = Assert<
-	Equal<keyof Pick<Native70.TabsRootChangeEventDetails, PublishedKeys182>, PublishedKeys182>
+type Contract1932 = Assert<
+	Equal<keyof Pick<Native70.TabsRootChangeEventDetails, PublishedKeys183>, PublishedKeys183>
 >;
-type Contract1901 = Assert<Equal<Parameters<typeof Native70.TabsIndicator>['length'], 1>>;
-type Contract1902 = Assert<
-	Equal<keyof Pick<Native70.TabsIndicatorState, PublishedKeys183>, PublishedKeys183>
+type Contract1933 = Assert<Equal<Parameters<typeof Native70.TabsIndicator>['length'], 1>>;
+type Contract1934 = Assert<
+	Equal<keyof Pick<Native70.TabsIndicatorState, PublishedKeys184>, PublishedKeys184>
 >;
-type Contract1903 = Assert<
-	Equal<keyof Pick<Native70.TabsIndicatorProps, PublishedKeys184>, PublishedKeys184>
+type Contract1935 = Assert<
+	Equal<keyof Pick<Native70.TabsIndicatorProps, PublishedKeys185>, PublishedKeys185>
 >;
-type Contract1904 = Assert<Equal<Parameters<typeof Native70.TabsTab>['length'], 1>>;
-type Contract1905 = Assert<
-	Equal<keyof Pick<Native70.TabsTabValue, PublishedKeys185>, PublishedKeys185>
+type Contract1936 = Assert<
+	Equal<keyof Pick<Native70.TabsTabValue, PublishedKeys180>, PublishedKeys180>
 >;
-type Contract1906 = Assert<
+type Contract1937 = Assert<
 	Equal<keyof Pick<Native70.TabsTabActivationDirection, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1907 = Assert<
+type Contract1938 = Assert<
 	Equal<keyof Pick<Native70.TabsTabPosition, PublishedKeys186>, PublishedKeys186>
 >;
-type Contract1908 = Assert<
+type Contract1939 = Assert<
 	Equal<keyof Pick<Native70.TabsTabSize, PublishedKeys152>, PublishedKeys152>
 >;
-type Contract1909 = Assert<
+type Contract1940 = Assert<
 	Equal<keyof Pick<Native70.TabsTabMetadata, PublishedKeys187>, PublishedKeys187>
 >;
-type Contract1910 = Assert<
+type Contract1941 = Assert<
 	Equal<keyof Pick<Native70.TabsTabState, PublishedKeys188>, PublishedKeys188>
 >;
-type Contract1911 = Assert<
+type Contract1942 = Assert<
 	Equal<keyof Pick<Native70.TabsTabProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1912 = Assert<Equal<Parameters<typeof Native70.TabsPanel>['length'], 1>>;
-type Contract1913 = Assert<
+type Contract1943 = Assert<
 	Equal<keyof Pick<Native70.TabsPanelMetadata, PublishedKeys189>, PublishedKeys189>
 >;
-type Contract1914 = Assert<
+type Contract1944 = Assert<
 	Equal<keyof Pick<Native70.TabsPanelState, PublishedKeys190>, PublishedKeys190>
 >;
-type Contract1915 = Assert<
+type Contract1945 = Assert<
 	Equal<keyof Pick<Native70.TabsPanelProps, PublishedKeys191>, PublishedKeys191>
 >;
-type Contract1916 = Assert<Equal<Parameters<typeof Native70.TabsList>['length'], 1>>;
-type Contract1917 = Assert<
-	Equal<keyof Pick<Native70.TabsListState, PublishedKeys180>, PublishedKeys180>
+type Contract1946 = Assert<
+	Equal<keyof Pick<Native70.TabsListState, PublishedKeys181>, PublishedKeys181>
 >;
-type Contract1918 = Assert<
+type Contract1947 = Assert<
 	Equal<keyof Pick<Native70.TabsListProps, PublishedKeys192>, PublishedKeys192>
 >;
-type Contract1919 = Assert<
+type Contract1948 = Assert<
 	Equal<keyof Pick<typeof Native71.Toast, PublishedKeys193>, PublishedKeys193>
 >;
-type Contract1920 = Assert<
+type Contract1949 = Assert<Equal<Parameters<typeof Native71.useToastManager>['length'], 0>>;
+type Contract1950 = Assert<Equal<Parameters<typeof Native71.createToastManager>['length'], 0>>;
+type Contract1951 = Assert<
 	Equal<
 		keyof Pick<typeof Native71.toastRootStateAttributesMapping, PublishedKeys194>,
 		PublishedKeys194
 	>
 >;
-type Contract1921 = Assert<Equal<Parameters<typeof Native71.ToastRoot>['length'], 1>>;
-type Contract1922 = Assert<
+type Contract1952 = Assert<Equal<Parameters<typeof Native71.ToastRoot>['length'], 1>>;
+type Contract1953 = Assert<
 	Equal<keyof Pick<Native71.ToastRootToastObject, PublishedKeys195>, PublishedKeys195>
 >;
-type Contract1923 = Assert<
+type Contract1954 = Assert<
 	Equal<keyof Pick<Native71.ToastRootState, PublishedKeys194>, PublishedKeys194>
 >;
-type Contract1924 = Assert<
+type Contract1955 = Assert<
 	Equal<keyof Pick<Native71.ToastRootProps, PublishedKeys196>, PublishedKeys196>
 >;
-type Contract1925 = Assert<Equal<Parameters<typeof Native71.ToastProvider>['length'], 1>>;
-type Contract1926 = Assert<Equal<keyof Native71.ToastProviderState, never>>;
-type Contract1927 = Assert<
+type Contract1956 = Assert<Equal<Parameters<typeof Native71.ToastProvider>['length'], 1>>;
+type Contract1957 = Assert<Equal<keyof Native71.ToastProviderState, never>>;
+type Contract1958 = Assert<
 	Equal<keyof Pick<Native71.ToastProviderProps, PublishedKeys197>, PublishedKeys197>
 >;
-type Contract1928 = Assert<Equal<Parameters<typeof Native71.ToastViewport>['length'], 1>>;
-type Contract1929 = Assert<
+type Contract1959 = Assert<Equal<Parameters<typeof Native71.ToastViewport>['length'], 1>>;
+type Contract1960 = Assert<
 	Equal<keyof Pick<Native71.ToastViewportState, PublishedKeys198>, PublishedKeys198>
 >;
-type Contract1930 = Assert<
+type Contract1961 = Assert<
 	Equal<keyof Pick<Native71.ToastViewportProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1931 = Assert<Equal<Parameters<typeof Native71.ToastContent>['length'], 1>>;
-type Contract1932 = Assert<
+type Contract1962 = Assert<Equal<Parameters<typeof Native71.ToastContent>['length'], 1>>;
+type Contract1963 = Assert<
 	Equal<keyof Pick<Native71.ToastContentState, PublishedKeys199>, PublishedKeys199>
 >;
-type Contract1933 = Assert<
+type Contract1964 = Assert<
 	Equal<keyof Pick<Native71.ToastContentProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1934 = Assert<Equal<Parameters<typeof Native71.ToastDescription>['length'], 1>>;
-type Contract1935 = Assert<
+type Contract1965 = Assert<Equal<Parameters<typeof Native71.ToastDescription>['length'], 1>>;
+type Contract1966 = Assert<
 	Equal<keyof Pick<Native71.ToastDescriptionState, PublishedKeys114>, PublishedKeys114>
 >;
-type Contract1936 = Assert<
+type Contract1967 = Assert<
 	Equal<keyof Pick<Native71.ToastDescriptionProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1937 = Assert<Equal<Parameters<typeof Native71.ToastTitle>['length'], 1>>;
-type Contract1938 = Assert<
+type Contract1968 = Assert<Equal<Parameters<typeof Native71.ToastTitle>['length'], 1>>;
+type Contract1969 = Assert<
 	Equal<keyof Pick<Native71.ToastTitleState, PublishedKeys114>, PublishedKeys114>
 >;
-type Contract1939 = Assert<
+type Contract1970 = Assert<
 	Equal<keyof Pick<Native71.ToastTitleProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1940 = Assert<Equal<Parameters<typeof Native71.ToastClose>['length'], 1>>;
-type Contract1941 = Assert<
+type Contract1971 = Assert<Equal<Parameters<typeof Native71.ToastClose>['length'], 1>>;
+type Contract1972 = Assert<
 	Equal<keyof Pick<Native71.ToastCloseState, PublishedKeys114>, PublishedKeys114>
 >;
-type Contract1942 = Assert<
+type Contract1973 = Assert<
 	Equal<keyof Pick<Native71.ToastCloseProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1943 = Assert<Equal<Parameters<typeof Native71.ToastAction>['length'], 1>>;
-type Contract1944 = Assert<
+type Contract1974 = Assert<Equal<Parameters<typeof Native71.ToastAction>['length'], 1>>;
+type Contract1975 = Assert<
 	Equal<keyof Pick<Native71.ToastActionState, PublishedKeys114>, PublishedKeys114>
 >;
-type Contract1945 = Assert<
+type Contract1976 = Assert<
 	Equal<keyof Pick<Native71.ToastActionProps, PublishedKeys9>, PublishedKeys9>
 >;
-type Contract1946 = Assert<Equal<Parameters<typeof Native71.ToastPortal>['length'], 1>>;
-type Contract1947 = Assert<Equal<keyof Native71.ToastPortalState, never>>;
-type Contract1948 = Assert<
+type Contract1977 = Assert<Equal<Parameters<typeof Native71.ToastPortal>['length'], 1>>;
+type Contract1978 = Assert<Equal<keyof Native71.ToastPortalState, never>>;
+type Contract1979 = Assert<
 	Equal<keyof Pick<Native71.ToastPortalProps, PublishedKeys164>, PublishedKeys164>
 >;
-type Contract1949 = Assert<Equal<Parameters<typeof Native71.ToastPositioner>['length'], 1>>;
-type Contract1950 = Assert<
+type Contract1980 = Assert<Equal<Parameters<typeof Native71.ToastPositioner>['length'], 1>>;
+type Contract1981 = Assert<
 	Equal<keyof Pick<Native71.ToastPositionerState, PublishedKeys200>, PublishedKeys200>
 >;
-type Contract1951 = Assert<
+type Contract1982 = Assert<
 	Equal<keyof Pick<Native71.ToastPositionerProps, PublishedKeys201>, PublishedKeys201>
 >;
-type Contract1952 = Assert<Equal<Parameters<typeof Native71.ToastArrow>['length'], 1>>;
-type Contract1953 = Assert<
+type Contract1983 = Assert<Equal<Parameters<typeof Native71.ToastArrow>['length'], 1>>;
+type Contract1984 = Assert<
 	Equal<keyof Pick<Native71.ToastArrowState, PublishedKeys202>, PublishedKeys202>
 >;
-type Contract1954 = Assert<
+type Contract1985 = Assert<
 	Equal<keyof Pick<Native71.ToastArrowProps, PublishedKeys8>, PublishedKeys8>
 >;
-type Contract1955 = Assert<Equal<Parameters<typeof Native71.useToastManager>['length'], 0>>;
-type Contract1956 = Assert<
+type Contract1986 = Assert<
 	Equal<keyof Pick<Native71.ToastObject<{ sample: string }>, PublishedKeys195>, PublishedKeys195>
 >;
-type Contract1957 = Assert<
-	Equal<keyof Pick<Native71.ToastManagerPositionerProps, PublishedKeys32>, PublishedKeys32>
+type Contract1987 = Assert<
+	Equal<keyof Pick<Native71.ToastManagerPositionerProps, PublishedKeys33>, PublishedKeys33>
 >;
-type Contract1958 = Assert<
+type Contract1988 = Assert<
 	Equal<keyof Pick<Native71.UseToastManagerReturnValue, PublishedKeys203>, PublishedKeys203>
 >;
-type Contract1959 = Assert<
+type Contract1989 = Assert<
 	Equal<
 		keyof Pick<Native71.ToastManagerAddOptions<{ sample: string }>, PublishedKeys204>,
 		PublishedKeys204
 	>
 >;
-type Contract1960 = Assert<
+type Contract1990 = Assert<
 	Equal<
 		keyof Pick<Native71.ToastManagerUpdateOptions<{ sample: string }>, PublishedKeys205>,
 		PublishedKeys205
 	>
 >;
-type Contract1961 = Assert<
+type Contract1991 = Assert<
 	Equal<
 		keyof Pick<
 			Native71.ToastManagerPromiseOptions<{ sample: string }, { sample: string }>,
@@ -8368,191 +8430,194 @@ type Contract1961 = Assert<
 		PublishedKeys206
 	>
 >;
-type Contract1962 = Assert<Equal<Parameters<typeof Native71.createToastManager>['length'], 0>>;
-type Contract1963 = Assert<
+type Contract1992 = Assert<
 	Equal<keyof Pick<Native71.ToastManager, PublishedKeys207>, PublishedKeys207>
 >;
-type Contract1964 = Assert<
+type Contract1993 = Assert<
 	Equal<keyof Pick<Native71.ToastManagerEvent, PublishedKeys208>, PublishedKeys208>
 >;
-type Contract1965 = Assert<Equal<Parameters<typeof Native72.Toggle>['length'], 1>>;
-type Contract1966 = Assert<
+type Contract1994 = Assert<Equal<Parameters<typeof Native72.Toggle>['length'], 1>>;
+type Contract1995 = Assert<
 	Equal<keyof Pick<Native72.ToggleState, PublishedKeys209>, PublishedKeys209>
 >;
-type Contract1967 = Assert<
+type Contract1996 = Assert<
 	Equal<keyof Pick<Native72.ToggleProps<'sample'>, PublishedKeys210>, PublishedKeys210>
 >;
-type Contract1968 = Assert<
+type Contract1997 = Assert<
 	Equal<keyof Pick<Native72.ToggleChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1969 = Assert<
+type Contract1998 = Assert<
 	Equal<keyof Pick<Native72.ToggleChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1970 = Assert<Equal<Parameters<typeof Native73.ToggleGroup>['length'], 1>>;
-type Contract1971 = Assert<
+type Contract1999 = Assert<Equal<Parameters<typeof Native73.ToggleGroup>['length'], 1>>;
+type Contract2000 = Assert<
 	Equal<keyof Pick<Native73.ToggleGroupState, PublishedKeys211>, PublishedKeys211>
 >;
-type Contract1972 = Assert<
+type Contract2001 = Assert<
 	Equal<keyof Pick<Native73.ToggleGroupProps<'sample'>, PublishedKeys212>, PublishedKeys212>
 >;
-type Contract1973 = Assert<
+type Contract2002 = Assert<
 	Equal<keyof Pick<Native73.ToggleGroupChangeEventReason, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1974 = Assert<
+type Contract2003 = Assert<
 	Equal<keyof Pick<Native73.ToggleGroupChangeEventDetails, PublishedKeys5>, PublishedKeys5>
 >;
-type Contract1975 = Assert<
+type Contract2004 = Assert<
 	Equal<keyof Pick<typeof Native74.Toolbar, PublishedKeys213>, PublishedKeys213>
 >;
-type Contract1976 = Assert<Equal<keyof Pick<Native74.Orientation, PublishedKeys4>, PublishedKeys4>>;
-type Contract1977 = Assert<Equal<Parameters<typeof Native74.ToolbarRoot>['length'], 1>>;
-type Contract1978 = Assert<
+type Contract2005 = Assert<Equal<keyof Pick<Native74.Orientation, PublishedKeys4>, PublishedKeys4>>;
+type Contract2006 = Assert<Equal<Parameters<typeof Native74.ToolbarRoot>['length'], 1>>;
+type Contract2007 = Assert<
 	Equal<keyof Pick<Native74.ToolbarRootItemMetadata, PublishedKeys214>, PublishedKeys214>
 >;
-type Contract1979 = Assert<
+type Contract2008 = Assert<
 	Equal<keyof Pick<Native74.ToolbarRootOrientation, PublishedKeys4>, PublishedKeys4>
 >;
-type Contract1980 = Assert<
+type Contract2009 = Assert<
 	Equal<keyof Pick<Native74.ToolbarRootState, PublishedKeys215>, PublishedKeys215>
 >;
-type Contract1981 = Assert<
+type Contract2010 = Assert<
 	Equal<keyof Pick<Native74.ToolbarRootProps, PublishedKeys216>, PublishedKeys216>
 >;
-type Contract1982 = Assert<Equal<Parameters<typeof Native74.ToolbarGroup>['length'], 1>>;
-type Contract1983 = Assert<
+type Contract2011 = Assert<Equal<Parameters<typeof Native74.ToolbarGroup>['length'], 1>>;
+type Contract2012 = Assert<
 	Equal<keyof Pick<Native74.ToolbarGroupState, PublishedKeys215>, PublishedKeys215>
 >;
-type Contract1984 = Assert<
+type Contract2013 = Assert<
 	Equal<keyof Pick<Native74.ToolbarGroupProps, PublishedKeys107>, PublishedKeys107>
 >;
-type Contract1985 = Assert<Equal<Parameters<typeof Native74.ToolbarButton>['length'], 1>>;
-type Contract1986 = Assert<
+type Contract2014 = Assert<Equal<Parameters<typeof Native74.ToolbarButton>['length'], 1>>;
+type Contract2015 = Assert<
 	Equal<keyof Pick<Native74.ToolbarButtonState, PublishedKeys217>, PublishedKeys217>
 >;
-type Contract1987 = Assert<
-	Equal<keyof Pick<Native74.ToolbarButtonProps, PublishedKeys50>, PublishedKeys50>
+type Contract2016 = Assert<
+	Equal<keyof Pick<Native74.ToolbarButtonProps, PublishedKeys51>, PublishedKeys51>
 >;
-type Contract1988 = Assert<Equal<Parameters<typeof Native74.ToolbarLink>['length'], 1>>;
-type Contract1989 = Assert<
-	Equal<keyof Pick<Native74.ToolbarLinkState, PublishedKeys26>, PublishedKeys26>
+type Contract2017 = Assert<Equal<Parameters<typeof Native74.ToolbarLink>['length'], 1>>;
+type Contract2018 = Assert<
+	Equal<keyof Pick<Native74.ToolbarLinkState, PublishedKeys27>, PublishedKeys27>
 >;
-type Contract1990 = Assert<
+type Contract2019 = Assert<
 	Equal<keyof Pick<Native74.ToolbarLinkProps, PublishedKeys218>, PublishedKeys218>
 >;
-type Contract1991 = Assert<Equal<Parameters<typeof Native74.ToolbarInput>['length'], 1>>;
-type Contract1992 = Assert<
+type Contract2020 = Assert<Equal<Parameters<typeof Native74.ToolbarInput>['length'], 1>>;
+type Contract2021 = Assert<
 	Equal<keyof Pick<Native74.ToolbarInputState, PublishedKeys217>, PublishedKeys217>
 >;
-type Contract1993 = Assert<
+type Contract2022 = Assert<
 	Equal<keyof Pick<Native74.ToolbarInputProps, PublishedKeys219>, PublishedKeys219>
 >;
-type Contract1994 = Assert<Equal<Parameters<typeof Native74.ToolbarSeparator>['length'], 1>>;
-type Contract1995 = Assert<
-	Equal<keyof Pick<Native74.ToolbarSeparatorState, PublishedKeys26>, PublishedKeys26>
->;
-type Contract1996 = Assert<
-	Equal<keyof Pick<Native74.ToolbarSeparatorProps, PublishedKeys25>, PublishedKeys25>
->;
-type Contract1997 = Assert<
-	Equal<keyof Pick<typeof Native75.Tooltip, PublishedKeys220>, PublishedKeys220>
->;
-type Contract1998 = Assert<Equal<Parameters<typeof Native75.TooltipProvider>['length'], 1>>;
-type Contract1999 = Assert<Equal<keyof Native75.TooltipProviderState, never>>;
-type Contract2000 = Assert<
-	Equal<keyof Pick<Native75.TooltipProviderProps, PublishedKeys221>, PublishedKeys221>
->;
-type Contract2001 = Assert<Equal<Parameters<typeof Native75.TooltipRoot>['length'], 1>>;
-type Contract2002 = Assert<Equal<keyof Native75.TooltipRootState, never>>;
-type Contract2003 = Assert<
-	Equal<keyof Pick<Native75.TooltipRootProps, PublishedKeys222>, PublishedKeys222>
->;
-type Contract2004 = Assert<
-	Equal<keyof Pick<Native75.TooltipRootActions, PublishedKeys20>, PublishedKeys20>
->;
-type Contract2005 = Assert<
-	Equal<keyof Pick<Native75.TooltipRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
->;
-type Contract2006 = Assert<
-	Equal<keyof Pick<Native75.TooltipRootChangeEventDetails, PublishedKeys21>, PublishedKeys21>
->;
-type Contract2007 = Assert<Equal<Parameters<Native75.TooltipTrigger>['length'], 1>>;
-type Contract2008 = Assert<
-	Equal<keyof Pick<Native75.TooltipTriggerState, PublishedKeys87>, PublishedKeys87>
->;
-type Contract2009 = Assert<
-	Equal<keyof Pick<Native75.TooltipTriggerProps, PublishedKeys223>, PublishedKeys223>
->;
-type Contract2010 = Assert<Equal<Parameters<typeof Native75.TooltipPortal>['length'], 1>>;
-type Contract2011 = Assert<Equal<keyof Native75.TooltipPortalState, never>>;
-type Contract2012 = Assert<
-	Equal<keyof Pick<Native75.TooltipPortalProps, PublishedKeys18>, PublishedKeys18>
->;
-type Contract2013 = Assert<Equal<Parameters<typeof Native75.TooltipPositioner>['length'], 1>>;
-type Contract2014 = Assert<
-	Equal<keyof Pick<Native75.TooltipPositionerState, PublishedKeys124>, PublishedKeys124>
->;
-type Contract2015 = Assert<
-	Equal<keyof Pick<Native75.TooltipPositionerProps, PublishedKeys32>, PublishedKeys32>
->;
-type Contract2016 = Assert<Equal<Parameters<typeof Native75.TooltipPopup>['length'], 1>>;
-type Contract2017 = Assert<
-	Equal<keyof Pick<Native75.TooltipPopupState, PublishedKeys140>, PublishedKeys140>
->;
-type Contract2018 = Assert<
-	Equal<keyof Pick<Native75.TooltipPopupProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract2019 = Assert<Equal<Parameters<typeof Native75.TooltipViewport>['length'], 1>>;
-type Contract2020 = Assert<
-	Equal<keyof Pick<Native75.TooltipViewportState, PublishedKeys116>, PublishedKeys116>
->;
-type Contract2021 = Assert<
-	Equal<keyof Pick<Native75.TooltipViewportProps, PublishedKeys8>, PublishedKeys8>
->;
-type Contract2022 = Assert<Equal<Parameters<typeof Native75.TooltipArrow>['length'], 1>>;
-type Contract2023 = Assert<
-	Equal<keyof Pick<Native75.TooltipArrowState, PublishedKeys224>, PublishedKeys224>
->;
+type Contract2023 = Assert<Equal<Parameters<typeof Native74.ToolbarSeparator>['length'], 1>>;
 type Contract2024 = Assert<
-	Equal<keyof Pick<Native75.TooltipArrowProps, PublishedKeys8>, PublishedKeys8>
+	Equal<keyof Pick<Native74.ToolbarSeparatorState, PublishedKeys27>, PublishedKeys27>
 >;
 type Contract2025 = Assert<
-	Equal<keyof Pick<Native76.BaseUIChangeEventDetails<'sample'>, PublishedKeys5>, PublishedKeys5>
+	Equal<keyof Pick<Native74.ToolbarSeparatorProps, PublishedKeys26>, PublishedKeys26>
 >;
 type Contract2026 = Assert<
+	Equal<keyof Pick<typeof Native75.Tooltip, PublishedKeys220>, PublishedKeys220>
+>;
+type Contract2027 = Assert<
+	Equal<keyof Pick<typeof Native75.TooltipHandle, PublishedKeys19>, PublishedKeys19>
+>;
+type Contract2028 = Assert<Equal<Parameters<typeof Native75.createTooltipHandle>['length'], 0>>;
+type Contract2029 = Assert<Equal<Parameters<typeof Native75.TooltipProvider>['length'], 1>>;
+type Contract2030 = Assert<Equal<keyof Native75.TooltipProviderState, never>>;
+type Contract2031 = Assert<
+	Equal<keyof Pick<Native75.TooltipProviderProps, PublishedKeys221>, PublishedKeys221>
+>;
+type Contract2032 = Assert<Equal<Parameters<typeof Native75.TooltipRoot>['length'], 1>>;
+type Contract2033 = Assert<Equal<keyof Native75.TooltipRootState, never>>;
+type Contract2034 = Assert<
+	Equal<keyof Pick<Native75.TooltipRootProps, PublishedKeys222>, PublishedKeys222>
+>;
+type Contract2035 = Assert<
+	Equal<keyof Pick<Native75.TooltipRootActions, PublishedKeys21>, PublishedKeys21>
+>;
+type Contract2036 = Assert<
+	Equal<keyof Pick<Native75.TooltipRootChangeEventReason, PublishedKeys4>, PublishedKeys4>
+>;
+type Contract2037 = Assert<
+	Equal<keyof Pick<Native75.TooltipRootChangeEventDetails, PublishedKeys22>, PublishedKeys22>
+>;
+type Contract2038 = Assert<Equal<Parameters<Native75.TooltipTrigger>['length'], 1>>;
+type Contract2039 = Assert<
+	Equal<keyof Pick<Native75.TooltipTriggerState, PublishedKeys87>, PublishedKeys87>
+>;
+type Contract2040 = Assert<
+	Equal<keyof Pick<Native75.TooltipTriggerProps, PublishedKeys223>, PublishedKeys223>
+>;
+type Contract2041 = Assert<Equal<Parameters<typeof Native75.TooltipPortal>['length'], 1>>;
+type Contract2042 = Assert<Equal<keyof Native75.TooltipPortalState, never>>;
+type Contract2043 = Assert<
+	Equal<keyof Pick<Native75.TooltipPortalProps, PublishedKeys18>, PublishedKeys18>
+>;
+type Contract2044 = Assert<Equal<Parameters<typeof Native75.TooltipPositioner>['length'], 1>>;
+type Contract2045 = Assert<
+	Equal<keyof Pick<Native75.TooltipPositionerState, PublishedKeys124>, PublishedKeys124>
+>;
+type Contract2046 = Assert<
+	Equal<keyof Pick<Native75.TooltipPositionerProps, PublishedKeys33>, PublishedKeys33>
+>;
+type Contract2047 = Assert<Equal<Parameters<typeof Native75.TooltipPopup>['length'], 1>>;
+type Contract2048 = Assert<
+	Equal<keyof Pick<Native75.TooltipPopupState, PublishedKeys140>, PublishedKeys140>
+>;
+type Contract2049 = Assert<
+	Equal<keyof Pick<Native75.TooltipPopupProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract2050 = Assert<Equal<Parameters<typeof Native75.TooltipViewport>['length'], 1>>;
+type Contract2051 = Assert<
+	Equal<keyof Pick<Native75.TooltipViewportState, PublishedKeys116>, PublishedKeys116>
+>;
+type Contract2052 = Assert<
+	Equal<keyof Pick<Native75.TooltipViewportProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract2053 = Assert<Equal<Parameters<typeof Native75.TooltipArrow>['length'], 1>>;
+type Contract2054 = Assert<
+	Equal<keyof Pick<Native75.TooltipArrowState, PublishedKeys224>, PublishedKeys224>
+>;
+type Contract2055 = Assert<
+	Equal<keyof Pick<Native75.TooltipArrowProps, PublishedKeys8>, PublishedKeys8>
+>;
+type Contract2056 = Assert<
+	Equal<keyof Pick<Native76.BaseUIChangeEventDetails<'sample'>, PublishedKeys5>, PublishedKeys5>
+>;
+type Contract2057 = Assert<
 	Equal<
 		keyof Pick<Native76.BaseUIGenericEventDetails<'sample'>, PublishedKeys110>,
 		PublishedKeys110
 	>
 >;
-type Contract2027 = Assert<
+type Contract2058 = Assert<
 	Equal<keyof Pick<Native76.HTMLProps, PublishedKeys225>, PublishedKeys225>
 >;
-type Contract2028 = Assert<
+type Contract2059 = Assert<
 	Equal<Parameters<Native76.ComponentRenderFn<{ sample: string }, { sample: string }>>['length'], 2>
 >;
-type Contract2029 = Assert<
+type Contract2060 = Assert<
 	Equal<keyof Pick<Native76.BaseUIEvent<MouseEvent>, PublishedKeys230>, PublishedKeys230>
 >;
-type Contract2030 = Assert<Equal<Parameters<typeof Native77.useMediaQuery>['length'], 2>>;
-type Contract2031 = Assert<
+type Contract2061 = Assert<Equal<Parameters<typeof Native77.useMediaQuery>['length'], 1 | 2>>;
+type Contract2062 = Assert<
 	Equal<keyof Pick<Native77.UseMediaQueryOptions, PublishedKeys277>, PublishedKeys277>
 >;
-type Contract2032 = Assert<Equal<keyof Native77.UseMediaQueryState, never>>;
-type Contract2033 = Assert<
+type Contract2063 = Assert<Equal<keyof Native77.UseMediaQueryState, never>>;
+type Contract2064 = Assert<
 	Equal<keyof Pick<Native78.HTMLProps, PublishedKeys225>, PublishedKeys225>
 >;
-type Contract2034 = Assert<
+type Contract2065 = Assert<
 	Equal<Parameters<Native78.ComponentRenderFn<{ sample: string }, { sample: string }>>['length'], 2>
 >;
-type Contract2035 = Assert<Equal<Parameters<typeof Native78.useRender>['length'], 1>>;
-type Contract2036 = Assert<Equal<keyof Native78.UseRenderRenderProp, never>>;
-type Contract2037 = Assert<
+type Contract2066 = Assert<Equal<Parameters<typeof Native78.useRender>['length'], 1>>;
+type Contract2067 = Assert<Equal<keyof Native78.UseRenderRenderProp, never>>;
+type Contract2068 = Assert<
 	Equal<keyof Pick<Native78.UseRenderElementProps<'div'>, PublishedKeys226>, PublishedKeys226>
 >;
-type Contract2038 = Assert<
+type Contract2069 = Assert<
 	Equal<keyof Pick<Native78.UseRenderComponentProps<'div'>, PublishedKeys227>, PublishedKeys227>
 >;
-type Contract2039 = Assert<
+type Contract2070 = Assert<
 	Equal<
 		keyof Pick<
 			Native78.UseRenderParameters<{ sample: string }, HTMLDivElement, true>,
@@ -8561,7 +8626,7 @@ type Contract2039 = Assert<
 		PublishedKeys228
 	>
 >;
-type Contract2040 = Assert<
+type Contract2071 = Assert<
 	Equal<keyof Pick<Native78.UseRenderReturnValue<true>, PublishedKeys229>, PublishedKeys229>
 >;
-type Contract2041 = Assert<Equal<keyof Native78.UseRenderState, never>>;
+type Contract2072 = Assert<Equal<keyof Native78.UseRenderState, never>>;

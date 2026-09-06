@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { gunzipSync } from 'node:zlib';
 import { parseTarArchive, verifyIntegrity } from './preflight-lib.mjs';
 import path from 'node:path';
+import { publicCompatibilityExport } from './public-compatibility.mjs';
 import ts from 'typescript';
 import { validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
 
@@ -83,6 +84,19 @@ export function pinnedPublicEntries(packageDirectory, node) {
 		entries.set(specifier, path.resolve(installedRoot, file));
 	}
 	return entries;
+}
+
+export function pinnedPublicExport(entries, program, checker, specifier, name) {
+	const compatibility = publicCompatibilityExport(specifier, name);
+	const target = compatibility?.specifier ?? specifier;
+	const source = program.getSourceFile(entries.get(target));
+	let symbol = source && checker.getSymbolAtLocation(source);
+	for (const part of (compatibility?.path ?? name).split('.')) {
+		if (!symbol) return undefined;
+		if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+		symbol = checker.getExportsOfModule(symbol).find((entry) => entry.name === part);
+	}
+	return symbol;
 }
 
 export function publicSymbolType(symbol, checker) {

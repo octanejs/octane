@@ -19,7 +19,12 @@ import ts from 'typescript';
 import { assertTsrxTypecheckSucceeded } from '../tsrx-typecheck.mjs';
 import { createTypeEvidenceProgram } from './type-program.mjs';
 import { assertMaterializedTypeEvidence } from './materialized-type-evidence.mjs';
-import { pinnedPublicEntries, newOpaquePublicSymbol } from './pinned-public-types.mjs';
+import { publicCompatibilityExport } from './public-compatibility.mjs';
+import {
+	pinnedPublicEntries,
+	pinnedPublicExport,
+	newOpaquePublicSymbol,
+} from './pinned-public-types.mjs';
 import {
 	auditShippedClosure,
 	assertCurrentEvidenceMatrix,
@@ -1208,7 +1213,9 @@ function analyzeTypeEvidence(
 				);
 			}
 			if (pinnedExports) {
-				const witness = pinnedExports.get(symbol.name);
+				const witness = publicCompatibilityExport(specifier, symbol.name)
+					? pinnedPublicExport(pinnedEntries, program, checker, specifier, symbol.name)
+					: pinnedExports.get(symbol.name);
 				if (!witness)
 					throw new Error(
 						`Export ${specifier}.${symbol.name} is absent from the pinned public API`,

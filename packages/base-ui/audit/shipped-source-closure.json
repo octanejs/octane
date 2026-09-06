@@ -686,7 +686,7 @@
     {
       "path": "src/accordion/index.ts",
       "origin": "adapted",
-      "sha256": "c16722e393bf41b0ca85f2f9a32ee9dfd3ae1eace9e8d8aa90b8abef0e9df135",
+      "sha256": "efa6d26410e9480eef493ab445683ecf57f3240c355d2304b35c5e59b89b4ef7",
       "packageName": "@base-ui/react"
     },
     {
@@ -758,7 +758,7 @@
     {
       "path": "src/alert-dialog/index.ts",
       "origin": "adapted",
-      "sha256": "c1852165fe6d2691bef78965b10ad0cc866788af0fcc8630853fd8dc94ce6b2b",
+      "sha256": "53d2f37aea867ac439a68973a6be4ba3f029cf9619de95c6959dddb3d115bbe5",
       "packageName": "@base-ui/react"
     },
     {
@@ -956,7 +956,7 @@
     {
       "path": "src/collapsible/index.ts",
       "origin": "adapted",
-      "sha256": "a7ed3037d7d7e4b2ed020e7ed1566ed97749bb2299195c040a06f81d4e445ff9",
+      "sha256": "7b816b52e9d185ecd44d9a0b2dd5e4e99d2cef25e312126096b5bac39617ac8f",
       "packageName": "@base-ui/react"
     },
     {
@@ -1406,7 +1406,7 @@
     {
       "path": "src/dialog/index.ts",
       "origin": "adapted",
-      "sha256": "56d6e39a42a60e68510441a20fefde1dce0e7ac17afaf6368a1ac2b2741fa6bf",
+      "sha256": "92cce92a59ae6efa58d62892d56fa96a9bad199d4b11412721b16fd734896dec",
       "packageName": "@base-ui/react"
     },
     {
@@ -2042,7 +2042,7 @@
     {
       "path": "src/index.ts",
       "origin": "adapted",
-      "sha256": "bdc94b38f7d1ab96c528b46d28b87db4e20caaf65629acec6ffd9b5f16bb90ed",
+      "sha256": "e32aac45a8712670777f4934d42ab3b70bdf319b2c7997f2884a39db2f9ed7b5",
       "packageName": "@base-ui/react"
     },
     {
@@ -2516,7 +2516,7 @@
     {
       "path": "src/menu/index.ts",
       "origin": "adapted",
-      "sha256": "56ee58b16ef35aa788ac031e2ea3189c07f4b3506704b6e6c1b89aaefa46fe48",
+      "sha256": "c0be4d25a79cee4d1b8ab765018cd3c99052fde48b713d3ed3f249827c09297e",
       "packageName": "@base-ui/react"
     },
     {
@@ -3086,7 +3086,7 @@
     {
       "path": "src/popover/index.ts",
       "origin": "adapted",
-      "sha256": "4c21bd9aa71b9f68e8bc5051d0925c31851b4f1e4bd42a057e2337f0673d3c7f",
+      "sha256": "d528986fe43d89ab8ecdde7a5b7bdb3be3c7a2fd167174c4c9df619c4a6d1939",
       "packageName": "@base-ui/react"
     },
     {
@@ -3188,7 +3188,7 @@
     {
       "path": "src/preview-card/index.ts",
       "origin": "adapted",
-      "sha256": "f1fa6350b37cf10d2ecbcb605e86186e054852b2055385239d404fe675944e37",
+      "sha256": "423aa9aa8f0ea131cf169aa6aa44c8658ba5707e46f2989a7b55fb8ff1223359",
       "packageName": "@base-ui/react"
     },
     {
@@ -3860,7 +3860,7 @@
     {
       "path": "src/tabs/index.ts",
       "origin": "adapted",
-      "sha256": "102dfc19c98dfef8abfa6845dae5b45005e91d961661c2150e3dbd862ebcce1f",
+      "sha256": "d895e0f287abf7c622621843560985173e9444ab08e8a382a74d48c7253513a4",
       "packageName": "@base-ui/react"
     },
     {
@@ -3980,7 +3980,7 @@
     {
       "path": "src/toast/index.ts",
       "origin": "adapted",
-      "sha256": "5f32ed454986b876dcb99e0d534413cb4ca50ab9bbbb8529aa973dee0b9a9b18",
+      "sha256": "9b9fa7f27fb62b06b1060a7a369240411f3f58354d61d46f13523a1fe42a1900",
       "packageName": "@base-ui/react"
     },
     {
@@ -4196,7 +4196,7 @@
     {
       "path": "src/tooltip/index.ts",
       "origin": "adapted",
-      "sha256": "fbcf6878839a76178e4ce4cf03adb10715eae57368ede3e9e803b84bab41f932",
+      "sha256": "1c0e53b14812eae7f6de145d2136abe05ebfabfe66708287caf33ed2277d5e25",
       "packageName": "@base-ui/react"
     },
     {
@@ -4298,7 +4298,7 @@
     {
       "path": "src/unstable-use-media-query/index.ts",
       "origin": "adapted",
-      "sha256": "7008f8aa984a41abcd7e28e21a4b43269a53475c0fe6e2b9dc9970eb177384f9",
+      "sha256": "fd0a07a2eabde22be15169f23e568e276a79a41e54b2101770a2483578467a6f",
       "packageName": "@base-ui/react"
     },
     {

@@ -18,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
 	getWorkspacePackages,
-	OCTANE_BETA_PEER_RANGE,
+	octanePeerRangeFor,
 	REPO_ROOT,
 	validateWorkspacePackages,
 } from './workspace-packages.mjs';
@@ -234,7 +234,7 @@ function validatePackedPackage(pkg, manifest, files, executableFiles) {
 		if (manifest.dependencies?.octane !== undefined) {
 			errors.push('packed manifest installs a duplicate octane runtime dependency');
 		}
-		const expectedOctane = OCTANE_BETA_PEER_RANGE.replace(/^workspace:/, '');
+		const expectedOctane = octanePeerRangeFor(pkg.name).replace(/^workspace:/, '');
 		if (manifest.peerDependencies?.octane !== expectedOctane) {
 			errors.push(
 				`packed octane peer is ${JSON.stringify(manifest.peerDependencies?.octane)}, expected ${JSON.stringify(expectedOctane)}`,

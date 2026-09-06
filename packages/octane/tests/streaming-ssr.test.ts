@@ -1857,7 +1857,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		);
 		try {
 			flushSync(() => {});
-			expect(container.querySelector('.id-error')).toBe(errorSpan);
+			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
 			expect(container.querySelector('.id-loading')).toBeNull();
 			expect(seen).toContainEqual(['root', rootId]);
 			expect(seen).toContainEqual(['catch', boundaryId]);
@@ -1869,7 +1869,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			clientPending.reject(new Error('client request also rejected'));
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
 			expect(unhandledClientRejections).toEqual([]);
-			expect(container.querySelector('.id-error')).toBe(errorSpan);
+			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
 			expect(errorSpan!.textContent).toBe('server-no');
 			expect(errSpy).not.toHaveBeenCalled();
 		} finally {

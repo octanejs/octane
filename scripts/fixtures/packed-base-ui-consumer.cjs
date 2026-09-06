@@ -20,6 +20,7 @@ globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.win
 globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 globalThis.BASE_UI_ANIMATIONS_DISABLED = true;
 const Octane = require('octane');
+const { render, cleanup } = require('@octanejs/testing-library');
 const { Select } = require('@octanejs/base-ui/select');
 const { Combobox } = require('@octanejs/base-ui/combobox');
 const { StoreInspector } = require('@octanejs/base-ui-utils/store');
@@ -43,6 +44,17 @@ const items = [
 	{ value: 'pear', label: 'Pear' },
 ];
 async function main() {
+	// This is the coordinated next-release source. Its declared peer floor
+	// excludes already-published runtimes without this API.
+	assert.equal(Octane.isInActScope(), false);
+	let tested;
+	await Octane.act(() => {
+		assert.equal(Octane.isInActScope(), true);
+		tested = render(h('output', null, 'packed testing-library'));
+	});
+	assert.equal(tested.container.textContent, 'packed testing-library');
+	assert.equal(Octane.isInActScope(), false);
+	cleanup();
 	await Octane.act(() =>
 		root.render(
 			h(

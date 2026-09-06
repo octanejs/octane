@@ -58,6 +58,31 @@ pnpm --dir packages/base-ui test:pristine # Immutable React oracle in jsdom
 pnpm --dir packages/base-ui upstream:verify
 ```
 
+## Migrating from the Base UI 1.6 binding
+
+Upgrade `octane` to **0.2.4 or later in the 0.2 line** together with this binding,
+`@octanejs/base-ui-utils`, `@octanejs/testing-library`, and `@octanejs/shadcn` when
+used. These packages require the compiler, hydration, and `act` support released
+in that coordinated patch. Earlier Octane 0.1 and 0.2 releases are not supported.
+
+- Select, Combobox, Autocomplete, Drawer, Navigation Menu, OTP Field, Scroll Area,
+  Toolbar, temporal adapters, and the remaining upstream parts are now available.
+- Existing primitives use the Base UI 1.8 implementations and public props. Keep
+  using component namespaces such as `Accordion.Root` and `Dialog.createHandle`.
+  Previously exported named components, handle constructors/factories, Toast
+  manager helpers, and Tabs type aliases remain available at the root and their
+  component entries. `useMediaQuery(query)` still works from the root or
+  `/unstable-use-media-query`; its options remain optional.
+- Packages publish authored Octane source. Use the Octane compiler integration
+  in your consumer toolchain; precompiled CommonJS export conditions are no
+  longer provided.
+- The export map now lists the upstream public entries explicitly. The previous
+  `/internal` and wildcard `/utils/*` implementation paths are unavailable.
+  Import supported utilities from `@octanejs/base-ui-utils`, for example
+  `@octanejs/base-ui-utils/usePreviousValue`, and composite primitives from
+  `@octanejs/base-ui/internals/composite`. Other private implementation paths
+  have no supported replacement contract.
+
 ## Intentional divergences from Base UI (React)
 
 - **Native events, not synthetic.** Handlers receive native DOM events (octane delegates

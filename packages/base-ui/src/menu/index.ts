@@ -19,3 +19,6 @@ export type * from './submenu-root/MenuSubmenuRoot.tsrx';
 export type * from './trigger/MenuTrigger.tsrx';
 export type * from './submenu-trigger/MenuSubmenuTrigger.tsrx';
 export type * from './viewport/MenuViewport.tsrx';
+
+// Retain the named runtime exports of the previous Octane binding.
+export { Handle as MenuHandle, createHandle as createMenuHandle } from './index.parts';

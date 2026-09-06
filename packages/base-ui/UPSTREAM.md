@@ -28,7 +28,7 @@ in CI and none otherwise. The byte-exact configuration is retained under
 subject to the same strict report validation after retries.
 
 Native source and adapted type tests pass strict `tsrx-tsc` checks with declaration
-checking enabled. The formal public type gate also passes. All 79 Base UI public entries and 2,042 entry/export pairs have consumer assertions.
+checking enabled. The formal public type gate also passes. All 79 Base UI public entries and 2,073 entry/export pairs have consumer assertions, including 31 retained Octane compatibility exports.
 The gate verifies the npm tarball integrity and installed declaration bytes before
 using them as witnesses for intentional opaque types. New erasure in callbacks,
 generic arguments, inherited properties, and refs is rejected. See

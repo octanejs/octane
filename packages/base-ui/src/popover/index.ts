@@ -11,3 +11,6 @@ export type * from './title/PopoverTitle.tsrx';
 export type * from './description/PopoverDescription.tsrx';
 export type * from './close/PopoverClose.tsrx';
 export type * from './viewport/PopoverViewport.tsrx';
+
+// Retain the named runtime exports of the previous Octane binding.
+export { Handle as PopoverHandle, createHandle as createPopoverHandle } from './index.parts';

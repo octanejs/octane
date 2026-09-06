@@ -15,3 +15,6 @@ utilities, including StoreInspector, from the public store entry.
 
 Base UI and Utils now expose authored source without precompiled CommonJS
 conditions, so client, server, and profiling output use the consumer toolchain.
+
+Retain the previous binding’s named component and handle exports, Toast manager
+helpers, Tabs type aliases, and optional media-query calls at both import paths.

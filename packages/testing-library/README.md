@@ -160,3 +160,10 @@ text commit on `tab()`, checkbox click ordering, `keyboard()`).
 Current scope, known divergences, and verification status are tracked in the
 generated [bindings status table](../../docs/bindings-status.md), sourced from
 this package's [`status.json`](./status.json).
+
+## Runtime requirement
+
+This release requires Octane 0.2.4 or later in the 0.2 line. Upgrade Octane together
+with testing-library so the `isInActScope` API used for nested `act` batching is
+available. The packed-consumer checks exercise that API and rendering inside
+an outer `act` scope.

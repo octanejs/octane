@@ -9,3 +9,6 @@ export type * from './title/DialogTitle.tsrx';
 export type * from './description/DialogDescription.tsrx';
 export type * from './close/DialogClose.tsrx';
 export type * from './viewport/DialogViewport.tsrx';
+
+// Retain the named runtime exports of the previous Octane binding.
+export { Handle as DialogHandle, createHandle as createDialogHandle } from './index.parts';

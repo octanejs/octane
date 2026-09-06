@@ -13630,7 +13630,7 @@ class HydrationCapability {
 	nativeAdoption?: NativeAdoptionState;
 
 	constructor(
-		readonly rootBlock: Block,
+		public rootBlock: Block,
 		public node: Node | null,
 		public seeds: unknown[] | null,
 	) {
@@ -30275,6 +30275,18 @@ function switchToCatchInner(
 	);
 	b.idState = state.idState;
 	state.block = b;
+	if (
+		adopting &&
+		hydration !== null &&
+		hydration.rootBlock.disposed &&
+		hydration.rootBlock.startMarker === bStart &&
+		hydration.rootBlock.endMarker === bEnd
+	) {
+		// An initially resolved arm scoped adoption to its discarded try block.
+		// Its catch replaces that exact range; transfer ownership to this sibling
+		// so adoption stays local without treating the catch as a fresh render.
+		hydration.rootBlock = b;
+	}
 	try {
 		// A client-fresh catch build during hydration must not read the adoption
 		// cursor — the server rendered the try arm here, so adopting would consume

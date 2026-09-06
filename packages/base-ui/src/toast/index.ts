@@ -13,3 +13,6 @@ export type * from './positioner/ToastPositioner.tsrx';
 export type * from './arrow/ToastArrow.tsrx';
 export type * from './useToastManager';
 export type * from './createToastManager';
+
+// Retain the named runtime exports of the previous Octane binding.
+export { useToastManager, createToastManager } from './index.parts';

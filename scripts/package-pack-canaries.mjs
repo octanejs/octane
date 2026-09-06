@@ -68,6 +68,7 @@ export const PACKED_ESM_ONLY_CONSUMER_PACKAGES = [
 	'@octanejs/draggable',
 	'@octanejs/base-ui',
 	'@octanejs/base-ui-utils',
+	'@octanejs/testing-library',
 ];
 
 export const PACKED_JAVASCRIPT_CONSUMER_PACKAGES = [
