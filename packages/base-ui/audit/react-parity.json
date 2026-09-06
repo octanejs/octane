@@ -164,7 +164,7 @@
         {
           "path": "packages/base-ui/audit/provenance.json",
           "role": "support",
-          "sha256": "4ee42908323e3212d927b3bcff646eaf3922730f9da4aff0922623dd3d8ac4f6"
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
         },
         {
           "path": "packages/base-ui/audit/parity-policy.json",
@@ -234,7 +234,7 @@
         {
           "path": "packages/base-ui/audit/provenance.json",
           "role": "support",
-          "sha256": "4ee42908323e3212d927b3bcff646eaf3922730f9da4aff0922623dd3d8ac4f6"
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
         },
         {
           "path": "packages/base-ui/audit/parity-policy.json",
@@ -304,7 +304,7 @@
         {
           "path": "packages/base-ui/audit/provenance.json",
           "role": "support",
-          "sha256": "4ee42908323e3212d927b3bcff646eaf3922730f9da4aff0922623dd3d8ac4f6"
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
         },
         {
           "path": "packages/base-ui/audit/parity-policy.json",
@@ -389,7 +389,7 @@
         {
           "path": "packages/base-ui/audit/provenance.json",
           "role": "support",
-          "sha256": "4ee42908323e3212d927b3bcff646eaf3922730f9da4aff0922623dd3d8ac4f6"
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
         },
         {
           "path": "packages/base-ui/audit/parity-policy.json",
