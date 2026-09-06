@@ -1,0 +1,8 @@
+diff --git a/tests/upstream/src/floating-ui-react/safePolygon.test.ts b/tests/upstream/src/floating-ui-react/safePolygon.test.ts
+--- a/tests/upstream/src/floating-ui-react/safePolygon.test.ts
++++ b/tests/upstream/src/floating-ui-react/safePolygon.test.ts
+@@ -1,3 +1,4 @@
++/** @jsxImportSource octane */
+ import { vi, expect, describe, beforeEach, afterEach, it } from 'vitest';
+ import { act } from '@mui/internal-test-utils';
+ import { FloatingTreeStore } from './components/FloatingTreeStore';

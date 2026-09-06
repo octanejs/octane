@@ -1,0 +1,63 @@
+diff --git a/tests/upstream/src/scroll-area/scrollbar/ScrollAreaScrollbar.test.tsx b/tests/upstream/src/scroll-area/scrollbar/ScrollAreaScrollbar.test.tsx
+--- a/tests/upstream/src/scroll-area/scrollbar/ScrollAreaScrollbar.test.tsx
++++ b/tests/upstream/src/scroll-area/scrollbar/ScrollAreaScrollbar.test.tsx
+@@ -48,10 +48,8 @@ describe('<ScrollArea.Scrollbar />', () => {
+   });
+ 
+   it('supports a custom scrollbar renderer that does not forward its ref', async () => {
+-    const ScrollbarWithoutRef = React.forwardRef<
+-      HTMLDivElement,
+-      React.ComponentPropsWithoutRef<'div'>
+-    >(function ScrollbarWithoutRef(props, _ref) {
++    const ScrollbarWithoutRef = (function ScrollbarWithoutRef(propsWithRef: (React.ComponentPropsWithoutRef<'div'>) & { ref?: React.Ref<HTMLDivElement> }) {
++  const { ref: _ref = null, ...props } = propsWithRef;
+       return <div {...props} />;
+     });
+ 
+@@ -177,7 +175,7 @@ describe('<ScrollArea.Scrollbar />', () => {
+       expect(scrollbar).not.toHaveAttribute('data-hovering');
+     });
+ 
+-    it('adds [data-hovering] when the synthetic pointer target differs from the native path', async () => {
++    it('adds [data-hovering] when the pointer event target differs from the native path', async () => {
+       await render(
+         <ScrollArea.Root data-testid="root" style={{ width: 200, height: 200 }}>
+           <ScrollArea.Viewport data-testid="viewport" style={{ width: '100%', height: '100%' }}>
+@@ -187,23 +185,25 @@ describe('<ScrollArea.Scrollbar />', () => {
+         </ScrollArea.Root>,
+       );
+ 
++      const root = screen.getByTestId('root');
+       const viewport = screen.getByTestId('viewport');
+       const verticalScrollbar = screen.getByTestId('vertical');
+ 
+       // Real browser runs can start with the viewport already hovered because
+       // ScrollAreaViewport syncs `:hover` on mount.
+-      fireEvent.pointerLeave(viewport, { pointerType: 'mouse' });
++      fireEvent.pointerLeave(root, { pointerType: 'mouse' });
+       expect(verticalScrollbar).not.toHaveAttribute('data-hovering');
+ 
++      // OCTANE DIVERGENCE[native-event-semantics]: pointermove bubbles natively; pointerenter is target-only.
+       const PointerEventCtor = window.PointerEvent ?? window.Event;
+-      const event = new PointerEventCtor('pointerover', {
++      const event = new PointerEventCtor('pointermove', {
+         bubbles: true,
+       });
+ 
+       Object.defineProperties(event, {
+         composedPath: {
+           configurable: true,
+-          value: () => [document.body, viewport],
++          value: () => [document.body, viewport, root, root.parentNode, document.body, document.documentElement, document, window],
+         },
+         pointerType: {
+           configurable: true,
+@@ -215,7 +215,7 @@ describe('<ScrollArea.Scrollbar />', () => {
+ 
+       expect(verticalScrollbar).toHaveAttribute('data-hovering', '');
+ 
+-      fireEvent.pointerLeave(viewport, { pointerType: 'mouse' });
++      fireEvent.pointerLeave(root, { pointerType: 'mouse' });
+ 
+       expect(verticalScrollbar).not.toHaveAttribute('data-hovering');
+     });

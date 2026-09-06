@@ -11,10 +11,7 @@
     "integrity": "sha256:92d1d53c119f0e0e6049effd0bba0e94d83508e3a7c7fd8d406e19fe16c49ca5",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "insufficient"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "insufficient" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tiptap/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

@@ -10,16 +10,9 @@
     "integrity": "sha256:d062e21bae0c864c3559707c0451edabc0aac32a22eda239064a3faa7c9f1b21",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/vaul/src"],
-      "include": ["\\.(?:ts|tsrx)$"],
-      "exclude": []
-    },
+    "source": { "roots": ["packages/vaul/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
     "tests": {
       "roots": ["packages/vaul/tests"],
       "include": ["\\.test\\.ts$"],
@@ -43,7 +36,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

@@ -10,10 +10,7 @@
     "integrity": "sha256:3f9c1c6da89473296033cc2701405080b2cb11478724bc7f045063ee618aaf57",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/formisch/src"],
@@ -39,7 +36,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

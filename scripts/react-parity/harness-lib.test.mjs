@@ -254,6 +254,31 @@ test('validates exact focused Vitest identities from the execution report', () =
 	);
 });
 
+test('accepts Vite port retries while retaining strict Vitest report validation', () => {
+	const lane = manifest().lanes[0];
+	const report = (status) =>
+		JSON.stringify({
+			testResults: [
+				{
+					name: '/repo/packages/hook-form/tests/upstream/example.test.ts',
+					assertionResults: [{ fullName: 'example suite does the thing', status }],
+				},
+			],
+		});
+	const retries =
+		'Port 63315 is in use, trying another one...\nPort 63316 is in use, trying another one...\r\n';
+	assert.equal(verifyLaneRunResult(lane, retries + report('passed'), '/repo'), true);
+	assert.throws(
+		() => verifyLaneRunResult(lane, retries + report('failed'), '/repo'),
+		/did not execute every declared test identity exactly once/,
+	);
+	assert.throws(
+		() => verifyLaneRunResult(lane, 'unknown preamble\n' + report('passed'), '/repo'),
+		SyntaxError,
+	);
+	assert.throws(() => verifyLaneRunResult(lane, retries + '{broken', '/repo'), SyntaxError);
+});
+
 test('selects every available required lane for recorded-unverified aggregate execution', () => {
 	const value = manifest();
 	value.lanes.push(

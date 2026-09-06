@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/radio-group/RadioGroup.spec.tsx b/tests/upstream/src/radio-group/RadioGroup.spec.tsx
+--- a/tests/upstream/src/radio-group/RadioGroup.spec.tsx
++++ b/tests/upstream/src/radio-group/RadioGroup.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { RadioGroup } from '@octanejs/base-ui/radio-group';
+ 
+ const values = ['a', 'b', 'c'];

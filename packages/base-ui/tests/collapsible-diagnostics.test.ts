@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'octane';
 import { Collapsible } from '@octanejs/base-ui/collapsible';
-import { mount } from '../../octane/tests/_helpers';
+import { flushEffects, mount } from '../../octane/tests/_helpers';
 
 const KEEP_MOUNTED_WARNING =
 	'Base UI: The `keepMounted={false}` prop on `Collapsible.Panel` is ignored when ' +
@@ -29,6 +29,7 @@ describe('Collapsible diagnostics', () => {
 		vi.stubEnv('NODE_ENV', 'development');
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		const m = mountConflictingPanel();
+		flushEffects();
 
 		try {
 			expect(warn).toHaveBeenCalledWith(KEEP_MOUNTED_WARNING);
@@ -41,6 +42,7 @@ describe('Collapsible diagnostics', () => {
 		vi.stubEnv('NODE_ENV', 'production');
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		const m = mountConflictingPanel();
+		flushEffects();
 
 		try {
 			expect(m.container.textContent).toBe('Panel content');

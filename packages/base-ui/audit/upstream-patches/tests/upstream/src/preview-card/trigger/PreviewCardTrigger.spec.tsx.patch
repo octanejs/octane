@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/preview-card/trigger/PreviewCardTrigger.spec.tsx b/tests/upstream/src/preview-card/trigger/PreviewCardTrigger.spec.tsx
+--- a/tests/upstream/src/preview-card/trigger/PreviewCardTrigger.spec.tsx
++++ b/tests/upstream/src/preview-card/trigger/PreviewCardTrigger.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { PreviewCard } from '@octanejs/base-ui/preview-card';
+ 
+ // `PreviewCard.Trigger` exposes the native `<a>` props in its `render` callback.

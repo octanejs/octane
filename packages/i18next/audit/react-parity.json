@@ -11,16 +11,9 @@
     "integrity": "sha256:3c306a9b58244804feb98b80951b9c1b9963e525bb6dc77e67ec766c2b702301",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/i18next/src"],
-      "include": ["\\.(?:ts|tsrx)$"],
-      "exclude": []
-    },
+    "source": { "roots": ["packages/i18next/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
     "tests": {
       "roots": ["packages/i18next/tests/differential"],
       "include": ["parity\\.test\\.ts$"],
@@ -40,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

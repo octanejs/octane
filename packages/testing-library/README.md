@@ -44,6 +44,11 @@ test('increments', () => {
 - `screen`, `waitFor`, `within`, … — dom-testing-library, re-exported
 - `fireEvent` — DOM event helpers, with focus/blur pairs for delegated handlers
 
+Multiple `rerender` calls inside one `act` callback commit together when that
+callback finishes. Await `act` before asserting results that depend on promises
+or effects. Promise work settles even when timeout clocks are frozen; advance
+fake timers explicitly when the behavior itself depends on a timer.
+
 ## Octane-specific surface
 
 **Components are values in plain-`.ts` tests** — there's no JSX in a `.ts`

@@ -78,6 +78,15 @@ test('applies a manifest file-parallelism override without fixing worker count',
 	assert.equal(project.test.testTimeout, undefined);
 });
 
+test('keeps repository inventory paths absolute in a package-root Vitest project', () => {
+	const [project] = buildParityVitestProjects({
+		baseProjects: [{ root: '/repo/packages/example', test: { name: 'example' } }],
+		lanes: [lane('package', 'example', 'packages/example/test/suite.test.ts')],
+		root: '/repo',
+	});
+	assert.deepEqual(project.test.include, ['/repo/packages/example/test/suite.test.ts']);
+});
+
 test('combines native file-shard reports before exact lane verification', () => {
 	const lanes = [
 		lane('first-lane', 'first', 'packages/first/first.test.ts'),
@@ -117,7 +126,7 @@ test('combines native file-shard reports before exact lane verification', () => 
 	);
 });
 
-test('rejects projects or files selected by multiple parity lanes', () => {
+test('rejects duplicate project ownership while allowing the same file in distinct projects', () => {
 	const baseProjects = [{ test: { name: 'first' } }, { test: { name: 'second' } }];
 	assert.throws(
 		() =>
@@ -131,17 +140,16 @@ test('rejects projects or files selected by multiple parity lanes', () => {
 			}),
 		/more than one required parity lane/,
 	);
-	assert.throws(
-		() =>
-			buildParityVitestProjects({
-				baseProjects,
-				lanes: [
-					lane('one', 'first', 'packages/shared.test.ts'),
-					lane('two', 'second', 'packages/shared.test.ts'),
-				],
-				root: '/repo',
-			}),
-		/selected by both one and two/,
+	assert.equal(
+		buildParityVitestProjects({
+			baseProjects,
+			lanes: [
+				lane('one', 'first', 'packages/shared.test.ts'),
+				lane('two', 'second', 'packages/shared.test.ts'),
+			],
+			root: '/repo',
+		}).length,
+		2,
 	);
 });
 
@@ -188,5 +196,48 @@ test('partitions one Vitest JSON report and verifies every lane exactly', () => 
 	assert.throws(
 		() => verifyBatchedVitestShardResult(lanes, JSON.stringify(failed), '/repo'),
 		/parity-wide Vitest shard contains non-passing tests/,
+	);
+});
+
+test('distinguishes the same file and test identity in unit and browser projects', () => {
+	const file = 'packages/shared.test.ts';
+	const lanes = [
+		lane('unit-lane', 'unit', file, 'same test'),
+		lane('browser-lane', 'browser', file, 'same test'),
+	];
+	const report = {
+		testResults: lanes.map((lane) => ({
+			name: `/repo/${file}`,
+			projectName: lane.project,
+			assertionResults: [{ fullName: 'same test', status: 'passed' }],
+		})),
+	};
+	assert.equal(verifyBatchedVitestResult(lanes, JSON.stringify(report), '/repo'), true);
+	assert.throws(
+		() =>
+			verifyBatchedVitestResult(
+				lanes,
+				JSON.stringify({ testResults: report.testResults.slice(0, 1) }),
+				'/repo',
+			),
+		/did not execute every declared test identity exactly once/,
+	);
+	const duplicated = structuredClone(report);
+	duplicated.testResults[1].projectName = 'unit';
+	assert.throws(
+		() => verifyBatchedVitestResult(lanes, JSON.stringify(duplicated), '/repo'),
+		/more than once/,
+	);
+	const missingProject = structuredClone(report);
+	delete missingProject.testResults[1].projectName;
+	assert.throws(
+		() => verifyBatchedVitestResult(lanes, JSON.stringify(missingProject), '/repo'),
+		/requires a project name/,
+	);
+	const wrongProject = structuredClone(report);
+	wrongProject.testResults[1].projectName = 'unknown';
+	assert.throws(
+		() => verifyBatchedVitestResult(lanes, JSON.stringify(wrongProject), '/repo'),
+		/undeclared project/,
 	);
 });

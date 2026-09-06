@@ -7,14 +7,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "octane": {
-    "hookSlots": {
-      "manual": [
-        "src"
-      ]
-    }
-  },
-  "description": "Base UI (@base-ui/react) for the octane renderer — headless, accessible, unstyled UI primitives ported from base-ui.com at full fidelity.",
+  "description": "Base UI (@base-ui/react) for the octane renderer \u2014 headless, accessible, unstyled UI primitives ported from base-ui.com at full fidelity.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -33,6 +26,7 @@
   "files": [
     "src",
     "dist/cjs",
+    "LICENSE",
     "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md"
@@ -44,34 +38,557 @@
       "require": "./dist/cjs/index.cjs",
       "default": "./src/index.ts"
     },
-    "./*": {
-      "types": "./src/*.ts",
-      "import": "./src/*.ts",
-      "require": "./dist/cjs/*.cjs",
-      "default": "./src/*.ts"
+    "./accordion": {
+      "types": "./src/accordion/index.ts",
+      "import": "./src/accordion/index.ts",
+      "require": "./dist/cjs/accordion/index.cjs",
+      "default": "./src/accordion/index.ts"
+    },
+    "./alert-dialog": {
+      "types": "./src/alert-dialog/index.ts",
+      "import": "./src/alert-dialog/index.ts",
+      "require": "./dist/cjs/alert-dialog/index.cjs",
+      "default": "./src/alert-dialog/index.ts"
+    },
+    "./autocomplete": {
+      "types": "./src/autocomplete/index.ts",
+      "import": "./src/autocomplete/index.ts",
+      "require": "./dist/cjs/autocomplete/index.cjs",
+      "default": "./src/autocomplete/index.ts"
+    },
+    "./avatar": {
+      "types": "./src/avatar/index.ts",
+      "import": "./src/avatar/index.ts",
+      "require": "./dist/cjs/avatar/index.cjs",
+      "default": "./src/avatar/index.ts"
+    },
+    "./button": {
+      "types": "./src/button/index.ts",
+      "import": "./src/button/index.ts",
+      "require": "./dist/cjs/button/index.cjs",
+      "default": "./src/button/index.ts"
+    },
+    "./checkbox": {
+      "types": "./src/checkbox/index.ts",
+      "import": "./src/checkbox/index.ts",
+      "require": "./dist/cjs/checkbox/index.cjs",
+      "default": "./src/checkbox/index.ts"
+    },
+    "./checkbox-group": {
+      "types": "./src/checkbox-group/index.ts",
+      "import": "./src/checkbox-group/index.ts",
+      "require": "./dist/cjs/checkbox-group/index.cjs",
+      "default": "./src/checkbox-group/index.ts"
+    },
+    "./collapsible": {
+      "types": "./src/collapsible/index.ts",
+      "import": "./src/collapsible/index.ts",
+      "require": "./dist/cjs/collapsible/index.cjs",
+      "default": "./src/collapsible/index.ts"
+    },
+    "./combobox": {
+      "types": "./src/combobox/index.ts",
+      "import": "./src/combobox/index.ts",
+      "require": "./dist/cjs/combobox/index.cjs",
+      "default": "./src/combobox/index.ts"
+    },
+    "./csp-provider": {
+      "types": "./src/csp-provider/index.ts",
+      "import": "./src/csp-provider/index.ts",
+      "require": "./dist/cjs/csp-provider/index.cjs",
+      "default": "./src/csp-provider/index.ts"
+    },
+    "./context-menu": {
+      "types": "./src/context-menu/index.ts",
+      "import": "./src/context-menu/index.ts",
+      "require": "./dist/cjs/context-menu/index.cjs",
+      "default": "./src/context-menu/index.ts"
+    },
+    "./dialog": {
+      "types": "./src/dialog/index.ts",
+      "import": "./src/dialog/index.ts",
+      "require": "./dist/cjs/dialog/index.cjs",
+      "default": "./src/dialog/index.ts"
+    },
+    "./direction-provider": {
+      "types": "./src/direction-provider/index.ts",
+      "import": "./src/direction-provider/index.ts",
+      "require": "./dist/cjs/direction-provider/index.cjs",
+      "default": "./src/direction-provider/index.ts"
+    },
+    "./drawer": {
+      "types": "./src/drawer/index.ts",
+      "import": "./src/drawer/index.ts",
+      "require": "./dist/cjs/drawer/index.cjs",
+      "default": "./src/drawer/index.ts"
+    },
+    "./field": {
+      "types": "./src/field/index.ts",
+      "import": "./src/field/index.ts",
+      "require": "./dist/cjs/field/index.cjs",
+      "default": "./src/field/index.ts"
+    },
+    "./fieldset": {
+      "types": "./src/fieldset/index.ts",
+      "import": "./src/fieldset/index.ts",
+      "require": "./dist/cjs/fieldset/index.cjs",
+      "default": "./src/fieldset/index.ts"
+    },
+    "./form": {
+      "types": "./src/form/index.ts",
+      "import": "./src/form/index.ts",
+      "require": "./dist/cjs/form/index.cjs",
+      "default": "./src/form/index.ts"
+    },
+    "./input": {
+      "types": "./src/input/index.ts",
+      "import": "./src/input/index.ts",
+      "require": "./dist/cjs/input/index.cjs",
+      "default": "./src/input/index.ts"
+    },
+    "./menu": {
+      "types": "./src/menu/index.ts",
+      "import": "./src/menu/index.ts",
+      "require": "./dist/cjs/menu/index.cjs",
+      "default": "./src/menu/index.ts"
+    },
+    "./menubar": {
+      "types": "./src/menubar/index.ts",
+      "import": "./src/menubar/index.ts",
+      "require": "./dist/cjs/menubar/index.cjs",
+      "default": "./src/menubar/index.ts"
+    },
+    "./merge-props": {
+      "types": "./src/merge-props/index.ts",
+      "import": "./src/merge-props/index.ts",
+      "require": "./dist/cjs/merge-props/index.cjs",
+      "default": "./src/merge-props/index.ts"
+    },
+    "./meter": {
+      "types": "./src/meter/index.ts",
+      "import": "./src/meter/index.ts",
+      "require": "./dist/cjs/meter/index.cjs",
+      "default": "./src/meter/index.ts"
+    },
+    "./navigation-menu": {
+      "types": "./src/navigation-menu/index.ts",
+      "import": "./src/navigation-menu/index.ts",
+      "require": "./dist/cjs/navigation-menu/index.cjs",
+      "default": "./src/navigation-menu/index.ts"
+    },
+    "./number-field": {
+      "types": "./src/number-field/index.ts",
+      "import": "./src/number-field/index.ts",
+      "require": "./dist/cjs/number-field/index.cjs",
+      "default": "./src/number-field/index.ts"
+    },
+    "./otp-field": {
+      "types": "./src/otp-field/index.ts",
+      "import": "./src/otp-field/index.ts",
+      "require": "./dist/cjs/otp-field/index.cjs",
+      "default": "./src/otp-field/index.ts"
+    },
+    "./popover": {
+      "types": "./src/popover/index.ts",
+      "import": "./src/popover/index.ts",
+      "require": "./dist/cjs/popover/index.cjs",
+      "default": "./src/popover/index.ts"
+    },
+    "./preview-card": {
+      "types": "./src/preview-card/index.ts",
+      "import": "./src/preview-card/index.ts",
+      "require": "./dist/cjs/preview-card/index.cjs",
+      "default": "./src/preview-card/index.ts"
+    },
+    "./progress": {
+      "types": "./src/progress/index.ts",
+      "import": "./src/progress/index.ts",
+      "require": "./dist/cjs/progress/index.cjs",
+      "default": "./src/progress/index.ts"
+    },
+    "./radio": {
+      "types": "./src/radio/index.ts",
+      "import": "./src/radio/index.ts",
+      "require": "./dist/cjs/radio/index.cjs",
+      "default": "./src/radio/index.ts"
+    },
+    "./radio-group": {
+      "types": "./src/radio-group/index.ts",
+      "import": "./src/radio-group/index.ts",
+      "require": "./dist/cjs/radio-group/index.cjs",
+      "default": "./src/radio-group/index.ts"
+    },
+    "./scroll-area": {
+      "types": "./src/scroll-area/index.ts",
+      "import": "./src/scroll-area/index.ts",
+      "require": "./dist/cjs/scroll-area/index.cjs",
+      "default": "./src/scroll-area/index.ts"
+    },
+    "./select": {
+      "types": "./src/select/index.ts",
+      "import": "./src/select/index.ts",
+      "require": "./dist/cjs/select/index.cjs",
+      "default": "./src/select/index.ts"
+    },
+    "./separator": {
+      "types": "./src/separator/index.ts",
+      "import": "./src/separator/index.ts",
+      "require": "./dist/cjs/separator/index.cjs",
+      "default": "./src/separator/index.ts"
+    },
+    "./slider": {
+      "types": "./src/slider/index.ts",
+      "import": "./src/slider/index.ts",
+      "require": "./dist/cjs/slider/index.cjs",
+      "default": "./src/slider/index.ts"
+    },
+    "./switch": {
+      "types": "./src/switch/index.ts",
+      "import": "./src/switch/index.ts",
+      "require": "./dist/cjs/switch/index.cjs",
+      "default": "./src/switch/index.ts"
+    },
+    "./tabs": {
+      "types": "./src/tabs/index.ts",
+      "import": "./src/tabs/index.ts",
+      "require": "./dist/cjs/tabs/index.cjs",
+      "default": "./src/tabs/index.ts"
+    },
+    "./toast": {
+      "types": "./src/toast/index.ts",
+      "import": "./src/toast/index.ts",
+      "require": "./dist/cjs/toast/index.cjs",
+      "default": "./src/toast/index.ts"
+    },
+    "./toggle": {
+      "types": "./src/toggle/index.ts",
+      "import": "./src/toggle/index.ts",
+      "require": "./dist/cjs/toggle/index.cjs",
+      "default": "./src/toggle/index.ts"
+    },
+    "./toggle-group": {
+      "types": "./src/toggle-group/index.ts",
+      "import": "./src/toggle-group/index.ts",
+      "require": "./dist/cjs/toggle-group/index.cjs",
+      "default": "./src/toggle-group/index.ts"
+    },
+    "./toolbar": {
+      "types": "./src/toolbar/index.ts",
+      "import": "./src/toolbar/index.ts",
+      "require": "./dist/cjs/toolbar/index.cjs",
+      "default": "./src/toolbar/index.ts"
+    },
+    "./tooltip": {
+      "types": "./src/tooltip/index.ts",
+      "import": "./src/tooltip/index.ts",
+      "require": "./dist/cjs/tooltip/index.cjs",
+      "default": "./src/tooltip/index.ts"
+    },
+    "./types": {
+      "types": "./src/types/index.ts",
+      "import": "./src/types/index.ts",
+      "require": "./dist/cjs/types/index.cjs",
+      "default": "./src/types/index.ts"
+    },
+    "./unstable-use-media-query": {
+      "types": "./src/unstable-use-media-query/index.ts",
+      "import": "./src/unstable-use-media-query/index.ts",
+      "require": "./dist/cjs/unstable-use-media-query/index.cjs",
+      "default": "./src/unstable-use-media-query/index.ts"
+    },
+    "./use-render": {
+      "types": "./src/use-render/index.ts",
+      "import": "./src/use-render/index.ts",
+      "require": "./dist/cjs/use-render/index.cjs",
+      "default": "./src/use-render/index.ts"
+    },
+    "./internals/composite": {
+      "types": "./src/internals/composite/index.ts",
+      "import": "./src/internals/composite/index.ts",
+      "require": "./dist/cjs/internals/composite/index.cjs",
+      "default": "./src/internals/composite/index.ts"
+    },
+    "./internals/constants": {
+      "types": "./src/internals/constants.ts",
+      "import": "./src/internals/constants.ts",
+      "require": "./dist/cjs/internals/constants.cjs",
+      "default": "./src/internals/constants.ts"
+    },
+    "./internals/createBaseUIEventDetails": {
+      "types": "./src/internals/createBaseUIEventDetails.ts",
+      "import": "./src/internals/createBaseUIEventDetails.ts",
+      "require": "./dist/cjs/internals/createBaseUIEventDetails.cjs",
+      "default": "./src/internals/createBaseUIEventDetails.ts"
+    },
+    "./internals/csp-context": {
+      "types": "./src/internals/csp-context/index.ts",
+      "import": "./src/internals/csp-context/index.ts",
+      "require": "./dist/cjs/internals/csp-context/index.cjs",
+      "default": "./src/internals/csp-context/index.ts"
+    },
+    "./internals/direction-context": {
+      "types": "./src/internals/direction-context/index.ts",
+      "import": "./src/internals/direction-context/index.ts",
+      "require": "./dist/cjs/internals/direction-context/index.cjs",
+      "default": "./src/internals/direction-context/index.ts"
+    },
+    "./internals/field-constants": {
+      "types": "./src/internals/field-constants/index.ts",
+      "import": "./src/internals/field-constants/index.ts",
+      "require": "./dist/cjs/internals/field-constants/index.cjs",
+      "default": "./src/internals/field-constants/index.ts"
+    },
+    "./internals/field-register-control": {
+      "types": "./src/internals/field-register-control/index.ts",
+      "import": "./src/internals/field-register-control/index.ts",
+      "require": "./dist/cjs/internals/field-register-control/index.cjs",
+      "default": "./src/internals/field-register-control/index.ts"
+    },
+    "./internals/field-root-context": {
+      "types": "./src/internals/field-root-context/index.ts",
+      "import": "./src/internals/field-root-context/index.ts",
+      "require": "./dist/cjs/internals/field-root-context/index.cjs",
+      "default": "./src/internals/field-root-context/index.ts"
+    },
+    "./internals/filter": {
+      "types": "./src/internals/filter.ts",
+      "import": "./src/internals/filter.ts",
+      "require": "./dist/cjs/internals/filter.cjs",
+      "default": "./src/internals/filter.ts"
+    },
+    "./internals/itemEquality": {
+      "types": "./src/internals/itemEquality.ts",
+      "import": "./src/internals/itemEquality.ts",
+      "require": "./dist/cjs/internals/itemEquality.cjs",
+      "default": "./src/internals/itemEquality.ts"
+    },
+    "./internals/form-context": {
+      "types": "./src/internals/form-context/index.ts",
+      "import": "./src/internals/form-context/index.ts",
+      "require": "./dist/cjs/internals/form-context/index.cjs",
+      "default": "./src/internals/form-context/index.ts"
+    },
+    "./internals/getDisabledMountTransitionStyles": {
+      "types": "./src/internals/getDisabledMountTransitionStyles.ts",
+      "import": "./src/internals/getDisabledMountTransitionStyles.ts",
+      "require": "./dist/cjs/internals/getDisabledMountTransitionStyles.cjs",
+      "default": "./src/internals/getDisabledMountTransitionStyles.ts"
+    },
+    "./internals/getStateAttributesProps": {
+      "types": "./src/internals/getStateAttributesProps.ts",
+      "import": "./src/internals/getStateAttributesProps.ts",
+      "require": "./dist/cjs/internals/getStateAttributesProps.cjs",
+      "default": "./src/internals/getStateAttributesProps.ts"
+    },
+    "./internals/labelable-provider": {
+      "types": "./src/internals/labelable-provider/index.ts",
+      "import": "./src/internals/labelable-provider/index.ts",
+      "require": "./dist/cjs/internals/labelable-provider/index.cjs",
+      "default": "./src/internals/labelable-provider/index.ts"
+    },
+    "./internals/noop": {
+      "types": "./src/internals/noop.ts",
+      "import": "./src/internals/noop.ts",
+      "require": "./dist/cjs/internals/noop.cjs",
+      "default": "./src/internals/noop.ts"
+    },
+    "./internals/reasons": {
+      "types": "./src/internals/reasons.ts",
+      "import": "./src/internals/reasons.ts",
+      "require": "./dist/cjs/internals/reasons.cjs",
+      "default": "./src/internals/reasons.ts"
+    },
+    "./internals/resolveValueLabel": {
+      "types": "./src/internals/resolveValueLabel.tsrx",
+      "import": "./src/internals/resolveValueLabel.tsrx",
+      "require": "./dist/cjs/internals/resolveValueLabel.cjs",
+      "default": "./src/internals/resolveValueLabel.tsrx"
+    },
+    "./internals/RequestQueue": {
+      "types": "./src/internals/RequestQueue.ts",
+      "import": "./src/internals/RequestQueue.ts",
+      "require": "./dist/cjs/internals/RequestQueue.cjs",
+      "default": "./src/internals/RequestQueue.ts"
+    },
+    "./internals/serializeValue": {
+      "types": "./src/internals/serializeValue.ts",
+      "import": "./src/internals/serializeValue.ts",
+      "require": "./dist/cjs/internals/serializeValue.cjs",
+      "default": "./src/internals/serializeValue.ts"
+    },
+    "./internals/stateAttributesMapping": {
+      "types": "./src/internals/stateAttributesMapping.ts",
+      "import": "./src/internals/stateAttributesMapping.ts",
+      "require": "./dist/cjs/internals/stateAttributesMapping.cjs",
+      "default": "./src/internals/stateAttributesMapping.ts"
+    },
+    "./internals/temporal": {
+      "types": "./src/internals/temporal/index.ts",
+      "import": "./src/internals/temporal/index.ts",
+      "require": "./dist/cjs/internals/temporal/index.cjs",
+      "default": "./src/internals/temporal/index.ts"
+    },
+    "./internals/temporal-adapter-date-fns": {
+      "types": "./src/internals/temporal-adapter-date-fns/index.ts",
+      "import": "./src/internals/temporal-adapter-date-fns/index.ts",
+      "require": "./dist/cjs/internals/temporal-adapter-date-fns/index.cjs",
+      "default": "./src/internals/temporal-adapter-date-fns/index.ts"
+    },
+    "./internals/temporal-adapter-luxon": {
+      "types": "./src/internals/temporal-adapter-luxon/index.ts",
+      "import": "./src/internals/temporal-adapter-luxon/index.ts",
+      "require": "./dist/cjs/internals/temporal-adapter-luxon/index.cjs",
+      "default": "./src/internals/temporal-adapter-luxon/index.ts"
+    },
+    "./internals/TimeoutManager": {
+      "types": "./src/internals/TimeoutManager.ts",
+      "import": "./src/internals/TimeoutManager.ts",
+      "require": "./dist/cjs/internals/TimeoutManager.cjs",
+      "default": "./src/internals/TimeoutManager.ts"
+    },
+    "./internals/types": {
+      "types": "./src/internals/types.ts",
+      "import": "./src/internals/types.ts",
+      "require": "./dist/cjs/internals/types.cjs",
+      "default": "./src/internals/types.ts"
+    },
+    "./internals/use-button": {
+      "types": "./src/internals/use-button/index.ts",
+      "import": "./src/internals/use-button/index.ts",
+      "require": "./dist/cjs/internals/use-button/index.cjs",
+      "default": "./src/internals/use-button/index.ts"
+    },
+    "./internals/useBaseUiId": {
+      "types": "./src/internals/useBaseUiId.ts",
+      "import": "./src/internals/useBaseUiId.ts",
+      "require": "./dist/cjs/internals/useBaseUiId.cjs",
+      "default": "./src/internals/useBaseUiId.ts"
+    },
+    "./internals/useAnchorPositioning": {
+      "types": "./src/internals/useAnchorPositioning.ts",
+      "import": "./src/internals/useAnchorPositioning.ts",
+      "require": "./dist/cjs/internals/useAnchorPositioning.cjs",
+      "default": "./src/internals/useAnchorPositioning.ts"
+    },
+    "./internals/useAnimationsFinished": {
+      "types": "./src/internals/useAnimationsFinished.ts",
+      "import": "./src/internals/useAnimationsFinished.ts",
+      "require": "./dist/cjs/internals/useAnimationsFinished.cjs",
+      "default": "./src/internals/useAnimationsFinished.ts"
+    },
+    "./internals/useOpenChangeComplete": {
+      "types": "./src/internals/useOpenChangeComplete.tsrx",
+      "import": "./src/internals/useOpenChangeComplete.tsrx",
+      "require": "./dist/cjs/internals/useOpenChangeComplete.cjs",
+      "default": "./src/internals/useOpenChangeComplete.tsrx"
+    },
+    "./internals/usePressAndHold": {
+      "types": "./src/internals/usePressAndHold.ts",
+      "import": "./src/internals/usePressAndHold.ts",
+      "require": "./dist/cjs/internals/usePressAndHold.cjs",
+      "default": "./src/internals/usePressAndHold.ts"
+    },
+    "./internals/useRenderElement": {
+      "types": "./src/internals/useRenderElement.tsrx",
+      "import": "./src/internals/useRenderElement.tsrx",
+      "require": "./dist/cjs/internals/useRenderElement.cjs",
+      "default": "./src/internals/useRenderElement.tsrx"
+    },
+    "./internals/useValueChanged": {
+      "types": "./src/internals/useValueChanged.ts",
+      "import": "./src/internals/useValueChanged.ts",
+      "require": "./dist/cjs/internals/useValueChanged.cjs",
+      "default": "./src/internals/useValueChanged.ts"
+    },
+    "./internals/useTransitionStatus": {
+      "types": "./src/internals/useTransitionStatus.ts",
+      "import": "./src/internals/useTransitionStatus.ts",
+      "require": "./dist/cjs/internals/useTransitionStatus.cjs",
+      "default": "./src/internals/useTransitionStatus.ts"
     }
   },
   "scripts": {
     "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
     "prepack": "pnpm build:cjs",
-    "test": "vitest run"
+    "test": "vitest run --config tests/vitest.owned.config.ts",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs",
+    "test:upstream": "vitest run --config tests/vitest.config.ts",
+    "test:pristine": "node ../../scripts/react-parity/run-pristine.mjs base-ui",
+    "test:browser": "vitest run --config tests/vitest.browser.config.ts"
   },
   "dependencies": {
-    "@floating-ui/utils": "catalog:default",
+    "@octanejs/base-ui-utils": "workspace:*",
     "@octanejs/floating-ui": "workspace:*",
-    "aria-hidden": "catalog:default",
-    "tabbable": "catalog:default"
+    "@floating-ui/utils": "^0.2.12"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0"
+    "octane": "workspace:^0.1.51 || ^0.2.0",
+    "date-fns": "^4.0.0",
+    "@date-fns/tz": "^1.2.0",
+    "luxon": "^3.7.2"
   },
   "devDependencies": {
-    "@base-ui/react": "catalog:default",
+    "@base-ui/react": "1.8.0",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
-    "react": "catalog:default",
-    "react-dom": "catalog:default",
-    "vitest": "catalog:default"
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "vitest": "catalog:default",
+    "@octanejs/testing-library": "workspace:*",
+    "@mui/internal-test-utils": "2.0.18-canary.25",
+    "@testing-library/user-event": "14.6.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "date-fns": "^4.0.0",
+    "@date-fns/tz": "^1.2.0",
+    "luxon": "^3.7.2",
+    "@types/luxon": "3.7.4",
+    "typescript-pristine": "npm:@typescript/typescript6@6.0.2",
+    "@floating-ui/dom": "^1.7.6",
+    "clsx": "^2.1.1",
+    "@octanejs/remix-router": "workspace:*",
+    "@testing-library/react": "16.3.2",
+    "@types/use-sync-external-store": "1.5.0",
+    "use-sync-external-store": "1.6.0",
+    "@floating-ui/react-dom": "2.1.9",
+    "react-router": "7.18.2",
+    "vitest-browser-react": "2.2.0",
+    "typescript-pristine-native": "npm:typescript@7.0.2",
+    "jsdom": "27.4.0"
+  },
+  "imports": {
+    "#prehydration/tabs/indicator": {
+      "browser": {
+        "require": "./dist/cjs/internals/prehydrationScript.stub.cjs",
+        "default": "./src/internals/prehydrationScript.stub.ts"
+      },
+      "require": "./dist/cjs/tabs/indicator/prehydrationScript.min.cjs",
+      "default": "./src/tabs/indicator/prehydrationScript.min.ts"
+    },
+    "#prehydration/slider/thumb": {
+      "browser": {
+        "require": "./dist/cjs/internals/prehydrationScript.stub.cjs",
+        "default": "./src/internals/prehydrationScript.stub.ts"
+      },
+      "require": "./dist/cjs/slider/thumb/prehydrationScript.min.cjs",
+      "default": "./src/slider/thumb/prehydrationScript.min.ts"
+    }
+  },
+  "peerDependenciesMeta": {
+    "date-fns": {
+      "optional": true
+    },
+    "@date-fns/tz": {
+      "optional": true
+    },
+    "luxon": {
+      "optional": true
+    }
+  },
+  "octane": {
+    "commonjsCompileSource": true
   }
 }

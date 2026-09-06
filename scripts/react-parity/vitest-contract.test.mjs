@@ -221,3 +221,38 @@ test('rejects duplicate project names before building ownership', async (t) => {
 		/base Vitest config contains duplicate project name full/,
 	);
 });
+
+test('discovers package-root tests with relative includes and exclusions', async (t) => {
+	const { root } = await fixture(t);
+	const project = {
+		root: path.join(root, 'packages/mixed'),
+		test: { include: ['**/*.test.ts'], exclude: ['ordinary.test.ts'] },
+	};
+	assert.deepEqual(
+		[...(await discoverProjectFiles(project, root))],
+		['packages/mixed/parity.test.ts'],
+	);
+	assert.equal(projectSelects(project, 'packages/mixed/parity.test.ts', root), true);
+	assert.equal(projectSelects(project, 'packages/mixed/ordinary.test.ts', root), false);
+});
+
+test('accepts absolute test includes confined to the repository', async (t) => {
+	const { root } = await fixture(t);
+	const project = {
+		root: path.join(root, 'packages/full'),
+		test: { include: [path.join(root, 'packages/full/**/*.test.ts')] },
+	};
+	assert.deepEqual(
+		[...(await discoverProjectFiles(project, root))],
+		['packages/full/parity.test.ts'],
+	);
+});
+
+test('rejects test includes that escape the repository root', async (t) => {
+	const { root } = await fixture(t);
+	const project = {
+		root: path.join(root, 'packages/full'),
+		test: { include: ['../../../elsewhere/**/*.test.ts'] },
+	};
+	await assert.rejects(discoverProjectFiles(project, root), /outside the repository/);
+});

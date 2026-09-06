@@ -1,6 +1,25 @@
 import { Hydrate, Suspense, use, useId, useState } from 'octane';
 import { Suspense as RetrySiblingSuspense, type HydrateProps } from 'octane';
 
+type HydrationGate = { pending: boolean; promise: Promise<void> };
+function DelayedHydrationButton({ gate }: { gate: HydrationGate }) {
+	if (gate.pending) throw gate.promise;
+	const [count, setCount] = useState(0);
+	return <button
+		data-delayed-hydration=""
+		onClick={() => setCount(count + 1)}
+	>{count as number}</button>;
+}
+
+export function DelayedHydrationBoundary({ gate }: { gate: HydrationGate }) {
+	return <>
+		<span>Shell</span>
+		<Suspense fallback="Loading">
+			<DelayedHydrationButton gate={gate} />
+		</Suspense>
+	</>;
+}
+
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the
 // value is serialized into an inline <script> that the client seeds on hydrate

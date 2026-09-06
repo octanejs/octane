@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/toggle-group/ToggleGroup.spec.tsx b/tests/upstream/src/toggle-group/ToggleGroup.spec.tsx
+--- a/tests/upstream/src/toggle-group/ToggleGroup.spec.tsx
++++ b/tests/upstream/src/toggle-group/ToggleGroup.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { ToggleGroup } from '@octanejs/base-ui/toggle-group';
+ 
+ const toggleDefaultValueReadonly = (value: NonNullable<ToggleGroup.Props['defaultValue']>) =>

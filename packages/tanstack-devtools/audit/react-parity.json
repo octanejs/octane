@@ -11,10 +11,7 @@
     "integrity": "sha256:79faf09d544b1558c0ed01c3b6784b4b0d4e84485a6beb3195ce13dcdbf1e94b",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "absent",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "absent", "types": "present" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-devtools/src"],
@@ -43,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

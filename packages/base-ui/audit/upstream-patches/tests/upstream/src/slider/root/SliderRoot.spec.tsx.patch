@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/src/slider/root/SliderRoot.spec.tsx b/tests/upstream/src/slider/root/SliderRoot.spec.tsx
+--- a/tests/upstream/src/slider/root/SliderRoot.spec.tsx
++++ b/tests/upstream/src/slider/root/SliderRoot.spec.tsx
+@@ -1,7 +1,7 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Slider } from '@octanejs/base-ui/slider';
+-import { REASONS } from '../../internals/reasons';
++import { REASONS } from "../../../../../src/internals/reasons.ts";
+ 
+ const value: number = 25;
+ const array = [25];

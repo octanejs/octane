@@ -1,0 +1,63 @@
+diff --git a/tests/upstream/src/internals/useAnimationsFinished.test.tsx b/tests/upstream/src/internals/useAnimationsFinished.test.tsx
+--- a/tests/upstream/src/internals/useAnimationsFinished.test.tsx
++++ b/tests/upstream/src/internals/useAnimationsFinished.test.tsx
+@@ -145,13 +145,22 @@ describe('useAnimationsFinished', () => {
+     const first = createAnimation();
+     const second = createAnimation();
+     const getAnimationsCallCounts = [0, 0];
+-    let commitCount = 0;
++    const committedVisibility: boolean[][] = [];
+ 
+     function Item({ index, animation }: { index: number; animation: Animation }) {
+       const ref = React.useRef<HTMLDivElement>(null);
+       const runOnceAnimationsFinish = useAnimationsFinished(ref, false, true);
+       const [mounted, setMounted] = React.useState(true);
+ 
++      // Layout effects observe the completed DOM commit in Octane. Both
++      // completions must see both items removed; an intermediate commit would
++      // expose one of them and fail this assertion.
++      React.useLayoutEffect(() => {
++        if (!mounted) {
++          committedVisibility.push([0, 1].map((item) => screen.queryByTestId(`item-${item}`) !== null));
++        }
++      }, [mounted]);
++
+       useIsoLayoutEffect(() => {
+         if (ref.current) {
+           ref.current.getAnimations = () => {
+@@ -170,15 +179,10 @@ describe('useAnimationsFinished', () => {
+ 
+     try {
+       await render(
+-        <React.Profiler
+-          id="test"
+-          onRender={() => {
+-            commitCount += 1;
+-          }}
+-        >
++        <React.Fragment>
+           <Item index={0} animation={first.animation} />
+           <Item index={1} animation={second.animation} />
+-        </React.Profiler>,
++        </React.Fragment>,
+       );
+ 
+       await waitFor(() => {
+@@ -188,8 +192,6 @@ describe('useAnimationsFinished', () => {
+         expect(getAnimationsCallCounts[1]).toBeGreaterThan(0);
+       });
+ 
+-      const commitCountBefore = commitCount;
+-
+       await act(async () => {
+         first.finish();
+         second.finish();
+@@ -198,7 +200,7 @@ describe('useAnimationsFinished', () => {
+ 
+       expect(screen.queryByTestId('item-0')).toBeNull();
+       expect(screen.queryByTestId('item-1')).toBeNull();
+-      expect(commitCount).toBe(commitCountBefore + 1);
++      expect(committedVisibility).toEqual([[false, false], [false, false]]);
+     } finally {
+       globalThis.BASE_UI_ANIMATIONS_DISABLED = animationsDisabled;
+     }

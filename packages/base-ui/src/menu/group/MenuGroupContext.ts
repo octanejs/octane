@@ -1,0 +1,18 @@
+/** @jsxImportSource octane */
+'use client';
+import * as React from 'octane';
+
+export type MenuGroupContext = React.Dispatch<React.SetStateAction<string | undefined>>;
+
+export const MenuGroupContext = React.createContext<MenuGroupContext | undefined>(undefined);
+
+export function useMenuGroupRootContext() {
+	const context = React.useContext(MenuGroupContext);
+	if (context === undefined) {
+		throw new Error(
+			'Base UI: MenuGroupContext is missing. Menu group parts must be used within <Menu.Group> or <Menu.RadioGroup>.',
+		);
+	}
+
+	return context;
+}

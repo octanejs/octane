@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/src/preview-card/positioner/PreviewCardPositioner.test.tsx b/tests/upstream/src/preview-card/positioner/PreviewCardPositioner.test.tsx
+--- a/tests/upstream/src/preview-card/positioner/PreviewCardPositioner.test.tsx
++++ b/tests/upstream/src/preview-card/positioner/PreviewCardPositioner.test.tsx
+@@ -5,10 +5,10 @@ import { PreviewCard } from '@octanejs/base-ui/preview-card';
+ import { fireEvent, screen, waitFor } from '@mui/internal-test-utils';
+ import { createRenderer, describeConformance, isJSDOM, waitForPositioned } from '#test-utils';
+ 
+-const Trigger = React.forwardRef(function Trigger(
+-  props: PreviewCard.Trigger.Props,
+-  ref: React.ForwardedRef<HTMLAnchorElement>,
++const Trigger = (function Trigger(
++  propsWithRef: (PreviewCard.Trigger.Props) & { ref?: React.Ref<HTMLAnchorElement> },
+ ) {
++  const { ref: ref = null, ...props } = propsWithRef;
+   return <PreviewCard.Trigger {...props} ref={ref} render={<div />} />;
+ });
+ 

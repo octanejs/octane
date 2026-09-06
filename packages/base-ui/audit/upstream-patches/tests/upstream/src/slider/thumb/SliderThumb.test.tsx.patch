@@ -1,0 +1,119 @@
+diff --git a/tests/upstream/src/slider/thumb/SliderThumb.test.tsx b/tests/upstream/src/slider/thumb/SliderThumb.test.tsx
+--- a/tests/upstream/src/slider/thumb/SliderThumb.test.tsx
++++ b/tests/upstream/src/slider/thumb/SliderThumb.test.tsx
+@@ -1,4 +1,11 @@
+ /** @jsxImportSource octane */
++import { SliderThumbServerCase1, SliderThumbServerCase2, SliderThumbServerCase3, SliderThumbServerCase4 } from './../../../../fixtures/SliderThumb-ssr.tsrx';
++import { SliderThumbServerCase1 as ServerSliderThumbServerCase1, SliderThumbServerCase2 as ServerSliderThumbServerCase2, SliderThumbServerCase3 as ServerSliderThumbServerCase3, SliderThumbServerCase4 as ServerSliderThumbServerCase4 } from './../../../../fixtures/SliderThumb-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(SliderThumbServerCase1, ServerSliderThumbServerCase1);
++registerServerComponent(SliderThumbServerCase2, ServerSliderThumbServerCase2);
++registerServerComponent(SliderThumbServerCase3, ServerSliderThumbServerCase3);
++registerServerComponent(SliderThumbServerCase4, ServerSliderThumbServerCase4);
+ import { expect, vi, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { act, fireEvent, screen, waitFor } from '@mui/internal-test-utils';
+@@ -10,10 +17,10 @@ import { createTouches, getHorizontalSliderRect } from '../utils/test-utils';
+ 
+ const isWebKit = platform.engine.webkit;
+ 
+-const UnstableRefThumb = React.forwardRef(function UnstableRefThumb(
+-  props: React.ComponentPropsWithoutRef<'div'>,
+-  forwardedRef: React.ForwardedRef<HTMLDivElement>,
++const UnstableRefThumb = (function UnstableRefThumb(
++  propsWithRef: (React.ComponentPropsWithoutRef<'div'>) & { ref?: React.Ref<HTMLDivElement> },
+ ) {
++  const { ref: forwardedRef = null, ...props } = propsWithRef;
+   const internalRef = React.useRef<HTMLDivElement>(null);
+ 
+   // Deliberately recreate the merged host ref on every render.
+@@ -1172,20 +1179,7 @@ describe('<Slider.Thumb />', () => {
+   describe.skipIf(isJSDOM)('server-side rendering', () => {
+     it('single thumb', async () => {
+       await renderToString(
+-        <Slider.Root
+-          defaultValue={30}
+-          style={{
+-            width: '100px',
+-          }}
+-        >
+-          <Slider.Value />
+-          <Slider.Control>
+-            <Slider.Track>
+-              <Slider.Indicator />
+-              <Slider.Thumb data-testid="thumb" />
+-            </Slider.Track>
+-          </Slider.Control>
+-        </Slider.Root>,
++        <SliderThumbServerCase1 />,
+       );
+ 
+       expect(getComputedStyle(screen.getByTestId('thumb')).getPropertyValue('left')).toBe('30px');
+@@ -1193,21 +1187,7 @@ describe('<Slider.Thumb />', () => {
+ 
+     it('renders the inline pre-hydration script for edge-aligned thumbs', async () => {
+       await renderToString(
+-        <Slider.Root
+-          defaultValue={30}
+-          thumbAlignment="edge"
+-          style={{
+-            width: '100px',
+-          }}
+-        >
+-          <Slider.Value />
+-          <Slider.Control>
+-            <Slider.Track>
+-              <Slider.Indicator />
+-              <Slider.Thumb data-testid="thumb" />
+-            </Slider.Track>
+-          </Slider.Control>
+-        </Slider.Root>,
++        <SliderThumbServerCase2 />,
+       );
+ 
+       expect(document.querySelector('script')).not.toBe(null);
+@@ -1215,21 +1195,7 @@ describe('<Slider.Thumb />', () => {
+ 
+     it('renders a single pre-hydration script with the last thumb', async () => {
+       const { container } = await renderToString(
+-        <Slider.Root
+-          defaultValue={[30, 40]}
+-          thumbAlignment="edge"
+-          style={{
+-            width: '100px',
+-          }}
+-        >
+-          <Slider.Value />
+-          <Slider.Control>
+-            <Slider.Track>
+-              <Slider.Thumb index={0} data-testid="thumb" />
+-              <Slider.Thumb index={1} data-testid="thumb" />
+-            </Slider.Track>
+-          </Slider.Control>
+-        </Slider.Root>,
++        <SliderThumbServerCase3 />,
+       );
+ 
+       // eslint-disable-next-line testing-library/no-container -- script elements have no accessible role
+@@ -1243,20 +1209,7 @@ describe('<Slider.Thumb />', () => {
+ 
+     it('multiple thumbs', async () => {
+       renderToString(
+-        <Slider.Root
+-          defaultValue={[30, 40]}
+-          style={{
+-            width: '100px',
+-          }}
+-        >
+-          <Slider.Value />
+-          <Slider.Control>
+-            <Slider.Track>
+-              <Slider.Thumb index={0} data-testid="thumb" />
+-              <Slider.Thumb index={1} data-testid="thumb" />
+-            </Slider.Track>
+-          </Slider.Control>
+-        </Slider.Root>,
++        <SliderThumbServerCase4 />,
+       );
+ 
+       const [thumb0, thumb1] = Array.from(await screen.findAllByTestId('thumb'));

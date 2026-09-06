@@ -66,6 +66,7 @@ function mountHydrationCase(): void {
 	const container = document.querySelector('#hydration-root') as HTMLElement;
 	const capturedBoundary = container.querySelector('#mismatch-hydration-boundary');
 	const capturedOutside = container.querySelector('#hydration-outside');
+	const capturedHeading = container.querySelector('#hydration-text');
 	const module = deferred<{ default: typeof hydration.HydrationLeaf }>();
 	hydration.setMismatchHydrationModule(module.promise);
 	const root = hydrateRoot(container, hydration.MismatchHydrationBoundary, {
@@ -86,6 +87,7 @@ function mountHydrationCase(): void {
 			return {
 				boundarySame: container.querySelector('#mismatch-hydration-boundary') === capturedBoundary,
 				outsideSame: container.querySelector('#hydration-outside') === capturedOutside,
+				headingSame: container.querySelector('#hydration-text') === capturedHeading,
 				outsideText: capturedOutside?.textContent?.trim() ?? '',
 				fallbackCount: container.querySelectorAll('.hydration-fallback').length,
 				headings: Array.from(

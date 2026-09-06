@@ -70,6 +70,7 @@ export const PACKED_ESM_ONLY_CONSUMER_PACKAGES = ['@octanejs/draggable'];
 export const PACKED_JAVASCRIPT_CONSUMER_PACKAGES = [
 	...PACKED_COMMONJS_CONSUMER_PACKAGES,
 	...PACKED_ESM_ONLY_CONSUMER_PACKAGES,
+	'@octanejs/base-ui-utils',
 ];
 
 export function createPackedJavascriptConsumerManifest(archiveSpecs) {
@@ -95,12 +96,16 @@ const octane = require('octane');
 const server = require('octane/server');
 const floating = require('@octanejs/floating-ui');
 const base = require('@octanejs/base-ui');
+const { StoreInspector } = require('@octanejs/base-ui-utils/store');
 const radix = require('@octanejs/radix');
 
 assert.equal(typeof octane.createElement, 'function');
 assert.equal(typeof server.renderToString, 'function');
 assert.equal(typeof floating.useFloating, 'function');
 assert.equal(typeof base.Button, 'function');
+assert.equal(typeof base.Select.Root, 'function');
+assert.equal(typeof base.Combobox.Root, 'function');
+assert.equal(typeof StoreInspector, 'function');
 assert.equal(typeof radix.Accordion, 'object');
 const ssr = server.renderToString(() => 'conditions');
 assert.deepEqual(ssr, { html: 'conditions', css: '' });
@@ -120,12 +125,16 @@ import * as octane from 'octane';
 import * as server from 'octane/server';
 import * as floating from '@octanejs/floating-ui';
 import * as base from '@octanejs/base-ui';
+import { StoreInspector } from '@octanejs/base-ui-utils/store';
 import * as radix from '@octanejs/radix';
 
 assert.equal(typeof octane.createElement, 'function');
 assert.equal(typeof server.renderToString, 'function');
 assert.equal(typeof floating.useFloating, 'function');
 assert.equal(typeof base.Button, 'function');
+assert.equal(typeof base.Select.Root, 'function');
+assert.equal(typeof base.Combobox.Root, 'function');
+assert.equal(typeof StoreInspector, 'function');
 assert.equal(typeof radix.Accordion, 'object');
 const ssr = server.renderToString(() => 'conditions');
 assert.deepEqual(ssr, { html: 'conditions', css: '' });
@@ -395,18 +404,7 @@ export const PACKED_TSRX_CONSUMER_PROJECTS = [
 	'tsconfig.strict-browser.json',
 ];
 
-export function assertPackedTsrxConsumerSucceeded(result, project) {
-	const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
-	// The language plugin can report a parser failure without failing the
-	// TypeScript process. That is not successful validation of the source file.
-	if (result.error || result.status !== 0 || /^\[tsrx-tsc\]/m.test(output)) {
-		const reason =
-			result.error?.message ??
-			result.signal ??
-			(result.status === 0 ? 'parser diagnostics' : `exit ${result.status}`);
-		throw new Error(`${project}: tsrx-tsc failed (${reason})${output ? `\n${output}` : ''}`);
-	}
-}
+export { assertTsrxTypecheckSucceeded as assertPackedTsrxConsumerSucceeded } from './tsrx-typecheck.mjs';
 
 // These packages have deliberate API assertions in the hand-authored consumer
 // probes. Keep them installed even when source compilation is temporarily

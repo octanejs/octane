@@ -1,0 +1,18 @@
+diff --git a/tests/upstream/test/createRenderer.ts b/tests/upstream/test/createRenderer.ts
+--- a/tests/upstream/test/createRenderer.ts
++++ b/tests/upstream/test/createRenderer.ts
+@@ -1,10 +1,10 @@
+ import * as React from 'octane';
+ import {
+-  CreateRendererOptions,
+-  RenderOptions,
++  type CreateRendererOptions,
++  type RenderOptions,
+   createRenderer as sharedCreateRenderer,
+-  Renderer,
+-  MuiRenderResult,
++  type Renderer,
++  type MuiRenderResult,
+   act,
+ } from '@mui/internal-test-utils';
+ 

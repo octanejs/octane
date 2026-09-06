@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/test/popupConformanceTests.tsx b/tests/upstream/test/popupConformanceTests.tsx
+--- a/tests/upstream/test/popupConformanceTests.tsx
++++ b/tests/upstream/test/popupConformanceTests.tsx
+@@ -2,7 +2,7 @@
+ import * as React from 'octane';
+ import { expect, vi } from 'vitest';
+ import { randomStringValue, screen, waitFor } from '@mui/internal-test-utils';
+-import { createRenderer, isJSDOM } from '#test-utils';
++import { type createRenderer, isJSDOM } from '#test-utils';
+ 
+ export function popupConformanceTests(config: PopupTestConfig) {
+   const {

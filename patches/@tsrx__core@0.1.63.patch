@@ -1,0 +1,29 @@
+diff --git a/src/plugin.js b/src/plugin.js
+--- a/src/plugin.js
++++ b/src/plugin.js
+@@ -2773,7 +2773,11 @@
+ 			 */
+ 			reportReservedArrowTypeParam(node) {
+ 				// Allow <T>() => {} syntax without requiring trailing comma
+-				if (this.#collect && node.params.length === 1 && node.extra?.trailingComma === undefined) {
++				if (
++					this.#collect && node.params.length === 1 &&
++					node.extra?.trailingComma === undefined &&
++					!node.params[0].constraint && !node.params[0].default
++				) {
+ 					error(
+ 						'This syntax is reserved in files with the .mts or .cts extension. Add a trailing comma, as in `<T,>() => ...`.',
+ 						this.#filename,
+diff --git a/src/transform/jsx/helpers.js b/src/transform/jsx/helpers.js
+--- a/src/transform/jsx/helpers.js
++++ b/src/transform/jsx/helpers.js
+@@ -308,6 +308,9 @@ const TOOLING_LOCATION_WRAPPED_NODE_TYPES = new Set([
+ 	'ExportDefaultDeclaration',
+ 	'ExportAllDeclaration',
+ 	'TSPropertySignature',
++	// Whole destructuring defaults own diagnostics that may extend beyond the
++	// last mapped token of a type assertion, such as `items = EMPTY as T[]`.
++	'AssignmentPattern',
+ ]);
+ 
+ // Be careful when adding visitors that are already defined in `wrappers`.

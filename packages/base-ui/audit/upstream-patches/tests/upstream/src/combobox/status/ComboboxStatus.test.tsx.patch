@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/combobox/status/ComboboxStatus.test.tsx b/tests/upstream/src/combobox/status/ComboboxStatus.test.tsx
+--- a/tests/upstream/src/combobox/status/ComboboxStatus.test.tsx
++++ b/tests/upstream/src/combobox/status/ComboboxStatus.test.tsx
+@@ -43,7 +43,7 @@ describe('<Combobox.Status />', () => {
+ 
+     clock.withFakeTimers();
+ 
+-    function StatusTest(props: { children?: React.ReactNode }) {
++    function StatusTest(props: { children?: React.OctaneNode }) {
+       return (
+         <Combobox.Root defaultOpen>
+           <Combobox.Input />

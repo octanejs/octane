@@ -12,14 +12,18 @@
 import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@octanejs/testing-library';
 import { renderHydrationFixture } from '../../octane/tests/_hydration-ssr';
-import { HydratableCounter, HydrateWrapper } from './_fixtures/hydrate.tsrx';
+import { HydratableCounter, HydrateWrapper, HydratableCallback } from './_fixtures/hydrate.tsrx';
 
 const FIXTURE = 'packages/testing-library/tests/_fixtures/hydrate.tsrx';
 
 let counterHtml: string;
 let wrappedHtml: string;
+let callbackHtml: string;
 
 beforeAll(async () => {
+	callbackHtml = (
+		await renderHydrationFixture('testing-library', FIXTURE, 'HydratableCallback', {})
+	).html;
 	// One SSR server spin-up per fixture export; the mismatch case re-uses
 	// counterHtml by hydrating it with a different label.
 	counterHtml = (
@@ -41,6 +45,19 @@ function serverContainer(html: string): HTMLElement {
 }
 
 describe('render({ hydrate: true })', () => {
+	it('commits insertion effects before running hydration passive effects', () => {
+		const container = serverContainer(callbackHtml);
+		const original = container.querySelector('span');
+		const onCall = vi.fn();
+		const { getByTestId } = render(HydratableCallback, {
+			container,
+			hydrate: true,
+			props: { onCall },
+		});
+		expect(getByTestId('callback')).toBe(original);
+		expect(onCall).toHaveBeenCalledOnce();
+	});
+
 	it('adopts the server nodes instead of remounting them', () => {
 		const container = serverContainer(counterHtml);
 		const serverButton = container.querySelector('[data-testid="button"]');

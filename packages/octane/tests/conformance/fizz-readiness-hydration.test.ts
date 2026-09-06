@@ -152,10 +152,9 @@ describe('conformance: Fizz readiness and hydration behavior', () => {
 	});
 
 	// Per ReactDOMFizzServer-test.js:4581 (React 19.2.7, issue #24384).
-	// OCTANE DIVERGENCE: Hydration is synchronous and has no selective boundary
-	// hydration. A client suspension therefore reconciles to the pending arm
-	// immediately, reports that recovery, and mounts fresh content on resolution.
-	it('eagerly recovers a matching streamed boundary that suspends during hydration', async () => {
+	// A pending client module preserves the completed server boundary until the
+	// client can compare and adopt it. Suspension alone is not a mismatch.
+	it('retains a matching streamed boundary while its client module loads', async () => {
 		const container = await revealServerBoundary(server.MatchingHydrationBoundary, 'initial');
 		const leaf = container.querySelector('#hydration-leaf');
 		const heading = container.querySelector('#hydration-text');
@@ -168,16 +167,21 @@ describe('conformance: Fizz readiness and hydration behavior', () => {
 		});
 		try {
 			flushSync(() => {});
-			expect(hydrationDiagnostics(diagnostic)).toHaveLength(expectedDiagnosticCount(1));
-			expect(container.querySelector('.hydration-fallback')?.textContent).toBe('Loading…');
-			expect(container.querySelector('#hydration-leaf')).not.toBe(leaf);
-			expect(container.querySelector('#hydration-text')).not.toBe(heading);
+			expect(hydrationDiagnostics(diagnostic)).toHaveLength(0);
+			expect(container.querySelector('.hydration-fallback')).toBeNull();
+			expect(container.querySelector('#hydration-leaf')).toBe(leaf);
+			expect(container.querySelector('#hydration-text')).toBe(heading);
 
 			loader.resolve({ default: client.HydrationLeaf });
 			await flushResolution();
-			expect(hydrationDiagnostics(diagnostic)).toHaveLength(expectedDiagnosticCount(1));
+			expect(hydrationDiagnostics(diagnostic)).toHaveLength(0);
 			expect(container.querySelector('.hydration-fallback')).toBeNull();
-			expect(container.querySelector('#hydration-text')?.textContent).toBe('initial');
+			expect(container.querySelector('#hydration-text')).toBe(heading);
+			expect(container.querySelector('#hydration-leaf')).toBe(leaf);
+			expect(heading?.textContent).toBe('initial');
+			const action = container.querySelector<HTMLButtonElement>('#hydration-recovered-action')!;
+			flushSync(() => action.click());
+			expect(action.textContent?.trim()).toBe('recovered:1');
 		} finally {
 			root.unmount();
 			diagnostic.mockRestore();
@@ -186,10 +190,9 @@ describe('conformance: Fizz readiness and hydration behavior', () => {
 	});
 
 	// Per ReactDOMFizzServer-test.js:4657 (React 19.2.7, issue #24384).
-	// OCTANE DIVERGENCE: Without selective hydration, Octane reports the eager
-	// success-to-pending recovery rather than deferring that warning. Resolution
-	// still converges to the client arm; only the diagnostic timing diverges.
-	it('reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch', async () => {
+	// Mismatched client content is checked once its module resolves. Unrelated
+	// hydrated controls remain interactive while that boundary is unavailable.
+	it('defers a streamed-boundary mismatch until its client module resolves', async () => {
 		const container = await revealServerBoundary(server.MismatchHydrationBoundary, 'initial');
 		const heading = container.querySelector('#hydration-text');
 		const outside = container.querySelector('#hydration-outside') as HTMLButtonElement;
@@ -202,9 +205,9 @@ describe('conformance: Fizz readiness and hydration behavior', () => {
 		});
 		try {
 			flushSync(() => {});
-			expect(hydrationDiagnostics(diagnostic)).toHaveLength(expectedDiagnosticCount(1));
-			expect(container.querySelector('.hydration-fallback')?.textContent).toBe('Loading…');
-			expect(container.querySelector('#hydration-text')).not.toBe(heading);
+			expect(hydrationDiagnostics(diagnostic)).toHaveLength(0);
+			expect(container.querySelector('.hydration-fallback')).toBeNull();
+			expect(container.querySelector('#hydration-text')).toBe(heading);
 			expect(container.querySelector('#hydration-outside')).toBe(outside);
 			flushSync(() => outside.click());
 			expect(outside.textContent?.trim()).toBe('outside:1');

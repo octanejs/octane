@@ -42,6 +42,21 @@
       "reason": "Exercises Octane SSR hydration integration and is not counted as React parity."
     },
     {
+      "path": "packages/base-ui/tests/legacy-upstream/accordion.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Retains the earlier port-authored integration regressions alongside the complete pinned adapted suite; these are not counted as pristine upstream tests."
+    },
+    {
+      "path": "packages/base-ui/tests/legacy-upstream/collapsible.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Retains the earlier port-authored integration regressions alongside the complete pinned adapted suite; these are not counted as pristine upstream tests."
+    },
+    {
+      "path": "packages/base-ui/tests/legacy-upstream/tabs.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Retains the earlier port-authored integration regressions alongside the complete pinned adapted suite; these are not counted as pristine upstream tests."
+    },
+    {
       "path": "packages/base-ui/tests/menu.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane component integration and is not counted as React parity."
@@ -63,9 +78,8 @@
     },
     {
       "path": "packages/base-ui/tests/parity/contracts.test.ts",
-      "disposition": "octane-only-divergence",
-      "reason": "Pins explicit unported surface rather than claiming React parity.",
-      "divergenceIds": ["unported-internal-hover", "number-field-interaction-gaps"]
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the complete public namespace and immutable artifact crosswalk; runtime equivalence is established by the pristine, adapted, and differential lanes."
     },
     {
       "path": "packages/base-ui/tests/popover-hover.test.ts",

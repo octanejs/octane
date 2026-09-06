@@ -277,7 +277,12 @@ function existingBindingAssessment(node, inventory) {
 			reason: `${bindingName} status targets ${binding.status?.upstream?.package ?? 'no upstream package'}.`,
 		};
 	}
-	if (!binding.status.verified || binding.status.verified === 'partial') {
+	// The status date records an audit of the stated scope, not blanket parity.
+	if (
+		!binding.status.verified ||
+		binding.status.verified === 'partial' ||
+		binding.status.provenance?.verification === 'recorded-unverified'
+	) {
 		return { adequate: false, reason: `${bindingName} has not recorded complete verification.` };
 	}
 	if (!binding.tested) {
@@ -538,7 +543,11 @@ export function planPortGraph({
 		}
 		if (inventory.sourceBindings[node.packageName]) {
 			assignBinding(node, inventory.sourceBindings[node.packageName]);
-			node.action = 'extend-binding';
+			node.action =
+				adoptedBindings.includes(node.packageName) &&
+				matchingAdoptionEvidence(node, inventory.bindings[node.binding])
+					? 'adopt-binding'
+					: 'extend-binding';
 			if (target?.status === 'licensed') {
 				node.state = 'ready';
 				node.evidenceFingerprint = target.evidenceFingerprint;

@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/src/number-field/root/NumberFieldRoot.spec.tsx b/tests/upstream/src/number-field/root/NumberFieldRoot.spec.tsx
+--- a/tests/upstream/src/number-field/root/NumberFieldRoot.spec.tsx
++++ b/tests/upstream/src/number-field/root/NumberFieldRoot.spec.tsx
+@@ -1,7 +1,7 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { NumberField } from '@octanejs/base-ui/number-field';
+-import { REASONS } from '../../internals/reasons';
++import { REASONS } from "../../../../../src/internals/reasons.ts";
+ 
+ type NumberFieldChangeHandler = NonNullable<NumberField.Root.Props['onValueChange']>;
+ type NumberFieldCommitHandler = NonNullable<NumberField.Root.Props['onValueCommitted']>;

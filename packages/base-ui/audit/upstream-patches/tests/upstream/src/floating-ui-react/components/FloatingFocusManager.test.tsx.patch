@@ -1,0 +1,97 @@
+diff --git a/tests/upstream/src/floating-ui-react/components/FloatingFocusManager.test.tsx b/tests/upstream/src/floating-ui-react/components/FloatingFocusManager.test.tsx
+--- a/tests/upstream/src/floating-ui-react/components/FloatingFocusManager.test.tsx
++++ b/tests/upstream/src/floating-ui-react/components/FloatingFocusManager.test.tsx
+@@ -143,7 +143,7 @@ function RadioApp() {
+ 
+ interface DialogProps {
+   open?: boolean;
+-  render: (props: { close: () => void }) => React.ReactNode;
++  render: (props: { close: () => void }) => React.OctaneNode;
+   children: React.JSX.Element;
+ }
+ 
+@@ -255,6 +255,7 @@ describe('FloatingFocusManager', () => {
+ 
+         fireEvent.click(screen.getByTestId('three'));
+         expect(screen.getByTestId('reference')).not.toHaveFocus();
++        await flushMicrotasks();
+       });
+ 
+       test('ref', async () => {
+@@ -326,6 +327,7 @@ describe('FloatingFocusManager', () => {
+         fireEvent.pointerDown(document.body);
+ 
+         expect(screen.queryByTestId('close-dialog')).not.toBeInTheDocument();
++        await flushMicrotasks();
+       });
+ 
+       test('return to the first focusable descendent of the reference, if the reference is not focusable', async () => {
+@@ -341,7 +343,7 @@ describe('FloatingFocusManager', () => {
+ 
+         expect(screen.getByTestId('close-dialog')).toBeInTheDocument();
+ 
+-        await userEvent.keyboard('{Esc}');
++        await userEvent.keyboard('{Escape}');
+ 
+         expect(screen.queryByTestId('close-dialog')).not.toBeInTheDocument();
+ 
+@@ -730,7 +732,7 @@ describe('FloatingFocusManager', () => {
+         portalRef,
+       }: {
+         children: React.ReactElement;
+-        render: () => React.ReactNode;
++        render: () => React.OctaneNode;
+         portalRef?: HTMLElement;
+       }) {
+         const [open, setOpen] = React.useState(false);
+@@ -813,7 +815,7 @@ describe('FloatingFocusManager', () => {
+ 
+         await user.click(iframeWithin.getByRole('button', { name: 'Open' }));
+ 
+-        expect(iframeWithin.getByTestId('popover')).toBeInTheDocument();
++        expect(iframeWithin.getByTestId('popover').isConnected).toBe(true);
+ 
+         await user.tab();
+         await user.tab();
+@@ -836,7 +838,7 @@ describe('FloatingFocusManager', () => {
+ 
+           await user.click(iframeWithin.getByRole('button', { name: 'Open' }));
+ 
+-          expect(iframeWithin.getByTestId('popover')).toBeInTheDocument();
++          expect(iframeWithin.getByTestId('popover').isConnected).toBe(true);
+ 
+           await user.tab({ shift: true });
+ 
+@@ -1035,7 +1037,7 @@ describe('FloatingFocusManager', () => {
+         interface Props {
+           open?: boolean;
+           modal?: boolean;
+-          render: (props: { close: () => void }) => React.ReactNode;
++          render: (props: { close: () => void }) => React.OctaneNode;
+           children?: React.JSX.Element;
+           sideChildren?: React.JSX.Element;
+         }
+@@ -1183,6 +1185,7 @@ describe('FloatingFocusManager', () => {
+         expect(screen.getByTestId('aria-live')).not.toHaveAttribute('aria-hidden');
+         expect(screen.getByTestId('btn-1')).not.toHaveAttribute('aria-hidden');
+         expect(screen.getByTestId('btn-2')).not.toHaveAttribute('aria-hidden');
++        await flushMicrotasks();
+       });
+ 
+       test('true - keeps supplied inside elements outside the floating node exposed to assistive tech', async () => {
+@@ -1278,6 +1281,7 @@ describe('FloatingFocusManager', () => {
+         expect(screen.getByTestId('outside-wrapper')).not.toHaveAttribute('data-base-ui-inert');
+         expect(screen.getByTestId('btn-1')).not.toHaveAttribute('data-base-ui-inert');
+         expect(screen.getByTestId('btn-2')).not.toHaveAttribute('data-base-ui-inert');
++        await flushMicrotasks();
+       });
+ 
+       test('false - keeps marker on top-level outside ancestor when reference has siblings', async () => {
+@@ -1335,6 +1339,7 @@ describe('FloatingFocusManager', () => {
+         expect(screen.getByTestId('btn-2')).not.toHaveAttribute('data-base-ui-inert');
+         expect(screen.getByTestId('nested-wrapper')).not.toHaveAttribute('data-base-ui-inert');
+         expect(screen.getByTestId('nested-btn')).not.toHaveAttribute('data-base-ui-inert');
++        await flushMicrotasks();
+       });
+     });
+ 

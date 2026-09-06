@@ -1,0 +1,344 @@
+{
+  "name": "@octanejs/base-ui-utils",
+  "version": "0.1.0",
+  "description": "Shared Base UI utilities and stores for Octane.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "files": [
+    "src",
+    "dist/cjs",
+    "LICENSE",
+    "LICENSE.upstream",
+    "UPSTREAM.md",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/base-ui-utils"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    "./store": {
+      "types": "./src/store/index.ts",
+      "import": "./src/store/index.ts",
+      "require": "./dist/cjs/store/index.cjs",
+      "default": "./src/store/index.ts"
+    },
+    "./platform": {
+      "types": "./src/platform/index.ts",
+      "import": "./src/platform/index.ts",
+      "require": "./dist/cjs/platform/index.cjs",
+      "default": "./src/platform/index.ts"
+    },
+    "./addEventListener": {
+      "types": "./src/addEventListener.ts",
+      "import": "./src/addEventListener.ts",
+      "require": "./dist/cjs/addEventListener.cjs",
+      "default": "./src/addEventListener.ts"
+    },
+    "./areArraysEqual": {
+      "types": "./src/areArraysEqual.ts",
+      "import": "./src/areArraysEqual.ts",
+      "require": "./dist/cjs/areArraysEqual.cjs",
+      "default": "./src/areArraysEqual.ts"
+    },
+    "./clamp": {
+      "types": "./src/clamp.ts",
+      "import": "./src/clamp.ts",
+      "require": "./dist/cjs/clamp.cjs",
+      "default": "./src/clamp.ts"
+    },
+    "./createLogOnce": {
+      "types": "./src/createLogOnce.ts",
+      "import": "./src/createLogOnce.ts",
+      "require": "./dist/cjs/createLogOnce.cjs",
+      "default": "./src/createLogOnce.ts"
+    },
+    "./empty": {
+      "types": "./src/empty.ts",
+      "import": "./src/empty.ts",
+      "require": "./dist/cjs/empty.cjs",
+      "default": "./src/empty.ts"
+    },
+    "./error": {
+      "types": "./src/error.ts",
+      "import": "./src/error.ts",
+      "require": "./dist/cjs/error.cjs",
+      "default": "./src/error.ts"
+    },
+    "./fastHooks": {
+      "types": "./src/fastHooks.ts",
+      "import": "./src/fastHooks.ts",
+      "require": "./dist/cjs/fastHooks.cjs",
+      "default": "./src/fastHooks.ts"
+    },
+    "./fastObjectShallowCompare": {
+      "types": "./src/fastObjectShallowCompare.ts",
+      "import": "./src/fastObjectShallowCompare.ts",
+      "require": "./dist/cjs/fastObjectShallowCompare.cjs",
+      "default": "./src/fastObjectShallowCompare.ts"
+    },
+    "./formatErrorMessage": {
+      "types": "./src/formatErrorMessage.ts",
+      "import": "./src/formatErrorMessage.ts",
+      "require": "./dist/cjs/formatErrorMessage.cjs",
+      "default": "./src/formatErrorMessage.ts"
+    },
+    "./formatNumber": {
+      "types": "./src/formatNumber.ts",
+      "import": "./src/formatNumber.ts",
+      "require": "./dist/cjs/formatNumber.cjs",
+      "default": "./src/formatNumber.ts"
+    },
+    "./generateId": {
+      "types": "./src/generateId.ts",
+      "import": "./src/generateId.ts",
+      "require": "./dist/cjs/generateId.cjs",
+      "default": "./src/generateId.ts"
+    },
+    "./getDefaultFormSubmitter": {
+      "types": "./src/getDefaultFormSubmitter.ts",
+      "import": "./src/getDefaultFormSubmitter.ts",
+      "require": "./dist/cjs/getDefaultFormSubmitter.cjs",
+      "default": "./src/getDefaultFormSubmitter.ts"
+    },
+    "./getReactElementRef": {
+      "types": "./src/getReactElementRef.ts",
+      "import": "./src/getReactElementRef.ts",
+      "require": "./dist/cjs/getReactElementRef.cjs",
+      "default": "./src/getReactElementRef.ts"
+    },
+    "./inertValue": {
+      "types": "./src/inertValue.ts",
+      "import": "./src/inertValue.ts",
+      "require": "./dist/cjs/inertValue.cjs",
+      "default": "./src/inertValue.ts"
+    },
+    "./isElementDisabled": {
+      "types": "./src/isElementDisabled.ts",
+      "import": "./src/isElementDisabled.ts",
+      "require": "./dist/cjs/isElementDisabled.cjs",
+      "default": "./src/isElementDisabled.ts"
+    },
+    "./isMouseWithinBounds": {
+      "types": "./src/isMouseWithinBounds.ts",
+      "import": "./src/isMouseWithinBounds.ts",
+      "require": "./dist/cjs/isMouseWithinBounds.cjs",
+      "default": "./src/isMouseWithinBounds.ts"
+    },
+    "./mergeCleanups": {
+      "types": "./src/mergeCleanups.ts",
+      "import": "./src/mergeCleanups.ts",
+      "require": "./dist/cjs/mergeCleanups.cjs",
+      "default": "./src/mergeCleanups.ts"
+    },
+    "./mergeObjects": {
+      "types": "./src/mergeObjects.ts",
+      "import": "./src/mergeObjects.ts",
+      "require": "./dist/cjs/mergeObjects.cjs",
+      "default": "./src/mergeObjects.ts"
+    },
+    "./owner": {
+      "types": "./src/owner.ts",
+      "import": "./src/owner.ts",
+      "require": "./dist/cjs/owner.cjs",
+      "default": "./src/owner.ts"
+    },
+    "./reactVersion": {
+      "types": "./src/reactVersion.ts",
+      "import": "./src/reactVersion.ts",
+      "require": "./dist/cjs/reactVersion.cjs",
+      "default": "./src/reactVersion.ts"
+    },
+    "./safeReact": {
+      "types": "./src/safeReact.ts",
+      "import": "./src/safeReact.ts",
+      "require": "./dist/cjs/safeReact.cjs",
+      "default": "./src/safeReact.ts"
+    },
+    "./shadowDom": {
+      "types": "./src/shadowDom.ts",
+      "import": "./src/shadowDom.ts",
+      "require": "./dist/cjs/shadowDom.cjs",
+      "default": "./src/shadowDom.ts"
+    },
+    "./stringifyLocale": {
+      "types": "./src/stringifyLocale.ts",
+      "import": "./src/stringifyLocale.ts",
+      "require": "./dist/cjs/stringifyLocale.cjs",
+      "default": "./src/stringifyLocale.ts"
+    },
+    "./testUtils": {
+      "types": "./src/testUtils.ts",
+      "import": "./src/testUtils.ts",
+      "require": "./dist/cjs/testUtils.cjs",
+      "default": "./src/testUtils.ts"
+    },
+    "./useAnimationFrame": {
+      "types": "./src/useAnimationFrame.ts",
+      "import": "./src/useAnimationFrame.ts",
+      "require": "./dist/cjs/useAnimationFrame.cjs",
+      "default": "./src/useAnimationFrame.ts"
+    },
+    "./useControlled": {
+      "types": "./src/useControlled.ts",
+      "import": "./src/useControlled.ts",
+      "require": "./dist/cjs/useControlled.cjs",
+      "default": "./src/useControlled.ts"
+    },
+    "./useEnhancedClickHandler": {
+      "types": "./src/useEnhancedClickHandler.ts",
+      "import": "./src/useEnhancedClickHandler.ts",
+      "require": "./dist/cjs/useEnhancedClickHandler.cjs",
+      "default": "./src/useEnhancedClickHandler.ts"
+    },
+    "./useForcedRerendering": {
+      "types": "./src/useForcedRerendering.ts",
+      "import": "./src/useForcedRerendering.ts",
+      "require": "./dist/cjs/useForcedRerendering.cjs",
+      "default": "./src/useForcedRerendering.ts"
+    },
+    "./useId": {
+      "types": "./src/useId.ts",
+      "import": "./src/useId.ts",
+      "require": "./dist/cjs/useId.cjs",
+      "default": "./src/useId.ts"
+    },
+    "./useIdleCallback": {
+      "types": "./src/useIdleCallback.ts",
+      "import": "./src/useIdleCallback.ts",
+      "require": "./dist/cjs/useIdleCallback.cjs",
+      "default": "./src/useIdleCallback.ts"
+    },
+    "./useInterval": {
+      "types": "./src/useInterval.ts",
+      "import": "./src/useInterval.ts",
+      "require": "./dist/cjs/useInterval.cjs",
+      "default": "./src/useInterval.ts"
+    },
+    "./useIsoLayoutEffect": {
+      "types": "./src/useIsoLayoutEffect.ts",
+      "import": "./src/useIsoLayoutEffect.ts",
+      "require": "./dist/cjs/useIsoLayoutEffect.cjs",
+      "default": "./src/useIsoLayoutEffect.ts"
+    },
+    "./useMergedRefs": {
+      "types": "./src/useMergedRefs.ts",
+      "import": "./src/useMergedRefs.ts",
+      "require": "./dist/cjs/useMergedRefs.cjs",
+      "default": "./src/useMergedRefs.ts"
+    },
+    "./useOnFirstRender": {
+      "types": "./src/useOnFirstRender.ts",
+      "import": "./src/useOnFirstRender.ts",
+      "require": "./dist/cjs/useOnFirstRender.cjs",
+      "default": "./src/useOnFirstRender.ts"
+    },
+    "./useOnMount": {
+      "types": "./src/useOnMount.ts",
+      "import": "./src/useOnMount.ts",
+      "require": "./dist/cjs/useOnMount.cjs",
+      "default": "./src/useOnMount.ts"
+    },
+    "./usePreviousValue": {
+      "types": "./src/usePreviousValue.ts",
+      "import": "./src/usePreviousValue.ts",
+      "require": "./dist/cjs/usePreviousValue.cjs",
+      "default": "./src/usePreviousValue.ts"
+    },
+    "./useRefWithInit": {
+      "types": "./src/useRefWithInit.ts",
+      "import": "./src/useRefWithInit.ts",
+      "require": "./dist/cjs/useRefWithInit.cjs",
+      "default": "./src/useRefWithInit.ts"
+    },
+    "./useScrollLock": {
+      "types": "./src/useScrollLock.ts",
+      "import": "./src/useScrollLock.ts",
+      "require": "./dist/cjs/useScrollLock.cjs",
+      "default": "./src/useScrollLock.ts"
+    },
+    "./useStableCallback": {
+      "types": "./src/useStableCallback.ts",
+      "import": "./src/useStableCallback.ts",
+      "require": "./dist/cjs/useStableCallback.cjs",
+      "default": "./src/useStableCallback.ts"
+    },
+    "./useTimeout": {
+      "types": "./src/useTimeout.ts",
+      "import": "./src/useTimeout.ts",
+      "require": "./dist/cjs/useTimeout.cjs",
+      "default": "./src/useTimeout.ts"
+    },
+    "./useValueAsRef": {
+      "types": "./src/useValueAsRef.ts",
+      "import": "./src/useValueAsRef.ts",
+      "require": "./dist/cjs/useValueAsRef.cjs",
+      "default": "./src/useValueAsRef.ts"
+    },
+    "./visuallyHidden": {
+      "types": "./src/visuallyHidden.ts",
+      "import": "./src/visuallyHidden.ts",
+      "require": "./dist/cjs/visuallyHidden.cjs",
+      "default": "./src/visuallyHidden.ts"
+    },
+    "./warn": {
+      "types": "./src/warn.ts",
+      "import": "./src/warn.ts",
+      "require": "./dist/cjs/warn.cjs",
+      "default": "./src/warn.ts"
+    }
+  },
+  "imports": {
+    "#formatErrorMessage": {
+      "require": "./dist/cjs/formatErrorMessage.cjs",
+      "default": "./src/formatErrorMessage.ts"
+    }
+  },
+  "dependencies": {
+    "@floating-ui/utils": "^0.2.12",
+    "reselect": "^5.2.0"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.1.51 || ^0.2.0"
+  },
+  "devDependencies": {
+    "octane": "workspace:*",
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/user-event": "^14.6.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "@base-ui/utils": "0.4.0",
+    "vitest": "catalog:default",
+    "typescript": "catalog:default",
+    "@mui/internal-test-utils": "2.0.18-canary.25",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "typescript-pristine": "npm:@typescript/typescript6@6.0.2",
+    "@testing-library/react": "16.3.2",
+    "@types/use-sync-external-store": "1.5.0",
+    "use-sync-external-store": "1.6.0",
+    "typescript-pristine-native": "npm:typescript@7.0.2",
+    "jsdom": "27.4.0"
+  },
+  "scripts": {
+    "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
+    "prepack": "pnpm build:cjs",
+    "test": "vitest run --config tests/vitest.owned.config.ts",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs",
+    "test:upstream": "vitest run --config tests/vitest.config.ts",
+    "test:pristine": "node ../../scripts/react-parity/run-pristine.mjs base-ui-utils"
+  },
+  "octane": {
+    "commonjsCompileSource": true
+  }
+}

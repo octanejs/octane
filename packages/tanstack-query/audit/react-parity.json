@@ -11,10 +11,7 @@
     "integrity": "sha256:1effc6149825d93d72c8a735d9790ee7cb4d96fa149749c7eb2bba39c180755f",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-query/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [
@@ -65,13 +62,13 @@
             },
             {
               "id": "differential:tanstack-query-async",
-              "testName": "AsyncApp: pending \u2192 success renders byte-identical at both steps",
-              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query AsyncApp: pending \u2192 success renders byte-identical at both steps"
+              "testName": "AsyncApp: pending → success renders byte-identical at both steps",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query AsyncApp: pending → success renders byte-identical at both steps"
             },
             {
               "id": "differential:tanstack-query-mutation",
-              "testName": "MutationApp: idle \u2192 pending \u2192 success renders byte-identical",
-              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query MutationApp: idle \u2192 pending \u2192 success renders byte-identical"
+              "testName": "MutationApp: idle → pending → success renders byte-identical",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query MutationApp: idle → pending → success renders byte-identical"
             }
           ]
         },

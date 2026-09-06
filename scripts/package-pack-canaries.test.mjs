@@ -39,6 +39,7 @@ const repositoryRequire = createRequire(import.meta.url);
 describe('packed JavaScript consumers', () => {
 	const archiveSpecs = {
 		'@octanejs/base-ui': 'file:/tmp/base-ui.tgz',
+		'@octanejs/base-ui-utils': 'file:/tmp/base-ui-utils.tgz',
 		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
 		'@octanejs/radix': 'file:/tmp/radix.tgz',
 		'@octanejs/draggable': 'file:/tmp/react-draggable.tgz',
@@ -53,6 +54,14 @@ describe('packed JavaScript consumers', () => {
 		assert.throws(
 			() => createPackedJavascriptConsumerManifest({ ...archiveSpecs, octane: undefined }),
 			/no packed archive was provided for octane/,
+		);
+		assert.throws(
+			() =>
+				createPackedJavascriptConsumerManifest({
+					...archiveSpecs,
+					'@octanejs/base-ui-utils': undefined,
+				}),
+			/no packed archive was provided for @octanejs\/base-ui-utils/,
 		);
 	});
 

@@ -1002,8 +1002,8 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		flushSync(() => {});
 		expect(rootA.querySelector('.ok')).toBe(firstNode);
 		expect(rootB.querySelector('.ok')).toBe(secondNode);
-		expect((window as any).$OCTS[firstId]).toContain('first');
-		expect((window as any).$OCTS[secondId]).toContain('second');
+		expect(rootA.querySelector('.ok')!.textContent).toBe('first');
+		expect(rootB.querySelector('.ok')!.textContent).toBe('second');
 		hydratedA.unmount();
 		hydratedB.unmount();
 	});
@@ -1819,7 +1819,6 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		expect(container.querySelector('.ok')).toBe(okSpan); // adopted, not rebuilt
 		expect(container.querySelector('.ok')!.textContent).toBe('streamed!');
 		expect(errSpy).not.toHaveBeenCalled();
-		expect((window as any).$OCTS[id]).toContain('streamed!');
 		errSpy.mockRestore();
 		root.unmount();
 	});

@@ -206,6 +206,19 @@ export function reconcileBatchManifest(previousManifest, nextManifest) {
 		}
 	}
 	merged.baseline = structuredClone(previousManifest.baseline);
+	// Explicit adoption accepts an already-present, provenance-matched package.
+	// Refresh that package's baseline only; ordinary resumes still reject writes
+	// since intake, and similarly named neighboring directories remain protected.
+	for (const node of Object.values(merged.nodes)) {
+		if (node.action !== 'adopt-binding' || node.state !== 'ready' || !node.bindingDirectory)
+			continue;
+		const directory = node.bindingDirectory.replace(/\/$/, '');
+		const owns = (filePath) => filePath === directory || filePath.startsWith(directory + '/');
+		for (const filePath of Object.keys(merged.baseline))
+			if (owns(filePath)) delete merged.baseline[filePath];
+		for (const [filePath, hash] of Object.entries(nextManifest.baseline))
+			if (owns(filePath)) merged.baseline[filePath] = hash;
+	}
 	merged.history = structuredClone(previousManifest.history ?? []);
 	merged.resume = {
 		invalidated: [...invalidated].sort(),

@@ -1,20 +1,17 @@
 {
-  "$schema": "../../hook-form/audit/react-parity.schema.json",
   "schemaVersion": 1,
+  "materializedTests": "packages/base-ui",
   "provenance": {
     "repo": "https://github.com/mui/base-ui.git",
-    "version": "1.6.0",
-    "commit": "b34551d644f2e58ebf8fc1050d949f6654ceca6c",
+    "version": "1.8.0",
+    "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
     "sourceRoot": "packages/react/src",
     "testRoot": "packages/react/src; packages/react/test",
     "license": "MIT",
-    "integrity": "sha256:583e60023a77fed45caf8a2f980813e8a75e2f2a97f59c30380d2234cc3e0423",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:699d86811d03011bd2b1f8eba6f8945b1c9912a635ddda6b31edcdd6e5d2cf7b",
+    "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/base-ui/src"],
@@ -23,14 +20,14 @@
     },
     "tests": {
       "roots": ["packages/base-ui/tests/upstream"],
-      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "include": ["\\.test\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 49,
-    "uniqueIdentities": 49,
-    "duplicateEntriesWithinLanes": 0,
+    "inventoryEntries": 7758,
+    "uniqueIdentities": 7356,
+    "duplicateEntriesWithinLanes": 402,
     "identitiesSharedAcrossLanes": 0
   },
   "environments": {
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [
@@ -51,7 +48,7 @@
       "environment": "workspace-node",
       "project": "base-ui-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs every collected same-fixture Base UI differential test and rejects inventory drift.",
+      "notes": "Runs the complete same-fixture differential suite and rejects test identity drift.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/base-ui/audit/differential-runtime.json"
@@ -60,17 +57,32 @@
         {
           "path": "packages/base-ui/audit/differential-runtime.json",
           "role": "support",
-          "sha256": "ecbc083e683b7260cf19b815498ae8bee20dce742cf47536eb6a87405bf80505"
+          "sha256": "1a8f8235c2c1dd4061ae728493647b7d3a135cf4b7dff1f701ec993299f128c0"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
           "role": "support",
-          "sha256": "bf3265b3fe5b5a48b2451cb8458e5e6554c42183478e3c78f91f58f2bbf03cdf"
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
+        },
+        {
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "5901b513679395f5f7e134f96aa7c714f04e6ca8e9f308832f124d6099e35bc9"
         },
         {
           "path": "packages/base-ui/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "60eb88b4cc54c7bbd45b8ac365f8b5283cd5e304462efa64f0235fa6afced121",
+          "sha256": "952fa15fefe4a8e8d723122da958bf8f92cb7d014e7512e767ff0274417bc114",
           "cases": [
             {
               "id": "differential:base-ui-render-element",
@@ -79,8 +91,8 @@
             },
             {
               "id": "differential:base-ui-switch-native-input",
-              "testName": "Switch: uncontrolled \u2014 click toggles aria-checked + data-checked (native input adaptation)",
-              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Switch: uncontrolled \u2014 click toggles aria-checked + data-checked (native input adaptation)"
+              "testName": "Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)"
             },
             {
               "id": "differential:base-ui-number-field",
@@ -122,7 +134,77 @@
         {
           "path": "packages/base-ui/tests/_fixtures/base-ui-diff.tsrx",
           "role": "support",
-          "sha256": "a82fcab35bfba210ba74dacfcdbf4e24f5fa6decc9ba510b2d4bc017ef7de407"
+          "sha256": "7260bf8da6f79bbb4bd12a654917f9551d933fe9b1c51c36218956241079a543"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-pristine-upstream-full-suite",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Requires 7775 passes in the pinned React unit environment. The same report must contain exactly 1317 declared skip/todo outcomes; none count as passes. Collection modes and execution identities are checked separately.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/base-ui/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "6558b01da4f3b1246a21ec27bf51f10cd699f36d21767a6b69bafcbe56e64c10"
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/audit/provenance.json",
+          "role": "support",
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
+        },
+        {
+          "path": "packages/base-ui/audit/parity-policy.json",
+          "role": "support",
+          "sha256": "9a71a4cf4d10dbc049b4f908871f8e45c1eef9afc7ffca7f76eb1a4172f25b00"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
+        },
+        {
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "5901b513679395f5f7e134f96aa7c714f04e6ca8e9f308832f124d6099e35bc9"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-hook-order.ts",
+          "role": "support",
+          "sha256": "4cb606846eb6acaf140f496acf036ccea995c171a845cea3741932c03507c828"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.pristine.config.ts",
+          "role": "support",
+          "sha256": "107a8e432261e28c71f381ab3a3a25db698f8537a52db4db07c04bb25e075e44"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-pristine-config.mjs",
+          "role": "support",
+          "sha256": "da706b3eb3f1b08d2b2ce5847968bf853c881d611b10a9d84e5a33bdc3bf8ac8"
         }
       ]
     },
@@ -131,62 +213,320 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "base-ui-upstream-adapted",
+      "project": "base-ui-adapted",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs every collected adapted Accordion, Collapsible, and Tabs identity (currently 49 selected cases) and rejects inventory drift. This is not the full pinned upstream suite.",
+      "notes": "Requires 7758 passes in the adapted Octane unit environment. The same report must contain exactly 1335 declared skip/todo outcomes; none count as passes. Collection modes and execution identities are checked separately.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/base-ui/audit/adapted-runtime.json"
       },
       "files": [
         {
-          "path": "packages/base-ui/audit/upstream.lock.json",
-          "role": "support",
-          "sha256": "82937a5512e6a5520261f1604eb30f8830a0385fb65a021e28157b16dd4d758f"
-        },
-        {
           "path": "packages/base-ui/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "44f227cee8df2ed4d681caa04ea92c86c0346cb789f326296ee820bea8908027"
+          "sha256": "b6730b33f226fb67febb052055008e2f6cd1edf1e9c3cdf91bd3f1fd2b84b849"
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/audit/provenance.json",
+          "role": "support",
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
+        },
+        {
+          "path": "packages/base-ui/audit/parity-policy.json",
+          "role": "support",
+          "sha256": "9a71a4cf4d10dbc049b4f908871f8e45c1eef9afc7ffca7f76eb1a4172f25b00"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
           "role": "support",
-          "sha256": "bf3265b3fe5b5a48b2451cb8458e5e6554c42183478e3c78f91f58f2bbf03cdf"
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
         },
         {
-          "path": "packages/base-ui/tests/upstream/accordion.test.ts",
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "5901b513679395f5f7e134f96aa7c714f04e6ca8e9f308832f124d6099e35bc9"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-hook-order.ts",
+          "role": "support",
+          "sha256": "4cb606846eb6acaf140f496acf036ccea995c171a845cea3741932c03507c828"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.config.ts",
+          "role": "support",
+          "sha256": "56e26bcdf86e096705a8a08907115924a00c14760744760a80c56cc1a73c850a"
+        },
+        {
+          "path": "packages/base-ui/tests/support/renderer.ts",
+          "role": "support",
+          "sha256": "6e740c4d30574e9a935e304ff783c67d9bf46d3e6fd34a661cf89291571ebf88"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-pristine-browser-upstream-full-suite",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-pristine-browser",
+      "notes": "Requires 8726 passes in the pinned React Chromium environment. The same report must contain exactly 380 declared skip/todo outcomes; none count as passes. Collection modes and execution identities are checked separately.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/base-ui/audit/pristine-browser-runtime.json",
+        "fileParallelism": false
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/audit/pristine-browser-runtime.json",
+          "role": "support",
+          "sha256": "54686f568f704da39d8e8c43161ea4b428f0e4540f4be1bb989e1a958c863914"
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/audit/provenance.json",
+          "role": "support",
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
+        },
+        {
+          "path": "packages/base-ui/audit/parity-policy.json",
+          "role": "support",
+          "sha256": "9a71a4cf4d10dbc049b4f908871f8e45c1eef9afc7ffca7f76eb1a4172f25b00"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
+        },
+        {
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/browser-runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "0171c3e92181c0d45f4facc214630af8f5d2d68c0a1eb4371ee8bd36a4545fff"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-hook-order.ts",
+          "role": "support",
+          "sha256": "4cb606846eb6acaf140f496acf036ccea995c171a845cea3741932c03507c828"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.pristine.config.ts",
+          "role": "support",
+          "sha256": "107a8e432261e28c71f381ab3a3a25db698f8537a52db4db07c04bb25e075e44"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.pristine.browser.config.ts",
+          "role": "support",
+          "sha256": "70d88078b10d12c9d128488be3e730d6abcfd0c69ce9eab60868042879574215"
+        },
+        {
+          "path": "patches/@vitest__browser@4.1.10.patch",
+          "role": "support",
+          "sha256": "d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0"
+        },
+        {
+          "path": "patches/@vitest__mocker@4.1.10.patch",
+          "role": "support",
+          "sha256": "538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-pristine-config.mjs",
+          "role": "support",
+          "sha256": "da706b3eb3f1b08d2b2ce5847968bf853c881d611b10a9d84e5a33bdc3bf8ac8"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-adapted-browser-upstream-full-suite",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-adapted-browser",
+      "notes": "Requires 8709 passes in the adapted Octane Chromium environment. The same report must contain exactly 398 declared skip/todo outcomes; none count as passes. Collection modes and execution identities are checked separately.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/base-ui/audit/adapted-browser-runtime.json",
+        "fileParallelism": false
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/audit/adapted-browser-runtime.json",
+          "role": "support",
+          "sha256": "5ee08774e56d59359b8b08c549e6de1ca821d6e9796faf4d19d9723c9ccee672"
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/audit/provenance.json",
+          "role": "support",
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
+        },
+        {
+          "path": "packages/base-ui/audit/parity-policy.json",
+          "role": "support",
+          "sha256": "9a71a4cf4d10dbc049b4f908871f8e45c1eef9afc7ffca7f76eb1a4172f25b00"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
+        },
+        {
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/browser-runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "0171c3e92181c0d45f4facc214630af8f5d2d68c0a1eb4371ee8bd36a4545fff"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-hook-order.ts",
+          "role": "support",
+          "sha256": "4cb606846eb6acaf140f496acf036ccea995c171a845cea3741932c03507c828"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.config.ts",
+          "role": "support",
+          "sha256": "56e26bcdf86e096705a8a08907115924a00c14760744760a80c56cc1a73c850a"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.browser.config.ts",
+          "role": "support",
+          "sha256": "2fb077defa09dc8b6968892fe2a4e668b6eca0852d59d0a4869374db6c892b37"
+        },
+        {
+          "path": "patches/@vitest__browser@4.1.10.patch",
+          "role": "support",
+          "sha256": "d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0"
+        },
+        {
+          "path": "patches/@vitest__mocker@4.1.10.patch",
+          "role": "support",
+          "sha256": "538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4"
+        },
+        {
+          "path": "packages/base-ui/tests/support/browser-renderer.ts",
+          "role": "support",
+          "sha256": "09a77ef4e0c0788619f985e2d8bedcc47aa945e00b5ba3369f81c325d35a78fb"
+        },
+        {
+          "path": "packages/base-ui/tests/support/renderer.ts",
+          "role": "support",
+          "sha256": "6e740c4d30574e9a935e304ff783c67d9bf46d3e6fd34a661cf89291571ebf88"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles every pinned upstream type-test file, preserving the positive assertions and negative controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/base-ui/tsconfig.pristine-specs.json",
+        "compilerBins": ["packages/base-ui/node_modules/typescript-pristine-native/bin/tsc"]
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/tsconfig.pristine-specs.json",
           "role": "test",
-          "sha256": "8bf10bf123463efc2131d3e8f91c95a4100e6ffafae294666badb6b0db68dddb",
+          "sha256": "cd57cb4af1e95e3418a60112313576873b48f4dad37e1f8a5820bd723a215801",
           "cases": [
             {
-              "id": "adapted:base-ui-accordion-aria",
-              "testName": "renders correct ARIA attributes",
-              "fullName": "<Accordion.Root /> ARIA attributes renders correct ARIA attributes"
-            },
-            {
-              "id": "adapted:base-ui-accordion-default-value",
-              "testName": "prop: defaultValue \u2014 custom item value",
-              "fullName": "<Accordion.Root /> uncontrolled prop: defaultValue \u2014 custom item value"
+              "id": "types:base-ui-pristine-types",
+              "testName": "complete pristine @base-ui/react 1.8.0 type suite",
+              "fullName": "complete pristine @base-ui/react 1.8.0 type suite"
             }
           ]
         },
         {
-          "path": "packages/base-ui/tests/upstream/collapsible.test.ts",
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles every pinned upstream type-test file, preserving the positive assertions and negative controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/base-ui/tsconfig.adapted-specs.json"
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/tsconfig.adapted-specs.json",
           "role": "test",
-          "sha256": "070afb0f80cb117dfcb28596d42e474d78afa493c1091e70e3646f29194c901d",
+          "sha256": "f218a2e9d4d2e506956f3ad287c5341c08a4995a52c26f0c3bb5206b0d93cd4f",
           "cases": [
             {
-              "id": "adapted:base-ui-collapsible-aria",
-              "testName": "sets ARIA attributes",
-              "fullName": "<Collapsible.Root /> ARIA attributes sets ARIA attributes"
-            },
-            {
-              "id": "adapted:base-ui-collapsible-cancel",
-              "testName": "eventDetails.cancel() prevents opening while uncontrolled",
-              "fullName": "<Collapsible.Root /> BaseUIChangeEventDetails eventDetails.cancel() prevents opening while uncontrolled"
+              "id": "types:base-ui-adapted-types",
+              "testName": "complete adapted @base-ui/react 1.8.0 type suite",
+              "fullName": "complete adapted @base-ui/react 1.8.0 type suite"
             }
           ]
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
         }
       ]
     }
@@ -217,28 +557,16 @@
       "reviewCondition": "Review if Octane changes render-element or ref composition semantics."
     },
     {
-      "id": "unported-internal-hover",
-      "caseIds": ["differential:base-ui-tooltip-open"],
-      "upstreamResult": "Base UI includes private hover infrastructure used by upstream components.",
-      "octaneResult": "The private hover helper is not exposed or independently ported; public supported components use Octane-native behavior.",
-      "rationale": "Private upstream internals are not a public compatibility surface.",
-      "classification": "scope",
-      "consumerImpact": "Consumers cannot import undocumented Base UI hover internals from the Octane package.",
-      "migrationGuidance": "Use public component APIs or Octane's native hover primitives.",
-      "owner": "@octanejs/base-ui",
-      "reviewCondition": "Review if a public supported component requires the missing internal helper."
-    },
-    {
-      "id": "number-field-interaction-gaps",
-      "caseIds": ["differential:base-ui-number-field"],
-      "upstreamResult": "Base UI NumberField includes ScrubArea and additional pointer and keyboard interaction behavior.",
-      "octaneResult": "The current Octane NumberField supports formatting and step controls but not ScrubArea or the complete interaction matrix.",
-      "rationale": "Those interaction surfaces have not yet been ported and must remain explicit gaps.",
-      "classification": "missing-surface",
-      "consumerImpact": "Consumers needing scrub gestures or the full upstream interaction matrix cannot migrate without adaptation.",
-      "migrationGuidance": "Use the supported input and stepper surface, or keep Base UI React for ScrubArea-dependent flows.",
-      "owner": "@octanejs/base-ui",
-      "reviewCondition": "Review when ScrubArea or the remaining NumberField interactions are implemented."
+      "id": "active-effect-commit-counts",
+      "caseIds": ["runtime:5733dce426f267ed"],
+      "upstreamResult": "The active tooltip consumers record 11 and 7 passive commits; the unrelated consumer remains at its three initial commits.",
+      "octaneResult": "Active consumers can commit a different number of times while finite layout cascades settle. The unrelated consumer retains exactly its three initial commits.",
+      "rationale": "Octane completes layout-driven updates before DOM observer delivery and does not promise React's incidental commit counts. The test retains its no-unrelated-update assertion and verifies active consumers update.",
+      "classification": "rendering",
+      "consumerImpact": "Effects in actively updating components may execute a different number of times. Unrelated delay-group consumers remain unaffected.",
+      "migrationGuidance": "Use effect dependencies and cleanup; depend on visible state and unrelated-consumer isolation instead of absolute active commit counts.",
+      "owner": "octane",
+      "reviewCondition": "Review if Octane changes layout cascade scheduling or commits updates to unrelated delay-group consumers."
     }
   ]
 }

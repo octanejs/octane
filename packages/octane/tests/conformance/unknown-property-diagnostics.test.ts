@@ -225,6 +225,8 @@ describe('React DOM unknown-property diagnostics', () => {
 		try {
 			const element = root.find('#canonical-input-properties') as HTMLInputElement;
 			expect(element.maxLength).toBe(12);
+			expect(element.minLength).toBe(4);
+			expect(element.getAttribute('enterkeyhint')).toBe('done');
 			expect(element.getAttribute('inputmode')).toBe('numeric');
 			expect(element.getAttribute('autocapitalize')).toBe('none');
 			expect(element.getAttribute('autocorrect')).toBe('off');
@@ -668,6 +670,8 @@ describe('server and hydration unknown-property diagnostics', () => {
 		const error = captureErrors();
 		const html = Server.renderToString(devServer.CanonicalInputProperties).html;
 		expect(html.toLowerCase()).toContain('maxlength="12"');
+		expect(html.toLowerCase()).toContain('minlength="4"');
+		expect(html.toLowerCase()).toContain('enterkeyhint="done"');
 		expect(html.toLowerCase()).toContain('inputmode="numeric"');
 		expect(html.toLowerCase()).toContain('autocapitalize="none"');
 		expect(html.toLowerCase()).toContain('autocorrect="off"');

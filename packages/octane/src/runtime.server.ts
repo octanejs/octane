@@ -31,6 +31,9 @@ import {
 	FOR_BLOCK_OPEN_ITEMS,
 	EMPTY_COMMENT,
 	SUSPENSE_SCRIPT_ATTR,
+	SUSPENSE_RESOLVED_COMMENT,
+	SUSPENSE_RESOLVED_SEED_ATTR,
+	SUSPENSE_RESOLVED_NATIVE_ATTR,
 	SUSPENSE_SEED_WIRE_PREFIX,
 	REJECTION_SENTINEL_KEY,
 	EXTERNAL_HYDRATION_PROMISE,
@@ -1479,18 +1482,21 @@ export function ssrTextPre(v: unknown): string {
 	return s.charCodeAt(0) === 10 ? '\n' + s : s;
 }
 
-// Render a COMPONENT `ElementDescriptor` (`d.type` is a function) via ssrComponent,
-// threading positional `d.children` through as `props.children` (don't drop them).
-// `createElement` already mirrors positional children into `props.children`, so for
-// its descriptors the spread is a no-op copy — it stays as a defensive guard for
-// hand-rolled descriptors whose props/children were never reconciled.
+// Preserve omitted children as omitted: wrappers can merge these props over a
+// separate children source. Scoped children must remain lazy. createElement
+// already mirrors positional children into props, so only legacy descriptors
+// with a distinct non-null children field need a repaired props object.
 function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
 	if (SCOPED_ELEMENT_PROPS.has(d.props)) {
 		return ssrComponent(scope, d.type as ServerComponent, d.props);
 	}
+	const children = d.children;
+	if (children == null || children === d.props?.children) {
+		return ssrComponent(scope, d.type as ServerComponent, d.props);
+	}
 	return ssrComponent(scope, d.type as ServerComponent, {
 		...d.props,
-		children: d.children ?? d.props?.children,
+		children,
 	});
 }
 
@@ -6040,6 +6046,15 @@ export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: stri
 	return provider as F;
 }
 
+/** Invoke a cached optional-chain method without consulting its call/bind properties. */
+export function callWithReceiver<T>(
+	fn: (...args: any[]) => T,
+	receiver: unknown,
+	...args: any[]
+): T {
+	return NATIVE_REFLECT_APPLY(fn, receiver, args);
+}
+
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: ServerHookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
 	const driver = MANUAL_HOOK_DRIVER;
@@ -6398,31 +6413,30 @@ function serializeSuspenseSeedJson(values: unknown[]): string {
  * `\u003c` so the JSON payload can't terminate the `<script>` element or open
  * an HTML comment. Only emitted when at least one value was resolved.
  */
-function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
+function serializeSuspenseSeeds(
+	values: unknown[],
+	nonceAttr: string,
+	attr = SUSPENSE_SCRIPT_ATTR,
+): string {
 	// Encode `undefined` (which JSON drops/nulls) through the seed wire escape so a
 	// `use(thenable)` that resolved to `undefined` round-trips to `undefined` on
 	// the client — not `null`. Prefix-leading user strings are escaped first, so
 	// neither sentinel-shaped objects nor user strings can collide with it.
 	const json = serializeSuspenseSeedJson(values);
 	if (json === '[]') return '';
-	return (
-		'<script type="application/json" ' + SUSPENSE_SCRIPT_ATTR + nonceAttr + '>' + json + '</script>'
-	);
+	return '<script type="application/json" ' + attr + nonceAttr + '>' + json + '</script>';
 }
 
-function serializeNativeSignalSeeds(signals: NativeSignalManifest, nonceAttr: string): string {
+function serializeNativeSignalSeeds(
+	signals: NativeSignalManifest,
+	nonceAttr: string,
+	attr = NATIVE_SIGNAL_SEED_ATTR,
+): string {
 	// Native values already have an unambiguous tagged JSON grammar. Apply the
 	// same script-text '<' escaping as use() seeds, without their positional
 	// undefined/string-prefix wire encoding.
 	const json = JSON.stringify(signals).replace(/</g, '\\u003c');
-	return (
-		'<script type="application/json" ' +
-		NATIVE_SIGNAL_SEED_ATTR +
-		nonceAttr +
-		'>' +
-		json +
-		'</script>'
-	);
+	return '<script type="application/json" ' + attr + nonceAttr + '>' + json + '</script>';
 }
 
 /**
@@ -8130,7 +8144,27 @@ export function ssrTry(
 				ID_COUNTER = entry.pendingIdOffset;
 				return pendingForm();
 			}
+			// Accepted boundary reads still belong to this result's HTML and its
+			// revision checks. The sidecar also keeps them available to a boundary
+			// that hydrates after the root's adoption frame has been released.
 			appendNativeSeedReads(nativeReads);
+			if (MARKERS && pendFn !== null) {
+				// Reserve sequential IDs and isolate positional use() seeds from siblings.
+				// A client-owned promise can suspend even though the server resolved it.
+				const idCount = ID_COUNTER - outerIdCounter;
+				const seeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+				const native = NATIVE_READ_COLLECTOR?.serialize(nativeReads);
+				return ssrBlock(
+					`<!--${SUSPENSE_RESOLVED_COMMENT}${idCount}-->` +
+						(seeds.length === 0
+							? ''
+							: serializeSuspenseSeeds(seeds, NONCE_ATTR, SUSPENSE_RESOLVED_SEED_ATTR)) +
+						(native === undefined
+							? ''
+							: serializeNativeSignalSeeds(native, NONCE_ATTR, SUSPENSE_RESOLVED_NATIVE_ATTR)) +
+						inner,
+				);
+			}
 			return ssrBlock(inner);
 		} catch (e) {
 			nativeFresh = NATIVE_SERVER_FAILURES !== nativeFailureStart;

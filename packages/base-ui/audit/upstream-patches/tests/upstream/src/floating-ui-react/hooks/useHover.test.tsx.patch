@@ -1,0 +1,42 @@
+diff --git a/tests/upstream/src/floating-ui-react/hooks/useHover.test.tsx b/tests/upstream/src/floating-ui-react/hooks/useHover.test.tsx
+--- a/tests/upstream/src/floating-ui-react/hooks/useHover.test.tsx
++++ b/tests/upstream/src/floating-ui-react/hooks/useHover.test.tsx
+@@ -39,12 +39,13 @@ describe.skipIf(!isJSDOM)('useHover', () => {
+     await flushMicrotasks();
+   });
+ 
+-  test('closes on mouseleave', () => {
++  test('closes on mouseleave', async () => {
+     render(<App />);
+ 
+     fireEvent.mouseEnter(screen.getByRole('button'));
+     fireEvent.mouseLeave(screen.getByRole('button'));
+     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
++    await flushMicrotasks();
+   });
+ 
+   describe('prop: delay', () => {
+@@ -227,6 +228,7 @@ describe.skipIf(!isJSDOM)('useHover', () => {
+     );
+ 
+     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
++    await flushMicrotasks();
+   });
+ 
+   test('does not show after delay if domReference changes', async () => {
+@@ -245,6 +247,7 @@ describe.skipIf(!isJSDOM)('useHover', () => {
+     });
+ 
+     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
++    await flushMicrotasks();
+   });
+ 
+   test('reason string', async () => {
+@@ -274,6 +277,7 @@ describe.skipIf(!isJSDOM)('useHover', () => {
+     fireEvent.mouseEnter(button);
+     await flushMicrotasks();
+     fireEvent.mouseLeave(button);
++    await flushMicrotasks();
+   });
+ 
+   test('does not treat a synthetic child target as inactive when the native path differs', async () => {

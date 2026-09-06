@@ -1,0 +1,29 @@
+diff --git a/dist/client/__vitest_browser__/tester-BJtsJFpD.js b/dist/client/__vitest_browser__/tester-BJtsJFpD.js
+--- a/dist/client/__vitest_browser__/tester-BJtsJFpD.js
++++ b/dist/client/__vitest_browser__/tester-BJtsJFpD.js
+@@ -1955,10 +1955,10 @@
+   resolveMockPath(path) {
+     const config = this.config;
+     const fsRoot = join("/@fs/", config.root);
+-    if (path.startsWith(config.root)) {
++    if (path === config.root || path.startsWith(config.root + "/")) {
+       return path.slice(config.root.length);
+     }
+-    if (path.startsWith(fsRoot)) {
++    if (path === fsRoot || path.startsWith(fsRoot + "/")) {
+       return path.slice(fsRoot.length);
+     }
+     return path;
+@@ -2229,7 +2229,11 @@
+         if (method === "run") {
+           await startTests([file], runner);
+         } else {
+-          await collectTests([file], runner);
++          try {
++            await collectTests([file], runner);
++          } finally {
++            await globalThis.__vitest_mocker__.invalidate();
++          }
+         }
+       }
+     );

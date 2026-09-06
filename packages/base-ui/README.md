@@ -11,10 +11,14 @@ npm install @octanejs/base-ui
 pnpm add @octanejs/base-ui
 ```
 
-Alpha, in progress. Ported at full fidelity from the pinned `mui/base-ui` source
-(`v1.6.0`), proven by differential parity tests against the real
-`@base-ui/react`. See `docs/base-ui-migration-plan.md` for the phased plan
-and progress.
+This binding targets Base UI **1.8.0**. The complete export surface is implemented,
+including Select, Combobox, Autocomplete, Drawer, Navigation Menu, OTP Field,
+Scroll Area, and Toolbar. Pristine and native unit, browser, type, and hydration checks pass;
+see [UPSTREAM.md](./UPSTREAM.md) for the pinned source and evidence.
+
+Use it in an Octane application with the Octane compiler enabled. ES module
+exports ship authored source so the application compiler selects client or server
+output. CommonJS exports contain compiled client modules.
 
 ## API
 
@@ -24,11 +28,35 @@ Mirrors Base UI's deep-subpath imports:
 import { Separator } from '@octanejs/base-ui/separator';
 import { useRender } from '@octanejs/base-ui/use-render';
 import { mergeProps } from '@octanejs/base-ui/merge-props';
+import { Select } from '@octanejs/base-ui/select';
+import { Combobox } from '@octanejs/base-ui/combobox';
 ```
 
-Every component takes Base UI's universal composition props — `render` (a JSX element or
+Rendered component parts support Base UI's composition props — `render` (a JSX element or
 `(props, state) => element`), `className` (string or `(state) => string`), and `style`
 (object or `(state) => object`) — routed through `useRenderElement`.
+CSS text strings are not accepted by Base UI's style composition API.
+
+The optional temporal adapters require their matching peer packages:
+
+```sh
+npm install date-fns @date-fns/tz # Date-fns adapter
+npm install luxon               # Luxon adapter
+```
+
+TypeScript users of the Luxon adapter also need `@types/luxon`.
+
+## Development checks
+
+From the repository root:
+
+```sh
+pnpm --dir packages/base-ui test          # Native, differential and SSR tests
+pnpm --dir packages/base-ui test:upstream # Adapted upstream suite in jsdom
+pnpm --dir packages/base-ui test:browser  # Adapted upstream suite in Chromium
+pnpm --dir packages/base-ui test:pristine # Immutable React oracle in jsdom
+pnpm --dir packages/base-ui upstream:verify
+```
 
 ## Intentional divergences from Base UI (React)
 
@@ -38,6 +66,8 @@ Every component takes Base UI's universal composition props — `render` (a JSX 
 - **ref-as-prop.** No `forwardRef`; `ref` is a normal prop (React-19 shape).
 - **`className` composition** follows octane's `normalizeClass` at the apply site; the
   `render`-prop merge concatenates strings exactly like Base UI.
+- Octane does not replay mount effects in Strict Mode or implement React's
+  Server Components Flight format.
 
 ## Status
 

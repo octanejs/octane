@@ -11,16 +11,9 @@
     "integrity": "sha256:e76faa61389e085518b0d8492a7970e9ce4c060e4a2e9181b1eb089805afb95d",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/dropzone/src"],
-      "include": ["\\.(?:ts|tsrx)$"],
-      "exclude": []
-    },
+    "source": { "roots": ["packages/dropzone/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
     "tests": {
       "roots": ["packages/dropzone/tests/adapted"],
       "include": ["\\.(?:test|spec)\\.(?:ts|tsx)$"],
@@ -40,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

@@ -6,14 +6,33 @@
  * and are out of scope by design.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { createElement } from 'octane';
-import { render, cleanup, screen } from '@octanejs/testing-library';
+import { act, createElement, Fragment } from 'octane';
+import { PreviousProp } from '../../octane/tests/_fixtures/act-warning.tsrx';
+import { render, cleanup, screen, fireEvent } from '@octanejs/testing-library';
+import { Counter } from './_fixtures/counter.tsrx';
 import { Greeting, Message, OtherMessage, MainWrapper } from './_fixtures/basic.tsrx';
 import { EffectLogger, DeferredLabel } from './_fixtures/effects.tsrx';
 
 afterEach(cleanup);
 
 describe('render', () => {
+	it('accepts renderable values and retains keyed state across a fragment and a single child', () => {
+		const counter = createElement(Counter, { key: 'counter' });
+		const view = render([createElement('span', { key: 'label' }, 'label'), counter]);
+		const button = view.getByRole('button');
+		fireEvent.click(button);
+		expect(button.textContent).toBe('Count: 1');
+		view.rerender(counter);
+		expect(view.getByRole('button')).toBe(button);
+		expect(button.textContent).toBe('Count: 1');
+		view.rerender(createElement(Fragment, null, counter));
+		expect(view.getByRole('button')).toBe(button);
+		view.rerender(null);
+		expect(view.container.textContent).toBe('');
+		view.rerender('finished');
+		expect(view.container.textContent).toBe('finished');
+	});
+
 	// Per react-testing-library src/__tests__/render.js:28 ("renders div into document")
 	it('renders a host element into the document', () => {
 		const { container } = render(createElement('div', { id: 'whatever' }, 'hello'));
@@ -151,4 +170,14 @@ describe('rerender', () => {
 		expect((container.firstChild as HTMLElement).tagName).toBe('MAIN');
 		expect(getByTestId('message').textContent).toBe('b');
 	});
+});
+
+it('batches rerender prop updates within an outer act callback', async () => {
+	const { container, rerender } = render(PreviousProp, { props: { value: 'initial' } });
+	await act(() => {
+		rerender(PreviousProp, { props: { value: 'first' } });
+		rerender(PreviousProp, { props: { value: 'second' } });
+		rerender(PreviousProp, { props: { value: 'third' } });
+	});
+	expect(container.textContent).toBe('initial');
 });

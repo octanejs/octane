@@ -11,21 +11,10 @@
     "integrity": "sha256:015a8c4972120e794fa648ef6604fdd0ff94d4748c9308b0cfe147c177b5df4a",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "insufficient",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/shadcn/src"],
-      "include": ["\\.(?:ts|tsrx)$"],
-      "exclude": []
-    },
-    "tests": {
-      "roots": ["packages/shadcn/tests"],
-      "include": ["\\.test\\.tsx?$"],
-      "exclude": []
-    }
+    "source": { "roots": ["packages/shadcn/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
+    "tests": { "roots": ["packages/shadcn/tests"], "include": ["\\.test\\.tsx?$"], "exclude": [] }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,
@@ -40,7 +29,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

@@ -90,16 +90,35 @@
       "name": "@octanejs/base-ui",
       "version": "0.1.50",
       "category": "UI Libraries",
-      "upstream": { "package": "@base-ui/react", "version": "1.6.0" },
-      "surface": "Alpha, in progress: 35 of 43 upstream subpaths. The implemented surface has a complete byte-exact upstream inventory, 98 same-fixture React/Octane differential cases, and 49 Accordion, Collapsible, and Tabs adapted cases. This is bounded evidence and remains recorded-unverified because eight public subpaths and most of the canonical runtime/type suite are not yet adapted. Menu covers all 20 upstream parts, Toast all 11 parts, Collapsible all 3 parts, Accordion all 5 parts, and Tabs 4 of 5 parts (Indicator unported); their detailed gaps and evidence are recorded in UPSTREAM.md and audit/react-parity.json.",
+      "upstream": {
+        "package": "@base-ui/react",
+        "version": "1.8.0",
+        "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
+        "license": "MIT"
+      },
+      "surface": "All 79 upstream export entries are implemented, including Select, Combobox, Autocomplete, Drawer, Navigation Menu, OTP Field, Scroll Area, Toolbar, and the remaining parts of existing components.",
       "divergences": [
-        "`native-event-semantics`: Host handlers receive native DOM events rather than React synthetic events; text edits use native `input`, form-facing NumberField commits use native `change`, and propagation reads `cancelBubble`.",
-        "`ref-as-prop-class-composition`: React `forwardRef` wrappers become ref-as-prop, and class values use Octane's composition rules.",
-        "`unported-internal-hover`: The internal standalone floating-ui-react `useHover` combiner is not republished because no ported Base UI component consumes it.",
-        "`number-field-interaction-gaps`: `NumberField.ScrubArea` and hold-to-repeat stepping remain unported; steppers respond to single presses only."
+        "Host handlers receive native DOM events; text edits use onInput. Refs are ordinary props and class values use Octane composition.",
+        "Octane does not replay renders or mount effects in Strict Mode and does not support the React Server Components Flight format.",
+        "Base UI style composition accepts object styles, including functions returning objects."
       ],
-      "ssr": "Dedicated Node-mode tests cover server snapshots, accessible separators, edge-aligned slider visibility, and closed dialogs; hydration adopts Vite-compiled Octane server markup, transitions to the client snapshot, and preserves interaction. Open overlays and remaining components are not yet covered.",
-      "verified": "2026-08-01"
+      "ssr": "Native SSR/hydration, initial suspended hydration, focus and portal regressions pass, including installed Select/Combobox server form rendering.",
+      "verified": "2026-09-06"
+    },
+    {
+      "name": "@octanejs/base-ui-utils",
+      "version": "0.1.0",
+      "category": "UI Utilities",
+      "upstream": {
+        "package": "@base-ui/utils",
+        "version": "0.4.0",
+        "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
+        "license": "MIT"
+      },
+      "surface": "All 45 published Base UI utility entries and 85 entry/export pairs match the pinned 0.4.0 release.",
+      "divergences": ["Refs are ordinary props and host callbacks receive native DOM events."],
+      "ssr": "Server and hydration behavior is verified through native Base UI integration and installed-consumer checks.",
+      "verified": "2026-09-06"
     },
     {
       "name": "@octanejs/better-auth",
@@ -358,10 +377,10 @@
       "version": "0.1.51",
       "category": "UI Utilities",
       "upstream": { "package": "@floating-ui/react", "version": "0.27.19" },
-      "surface": "Complete @floating-ui/react 0.27.19 export surface: positioning (`useFloating`, ref-aware `arrow`, and the framework-neutral middleware re-exports), floating tree and list primitives, every interaction hook, portals/overlays/focus management/arrows/composites, transitions, both delay-group APIs, and the deprecated `inner`/`useInnerOffset` pair. Runtime parity is executable and bounded: 272 adapted assertions pass compatibly, 29 remain executable expected-failure negative controls, and 6 upstream-declared skips are non-evidence.",
+      "surface": "Complete @floating-ui/react 0.27.19 export surface: positioning (`useFloating`, ref-aware `arrow`, and the framework-neutral middleware re-exports), floating tree and list primitives, every interaction hook, portals/overlays/focus management/arrows/composites, transitions, both delay-group APIs, and the deprecated `inner`/`useInnerOffset` pair. Runtime parity is executable and bounded: 276 adapted assertions pass compatibly, 25 remain executable expected-failure negative controls, and 6 upstream-declared skips are non-evidence.",
       "divergences": [
         "`ref-as-prop`: React forwardRef component APIs become Octane ref-as-prop APIs.",
-        "Twenty-nine upstream assertions remain executable expected-failure controls across ref/focus/effect scheduling, dynamic-child registration, iframe realms, render counts, React-only context fixtures, and list registration; audit/expected-failures.json names every case.",
+        "Twenty-five upstream assertions remain executable expected-failure controls across ref/focus/effect scheduling, dynamic-child registration, iframe realms, render counts, React-only context fixtures, and list registration; audit/expected-failures.json names every case.",
         "The combined Octane entry point cannot preserve every @floating-ui/react-dom-only type narrowing; the one-for-one adapted type program records those diagnostics explicitly."
       ],
       "ssr": "No dedicated SSR/hydration lane; the supported claims are client positioning and interactions.",
@@ -993,7 +1012,7 @@
         "package": "shadcn-ui/ui (radix base)",
         "version": "4baadbc6517070ae8f8feb2c97037adc2b305544 + shadcn@4.14.1"
       },
-      "surface": "Two primitive bases. RADIX base (default, reached at the bare subpaths): tiers 1-2 complete plus the first tier-3 composites — 40 component families. REACT ARIA base (@octanejs/shadcn/react-aria/<Family>): 33 families over @octanejs/aria/components, taken from upstream's aria-nova style and verified class-string identical to it; not ported are select and sonner (need input-group and next-themes), while hover-card, menubar and navigation-menu do not exist in upstream's aria base. Sources live at src/bases/<base>/ui/ with lib/hooks/styles shared. DISTRIBUTION is registry-first with per-family subpath exports; the monolithic root entry is removed. STYLING FLAVOR: the radix base is mid-migration from the pinned cn-* semantic-hook system to the default-Tailwind utilities-inlined flavor (user-directed); the react-aria base is uniformly the utilities-inlined aria-nova output. THE REGISTRY NOW COVERS ALL THREE BASES, using shadcn's own mechanism rather than a namespace: base and visual style compose into components.json's single `style` field, which the CLI substitutes into the registry URL (`{style}` and `{name}` are the only placeholders shadcn@4.14.1 substitutes, and it never parses the style string). Emitted as registry/styles/<style>/<name>.json for base-nova (default, @octanejs/base-ui), radix-nova and aria-nova, plus an un-styled copy of the default so a URL without {style} still resolves. Base-agnostic items (utils/types/theme/use-mobile) are emitted into every style tree because registryDependencies resolve through the same templated URL. `registry:serve` serves it locally — the port the playground's components.json always referenced but which nothing previously served. Verified end to end by installing with the real shadcn CLI: each style yields its own primitive. BASE UI base (@octanejs/shadcn/base-ui/<Family>): STARTED, 21 of 44 families and PARTIAL. `accordion` is transcribed from upstream and runs on the @octanejs/base-ui accordion primitive — the first primitive-backed family in this base. The rest are primitive-free: `alert` is transcribed from upstream's Base UI source and verified byte-identical to it; `aspect-ratio`, `card`, `empty`, `native-select`, `skeleton` and `spinner` are DERIVED from the react-aria base and are NOT yet verified against upstream, which each file's header records. Nothing primitive-backed is ported: Base UI's primitive API is structurally different from React Aria's, so it cannot be derived and needs transcribed upstream sources. The foundations now run on real Base UI primitives: `button` (Button), `input` (Field.Control), `label` (Field.Label) and `separator` (Separator), alongside plain-host `textarea` and `kbd` — Base UI ships no textarea or Keyboard primitive, so those match the radix base's shape rather than the aria base's. `separator` deliberately takes the ARIA base's class string, not the radix one: Base UI emits `aria-orientation`, so radix's `data-horizontal:` utilities would never match and the separator would render with no thickness. `button` omits the aria base's data-variant/data-size, which upstream's Base UI base also omits, and ships no LinkButton because Base UI has no Link primitive — which is why `pagination` remains unported. `alert-dialog` is transcribed from upstream and is the first portalled family here (Overlay->Backdrop, Content->Popup, Cancel->Close); it drops upstream's `cn-font-heading` on the title, matching the react-aria base, because this package ships the utilities-inlined flavor and nothing defines that semantic hook. The form controls (`checkbox`, `switch`, `radio-group`) adapt their conditional utilities rather than copying them: Base UI publishes bare `data-checked`/`data-unchecked` where radix publishes `data-state=\"checked\"`, and every Root renders a `<span role=…>` that is never `:disabled`, so `disabled:` variants become `data-disabled:`. Both dialects are pinned by tests asserting the rendered DOM carries the attributes the class strings target. The overlays (`dialog`, `popover`, `tooltip`, plus `alert-dialog`) adapt positioning: Base UI inserts a Positioner layer (Portal > Positioner > Popup) and names its transform origin `--transform-origin`, not radix's `--radix-<part>-content-transform-origin`, so a copied radix class would reference a variable nothing sets and the popup would scale from the wrong corner. Tooltip also drops radix's `data-[state=delayed-open]` utilities, which have no Base UI counterpart. `PopoverAnchor` is absent because Base UI positions via the Positioner's `anchor` prop rather than an Anchor element — recorded in tests/cross-base.test.ts.",
+      "surface": "Three primitive bases. RADIX base (default, reached at the bare subpaths): tiers 1-2 complete plus the first tier-3 composites — 44 component families. REACT ARIA base (@octanejs/shadcn/react-aria/<Family>): 33 families over @octanejs/aria/components, taken from upstream's aria-nova style and verified class-string identical to it; not ported are select and sonner (need input-group and next-themes), while hover-card, menubar and navigation-menu do not exist in upstream's aria base. Sources live at src/bases/<base>/ui/ with lib/hooks/styles shared. DISTRIBUTION is registry-first with per-family subpath exports; the monolithic root entry is removed. STYLING FLAVOR: the radix base is mid-migration from the pinned cn-* semantic-hook system to the default-Tailwind utilities-inlined flavor (user-directed); the react-aria base is uniformly the utilities-inlined aria-nova output. THE REGISTRY NOW COVERS ALL THREE BASES, using shadcn's own mechanism rather than a namespace: base and visual style compose into components.json's single `style` field, which the CLI substitutes into the registry URL (`{style}` and `{name}` are the only placeholders shadcn@4.14.1 substitutes, and it never parses the style string). Emitted as registry/styles/<style>/<name>.json for base-nova (default, @octanejs/base-ui), radix-nova and aria-nova, plus an un-styled copy of the default so a URL without {style} still resolves. Base-agnostic items (utils/types/theme/use-mobile) are emitted into every style tree because registryDependencies resolve through the same templated URL. `registry:serve` serves it locally — the port the playground's components.json always referenced but which nothing previously served. Verified end to end by installing with the real shadcn CLI: each style yields its own primitive. BASE UI base (@octanejs/shadcn/base-ui/<Family>): 40 of 44 families. Existing wrappers target the Base UI 1.8.0 binding. Positioner props and required item/tab values derive from the primitive types; dialogs, sliders, and toggle groups compose through native templates. Styles target Base UI's state attributes and positioning variables. Select, Combobox, Navigation Menu, and Scroll Area primitives are available in @octanejs/base-ui, but their shadcn Base UI wrappers remain unported. Existing source headers distinguish transcribed upstream styles from derived styles whose upstream fidelity remains unverified.",
       "divergences": [
         "No `\"use client\"` directives anywhere: octane has no Server Components, so the RSC axis does not exist here.",
         "Refs are props (octane has no forwardRef) — upstream v4 already dropped forwardRef, so component shapes match.",
@@ -1635,9 +1654,7 @@
       "category": "State Management",
       "upstream": { "package": "zustand", "version": "5.0.14" },
       "surface": "Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).",
-      "divergences": [
-        "Unstable selectors (a new reference every render) settle after a bounded number of re-renders instead of hitting React's `useSyncExternalStore` warning loop — still prefer `useShallow`."
-      ],
+      "divergences": [],
       "ssr": "No SSR-specific surface; no dedicated SSR tests.",
       "verified": "2026-08-02"
     }
@@ -1645,6 +1662,8 @@
   "reactPackages": {
     "@apollo/client": "@octanejs/apollo-client",
     "@base-ui-components/react": "@octanejs/base-ui",
+    "@base-ui/react": "@octanejs/base-ui",
+    "@base-ui/utils": "@octanejs/base-ui-utils",
     "@dnd-kit/react": "@octanejs/dnd-kit",
     "@floating-ui/react": "@octanejs/floating-ui",
     "@formisch/react": "@octanejs/formisch",
@@ -2114,6 +2133,11 @@
     },
     "63": {
       "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "64": {
+      "message": "Multiple errors were thrown during act.",
       "runtime": ["client"],
       "status": "active"
     }

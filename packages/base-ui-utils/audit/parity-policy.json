@@ -1,0 +1,64 @@
+{
+  "divergences": [
+    {
+      "id": "ref-as-prop",
+      "caseIds": ["ordinary:base-ui-utils-native-refs"],
+      "upstreamResult": "React uses scalar refs and a forwarding wrapper.",
+      "octaneResult": "Octane accepts recursive refs as ordinary component props.",
+      "rationale": "The binding implements the upstream public behavior with Octane framework primitives.",
+      "classification": "rendering",
+      "consumerImpact": "Consumers can compose native ref arrays and callback cleanups.",
+      "migrationGuidance": "Use Octane refs with the binding; React forwarding wrappers are unnecessary.",
+      "owner": "@octanejs/base-ui-utils",
+      "reviewCondition": "Review when the corresponding Octane framework contract changes.",
+      "ordinaryEvidence": [
+        {
+          "id": "ordinary:base-ui-utils-native-refs",
+          "path": "packages/base-ui-utils/tests/native-contracts.test.tsrx",
+          "testName": "attaches and cleans up recursive refs passed through a fast component",
+          "fullName": "attaches and cleans up recursive refs passed through a fast component"
+        }
+      ]
+    },
+    {
+      "id": "capability-detection",
+      "caseIds": ["ordinary:base-ui-utils-capabilities"],
+      "upstreamResult": "The helper reads the React runtime version.",
+      "octaneResult": "The helper reports the supported React API feature level.",
+      "rationale": "The binding implements the upstream public behavior with Octane framework primitives.",
+      "classification": "rendering",
+      "consumerImpact": "The result describes compatibility, not the installed Octane version.",
+      "migrationGuidance": "Use the helper for supported feature branches, not to identify the renderer.",
+      "owner": "@octanejs/base-ui-utils",
+      "reviewCondition": "Review when the corresponding Octane framework contract changes.",
+      "ordinaryEvidence": [
+        {
+          "id": "ordinary:base-ui-utils-capabilities",
+          "path": "packages/base-ui-utils/tests/native-contracts.test.tsrx",
+          "testName": "supports the inert, stable ID, and ref cleanup capabilities advertised to upstream code",
+          "fullName": "supports the inert, stable ID, and ref cleanup capabilities advertised to upstream code"
+        }
+      ]
+    },
+    {
+      "id": "native-external-store",
+      "caseIds": ["ordinary:base-ui-utils-native-store"],
+      "upstreamResult": "React selects its external-store implementation by runtime version.",
+      "octaneResult": "Octane uses its native external-store subscription contract.",
+      "rationale": "The binding implements the upstream public behavior with Octane framework primitives.",
+      "classification": "rendering",
+      "consumerImpact": "Store updates use Octane scheduling and server snapshots.",
+      "migrationGuidance": "Observe selected values and DOM commits instead of React scheduling internals.",
+      "owner": "@octanejs/base-ui-utils",
+      "reviewCondition": "Review when the corresponding Octane framework contract changes.",
+      "ordinaryEvidence": [
+        {
+          "id": "ordinary:base-ui-utils-native-store",
+          "path": "packages/base-ui-utils/tests/fast-store.test.tsrx",
+          "testName": "renders the latest values of every selector after consecutive updates",
+          "fullName": "fast store subscriptions renders the latest values of every selector after consecutive updates"
+        }
+      ]
+    }
+  ]
+}

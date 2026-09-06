@@ -83,6 +83,7 @@ packages/*/.pristine-upstream-*/
 # directory name is fixed by the shared `tests/upstream-vitest.config.ts`
 # convention, so this stays generic like the scratch-copy pattern above.
 packages/*/.upstream-vitest-cache/
+packages/*/.pristine-vitest-cache/
 # Pristine vitest cache for tanstack-hotkeys upstream suite
 packages/tanstack-hotkeys/.vite-pristine/
 

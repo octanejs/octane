@@ -154,7 +154,7 @@ test('serializes the real timeout message through the JSON reporter', async () =
 		snapshot: { summary: {} },
 		logger: { log: (message) => logs.push(message), warn: () => {} },
 	});
-	await reporter.onTestRunEnd([{ task: fileTask }]);
+	await reporter.onTestRunEnd([{ task: fileTask, project: { name: 'example' } }]);
 	assert.equal(logs.length, 1);
 	const [assertion] = JSON.parse(logs[0]).testResults[0].assertionResults;
 	assert.equal(assertion.status, 'failed');
@@ -357,6 +357,7 @@ test('separates real JSON reports from colored Vite output and preserves asserti
 export default ${JSON.stringify({
 			root,
 			test: {
+				name: 'example',
 				include: ['example.test.js'],
 				globals: true,
 				maxWorkers: 1,

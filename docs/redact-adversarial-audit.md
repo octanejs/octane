@@ -459,16 +459,16 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 **Octane references**
 
-- [packages/octane/tests/conformance/fizz-readiness-hydration.test.ts](../packages/octane/tests/conformance/fizz-readiness-hydration.test.ts) — “reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch” — Proves one final client arm, one expected diagnostic, and identity plus continued interactivity of a stateful sibling outside the recovered boundary.
+- [packages/octane/tests/conformance/fizz-readiness-hydration.test.ts](../packages/octane/tests/conformance/fizz-readiness-hydration.test.ts) — “defers a streamed-boundary mismatch until its client module resolves” — Proves one final client arm, one expected diagnostic, and identity plus continued interactivity of a stateful sibling outside the recovered boundary.
 - [packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — “contains async hydration recovery and preserves an interactive outside sibling” — Captures browser error and unhandled-rejection channels before hydration and exercises the streamed reveal script in Chromium.
 - [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `hideTryContentAndMountPending`
 
 **Executable evidence**
 
-- [reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch](../packages/octane/tests/conformance/fizz-readiness-hydration.test.ts) — modes: `server-stream`, `hydrate-mismatch`, `deferred-hydration`, `production-compile`; observables: `markup`, `node-identity`, `events`, `errors`, `streaming`
+- [defers a streamed-boundary mismatch until its client module resolves](../packages/octane/tests/conformance/fizz-readiness-hydration.test.ts) — modes: `server-stream`, `hydrate-mismatch`, `deferred-hydration`, `production-compile`; observables: `markup`, `node-identity`, `events`, `errors`, `streaming`
 - [contains async hydration recovery and preserves an interactive outside sibling](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `server-stream`, `hydrate-mismatch`, `deferred-hydration`, `real-browser`; observables: `markup`, `node-identity`, `events`, `errors`, `streaming`
 
-**Rationale.** Issue #17 remained open when captured, but Redact main commit e1620a13aab8935c806238f117ba58559b7cd002 contains the matching fix and regression, so the resolution is inferred rather than administratively confirmed. Octane eagerly leaves synchronous hydration for a fresh client arm, so Redact's resumed-cursor implementation bug does not transfer directly. The transferred risk is covered at Octane's observation boundary by the one-arm, outside-sibling, and real-browser global-error evidence.
+**Rationale.** Issue #17 remained open when captured, but Redact main commit e1620a13aab8935c806238f117ba58559b7cd002 contains the matching fix and regression, so the resolution is inferred rather than administratively confirmed. Octane preserves a completed server boundary while its client module loads and compares the resumed client arm on resolution. The transferred risk is covered at Octane's observation boundary by the one-arm, outside-sibling, and real-browser global-error evidence.
 
 
 ### hydration-errors

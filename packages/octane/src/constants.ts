@@ -56,6 +56,10 @@ export const HYDRATION_TEXT_SEP = ' ';
  * re-suspending. Shared so server emit and client read stay byte-identical.
  */
 export const SUSPENSE_SCRIPT_ATTR = 'data-octane-suspense';
+// A resolved server arm can hydrate independently if client data suspends.
+export const SUSPENSE_RESOLVED_COMMENT = 'oct-suspense:';
+export const SUSPENSE_RESOLVED_SEED_ATTR = 'data-octane-suspense-seeds';
+export const SUSPENSE_RESOLVED_NATIVE_ATTR = 'data-octane-suspense-signals';
 
 /**
  * Legacy undefined-sentinel key retained for consumers of `octane/constants`.

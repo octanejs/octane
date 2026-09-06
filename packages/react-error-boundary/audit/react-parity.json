@@ -11,16 +11,9 @@
     "integrity": "sha256:74ba770d513712aaab909ffe27209804739a33896c2635f974eddf141661901f",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/react-error-boundary/src"],
-      "include": ["$a"],
-      "exclude": []
-    },
+    "source": { "roots": ["packages/react-error-boundary/src"], "include": ["$a"], "exclude": [] },
     "tests": {
       "roots": ["packages/react-error-boundary/tests/differential"],
       "include": ["$a"],
@@ -40,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

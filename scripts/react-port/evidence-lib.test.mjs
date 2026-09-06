@@ -110,6 +110,27 @@ describe('evidence matrix', () => {
 		assert.equal(matrix.gates['package-tests'].status, 'passed');
 	});
 
+	test('replaces a resolved blocker with the successful command result', () => {
+		const matrix = createEvidenceMatrix({
+			categories: ['thin-core'],
+			preflightArtifact: 'manifest.json',
+		});
+		recordEvidence(matrix, 'package-tests', {
+			status: 'blocked',
+			reason: 'Waiting for authorization',
+			repair: 'Obtain authorization',
+		});
+		const result = recordEvidence(matrix, 'package-tests', {
+			status: 'passed',
+			command: 'pnpm --dir packages/widget test',
+			observed: '12 tests passed',
+		});
+		assert.equal(result.status, 'passed');
+		assert.equal(result.observed, '12 tests passed');
+		assert.equal(result.reason, undefined);
+		assert.equal(result.repair, undefined);
+	});
+
 	test('rejects stale matrices instead of accepting legacy typecheck evidence', () => {
 		const staleMatrix = {
 			schemaVersion: 1,

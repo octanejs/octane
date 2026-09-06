@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
+import { buildUpstreamLock, gitBlobSha1 } from '../react-port/materialize-lib.mjs';
+import { verifyMaterializedUpstreamEvidence } from './materialized-upstream-lib.mjs';
 import { verifyLaneCollectedTests } from './harness-lib.mjs';
 import { verifyPortTestClassifications } from './binding-classifications-lib.mjs';
 
@@ -15,7 +16,7 @@ const manifest = JSON.parse(
 );
 
 test('Base UI classifies every port-authored test exactly once', () => {
-	assert.deepEqual(verifyPortTestClassifications(root, 'base-ui'), { tests: 22 });
+	assert.deepEqual(verifyPortTestClassifications(root, 'base-ui'), { tests: 25 });
 });
 
 test('Base UI differential lane rejects a renamed declared case', () => {
@@ -36,21 +37,37 @@ test('Base UI differential lane rejects a renamed declared case', () => {
 	);
 });
 
-test('Base UI crosswalk generator rejects a checkout at the wrong commit', () => {
-	const checkout = mkdtempSync(join(tmpdir(), 'base-ui-wrong-pin-'));
+test('Base UI crosswalk pin validation rejects altered pristine bytes', () => {
+	const checkout = mkdtempSync(join(tmpdir(), 'base-ui-altered-pin-'));
 	try {
-		execFileSync('git', ['init', '--quiet', checkout]);
-		execFileSync('git', ['-C', checkout, 'config', 'user.email', 'parity@example.invalid']);
-		execFileSync('git', ['-C', checkout, 'config', 'user.name', 'Parity Control']);
-		execFileSync('git', ['-C', checkout, 'commit', '--allow-empty', '--quiet', '-m', 'wrong pin']);
+		const packageRoot = join(checkout, 'packages/base-ui');
+		const pinned = JSON.parse(
+			readFileSync(join(root, 'packages/base-ui/audit/upstream.lock.json'), 'utf8'),
+		);
+		const source = 'export const value = 1;\n';
+		const lock = buildUpstreamLock({
+			identity: pinned.identity,
+			license: { spdx: 'MIT' },
+			scopes: ['src/index.ts'],
+			treeEntries: [
+				{
+					type: 'blob',
+					path: 'packages/react/src/index.ts',
+					sha: gitBlobSha1(Buffer.from(source)),
+					size: Buffer.byteLength(source),
+				},
+			],
+			adaptedMappings: [],
+		});
+		mkdirSync(join(packageRoot, 'audit'), { recursive: true });
+		mkdirSync(join(packageRoot, 'upstream/src'), { recursive: true });
+		writeFileSync(join(packageRoot, 'audit/upstream.lock.json'), JSON.stringify(lock));
+		writeFileSync(join(packageRoot, 'upstream/src/index.ts'), source);
+		assert.equal(verifyMaterializedUpstreamEvidence(checkout, 'packages/base-ui').files, 1);
+		writeFileSync(join(packageRoot, 'upstream/src/index.ts'), 'export const value = 2;\n');
 		assert.throws(
-			() =>
-				execFileSync(
-					process.execPath,
-					['packages/base-ui/scripts/build-upstream-crosswalk.mjs', checkout],
-					{ cwd: root, stdio: 'pipe' },
-				),
-			/pinned to b34551d644f2e58ebf8fc1050d949f6654ceca6c/,
+			() => verifyMaterializedUpstreamEvidence(checkout, 'packages/base-ui'),
+			/upstream tree drifted.*mismatched: 1/,
 		);
 	} finally {
 		rmSync(checkout, { recursive: true, force: true });

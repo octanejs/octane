@@ -1,0 +1,63 @@
+{
+  "package": "@base-ui/react",
+  "version": "1.8.0",
+  "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
+  "review": "Both shared registrars run every suite at this commit. All conformance invocations use the default full suite (no only or skip options). Adapter gates use skipIf so registrations remain present. Counts and titles are extracted from the pinned implementation modules; upstream code is never executed during intake.",
+  "helpers": [
+    {
+      "name": "describeConformance",
+      "modules": [
+        {
+          "path": "packages/react/test/describeConformance.tsx",
+          "gitBlob": "13f2a7cdd632238efb46ebf7f9587d3eb0ca7e6b",
+          "registrations": false
+        },
+        {
+          "path": "packages/react/test/conformanceTests/className.tsx",
+          "gitBlob": "3af310c2937d620a50d04152de3465b88eaadaac",
+          "registrations": true
+        },
+        {
+          "path": "packages/react/test/conformanceTests/propForwarding.tsx",
+          "gitBlob": "dfcba9d5809e26a22c6df290384bb0e57ba2cc39",
+          "registrations": true
+        },
+        {
+          "path": "packages/react/test/conformanceTests/refForwarding.tsx",
+          "gitBlob": "1fc8a3da1263b70368c50f6fbbf37d4c8434dea2",
+          "registrations": true
+        },
+        {
+          "path": "packages/react/test/conformanceTests/renderProp.tsx",
+          "gitBlob": "33990e43e15f7c5260446b887ac09f2d98367fa1",
+          "registrations": true
+        }
+      ]
+    },
+    {
+      "name": "describeGregorianAdapter",
+      "modules": [
+        {
+          "path": "packages/react/test/describeGregorianAdapter/describeGregorianAdapter.ts",
+          "gitBlob": "1b533fa04eb6a0afcb302b20a2405d179ba838e5",
+          "registrations": false
+        },
+        {
+          "path": "packages/react/test/describeGregorianAdapter/testComputations.ts",
+          "gitBlob": "4baa2d29911172a3dfc3c7ed32ea4a42f7f86e7a",
+          "registrations": true
+        },
+        {
+          "path": "packages/react/test/describeGregorianAdapter/testFormats.ts",
+          "gitBlob": "eb181dd183039222d820b2bf7365cfd4208edda3",
+          "registrations": true
+        },
+        {
+          "path": "packages/react/test/describeGregorianAdapter/testLocalization.ts",
+          "gitBlob": "69832159cdf7d851a1fd6dc3208490881e62cf75",
+          "registrations": true
+        }
+      ]
+    }
+  ]
+}

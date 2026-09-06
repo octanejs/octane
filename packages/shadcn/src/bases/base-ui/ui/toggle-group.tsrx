@@ -20,13 +20,9 @@
 // The pressed dialect is `data-pressed`, not radix's `data-[state=on]` — see toggle.tsrx, whose
 // `toggleVariants` this file reuses, so the two bases cannot drift apart.
 //
-// ToggleGroup is composed with createElement: the consumer's children must sit INSIDE the context
-// Provider, and opaque compiled .tsrx children can only flow through the props.children channel
-// (see breadcrumb.tsrx's comment).
-//
 // UNVERIFIED PROVENANCE: class strings come from this package's radix base rather than
 // transcribed from upstream's Base UI source.
-import { createContext, createElement, useContext, type OctaneNode } from 'octane';
+import { createContext, useContext, type CSSProperties, type OctaneNode } from 'octane';
 import { type VariantProps } from 'class-variance-authority';
 import { ToggleGroup as ToggleGroupPrimitive } from '@octanejs/base-ui/toggle-group';
 import { Toggle as TogglePrimitive } from '@octanejs/base-ui/toggle';
@@ -65,32 +61,26 @@ export function ToggleGroup({
 	type,
 	children,
 	...props
-}: ToggleGroupProps) {
-	return createElement(
-		ToggleGroupPrimitive,
-		{
-			'data-slot': 'toggle-group',
-			'data-variant': variant,
-			'data-size': size,
-			'data-spacing': spacing,
-			// Forwarded to the primitive: it drives the arrow-key axis (a vertical group must
-			// ignore left/right and use up/down). The primitive also emits `data-orientation`
-			// itself, so unlike the radix base this is not set by hand.
-			orientation,
-			multiple: type === 'multiple',
-			style: { '--gap': spacing },
-			className: cn(
-				'group/toggle-group flex w-fit items-center gap-[--spacing(var(--gap))] rounded-md data-[spacing=default]:data-[variant=outline]:shadow-xs',
-				className,
-			),
-			...props,
-		},
-		createElement(
-			ToggleGroupContext.Provider,
-			{ value: { variant, size, spacing, orientation } },
-			children,
-		),
-	);
+}: ToggleGroupProps) @{
+	const style: CSSProperties & { '--gap': number } = { '--gap': spacing };
+	<ToggleGroupPrimitive
+		data-slot="toggle-group"
+		data-variant={variant}
+		data-size={size}
+		data-spacing={spacing}
+		orientation={orientation}
+		multiple={type === 'multiple'}
+		style={style}
+		className={cn(
+			'group/toggle-group flex w-fit items-center gap-[--spacing(var(--gap))] rounded-md data-[spacing=default]:data-[variant=outline]:shadow-xs',
+			className,
+		)}
+		{...props}
+	>
+		<ToggleGroupContext.Provider
+			value={{ variant, size, spacing, orientation }}
+		>{children}</ToggleGroupContext.Provider>
+	</ToggleGroupPrimitive>
 }
 
 export interface ToggleGroupItemProps extends Record<string, unknown> {

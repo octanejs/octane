@@ -1,0 +1,141 @@
+diff --git a/tests/upstream/src/checkbox/root/CheckboxRoot.test.tsx b/tests/upstream/src/checkbox/root/CheckboxRoot.test.tsx
+--- a/tests/upstream/src/checkbox/root/CheckboxRoot.test.tsx
++++ b/tests/upstream/src/checkbox/root/CheckboxRoot.test.tsx
+@@ -1,4 +1,8 @@
+ /** @jsxImportSource octane */
++import { CheckboxRootHydrationFixture1 } from './../../../../fixtures/CheckboxRoot-functions-ssr.tsrx';
++import { CheckboxRootHydrationFixture1 as ServerCheckboxRootHydrationFixture1 } from './../../../../fixtures/CheckboxRoot-functions-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(CheckboxRootHydrationFixture1, ServerCheckboxRootHydrationFixture1);
+ import { expect, vi, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { act, fireEvent, screen, waitFor } from '@mui/internal-test-utils';
+@@ -40,25 +44,7 @@ describe('<Checkbox.Root />', () => {
+   });
+ 
+   describe('id', () => {
+-    function TestCase(props: {
+-      checkboxId?: string | undefined;
+-      checkboxKey?: React.Key | undefined;
+-      nativeButton: boolean;
+-    }) {
+-      const { checkboxId, checkboxKey, nativeButton } = props;
+-
+-      return (
+-        <Field.Root>
+-          <Field.Label data-testid="label">Label</Field.Label>
+-          <Checkbox.Root
+-            key={checkboxKey}
+-            id={checkboxId}
+-            nativeButton={nativeButton}
+-            render={nativeButton ? <button /> : undefined}
+-          />
+-        </Field.Root>
+-      );
+-    }
++    
+ 
+     function getLabelControl(nativeButton: boolean) {
+       return nativeButton
+@@ -70,14 +56,14 @@ describe('<Checkbox.Root />', () => {
+       'drops an explicit id when the prop is removed (nativeButton=%s)',
+       async (nativeButton) => {
+         const { rerender } = await render(
+-          <TestCase checkboxId="explicit" nativeButton={nativeButton} />,
++          <CheckboxRootHydrationFixture1 checkboxId="explicit" nativeButton={nativeButton} />,
+         );
+ 
+         const label = screen.getByTestId('label');
+         expect(getLabelControl(nativeButton)).toHaveAttribute('id', 'explicit');
+         expect(label).toHaveAttribute('for', 'explicit');
+ 
+-        await rerender(<TestCase nativeButton={nativeButton} />);
++        await rerender(<CheckboxRootHydrationFixture1 nativeButton={nativeButton} />);
+ 
+         const control = getLabelControl(nativeButton);
+         expect(control.id).not.toBe('');
+@@ -90,14 +76,14 @@ describe('<Checkbox.Root />', () => {
+       'does not reuse an unmounted Checkbox id for a keyed id-less Checkbox (nativeButton=%s)',
+       async (nativeButton) => {
+         const { rerender } = await renderNonStrict(
+-          <TestCase checkboxKey="explicit" checkboxId="explicit" nativeButton={nativeButton} />,
++          <CheckboxRootHydrationFixture1 checkboxKey="explicit" checkboxId="explicit" nativeButton={nativeButton} />,
+         );
+ 
+         const label = screen.getByTestId('label');
+         expect(getLabelControl(nativeButton)).toHaveAttribute('id', 'explicit');
+         expect(label).toHaveAttribute('for', 'explicit');
+ 
+-        await rerender(<TestCase checkboxKey="generated" nativeButton={nativeButton} />);
++        await rerender(<CheckboxRootHydrationFixture1 checkboxKey="generated" nativeButton={nativeButton} />);
+ 
+         const control = getLabelControl(nativeButton);
+         expect(control.id).not.toBe('');
+@@ -113,7 +99,7 @@ describe('<Checkbox.Root />', () => {
+       'defers an explicit id until hydration but keeps Field.Label associated during SSR (nativeButton=%s)',
+       async (nativeButton) => {
+         const { hydrate } = renderToString(
+-          <TestCase checkboxId="explicit" nativeButton={nativeButton} />,
++          <CheckboxRootHydrationFixture1 checkboxId="explicit" nativeButton={nativeButton} />,
+         );
+ 
+         const control = getLabelControl(nativeButton);
+@@ -308,7 +294,10 @@ describe('<Checkbox.Root />', () => {
+       await user.keyboard('{/Shift}');
+ 
+       expect(handleChange.mock.calls.length).toBe(1);
+-      expect(handleChange.mock.results[0]?.value.event.shiftKey).toBe(true);
++      // OCTANE DIVERGENCE[native-event-semantics]: native checkbox/radio change events carry no keyboard modifiers.
++      // Modifier state remains on the native click; the change callback receives its actual event.
++      expect(handleChange.mock.results[0]?.value.event).toBeInstanceOf(Event);
++      expect(handleChange.mock.results[0]?.value.event.type).toBe('change');
+     });
+ 
+     it('should update its state if the underlying input is toggled', async () => {
+@@ -781,7 +770,7 @@ describe('<Checkbox.Root />', () => {
+         const formData = new FormData(event.currentTarget);
+         return {
+           value: formData.get('test-checkbox'),
+-          submitter: (event.nativeEvent as SubmitEvent).submitter,
++          submitter: (event as SubmitEvent).submitter,
+         };
+       });
+       const submitClickSpy = vi.fn();
+@@ -869,7 +858,9 @@ describe('<Checkbox.Root />', () => {
+ 
+         await user.keyboard('[Enter]');
+ 
+-        expect(keyDownSpy.mock.results.at(-1)?.value).toBe(false);
++        // OCTANE DIVERGENCE[native-event-semantics]: ancestors observe the same native
++        // event whose checkbox activation was canceled, including its flag.
++        expect(keyDownSpy.mock.results.at(-1)?.value).toBe(true);
+         expect(submitSpy.mock.calls.length).toBe(0);
+         expect(checkbox).toHaveAttribute('aria-checked', 'false');
+       },
+@@ -878,7 +869,7 @@ describe('<Checkbox.Root />', () => {
+     it.skipIf(isJSDOM)('submits the form with Enter when readOnly', async () => {
+       const submitSpy = vi.fn((event) => {
+         event.preventDefault();
+-        return (event.nativeEvent as SubmitEvent).submitter;
++        return (event as SubmitEvent).submitter;
+       });
+ 
+       const { user } = await render(
+@@ -909,7 +900,7 @@ describe('<Checkbox.Root />', () => {
+       async () => {
+         const submitSpy = vi.fn((event) => {
+           event.preventDefault();
+-          return (event.nativeEvent as SubmitEvent).submitter;
++          return (event as SubmitEvent).submitter;
+         });
+         const submitClickSpy = vi.fn();
+ 
+@@ -1028,7 +1019,7 @@ describe('<Checkbox.Root />', () => {
+       async () => {
+         const submitSpy = vi.fn((event) => {
+           event.preventDefault();
+-          return (event.nativeEvent as SubmitEvent).submitter;
++          return (event as SubmitEvent).submitter;
+         });
+ 
+         const { user } = await render(

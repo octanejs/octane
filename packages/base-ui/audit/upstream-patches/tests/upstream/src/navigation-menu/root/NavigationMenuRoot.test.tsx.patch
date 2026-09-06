@@ -1,0 +1,30 @@
+diff --git a/tests/upstream/src/navigation-menu/root/NavigationMenuRoot.test.tsx b/tests/upstream/src/navigation-menu/root/NavigationMenuRoot.test.tsx
+--- a/tests/upstream/src/navigation-menu/root/NavigationMenuRoot.test.tsx
++++ b/tests/upstream/src/navigation-menu/root/NavigationMenuRoot.test.tsx
+@@ -947,7 +947,7 @@ function TestDeeplyNestedNavigationMenuWithCloseOnClick() {
+   );
+ }
+ 
+-function TestNavigationMenuWithNestedPopup(props: { children: React.ReactNode }) {
++function TestNavigationMenuWithNestedPopup(props: { children: React.OctaneNode }) {
+   const { children } = props;
+   return (
+     <NavigationMenu.Root>
+@@ -2015,7 +2015,7 @@ describe('<NavigationMenu.Root />', () => {
+ 
+   describe('prop: actionsRef', () => {
+     it('exposes an unmount action and defers unmounting until it is called', async () => {
+-      const actionsRef = React.createRef<NavigationMenu.Root.Actions>();
++      const actionsRef = ({current:null} as React.RefObject<NavigationMenu.Root.Actions | null>);
+ 
+       function ControlledNavigationMenu(props: { value: string | null }) {
+         return <TestNavigationMenu value={props.value} actionsRef={actionsRef} />;
+@@ -2045,7 +2045,7 @@ describe('<NavigationMenu.Root />', () => {
+       globalThis.BASE_UI_ANIMATIONS_DISABLED = false;
+ 
+       try {
+-        const actionsRef = React.createRef<NavigationMenu.Root.Actions>();
++        const actionsRef = ({current:null} as React.RefObject<NavigationMenu.Root.Actions | null>);
+ 
+         function ControlledNavigationMenu(props: { value: string | null }) {
+           return <TestNavigationMenu value={props.value} actionsRef={actionsRef} />;

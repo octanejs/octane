@@ -12,6 +12,7 @@ import {
 import {
 	MATERIALIZE_STATE_FILE,
 	assertSafeLockPath,
+	applyAdaptedRewrites,
 	findForbiddenReactSpecifiers,
 	buildUpstreamLock,
 	extractPristineFromArchive,
@@ -30,6 +31,36 @@ function fixtureLock({ adaptedMappings = [{ fromRoot: 'tests', toRoot: 'tests/up
 		adaptedMappings,
 	});
 }
+
+test('records file-scoped headers as mechanical rewrites without touching other fixtures', () => {
+	const rewrites = [
+		{ find: "'react'", replace: "'octane'" },
+		{ include: '\\.tsx$', prepend: '/** @jsxImportSource octane */\n' },
+	];
+	const source = "import { useState } from 'react';\n";
+	assert.equal(
+		applyAdaptedRewrites(source, rewrites, 'tests/upstream/a.test.tsx'),
+		'/** @jsxImportSource octane */\n' + source.replace("'react'", "'octane'"),
+	);
+	assert.equal(
+		applyAdaptedRewrites('{"fixture":true}', rewrites, 'tests/upstream/a.json'),
+		'{"fixture":true}',
+	);
+	assert.throws(() => applyAdaptedRewrites(source, rewrites), /target path/);
+	const lock = fixtureLock();
+	lock.adaptedRewrites = rewrites;
+	lock.fingerprint = upstreamLockFingerprint(lock);
+	assert.doesNotThrow(() => validateUpstreamLock(lock));
+	for (const rewrite of [
+		{ prepend: 'header' },
+		{ include: '[', prepend: 'header' },
+		{ include: '.tsx$', prepend: 'header', find: 'a', replace: 'b' },
+	]) {
+		lock.adaptedRewrites = [rewrite];
+		lock.fingerprint = upstreamLockFingerprint(lock);
+		assert.throws(() => validateUpstreamLock(lock), /rewrite/);
+	}
+});
 
 describe('git blob hashing', () => {
 	test('matches git hash-object for a known vector', () => {

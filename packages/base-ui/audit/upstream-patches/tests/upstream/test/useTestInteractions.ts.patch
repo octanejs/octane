@@ -1,0 +1,8 @@
+diff --git a/tests/upstream/test/useTestInteractions.ts b/tests/upstream/test/useTestInteractions.ts
+--- a/tests/upstream/test/useTestInteractions.ts
++++ b/tests/upstream/test/useTestInteractions.ts
+@@ -1,3 +1,4 @@
++/** @jsxImportSource octane */
+ import * as React from 'octane';
+ import type { ElementProps } from '../src/floating-ui-react/types';
+ import {

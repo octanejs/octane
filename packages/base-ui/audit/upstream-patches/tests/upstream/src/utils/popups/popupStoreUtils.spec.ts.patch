@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/src/utils/popups/popupStoreUtils.spec.ts b/tests/upstream/src/utils/popups/popupStoreUtils.spec.ts
+--- a/tests/upstream/src/utils/popups/popupStoreUtils.spec.ts
++++ b/tests/upstream/src/utils/popups/popupStoreUtils.spec.ts
+@@ -1,8 +1,9 @@
++/** @jsxImportSource octane */
+ import type { ReactStore } from '@octanejs/base-ui-utils/store';
+-import type { HTMLProps } from '../../internals/types';
+-import type { BaseUIChangeEventDetails } from '../../types';
+-import { applyPopupOpenChange, usePopupInteractionProps } from './popupStoreUtils';
+-import type { PopupStoreContext, PopupStoreState, popupStoreSelectors } from './store';
++import type { HTMLProps } from "../../../../../src/internals/types.ts";
++import type { BaseUIChangeEventDetails } from "../../../../../src/types/index.ts";
++import { applyPopupOpenChange, usePopupInteractionProps } from "../../../../../src/utils/popups/popupStoreUtils.ts";
++import type { PopupStoreContext, PopupStoreState, popupStoreSelectors } from "../../../../../src/utils/popups/store.ts";
+ 
+ type TestState = PopupStoreState<unknown> & {
+   itemProps: HTMLProps;

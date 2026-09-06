@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 64,
+  "nextCode": 65,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -372,6 +372,12 @@
       "message": "%s requires an active server component.",
       "argumentCount": 1,
       "runtime": ["server"],
+      "status": "active"
+    },
+    "64": {
+      "message": "Multiple errors were thrown during act.",
+      "argumentCount": 0,
+      "runtime": ["client"],
       "status": "active"
     },
     "63": {

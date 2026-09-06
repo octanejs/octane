@@ -15,7 +15,12 @@ import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 // CLIENT-compiled components (normal .tsrx import path). Importing AsyncCounter
 // (which has an onClick) makes this module register click delegation at load.
-import { AsyncLeaf, AsyncCounter, AsyncUndef } from '../_fixtures/ssr-suspense.tsrx';
+import {
+	AsyncLeaf,
+	AsyncCounter,
+	AsyncUndef,
+	DelayedHydrationBoundary,
+} from '../_fixtures/ssr-suspense.tsrx';
 import {
 	DescriptorRetryBoundary,
 	RootSuspensionScreen,
@@ -169,6 +174,38 @@ beforeEach(() => {
 	document.body.appendChild(container);
 });
 afterEach(() => container.remove());
+
+it('adopts server content when a boundary suspends during its initial hydration', async () => {
+	const fixture = loadServerFixture<typeof import('../_fixtures/ssr-suspense.tsrx')>(
+		'packages/octane/tests/_fixtures/ssr-suspense.tsrx',
+	);
+	let resume!: () => void;
+	const gate = {
+		pending: false,
+		promise: new Promise<void>((resolve) => {
+			resume = resolve;
+		}),
+	};
+	container.innerHTML = ServerRT.renderToString(fixture.DelayedHydrationBoundary, { gate }).html;
+	const button = container.querySelector<HTMLButtonElement>('button')!;
+	gate.pending = true;
+	const root = hydrateRoot(container, DelayedHydrationBoundary, { gate });
+	try {
+		await act(() => {});
+		expect(container.querySelector('button')).toBe(button);
+		expect(container.textContent).not.toContain('Loading');
+		await act(async () => {
+			gate.pending = false;
+			resume();
+			await gate.promise;
+		});
+		expect(container.querySelector('button')).toBe(button);
+		await act(() => button.click());
+		expect(button.textContent).toBe('1');
+	} finally {
+		root.unmount();
+	}
+});
 
 describe.each(['raw', 'use'] as const)(
 	'hydrateRoot — root suspension without a boundary (%s resource reads)',

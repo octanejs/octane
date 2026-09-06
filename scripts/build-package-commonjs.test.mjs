@@ -6,6 +6,9 @@ import { afterEach, describe, test } from 'node:test';
 import { tmpdir } from 'node:os';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { buildPackageCommonjs, buildPackageCommonjsSourceTree } from './build-package-commonjs.mjs';
+import { build } from 'esbuild';
+import { JSDOM } from 'jsdom';
+import { fileURLToPath } from 'node:url';
 
 const fixtures = [];
 
@@ -29,6 +32,52 @@ async function fixture(files) {
 }
 
 describe('buildPackageCommonjs', () => {
+	test('compiles opted-in native source and preserves independent helper hook state', async () => {
+		const packageDir = await fixture({
+			'package.json': JSON.stringify({
+				name: 'fixture',
+				type: 'module',
+				octane: { commonjsCompileSource: true },
+			}),
+			'src/index.ts': "export { Counter } from './Counter.tsrx';",
+			'src/useCounter.ts':
+				"/** @jsxImportSource octane */\nimport { useState } from 'octane'; export function useCounter(initial: number) { return useState(initial); }",
+			'src/Counter.tsrx':
+				'import { useCounter } from \'./useCounter\'; export function Counter() { const [left, setLeft] = useCounter(1); const [right, setRight] = useCounter(10); return <div><button id="left" onClick={() => setLeft(left + 1)}>{left as string}</button><button id="right" onClick={() => setRight(right + 10)}>{right as string}</button></div>; }',
+		});
+		const result = await buildPackageCommonjsSourceTree({ packageDir });
+		assert.equal(result.modules, 3);
+		const runtime = fileURLToPath(new URL('../packages/octane/src/index.ts', import.meta.url));
+		const output = await build({
+			stdin: {
+				contents: `import { createRoot } from 'octane'; import { Counter } from ${JSON.stringify(join(packageDir, 'dist/cjs/index.cjs'))}; createRoot(document.body).render(Counter);`,
+				resolveDir: packageDir,
+			},
+			alias: { octane: runtime },
+			bundle: true,
+			write: false,
+			format: 'iife',
+			define: { __OCTANE_PROFILE_ENABLED__: 'false', 'process.env.NODE_ENV': '"production"' },
+		});
+		const browser = new JSDOM('<!doctype html><body></body>', { runScripts: 'dangerously' });
+		try {
+			browser.window.eval(output.outputFiles[0].text);
+			const left = browser.window.document.getElementById('left');
+			const right = browser.window.document.getElementById('right');
+			assert.equal(left.textContent, '1');
+			assert.equal(right.textContent, '10');
+			left.click();
+			await new Promise(setImmediate);
+			assert.equal(left.textContent, '2');
+			assert.equal(right.textContent, '10');
+			right.click();
+			await new Promise(setImmediate);
+			assert.equal(left.textContent, '2');
+			assert.equal(right.textContent, '20');
+		} finally {
+			browser.window.close();
+		}
+	});
 	test('emits an executable per-module CommonJS graph and removes stale output', async () => {
 		const packageDir = await fixture({
 			'package.json': JSON.stringify({ name: 'fixture', type: 'module' }),

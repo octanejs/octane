@@ -28,8 +28,8 @@
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 30,
-    "uniqueIdentities": 30,
+    "inventoryEntries": 26,
+    "uniqueIdentities": 26,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [
@@ -106,7 +106,7 @@
       "environment": "workspace-node",
       "project": "floating-ui-adapted",
       "evidenceOrigin": "upstream-suite",
-      "notes": "One-for-one adapted suite on the same Vitest 3.0.9 runner: 272 compatible passes plus 29 executable expected-failure negative controls, crosswalked to every pristine executed identity.",
+      "notes": "One-for-one adapted suite on the same Vitest 3.0.9 runner: 276 compatible passes plus 25 executable expected-failure negative controls, crosswalked to every pristine executed identity.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/floating-ui/audit/adapted-wrapper-runtime.json"
@@ -115,22 +115,22 @@
         {
           "path": "packages/floating-ui/audit/adapted-wrapper-runtime.json",
           "role": "support",
-          "sha256": "5b88485ca71be7a1c09b0da82dbf89343c2a160223ea64c1ee83c5bdeb603b1d"
+          "sha256": "481ba20f1264c0b7b09537903b101d182fe62a6bfc515947fb7c80178ef39e44"
         },
         {
           "path": "packages/floating-ui/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "c13559b3600f0e9f910b0892c1df4ac4ab6af352e266060518e094e849338465"
+          "sha256": "9face5cf1ec06a04c8fef5193816acc08cd0e2cfaa7c067e94894bf9cfdab52b"
         },
         {
           "path": "packages/floating-ui/audit/runtime-crosswalk.json",
           "role": "support",
-          "sha256": "e8dfbecb865dc0459816b13b2eb839100750f8666717470f0cabb5c25efb0509"
+          "sha256": "1c52722ae50b05fbc3c527e6e9deb1d28f1bece7b75eb1e04cf2a2536f4fccc9"
         },
         {
           "path": "packages/floating-ui/audit/expected-failures.json",
           "role": "support",
-          "sha256": "727e66f3471eb60d960d820ccef9b9fd4baa63bc8c16153a3f7515c958a2c4b1"
+          "sha256": "68631c8fb4d579b34b3c707b10ec6f1b63cba166c95af4eef672895082b80fbd"
         },
         {
           "path": "packages/floating-ui/audit/upstream-skips.json",
@@ -145,22 +145,12 @@
         {
           "path": "packages/floating-ui/tests/adapted-divergences.test.ts",
           "role": "test",
-          "sha256": "fccd2f65df87401a765bfa6f4e2267a06eb74d6483cbd7d1f304c76483812a7b",
+          "sha256": "e181c38797cc91a737fa67daa878cd0958359c8a83277482ca359297a590993b",
           "cases": [
-            {
-              "id": "divergence:ref-scheduling:01",
-              "testName": "locks divergence:ref-scheduling:01",
-              "fullName": "locks divergence:ref-scheduling:01"
-            },
             {
               "id": "divergence:ref-scheduling:02",
               "testName": "locks divergence:ref-scheduling:02",
               "fullName": "locks divergence:ref-scheduling:02"
-            },
-            {
-              "id": "divergence:ref-scheduling:03",
-              "testName": "locks divergence:ref-scheduling:03",
-              "fullName": "locks divergence:ref-scheduling:03"
             },
             {
               "id": "divergence:focus-scheduling:01",
@@ -233,16 +223,6 @@
               "fullName": "locks divergence:effect-scheduling:01"
             },
             {
-              "id": "divergence:ref-scheduling:04",
-              "testName": "locks divergence:ref-scheduling:04",
-              "fullName": "locks divergence:ref-scheduling:04"
-            },
-            {
-              "id": "divergence:ref-scheduling:05",
-              "testName": "locks divergence:ref-scheduling:05",
-              "fullName": "locks divergence:ref-scheduling:05"
-            },
-            {
               "id": "divergence:effect-scheduling:02",
               "testName": "locks divergence:effect-scheduling:02",
               "fullName": "locks divergence:effect-scheduling:02"
@@ -312,7 +292,7 @@
         {
           "path": "packages/floating-ui/scripts/generate-parity-evidence.mjs",
           "role": "support",
-          "sha256": "7d89b59bdc72b266dfb51fab43c566a191d25b371a44adb5838ad9825e2824cf"
+          "sha256": "eca41d24d80cbc572c607b94a2fc32295bcf96ab813b4876cff0eba637b5d12a"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react-dom/index.test-d.tsx.patch",
@@ -322,7 +302,7 @@
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react-dom/index.test.tsx.patch",
           "role": "support",
-          "sha256": "c360e9a2bdd8dd53d8dd7007fc62dde8f2c778efa812cf5b1bb96d372f6772b7"
+          "sha256": "468f0d7b246fc97028013c665b8f191ef1b92354432c98de75f45674bfed6f1c"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/index.test-d.tsx.patch",
@@ -343,11 +323,6 @@
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/useClientPoint.test.tsx.patch",
           "role": "support",
           "sha256": "4a5c350a57a7d7a2bd563393fb61504306723111a9cc624642bd1b013667f210"
-        },
-        {
-          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/useFloating.test.tsx.patch",
-          "role": "support",
-          "sha256": "df31891f7ce01ccde02ad81eeb9afda5b99b6b25e72d20743282e34cbe3402b8"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/useListNavigation.test.tsx.patch",
@@ -584,13 +559,7 @@
     },
     {
       "id": "floating-ui-ref-scheduling",
-      "caseIds": [
-        "divergence:ref-scheduling:01",
-        "divergence:ref-scheduling:02",
-        "divergence:ref-scheduling:03",
-        "divergence:ref-scheduling:04",
-        "divergence:ref-scheduling:05"
-      ],
+      "caseIds": ["divergence:ref-scheduling:02"],
       "upstreamResult": "Callback-ref swaps, middleware freshness, and element cleanup follow React commit timing.",
       "octaneResult": "The same scenarios currently fail under Octane ref/effect scheduling.",
       "rationale": "These cases remain executable expected-failure controls rather than compatibility claims.",

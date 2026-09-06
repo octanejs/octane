@@ -23,29 +23,26 @@
 // `thumbAlignment="edge"` is forwarded as upstream does: it insets the thumb so the two extremes
 // sit flush with the ends of the track instead of overhanging them.
 //
-// Thumbs are composed with createElement for the same reason as the radix base: one per entry of
-// `_values`, and mapped descriptors are octane's channel for computed children.
-import { createElement, useMemo } from 'octane';
+// One keyed thumb is rendered for each value.
+import { useMemo } from 'octane';
 import { Slider as SliderPrimitive } from '@octanejs/base-ui/slider';
 
 import { cn } from '../../../lib/utils';
 
-export interface SliderProps extends Record<string, unknown> {
+export interface SliderProps<
+	Value extends number | readonly number[] = number | readonly number[],
+> extends Omit<SliderPrimitive.Root.Props<Value>, 'className'> {
 	className?: string;
-	defaultValue?: number | number[];
-	value?: number | number[];
-	min?: number;
-	max?: number;
 }
 
-export function Slider({
+export function Slider<Value extends number | readonly number[]>({
 	className,
 	defaultValue,
 	value,
 	min = 0,
 	max = 100,
 	...props
-}: SliderProps) {
+}: SliderProps<Value>) @{
 	// This drives HOW MANY THUMBS get rendered, so a value shape it fails to recognise is a visible
 	// bug rather than a type nicety.
 	//
@@ -67,45 +64,37 @@ export function Slider({
 		return [min, max];
 	}, [value, defaultValue, min, max]);
 
-	return createElement(
-		SliderPrimitive.Root,
-		{
-			className: cn(
-				'data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full',
-				className,
-			),
-			'data-slot': 'slider',
-			defaultValue,
-			value,
-			min,
-			max,
-			thumbAlignment: 'edge',
-			...props,
-		},
-		createElement(
-			SliderPrimitive.Control,
-			{
-				className: 'relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-40 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col',
-			},
-			createElement(
-				SliderPrimitive.Track,
-				{
-					'data-slot': 'slider-track',
-					className: 'relative grow overflow-hidden rounded-full bg-muted select-none data-[orientation=horizontal]:h-1 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1',
-				},
-				createElement(SliderPrimitive.Indicator, {
-					'data-slot': 'slider-range',
-					className: 'bg-primary select-none data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full',
-				}),
-			),
-			...Array.from(
-				{ length: _values.length },
-				(_, index) => createElement(SliderPrimitive.Thumb, {
-					'data-slot': 'slider-thumb',
-					key: index,
-					className: 'relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50',
-				}),
-			),
-		),
-	);
+	<SliderPrimitive.Root
+		className={cn(
+			'data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full',
+			className,
+		)}
+		data-slot="slider"
+		defaultValue={defaultValue}
+		value={value}
+		min={min}
+		max={max}
+		thumbAlignment="edge"
+		{...props}
+	>
+		<SliderPrimitive.Control
+			className="relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-40 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col"
+		>
+			<SliderPrimitive.Track
+				data-slot="slider-track"
+				className="relative grow overflow-hidden rounded-full bg-muted select-none data-[orientation=horizontal]:h-1 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1"
+			>
+				<SliderPrimitive.Indicator
+					data-slot="slider-range"
+					className="bg-primary select-none data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
+				/>
+			</SliderPrimitive.Track>
+			@for (const index of _values.keys(); key index) {
+				<SliderPrimitive.Thumb
+					data-slot="slider-thumb"
+					className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
+				/>
+			}
+		</SliderPrimitive.Control>
+	</SliderPrimitive.Root>
 }

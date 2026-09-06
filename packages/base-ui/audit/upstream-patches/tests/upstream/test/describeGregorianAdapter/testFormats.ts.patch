@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/test/describeGregorianAdapter/testFormats.ts b/tests/upstream/test/describeGregorianAdapter/testFormats.ts
+--- a/tests/upstream/test/describeGregorianAdapter/testFormats.ts
++++ b/tests/upstream/test/describeGregorianAdapter/testFormats.ts
+@@ -1,7 +1,7 @@
+ import { expect } from 'vitest';
+ // TODO Temporal: Replace with `@octanejs/base-ui/types` import when Temporal components will become public.
+-import { TemporalAdapterFormats } from '../../src/internals/temporal';
+-import { DescribeGregorianAdapterTestSuite } from './describeGregorianAdapter.types';
++import type { TemporalAdapterFormats } from '../../src/internals/temporal';
++import type { DescribeGregorianAdapterTestSuite } from './describeGregorianAdapter.types';
+ 
+ export const testFormats: DescribeGregorianAdapterTestSuite = ({ adapter }) => {
+   const expectFormattedDate = (format: keyof TemporalAdapterFormats, expected: string) => {

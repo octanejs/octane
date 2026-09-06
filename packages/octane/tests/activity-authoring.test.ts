@@ -276,15 +276,23 @@ describe('<Activity> authoring forms', () => {
 		expect(empty.style.display).toBe('');
 	});
 
-	for (const suspends of [false, true]) {
-		it(`bounds render-phase update loops in hidden content${suspends ? ' that suspends' : ''}`, () => {
-			const pending = suspends ? new Promise<never>(() => {}) : undefined;
-			expect(() => {
-				const view = mount(Fixture.ActivityRenderLoop, { pending });
-				roots.push(view);
-			}).toThrow(/Too many re-renders|error #9/);
-		});
-	}
+	it('bounds render-phase update loops in hidden content', () => {
+		expect(() => {
+			const view = mount(Fixture.ActivityRenderLoop, {});
+			roots.push(view);
+		}).toThrow(/Too many re-renders|error #9/);
+	});
+
+	it('abandons render-phase updates while hidden content suspends and bounds a completed retry', () => {
+		const view = mount(Fixture.ActivityRenderLoop, { pending: new Promise<never>(() => {}) });
+		roots.push(view);
+		// An unfinished render must not replay its state updates until it can
+		// complete. Removing the unavailable resource exposes the real loop.
+		expect(view.container.textContent).toBe('');
+		expect(() => view.update(Fixture.ActivityRenderLoop, {})).toThrow(
+			/Too many re-renders|error #9/,
+		);
+	});
 });
 
 describe('<Activity> element descriptors', () => {

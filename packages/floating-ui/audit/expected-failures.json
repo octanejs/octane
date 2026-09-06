@@ -4,21 +4,9 @@
   "semantics": "Every listed test is registered with Vitest's fails modifier: the adapted lane succeeds only while the asserted upstream behavior still fails under Octane.",
   "tests": [
     {
-      "id": "divergence:ref-scheduling:01",
-      "file": "packages/floating-ui/tests/upstream/react-dom/index.test.tsx",
-      "fullName": "middleware is always fresh and does not cause an infinite loop",
-      "divergenceId": "floating-ui-ref-scheduling"
-    },
-    {
       "id": "divergence:ref-scheduling:02",
       "file": "packages/floating-ui/tests/upstream/react-dom/index.test.tsx",
       "fullName": "whileElementsMounted calls the cleanup function",
-      "divergenceId": "floating-ui-ref-scheduling"
-    },
-    {
-      "id": "divergence:ref-scheduling:03",
-      "file": "packages/floating-ui/tests/upstream/react-dom/index.test.tsx",
-      "fullName": "unstable callback refs",
       "divergenceId": "floating-ui-ref-scheduling"
     },
     {
@@ -104,18 +92,6 @@
       "file": "packages/floating-ui/tests/upstream/react/unit/useClientPoint.test.tsx",
       "fullName": "cleans up window listener when closing or disabling",
       "divergenceId": "floating-ui-effect-scheduling"
-    },
-    {
-      "id": "divergence:ref-scheduling:04",
-      "file": "packages/floating-ui/tests/upstream/react/unit/useFloating.test.tsx",
-      "fullName": "positionReference handles unstable reference prop",
-      "divergenceId": "floating-ui-ref-scheduling"
-    },
-    {
-      "id": "divergence:ref-scheduling:05",
-      "file": "packages/floating-ui/tests/upstream/react/unit/useFloating.test.tsx",
-      "fullName": "positionReference handles real virtual element",
-      "divergenceId": "floating-ui-ref-scheduling"
     },
     {
       "id": "divergence:effect-scheduling:02",

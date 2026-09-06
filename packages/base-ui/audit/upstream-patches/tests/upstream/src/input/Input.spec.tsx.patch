@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/src/input/Input.spec.tsx b/tests/upstream/src/input/Input.spec.tsx
+--- a/tests/upstream/src/input/Input.spec.tsx
++++ b/tests/upstream/src/input/Input.spec.tsx
+@@ -3,6 +3,6 @@ import * as React from 'octane';
+ import { Input } from '@octanejs/base-ui/input';
+ 
+ function App() {
+-  const ref = React.useRef<HTMLTextAreaElement>(null);
++  const ref = React.useRef<HTMLTextAreaElement | null>(null);
+   return <Input ref={ref} render={<textarea />} />;
+ }

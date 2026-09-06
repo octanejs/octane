@@ -8,6 +8,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const runners = new Map([
+	['base-ui', { module: './base-ui-pristine-runtime.mjs', label: '@base-ui/react' }],
+	['base-ui-utils', { module: './base-ui-utils-pristine-runtime.mjs', label: '@base-ui/utils' }],
 	['octane-is', { module: './octane-is-pristine-runtime.mjs', label: 'react-is' }],
 	['alien-signals', { module: './alien-signals-pristine-runtime.mjs', label: 'Alien Signals' }],
 	['draggable', { module: './react-draggable-pristine-runtime.mjs', label: 'react-draggable' }],

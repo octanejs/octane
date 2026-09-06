@@ -33,6 +33,7 @@ export {
 	hydrateRoot,
 	flushSync,
 	act,
+	isInActScope,
 	type Root,
 	type RootContainer,
 	type RootOptions,

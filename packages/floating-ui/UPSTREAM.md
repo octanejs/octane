@@ -19,7 +19,7 @@ reviewed patches in `audit/upstream-patches/`.
 
 Both runtime lanes register the same 307 upstream cases. The pristine lane has
 301 passes and six upstream-declared skips. The adapted lane crosswalks the
-same 301 executed identities: 272 are compatible passes and 29 use Vitest's
+same 301 executed identities: 276 are compatible passes and 25 use Vitest's
 `fails` modifier as executable negative controls for documented Octane
 divergences. The same six upstream skips remain explicit non-evidence. See
 `audit/runtime-crosswalk.json`, `audit/expected-failures.json`, and

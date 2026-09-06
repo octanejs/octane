@@ -30,21 +30,23 @@ import { cn } from '../../../lib/utils';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 
-export interface BaseUiPositioningProps {
-	/** Forwarded to the Positioner; see the note at the top of this file. */
-	side?: 'top' | 'right' | 'bottom' | 'left';
-	sideOffset?: number;
-	align?: 'start' | 'center' | 'end';
-	alignOffset?: number;
-	anchor?: unknown;
-	positionMethod?: 'absolute' | 'fixed';
-	collisionBoundary?: unknown;
-	collisionPadding?: unknown;
-	collisionAvoidance?: unknown;
-	arrowPadding?: number;
-	sticky?: boolean;
-	disableAnchorTracking?: boolean;
-}
+/** Props routed to the Positioner rather than the popup. */
+export type BaseUiPositioningProps =
+	Pick<
+		ContextMenuPrimitive.Positioner.Props,
+		| 'side'
+		| 'sideOffset'
+		| 'align'
+		| 'alignOffset'
+		| 'anchor'
+		| 'positionMethod'
+		| 'collisionBoundary'
+		| 'collisionPadding'
+		| 'collisionAvoidance'
+		| 'arrowPadding'
+		| 'sticky'
+		| 'disableAnchorTracking'
+	>;
 
 export function ContextMenu(props: Record<string, unknown>) @{
 	<ContextMenuPrimitive.Root data-slot="context-menu" {...props} />
@@ -221,7 +223,10 @@ export function ContextMenuCheckboxItem(props: Props & {
 	</ContextMenuPrimitive.CheckboxItem>
 }
 
-export function ContextMenuRadioItem(props: Props & { inset?: boolean }) @{
+export function ContextMenuRadioItem(props: Omit<
+	ContextMenuPrimitive.RadioItem.Props,
+	'className'
+> & { className?: string; inset?: boolean }) @{
 	const { className, children: _children, inset, ...rest } = props;
 
 	<ContextMenuPrimitive.RadioItem

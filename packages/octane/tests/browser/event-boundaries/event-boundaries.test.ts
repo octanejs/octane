@@ -328,3 +328,36 @@ describe.sequential('controlled text input under a capture-phase handler', () =>
 		});
 	});
 });
+
+describe.sequential('layout state at the DOM observation boundary', () => {
+	for (const runtime of ['octane', 'react'] as const) {
+		for (const trigger of ['trusted click', 'script click', 'scheduled update'] as const) {
+			it(`${runtime}: ${trigger} completes layout measurements before mutation observers run`, async () => {
+				const page = await openCase({ kind: 'layout-commit' });
+				if (trigger === 'trusted click') {
+					await page.locator(`#${runtime}-root button`).click();
+				} else {
+					await page.evaluate(
+						({ runtime, trigger }) => {
+							const api = window.__eventBoundaries;
+							if (trigger === 'script click') api.scriptClick(runtime);
+							else api.scheduleLayoutOpen(runtime);
+						},
+						{ runtime, trigger },
+					);
+				}
+				// Waiting reads the observer's captures without forcing a framework flush.
+				await page.waitForFunction(
+					(r) => window.__eventBoundaries.layoutHeights[r].length > 0,
+					runtime,
+				);
+				const heights = await page.evaluate(
+					(r) => window.__eventBoundaries.layoutHeights[r],
+					runtime,
+				);
+				expect(heights.length).toBeGreaterThan(0);
+				expect(heights.every((height) => height === '160px')).toBe(true);
+			});
+		}
+	}
+});

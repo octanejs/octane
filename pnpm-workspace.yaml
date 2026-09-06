@@ -620,4 +620,12 @@ minimumReleaseAgeExclude:
 # The JSX type-only fixes formerly patched into @tsrx/core 0.1.56/0.1.58
 # are published in the required @tsrx/core >= 0.1.60.
 patchedDependencies:
+  # Preserve sibling package URLs when browser mocks share a directory-name prefix.
+  # Browser ships its own prebundled copy of the mocker implementation.
+  '@vitest/browser@4.1.10': patches/@vitest__browser@4.1.10.patch
+  '@vitest/mocker@4.1.10': patches/@vitest__mocker@4.1.10.patch
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
+  # Map typed default-parameter patterns in the shared printer. Octane bundles
+  # this fix into its published Volar compiler; consumers need no local patch.
+  # Preserve valid constrained/defaulted generic arrows in editor diagnostics.
+  '@tsrx/core@0.1.63': patches/@tsrx__core@0.1.63.patch

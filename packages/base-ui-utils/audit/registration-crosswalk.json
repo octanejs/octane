@@ -1,0 +1,1177 @@
+[
+  {
+    "id": "react-case-v1:baa7baf0bbcc94772f94",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:4699495440083b6ff979",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:47facdab6f8d7e217498",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:9f387089cc094d3a12fa",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:9a246dd29f106c60011b",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:0cb85797c38c1a1ff571",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:dad3334b54a45d9695b4",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:25b6506e4a37d5b882d3",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:88b0a96c12dcbb183539",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:59b8de1d094e52f4c627",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:0f7822ceb99d2ed28478",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:e5f5b7f77a80c9d1901d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:08cdeff829052b8c2155",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:dd2cac3b933d3c6814ae",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:2294653930bdaeedce2f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:798c869d2179e2934661",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.spec.ts"
+  },
+  {
+    "id": "react-case-v1:f23e4c3255df30e6b428",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/addEventListener.test.ts"
+  },
+  {
+    "id": "react-case-v1:092c5544229e3d06ed91",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:45294373ff88c2f5ef44",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:06954bab3eb487793b98",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:0999a663fa316368659a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:14d79087634d9b57a919",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:42b08977fcce60da0632",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:996992d19241249a8572",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:1826c366d1fb6b036668",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:705655228ec68c068bd4",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:5c8083c2d38331174662",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:272e46e95a771492af48",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/areArraysEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:815288084e44ba588805",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/clamp.test.ts"
+  },
+  {
+    "id": "react-case-v1:6f0949c8a9d6611b1502",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/createLogOnce.test.ts"
+  },
+  {
+    "id": "react-case-v1:7fc28ffbc119fa813361",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/createLogOnce.test.ts"
+  },
+  {
+    "id": "react-case-v1:2fdc1a4e92067de517a5",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/createLogOnce.test.ts"
+  },
+  {
+    "id": "react-case-v1:21d808e8802e64552b06",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/createLogOnce.test.ts"
+  },
+  {
+    "id": "react-case-v1:87244078eb3ffd60cddd",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/createLogOnce.test.ts"
+  },
+  {
+    "id": "react-case-v1:c4026e98f3170fec9ab7",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/empty.test.ts"
+  },
+  {
+    "id": "react-case-v1:aa68494dc8cf97af5ce4",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/empty.test.ts"
+  },
+  {
+    "id": "react-case-v1:a202b0e7606af0cdbb50",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatErrorMessage.test.ts"
+  },
+  {
+    "id": "react-case-v1:25f3e065c8fb78229bc4",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatErrorMessage.test.ts"
+  },
+  {
+    "id": "react-case-v1:d861b35f8494bdcce571",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatErrorMessage.test.ts"
+  },
+  {
+    "id": "react-case-v1:638d44cca1b6917e8274",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatErrorMessage.test.ts"
+  },
+  {
+    "id": "react-case-v1:7856a4bbd7b2e606ff0c",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatErrorMessage.test.ts"
+  },
+  {
+    "id": "react-case-v1:d168282cf83aa3d5aaa3",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:eb4128a7f734695c6879",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:925a2c600280c30af05b",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:800ba3830b8107dea1c9",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:0bd4f2823708675b4dfc",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/formatNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:633095f43d9976952d81",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/getDefaultFormSubmitter.test.ts"
+  },
+  {
+    "id": "react-case-v1:10a7e5596dae736a8a6f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/getDefaultFormSubmitter.test.ts"
+  },
+  {
+    "id": "react-case-v1:2b13b73e2e704dcf064d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/getDefaultFormSubmitter.test.ts"
+  },
+  {
+    "id": "react-case-v1:55a905a688ab54a93ddd",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/getDefaultFormSubmitter.test.ts"
+  },
+  {
+    "id": "react-case-v1:5f01ca3e496a6a1b33c5",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/getDefaultFormSubmitter.test.ts"
+  },
+  {
+    "id": "react-case-v1:d3d083554679655efe28",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/getReactElementRef.test.tsx"
+  },
+  {
+    "id": "react-case-v1:055f2f861c8cceb4184c",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/getReactElementRef.test.tsx"
+  },
+  {
+    "id": "react-case-v1:21e745d8c1ab26104148",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/getReactElementRef.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c3046211e28a5be134ec",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/getReactElementRef.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c93d00b89bcd52bfc991",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/mergeCleanups.test.ts"
+  },
+  {
+    "id": "react-case-v1:44ab24b47e9daf369ed1",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/shadowDom.test.ts"
+  },
+  {
+    "id": "react-case-v1:5b82013a348b83adfb65",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/shadowDom.test.ts"
+  },
+  {
+    "id": "react-case-v1:0c1743c854e02400a44a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.spec.ts"
+  },
+  {
+    "id": "react-case-v1:71fffaa627119ea8e205",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.spec.ts"
+  },
+  {
+    "id": "react-case-v1:e3e1a65159b5f9b3384d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.spec.ts"
+  },
+  {
+    "id": "react-case-v1:0fc0de63136d3530ac17",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.spec.ts"
+  },
+  {
+    "id": "react-case-v1:b97ae50748ce9b488ca2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.spec.ts"
+  },
+  {
+    "id": "react-case-v1:6a5e81ea8e13dee505a2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.spec.ts"
+  },
+  {
+    "id": "react-case-v1:3382fdfb7d0e9dec23d8",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.spec.ts"
+  },
+  {
+    "id": "react-case-v1:e7bca6eef79c725ebe4d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.spec.ts"
+  },
+  {
+    "id": "react-case-v1:d1c773ebbf5e7151fc23",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.spec.ts"
+  },
+  {
+    "id": "react-case-v1:27cb077f29c88e4788b9",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.test.ts"
+  },
+  {
+    "id": "react-case-v1:d14a8ace80c0ca0d745e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.test.ts"
+  },
+  {
+    "id": "react-case-v1:62acad5c495b53e54f22",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.test.ts"
+  },
+  {
+    "id": "react-case-v1:40904959077d5c71aa34",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.test.ts"
+  },
+  {
+    "id": "react-case-v1:7cff37e8bfee2f153d3e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.test.ts"
+  },
+  {
+    "id": "react-case-v1:d86228cb88a85d2886a5",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelector.test.ts"
+  },
+  {
+    "id": "react-case-v1:206870d64023da3bf266",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.spec.ts"
+  },
+  {
+    "id": "react-case-v1:9b61e298ca96e802d0d5",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.spec.ts"
+  },
+  {
+    "id": "react-case-v1:9f0b83c1ee86bfff293d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.spec.ts"
+  },
+  {
+    "id": "react-case-v1:26617dd4c73999a54678",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.spec.ts"
+  },
+  {
+    "id": "react-case-v1:868e6c0361f9831c6ce6",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.spec.ts"
+  },
+  {
+    "id": "react-case-v1:8c079816c14e40d6d273",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.spec.ts"
+  },
+  {
+    "id": "react-case-v1:b73546b34c162675dceb",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.spec.ts"
+  },
+  {
+    "id": "react-case-v1:b8b99fc7e049464f484b",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:553aa739704f4ba2376e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:341847c19180a9726225",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:055b5db1629fbbc6e4a6",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:1df2adff7251facf3a04",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:0f4a3abde6eca882525c",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:c7d5ff7b4b431e4d42ae",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:7a251774fe26e9ff27e2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:9a258d58642f241bda5e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:ba2ff95865927d0e5805",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:373a69dd535fa079f7e3",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:dc1e8e38f0831d4d3e7e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:25b588d16dc0563e0cf9",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:25fba60b9f39cf0ce83d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:93f7a21bd08c4a5e93b3",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:d607c2294efb71854a40",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:cff1b94762aea2db42d2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/createSelectorMemoized.test.ts"
+  },
+  {
+    "id": "react-case-v1:96e6648019de6aa9ecc0",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:12dde9abba587be8c26f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:ae756871b70fc867dbc2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:109728cc204144469ae7",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:19e2fe230cec7306fd99",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:feb8da8ea46ff5ef10bf",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:2d51c78a40931c526f99",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:cbaece7dc38ae9c84c50",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:efc07ac8ec8d74c7428f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:c85555b04366f36ecc0e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:329edbb312d609da0c72",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:03763ada1ecb22106f8d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:4518da577eb7aba19fb4",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:e607307db9642be7107a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:bf6ba8ec88afe702bafd",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:11a250e7d54031ee5768",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:073d148a0aa2580b3d27",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:29f780877e440330f740",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:4458c0a4f926cb017192",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:94d3c7a7bd9d3c0f5dc1",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:912c4006984f2258f41f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:abf1825cf079b25873f8",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:aafb30592b7a529f1533",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:2eb95da7f7c93ebd1d9e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:8f2d9784d97b0b50fb2a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:12781da819747404258d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:7b7a2db36a8408668145",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:8175690894916d486c51",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:740ba7dc4bb135899e26",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:df365f06edfc47e19296",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:08186e1091eff65ce9f0",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:41c6f1edafa3b8807b6c",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:04f4638c80d067cfcc64",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:267a8495d072a361e659",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:de4d821638cebed6e8eb",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:6c132d85911c3fd8d317",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:b7ffafd8c61f943e917d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:22f0bf0760696b4b7fca",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:653208b8312a08ca435c",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:d807d3bb1cde1c4ece26",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:3b2bdf1ae6ba76df630f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:003526b9ea2e85e457ba",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:694434d780f3e11bae3d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:28453206df903e810491",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:168e3fff12e6aa0bf492",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:01dcfe453c93b15aa633",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:56e57511d813917f46a2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:38a8bd4c7bed60174c6f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:1711743ca183a0fb547f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:acda6d403ec8dd491628",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:70963061a27507bbf5eb",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.spec.ts"
+  },
+  {
+    "id": "react-case-v1:b8ad539a7f43f1f6a61f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cb878d8f3b896a1552c5",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b76b1c0e2d50d0803b75",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:426cf6cfcad25d14f1a6",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a205f4e487e96df68361",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2e5fb3898323b8cbdb06",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:85f6358f2df7ac0fce13",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:87cec079c42ab306e4de",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ef26365dd3e6824f64f4",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3fece735f9f63eee93c3",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1d9533bcf7400824d6fb",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:739648b5084ed7e365a2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ef179eba23df8c45b927",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b6dfe3e1f4fa451ff3ba",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a5649d213dfa1bcb28ba",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:63e01e8b05772d425a51",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7a11dd7bb949c401a622",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e4c403c61f1efb8b5368",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3a5568797fd3835566a1",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5c101e11af405e2c061c",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2cfd491b937031838917",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cfef65a1d99c84614e55",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:197b70800a624160e2b7",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/ReactStore.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2ab6c0810989ecca85b7",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.spec.ts"
+  },
+  {
+    "id": "react-case-v1:c3ae3e0c285e96a0224a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.spec.ts"
+  },
+  {
+    "id": "react-case-v1:dffe623a665325c1657b",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:d96ede25fe92060c7650",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:f3b6a5a26a40b981c72a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:a0b78d813dfbfc9d560e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:18153dd9e886a164bd45",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:989db7eec4d2e1f3cfcc",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:ab5c4a499d355a05e81e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:2444ae75082a79e01054",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:5ef71e0f5efd6940e37d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:c261bac17c09cb4c967c",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/store/Store.test.ts"
+  },
+  {
+    "id": "react-case-v1:ef58805e74ff74670a1d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/stringifyLocale.test.ts"
+  },
+  {
+    "id": "react-case-v1:0cf5ae0e1aa4e4e0a12a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useAnimationFrame.test.ts"
+  },
+  {
+    "id": "react-case-v1:fe62dd74b9762bdde3f6",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.spec.ts"
+  },
+  {
+    "id": "react-case-v1:f08cdd9cfd89efa6322f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.spec.ts"
+  },
+  {
+    "id": "react-case-v1:138ebfc66dbd62520f13",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.spec.ts"
+  },
+  {
+    "id": "react-case-v1:b051f91fc2828e361b85",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.spec.ts"
+  },
+  {
+    "id": "react-case-v1:e09df9e3b8c7706722d4",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6548529838ca564ff741",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e2bcb120051bcd1884ea",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7585ff2468c479145b27",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:19856c786429a1e91f32",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7c91cd703bbeb4dc3ad3",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c16c2606abd389e6413a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d57b6cd6d10998c9b0e5",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e247bb407194b640d03d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e57cf90f60807624e219",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f6bd7ad69f2a8e5d1f28",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:00f80cd60c9a0ff22d2f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5d5243c5fddd6fea6f93",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:399eff41f1cc3f01c17b",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useControlled.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d40b4868f77f94ea545a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useId.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7a82258915803c51c2c9",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useId.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5d0fc15d00c008ee6e0d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useId.test.tsx"
+  },
+  {
+    "id": "react-case-v1:085c198c13684ac0006b",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useId.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d7d1c36176b6a86b5f7b",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useId.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f3ea34ccbd3625cc4f74",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useId.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a049d8004380504f779d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useIdleCallback.fallback.test.ts"
+  },
+  {
+    "id": "react-case-v1:94899a51056dcae4ed67",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useIdleCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ee54945405b601679f19",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useIdleCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:54e96c4bf969201f9c4a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useIdleCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:43628771ec2b4a5d1624",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useIdleCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5a617c2eacdfb00714c5",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useIdleCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:224d153dd24630bff32a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useIdleCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e6a86c28773bdd1ee6ef",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useIdleCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2d8b0a9906d4521ec39a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useIdleCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:012d142e35372c0af05b",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useMergedRefs.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a9639ce2a7be8f109f72",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useMergedRefs.test.tsx"
+  },
+  {
+    "id": "react-case-v1:28fb81ca970aba8145d2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useMergedRefs.test.tsx"
+  },
+  {
+    "id": "react-case-v1:adcbf96e1f64d91e26ee",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useMergedRefs.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d3e3b05151f90234f69e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useMergedRefs.test.tsx"
+  },
+  {
+    "id": "react-case-v1:909faf28c0ae2136909f",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/useMergedRefs.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cb725744aa60ee349779",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:46d66c77e54ed043466a",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d02e7b39ed02c167bee1",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7b6cc5826e28fb8e1332",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8e1cb45a10d2d6f188b2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:218236a2285dd16fbb74",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:bb0b9dfca78ac00182e2",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0cecde052922c45118c6",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1c240327a3df4321bd34",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e3ea6b652f803b626a8d",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e4c38e918e1098c3384b",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/src/usePreviousValue.test.tsx"
+  }
+]

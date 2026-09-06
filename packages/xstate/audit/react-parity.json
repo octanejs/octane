@@ -11,10 +11,7 @@
     "integrity": "sha256:a5da9d58498c9febdba6b5b5c58f9cc1d056caa2a79d6bac449f022b5600a514",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/xstate/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [
@@ -113,7 +110,7 @@
       "environment": "workspace-node",
       "project": "xstate",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the one-for-one adapted useActor, useActorRef, useSelector, and createActorContext suites on Octane: 75 cases whose names match the pristine lane's identities exactly. Permitted transformations: @testing-library/react to @octanejs/testing-library; `import * as React from 'react'` to 'octane' (namespace-imported base hooks are slotted directly by the compiler); the '../src/index.ts' import root to '@octanejs/xstate'; './utils.tsx' to the adapted './utils.ts' mode helper; explicit describe/it/expect/vi/afterEach imports because the project runs globals:false; the class ErrorBoundary to a @try/@catch component; an explicit `null` dependency array on four deps-less effects, which is Octane's documented spelling of React's run-after-every-render; .tsx to .tsrx. Upstream's `suiteKey === 'strict' ? \u2026 : \u2026` expressions are left byte-identical and simply evaluate to the non-strict expectations. Octane-only conformance cases share this Vitest project but sit outside adaptedRoots.tests and are not counted as parity evidence.",
+      "notes": "Runs the one-for-one adapted useActor, useActorRef, useSelector, and createActorContext suites on Octane: 75 cases whose names match the pristine lane's identities exactly. Permitted transformations: @testing-library/react to @octanejs/testing-library; `import * as React from 'react'` to 'octane' (namespace-imported base hooks are slotted directly by the compiler); the '../src/index.ts' import root to '@octanejs/xstate'; './utils.tsx' to the adapted './utils.ts' mode helper; explicit describe/it/expect/vi/afterEach imports because the project runs globals:false; the class ErrorBoundary to a @try/@catch component; an explicit `null` dependency array on four deps-less effects, which is Octane's documented spelling of React's run-after-every-render; .tsx to .tsrx. Upstream's `suiteKey === 'strict' ? … : …` expressions are left byte-identical and simply evaluate to the non-strict expectations. Octane-only conformance cases share this Vitest project but sit outside adaptedRoots.tests and are not counted as parity evidence.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/xstate/audit/adapted-runtime.json"

@@ -79,13 +79,13 @@
       "id": "runtime:1267e42a88e83e87",
       "file": "packages/floating-ui/tests/upstream/react-dom/index.test.tsx",
       "fullName": "middleware is always fresh and does not cause an infinite loop",
-      "classification": "expected-failure-negative-control"
+      "classification": "compatible"
     },
     {
       "id": "runtime:8613f8b624d186e6",
       "file": "packages/floating-ui/tests/upstream/react-dom/index.test.tsx",
       "fullName": "unstable callback refs",
-      "classification": "expected-failure-negative-control"
+      "classification": "compatible"
     },
     {
       "id": "runtime:466b63724c155f1c",
@@ -1135,13 +1135,13 @@
       "id": "runtime:f650cdb9137fa120",
       "file": "packages/floating-ui/tests/upstream/react/unit/useFloating.test.tsx",
       "fullName": "positionReference handles real virtual element",
-      "classification": "expected-failure-negative-control"
+      "classification": "compatible"
     },
     {
       "id": "runtime:ebdbe8c83bf6ab1c",
       "file": "packages/floating-ui/tests/upstream/react/unit/useFloating.test.tsx",
       "fullName": "positionReference handles unstable reference prop",
-      "classification": "expected-failure-negative-control"
+      "classification": "compatible"
     },
     {
       "id": "runtime:bff8a811c90f7d29",
@@ -1837,7 +1837,7 @@
   "snapshots": 0,
   "summary": {
     "registered": 301,
-    "compatible": 272,
-    "expectedFailureNegativeControls": 29
+    "compatible": 276,
+    "expectedFailureNegativeControls": 25
   }
 }

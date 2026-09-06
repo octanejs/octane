@@ -1,0 +1,15 @@
+diff --git a/tests/upstream/src/internals/useRenderElement.spec.tsx b/tests/upstream/src/internals/useRenderElement.spec.tsx
+--- a/tests/upstream/src/internals/useRenderElement.spec.tsx
++++ b/tests/upstream/src/internals/useRenderElement.spec.tsx
+@@ -1,8 +1,8 @@
+ /** @jsxImportSource octane */
+ /* eslint-disable react-hooks/rules-of-hooks */
+-import * as React from 'octane';
+-import { expectType } from '#test-utils';
+-import { useRenderElement } from './useRenderElement';
++import type * as React from 'octane';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
++import { useRenderElement } from "../../../../src/internals/useRenderElement.tsrx";
+ 
+ const element1 = useRenderElement('div', {}, {});
+ 

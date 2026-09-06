@@ -11,10 +11,7 @@
     "integrity": "sha256:ddfb74037a3979ed98c8784034071f24040b5a6b7d560254fcb6c6676946da47",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "absent",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "absent", "types": "absent" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/xyflow/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

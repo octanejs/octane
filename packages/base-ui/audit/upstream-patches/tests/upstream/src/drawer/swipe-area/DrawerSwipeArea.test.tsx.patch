@@ -1,0 +1,16 @@
+diff --git a/tests/upstream/src/drawer/swipe-area/DrawerSwipeArea.test.tsx b/tests/upstream/src/drawer/swipe-area/DrawerSwipeArea.test.tsx
+--- a/tests/upstream/src/drawer/swipe-area/DrawerSwipeArea.test.tsx
++++ b/tests/upstream/src/drawer/swipe-area/DrawerSwipeArea.test.tsx
+@@ -582,10 +582,8 @@ describe('<Drawer.SwipeArea />', () => {
+     let providerContext: DrawerProviderContext | undefined;
+     const cleanupPhases: boolean[] = [];
+ 
+-    const SwipeAreaPhaseBoundary = React.forwardRef<
+-      HTMLDivElement,
+-      React.ComponentPropsWithoutRef<'div'>
+-    >(function SwipeAreaPhaseBoundary(props, ref) {
++    const SwipeAreaPhaseBoundary = (function SwipeAreaPhaseBoundary(propsWithRef: (React.ComponentPropsWithoutRef<'div'>) & { ref?: React.Ref<HTMLDivElement> }) {
++  const { ref: ref = null, ...props } = propsWithRef;
+       useIsoLayoutEffect(() => {
+         disabledPassiveEffectFlushed = false;
+       });

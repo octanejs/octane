@@ -11,21 +11,10 @@
     "integrity": "sha256:01177da508a5551b38908e3da7ce51601f140fd35497e3b3daf73af58f75e67c",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "insufficient",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/three/src"],
-      "include": ["\\.(?:ts|tsrx)$"],
-      "exclude": []
-    },
-    "tests": {
-      "roots": ["packages/three/tests"],
-      "include": ["\\.test\\.ts$"],
-      "exclude": []
-    }
+    "source": { "roots": ["packages/three/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
+    "tests": { "roots": ["packages/three/tests"], "include": ["\\.test\\.ts$"], "exclude": [] }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,
@@ -40,7 +29,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

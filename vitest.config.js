@@ -14,6 +14,12 @@ import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.t
 import { inkRenderers as INK_RENDERERS } from './packages/ink/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 import { ensureMaterializedUpstream } from './scripts/react-port/ensure-materialized.mjs';
+import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
+import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
+import baseUIPristine from './packages/base-ui/tests/vitest.pristine.config.ts';
+import baseUIUtilsPristine from './packages/base-ui-utils/tests/vitest.pristine.config.ts';
+import baseUIBrowser from './packages/base-ui/tests/vitest.browser.config.ts';
+import baseUIPristineBrowser from './packages/base-ui/tests/vitest.pristine.browser.config.ts';
 import {
 	scopedSignalsProjects,
 	signalsBrowserTests,
@@ -48,6 +54,17 @@ const REACT_TEXTAREA_AUTOSIZE_USE_LATEST = reactTextareaAutosizeEsm(
 const REACT_TEXTAREA_AUTOSIZE_USE_ISOMORPHIC_LAYOUT_EFFECT = reactTextareaAutosizeEsm(
 	requireFromUseLatest.resolve('use-isomorphic-layout-effect'),
 );
+const requireBaseUI = createRequire(resolve(import.meta.dirname, 'packages/base-ui/package.json'));
+const BASE_UI_REACT_ALIASES = [
+	'react',
+	'react/jsx-runtime',
+	'react/jsx-dev-runtime',
+	'react-dom',
+	'react-dom/client',
+].map((specifier) => ({
+	find: new RegExp(`^${specifier.replaceAll('/', '\\/')}$`),
+	replacement: realpathSync(requireBaseUI.resolve(specifier)),
+}));
 const requireTanstackStore = createRequire(
 	resolve(import.meta.dirname, 'packages/tanstack-store/package.json'),
 );
@@ -589,6 +606,29 @@ export default defineConfig({
 			...reactCompatSpikeProjects,
 			...reactCompatProjects,
 			...reactCompatSSRProjects,
+			{ ...baseUIAdapted, testExecution: { group: 'react-parity' } },
+			{ ...baseUIUtilsAdapted, testExecution: { group: 'react-parity' } },
+			{
+				...baseUIUtilsAdapted,
+				test: {
+					...baseUIUtilsAdapted.test,
+					name: 'base-ui-utils',
+					include: ['tests/**/*.test.tsrx'],
+				},
+			},
+			{ ...baseUIPristine, testExecution: { group: 'react-parity' } },
+			{ ...baseUIUtilsPristine, testExecution: { group: 'react-parity' } },
+			{ ...baseUIBrowser, testExecution: { group: 'react-parity' } },
+			{ ...baseUIPristineBrowser, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'heavy-browser', browsers: ['chromium'] },
+				test: {
+					name: 'react-parity-browser-tooling',
+					include: ['test-utils/vitest-browser-collection.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+				},
+			},
 			{
 				test: {
 					name: 'octane',
@@ -4540,7 +4580,7 @@ export default defineConfig({
 						'packages/base-ui/tests/**/*.test.tsx',
 						'!packages/base-ui/tests/ssr/**/*.test.ts',
 						'!packages/base-ui/tests/differential/**/*.test.ts',
-						'!packages/base-ui/tests/upstream/**/*.test.ts',
+						'!packages/base-ui/tests/upstream/**',
 					],
 					environment: 'jsdom',
 					// hydration.test.ts boots a real Vite server and SSR-compiles its fixture
@@ -4550,10 +4590,7 @@ export default defineConfig({
 					hookTimeout: 30_000,
 					globals: false,
 				},
-				// base-ui's `.ts` foundation forwards the caller's slot via subSlot (as does
-				// @octanejs/floating-ui, which base-ui's overlays build on) — both declare
-				// manual hook slots in their package.json, so the auto-slotting pass skips
-				// them.
+				// Compile Base UI components and transitive native hook helpers.
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -4563,7 +4600,7 @@ export default defineConfig({
 						},
 						{
 							find: /^@octanejs\/base-ui\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1.ts',
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1',
 						},
 						{
 							find: /^@octanejs\/floating-ui$/,
@@ -4592,7 +4629,7 @@ export default defineConfig({
 						},
 						{
 							find: /^@octanejs\/base-ui\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1.ts',
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1',
 						},
 						{
 							find: /^@octanejs\/floating-ui$/,
@@ -7693,41 +7730,14 @@ export default defineConfig({
 				plugins: [octane()],
 				resolve: {
 					alias: [
+						...BASE_UI_REACT_ALIASES,
 						{
 							find: /^@octanejs\/base-ui$/,
 							replacement: resolve(import.meta.dirname, 'packages/base-ui/src/index.ts'),
 						},
 						{
 							find: /^@octanejs\/base-ui\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1.ts',
-						},
-						{
-							find: /^@octanejs\/floating-ui$/,
-							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
-				testExecution: { group: 'react-parity' },
-				test: {
-					name: 'base-ui-upstream-adapted',
-					include: ['packages/base-ui/tests/upstream/**/*.test.ts'],
-					environment: 'jsdom',
-					testTimeout: 30_000,
-					hookTimeout: 30_000,
-					globals: false,
-				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/base-ui$/,
-							replacement: resolve(import.meta.dirname, 'packages/base-ui/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/base-ui\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1.ts',
+							replacement: resolve(import.meta.dirname, 'packages/base-ui/src') + '/$1',
 						},
 						{
 							find: /^@octanejs\/floating-ui$/,

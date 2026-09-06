@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/collapsible/root/CollapsibleRoot.spec.tsx b/tests/upstream/src/collapsible/root/CollapsibleRoot.spec.tsx
+--- a/tests/upstream/src/collapsible/root/CollapsibleRoot.spec.tsx
++++ b/tests/upstream/src/collapsible/root/CollapsibleRoot.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Collapsible } from '@octanejs/base-ui/collapsible';
+ import type {
+   CollapsiblePanelProps,

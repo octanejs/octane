@@ -1,4 +1,4 @@
-import { useState, flushSync } from 'octane';
+import { useState, useRef, useLayoutEffect, flushSync } from 'octane';
 
 // Probes for WHEN a delegated discrete event commits handler-scheduled state,
 // as observed by code outside the Octane root (native listeners registered on
@@ -67,5 +67,25 @@ export function ResetForm() @{
 		<button id="reset-btn" type="reset" onClick={() => setValue('')}>
 			reset
 		</button>
+	</form>
+}
+
+export function SubmitCompletedInput() @{
+	const [value, setValue] = useState('');
+	const [submitted, setSubmitted] = useState('');
+	const form = useRef<HTMLFormElement | null>(null);
+	useLayoutEffect(() => {
+		if (value === '1234') form.current?.requestSubmit();
+	}, [value]);
+	<form
+		ref={form}
+		onSubmit={(event) => {
+			event.preventDefault();
+			setSubmitted(value);
+			setValue('');
+		}}
+	>
+		<input id="code" value={value} onInput={(event) => setValue(event.currentTarget.value)} />
+		<output id="submitted">{submitted as string}</output>
 	</form>
 }

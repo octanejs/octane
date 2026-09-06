@@ -11,10 +11,7 @@
     "integrity": "sha256:648a3eae6d4a8708e215b7272907ba018b5f77430acbb568a2c5aebd238ce945",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "insufficient"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "insufficient" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/textarea-autosize/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3412394bfe2b6971fb79bc8be097720e18a612d548e543e5c6f98a580098507b"
+      "lockfileSha256": "51b992a0e9e6af2076983d6d1f54ff625791f5bcd1559846610a970373d02baf"
     }
   },
   "lanes": [

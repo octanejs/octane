@@ -1,0 +1,26 @@
+diff --git a/tests/upstream/src/combobox/item/ComboboxItem.test.tsx b/tests/upstream/src/combobox/item/ComboboxItem.test.tsx
+--- a/tests/upstream/src/combobox/item/ComboboxItem.test.tsx
++++ b/tests/upstream/src/combobox/item/ComboboxItem.test.tsx
+@@ -624,10 +624,10 @@ describe('<Combobox.Item />', () => {
+       const items = ['apple', 'apricot', 'avocado'];
+       const renderSpy = vi.fn();
+ 
+-      const LoggingItem = React.forwardRef(function LoggingItem(
+-        props: any,
+-        ref: React.ForwardedRef<HTMLDivElement>,
++      const LoggingItem = (function LoggingItem(
++        propsWithRef: (any) & { ref?: React.Ref<HTMLDivElement> },
+       ) {
++  const { ref: ref = null, ...props } = propsWithRef;
+         const { state, ...other } = props;
+         renderSpy();
+         return <div {...other} ref={ref} />;
+@@ -663,7 +663,7 @@ describe('<Combobox.Item />', () => {
+       renderSpy.mockClear();
+ 
+       // "a" matches all three items, so the filtered set is unchanged and every item stays mounted.
+-      fireEvent.change(screen.getByTestId('input'), { target: { value: 'a' } });
++      fireEvent.input(screen.getByTestId('input'), { target: { value: 'a' } });
+ 
+       await waitFor(() => expect(screen.getByTestId('input')).toHaveValue('a'));
+       expect(screen.getAllByRole('option')).toHaveLength(3);
