@@ -531,6 +531,61 @@ reach, and the hash decides which rule wins:
 - At equal specificity the later stylesheet wins, as [Which rule wins](#ordering)
   explains.
 
+<h3 id="global-keyframes">Global Keyframes</h3>
+
+Keyframe names are scoped by default, and the compiler rewrites references to them in
+the block's `animation` and `animation-name` declarations. To share an animation across
+components, prefix its declaration with `-global-`. The compiler removes that prefix
+and leaves the name unscoped, so other components reference it without the prefix:
+
+```tsrx
+export function App() @{
+	<>
+		<style>
+			/* Scoped to this block. */
+			@keyframes slideIn {
+				from {
+					transform: translateX(-100%);
+				}
+				to {
+					transform: translateX(0);
+				}
+			}
+			/* Shared as fadeIn, without the -global- prefix. */
+			@keyframes -global-fadeIn {
+				from {
+					opacity: 0;
+				}
+				to {
+					opacity: 1;
+				}
+			}
+			.parent {
+				animation: slideIn 1s;
+			}
+		</style>
+		<div class="parent">
+			<Child />
+		</div>
+	</>
+}
+
+function Child() @{
+	<>
+		<style>
+			.child {
+				animation: fadeIn 1s;
+			}
+		</style>
+		<div class="child">Child content</div>
+	</>
+}
+```
+
+The stylesheet that defines `fadeIn` must be loaded wherever it is used. In this
+example, `App` supplies it for `Child`; an animation shared across unrelated pages can
+instead live in a global `.css` file that those pages link.
+
 <h2 id="ordering">Which rule wins</h2>
 
 At equal specificity, the rule that comes later in the CSS wins, and the CSS comes out

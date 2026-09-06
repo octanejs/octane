@@ -345,6 +345,12 @@ const EVALUATIONS: Record<string, Evaluation> = {
 			},
 		],
 	},
+	'sibling-combinators': {
+		renders: [
+			{ component: 'SiblingCombinators', props: { open: true } },
+			{ component: 'SiblingCombinators', props: { open: false } },
+		],
+	},
 	'sibling-scopes': { renders: [{ component: 'Siblings' }] },
 	'theme-composition': { renders: [{ component: 'Composed' }] },
 	'theme-diamond': { renders: [] },

@@ -242,6 +242,7 @@ export const docsMeta: DocMeta[] = [
 			},
 			{ id: 'global-when', title: 'Which one to use', level: 3 },
 			{ id: 'global-specificity', title: 'How a global rule ranks', level: 3 },
+			{ id: 'global-keyframes', title: 'Global Keyframes', level: 3 },
 			{
 				id: 'ordering',
 				title: 'Which rule wins',
