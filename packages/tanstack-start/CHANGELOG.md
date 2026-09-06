@@ -1,5 +1,14 @@
 # @octanejs/tanstack-start
 
+## 0.1.43
+
+### Patch Changes
+
+- Updated dependencies [1f19beb]
+- Updated dependencies [67ae07f]
+  - @octanejs/rspack-plugin@0.1.48
+  - @octanejs/tanstack-router@0.1.53
+
 ## 0.1.42
 
 ### Patch Changes
