@@ -1,0 +1,15 @@
+diff --git a/tests/upstream/src/dialog/popup/DialogPopup.test.tsx b/tests/upstream/src/dialog/popup/DialogPopup.test.tsx
+--- a/tests/upstream/src/dialog/popup/DialogPopup.test.tsx
++++ b/tests/upstream/src/dialog/popup/DialogPopup.test.tsx
+@@ -637,7 +637,10 @@ describe('<Dialog.Popup />', () => {
+ 
+       // Close via keyboard: should move focus to final-input
+       await user.click(trigger);
+-      await waitSingleFrame();
++      // The transition frame updates state before the keyboard close.
++      await act(async () => {
++        await waitSingleFrame();
++      });
+       await user.keyboard('{Escape}');
+       await waitFor(() => {
+         expect(screen.getByTestId('final-input')).toHaveFocus();
