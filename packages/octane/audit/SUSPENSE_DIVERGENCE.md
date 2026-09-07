@@ -343,6 +343,11 @@ handlers, refs, and layout/passive effects. Replacement components, branches,
 lists, rendered values, and portals wait for a successful root render before
 replacing committed content.
 
+For text and attributes in retained content, an abandoned root attempt restores
+the DOM value that was live immediately before its speculative write, including
+an external edit made since Octane's previous commit. Attribute absence is
+preserved as well. A successful retry applies the authored binding normally.
+
 Retries use the latest inputs. Superseding requests and unmounts cancel stale
 reveals, and an uncommitted initial root initializes state from its current props
 on retry. A rejected resource reports the actual error through the ordinary
@@ -365,6 +370,9 @@ thenables, independent roots, and unmount. The root-suspension group in
 [hydration/suspense-hydrate.test.ts](../tests/hydration/suspense-hydrate.test.ts)
 checks server-node adoption, subsequent suspended updates, rejection,
 supersession, and unmount in both compile modes.
+[suspense-preserves-dom.test.ts](../tests/suspense-preserves-dom.test.ts) also
+checks a first raw-thenable throw after sibling writes and live external text
+and attribute restoration during a held root update.
 
 Pending-cue and commit-time evidence covers single-origin root suspension, including
 successive resources, unrelated props refreshes, cancellation, and rejection. This matrix

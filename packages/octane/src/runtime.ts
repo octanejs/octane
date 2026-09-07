@@ -3006,6 +3006,19 @@ function cloneBindingBag(bag: any, arity: number): object {
 function journalBag(): void {
 	const scope = CURRENT_SCOPE;
 	if (scope === null) return;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	// The root log discards a Block created in this transaction wholesale, even
+	// if it completed an earlier render in the same wave. Keep nested boundary
+	// windows and adopted DOM on the ordinary snapshot path: they can restore
+	// their content without discarding this scope.
+	if (
+		transaction !== null &&
+		!transaction.hydrating &&
+		transaction.retainedCreated === null &&
+		TRANSITION_JOURNAL_DEPTH === 1 &&
+		scope.block.createdStamp === transaction.createdStamp
+	)
+		return;
 	const bag = scope.slots[0];
 	if (bag === null || typeof bag !== 'object') return;
 	const arity = (bag as any)[BINDING_BAG_ARITY];
@@ -3138,8 +3151,8 @@ function journalControlledOption(option: HTMLOptionElement, withDefault: boolean
  */
 interface ParkedItem {
 	block: Block;
-	/** Owned ranges need no saved nodes; borrowed markers retain only their original content. */
-	nodes: Node[] | null;
+	/** Preserve the exact row range across later journal windows that can detach it. */
+	nodes: Node[];
 }
 let PARKED_ITEMS: ParkedItem[] | null = null;
 
@@ -3147,26 +3160,24 @@ let PARKED_ITEMS: ParkedItem[] | null = null;
 function parkItemForHold(block: Block): void {
 	const retainConnected = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
 	if (retainConnected) retireRootBlock(block);
-	let nodes: Node[] | null = null;
-	// An @empty block borrows the list's markers. Its range may gain fresh rows
-	// before commit, so tearing down the whole live range would delete those rows.
-	// Save just its original content while leaving it connected through cleanup.
-	if (!retainConnected || block.exclusiveMarkers) {
-		nodes = [];
-		const start = block.startMarker;
-		const end = block.endMarker;
-		if (start && end) {
-			const parent = start.parentNode;
-			if (parent !== null) {
-				const exclusive = block.exclusiveMarkers;
-				let n: Node | null = exclusive ? start.nextSibling : start;
-				const stop = exclusive ? end : end.nextSibling;
-				while (n !== null && n !== stop) {
-					const next: Node | null = getNextSibling(n);
-					if (!retainConnected) parent.removeChild(n);
-					nodes.push(n);
-					n = next;
-				}
+	// A later nested window can sweep an already parked row out of the live
+	// DOM before this window rolls back. Retain the original nodes now, while
+	// the row is still attached; only detach on non-root holds. Borrowed @empty
+	// markers retain their original content, never the list's shared markers.
+	const nodes: Node[] = [];
+	const start = block.startMarker;
+	const end = block.endMarker;
+	if (start && end) {
+		const parent = start.parentNode;
+		if (parent !== null) {
+			const exclusive = block.exclusiveMarkers;
+			let n: Node | null = exclusive ? start.nextSibling : start;
+			const stop = exclusive ? end : end.nextSibling;
+			while (n !== null && n !== stop) {
+				const next: Node | null = getNextSibling(n);
+				if (!retainConnected) parent.removeChild(n);
+				nodes.push(n);
+				n = next;
 			}
 		}
 	}
@@ -3306,9 +3317,9 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 			state.items.set(block.key, block);
 		}
 	}
-	// Collect the committed ranges before removing speculative nodes. Root
-	// transactions left outgoing rows connected; hold-only callers may have
-	// detached them, so use the retained range in either case.
+	// Collect the committed ranges before removing speculative nodes. An
+	// earlier window may have parked rows that a later sweep detached, so use
+	// their saved node lists rather than reading their current DOM position.
 	const nodes: Node[] = [];
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
 		const range = takeParkedItem(b) ?? collectBlockRange(b);
@@ -3356,7 +3367,7 @@ function takeParkedItem(block: Block): Node[] | null {
 		if (parked[i].block === block) {
 			const nodes = parked[i].nodes;
 			parked.splice(i, 1);
-			return nodes ?? collectBlockRange(block);
+			return nodes;
 		}
 	}
 	return null;
@@ -3445,8 +3456,8 @@ function disarmTransitionJournal(checkpoint: number): void {
 /**
  * Tear down the rows still parked when the last window closes. Anything a
  * rollback put back has already been taken off this list, so what is left is
- * genuinely gone and its cleanups are due. A root-retained range stays connected
- * through block teardown; detached holds remove their saved nodes afterward.
+ * genuinely gone and its cleanups are due. Root-retained ranges stay connected
+ * through teardown; the saved nodes are removed after cleanup in either mode.
  */
 function flushParkedItems(): void {
 	const parked = PARKED_ITEMS;
@@ -3457,12 +3468,6 @@ function flushParkedItems(): void {
 
 /** Committed root deletions clean up against connected DOM before removing the range. */
 function unmountParkedItem(item: ParkedItem): void {
-	if (item.nodes === null) {
-		// Root transactions leave this range connected until its cleanup finishes.
-		// The regular block teardown then removes the whole range once.
-		unmountBlock(item.block);
-		return;
-	}
 	try {
 		unmountBlock(item.block, false);
 	} finally {
@@ -27693,13 +27698,20 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	// A transition hold replays the root journal, including touched effect cells.
 	// An urgent update superseding an existing hold can instead show @pending
 	// without replaying that journal; a propagating boundary may do likewise in
-	// its ancestor. Keep the old snapshot only for those cold paths and detached
-	// renders without a root transaction.
+	// its ancestor. A queued transition child rendered by an urgent ancestor is
+	// urgent too (renderBlockInner overrides its pendingMode). Keep the old
+	// snapshot for these cold paths and detached renders without a root transaction.
 	const effectDeps =
 		capture !== null &&
 		(ROOT_RENDER_TRANSACTION === null ||
 			state.propagateSuspense ||
-			(block.pendingMode ?? CURRENT_BLOCK?.currentRenderMode) !== 'transition')
+			(block.pendingMode ?? CURRENT_BLOCK?.currentRenderMode) !== 'transition' ||
+			(block.pending &&
+				block.pendingMode === 'transition' &&
+				CURRENT_BLOCK !== null &&
+				CURRENT_BLOCK.currentRenderMode === 'urgent' &&
+				blockIsAncestor(CURRENT_BLOCK, block) &&
+				TRANSITION_SWAP_DRIVER !== null))
 			? snapshotSubtreeEffectDeps(block)
 			: null;
 	const refDetachCheckpoint = refDetachQueue.length;
