@@ -293,14 +293,14 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.1.67
-    '@tsrx/prettier-plugin': ^0.3.133
-    '@tsrx/typescript-plugin': ^0.3.133
+    '@tsrx/core': ^0.1.69
+    '@tsrx/prettier-plugin': ^0.3.135
+    '@tsrx/typescript-plugin': ^0.3.135
     '@tsrx/ripple': ^0.1.62
-    '@tsrx/react': ^0.2.67
-    '@tsrx/solid': ^0.1.67
-    '@tsrx/vite-plugin-react': ^0.0.100
-    '@tsrx/vite-plugin-solid': ^0.0.97
+    '@tsrx/react': ^0.2.69
+    '@tsrx/solid': ^0.1.69
+    '@tsrx/vite-plugin-react': ^0.0.102
+    '@tsrx/vite-plugin-solid': ^0.0.99
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -589,7 +589,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39 || 0.1.42 || 0.1.43 || 0.1.45 || 0.1.46 || 0.1.47 || 0.1.49 || 0.1.51 || 0.2.2 || 0.2.3 || 0.2.4
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39 || 0.1.42 || 0.1.43 || 0.1.45 || 0.1.46 || 0.1.47 || 0.1.49 || 0.1.51 || 0.2.2 || 0.2.3 || 0.2.4 || 0.2.5
   - react-dropzone@20.0.0
   - '@blocknote/core@0.53.0'
   - '@blocknote/react@0.53.0'
@@ -605,31 +605,27 @@ minimumReleaseAgeExclude:
   - oxc-tsrx@0.5.0
   - '@ripple-ts/adapter@0.3.125'
   - '@ripple-ts/vite-plugin@0.3.125'
-  - '@tsrx/core@0.1.66 || 0.1.67'
-  - '@tsrx/prettier-plugin@0.3.133'
-  - '@tsrx/react@0.2.67'
+  - '@tsrx/core@0.1.69'
+  - '@tsrx/prettier-plugin@0.3.135'
+  - '@tsrx/react@0.2.69'
   - '@tsrx/ripple@0.1.62'
-  - '@tsrx/solid@0.1.67'
-  - '@tsrx/typescript-plugin@0.3.133'
-  - '@tsrx/vite-plugin-react@0.0.100'
-  - '@tsrx/vite-plugin-solid@0.0.97'
+  - '@tsrx/solid@0.1.69'
+  - '@tsrx/typescript-plugin@0.3.135'
+  - '@tsrx/vite-plugin-react@0.0.102'
+  - '@tsrx/vite-plugin-solid@0.0.99'
   - ripple@0.3.125
-  - '@tsrx/runtime@0.1.5'
-  - '@tsrx/react-runtime@0.1.5'
-  - '@tsrx/solid-runtime@0.1.5'
+  - '@tsrx/runtime@0.1.6'
+  - '@tsrx/react-runtime@0.1.6'
+  - '@tsrx/solid-runtime@0.1.6'
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.
 #
-# The JSX type-only fixes formerly patched into @tsrx/core 0.1.56/0.1.58
-# are published in the required @tsrx/core >= 0.1.60.
+# The JSX type-only, generic-arrow, and typed-default mapping fixes formerly
+# patched into @tsrx/core are published in the required @tsrx/core >= 0.1.69.
 patchedDependencies:
   # Preserve sibling package URLs when browser mocks share a directory-name prefix.
   # Browser ships its own prebundled copy of the mocker implementation.
   '@vitest/browser@4.1.10': patches/@vitest__browser@4.1.10.patch
   '@vitest/mocker@4.1.10': patches/@vitest__mocker@4.1.10.patch
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
-  # Map typed default-parameter patterns in the shared printer. Octane bundles
-  # this fix into its published Volar compiler; consumers need no local patch.
-  # Preserve valid constrained/defaulted generic arrows in editor diagnostics.
-  '@tsrx/core@0.1.67': patches/@tsrx__core@0.1.67.patch
