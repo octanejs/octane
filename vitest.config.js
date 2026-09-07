@@ -4496,13 +4496,14 @@ export default defineConfig({
 					],
 				},
 			},
-			{
+			...['shadcn-differential', 'shadcn-base-ui-differential'].map((name) => ({
 				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'shadcn-differential',
+					name,
 					include: [
-						'packages/shadcn/tests/differential/**/*.test.ts',
-						'packages/shadcn/tests/differential/**/*.test.tsx',
+						name === 'shadcn-differential'
+							? 'packages/shadcn/tests/differential/parity.test.ts'
+							: 'packages/shadcn/tests/differential/base-ui-latest.test.ts',
 					],
 					environment: 'jsdom',
 					// Rewrites @octanejs/shadcn subpaths to the matching vendored,
@@ -4521,7 +4522,7 @@ export default defineConfig({
 						},
 					],
 				},
-			},
+			})),
 			{
 				// No react-parity lane owns `project: "shadcn-ssr"`, so leave this on ordinary
 				// shards rather than marking the package-authored SSR suite as parity-owned.

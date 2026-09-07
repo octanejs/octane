@@ -172,7 +172,7 @@
       "type": "differential",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "shadcn-differential",
+      "project": "shadcn-base-ui-differential",
       "evidenceOrigin": "repo-authored",
       "notes": "Three bounded same-fixture React/Octane comparisons using the release Base UI source, Nova stylesheet and Lucide icon transforms. See UPSTREAM.md for retained prior Radix lineage and full scope limits.",
       "files": [
