@@ -34,7 +34,7 @@ Methodology notes:
 - TTFB is the first response **body** chunk, not headers.
 - Chunk counts/bytes are TCP-coalescing artifacts → reported under `meta`,
   never guarded.
-- Fixture bundles are built exactly like streaming-ssr's (`minify: false`, per
+- Fixture bundles are built exactly like streaming-ssr's (`minify: 'esbuild'`, per
   the fixtures' vite configs). Octane is bundled from TS source into the entry;
   react-dom stays external and loads its prebuilt minified production files —
   the same asymmetry real deployments have.

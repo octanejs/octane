@@ -6,6 +6,6 @@ export default defineConfig({
 	optimizeDeps: {
 		exclude: ['octane', 'octane/compiler'],
 	},
-	build: { target: 'esnext' },
+	build: { minify: 'esbuild', target: 'esnext' },
 	server: { port: 5282, strictPort: true },
 });

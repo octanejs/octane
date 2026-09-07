@@ -70,8 +70,7 @@ variance of a whole process start. Treat it as indicative, and raise
 - React runs without `StrictMode`. Its double-invoke is a development aid and
   Octane has no equivalent, so enabling it would compare different amounts of
   work.
-- All targets build with the same normalized Vite settings (`esnext`, terser, 2 passes,
-  toplevel mangling).
+- All targets build with the same normalized Vite settings (`esnext`, `minify: 'esbuild'`).
 - Row labels are derived from the index, never randomized: a benchmark that
   cannot be re-run to the same numbers cannot catch a regression.
 - Every repetition is a fresh process, so `boot_ms` is a real cold start. The

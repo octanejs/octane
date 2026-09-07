@@ -13,7 +13,7 @@
     "inferno": "catalog:default"
   },
   "devDependencies": {
-    "vite": "catalog:default",
-    "terser": "catalog:default"
+    "esbuild": "catalog:default",
+    "vite": "catalog:default"
   }
 }

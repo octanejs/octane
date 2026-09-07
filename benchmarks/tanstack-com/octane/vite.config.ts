@@ -11,6 +11,7 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
 export default defineConfig({
+	build: { minify: 'esbuild' },
 	// Same compile-time globals as the react flavor's bench config — utils
 	// reference them and SSR dies with a ReferenceError otherwise (this was
 	// the whole-page-body-missing bug: the root error boundary swallowed it).

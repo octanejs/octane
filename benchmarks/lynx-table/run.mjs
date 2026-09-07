@@ -87,7 +87,7 @@ try {
 		},
 		build: {
 			write: true,
-			minify: false,
+			minify: 'esbuild',
 			target: 'node22',
 			lib: {
 				entry: path.join(ROOT, 'workload.ts'),

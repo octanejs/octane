@@ -14,8 +14,8 @@
     "@solidjs/web": "catalog:default"
   },
   "devDependencies": {
-    "vite-plugin-solid": "catalog:default",
+    "esbuild": "catalog:default",
     "vite": "catalog:default",
-    "terser": "catalog:default"
+    "vite-plugin-solid": "catalog:default"
   }
 }

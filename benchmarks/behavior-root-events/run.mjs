@@ -39,7 +39,7 @@ async function buildEntry(outDir) {
 			},
 			outDir,
 			emptyOutDir: true,
-			minify: true,
+			minify: 'esbuild',
 			target: 'es2022',
 		},
 	});
