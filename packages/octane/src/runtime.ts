@@ -3163,7 +3163,8 @@ function parkItemForHold(block: Block): void {
 	// A later nested window can sweep an already parked row out of the live
 	// DOM before this window rolls back. Retain the original nodes now, while
 	// the row is still attached; only detach on non-root holds. Borrowed @empty
-	// markers retain their original content, never the list's shared markers.
+	// markers are excluded, but their saved content can include rows parked
+	// earlier in the same root transaction.
 	const nodes: Node[] = [];
 	const start = block.startMarker;
 	const end = block.endMarker;
