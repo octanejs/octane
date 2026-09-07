@@ -1192,9 +1192,10 @@ describe('useTransition — the old screen stays whole', () => {
 			await act(() => next.resolve('one'));
 			const committed = rows();
 			expect(committed).toHaveLength(3);
+			expect(committed.map((row) => row.id)).toEqual(['row-d', 'row-a', 'row-c']);
 			expect(committed[0]).toBe(original[3]);
-			expect(committed[1]).toBe(original[0]);
-			expect(committed[2]).toBe(original[2]);
+			expect(committed[1]).toBe(original[1]);
+			expect(committed[2]).toBe(original[0]);
 			expect(events).toEqual(['cleanup:b']);
 			expect(connectedDuringCleanup).toBe(true);
 			expect(removed.isConnected).toBe(false);
@@ -1203,7 +1204,8 @@ describe('useTransition — the old screen stays whole', () => {
 			r.update(TransitionKeyedRemoval, { ...props, nextItems: ['a', 'd'] });
 			const updated = rows();
 			expect(updated).toHaveLength(2);
-			expect(updated[0]).toBe(original[0]);
+			expect(updated.map((row) => row.id)).toEqual(['row-a', 'row-d']);
+			expect(updated[0]).toBe(original[1]);
 			expect(updated[1]).toBe(original[3]);
 		} finally {
 			next.resolve('one');
