@@ -24,6 +24,7 @@ import {
 	TransitionControlledInput,
 	TransitionRadioGroup,
 	TransitionKeyedRemoval,
+	TransitionEffectsBeforeSuspension,
 	TransitionListToEmpty,
 	TransitionKeyedAddition,
 	TransitionKeyedEmptyFill,
@@ -1146,6 +1147,132 @@ describe('useTransition — the old screen stays whole', () => {
 		await act(() => {});
 		expect(log.drain()).toEqual(['cleanup:b']);
 		r.unmount();
+	});
+
+	it('restores keyed order, focused row identity, and connected cleanup across a held removal', async () => {
+		const next = deferred<string>();
+		const load = (step: number) => (step === 0 ? fulfilledMemoValue('zero') : next.promise);
+		const events: string[] = [];
+		let removed: HTMLElement | null = null;
+		let connectedDuringCleanup: boolean | null = null;
+		const props = {
+			load,
+			initialItems: ['a', 'b', 'c', 'd'],
+			nextItems: ['d', 'a', 'c'],
+			log: (event: string) => events.push(event),
+			onLayoutCleanup: (id: string) => {
+				if (id === 'b') connectedDuringCleanup = removed!.isConnected;
+			},
+		};
+		const r = mount(TransitionKeyedRemoval, props);
+		const rows = () => r.findAll('#list li');
+		try {
+			await act(() => {});
+			// The key Map retains its original insertion order while the live chain
+			// takes this earlier committed order.
+			r.update(TransitionKeyedRemoval, {
+				...props,
+				initialItems: ['c', 'a', 'b', 'd'],
+			});
+			expect(rows().map((row) => row.id)).toEqual(['row-c', 'row-a', 'row-b', 'row-d']);
+			const original = rows();
+			removed = r.find('#row-b') as HTMLElement;
+			removed.focus();
+			expect(document.activeElement).toBe(removed);
+			events.length = 0;
+
+			r.click('#bump');
+			const held = rows();
+			expect(held).toHaveLength(original.length);
+			for (let i = 0; i < held.length; i++) expect(held[i]).toBe(original[i]);
+			expect(document.activeElement).toBe(removed);
+			expect(events).toEqual([]);
+			expect(r.findAll('#fallback')).toHaveLength(0);
+
+			await act(() => next.resolve('one'));
+			const committed = rows();
+			expect(committed).toHaveLength(3);
+			expect(committed[0]).toBe(original[3]);
+			expect(committed[1]).toBe(original[0]);
+			expect(committed[2]).toBe(original[2]);
+			expect(events).toEqual(['cleanup:b']);
+			expect(connectedDuringCleanup).toBe(true);
+			expect(removed.isConnected).toBe(false);
+
+			// A later edit must still see the restored chain and key index coherently.
+			r.update(TransitionKeyedRemoval, { ...props, nextItems: ['a', 'd'] });
+			const updated = rows();
+			expect(updated).toHaveLength(2);
+			expect(updated[0]).toBe(original[0]);
+			expect(updated[1]).toBe(original[3]);
+		} finally {
+			next.resolve('one');
+			r.unmount();
+		}
+	});
+
+	it('keeps effect dependencies and a conditional effect active until a suspended transition commits', async () => {
+		const next = deferred<string>();
+		const load = (step: number) => (step === 0 ? fulfilledMemoValue('zero') : next.promise);
+		const events: string[] = [];
+		const r = mount(TransitionEffectsBeforeSuspension, {
+			load,
+			log: (event: string) => events.push(event),
+		});
+		try {
+			await act(() => {});
+			expect(events).toEqual(['setup:optional', 'setup:changed:0']);
+			events.length = 0;
+
+			r.click('#bump');
+			expect(r.find('#changed-effect').textContent).toBe('0');
+			expect(r.find('#omitted-effect').textContent).toBe('present');
+			expect(events).toEqual([]);
+
+			await act(() => next.resolve('one'));
+			expect(r.find('#changed-effect').textContent).toBe('1');
+			expect(r.find('#omitted-effect').textContent).toBe('omitted');
+			expect(events).toContain('cleanup:optional');
+			expect(events).toContain('cleanup:changed:0');
+			expect(events).toContain('setup:changed:1');
+			expect(events.filter((event) => event === 'cleanup:optional')).toHaveLength(1);
+			expect(events.filter((event) => event === 'setup:changed:1')).toHaveLength(1);
+		} finally {
+			next.resolve('one');
+			r.unmount();
+		}
+	});
+
+	it('restores effect dependencies when an urgent suspension supersedes a held transition', async () => {
+		const first = deferred<string>();
+		const urgent = deferred<string>();
+		const load = (step: number) =>
+			step === 0 ? fulfilledMemoValue('zero') : step === 1 ? first.promise : urgent.promise;
+		const events: string[] = [];
+		const r = mount(TransitionEffectsBeforeSuspension, {
+			load,
+			log: (event: string) => events.push(event),
+		});
+		try {
+			await act(() => {});
+			events.length = 0;
+			r.click('#bump');
+			expect(r.find('#changed-effect').textContent).toBe('0');
+			expect(events).toEqual([]);
+
+			r.click('#urgent');
+			expect(r.find('#fallback').textContent).toBe('fallback');
+			expect(events).not.toContain('cleanup:changed:0');
+			await act(() => urgent.resolve('two'));
+			expect(r.find('#changed-effect').textContent).toBe('2');
+			expect(r.findAll('#fallback')).toHaveLength(0);
+			expect(events.filter((event) => event === 'cleanup:changed:0')).toHaveLength(1);
+			expect(events.filter((event) => event === 'setup:changed:2')).toHaveLength(1);
+		} finally {
+			first.resolve('one');
+			urgent.resolve('two');
+			r.unmount();
+		}
 	});
 
 	it('holds a list that emptied, and swaps to @empty only on commit', async () => {
