@@ -3156,15 +3156,48 @@ interface ParkedItem {
 }
 let PARKED_ITEMS: ParkedItem[] | null = null;
 
+/** Top-level nodes belonging to an earlier, still-connected deletion of this list. */
+function retainedForSlotNodes(state: ForSlot, retained: Set<Node> | null): Set<Node> | null {
+	const parked = PARKED_ITEMS;
+	if (parked !== null) {
+		for (const item of parked) {
+			const previous = item.block;
+			if (
+				previous.forSlot !== state &&
+				!(
+					previous.exclusiveMarkers &&
+					previous.startMarker === state.start &&
+					previous.endMarker === state.end
+				)
+			)
+				continue;
+			for (const node of item.nodes) (retained ??= new Set()).add(node);
+		}
+	}
+	// Certified owned-list clears retire inert hosts without parking them.
+	const retired = ROOT_RENDER_TRANSACTION!.retired;
+	if (retired !== null) {
+		for (const row of retired) {
+			if (row.forSlot !== state) continue;
+			const start = row.startMarker;
+			if (start !== null && start === row.endMarker) (retained ??= new Set()).add(start);
+		}
+	}
+	return retained;
+}
+
 /** Retain an outgoing row's nodes and scope until its render can commit. */
-function parkItemForHold(block: Block): void {
+function parkItemForHold(block: Block, owningList?: ForSlot): void {
 	const retainConnected = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
 	if (retainConnected) retireRootBlock(block);
+	// @empty borrows the list's markers. Its saved nodes must not overlap rows
+	// retired in an earlier window, or a prior parked @empty arm's own content.
+	const excluded =
+		owningList !== undefined && retainConnected ? retainedForSlotNodes(owningList, null) : null;
 	// A later nested window can sweep an already parked row out of the live
 	// DOM before this window rolls back. Retain the original nodes now, while
-	// the row is still attached; only detach on non-root holds. Borrowed @empty
-	// markers are excluded, but their saved content can include rows parked
-	// earlier in the same root transaction.
+	// the row is still attached; only detach on non-root holds. An @empty arm
+	// saves only nodes it owns, even though its markers span retired rows.
 	const nodes: Node[] = [];
 	const start = block.startMarker;
 	const end = block.endMarker;
@@ -3174,11 +3207,22 @@ function parkItemForHold(block: Block): void {
 			const exclusive = block.exclusiveMarkers;
 			let n: Node | null = exclusive ? start.nextSibling : start;
 			const stop = exclusive ? end : end.nextSibling;
-			while (n !== null && n !== stop) {
-				const next: Node | null = getNextSibling(n);
-				if (!retainConnected) parent.removeChild(n);
-				nodes.push(n);
-				n = next;
+			if (excluded === null) {
+				while (n !== null && n !== stop) {
+					const next: Node | null = getNextSibling(n);
+					if (!retainConnected) parent.removeChild(n);
+					nodes.push(n);
+					n = next;
+				}
+			} else {
+				while (n !== null && n !== stop) {
+					const next: Node | null = getNextSibling(n);
+					if (!excluded.has(n)) {
+						if (!retainConnected) parent.removeChild(n);
+						nodes.push(n);
+					}
+					n = next;
+				}
 			}
 		}
 	}
@@ -3323,8 +3367,14 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 	// their saved node lists rather than reading their current DOM position.
 	const nodes: Node[] = [];
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		const range = takeParkedItem(b) ?? collectBlockRange(b);
-		for (const node of range) nodes.push(node);
+		const parked = takeParkedItem(b);
+		if (parked !== null) for (const node of parked) nodes.push(node);
+		else if (b.startMarker !== null && b.startMarker === b.endMarker) {
+			// An inert owned-list clear can retain a single host without parking it.
+			// A later window may detach it before this snapshot is restored; the
+			// Block still holds its exact Node and can reinsert it here.
+			nodes.push(b.startMarker);
+		} else for (const node of collectBlockRange(b)) nodes.push(node);
 	}
 	// The @empty branch swaps with the rows, so it rolls back with them. A
 	// branch the aborted render mounted is scope-only torn down before the
@@ -3340,7 +3390,12 @@ function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): v
 		for (const node of range) nodes.push(node);
 	}
 	const parent = state.end.parentNode;
+	// An inner boundary may restore the @empty snapshot while an outer root
+	// attempt still owns rows parked inside those borrowed markers. Leave those
+	// rows connected until the outer attempt commits or rolls back; they are not
+	// members of this snapshot and must not be reordered with its nodes.
 	const keptNodes = new Set(nodes);
+	if (ROOT_RENDER_TRANSACTION !== null) retainedForSlotNodes(state, keptNodes);
 	let current: Node | null = state.start.nextSibling;
 	while (current !== null && current !== state.end) {
 		const next: Node | null = current.nextSibling;
@@ -32417,7 +32472,7 @@ export function forBlock<T>(
 		// row removal: keep the branch's nodes and defer its teardown.
 		if (itemRemovalDefers()) {
 			journalForSlot(state);
-			parkItemForHold(state.emptyBlock);
+			parkItemForHold(state.emptyBlock, state);
 		} else unmountBlock(state.emptyBlock);
 		state.emptyBlock = null;
 	}
