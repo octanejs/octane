@@ -82,7 +82,7 @@
         {
           "path": "packages/base-ui/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "952fa15fefe4a8e8d723122da958bf8f92cb7d014e7512e767ff0274417bc114",
+          "sha256": "30174974012decd794b9ecdc78d3e79b4a4245de7187211c61c00bf5e0ab9b5c",
           "cases": [
             {
               "id": "differential:base-ui-render-element",

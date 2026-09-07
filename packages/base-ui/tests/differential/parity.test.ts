@@ -364,10 +364,11 @@ describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it('CheckboxGroup: shared value — child derives checked; click updates the group', async () => {
 		const d = await mountDifferential(FIXTURE, 'CheckboxGroupBasic', undefined, CACHE);
 		await d.step('mount (a checked)', () => {});
-		await d.step('click b → added to group', async (i, r) => {
+		await d.observe('click b → added to group', async (i, r) => {
 			await i.click('.cb:nth-child(3)');
 			await r.click('.cb:nth-child(3)');
 		});
+		await d.step('group after the indicator entrance paint', waitForEntrancePaint);
 		d.unmount();
 	});
 

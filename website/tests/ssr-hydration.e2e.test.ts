@@ -559,7 +559,14 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 		// that introduces its own directives in a prose comment mentions each
 		// one before using it, and a comment is correctly unmapped.
 		const probeKeyword = async (keyword: string, action: 'hover' | 'click', nth = 0) => {
-			const point = await locateSourceKeyword(page, keyword, nth);
+			let point = await locateSourceKeyword(page, keyword, nth);
+			// Under concurrent browser load, a CodeMirror measure can remain
+			// pending for an entire virtualized sweep. Repeat the bounded sweep so
+			// the assertion below still distinguishes a delayed viewport from a
+			// genuinely absent source token.
+			for (let attempt = 1; point === null && attempt < 3; attempt++) {
+				point = await locateSourceKeyword(page, keyword, nth);
+			}
 			if (!point) return null;
 			const before = await page.evaluate(
 				() =>
