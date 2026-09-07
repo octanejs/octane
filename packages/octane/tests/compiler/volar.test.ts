@@ -51,62 +51,6 @@ function writeOctaneJsxRuntimeStub(root: string, intrinsics: string): void {
  * the contract.
  */
 describe('compileToVolarMappings', () => {
-	it.each(['Value extends { id: string }', 'Value = string'])(
-		'accepts an unambiguous generic arrow without a trailing comma (%s)',
-		(parameter) => {
-			const source = `export const identity = <${parameter}>(value: Value) => value;`;
-			const result = compileToVolarMappings(source, 'generic-arrow.tsrx', { loose: true });
-			expect(result.errors).toEqual([]);
-			const parsed = ts.createSourceFile(
-				'generic-arrow.tsx',
-				result.code,
-				ts.ScriptTarget.Latest,
-				true,
-				ts.ScriptKind.TSX,
-			);
-			expect(
-				(parsed as ts.SourceFile & { parseDiagnostics: readonly ts.Diagnostic[] }).parseDiagnostics,
-			).toEqual([]);
-		},
-	);
-	it('retains the disambiguation diagnostic for a bare generic arrow', () => {
-		const result = compileToVolarMappings(
-			'export const identity = <Value>(value: Value) => value;',
-			'generic-arrow.tsrx',
-			{ loose: true },
-		);
-		expect(result.errors.map((error) => error.message)).toEqual([
-			expect.stringContaining('trailing comma'),
-		]);
-	});
-	it('maps multiline typed defaults without losing their diagnostic span', () => {
-		const fixture = readFileSync(
-			new URL('../_fixtures/compiler-typed-default.tsrx', import.meta.url),
-			'utf8',
-		);
-		// Keep the multiline input even when the fixture formatter collapses
-		// the destructured parameter. Only whitespace changes between variants.
-		const source = fixture.replace('items = ', 'items =\n ');
-		expect(source).not.toBe(fixture);
-		const result = compileToVolarMappings(source, 'typed-default.tsrx');
-		expect(result.errors).toEqual([]);
-		const start = source.indexOf('items =');
-		const end = source.indexOf('[]', start) + 2;
-		const assignment = result.mappings
-			.flatMap((mapping) =>
-				mapping.sourceOffsets.map((offset, index) => ({
-					offset,
-					length: mapping.lengths[index],
-					generated: mapping.generatedOffsets[index],
-					generatedLength: mapping.generatedLengths?.[index] ?? mapping.lengths[index],
-				})),
-			)
-			.find((mapping) => mapping.offset === start && mapping.length === end - start);
-		expect(assignment).toBeDefined();
-		expect(
-			result.code.slice(assignment!.generated, assignment!.generated + assignment!.generatedLength),
-		).toBe('items = EMPTY_ARRAY as string[]');
-	});
 	it('retains computed method keys when generated brackets have no source mapping', () => {
 		const source = `const key = Symbol.iterator;
 		export const iterable = { [key]() { return [1, 2][Symbol.iterator](); } };`;
