@@ -32096,8 +32096,8 @@ function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void 
 				}
 			}
 			// Force the setup to re-enqueue + re-fire when the subtree reactivates.
-			if (e.deps !== undefined && ROOT_RENDER_TRANSACTION !== null)
-				journalRootProperty(e, 'deps', e.deps);
+			// A cleanup cannot be undone by root rollback. Keep this reset even
+			// across a suspended retry so the next visible render reconnects it.
 			e.deps = undefined;
 			if (e.connectedFn !== null) e.disconnected = true;
 		}
