@@ -10,6 +10,7 @@ import {
 import { getPublishablePackages, REPO_ROOT } from './workspace-packages.mjs';
 
 const DEFAULT_GITHUB_API_URL = 'https://api.github.com';
+const NPM_PROPAGATION_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 30_000, 30_000];
 const RELEASE_TAGGER_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 const RELEASE_TAGGER_NAME = 'github-actions[bot]';
 
@@ -313,9 +314,34 @@ function renderReconciliationSummary(result) {
 	].join('\n')}\n`;
 }
 
+export async function waitForNpmPublication(
+	packages,
+	{
+		inspectReleaseState = inspectNpmReleaseState,
+		log = console.log,
+		retryDelays = NPM_PROPAGATION_RETRY_DELAYS_MS,
+		sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
+	} = {},
+) {
+	let state = await inspectReleaseState(packages);
+	for (const delay of retryDelays) {
+		const remaining = packages.length - state.published.length;
+		if (remaining === 0) return state;
+		log(
+			`npm registry has not exposed ${remaining} published package version(s); checking again in ${delay / 1_000}s`,
+		);
+		await sleep(delay);
+		state = await inspectReleaseState(packages);
+	}
+	return state;
+}
+
 async function runCli() {
 	const packages = getPublishablePackages();
-	const state = await inspectNpmReleaseState(packages);
+	// npm accepts a publish before every packument replica necessarily exposes
+	// the new version. Give that bounded propagation window time to settle so
+	// successful publishes still receive their matching GitHub tag and release.
+	const state = await waitForNpmPublication(packages);
 	const errors = releaseStateErrors(state);
 	if (errors.length > 0) {
 		for (const error of errors) console.error(`\n${error}`);

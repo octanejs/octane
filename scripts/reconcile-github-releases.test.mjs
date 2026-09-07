@@ -9,6 +9,7 @@ import {
 	reconcileGithubReleases,
 	releaseTag,
 	runGit,
+	waitForNpmPublication,
 } from './reconcile-github-releases.mjs';
 
 async function git(cwd, args) {
@@ -43,6 +44,61 @@ async function createRepositoryFixture() {
 }
 
 describe('GitHub release reconciliation', () => {
+	test('waits for npm registry propagation after a successful publish', async () => {
+		const pkg = { name: 'octane', version: '0.3.4' };
+		const pending = {
+			invalid: [],
+			pending: [pkg],
+			published: [],
+			unbootstrapped: [],
+			unreachable: [],
+		};
+		const published = {
+			...pending,
+			pending: [],
+			published: [pkg],
+		};
+		const states = [pending, pending, published];
+		const delays = [];
+		const logs = [];
+
+		const state = await waitForNpmPublication([pkg], {
+			inspectReleaseState: async () => states.shift(),
+			log: (message) => logs.push(message),
+			retryDelays: [5_000, 10_000, 20_000],
+			sleep: async (delay) => delays.push(delay),
+		});
+
+		assert.equal(state, published);
+		assert.deepEqual(delays, [5_000, 10_000]);
+		assert.equal(logs.length, 2);
+	});
+
+	test('returns the final npm state when the propagation window expires', async () => {
+		const pkg = { name: 'octane', version: '0.3.4' };
+		const pending = {
+			invalid: [],
+			pending: [pkg],
+			published: [],
+			unbootstrapped: [],
+			unreachable: [],
+		};
+		let inspections = 0;
+
+		const state = await waitForNpmPublication([pkg], {
+			inspectReleaseState: async () => {
+				inspections++;
+				return pending;
+			},
+			log: () => {},
+			retryDelays: [5_000, 10_000],
+			sleep: async () => {},
+		});
+
+		assert.equal(state, pending);
+		assert.equal(inspections, 3);
+	});
+
 	test('pushes annotated missing tags atomically without repository identity and creates every missing release sequentially', async () => {
 		const { expectedSha, remote, repository, root } = await createRepositoryFixture();
 		try {
