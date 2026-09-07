@@ -14,6 +14,8 @@ import {
 	TransitionChildWipReentrantUnmountApp,
 	TransitionComponentWipReentrantUnmountApp,
 	SuspensePreservationApp,
+	RootSuspensionAfterSiblingApp,
+	RawRootSuspensionAfterSiblingApp,
 	UrgentChildSlotSuspenseApp,
 	UrgentComponentSlotSuspenseApp,
 	UrgentReturnKindSuspenseApp,
@@ -129,6 +131,87 @@ function setupNestedPortal(onDetach?: (mounted: ReturnType<typeof mount>) => voi
 }
 
 describe('Suspense preserves committed host DOM', () => {
+	it('keeps committed siblings when a previously synchronous reader throws its first thenable', async () => {
+		const pending = deferred<string>();
+		let value: string | null = 'A';
+		const read = () => {
+			if (value === null) throw pending.promise;
+			return value;
+		};
+		const root = mount(RawRootSuspensionAfterSiblingApp, { label: 'original', read });
+		try {
+			const shell = root.find('#raw-root-suspension-shell');
+			const label = root.find('#raw-root-suspension-label');
+			const reader = root.find('#raw-root-suspension-reader');
+			value = null;
+			root.update(RawRootSuspensionAfterSiblingApp, { label: 'replacement', read });
+			expect(root.find('#raw-root-suspension-shell')).toBe(shell);
+			expect(root.find('#raw-root-suspension-label')).toBe(label);
+			expect(label.textContent).toBe('original');
+			expect(label.getAttribute('title')).toBe('original');
+			expect(root.find('#raw-root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:A');
+
+			value = 'B';
+			await act(() => pending.resolve('ready'));
+			expect(root.find('#raw-root-suspension-shell')).toBe(shell);
+			expect(root.find('#raw-root-suspension-label')).toBe(label);
+			expect(label.textContent).toBe('replacement');
+			expect(root.find('#raw-root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:B');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('keeps earlier sibling writes and an edited input intact while a root props refresh suspends', async () => {
+		const pending = deferred<string>();
+		const root = mount(RootSuspensionAfterSiblingApp, {
+			label: 'original',
+			promise: fulfilled('A'),
+		});
+		try {
+			const shell = root.find('#root-suspension-shell');
+			const label = root.find('#root-suspension-label');
+			const reader = root.find('#root-suspension-reader');
+			const draft = root.find('#root-suspension-draft') as HTMLInputElement;
+			draft.value = 'edited';
+			draft.focus();
+			draft.setSelectionRange(2, 4);
+			// An external owner may have changed live DOM since Octane's last commit.
+			// A suspended write must put that exact browser state back.
+			label.firstChild!.nodeValue = 'external text';
+			label.setAttribute('title', 'external title');
+
+			root.update(RootSuspensionAfterSiblingApp, {
+				label: 'replacement',
+				promise: pending.promise,
+			});
+			expect(root.find('#root-suspension-shell')).toBe(shell);
+			expect(root.find('#root-suspension-label')).toBe(label);
+			expect(label.textContent).toBe('external text');
+			expect(label.getAttribute('title')).toBe('external title');
+			expect(root.find('#root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:A');
+			expect(root.find('#root-suspension-draft')).toBe(draft);
+			expect(draft.value).toBe('edited');
+			expect(document.activeElement).toBe(draft);
+			expect([draft.selectionStart, draft.selectionEnd]).toEqual([2, 4]);
+
+			await act(() => pending.resolve('B'));
+			expect(root.find('#root-suspension-shell')).toBe(shell);
+			expect(root.find('#root-suspension-label')).toBe(label);
+			expect(label.textContent).toBe('replacement');
+			expect(label.getAttribute('title')).toBe('replacement');
+			expect(root.find('#root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:B');
+			expect(root.find('#root-suspension-draft')).toBe(draft);
+			expect(draft.value).toBe('edited');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	async function expectPreservedHosts(shape: 'same' | 'swap'): Promise<void> {
 		const t = setup(shape);
 		const panel = t.root.find('#preserved-panel') as HTMLElement;

@@ -968,6 +968,8 @@ export interface Block extends Scope {
 	forSlot: ForSlot | null;
 	/** Item position within the enclosing for-block. 0 for non-item blocks. */
 	itemIndex: number;
+	/** Root-render transaction that created this block (0 outside a transaction). */
+	createdStamp: number;
 	/**
 	 * Doubly-linked-list pointers for for-block item blocks. Maintained by
 	 * reconcileKeyed so move/remove are O(1) pointer ops instead of array
@@ -1984,7 +1986,9 @@ function beginTransitionAttempt(block: Block): TransitionAttempt | null {
 	TRANSITION_JOURNAL ??= [];
 	TRANSITION_JOURNAL_BAGS ??= new Map();
 	TRANSITION_JOURNAL_WINDOWS.push(TRANSITION_JOURNAL_CHECKPOINT);
+	TRANSITION_JOURNAL_BAG_WINDOWS.push(TRANSITION_JOURNAL_BAG_WINDOW);
 	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL.length;
+	TRANSITION_JOURNAL_BAG_WINDOW = ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW;
 	TRANSITION_JOURNAL_DEPTH++;
 	const capture = WIP_CAPTURE;
 	const effects = capture?.effects ?? effectQueues;
@@ -2087,6 +2091,7 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 		if (!continuing) scheduleRender(attempt.origin);
 	}
 	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL_WINDOWS.pop()!;
+	TRANSITION_JOURNAL_BAG_WINDOW = TRANSITION_JOURNAL_BAG_WINDOWS.pop()!;
 	if (--TRANSITION_JOURNAL_DEPTH === 0) {
 		TRANSITION_JOURNAL = null;
 		TRANSITION_JOURNAL_BAGS = null;
@@ -2233,7 +2238,7 @@ function holdRootTransition(
 		attempt === null ||
 		!attempt.origin.mounted ||
 		attempt.origin.disposed ||
-		transaction.created?.has(attempt.origin) ||
+		isCreatedInRootRender(transaction, attempt.origin) ||
 		(attempt.heldSlots !== null && attempt.heldSlots.size !== 0)
 	) {
 		if (previous !== undefined && !rootTransitionCellsIntact(previous))
@@ -2390,6 +2395,7 @@ const JOURNAL_TEXT = 0;
 const JOURNAL_ATTR = 1;
 const JOURNAL_BAG = 2;
 const JOURNAL_PROP = 3;
+const JOURNAL_CREATED = 4;
 const JOURNAL_RENDER = 5;
 const JOURNAL_UNDO = 6;
 /** Flat undo log, four slots per entry: kind, target, a, b. */
@@ -2398,6 +2404,10 @@ let TRANSITION_JOURNAL: any[] | null = null;
 let TRANSITION_JOURNAL_BAGS: Map<object, number> | null = null;
 let TRANSITION_JOURNAL_CHECKPOINT = 0;
 const TRANSITION_JOURNAL_WINDOWS: number[] = [];
+/** Bag snapshots use one stamp per rollback window, including nested boundaries. */
+let TRANSITION_JOURNAL_BAG_WINDOW = 0;
+let NEXT_TRANSITION_JOURNAL_BAG_WINDOW = 0;
+const TRANSITION_JOURNAL_BAG_WINDOWS: number[] = [];
 /** Open windows. Boundaries nest, and only the outermost may drop the log. */
 let TRANSITION_JOURNAL_DEPTH = 0;
 
@@ -2423,7 +2433,9 @@ interface RootRenderTransaction {
 	log: any[];
 	bags: Map<object, number>;
 	capture: OffscreenCapture;
-	created: Set<Block> | null;
+	created: Block[] | null;
+	createdStamp: number;
+	bagWindow: number;
 	retainedCreated: Set<Block> | null;
 	retired: Set<Block> | null;
 	structures: Map<object, number> | null;
@@ -2440,6 +2452,7 @@ interface RootRenderFrame {
 	log: any[] | null;
 	bags: Map<object, number> | null;
 	checkpoint: number;
+	bagWindow: number;
 	depth: number;
 	parked: ParkedItem[] | null;
 	capture: OffscreenCapture | null;
@@ -2453,6 +2466,7 @@ interface RootRenderFrame {
 let ROOT_RENDER_TRANSACTION: RootRenderTransaction | null = null;
 let ROOT_RENDER_TRANSACTIONS: RootRenderTransaction[] = [];
 let ROOT_RENDER_ROLLBACK = false;
+let NEXT_ROOT_RENDER_CREATED_STAMP = 0;
 
 /** @internal Opaque retry episode, without retaining an abandoned Scope. */
 export function getRootRenderRetryKey(scope: Scope, retryOnly = false): object | null {
@@ -2479,6 +2493,8 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 			bags: new Map(),
 			capture,
 			created: null,
+			createdStamp: ++NEXT_ROOT_RENDER_CREATED_STAMP,
+			bagWindow: ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW,
 			retainedCreated: null,
 			retired: null,
 			structures: null,
@@ -2496,6 +2512,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 		log: TRANSITION_JOURNAL,
 		bags: TRANSITION_JOURNAL_BAGS,
 		checkpoint: TRANSITION_JOURNAL_CHECKPOINT,
+		bagWindow: TRANSITION_JOURNAL_BAG_WINDOW,
 		depth: TRANSITION_JOURNAL_DEPTH,
 		parked: PARKED_ITEMS,
 		capture: WIP_CAPTURE,
@@ -2504,6 +2521,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 	TRANSITION_JOURNAL = transaction.log;
 	TRANSITION_JOURNAL_BAGS = transaction.bags;
 	TRANSITION_JOURNAL_CHECKPOINT = 0;
+	TRANSITION_JOURNAL_BAG_WINDOW = transaction.bagWindow;
 	TRANSITION_JOURNAL_DEPTH = 1;
 	PARKED_ITEMS = transaction.parked;
 	WIP_CAPTURE = transaction.capture;
@@ -2517,6 +2535,7 @@ function endRootRender(frame: RootRenderFrame | null): void {
 	TRANSITION_JOURNAL = frame.log;
 	TRANSITION_JOURNAL_BAGS = frame.bags;
 	TRANSITION_JOURNAL_CHECKPOINT = frame.checkpoint;
+	TRANSITION_JOURNAL_BAG_WINDOW = frame.bagWindow;
 	TRANSITION_JOURNAL_DEPTH = frame.depth;
 	PARKED_ITEMS = frame.parked;
 	WIP_CAPTURE = frame.capture;
@@ -2526,9 +2545,9 @@ function journalUndo(undo: () => void): void {
 	TRANSITION_JOURNAL!.push(JOURNAL_UNDO, undo, null, null);
 }
 
-function journalRootProperty(target: object, key: string): void {
+function journalRootProperty(target: object, key: PropertyKey, oldValue: unknown): void {
 	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return;
-	TRANSITION_JOURNAL!.push(JOURNAL_PROP, target, key, (target as any)[key]);
+	TRANSITION_JOURNAL!.push(JOURNAL_PROP, target, key, oldValue);
 }
 
 /** Save only a structurally changed slot and its exact, shallow sibling range. */
@@ -2626,7 +2645,7 @@ function retireRootBlock(block: Block): void {
 		});
 	}
 	if (block.pending) {
-		journalRootProperty(block, 'pending');
+		journalRootProperty(block, 'pending', block.pending);
 		block.pending = false;
 	}
 }
@@ -2685,7 +2704,7 @@ function deferRootUnmount(block: Block, detachDom: boolean): boolean {
 		ROOT_RENDER_ROLLBACK ||
 		block.idState.renderOwner !== transaction.owner ||
 		!block.mounted ||
-		transaction.created?.has(block)
+		isCreatedInRootRender(transaction, block)
 	)
 		return false;
 	retireRootBlock(block);
@@ -2739,19 +2758,29 @@ function deferRootUnmount(block: Block, detachDom: boolean): boolean {
 	return true;
 }
 
+function isCreatedInRootRender(transaction: RootRenderTransaction, block: Block): boolean {
+	return block.createdStamp === transaction.createdStamp;
+}
+
+function undoCreatedInRootRender(block: Block, transaction: RootRenderTransaction): void {
+	const refCheckpoint = refDetachQueue.length;
+	unmountBlock(
+		block,
+		(!transaction.hydrating || block.kind === 'portal') && !transaction.retainedCreated?.has(block),
+	);
+	refDetachQueue.length = refCheckpoint;
+}
+
 function createdInRootRender(block: Block): void {
 	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction === null || ROOT_RENDER_ROLLBACK || transaction.created?.has(block)) return;
-	(transaction.created ??= new Set()).add(block);
-	journalUndo(() => {
-		const checkpoint = refDetachQueue.length;
-		unmountBlock(
-			block,
-			(!transaction.hydrating || block.kind === 'portal') &&
-				!transaction.retainedCreated?.has(block),
-		);
-		refDetachQueue.length = checkpoint;
-	});
+	if (transaction === null || ROOT_RENDER_ROLLBACK || isCreatedInRootRender(transaction, block))
+		return;
+	// Child Blocks inherit their parent's renderOwner; root/hydration entry uses
+	// that root's owner. Reentrant frames reuse owner.transaction, so a Block
+	// cannot be created by two live transactions with different stamps.
+	block.createdStamp = transaction.createdStamp;
+	(transaction.created ??= []).push(block);
+	TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, transaction, null);
 }
 
 /** An upgraded runtime descriptor can give a fresh Block existing host DOM. */
@@ -2772,6 +2801,8 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 		else {
 			for (let i = transaction.log.length - 4; i >= 0; i -= 4) {
 				if (transaction.log[i] === JOURNAL_UNDO) transaction.log[i + 1]();
+				else if (transaction.log[i] === JOURNAL_CREATED)
+					undoCreatedInRootRender(transaction.log[i + 1], transaction.log[i + 2]);
 			}
 			transaction.log.length = 0;
 		}
@@ -2870,7 +2901,10 @@ function suspendRootRender(
 			// Only fresh subtrees are destroyed by this rollback. Their warm
 			// occurrences remain owned by the root's continuing retry token.
 			for (const created of transaction.created) {
-				if (created.parentBlock === null || !transaction.created.has(created.parentBlock))
+				if (
+					created.parentBlock === null ||
+					!isCreatedInRootRender(transaction, created.parentBlock)
+				)
 					retainDiscardedWarmMemos(created);
 			}
 		}
@@ -2903,15 +2937,101 @@ function suspendRootRender(
  *
  * Slot 0 only holds a bag when the body has a template root; a body made purely
  * of control flow puts its first block slot there instead (`tryBlock(__s, 0, …)`).
- * Every runtime slot is tagged with `__kind` and no compiler bag is, so that tag
- * is the discriminator — restoring a boundary's own `branch`/`transitionHeld`
- * from a "bag" snapshot would corrupt the very state driving the hold.
+ * Fixed-arity bags have a private brand. The spill bagOf path retains the
+ * `__kind` test so user-supplied keys cannot impersonate a runtime slot or a
+ * fixed bag; restoring a boundary's own state as a bag would corrupt its hold.
  */
+const BINDING_BAG_ARITY = Symbol();
+// Each clone has its own spread site, so normal bag arities stay monomorphic.
+// Spread retains prior enumerable string fields; rollback removes speculative additions.
+/* prettier-ignore */ function cloneBag0(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag1(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag2(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag3(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag4(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag5(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag6(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag7(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag8(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag9(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag10(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag11(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag12(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag13(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag14(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag15(bag: any): object { return { ...bag }; }
+/* prettier-ignore */ function cloneBag16(bag: any): object { return { ...bag }; }
+
+function cloneBindingBag(bag: any, arity: number): object {
+	switch (arity) {
+		case 0:
+			return cloneBag0(bag);
+		case 1:
+			return cloneBag1(bag);
+		case 2:
+			return cloneBag2(bag);
+		case 3:
+			return cloneBag3(bag);
+		case 4:
+			return cloneBag4(bag);
+		case 5:
+			return cloneBag5(bag);
+		case 6:
+			return cloneBag6(bag);
+		case 7:
+			return cloneBag7(bag);
+		case 8:
+			return cloneBag8(bag);
+		case 9:
+			return cloneBag9(bag);
+		case 10:
+			return cloneBag10(bag);
+		case 11:
+			return cloneBag11(bag);
+		case 12:
+			return cloneBag12(bag);
+		case 13:
+			return cloneBag13(bag);
+		case 14:
+			return cloneBag14(bag);
+		case 15:
+			return cloneBag15(bag);
+		case 16:
+			return cloneBag16(bag);
+		default:
+			return { ...bag };
+	}
+}
+
 function journalBag(): void {
 	const scope = CURRENT_SCOPE;
 	if (scope === null) return;
+	const transaction = ROOT_RENDER_TRANSACTION;
+	// The root log discards a Block created in this transaction wholesale, even
+	// if it completed an earlier render in the same wave. Keep nested boundary
+	// windows and adopted DOM on the ordinary snapshot path: they can restore
+	// their content without discarding this scope.
+	if (
+		transaction !== null &&
+		!transaction.hydrating &&
+		transaction.retainedCreated === null &&
+		TRANSITION_JOURNAL_DEPTH === 1 &&
+		scope.block.createdStamp === transaction.createdStamp
+	)
+		return;
 	const bag = scope.slots[0];
-	if (bag === null || typeof bag !== 'object' || (bag as any).__kind !== undefined) return;
+	if (bag === null || typeof bag !== 'object') return;
+	const arity = (bag as any)[BINDING_BAG_ARITY];
+	if (arity !== undefined) {
+		const window = TRANSITION_JOURNAL_BAG_WINDOW;
+		if (bag.__journalWindow === window) return;
+		const snapshot = cloneBindingBag(bag, arity);
+		TRANSITION_JOURNAL!.push(JOURNAL_BAG, bag, snapshot, null);
+		bag.__journalWindow = window;
+		return;
+	}
+	// The spill bagOf path and runtime slots retain the generic, exact snapshot.
+	if ((bag as any).__kind !== undefined) return;
 	journalObjectOnce(bag);
 }
 
@@ -3031,15 +3151,21 @@ function journalControlledOption(option: HTMLOptionElement, withDefault: boolean
  */
 interface ParkedItem {
 	block: Block;
+	/** Preserve the exact row range across later journal windows that can detach it. */
 	nodes: Node[];
 }
 let PARKED_ITEMS: ParkedItem[] | null = null;
 
 /** Retain an outgoing row's nodes and scope until its render can commit. */
 function parkItemForHold(block: Block): void {
-	const nodes: Node[] = [];
 	const retainConnected = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
 	if (retainConnected) retireRootBlock(block);
+	// A later nested window can sweep an already parked row out of the live
+	// DOM before this window rolls back. Retain the original nodes now, while
+	// the row is still attached; only detach on non-root holds. Borrowed @empty
+	// markers are excluded, but their saved content can include rows parked
+	// earlier in the same root transaction.
+	const nodes: Node[] = [];
 	const start = block.startMarker;
 	const end = block.endMarker;
 	if (start && end) {
@@ -3105,16 +3231,23 @@ function journalForSlot(state: ForSlot): void {
 		journalRootRange(state.start.parentNode!, state.start, state.end);
 		return;
 	}
-	const chain: Array<[Block, Block | null, Block | null]> = [];
+	const chain: Block[] = [];
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
-		chain.push([b, b.nextSibling, b.prevSibling]);
+		chain.push(b);
 	}
+	// The key Map keeps insertion order through earlier reorders. Preserve that
+	// order for context refresh only when it differs from the linked DOM order.
+	let mapOrder: Block[] | null = null;
+	let index = 0;
+	for (const block of state.items.values()) {
+		if (mapOrder === null && chain[index] !== block) mapOrder = chain.slice(0, index);
+		mapOrder?.push(block);
+		index++;
+	}
+	if (mapOrder === null && index !== chain.length) mapOrder = chain.slice(0, index);
 	const snapshot = {
-		head: state.head,
-		tail: state.tail,
-		size: state.size,
 		empty: state.emptyBlock,
-		entries: [...state.items],
+		mapOrder,
 	};
 	journalUndo(() => {
 		restoreForSlot(state, snapshot, chain);
@@ -3146,11 +3279,7 @@ function journalForOwnedListClear(state: ForSlot): void {
 }
 
 /** Put a keyed list back the way it was, rows and order together. */
-function restoreForSlot(
-	state: ForSlot,
-	snapshot: any,
-	chain: Array<[Block, Block | null, Block | null]> | null,
-): void {
+function restoreForSlot(state: ForSlot, snapshot: any, chain: Block[] | null): void {
 	// Rows the aborted attempt freshly mounted are not in the snapshot, so
 	// restoring the old chain would simply forget them. Their DOM goes with the
 	// unmatched-node removal below, but the scope has to go NOW, before the overwrite makes
@@ -3161,8 +3290,7 @@ function restoreForSlot(
 	// map-swap clear the original chain cannot become live before its own undo:
 	// later windows undo first, and later fills use the replacement map.
 	const preservedMap: Map<any, Block> | null = chain === null ? snapshot.entries : null;
-	const kept: Set<Block> | null = chain === null ? null : new Set<Block>();
-	if (chain !== null) for (let i = 0; i < chain.length; i++) kept!.add(chain[i][0]);
+	const kept: Set<Block> | null = chain === null ? null : new Set(chain);
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
 		if (preservedMap !== null || !kept!.has(b)) unmountBlock(b, false);
 	}
@@ -3172,24 +3300,27 @@ function restoreForSlot(
 	// invariant as renderReturnedValue's disposed check: stop here, and let
 	// flushParkedItems finish off whatever stayed parked.
 	if (state.end.parentNode === null) return;
-	state.head = snapshot.head;
-	state.tail = snapshot.tail;
-	state.size = snapshot.size;
+	state.head = chain === null ? snapshot.head : (chain[0] ?? null);
+	state.tail = chain === null ? snapshot.tail : (chain[chain.length - 1] ?? null);
+	state.size = chain === null ? snapshot.size : chain.length;
 	if (preservedMap !== null) state.items = preservedMap;
 	else {
 		const originalChain = chain!;
 		state.items.clear();
-		for (let i = 0; i < snapshot.entries.length; i++) {
-			state.items.set(snapshot.entries[i][0], snapshot.entries[i][1]);
-		}
 		for (let i = 0; i < originalChain.length; i++) {
-			originalChain[i][0].nextSibling = originalChain[i][1];
-			originalChain[i][0].prevSibling = originalChain[i][2];
+			const block = originalChain[i];
+			block.nextSibling = originalChain[i + 1] ?? null;
+			block.prevSibling = originalChain[i - 1] ?? null;
+		}
+		const keyOrder: Block[] = snapshot.mapOrder ?? originalChain;
+		for (let i = 0; i < keyOrder.length; i++) {
+			const block = keyOrder[i];
+			state.items.set(block.key, block);
 		}
 	}
-	// Collect the committed ranges before removing speculative nodes. Root
-	// transactions left outgoing rows connected; hold-only callers may have
-	// detached them, so use the retained range in either case.
+	// Collect the committed ranges before removing speculative nodes. An
+	// earlier window may have parked rows that a later sweep detached, so use
+	// their saved node lists rather than reading their current DOM position.
 	const nodes: Node[] = [];
 	for (let b: Block | null = state.head; b !== null; b = b.nextSibling) {
 		const range = takeParkedItem(b) ?? collectBlockRange(b);
@@ -3296,7 +3427,9 @@ function armTransitionJournal(state: TrySlot): number {
 	TRANSITION_JOURNAL ??= [];
 	TRANSITION_JOURNAL_BAGS ??= new Map();
 	TRANSITION_JOURNAL_WINDOWS.push(TRANSITION_JOURNAL_CHECKPOINT);
+	TRANSITION_JOURNAL_BAG_WINDOWS.push(TRANSITION_JOURNAL_BAG_WINDOW);
 	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL.length;
+	TRANSITION_JOURNAL_BAG_WINDOW = ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW;
 	TRANSITION_JOURNAL_DEPTH++;
 	return TRANSITION_JOURNAL.length;
 }
@@ -3313,6 +3446,7 @@ function armTransitionJournal(state: TrySlot): number {
 function disarmTransitionJournal(checkpoint: number): void {
 	if (checkpoint < 0) return;
 	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL_WINDOWS.pop()!;
+	TRANSITION_JOURNAL_BAG_WINDOW = TRANSITION_JOURNAL_BAG_WINDOWS.pop()!;
 	if (--TRANSITION_JOURNAL_DEPTH === 0) {
 		TRANSITION_JOURNAL = null;
 		TRANSITION_JOURNAL_BAGS = null;
@@ -3323,8 +3457,8 @@ function disarmTransitionJournal(checkpoint: number): void {
 /**
  * Tear down the rows still parked when the last window closes. Anything a
  * rollback put back has already been taken off this list, so what is left is
- * genuinely gone and its cleanups are due. A root-retained range stays connected
- * through teardown, then its exact nodes are removed.
+ * genuinely gone and its cleanups are due. Root-retained ranges stay connected
+ * through teardown; the saved nodes are removed after cleanup in either mode.
  */
 function flushParkedItems(): void {
 	const parked = PARKED_ITEMS;
@@ -3333,7 +3467,7 @@ function flushParkedItems(): void {
 	for (let i = 0; i < parked.length; i++) unmountParkedItem(parked[i]);
 }
 
-/** Committed deletion cleans up against connected DOM before removing its range. */
+/** Committed root deletions clean up against connected DOM before removing the range. */
 function unmountParkedItem(item: ParkedItem): void {
 	try {
 		unmountBlock(item.block, false);
@@ -3361,6 +3495,9 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 				break;
 			case JOURNAL_PROP:
 				(target as any)[a] = b;
+				break;
+			case JOURNAL_CREATED:
+				undoCreatedInRootRender(target as Block, a as RootRenderTransaction);
 				break;
 			case JOURNAL_RENDER:
 				if (!target.disposed && (target === owner || blockIsAncestorOf(owner, target))) {
@@ -5536,7 +5673,7 @@ export function replaceRef(
 		// before retrying, even when no other binding in this scope changed.
 		journalBag();
 		if (Object.prototype.hasOwnProperty.call(target, '_currentRef'))
-			journalRootProperty(target, '_currentRef');
+			journalRootProperty(target, '_currentRef', (target as any)._currentRef);
 	}
 	if (previous != null) queueRefDetach(previous, target);
 	if (next != null) queueRefAttach(scope, next, target);
@@ -6206,6 +6343,7 @@ function nativeEffectPublicationCurrent(entry: PendingEffect, slot: EffectSlot):
 	// A skipped setup still belongs to the next render, even with an unchanged
 	// explicit dependency array or a memoized parent. Preserve any connected
 	// cleanup until that render decides whether the call site remains present.
+	if (ROOT_RENDER_TRANSACTION !== null) journalObjectOnce(slot);
 	slot.deps = undefined;
 	slot.active = slot.connectedFn !== null;
 	invalidateRender(entry.scope.block, entry.scope.block);
@@ -6501,6 +6639,8 @@ class BlockImpl {
 	endMarker: Node | null;
 	exclusiveMarkers: boolean;
 	itemIndex: number;
+	// A type-only field avoids emitting an undefined DefineNamedOwn before its Smi initialization.
+	declare createdStamp: number;
 	// Scheduler / lifecycle.
 	pending: boolean;
 	disposed: boolean;
@@ -6596,6 +6736,7 @@ class BlockImpl {
 		this.endMarker = endMarker;
 		this.exclusiveMarkers = false;
 		this.itemIndex = 0;
+		this.createdStamp = 0;
 		this.pending = false;
 		this.disposed = false;
 		this.mounted = false;
@@ -7346,7 +7487,7 @@ function disposeReturnSlot(block: Block, state: any): void {
 		// Keep the retired slot intact for connected-DOM cleanup. Only its
 		// registry entry changes while the new return shape renders alongside it.
 		deferRootRange(parent, first, last, () => unmountSlot(state, false));
-		journalRootProperty(block.slots, '0');
+		journalRootProperty(block.slots, 0, block.slots[0]);
 		const registry = block._slots;
 		if (registry !== null) {
 			const index = registry.indexOf(state);
@@ -7682,7 +7823,7 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 function registerSlot(scope: Scope, slot: any): void {
 	const slots = scope._slots;
 	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction !== null && scope.mounted && !transaction.created?.has(scope.block)) {
+	if (transaction !== null && scope.mounted && !isCreatedInRootRender(transaction, scope.block)) {
 		journalUndo(() => {
 			unmountSlot(slot, true);
 			const index = scope.slots.indexOf(slot);
@@ -8884,9 +9025,9 @@ function finishEffectRender(scope: Scope): void {
 	for (let i = 0; i < effects.length; i++) {
 		const effect = effects[i];
 		if (effect.renderVersion === CURRENT_EFFECT_RENDER_VERSION) continue;
-		if (ROOT_RENDER_TRANSACTION !== null) journalObjectOnce(effect);
 		if (effect.phase === INSERTION) invalidateInsertionReplay(effect);
 		if (!effect.active) continue;
+		if (ROOT_RENDER_TRANSACTION !== null) journalObjectOnce(effect);
 		// Reaching this call site again must recreate even when its authored deps
 		// are unchanged.
 		effect.deps = undefined;
@@ -14483,23 +14624,23 @@ function commitBag<T>(scope: Scope, root: Node | null, bag: T): T {
 	scope.slots[0] = bag;
 	return bag;
 }
-/* prettier-ignore */ export function bag0(s: Scope, r: Node | null): any { return commitBag(s, r, {}); }
-/* prettier-ignore */ export function bag1(s: Scope, r: Node | null, a: any): any { return commitBag(s, r, { a }); }
-/* prettier-ignore */ export function bag2(s: Scope, r: Node | null, a: any, b: any): any { return commitBag(s, r, { a, b }); }
-/* prettier-ignore */ export function bag3(s: Scope, r: Node | null, a: any, b: any, c: any): any { return commitBag(s, r, { a, b, c }); }
-/* prettier-ignore */ export function bag4(s: Scope, r: Node | null, a: any, b: any, c: any, d: any): any { return commitBag(s, r, { a, b, c, d }); }
-/* prettier-ignore */ export function bag5(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any): any { return commitBag(s, r, { a, b, c, d, e }); }
-/* prettier-ignore */ export function bag6(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any): any { return commitBag(s, r, { a, b, c, d, e, f }); }
-/* prettier-ignore */ export function bag7(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any): any { return commitBag(s, r, { a, b, c, d, e, f, g }); }
-/* prettier-ignore */ export function bag8(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h }); }
-/* prettier-ignore */ export function bag9(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i }); }
-/* prettier-ignore */ export function bag10(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j }); }
-/* prettier-ignore */ export function bag11(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k }); }
-/* prettier-ignore */ export function bag12(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l }); }
-/* prettier-ignore */ export function bag13(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m }); }
-/* prettier-ignore */ export function bag14(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n }); }
-/* prettier-ignore */ export function bag15(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o }); }
-/* prettier-ignore */ export function bag16(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any, p: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p }); }
+/* prettier-ignore */ export function bag0(s: Scope, r: Node | null): any { return commitBag(s, r, { __journalWindow: 0, [BINDING_BAG_ARITY]: 0 }); }
+/* prettier-ignore */ export function bag1(s: Scope, r: Node | null, a: any): any { return commitBag(s, r, { a, __journalWindow: 0, [BINDING_BAG_ARITY]: 1 }); }
+/* prettier-ignore */ export function bag2(s: Scope, r: Node | null, a: any, b: any): any { return commitBag(s, r, { a, b, __journalWindow: 0, [BINDING_BAG_ARITY]: 2 }); }
+/* prettier-ignore */ export function bag3(s: Scope, r: Node | null, a: any, b: any, c: any): any { return commitBag(s, r, { a, b, c, __journalWindow: 0, [BINDING_BAG_ARITY]: 3 }); }
+/* prettier-ignore */ export function bag4(s: Scope, r: Node | null, a: any, b: any, c: any, d: any): any { return commitBag(s, r, { a, b, c, d, __journalWindow: 0, [BINDING_BAG_ARITY]: 4 }); }
+/* prettier-ignore */ export function bag5(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any): any { return commitBag(s, r, { a, b, c, d, e, __journalWindow: 0, [BINDING_BAG_ARITY]: 5 }); }
+/* prettier-ignore */ export function bag6(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any): any { return commitBag(s, r, { a, b, c, d, e, f, __journalWindow: 0, [BINDING_BAG_ARITY]: 6 }); }
+/* prettier-ignore */ export function bag7(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, __journalWindow: 0, [BINDING_BAG_ARITY]: 7 }); }
+/* prettier-ignore */ export function bag8(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, __journalWindow: 0, [BINDING_BAG_ARITY]: 8 }); }
+/* prettier-ignore */ export function bag9(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, __journalWindow: 0, [BINDING_BAG_ARITY]: 9 }); }
+/* prettier-ignore */ export function bag10(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, __journalWindow: 0, [BINDING_BAG_ARITY]: 10 }); }
+/* prettier-ignore */ export function bag11(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, __journalWindow: 0, [BINDING_BAG_ARITY]: 11 }); }
+/* prettier-ignore */ export function bag12(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, __journalWindow: 0, [BINDING_BAG_ARITY]: 12 }); }
+/* prettier-ignore */ export function bag13(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, __journalWindow: 0, [BINDING_BAG_ARITY]: 13 }); }
+/* prettier-ignore */ export function bag14(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, __journalWindow: 0, [BINDING_BAG_ARITY]: 14 }); }
+/* prettier-ignore */ export function bag15(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, __journalWindow: 0, [BINDING_BAG_ARITY]: 15 }); }
+/* prettier-ignore */ export function bag16(s: Scope, r: Node | null, a: any, b: any, c: any, d: any, e: any, f: any, g: any, h: any, i: any, j: any, k: any, l: any, m: any, n: any, o: any, p: any): any { return commitBag(s, r, { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, __journalWindow: 0, [BINDING_BAG_ARITY]: 16 }); }
 /* prettier-ignore */ export function bagOf(s: Scope, r: Node | null, bag: any): any { return commitBag(s, r, bag); }
 
 /**
@@ -14946,7 +15087,7 @@ function validateDangerouslySetInnerHTMLValue(value: unknown): void {
 /** Complete validated write used by direct, spread, and html-only compiler paths. */
 export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 	validateDangerouslySetInnerHTMLValue(value);
-	journalRootProperty(el, DANGER_HTML_ACTIVE);
+	journalRootProperty(el, DANGER_HTML_ACTIVE, (el as any)[DANGER_HTML_ACTIVE]);
 	const wasActive = (el as any)[DANGER_HTML_ACTIVE] === true;
 	if (value == null) {
 		(el as any)[DANGER_HTML_ACTIVE] = false;
@@ -15036,9 +15177,9 @@ export function setDangerouslySetInnerHTMLSources(
 	// Stamp only the FINAL child source. Spread-local validation runs too early:
 	// when a render transitions raw HTML -> ordinary children, the old raw-HTML
 	// active bit is still present until this commit disables it.
-	journalRootProperty(el, DANGER_HTML_SPREAD_CHILD);
-	journalRootProperty(el, DANGER_HTML_RESOLVED_VALUE);
-	journalRootProperty(el, DANGER_HTML_RESOLVED_CHILD);
+	journalRootProperty(el, DANGER_HTML_SPREAD_CHILD, (el as any)[DANGER_HTML_SPREAD_CHILD]);
+	journalRootProperty(el, DANGER_HTML_RESOLVED_VALUE, (el as any)[DANGER_HTML_RESOLVED_VALUE]);
+	journalRootProperty(el, DANGER_HTML_RESOLVED_CHILD, (el as any)[DANGER_HTML_RESOLVED_CHILD]);
 	(el as any)[DANGER_HTML_SPREAD_CHILD] = resolvedChild;
 	setDangerouslySetInnerHTML(el, resolved);
 	(el as any)[DANGER_HTML_RESOLVED_VALUE] = resolved;
@@ -18198,8 +18339,8 @@ function resolvePortalEventOwner(node: DelegatedNode): void {
 	}
 	if (owner === undefined) return;
 	if (ROOT_RENDER_TRANSACTION !== null) {
-		journalRootProperty(node, '$$portalParent');
-		journalRootProperty(node, '$$portalContainer');
+		journalRootProperty(node, '$$portalParent', (node as any).$$portalParent);
+		journalRootProperty(node, '$$portalContainer', (node as any).$$portalContainer);
 	}
 	node.$$portalParent = owner.host;
 	node.$$portalContainer = target;
@@ -20432,7 +20573,7 @@ export function portal(
 	// Register on first creation (or after a target-change rebuild) so the slot is
 	// torn down with its parent scope.
 	if (prev !== state) {
-		journalRootProperty(parentScope.slots, String(slotKey));
+		journalRootProperty(parentScope.slots, slotKey, parentScope.slots[slotKey]);
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
 	}
@@ -20703,11 +20844,13 @@ function renderPortalState(
 		}
 		renderBlock(block);
 	} else {
-		if (state.host !== host) journalRootProperty(state, 'host');
+		if (state.host !== host) journalRootProperty(state, 'host', state.host);
 		state.host = host;
-		if (state.block!.body !== norm.body) journalRootProperty(state.block!, 'body');
-		if (state.block!.props !== norm.props) journalRootProperty(state.block!, 'props');
-		if (state.block!.extra !== env) journalRootProperty(state.block!, 'extra');
+		if (state.block!.body !== norm.body)
+			journalRootProperty(state.block!, 'body', state.block!.body);
+		if (state.block!.props !== norm.props)
+			journalRootProperty(state.block!, 'props', state.block!.props);
+		if (state.block!.extra !== env) journalRootProperty(state.block!, 'extra', state.block!.extra);
 		state.block!.body = norm.body;
 		state.block!.props = norm.props;
 		state.block!.extra = env;
@@ -20753,7 +20896,7 @@ function teardownPortalState(state: PortalSlot): void {
 		!transaction.aborted &&
 		!ROOT_RENDER_ROLLBACK &&
 		state.block?.mounted &&
-		!transaction.created?.has(state.block) &&
+		!isCreatedInRootRender(transaction, state.block) &&
 		state.target !== null
 	) {
 		deferRootRange(state.target, state.start, state.end, () => teardownPortalState(state));
@@ -21815,7 +21958,7 @@ function componentSlotImpl(
 		}
 	}
 	if ((hasKey === true || key !== undefined) && !state.keyed) {
-		if (!journaledSlot) journalRootProperty(state, 'keyed');
+		if (!journaledSlot) journalRootProperty(state, 'keyed', state.keyed);
 		state.keyed = true;
 	}
 	// Key-driven remount: when the compiler emitted a key arg AND its value
@@ -21827,7 +21970,8 @@ function componentSlotImpl(
 	if (keyChanged) {
 		state.currentComp = null;
 	}
-	if (!journaledSlot && !Object.is(state.prevKey, nextKey)) journalRootProperty(state, 'prevKey');
+	if (!journaledSlot && !Object.is(state.prevKey, nextKey))
+		journalRootProperty(state, 'prevKey', state.prevKey);
 	state.prevKey = nextKey;
 	if (replacing) {
 		const swapDriver = TRANSITION_SWAP_DRIVER;
@@ -21849,7 +21993,7 @@ function componentSlotImpl(
 			hydration === null &&
 			state.block !== null &&
 			state.block.mounted &&
-			!rootTransaction.created?.has(state.block)
+			!isCreatedInRootRender(rootTransaction, state.block)
 		) {
 			// Keep the committed range connected until the whole root succeeds.
 			// This is the incoming subtree's only render, not a probe: its captured
@@ -22091,7 +22235,8 @@ function componentSlotImpl(
 		// committed props (React.memo's contract; see tryMemoBail). A string comp
 		// is never memo-wrapped, so it falls through to the re-render below.
 		if (tryMemoBail(state.block, identity, props)) return;
-		if (state.block.props !== renderProps) journalRootProperty(state.block, 'props');
+		if (state.block.props !== renderProps)
+			journalRootProperty(state.block, 'props', state.block.props);
 		state.block.props = renderProps;
 		renderBlock(state.block);
 	}
@@ -23112,7 +23257,7 @@ function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: Scope
 		block.slots[1] = instance;
 		block.refFields = ['f', 'a', ''];
 	} else if (instance._currentRef !== descriptor.ref) {
-		journalRootProperty(instance, '_currentRef');
+		journalRootProperty(instance, '_currentRef', (instance as any)._currentRef);
 		if (instance._currentRef != null) queueRefDetach(instance._currentRef, instance);
 		if (descriptor.ref != null) queueRefAttach(scope, descriptor.ref, instance);
 		instance._currentRef = descriptor.ref;
@@ -23604,8 +23749,8 @@ function deoptItemBody(item: any, scope: Scope): void {
 		const p = sm.parentNode;
 		if (ROOT_RENDER_TRANSACTION !== null) {
 			journalRootRange(p, sm.previousSibling, sm.nextSibling);
-			journalRootProperty(block, 'startMarker');
-			journalRootProperty(block, 'endMarker');
+			journalRootProperty(block, 'startMarker', block.startMarker);
+			journalRootProperty(block, 'endMarker', block.endMarker);
 		}
 		const s = document.createComment('it');
 		const e = document.createComment('/it');
@@ -23636,7 +23781,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		const stale = block.deoptNode;
 		let transfer: Node | null = null;
 		if (stale != null) {
-			journalRootProperty(block, 'deoptNode');
+			journalRootProperty(block, 'deoptNode', block.deoptNode);
 			if (
 				scope.slots[0] === undefined &&
 				stale.nodeType === 1 /* Element */ &&
@@ -23762,7 +23907,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 	}
 	const node = reconcileDeoptNode(prev, item, block, deoptChildNamespace(block.parentNode));
 	if (node !== prev) {
-		journalRootProperty(block, 'deoptNode');
+		journalRootProperty(block, 'deoptNode', block.deoptNode);
 		// Built a fresh node (first mount, or a tag/type change) — insert it at
 		// the old node's position, THEN drop the old one. Insert-before-remove
 		// matters for a SELF-MARKED item (M4): there `prev` IS the block's end
@@ -23795,8 +23940,8 @@ function deoptItemBody(item: any, scope: Scope): void {
 		// both markers at the replacement. (A non-host new value never reaches
 		// here self-marked — the promotion above minted a pair first.)
 		if (prev !== null && block.startMarker === prev) {
-			journalRootProperty(block, 'startMarker');
-			journalRootProperty(block, 'endMarker');
+			journalRootProperty(block, 'startMarker', block.startMarker);
+			journalRootProperty(block, 'endMarker', block.endMarker);
 			block.startMarker = node;
 			block.endMarker = node;
 		}
@@ -23991,7 +24136,7 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 			const retired = el;
 			if (ROOT_RENDER_TRANSACTION !== null) {
 				journalRootRange(block.parentNode, retired.previousSibling, retired.nextSibling);
-				journalRootProperty(block, 'deoptNode');
+				journalRootProperty(block, 'deoptNode', block.deoptNode);
 			}
 			// The children slot's live content — markers included — sat inside the
 			// removed element, so a preserved slot would keep rendering into the
@@ -25033,7 +25178,7 @@ export function childSlot(
 			!transaction.aborted &&
 			!ROOT_RENDER_ROLLBACK &&
 			parentScope.mounted &&
-			!transaction.created?.has(parentBlock)
+			!isCreatedInRootRender(transaction, parentBlock)
 		) {
 			// A stable component may have returned undefined until now, so no
 			// previous slot owns this first insertion. Keep the original anchor
@@ -25381,8 +25526,8 @@ export function childSlot(
 				tryImplicitBail(state.block)
 			)
 				return;
-			if (state.block.body !== comp) journalRootProperty(state.block, 'body');
-			if (state.currentComp !== comp) journalRootProperty(state, 'currentComp');
+			if (state.block.body !== comp) journalRootProperty(state.block, 'body', state.block.body);
+			if (state.currentComp !== comp) journalRootProperty(state, 'currentComp', state.currentComp);
 			state.block.body = comp;
 			renderBlock(state.block);
 			state.currentComp = comp;
@@ -25400,7 +25545,7 @@ export function childSlot(
 			// lazily. This is what lets a `{children}` passthrough under a
 			// re-rendering Provider skip untouched subtrees without a memo() shim.
 			if (props === state.block.props && tryImplicitBail(state.block)) return;
-			if (state.block.props !== props) journalRootProperty(state.block, 'props');
+			if (state.block.props !== props) journalRootProperty(state.block, 'props', state.block.props);
 			state.block.props = props;
 			renderBlock(state.block);
 			return;
@@ -25607,7 +25752,7 @@ export function childSlot(
 					const oldEnd = state.end!;
 					state.start = r.wip.start;
 					state.end = r.wip.end;
-					journalRootProperty(r.wip.block, 'exclusiveMarkers');
+					journalRootProperty(r.wip.block, 'exclusiveMarkers', r.wip.block.exclusiveMarkers);
 					r.wip.block.exclusiveMarkers = true;
 					replaceSharedBlockBoundary(parentBlock, oldStart, oldEnd, state.start, state.end);
 					deferRootRange(domParent, oldStart, oldStart);
@@ -25876,7 +26021,7 @@ export function childTextHole(
 	if (ROOT_RENDER_TRANSACTION !== null && state === undefined && parentScope.mounted) {
 		journalBag();
 		journalRootRange(domParent, null, null);
-		journalRootProperty(parentScope.slots, String(slotKey));
+		journalRootProperty(parentScope.slots, slotKey, parentScope.slots[slotKey]);
 	}
 	if (state === undefined && vt !== 'object' && vt !== 'function') {
 		// Markerless pure-text mode.
@@ -27551,7 +27696,25 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 	const journalCheckpoint = armTransitionJournal(state);
 	const previousCapture = WIP_CAPTURE;
 	const capture = journalCheckpoint < 0 ? null : createOffscreenCapture();
-	const effectDeps = capture === null ? null : snapshotSubtreeEffectDeps(block);
+	// A transition hold replays the root journal, including touched effect cells.
+	// An urgent update superseding an existing hold can instead show @pending
+	// without replaying that journal; a propagating boundary may do likewise in
+	// its ancestor. A queued transition child rendered by an urgent ancestor is
+	// urgent too (renderBlockInner overrides its pendingMode). Keep the old
+	// snapshot for these cold paths and detached renders without a root transaction.
+	const effectDeps =
+		capture !== null &&
+		(ROOT_RENDER_TRANSACTION === null ||
+			state.propagateSuspense ||
+			(block.pendingMode ?? CURRENT_BLOCK?.currentRenderMode) !== 'transition' ||
+			(block.pending &&
+				block.pendingMode === 'transition' &&
+				CURRENT_BLOCK !== null &&
+				CURRENT_BLOCK.currentRenderMode === 'urgent' &&
+				blockIsAncestor(CURRENT_BLOCK, block) &&
+				TRANSITION_SWAP_DRIVER !== null))
+			? snapshotSubtreeEffectDeps(block)
+			: null;
 	const refDetachCheckpoint = refDetachQueue.length;
 	let didThrow = false;
 	let renderError: unknown;
@@ -27568,7 +27731,7 @@ function renderVisibleTry(state: TrySlot, source?: Block): void {
 		if (didThrow) {
 			if (capture !== null) {
 				refDetachQueue.splice(refDetachCheckpoint);
-				restoreSubtreeEffectDeps(block, effectDeps!);
+				if (effectDeps !== null) restoreSubtreeEffectDeps(block, effectDeps);
 				discardOffscreenCapture(capture);
 			}
 			if (isHostContextRequest(renderError) || renderError instanceof NativeAdoptionMiss)
@@ -28305,6 +28468,7 @@ function invalidatePendingSuspenseEffects(owner: Block): void {
 			if (block.disposed || (block !== owner && !blockIsAncestorOf(owner, block))) continue;
 			const effect = pending.scope.hooks?.get(pending.slot) as EffectSlot | undefined;
 			if (effect === undefined || effect.revision !== pending.revision) continue;
+			if (ROOT_RENDER_TRANSACTION !== null) journalObjectOnce(effect);
 			effect.revision++;
 			effect.active = effect.connectedFn !== null;
 			effect.deps = effect.connectedFn === null ? undefined : effect.connectedArgs;
@@ -28404,7 +28568,7 @@ function hideTryContentAndMountPendingInner(
 		// committed, without retaining a witness for every callback ref in the app.
 		const uncommittedRefs = discardSubtreeRefAttaches(persistent);
 		invalidatePendingSuspenseEffects(persistent);
-		journalRootProperty(persistent, 'inactive');
+		journalRootProperty(persistent, 'inactive', persistent.inactive);
 		persistent.inactive = true;
 		// The fallback's native reads must be accepted before an outgoing cleanup
 		// can write. Its sampled callbacks retain that accepted value; a cleanup
@@ -28991,6 +29155,7 @@ function reconnectBailedEffects(block: Block): void {
 			// Its insertion effect has not committed, so replay the retained body at
 			// this bail position; a real rerender would have queued a fresher body.
 			const last = replay[replay.length - 1];
+			if (ROOT_RENDER_TRANSACTION !== null) journalObjectOnce(effect);
 			effect.active = last.fn !== null;
 			effect.deps = last.fn === null ? undefined : last.args;
 			const revision = ++effect.revision;
@@ -30528,8 +30693,8 @@ function replaceSharedBlockBoundary(
 	if (oldStart === null || oldEnd === null) return;
 	let block = parent;
 	while (block !== null && block.startMarker === oldStart && block.endMarker === oldEnd) {
-		journalRootProperty(block, 'startMarker');
-		journalRootProperty(block, 'endMarker');
+		journalRootProperty(block, 'startMarker', block.startMarker);
+		journalRootProperty(block, 'endMarker', block.endMarker);
 		block.startMarker = newStart;
 		block.endMarker = newEnd;
 		block = block.parentBlock;
@@ -30668,7 +30833,7 @@ function renderBranchSlot(
 			hydration === null &&
 			state.block !== null &&
 			state.block.mounted &&
-			!rootTransaction.created?.has(state.block)
+			!isCreatedInRootRender(rootTransaction, state.block)
 		) {
 			const oldBlock = state.block;
 			const oldStart = oldBlock.startMarker;
@@ -30748,7 +30913,7 @@ function renderBranchSlot(
 				}
 				// The slot now owns this pair. Undo ownership before created-block
 				// disposal so a failed root also removes the speculative comments.
-				journalRootProperty(r.wip.block, 'exclusiveMarkers');
+				journalRootProperty(r.wip.block, 'exclusiveMarkers', r.wip.block.exclusiveMarkers);
 				r.wip.block.exclusiveMarkers = true;
 				spliceWipCapture(r.wip);
 				deferRootReplacement(oldBlock, domParent, first, last);
@@ -31010,8 +31175,8 @@ function renderBranchSlot(
 		}
 	} else if (state.block) {
 		// Same branch — re-render in place with this render's env snapshot.
-		if (state.block.body !== body) journalRootProperty(state.block, 'body');
-		if (state.block.extra !== env) journalRootProperty(state.block, 'extra');
+		if (state.block.body !== body) journalRootProperty(state.block, 'body', state.block.body);
+		if (state.block.extra !== env) journalRootProperty(state.block, 'extra', state.block.extra);
 		state.block.body = body!;
 		state.block.extra = env;
 		renderBlock(state.block);
@@ -31931,6 +32096,8 @@ function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void 
 				}
 			}
 			// Force the setup to re-enqueue + re-fire when the subtree reactivates.
+			// A cleanup cannot be undone by root rollback. Keep this reset even
+			// across a suspended retry so the next visible render reconnects it.
 			e.deps = undefined;
 			if (e.connectedFn !== null) e.disconnected = true;
 		}
@@ -32166,7 +32333,8 @@ export function forBlock<T>(
 	// The env tuple refreshes every parent render (the compiled call site
 	// re-evaluates the captured values); item/empty blocks pick it up at
 	// mount and at every survivor re-render below.
-	if (state.env !== deps) journalRootProperty(state, 'env');
+	if (ROOT_RENDER_TRANSACTION !== null && state.env !== deps)
+		journalRootProperty(state, 'env', state.env);
 	state.env = deps;
 	// `@empty` arm: when `items.length === 0` and the compiler emitted an
 	// empty-body helper, mount that body in place of the (empty) item list. We
@@ -32181,8 +32349,10 @@ export function forBlock<T>(
 		if (state.emptyBlock) {
 			// keep the existing empty branch mounted, but re-render in case the
 			// body closes over parent state that changed this render.
-			if (state.emptyBlock.body !== emptyBody) journalRootProperty(state.emptyBlock, 'body');
-			if (state.emptyBlock.extra !== state.env) journalRootProperty(state.emptyBlock, 'extra');
+			if (state.emptyBlock.body !== emptyBody)
+				journalRootProperty(state.emptyBlock, 'body', state.emptyBlock.body);
+			if (state.emptyBlock.extra !== state.env)
+				journalRootProperty(state.emptyBlock, 'extra', state.emptyBlock.extra);
 			state.emptyBlock.body = emptyBody;
 			state.emptyBlock.extra = state.env;
 			renderBlock(state.emptyBlock);
@@ -32299,7 +32469,8 @@ export function forBlock<T>(
 			} else {
 				lite = !requiresScope;
 			}
-			if (state.cachedDeps !== deps) journalRootProperty(state, 'cachedDeps');
+			if (ROOT_RENDER_TRANSACTION !== null && state.cachedDeps !== deps)
+				journalRootProperty(state, 'cachedDeps', state.cachedDeps);
 			state.cachedDeps = deps;
 		}
 	}
@@ -32404,7 +32575,8 @@ export function keyedForBlock<T>(
 	);
 	if (TRANSITION_JOURNAL === null || ROOT_RENDER_TRANSACTION !== null) {
 		const rendered = parentScope.slots[slotKey] as ForSlot;
-		if (rendered.selectionItems !== items) journalRootProperty(rendered, 'selectionItems');
+		if (rendered.selectionItems !== items)
+			journalRootProperty(rendered, 'selectionItems', rendered.selectionItems);
 		rendered.selectionItems = items;
 	}
 }
@@ -32456,14 +32628,16 @@ function mountFastHostItems<T>(
 	let previous: Block | null = null;
 	let current: Block | null = null;
 	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
-	if (state.env !== deps) journalRootProperty(state, 'env');
+	if (ROOT_RENDER_TRANSACTION !== null && state.env !== deps)
+		journalRootProperty(state, 'env', state.env);
 	state.env = deps;
 	if (((flags || 0) & 4) !== 0 && deps !== undefined) {
-		if (state.cachedDeps !== deps) journalRootProperty(state, 'cachedDeps');
+		if (ROOT_RENDER_TRANSACTION !== null && state.cachedDeps !== deps)
+			journalRootProperty(state, 'cachedDeps', state.cachedDeps);
 		state.cachedDeps = deps;
 	}
 	if (mapped) {
-		if (state.mappedNative !== true) journalRootProperty(state, 'mappedNative');
+		if (state.mappedNative !== true) journalRootProperty(state, 'mappedNative', state.mappedNative);
 		state.mappedNative = true;
 	}
 	try {
@@ -32605,7 +32779,8 @@ export function fastKeyedForBlock<T>(
 		return;
 	}
 	mountFastHostItems(parentScope, state!, parent, items, getKey, itemBody, flags, deps, false);
-	if (state!.selectionItems !== items) journalRootProperty(state!, 'selectionItems');
+	if (state!.selectionItems !== items)
+		journalRootProperty(state!, 'selectionItems', state!.selectionItems);
 	state!.selectionItems = items;
 }
 
@@ -32745,8 +32920,10 @@ function tryUpdateKeyedSelection<T>(
 	const next = deps[selectionIndex];
 	// Publish the same snapshots as forBlock before any row can run user code;
 	// reentrant updates must observe the selection currently being committed.
-	if (state.cachedDeps !== deps) journalRootProperty(state, 'cachedDeps');
-	if (state.env !== deps) journalRootProperty(state, 'env');
+	if (ROOT_RENDER_TRANSACTION !== null && state.cachedDeps !== deps)
+		journalRootProperty(state, 'cachedDeps', state.cachedDeps);
+	if (ROOT_RENDER_TRANSACTION !== null && state.env !== deps)
+		journalRootProperty(state, 'env', state.env);
 	state.cachedDeps = deps;
 	state.env = deps;
 	if (Object.is(previous, next)) return true;
@@ -32760,8 +32937,8 @@ function tryUpdateKeyedSelection<T>(
 		second = swap;
 	}
 	if (first !== undefined) {
-		if (first.body !== itemBody) journalRootProperty(first, 'body');
-		if (first.extra !== deps) journalRootProperty(first, 'extra');
+		if (first.body !== itemBody) journalRootProperty(first, 'body', first.body);
+		if (first.extra !== deps) journalRootProperty(first, 'extra', first.extra);
 		first.body = itemBody as ComponentBody;
 		first.extra = deps;
 		// A separately certified host row can update just its class binding. Raw
@@ -32775,8 +32952,8 @@ function tryUpdateKeyedSelection<T>(
 		}
 	}
 	if (second !== undefined) {
-		if (second.body !== itemBody) journalRootProperty(second, 'body');
-		if (second.extra !== deps) journalRootProperty(second, 'extra');
+		if (second.body !== itemBody) journalRootProperty(second, 'body', second.body);
+		if (second.extra !== deps) journalRootProperty(second, 'extra', second.extra);
 		second.body = itemBody as ComponentBody;
 		second.extra = deps;
 		if (selectionBody !== undefined && second._slots === null) {
@@ -32868,14 +33045,16 @@ function updateSurvivor<T>(
 	// the body can't observe position (indexIndependent — the common index-less
 	// `@for`) or the position is also unchanged. This is what makes a pure reorder
 	// (shuffle / reverse / rotate) move survivors' DOM without re-rendering them.
-	if (block.itemIndex !== newIdx) journalRootProperty(block, 'itemIndex');
-	if (block.body !== itemBody) journalRootProperty(block, 'body');
+	const journal = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
+	if (journal && block.itemIndex !== newIdx)
+		journalRootProperty(block, 'itemIndex', block.itemIndex);
+	if (journal && block.body !== itemBody) journalRootProperty(block, 'body', block.body);
 	if (pure && block.props === newItem && (indexIndependent || block.itemIndex === newIdx)) {
 		block.itemIndex = newIdx;
 		block.body = itemBody as ComponentBody;
 	} else {
-		if (block.props !== newItem) journalRootProperty(block, 'props');
-		if (block.extra !== env) journalRootProperty(block, 'extra');
+		if (journal && block.props !== newItem) journalRootProperty(block, 'props', block.props);
+		if (journal && block.extra !== env) journalRootProperty(block, 'extra', block.extra);
 		block.props = newItem;
 		block.body = itemBody as ComponentBody;
 		block.itemIndex = newIdx;
@@ -33576,7 +33755,7 @@ function deferRootOwnedListClear(state: ForSlot, certified: boolean = false): bo
 			newlyRetired.push(block);
 		}
 		if (block.pending) {
-			journalRootProperty(block, 'pending');
+			journalRootProperty(block, 'pending', block.pending);
 			block.pending = false;
 		}
 	}
@@ -35020,7 +35199,8 @@ function makeRoot(
 			const block = rootBlock;
 			renderOwner.request = (renderMode) => {
 				renderOwner.transaction!.rootRequest = true;
-				if (block.props !== props) journalRootProperty(block, 'props');
+				const previousProps = block.props;
+				if (previousProps !== props) journalRootProperty(block, 'props', previousProps);
 				block.props = props;
 				block.pendingMode = renderMode;
 				renderBlock(block);
@@ -35050,7 +35230,7 @@ function makeRoot(
 			previousRoot !== null &&
 			previousRoot.mounted &&
 			!previousRoot.disposed &&
-			!renderOwner.transaction!.created?.has(previousRoot);
+			!isCreatedInRootRender(renderOwner.transaction!, previousRoot);
 		const oldFirst = staged ? container.firstChild : null;
 		const oldLast = staged ? container.lastChild : null;
 		journalUndo(() => {
@@ -35508,7 +35688,7 @@ export function hydrateRoot(
 		owner.transaction!.rootRequest = true;
 		owner.transaction!.hydrating = true;
 		createdInRootRender(rootBlock);
-		journalRootProperty(idState, 'next');
+		journalRootProperty(idState, 'next', idState.next);
 		// Every failed adoption discards its scopes, not the server DOM. Restart
 		// the root-local ID and seed cursors together on the next attempt.
 		idState.next = 0;
