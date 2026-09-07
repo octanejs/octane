@@ -56,7 +56,7 @@
         {
           "path": "packages/shadcn/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "fd1a2660f19696c297d9bab4d818b48ad9ea48e6d0537f23635d5d02be2419e4",
+          "sha256": "e9b18e8e5073e815549eaab5c837d737d455885dc9cf070a86aa1746da1eefc5",
           "cases": [
             {
               "id": "differential:shadcn-badge-runtime",
@@ -113,7 +113,7 @@
         {
           "path": "packages/shadcn/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "ff1bf8c3a01f8ed04c8348e05ec304582f479c27e98d787214c490ac33194c3c"
+          "sha256": "58eb4bdcba11e19441a0eb83bf3ea7b5bddf86b514f1d9394e04268f010fd1a8"
         },
         {
           "path": "packages/shadcn/tests/differential/upstream/index.ts",
@@ -179,7 +179,7 @@
         {
           "path": "packages/shadcn/tests/differential/base-ui-latest.test.ts",
           "role": "test",
-          "sha256": "acaca06f68378514fcbc1c01ae22ced793f315e570819d2f3c112422b8f95986",
+          "sha256": "1b556a9bf90ff17688aa67de340c7d512db587b849799b4ab8c94028a1bb78b9",
           "cases": [
             {
               "id": "differential:shadcn-base-select",
@@ -236,7 +236,7 @@
         {
           "path": "packages/shadcn/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "ff1bf8c3a01f8ed04c8348e05ec304582f479c27e98d787214c490ac33194c3c"
+          "sha256": "58eb4bdcba11e19441a0eb83bf3ea7b5bddf86b514f1d9394e04268f010fd1a8"
         },
         {
           "path": "packages/shadcn/upstream/style-nova.css",

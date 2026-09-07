@@ -9,7 +9,7 @@ import {
 } from '../../../octane/tests/differential/_rig';
 
 const fixture = resolve(__dirname, '../_fixtures/shadcn-diff/base-ui-latest.tsrx');
-const cache = resolve(__dirname, '.react-cache');
+const cache = resolve(__dirname, '.react-cache/base-ui');
 await preloadDifferentialFixture(fixture, cache);
 
 describe('differential: shadcn 4.21 Base UI wrappers', () => {
