@@ -1,5 +1,5 @@
 /** @jsxImportSource octane */
-// Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria/src/color/useColorArea.ts).
+// Ported from adobe/react-spectrum@5ecb3333001313e83898cd07644227897e3bae1f (packages/react-aria/src/color/useColorArea.ts).
 /*
  * Copyright 2020 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
@@ -12,13 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import {
-	AriaLabelingProps,
-	DOMAttributes,
-	DOMProps,
-	MoveMoveEvent,
-	RefObject,
-} from '@react-types/shared';
+import { AriaLabelingProps, DOMAttributes, DOMProps, RefObject } from '@react-types/shared';
 import {
 	ColorAreaProps,
 	ColorAreaState,
@@ -28,7 +22,13 @@ import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import intlMessages from '../intl/color/index';
 import { isAndroid, isIOS } from '../utils/platform';
 import { mergeProps } from '../utils/mergeProps';
-import React, { InputHTMLAttributes, useCallback, useRef, useState } from '../compat/react';
+import React, {
+	ChangeEvent,
+	InputHTMLAttributes,
+	useCallback,
+	useRef,
+	useState,
+} from '../compat/react';
 import { useColorAreaGradient } from './useColorAreaGradient';
 import { useFocus } from '../interactions/useFocus';
 import { useFocusWithin } from '../interactions/useFocusWithin';
@@ -80,8 +80,6 @@ export interface AriaColorAreaOptions extends AriaColorAreaProps {
 	containerRef: RefObject<Element | null>;
 }
 
-type NativeInputEvent = Event & { currentTarget: HTMLInputElement };
-
 /**
  * Provides the behavior and accessibility implementation for a color area component. Color area
  * allows users to adjust two channels of an RGB, HSL or HSB color value against a two-dimensional
@@ -117,55 +115,70 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 	useFormReset(inputXRef, state.defaultValue, state.setValue);
 
 	let [valueChangedViaKeyboard, setValueChangedViaKeyboard] = useState(false);
-	let [valueChangedViaInputEvent, setValueChangedViaInputEvent] = useState(false);
+	let [valueChangedViaInputChangeEvent, setValueChangedViaInputChangeEvent] = useState(false);
 	let { xChannel, yChannel, zChannel } = state.channels;
 	let xChannelStep = state.xChannelStep;
 	let yChannelStep = state.yChannelStep;
 
 	let currentPosition = useRef<{ x: number; y: number } | null>(null);
 
+	let keyboardUpdate = (
+		cb: () => void,
+		inputRef: RefObject<HTMLInputElement | null>,
+		input: 'x' | 'y',
+	) => {
+		state.setDragging(true);
+		setValueChangedViaKeyboard(true);
+		cb();
+		state.setDragging(false);
+		focusInput(inputRef);
+		setFocusedInput(input);
+	};
+
 	let { keyboardProps } = useKeyboard({
-		onKeyDown(e) {
-			// these are the cases that useMove doesn't handle
-			if (!/^(PageUp|PageDown|Home|End)$/.test(e.key)) {
-				e.continuePropagation();
-				return;
-			}
-			// same handling as useMove, don't need to stop propagation, useKeyboard will do that for us
-			e.preventDefault();
-			// remember to set this and unset it so that onChangeEnd is fired
-			state.setDragging(true);
-			setValueChangedViaKeyboard(true);
-			let dir: 'x' | 'y' | undefined;
-			switch (e.key) {
-				case 'PageUp':
-					state.incrementY(state.yChannelPageStep);
-					dir = 'y';
-					break;
-				case 'PageDown':
-					state.decrementY(state.yChannelPageStep);
-					dir = 'y';
-					break;
-				case 'Home':
-					direction === 'rtl'
-						? state.incrementX(state.xChannelPageStep)
-						: state.decrementX(state.xChannelPageStep);
-					dir = 'x';
-					break;
-				case 'End':
-					direction === 'rtl'
-						? state.decrementX(state.xChannelPageStep)
-						: state.incrementX(state.xChannelPageStep);
-					dir = 'x';
-					break;
-			}
-			state.setDragging(false);
-			if (dir) {
-				let input = dir === 'x' ? inputXRef : inputYRef;
-				focusInput(input);
-				setFocusedInput(dir);
-			}
+		shortcuts: {
+			PageUp: () => {
+				return keyboardUpdate(
+					() => {
+						state.incrementY(state.yChannelPageStep);
+					},
+					inputYRef,
+					'y',
+				);
+			},
+			PageDown: () => {
+				return keyboardUpdate(
+					() => {
+						state.decrementY(state.yChannelPageStep);
+					},
+					inputYRef,
+					'y',
+				);
+			},
+			Home: () => {
+				return keyboardUpdate(
+					() => {
+						direction === 'rtl'
+							? state.incrementX(state.xChannelPageStep)
+							: state.decrementX(state.xChannelPageStep);
+					},
+					inputXRef,
+					'x',
+				);
+			},
+			End: () => {
+				return keyboardUpdate(
+					() => {
+						direction === 'rtl'
+							? state.decrementX(state.xChannelPageStep)
+							: state.incrementX(state.xChannelPageStep);
+					},
+					inputXRef,
+					'x',
+				);
+			},
 		},
+		allowRepeats: true,
 	});
 
 	let moveHandler = {
@@ -173,7 +186,7 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 			currentPosition.current = null;
 			state.setDragging(true);
 		},
-		onMove({ deltaX, deltaY, pointerType, shiftKey }: MoveMoveEvent) {
+		onMove({ deltaX, deltaY, pointerType, shiftKey }: import('@react-types/shared').MoveMoveEvent) {
 			let {
 				incrementX,
 				decrementX,
@@ -210,6 +223,7 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 				}
 				setValueChangedViaKeyboard(valueChanged);
 				// set the focused input based on which axis has the greater delta
+				// oxlint-disable-next-line react/react-compiler
 				focusedInput = valueChanged && Math.abs(deltaY) > Math.abs(deltaX) ? 'y' : 'x';
 				setFocusedInput(focusedInput);
 			} else {
@@ -231,7 +245,7 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 		onFocusWithinChange: (focusWithin: boolean) => {
 			if (!focusWithin) {
 				setValueChangedViaKeyboard(false);
-				setValueChangedViaInputEvent(false);
+				setValueChangedViaInputChangeEvent(false);
 			}
 		},
 	});
@@ -271,8 +285,13 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 		}
 	};
 
-	let onThumbUp = (e: any) => {
-		let id = e.pointerId ?? e.changedTouches?.[0].identifier;
+	let onThumbUp = (e: globalThis.PointerEvent | globalThis.TouchEvent | globalThis.MouseEvent) => {
+		let id =
+			'pointerId' in e
+				? e.pointerId
+				: 'changedTouches' in e
+					? e.changedTouches[0]?.identifier
+					: undefined;
 		if (id === currentPointer.current) {
 			setValueChangedViaKeyboard(false);
 			focusInput();
@@ -327,8 +346,15 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 		}
 	};
 
-	let onColorAreaUp = (e: any) => {
-		let id = e.pointerId ?? e.changedTouches?.[0].identifier;
+	let onColorAreaUp = (
+		e: globalThis.PointerEvent | globalThis.TouchEvent | globalThis.MouseEvent,
+	) => {
+		let id =
+			'pointerId' in e
+				? e.pointerId
+				: 'changedTouches' in e
+					? e.changedTouches[0]?.identifier
+					: undefined;
 		if (isOnColorArea.current && id === currentPointer.current) {
 			isOnColorArea.current = false;
 			setValueChangedViaKeyboard(false);
@@ -348,6 +374,7 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 	let colorAreaInteractions = isDisabled
 		? {}
 		: mergeProps(
+				// oxlint-disable-next-line react/react-compiler
 				{
 					...(typeof PointerEvent !== 'undefined'
 						? {
@@ -384,6 +411,7 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 	let thumbInteractions = isDisabled
 		? {}
 		: mergeProps(
+				// oxlint-disable-next-line react/react-compiler
 				{
 					...(typeof PointerEvent !== 'undefined'
 						? {
@@ -426,13 +454,13 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 		},
 	});
 
-	const onInput = (e: NativeInputEvent) => {
-		const { currentTarget } = e;
-		setValueChangedViaInputEvent(true);
-		if (currentTarget === inputXRef.current) {
-			state.setXValue(parseFloat(currentTarget.value));
-		} else if (currentTarget === inputYRef.current) {
-			state.setYValue(parseFloat(currentTarget.value));
+	const onInput = (e: ChangeEvent<HTMLInputElement>) => {
+		const { target } = e;
+		setValueChangedViaInputChangeEvent(true);
+		if (target === inputXRef.current) {
+			state.setXValue(parseFloat(target.value));
+		} else if (target === inputYRef.current) {
+			state.setYValue(parseFloat(target.value));
 		}
 	};
 
@@ -441,7 +469,7 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 	let value = state.getDisplayColor();
 	const getAriaValueTextForChannel = useCallback(
 		(channel: ColorChannel) => {
-			const isAfterInput = valueChangedViaInputEvent || valueChangedViaKeyboard;
+			const isAfterInput = valueChangedViaInputChangeEvent || valueChangedViaKeyboard;
 			return `${
 				isAfterInput
 					? stringFormatter.format('colorNameAndValue', {
@@ -468,7 +496,7 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 			locale,
 			value,
 			stringFormatter,
-			valueChangedViaInputEvent,
+			valueChangedViaInputChangeEvent,
 			valueChangedViaKeyboard,
 			xChannel,
 			yChannel,
@@ -564,7 +592,6 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
 				isMobile || !focusedInput || focusedInput === 'x' || valueChangedViaKeyboard
 					? undefined
 					: 'true',
-			// React's synthetic onChange for range inputs follows the native input event.
 			onInput,
 		},
 		yInputProps: {
@@ -592,7 +619,6 @@ export function useColorArea(props: AriaColorAreaOptions, state: ColorAreaState)
       */
 			'aria-hidden':
 				isMobile || focusedInput === 'y' || valueChangedViaKeyboard ? undefined : 'true',
-			// React's synthetic onChange for range inputs follows the native input event.
 			onInput,
 		},
 	};

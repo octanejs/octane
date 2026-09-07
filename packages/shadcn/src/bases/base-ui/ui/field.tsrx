@@ -19,7 +19,7 @@
 import { createElement, useMemo, type OctaneNode } from 'octane';
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { Label } from './label.tsrx';
 import { Separator } from './separator.tsrx';
 

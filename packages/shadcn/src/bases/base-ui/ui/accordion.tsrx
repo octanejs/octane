@@ -12,7 +12,7 @@
 import { Accordion as AccordionPrimitive } from '@octanejs/base-ui/accordion';
 import { ChevronDownIcon, ChevronUpIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export function Accordion({ className, ...props }: Record<string, any>) @{
 	<AccordionPrimitive.Root

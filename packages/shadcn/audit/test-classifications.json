@@ -7,6 +7,16 @@
       "reason": "Checks the Octane Badge contract; it is not counted as same-fixture React evidence."
     },
     {
+      "path": "packages/shadcn/tests/base-ui-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks adoption of server markup and live controlled Select events."
+    },
+    {
+      "path": "packages/shadcn/tests/base-ui-latest.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks selection, form submission, focus, navigation and scroll-area composition through public native binding exports."
+    },
+    {
       "path": "packages/shadcn/tests/base-ui-smoke.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the partial Octane Base UI component base; it is not counted as React parity evidence."
@@ -20,6 +30,11 @@
       "path": "packages/shadcn/tests/cross-base.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks structural consistency between Octane component bases; it is not a React oracle."
+    },
+    {
+      "path": "packages/shadcn/tests/differential/base-ui-latest.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Same fixture compiled for Octane and React against shadcn-ui/ui@7c9eaba1c0a6404c990c144a654792e3313c650d Base UI Select, Navigation Menu and Scroll Area, resolved with the release Nova stylesheet, Lucide icons and real @base-ui/react@1.8.0."
     },
     {
       "path": "packages/shadcn/tests/differential/parity.test.ts",
@@ -90,6 +105,11 @@
       "path": "packages/shadcn/tests/sonner.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Authenticates the documented Sonner theme/wrapper adaptation outside the React-parity lane; not counted as React-parity evidence."
+    },
+    {
+      "path": "packages/shadcn/tests/ssr/base-ui-latest.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the new Base UI wrappers without browser globals."
     },
     {
       "path": "packages/shadcn/tests/ssr/server-tier2.test.ts",

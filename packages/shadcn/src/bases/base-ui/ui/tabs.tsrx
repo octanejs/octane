@@ -12,7 +12,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { Tabs as TabsPrimitive } from '@octanejs/base-ui/tabs';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type StyledProps<P> = Omit<P, 'className'> & { className?: string };
 

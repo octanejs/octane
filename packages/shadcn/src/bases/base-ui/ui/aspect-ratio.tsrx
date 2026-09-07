@@ -5,7 +5,7 @@
 // `alert` was confirmed byte-identical between the two bases, which is why this is plausible —
 // but it is not proof, and the bases DO diverge elsewhere. Diff the class strings against the
 // upstream source before treating this as ported.
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { DivProps } from '../../../lib/types';
 
 export interface AspectRatioProps extends DivProps {

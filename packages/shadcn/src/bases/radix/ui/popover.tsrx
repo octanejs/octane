@@ -10,7 +10,7 @@
 import { createElement } from 'octane';
 import { Popover as PopoverPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string } & Record<string, unknown>;
 

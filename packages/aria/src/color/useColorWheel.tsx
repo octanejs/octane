@@ -1,5 +1,5 @@
 /** @jsxImportSource octane */
-// Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria/src/color/useColorWheel.ts).
+// Ported from adobe/react-spectrum@5ecb3333001313e83898cd07644227897e3bae1f (packages/react-aria/src/color/useColorWheel.ts).
 /*
  * Copyright 2020 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,6 @@ import {
 	DOMAttributes,
 	DOMProps,
 	InputDOMProps,
-	MoveMoveEvent,
 	RefObject,
 } from '@react-types/shared';
 import {
@@ -27,7 +26,7 @@ import {
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { mergeProps } from '../utils/mergeProps';
-import React, { InputHTMLAttributes, useCallback, useRef } from '../compat/react';
+import React, { ChangeEvent, InputHTMLAttributes, useCallback, useRef } from '../compat/react';
 import { useFormReset } from '../utils/useFormReset';
 import { useGlobalListeners } from '../utils/useGlobalListeners';
 import { useKeyboard } from '../interactions/useKeyboard';
@@ -55,8 +54,6 @@ export interface ColorWheelAria {
 	inputProps: InputHTMLAttributes<HTMLInputElement>;
 }
 
-type NativeInputEvent = Event & { currentTarget: HTMLInputElement };
-
 /**
  * Provides the behavior and accessibility implementation for a color wheel component.
  * Color wheels allow users to adjust the hue of an HSL or HSB color value on a circular track.
@@ -83,28 +80,19 @@ export function useColorWheel(
 	let currentPosition = useRef<{ x: number; y: number } | null>(null);
 
 	let { keyboardProps } = useKeyboard({
-		onKeyDown(e) {
-			// these are the cases that useMove doesn't handle
-			if (!/^(PageUp|PageDown)$/.test(e.key)) {
-				e.continuePropagation();
-				return;
-			}
-			// same handling as useMove, don't need to stop propagation, useKeyboard will do that for us
-			e.preventDefault();
-			// remember to set this and unset it so that onChangeEnd is fired
-			state.setDragging(true);
-			switch (e.key) {
-				case 'PageUp':
-					e.preventDefault();
-					state.increment(state.pageStep);
-					break;
-				case 'PageDown':
-					e.preventDefault();
-					state.decrement(state.pageStep);
-					break;
-			}
-			state.setDragging(false);
+		shortcuts: {
+			PageUp: () => {
+				state.setDragging(true);
+				state.increment(state.pageStep);
+				state.setDragging(false);
+			},
+			PageDown: () => {
+				state.setDragging(true);
+				state.decrement(state.pageStep);
+				state.setDragging(false);
+			},
 		},
+		allowRepeats: true,
 	});
 
 	let moveHandler = {
@@ -112,7 +100,7 @@ export function useColorWheel(
 			currentPosition.current = null;
 			state.setDragging(true);
 		},
-		onMove({ deltaX, deltaY, pointerType, shiftKey }: MoveMoveEvent) {
+		onMove({ deltaX, deltaY, pointerType, shiftKey }: import('@react-types/shared').MoveMoveEvent) {
 			if (currentPosition.current == null) {
 				currentPosition.current = state.getThumbPosition(thumbRadius);
 			}
@@ -171,8 +159,13 @@ export function useColorWheel(
 		}
 	};
 
-	let onThumbUp = (e: any) => {
-		let id = e.pointerId ?? e.changedTouches?.[0].identifier;
+	let onThumbUp = (e: globalThis.PointerEvent | globalThis.TouchEvent | globalThis.MouseEvent) => {
+		let id =
+			'pointerId' in e
+				? e.pointerId
+				: 'changedTouches' in e
+					? e.changedTouches[0]?.identifier
+					: undefined;
 		if (id === currentPointer.current) {
 			focusInput();
 			state.setDragging(false);
@@ -220,8 +213,13 @@ export function useColorWheel(
 		}
 	};
 
-	let onTrackUp = (e: any) => {
-		let id = e.pointerId ?? e.changedTouches?.[0].identifier;
+	let onTrackUp = (e: globalThis.PointerEvent | globalThis.TouchEvent | globalThis.MouseEvent) => {
+		let id =
+			'pointerId' in e
+				? e.pointerId
+				: 'changedTouches' in e
+					? e.changedTouches[0]?.identifier
+					: undefined;
 		if (isOnTrack.current && id === currentPointer.current) {
 			isOnTrack.current = false;
 			currentPointer.current = undefined;
@@ -240,6 +238,7 @@ export function useColorWheel(
 	let trackInteractions = isDisabled
 		? {}
 		: mergeProps(
+				// oxlint-disable-next-line react/react-compiler
 				{
 					...(typeof PointerEvent !== 'undefined'
 						? {
@@ -276,6 +275,7 @@ export function useColorWheel(
 	let thumbInteractions = isDisabled
 		? {}
 		: mergeProps(
+				// oxlint-disable-next-line react/react-compiler
 				{
 					...(typeof PointerEvent !== 'undefined'
 						? {
@@ -320,8 +320,8 @@ export function useColorWheel(
 	let { minValue, maxValue, step } = state.value.getChannelRange('hue');
 
 	let forcedColorAdjustNoneStyle = {
-		forcedColorAdjust: 'none',
-	} as const;
+		forcedColorAdjust: 'none' as const,
+	};
 
 	let { visuallyHiddenProps } = useVisuallyHidden({
 		style: {
@@ -383,12 +383,13 @@ export function useColorWheel(
 			value: `${state.value.getChannelValue('hue')}`,
 			name,
 			form,
-			// React's synthetic onChange for range inputs follows the native input event.
-			onInput: (e: NativeInputEvent) => {
-				state.setHue(parseFloat(e.currentTarget.value));
+			onInput: (e: Event) => {
+				state.setHue(parseFloat((getEventTarget(e) as HTMLInputElement).value));
 			},
 			style: visuallyHiddenProps.style,
-			'aria-errormessage': (props as any)['aria-errormessage'],
+			'aria-errormessage': (props as AriaColorWheelOptions & { 'aria-errormessage'?: string })[
+				'aria-errormessage'
+			],
 			'aria-describedby': props['aria-describedby'],
 			'aria-details': props['aria-details'],
 		}),

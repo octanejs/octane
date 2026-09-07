@@ -36,6 +36,11 @@ const UPSTREAM_SUBPATHS: Record<string, string> = {
 	DropdownMenu: 'dropdown-menu',
 	Tabs: 'tabs',
 };
+const BASE_UPSTREAM_SUBPATHS: Record<string, string> = {
+	Select: 'select',
+	NavigationMenu: 'navigation-menu',
+	ScrollArea: 'scroll-area',
+};
 
 // Must match the hash in octane's `_rig.ts` so the slug+hash file names line up.
 function hashString(s: string): string {
@@ -52,8 +57,8 @@ function hashString(s: string): string {
  * class-variance-authority, clsx, tailwind-merge — resolve from this package's
  * node_modules).
  */
-function compileUpstream(name: string, ext: '.ts' | '.tsx'): void {
-	const srcPath = join(UPSTREAM_DIR, `${name}${ext}`);
+function compileUpstream(name: string, ext: '.ts' | '.tsx', base = false): void {
+	const srcPath = join(base ? join(__dirname, 'base-upstream') : UPSTREAM_DIR, `${name}${ext}`);
 	const source = readFileSync(srcPath, 'utf8');
 	const transformed = esbuildTransformSync(source, {
 		loader: 'tsx',
@@ -67,7 +72,7 @@ function compileUpstream(name: string, ext: '.ts' | '.tsx'): void {
 		/from\s*["']\.\/([\w-]+)["']/g,
 		'from "./upstream-$1.js"',
 	);
-	writeFileSync(join(CACHE_DIR, `upstream-${name}.js`), rewritten);
+	writeFileSync(join(CACHE_DIR, `${base ? 'base' : 'upstream'}-${name}.js`), rewritten);
 }
 
 function compileFixture(srcPath: string): void {
@@ -92,6 +97,11 @@ function compileFixture(srcPath: string): void {
 	// Dialog/Menu/Tabs graphs. Relative source imports still use the aggregate
 	// barrel as a fallback for any future multi-component fixture.
 	const rewritten = transformed.code
+		.replace(/from\s*["']@octanejs\/shadcn\/base-ui\/(\w+)["']/g, (specifier, subpath) => {
+			const name = BASE_UPSTREAM_SUBPATHS[subpath];
+			if (!name) throw new Error(`No pinned Base UI reference for ${subpath}`);
+			return `from "./base-${name}.js"`;
+		})
 		.replace(/from\s*["']@octanejs\/shadcn\/([\w-]+)["']/g, (_match, subpath: string) => {
 			const moduleName = UPSTREAM_SUBPATHS[subpath] ?? 'index';
 			return `from "./upstream-${moduleName}.js"`;
@@ -128,6 +138,7 @@ export async function setup(): Promise<void> {
 	compileUpstream('dialog', '.tsx');
 	compileUpstream('dropdown-menu', '.tsx');
 	compileUpstream('index', '.ts');
+	for (const name of Object.values(BASE_UPSTREAM_SUBPATHS)) compileUpstream(name, '.tsx', true);
 	for (const fixturePath of walk(join(FIXTURE_DIR, 'shadcn-diff'))) {
 		compileFixture(fixturePath);
 	}

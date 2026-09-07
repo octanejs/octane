@@ -16,8 +16,17 @@ import { fileURLToPath } from 'node:url';
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BIN = resolve(PKG_ROOT, '../../node_modules/.bin/tsrx-tsc');
 
-const check = (project) =>
-	`${spawnSync(BIN, ['--noEmit', '-p', project], { cwd: PKG_ROOT, encoding: 'utf8' }).stdout ?? ''}`;
+function check(project) {
+	const result = spawnSync(BIN, ['--noEmit', '-p', project], { cwd: PKG_ROOT, encoding: 'utf8' });
+	if (result.error) throw result.error;
+	const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+	if (result.status !== 0 && !/error TS/.test(output)) {
+		throw new Error(
+			`tsrx-tsc failed for ${project} (${result.signal ?? result.status}):\n${output}`,
+		);
+	}
+	return output;
+}
 
 // Two programs, because they prove different things. `tsconfig.json` covers the
 // authored sources. `tsconfig.consumer.json` covers tests/types/, which imports

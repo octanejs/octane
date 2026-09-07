@@ -7,7 +7,7 @@ import {
 } from '@octanejs/aria/components';
 import type { TabPanelProps, TabProps, TabsProps } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export function Tabs({ className, ...props }: TabsProps) {
 	return <TabsPrimitive

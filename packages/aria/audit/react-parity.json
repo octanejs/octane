@@ -3,26 +3,33 @@
   "$schema": "../../hook-form/audit/react-parity.schema.json",
   "provenance": {
     "repo": "https://github.com/adobe/react-spectrum.git",
-    "version": "react-aria@3.50.0; react-aria-components@1.19.0; react-stately@3.48.0",
-    "commit": "1c84a49a1faf50b571c84e00bcf9c60b22ddd03e",
+    "version": "react-aria@3.51.0; react-aria-components@1.20.0; react-stately@3.49.0",
+    "commit": "5ecb3333001313e83898cd07644227897e3bae1f",
     "sourceRoot": "packages/react-aria/src; packages/react-aria-components/src; packages/react-stately/src",
     "testRoot": "packages/react-aria/test; packages/react-aria-components/test; packages/react-stately/test",
     "license": "Apache-2.0",
-    "integrity": "sha256:dcad3293f0f7438705f72cdd7df03351476aeaba7d0d2743c7ad6d8130aff56f",
+    "integrity": "sha256:775b11dacccd090af9b3a59f47b17dcf03efd7cf09be32b5b8e94dc707167b86",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/aria/src"], "include": ["\\.(?:ts|tsx|tsrx)$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/aria/src"],
+      "include": ["\\.(?:ts|tsx|tsrx)$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/aria/tests"],
-      "include": ["\\.test\\.(?:ts|tsx|tsrx)$"],
+      "include": ["/token-field-value\\.test\\.ts$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
+    "inventoryEntries": 96,
+    "uniqueIdentities": 96,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -33,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "d53564aca674656a4daa1e12f997fc6185e2a577fea4421e59c46a850d71d157"
+      "lockfileSha256": "39855a8c7500f84c6936608a5feaa8ac9eabe76c61c7e07cd3c98dbb4f2ee357"
     }
   },
   "lanes": [
@@ -53,8 +60,8 @@
           "cases": [
             {
               "id": "differential:aria-interactions-press",
-              "testName": "usePress: pointer press start → pressed state → press sequence, byte-identical",
-              "fullName": "differential: @octanejs/aria vs real react-aria on React usePress: pointer press start → pressed state → press sequence, byte-identical"
+              "testName": "usePress: pointer press start \u2192 pressed state \u2192 press sequence, byte-identical",
+              "fullName": "differential: @octanejs/aria vs real react-aria on React usePress: pointer press start \u2192 pressed state \u2192 press sequence, byte-identical"
             },
             {
               "id": "differential:aria-usehover-pointer-enter-leave-toggles-hover-state",
@@ -346,6 +353,88 @@
           "path": "packages/aria/tests/_fixtures/aria-diff-tree-table.tsrx",
           "role": "support",
           "sha256": "aac296ea6fe592c3c69822aad592d209085b577d64f5df485da5b6b1dd5e7344"
+        },
+        {
+          "path": "packages/aria/tests/differential/parity-120.test.ts",
+          "role": "test",
+          "cases": [
+            {
+              "id": "differential:aria-120-shortcut-propagation",
+              "testName": "matches exact shortcut handling, repeat/composition filtering, and propagation",
+              "fullName": "React Aria 1.20 differential behavior matches exact shortcut handling, repeat/composition filtering, and propagation"
+            },
+            {
+              "id": "differential:aria-120-token-field-markup",
+              "testName": "matches token, label, and description markup",
+              "fullName": "React Aria 1.20 differential behavior matches token, label, and description markup"
+            }
+          ],
+          "sha256": "a6c353f9ad8d2c2a88f9281f8b90d4fef1a7488921f247af14bf5a47cf9306a6"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-120.tsrx",
+          "role": "support",
+          "sha256": "e7b4a1dfe330e1ba693eabe8b85c63432b73b457af0a67cde404b147f15fb275"
+        }
+      ]
+    },
+    {
+      "id": "aria-token-value-pristine",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "aria-token-value-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Complete 96-case TokenFieldValue file only; other React Spectrum runtime and type suites are not claimed.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/aria/audit/token-value-pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/aria/audit/token-value-pristine.json",
+          "role": "support",
+          "sha256": "d45a663dd21ca1fb53663912f5213fe365afd0bee8b3718d4f9a94302f911326"
+        },
+        {
+          "path": "packages/aria/upstream/react-stately/src/tokenfield/TokenFieldValue.ts",
+          "role": "support",
+          "sha256": "606970b1c97cb46bca141973a6671b7bdc91c50ec8e221676a605cd730b14a80"
+        },
+        {
+          "path": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+          "role": "support",
+          "sha256": "b26ffd58bf8b6af71ad7b4b9faec33bb500631c27df300633ccbabc5b89dc222"
+        }
+      ]
+    },
+    {
+      "id": "aria-token-value-adapted",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "aria-token-value-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Complete 96-case TokenFieldValue file only; other React Spectrum runtime and type suites are not claimed.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/aria/audit/token-value-adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/aria/audit/token-value-adapted.json",
+          "role": "support",
+          "sha256": "ab30820d4eb001e3bf571ce275783f6ed7c19ef9adf6d0f8805a4871209c0a5a"
+        },
+        {
+          "path": "packages/aria/src/stately/tokenfield/TokenFieldValue.tsx",
+          "role": "support",
+          "sha256": "1a09937f2c9462a08af7018eca5bfcae1889568a1146da29ab9232473f615b09"
+        },
+        {
+          "path": "packages/aria/tests/token-field-value.test.ts",
+          "role": "support",
+          "sha256": "c5895bf8ae0567d197c9e33390c872ae928bf3a1a673322d16649ba9b3e67db5"
         }
       ]
     }

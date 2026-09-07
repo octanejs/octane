@@ -11,7 +11,7 @@ import {
 	type SwitchRenderProps,
 } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export function Switch({ className, size = 'default', children, ...props }: SwitchPrimitiveProps & {
 	size?: 'sm' | 'default';

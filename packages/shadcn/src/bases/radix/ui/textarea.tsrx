@@ -3,7 +3,7 @@
 //
 // Octane divergence (shadcn-native-input-events): per-keystroke handling is the native `onInput` event, not
 // a synthetic `onChange`; native `change` keeps its commit-on-blur meaning.
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export interface TextareaProps extends HostProps<'textarea'> {}

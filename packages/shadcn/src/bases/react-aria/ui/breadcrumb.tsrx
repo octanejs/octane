@@ -15,7 +15,7 @@ import {
 	type LinkProps,
 } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 import { ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';
 

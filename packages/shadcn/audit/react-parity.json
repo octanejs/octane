@@ -3,18 +3,29 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/shadcn-ui/ui.git",
-    "version": "4baadbc6517070ae8f8feb2c97037adc2b305544 + shadcn@4.14.1",
-    "commit": "4baadbc6517070ae8f8feb2c97037adc2b305544",
+    "version": "7c9eaba1c0a6404c990c144a654792e3313c650d + shadcn@4.21.0",
+    "commit": "7c9eaba1c0a6404c990c144a654792e3313c650d",
     "sourceRoot": "apps/v4/registry",
     "testRoot": "apps/v4/registry (calendar.test.ts, config.test.ts); packages/shadcn/src; packages/shadcn/test/fixtures",
     "license": "MIT",
-    "integrity": "sha256:015a8c4972120e794fa648ef6604fdd0ff94d4748c9308b0cfe147c177b5df4a",
+    "integrity": "sha256:21e50e002f243fefc94f4a47cd66c0babf5041f2c69b8be34a18e89c9cf16523",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "insufficient",
+    "types": "absent"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/shadcn/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
-    "tests": { "roots": ["packages/shadcn/tests"], "include": ["\\.test\\.tsx?$"], "exclude": [] }
+    "source": {
+      "roots": ["packages/shadcn/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/shadcn/tests"],
+      "include": ["\\.test\\.tsx?$"],
+      "exclude": []
+    }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,
@@ -29,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "d53564aca674656a4daa1e12f997fc6185e2a577fea4421e59c46a850d71d157"
+      "lockfileSha256": "39855a8c7500f84c6936608a5feaa8ac9eabe76c61c7e07cd3c98dbb4f2ee357"
     }
   },
   "lanes": [
@@ -69,8 +80,8 @@
             },
             {
               "id": "differential:shadcn-dropdown-upstream",
-              "testName": "DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item — byte-identical",
-              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item — byte-identical"
+              "testName": "DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item \u2014 byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item \u2014 byte-identical"
             }
           ]
         },
@@ -102,7 +113,7 @@
         {
           "path": "packages/shadcn/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "2fcdbe409fb9c07c80c599297613c0fee6807c5b58b03c8fdeb720fd58ac962a"
+          "sha256": "ff1bf8c3a01f8ed04c8348e05ec304582f479c27e98d787214c490ac33194c3c"
         },
         {
           "path": "packages/shadcn/tests/differential/upstream/index.ts",
@@ -147,12 +158,95 @@
         {
           "path": "packages/shadcn/audit/test-classifications.json",
           "role": "support",
-          "sha256": "7f42c85513823d9ed516e46c2ea3d8e96ed449533f1c9cb2299eb451e76d9960"
+          "sha256": "396be46ecb983be6ebc2294a06a37eaf1a9d5df54bcff4998e68ef98a9773b27"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
           "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+        }
+      ]
+    },
+    {
+      "id": "shadcn-base-ui-release-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "shadcn-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Three bounded same-fixture React/Octane comparisons using the release Base UI source, Nova stylesheet and Lucide icon transforms. See UPSTREAM.md for retained prior Radix lineage and full scope limits.",
+      "files": [
+        {
+          "path": "packages/shadcn/tests/differential/base-ui-latest.test.ts",
+          "role": "test",
+          "sha256": "acaca06f68378514fcbc1c01ae22ced793f315e570819d2f3c112422b8f95986",
+          "cases": [
+            {
+              "id": "differential:shadcn-base-select",
+              "testName": "Select preserves selected labels and controlled updates",
+              "fullName": "differential: shadcn 4.21 Base UI wrappers Select preserves selected labels and controlled updates"
+            },
+            {
+              "id": "differential:shadcn-base-navigation-menu",
+              "testName": "NavigationMenu preserves links, active state and trigger markup",
+              "fullName": "differential: shadcn 4.21 Base UI wrappers NavigationMenu preserves links, active state and trigger markup"
+            },
+            {
+              "id": "differential:shadcn-base-scroll-area",
+              "testName": "ScrollArea preserves viewport content and horizontal scrollbar markup",
+              "fullName": "differential: shadcn 4.21 Base UI wrappers ScrollArea preserves viewport content and horizontal scrollbar markup"
+            }
+          ]
+        },
+        {
+          "path": "packages/shadcn/tests/differential/base-upstream/select.tsx",
+          "role": "support",
+          "sha256": "55152cd70652219f84880774bbe9b4d24802fce03c1988bf30fd51aec9ff59f9"
+        },
+        {
+          "path": "packages/shadcn/upstream/base/select.tsx",
+          "role": "support",
+          "sha256": "6348d30035b68867d5efffe9b0b1611718226bef9fdeef9554349d6b98252110"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/base-upstream/navigation-menu.tsx",
+          "role": "support",
+          "sha256": "d2fa961e169c826afb1e2f9fc9d53e6b720b30209482531127bc01f429b28148"
+        },
+        {
+          "path": "packages/shadcn/upstream/base/navigation-menu.tsx",
+          "role": "support",
+          "sha256": "37074909a349319adc1f90ab122c46730103b5bf752915de27fb10ab25b90f65"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/base-upstream/scroll-area.tsx",
+          "role": "support",
+          "sha256": "5241fa2511e76bd32f79fda767621441faf6342f7051cbcbbc314f13b540a872"
+        },
+        {
+          "path": "packages/shadcn/upstream/base/scroll-area.tsx",
+          "role": "support",
+          "sha256": "7e49845827447091a6493473779a05ba45cb8302e3703a6f9e4225dd6315cce2"
+        },
+        {
+          "path": "packages/shadcn/tests/_fixtures/shadcn-diff/base-ui-latest.tsrx",
+          "role": "support",
+          "sha256": "9f43f71b8bbb6d1592f1c1e3b8d55ab05411e07370aaf028c9952989f9d23888"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "ff1bf8c3a01f8ed04c8348e05ec304582f479c27e98d787214c490ac33194c3c"
+        },
+        {
+          "path": "packages/shadcn/upstream/style-nova.css",
+          "role": "support",
+          "sha256": "5d5751579c015b61e77cf0822862a43ac79f3e6fed236a17624be8e6d1ebea1d"
+        },
+        {
+          "path": "packages/shadcn/audit/shadcn-4.21.0.json",
+          "role": "support",
+          "sha256": "4da160e4ba1df9223e3370569293cbffe922cfb57c600074a84a5ed49e829e1a"
         }
       ]
     }

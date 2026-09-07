@@ -21,7 +21,7 @@
 // Indicator to match the extra part.
 import { Progress as ProgressPrimitive } from '@octanejs/base-ui/progress';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface ProgressProps extends Record<string, unknown> {
 	className?: string;

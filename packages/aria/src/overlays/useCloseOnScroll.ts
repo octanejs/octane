@@ -1,10 +1,15 @@
+import { addEvent } from '../utils/domHelpers';
 // Ported from react-aria (source: .react-spectrum/packages/react-aria/src/overlays/useCloseOnScroll.ts).
 // octane adaptations: public-hook slot threading (splitSlot/subSlot) per the binding
 // convention; the explicit dependency array is kept verbatim.
 //
 // NOTE: ported ahead of the rest of the overlays area because useOverlayTrigger (needed by
 // useMenuTrigger) shares its `onCloseMap` backward-compatibility channel.
-import { getEventTarget, nodeContains } from '../utils/shadowdom/DOMFunctions';
+import {
+	getEventTarget,
+	getPropagationTargets,
+	nodeContains,
+} from '../utils/shadowdom/DOMFunctions';
 import type { RefObject } from '@react-types/shared';
 import { useEffect } from 'octane';
 
@@ -64,10 +69,7 @@ export function useCloseOnScroll(...args: any[]): void {
 				}
 			};
 
-			window.addEventListener('scroll', onScroll, true);
-			return () => {
-				window.removeEventListener('scroll', onScroll, true);
-			};
+			return addEvent(getPropagationTargets(triggerRef.current), 'scroll', onScroll, true);
 		},
 		[isOpen, onClose, triggerRef],
 		subSlot(slot, 'scroll'),

@@ -15,16 +15,17 @@ pnpm add @octanejs/aria
 - `@octanejs/aria` — the `react-aria` behavior-hook surface.
 - `@octanejs/aria/stately` — the `react-stately` state-hook surface.
 - `@octanejs/aria/components` — the complete public export surface of
-  `react-aria-components@1.19.0`.
+  `react-aria-components@1.20.0`.
 
 Ported from the pinned `adobe/react-spectrum` checkout at commit
-`1c84a49a1faf50b571c84e00bcf9c60b22ddd03e`, which publishes
-`react-aria@3.50.0`, `react-stately@3.48.0`, and
-`react-aria-components@1.19.0`. The components entry point has an exact checked
-crosswalk: all 280 runtime exports and all 313 type exports match the pinned
+`5ecb3333001313e83898cd07644227897e3bae1f`, which publishes
+`react-aria@3.51.0`, `react-stately@3.49.0`, and
+`react-aria-components@1.20.0`. The components entry point has an exact checked
+crosswalk: all 286 runtime exports and all 327 type exports match the pinned
 package, with no missing or extra names. Existing families retain differential
 tests against React; calendar/date, color, drag and drop, file, data, toast, and
-layout additions have focused public-behavior coverage.
+layout additions have focused public-behavior coverage. The 1.20 release adds
+TokenField and PreviewTrigger, keyboard shortcut bindings, and context-menu triggers.
 
 Status, supported surface, and known divergences: `status.json` (rendered into
 `docs/bindings-status.md`). Source provenance and refresh instructions:

@@ -15,7 +15,7 @@
 import { createElement, Fragment, type OctaneNode } from 'octane';
 import { Tooltip as TooltipPrimitive } from '@octanejs/base-ui/tooltip';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface TooltipProviderProps extends Record<string, unknown> {
 	delay?: number;

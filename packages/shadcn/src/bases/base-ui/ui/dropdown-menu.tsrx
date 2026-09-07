@@ -41,7 +41,7 @@ import { type OctaneNode } from 'octane';
 import { Menu as MenuPrimitive } from '@octanejs/base-ui/menu';
 import { CheckIcon, ChevronRightIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 

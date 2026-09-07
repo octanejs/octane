@@ -532,8 +532,12 @@ class DragSession {
 
 		let minDistance = Infinity;
 		let nearest = -1;
+		let ancestor = -1;
 		for (let i = 0; i < this.validDropTargets.length; i++) {
 			let dropTarget = this.validDropTargets[i];
+			if (ancestor < 0 && nodeContains(dropTarget.element, this.dragTarget.element)) {
+				ancestor = i;
+			}
 			let rect = dropTarget.element.getBoundingClientRect();
 			let dx = rect.left - dragTargetRect.left;
 			let dy = rect.top - dragTargetRect.top;
@@ -544,7 +548,7 @@ class DragSession {
 			}
 		}
 
-		return nearest;
+		return ancestor >= 0 ? ancestor : nearest;
 	}
 
 	setCurrentDropTarget(dropTarget: DropTarget | null, item?: DroppableItem): void {

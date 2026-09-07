@@ -462,7 +462,7 @@ function useFocusContainment(
 					// If a focus event occurs outside the active scope (e.g. user tabs from browser location bar),
 					// restore focus to the previously focused node or the first tabbable element in the active scope.
 					if (focusedNode.current) {
-						focusedNode.current.focus();
+						focusElement(focusedNode.current);
 					} else if (activeScope && activeScope.current) {
 						focusFirstInScope(activeScope.current);
 					}
@@ -496,7 +496,7 @@ function useFocusContainment(
 						let target = getEventTarget(e) as FocusableElement;
 						if (target && target.isConnected) {
 							focusedNode.current = target;
-							focusedNode.current?.focus();
+							focusElement(focusedNode.current);
 						} else if (activeScope.current) {
 							focusFirstInScope(activeScope.current);
 						}

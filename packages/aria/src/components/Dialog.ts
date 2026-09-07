@@ -19,6 +19,7 @@ import type {
 import { PopoverContext } from './Popover';
 import { PressResponder } from '../interactions/PressResponder';
 import { RootMenuTriggerStateContext } from './Menu';
+import { TextContext } from './Text';
 import { useId } from '../utils/useId';
 import { useMenuTriggerState } from '../stately/menu/useMenuTriggerState';
 import { useOverlayTrigger } from '../overlays/useOverlayTrigger';
@@ -101,6 +102,7 @@ export function DialogTrigger(props: DialogTriggerProps): any {
 				{
 					trigger: 'DialogTrigger',
 					triggerRef: buttonRef,
+					id: overlayProps.id,
 					'aria-labelledby': (overlayProps as any)['aria-labelledby'],
 				},
 			],
@@ -122,7 +124,7 @@ export function Dialog(props: DialogProps): any {
 	let originalAriaLabelledby = props['aria-labelledby'];
 	let ref: any;
 	[props, ref] = useContextProps(props, (props as any).ref, DialogContext, subSlot(slot, 'ctx'));
-	let { dialogProps, titleProps } = useDialog(
+	let { dialogProps, titleProps, contentProps } = useDialog(
 		{
 			...props,
 			// Only pass aria-labelledby from props, not context.
@@ -174,6 +176,15 @@ export function Dialog(props: DialogProps): any {
 						slots: {
 							[DEFAULT_SLOT]: {},
 							title: { ...titleProps, level: 2 },
+						},
+					},
+				],
+				[
+					TextContext,
+					{
+						slots: {
+							[DEFAULT_SLOT]: {},
+							description: contentProps,
 						},
 					},
 				],

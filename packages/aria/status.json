@@ -1,9 +1,9 @@
 {
   "upstream": {
     "package": "react-aria",
-    "version": "3.50.0"
+    "version": "3.51.0"
   },
-  "surface": "The `@octanejs/aria/components` entry point matches the complete named public surface of `react-aria-components@1.19.0`: 280 runtime exports and 313 type exports, checked in both directions with no missing or extra names. This includes calendar/date/time, color, drag-and-drop, DropZone/FileTrigger, toast, data hooks, and virtualized layout APIs in addition to the previously ported primitives, overlays, collections, Tree, and Table. The root behavior-hook and `/stately` entries remain curated React Aria 3.50.0 / React Stately 3.48.0 surfaces rather than separate full-export claims.",
+  "surface": "The `@octanejs/aria/components` entry point matches the complete named public surface of `react-aria-components@1.20.0`: 286 runtime exports and 327 type exports, checked in both directions with no missing or extra names. This includes TokenField, PreviewTrigger, calendar/date/time, color, drag-and-drop, DropZone/FileTrigger, toast, data hooks, and virtualized layout APIs in addition to the previously ported primitives, overlays, collections, Tree, and Table. The root behavior-hook and `/stately` entries remain curated React Aria 3.51.0 / React Stately 3.49.0 surfaces rather than separate full-export claims.",
   "divergences": [
     "`native-input-event-wiring`: Text-input DOM wiring uses Octane's native `onInput` per keystroke instead of React's synthetic `onChange`; public value-level callbacks are unchanged.",
     "`ref-as-prop`: React `forwardRef` wrappers become Octane ref-as-prop components.",
@@ -11,11 +11,15 @@
     "`valid-hoisted-identifiers`: The i18n server serializer keeps hoisted-string identifiers valid past 26 entries instead of emitting invalid JavaScript identifiers.",
     "`server-rtl-direction`: The SSR locale direction derives from the injected locale via `isRTL` rather than being hard-coded to `ltr`."
   ],
-  "ssr": "Dedicated Node-mode coverage verifies SSRProvider, hydration-safe labelled relationships, server snapshots, and injected LTR/RTL locales; real Vite-compiled Octane server markup is hydrated in place and remains interactive. The newly completed advanced component families have client behavior and type/export coverage but do not yet extend the package's existing SSR evidence.",
-  "verified": "2026-08-18",
+  "ssr": "Dedicated Node coverage verifies SSRProvider, labelled relationships, snapshots, LTR/RTL locales, TokenField markup, and a closed PreviewTrigger. Vite-compiled server markup hydrates in place with interactive state updates. Other advanced families retain client and type/export coverage.",
+  "verified": "2026-09-07",
   "notes": [
     "`pnpm --filter @octanejs/aria exports:check` compares the installed pinned React Aria Components declarations with the Octane components barrel in both directions.",
-    "The Aria client project passes 45 files / 370 tests, including calendar selection, localized date segments, native color input, file/drop-zone wiring, list-data mutation, toast ordering, virtualized layout geometry, and real drag-and-drop hook composition."
+    "The coordinated release has client, SSR, hydration, and React differential coverage. All 96 upstream TokenFieldValue cases also execute against both pristine source and the Octane adaptation; the broader React Spectrum suite remains recorded-unverified."
   ],
-  "docs": ["packages/aria/UPSTREAM.md", "docs/aria-migration-plan.md"]
+  "docs": [
+    "packages/aria/UPSTREAM.md",
+    "docs/aria-migration-plan.md",
+    "packages/aria/audit/release-1.20.0.json"
+  ]
 }

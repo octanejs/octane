@@ -3,7 +3,7 @@
 // @octanejs/radix; pure template JSX.
 import { Avatar as AvatarPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string } & Record<string, unknown>;
 

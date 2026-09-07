@@ -2,7 +2,7 @@
 // Verbatim (no React surface), including the NODE_ENV === 'test' direct-assignment branch
 // (jsdom has no scrollTo implementation).
 import { getScrollParents } from './getScrollParents';
-import { isIOS } from './platform';
+import { isIOS, isWebKit } from '../utils/platform';
 
 interface ScrollIntoViewOpts {
 	/** The position to align items along the block axis in. */
@@ -81,10 +81,10 @@ export function scrollIntoView(
 	let scrollPortRight = viewRight - (isRoot ? 0 : borderRightWidth) - scrollPaddingRight;
 
 	// IOS always positions the scrollbar on the right ¯\_(ツ)_/¯
-	if (viewStyle.direction === 'rtl' && !isIOS()) {
-		scrollPortLeft += scrollBarWidth;
-	} else {
+	if ((isIOS() && isWebKit()) || viewStyle.direction === 'ltr') {
 		scrollPortRight -= scrollBarWidth;
+	} else if (viewStyle.direction === 'rtl') {
+		scrollPortLeft += scrollBarWidth;
 	}
 
 	let shouldScrollBlock = scrollAreaTop < scrollPortTop || scrollAreaBottom > scrollPortBottom;

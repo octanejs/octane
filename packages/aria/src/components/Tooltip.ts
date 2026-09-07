@@ -168,8 +168,8 @@ export function Tooltip(allProps: TooltipProps): any {
 	let localState = useTooltipTriggerState(props, subSlot(slot, 'state'));
 	let state =
 		props.isOpen != null || props.defaultOpen != null || !contextState ? localState : contextState;
-	let isExiting =
-		useExitAnimation(ref, state.isOpen, subSlot(slot, 'exit')) || props.isExiting || false;
+	let exitAnimation = useExitAnimation(ref, state.isOpen, subSlot(slot, 'exit'));
+	let isExiting = props.isExiting || (!state.shouldSkipAnimation && exitAnimation) || false;
 	if (!state.isOpen && !isExiting) {
 		return null;
 	}
@@ -205,10 +205,8 @@ function TooltipInner(
 		subSlot(slot, 'position'),
 	);
 
-	let isEntering =
-		useEnterAnimation(props.tooltipRef, !!placement, subSlot(slot, 'enter')) ||
-		props.isEntering ||
-		false;
+	let enterAnimation = useEnterAnimation(props.tooltipRef, !!placement, subSlot(slot, 'enter'));
+	let isEntering = props.isEntering || (!state.shouldSkipAnimation && enterAnimation) || false;
 	let renderProps = useRenderProps(
 		{
 			...props,

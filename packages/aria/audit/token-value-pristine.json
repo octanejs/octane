@@ -1,0 +1,488 @@
+{
+  "schemaVersion": 1,
+  "project": "aria-token-value-pristine",
+  "roots": ["packages/aria/upstream/react-stately/test/tokenfield"],
+  "files": ["packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts"],
+  "tests": [
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange single text segment inserts at start (collapsed range)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange single text segment inserts at start (collapsed range)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange single text segment inserts at end (collapsed range)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange single text segment inserts at end (collapsed range)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange single text segment inserts in middle (collapsed range)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange single text segment inserts in middle (collapsed range)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange single text segment replaces a substring in the middle",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange single text segment replaces a substring in the middle"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange single text segment replaces entire segment with empty string",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange single text segment replaces entire segment with empty string"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange single text segment replaces entire segment with new text",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange single text segment replaces entire segment with new text"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange single text segment deletes a single character range",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange single text segment deletes a single character range"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange single text segment inserts text when empty",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange single text segment inserts text when empty"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange multiple text segments (no tokens) merges across two segments when selection spans boundary",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange multiple text segments (no tokens) merges across two segments when selection spans boundary"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange multiple text segments (no tokens) replaces both segments entirely with one insert",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange multiple text segments (no tokens) replaces both segments entirely with one insert"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange tokens in range removes token and merges surrounding text when selection spans token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange tokens in range removes token and merges surrounding text when selection spans token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange tokens in range replaces across token with new text",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange tokens in range replaces across token with new text"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange tokens in range removes two adjacent tokens when range covers both and following text start",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange tokens in range removes two adjacent tokens when range covers both and following text start"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange tokens in range removes multiple interior tokens between text selections",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange tokens in range removes multiple interior tokens between text selections"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange tokens in range inserts before token when range starts at token boundary (offset 0)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange tokens in range inserts before token when range starts at token boundary (offset 0)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange tokens in range inserts text before a lone token when collapsed at token start (implementation order)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange tokens in range inserts text before a lone token when collapsed at token start (implementation order)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange tokens in range inserts after token when start is inside token (offset 0)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange tokens in range inserts after token when start is inside token (offset 0)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange UTF-16 / supplementary plane inserts before an emoji using code unit offsets",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange UTF-16 / supplementary plane inserts before an emoji using code unit offsets"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange UTF-16 / supplementary plane replaces only the emoji (two code units)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange UTF-16 / supplementary plane replaces only the emoji (two code units)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange UTF-16 / supplementary plane handles combining character as two code units after base letter",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange UTF-16 / supplementary plane handles combining character as two code units after base letter"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRange UTF-16 / supplementary plane handles family emoji sequence length for offset math",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRange UTF-16 / supplementary plane handles family emoji sequence length for offset math"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRangeWithSegments matches replaceRange for a single text insert segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRangeWithSegments matches replaceRange for a single text insert segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRangeWithSegments matches replaceRange across a token when insert is one text segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRangeWithSegments matches replaceRange across a token when insert is one text segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRangeWithSegments matches replaceRange with tokenRegex when insert is one text segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRangeWithSegments matches replaceRange with tokenRegex when insert is one text segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRangeWithSegments replaceRange delegates to replaceRangeWithSegments (non-empty string)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRangeWithSegments replaceRange delegates to replaceRangeWithSegments (non-empty string)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRangeWithSegments inserts structured segments in the middle of a text run",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRangeWithSegments inserts structured segments in the middle of a text run"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue replaceRangeWithSegments does not run tokenRegex on token-only insert",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue replaceRangeWithSegments does not run tokenRegex on token-only insert"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete deletes one grapheme backward inside ASCII text",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete deletes one grapheme backward inside ASCII text"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete deletes one grapheme forward from middle of ASCII text",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete deletes one grapheme forward from middle of ASCII text"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete deletes one grapheme forward at offset 0",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete deletes one grapheme forward at offset 0"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete deletes full emoji as one grapheme backward",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete deletes full emoji as one grapheme backward"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete deletes full emoji as one grapheme forward from before emoji",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete deletes full emoji as one grapheme forward from before emoji"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete backward deletes trailing token when last segment is a token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete backward deletes trailing token when last segment is a token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete at start of text backward removes previous token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete at start of text backward removes previous token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete at start of text backward removes character from previous text segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete at start of text backward removes character from previous text segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete at end of text forward removes next token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete at end of text forward removes next token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete on token index at offset 0 backward removes previous character",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete on token index at offset 0 backward removes previous character"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete on token index at offset 0 backward removes token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete on token index at offset 0 backward removes token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete on token index at offset 0 forward removes token segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete on token index at offset 0 forward removes token segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete on token index at offset 0 forward removes next character",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete on token index at offset 0 forward removes next character"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete backward from start of second token removes first token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete backward from start of second token removes first token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete forward from start of second token removes second token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete forward from start of second token removes second token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete backward from end of first token removes first token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete backward from end of first token removes first token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete forward from end of first token removes second token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete forward from end of first token removes second token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete at first segment offset 0 backward is no-op",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete at first segment offset 0 backward is no-op"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete at end of last segment forward is a no-op",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete at end of last segment forward is a no-op"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete uses word segmenter for deleteWordBackward-style range",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete uses word segmenter for deleteWordBackward-style range"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete uses word segmenter for deleteWordForward-style range",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete uses word segmenter for deleteWordForward-style range"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete forward from end of a text segment deletes first grapheme of the next text segment (merged into one run)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete forward from end of a text segment deletes first grapheme of the next text segment (merged into one run)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete is a no-op when segments are empty",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete is a no-op when segments are empty"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete on lone token at offset 0 backward is a no-op",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete on lone token at offset 0 backward is a no-op"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete on lone token at offset 0 forward removes the token",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete on lone token at offset 0 forward removes the token"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete deletes e plus combining acute as one grapheme backward (entire cluster removed)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete deletes e plus combining acute as one grapheme backward (entire cluster removed)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete backward delete of last character leaves caret between the two tokens",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete backward delete of last character leaves caret between the two tokens"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue delete forward delete of last character leaves caret between the two tokens",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue delete forward delete of last character leaves caret between the two tokens"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText string search finds text forward in same segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText string search finds text forward in same segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText string search finds text forward starting at caret offset",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText string search finds text forward starting at caret offset"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText string search finds text backward in same segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText string search finds text backward in same segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText string search finds text backward before caret offset",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText string search finds text backward before caret offset"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText string search finds text in a later segment when searching forward",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText string search finds text in a later segment when searching forward"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText string search finds text in an earlier segment when searching backward",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText string search finds text in an earlier segment when searching backward"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText string search returns null when not found",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText string search returns null when not found"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText string search returns null for empty list",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText string search returns null for empty list"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText regex search finds regex forward in same segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText regex search finds regex forward in same segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText regex search finds regex backward for mention anchor",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText regex search finds regex backward for mention anchor"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText regex search finds regex forward starting at caret offset",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText regex search finds regex forward starting at caret offset"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText regex search finds last regex match backward before caret",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText regex search finds last regex match backward before caret"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText regex search finds regex in a later segment when searching forward",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText regex search finds regex in a later segment when searching forward"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText regex search does not mutate global regex lastIndex",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText regex search does not mutate global regex lastIndex"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText regex search returns null when regex does not match",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText regex search returns null when regex does not match"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText findLineBoundary finds newline via findText when searching backward",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText findLineBoundary finds newline via findText when searching backward"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText findLineBoundary falls back to document start when no newline before caret",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText findLineBoundary falls back to document start when no newline before caret"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue findText findLineBoundary falls back to document end when no newline after caret",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue findText findLineBoundary falls back to document end when no newline after caret"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue deleteLine (forward) deletes from caret through character before newline in same segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue deleteLine (forward) deletes from caret through character before newline in same segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue deleteLine (forward) finds newline in a later segment when none after caret in first",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue deleteLine (forward) finds newline in a later segment when none after caret in first"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue deleteLine (forward) when no newline after caret, deletes to end of last segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue deleteLine (forward) when no newline after caret, deletes to end of last segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue deleteLine (forward) uses newline after caret in same segment when multiple newlines exist",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue deleteLine (forward) uses newline after caret in same segment when multiple newlines exist"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue deleteLine (backward) deletes from newline through caret (range start is the newline code unit)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue deleteLine (backward) deletes from newline through caret (range start is the newline code unit)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue deleteLine (backward) finds newline in an earlier segment",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue deleteLine (backward) finds newline in an earlier segment"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue deleteLine (backward) when no newline before caret, deletes from document start",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue deleteLine (backward) when no newline before caret, deletes from document start"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue deleteLine empty list returns unchanged for empty segments",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue deleteLine empty list returns unchanged for empty segments"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo returns the same instance when there is nothing to undo",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo returns the same instance when there is nothing to undo"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo returns the same instance when there is nothing to redo",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo returns the same instance when there is nothing to redo"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo undo restores the prior list and redo returns to the newer list",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo undo restores the prior list and redo returns to the newer list"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo coalesces consecutive replaceRange edits into a single undo step",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo coalesces consecutive replaceRange edits into a single undo step"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo endCoalescing starts a new undo group for the next edit only",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo endCoalescing starts a new undo group for the next edit only"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo calling endCoalescing on the head before each edit keeps every change on its own undo step",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo calling endCoalescing on the head before each edit keeps every change on its own undo step"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo supports undo and redo across multiple history entries",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo supports undo and redo across multiple history entries"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo replaceRange with coalesce false does not merge into the prior coalesced group",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo replaceRange with coalesce false does not merge into the prior coalesced group"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo a new edit after undo replaces the redo branch",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo a new edit after undo replaces the redo branch"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue undo/redo coalesces consecutive delete operations into one undo step",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue undo/redo coalesces consecutive delete operations into one undo step"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue tokenize tokenizes mention when trailing space is part of the insert (lookahead in window)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue tokenize tokenizes mention when trailing space is part of the insert (lookahead in window)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue tokenize does not tokenize when space after mention exists only in suffix (outside window)",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue tokenize does not tokenize when space after mention exists only in suffix (outside window)"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue tokenize tokenizes multiple mentions in one insert",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue tokenize tokenizes multiple mentions in one insert"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue tokenize does not run tokenization on empty insert even when pattern would match full string",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue tokenize does not run tokenization on empty insert even when pattern would match full string"
+    },
+    {
+      "id": "pristine:packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts::TokenFieldValue tokenize tokenizes when pasting multiple segments",
+      "file": "packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "fullName": "TokenFieldValue tokenize tokenizes when pasting multiple segments"
+    }
+  ]
+}

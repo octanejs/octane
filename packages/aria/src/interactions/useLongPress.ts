@@ -4,7 +4,7 @@
 //   synthetic handlers); the `contextmenu` listener param carries an explicit native
 //   annotation (upstream got it contextually).
 // - Public-hook slot threading (splitSlot/subSlot) per the binding convention.
-import type { FocusableElement, LongPressEvent } from '@react-types/shared';
+import type { FocusableElement, LongPressEvent, PressEvent } from '@react-types/shared';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import { getOwnerDocument, getOwnerWindow } from '../utils/domHelpers';
 import { mergeProps } from '../utils/mergeProps';
@@ -21,6 +21,8 @@ type DOMAttributes = Record<string, any>;
 export interface LongPressProps {
 	/** Whether long press events should be disabled. */
 	isDisabled?: boolean;
+	/** Which pointer type to listen for. By default, both mouse and touch are listened for. */
+	pointerType?: 'mouse' | 'touch';
 	/** Handler that is called when a long press interaction starts. */
 	onLongPressStart?: (e: LongPressEvent) => void;
 	/**
@@ -65,6 +67,7 @@ export function useLongPress(...args: any[]): LongPressResult {
 
 	let {
 		isDisabled,
+		pointerType,
 		onLongPressStart,
 		onLongPressEnd,
 		onLongPress,
@@ -76,14 +79,20 @@ export function useLongPress(...args: any[]): LongPressResult {
 		undefined,
 		subSlot(slot, 'timer'),
 	);
-	let { addGlobalListener, removeGlobalListener } = useGlobalListeners(subSlot(slot, 'listeners'));
+	let { addGlobalListener, removeAllGlobalListeners } = useGlobalListeners(
+		subSlot(slot, 'listeners'),
+	);
+	let isAcceptedPointerType = (e: PressEvent) =>
+		pointerType
+			? e.pointerType === pointerType
+			: e.pointerType === 'mouse' || e.pointerType === 'touch';
 
 	let { pressProps } = usePress(
 		{
 			isDisabled,
 			onPressStart(e) {
 				e.continuePropagation();
-				if (e.pointerType === 'mouse' || e.pointerType === 'touch') {
+				if (isAcceptedPointerType(e)) {
 					if (onLongPressStart) {
 						onLongPressStart({
 							...e,
@@ -94,6 +103,9 @@ export function useLongPress(...args: any[]): LongPressResult {
 					timeRef.current = setTimeout(() => {
 						// Prevent other usePress handlers from also handling this event.
 						e.target.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true }));
+
+						// Prevent default click action (e.g. opening a link) after a long press.
+						addGlobalListener(e.target, 'click', (e) => e.preventDefault(), { once: true });
 
 						// Ensure target is focused. On touch devices, browsers typically focus on pointer up.
 						if (getOwnerDocument(e.target).activeElement !== e.target) {
@@ -111,25 +123,24 @@ export function useLongPress(...args: any[]): LongPressResult {
 
 					// Prevent context menu, which may be opened on long press on touch devices
 					if (e.pointerType === 'touch') {
-						let onContextMenu = (e: Event) => {
-							e.preventDefault();
-						};
-
-						let ownerWindow = getOwnerWindow(e.target);
-						addGlobalListener(e.target, 'contextmenu', onContextMenu, { once: true });
-						addGlobalListener(
-							ownerWindow,
-							'pointerup',
-							() => {
-								// If no contextmenu event is fired quickly after pointerup, remove the handler
-								// so future context menu events outside a long press are not prevented.
-								setTimeout(() => {
-									removeGlobalListener(e.target, 'contextmenu', onContextMenu);
-								}, 30);
-							},
-							{ once: true },
-						);
+						addGlobalListener(e.target, 'contextmenu', (e: Event) => e.preventDefault(), {
+							once: true,
+						});
 					}
+
+					let ownerWindow = getOwnerWindow(e.target);
+					addGlobalListener(
+						ownerWindow,
+						'pointerup',
+						() => {
+							// If no contextmenu event is fired quickly after pointerup, remove the handler
+							// so future context menu events outside a long press are not prevented.
+							setTimeout(() => {
+								removeAllGlobalListeners();
+							}, 100);
+						},
+						{ once: true },
+					);
 				}
 			},
 			onPressEnd(e) {
@@ -137,7 +148,7 @@ export function useLongPress(...args: any[]): LongPressResult {
 					clearTimeout(timeRef.current);
 				}
 
-				if (onLongPressEnd && (e.pointerType === 'mouse' || e.pointerType === 'touch')) {
+				if (onLongPressEnd && isAcceptedPointerType(e)) {
 					onLongPressEnd({
 						...e,
 						type: 'longpressend',
