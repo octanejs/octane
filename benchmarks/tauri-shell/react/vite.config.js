@@ -8,7 +8,6 @@ export default defineConfig({
 	base: './',
 	build: {
 		target: 'esnext',
-		minify: 'terser',
-		terserOptions: { compress: { passes: 2, toplevel: true }, mangle: { toplevel: true } },
+		minify: 'esbuild',
 	},
 });

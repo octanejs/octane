@@ -16,11 +16,7 @@ export default defineConfig({
 	},
 	build: {
 		target: 'esnext',
-		minify: 'terser',
-		terserOptions: {
-			compress: { passes: 3, reduce_vars: false, inline: 0, toplevel: true },
-			mangle: { toplevel: true },
-		},
+		minify: 'esbuild',
 		rollupOptions: {
 			input: {
 				octane: fileURLToPath(new URL('./octane.html', import.meta.url)),

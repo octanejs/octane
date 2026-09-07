@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "catalog:default",
-    "terser": "catalog:default",
+    "esbuild": "catalog:default",
     "vite": "catalog:default"
   }
 }
