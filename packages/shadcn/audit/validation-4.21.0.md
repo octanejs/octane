@@ -16,8 +16,8 @@ or every shadcn family.
   pass the shared verification helpers.
 - The real `shadcn@4.21.0 add` dry run resolves Select, Navigation Menu and Scroll
   Area to three `.tsrx` files with the correct four dependencies. A full external
-  install stops at npm because merged `@octanejs/base-ui@0.1.51` has not yet been
-  published. Workspace tests exercise the merged source.
+  install also succeeds after Base UI publication propagated, creating all three
+  wrappers and installing their dependencies.
 
 ## Regressions fixed during integration
 

@@ -69,5 +69,5 @@ differential, SSR, hydration, type, and registry checks. Keep older reference
 lineage explicit when local adaptations are retained.
 
 The release CLI resolves the three new registry entries in a dry run. A full
-external install currently awaits publication of the merged
-`@octanejs/base-ui@0.1.51` dependency; workspace tests exercise the merged source.
+external install also succeeds, creating all three wrappers and installing their
+dependencies after the merged Base UI release was published.

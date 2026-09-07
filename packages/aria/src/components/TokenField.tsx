@@ -12,7 +12,7 @@
  * governing permissions and limitations under the License.
  */
 
-import type { OctaneNode } from 'octane';
+import { isChildrenBlock, type OctaneNode } from 'octane';
 import { AriaTokenFieldProps } from '../upstream-exports/react-aria/useTokenField';
 import {
 	ClassNameOrFunction,
@@ -301,7 +301,8 @@ export const TokenInput = /*#__PURE__*/ (forwardRef as any)(function TokenInput<
 				{state.value.segments.map((v, i) => {
 					switch (v.type) {
 						case 'token': {
-							let token = children(v);
+							// Compiled template children are blocks, not per-token render callbacks.
+							let token = isChildrenBlock(children) ? children : children(v);
 							return (
 								// Wrap tokens in zero-width spaces so the cursor is placed correctly.
 								<span key={i}>

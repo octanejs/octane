@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { act, mount } from '../../octane/tests/_helpers';
-import { Preview, Shortcuts, Tokens } from './_fixtures/aria-120.tsrx';
+import { Preview, Shortcuts, Tokens, TokenBlocks } from './_fixtures/aria-120.tsrx';
 
 describe('React Aria Components 1.20 additions', () => {
+	it('renders TokenInput template children without calling them as a render prop', () => {
+		const view = mount(TokenBlocks);
+		try {
+			const input = view.container.querySelector('[role="textbox"]')!;
+			expect(input.querySelector('[contenteditable="false"]')?.textContent).toBe('Ada');
+			expect(input.textContent?.replace(/\u200b/g, '')).toBe('Ada');
+		} finally {
+			view.unmount();
+		}
+	});
 	it('labels a token field and renders text and noneditable tokens', () => {
 		const view = mount(Tokens, {});
 		try {

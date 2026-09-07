@@ -38,6 +38,19 @@ export function Preview() {
 	</PreviewTrigger>;
 }
 
+export function TokenBlocks() @{
+	<TokenField
+		defaultValue={new TokenFieldValue([
+			{ type: 'token', text: 'Ada' },
+		])}
+	>
+		<Label>Recipient</Label>
+		<TokenInput>
+			<Token>Ada</Token>
+		</TokenInput>
+	</TokenField>
+}
+
 export function Shortcuts() {
 	const [count, setCount] = useState(0);
 	const [bubbles, setBubbles] = useState(0);

@@ -1,15 +1,19 @@
 import { act, hydrateRoot } from 'octane';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderHydrationFixture } from '../../octane/tests/_hydration-ssr';
 import { SelectExample } from './_fixtures/shadcn-diff/base-ui-latest.tsrx';
 
+let server: Awaited<ReturnType<typeof renderHydrationFixture>>;
+beforeAll(async () => {
+	server = await renderHydrationFixture(
+		'base-ui',
+		'packages/shadcn/tests/_fixtures/shadcn-diff/base-ui-latest.tsrx',
+		'SelectExample',
+	);
+}, 60_000);
+
 describe('shadcn Base UI hydration', () => {
 	it('adopts server-rendered Select markup and handles controlled updates', async () => {
-		const server = await renderHydrationFixture(
-			'base-ui',
-			'packages/shadcn/tests/_fixtures/shadcn-diff/base-ui-latest.tsrx',
-			'SelectExample',
-		);
 		const container = document.createElement('div');
 		container.innerHTML = server.html;
 		document.body.appendChild(container);

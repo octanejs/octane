@@ -41,7 +41,7 @@ test('Aria crosswalk generation rejects a checkout at the wrong commit', () => {
 					['packages/aria/scripts/build-upstream-crosswalk.mjs', checkout],
 					{ cwd: REPO, encoding: 'utf8', stdio: 'pipe' },
 				),
-			/pinned to 1c84a49a1faf50b571c84e00bcf9c60b22ddd03e/,
+			/pinned to 5ecb3333001313e83898cd07644227897e3bae1f/,
 		);
 	} finally {
 		rmSync(checkout, { recursive: true, force: true });
