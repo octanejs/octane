@@ -9,6 +9,7 @@ import { tanstackStart } from '@octanejs/tanstack-start/plugin/vite';
 // (octane-minimal) and the nitro .output flavor (octane-nitro); their delta is
 // the deployment host's overhead, isolated from the renderer's.
 export default defineConfig({
+	build: { minify: 'esbuild' },
 	server: { port: 3000 },
 	plugins: [tanstackStart()],
 });

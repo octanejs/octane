@@ -1,5 +1,8 @@
 # Octane benchmarks
 
+Benchmark Vite builds use `build.minify: 'esbuild'`. Untimed diagnostic builds
+that inspect function names or generated code keep minification disabled.
+
 A set of self-contained benchmark suites, each a pnpm workspace of fixture apps
 (octane + reference frameworks) plus a Playwright/Node harness. Every suite can
 be run on its own; **`benchmarks/bench.mjs` is the unified runner** that boots the
@@ -308,8 +311,7 @@ numbers). They are the regression gates for
 `docs/compiled-output-optimization-plan.md`: `codegen-size` is the seconds-fast
 per-commit signal (its corpus is FIXED — editing the corpus list invalidates the
 baseline, re-record when you change it), `bundle-size` is the cross-framework
-comparison (all targets built with one normalized minify so solid's
-`minify:false` dev config and octane's terser passes don't skew the compare).
+comparison (all targets built with `minify: 'esbuild'`).
 The separate `codegen-size` CSS targets also build the real Rspack/CssExtract
 adapter with named exports and authenticated immutable default maps. They compare
 identical source with the option off/on, keep framework imports external for byte

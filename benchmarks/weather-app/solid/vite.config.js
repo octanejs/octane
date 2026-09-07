@@ -12,6 +12,6 @@ export default defineConfig({
 		conditions: ['solid', 'browser', 'module', 'import', 'default'],
 	},
 	publicDir: '../shared/public',
-	build: { target: 'esnext' },
+	build: { minify: 'esbuild', target: 'esnext' },
 	server: { port: 5295, strictPort: true },
 });

@@ -52,7 +52,7 @@ async function buildEntry(entry, output, ssr) {
 			lib: { entry, formats: ['es'], fileName: () => path.basename(output) },
 			outDir: path.dirname(output),
 			emptyOutDir: true,
-			minify: true,
+			minify: 'esbuild',
 			target: 'node22',
 		},
 	});
