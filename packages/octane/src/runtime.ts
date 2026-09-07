@@ -3138,7 +3138,7 @@ function journalControlledOption(option: HTMLOptionElement, withDefault: boolean
  */
 interface ParkedItem {
 	block: Block;
-	/** Root-owned rows stay connected; their range is read only if rollback needs it. */
+	/** Owned ranges need no saved nodes; borrowed markers retain only their original content. */
 	nodes: Node[] | null;
 }
 let PARKED_ITEMS: ParkedItem[] | null = null;
@@ -3148,7 +3148,10 @@ function parkItemForHold(block: Block): void {
 	const retainConnected = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
 	if (retainConnected) retireRootBlock(block);
 	let nodes: Node[] | null = null;
-	if (!retainConnected) {
+	// An @empty block borrows the list's markers. Its range may gain fresh rows
+	// before commit, so tearing down the whole live range would delete those rows.
+	// Save just its original content while leaving it connected through cleanup.
+	if (!retainConnected || block.exclusiveMarkers) {
 		nodes = [];
 		const start = block.startMarker;
 		const end = block.endMarker;
@@ -3160,7 +3163,7 @@ function parkItemForHold(block: Block): void {
 				const stop = exclusive ? end : end.nextSibling;
 				while (n !== null && n !== stop) {
 					const next: Node | null = getNextSibling(n);
-					parent.removeChild(n);
+					if (!retainConnected) parent.removeChild(n);
 					nodes.push(n);
 					n = next;
 				}
