@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
+import { prerender } from 'octane/static';
 import {
 	createElement as createClientElement,
 	flushSync,
@@ -1130,7 +1131,7 @@ describe('SSR, hoisted head channel', () => {
 
 	it('prepends metadata to a fragment even when its content mentions a head close', async () => {
 		// Raw HTML can contain these bytes without turning the fragment into a document.
-		for (const render of [RT.renderToString, RT.renderToStaticMarkup, RT.prerender]) {
+		for (const render of [RT.renderToString, RT.renderToStaticMarkup, prerender]) {
 			const folded = await render(fragmentWithHeadText.Page);
 			const separate = await render(fragmentWithHeadText.Page, undefined, {
 				headChannel: 'separate',
@@ -1147,7 +1148,7 @@ describe('SSR, hoisted head channel', () => {
 
 	it('places metadata inside an authored or synthesized document head', async () => {
 		for (const document of [documentPages.WithHead, documentPages.WithoutHead]) {
-			for (const render of [RT.renderToString, RT.renderToStaticMarkup, RT.prerender]) {
+			for (const render of [RT.renderToString, RT.renderToStaticMarkup, prerender]) {
 				const { html } = await render(document);
 				const headOpen = html.indexOf('<head>');
 				const title = html.indexOf('<title>Document title</title>');
