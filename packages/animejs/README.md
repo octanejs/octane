@@ -11,7 +11,7 @@ npm install @octanejs/animejs
 pnpm add @octanejs/animejs
 ```
 
-The exact upstream pin, supported entry points, explicit subpath gaps, and test
+The exact upstream pin, supported entry points and test
 dispositions are recorded in [`UPSTREAM.md`](./UPSTREAM.md).
 
 ```tsx
@@ -38,6 +38,19 @@ export function Logo() @{
 The scope is created after the root mounts, recreated when the dependency list
 changes, and reverted during cleanup. Effects do not run during server
 rendering.
+
+## Subpath imports
+
+Every Anime.js runtime subpath is available at the same path under this package,
+including `animation`, `timeline`, `svg`, `text`, `adapters`, and
+`easings/cubic-bezier`. These entries forward the upstream module directly:
+
+```ts
+import { animate } from '@octanejs/animejs/animation';
+import { cubicBezier } from '@octanejs/animejs/easings/cubic-bezier';
+```
+
+The Octane-only `useAnimeScope` hook remains a root export.
 
 ## Three.js
 

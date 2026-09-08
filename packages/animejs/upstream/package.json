@@ -1,0 +1,234 @@
+{
+  "name": "animejs",
+  "version": "4.5.0",
+  "description": "JavaScript animation engine",
+  "homepage": "https://animejs.com",
+  "author": "Julian Garnier <julian@animejs.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juliangarnier/anime.git"
+  },
+  "bugs": {
+    "url": "https://github.com/juliangarnier/anime/issues"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/juliangarnier"
+  },
+  "keywords": [
+    "anime",
+    "animejs",
+    "anime.js",
+    "timer",
+    "animation",
+    "timeline",
+    "animatable",
+    "draggable",
+    "scope",
+    "engine",
+    "scroll",
+    "easings",
+    "cubic-bezier",
+    "spring",
+    "splitText",
+    "CSS",
+    "SVG",
+    "WAAPI",
+    "Canvas",
+    "WebGL",
+    "treejs",
+    "tree.js"
+  ],
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "./dist/modules/adapters/**",
+    "./src/adapters/**"
+  ],
+  "type": "module",
+  "main": "./dist/modules/index.cjs",
+  "module": "./dist/modules/index.js",
+  "types": "./dist/modules/index.d.ts",
+  "jsdelivr": "./dist/bundles/anime.umd.min.js",
+  "unpkg": "./dist/bundles/anime.umd.min.js",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/modules/index.d.ts",
+      "require": "./dist/modules/index.cjs",
+      "import": "./dist/modules/index.js",
+      "default": "./dist/modules/index.cjs"
+    },
+    "./timer": {
+      "types": "./dist/modules/timer/index.d.ts",
+      "require": "./dist/modules/timer/index.cjs",
+      "import": "./dist/modules/timer/index.js",
+      "default": "./dist/modules/timer/index.cjs"
+    },
+    "./animation": {
+      "types": "./dist/modules/animation/index.d.ts",
+      "require": "./dist/modules/animation/index.cjs",
+      "import": "./dist/modules/animation/index.js",
+      "default": "./dist/modules/animation/index.cjs"
+    },
+    "./timeline": {
+      "types": "./dist/modules/timeline/index.d.ts",
+      "require": "./dist/modules/timeline/index.cjs",
+      "import": "./dist/modules/timeline/index.js",
+      "default": "./dist/modules/timeline/index.cjs"
+    },
+    "./animatable": {
+      "types": "./dist/modules/animatable/index.d.ts",
+      "require": "./dist/modules/animatable/index.cjs",
+      "import": "./dist/modules/animatable/index.js",
+      "default": "./dist/modules/animatable/index.cjs"
+    },
+    "./draggable": {
+      "types": "./dist/modules/draggable/index.d.ts",
+      "require": "./dist/modules/draggable/index.cjs",
+      "import": "./dist/modules/draggable/index.js",
+      "default": "./dist/modules/draggable/index.cjs"
+    },
+    "./scope": {
+      "types": "./dist/modules/scope/index.d.ts",
+      "require": "./dist/modules/scope/index.cjs",
+      "import": "./dist/modules/scope/index.js",
+      "default": "./dist/modules/scope/index.cjs"
+    },
+    "./engine": {
+      "types": "./dist/modules/engine/index.d.ts",
+      "require": "./dist/modules/engine/index.cjs",
+      "import": "./dist/modules/engine/index.js",
+      "default": "./dist/modules/engine/index.cjs"
+    },
+    "./events": {
+      "types": "./dist/modules/events/index.d.ts",
+      "require": "./dist/modules/events/index.cjs",
+      "import": "./dist/modules/events/index.js",
+      "default": "./dist/modules/events/index.cjs"
+    },
+    "./layout": {
+      "types": "./dist/modules/layout/index.d.ts",
+      "require": "./dist/modules/layout/index.cjs",
+      "import": "./dist/modules/layout/index.js",
+      "default": "./dist/modules/layout/index.cjs"
+    },
+    "./easings": {
+      "types": "./dist/modules/easings/index.d.ts",
+      "require": "./dist/modules/easings/index.cjs",
+      "import": "./dist/modules/easings/index.js",
+      "default": "./dist/modules/easings/index.cjs"
+    },
+    "./easings/eases": {
+      "types": "./dist/modules/easings/eases/index.d.ts",
+      "require": "./dist/modules/easings/eases/index.cjs",
+      "import": "./dist/modules/easings/eases/index.js",
+      "default": "./dist/modules/easings/eases/index.cjs"
+    },
+    "./easings/linear": {
+      "types": "./dist/modules/easings/linear/index.d.ts",
+      "require": "./dist/modules/easings/linear/index.cjs",
+      "import": "./dist/modules/easings/linear/index.js",
+      "default": "./dist/modules/easings/linear/index.cjs"
+    },
+    "./easings/steps": {
+      "types": "./dist/modules/easings/steps/index.d.ts",
+      "require": "./dist/modules/easings/steps/index.cjs",
+      "import": "./dist/modules/easings/steps/index.js",
+      "default": "./dist/modules/easings/steps/index.cjs"
+    },
+    "./easings/irregular": {
+      "types": "./dist/modules/easings/irregular/index.d.ts",
+      "require": "./dist/modules/easings/irregular/index.cjs",
+      "import": "./dist/modules/easings/irregular/index.js",
+      "default": "./dist/modules/easings/irregular/index.cjs"
+    },
+    "./easings/cubic-bezier": {
+      "types": "./dist/modules/easings/cubic-bezier/index.d.ts",
+      "require": "./dist/modules/easings/cubic-bezier/index.cjs",
+      "import": "./dist/modules/easings/cubic-bezier/index.js",
+      "default": "./dist/modules/easings/cubic-bezier/index.cjs"
+    },
+    "./easings/spring": {
+      "types": "./dist/modules/easings/spring/index.d.ts",
+      "require": "./dist/modules/easings/spring/index.cjs",
+      "import": "./dist/modules/easings/spring/index.js",
+      "default": "./dist/modules/easings/spring/index.cjs"
+    },
+    "./utils": {
+      "types": "./dist/modules/utils/index.d.ts",
+      "require": "./dist/modules/utils/index.cjs",
+      "import": "./dist/modules/utils/index.js",
+      "default": "./dist/modules/utils/index.cjs"
+    },
+    "./svg": {
+      "types": "./dist/modules/svg/index.d.ts",
+      "require": "./dist/modules/svg/index.cjs",
+      "import": "./dist/modules/svg/index.js",
+      "default": "./dist/modules/svg/index.cjs"
+    },
+    "./text": {
+      "types": "./dist/modules/text/index.d.ts",
+      "require": "./dist/modules/text/index.cjs",
+      "import": "./dist/modules/text/index.js",
+      "default": "./dist/modules/text/index.cjs"
+    },
+    "./waapi": {
+      "types": "./dist/modules/waapi/index.d.ts",
+      "require": "./dist/modules/waapi/index.cjs",
+      "import": "./dist/modules/waapi/index.js",
+      "default": "./dist/modules/waapi/index.cjs"
+    },
+    "./adapters": {
+      "types": "./dist/modules/adapters/index.d.ts",
+      "require": "./dist/modules/adapters/index.cjs",
+      "import": "./dist/modules/adapters/index.js",
+      "default": "./dist/modules/adapters/index.cjs"
+    },
+    "./adapters/three": {
+      "types": "./dist/modules/adapters/three/index.d.ts",
+      "require": "./dist/modules/adapters/three/index.cjs",
+      "import": "./dist/modules/adapters/three/index.js",
+      "default": "./dist/modules/adapters/three/index.cjs"
+    }
+  },
+  "peerDependencies": {
+    "three": ">=0.150.0",
+    "@types/three": ">=0.150.0"
+  },
+  "peerDependenciesMeta": {
+    "three": {
+      "optional": true
+    },
+    "@types/three": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^24.3.0",
+    "browser-sync": "^3.0.4",
+    "chai": "^4.3.10",
+    "mocha": "^10.2.0",
+    "nodemon": "^3.1.10",
+    "rollup": "^4.9.1",
+    "three": "^0.184.0",
+    "@types/three": "^0.184.0",
+    "tweaks": "^0.3.4",
+    "typescript": "^5.9.2"
+  },
+  "scripts": {
+    "dev": "nodemon --quiet --watch src --ext js --exec \"rollup -c && tsc -p tsconfig.types.json && echo '\\n\\033[32m✓ modules and types compiled\\n\\033[36m⊙ watching for changes...\\n\\033[0m'\"",
+    "dev:test": "npm run dev & npm run test:browser",
+    "build": "rm -rf dist && build=true rollup -c && tsc -p tsconfig.types.json && echo '\\n\\033[32m✓ build completed\\n\\033[0m'",
+    "test:browser": "browser-sync start --startPath tests/index.html --server --files 'dist/modules/**/*.js' 'tests/suites/**/*.js' --no-notify --directory",
+    "test:node": "node --allow-natives-syntax \"node_modules/.bin/mocha\" -u tdd --timeout 20000 \"./tests/suites/node.test.js\"",
+    "open:examples": "browser-sync start --startPath examples --server --no-notify --directory --files '**/*.js'",
+    "typecheck": "tsc -p . && tsc -p tests && tsc -p examples",
+    "typecheck:examples": "tsc -p examples",
+    "typecheck:tests": "tsc -p tests"
+  }
+}

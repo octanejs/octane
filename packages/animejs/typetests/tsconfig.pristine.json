@@ -1,0 +1,22 @@
+{
+  "extends": "../upstream/tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": true,
+    "strict": true,
+    "skipLibCheck": false
+  },
+  "include": ["../upstream/tests/suites/types.test.js"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamMode": "materialized",
+    "upstreamRegistrations": [
+      "react-case-v1:1d7cb3eb934771585144",
+      "react-case-v1:4883a0d0140b5f3acd47",
+      "react-case-v1:79b54f25dceb6e6cf9b1",
+      "react-case-v1:5f1f27d424e9d6e01a8d",
+      "react-case-v1:f4bed7e46178d64a35ed"
+    ]
+  }
+}

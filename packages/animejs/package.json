@@ -37,11 +37,34 @@
     "LICENSE",
     "README.md",
     "UPSTREAM.md",
-    "status.json"
+    "status.json",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./adapters/three": "./src/adapters/three.ts"
+    "./adapters/three": "./src/adapters/three.ts",
+    "./timer": "./src/timer.ts",
+    "./animation": "./src/animation.ts",
+    "./timeline": "./src/timeline.ts",
+    "./animatable": "./src/animatable.ts",
+    "./draggable": "./src/draggable.ts",
+    "./scope": "./src/scope.ts",
+    "./engine": "./src/engine.ts",
+    "./events": "./src/events.ts",
+    "./layout": "./src/layout.ts",
+    "./easings": "./src/easings.ts",
+    "./easings/eases": "./src/easings/eases.ts",
+    "./easings/linear": "./src/easings/linear.ts",
+    "./easings/steps": "./src/easings/steps.ts",
+    "./easings/irregular": "./src/easings/irregular.ts",
+    "./easings/cubic-bezier": "./src/easings/cubic-bezier.ts",
+    "./easings/spring": "./src/easings/spring.ts",
+    "./utils": "./src/utils.ts",
+    "./svg": "./src/svg.ts",
+    "./text": "./src/text.ts",
+    "./waapi": "./src/waapi.ts",
+    "./adapters": "./src/adapters.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "test": "vitest run --root ../.. --config vitest.config.js --project animejs --project animejs-ssr",
