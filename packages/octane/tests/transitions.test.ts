@@ -1060,15 +1060,22 @@ describe('useTransition — the old screen stays whole', () => {
 				expect(onNext).not.toHaveBeenCalled();
 
 				r.click('#bump');
-				expect(document.head.querySelector('title[data-transition-held-listener="yes"]')).toBe(title);
-				expect(title.textContent).toBe('Old');
-				expect(r.findAll('#fallback')).toHaveLength(0);
+				const heldTitle = document.head.querySelector('title[data-transition-held-listener="yes"]');
+				const heldText = title.textContent;
+				const heldFallbackCount = r.findAll('#fallback').length;
 				clickTitle();
-				expect(onOld).toHaveBeenCalledTimes(2);
-				expect(onNext).not.toHaveBeenCalled();
+				const heldOldCalls = onOld.mock.calls.length;
+				const heldNextCalls = onNext.mock.calls.length;
 
 				await act(() => next.resolve('one'));
-				expect(document.head.querySelector('title[data-transition-held-listener="yes"]')).toBe(title);
+				expect(heldTitle).toBe(title);
+				expect(heldText).toBe('Old');
+				expect(heldFallbackCount).toBe(0);
+				expect(heldOldCalls).toBe(2);
+				expect(heldNextCalls).toBe(0);
+				expect(document.head.querySelector('title[data-transition-held-listener="yes"]')).toBe(
+					title,
+				);
 				expect(title.textContent).toBe('New');
 				clickTitle();
 				expect(onOld).toHaveBeenCalledTimes(2);
@@ -1081,6 +1088,52 @@ describe('useTransition — the old screen stays whole', () => {
 			expect(onNext).toHaveBeenCalledTimes(action === 'replace' ? 1 : 0);
 		},
 	);
+
+	it('restores aliased native head listeners when a candidate reuses an unchanged handler', async () => {
+		const first = deferred<string>();
+		const next = deferred<string>();
+		first.resolve('zero');
+		const onOld = vi.fn();
+		const onAlias = vi.fn();
+		const r = mount(TransitionHeadListenerInsideBoundary, {
+			load: (step: number) => (step === 0 ? first.promise : next.promise),
+			onOld,
+			onAlias,
+		});
+		await act(() => {});
+		const title = document.head.querySelector('title[data-transition-held-listener="yes"]')!;
+		const doubleClickTitle = () =>
+			title.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		try {
+			doubleClickTitle();
+			expect(onOld).toHaveBeenCalledTimes(1);
+			expect(onAlias).toHaveBeenCalledTimes(1);
+
+			r.click('#bump');
+			const heldTitle = document.head.querySelector('title[data-transition-held-listener="yes"]');
+			const heldText = title.textContent;
+			const heldFallbackCount = r.findAll('#fallback').length;
+			doubleClickTitle();
+			const heldOldCalls = onOld.mock.calls.length;
+			const heldAliasCalls = onAlias.mock.calls.length;
+
+			await act(() => next.resolve('one'));
+			expect(heldTitle).toBe(title);
+			expect(heldText).toBe('Old');
+			expect(heldFallbackCount).toBe(0);
+			expect(heldOldCalls).toBe(2);
+			expect(heldAliasCalls).toBe(2);
+			expect(title.textContent).toBe('New');
+			doubleClickTitle();
+			expect(onOld).toHaveBeenCalledTimes(2);
+			expect(onAlias).toHaveBeenCalledTimes(3);
+		} finally {
+			r.unmount();
+		}
+		doubleClickTitle();
+		expect(onOld).toHaveBeenCalledTimes(2);
+		expect(onAlias).toHaveBeenCalledTimes(3);
+	});
 
 	it('holds a controlled input and checkbox, records included', async () => {
 		const entries = new Map<number, Deferred<string>>();

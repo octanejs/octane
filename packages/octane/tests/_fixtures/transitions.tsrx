@@ -522,13 +522,19 @@ function TransitionHeadListener(props: {
 	step: number;
 	onOld: () => void;
 	onNext?: (() => void) | null;
+	onAlias?: () => void;
 }) @{
 	const handlerProps =
-		props.step === 0
-			? { onClick: props.onOld }
-			: props.onNext === undefined
-				? {}
-				: { onClick: props.onNext ?? undefined };
+		props.onAlias !== undefined
+			? {
+					onDoubleClick: props.step === 0 ? props.onOld : props.onAlias,
+					onDblClick: props.onAlias,
+				}
+			: props.step === 0
+				? { onClick: props.onOld }
+				: props.onNext === undefined
+					? {}
+					: { onClick: props.onNext ?? undefined };
 	<title
 		data-transition-held-listener="yes"
 		{...handlerProps}
@@ -539,13 +545,19 @@ export function TransitionHeadListenerInsideBoundary(props: {
 	load: (step: number) => PromiseLike<string>;
 	onOld: () => void;
 	onNext?: (() => void) | null;
+	onAlias?: () => void;
 }) @{
 	const [step, setStep] = useState(0);
 	<div>
 		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
 		@try {
 			<>
-				<TransitionHeadListener step={step} onOld={props.onOld} onNext={props.onNext} />
+				<TransitionHeadListener
+					step={step}
+					onOld={props.onOld}
+					onNext={props.onNext}
+					onAlias={props.onAlias}
+				/>
 				<ControlledValue load={props.load} step={step} />
 			</>
 		} @pending {
