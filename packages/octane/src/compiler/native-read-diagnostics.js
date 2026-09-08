@@ -64,16 +64,43 @@ function propertyName(node, computed = false) {
 		: null;
 }
 
-export function assertNativeReadOptions(options) {
-	if (options?.nativeReads !== undefined && typeof options.nativeReads !== 'boolean') {
-		throw new TypeError('Octane nativeReads must be a boolean.');
+/**
+ * Signal capabilities are part of authored source, not build configuration.
+ * A `$` capability can arrive through props, a namespace, or an imported helper;
+ * do not require a direct signals import or proof of the eventual read target.
+ * Once selected, the entire module captures actual reads, including opaque calls.
+ * Inspect syntax rather than text so comments and string contents do not opt an
+ * ordinary module into native memoization and its renderer adapter.
+ */
+export function nativeReadOptions(ast, options) {
+	let nativeReads = false;
+	function visit(node) {
+		if (nativeReads || !node || typeof node !== 'object') return;
+		if (
+			((node.type === 'Identifier' || node.type === 'JSXIdentifier') && node.name.endsWith('$')) ||
+			(node.type === 'ImportDeclaration' &&
+				(node.source?.value === SIGNALS_MODULE || LOCAL_MODULES.has(node.source?.value))) ||
+			((node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') &&
+				String(propertyName(node.property, node.computed) ?? '').endsWith('$')) ||
+			(node.type === 'Property' &&
+				String(propertyName(node.key, node.computed) ?? '').endsWith('$'))
+		) {
+			nativeReads = true;
+			return;
+		}
+		children(node, visit);
 	}
+	visit(ast);
+	return { ...options, nativeReads };
+}
+
+export function assertNativeReadOptions(options) {
 	if (
 		options?.nativeReads === true &&
 		options.renderer?.target != null &&
 		options.renderer.target !== 'dom'
 	) {
-		throw new Error('Octane nativeReads currently supports only the DOM client and server.');
+		throw new Error('Octane native signal reads support only the DOM client and server.');
 	}
 }
 
@@ -85,34 +112,7 @@ export function assertNativeReadOptions(options) {
  */
 export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}) {
 	assertNativeReadOptions(options);
-	if (options.nativeReads !== true) {
-		for (const statement of ast.body ?? []) {
-			if (
-				statement.type !== 'ImportDeclaration' ||
-				statement.importKind === 'type' ||
-				!LOCAL_MODULES.has(statement.source?.value)
-			)
-				continue;
-			const capability = (statement.specifiers ?? []).find(
-				(specifier) =>
-					specifier.importKind !== 'type' &&
-					(specifier.type === 'ImportNamespaceSpecifier' ||
-						LOCAL_HOOKS.has(specifier.imported?.name ?? specifier.imported?.value)),
-			);
-			if (capability)
-				return [
-					nativeReadDiagnostic(
-						'OCTANE_NATIVE_READ_OPT_IN',
-						source,
-						filename,
-						capability.start ?? statement.start,
-						capability.end ?? statement.end,
-						'Local native signal hooks require nativeReads: true in the Octane compiler configuration.',
-					),
-				];
-		}
-		return [];
-	}
+	if (!options.nativeReads) return [];
 	if (options.rendererBoundaries && Object.keys(options.rendererBoundaries).length > 0) {
 		const { boundaries } = analyzeRendererBoundaries(source, {
 			ast,
@@ -132,7 +132,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 					filename,
 					unsupported.tagRange[0],
 					unsupported.tagRange[1],
-					`Octane nativeReads currently supports only the DOM client and server; renderer ${JSON.stringify(unsupported.childRenderer)} has no native-read integration.`,
+					`Octane native signal reads support only the DOM client and server; renderer ${JSON.stringify(unsupported.childRenderer)} has no native-read integration.`,
 				),
 			];
 	}
@@ -536,7 +536,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			report(
 				'OCTANE_NATIVE_SIGNAL_HOOK',
 				node,
-				'useDerived$ is not available in this experimental integration. Create derived$ on an explicitly owned Scope and pass the handle to the component.',
+				'useDerived$ is not available. Create derived$ on an explicitly owned Scope and pass the handle to the component.',
 			);
 		} else if (node.type === 'Property' && parents.get(node)?.type === 'ObjectExpression') {
 			checkName(node.key, propertyName(node.key, node.computed), valueOf(node.value));

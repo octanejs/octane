@@ -87,8 +87,6 @@ export interface OctaneVitePluginOptions {
 	 * @default false
 	 */
 	strong?: boolean;
-	/** Experimental native signal reads in DOM client/server render scopes. */
-	nativeReads?: boolean;
 	/**
 	 * Path fragments excluded from Octane's plain `.ts`/`.js` hook-slot pass.
 	 * Prefer package manifest `octane.hookSlots.manual` declarations for bindings.

@@ -1,4 +1,4 @@
-/** Experimental scoped signals. This entry does not import a renderer. */
+/** Stable scoped signals. This entry does not import a renderer. */
 export { createScope } from './engine.js';
 export { query } from './requests.js';
 export {
