@@ -17749,6 +17749,8 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // Arity variants mirror fireEventSlot's dispatch switch; `evtN`/`evtNu` are
 // the rest fallbacks. Arity-0 descriptors share one empty args array
 // (dispatch only reads it; the arity-0 update never writes args).
+// Keep the computed brand last in every bundle literal, including dispatch
+// snapshots, so V8 can initialize fn/args from its object-literal boilerplate.
 // ---------------------------------------------------------------------------
 
 const EMPTY_ARGS: any[] = [];
@@ -17763,7 +17765,7 @@ export function setEventHandler(el: Element, key: string, handler: any): void {
 }
 
 export function evt0(el: Element, key: string, fn: any): HandlerBundle {
-	const d: HandlerBundle = { [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND, fn, args: EMPTY_ARGS };
+	const d: HandlerBundle = { fn, args: EMPTY_ARGS, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -17773,7 +17775,7 @@ export function evt0u(d: HandlerBundle, fn: any): void {
 	d.fn = fn;
 }
 export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle {
-	const d: HandlerBundle = { [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND, fn, args: [a0] };
+	const d: HandlerBundle = { fn, args: [a0], [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -17787,7 +17789,7 @@ export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 	d.args[0] = a0;
 }
 export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
-	const d: HandlerBundle = { [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND, fn, args: [a0, a1] };
+	const d: HandlerBundle = { fn, args: [a0, a1], [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -17803,7 +17805,7 @@ export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 	a[1] = a1;
 }
 export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
-	const d: HandlerBundle = { [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND, fn, args };
+	const d: HandlerBundle = { fn, args, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -18351,9 +18353,9 @@ function preserveDispatchedBundle(bundle: HandlerBundle): void {
 	for (let index = 0; index < CAPTURE_SLOTS.length; index++) {
 		if (CAPTURE_SLOTS[index] === bundle) {
 			CAPTURE_SLOTS[index] = snapshot ??= {
-				[EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND,
 				fn: bundle.fn,
 				args: bundle.args.slice(),
+				[EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND,
 			};
 		}
 	}
