@@ -535,10 +535,9 @@ function TransitionHeadListener(props: {
 				: props.onNext === undefined
 					? {}
 					: { onClick: props.onNext ?? undefined };
-	<title
-		data-transition-held-listener="yes"
-		{...handlerProps}
-	>{(props.step === 0 ? 'Old' : 'New') as string}</title>
+	<title data-transition-held-listener="yes" {...handlerProps}>{(props.step === 0
+		? 'Old'
+		: 'New') as string}</title>
 }
 
 export function TransitionHeadListenerInsideBoundary(props: {
