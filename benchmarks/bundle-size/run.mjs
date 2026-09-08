@@ -3,10 +3,8 @@
 // is the cross-framework shipped-bytes comparison the perf suites can't see
 // (docs/compiled-output-optimization-plan.md, Phase 0a).
 //
-// Fairness: the apps' own vite configs differ where it matters for size (solid
-// ships `build.minify:false` for its dev-server bench, octane uses terser
-// passes:5, react passes:2) — so every target is built with ONE normalized
-// inline override (minify: 'esbuild', target: 'esnext'). Inline config wins
+// Fairness: every target uses the same explicit production build settings
+// (minify: 'esbuild', target: 'esnext'). The inline config wins
 // over the app's config file for these keys; everything else (plugins, mode,
 // NODE_ENV) still comes from each app's own config, exactly like the news
 // suite's programmatic builds.

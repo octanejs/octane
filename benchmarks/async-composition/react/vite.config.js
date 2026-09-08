@@ -4,6 +4,6 @@ import { reactCompiler } from '../../react-compiler.mjs';
 
 export default defineConfig({
 	plugins: [react(), reactCompiler()],
-	build: { target: 'esnext' },
+	build: { minify: 'esbuild', target: 'esnext' },
 	server: { port: 5284, strictPort: true },
 });

@@ -77,7 +77,7 @@ try {
 		define: { 'process.env.NODE_ENV': '"production"' },
 		build: {
 			write: true,
-			minify: false,
+			minify: 'esbuild',
 			target: 'node22',
 			lib: {
 				entry: path.join(ROOT, 'workload.ts'),

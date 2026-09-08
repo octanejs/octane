@@ -31,7 +31,7 @@ await build({
 	configFile: false,
 	logLevel: 'warn',
 	plugins: [octane()],
-	build: { ssr: 'worker.ts', outDir, emptyOutDir: true, minify: true, target: 'esnext' },
+	build: { ssr: 'worker.ts', outDir, emptyOutDir: true, minify: 'esbuild', target: 'esnext' },
 	ssr: { target: 'webworker', noExternal: true },
 });
 const compatibilityDate = '2026-07-14';

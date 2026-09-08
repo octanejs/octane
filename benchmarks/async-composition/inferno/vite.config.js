@@ -5,6 +5,6 @@ export default defineConfig({
 	plugins: [infernoCompiler()],
 	mode: 'production',
 	define: { 'process.env.NODE_ENV': JSON.stringify('production') },
-	build: { target: 'esnext' },
+	build: { minify: 'esbuild', target: 'esnext' },
 	server: { port: 5334, strictPort: true },
 });

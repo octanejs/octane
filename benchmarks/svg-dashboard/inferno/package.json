@@ -14,7 +14,7 @@
     "inferno-create-element": "catalog:default"
   },
   "devDependencies": {
-    "terser": "catalog:default",
+    "esbuild": "catalog:default",
     "vite": "catalog:default"
   }
 }

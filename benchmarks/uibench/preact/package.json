@@ -14,7 +14,7 @@
   },
   "devDependencies": {
     "@preact/preset-vite": "catalog:default",
-    "terser": "catalog:default",
+    "esbuild": "catalog:default",
     "vite": "catalog:default"
   }
 }

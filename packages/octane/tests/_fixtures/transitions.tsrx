@@ -574,26 +574,63 @@ export function TransitionRadioGroup(props) @{
 // ---------------------------------------------------------------------------
 function RemovalRow(props) @{
 	const [seen] = useState(props.id + '!');
+	useLayoutEffect(() => () => props.onLayoutCleanup?.(props.id), []);
 	useEffect(() => {
 		props.log('mount:' + props.id);
 		return () => props.log('cleanup:' + props.id);
 	}, []);
-	<li id={'row-' + props.id}>{seen as string}</li>
+	<li id={'row-' + props.id} tabIndex={0}>{seen as string}</li>
 }
 
 export function TransitionKeyedRemoval(props) @{
 	const [step, setStep] = useState(0);
 	const items =
-		step === 0 ? ['a', 'b', 'c'] : ['a', 'c'];
+		step === 0 ? props.initialItems ?? ['a', 'b', 'c'] : props.nextItems ?? ['a', 'c'];
 	<div>
 		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
 		@try {
 			<>
 				<ul id="list">
 					@for (const id of items; key id) {
-						<RemovalRow id={id} log={props.log} />
+						<RemovalRow id={id} log={props.log} onLayoutCleanup={props.onLayoutCleanup} />
 					}
 				</ul>
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+// Both a dependency update and a conditional omission precede a suspending
+// sibling. Their old lifetimes must survive an abandoned transition attempt.
+function ChangingEffect(props) @{
+	useEffect(() => {
+		props.log('setup:changed:' + props.step);
+		return () => props.log('cleanup:changed:' + props.step);
+	}, [props.step]);
+	<span id="changed-effect">{props.step as string}</span>
+}
+
+function OmittedEffect(props) @{
+	if (props.step !== 0) return <span id="omitted-effect">{'omitted'}</span>;
+	useLayoutEffect(() => {
+		props.log('setup:optional');
+		return () => props.log('cleanup:optional');
+	}, []);
+	<span id="omitted-effect">{'present'}</span>
+}
+
+export function TransitionEffectsBeforeSuspension(props) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		<button id="urgent" onClick={() => setStep(2)}>{'urgent'}</button>
+		@try {
+			<>
+				<ChangingEffect step={step} log={props.log} />
+				<OmittedEffect step={step} log={props.log} />
 				<ControlledValue load={props.load} step={step} />
 			</>
 		} @pending {
