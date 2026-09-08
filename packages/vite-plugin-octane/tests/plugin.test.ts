@@ -3,6 +3,7 @@
 // option forwarding to the bundled compiler, the appType default, and the
 // config resolution of `router.preHydrate` / RenderRoute `status`.
 import { fileURLToPath } from 'node:url';
+import { statSync } from 'node:fs';
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -380,6 +381,49 @@ describe('octane() plugin factory', () => {
 			await hotUpdate.handler.call(
 				{ environment: { name: 'client' } },
 				{ file: watchedPolicyPath, modules: [], server: { restart } },
+			);
+			expect(restart).toHaveBeenCalledOnce();
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
+	it('watches real config imports when an imported module uses decorators', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-decorated-config-'));
+		const configPath = join(root, 'octane.config.ts');
+		const entityPath = join(root, 'entity.ts');
+		try {
+			await writeFile(
+				join(root, 'tsconfig.json'),
+				JSON.stringify({ compilerOptions: { experimentalDecorators: true } }),
+			);
+			await writeFile(
+				entityPath,
+				'function entity(value) { return value; }\n@entity class Entity {}\nexport const strong = Entity.name === "Entity";\n',
+			);
+			await writeFile(
+				configPath,
+				"import { strong } from './entity.ts';\nexport default { compiler: { strong } };\n",
+			);
+
+			const [compiler, meta] = octane({ hmr: false });
+			await (compiler.config as (config: { root: string }) => unknown)({ root });
+
+			const add = vi.fn((files: string[]) => {
+				for (const file of files) statSync(file);
+			});
+			(meta.configureServer as (server: unknown) => void)({
+				watcher: { add },
+				middlewares: { use: vi.fn() },
+			});
+			const watchedEntityPath = await realpath(entityPath);
+			expect(add).toHaveBeenCalledWith(expect.arrayContaining([configPath, watchedEntityPath]));
+
+			const restart = vi.fn(async () => undefined);
+			const hotUpdate = meta.hotUpdate as { handler(context: unknown): Promise<unknown> };
+			await hotUpdate.handler.call(
+				{ environment: { name: 'client' } },
+				{ file: watchedEntityPath, modules: [], server: { restart } },
 			);
 			expect(restart).toHaveBeenCalledOnce();
 		} finally {
