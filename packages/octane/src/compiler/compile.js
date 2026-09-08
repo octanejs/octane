@@ -8596,7 +8596,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, strong?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], valdiWriterFacts?: import('./compile-valdi.js').ValdiWriterFacts, textTypeFacts?: { version: 1, filename: string, sourceVersion: string, projectVersion: string, stringChildRanges: readonly (readonly [number, number])[] }, renderer?: { id: string, module: string, target: 'dom' | 'universal' | 'valdi', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal' | 'valdi', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, strong?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], valdiWriterFacts?: import('./compile-valdi.js').ValdiWriterFacts, textTypeFacts?: { version: 1, filename: string, sourceVersion: string, projectVersion: string, stringChildRanges: readonly (readonly [number, number])[], primitiveTextChildRanges?: readonly (readonly [number, number])[] }, renderer?: { id: string, module: string, target: 'dom' | 'universal' | 'valdi', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal' | 'valdi', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -11060,7 +11060,7 @@ function ssrCompileBodyWithMapTemps(
 // produce mergeable text nodes:
 //   'static' — a static string-literal Text (bakes / serializes as literal text)
 //   'empty'  — a static literal that renders NOTHING (adjacency-transparent)
-//   'dyn'    — a known-string dynamic text hole (client `<!>` + htextSwap,
+//   'dyn'    — a proven primitive text hole (client `<!>` + htextSwap,
 //              server markerless ssrText)
 //   'other'  — everything else (elements, renderable `{expr}` holes, control
 //              flow — all serialize elements or `<!--[-->…<!--]-->` ranges
@@ -11069,9 +11069,7 @@ function textAdjacencyKind(node, ctx) {
 	if (node.type !== 'Text') return 'other';
 	const lit = staticTextLiteral(node.expression);
 	if (lit !== null) return lit === '' ? 'empty' : 'static';
-	return isKnownStringChildExpression(node.expression, ctx.knownStringChildLocals)
-		? 'dyn'
-		: 'other';
+	return isKnownTextChildExpression(node.expression, ctx.knownStringChildLocals) ? 'dyn' : 'other';
 }
 
 // Does the child at `i` have a text-producing sibling next to it (looking
@@ -11371,13 +11369,14 @@ function ssrEmitNode(
 						: null,
 				);
 			}
-			// `{x as string}` / literals / templates / `+`-concats → definite TEXT.
+			// String assertions / templates / string concats / proven numeric results
+			// → a text binding on both client and server.
 			// Everything else (`{children}`, `{<Comp/>}`, possibly-renderable values)
 			// → ssrChild, which RENDERS a component/element child (and coerces a
 			// primitive to text) — mirrors Ripple's `{expr}` vs `{expr as string}`.
 			// rewriteHookCalls: a `use(thenable)` in this hole bypasses the setup
 			// rewrite, so key it here too (else it collides with sibling/nested use()).
-			if (isKnownStringChildExpression(expr, ctx.knownStringChildLocals)) {
+			if (isKnownTextChildExpression(expr, ctx.knownStringChildLocals)) {
 				// ssrTextPre = ssrText + the runtime leading-'\n' protection (the value
 				// isn't known at compile time here).
 				const fn =
@@ -12263,7 +12262,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// markerless `childTextHole` mount: a primitive is the host's bare text, an object
 	// still gets a `<!--[-->…<!--]-->` block). Must match the client's only-child
 	// markerless condition exactly so both sides agree for hydration: a single `Text`
-	// child that is neither a static literal (baked into HTML) nor a known string
+	// child that is neither a static literal (baked into HTML) nor proven text
 	// (emitted via `ssrText`).
 	const onlyChild0 =
 		normChildren.length === 1 && normChildren[0].type === 'Text' ? normChildren[0] : null;
@@ -12275,7 +12274,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		htmlSources.length === 0 &&
 		onlyChild0 !== null &&
 		staticTextLiteral(onlyChild0.expression) === null &&
-		!isKnownStringChildExpression(onlyChild0.expression, ctx.knownStringChildLocals)
+		!isKnownTextChildExpression(onlyChild0.expression, ctx.knownStringChildLocals)
 	) {
 		const childHelper =
 			tag === 'pre' || tag === 'textarea' || tag === 'listing' ? 'ssrChildTextPre' : 'ssrChildText';
@@ -18356,22 +18355,24 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			}
 			const hn = `h${holeProps.length}`;
 			if (expr && expr.type === 'TSAsExpression') {
-				// Preserve the `as T` cast in the renderer (it marks a dynamic TEXT hole).
+				// Preserve explicit string assertions. Numeric assertions and typed
+				// primitive proofs need a synthetic text assertion on the renderer's
+				// `props.hN` because it cannot see the original expression's proof.
 				holeProps.push(objectProp(hn, rewriteExtractedFragmentHole(expr.expression, ctx, childNs)));
+				const annotation = isKnownTextChildExpression(expr, ctx.knownStringChildLocals)
+					? b.ts_keyword_type('string')
+					: expr.typeAnnotation;
 				newChildren.push(
-					b.jsx_expression_container(
-						b.ts_as(memberProps(hn, expr.expression), expr.typeAnnotation),
-					),
+					b.jsx_expression_container(b.ts_as(memberProps(hn, expr.expression), annotation)),
 				);
 			} else {
 				holeProps.push(objectProp(hn, rewriteExtractedFragmentHole(expr, ctx, childNs)));
-				// A hole the compiler proved is a string (concat / template / tracked
-				// local) is a TEXT hole — but the renderer only sees `props.hN`, which it
-				// can't prove. Re-assert it with an `as string` cast so the renderer keeps
-				// the text-binding classification (htext, markerless) instead of falling to
-				// a renderable childSlot, preserving byte-equality with the inline form.
+				// The renderer only sees `props.hN`, so it cannot rediscover an inline
+				// string or primitive-number proof. This synthetic cast preserves the
+				// text binding across extraction; it is stripped from emitted JS and
+				// does not change the authored expression or its runtime value.
 				const member = memberProps(hn, expr);
-				const rendered = isKnownStringChildExpression(expr, ctx.knownStringChildLocals)
+				const rendered = isKnownTextChildExpression(expr, ctx.knownStringChildLocals)
 					? b.ts_as(member, b.ts_keyword_type('string'))
 					: member;
 				newChildren.push(b.jsx_expression_container(rendered));
@@ -21187,17 +21188,30 @@ function staticTextLiteral(node) {
 // to inherit a type proof. Ordinary copy-on-write expression rewrites preserve
 // the metadata, and extractFragment explicitly carries it onto its props hole.
 function applyStringChildProofs(ast, source, filename, facts) {
-	const typedRanges = createTextTypeFactsLookup(facts, filename, source);
+	const typeRanges = createTextTypeFactsLookup(facts, filename, source);
+	const typedRanges = typeRanges?.stringRanges ?? null;
+	const primitiveRanges = typeRanges?.primitiveRanges ?? null;
 	// Avoid another AST walk for the overwhelmingly common syntax-only module.
-	// Escaped identifiers can spell String too; declining a module without either
-	// spelling is safe, while the AST remains the authority for actual calls.
-	const inspectStringCalls = source.includes('String') || source.includes('\\u');
-	if ((typedRanges === null || typedRanges.size === 0) && !inspectStringCalls) return ast;
-	const remainingRanges = typedRanges;
-	const proofs = new Set();
-	const stringCalls = [];
+	// Escaped identifiers can spell these built-ins too. The AST remains the
+	// authority for calls; these substring checks only skip common files.
+	const inspectIntrinsicCalls =
+		source.includes('String') ||
+		source.includes('Number') ||
+		source.includes('BigInt') ||
+		source.includes('Date') ||
+		source.includes('\\u');
+	if (
+		(typedRanges === null || typedRanges.size === 0) &&
+		(primitiveRanges === null || primitiveRanges.size === 0) &&
+		!inspectIntrinsicCalls
+	) {
+		return ast;
+	}
+	const stringProofs = new Set();
+	const primitiveProofs = new Set();
+	const intrinsicCalls = [];
 	const writes = [];
-	let ambientStringValue = false;
+	const ambientIntrinsicValues = new Set();
 	const seen = new WeakSet();
 	const collect = (node, parent = null, key = null) => {
 		if (node === null || typeof node !== 'object') return;
@@ -21208,7 +21222,7 @@ function applyStringChildProofs(ast, source, filename, facts) {
 		if (seen.has(node)) return;
 		seen.add(node);
 		if (
-			remainingRanges !== null &&
+			(typedRanges !== null || primitiveRanges !== null) &&
 			node.type === 'JSXExpressionContainer' &&
 			((key === 'children' &&
 				(parent?.type === 'JSXElement' ||
@@ -21219,16 +21233,17 @@ function applyStringChildProofs(ast, source, filename, facts) {
 		) {
 			const expr = node.expression;
 			const range = `${expr?.start}:${expr?.end}`;
-			if (remainingRanges.delete(range)) proofs.add(expr);
+			if (typedRanges?.delete(range)) stringProofs.add(expr);
+			if (primitiveRanges?.delete(range)) primitiveProofs.add(expr);
 		}
-		if (inspectStringCalls) {
+		if (inspectIntrinsicCalls) {
 			if (
 				node.type === 'CallExpression' &&
 				node.optional !== true &&
 				node.callee?.type === 'Identifier' &&
-				node.callee.name === 'String'
+				TEXT_INTRINSICS.has(node.callee.name)
 			) {
-				stringCalls.push(node);
+				intrinsicCalls.push(node);
 			}
 			if (node.type === 'AssignmentExpression') writes.push(node.left);
 			else if (node.type === 'UpdateExpression') writes.push(node.argument);
@@ -21243,11 +21258,13 @@ function applyStringChildProofs(ast, source, filename, facts) {
 			// Ambient VALUE declarations can describe a replaced global. Type-only
 			// imports/interfaces do not shadow the JavaScript built-in.
 			if (node.type === 'TSDeclareFunction' || node.declare === true) {
-				if (node.id?.name === 'String') ambientStringValue = true;
+				if (TEXT_INTRINSICS.has(node.id?.name)) ambientIntrinsicValues.add(node.id.name);
 				if (node.type === 'VariableDeclaration') {
 					const names = new Set();
 					for (const declaration of node.declarations || []) collectBindings(declaration.id, names);
-					if (names.has('String')) ambientStringValue = true;
+					for (const name of names) {
+						if (TEXT_INTRINSICS.has(name)) ambientIntrinsicValues.add(name);
+					}
 				}
 			}
 		}
@@ -21258,33 +21275,43 @@ function applyStringChildProofs(ast, source, filename, facts) {
 		}
 	};
 	collect(ast);
-	if (remainingRanges !== null && remainingRanges.size !== 0) {
+	const remainingRange =
+		typedRanges?.values().next().value ?? primitiveRanges?.values().next().value;
+	if (remainingRange !== undefined) {
 		throw new Error(
-			`Invalid textTypeFacts for ${JSON.stringify(filename)}: range ${remainingRanges.values().next().value} is not an authored JSX child expression.`,
+			`Invalid textTypeFacts for ${JSON.stringify(filename)}: range ${remainingRange} is not an authored JSX child expression.`,
 		);
 	}
 	let lexical = null;
-	if (stringCalls.length > 0 || (proofs.size > 0 && writes.length > 0)) {
+	if (
+		intrinsicCalls.length > 0 ||
+		((stringProofs.size > 0 || primitiveProofs.size > 0) && writes.length > 0)
+	) {
 		// The existing scope analysis understands var hoisting, parameter defaults,
 		// imports, catch bindings, and TSRX @for/@try scopes. Pay for it only when
 		// an intrinsic candidate or a possible proof-invalidating write needs it.
 		lexical = createLexicalAnalysis(ast);
-		if (writes.some((target) => writesGlobalString(target, lexical))) {
-			// TypeScript still calls the global constructor's return type `string`
-			// after an asserted replacement. Decline ALL new child proofs in this
+		if (writes.some((target) => writesGlobalTextIntrinsic(target, lexical))) {
+			// TypeScript still uses a built-in constructor's declared primitive
+			// return type after an asserted replacement. Decline all new proofs in this
 			// rare module rather than attempting incomplete value-taint analysis.
 			// Supplied ranges were still validated above; explicit text syntax keeps
 			// its existing coercion meaning through isKnownStringExpression.
 			return ast;
 		}
 	}
-	if (lexical !== null && !ambientStringValue) {
-		for (const call of stringCalls) {
+	if (lexical !== null) {
+		for (const call of intrinsicCalls) {
+			const name = call.callee.name;
+			if (ambientIntrinsicValues.has(name)) continue;
 			const scope = lexical.nodeScopes.get(call);
-			if (scope !== undefined && !lexical.isBound(scope, 'String')) proofs.add(call);
+			if (scope !== undefined && !lexical.isBound(scope, name)) {
+				if (name === 'String' || name === 'Date') stringProofs.add(call);
+				else primitiveProofs.add(call);
+			}
 		}
 	}
-	if (proofs.size === 0) return ast;
+	if (stringProofs.size === 0 && primitiveProofs.size === 0) return ast;
 	const rewritten = new WeakMap();
 	const rewrite = (node) => {
 		if (node === null || typeof node !== 'object') return node;
@@ -21310,8 +21337,10 @@ function applyStringChildProofs(ast, source, filename, facts) {
 					out[key] = next;
 				}
 			}
-			if (proofs.has(node)) {
+			if (stringProofs.has(node)) {
 				out = { ...out, metadata: { ...out.metadata, octane_string_child: true } };
+			} else if (primitiveProofs.has(node)) {
+				out = { ...out, metadata: { ...out.metadata, octane_primitive_text_child: true } };
 			}
 		}
 		rewritten.set(node, out);
@@ -21320,10 +21349,12 @@ function applyStringChildProofs(ast, source, filename, facts) {
 	return rewrite(ast);
 }
 
-// A visible replacement of the global constructor invalidates intrinsic
-// recognition for the whole module. Calls still evaluate the authored callee;
-// do not silently turn a replacement's returned element into its string form.
-function writesGlobalString(target, lexical) {
+const TEXT_INTRINSICS = new Set(['String', 'Number', 'BigInt', 'Date']);
+
+// A visible replacement of a global constructor invalidates inferred text
+// proofs for the module. Calls still evaluate the authored callee: a replacement
+// may return an element rather than the built-in's primitive result.
+function writesGlobalTextIntrinsic(target, lexical) {
 	if (!target || typeof target !== 'object') return false;
 	if (
 		target.type === 'TSAsExpression' ||
@@ -21331,20 +21362,20 @@ function writesGlobalString(target, lexical) {
 		target.type === 'TSNonNullExpression' ||
 		target.type === 'ParenthesizedExpression'
 	) {
-		return writesGlobalString(target.expression, lexical);
+		return writesGlobalTextIntrinsic(target.expression, lexical);
 	}
 	const unbound = (node, name) => {
 		const scope = lexical.nodeScopes.get(node);
 		return scope !== undefined && !lexical.isBound(scope, name);
 	};
 	if (target.type === 'Identifier') {
-		return target.name === 'String' && unbound(target, 'String');
+		return TEXT_INTRINSICS.has(target.name) && unbound(target, target.name);
 	}
 	if (target.type === 'MemberExpression') {
 		const name = target.computed ? target.property?.value : target.property?.name;
 		const object = target.object;
 		return (
-			name === 'String' &&
+			TEXT_INTRINSICS.has(name) &&
 			object?.type === 'Identifier' &&
 			(object.name === 'globalThis' ||
 				object.name === 'window' ||
@@ -21353,14 +21384,14 @@ function writesGlobalString(target, lexical) {
 			unbound(object, object.name)
 		);
 	}
-	if (target.type === 'AssignmentPattern') return writesGlobalString(target.left, lexical);
-	if (target.type === 'RestElement') return writesGlobalString(target.argument, lexical);
+	if (target.type === 'AssignmentPattern') return writesGlobalTextIntrinsic(target.left, lexical);
+	if (target.type === 'RestElement') return writesGlobalTextIntrinsic(target.argument, lexical);
 	if (target.type === 'ArrayPattern') {
-		return (target.elements || []).some((element) => writesGlobalString(element, lexical));
+		return (target.elements || []).some((element) => writesGlobalTextIntrinsic(element, lexical));
 	}
 	if (target.type === 'ObjectPattern') {
 		return (target.properties || []).some((property) =>
-			writesGlobalString(property.argument ?? property.value, lexical),
+			writesGlobalTextIntrinsic(property.argument ?? property.value, lexical),
 		);
 	}
 	return false;
@@ -21373,6 +21404,7 @@ function writesGlobalString(target, lexical) {
 // Recognised shapes:
 //   - String Literal:               'foo' / "bar"
 //   - TemplateLiteral:               `${x}-${y}` (always coerces to string)
+//   - `typeof x`:                   always a string, even for unknown x
 //   - `as string` / `<string>x`:     user-asserted string-typed expression
 //   - `satisfies string`:            same intent
 //   - Wrappers (`!`, instantiation): peel and check inside
@@ -21387,6 +21419,7 @@ function isKnownStringExpression(node, locals, childProofs = false) {
 		return typeof node.value === 'string';
 	}
 	if (node.type === 'TemplateLiteral') return true;
+	if (node.type === 'UnaryExpression' && node.operator === 'typeof') return true;
 	// An identifier the compiler has tracked back to a string in this component's
 	// scope: a `const` bound to a provably-string expression, a `const x: string`,
 	// or a `string`-typed param — see collectKnownStringLocals. `locals` is
@@ -21430,6 +21463,15 @@ function isKnownStringExpression(node, locals, childProofs = false) {
 			isKnownStringExpression(node.alternate, locals, childProofs)
 		);
 	}
+	if (node.type === 'LogicalExpression') {
+		return (
+			isKnownStringExpression(node.left, locals, childProofs) &&
+			isKnownStringExpression(node.right, locals, childProofs)
+		);
+	}
+	if (node.type === 'SequenceExpression') {
+		return isKnownStringExpression(node.expressions.at(-1), locals, childProofs);
+	}
 	return false;
 }
 
@@ -21439,6 +21481,75 @@ function isKnownStringExpression(node, locals, childProofs = false) {
 function isKnownStringChildExpression(node, locals) {
 	return isKnownStringExpression(node, locals, true);
 }
+
+// Only child positions may use the primitive-text binding for numbers and
+// bigints. These expressions are primitives (or throw before returning) under
+// JavaScript's own operators. Keep the proof distinct from "known string":
+// numeric results cannot establish that `value + anotherValue` concatenates.
+function isKnownTextChildExpression(node, stringLocals) {
+	if (isKnownStringChildExpression(node, stringLocals)) return true;
+	if (node == null || typeof node !== 'object') return false;
+	if (node.metadata?.octane_primitive_text_child === true) return true;
+	if (node.type === 'Literal' || node.type === 'NumericLiteral' || node.type === 'BigIntLiteral') {
+		return (
+			typeof node.value === 'number' ||
+			typeof node.value === 'bigint' ||
+			node.type === 'BigIntLiteral'
+		);
+	}
+	if (node.type === 'UnaryExpression') {
+		return node.operator === '+' || node.operator === '-' || node.operator === '~';
+	}
+	if (node.type === 'BinaryExpression') {
+		if (node.operator === '+') {
+			return (
+				isKnownTextChildExpression(node.left, stringLocals) &&
+				isKnownTextChildExpression(node.right, stringLocals)
+			);
+		}
+		return NUMERIC_TEXT_OPERATORS.has(node.operator);
+	}
+	if (node.type === 'ConditionalExpression') {
+		return (
+			isKnownTextChildExpression(node.consequent, stringLocals) &&
+			isKnownTextChildExpression(node.alternate, stringLocals)
+		);
+	}
+	if (node.type === 'LogicalExpression') {
+		return (
+			isKnownTextChildExpression(node.left, stringLocals) &&
+			isKnownTextChildExpression(node.right, stringLocals)
+		);
+	}
+	if (node.type === 'SequenceExpression') {
+		return isKnownTextChildExpression(node.expressions.at(-1), stringLocals);
+	}
+	if (
+		node.type === 'TSAsExpression' ||
+		node.type === 'TSTypeAssertion' ||
+		node.type === 'TSSatisfiesExpression' ||
+		node.type === 'TSNonNullExpression' ||
+		node.type === 'TSInstantiationExpression' ||
+		node.type === 'ParenthesizedExpression'
+	) {
+		return isKnownTextChildExpression(node.expression, stringLocals);
+	}
+	return false;
+}
+
+const NUMERIC_TEXT_OPERATORS = new Set([
+	'-',
+	'*',
+	'/',
+	'%',
+	'**',
+	'<<',
+	'>>',
+	'>>>',
+	'|',
+	'&',
+	'^',
+]);
 
 // Annotation check: does a TS type annotation resolve to `string`? Accepts both a
 // bare type node and a `TSTypeAnnotation` wrapper (`x: string`).
@@ -22027,7 +22138,7 @@ function planJsx(
 	const coalesceChildRoot =
 		jsxNodes.length === 1 &&
 		((jsxNodes[0].type === 'Text' &&
-			!isKnownStringChildExpression(jsxNodes[0].expression, ctx.knownStringChildLocals)) ||
+			!isKnownTextChildExpression(jsxNodes[0].expression, ctx.knownStringChildLocals)) ||
 			jsxNodes[0].type === 'TSRXExpression');
 	// Top-level control-flow directives (@if/@for/@switch/@try/<Activity>). In a
 	// body that ALSO has static template roots, each construct emits a `<!>`
@@ -24861,12 +24972,11 @@ function emitNodeHtml(
 	cssHash = null,
 ) {
 	if (node.type === 'Text') {
-		if (isKnownStringChildExpression(node.expression, ctx.knownStringChildLocals)) {
+		if (isKnownTextChildExpression(node.expression, ctx.knownStringChildLocals)) {
 			bindings.push({
 				id: bindings.length,
 				kind: 'text',
 				expr: resolveStyleExpr(node.expression, cssHash),
-				knownString: true,
 				path: path.slice(0, -1),
 				childIndex: path[path.length - 1],
 			});
@@ -26064,12 +26174,11 @@ function emitElementHtml(
 						]
 					: null;
 			appendTemplatePart(html, escaped, 'text', origins);
-		} else if (isKnownStringChildExpression(txtChild.expression, ctx.knownStringChildLocals)) {
+		} else if (isKnownTextChildExpression(txtChild.expression, ctx.knownStringChildLocals)) {
 			bindings.push({
 				id: bindings.length,
 				kind: 'textOnlyChild',
 				expr: resolveStyleExpr(txtChild.expression, cssHash),
-				knownString: true,
 				path,
 			});
 			// The element stays empty in the template — runtime appends a Text node.
@@ -26238,12 +26347,11 @@ function emitElementHtml(
 					appendTemplatePart(html, escaped, 'text', origins);
 					prevBakedText = true;
 					if (!prevBaked) childIdx++;
-				} else if (isKnownStringChildExpression(child.expression, ctx.knownStringChildLocals)) {
+				} else if (isKnownTextChildExpression(child.expression, ctx.knownStringChildLocals)) {
 					bindings.push({
 						id: bindings.length,
 						kind: 'text',
 						expr: resolveStyleExpr(child.expression, cssHash),
-						knownString: true,
 						path,
 						childIndex: childIdx,
 						// A text-producing neighbour → the server emits a `<!-- -->`
@@ -26410,7 +26518,7 @@ function emitElementHtml(
 				//   - `{createPortal(BODY, TARGET, PROPS?)}` → portal() call
 				//   - `{cond ? <JSX/> : <JSX/>}` → lowered to ifBlock (so the branches
 				//      mount real DOM, not stringified text)
-				//   - a known-string expression → text-hole binding
+				//   - a proven primitive text expression → text-hole binding
 				//   - anything else → renderable childSlot hole
 				const expr = child.expression;
 				if (isCreatePortalCall(expr)) {
@@ -26438,12 +26546,11 @@ function emitElementHtml(
 					ifCalls.push(ic);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
-				} else if (isKnownStringChildExpression(expr, ctx.knownStringChildLocals)) {
+				} else if (isKnownTextChildExpression(expr, ctx.knownStringChildLocals)) {
 					bindings.push({
 						id: bindings.length,
 						kind: 'text',
 						expr: tsrxExprNode(resolveStyleExpr(expr, cssHash), ctx, componentName, inlinedSubs),
-						knownString: true,
 						path,
 						childIndex: childIdx,
 					});

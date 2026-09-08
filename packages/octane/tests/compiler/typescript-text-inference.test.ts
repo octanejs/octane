@@ -29,6 +29,39 @@ function childRange(source: string, expression: string): [number, number] {
 }
 
 describe('TypeScript-backed text facts', () => {
+	it('proves only primitive text domains for numeric and mixed child values', () => {
+		const source = `export function TextValues(props: {
+			count: number; large: bigint; mixed: string | number | bigint;
+			optional?: number; boxed: Number; flag: boolean; date: Date;
+			unchecked: any; unknown: unknown;
+		}) @{
+			const count = props.count;
+			<main>
+				<p>{props.count}</p><p>{count}</p><p>{props.large}</p><p>{props.mixed}</p>
+				<p>{Date()}</p><p>{props.date.toISOString()}</p>
+				<p>{props.optional}</p><p>{props.boxed}</p><p>{props.flag}</p>
+				<p>{props.date}</p><p>{props.unchecked}</p><p>{props.unknown}</p>
+			</main>
+		}`;
+		const consumer = fixture({ 'TextValues.tsrx': source });
+		const facts = consumer.project.snapshot(consumer.file('TextValues.tsrx'));
+		const primitive = (facts.primitiveTextChildRanges ?? []).map(([start, end]) =>
+			source.slice(start, end),
+		);
+		expect(primitive).toEqual(['props.count', 'count', 'props.large', 'props.mixed']);
+		expect(stringChildren(source, facts)).toEqual(['Date()', 'props.date.toISOString()']);
+		for (const uncertain of [
+			'props.optional',
+			'props.boxed',
+			'props.flag',
+			'props.date',
+			'props.unchecked',
+			'props.unknown',
+		]) {
+			expect(primitive, uncertain).not.toContain(uncertain);
+		}
+	});
+
 	it('proves exact primitive-string child expressions across declarations and calls', () => {
 		const source = `import { useState } from 'octane';
 type Label = string;
@@ -170,6 +203,9 @@ export function Imported(props: { label: Label }) @{
 		const second = consumer.project.snapshot(filename);
 		expect(stringChildren(source, second)).not.toContain('props.label');
 		expect(stringChildren(source, second)).not.toContain('readLabel()');
+		expect(
+			(second.primitiveTextChildRanges ?? []).map(([start, end]) => source.slice(start, end)),
+		).toEqual(expect.arrayContaining(['props.label', 'readLabel()']));
 		expect(second.sourceVersion).toBe(first.sourceVersion);
 		expect(second.projectVersion).not.toBe(first.projectVersion);
 		expect(JSON.stringify(first)).toBe(original);
@@ -372,6 +408,16 @@ describe('source-bound textTypeFacts compile option', () => {
 			{ ...facts, stringChildRanges: [[end, start]] },
 			{ ...facts, stringChildRanges: [[start - 1, end + 1]] },
 			{ ...facts, stringChildRanges: [[attrStart, attrStart + 'props.title'.length]] },
+			{ ...facts, primitiveTextChildRanges: null },
+			{
+				...facts,
+				primitiveTextChildRanges: [
+					[start, end],
+					[start, end],
+				],
+			},
+			{ ...facts, primitiveTextChildRanges: [[attrStart, attrStart + 'props.title'.length]] },
+			{ ...facts, primitiveTextChildRanges: [[start, end]] },
 		];
 		for (const invalid of malformed) {
 			for (const mode of ['client', 'server'] as const) {

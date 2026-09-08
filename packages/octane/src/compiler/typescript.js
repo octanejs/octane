@@ -188,15 +188,18 @@ function mappedChild(child, sourceMap, generatedChildren, generatedLength) {
 
 /**
  * TypeScript assignability alone is insufficient: `any` and `never` are both
- * assignable to string. Only a primitive-string domain is useful here. Branded
- * string intersections and bounded generic constraints retain that domain;
- * mixed unions, boxed String, and unresolved/error types do not.
+ * assignable to string. A direct child can use the text binding when every
+ * possible value is a primitive string, number, or bigint. Keep a distinct
+ * string result for the compiler's string-only proofs; a mixed union is text,
+ * but it is not evidence for string concatenation. Branded intersections and
+ * bounded generic constraints retain their primitive domain. Boxed values,
+ * nullish/boolean unions, and unresolved/error types do not.
  *
  * This is a typed-program contract, not runtime validation of inaccurate
  * declarations or values smuggled through `any`.
  */
-function isPrimitiveString(type, checker, seen = new Set()) {
-	if (!type || seen.has(type)) return false;
+function primitiveTextKind(type, checker, seen = new Set()) {
+	if (!type || seen.has(type)) return 0;
 	const flags = type.flags;
 	if (
 		flags &
@@ -207,20 +210,33 @@ function isPrimitiveString(type, checker, seen = new Set()) {
 			ts.TypeFlags.Undefined |
 			ts.TypeFlags.Null)
 	) {
-		return false;
+		return 0;
 	}
-	if (flags & ts.TypeFlags.StringLike) return true;
-	if (seen.size >= 64) return false;
+	if (flags & ts.TypeFlags.StringLike) return 1;
+	if (flags & (ts.TypeFlags.NumberLike | ts.TypeFlags.BigIntLike)) return 2;
+	if (seen.size >= 64) return 0;
 	seen.add(type);
-	let result = false;
+	let result = 0;
 	if (type.isUnion()) {
-		result =
-			type.types.length > 0 && type.types.every((part) => isPrimitiveString(part, checker, seen));
+		if (type.types.length > 0) {
+			result = 1;
+			for (const part of type.types) {
+				const kind = primitiveTextKind(part, checker, seen);
+				if (kind === 0) {
+					result = 0;
+					break;
+				}
+				if (kind === 2) result = 2;
+			}
+		}
 	} else if (type.isIntersection()) {
-		result = type.types.some((part) => isPrimitiveString(part, checker, seen));
+		for (const part of type.types) {
+			result = primitiveTextKind(part, checker, seen);
+			if (result !== 0) break;
+		}
 	} else {
 		const constraint = checker.getBaseConstraintOfType(type);
-		if (constraint && constraint !== type) result = isPrimitiveString(constraint, checker, seen);
+		if (constraint && constraint !== type) result = primitiveTextKind(constraint, checker, seen);
 	}
 	seen.delete(type);
 	return result;
@@ -232,18 +248,23 @@ function overlapsDiagnostic(diagnostic, start, end) {
 	return diagnostic.start < end && diagnostic.start + diagnostic.length > start;
 }
 
-function freezeFacts(filename, record, projectVersion, ranges) {
+function freezeRanges(ranges) {
 	const unique = new Map();
 	for (const [start, end] of ranges) unique.set(`${start}:${end}`, [start, end]);
 	const sorted = [...unique.values()].sort(
 		(left, right) => left[0] - right[0] || left[1] - right[1],
 	);
+	return Object.freeze(sorted.map((range) => Object.freeze(range)));
+}
+
+function freezeFacts(filename, record, projectVersion, stringRanges, primitiveRanges) {
 	return Object.freeze({
 		version: TEXT_TYPE_FACTS_VERSION,
 		filename,
 		sourceVersion: record.version,
 		projectVersion,
-		stringChildRanges: Object.freeze(sorted.map((range) => Object.freeze(range))),
+		stringChildRanges: freezeRanges(stringRanges),
+		primitiveTextChildRanges: freezeRanges(primitiveRanges),
 	});
 }
 
@@ -257,6 +278,10 @@ export function createTextTypeProject(options) {
 	}
 	const configFilename = absoluteFilename(options.tsconfig, process.cwd());
 	const directory = nodePath.dirname(configFilename);
+	// TypeScript resolves relative files from its tsconfig; renderer rules use
+	// bundler module IDs, which may be relative to a different project root.
+	const rendererRoot =
+		options.root === undefined ? directory : absoluteFilename(options.root, process.cwd());
 	const renderers = normalizeRendererConfig(options.renderers);
 	const caseSensitive = ts.sys.useCaseSensitiveFileNames;
 	const sources = new FileMap(caseSensitive);
@@ -394,7 +419,7 @@ export function createTextTypeProject(options) {
 		if (cached?.version === version) return cached.code;
 		let compilation = null;
 		try {
-			compilation = compileToVolarMappings(source, rendererFilename(file, directory), {
+			compilation = compileToVolarMappings(source, rendererFilename(file, rendererRoot), {
 				renderers,
 			});
 		} catch {
@@ -470,6 +495,7 @@ export function createTextTypeProject(options) {
 				options: program.getCompilerOptions(),
 				references: loadConfig().projectReferences ?? [],
 				renderers: renderers.signature,
+				rendererRoot,
 				roots: roots(),
 				inputs,
 			}),
@@ -536,7 +562,8 @@ export function createTextTypeProject(options) {
 			cached.projectVersion === version
 		)
 			return cached;
-		const ranges = [];
+		const stringRanges = [];
+		const primitiveRanges = [];
 		const compilerOptions = program.getCompilerOptions();
 		const strictNullChecks = compilerOptions.strictNullChecks ?? compilerOptions.strict ?? false;
 		const sourceFile = program.getSourceFile(file);
@@ -562,8 +589,9 @@ export function createTextTypeProject(options) {
 						) {
 							return;
 						}
-						if (isPrimitiveString(checker.getTypeAtLocation(expression), checker))
-							ranges.push([start, end]);
+						const kind = primitiveTextKind(checker.getTypeAtLocation(expression), checker);
+						if (kind === 1) stringRanges.push([start, end]);
+						else if (kind === 2) primitiveRanges.push([start, end]);
 					};
 					if (compilation) {
 						const sourceMap = new SourceMap(compilation.mappings);
@@ -583,7 +611,7 @@ export function createTextTypeProject(options) {
 				}
 			}
 		}
-		const facts = freezeFacts(file, record, version, ranges);
+		const facts = freezeFacts(file, record, version, stringRanges, primitiveRanges);
 		factsCache.set(file, facts);
 		return facts;
 	};

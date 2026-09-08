@@ -1,4 +1,4 @@
-/** A source-bound, serializable primitive-string proof for JSX child holes. */
+/** Source-bound, serializable primitive-text proofs for JSX child holes. */
 export interface TextTypeFacts {
 	readonly version: 1;
 	/** Clean absolute filename, with forward-slash separators. */
@@ -9,11 +9,18 @@ export interface TextTypeFacts {
 	readonly projectVersion: string;
 	/** Sorted, unique, half-open UTF-16 ranges of authored child expressions. */
 	readonly stringChildRanges: readonly (readonly [start: number, end: number])[];
+	/**
+	 * Number, bigint, and mixed string/number/bigint children. Older version-1
+	 * snapshots omit this field and retain their string-only behavior.
+	 */
+	readonly primitiveTextChildRanges?: readonly (readonly [start: number, end: number])[];
 }
 
 export interface TextTypeProjectOptions {
 	/** Path to the consumer tsconfig. Relative paths resolve from the process cwd. */
 	tsconfig: string;
+	/** Root for project-relative renderer module IDs; defaults to the tsconfig directory. */
+	root?: string;
 	/** The same renderer configuration used by the Octane compiler. */
 	renderers?: unknown;
 }

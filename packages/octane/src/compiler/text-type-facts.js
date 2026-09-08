@@ -35,7 +35,7 @@ export function textTypeSourceVersion(source) {
  * because independently falling back on the client/server could change the
  * hydration protocol. Nested ranges are valid when a child expression contains
  * JSX with child expressions of its own.
- * @returns {Set<string> | null}
+ * @returns {{ stringRanges: Set<string>, primitiveRanges: Set<string> } | null}
  */
 export function createTextTypeFactsLookup(facts, filename, source) {
 	if (facts === undefined) return null;
@@ -61,29 +61,43 @@ export function createTextTypeFactsLookup(facts, filename, source) {
 	if (typeof facts.projectVersion !== 'string' || facts.projectVersion.length === 0) {
 		invalid('projectVersion must identify the TypeScript project snapshot');
 	}
-	if (!Array.isArray(facts.stringChildRanges)) invalid('stringChildRanges must be an array');
-	const ranges = new Set();
-	let previousStart = -1;
-	let previousEnd = -1;
-	for (const range of facts.stringChildRanges) {
-		if (
-			!Array.isArray(range) ||
-			range.length !== 2 ||
-			!Number.isSafeInteger(range[0]) ||
-			!Number.isSafeInteger(range[1]) ||
-			range[0] < 0 ||
-			range[0] >= range[1] ||
-			range[1] > source.length
-		) {
-			invalid('stringChildRanges contains an invalid authored range');
+	const validateRanges = (value, name) => {
+		if (!Array.isArray(value)) invalid(`${name} must be an array`);
+		const ranges = new Set();
+		let previousStart = -1;
+		let previousEnd = -1;
+		for (const range of value) {
+			if (
+				!Array.isArray(range) ||
+				range.length !== 2 ||
+				!Number.isSafeInteger(range[0]) ||
+				!Number.isSafeInteger(range[1]) ||
+				range[0] < 0 ||
+				range[0] >= range[1] ||
+				range[1] > source.length
+			) {
+				invalid(`${name} contains an invalid authored range`);
+			}
+			const [start, end] = range;
+			if (start < previousStart || (start === previousStart && end <= previousEnd)) {
+				invalid(`${name} must be sorted and unique`);
+			}
+			previousStart = start;
+			previousEnd = end;
+			ranges.add(`${start}:${end}`);
 		}
-		const [start, end] = range;
-		if (start < previousStart || (start === previousStart && end <= previousEnd)) {
-			invalid('stringChildRanges must be sorted and unique');
-		}
-		previousStart = start;
-		previousEnd = end;
-		ranges.add(`${start}:${end}`);
+		return ranges;
+	};
+	const stringRanges = validateRanges(facts.stringChildRanges, 'stringChildRanges');
+	// The optional field lets older project adapters keep supplying version-1
+	// string-only snapshots. A numeric proof must never masquerade as string
+	// evidence in the compiler's concatenation and local-binding analysis.
+	const primitiveRanges = validateRanges(
+		facts.primitiveTextChildRanges === undefined ? [] : facts.primitiveTextChildRanges,
+		'primitiveTextChildRanges',
+	);
+	for (const range of primitiveRanges) {
+		if (stringRanges.has(range)) invalid('a child has conflicting text proofs');
 	}
-	return ranges;
+	return { stringRanges, primitiveRanges };
 }

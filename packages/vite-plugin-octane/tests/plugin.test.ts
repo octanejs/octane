@@ -183,6 +183,12 @@ describe('isViteOwnedUrl', () => {
 });
 
 describe('octane() plugin factory', () => {
+	it('forwards the typed-text project option to the compiler', () => {
+		expect(() => octane({ textTypes: { tsconfig: ' tsconfig.json ' } })).toThrow(
+			'`textTypes` requires { tsconfig: string }.',
+		);
+	});
+
 	it('types components with the live props-first ABI', () => {
 		const Component: Component<{ value: string }> = (props) => props.value;
 		expect(Component({ value: 'props-first' }, undefined)).toBe('props-first');

@@ -221,7 +221,7 @@ function collect_hydrate_module_paths(config) {
  * it). An explicit `profile` (true or false) always takes precedence over
  * `devtools`.
  *
- * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
+ * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'], exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -881,6 +881,7 @@ export function octane(inlineOptions = {}) {
 	 *   hmr?: boolean,
 	 *   profile?: boolean | 'auto',
 	 *   strong?: boolean,
+	 *   textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'],
 	 *   exclude?: string[],
 	 *   requireDirective?: boolean,
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
@@ -894,6 +895,7 @@ export function octane(inlineOptions = {}) {
 	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;
 	else if (inlineOptions.devtools === true) compilerOptions.profile = 'auto';
 	if (inlineOptions.strong !== undefined) compilerOptions.strong = inlineOptions.strong;
+	if (inlineOptions.textTypes !== undefined) compilerOptions.textTypes = inlineOptions.textTypes;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
 	if (inlineOptions.requireDirective !== undefined) {
 		compilerOptions.requireDirective = inlineOptions.requireDirective;

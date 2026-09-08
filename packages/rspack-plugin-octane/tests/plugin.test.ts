@@ -162,6 +162,34 @@ describe('OctaneRspackPlugin', () => {
 		]);
 	});
 
+	it('uses a main-thread, non-worker loader only for opted-in production text analysis', () => {
+		const production = createCompiler('web');
+		(production.options as any).mode = 'production';
+		(production.options as any).cache = { type: 'persistent', version: 'user-cache' };
+		applyPlugin(new OctaneRspackPlugin({ textTypes: { tsconfig: 'tsconfig.json' } }), production);
+		expect(production.options.module.rules[0].use).toEqual([
+			{
+				loader: expect.any(String),
+				options: expect.objectContaining({
+					textTypes: { tsconfig: '/project/tsconfig.json' },
+				}),
+			},
+		]);
+		const ordinary = createCompiler('web');
+		(ordinary.options as any).mode = 'production';
+		(ordinary.options as any).cache = { type: 'persistent', version: 'user-cache' };
+		applyPlugin(new OctaneRspackPlugin(), ordinary);
+		expect((ordinary.options as any).cache.version).not.toBe(
+			(production.options as any).cache.version,
+		);
+		const development = createCompiler('web');
+		(development.options as any).mode = 'development';
+		applyPlugin(new OctaneRspackPlugin({ textTypes: { tsconfig: 'tsconfig.json' } }), development);
+		expect(development.options.module.rules[0].use).toHaveLength(2);
+		expect(development.options.module.rules[0].use[1].parallel).toEqual({ maxWorkers: 4 });
+		expect(development.options.module.rules[0].use[1].options).not.toHaveProperty('textTypes');
+	});
+
 	it('honors explicit client mode and serializable loader options', () => {
 		const existingHostPath = process.execPath;
 		const compiler = createCompiler('node');

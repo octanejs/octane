@@ -1,7 +1,8 @@
-import { realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import remapping from '@jridgewell/remapping';
 import { canonicalModuleId, cleanModuleId, createOctaneCompiler } from 'octane/compiler/bundler';
+import { resolveRendererForFile } from 'octane/compiler/renderers';
 import {
 	clearCssModuleBuildInfo,
 	CSS_MODULE_CONTEXT_KEY,
@@ -14,6 +15,7 @@ import {
 	selectLayerCompilerOptions,
 } from './shared.js';
 import { loadDescriptorChildrenImports } from './descriptor-children.js';
+import { textTypeFactsForLoader } from './text-types.js';
 
 function realRoot(path) {
 	try {
@@ -134,6 +136,41 @@ export default function octaneLoader(source, inputSourceMap) {
 		});
 		const id = realModuleId(this.resource ?? this.resourcePath);
 		const authoredSource = String(source);
+		const textTypeCandidate =
+			options.textTypes !== undefined && this.mode === 'production' && !dev && this.hot !== true;
+		let textTypeFilename;
+		if (textTypeCandidate) {
+			const file = cleanModuleId(id);
+			if (
+				/(?:\.tsrx|\.tsx)$/i.test(file) &&
+				existsSync(file) &&
+				compiler._isProjectOwnedSource(file)
+			) {
+				const canonical = compiler._canonicalModuleId(file);
+				const pragmaOwned =
+					file.endsWith('.tsx') && compiler._pragmaClaimsOwnership(authoredSource);
+				if (compiler._passesOwnershipGate(file, canonical, pragmaOwned)) {
+					const renderer = resolveRendererForFile(compiler.renderers, canonical);
+					if (
+						renderer.target === 'dom' &&
+						!(environment === 'server' && renderer.server === 'client-only')
+					) {
+						textTypeFilename = canonical;
+					}
+				}
+			}
+		}
+		if (textTypeFilename !== undefined) {
+			// An imported type can change while this module's source stays the same.
+			// Rspack's persistent module cache has no dependency edges to every TS
+			// Program input. Production watches stay syntax-only but must not persist
+			// their generic output for a later one-shot typed build either.
+			this.cacheable?.(false);
+		}
+		const textTypes =
+			textTypeFilename !== undefined &&
+			this._compiler?.watchMode !== true &&
+			this._compiler?.options?.watch !== true;
 		const cssModuleConstants =
 			this[CSS_MODULE_CONTEXT_KEY]?.enabled === true
 				? prepareCssModuleConstants(this, compiler, authoredSource, id, {
@@ -142,7 +179,7 @@ export default function octaneLoader(source, inputSourceMap) {
 						dev,
 					})
 				: null;
-		const finish = (clientOnlyImports, isDescriptorChildrenImport, callback) => {
+		const finish = (clientOnlyImports, isDescriptorChildrenImport, textTypeFacts, callback) => {
 			try {
 				const result = compiler.transform(authoredSource, id, {
 					environment,
@@ -151,6 +188,7 @@ export default function octaneLoader(source, inputSourceMap) {
 					profile,
 					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
 					...(isDescriptorChildrenImport === null ? null : { isDescriptorChildrenImport }),
+					...(textTypeFacts === undefined ? null : { textTypeFacts }),
 					...cssModuleConstants?.transformOptions,
 				});
 
@@ -205,18 +243,33 @@ export default function octaneLoader(source, inputSourceMap) {
 			/\.(?:tsrx|tsx)$/.test(cleanModuleId(id)) &&
 			/<\s*[A-Z_$]/.test(authoredSource) &&
 			authoredSource.includes('import');
-		if (requests.length > 0 || mayUseDescriptorImports) {
+		if (requests.length > 0 || mayUseDescriptorImports || textTypes) {
 			const asyncCallback = this.async?.() ?? callback;
 			Promise.all([
 				requests.length > 0 ? resolveClientOnlyImports(this, compiler, authoredSource, id) : [],
 				mayUseDescriptorImports ? loadDescriptorChildrenImports(this, authoredSource, id) : null,
+				textTypes
+					? textTypeFactsForLoader(
+							this._compiler,
+							options.textTypes.tsconfig,
+							compilerOptions.renderers,
+							cleanModuleId(id),
+							authoredSource,
+						).then((facts) => ({
+							...facts,
+							// The neutral compiler uses a project-relative module identity;
+							// the checker necessarily reads the real filesystem filename.
+							filename: textTypeFilename,
+						}))
+					: undefined,
 			]).then(
-				([imports, descriptorImport]) => finish(imports, descriptorImport, asyncCallback),
+				([imports, descriptorImport, textTypeFacts]) =>
+					finish(imports, descriptorImport, textTypeFacts, asyncCallback),
 				(error) => asyncCallback(error instanceof Error ? error : new Error(String(error))),
 			);
 			return;
 		}
-		finish([], null, callback);
+		finish([], null, undefined, callback);
 	} catch (error) {
 		this.callback(error instanceof Error ? error : new Error(String(error)));
 	}

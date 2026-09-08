@@ -235,6 +235,7 @@ function assertRootPublicPaths(config, clientEnvironment) {
  *   hmr?: boolean,
  *   parallel?: boolean | { maxWorkers?: number },
  *   cssModuleConstants?: import('@octanejs/rspack-plugin').OctaneRspackPluginOptions['cssModuleConstants'],
+ *   textTypes?: import('@octanejs/rspack-plugin').OctaneRspackPluginOptions['textTypes'],
  *   profile?: boolean,
  *   strong?: boolean,
  *   exclude?: string[],
@@ -555,6 +556,9 @@ export function pluginOctane(inlineOptions = {}) {
 						...(inlineOptions.cssModuleConstants === undefined
 							? null
 							: { cssModuleConstants: inlineOptions.cssModuleConstants }),
+						...(inlineOptions.textTypes === undefined
+							? null
+							: { textTypes: inlineOptions.textTypes }),
 						...(strong === undefined ? null : { strong }),
 						...(inlineOptions.hmr === undefined ? null : { hmr: inlineOptions.hmr }),
 						...(inlineOptions.profile === undefined

@@ -192,6 +192,11 @@ describe.each([false, true])('inferred text hydration (development diagnostics: 
 		);
 		expect(stringChildren(fixture.source, fixture.facts!)).not.toContain('props.maybe');
 		expect(stringChildren(fixture.source, fixture.facts!)).not.toContain('props.child');
+		expect(
+			(fixture.facts!.primitiveTextChildRanges ?? []).map(([start, end]) =>
+				fixture.source.slice(start, end),
+			),
+		).toContain('count');
 		const props = { label: 'First & <label>', maybe: null, child: 'plain' };
 		const { html } = await ServerRuntime.renderToString(fixture.server.TextScene, props);
 		const container = document.createElement('div');
@@ -199,6 +204,12 @@ describe.each([false, true])('inferred text hydration (development diagnostics: 
 		document.body.appendChild(container);
 		const member = container.querySelector('#text-member')!;
 		const memberText = member.firstChild;
+		const typedCount = container.querySelector('#text-typed-count')!;
+		const typedCountText = typedCount.firstChild;
+		const numberSibling = [...container.querySelector('#text-number-siblings')!.childNodes].find(
+			(node) => node.nodeType === Node.TEXT_NODE && node.nodeValue === '0',
+		);
+		expect(numberSibling).toBeDefined();
 		const before = container.querySelector('#text-before');
 		const after = container.querySelector('#text-after');
 		const siblingText = [...container.querySelector('#text-siblings')!.childNodes].find(
@@ -212,11 +223,16 @@ describe.each([false, true])('inferred text hydration (development diagnostics: 
 			flushSync(() => {});
 			expect(container.querySelector('#text-member')).toBe(member);
 			expect(member.firstChild).toBe(memberText);
+			expect(typedCount.firstChild).toBe(typedCountText);
+			expect(numberSibling!.parentNode).toBe(container.querySelector('#text-number-siblings'));
 			expect(container.querySelector('#text-before')).toBe(before);
 			expect(container.querySelector('#text-after')).toBe(after);
 			expect(siblingText!.parentNode).toBe(container.querySelector('#text-siblings'));
 			flushSync(() => (container.querySelector('#text-bump') as HTMLButtonElement).click());
 			expect(container.querySelector('#text-count')!.textContent).toBe('1');
+			expect(typedCount.firstChild).toBe(typedCountText);
+			expect(typedCountText!.nodeValue).toBe('1');
+			expect(numberSibling!.nodeValue).toBe('1');
 			flushSync(() =>
 				root!.render(fixture.client.TextScene, {
 					label: 'Second',

@@ -26,6 +26,7 @@ function transform({
 	source,
 	target = 'web',
 	hot = false,
+	watch = false,
 	mode = 'development',
 	options = {},
 }: {
@@ -34,12 +35,14 @@ function transform({
 	source: string;
 	target?: unknown;
 	hot?: boolean;
+	watch?: boolean;
 	mode?: string;
 	options?: Record<string, unknown>;
 }) {
 	const dependencies: string[] = [];
 	const missingDependencies: string[] = [];
 	const warnings: Error[] = [];
+	const cacheable: boolean[] = [];
 	const module = { buildInfo: {} as Record<string, unknown> };
 	let output: LoaderOutput | undefined;
 	octaneLoader.call(
@@ -49,10 +52,11 @@ function transform({
 			resourcePath,
 			target,
 			hot,
+			...(watch ? { _compiler: { watchMode: true, options: { watch: true } } } : null),
 			mode,
 			sourceMap: true,
 			_module: module,
-			cacheable() {},
+			cacheable: (value: boolean) => cacheable.push(value),
 			getOptions: () => options,
 			addDependency: (dependency: string) => dependencies.push(dependency),
 			addMissingDependency: (dependency: string) => missingDependencies.push(dependency),
@@ -65,7 +69,7 @@ function transform({
 	);
 	if (!output) throw new Error('Octane loader did not invoke its callback.');
 	if (output.error) throw output.error;
-	return { ...output, dependencies, missingDependencies, warnings, module };
+	return { ...output, dependencies, missingDependencies, warnings, cacheable, module };
 }
 
 describe('loader with the neutral compiler', () => {
@@ -416,6 +420,43 @@ describe('loader with the neutral compiler', () => {
 
 		expect(result.content).toBe(source);
 		expect(result.dependencies).not.toContain(join(root, 'src/Main.tsrx'));
+	});
+
+	it('keeps production watch builds syntax-only and out of the persistent module cache', () => {
+		const source = 'export function Watch(props: { label: string }) @{ <p>{props.label}</p> }\n';
+		const resourcePath = write(root, 'src/Watch.tsrx', source);
+		const result = transform({
+			root,
+			resourcePath,
+			source,
+			mode: 'production',
+			watch: true,
+			// A watch transform must not initialize a checker or read a tsconfig.
+			options: { textTypes: { tsconfig: join(root, 'missing-tsconfig.json') } },
+		});
+
+		expect(getOctaneRspackBuildInfo(result.module)?.transformKind).toBe('compile');
+		expect(result.cacheable).toContain(false);
+	});
+
+	it('keeps installed Octane sources outside the application type project', () => {
+		write(
+			root,
+			'node_modules/@fixture/raw/package.json',
+			JSON.stringify({ name: '@fixture/raw', dependencies: { octane: '*' } }),
+		);
+		const source = 'export function Raw() { return <span>ready</span>; }\n';
+		const resourcePath = write(root, 'node_modules/@fixture/raw/index.tsx', source);
+		const result = transform({
+			root,
+			resourcePath,
+			source,
+			mode: 'production',
+			options: { textTypes: { tsconfig: join(root, 'missing-tsconfig.json') } },
+		});
+
+		expect(getOctaneRspackBuildInfo(result.module)?.transformKind).toBe('compile');
+		expect(result.cacheable).not.toContain(false);
 	});
 
 	it('watches a manual-slot manifest that changes a plain TypeScript decision', () => {

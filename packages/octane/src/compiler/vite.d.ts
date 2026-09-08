@@ -88,6 +88,12 @@ export interface OctaneVitePluginOptions {
 	 */
 	strong?: boolean;
 	/**
+	 * @experimental Infer primitive child text from a TypeScript project in
+	 * one-shot production builds. Serve and watched builds retain syntax
+	 * inference. A relative tsconfig is resolved from the Vite project root.
+	 */
+	textTypes?: { tsconfig: string };
+	/**
 	 * Path fragments excluded from Octane's plain `.ts`/`.js` hook-slot pass.
 	 * Prefer package manifest `octane.hookSlots.manual` declarations for bindings.
 	 */
