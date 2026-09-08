@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, readdir, stat } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdir, mkdtemp, readFile, readdir, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import { createEvidenceMatrix } from './evidence-lib.mjs';
 import {
 	acquireBatchLock,
+	captureWorktreeBaseline,
 	createBatchManifest,
 	detectWorktreeCollisions,
 	invalidateChangedEvidence,
@@ -201,6 +203,44 @@ describe('batch state', () => {
 			resumed.resume.invalidated,
 			[...implementationActions.map((action) => `pkg:${action}`), 'pkg:verified-binding'].sort(),
 		);
+	});
+
+	test('binding baselines exclude installed dependencies and do not follow source symlinks', async () => {
+		const root = await mkdtemp(path.join(tmpdir(), 'binding-baseline-'));
+		execFileSync('git', ['init', '--quiet'], { cwd: root });
+		await writeFile(path.join(root, '.gitignore'), 'node_modules/\n');
+		await mkdir(path.join(root, 'packages/widget/node_modules/tool'), { recursive: true });
+		await mkdir(path.join(root, 'outside'), { recursive: true });
+		await writeFile(path.join(root, 'outside/private.js'), 'export default 1;');
+		await symlink(path.join(root, 'outside'), path.join(root, 'packages/widget/linked'));
+		await writeFile(path.join(root, 'packages/widget/node_modules/tool/index.js'), 'first');
+		const before = captureWorktreeBaseline(root, ['packages/widget']);
+		await writeFile(path.join(root, 'packages/widget/node_modules/tool/index.js'), 'second');
+		assert.deepEqual(captureWorktreeBaseline(root, ['packages/widget']), before);
+		assert.ok(!Object.keys(before).some((name) => name.includes('node_modules')));
+		assert.ok(!Object.hasOwn(before, 'packages/widget/linked/private.js'));
+		assert.match(before['packages/widget/linked'], /^symlink:/);
+	});
+
+	test('captures newly planned binding paths without accepting existing dirty-path changes', () => {
+		const previous = fixtureManifest();
+		previous.baseline = { 'packages/new/src/local.ts': 'original' };
+		const next = fixtureManifest();
+		next.nodes['pkg:other'].bindingDirectory = 'packages/new';
+		next.nodes['pkg:other'].state = 'ready';
+		next.nodes['pkg:other'].action = 'extend-binding';
+		next.dirtyPaths = ['packages/new/src/arrived.ts'];
+		next.baseline = {
+			'packages/new/src/arrived.ts': 'unreviewed',
+			'packages/new': 'directory',
+			'packages/new/package.json': 'manifest',
+			'packages/new/src/local.ts': 'changed',
+		};
+		assert.deepEqual(reconcileBatchManifest(previous, next).baseline, {
+			'packages/new': 'directory',
+			'packages/new/package.json': 'manifest',
+			'packages/new/src/local.ts': 'original',
+		});
 	});
 
 	test('accepts only explicitly adopted paths into a resumed baseline', () => {

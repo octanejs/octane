@@ -395,6 +395,15 @@ describe('union prerequisite graph', () => {
 		assert.match(graph.nodes['pkg:react-covered'].blockers.join('\n'), /test evidence/i);
 	});
 
+	test('extends requested bindings until every published subpath is available', () => {
+		const target = licensedTarget('react-covered', '2.4.0');
+		target.publicExports = { '.': './index.js', './advanced': './advanced.js' };
+		const graph = planPortGraph({ targets: [target], inventory: fixtureInventory() });
+		assert.deepEqual(graph.nodes['pkg:react-covered'].requiredSubpaths, ['.', './advanced']);
+		assert.equal(graph.nodes['pkg:react-covered'].action, 'extend-binding');
+		assert.equal(graph.nodes['pkg:react-covered'].state, 'ready');
+	});
+
 	test('extends an existing binding when shipped code needs an unexported subpath', () => {
 		const target = licensedTarget('consumer', '1.0.0', { 'react-covered': '^2.0.0' });
 		target.sourceAnalysis = {

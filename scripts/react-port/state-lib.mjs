@@ -87,6 +87,7 @@ export function createBatchManifest({
 	inventoryFingerprint,
 	nodes,
 	baseline = {},
+	dirtyPaths = [],
 	graphFingerprint = null,
 	executionUnits = [],
 	actionableExecutionUnits = [],
@@ -103,6 +104,7 @@ export function createBatchManifest({
 		actionableExecutionUnits: structuredClone(actionableExecutionUnits),
 		executionOrder: structuredClone(executionOrder),
 		baseline: structuredClone(baseline),
+		dirtyPaths: [...dirtyPaths],
 		history: [],
 	};
 	return validateBatchManifest(manifest);
@@ -206,6 +208,20 @@ export function reconcileBatchManifest(previousManifest, nextManifest) {
 		}
 	}
 	merged.baseline = structuredClone(previousManifest.baseline);
+	// Recursive intake can discover a binding after the initial blocked report.
+	// Capture its first planned baseline, retaining every previously observed hash.
+	for (const node of Object.values(merged.nodes)) {
+		const directory = node.bindingDirectory?.replace(/\/$/, '');
+		if (!directory || Object.hasOwn(previousManifest.baseline, directory)) continue;
+		for (const [filePath, hash] of Object.entries(nextManifest.baseline)) {
+			if (
+				(filePath === directory || filePath.startsWith(directory + '/')) &&
+				!Object.hasOwn(merged.baseline, filePath) &&
+				!(nextManifest.dirtyPaths ?? []).includes(filePath)
+			)
+				merged.baseline[filePath] = hash;
+		}
+	}
 	// Explicit adoption accepts an already-present, provenance-matched package.
 	// Refresh that package's baseline only; ordinary resumes still reject writes
 	// since intake, and similarly named neighboring directories remain protected.
@@ -272,8 +288,15 @@ export function captureWorktreeBaseline(repoRoot = process.cwd(), plannedRoots =
 		try {
 			paths.push(plannedRoot);
 			if (!lstatSync(rootPath).isDirectory()) continue;
-			for (const entry of readdirSync(rootPath, { recursive: true, withFileTypes: true })) {
-				paths.push(path.relative(repoRoot, path.join(entry.parentPath, entry.name)));
+			const directories = [rootPath];
+			while (directories.length > 0) {
+				const directory = directories.pop();
+				for (const entry of readdirSync(directory, { withFileTypes: true })) {
+					if (entry.name === 'node_modules') continue;
+					const entryPath = path.join(directory, entry.name);
+					paths.push(path.relative(repoRoot, entryPath));
+					if (entry.isDirectory() && !entry.isSymbolicLink()) directories.push(entryPath);
+				}
 			}
 		} catch (error) {
 			if (error?.code !== 'ENOENT') throw error;

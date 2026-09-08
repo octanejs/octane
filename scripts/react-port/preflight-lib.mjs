@@ -760,11 +760,12 @@ export function conventionalTestPath(relativePath, { runner } = {}) {
 	) {
 		return false;
 	}
-	if (runner === 'vitest' || runner === 'jest') {
+	if (runner === 'vitest' || runner === 'jest' || runner === 'mocha') {
 		return (
 			/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(baseName) ||
 			segments.some((segment) => ['typetests', 'type-tests', 'test-d'].includes(segment)) ||
-			(runner === 'jest' && segments.includes('__tests__'))
+			(runner === 'jest' && segments.includes('__tests__')) ||
+			(runner === 'mocha' && /^test\/[^/]+\.[cm]?js$/.test(relativePath))
 		);
 	}
 	return (
@@ -824,8 +825,23 @@ function normalizeConfigurationPattern(value) {
 }
 
 function commandPathPatterns(testScripts) {
-	return Object.values(testScripts).flatMap((command) =>
-		String(command).split(/\s+/).map(normalizeConfigurationPattern).filter(Boolean),
+	return Object.values(testScripts).flatMap(
+		(command) =>
+			String(command)
+				// Keep quoted glob characters intact when separating shell commands.
+				.match(/(?:"(?:\\.|[^"\\])*"|'[^']*'|[^;&|"'])+/g)
+				?.flatMap((segment) => {
+					// BrowserSync serves and watches files; its --files globs do not
+					// select executable tests. Preserve any chained test-runner command.
+					if (
+						/^(?:(?:npx|npm exec|pnpm exec|yarn exec)\s+)?(?:[^\s]*\/)?browser-sync(?:\s|$)/.test(
+							segment.trim(),
+						)
+					) {
+						return [];
+					}
+					return segment.split(/\s+/).map(normalizeConfigurationPattern).filter(Boolean);
+				}) ?? [],
 	);
 }
 
@@ -916,7 +932,11 @@ function containsInlineTestMarker(source, fileName) {
 }
 
 function extractTypeAssertionGroups(source, file) {
+	const checkedJavaScript =
+		/(?:^|\/)(?:types?|typings?)\.(?:test|spec)\.[cm]?jsx?$/i.test(file) &&
+		/@ts-(?:check|expect-error)\b/.test(source);
 	if (
+		!checkedJavaScript &&
 		!/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|\.(?:spec|test-d|d-test)\.[cm]?tsx?$/i.test(
 			file,
 		)
@@ -1051,11 +1071,20 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const configuredTestPatterns = [...configurationPatterns];
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
-	const runner = ['vitest', 'jest'].find(
+	const runner = ['vitest', 'jest', 'mocha'].find(
 		(name) =>
 			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
 			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
 	);
+	// Non-default Mocha discovery needs its configuration interpreted before
+	// narrowing the conservative inventory; never silently omit custom suites.
+	const mochaCustomDiscovery =
+		runner === 'mocha' &&
+		(manifest.mocha !== undefined ||
+			Object.values(testScripts).some((command) =>
+				/--(?:recursive|extension|opts|config)(?:[=\s]|$)/.test(command),
+			) ||
+			tree.some((entry) => /(?:^|\/)(?:\.mocharc(?:\.[^/]+)?|mocha\.opts)$/.test(entry.path)));
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];
@@ -1066,7 +1095,9 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		// Vitest's default discovery selects named test/spec files, not every
 		// module beneath a test/ support directory. Explicit include patterns
 		// still admit nonstandard names, and compile-only specs remain inventoried.
-		const conventional = conventionalTestPath(relativePath, { runner });
+		const conventional = conventionalTestPath(relativePath, {
+			runner: mochaCustomDiscovery ? undefined : runner,
+		});
 		const directTest =
 			conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
 		const inlineSource = referencedByTestConfiguration(
@@ -1407,6 +1438,7 @@ async function resolveRegistryArtifact(packageName, selector, options) {
 		manifestSha256: sha256(contents.manifestBytes),
 		artifactUrl: artifact.finalUrl,
 		runtimeDependencies: mergeRuntimeDependencies(contents.manifest),
+		publicExports: contents.manifest.exports ?? null,
 		sourceAnalysis: contents.sourceAnalysis,
 	};
 }
@@ -1620,6 +1652,7 @@ export async function resolveRemoteInput(parsedInput, rawInput, options = {}) {
 			upstreamTestInventory,
 		}),
 		runtimeDependencies: registry.runtimeDependencies,
+		publicExports: registry.publicExports,
 		sourceAnalysis: registry.sourceAnalysis,
 		provenance: sanitizeForReport({
 			registryManifestSha256: registry.manifestSha256,

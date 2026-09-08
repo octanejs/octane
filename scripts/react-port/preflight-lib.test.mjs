@@ -29,6 +29,13 @@ test('conventional test discovery excludes fixture modules beside runnable suite
 	assert.equal(conventionalTestPath('test/dnd/example.test.js', { runner: 'jest' }), true);
 	assert.equal(conventionalTestPath('__tests__/example.js', { runner: 'jest' }), true);
 	assert.equal(conventionalTestPath('test/types.ts', { runner: 'vitest' }), false);
+	assert.equal(conventionalTestPath('test/widget.js', { runner: 'mocha' }), true);
+	assert.equal(conventionalTestPath('tests/suites/widget.test.js', { runner: 'mocha' }), true);
+	assert.equal(
+		conventionalTestPath('tests/playground/assets/js/widget.js', { runner: 'mocha' }),
+		false,
+	);
+	assert.equal(conventionalTestPath('tests/setup.js', { runner: 'mocha' }), false);
 });
 
 const MIT_TEXT = `MIT License
@@ -606,7 +613,12 @@ describe('resolved evidence', () => {
 			},
 			gitHead: commit,
 			dependencies: { 'react-helper': '^1.0.0' },
-			scripts: { test: 'vitest --config configs/quality.mjs' },
+			exports: { '.': './index.js', './advanced': './advanced.js' },
+			scripts: {
+				test: 'vitest --config configs/quality.mjs',
+				'test:browser':
+					"browser-sync start --files 'src/**/*.ts' --server & mocha 'quality/**/*.ts'",
+			},
 		};
 		const tarball = gzipSync(
 			makeTar({
@@ -802,6 +814,7 @@ describe('resolved evidence', () => {
 		);
 		assert.equal(result.status, 'licensed');
 		assert.deepEqual(result.runtimeDependencies, { 'react-helper': '^1.0.0' });
+		assert.deepEqual(result.publicExports, manifest.exports);
 		assert.equal(result.identity.commit, commit);
 		assert.equal(result.sourceAnalysis.verdict, 'bridgeable');
 		assert.equal(result.sourceAnalysis.apis[0].name, 'useState');
@@ -913,6 +926,44 @@ export function Wrapper(props: Widget.Props<string>) { return <Widget {...props}
 		assert.equal(new Set(typeInventory.registrations.map(({ id }) => id)).size, 3);
 		assert.ok(typeInventory.registrations.every(({ kind }) => kind === 'type-assertion'));
 		assert.match(typeInventory.registrations[1].title, /invalid/);
+
+		const checkedJavaScript = Buffer.from(`import { animate } from 'widget';
+animate({ value: 1 });
+// @ts-expect-error invalid value
+animate({ value: null });
+`);
+		responses.set(
+			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
+			githubTreeResponse(
+				sourceTree.map((entry) =>
+					entry.path === 'packages/react-widget/quality/widget.behavior.ts'
+						? {
+								...entry,
+								path: 'packages/react-widget/tests/types.test.js',
+								size: checkedJavaScript.length,
+								sha: gitBlobSha(checkedJavaScript),
+							}
+						: entry,
+				),
+			),
+		);
+		responses.set(
+			'https://api.github.com/repos/example/widgets/git/blobs/test',
+			Response.json({
+				encoding: 'base64',
+				content: checkedJavaScript.toString('base64'),
+				size: checkedJavaScript.length,
+			}),
+		);
+		const checkedResult = await resolveRemoteInput(parseInput(githubInput), githubInput, {
+			fetchImpl,
+		});
+		const checkedInventory = checkedResult.upstreamTestInventory.find(
+			(entry) => entry.kind === 'type',
+		);
+		assert.equal(checkedInventory.path, 'packages/react-widget/tests/types.test.js');
+		assert.equal(checkedInventory.registrations.length, 2);
+		assert.ok(checkedInventory.registrations.every(({ kind }) => kind === 'type-assertion'));
 
 		const dynamicTestBytes = Buffer.from("test.each(rows)('renders %s', value => value);\n");
 		responses.set(

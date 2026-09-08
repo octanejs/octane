@@ -437,6 +437,13 @@ export function planPortGraph({
 			node.license = target.license;
 			node.provenance = target.provenance;
 			node.upstreamTestInventory = target.upstreamTestInventory ?? [];
+			if (node.requested && target.publicExports) {
+				node.requiredSubpaths.push(
+					...manifestExports({ exports: target.publicExports }).filter(
+						(subpath) => target.publicExports[subpath] !== null,
+					),
+				);
+			}
 			targetByPackage.set(packageName, target);
 		}
 		if (providesPrimaryEvidence && target.sourceAnalysis) {

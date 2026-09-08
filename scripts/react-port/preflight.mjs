@@ -222,6 +222,7 @@ export async function main({ argumentsList = process.argv.slice(2), resolve } = 
 				executionUnits: graph.executionUnits,
 				actionableExecutionUnits: graph.actionableExecutionUnits,
 				executionOrder: graph.executionOrder,
+				dirtyPaths: Object.keys(captureWorktreeBaseline(process.cwd())),
 				baseline: captureWorktreeBaseline(
 					process.cwd(),
 					Object.values(graph.nodes)
