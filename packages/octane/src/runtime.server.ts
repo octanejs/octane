@@ -6360,14 +6360,12 @@ export interface RenderOptions {
 // body with nothing to splice is returned as is, decided from its first bytes so
 // the common fragment response is never scanned for a `</head>`.
 function spliceHead(body: string, head: string): string {
-	if (head === '' && !isDocumentRoot(body)) return body;
+	if (!isDocumentRoot(body)) return head === '' ? body : head + body;
 	const headClose = body.indexOf('</head>');
 	if (headClose !== -1) return body.slice(0, headClose) + head + body.slice(headClose);
-	if (isDocumentRoot(body)) {
-		const openingEnd = documentTagEnd(body, body.indexOf('<html') + 5);
-		if (openingEnd !== -1)
-			return body.slice(0, openingEnd) + '<head>' + head + '</head>' + body.slice(openingEnd);
-	}
+	const openingEnd = documentTagEnd(body, body.indexOf('<html') + 5);
+	if (openingEnd !== -1)
+		return body.slice(0, openingEnd) + '<head>' + head + '</head>' + body.slice(openingEnd);
 	if (head === '') return body;
 	return head + body;
 }
