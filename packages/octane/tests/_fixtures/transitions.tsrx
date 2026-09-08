@@ -518,6 +518,42 @@ export function TransitionHeadInsideBoundary(props: {
 	</div>
 }
 
+function TransitionHeadListener(props: {
+	step: number;
+	onOld: () => void;
+	onNext?: (() => void) | null;
+}) @{
+	const handlerProps =
+		props.step === 0
+			? { onClick: props.onOld }
+			: props.onNext === undefined
+				? {}
+				: { onClick: props.onNext ?? undefined };
+	<title
+		data-transition-held-listener="yes"
+		{...handlerProps}
+	>{(props.step === 0 ? 'Old' : 'New') as string}</title>
+}
+
+export function TransitionHeadListenerInsideBoundary(props: {
+	load: (step: number) => PromiseLike<string>;
+	onOld: () => void;
+	onNext?: (() => void) | null;
+}) @{
+	const [step, setStep] = useState(0);
+	<div>
+		<button id="bump" onClick={() => startTransition(() => setStep(1))}>{'bump'}</button>
+		@try {
+			<>
+				<TransitionHeadListener step={step} onOld={props.onOld} onNext={props.onNext} />
+				<ControlledValue load={props.load} step={step} />
+			</>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
 // ---------------------------------------------------------------------------
 // A controlled input and checkbox inside a boundary. Their values live on the
 // DOM properties AND in a per-element record, so a suspended transition has to
