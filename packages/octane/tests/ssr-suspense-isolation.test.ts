@@ -25,6 +25,38 @@ function deferred<T>() {
 }
 
 describe('SSR suspense — resolved values and concurrent render isolation', () => {
+	it('keeps SVG and HTML attribute namespaces through component retries', async () => {
+		const mod = evalServer(
+			`import { use, useId } from 'octane';
+			 export function DynamicHost(p) @{
+				const Tag = p.tag;
+				const id = useId();
+				const value = use(p.promise);
+				<Tag id={id} accentHeight="7">{value as string}</Tag>
+			 }
+			 export function SvgWrapper(p) @{ <DynamicHost tag="custom-shape" promise={p.value} /> }
+			 export function HtmlWrapper(p) @{ <DynamicHost tag="custom-panel" promise={p.value} /> }
+			 export function Page(p) @{
+				<svg>
+					@try { <SvgWrapper value={p.svg} /> } @pending { <text>loading</text> }
+					<foreignObject>
+						@try { <HtmlWrapper value={p.html} /> } @pending { <span>waiting</span> }
+					</foreignObject>
+				</svg>
+			 }`,
+			'foreign-retry.tsrx',
+		);
+		const { html } = await prerender(mod.Page, {
+			svg: Promise.resolve('svg ready'),
+			html: Promise.resolve('html ready'),
+		});
+		expect(html).toMatch(/<custom-shape[^>]*accent-height="7"[^>]*>svg ready<\/custom-shape>/);
+		expect(html).toMatch(/<custom-panel[^>]*accentHeight="7"[^>]*>html ready<\/custom-panel>/);
+		const ids = [...html.matchAll(/<custom-(?:shape|panel)[^>]*\bid="([^"]+)"/g)].map((m) => m[1]);
+		expect(ids).toHaveLength(2);
+		expect(new Set(ids).size).toBe(2);
+	});
+
 	// The same component renders both inside and after a Suspense boundary; each
 	// position must retain the promise value supplied by the application.
 	it('does not cross resolved values between a use() inside a boundary and one after it', async () => {
