@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
+import { prerender } from 'octane/static';
 import {
 	createElement as createClientElement,
 	flushSync,
@@ -1063,6 +1064,40 @@ describe('SSR, hoisted head channel', () => {
 		}
 	`;
 	const headPage = evalServer(HEAD_PAGE, 'head-channel.tsrx');
+	const fragmentWithHeadText = evalServer(
+		`
+		export function Page() @{
+			<>
+				<title>Fragment title</title>
+				<main dangerouslySetInnerHTML={{ __html: '<!-- </head> -->' }} />
+			</>
+		}
+		`,
+		'head-fragment-comment.tsrx',
+	);
+	const documentPages = evalServer(
+		`
+		export function WithHead() @{
+			<html>
+				<head />
+				<body>
+					<title>Document title</title>
+					<main>body text</main>
+				</body>
+			</html>
+		}
+
+		export function WithoutHead() @{
+			<html>
+				<body>
+					<title>Document title</title>
+					<main>body text</main>
+				</body>
+			</html>
+		}
+		`,
+		'head-document.tsrx',
+	);
 
 	it('folds metadata into html and omits the head field by default', async () => {
 		for (const render of [RT.renderToString, RT.renderToStaticMarkup]) {
@@ -1092,6 +1127,39 @@ describe('SSR, hoisted head channel', () => {
 		const folded = RT.renderToString(headPage.Page, { slug: 'a' });
 		const separated = RT.renderToString(headPage.Page, { slug: 'a' }, { headChannel: 'separate' });
 		expect(separated.head! + separated.html).toBe(folded.html);
+	});
+
+	it('prepends metadata to a fragment even when its content mentions a head close', async () => {
+		// Raw HTML can contain these bytes without turning the fragment into a document.
+		for (const render of [RT.renderToString, RT.renderToStaticMarkup, prerender]) {
+			const folded = await render(fragmentWithHeadText.Page);
+			const separate = await render(fragmentWithHeadText.Page, undefined, {
+				headChannel: 'separate',
+			});
+			expect(folded.html.indexOf('<title>Fragment title</title>')).toBeLessThan(
+				folded.html.indexOf('<main'),
+			);
+			expect(folded.html).toContain('<main><!-- </head> --></main>');
+			expect(separate.head).toContain('<title>Fragment title</title>');
+			expect(separate.html).toContain('<main><!-- </head> --></main>');
+			expect(separate.head! + separate.html).toBe(folded.html);
+		}
+	});
+
+	it('places metadata inside an authored or synthesized document head', async () => {
+		for (const document of [documentPages.WithHead, documentPages.WithoutHead]) {
+			for (const render of [RT.renderToString, RT.renderToStaticMarkup, prerender]) {
+				const { html } = await render(document);
+				const headOpen = html.indexOf('<head>');
+				const title = html.indexOf('<title>Document title</title>');
+				const headClose = html.indexOf('</head>');
+				const bodyOpen = html.indexOf('<body>');
+				expect(headOpen).toBeGreaterThan(html.indexOf('<html>'));
+				expect(title).toBeGreaterThan(headOpen);
+				expect(title).toBeLessThan(headClose);
+				expect(headClose).toBeLessThan(bodyOpen);
+			}
+		}
 	});
 
 	it('reports an empty head when a render hoists nothing', async () => {
