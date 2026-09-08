@@ -998,6 +998,7 @@ export function Typed(props: { label: Label }) { return <p>before{props.label}af
 		);
 		write(root, 'src/model.ts', 'export type Label = string;\n');
 		write(root, 'src/text-entry.js', `export { Typed } from './Typed.tsx';\n`);
+		write(root, 'src/stable-entry.js', `export const stable = 'unchanged';\n`);
 		const tsconfig = write(
 			root,
 			'tsconfig.json',
@@ -1030,15 +1031,15 @@ export function Typed(props: { label: Label }) { return <p>before{props.label}af
 		);
 		const cacheDirectory = join(root, '.rspack-text-types-cache');
 		const build = async () => {
-			const { code, transformKind, builtTyped, builtEntry } = await compile(
+			const { code, transformKind, builtTyped, builtStable } = await compile(
 				{
 					name: 'text-type-import-cache',
 					context: root,
 					mode: 'production',
 					target: 'node',
-					entry: './src/text-entry.js',
+					entry: { typed: './src/text-entry.js', stable: './src/stable-entry.js' },
 					optimization: { minimize: false },
-					output: { path: join(root, 'dist-text-types'), filename: 'bundle.js' },
+					output: { path: join(root, 'dist-text-types'), filename: '[name].js' },
 					cache: {
 						type: 'persistent',
 						version: 'user-cache-v1',
@@ -1053,18 +1054,19 @@ export function Typed(props: { label: Label }) { return <p>before{props.label}af
 							item.nameForCondition?.() === component ||
 							item.identifier?.().includes(component),
 					) as any;
-				const entry = [...stats.compilation.modules].find(
-					(item: any) => item.nameForCondition?.() === join(root, 'src/text-entry.js'),
-				) as any;
-				const built = new Set(
-					[...stats.compilation.builtModules].map((item: any) => item.identifier()),
-				);
-				return {
-					transformKind: getOctaneRspackBuildInfo(module)?.transformKind,
-					code: module.originalSource()?.source(),
-					builtTyped: built.has(module.identifier()),
-					builtEntry: entry && built.has(entry.identifier()),
-				};
+					const stableModules = [...stats.compilation.modules].filter(
+						(item: any) =>
+							item.nameForCondition?.() === realpathSync(join(root, 'src/stable-entry.js')),
+					) as any[];
+					const built = new Set(
+						[...stats.compilation.builtModules].map((item: any) => item.identifier()),
+					);
+					return {
+						transformKind: getOctaneRspackBuildInfo(module)?.transformKind,
+						code: module.originalSource()?.source(),
+						builtTyped: built.has(module.identifier()),
+						builtStable: stableModules.some((item) => built.has(item.identifier())),
+					};
 				},
 			);
 			expect(transformKind).toBe('compile');
@@ -1072,13 +1074,13 @@ export function Typed(props: { label: Label }) { return <p>before{props.label}af
 			return {
 				Typed: evaluateCompiledFixtureCode(String(code), component, 'server', undefined).Typed,
 				builtTyped,
-				builtEntry,
+				builtStable,
 			};
 		};
 
 		const first = await build();
 		expect(first.builtTyped).toBe(true);
-		expect(first.builtEntry).toBe(true);
+		expect(first.builtStable).toBe(true);
 		const initialHtml = (await renderToString(first.Typed, { label: 'first' })).html.replace(
 			/<!--.*?-->/g,
 			'',
@@ -1094,7 +1096,7 @@ export function Typed(props: { label: Label }) { return <p>before{props.label}af
 		write(root, 'src/model.ts', 'export type Label = boolean;\n');
 		const second = await build();
 		expect(second.builtTyped).toBe(true);
-		expect(second.builtEntry).toBe(false);
+		expect(second.builtStable).toBe(false);
 		const { html: rendered } = await renderToString(second.Typed, { label: true });
 		const html = rendered.replace(/<!--.*?-->/g, '');
 		expect(html).toContain('beforeafter');
