@@ -6884,7 +6884,7 @@ function runOwnedCommit(owner: UniversalOwnerRecord | null, work: () => void): v
 
 function cloneSerializableValue(
 	value: unknown,
-	seen: WeakSet<object> = new WeakSet(),
+	seen?: WeakSet<object>,
 ): UniversalSerializableValue {
 	if (
 		value === null ||
@@ -6902,6 +6902,7 @@ function cloneSerializableValue(
 	if ((value as Partial<UniversalResourceHandle>).$$kind === 'octane.universal.resource') {
 		throw new TypeError('A resource handle must use the resource encoding branch.');
 	}
+	seen ??= new WeakSet();
 	if (seen.has(value)) throw new TypeError('Serializable host values cannot contain cycles.');
 	seen.add(value);
 	try {

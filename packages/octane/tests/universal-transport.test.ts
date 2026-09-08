@@ -841,6 +841,62 @@ describe('universal asynchronous transport', () => {
 		await root.unmountAsync();
 	});
 
+	it.each([false, true])(
+		'transports ordinary values with shared nesting and rejects cycles (codec: %s)',
+		async (withCodec) => {
+			const { container, root } = transportRoot(withCodec);
+			const plan = universalPlan(RENDERER, { kind: 'host', type: 'node', propsSlot: 0 });
+			const Scene = defineUniversalComponent(RENDERER, (props: { payload: unknown }) =>
+				universalValue(plan, [
+					universalProps([
+						['set', 'empty', null],
+						['set', 'missing', undefined],
+						['set', 'label', 'ready'],
+						['set', 'count', 42],
+						['set', 'large', 17n],
+						['set', 'enabled', true],
+						['set', 'disabled', false],
+						['set', 'payload', props.payload],
+					]),
+				]),
+			);
+			const shared = { label: 'shared', values: [1, null] };
+			const payload = {
+				first: shared,
+				repeated: [shared, shared.values],
+				nested: { value: shared },
+			};
+			await root.renderAsync(Scene, { payload });
+			shared.label = 'changed';
+			shared.values[0] = 99;
+
+			const expectedPayload = {
+				first: { label: 'shared', values: [1, null] },
+				repeated: [{ label: 'shared', values: [1, null] }, [1, null]],
+				nested: { value: { label: 'shared', values: [1, null] } },
+			};
+			expect(container.host.children[0].props).toEqual({
+				empty: null,
+				missing: undefined,
+				label: 'ready',
+				count: 42,
+				large: 17n,
+				enabled: true,
+				disabled: false,
+				payload: expectedPayload,
+			});
+			expect(container.host.children[0].props.payload).not.toBe(payload);
+
+			const cycle: Record<string, unknown> = {};
+			cycle.self = cycle;
+			await expect(root.renderAsync(Scene, { payload: cycle })).rejects.toThrow(
+				'Serializable host values cannot contain cycles.',
+			);
+			expect(container.host.children[0].props.payload).toEqual(expectedPayload);
+			await root.unmountAsync();
+		},
+	);
+
 	it('clones plain object props built in another realm across the wire', async () => {
 		// A transported renderer can be handed values whose Object.prototype
 		// belongs to another realm (an engine main thread hosted in an iframe, an
