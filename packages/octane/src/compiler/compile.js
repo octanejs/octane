@@ -22464,7 +22464,7 @@ function planJsx(
 		// a mount-only import for deferred writes.
 		const attrHelper = attrBindingHelper(b);
 		if (attrHelper !== null) {
-			if (b.kind === 'class' && b.fresh) ctx.runtimeNeeded.add('normalizeClass');
+			if (b.kind === 'class' && b.fresh && !b.mountOnly) ctx.runtimeNeeded.add('normalizeClass');
 			if (!b.deferred) {
 				ctx.runtimeNeeded.add(attrHelper);
 				registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
@@ -24085,11 +24085,17 @@ function emitBindingMount(bind, elVar, bag) {
 		}
 		case 'class': {
 			// On SVG/MathML hosts the `className` property is read-only — fall back
-			// to setAttribute. A fresh literal is always truthy, so composing it
-			// before the write preserves the nullish-vs-empty attribute contract.
-			const value = bind.fresh ? b.call('_$normalizeClass', bind.expr) : bind.expr;
+			// to setAttribute. The ordinary setter returns the composed string so a
+			// fresh literal can seed its update guard with no second composition.
+			if (bind.fresh)
+				return st(
+					b.block([
+						b.stmt(b.assignment('=', local(`_prev$${bind.id}`), b.call(callee(), el(), bind.expr))),
+						...mountHost(),
+					]),
+				);
 			const body = [
-				b.const('_v', value),
+				b.const('_v', bind.expr),
 				b.stmt(b.call(callee(), el(), V())),
 				...mountHost(),
 				b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),

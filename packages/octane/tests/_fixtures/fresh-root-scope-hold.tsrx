@@ -23,9 +23,7 @@ export function FreshRootScopeHold(props) @{
 			id="committed-label"
 			title={props.label}
 			class={{ initial: props.label === 'initial', next: props.label === 'next' }}
-		>
-			{props.label as string}
-		</span>
+		>{props.label as string}</span>
 		<Reader promise={props.promise} />
 	</main>
 }

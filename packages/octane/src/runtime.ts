@@ -16710,14 +16710,14 @@ import {
 } from './css.js';
 export { normalizeClass };
 
-export function setClassName(el: Element, value: unknown): void {
+export function setClassName(el: Element, value: unknown): string {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write).
 	const cls = normalizeClass(value);
 	const hydration = activeHydration();
 	if (hydration !== null) {
 		hydration.queueClass(el, cls, true, false, value == null || value === false);
-		return;
+		return cls;
 	}
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
@@ -16730,6 +16730,7 @@ export function setClassName(el: Element, value: unknown): void {
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (value == null || value === false) el.removeAttribute('class');
 	else (el as any).className = cls;
+	return cls;
 }
 
 // Attribute-based class setter: SVG/MathML compiled TEMPLATE bindings (where
@@ -16738,16 +16739,17 @@ export function setClassName(el: Element, value: unknown): void {
 // clsx-composes the value; a nullish/false value REMOVES the attribute (parity with
 // the generic setAttribute this binding routed through before clsx composition
 // existed).
-export function setClassAttr(el: Element, value: unknown): void {
+export function setClassAttr(el: Element, value: unknown): string | null {
 	const cls = value == null || value === false ? null : normalizeClass(value);
 	const hydration = activeHydration();
 	if (hydration !== null) {
 		hydration.queueClass(el, cls, false, true, cls === null);
-		return;
+		return cls;
 	}
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
+	return cls;
 }
 
 // SVG-safe class setter for the de-opt / hostComponent paths, which (unlike the
