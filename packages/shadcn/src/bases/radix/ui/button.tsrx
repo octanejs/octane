@@ -7,7 +7,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { Slot } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export const buttonVariants = cva(

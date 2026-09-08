@@ -5,7 +5,7 @@
 // Root, whose role/aria-valuemax/data-state contract comes from its defaults.
 import { Progress as ProgressPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface ProgressProps extends Record<string, unknown> {
 	className?: string;

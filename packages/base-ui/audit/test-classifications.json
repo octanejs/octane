@@ -122,6 +122,11 @@
       "reason": "Verifies Octane production bundle output and is not counted as React parity."
     },
     {
+      "path": "packages/base-ui/tests/scroll-area-styles.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks global scrollbar CSS is effective, hoisted and deduplicated through public ScrollArea components."
+    },
+    {
       "path": "packages/base-ui/tests/ssr/ssr.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises the Octane server renderer and is not counted as React parity."

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/adobe/react-spectrum.git",
+  "commit": "5ecb3333001313e83898cd07644227897e3bae1f",
+  "previousCommit": "1c84a49a1faf50b571c84e00bcf9c60b22ddd03e",
+  "artifacts": [
+    {
+      "package": "react-aria",
+      "version": "3.51.0",
+      "url": "https://registry.npmjs.org/react-aria/-/react-aria-3.51.0.tgz",
+      "sha256": "8d404cc6c43909f85dcd207435614db08f38c69553b8085bed2910c61b7e89fa",
+      "integrity": "sha512-AyWLw0XR38cFPwBu/ErgGaVrc5dupLEKmRlMXTGvFKOtbaGRQ2+yQJkjVhpdHhoRhU4+G+tJDFeHDTS8tK3bfQ=="
+    },
+    {
+      "package": "react-aria-components",
+      "version": "1.20.0",
+      "url": "https://registry.npmjs.org/react-aria-components/-/react-aria-components-1.20.0.tgz",
+      "sha256": "b63f044f9cb25cb48789b8c2ce06b27c83a81c94c6413a29766eabb3c15458dd",
+      "integrity": "sha512-BMbpIgoV9aELeBrB0Y120NgoigHb5OdcJwc+4e7uSnbTbamea6lo+gqcc4LAxzMaK3Jf+7LI1oCDE6yANsmxIQ=="
+    },
+    {
+      "package": "react-stately",
+      "version": "3.49.0",
+      "url": "https://registry.npmjs.org/react-stately/-/react-stately-3.49.0.tgz",
+      "sha256": "90e49592b8c2aa351c9e25c2ad82f477aa50682dd7ef9afe8c7c11a01f856793",
+      "integrity": "sha512-13iNq2KzBrRAzxRc+n53hgROfIistiYY/sPtIhCw1qUB7/kmo+X1xEU2uiS5zcCIrc55AUPwoHqOIIpKWSwB9A=="
+    }
+  ],
+  "compositeSha256": "775b11dacccd090af9b3a59f47b17dcf03efd7cf09be32b5b8e94dc707167b86",
+  "compositeDefinition": "SHA-256 of concatenated npm tarball bytes in the artifacts order.",
+  "licenseSha256": "7dfe6526888bac51759c99f9a51262ba2711a8c12a067f2181609dd9a4066b84",
+  "adaptations": [
+    "Native event handlers and ref-as-prop components use Octane adapters.",
+    "Compiler-authored TSX hooks replace manual hook slots where the coordinated keyboard refactor changed composition.",
+    "TokenFieldValue tests keep all 96 upstream cases; the adaptation rewrites its source import and uses Vitest registration without the React 19 version gate."
+  ],
+  "scope": "Complete React Aria Components export-name parity; root and stately remain curated with 296 existing export gaps. Upstream runtime coverage is limited to the complete TokenFieldValue file plus representative differential scenarios, not the entire React Spectrum suite."
+}

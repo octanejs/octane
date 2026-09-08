@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Stages the advanced React Aria 3.50 / React Stately 3.48 / React Aria
- * Components 1.19 modules from the repository's pinned `.react-spectrum`
+ * Stages the advanced React Aria 3.51 / React Stately 3.49 / React Aria
+ * Components 1.20 modules from the repository's pinned `.react-spectrum`
  * checkout into a staging directory and rewrites only module boundaries.
  * Behavioral adaptations are reviewed into the package source separately.
  *
@@ -25,16 +25,19 @@ const packageRoot = path.resolve(process.cwd(), process.argv[outputFlag + 1]);
 if (packageRoot === sourcePackageRoot) {
 	throw new Error('Refusing to overwrite packages/aria; choose a staging directory');
 }
-const upstreamRoot = path.join(repoRoot, '.react-spectrum', 'packages');
+const checkoutFlag = process.argv.indexOf('--source-checkout');
+const checkoutRoot =
+	checkoutFlag === -1
+		? path.join(repoRoot, '.react-spectrum')
+		: path.resolve(process.argv[checkoutFlag + 1]);
+const upstreamRoot = path.join(checkoutRoot, 'packages');
 
-const PIN = '1c84a49a1faf50b571c84e00bcf9c60b22ddd03e';
+const PIN = '5ecb3333001313e83898cd07644227897e3bae1f';
 const PRAGMA = '/** @jsxImportSource octane */';
 
-const checkoutCommit = execFileSync(
-	'git',
-	['-C', path.join(repoRoot, '.react-spectrum'), 'rev-parse', 'HEAD'],
-	{ encoding: 'utf8' },
-).trim();
+const checkoutCommit = execFileSync('git', ['-C', checkoutRoot, 'rev-parse', 'HEAD'], {
+	encoding: 'utf8',
+}).trim();
 if (checkoutCommit !== PIN) {
 	throw new Error(`Expected .react-spectrum at ${PIN}, found ${checkoutCommit}`);
 }
@@ -48,13 +51,23 @@ const statelyAreas = [
 	'layout',
 	'toast',
 	'virtualizer',
+	'tokenfield',
 ];
-const ariaAreas = ['calendar', 'color', 'datepicker', 'dnd', 'toast', 'virtualizer'];
+const ariaAreas = ['calendar', 'color', 'datepicker', 'dnd', 'toast', 'virtualizer', 'tokenfield'];
 const ariaFiles = [
+	['tooltip/usePreviewTrigger.ts', 'tooltip/usePreviewTrigger.tsx'],
+	['tooltip/useSafeArea.ts', 'tooltip/useSafeArea.tsx'],
+	['interactions/useContextMenu.ts', 'interactions/useContextMenu.tsx'],
+	[
+		'interactions/createKeyboardShortcutHandler.ts',
+		'interactions/createKeyboardShortcutHandler.tsx',
+	],
 	['landmark/useLandmark.ts', 'landmark/useLandmark.tsx'],
 	['utils/useLoadMore.ts', 'utils/useLoadMore.tsx'],
 ];
 const componentFiles = [
+	'PreviewTrigger.tsx',
+	'TokenField.tsx',
 	'Calendar.tsx',
 	'ColorArea.tsx',
 	'ColorField.tsx',
@@ -75,7 +88,7 @@ const componentFiles = [
 	'Virtualizer.tsx',
 	'useDragAndDrop.tsx',
 ];
-const intlAreas = ['calendar', 'color', 'datepicker', 'dnd', 'toast'];
+const intlAreas = ['calendar', 'color', 'datepicker', 'dnd', 'toast', 'previewtrigger'];
 
 function posix(value) {
 	return value.split(path.sep).join('/');
@@ -145,6 +158,18 @@ async function rewriteSpecifier(specifier, destination, context = {}) {
 	if (areaIntl) {
 		return importPath(destination, path.join(packageRoot, `src/intl/${areaIntl[1]}/index.ts`));
 	}
+	const privateSource = specifier.match(/^(react-aria|react-stately)\/private\/(.+)$/);
+	if (privateSource) {
+		return importPath(
+			destination,
+			path.join(
+				packageRoot,
+				'src',
+				privateSource[1] === 'react-stately' ? 'stately' : '',
+				privateSource[2],
+			),
+		);
+	}
 	if (specifier.startsWith('react-aria/')) {
 		return importPath(
 			destination,
@@ -201,7 +226,7 @@ async function rewriteSource(source, upstreamFile, destination, context = {}) {
 		output = `import {${extraHooks.join(', ')}} from 'octane';\n${output}`;
 	}
 
-	const provenance = posix(path.relative(path.join(repoRoot, '.react-spectrum'), upstreamFile));
+	const provenance = posix(path.relative(checkoutRoot, upstreamFile));
 	return `${PRAGMA}\n// Ported from adobe/react-spectrum@${PIN} (${provenance}).\n${output}`;
 }
 

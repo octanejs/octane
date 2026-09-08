@@ -4,7 +4,7 @@
 // no slot threading. Module-level ref-count map and observer stack are ported verbatim.
 import { createShadowTreeWalker } from '../utils/shadowdom/ShadowTreeWalker';
 
-import { getOwnerDocument, getOwnerWindow } from '../utils/domHelpers';
+import { getOwnerDocument, getOwnerWindow, isShadowRoot } from '../utils/domHelpers';
 import { nodeContains } from '../utils/shadowdom/DOMFunctions';
 import { shadowDOM } from '../stately/flags';
 
@@ -72,14 +72,12 @@ export function ariaHideOutside(targets: Element[], options?: AriaHideOutsideOpt
 	if (shadowDOM()) {
 		// find all shadow roots that are ancestors of the targets
 		// traverse upwards until the root is reached
+		let boundary = root.getRootNode();
 		for (let target of targets) {
-			let node = target;
-			while (node && node !== root) {
-				let root = node.getRootNode();
-				if ('shadowRoot' in root) {
-					shadowRootsToWatch.add(root.shadowRoot as ShadowRoot);
-				}
-				node = root.parentNode as Element;
+			let current = target.getRootNode();
+			while (isShadowRoot(current) && current !== boundary) {
+				shadowRootsToWatch.add(current);
+				current = current.host.getRootNode();
 			}
 		}
 	}

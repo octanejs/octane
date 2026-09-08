@@ -5,6 +5,7 @@
 // Provider descriptor keeps a stable `{ value, children }` shape; React's ReactNode/JSX/Context
 // types → `any`; `useOverlayFocusContain` gets public-hook slot threading.
 import { ClearPressResponder } from '../interactions/PressResponder';
+import { FocusableContext } from '../interactions/useFocusable';
 import { FocusScope } from '../focus/FocusScope';
 import { createContext, createElement, createPortal, useContext, useMemo, useState } from 'octane';
 import { useIsSSR } from '../ssr/SSRProvider';
@@ -81,7 +82,10 @@ export function Overlay(props: OverlayProps): any {
 
 	contents = createElement(OverlayContext.Provider, {
 		value: contextValue as OverlayContextValue,
-		children: createElement(ClearPressResponder, { children: contents }),
+		children: createElement(FocusableContext.Provider, {
+			value: null,
+			children: createElement(ClearPressResponder, { children: contents }),
+		}),
 	});
 
 	return createPortal(contents, portalContainer);

@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "provenance": {
     "repository": "https://github.com/adobe/react-spectrum.git",
-    "commit": "1c84a49a1faf50b571c84e00bcf9c60b22ddd03e",
-    "tags": ["react-aria@3.50.0", "react-aria-components@1.19.0", "react-stately@3.48.0"]
+    "commit": "5ecb3333001313e83898cd07644227897e3bae1f",
+    "tags": ["react-aria@3.51.0", "react-aria-components@1.20.0", "react-stately@3.49.0"]
   },
   "entryPoints": [
     {
       "package": "react-aria",
-      "version": "3.50.0",
+      "version": "3.51.0",
       "upstreamPath": "packages/react-aria/exports/index.ts",
       "octanePath": "packages/aria/src/index.ts",
       "exports": [
@@ -368,6 +368,12 @@
           "packages/aria/src/index.ts exports AriaPositionProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "AriaPreviewTriggerProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports AriaPreviewTriggerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "AriaProgressBarBaseProps",
           "type",
           "gap",
@@ -582,6 +588,12 @@
           "type",
           "surface-present-unverified",
           "packages/aria/src/index.ts exports AriaToggleButtonProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "AriaTokenFieldProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports AriaTokenFieldProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "AriaToolbarProps",
@@ -803,6 +815,24 @@
           "type",
           "surface-present-unverified",
           "packages/aria/src/index.ts exports ComboBoxAria with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "ContextMenuAria",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports ContextMenuAria with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "ContextMenuEvent",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports ContextMenuEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "ContextMenuProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports ContextMenuProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "createBranchComponent",
@@ -1168,6 +1198,12 @@
           "packages/aria/src/index.ts exports FocusWithinResult with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "getSelection",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports getSelection with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "GridAria",
           "type",
           "surface-present-unverified",
@@ -1314,6 +1350,12 @@
           "type",
           "surface-present-unverified",
           "packages/aria/src/index.ts exports KeyboardResult with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "KeyboardShortcutBindings",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports KeyboardShortcutBindings with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "LabelAria",
@@ -1686,6 +1728,12 @@
           "packages/aria/src/index.ts exports PressResult with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "PreviewTriggerTriggerAria",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports PreviewTriggerTriggerAria with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "ProgressBarAria",
           "type",
           "surface-present-unverified",
@@ -1764,6 +1812,12 @@
           "type",
           "surface-present-unverified",
           "packages/aria/src/index.ts exports SeparatorProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "setTokenFieldSelection",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports setTokenFieldSelection with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "SizeAxis",
@@ -1923,6 +1977,30 @@
           "type",
           "gap",
           "Not exported by packages/aria/src/index.ts at this pin."
+        ],
+        [
+          "TokenAria",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports TokenAria with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldAria",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports TokenFieldAria with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "tokenFieldPositionToDOMRange",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports tokenFieldPositionToDOMRange with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports TokenProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ToolbarAria",
@@ -2109,6 +2187,12 @@
           "runtime",
           "surface-present-unverified",
           "packages/aria/src/index.ts exports useComboBox with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "useContextMenu",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports useContextMenu with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "useDateField",
@@ -2467,6 +2551,12 @@
           "packages/aria/src/index.ts exports usePreventScroll with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "usePreviewTrigger",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports usePreviewTrigger with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "useProgressBar",
           "runtime",
           "surface-present-unverified",
@@ -2654,6 +2744,18 @@
           "packages/aria/src/index.ts exports useToggleButtonGroupItem with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "useToken",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports useToken with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "useTokenField",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/index.ts exports useTokenField with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "useToolbar",
           "runtime",
           "surface-present-unverified",
@@ -2717,7 +2819,7 @@
     },
     {
       "package": "react-aria-components",
-      "version": "1.19.0",
+      "version": "1.20.0",
       "upstreamPath": "packages/react-aria-components/exports/index.ts",
       "octanePath": "packages/aria/src/components/index.ts",
       "exports": [
@@ -3098,6 +3200,18 @@
           "type",
           "surface-present-unverified",
           "packages/aria/src/components/index.ts exports CheckboxRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "ChildrenOrFunction",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ChildrenOrFunction with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "ClassNameOrFunction",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports ClassNameOrFunction with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "Collection",
@@ -3874,6 +3988,18 @@
           "packages/aria/src/components/index.ts exports DisclosureStateContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "DOMRenderFunction",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DOMRenderFunction with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "DOMRenderProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports DOMRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "DragAndDropContext",
           "runtime",
           "surface-present-unverified",
@@ -4178,6 +4304,12 @@
           "runtime",
           "surface-present-unverified",
           "packages/aria/src/components/index.ts exports GridListHeaderContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "GridListHeaderProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports GridListHeaderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "GridListItem",
@@ -4768,6 +4900,12 @@
           "packages/aria/src/components/index.ts exports PopoverRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "PossibleLinkDOMRenderProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports PossibleLinkDOMRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "Pressable",
           "runtime",
           "surface-present-unverified",
@@ -4778,6 +4916,18 @@
           "type",
           "surface-present-unverified",
           "packages/aria/src/components/index.ts exports PressEvent with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "PreviewTrigger",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports PreviewTrigger with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "PreviewTriggerProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports PreviewTriggerProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "ProgressBar",
@@ -5374,6 +5524,12 @@
           "packages/aria/src/components/index.ts exports SSRProvider with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "StyleOrFunction",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports StyleOrFunction with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "StyleRenderProps",
           "type",
           "surface-present-unverified",
@@ -5938,6 +6094,72 @@
           "packages/aria/src/components/index.ts exports ToggleState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "Token",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports Token with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenField",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenField with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldContext",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenFieldContext with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenFieldProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldRenderProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenFieldRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldValue",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenFieldValue with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenInput",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenInput with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenInputProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenInputProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenInputRenderProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenInputRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenRenderProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/components/index.ts exports TokenRenderProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "Toolbar",
           "runtime",
           "surface-present-unverified",
@@ -6283,7 +6505,7 @@
     },
     {
       "package": "react-stately",
-      "version": "3.48.0",
+      "version": "3.49.0",
       "upstreamPath": "packages/react-stately/exports/index.ts",
       "octanePath": "packages/aria/src/stately/index.ts",
       "exports": [
@@ -6867,6 +7089,12 @@
           "Not exported by packages/aria/src/stately/index.ts at this pin."
         ],
         [
+          "Position",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/stately/index.ts exports Position with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "QueuedToast",
           "type",
           "gap",
@@ -7155,6 +7383,12 @@
           "packages/aria/src/stately/index.ts exports TabListStateOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "TextSegment",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/stately/index.ts exports TextSegment with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "TimeFieldState",
           "type",
           "gap",
@@ -7231,6 +7465,42 @@
           "type",
           "surface-present-unverified",
           "packages/aria/src/stately/index.ts exports ToggleStateOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldProps",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/stately/index.ts exports TokenFieldProps with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldSegment",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/stately/index.ts exports TokenFieldSegment with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldState",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/stately/index.ts exports TokenFieldState with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldValue",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/stately/index.ts exports TokenFieldValue with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenFieldValueOptions",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/stately/index.ts exports TokenFieldValueOptions with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
+          "TokenSegment",
+          "type",
+          "surface-present-unverified",
+          "packages/aria/src/stately/index.ts exports TokenSegment with a compatible type namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
           "TooltipTriggerProps",
@@ -7515,6 +7785,12 @@
           "packages/aria/src/stately/index.ts exports useToggleState with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
         ],
         [
+          "useTokenFieldState",
+          "runtime",
+          "surface-present-unverified",
+          "packages/aria/src/stately/index.ts exports useTokenFieldState with a compatible runtime namespace; behavior remains bounded by the recorded-unverified manifest lanes."
+        ],
+        [
           "useTooltipTriggerState",
           "runtime",
           "surface-present-unverified",
@@ -7567,7 +7843,8 @@
   ],
   "artifactEvidence": {
     "not-adapted": "The canonical suite is present but is not adapted case-by-case; representative same-fixture behavior is bounded by the differential lanes.",
-    "not-vendored-support": "Support bytes remain in the immutable external checkout."
+    "not-vendored-support": "Support bytes remain in the immutable external checkout.",
+    "adapted-token-value": "All 96 TokenFieldValue cases run in aria-token-value-pristine and aria-token-value-adapted; inventories and source hashes are recorded in audit/react-parity.json."
   },
   "upstreamArtifacts": [
     [
@@ -7603,6 +7880,11 @@
       "not-adapted"
     ],
     ["packages/react-aria-components/test/ColorWheel.test.js", "runtime-test", "not-adapted"],
+    [
+      "packages/react-aria-components/test/ComboBox.browser.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
     ["packages/react-aria-components/test/ComboBox.ssr.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/ComboBox.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/DateField.test.js", "runtime-test", "not-adapted"],
@@ -7637,8 +7919,10 @@
     ["packages/react-aria-components/test/ListBox.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/Menu.test.tsx", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/Meter.test.js", "runtime-test", "not-adapted"],
+    ["packages/react-aria-components/test/Modal.browser.test.tsx", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/NumberField.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/Popover.test.js", "runtime-test", "not-adapted"],
+    ["packages/react-aria-components/test/PreviewTrigger.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/ProgressBar.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/RadioGroup.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/RangeCalendar.test.tsx", "runtime-test", "not-adapted"],
@@ -7664,12 +7948,29 @@
       "runtime-test",
       "not-adapted"
     ],
+    [
+      "packages/react-aria-components/test/TokenField.browser.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react-aria-components/test/TokenField.composition.browser.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react-aria-components/test/TokenField.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/Toolbar.test.tsx", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/Tooltip.test.js", "runtime-test", "not-adapted"],
+    ["packages/react-aria-components/test/Tree.browser.test.tsx", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/Tree.ssr.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/Tree.test.tsx", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/Treeble.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria-components/test/types.tsx", "type-test", "not-adapted"],
+    [
+      "packages/react-aria-components/test/utils/tokenFieldBrowserUtils.tsx",
+      "support",
+      "not-vendored-support"
+    ],
     ["packages/react-aria-components/test/VirtualizedMenu.test.tsx", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/actiongroup/useActionGroup.test.ts", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/aria-modal-polyfill/index.test.tsx", "runtime-test", "not-adapted"],
@@ -7719,10 +8020,20 @@
     ["packages/react-aria/test/grid/useGrid.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/i18n/languagechange.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/i18n/server.test.js", "runtime-test", "not-adapted"],
+    [
+      "packages/react-aria/test/interactions/createKeyboardShortcutHandler.test.js",
+      "runtime-test",
+      "not-adapted"
+    ],
     ["packages/react-aria/test/interactions/Focusable.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/interactions/focusSafely.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/interactions/Pressable.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/interactions/PressResponder.test.js", "runtime-test", "not-adapted"],
+    [
+      "packages/react-aria/test/interactions/useContextMenu.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
     ["packages/react-aria/test/interactions/useFocus.test.js", "runtime-test", "not-adapted"],
     [
       "packages/react-aria/test/interactions/useFocusVisible.test.js",
@@ -7788,7 +8099,7 @@
     ["packages/react-aria/test/textfield/useTextField.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/toast/useToast.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/tooltip/useTooltip.test.js", "runtime-test", "not-adapted"],
-    ["packages/react-aria/test/utils/DOMFunctions.test.js", "runtime-test", "not-adapted"],
+    ["packages/react-aria/test/utils/DOMFunctions.test.tsx", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/utils/domHelpers.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/utils/getNonce.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/utils/getScrollParents.test.ts", "runtime-test", "not-adapted"],
@@ -7799,6 +8110,7 @@
     ["packages/react-aria/test/utils/scrollIntoView.test.ts", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/utils/shadowTreeWalker.test.tsx", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/utils/useFormReset.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react-aria/test/utils/useId.test.jsx", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/utils/useObjectRef.test.js", "runtime-test", "not-adapted"],
     ["packages/react-aria/test/utils/useViewportSize.ssr.test.tsx", "runtime-test", "not-adapted"],
     [
@@ -7846,6 +8158,11 @@
     ["packages/react-stately/test/table/TableUtils.test.js", "runtime-test", "not-adapted"],
     ["packages/react-stately/test/toast/useToastState.test.js", "runtime-test", "not-adapted"],
     [
+      "packages/react-stately/test/tokenfield/TokenFieldValue.test.ts",
+      "runtime-test",
+      "adapted-token-value"
+    ],
+    [
       "packages/react-stately/test/tooltip/useTooltipTriggerState.test.js",
       "runtime-test",
       "not-adapted"
@@ -7858,15 +8175,16 @@
       "not-adapted"
     ],
     ["packages/react-stately/test/virtualizer/GridLayout.test.ts", "runtime-test", "not-adapted"],
-    ["packages/react-stately/test/virtualizer/LayoutInfo.test.tsx", "runtime-test", "not-adapted"]
+    ["packages/react-stately/test/virtualizer/LayoutInfo.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react-stately/test/virtualizer/ScrollAnchor.test.ts", "runtime-test", "not-adapted"]
   ],
   "summary": {
-    "exports": 1294,
-    "surfacePresentUnverifiedExports": 998,
+    "exports": 1340,
+    "surfacePresentUnverifiedExports": 1044,
     "gapExports": 296,
-    "upstreamArtifacts": 185,
-    "runtimeTests": 177,
+    "upstreamArtifacts": 198,
+    "runtimeTests": 189,
     "typeTests": 1,
-    "supportArtifacts": 7
+    "supportArtifacts": 8
   }
 }

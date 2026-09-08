@@ -240,6 +240,16 @@ function sameRepository(left, right) {
 	);
 }
 
+// A monorepo package may publish only its repository URL. An explicit source
+// location supplies the directory; name/version/commit and license still have
+// to agree. A directory that metadata DOES declare must match exactly.
+function repositoryMatchesLocation(metadata, location) {
+	return sameRepository(
+		{ ...metadata, subdirectory: metadata?.subdirectory ?? location?.subdirectory },
+		location,
+	);
+}
+
 export function assessResolvedEvidence({ input, registry, source }) {
 	const blockers = [];
 	for (const [label, value] of [
@@ -267,7 +277,7 @@ export function assessResolvedEvidence({ input, registry, source }) {
 			`Published package version ${registry.version} does not match source version ${source.version}.`,
 		);
 	}
-	if (!sameRepository(registry.repository, source.repository)) {
+	if (!repositoryMatchesLocation(registry.repository, source.repository)) {
 		blockers.push(
 			'Published repository identity or package subdirectory does not match immutable source.',
 		);
@@ -741,7 +751,7 @@ function isScannableSourcePath(entryPath) {
 	return !parts.some((part) => SOURCE_SKIP_PARTS.has(part.toLowerCase()));
 }
 
-export function conventionalTestPath(relativePath) {
+export function conventionalTestPath(relativePath, { runner } = {}) {
 	const segments = relativePath.toLowerCase().split('/');
 	const baseName = segments.at(-1);
 	if (
@@ -749,6 +759,13 @@ export function conventionalTestPath(relativePath) {
 		/(?:^|[.-])fixture\.[cm]?[jt]sx?$/.test(baseName)
 	) {
 		return false;
+	}
+	if (runner === 'vitest' || runner === 'jest') {
+		return (
+			/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(baseName) ||
+			segments.some((segment) => ['typetests', 'type-tests', 'test-d'].includes(segment)) ||
+			(runner === 'jest' && segments.includes('__tests__'))
+		);
 	}
 	return (
 		segments.some((segment) =>
@@ -1034,6 +1051,11 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const configuredTestPatterns = [...configurationPatterns];
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
+	const runner = ['vitest', 'jest'].find(
+		(name) =>
+			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
+			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
+	);
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];
@@ -1044,12 +1066,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		// Vitest's default discovery selects named test/spec files, not every
 		// module beneath a test/ support directory. Explicit include patterns
 		// still admit nonstandard names, and compile-only specs remain inventoried.
-		const vitestDefaults = Object.values(testScripts).some((command) => /\bvitest\b/.test(command));
-		const conventional =
-			conventionalTestPath(relativePath) &&
-			(!vitestDefaults ||
-				/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(relativePath) ||
-				/(?:^|\/)(?:typetests|type-tests|test-d)\//.test(relativePath));
+		const conventional = conventionalTestPath(relativePath, { runner });
 		const directTest =
 			conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
 		const inlineSource = referencedByTestConfiguration(
@@ -1506,7 +1523,7 @@ async function resolveGitHubSource(repository, ref, options) {
 	const manifest = parseJsonFile(manifestBytes, 'Immutable source manifest');
 	if (manifest.repository) {
 		const sourceManifestRepository = normalizeRepository(manifest.repository);
-		if (!sameRepository(repository, sourceManifestRepository)) {
+		if (!repositoryMatchesLocation(sourceManifestRepository, repository)) {
 			throw new Error('Immutable source manifest repository contradicts the requested repository');
 		}
 	}

@@ -1,6 +1,6 @@
 import { LabelContext, Label as LabelPrimitive, type LabelProps } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export function Label({ className, htmlFor, slot, ...props }: LabelProps) {
 	const label = <LabelPrimitive

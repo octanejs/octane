@@ -1,7 +1,7 @@
 import { type OctaneNode } from 'octane';
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export const badgeVariants = cva(

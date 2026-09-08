@@ -1,6 +1,6 @@
 import { useState } from 'octane';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export function Avatar({ className, size = 'default', ...props }: HostProps<'div'> & {

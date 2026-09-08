@@ -4532,7 +4532,7 @@
     {
       "path": "src/utils/styles.tsrx",
       "origin": "adapted",
-      "sha256": "e0ac083272488b8aaf956ea4997f83f43c6f6d0c8129169b9294a64f3f3cfb7c",
+      "sha256": "44db892e7c56d8fb91f4a53d7c96a0ade81d9f2907919a449801880c6b9dbe28",
       "packageName": "@base-ui/react"
     },
     {

@@ -1,7 +1,7 @@
 // Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544
 // apps/v4/registry/bases/radix/ui/kbd.tsx. Note: upstream renders KbdGroup as
 // a <kbd> host too — preserved as-is.
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export interface KbdProps extends HostProps<'kbd'> {}

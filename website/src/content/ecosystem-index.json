@@ -544,10 +544,10 @@
     "id": "binding-shadcn",
     "title": "shadcn/ui",
     "packageName": "@octanejs/shadcn",
-    "upstreamPackage": "shadcn-ui/ui (radix base)",
+    "upstreamPackage": "shadcn-ui/ui (component registry)",
     "category": "UI Libraries",
     "categoryId": "ui-libraries",
-    "description": "Use shadcn-ui/ui (radix base) with Octane.",
+    "description": "Use shadcn-ui/ui (component registry) with Octane.",
     "searchTerms": ["shadcn UI"],
     "tags": ["components", "primitives"],
     "order": 42

@@ -29,8 +29,8 @@ export function nodeContains(
 		}
 
 		if (
-			(currentNode as HTMLSlotElement).tagName === 'SLOT' &&
-			(currentNode as HTMLSlotElement).assignedSlot
+			typeof (currentNode as HTMLSlotElement).assignedElements !== 'function' &&
+			(currentNode as HTMLSlotElement).assignedSlot?.parentNode
 		) {
 			// Element is slotted
 			currentNode = (currentNode as HTMLSlotElement).assignedSlot!.parentNode;
@@ -75,6 +75,46 @@ export function getEventTarget<T extends Event>(event: T): EventTarget {
 		}
 	}
 	return event.target as EventTarget;
+}
+
+/**
+ * ShadowDOM safe fast version of node.contains(document.activeElement).
+ *
+ * @param node
+ * @returns
+ */
+export function getPropagationTargets(
+	from: Element | null | undefined,
+	to?: Document | Window | Element | null,
+): EventTarget[] {
+	// If `to` is coming from a ref, its type technically allows `null`.
+	// In practice, this function will generally be called from within a useEffect.
+	// If the ref has not resolved by that point, then a coding error has been made.
+	// Better to return an empty array than `[window]`, which may appear to work
+	// in the light DOM, but fail in the shadow DOM.
+	if (to === null) {
+		return [];
+	}
+	to = to ?? getOwnerWindow(from);
+	let targets: EventTarget[] = [to];
+	if (!shadowDOM() || !from || from === to) {
+		return targets;
+	}
+
+	// The root `to` itself lives in. The event already reaches `to` once
+	// it is inside this root, so we must NOT collect this root or anything above
+	// it — only the shadow roots strictly between `refNode` and `to`.
+	// `window` has no getRootNode; its boundary is the document, which the walk
+	// reaches naturally (the document is not a ShadowRoot, so the loop exits).
+	let toRoot = 'getRootNode' in to ? to.getRootNode() : null;
+	let current: Node | null = from.getRootNode() ?? null;
+	while (isShadowRoot(current) && current !== toRoot) {
+		// order shouldn't matter
+		targets.push(current);
+		current = current.host.getRootNode();
+	}
+
+	return targets;
 }
 
 /**

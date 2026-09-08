@@ -104,14 +104,14 @@ catalogs:
       specifier: 3.6.1
       version: 3.6.1
     '@internationalized/date':
-      specifier: ^3.12.2
-      version: 3.12.2
+      specifier: ^3.12.3
+      version: 3.12.4
     '@internationalized/number':
       specifier: ^3.6.7
       version: 3.6.7
     '@internationalized/string':
-      specifier: ^3.2.9
-      version: 3.2.9
+      specifier: ^3.2.10
+      version: 3.2.10
     '@jridgewell/remapping':
       specifier: ^2.3.5
       version: 2.3.5
@@ -260,8 +260,8 @@ catalogs:
       specifier: 9.6.1
       version: 9.6.1
     '@react-types/shared':
-      specifier: ^3.36.0
-      version: 3.36.0
+      specifier: ^3.36.1
+      version: 3.36.1
     '@reduxjs/toolkit':
       specifier: ^2.12.0
       version: 2.12.0
@@ -631,6 +631,9 @@ catalogs:
     cmdk:
       specifier: 1.1.1
       version: 1.1.1
+    cn:
+      specifier: 0.2.6
+      version: 0.2.6
     csstype:
       specifier: 3.2.3
       version: 3.2.3
@@ -809,11 +812,11 @@ catalogs:
       specifier: 19.2.7
       version: 19.2.7
     react-aria:
-      specifier: 3.50.0
-      version: 3.50.0
+      specifier: 3.51.0
+      version: 3.51.0
     react-aria-components:
-      specifier: 1.19.0
-      version: 1.19.0
+      specifier: 1.20.0
+      version: 1.20.0
     react-day-picker:
       specifier: 10.0.1
       version: 10.0.1
@@ -842,8 +845,8 @@ catalogs:
       specifier: 8.2.0
       version: 8.2.0
     react-stately:
-      specifier: 3.48.0
-      version: 3.48.0
+      specifier: 3.49.0
+      version: 3.49.0
     react-transition-group:
       specifier: 4.4.5
       version: 4.4.5
@@ -878,8 +881,8 @@ catalogs:
       specifier: ^7.8.2
       version: 7.8.2
     shadcn:
-      specifier: 4.14.1
-      version: 4.14.1
+      specifier: 4.21.0
+      version: 4.21.0
     shiki:
       specifier: ^3.23.0
       version: 3.23.0
@@ -1294,7 +1297,7 @@ importers:
         version: 0.3.135(prettier@3.9.6)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.3.135(@tsrx/react@0.2.69(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.69(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@0.2.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
+        version: 0.3.135(@tsrx/react@0.2.69(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.69(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@0.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -5005,16 +5008,16 @@ importers:
     dependencies:
       '@internationalized/date':
         specifier: catalog:default
-        version: 3.12.2
+        version: 3.12.4
       '@internationalized/number':
         specifier: catalog:default
         version: 3.6.7
       '@internationalized/string':
         specifier: catalog:default
-        version: 3.2.9
+        version: 3.2.10
       '@react-types/shared':
         specifier: catalog:default
-        version: 3.36.0(react@19.2.7)
+        version: 3.36.1(react@19.2.7)
       clsx:
         specifier: catalog:default
         version: 2.1.1
@@ -5033,16 +5036,16 @@ importers:
         version: 19.2.7
       react-aria:
         specifier: catalog:default
-        version: 3.50.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 3.51.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react-aria-components:
         specifier: catalog:default
-        version: 1.19.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 1.20.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react-dom:
         specifier: catalog:default
         version: 19.2.7(react@19.2.7)
       react-stately:
         specifier: catalog:default
-        version: 3.48.0(react@19.2.7)
+        version: 3.49.0(react@19.2.7)
       typescript:
         specifier: catalog:default
         version: 5.9.3
@@ -8172,10 +8175,16 @@ importers:
       clsx:
         specifier: catalog:default
         version: 2.1.1
+      cn:
+        specifier: catalog:default
+        version: 0.2.6
       tailwind-merge:
         specifier: catalog:default
         version: 3.6.0
     devDependencies:
+      '@base-ui/react':
+        specifier: 1.8.0
+        version: 1.8.0(@date-fns/tz@1.5.0)(@types/react@19.2.18)(date-fns@4.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.69(react@19.2.7)
@@ -10499,7 +10508,7 @@ importers:
         version: 1.61.1
       shadcn:
         specifier: catalog:default
-        version: 4.14.1(babel-plugin-macros@3.1.0)(supports-color@10.2.2)(typescript@5.9.3)
+        version: 4.21.0(babel-plugin-macros@3.1.0)(supports-color@10.2.2)(typescript@5.9.3)
       tailwindcss:
         specifier: catalog:default
         version: 4.3.3
@@ -13870,14 +13879,14 @@ packages:
       '@types/node':
         optional: true
 
-  '@internationalized/date@3.12.2':
-    resolution: {integrity: sha512-FY1Y+H64NDs+HAF6omlnWxm3mEpfgaCSWtL5l551ZZfImA+kGjPFgrnJrGjH6lfmLL0g8Z/mBu1R3kufeCp6Jw==}
+  '@internationalized/date@3.12.4':
+    resolution: {integrity: sha512-M1dEn4c1U1HsSlaVR8upZtSqvXrTkHDfv18H01uCSJyjVLDxnBR38v/fMxecmlwXKR4i9HeZcmgQAPE6A+aGJQ==}
 
   '@internationalized/number@3.6.7':
     resolution: {integrity: sha512-3ji1fcrT+FPAK86UqEhB/psHixYo6niWPJtt7+qRaYFynt/BaJG8GhAPimtWUpEiVSTq8ZM8L5psMxGquiB/Vg==}
 
-  '@internationalized/string@3.2.9':
-    resolution: {integrity: sha512-kzP/M/mbQxODlmOt4bIQZ2SBVUWUSqMLXooXixnX7noche8WHaQcA+nwFN1K2KCF/cp+LDUhcJsCicwkvhD1pg==}
+  '@internationalized/string@3.2.10':
+    resolution: {integrity: sha512-PDx6//vHSpRnHfxqMqto11zQvhsaU74O3mKv2F/0eicGZcl9NLjQmGlbHz/LsJh5tLKp4A4L7ZVTzN1/MmMTvA==}
 
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -17319,8 +17328,8 @@ packages:
       react-native:
         optional: true
 
-  '@react-types/shared@3.36.0':
-    resolution: {integrity: sha512-DkP/H0C2YjjS7gZWKNqOmU8a16qHPjQNdzMwmTq9SzplM6Iw0kVMTZ0OIoe6FOgGqa+FwMsE2QbPjh/n3g/jXQ==}
+  '@react-types/shared@3.36.1':
+    resolution: {integrity: sha512-AzsuD9OfxTOZMMvTRhlN3oHBwOmFN7tDh27LzqmHt4+uOgPhJT7ZM7/kVs/8/o0WxayMUIk3hBmCFRHv1FUoag==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
@@ -20410,6 +20419,9 @@ packages:
   '@ts-morph/common@0.27.0':
     resolution: {integrity: sha512-Wf29UqxWDpc+i61k3oIOzcUfQt79PIT9y/MWfAGlrkjg6lBC1hwDECLXPVJAhWjiGbfBCxZd65F/LIZF3+jeJQ==}
 
+  '@tsrx/core@0.1.67':
+    resolution: {integrity: sha512-6QUOOX6hQdmGsQy2/pj6eKHLibmsD1kOjQh/N7UVzWCaehiIoQy7R/BbX0BlD2f25+uAUR4jzCMBfgYHfTmGdQ==}
+
   '@tsrx/core@0.1.69':
     resolution: {integrity: sha512-8iMLyFUHFPKAkNtHASasYnXTF/kqkO3/n42yTW83CqndWhTyxbxw2O92EFrDlL8ewTjQ+QWueuQUePes0EM0rQ==}
 
@@ -20430,6 +20442,9 @@ packages:
 
   '@tsrx/ripple@0.1.62':
     resolution: {integrity: sha512-903lYUwLNXrtMYOsMtOlrPgdZ9OL0MS06jG4Qbpc2enG3y2sGfwXrZfKnDdKn+1rdtkw5Eb5WGOnN1KxUGuZpw==}
+
+  '@tsrx/runtime@0.1.5':
+    resolution: {integrity: sha512-sZHTOr2OOGg+EcebZoTeznomydrA4FdvJDfp95lPTj+mq5KpfRT4W6gnO6RoEESrSfL/Ti+V0xzZbA5BYTDBKw==}
 
   '@tsrx/runtime@0.1.6':
     resolution: {integrity: sha512-JDqwh1anI9roESDnT7uP2oreBhr8ZQdd1zc0f2Ec4VCW/l7oWGHhFD39huISRoFbUEqJbip56dJ+Zc9iiG2CDQ==}
@@ -23388,6 +23403,16 @@ packages:
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
       react-dom: ^18 || ^19 || ^19.0.0-rc
+
+  cn@0.2.5:
+    resolution: {integrity: sha512-OCjZtMeQfXbI4Es1+EIjkd77gvWzaE689gD8KhfexlqjClC06qR1MQBR+Z35ZMSPNEBWyHiItW1Soy0UvwNv9w==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  cn@0.2.6:
+    resolution: {integrity: sha512-+i4L0zUGgRcEnhsxueVrP7iBGxBx5iD0WOTYg1MwFEu2ZyCmH5Ov2V1cul2Ht5UchRQQgftCf4be/RxspuW6QQ==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   co@4.6.0:
     resolution: {integrity: sha512-QVb0dM5HvG+uaxitm8wONl7jltx8dqhfU33DcqtOZcLSVIKSDDLDi7+0LbAKiyI8hD9u42m2YxXSkMGWThaecQ==}
@@ -28683,8 +28708,8 @@ packages:
   ocache@0.1.5:
     resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
 
-  octane@0.2.5:
-    resolution: {integrity: sha512-Z45POlA65V6F2h7T5JM2mRD4KDRKJqg1zeplavgBdzsIOxhO2Wqk0saHhV0kovR+Y7ohDesMWzvlZII4eIRHBA==}
+  octane@0.2.6:
+    resolution: {integrity: sha512-ic1hZMDGwKeAZn9GdCEjhd85IQTiJU4XL0EHEqkwAUjWugaW0Pd69NvtbSHEu5ehDymwMUs3nAllWsX2oQxSdw==}
     engines: {node: '>=22.22.2'}
     peerDependencies:
       react: ^19.0.0
@@ -30229,14 +30254,14 @@ packages:
     resolution: {integrity: sha512-y3bGgqKj3QBdxLbLkomlohkvsA8gdAiUQlSBJnBhfn+BPxg4bc62d8TcBW15wavDfgexCgccckhcZvywyQYPOw==}
     hasBin: true
 
-  react-aria-components@1.19.0:
-    resolution: {integrity: sha512-2smSS5nqJ8cGYMQezuUXveZm7eMyHCqTN6mDpylQBYLYbdF5dxCCuW1DHn1VKLe1DybSfPvX/cZtJlDmvFfn8A==}
+  react-aria-components@1.20.0:
+    resolution: {integrity: sha512-BMbpIgoV9aELeBrB0Y120NgoigHb5OdcJwc+4e7uSnbTbamea6lo+gqcc4LAxzMaK3Jf+7LI1oCDE6yANsmxIQ==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
       react-dom: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
-  react-aria@3.50.0:
-    resolution: {integrity: sha512-S0Os6QZk33fzUAKu1QLT9afoUaCBt1ZNdoiq0n2YMVgKIdNIQS8zxiZ8O9hYE6QyDkHKjD6q39LQZ+qaSAIgjw==}
+  react-aria@3.51.0:
+    resolution: {integrity: sha512-AyWLw0XR38cFPwBu/ErgGaVrc5dupLEKmRlMXTGvFKOtbaGRQ2+yQJkjVhpdHhoRhU4+G+tJDFeHDTS8tK3bfQ==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
       react-dom: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
@@ -30509,8 +30534,8 @@ packages:
     peerDependencies:
       react: ^16.0.0 || ^17.0.0 || ^18.0.0
 
-  react-stately@3.48.0:
-    resolution: {integrity: sha512-ImicSAG+lTotAe5izcs1fz49Zk48w7pDusqYg04WaPhCoej8BJ24soMu3iLXIrsi273s4P1gZrYGrqReMfgEEA==}
+  react-stately@3.49.0:
+    resolution: {integrity: sha512-13iNq2KzBrRAzxRc+n53hgROfIistiYY/sPtIhCw1qUB7/kmo+X1xEU2uiS5zcCIrc55AUPwoHqOIIpKWSwB9A==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
@@ -31256,8 +31281,8 @@ packages:
     engines: {node: '>= 0.10'}
     hasBin: true
 
-  shadcn@4.14.1:
-    resolution: {integrity: sha512-Xb4r150oGNexMBxUnWPG1emcaUlFbhzMOJubdA+k0NTkmhgBBycFZjTz9Aw2yQbpDR6QnIZbk234N20s/s7s9A==}
+  shadcn@4.21.0:
+    resolution: {integrity: sha512-UU2mFNusW8C5rvadKdH69vERYZqUlOOlXBcf0MYhYLdTGP6DPti7X4qovCu+RTfCqsAgq/T+YfE0Vnttxh9aiw==}
     engines: {node: '>=20.18.1'}
     hasBin: true
 
@@ -35894,6 +35919,20 @@ snapshots:
       - utf-8-validate
       - zod
 
+  '@base-ui/react@1.8.0(@date-fns/tz@1.5.0)(@types/react@19.2.18)(date-fns@4.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@babel/runtime': 7.29.7
+      '@base-ui/utils': 0.4.0(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@floating-ui/react-dom': 2.1.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@floating-ui/utils': 0.2.12
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    optionalDependencies:
+      '@date-fns/tz': 1.5.0
+      '@types/react': 19.2.18
+      date-fns: 4.4.0
+
   '@base-ui/react@1.8.0(@date-fns/tz@1.5.0)(@types/react@19.2.18)(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@babel/runtime': 7.29.7
@@ -35907,6 +35946,17 @@ snapshots:
       '@date-fns/tz': 1.5.0
       '@types/react': 19.2.18
       date-fns: 4.4.0
+
+  '@base-ui/utils@0.4.0(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      '@babel/runtime': 7.29.7
+      '@floating-ui/utils': 0.2.12
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      reselect: 5.2.0
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    optionalDependencies:
+      '@types/react': 19.2.18
 
   '@base-ui/utils@0.4.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
@@ -38361,7 +38411,7 @@ snapshots:
     optionalDependencies:
       '@types/node': 24.13.3
 
-  '@internationalized/date@3.12.2':
+  '@internationalized/date@3.12.4':
     dependencies:
       '@swc/helpers': 0.5.23
 
@@ -38369,7 +38419,7 @@ snapshots:
     dependencies:
       '@swc/helpers': 0.5.23
 
-  '@internationalized/string@3.2.9':
+  '@internationalized/string@3.2.10':
     dependencies:
       '@swc/helpers': 0.5.23
 
@@ -43297,7 +43347,7 @@ snapshots:
       - '@types/react'
       - immer
 
-  '@react-types/shared@3.36.0(react@19.2.7)':
+  '@react-types/shared@3.36.1(react@19.2.7)':
     dependencies:
       react: 19.2.7
 
@@ -44063,7 +44113,7 @@ snapshots:
   '@ripple-ts/vite-plugin@0.3.125':
     dependencies:
       '@ripple-ts/adapter': 0.3.125
-      '@tsrx/core': 0.1.69
+      '@tsrx/core': 0.1.67
       '@tsrx/ripple': 0.1.62
     transitivePeerDependencies:
       - '@typescript-eslint/types'
@@ -47766,6 +47816,21 @@ snapshots:
       minimatch: 10.2.5
       path-browserify: 1.0.1
 
+  '@tsrx/core@0.1.67':
+    dependencies:
+      '@jridgewell/sourcemap-codec': 1.5.5
+      '@noble/hashes': 2.2.0
+      '@sveltejs/acorn-typescript': 1.0.13(acorn@8.17.0)
+      '@tsrx/runtime': 0.1.5
+      '@types/estree': 1.0.9
+      '@types/estree-jsx': 1.0.5
+      acorn: 8.17.0
+      esrap: 2.3.2
+      magic-string: 0.30.21
+      zimmerframe: 1.1.4
+    transitivePeerDependencies:
+      - '@typescript-eslint/types'
+
   '@tsrx/core@0.1.69':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -47865,13 +47930,15 @@ snapshots:
 
   '@tsrx/ripple@0.1.62':
     dependencies:
-      '@tsrx/core': 0.1.69
+      '@tsrx/core': 0.1.67
       esrap: 2.3.2
       is-reference: 3.0.3
       source-map: 0.7.6
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
+
+  '@tsrx/runtime@0.1.5': {}
 
   '@tsrx/runtime@0.1.6': {}
 
@@ -47911,7 +47978,7 @@ snapshots:
       - '@typescript-eslint/types'
     optional: true
 
-  '@tsrx/typescript-plugin@0.3.135(@tsrx/react@0.2.69(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.69(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@0.2.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
+  '@tsrx/typescript-plugin@0.3.135(@tsrx/react@0.2.69(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.69(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@0.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
       '@volar/typescript': 2.4.28
@@ -47920,7 +47987,7 @@ snapshots:
       '@tsrx/react': 0.2.69(react@19.2.8)
       '@tsrx/ripple': 0.1.62
       '@tsrx/solid': 0.1.69(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)
-      octane: 0.2.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      octane: 0.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
   '@tsrx/typescript-plugin@0.3.135(@tsrx/react@0.2.69(react@19.2.8))(@tsrx/ripple@0.1.62)(@tsrx/solid@0.1.69(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3))(octane@packages+octane)(typescript@5.9.3)':
     dependencies:
@@ -52560,6 +52627,10 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
+
+  cn@0.2.5: {}
+
+  cn@0.2.6: {}
 
   co@4.6.0: {}
 
@@ -59918,7 +59989,7 @@ snapshots:
     dependencies:
       ohash: 2.0.11
 
-  octane@0.2.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  octane@0.2.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(typescript@5.9.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       '@tsrx/core': 0.1.69
       '@types/react': 19.2.18
@@ -61868,29 +61939,30 @@ snapshots:
       minimist: 1.2.8
       strip-json-comments: 2.0.1
 
-  react-aria-components@1.19.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  react-aria-components@1.20.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
-      '@internationalized/date': 3.12.2
-      '@react-types/shared': 3.36.0(react@19.2.7)
+      '@internationalized/date': 3.12.4
+      '@internationalized/string': 3.2.10
+      '@react-types/shared': 3.36.1(react@19.2.7)
       '@swc/helpers': 0.5.23
       client-only: 0.0.1
       react: 19.2.7
-      react-aria: 3.50.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react-aria: 3.51.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react-dom: 19.2.7(react@19.2.7)
-      react-stately: 3.48.0(react@19.2.7)
+      react-stately: 3.49.0(react@19.2.7)
 
-  react-aria@3.50.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  react-aria@3.51.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.4
       '@internationalized/number': 3.6.7
-      '@internationalized/string': 3.2.9
-      '@react-types/shared': 3.36.0(react@19.2.7)
+      '@internationalized/string': 3.2.10
+      '@react-types/shared': 3.36.1(react@19.2.7)
       '@swc/helpers': 0.5.23
       aria-hidden: 1.2.6
       clsx: 2.1.1
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
-      react-stately: 3.48.0(react@19.2.7)
+      react-stately: 3.49.0(react@19.2.7)
       use-sync-external-store: 1.6.0(react@19.2.7)
 
   react-colorful@5.8.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
@@ -62278,12 +62350,12 @@ snapshots:
       react: 19.2.7
       react-is: 18.3.1
 
-  react-stately@3.48.0(react@19.2.7):
+  react-stately@3.49.0(react@19.2.7):
     dependencies:
-      '@internationalized/date': 3.12.2
+      '@internationalized/date': 3.12.4
       '@internationalized/number': 3.6.7
-      '@internationalized/string': 3.2.9
-      '@react-types/shared': 3.36.0(react@19.2.7)
+      '@internationalized/string': 3.2.10
+      '@react-types/shared': 3.36.1(react@19.2.7)
       '@swc/helpers': 0.5.23
       react: 19.2.7
       use-sync-external-store: 1.6.0(react@19.2.7)
@@ -62965,7 +63037,7 @@ snapshots:
 
   ripple@0.3.125:
     dependencies:
-      '@tsrx/core': 0.1.69
+      '@tsrx/core': 0.1.67
       '@tsrx/ripple': 0.1.62
       clsx: 2.1.1
       devalue: 5.8.2
@@ -63369,7 +63441,7 @@ snapshots:
       safe-buffer: 5.2.1
       to-buffer: 1.2.2
 
-  shadcn@4.14.1(babel-plugin-macros@3.1.0)(supports-color@10.2.2)(typescript@5.9.3):
+  shadcn@4.21.0(babel-plugin-macros@3.1.0)(supports-color@10.2.2)(typescript@5.9.3):
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@babel/parser': 7.29.7
@@ -63379,6 +63451,7 @@ snapshots:
       '@modelcontextprotocol/sdk': 1.29.0(supports-color@10.2.2)(zod@3.25.76)
       '@types/validate-npm-package-name': 4.0.2
       browserslist: 4.28.6
+      cn: 0.2.5
       commander: 14.0.3
       cosmiconfig: 9.0.2(typescript@5.9.3)
       dedent: 1.7.2(babel-plugin-macros@3.1.0)
@@ -63395,8 +63468,8 @@ snapshots:
       postcss-selector-parser: 7.1.4
       prompts: 2.4.2
       recast: 0.23.12
+      socks: 2.8.10
       stringify-object: 5.0.0
-      tailwind-merge: 3.6.0
       ts-morph: 26.0.0
       tsconfig-paths: 4.2.0
       undici: 7.28.0

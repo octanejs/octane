@@ -1,3 +1,4 @@
+import type { FocusableElement } from '@react-types/shared';
 // Ported from react-aria-components (source: .react-spectrum/packages/react-aria-components/src/ComboBox.tsx).
 // octane adaptations: `.tsx` → `.ts`, JSX → `createElement`; NO forwardRef —
 // `createHideableComponent` forwards `props.ref` positionally exactly like TextField; the
@@ -34,6 +35,7 @@ import { useResizeObserver } from '../utils/useResizeObserver';
 import { ButtonContext } from './Button';
 import { OverlayTriggerStateContext } from './Dialog';
 import { FieldErrorContext } from './FieldError';
+import { FieldInputContext } from './Autocomplete';
 import { FormContext } from './Form';
 import { GroupContext } from './Group';
 import { InputContext } from './Input';
@@ -186,7 +188,14 @@ export const ComboBox: <T, M extends SelectionMode = 'single'>(
 }) as any;
 
 // Contexts to clear inside the popover.
-const CLEAR_CONTEXTS = [LabelContext, ButtonContext, InputContext, GroupContext, TextContext];
+const CLEAR_CONTEXTS = [
+	LabelContext,
+	ButtonContext,
+	InputContext,
+	FieldInputContext,
+	GroupContext,
+	TextContext,
+];
 
 interface ComboBoxInnerProps<T> {
 	props: ComboBoxProps<T, SelectionMode>;
@@ -226,6 +235,11 @@ function ComboBoxInner<T>({ props, collection, comboBoxRef: ref }: ComboBoxInner
 		!props['aria-label'] && !props['aria-labelledby'],
 		subSlot(slot, 'labelSlot'),
 	);
+	let [labelElementType, setLabelElementType] = useState<'span' | 'label'>(
+		'label',
+		subSlot(slot, 'labelElementType'),
+	);
+
 	let {
 		buttonProps,
 		inputProps,
@@ -242,6 +256,7 @@ function ComboBoxInner<T>({ props, collection, comboBoxRef: ref }: ComboBoxInner
 			inputRef,
 			buttonRef,
 			listBoxRef,
+			labelElementType,
 			popoverRef,
 			name: formValue === 'text' ? name : undefined,
 			validationBehavior,
@@ -334,9 +349,27 @@ function ComboBoxInner<T>({ props, collection, comboBoxRef: ref }: ComboBoxInner
 	return createElement(Provider, {
 		values: [
 			[ComboBoxStateContext, state],
-			[LabelContext, { ...labelProps, ref: labelRef }],
+			[LabelContext, { ...labelProps, elementType: labelElementType, ref: labelRef }],
 			[ButtonContext, { ...buttonProps, ref: buttonRef, isPressed: state.isOpen }],
 			[InputContext, { ...inputProps, ref: inputRef }],
+			[
+				FieldInputContext,
+				{
+					...inputProps,
+					ref: useCallback(
+						(el: FocusableElement) => {
+							inputRef.current = el as HTMLInputElement; // TODO: figure out how to fix non-input element types in useComboBox/useTextField
+							if (el) {
+								setLabelElementType(el.tagName.toLowerCase() === 'input' ? 'label' : 'span');
+							}
+						},
+						[],
+						subSlot(slot, 'fieldInputRef'),
+					),
+					value: state.inputValue,
+					onChange: (v: string) => state.setInputValue(v as string),
+				} as any,
+			],
 			[OverlayTriggerStateContext, state],
 			[
 				PopoverContext,

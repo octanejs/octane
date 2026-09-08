@@ -780,7 +780,7 @@ export interface TreeItemProps<T = object>
 		LinkDOMProps,
 		HoverEvents,
 		PressEvents,
-		Pick<AriaTreeItemOptions, 'hasChildItems'>,
+		Pick<AriaTreeItemOptions, 'hasChildItems' | 'focusMode' | 'allowsArrowNavigation'>,
 		Omit<GlobalDOMAttributes, 'onClick'> {
 	/**
 	 * The CSS [className](https://developer.mozilla.org/en-US/docs/Web/API/Element/className) for the
@@ -836,6 +836,8 @@ export const TreeItem: <T extends object = object>(props: TreeItemProps<T> & { r
 		let { rowProps, gridCellProps, expandButtonProps, descriptionProps, ...states } = useTreeItem(
 			{
 				node: item!,
+				focusMode: props.focusMode,
+				allowsArrowNavigation: props.allowsArrowNavigation,
 				shouldSelectOnPressUp: !!dragState,
 			},
 			state,
@@ -1092,6 +1094,7 @@ export const TreeItem: <T extends object = object>(props: TreeItemProps<T> & { r
 								CheckboxContext,
 								{
 									slots: {
+										[DEFAULT_SLOT]: {},
 										selection: checkboxProps,
 									},
 								},
@@ -1100,6 +1103,7 @@ export const TreeItem: <T extends object = object>(props: TreeItemProps<T> & { r
 								CheckboxFieldContext,
 								{
 									slots: {
+										[DEFAULT_SLOT]: {},
 										selection: checkboxProps,
 									},
 								},
@@ -1150,7 +1154,9 @@ export interface TreeLoadMoreItemRenderProps {
 }
 
 export interface TreeLoadMoreItemProps
-	extends Omit<LoadMoreSentinelProps, 'collection'>, RenderProps<TreeLoadMoreItemRenderProps> {
+	extends
+		Omit<LoadMoreSentinelProps, 'collection' | 'direction'>,
+		RenderProps<TreeLoadMoreItemRenderProps> {
 	/**
 	 * The CSS [className](https://developer.mozilla.org/en-US/docs/Web/API/Element/className) for the
 	 * element. A function may be provided to compute the class based on component state.
@@ -1374,17 +1380,16 @@ function RootDropIndicator(): any {
 	});
 }
 
-export interface GridListSectionProps<T>
-	extends SectionProps<T>, DOMRenderProps<'div', undefined> {}
+export interface TreeSectionProps<T> extends SectionProps<T>, DOMRenderProps<'div', undefined> {}
 
 /**
  * A TreeSection represents a section within a Tree.
  */
 export const TreeSection: <T extends object = object>(
-	props: GridListSectionProps<T> & { ref?: any },
+	props: GridListHeaderProps & { ref?: any },
 ) => any = /*#__PURE__*/ createBranchComponent(SectionNode, function TreeSection<
 	T,
->(props: GridListSectionProps<T>, forwardedRef: any, item?: Node<T>): any {
+>(props: TreeSectionProps<T>, forwardedRef: any, item?: Node<T>): any {
 	const slot = S('TreeSection');
 	let state = useContext(TreeStateContext)!;
 	let { CollectionBranch } = useContext(CollectionRendererContext);
@@ -1428,7 +1433,9 @@ export const TreeSection: <T extends object = object>(
 	});
 });
 
-export const TreeHeader = (props: GridListHeaderProps): ReactNode => {
+export interface TreeHeaderProps extends GridListHeaderProps {}
+
+export const TreeHeader = (props: TreeHeaderProps): ReactNode => {
 	return createElement(GridListHeader, {
 		className: 'react-aria-TreeHeader',
 		...props,

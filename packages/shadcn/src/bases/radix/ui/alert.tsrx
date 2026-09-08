@@ -2,7 +2,7 @@
 // cva strings verbatim. Pure template JSX (no consumer-children interleave).
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { DivProps } from '../../../lib/types';
 
 export const alertVariants = cva(

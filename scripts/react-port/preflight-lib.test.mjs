@@ -25,6 +25,10 @@ test('conventional test discovery excludes fixture modules beside runnable suite
 	assert.equal(conventionalTestPath('tests/image.test.tsx'), true);
 	assert.equal(conventionalTestPath('tests/runtime-plugin-support.fixture.ts'), false);
 	assert.equal(conventionalTestPath('tests/fixtures/runtime-plugin-support.ts'), false);
+	assert.equal(conventionalTestPath('test/dnd/examples.js', { runner: 'jest' }), false);
+	assert.equal(conventionalTestPath('test/dnd/example.test.js', { runner: 'jest' }), true);
+	assert.equal(conventionalTestPath('__tests__/example.js', { runner: 'jest' }), true);
+	assert.equal(conventionalTestPath('test/types.ts', { runner: 'vitest' }), false);
 });
 
 const MIT_TEXT = `MIT License
@@ -313,6 +317,44 @@ function makeTar(files) {
 }
 
 describe('resolved evidence', () => {
+	test('accepts an explicit package location when published metadata omits its directory', () => {
+		const registry = {
+			name: 'react-widget',
+			version: '1.2.3',
+			repository: { owner: 'example', repo: 'widgets', subdirectory: null },
+			gitHead: 'a'.repeat(40),
+			integrity: 'sha512-example',
+			manifestLicense: 'MIT',
+			licenseFiles: [{ path: 'package/LICENSE', scope: 'package', content: MIT_TEXT }],
+		};
+		const source = {
+			name: 'react-widget',
+			version: '1.2.3',
+			repository: { owner: 'example', repo: 'widgets', subdirectory: 'packages/react-widget' },
+			commit: 'a'.repeat(40),
+			manifestLicense: 'MIT',
+			licenseFiles: [{ path: 'LICENSE', scope: 'root', content: MIT_TEXT }],
+		};
+		const assess = (published = registry, pinned = source) =>
+			assessResolvedEvidence({
+				input: 'https://github.com/example/widgets/tree/main/packages/react-widget',
+				registry: published,
+				source: pinned,
+			});
+		assert.equal(assess().status, 'licensed');
+		assert.equal(
+			assess({ ...registry, repository: { ...registry.repository, subdirectory: 'other' } }).status,
+			'blocked',
+		);
+		assert.equal(assess(registry, { ...source, name: 'another-package' }).status, 'blocked');
+		assert.equal(assess(registry, { ...source, commit: 'b'.repeat(40) }).status, 'blocked');
+		assert.equal(
+			assess(registry, { ...source, repository: { ...source.repository, repo: 'another-repo' } })
+				.status,
+			'blocked',
+		);
+	});
+
 	test('cross-checks the published artifact against one immutable source revision', () => {
 		const result = assessResolvedEvidence({
 			input: 'react-widget@1.2.3',

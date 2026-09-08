@@ -24,6 +24,12 @@
 			}
 		},
 		{
+			"files": ["packages/base-ui/src/utils/styles.tsrx"],
+			"options": {
+				"parser": "tsrx"
+			}
+		},
+		{
 			"files": ["**/*.json"],
 			"options": {
 				"useTabs": false

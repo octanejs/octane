@@ -33,6 +33,7 @@ import { setInteractionModality } from '../interactions/useFocusVisible';
 import { useCollator } from '../i18n/useCollator';
 import { useField } from '../label/useField';
 import { useId } from '../utils/useId';
+import { useKeyboard } from '../interactions/useKeyboard';
 import { useMenuTrigger } from '../menu/useMenuTrigger';
 import { useTypeSelect } from '../selection/useTypeSelect';
 
@@ -153,15 +154,12 @@ export function useSelect(...args: any[]): SelectAria<any, any> {
 		subSlot(slot, 'menuTrigger'),
 	);
 
-	let onKeyDown = (e: KeyboardEvent) => {
-		if (state.selectionManager.selectionMode === 'multiple') {
-			return;
-		}
-
-		switch (e.key) {
-			case 'ArrowLeft': {
-				// prevent scrolling containers
-				e.preventDefault();
+	let { keyboardProps } = useKeyboard({
+		shortcuts: {
+			ArrowLeft: () => {
+				if (state.selectionManager.selectionMode === 'multiple') {
+					return false;
+				}
 
 				let key =
 					state.selectedKey != null
@@ -170,11 +168,11 @@ export function useSelect(...args: any[]): SelectAria<any, any> {
 				if (key != null) {
 					state.setSelectedKey(key);
 				}
-				break;
-			}
-			case 'ArrowRight': {
-				// prevent scrolling containers
-				e.preventDefault();
+			},
+			ArrowRight: () => {
+				if (state.selectionManager.selectionMode === 'multiple') {
+					return false;
+				}
 
 				let key =
 					state.selectedKey != null
@@ -183,10 +181,12 @@ export function useSelect(...args: any[]): SelectAria<any, any> {
 				if (key != null) {
 					state.setSelectedKey(key);
 				}
-				break;
-			}
-		}
-	};
+			},
+		},
+		allowRepeats: true,
+		onKeyDown: props.onKeyDown,
+		onKeyUp: props.onKeyUp,
+	});
 
 	let { typeSelectProps } = useTypeSelect(
 		{
@@ -242,8 +242,8 @@ export function useSelect(...args: any[]): SelectAria<any, any> {
 		triggerProps: mergeProps(domProps, {
 			...triggerProps,
 			isDisabled,
-			onKeyDown: chain(triggerProps.onKeyDown, onKeyDown, props.onKeyDown),
-			onKeyUp: props.onKeyUp,
+			onKeyDown: chain(triggerProps.onKeyDown, keyboardProps.onKeyDown),
+			onKeyUp: keyboardProps.onKeyUp,
 			'aria-labelledby': [
 				valueId,
 				triggerProps['aria-labelledby'],

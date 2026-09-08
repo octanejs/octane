@@ -554,6 +554,13 @@ export interface GridListItemProps<T = object>
 	 * on the collection's `selectionBehavior` prop and the interaction modality.
 	 */
 	onAction?: () => void;
+	focusMode?: 'child' | 'row';
+	/**
+	 * Whether the row should support arrow key navigation even when the containing collection uses
+	 * tab keyboard navigation. Allows users to navigate between rows with arrow keys while
+	 * focus is on an interactive child element within the row.
+	 */
+	allowsArrowNavigation?: boolean;
 }
 
 /**
@@ -577,6 +584,8 @@ export const GridListItem: <T extends object = object>(
 		let { rowProps, gridCellProps, descriptionProps, ...states } = useGridListItem(
 			{
 				node: item!,
+				focusMode: props.focusMode,
+				allowsArrowNavigation: props.allowsArrowNavigation,
 				shouldSelectOnPressUp: !!dragState,
 				isVirtualized,
 			},
@@ -902,7 +911,7 @@ function RootDropIndicator(): any {
 
 export interface GridListLoadMoreItemProps
 	extends
-		Omit<LoadMoreSentinelProps, 'collection'>,
+		Omit<LoadMoreSentinelProps, 'collection' | 'direction'>,
 		StyleProps,
 		DOMRenderProps<'div', undefined>,
 		GlobalDOMAttributes {
@@ -945,7 +954,7 @@ export const GridListLoadMoreItem: (props: GridListLoadMoreItemProps & { ref?: a
 					sentinelRef,
 					scrollOffset,
 				}),
-				[onLoadMore, scrollOffset, state?.collection],
+				[onLoadMore, scrollOffset, sentinelRef, state?.collection],
 				subSlot(slot, 'loadMoreProps'),
 			);
 			useLoadMoreSentinel(

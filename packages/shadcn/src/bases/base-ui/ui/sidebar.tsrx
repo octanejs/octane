@@ -35,7 +35,7 @@ import {
 import { cva, type VariantProps } from 'class-variance-authority';
 import { PanelLeftIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { useIsMobile } from '../../../hooks/use-mobile';
 import { Button } from './button.tsrx';
 import { Input } from './input.tsrx';

@@ -359,3 +359,25 @@ export type {
 } from './table/useTableColumnResize';
 export type { GridAria, GridProps } from './grid/useGrid';
 export type { GridRowAria, GridRowProps } from './grid/useGridRow';
+
+export { useContextMenu } from './interactions/useContextMenu';
+export type {
+	ContextMenuProps,
+	ContextMenuAria,
+	ContextMenuEvent,
+} from './interactions/useContextMenu';
+export type { KeyboardShortcutBindings } from './interactions/createKeyboardShortcutHandler';
+export { usePreviewTrigger } from './tooltip/usePreviewTrigger';
+export type {
+	AriaPreviewTriggerProps,
+	PreviewTriggerTriggerAria,
+} from './tooltip/usePreviewTrigger';
+export {
+	useTokenField,
+	tokenFieldPositionToDOMRange,
+	setTokenFieldSelection,
+	getSelection,
+} from './tokenfield/useTokenField';
+export type { AriaTokenFieldProps, TokenFieldAria } from './tokenfield/useTokenField';
+export { useToken } from './tokenfield/useToken';
+export type { TokenProps, TokenAria } from './tokenfield/useToken';

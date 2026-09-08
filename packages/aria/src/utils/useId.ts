@@ -29,6 +29,7 @@ if (typeof FinalizationRegistry !== 'undefined') {
  *
  * @param defaultId - Default component id.
  */
+let registeredIds = new WeakMap<object, string>();
 export function useId(defaultId?: string): string;
 // Slot-threading form: sibling ported hooks pass their derived sub-slot as the trailing arg.
 export function useId(slot: symbol | undefined): string;
@@ -44,8 +45,15 @@ export function useId(...args: any[]): string {
 	let res = useSSRSafeId(value, subSlot(slot, 'ssrId'));
 	let cleanupRef = useRef(null, subSlot(slot, 'cleanupToken'));
 
-	if (registry) {
-		registry.register(cleanupRef, res);
+	let registeredId = registeredIds.get(cleanupRef);
+	if (registry && registeredId !== res) {
+		if (registeredId != null) {
+			registry.unregister(cleanupRef);
+		}
+		// oxlint-disable-next-line react/react-compiler
+		registry.register(cleanupRef, res, cleanupRef);
+		// oxlint-disable-next-line react/react-compiler
+		registeredIds.set(cleanupRef, res);
 	}
 
 	if (canUseDOM) {
@@ -65,6 +73,7 @@ export function useId(...args: any[]): string {
 				// when it is though, also remove it from the finalization registry.
 				if (registry) {
 					registry.unregister(cleanupRef);
+					registeredIds.delete(cleanupRef);
 				}
 				idsUpdaterMap.delete(r);
 			};

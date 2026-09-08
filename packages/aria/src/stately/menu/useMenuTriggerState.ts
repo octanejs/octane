@@ -11,7 +11,7 @@ import {
 	useOverlayTriggerState,
 } from '../overlays/useOverlayTriggerState';
 
-export type MenuTriggerType = 'press' | 'longPress';
+export type MenuTriggerType = 'press' | 'longPress' | 'contextMenu';
 
 export interface MenuTriggerProps extends OverlayTriggerProps {
 	/**

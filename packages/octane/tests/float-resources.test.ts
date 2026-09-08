@@ -130,6 +130,9 @@ describe('Float resources — client', () => {
 		expect(styles[0].getAttribute('data-precedence')).toBe('default');
 		expect(styles[0].textContent).toContain('.tokens');
 		expect(styles[0].textContent).toContain('teal');
+		const rule = (styles[0] as HTMLStyleElement).sheet!.cssRules[0] as CSSStyleRule;
+		expect(rule.selectorText).toBe('.tokens');
+		expect(rule.style.color).toBe('teal');
 		// Unscoped: the CSS ships verbatim-by-meaning, no component hash class.
 		expect(styles[0].textContent).not.toMatch(/\.tokens\.[a-z0-9]/i);
 		// Group order: default (link then style, discovery order) then high.
@@ -292,6 +295,19 @@ describe('Float resources — SSR + hydration dedupe', () => {
 		const r = await Server.renderToString(App as any);
 		expect(r.html.match(/data-href="inline-tokens"/g) || []).toHaveLength(1);
 		expect(r.html).toContain('.tokens');
+		const parsed = document.createElement('div');
+		parsed.innerHTML = r.html;
+		const serverStyle = parsed.querySelector<HTMLStyleElement>('style[data-href="inline-tokens"]')!;
+		const style = document.createElement('style');
+		style.textContent = serverStyle.textContent;
+		document.head.appendChild(style);
+		try {
+			const rule = style.sheet!.cssRules[0] as CSSStyleRule;
+			expect(rule.selectorText).toBe('.tokens');
+			expect(rule.style.color).toBe('teal');
+		} finally {
+			style.remove();
+		}
 		// Same default group, discovery order: the link precedes the style tag.
 		expect(r.html.indexOf('/base.css')).toBeLessThan(r.html.indexOf('inline-tokens'));
 

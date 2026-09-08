@@ -34,6 +34,7 @@ export interface DialogAria {
 
 	/** Props for the dialog title element. */
 	titleProps: DOMAttributes;
+	contentProps: DOMAttributes;
 }
 
 /**
@@ -59,6 +60,9 @@ export function useDialog(...args: any[]): DialogAria {
 	let { role = 'dialog' } = props;
 	let titleId: string | undefined = useSlotId(undefined, subSlot(slot, 'title'));
 	titleId = props['aria-label'] ? undefined : titleId;
+
+	let contentId: string | undefined = useSlotId();
+	contentId = role === 'alertdialog' && !props['aria-describedby'] ? contentId : undefined;
 
 	let isRefocusing = useRef(false, subSlot(slot, 'refocusing'));
 
@@ -125,12 +129,14 @@ export function useDialog(...args: any[]): DialogAria {
 	// See https://bugs.webkit.org/show_bug.cgi?id=211934.
 	// useModal sets aria-hidden on all elements outside the dialog, so the dialog will behave as a modal
 	// even without aria-modal on the dialog itself.
+	let ariaDescribedby = props['aria-describedby'] ?? contentId;
 	return {
 		dialogProps: {
 			...filterDOMProps(props, { labelable: true }),
 			role,
 			tabIndex: -1,
-			'aria-labelledby': props['aria-labelledby'] || titleId,
+			'aria-labelledby': props['aria-labelledby'] ?? titleId,
+			'aria-describedby': ariaDescribedby,
 			// Prevent blur events from reaching useOverlay, which may cause
 			// popovers to close. Since focus is contained within the dialog,
 			// we don't want this to occur due to the above useEffect.
@@ -140,6 +146,7 @@ export function useDialog(...args: any[]): DialogAria {
 				}
 			},
 		},
+		contentProps: { id: contentId },
 		titleProps: {
 			id: titleId,
 		},

@@ -63,6 +63,7 @@ export function useLink(...args: any[]): LinkAria {
 		onPress,
 		onPressStart,
 		onPressEnd,
+		onPressChange,
 		onClick,
 		isDisabled,
 		...otherProps
@@ -81,6 +82,7 @@ export function useLink(...args: any[]): LinkAria {
 			onPress,
 			onPressStart,
 			onPressEnd,
+			onPressChange,
 			onClick,
 			isDisabled,
 			ref,

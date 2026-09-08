@@ -4,7 +4,7 @@
 //
 // UNVERIFIED PROVENANCE: class strings taken from this package's React Aria base rather than
 // transcribed from upstream's Base UI source.
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export function Kbd({ className, ...props }: HostProps<'kbd'>) @{

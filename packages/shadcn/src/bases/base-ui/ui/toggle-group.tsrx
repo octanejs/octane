@@ -27,7 +27,7 @@ import { type VariantProps } from 'class-variance-authority';
 import { ToggleGroup as ToggleGroupPrimitive } from '@octanejs/base-ui/toggle-group';
 import { Toggle as TogglePrimitive } from '@octanejs/base-ui/toggle';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { toggleVariants } from './toggle.tsrx';
 
 const ToggleGroupContext = createContext<

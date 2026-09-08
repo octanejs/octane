@@ -7,7 +7,7 @@ import { Slot } from '@octanejs/radix';
 import { ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';
 import { createElement, type OctaneNode } from 'octane';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string } & Record<string, unknown>;
 

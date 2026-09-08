@@ -16,7 +16,7 @@
 // UNVERIFIED PROVENANCE: the class string is taken from this package's React Aria base rather
 // than transcribed from upstream's Base UI source. It carries one utility the Radix base omits
 // (`peer-data-disabled:opacity-50`).
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export function Label({ className, ...props }: HostProps<'label'>) @{

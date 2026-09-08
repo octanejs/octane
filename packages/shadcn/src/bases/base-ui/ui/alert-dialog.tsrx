@@ -17,7 +17,7 @@
 // props.children channel.
 import { AlertDialog as AlertDialogPrimitive } from '@octanejs/base-ui/alert-dialog';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { DivProps } from '../../../lib/types';
 import { Button } from './button.tsrx';
 

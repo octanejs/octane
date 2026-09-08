@@ -69,3 +69,38 @@ void ControlledSliders;
 <Slider value={[20, 80]} onValueChange={(value: number) => void value} />;
 // @ts-expect-error A scalar slider callback receives a number.
 <Slider value={20} onValueCommitted={(value: number[]) => void value} />;
+
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@octanejs/shadcn/base-ui/Select';
+import {
+	NavigationMenu,
+	NavigationMenuItem,
+	NavigationMenuLink,
+} from '@octanejs/shadcn/base-ui/NavigationMenu';
+import { ScrollArea, ScrollBar } from '@octanejs/shadcn/base-ui/ScrollArea';
+
+<Select
+	value="apple"
+	onValueChange={(value) => {
+		const selected: string | null = value;
+		void selected;
+	}}
+/>;
+<SelectContent side="bottom" alignItemWithTrigger={false} />;
+<SelectTrigger size="sm" ref={{ current: null as HTMLButtonElement | null }} />;
+<SelectItem value="pear">Pear</SelectItem>;
+<NavigationMenu align="end">
+	<NavigationMenuItem>
+		<NavigationMenuLink href="#guide">Guide</NavigationMenuLink>
+	</NavigationMenuItem>
+</NavigationMenu>;
+<ScrollArea ref={{ current: null as HTMLDivElement | null }}>
+	<ScrollBar orientation="horizontal" />
+</ScrollArea>;
+// @ts-expect-error Select trigger size is restricted to the public variants.
+<SelectTrigger size="huge" />;
+// Base UI permits an unvalued item (for example a placeholder).
+<SelectItem />;
+// @ts-expect-error Positioning sides must be supported by Base UI.
+<SelectContent side="diagonal" />;
+// @ts-expect-error Scrollbar orientation is restricted to the two axes.
+<ScrollBar orientation="diagonal" />;

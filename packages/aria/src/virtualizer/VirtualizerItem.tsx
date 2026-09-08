@@ -24,10 +24,12 @@ interface VirtualizerItemProps extends Omit<VirtualizerItemOptions, 'ref'> {
 	style?: CSSProperties;
 	className?: string;
 	children: ReactNode;
+	shouldObserveItemSize?: boolean;
 }
 
 export function VirtualizerItem(props: VirtualizerItemProps): JSX.Element {
-	let { style, className, layoutInfo, virtualizer, parent, children } = props;
+	let { style, className, layoutInfo, virtualizer, parent, shouldObserveItemSize, children } =
+		props;
 	let { direction } = useLocale();
 	let ref = useRef<HTMLDivElement | null>(null);
 	useVirtualizerItem({

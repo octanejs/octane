@@ -3,7 +3,7 @@
 // @octanejs/radix; pure template JSX.
 import { Switch as SwitchPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface SwitchProps extends Record<string, unknown> {
 	className?: string;

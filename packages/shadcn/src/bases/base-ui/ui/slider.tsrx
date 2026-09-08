@@ -27,7 +27,7 @@
 import { useMemo } from 'octane';
 import { Slider as SliderPrimitive } from '@octanejs/base-ui/slider';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface SliderProps<
 	Value extends number | readonly number[] = number | readonly number[],

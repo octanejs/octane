@@ -1,5 +1,5 @@
 /** @jsxImportSource octane */
-// Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria/src/datepicker/useDateSegment.ts).
+// Ported from adobe/react-spectrum@5ecb3333001313e83898cd07644227897e3bae1f (packages/react-aria/src/datepicker/useDateSegment.ts).
 /*
  * Copyright 2020 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@ import { DateFieldState, DateSegment } from '../upstream-exports/react-stately/u
 import { getActiveElement, nodeContains } from '../utils/shadowdom/DOMFunctions';
 import { getScrollParent } from '../utils/getScrollParent';
 import { hookData } from './useDateField';
-import { isIOS, isMac } from '../utils/platform';
+import { isIOS } from '../utils/platform';
 import { mergeProps } from '../utils/mergeProps';
 import { NumberParser } from '@internationalized/number';
 import React, { CSSProperties, useMemo, useRef } from '../compat/react';
@@ -28,6 +28,7 @@ import { useDisplayNames } from './useDisplayNames';
 import { useEvent } from '../utils/useEvent';
 import { useFilter } from '../i18n/useFilter';
 import { useId } from '../utils/useId';
+import { useKeyboard } from '../interactions/useKeyboard';
 import { useLabels } from '../utils/useLabels';
 import { useLayoutEffect } from '../utils/useLayoutEffect';
 import { useLocale } from '../i18n/I18nProvider';
@@ -127,28 +128,21 @@ export function useDateSegment(
 		}
 	};
 
-	let onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-		// Firefox does not fire selectstart for Ctrl/Cmd + A
-		// https://bugzilla.mozilla.org/show_bug.cgi?id=1742153
-		if (e.key === 'a' && (isMac() ? e.metaKey : e.ctrlKey)) {
-			e.preventDefault();
-		}
-
-		if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) {
-			return;
-		}
-
-		switch (e.key) {
-			case 'Backspace':
-			case 'Delete': {
-				// Safari on iOS does not fire beforeinput for the backspace key because the cursor is at the start.
-				e.preventDefault();
-				e.stopPropagation();
+	let { keyboardProps } = useKeyboard({
+		shortcuts: {
+			Backspace: () => {
 				backspace();
-				break;
-			}
-		}
-	};
+			},
+			Delete: () => {
+				backspace();
+			},
+			'Mod+a': () => {
+				// Firefox does not fire selectstart for Ctrl/Cmd + A
+				// https://bugzilla.mozilla.org/show_bug.cgi?id=1742153
+			},
+		},
+		allowRepeats: true,
+	});
 
 	// Safari dayPeriod option doesn't work...
 	let { startsWith } = useFilter({ sensitivity: 'base' });
@@ -273,7 +267,13 @@ export function useDateSegment(
 		// Otherwise, when tapping on a segment in Android Chrome and then entering text,
 		// composition events will be fired that break the DOM structure and crash the page.
 		let selection = window.getSelection();
-		if (selection?.anchorNode && nodeContains(ref.current, selection?.anchorNode)) {
+		// Only collapse while focused, otherwise a stale anchor left in the segment (e.g. on Firefox)
+		// steals focus back into it on selectionchange. See #10259.
+		if (
+			selection?.anchorNode &&
+			nodeContains(ref.current, selection?.anchorNode) &&
+			getActiveElement() === ref.current
+		) {
 			selection.collapse(ref.current);
 		}
 	});
@@ -393,32 +393,33 @@ export function useDateSegment(
 	}
 
 	return {
+		// oxlint-disable-next-line react/react-compiler
 		segmentProps: mergeProps(spinButtonProps, labelProps, {
 			id,
 			...touchPropOverrides,
+			...keyboardProps,
 			'aria-invalid': state.isInvalid ? 'true' : undefined,
 			'aria-describedby': ariaDescribedBy,
 			'aria-readonly': state.isReadOnly || !segment.isEditable ? 'true' : undefined,
 			'data-placeholder': segment.isPlaceholder || undefined,
 			contentEditable: isEditable,
 			suppressContentEditableWarning: isEditable,
-			spellCheck: isEditable ? 'false' : undefined,
+			spellCheck: isEditable ? ('false' as const) : undefined,
 			autoCorrect: isEditable ? 'off' : undefined,
-			// Octane uses the modern DOM property name regardless of its package version.
+			// Capitalization was changed in React 17...
 			enterKeyHint: isEditable ? 'next' : undefined,
 			inputMode:
 				state.isDisabled || segment.type === 'dayPeriod' || segment.type === 'era' || !isEditable
 					? undefined
-					: 'numeric',
+					: ('numeric' as const),
 			tabIndex: state.isDisabled ? undefined : 0,
-			onKeyDown,
 			onFocus,
 			style: segmentStyle,
 			// Prevent pointer events from reaching useDatePickerGroup, and allow native browser behavior to focus the segment.
-			onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+			onPointerDown(e: PointerEvent) {
 				e.stopPropagation();
 			},
-			onMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+			onMouseDown(e: MouseEvent) {
 				e.stopPropagation();
 			},
 		}),

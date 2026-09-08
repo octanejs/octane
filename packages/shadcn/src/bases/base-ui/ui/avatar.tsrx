@@ -13,7 +13,7 @@
 // transcribed from upstream's Base UI source.
 import { Avatar as AvatarPrimitive } from '@octanejs/base-ui/avatar';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string } & Record<string, unknown>;
 

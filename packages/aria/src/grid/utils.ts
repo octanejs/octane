@@ -13,6 +13,7 @@ interface GridMapShared {
 		onCellAction?: (key: Key) => void;
 	};
 	shouldSelectOnPressUp?: boolean;
+	keyboardNavigationBehavior?: 'arrow' | 'tab';
 }
 
 // Used to share:

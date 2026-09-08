@@ -26,7 +26,7 @@
 import { createElement } from 'octane';
 import { PreviewCard as PreviewCardPrimitive } from '@octanejs/base-ui/preview-card';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 /** Props routed to the Positioner rather than the popup. */
 export type BaseUiPositioningProps =

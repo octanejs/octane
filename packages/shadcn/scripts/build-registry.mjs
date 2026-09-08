@@ -131,8 +131,8 @@ async function buildItems(srcUi) {
 		name: 'utils',
 		type: 'registry:lib',
 		title: 'Utils',
-		description: 'The cn() class utility (clsx + tailwind-merge).',
-		dependencies: ['clsx', 'tailwind-merge'],
+		description: 'The cn() class utility from the upstream cn package.',
+		dependencies: ['cn'],
 		files: [
 			{ path: 'lib/utils.ts', type: 'registry:lib', target: 'lib/utils.ts', content: utilsSource },
 		],

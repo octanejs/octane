@@ -7,7 +7,7 @@ import { cva } from 'class-variance-authority';
 import { NavigationMenu as NavigationMenuPrimitive } from '@octanejs/radix';
 import { ChevronDownIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 

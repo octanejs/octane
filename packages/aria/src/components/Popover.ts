@@ -100,6 +100,8 @@ export interface PopoverProps
 	 * @default document.body
 	 */
 	UNSTABLE_portalContainer?: Element;
+	/** Whether enter and exit animations should be skipped. */
+	shouldSkipAnimation?: boolean;
 	/**
 	 * The additional offset applied along the main axis between the element and its
 	 * anchor element.
@@ -138,6 +140,7 @@ export interface PopoverRenderProps {
 
 interface PopoverContextValue extends PopoverProps {
 	/** Contexts to clear. */
+	id?: string;
 	clearContexts?: Context<any>[];
 }
 
@@ -157,8 +160,8 @@ export function Popover(props: PopoverProps): any {
 	let localState = useOverlayTriggerState(props, subSlot(slot, 'state'));
 	let state =
 		props.isOpen != null || props.defaultOpen != null || !contextState ? localState : contextState;
-	let isExiting =
-		useExitAnimation(ref, state.isOpen, subSlot(slot, 'exit')) || props.isExiting || false;
+	let exitAnimation = useExitAnimation(ref, state.isOpen, subSlot(slot, 'exit'));
+	let isExiting = props.isExiting || (!props.shouldSkipAnimation && exitAnimation) || false;
 	let isHidden = useIsHidden();
 	let { direction } = useLocale(subSlot(slot, 'locale'));
 
@@ -198,10 +201,12 @@ interface PopoverInnerProps extends AriaPopoverProps, RenderProps<PopoverRenderP
 	state: OverlayTriggerState;
 	isEntering?: boolean;
 	isExiting: boolean;
+	shouldSkipAnimation?: boolean;
 	UNSTABLE_portalContainer?: Element;
 	trigger?: string;
 	dir?: 'ltr' | 'rtl';
 	clearContexts?: Context<any>[];
+	id?: string;
 }
 
 function PopoverInner(allProps: PopoverInnerProps): any {
@@ -229,8 +234,9 @@ function PopoverInner(allProps: PopoverInnerProps): any {
 	);
 
 	let ref = props.popoverRef as RefObject<HTMLDivElement | null>;
-	let isEntering =
-		useEnterAnimation(ref, !!placement, subSlot(slot, 'enter')) || props.isEntering || false;
+	let enterAnimation = useEnterAnimation(ref, !!placement, subSlot(slot, 'enter'));
+	// oxlint-disable-next-line react/react-compiler
+	let isEntering = props.isEntering || (!props.shouldSkipAnimation && enterAnimation) || false;
 	let renderProps = useRenderProps(
 		{
 			...props,
@@ -247,8 +253,12 @@ function PopoverInner(allProps: PopoverInnerProps): any {
 
 	// Automatically render Popover with role=dialog except when isNonModal is true,
 	// or a dialog is already nested inside the popover.
-	let shouldBeDialog = !props.isNonModal || props.trigger === 'SubmenuTrigger';
-	let [isDialog, setDialog] = useState(false, subSlot(slot, 'isDialog'));
+	let shouldBeDialog =
+		!props.isNonModal || props.trigger === 'SubmenuTrigger' || props.trigger === 'PreviewTrigger';
+	let [isDialog, setDialog] = useState(
+		props.trigger === 'PreviewTrigger',
+		subSlot(slot, 'isDialog'),
+	);
 	useLayoutEffect(
 		() => {
 			if (ref.current) {
@@ -265,6 +275,7 @@ function PopoverInner(allProps: PopoverInnerProps): any {
 		() => {
 			if (
 				isDialog &&
+				props.trigger !== 'PreviewTrigger' &&
 				(props.trigger !== 'SubmenuTrigger' || getInteractionModality() !== 'pointer') &&
 				ref.current &&
 				!isFocusWithin(ref.current)
@@ -327,6 +338,7 @@ function PopoverInner(allProps: PopoverInnerProps): any {
 		{
 			...mergeProps(filterDOMProps(props, { global: true }), popoverProps),
 			...renderProps,
+			id: isDialog ? props.id : undefined,
 			role: isDialog ? 'dialog' : undefined,
 			tabIndex: isDialog ? -1 : undefined,
 			'aria-label': props['aria-label'],
@@ -354,7 +366,7 @@ function PopoverInner(allProps: PopoverInnerProps): any {
 			Overlay,
 			{
 				...props,
-				shouldContainFocus: isDialog,
+				shouldContainFocus: isDialog && props.trigger !== 'PreviewTrigger',
 				isExiting,
 				portalContainer: UNSTABLE_portalContainer,
 				// octane adaptation: children arrive positionally below.
@@ -380,7 +392,7 @@ function PopoverInner(allProps: PopoverInnerProps): any {
 	// Submenus/subdialogs are mounted into the root popover's container.
 	return createElement(Overlay, {
 		...props,
-		shouldContainFocus: isDialog,
+		shouldContainFocus: isDialog && props.trigger !== 'PreviewTrigger',
 		isExiting,
 		portalContainer: UNSTABLE_portalContainer ?? groupCtx?.current ?? undefined,
 		children: overlay,

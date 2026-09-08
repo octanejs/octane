@@ -7,7 +7,7 @@
 import { composeRenderProps, TextArea as TextareaPrimitive } from '@octanejs/aria/components';
 import type { TextAreaProps as TextareaPrimitiveProps } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface TextareaProps extends TextareaPrimitiveProps {}
 

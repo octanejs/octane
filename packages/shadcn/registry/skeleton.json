@@ -8,11 +8,13 @@
       "path": "ui/skeleton.tsrx",
       "type": "registry:ui",
       "target": "components/ui/skeleton.tsrx",
-      "content": "// Base UI base skeleton — presentational, no headless primitive in any base.\n//\n// UNVERIFIED PROVENANCE: derived from this package's React Aria base rather than transcribed\n// from upstream's `bases/base-ui/ui/skeleton.tsx`, which was not available at port time.\n// Skeleton is the WORST case for this, and the reason the whole batch is labelled: the Radix\n// base renders `bg-accent` where the React Aria base renders `bg-muted`, so the one token that\n// matters here is known to differ ACROSS bases. Verify against the upstream source.\nimport { cn } from '@/lib/utils';\nimport type { DivProps } from '@/lib/types';\n\nexport function Skeleton({ className, ...props }: DivProps) @{\n\t<div\n\t\tdata-slot=\"skeleton\"\n\t\tclassName={cn('animate-pulse rounded-md bg-muted', className)}\n\t\t{...props}\n\t/>\n}\n"
+      "content": "// Base UI base skeleton — presentational, no headless primitive in any base.\n//\n// UNVERIFIED PROVENANCE: derived from this package's React Aria base rather than transcribed\n// from upstream's `bases/base-ui/ui/skeleton.tsx`, which was not available at port time.\n// Skeleton is the WORST case for this, and the reason the whole batch is labelled: the Radix\n// base renders `bg-accent` where the React Aria base renders `bg-muted`, so the one token that\n// matters here is known to differ ACROSS bases. Verify against the upstream source.\nimport { cn } from 'cn';\nimport type { DivProps } from '@/lib/types';\n\nexport function Skeleton({ className, ...props }: DivProps) @{\n\t<div\n\t\tdata-slot=\"skeleton\"\n\t\tclassName={cn('animate-pulse rounded-md bg-muted', className)}\n\t\t{...props}\n\t/>\n}\n"
     }
   ],
+  "dependencies": [
+    "cn"
+  ],
   "registryDependencies": [
-    "@octane/types",
-    "@octane/utils"
+    "@octane/types"
   ]
 }

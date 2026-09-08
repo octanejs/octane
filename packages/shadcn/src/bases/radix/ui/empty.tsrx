@@ -3,7 +3,7 @@
 // as a <div> (typed as "p") — both preserved as-is.
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type DivProps = { className?: string } & Record<string, unknown>;
 

@@ -3,7 +3,7 @@
 // UNVERIFIED PROVENANCE: derived from this package's React Aria base rather than transcribed
 // from upstream's `bases/base-ui/ui/card.tsx`, which was not available at port time.
 // Diff the class strings against the upstream source before treating this as ported.
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { DivProps } from '../../../lib/types';
 
 export interface CardProps extends DivProps {

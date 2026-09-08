@@ -5,7 +5,7 @@
 // Skeleton is the WORST case for this, and the reason the whole batch is labelled: the Radix
 // base renders `bg-accent` where the React Aria base renders `bg-muted`, so the one token that
 // matters here is known to differ ACROSS bases. Verify against the upstream source.
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { DivProps } from '../../../lib/types';
 
 export function Skeleton({ className, ...props }: DivProps) @{

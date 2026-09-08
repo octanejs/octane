@@ -7,10 +7,9 @@
       "name": "utils",
       "type": "registry:lib",
       "title": "Utils",
-      "description": "The cn() class utility (clsx + tailwind-merge).",
+      "description": "The cn() class utility from the upstream cn package.",
       "dependencies": [
-        "clsx",
-        "tailwind-merge"
+        "cn"
       ],
       "files": [
         {
@@ -64,10 +63,8 @@
       "title": "Accordion",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "@octanejs/lucide@0.1.47"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "files": [
         {
@@ -82,12 +79,12 @@
       "type": "registry:ui",
       "title": "Alert Dialog",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "registryDependencies": [
         "@octane/button",
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -102,11 +99,11 @@
       "type": "registry:ui",
       "title": "Alert",
       "dependencies": [
-        "class-variance-authority"
+        "class-variance-authority",
+        "cn"
       ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -120,9 +117,11 @@
       "name": "aspect-ratio",
       "type": "registry:ui",
       "title": "Aspect Ratio",
+      "dependencies": [
+        "cn"
+      ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -137,10 +136,8 @@
       "type": "registry:ui",
       "title": "Avatar",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "files": [
         {
@@ -155,11 +152,11 @@
       "type": "registry:ui",
       "title": "Badge",
       "dependencies": [
-        "class-variance-authority"
+        "class-variance-authority",
+        "cn"
       ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -174,10 +171,8 @@
       "type": "registry:ui",
       "title": "Breadcrumb",
       "dependencies": [
-        "@octanejs/lucide@0.1.47"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "files": [
         {
@@ -193,10 +188,8 @@
       "title": "Button",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "class-variance-authority",
+        "cn"
       ],
       "files": [
         {
@@ -210,9 +203,11 @@
       "name": "card",
       "type": "registry:ui",
       "title": "Card",
+      "dependencies": [
+        "cn"
+      ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -228,10 +223,8 @@
       "title": "Checkbox",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "@octanejs/lucide@0.1.47"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "files": [
         {
@@ -262,10 +255,8 @@
       "title": "Context Menu",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "@octanejs/lucide@0.1.47"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "files": [
         {
@@ -281,11 +272,11 @@
       "title": "Dialog",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "@octanejs/lucide@0.1.47"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "registryDependencies": [
-        "@octane/button",
-        "@octane/utils"
+        "@octane/button"
       ],
       "files": [
         {
@@ -301,10 +292,8 @@
       "title": "Dropdown Menu",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "@octanejs/lucide@0.1.47"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "files": [
         {
@@ -319,11 +308,11 @@
       "type": "registry:ui",
       "title": "Empty",
       "dependencies": [
-        "class-variance-authority"
+        "class-variance-authority",
+        "cn"
       ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -338,12 +327,12 @@
       "type": "registry:ui",
       "title": "Field",
       "dependencies": [
-        "class-variance-authority"
+        "class-variance-authority",
+        "cn"
       ],
       "registryDependencies": [
         "@octane/label",
-        "@octane/separator",
-        "@octane/utils"
+        "@octane/separator"
       ],
       "files": [
         {
@@ -358,10 +347,8 @@
       "type": "registry:ui",
       "title": "Hover Card",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "files": [
         {
@@ -376,10 +363,8 @@
       "type": "registry:ui",
       "title": "Input",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "files": [
         {
@@ -394,11 +379,11 @@
       "type": "registry:ui",
       "title": "Item",
       "dependencies": [
-        "class-variance-authority"
+        "class-variance-authority",
+        "cn"
       ],
       "registryDependencies": [
-        "@octane/separator",
-        "@octane/utils"
+        "@octane/separator"
       ],
       "files": [
         {
@@ -412,9 +397,11 @@
       "name": "kbd",
       "type": "registry:ui",
       "title": "Kbd",
+      "dependencies": [
+        "cn"
+      ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -428,9 +415,11 @@
       "name": "label",
       "type": "registry:ui",
       "title": "Label",
+      "dependencies": [
+        "cn"
+      ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -446,10 +435,8 @@
       "title": "Menubar",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "@octanejs/lucide@0.1.47"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "files": [
         {
@@ -464,11 +451,11 @@
       "type": "registry:ui",
       "title": "Native Select",
       "dependencies": [
-        "@octanejs/lucide@0.1.47"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -479,15 +466,33 @@
       ]
     },
     {
+      "name": "navigation-menu",
+      "type": "registry:ui",
+      "title": "Navigation Menu",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.51",
+        "@octanejs/lucide@0.1.47",
+        "class-variance-authority",
+        "cn"
+      ],
+      "files": [
+        {
+          "path": "ui/navigation-menu.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/navigation-menu.tsrx"
+        }
+      ]
+    },
+    {
       "name": "pagination",
       "type": "registry:ui",
       "title": "Pagination",
       "dependencies": [
-        "@octanejs/lucide@0.1.47"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "registryDependencies": [
-        "@octane/button",
-        "@octane/utils"
+        "@octane/button"
       ],
       "files": [
         {
@@ -502,10 +507,8 @@
       "type": "registry:ui",
       "title": "Popover",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "files": [
         {
@@ -520,10 +523,8 @@
       "type": "registry:ui",
       "title": "Progress",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "files": [
         {
@@ -539,10 +540,8 @@
       "title": "Radio Group",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "@octanejs/lucide@0.1.47"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "files": [
         {
@@ -553,14 +552,45 @@
       ]
     },
     {
+      "name": "scroll-area",
+      "type": "registry:ui",
+      "title": "Scroll Area",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.51",
+        "cn"
+      ],
+      "files": [
+        {
+          "path": "ui/scroll-area.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/scroll-area.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "select",
+      "type": "registry:ui",
+      "title": "Select",
+      "dependencies": [
+        "@octanejs/base-ui@0.1.51",
+        "@octanejs/lucide@0.1.47",
+        "cn"
+      ],
+      "files": [
+        {
+          "path": "ui/select.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/select.tsrx"
+        }
+      ]
+    },
+    {
       "name": "separator",
       "type": "registry:ui",
       "title": "Separator",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "files": [
         {
@@ -576,11 +606,11 @@
       "title": "Sheet",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "@octanejs/lucide@0.1.47"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "registryDependencies": [
-        "@octane/button",
-        "@octane/utils"
+        "@octane/button"
       ],
       "files": [
         {
@@ -596,7 +626,8 @@
       "title": "Sidebar",
       "dependencies": [
         "@octanejs/lucide@0.1.47",
-        "class-variance-authority"
+        "class-variance-authority",
+        "cn"
       ],
       "registryDependencies": [
         "@octane/button",
@@ -605,8 +636,7 @@
         "@octane/sheet",
         "@octane/skeleton",
         "@octane/tooltip",
-        "@octane/use-mobile",
-        "@octane/utils"
+        "@octane/use-mobile"
       ],
       "files": [
         {
@@ -620,9 +650,11 @@
       "name": "skeleton",
       "type": "registry:ui",
       "title": "Skeleton",
+      "dependencies": [
+        "cn"
+      ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -637,10 +669,8 @@
       "type": "registry:ui",
       "title": "Slider",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "files": [
         {
@@ -655,10 +685,8 @@
       "type": "registry:ui",
       "title": "Spinner",
       "dependencies": [
-        "@octanejs/lucide@0.1.47"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/lucide@0.1.47",
+        "cn"
       ],
       "files": [
         {
@@ -673,10 +701,8 @@
       "type": "registry:ui",
       "title": "Switch",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "files": [
         {
@@ -690,8 +716,8 @@
       "name": "table",
       "type": "registry:ui",
       "title": "Table",
-      "registryDependencies": [
-        "@octane/utils"
+      "dependencies": [
+        "cn"
       ],
       "files": [
         {
@@ -707,10 +733,8 @@
       "title": "Tabs",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "class-variance-authority",
+        "cn"
       ],
       "files": [
         {
@@ -724,9 +748,11 @@
       "name": "textarea",
       "type": "registry:ui",
       "title": "Textarea",
+      "dependencies": [
+        "cn"
+      ],
       "registryDependencies": [
-        "@octane/types",
-        "@octane/utils"
+        "@octane/types"
       ],
       "files": [
         {
@@ -742,11 +768,11 @@
       "title": "Toggle Group",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "class-variance-authority"
+        "class-variance-authority",
+        "cn"
       ],
       "registryDependencies": [
-        "@octane/toggle",
-        "@octane/utils"
+        "@octane/toggle"
       ],
       "files": [
         {
@@ -762,10 +788,8 @@
       "title": "Toggle",
       "dependencies": [
         "@octanejs/base-ui@0.1.51",
-        "class-variance-authority"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "class-variance-authority",
+        "cn"
       ],
       "files": [
         {
@@ -780,10 +804,8 @@
       "type": "registry:ui",
       "title": "Tooltip",
       "dependencies": [
-        "@octanejs/base-ui@0.1.51"
-      ],
-      "registryDependencies": [
-        "@octane/utils"
+        "@octanejs/base-ui@0.1.51",
+        "cn"
       ],
       "files": [
         {

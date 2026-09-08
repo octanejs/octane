@@ -1,4 +1,5 @@
 /** @jsxImportSource octane */
+import { isIOS, isWebKit } from '../utils/platform';
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria/src/dnd/useDrag.ts).
 /*
  * Copyright 2020 Adobe. All rights reserved.
@@ -368,7 +369,7 @@ export function useDrag(options: DragOptions): DragResult {
 				modalityOnPointerDown.current = isVirtualPointerEvent(e) ? 'virtual' : e.pointerType;
 
 				// Try to detect virtual drag passthrough gestures.
-				if (e.width < 1 && e.height < 1) {
+				if (e.width < 1 && e.height < 1 && isIOS() && isWebKit()) {
 					// iOS VoiceOver.
 					modalityOnPointerDown.current = 'virtual';
 				} else {

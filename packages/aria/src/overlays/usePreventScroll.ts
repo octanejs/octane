@@ -8,7 +8,7 @@ import { chain } from '../utils/chain';
 import { getActiveElement, getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { getNonce } from '../utils/getNonce';
 import { getScrollParent } from '../utils/getScrollParent';
-import { isIOS } from '../utils/platform';
+import { isIOS, isWebKit } from '../utils/platform';
 import { isScrollable } from '../utils/isScrollable';
 import { useLayoutEffect } from '../utils/useLayoutEffect';
 import { willOpenKeyboard } from '../utils/keyboard';
@@ -52,8 +52,8 @@ export function usePreventScroll(...args: any[]): void {
 
 			preventScrollCount++;
 			if (preventScrollCount === 1) {
-				if (isIOS()) {
-					restore = preventScrollMobileSafari();
+				if (isIOS() && isWebKit()) {
+					restore = preventScrollMobileWebKit();
 				} else {
 					restore = preventScrollStandard();
 				}
@@ -108,7 +108,7 @@ function preventScrollStandard() {
 // 4. When focus moves to an input, create an off screen input and focus that temporarily. This prevents
 //    Safari from scrolling the page. After a small delay, focus the real input and scroll it into view
 //    ourselves, without scrolling the whole page.
-function preventScrollMobileSafari() {
+function preventScrollMobileWebKit() {
 	// Set overflow hidden so scrollIntoViewport() (useSelectableCollection) sees isScrollPrevented and
 	// scrolls only scroll parents instead of calling native scrollIntoView() which moves the window.
 	let restoreOverflow = setStyle(document.documentElement, 'overflow', 'hidden');

@@ -5,7 +5,7 @@
 // utilities-inlined flavor, matching the Radix base.
 import { Keyboard as KbdPrimitive } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export interface KbdProps extends HostProps<'kbd'> {}

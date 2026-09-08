@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "version": "4.21.0",
+  "commit": "7c9eaba1c0a6404c990c144a654792e3313c650d",
+  "releaseBinding": "npm signed provenance subject for shadcn@4.21.0",
+  "npmIntegrity": "sha512-UU2mFNusW8C5rvadKdH69vERYZqUlOOlXBcf0MYhYLdTGP6DPti7X4qovCu+RTfCqsAgq/T+YfE0Vnttxh9aiw==",
+  "license": {
+    "path": "LICENSE.upstream",
+    "sha256": "1564074e13439397221ffd522e2e504d56561994a23d371aa5e3ad43e4f5423f"
+  },
+  "files": [
+    {
+      "path": "upstream/base/select.tsx",
+      "sha256": "6348d30035b68867d5efffe9b0b1611718226bef9fdeef9554349d6b98252110"
+    },
+    {
+      "path": "upstream/base/navigation-menu.tsx",
+      "sha256": "37074909a349319adc1f90ab122c46730103b5bf752915de27fb10ab25b90f65"
+    },
+    {
+      "path": "upstream/base/scroll-area.tsx",
+      "sha256": "7e49845827447091a6493473779a05ba45cb8302e3703a6f9e4225dd6315cce2"
+    },
+    {
+      "path": "upstream/style-nova.css",
+      "sha256": "5d5751579c015b61e77cf0822862a43ac79f3e6fed236a17624be8e6d1ebea1d"
+    }
+  ],
+  "transforms": [
+    "Apply the pinned CLI createStyleMap/transformStyle to resolve cn-* hooks using style-nova.css.",
+    "Resolve IconPlaceholder to default Lucide icons.",
+    "React references preserve React and @base-ui/react@1.8.0 imports. Octane sources substitute octane and @octanejs/base-ui/@octanejs/lucide and omit the RSC-only directive."
+  ],
+  "scope": "Existing component-family delta is cn imports only; new Base UI wrappers are select, navigation-menu and scroll-area. This is not a full CLI or registry port."
+}

@@ -1,73 +1,73 @@
 # Upstream provenance
 
-The component source baseline is `shadcn-ui/ui` commit
-`4baadbc6517070ae8f8feb2c97037adc2b305544`. The distribution/CLI baseline
-recorded by this port is `shadcn@4.14.1`. These are distinct inputs: the npm
-package is the registry CLI, while component implementations live in the Git
-repository.
+The current registry baseline is `shadcn@4.21.0`, tied by npm's signed build
+provenance to `shadcn-ui/ui@7c9eaba1c0a6404c990c144a654792e3313c650d`.
+The npm package is a CLI; component sources live in `apps/v4/registry/bases`.
+The Octane binding consumes that registry and does not port the CLI itself.
 
 | Input | Location | Integrity |
 | --- | --- | --- |
-| Git source archive | `https://github.com/shadcn-ui/ui/archive/4baadbc6517070ae8f8feb2c97037adc2b305544.tar.gz` | SHA-256 `015a8c4972120e794fa648ef6604fdd0ff94d4748c9308b0cfe147c177b5df4a` |
-| npm tarball | `https://registry.npmjs.org/shadcn/-/shadcn-4.14.1.tgz` | SHA-256 `a264f1be8f1247c755e1186a0b3eba305fb581f04a4bfccf5077ea43a548256d` |
-| npm license | `package/LICENSE.md` | MIT; SHA-256 `1564074e13439397221ffd522e2e504d56561994a23d371aa5e3ad43e4f5423f` |
+| Release sources | [Git commit](https://github.com/shadcn-ui/ui/tree/7c9eaba1c0a6404c990c144a654792e3313c650d) | Commit `7c9eaba1c0a6404c990c144a654792e3313c650d` |
+| npm tarball | [shadcn 4.21.0](https://registry.npmjs.org/shadcn/-/shadcn-4.21.0.tgz) | SHA-256 `21e50e002f243fefc94f4a47cd66c0babf5041f2c69b8be34a18e89c9cf16523` |
+| MIT license | `LICENSE.upstream` | SHA-256 `1564074e13439397221ffd522e2e504d56561994a23d371aa5e3ad43e4f5423f` |
 
-## Upstream artifact inventory
+## Scope of the update
 
-The pinned component registry contains the following executable component
-surfaces. Counts include component modules plus their base-local examples,
-blocks, hooks, libraries, and registry metadata.
+Comparing the prior component pin `4baadbc6517070ae8f8feb2c97037adc2b305544`
+with the release commit shows the existing families changed their class helper
+imports to `cn`. The binding adopts `cn@0.2.6` across all three bases and retains
+its tested adaptations and local styling choices. Its `/cn` entry re-exports
+that helper, preserving the existing import surface.
 
-| Source surface | Archive inventory | Port relationship |
-| --- | ---: | --- |
-| `apps/v4/registry/bases/radix` | 391 files | Primary default component base; partially transcribed/adapted |
-| `apps/v4/registry/bases/aria` | 371 files | React Aria component base; partially transcribed/adapted |
-| `apps/v4/registry/bases/base` | 379 files | Base UI component base; partial port |
-| `apps/v4/registry/new-york-v4/ui` | 63 component files | Historical/default style input and comparison surface |
-| `apps/v4/registry/new-york-v4/examples` | 245 files | Not ported; examples are not runtime package surface |
-| `apps/v4/registry/new-york-v4/blocks` | 159 files | Not ported; site/application blocks are out of package scope |
-| `apps/v4/registry/new-york-v4/charts` | 72 files | Not ported; chart examples are out of package scope |
-| `packages/shadcn/src` | CLI commands, registry, schema, transforms, styles, MCP, presets, templates, and utilities | The Octane package emits a compatible registry but does not port the CLI runtime |
-| `packages/shadcn/test/fixtures` | 287 framework fixture files plus project/config fixtures | Not executed; they validate the upstream CLI rather than component renderer parity |
+Base UI Select, Navigation Menu, and Scroll Area are new wrappers over the merged
+Base UI 1.8.0 binding. Their original sources are preserved in `upstream/base/`,
+alongside the release's `upstream/style-nova.css`. `audit/shadcn-4.21.0.json`
+records their hashes and transformations. The release CLI's style transformer
+resolves Nova utility classes; Lucide resolves the default icon placeholders.
+The React references in `tests/differential/base-upstream/` retain React and the
+real `@base-ui/react@1.8.0` imports. Octane sources substitute the native bindings
+and omit the RSC directive.
 
-The npm tarball contains 27 published files: the CLI entry and chunks, registry,
-schema, preset, icons, MCP, and utility entries and declarations, Tailwind CSS,
-README, package metadata, and MIT license. It contains no React component runtime
-to execute against the Octane port.
+The coverage table tracks 44 existing families, with 43 Base UI wrappers. It is
+not a complete upstream registry inventory. Base UI Sonner and additional
+upstream families such as Combobox remain outside this update. Examples, site
+blocks, questionnaire, and the CLI commands/MCP/schema runtime are also outside
+the binding's component surface.
 
-## Upstream test inventory
+## Evidence and prior lineage
 
-The source archive contains registry tests (`apps/v4/registry/calendar.test.ts`
-and `config.test.ts`) and the CLI package suites under `packages/shadcn/src`:
-command tests, registry resolver/parser/schema/fetcher tests, MCP, migrations,
-preflights, presets, styles, templates, utilities, transformers, updaters, and
-their snapshots/fixtures. Those suites exercise registry and CLI behavior; they
-are inventoried but not treated as React component parity.
+The new same-fixture differential cases compare Select controlled values,
+Navigation Menu links and trigger state, and Scroll Area viewport/scrollbar
+markup against the release's React implementations. Native tests additionally
+exercise Select option selection, form submission and focus restoration,
+Navigation Menu opening and Escape, no-browser-globals SSR, and Select hydration
+adoption. Layout and pointer behavior in a real browser are not certified by
+these DOM tests.
 
-The bounded `shadcn-runtime-differential` lane selects five exact cases from one
-shared fixture and cites these pinned upstream sources at
-`4baadbc6517070ae8f8feb2c97037adc2b305544`:
+The existing five Radix differential cases retain their earlier component pin,
+`4baadbc6517070ae8f8feb2c97037adc2b305544`, previously paired with CLI 4.14.1.
+Dialog and Dropdown Menu use import-path-only references. Badge, Button, and
+Tabs retain documented local class-hook adaptations, and IconPlaceholder is
+resolved to Lucide. These references establish runtime equivalence under that
+lineage; they do not certify every current upstream style. Existing derived Base
+UI styles likewise retain their documented fidelity limits.
 
-| Local React reference | Cited upstream source | Allowed transform |
-| --- | --- | --- |
-| `tests/differential/upstream/badge.tsx` | `apps/v4/registry/bases/radix/ui/badge.tsx` | Port-selected class hooks for the package's default-Tailwind flavor |
-| `tests/differential/upstream/button.tsx` | `apps/v4/registry/bases/radix/ui/button.tsx` | Port-selected class hooks; plain `<button>` host matching the Octane port |
-| `tests/differential/upstream/tabs.tsx` | `apps/v4/registry/bases/radix/ui/tabs.tsx` | Port-selected class hooks; local `utils` import rewrite |
-| `tests/differential/upstream/dialog.tsx` | `apps/v4/registry/bases/radix/ui/dialog.tsx` | Import-path rewrite only |
-| `tests/differential/upstream/dropdown-menu.tsx` | `apps/v4/registry/bases/radix/ui/dropdown-menu.tsx` | Import-path rewrite only |
-| `tests/differential/upstream/icon-placeholder.tsx` | CLI `iconLibrary: "lucide"` resolution | Local lucide-react shim used by vendored references |
+The original artifact hashes remain useful for that lineage: source archive
+SHA-256 `015a8c4972120e794fa648ef6604fdd0ff94d4748c9308b0cfe147c177b5df4a`;
+CLI 4.14.1 tarball SHA-256
+`a264f1be8f1247c755e1186a0b3eba305fb581f04a4bfccf5077ea43a548256d`.
 
-Those local React references are lineage evidence with the transforms above; they
-are not themselves the pinned upstream oracle. The lane proves same-fixture
-React/Octane runtime equivalence under that cited lineage. Structured
-native-input, descriptor-`asChild`, icon-resolution, and Sonner-theme
-divergences remain authenticated by ordinary-shard Octane-only tests and are
-not counted as React-parity evidence. All other local tests are classified as
-Octane framework contracts.
+Native-input, descriptor `asChild`, icon-resolution, and Sonner-theme contracts
+remain ordinary Octane tests, separate from the React differential cases.
 
-## Monitoring
+## Updating
 
-When updating either pin, fetch both artifacts again, record new SHA-256 values,
-reconcile the complete registry/CLI inventories, refresh every vendored reference
-and its manifest hash, then rerun the exact differential lane and the global React
-parity audit.
+Verify the npm release's source commit and MIT license, compare the existing
+component inventory, update pristine references only when their sources change,
+regenerate the registry and coverage table, and rerun the package's interaction,
+differential, SSR, hydration, type, and registry checks. Keep older reference
+lineage explicit when local adaptations are retained.
+
+The release CLI resolves the three new registry entries in a dry run. A full
+external install also succeeds, creating all three wrappers and installing their
+dependencies after the merged Base UI release was published.

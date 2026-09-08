@@ -10,7 +10,7 @@
 import { createElement } from 'octane';
 import { HoverCard as HoverCardPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export function HoverCard(props: Record<string, unknown>) @{
 	<HoverCardPrimitive.Root data-slot="hover-card" {...props} />

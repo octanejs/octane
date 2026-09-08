@@ -3,7 +3,7 @@
 // convention; the module-level warmup/cooldown timers and global tooltip registry are
 // ported verbatim; upstream's explicit useEffect dep arrays are kept verbatim with a
 // trailing subSlot.
-import { useEffect, useMemo, useRef } from 'octane';
+import { useEffect, useMemo, useRef, useState } from 'octane';
 
 import { S, splitSlot, subSlot } from '../../internal';
 import {
@@ -55,6 +55,11 @@ export interface TooltipTriggerState {
 	/** Whether the tooltip is currently showing. */
 	isOpen: boolean;
 	/**
+	 * Whether the tooltip is being shown or hidden without an animation. This is true while the
+	 * global warmup timer is active, i.e. when quickly moving between tooltips.
+	 */
+	shouldSkipAnimation: boolean;
+	/**
 	 * Shows the tooltip. By default, the tooltip becomes visible after a delay
 	 * depending on a global warmup timer. The `immediate` option shows the
 	 * tooltip immediately instead.
@@ -90,6 +95,7 @@ export function useTooltipTriggerState(...args: any[]): TooltipTriggerState {
 
 	let { delay = TOOLTIP_DELAY, closeDelay = TOOLTIP_COOLDOWN } = props;
 	let { isOpen, open, close } = useOverlayTriggerState(props, subSlot(slot, 'overlay'));
+	let [shouldSkipAnimation, setIsInstant] = useState(false, subSlot(slot, 'skipAnimation'));
 	let id = useMemo(() => `${++tooltipId}`, [], subSlot(slot, 'id'));
 	let closeTimeout = useRef<ReturnType<typeof setTimeout> | null>(
 		null,
@@ -104,19 +110,20 @@ export function useTooltipTriggerState(...args: any[]): TooltipTriggerState {
 	let closeOpenTooltips = () => {
 		for (let hideTooltipId in tooltips) {
 			if (hideTooltipId !== id) {
-				tooltips[hideTooltipId](true);
+				tooltips[hideTooltipId](true, true);
 				delete tooltips[hideTooltipId];
 			}
 		}
 	};
 
-	let showTooltip = () => {
+	let showTooltip = (instant?: boolean) => {
 		if (closeTimeout.current) {
 			clearTimeout(closeTimeout.current);
 		}
 		closeTimeout.current = null;
 		closeOpenTooltips();
 		ensureTooltipEntry();
+		setIsInstant(!!instant);
 		globalWarmedUp = true;
 		open();
 		if (globalWarmUpTimeout) {
@@ -129,7 +136,8 @@ export function useTooltipTriggerState(...args: any[]): TooltipTriggerState {
 		}
 	};
 
-	let hideTooltip = (immediate?: boolean) => {
+	let hideTooltip = (immediate?: boolean, instant?: boolean) => {
+		setIsInstant(!!instant);
 		if (immediate || closeDelay <= 0) {
 			if (closeTimeout.current) {
 				clearTimeout(closeTimeout.current);
@@ -173,10 +181,10 @@ export function useTooltipTriggerState(...args: any[]): TooltipTriggerState {
 			globalWarmUpTimeout = setTimeout(() => {
 				globalWarmUpTimeout = null;
 				globalWarmedUp = true;
-				showTooltip();
+				showTooltip(false);
 			}, delay);
 		} else if (!isOpen) {
-			showTooltip();
+			showTooltip(true);
 		}
 	};
 
@@ -206,11 +214,12 @@ export function useTooltipTriggerState(...args: any[]): TooltipTriggerState {
 
 	return {
 		isOpen,
+		shouldSkipAnimation,
 		open: (immediate) => {
 			if (!immediate && delay > 0 && !closeTimeout.current) {
 				warmupTooltip();
 			} else {
-				showTooltip();
+				showTooltip(globalWarmedUp);
 			}
 		},
 		close: hideTooltip,

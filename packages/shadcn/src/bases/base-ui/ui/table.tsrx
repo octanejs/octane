@@ -7,7 +7,7 @@
 // `data-[state=selected]` on the row is written by the CONSUMER — a data-table library setting
 // selection state — not emitted by anything underneath, so unlike checkbox or toggle it is not a
 // Radix-ism that needs translating.
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 // Multi-host family (div/table/thead/tbody/tr/th/td/caption): no single host
 // prop table applies, so the shared alias stays structural.

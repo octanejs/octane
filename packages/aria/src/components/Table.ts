@@ -1308,6 +1308,13 @@ export interface ColumnProps
 	 * `<ResizableTableContainer>`.
 	 */
 	maxWidth?: ColumnStaticSize | null;
+	focusMode?: 'child' | 'cell';
+	/**
+	 * Whether the column should support arrow key navigation even when the containing table uses tab
+	 * keyboard navigation. Allows users to navigate between columns and rows with arrow keys while
+	 * focus is on an interactive child element within the column header.
+	 */
+	allowsArrowNavigation?: boolean;
 }
 
 class TableColumnNode extends CollectionNode<unknown> {
@@ -1337,7 +1344,12 @@ export const Column: (props: ColumnProps & { ref?: any }) => any =
 			let state = useContext(TableStateContext)!;
 			let { isVirtualized } = useContext(CollectionRendererContext);
 			let { columnHeaderProps, isPressed } = useTableColumnHeader(
-				{ node: column as GridNode<unknown>, isVirtualized },
+				{
+					node: column as GridNode<unknown>,
+					isVirtualized,
+					focusMode: props.focusMode,
+					allowsArrowNavigation: props.allowsArrowNavigation,
+				},
 				state,
 				ref,
 				subSlot(slot, 'columnHeader'),
@@ -1500,7 +1512,7 @@ export function ColumnResizer(props: ColumnResizerProps & { ref?: any }): any {
 	let { onResizeStart, onResize, onResizeEnd } = useContext(ResizableTableContainerContext)!;
 	let { column, triggerRef } = useContext(ColumnResizerContext)!;
 	let inputRef = useRef<HTMLInputElement | null>(null, subSlot(slot, 'input'));
-	let { resizerProps, inputProps, isResizing } = useTableColumnResize(
+	let { resizerProps, inputProps, isResizing, isMouseResizing } = useTableColumnResize(
 		{
 			column,
 			'aria-label': props['aria-label'] || stringFormatter.format('tableResizer'),
@@ -1562,17 +1574,6 @@ export function ColumnResizer(props: ColumnResizerProps & { ref?: any }): any {
 		subSlot(slot, 'render'),
 	);
 
-	let [isMouseDown, setMouseDown] = useState(false, subSlot(slot, 'mouseDown'));
-	let onPointerDown = (e: PointerEvent) => {
-		if (e.pointerType === 'mouse') {
-			setMouseDown(true);
-		}
-	};
-
-	if (!isResizing && isMouseDown) {
-		setMouseDown(false);
-	}
-
 	let DOMProps = filterDOMProps(props, { global: true });
 
 	// Positional (non-array) children: the resizer content, the visually hidden input, and
@@ -1582,7 +1583,7 @@ export function ColumnResizer(props: ColumnResizerProps & { ref?: any }): any {
 		{
 			ref: objectRef,
 			role: 'presentation',
-			...mergeProps(DOMProps, renderProps, resizerProps, { onPointerDown }, hoverProps),
+			...mergeProps(DOMProps, renderProps, resizerProps, hoverProps),
 			'data-hovered': isHovered || undefined,
 			'data-focused': isFocused || undefined,
 			'data-focus-visible': isFocusVisible || undefined,
@@ -1591,9 +1592,10 @@ export function ColumnResizer(props: ColumnResizerProps & { ref?: any }): any {
 		},
 		renderProps.children,
 		createElement('input', { ref: inputRef, ...mergeProps(inputProps, focusProps) }),
-		isResizing && isMouseDown
+		isResizing && isMouseResizing
 			? createPortal(
 					createElement('div', {
+						'data-testid': 'cursor-overlay',
 						style: { position: 'fixed', top: 0, left: 0, bottom: 0, right: 0, cursor },
 					}),
 					document.body,
@@ -2250,6 +2252,13 @@ export interface CellProps extends RenderProps<CellRenderProps, 'td' | 'div'>, G
 	textValue?: string;
 	/** Indicates how many columns the data cell spans. */
 	colSpan?: number;
+	focusMode?: 'child' | 'cell';
+	/**
+	 * Whether the cell should support arrow key navigation even when the containing table uses
+	 * tab keyboard navigation. Allows users to navigate between cells and rows with arrow keys while
+	 * focus is on an interactive child element within the cell.
+	 */
+	allowsArrowNavigation?: boolean;
 }
 
 class TableCellNode extends CollectionNode<unknown> {
@@ -2285,6 +2294,8 @@ export const Cell: (props: CellProps & { ref?: any }) => any = /*#__PURE__*/ cre
 		let { gridCellProps, isPressed } = useTableCell(
 			{
 				node: cell,
+				focusMode: props.focusMode,
+				allowsArrowNavigation: props.allowsArrowNavigation,
 				shouldSelectOnPressUp: !!dragState,
 				isVirtualized,
 			},

@@ -5,7 +5,7 @@
 import type { OctaneNode } from 'octane';
 import { ScrollArea as ScrollAreaPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 

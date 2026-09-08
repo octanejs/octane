@@ -7,6 +7,7 @@
 import { ariaHideOutside, keepVisible } from './ariaHideOutside';
 import { AriaPositionProps, PlacementAxis, useOverlayPosition } from './useOverlayPosition';
 import type { RefObject } from '@react-types/shared';
+import { FocusWithinProps, useFocusWithin } from '../interactions/useFocusWithin';
 import { mergeProps } from '../utils/mergeProps';
 import type { OverlayTriggerState } from '../stately/overlays/useOverlayTriggerState';
 import { useEffect } from 'octane';
@@ -19,10 +20,10 @@ import { S, splitSlot, subSlot } from '../internal';
 // handler types along).
 type DOMAttributes = Record<string, any>;
 
-export interface AriaPopoverProps extends Omit<
-	AriaPositionProps,
-	'isOpen' | 'onClose' | 'targetRef' | 'overlayRef'
-> {
+export interface AriaPopoverProps
+	extends
+		Omit<AriaPositionProps, 'isOpen' | 'onClose' | 'targetRef' | 'overlayRef'>,
+		Omit<FocusWithinProps, 'isDisabled'> {
 	/**
 	 * The ref for the element which the popover positions itself with respect to.
 	 */
@@ -133,6 +134,9 @@ export function usePopover(...args: any[]): PopoverAria {
 			overlayRef: popoverRef,
 			isOpen: state.isOpen,
 			onClose: isNonModal && !isSubmenu ? state.close : null,
+			getTargetRect:
+				otherProps.getTargetRect ??
+				(state.point ? () => new DOMRect(state.point!.x, state.point!.y, 0, 0) : undefined),
 		},
 		subSlot(slot, 'position'),
 	);
@@ -160,8 +164,9 @@ export function usePopover(...args: any[]): PopoverAria {
 		subSlot(slot, 'hideOutside'),
 	);
 
+	let { focusWithinProps } = useFocusWithin(props, subSlot(slot, 'focusWithin'));
 	return {
-		popoverProps: mergeProps(overlayProps, positionProps),
+		popoverProps: mergeProps(overlayProps, positionProps, focusWithinProps),
 		arrowProps,
 		underlayProps,
 		placement,

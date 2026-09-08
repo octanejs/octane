@@ -9,7 +9,7 @@
 // `onChange` handlers are passed through unrenamed.
 import { ChevronDownIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export type NativeSelectProps =

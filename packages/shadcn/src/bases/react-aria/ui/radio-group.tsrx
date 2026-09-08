@@ -13,7 +13,7 @@ import {
 	type RadioProps,
 } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export function RadioGroup({ className, ...props }: RadioGroupProps) {
 	return <RadioGroupPrimitive

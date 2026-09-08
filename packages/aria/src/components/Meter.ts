@@ -65,6 +65,8 @@ export function Meter(props: MeterProps): any {
 	let { value = 0, minValue = 0, maxValue = 100 } = props;
 	value = clamp(value, minValue, maxValue);
 
+	let range = maxValue - minValue;
+
 	let [labelRef, label] = useSlot(
 		!props['aria-label'] && !props['aria-labelledby'],
 		subSlot(slot, 'labelSlot'),
@@ -72,7 +74,7 @@ export function Meter(props: MeterProps): any {
 	let { meterProps, labelProps } = useMeter({ ...props, label }, subSlot(slot, 'meter'));
 
 	// Calculate the width of the progress bar as a percentage
-	let percentage = ((value - minValue) / (maxValue - minValue)) * 100;
+	let percentage = range === 0 ? 0 : ((value - minValue) / range) * 100;
 
 	let renderProps = useRenderProps(
 		{

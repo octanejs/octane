@@ -8,7 +8,7 @@ import { createElement, type OctaneNode } from 'octane';
 import { Dialog as SheetPrimitive } from '@octanejs/radix';
 import { XIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { Button } from './button.tsrx';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;

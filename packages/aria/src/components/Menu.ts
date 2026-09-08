@@ -145,6 +145,7 @@ export function MenuTrigger(props: MenuTriggerProps): any {
 					triggerRef: ref,
 					scrollRef,
 					placement: 'bottom start',
+					offset: props.trigger === 'contextMenu' ? 0 : undefined,
 					'aria-labelledby': (menuProps as any)['aria-labelledby'],
 				},
 			],

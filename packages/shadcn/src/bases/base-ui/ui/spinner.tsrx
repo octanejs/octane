@@ -13,7 +13,7 @@
 // describe them.
 import { Loader2Icon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface SpinnerProps extends Record<string, unknown> {
 	className?: string;

@@ -6,7 +6,7 @@
 // @octanejs/lucide. Other icon libraries are a registry-emit concern.
 import { Loader2Icon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface SpinnerProps extends Record<string, unknown> {
 	className?: string;

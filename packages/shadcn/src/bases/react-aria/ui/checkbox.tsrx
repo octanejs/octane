@@ -11,7 +11,7 @@ import {
 	type CheckboxRenderProps,
 } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { CheckIcon } from '@octanejs/lucide';
 
 export function Checkbox({ className, children, ...props }: CheckboxProps) {

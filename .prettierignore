@@ -189,3 +189,10 @@ dist-redact
 # Pristine Vitest caches
 packages/*/.vite-pristine/
 
+
+# Immutable shadcn sources and React references.
+packages/shadcn/upstream/
+packages/shadcn/tests/differential/base-upstream/
+
+# Immutable React Stately 3.49 source and tests.
+packages/aria/upstream/

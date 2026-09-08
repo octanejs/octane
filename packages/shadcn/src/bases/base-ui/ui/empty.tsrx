@@ -5,7 +5,7 @@
 // Diff the class strings against the upstream source before treating this as ported.
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { DivProps, HostProps } from '../../../lib/types';
 
 export function Empty({ className, ...props }: DivProps) @{

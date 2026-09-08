@@ -13,14 +13,14 @@ const exports = crosswalk.entryPoints.flatMap((entry) =>
 );
 const artifacts = crosswalk.upstreamArtifacts.map(([path]) => path);
 
-if (crosswalk.provenance.commit !== '1c84a49a1faf50b571c84e00bcf9c60b22ddd03e') {
+if (crosswalk.provenance.commit !== '5ecb3333001313e83898cd07644227897e3bae1f') {
 	throw new Error('crosswalk does not target the pinned React Spectrum commit');
 }
-if (exports.length !== 1294 || new Set(exports).size !== exports.length) {
-	throw new Error('crosswalk must classify 1,294 unique entry-point exports');
+if (exports.length !== 1340 || new Set(exports).size !== exports.length) {
+	throw new Error('crosswalk must classify 1,340 unique entry-point exports');
 }
-if (artifacts.length !== 185 || new Set(artifacts).size !== artifacts.length) {
-	throw new Error('crosswalk must classify 185 unique upstream test artifacts');
+if (artifacts.length !== 198 || new Set(artifacts).size !== artifacts.length) {
+	throw new Error('crosswalk must classify 198 unique upstream test artifacts');
 }
 if (crosswalk.entryPoints.some((entry) => entry.exports.some((item) => item.length !== 4))) {
 	throw new Error('every upstream export requires disposition-specific evidence');
@@ -42,7 +42,7 @@ for (const entry of crosswalk.entryPoints) {
 }
 if (
 	crosswalk.upstreamArtifacts.some(
-		(entry) => !['not-adapted', 'not-vendored-support'].includes(entry[2]),
+		(entry) => !['not-adapted', 'not-vendored-support', 'adapted-token-value'].includes(entry[2]),
 	)
 ) {
 	throw new Error('every upstream test artifact requires a supported disposition');

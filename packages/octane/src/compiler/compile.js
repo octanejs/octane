@@ -20563,15 +20563,14 @@ function headElementArgNodes(node, index, ctx) {
 	];
 }
 
-// A Float style resource ships its authored CSS verbatim-by-meaning: the parsed
-// StyleSheet re-renders WITHOUT the scoping pipeline (no analyze/prepare), so
-// selectors and rules come out unscoped. Serialization normalizes whitespace,
-// which is invisible to the resource contract (identity is the href).
+// Float resources contain global CSS. Preserve the parser's CSS source rather
+// than sending it through the scoped stylesheet renderer, which prunes unused
+// selectors and renames keyframes even without the scoping analysis pass.
 /** @param {any} el @returns {any} */
 function styleResourceCssExpression(el) {
 	const sheet = (el.children || []).find((c) => c && c.type === 'StyleSheet');
 	if (!sheet) return b.literal('');
-	const css = renderStylesheets([cloneAstNode(sheet)]);
+	const css = sheet.source;
 	return b.literal(css, JSON.stringify(css), el);
 }
 

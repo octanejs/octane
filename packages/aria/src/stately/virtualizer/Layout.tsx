@@ -1,4 +1,5 @@
 /** @jsxImportSource octane */
+import type { ScrollAnchorInfo } from './ScrollAnchor';
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-stately/src/virtualizer/Layout.ts).
 /*
  * Copyright 2020 Adobe. All rights reserved.
@@ -33,6 +34,7 @@ import { Virtualizer } from './Virtualizer';
 export abstract class Layout<T extends object = Node<any>, O = any> implements LayoutDelegate {
 	/** The Virtualizer the layout is currently attached to. */
 	virtualizer: Virtualizer<T, any> | null = null;
+	UNSTABLE_getScrollAnchorInfo?(options?: O): ScrollAnchorInfo | null;
 
 	/**
 	 * Returns an array of `LayoutInfo` objects which are inside the given rectangle.

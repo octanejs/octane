@@ -9,7 +9,7 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(PACKAGE_ROOT, '../..');
 const upstreamRoot = resolve(process.argv[2] ?? '');
 const output = resolve(process.argv[3] ?? join(PACKAGE_ROOT, 'audit/upstream-crosswalk.json'));
-const PINNED_COMMIT = '1c84a49a1faf50b571c84e00bcf9c60b22ddd03e';
+const PINNED_COMMIT = '5ecb3333001313e83898cd07644227897e3bae1f';
 
 if (!process.argv[2]) {
 	throw new Error(
@@ -20,19 +20,19 @@ if (!process.argv[2]) {
 const entryPoints = [
 	{
 		package: 'react-aria',
-		version: '3.50.0',
+		version: '3.51.0',
 		upstreamPath: 'packages/react-aria/exports/index.ts',
 		octanePath: 'packages/aria/src/index.ts',
 	},
 	{
 		package: 'react-aria-components',
-		version: '1.19.0',
+		version: '1.20.0',
 		upstreamPath: 'packages/react-aria-components/exports/index.ts',
 		octanePath: 'packages/aria/src/components/index.ts',
 	},
 	{
 		package: 'react-stately',
-		version: '3.48.0',
+		version: '3.49.0',
 		upstreamPath: 'packages/react-stately/exports/index.ts',
 		octanePath: 'packages/aria/src/stately/index.ts',
 	},
@@ -85,7 +85,15 @@ const upstreamArtifacts = entryPoints
 				: /\.test\.(?:js|jsx|ts|tsx)$/.test(path)
 					? 'runtime-test'
 					: 'support';
-			return [path, kind, kind === 'support' ? 'not-vendored-support' : 'not-adapted'];
+			return [
+				path,
+				kind,
+				path === 'packages/react-stately/test/tokenfield/TokenFieldValue.test.ts'
+					? 'adapted-token-value'
+					: kind === 'support'
+						? 'not-vendored-support'
+						: 'not-adapted',
+			];
 		});
 	})
 	.sort((a, b) => a[0].localeCompare(b[0]));
@@ -96,13 +104,15 @@ const result = {
 	provenance: {
 		repository: 'https://github.com/adobe/react-spectrum.git',
 		commit: PINNED_COMMIT,
-		tags: ['react-aria@3.50.0', 'react-aria-components@1.19.0', 'react-stately@3.48.0'],
+		tags: ['react-aria@3.51.0', 'react-aria-components@1.20.0', 'react-stately@3.49.0'],
 	},
 	entryPoints: mappedEntryPoints,
 	artifactEvidence: {
 		'not-adapted':
 			'The canonical suite is present but is not adapted case-by-case; representative same-fixture behavior is bounded by the differential lanes.',
 		'not-vendored-support': 'Support bytes remain in the immutable external checkout.',
+		'adapted-token-value':
+			'All 96 TokenFieldValue cases run in aria-token-value-pristine and aria-token-value-adapted; inventories and source hashes are recorded in audit/react-parity.json.',
 	},
 	upstreamArtifacts,
 	summary: {

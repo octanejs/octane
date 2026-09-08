@@ -14,7 +14,7 @@
 // exactly this reason. The non-conditional utilities stay in step with the other bases.
 import { Separator as SeparatorPrimitive } from '@octanejs/base-ui/separator';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface SeparatorProps extends Record<string, unknown> {
 	className?: string;

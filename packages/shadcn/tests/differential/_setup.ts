@@ -1,7 +1,7 @@
 /**
- * Vitest globalSetup for the `shadcn` project — the shadcn analogue of radix's
+ * Vitest globalSetup for the shadcn projects — the shadcn analogue of radix's
  * differential precompile. Runs ONCE in pure Node before any test loads and fills
- * THIS package's `.react-cache` with the React side of the differential rig:
+ * each project's subdirectory in `.react-cache` with the React side of the rig:
  *
  *   1. The vendored pinned upstream sources (`tests/differential/upstream/…`,
  *      real React TSX from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544)
@@ -23,18 +23,24 @@ import { transformSync as esbuildTransformSync } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { TestProject } from 'vitest/node';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const FIXTURE_DIR = join(__dirname, '../_fixtures');
 const UPSTREAM_DIR = join(__dirname, 'upstream');
-const CACHE_DIR = join(__dirname, '.react-cache');
+const CACHE_ROOT = join(__dirname, '.react-cache');
 const UPSTREAM_SUBPATHS: Record<string, string> = {
 	Badge: 'badge',
 	Button: 'button',
 	Dialog: 'dialog',
 	DropdownMenu: 'dropdown-menu',
 	Tabs: 'tabs',
+};
+const BASE_UPSTREAM_SUBPATHS: Record<string, string> = {
+	Select: 'select',
+	NavigationMenu: 'navigation-menu',
+	ScrollArea: 'scroll-area',
 };
 
 // Must match the hash in octane's `_rig.ts` so the slug+hash file names line up.
@@ -52,8 +58,8 @@ function hashString(s: string): string {
  * class-variance-authority, clsx, tailwind-merge — resolve from this package's
  * node_modules).
  */
-function compileUpstream(name: string, ext: '.ts' | '.tsx'): void {
-	const srcPath = join(UPSTREAM_DIR, `${name}${ext}`);
+function compileUpstream(cacheDir: string, name: string, ext: '.ts' | '.tsx', base = false): void {
+	const srcPath = join(base ? join(__dirname, 'base-upstream') : UPSTREAM_DIR, `${name}${ext}`);
 	const source = readFileSync(srcPath, 'utf8');
 	const transformed = esbuildTransformSync(source, {
 		loader: 'tsx',
@@ -67,10 +73,10 @@ function compileUpstream(name: string, ext: '.ts' | '.tsx'): void {
 		/from\s*["']\.\/([\w-]+)["']/g,
 		'from "./upstream-$1.js"',
 	);
-	writeFileSync(join(CACHE_DIR, `upstream-${name}.js`), rewritten);
+	writeFileSync(join(cacheDir, `${base ? 'base' : 'upstream'}-${name}.js`), rewritten);
 }
 
-function compileFixture(srcPath: string): void {
+function compileFixture(cacheDir: string, srcPath: string): void {
 	const source = readFileSync(srcPath, 'utf8');
 	const compiled = compileToReact(source, srcPath);
 	if (compiled.errors && compiled.errors.length > 0) {
@@ -92,6 +98,11 @@ function compileFixture(srcPath: string): void {
 	// Dialog/Menu/Tabs graphs. Relative source imports still use the aggregate
 	// barrel as a fallback for any future multi-component fixture.
 	const rewritten = transformed.code
+		.replace(/from\s*["']@octanejs\/shadcn\/base-ui\/(\w+)["']/g, (specifier, subpath) => {
+			const name = BASE_UPSTREAM_SUBPATHS[subpath];
+			if (!name) throw new Error(`No pinned Base UI reference for ${subpath}`);
+			return `from "./base-${name}.js"`;
+		})
 		.replace(/from\s*["']@octanejs\/shadcn\/([\w-]+)["']/g, (_match, subpath: string) => {
 			const moduleName = UPSTREAM_SUBPATHS[subpath] ?? 'index';
 			return `from "./upstream-${moduleName}.js"`;
@@ -103,7 +114,7 @@ function compileFixture(srcPath: string): void {
 		)
 		.replace(/from\s*["']octane["']/g, 'from "react"');
 	const slug = basename(srcPath).replace(/\.tsrx$/, '');
-	const outFile = join(CACHE_DIR, `${slug}-${hashString(srcPath)}.js`);
+	const outFile = join(cacheDir, `${slug}-${hashString(srcPath)}.js`);
 	writeFileSync(outFile, rewritten);
 }
 
@@ -117,19 +128,28 @@ function walk(directory: string): string[] {
 	return files;
 }
 
-export async function setup(): Promise<void> {
-	rmSync(CACHE_DIR, { recursive: true, force: true });
-	mkdirSync(CACHE_DIR, { recursive: true });
-	compileUpstream('utils', '.ts');
-	compileUpstream('icon-placeholder', '.tsx');
-	compileUpstream('badge', '.tsx');
-	compileUpstream('button', '.tsx');
-	compileUpstream('tabs', '.tsx');
-	compileUpstream('dialog', '.tsx');
-	compileUpstream('dropdown-menu', '.tsx');
-	compileUpstream('index', '.ts');
+export async function setup(project: TestProject): Promise<void> {
+	const families: Record<string, string> = {
+		'shadcn-differential': 'radix',
+		'shadcn-base-ui-differential': 'base-ui',
+	};
+	const family = families[project.name];
+	if (!family) throw new Error(`Unknown shadcn differential project: ${project.name}`);
+	const cacheDir = join(CACHE_ROOT, family);
+	rmSync(cacheDir, { recursive: true, force: true });
+	mkdirSync(cacheDir, { recursive: true });
+	compileUpstream(cacheDir, 'utils', '.ts');
+	compileUpstream(cacheDir, 'icon-placeholder', '.tsx');
+	compileUpstream(cacheDir, 'badge', '.tsx');
+	compileUpstream(cacheDir, 'button', '.tsx');
+	compileUpstream(cacheDir, 'tabs', '.tsx');
+	compileUpstream(cacheDir, 'dialog', '.tsx');
+	compileUpstream(cacheDir, 'dropdown-menu', '.tsx');
+	compileUpstream(cacheDir, 'index', '.ts');
+	for (const name of Object.values(BASE_UPSTREAM_SUBPATHS))
+		compileUpstream(cacheDir, name, '.tsx', true);
 	for (const fixturePath of walk(join(FIXTURE_DIR, 'shadcn-diff'))) {
-		compileFixture(fixturePath);
+		compileFixture(cacheDir, fixturePath);
 	}
 }
 

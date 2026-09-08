@@ -2,7 +2,7 @@
 // apps/v4/registry/bases/radix/ui/table.tsx (the `"use client"` directive is
 // dropped — octane has no RSC axis). Table renders inside the upstream
 // table-container wrapper div.
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 // Multi-host family (div/table/thead/tbody/tr/th/td/caption): no single host
 // prop table applies, so the shared alias stays structural.

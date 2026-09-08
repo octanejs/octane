@@ -38,6 +38,13 @@ export interface AriaTableColumnHeaderProps<T> {
 	 * virtual scroller.
 	 */
 	isVirtualized?: boolean;
+	focusMode?: 'child' | 'cell';
+	/**
+	 * Whether the column header should support arrow key navigation even when the containing table
+	 * uses tab keyboard navigation. Allows users to navigate between columns with arrow keys while
+	 * focus is on an interactive child element within the cell.
+	 */
+	allowsArrowNavigation?: boolean;
 }
 
 export interface TableColumnHeaderAria {
@@ -77,7 +84,7 @@ export function useTableColumnHeader(...args: any[]): TableColumnHeaderAria {
 	let allowsSorting = node.props.allowsSorting;
 	// if there are no focusable children, the column header will focus the cell
 	let { gridCellProps } = useGridCell(
-		{ ...props, focusMode: 'child' },
+		{ focusMode: 'child', ...props },
 		state,
 		ref,
 		subSlot(slot, 'gridCell'),

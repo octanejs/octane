@@ -10,7 +10,7 @@
 import { createElement, type OctaneNode } from 'octane';
 import { Tooltip as TooltipPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface TooltipProviderProps extends Record<string, unknown> {
 	delayDuration?: number;

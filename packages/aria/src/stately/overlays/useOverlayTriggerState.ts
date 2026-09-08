@@ -2,7 +2,7 @@
 // octane adaptations: public-hook slot threading (splitSlot/subSlot) per the binding
 // convention; the public value-level `onOpenChange` callback is unchanged (the onInput
 // rule applies only to DOM wiring); explicit dependency arrays are kept verbatim.
-import { useCallback } from 'octane';
+import { useCallback, useState } from 'octane';
 
 import { S, splitSlot, subSlot } from '../../internal';
 import { useControlledState } from '../utils/useControlledState';
@@ -16,6 +16,11 @@ export interface OverlayTriggerProps {
 	onOpenChange?: (isOpen: boolean) => void;
 }
 
+interface Point {
+	x: number;
+	y: number;
+}
+
 export interface OverlayTriggerState {
 	/** Whether the overlay is currently open. */
 	readonly isOpen: boolean;
@@ -27,6 +32,9 @@ export interface OverlayTriggerState {
 	close(): void;
 	/** Toggles the overlay's visibility. */
 	toggle(): void;
+	readonly point: Point | null;
+	/** Sets the cursor position relative to the window viewport. */
+	setPoint(point: Point): void;
 }
 
 /**
@@ -51,6 +59,7 @@ export function useOverlayTriggerState(...args: any[]): OverlayTriggerState {
 		subSlot(slot, 'open'),
 	);
 
+	let [point, setPoint] = useState<Point | null>(null, subSlot(slot, 'point'));
 	const open = useCallback(
 		() => {
 			setOpen(true);
@@ -81,5 +90,7 @@ export function useOverlayTriggerState(...args: any[]): OverlayTriggerState {
 		open,
 		close,
 		toggle,
+		point,
+		setPoint,
 	};
 }

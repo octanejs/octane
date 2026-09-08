@@ -639,6 +639,36 @@ function extractCoffeeScriptTestCases(source, file) {
 	return cases;
 }
 
+function directRegistrarAliases(source) {
+	const file = ts.createSourceFile(
+		'aliases.tsx',
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX,
+	);
+	const aliases = new Map();
+	const isRegistrar = (node) =>
+		(ts.isIdentifier(node) && DIRECT_REGISTRARS.has(node.text)) ||
+		(ts.isPropertyAccessExpression(node) &&
+			['skip', 'only', 'todo'].includes(node.name.text) &&
+			isRegistrar(node.expression)) ||
+		(ts.isConditionalExpression(node) && isRegistrar(node.whenTrue) && isRegistrar(node.whenFalse));
+	const visit = (node) => {
+		if (
+			ts.isVariableDeclaration(node) &&
+			ts.isIdentifier(node.name) &&
+			node.initializer &&
+			isRegistrar(node.initializer)
+		) {
+			aliases.set(node.name.text, node.initializer.getText(file));
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(file);
+	return aliases;
+}
+
 export function extractTestCases(
 	source,
 	{ file = '<unknown>', helperExpansions = DEFAULT_HELPER_EXPANSIONS } = {},
@@ -650,6 +680,7 @@ export function extractTestCases(
 	const describeContexts = describeEachContexts(source, tokens, pairs, staticCounts);
 	const loops = loopContexts(source, tokens, pairs, staticCounts);
 	const nodeSubtestOffsets = nodeSubtestRegistrarOffsets(source, file);
+	const aliases = directRegistrarAliases(source);
 	const cases = [];
 	const occurrences = new Map();
 	for (let index = 0; index < tokens.length; index++) {
@@ -659,7 +690,7 @@ export function extractTestCases(
 			(NAMESPACED_DIRECT_REGISTRARS.has(name) || nodeSubtestOffsets.has(token.start)) &&
 			tokens[index - 1]?.value === '.' &&
 			tokens[index - 2]?.type === 'identifier';
-		const isDirect = DIRECT_REGISTRARS.has(name) || isNamespacedDirect;
+		const isDirect = DIRECT_REGISTRARS.has(name) || isNamespacedDirect || aliases.has(name);
 		const isGated = GATED_REGISTRARS.has(name);
 		const helper = Object.hasOwn(helperExpansions, name) ? helperExpansions[name] : undefined;
 		if (!isDirect && !isGated && !helper) continue;
@@ -723,7 +754,9 @@ export function extractTestCases(
 			? { kind: 'runtime', expression: dynamicGate }
 			: conditionalGate
 				? { kind: 'runtime', expression: conditionalGate }
-				: pragmaGate(source, comments, token.start);
+				: aliases.has(name)
+					? { kind: 'runtime', expression: aliases.get(name) }
+					: pragmaGate(source, comments, token.start);
 		const snippetEnd = Math.min(tokens[close].end, token.start + 320);
 		const declarationId = makeCaseId(file, name, identity, occurrence);
 		const rowVariants = parsed.each?.rows?.map((row, rowIndex) => ({
@@ -867,6 +900,7 @@ export function findPossibleUnexpandedRegistrars(source) {
 		...NAMESPACED_DIRECT_REGISTRARS,
 		...GATED_REGISTRARS,
 		...Object.keys(DEFAULT_HELPER_EXPANSIONS),
+		...directRegistrarAliases(source).keys(),
 	]);
 	const possible = new Map();
 	const sourceFile = ts.createSourceFile(
@@ -877,6 +911,18 @@ export function findPossibleUnexpandedRegistrars(source) {
 		ts.ScriptKind.TSX,
 	);
 	const visit = (node) => {
+		// Calls inside an existing test callback execute the test, rather than
+		// declaring cases (for example testSSR(file, source, assertions)).
+		if (
+			(ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
+			ts.isCallExpression(node.parent)
+		) {
+			let callee = node.parent.expression;
+			while (ts.isCallExpression(callee) || ts.isPropertyAccessExpression(callee)) {
+				callee = callee.expression;
+			}
+			if (ts.isIdentifier(callee) && DIRECT_REGISTRARS.has(callee.text)) return;
+		}
 		if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
 			const name = node.expression.text;
 			if (/^(?:it|test)[A-Z][A-Za-z0-9_$]*$/.test(name) && !known.has(name)) {

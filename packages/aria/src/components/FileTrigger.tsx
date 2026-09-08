@@ -84,6 +84,7 @@ export const FileTrigger = forwardRef(function FileTrigger(
 				className=""
 				type="file"
 				ref={inputRef}
+				onClick={(e: MouseEvent) => e.stopPropagation()}
 				style={{ display: 'none' }}
 				accept={acceptedFileTypes?.toString()}
 				onChange={(e: React.ChangeEvent<HTMLInputElement>) => onSelect?.(e.currentTarget.files)}

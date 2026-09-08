@@ -1222,7 +1222,15 @@ function shouldPreventDefaultUp(target: Element) {
 }
 
 function shouldPreventDefaultKeyboard(target: Element, key: string) {
+	if (isMac() && key === 'Enter') {
+		return false;
+	}
+
 	if (target instanceof HTMLInputElement) {
+		if (key === 'Enter' && (target.type === 'checkbox' || target.type === 'radio')) {
+			// Enter on a checkbox or radio should do an implicit form submission, but not toggle the input.
+			return false;
+		}
 		return !isValidInputKey(target, key);
 	}
 

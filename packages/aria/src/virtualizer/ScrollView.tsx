@@ -1,4 +1,5 @@
 /** @jsxImportSource octane */
+import { addEvent, getOwnerDocument } from '../utils/domHelpers';
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria/src/virtualizer/ScrollView.tsx).
 /*
  * Copyright 2020 Adobe. All rights reserved.
@@ -14,7 +15,11 @@
 
 // @ts-ignore
 import { flushSync } from 'octane';
-import { getEventTarget, nodeContains } from '../utils/shadowdom/DOMFunctions';
+import {
+	getEventTarget,
+	getPropagationTargets,
+	nodeContains,
+} from '../utils/shadowdom/DOMFunctions';
 import { getScrollLeft } from './utils';
 import { Point, Rect, Size } from '../upstream-exports/react-stately/useVirtualizerState';
 import React, {
@@ -221,9 +226,13 @@ export function useScrollView(
 
 	// Attach a document-level capturing scroll listener so we can account for scrollable ancestors.
 	useEffect(() => {
-		document.addEventListener('scroll', onScroll, true);
-		return () => document.removeEventListener('scroll', onScroll, true);
-	}, [onScroll]);
+		return addEvent(
+			getPropagationTargets(ref.current, getOwnerDocument(ref.current)),
+			'scroll',
+			onScroll,
+			true,
+		);
+	}, [onScroll, ref]);
 
 	useEffect(() => {
 		return () => {
