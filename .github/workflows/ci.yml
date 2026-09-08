@@ -1079,9 +1079,10 @@ jobs:
           test "$(git -C "$THREE_CURRENT_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
           test "$(git -C "$THREE_MINIMUM_WORKSPACE" rev-parse --git-dir)" != "$(git -C "$THREE_CURRENT_WORKSPACE" rev-parse --git-dir)"
 
-      # Keep the r172 differential oracle immutable. Each lane replaces only
-      # the Three runtime/type pair, then selects the Octane-owned compatibility
-      # suite so current/minimum support cannot be faked by the pinned oracle.
+      # Keep the r172 differential oracle immutable. The minimum lane uses its
+      # matching runtime/type pair; the current lane checks the newest published
+      # matching pair and tests the latest runtime even when its types lag.
+      # Both select the Octane-owned compatibility suite.
       - name: Test Three compatibility (minimum r156)
         working-directory: ${{ runner.temp }}/octane-three-compat-minimum-r156
         env:
@@ -1111,16 +1112,24 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           THREE_VERSION="$(pnpm view "three@$THREE_VERSION_SPEC" version)"
-          THREE_RELEASE_LINE="${THREE_VERSION%.*}"
-          pnpm --filter @octanejs/three add --save-dev --lockfile=false "three@$THREE_VERSION" "@types/three@${THREE_RELEASE_LINE}.x"
-          RESOLVED_THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
-          TYPES_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/@types/three/package.json').version)")"
+          TYPES_VERSION="$(pnpm view @types/three@latest version)"
           TYPES_RELEASE_LINE="${TYPES_VERSION%.*}"
-          echo "three=$RESOLVED_THREE_VERSION @types/three=$TYPES_VERSION"
-          test "$RESOLVED_THREE_VERSION" = "$THREE_VERSION"
-          test "$THREE_RELEASE_LINE" = "$TYPES_RELEASE_LINE"
+          pnpm --filter @octanejs/three add --save-dev --lockfile=false "three@${TYPES_RELEASE_LINE}.x" "@types/three@$TYPES_VERSION"
+          TYPED_THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
+          RESOLVED_TYPES_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/@types/three/package.json').version)")"
+          echo "typed pair: three=$TYPED_THREE_VERSION @types/three=$RESOLVED_TYPES_VERSION"
+          test "${TYPED_THREE_VERSION%.*}" = "$TYPES_RELEASE_LINE"
+          test "$RESOLVED_TYPES_VERSION" = "$TYPES_VERSION"
           pnpm exec tsgo --noEmit -p packages/three/tsconfig.json
           pnpm exec tsc --noEmit -p packages/three/typetests/tsconfig.json
+          OCTANE_THREE_COMPAT_VERSION="$TYPED_THREE_VERSION" pnpm --dir packages/three test:compat
+
+          pnpm --filter @octanejs/three add --save-dev --lockfile=false "three@$THREE_VERSION"
+          RESOLVED_THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
+          RESOLVED_TYPES_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/@types/three/package.json').version)")"
+          echo "latest runtime: three=$RESOLVED_THREE_VERSION @types/three=$RESOLVED_TYPES_VERSION"
+          test "$RESOLVED_THREE_VERSION" = "$THREE_VERSION"
+          test "$RESOLVED_TYPES_VERSION" = "$TYPES_VERSION"
           OCTANE_THREE_COMPAT_VERSION="$THREE_VERSION" pnpm --dir packages/three test:compat
 
   lynx_compat:

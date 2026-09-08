@@ -104,6 +104,69 @@ describe('ViewTransition server output', () => {
 		expect(html).not.toContain('vt-exit=');
 	});
 
+	it('keeps ordinary Suspense arm markup in buffered and streamed output', async () => {
+		const mod = evalServer(
+			`
+				import { use } from 'octane';
+				export function Content() @{
+					@try { <x-arm id="content" title="ordinary">{'ready'}</x-arm> }
+					@pending { <i>{'waiting'}</i> }
+				}
+				export function Pending(props) @{
+					@try { <span id="settled" title="ordinary">{use(props.promise) as string}</span> }
+					@pending { <x-arm id="fallback" data-phase="waiting">{'waiting'}</x-arm> }
+				}
+			`,
+			'ordinary-suspense-arms.tsrx',
+		);
+		const content = document.createElement('div');
+		content.innerHTML = ServerRuntime.renderToString(mod.Content).html;
+		const contentArm = content.querySelector('#content')!;
+		expect(contentArm.getAttribute('title')).toBe('ordinary');
+		expect(contentArm.textContent).toBe('ready');
+
+		const fallback = document.createElement('div');
+		fallback.innerHTML = ServerRuntime.renderToString(mod.Pending, {
+			promise: new Promise<string>(() => {}),
+		}).html;
+		const fallbackArm = fallback.querySelector('#fallback')!;
+		expect(fallbackArm.getAttribute('data-phase')).toBe('waiting');
+		expect(fallbackArm.textContent).toBe('waiting');
+
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const chunks: string[] = [];
+		let finish!: () => void;
+		const ended = new Promise<void>((done) => {
+			finish = done;
+		});
+		ServerRuntime.renderToPipeableStream(mod.Pending, { promise }).pipe({
+			write: (chunk: string) => chunks.push(chunk),
+			end: finish,
+		});
+		const shell = document.createElement('div');
+		shell.innerHTML = chunks.join('');
+		const shellFallback = shell.querySelector('#fallback')!;
+		expect(shellFallback.getAttribute('data-phase')).toBe('waiting');
+		expect(shellFallback.textContent).toBe('waiting');
+		resolve('streamed');
+		await ended;
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		try {
+			container.innerHTML = chunks.join('');
+			activateStreamedMarkup(container);
+			const settled = container.querySelector('#settled')!;
+			expect(settled.getAttribute('title')).toBe('ordinary');
+			expect(settled.textContent).toBe('streamed');
+		} finally {
+			container.remove();
+			resetStreamRuntimeGlobals();
+		}
+	});
+
 	it('annotates and claims the first visible element past quoted tag delimiters', () => {
 		const mod = evalServer(
 			`

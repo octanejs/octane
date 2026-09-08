@@ -4383,6 +4383,7 @@ function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
  * claims nothing — that is exactly React's "top of the arm only" rule.
  */
 function vtSsrClaimArm(html: string, kind: 'enter' | 'exit'): string {
+	if (!VT_SSR_HAS_CANDIDATES) return html;
 	const start = vtSsrFirstVisibleOpenTag(html);
 	if (start === -1) return html;
 	const end = vtSsrOpenTagEnd(html, start + 1);
