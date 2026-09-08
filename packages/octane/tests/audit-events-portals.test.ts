@@ -103,6 +103,33 @@ describe('audit event and portal behavior', () => {
 		}
 	});
 
+	it('preserves callback arguments during a synchronous event update', () => {
+		const { App } = fixture(
+			`export function App({report, update, label}) @{ <div onClick={() => report(label, 'parent', 'third')}><button onClickCapture={() => report()} onClick={() => update(label, 'child')}>go</button></div> }`,
+		);
+		const calls: unknown[][] = [];
+		let r: ReturnType<typeof mount>;
+		const report = (...args: unknown[]) => calls.push(args);
+		const nextReport = (...args: unknown[]) => calls.push(['next', ...args]);
+		const update = (...args: unknown[]) => {
+			calls.push(args);
+			r.update(App, { report: nextReport, update, label: 'new' });
+		};
+		r = mount(App, { report, update, label: 'old' });
+		try {
+			const button = r.find('button');
+			mouse(button);
+			// The ancestor's callback was queued before the child synchronously
+			// updated its props. The next event observes the new callback inputs.
+			expect(calls).toEqual([[], ['old', 'child'], ['old', 'parent', 'third']]);
+			calls.length = 0;
+			mouse(button);
+			expect(calls).toEqual([['next'], ['new', 'child'], ['next', 'new', 'parent', 'third']]);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it.each(['compiled', 'spread', 'descriptor'])(
 		'uses case-sensitive custom event names through %s props',
 		(kind) => {
