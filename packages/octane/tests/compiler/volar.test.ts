@@ -169,7 +169,7 @@ export function Repeated() @{
 				];
 				const files = validSources.map((input, index) => {
 					const result = compileToVolarMappings(
-						signalModule ? `${input}\nexport type Scope$ = import('octane/signals').Scope;` : input,
+						signalModule ? `${input}\nimport 'octane/signals';` : input,
 						`Panel${index}.tsrx`,
 					);
 					expect(result.errors).toEqual([]);
@@ -194,9 +194,7 @@ export function Repeated() @{
 				files.push(inspectionFile);
 				const invalidSource = source.replace('pendingLabel: string', 'pendingLabel: number');
 				const invalid = compileToVolarMappings(
-					signalModule
-						? `${invalidSource}\nexport type Scope$ = import('octane/signals').Scope;`
-						: invalidSource,
+					signalModule ? `${invalidSource}\nimport 'octane/signals';` : invalidSource,
 					'Invalid.tsrx',
 				);
 				expect(invalid.errors).toEqual([]);

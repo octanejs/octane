@@ -1,4 +1,4 @@
-import { createLexicalAnalysis } from './compile-universal.js';
+import { createLexicalAnalysis, forEachRuntimeAstChild } from './compile-universal.js';
 import { analyzeRendererBoundaries } from './renderer-boundaries.js';
 import { NATIVE_SIGNAL_NAME, NATIVE_MEMO_READ, nativeReadDiagnostic } from './native-read-facts.js';
 export { NATIVE_SIGNAL_NAME, NATIVE_MEMO_READ } from './native-read-facts.js';
@@ -69,13 +69,21 @@ function propertyName(node, computed = false) {
  * A `$` capability can arrive through props, a namespace, or an imported helper;
  * do not require a direct signals import or proof of the eventual read target.
  * Once selected, the entire module captures actual reads, including opaque calls.
- * Inspect syntax rather than text so comments and string contents do not opt an
- * ordinary module into native memoization and its renderer adapter.
+ * Inspect runtime syntax rather than text so erased types, comments, and string
+ * contents do not opt an ordinary module into native memoization and its adapter.
  */
 export function nativeReadOptions(ast, options) {
 	let nativeReads = false;
 	function visit(node) {
 		if (nativeReads || !node || typeof node !== 'object') return;
+		if (node.importKind === 'type' || node.exportKind === 'type') return;
+		if (
+			node.type === 'ImportDeclaration' &&
+			node.specifiers.length > 0 &&
+			node.specifiers.every((specifier) => specifier.importKind === 'type')
+		) {
+			return;
+		}
 		if (
 			((node.type === 'Identifier' || node.type === 'JSXIdentifier') && node.name.endsWith('$')) ||
 			(node.type === 'ImportDeclaration' &&
@@ -88,7 +96,7 @@ export function nativeReadOptions(ast, options) {
 			nativeReads = true;
 			return;
 		}
-		children(node, visit);
+		forEachRuntimeAstChild(node, visit);
 	}
 	visit(ast);
 	return { ...options, nativeReads };

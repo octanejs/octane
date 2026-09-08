@@ -53,6 +53,13 @@ const scope = createScope({ scopeKey: 'plain' }); const count = scope.signal$('c
 		expect(() => compiler.transform(source, '/project/src/store.ts')).toThrow(NAMING);
 	});
 
+	it('checks runtime capabilities alongside inline type imports', () => {
+		const source = `import { type Scope, createScope } from 'octane/signals';
+const scope: Scope = createScope();
+const count = scope.signal$('count', 0);`;
+		expect(() => compile(app('', source), FILENAME)).toThrow(NAMING);
+	});
+
 	it('leaves data-only modules free of renderer initialization, including type imports', () => {
 		const compiler = createOctaneCompiler({ root: '/project' });
 		const source = `import type { OctaneNode } from 'octane';
@@ -79,6 +86,31 @@ export function useCounter$() { return useSignal$(0); }`;
 				renderer: { id: 'other', module: 'other-renderer', target } as any,
 			}),
 		).toThrow(/native signal reads.*DOM/);
+	});
+
+	it.each([
+		`import type { Scope } from 'octane/signals';`,
+		`import { type Scope } from 'octane/signals';`,
+		`import type { Scope as Scope$ } from 'octane/signals';`,
+		`import { type useSignal$ } from 'octane/signals/client';`,
+		`import { type Scope as Scope$ } from 'octane/signals';`,
+		`export type Scope$ = import('octane/signals').Scope;`,
+	])('allows non-DOM components with only signal types: %s', (types) => {
+		for (const dev of [false, true]) {
+			for (const component of [
+				'export function App() @{ <group /> }',
+				'export function App() { return <group />; }',
+			]) {
+				const source = `${types}\n${component}`;
+				const options = {
+					dev,
+					hmr: false,
+					renderer: { id: 'scene', module: 'scene-runtime', target: 'universal' as const },
+				};
+				expect(() => compile(source, FILENAME, options)).not.toThrow();
+				expect(compileToVolarMappings(source, FILENAME, options).diagnostics).toEqual([]);
+			}
+		}
 	});
 
 	it('rejects an active non-DOM renderer boundary inside a DOM module', () => {
