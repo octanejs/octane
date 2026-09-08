@@ -179,7 +179,8 @@ describe('dynamic text authoring', () => {
 			expect(adjacentText).toBeDefined();
 			let root: ReturnType<typeof hydrateRoot> | undefined;
 			try {
-				root = hydrateRoot(container, client.Scalar, first);
+				const hydrated = hydrateRoot(container, client.Scalar, first);
+				root = hydrated;
 				flushSync(() => {});
 				expect(numeric.firstChild).toBe(numericText);
 				expect(assertedText!.parentNode).toBe(asserted);
@@ -190,7 +191,7 @@ describe('dynamic text authoring', () => {
 				expect(container.querySelector('#arithmetic')!.textContent).toBe('5');
 				expect(container.querySelector('#type')!.textContent).toBe('object');
 				expect(adjacent.textContent).toBe('before1.5and9after');
-				flushSync(() => root.render(client.Scalar, second));
+				flushSync(() => hydrated.render(client.Scalar, second));
 				expect(numeric.firstChild).toBe(numericText);
 				expect(assertedText!.nodeValue).toBe('second');
 				expect(asserted.textContent).toBe('beforesecondafter');
@@ -242,7 +243,11 @@ describe('dynamic text authoring', () => {
 		let replacedRoot: ReturnType<typeof mount> | undefined;
 		try {
 			replacedRoot = mount(replaced.Replaced, { value: sentinel });
-			expect(replacedRoot.find('em').textContent).toBe('replacement');
+			// Selector engines rely on Number.isNaN; read the rendered child
+			// directly while the authored replacement is active.
+			const child = replacedRoot.container.firstElementChild?.firstElementChild;
+			expect(child?.tagName).toBe('EM');
+			expect(child?.textContent).toBe('replacement');
 		} finally {
 			restore();
 			replacedRoot?.unmount();

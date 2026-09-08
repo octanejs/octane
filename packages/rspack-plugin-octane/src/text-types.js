@@ -3,32 +3,44 @@
  * the ordinary loader's module graph and retain one project per compiler and
  * renderer configuration, rather than one TypeScript Program per module.
  */
-const projectsByCompiler = new WeakMap();
+// Rspack loads the plugin from its application's module graph and the loader
+// through its loader runner. Those can instantiate this ESM module separately
+// (for example under Vitest), even though both receive the same compiler.
+// Keep the project on that compiler under a process-wide symbol instead of in
+// module-local state. Typed builds use the main-thread loader.
+const COMPILER_TEXT_TYPES = Symbol.for('@octanejs/rspack-plugin/text-types/v1');
+
+function compilerState(compiler) {
+	return compiler?.[COMPILER_TEXT_TYPES];
+}
 
 export function registerTextTypeCompiler(compiler, tsconfig, root) {
-	if (projectsByCompiler.has(compiler)) {
+	if (compilerState(compiler)) {
 		throw new Error('@octanejs/rspack-plugin: only one text type project may own a compiler.');
 	}
-	projectsByCompiler.set(compiler, { tsconfig, root, projects: new Map(), closed: false });
+	Object.defineProperty(compiler, COMPILER_TEXT_TYPES, {
+		value: { tsconfig, root, projects: new Map(), closed: false },
+		configurable: true,
+	});
 }
 
 export function invalidateTextTypeCompiler(compiler) {
-	const state = projectsByCompiler.get(compiler);
+	const state = compilerState(compiler);
 	if (!state || state.closed) return;
 	for (const project of state.projects.values()) project.invalidate();
 }
 
 export function disposeTextTypeCompiler(compiler) {
-	const state = projectsByCompiler.get(compiler);
+	const state = compilerState(compiler);
 	if (!state) return;
 	state.closed = true;
 	for (const project of state.projects.values()) project.dispose();
 	state.projects.clear();
-	projectsByCompiler.delete(compiler);
+	delete compiler[COMPILER_TEXT_TYPES];
 }
 
 export async function textTypeFactsForLoader(compiler, tsconfig, renderers, filename, source) {
-	const state = projectsByCompiler.get(compiler);
+	const state = compilerState(compiler);
 	if (!state || state.tsconfig !== tsconfig || state.closed) {
 		throw new Error(
 			'@octanejs/rspack-plugin: `textTypes` requires the OctaneRspackPlugin on the same compiler.',

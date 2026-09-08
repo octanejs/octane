@@ -48,10 +48,16 @@ module.exports = new Proxy({}, {
 `;
 }
 
-async function compile(config: Record<string, unknown>) {
+async function compile(config: Record<string, unknown>, capture?: (stats: any) => unknown) {
 	const compiler = rspack(config as any) as any;
 	return new Promise<any>((resolve, reject) => {
 		compiler.run((error: Error | null, stats: any) => {
+			let captured: unknown;
+			try {
+				if (!error && stats && !stats.hasErrors()) captured = capture?.(stats);
+			} catch (captureError) {
+				error = captureError instanceof Error ? captureError : new Error(String(captureError));
+			}
 			compiler.close((closeError: Error | null) => {
 				if (error || closeError) {
 					reject(error ?? closeError);
@@ -66,7 +72,7 @@ async function compile(config: Record<string, unknown>) {
 					reject(new Error(errors.map((entry: any) => entry.message ?? String(entry)).join('\n')));
 					return;
 				}
-				resolve(stats);
+				resolve(capture ? captured : stats);
 			});
 		});
 	});
@@ -1023,47 +1029,73 @@ export function Typed(props: { label: Label }) { return <p>before{props.label}af
 `,
 		);
 		const cacheDirectory = join(root, '.rspack-text-types-cache');
-		const build = async (index: number) => {
-			const stats = await compile({
-				name: 'text-type-import-cache',
-				context: root,
-				mode: 'production',
-				target: 'node',
-				entry: './src/text-entry.js',
-				optimization: { minimize: false },
-				output: { path: join(root, `dist-text-types-${index}`), filename: 'bundle.js' },
-				cache: {
-					type: 'persistent',
-					version: 'user-cache-v1',
-					storage: { type: 'filesystem', directory: cacheDirectory },
+		const build = async () => {
+			const { code, transformKind, builtTyped, builtEntry } = await compile(
+				{
+					name: 'text-type-import-cache',
+					context: root,
+					mode: 'production',
+					target: 'node',
+					entry: './src/text-entry.js',
+					optimization: { minimize: false },
+					output: { path: join(root, 'dist-text-types'), filename: 'bundle.js' },
+					cache: {
+						type: 'persistent',
+						version: 'user-cache-v1',
+						storage: { type: 'filesystem', directory: cacheDirectory },
+					},
+					plugins: [new OctaneRspackPlugin({ textTypes: { tsconfig } })],
 				},
-				plugins: [new OctaneRspackPlugin({ textTypes: { tsconfig } })],
-			});
-			const module = [...stats.compilation.modules].find(
-				(item: any) => item.resource === component,
-			) as any;
-			expect(getOctaneRspackBuildInfo(module)?.transformKind).toBe('compile');
-			const code = module.originalSource()?.source();
+				(stats) => {
+					const module = [...stats.compilation.modules].find(
+						(item: any) =>
+							item.resource === component ||
+							item.nameForCondition?.() === component ||
+							item.identifier?.().includes(component),
+					) as any;
+				const entry = [...stats.compilation.modules].find(
+					(item: any) => item.nameForCondition?.() === join(root, 'src/text-entry.js'),
+				) as any;
+				const built = new Set(
+					[...stats.compilation.builtModules].map((item: any) => item.identifier()),
+				);
+				return {
+					transformKind: getOctaneRspackBuildInfo(module)?.transformKind,
+					code: module.originalSource()?.source(),
+					builtTyped: built.has(module.identifier()),
+					builtEntry: entry && built.has(entry.identifier()),
+				};
+				},
+			);
+			expect(transformKind).toBe('compile');
 			expect(code).toBeTypeOf('string');
-			return evaluateCompiledFixtureCode(String(code), component, 'server', undefined).Typed;
+			return {
+				Typed: evaluateCompiledFixtureCode(String(code), component, 'server', undefined).Typed,
+				builtTyped,
+				builtEntry,
+			};
 		};
 
-		const first = await build(1);
-		const initialHtml = (await renderToString(first, { label: 'first' })).html.replace(
+		const first = await build();
+		expect(first.builtTyped).toBe(true);
+		expect(first.builtEntry).toBe(true);
+		const initialHtml = (await renderToString(first.Typed, { label: 'first' })).html.replace(
 			/<!--.*?-->/g,
 			'',
 		);
 		expect(initialHtml).toContain('beforefirstafter');
 		// Exercise the boundary of the first build's static string proof to
 		// distinguish it from a syntax-only build before checking invalidation.
-		const { html: oldTypedHtml } = await renderToString(first, { label: true });
+		const { html: oldTypedHtml } = await renderToString(first.Typed, { label: true });
 		expect(oldTypedHtml.replace(/<!--.*?-->/g, '')).toContain('beforetrueafter');
 		// The component source is unchanged and its type-only import is absent
 		// from the emitted module graph. A persistent cached text binding would
 		// incorrectly stringify the newly valid boolean child.
 		write(root, 'src/model.ts', 'export type Label = boolean;\n');
-		const second = await build(2);
-		const { html: rendered } = await renderToString(second, { label: true });
+		const second = await build();
+		expect(second.builtTyped).toBe(true);
+		expect(second.builtEntry).toBe(false);
+		const { html: rendered } = await renderToString(second.Typed, { label: true });
 		const html = rendered.replace(/<!--.*?-->/g, '');
 		expect(html).toContain('beforeafter');
 		expect(html).not.toContain('true');

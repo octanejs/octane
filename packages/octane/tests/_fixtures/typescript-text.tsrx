@@ -30,7 +30,11 @@ export function TextScene(props: {
 		<span id="text-return">{uppercase(props.label)}</span>
 		<span id="text-count">{String(count)}</span>
 		<span id="text-typed-count">{count}</span>
-		<section id="text-number-siblings"><Before />{count}<After /></section>
+		<section id="text-number-siblings">
+			<Before />
+			{count}
+			<After />
+		</section>
 		<span id="text-nullable">{props.maybe}</span>
 		<div id="text-renderable">{props.child}</div>
 	</main>
