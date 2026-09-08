@@ -181,6 +181,9 @@ describe('CI workflow aggregation', () => {
 
 	test('runs both Three compatibility lanes in one job with isolated worktrees', () => {
 		const compat = jobSource('three_compat');
+		const current = compat.slice(
+			compat.indexOf('      - name: Test Three compatibility (current)'),
+		);
 		const provenance = stepScript(workflow, 'Verify full-suite provenance');
 
 		assert.match(compat, /^    name: Three compatibility$/m);
@@ -216,8 +219,32 @@ describe('CI workflow aggregation', () => {
 		);
 		assert.equal(
 			[...compat.matchAll(/test "\$THREE_RELEASE_LINE" = "\$TYPES_RELEASE_LINE"/g)].length,
-			2,
+			1,
 		);
+		assert.match(current, /TYPES_VERSION="\$\(pnpm view @types\/three@latest version\)"/);
+		assert.match(current, /test "\$\{TYPED_THREE_VERSION%\.\*\}" = "\$TYPES_RELEASE_LINE"/);
+		assert.match(current, /test "\$RESOLVED_TYPES_VERSION" = "\$TYPES_VERSION"/);
+		const typedPairInstall = current.indexOf(
+			'"three@${TYPES_RELEASE_LINE}.x" "@types/three@$TYPES_VERSION"',
+		);
+		const typecheck = current.indexOf(
+			'pnpm exec tsc --noEmit -p packages/three/typetests/tsconfig.json',
+		);
+		const typedRuntimeTest = current.indexOf(
+			'OCTANE_THREE_COMPAT_VERSION="$TYPED_THREE_VERSION" pnpm --dir packages/three test:compat',
+		);
+		const latestRuntimeInstall = current.indexOf('"three@$THREE_VERSION"');
+		const latestRuntimeAssertion = current.indexOf(
+			'test "$RESOLVED_THREE_VERSION" = "$THREE_VERSION"',
+		);
+		const latestRuntimeTest = current.indexOf(
+			'OCTANE_THREE_COMPAT_VERSION="$THREE_VERSION" pnpm --dir packages/three test:compat',
+		);
+		assert.ok(typedPairInstall >= 0 && typedPairInstall < typecheck);
+		assert.ok(typecheck < typedRuntimeTest);
+		assert.ok(typedRuntimeTest < latestRuntimeInstall);
+		assert.ok(latestRuntimeInstall < latestRuntimeAssertion);
+		assert.ok(latestRuntimeAssertion < latestRuntimeTest);
 		assert.equal(
 			[...compat.matchAll(/pnpm exec tsgo --noEmit -p packages\/three\/tsconfig\.json/g)].length,
 			2,
@@ -227,7 +254,7 @@ describe('CI workflow aggregation', () => {
 				.length,
 			2,
 		);
-		assert.equal([...compat.matchAll(/pnpm --dir packages\/three test:compat/g)].length, 2);
+		assert.equal([...compat.matchAll(/pnpm --dir packages\/three test:compat/g)].length, 3);
 		assert.match(provenance, /^\s+"Three compatibility",$/m);
 		assert.doesNotMatch(provenance, /Three compatibility \(\$\{lane\}\)/);
 	});
