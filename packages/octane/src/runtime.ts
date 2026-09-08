@@ -17720,7 +17720,10 @@ const INVALID_EVENT_LISTENER_KIND = 2;
 interface HandlerBundle {
 	[EVENT_SLOT_KIND]: typeof HANDLER_BUNDLE_KIND;
 	fn: (...args: any[]) => any;
-	args: any[];
+	// An array for arity 0/N; fixed arities carry their arguments in the bundle.
+	args: any[] | 1 | 2;
+	a0?: any;
+	a1?: any;
 }
 
 interface InvalidEventListenerSlot {
@@ -17785,14 +17788,15 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // ---------------------------------------------------------------------------
 // Event bundle helpers (compiled-output plan 3b) — compiler targets for the
 // `() => fn(arg, …)` bundle optimization. Mount (`evtN`): build the
-// nominal `{ fn, args }` descriptor ONCE, assign it to the element's event slot, and
+// nominal handler descriptor ONCE, assign it to the element's event slot, and
 // return it for the binding bag (one field instead of el + fn + each arg).
 // Update (`evtNu`): mutate the SAME descriptor in place between events. A
 // synchronous update during dispatch preserves only the queued snapshot before
 // mutating, so later events see the change without rebuilding every render.
 // Arity variants mirror fireEventSlot's dispatch switch; `evtN`/`evtNu` are
-// the rest fallbacks. Arity-0 descriptors share one empty args array
-// (dispatch only reads it; the arity-0 update never writes args).
+// the rest fallbacks. Arity-0 descriptors share one empty args array; arity-1/2
+// store their arguments in fields instead of allocating a second array. Their
+// `args` numeric tag keeps the common dispatch read in the same property slot.
 // Keep the computed brand last in every bundle literal, including dispatch
 // snapshots, so V8 can initialize fn/args from its object-literal boilerplate.
 // ---------------------------------------------------------------------------
@@ -17819,34 +17823,27 @@ export function evt0u(d: HandlerBundle, fn: any): void {
 	d.fn = fn;
 }
 export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: [a0], [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: 1, a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
 export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-	if (TRANSITION_JOURNAL !== null) {
-		journalObjectOnce(d);
-		journalObjectOnce(d.args);
-	}
+	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 	d.fn = fn;
-	d.args[0] = a0;
+	d.a0 = a0;
 }
 export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: [a0, a1], [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d: HandlerBundle = { fn, args: 2, a0, a1, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	setEventHandler(el, key, d);
 	return d;
 }
 export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-	if (TRANSITION_JOURNAL !== null) {
-		journalObjectOnce(d);
-		journalObjectOnce(d.args);
-	}
+	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
 	d.fn = fn;
-	const a = d.args;
-	a[0] = a0;
-	a[1] = a1;
+	d.a0 = a0;
+	d.a1 = a1;
 }
 export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
 	const d: HandlerBundle = { fn, args, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
@@ -18396,11 +18393,22 @@ function preserveDispatchedBundle(bundle: HandlerBundle): void {
 	let snapshot: HandlerBundle | undefined;
 	for (let index = 0; index < CAPTURE_SLOTS.length; index++) {
 		if (CAPTURE_SLOTS[index] === bundle) {
-			CAPTURE_SLOTS[index] = snapshot ??= {
-				fn: bundle.fn,
-				args: bundle.args.slice(),
-				[EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND,
-			};
+			if (snapshot === undefined) {
+				const args = bundle.args;
+				snapshot =
+					typeof args !== 'number'
+						? { fn: bundle.fn, args: args.slice(), [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND }
+						: args === 1
+							? { fn: bundle.fn, args: 1, a0: bundle.a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND }
+							: {
+									fn: bundle.fn,
+									args: 2,
+									a0: bundle.a0,
+									a1: bundle.a1,
+									[EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND,
+								};
+			}
+			CAPTURE_SLOTS[index] = snapshot;
 		}
 	}
 }
@@ -18605,8 +18613,8 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 	}
 }
 
-// Invoke one event slot — a bare handler `fn(event)` or a nominal `{ fn, args }` bundle
-// (the compiler's zero-argument-arrow optimisation) as `fn(...args)`. A bundled
+// Invoke one event slot — a bare handler `fn(event)` or a nominal arity-specific
+// bundle (the compiler's zero-argument-arrow optimisation) as `fn(...args)`. A bundled
 // arrow never observes its native event, so forwarding that event to its callee
 // would change the authored callback's argument list.
 //
@@ -18637,18 +18645,24 @@ function fireEventSlot(slot: EventSlot, event: Event): void {
 		if (isHandlerBundle(slot)) {
 			const bundle = slot;
 			const a = bundle.args;
-			switch (a.length) {
-				case 0:
-					bundle.fn();
-					break;
-				case 1:
-					bundle.fn(a[0]);
-					break;
-				case 2:
-					bundle.fn(a[0], a[1]);
-					break;
-				default:
-					bundle.fn.apply(null, a);
+			if (typeof a !== 'number') {
+				switch (a.length) {
+					case 0:
+						bundle.fn();
+						break;
+					case 1:
+						bundle.fn(a[0]);
+						break;
+					case 2:
+						bundle.fn(a[0], a[1]);
+						break;
+					default:
+						bundle.fn.apply(null, a);
+				}
+			} else if (a === 1) {
+				bundle.fn(bundle.a0);
+			} else {
+				bundle.fn(bundle.a0, bundle.a1);
 			}
 			return;
 		}

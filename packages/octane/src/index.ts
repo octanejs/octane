@@ -147,7 +147,7 @@ export {
 	bag15,
 	bag16,
 	bagOf,
-	// Event-bundle helpers (3b) — build the `{ fn, args }` descriptor once at
+	// Event-bundle helpers (3b) — build an arity-specific descriptor once at
 	// mount, mutate it in place on update (dispatch reads `el[key]` per event).
 	evt0,
 	evt0u,

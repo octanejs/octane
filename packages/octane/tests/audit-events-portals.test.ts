@@ -3,7 +3,7 @@ import { createElement as h, createPortal, createRoot, flushSync } from '../src/
 import * as React from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import { flushSync as flushReact } from 'react-dom';
-import { mount } from './_helpers.js';
+import { act, mount } from './_helpers.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 
 const dev = process.env.OCTANE_TEST_COMPILE_MODE !== 'prod';
@@ -125,6 +125,84 @@ describe('audit event and portal behavior', () => {
 			calls.length = 0;
 			mouse(button);
 			expect(calls).toEqual([['next'], ['new', 'child'], ['next', 'new', 'parent', 'third']]);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('preserves queued one- and two-argument bundles during a synchronous update', () => {
+		const { App } = fixture(
+			`export function App({report, change, label}) @{ <section onClick={() => report(label, 'outer')}><div onClick={() => report(label)}><button onClick={change}>go</button></div></section> }`,
+		);
+		const calls: unknown[][] = [];
+		let r: ReturnType<typeof mount>;
+		const report = (...args: unknown[]) => calls.push(['old', ...args]);
+		const nextReport = (...args: unknown[]) => calls.push(['next', ...args]);
+		const change = () => r.update(App, { report: nextReport, change, label: 'new' });
+		r = mount(App, { report, change, label: 'old' });
+		try {
+			const button = r.find('button');
+			mouse(button);
+			expect(calls).toEqual([
+				['old', 'old'],
+				['old', 'old', 'outer'],
+			]);
+			calls.length = 0;
+			mouse(button);
+			expect(calls).toEqual([
+				['next', 'new'],
+				['next', 'new', 'outer'],
+			]);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('restores one- and two-argument bundles after a suspended root update', async () => {
+		const { App } = fixture(`
+export function Reader({read, token}) @{ const value = read(token); <strong>{value as string}</strong> }
+export function App({report, label, read}) @{
+	<section>
+		<button id="event-target" onClick={() => report(label)} onDoubleClick={() => report(label, 'two')}>go</button>
+		<Reader read={read} token={label} />
+	</section>
+}
+`);
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		let value: string | null = 'A';
+		const read = () => {
+			if (value === null) throw pending;
+			return value;
+		};
+		const calls: unknown[][] = [];
+		const report = (...args: unknown[]) => calls.push(['old', ...args]);
+		const nextReport = (...args: unknown[]) => calls.push(['next', ...args]);
+		const r = mount(App, { report, label: 'old', read });
+		try {
+			const button = r.find('#event-target');
+			value = null;
+			r.update(App, { report: nextReport, label: 'new', read });
+			expect(r.find('#event-target')).toBe(button);
+			mouse(button);
+			mouse(button, 'dblclick');
+			expect(calls).toEqual([
+				['old', 'old'],
+				['old', 'old', 'two'],
+			]);
+
+			value = 'B';
+			await act(() => resolve('ready'));
+			expect(r.find('#event-target')).toBe(button);
+			calls.length = 0;
+			mouse(button);
+			mouse(button, 'dblclick');
+			expect(calls).toEqual([
+				['next', 'new'],
+				['next', 'new', 'two'],
+			]);
 		} finally {
 			r.unmount();
 		}
