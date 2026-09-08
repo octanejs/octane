@@ -5,7 +5,7 @@
 // <select> and the chevron keep their fixed classes.
 import { ChevronDownIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface NativeSelectProps extends Record<string, unknown> {
 	className?: string;

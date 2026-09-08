@@ -24,3 +24,34 @@ export function NestedStoryFeed(props) @{
 		}
 	</section>
 }
+
+interface SparseRow {
+	id: string;
+	label: string;
+	selected: boolean;
+}
+
+// The item and empty arms read different parent locals. Within an item, the
+// selected and plain arms read different subsets again, including a later
+// captured value after a skipped sibling. Reordering must not swap those
+// values between keyed survivors.
+export function SparseCaptureFeed(props: {
+	rows: SparseRow[];
+	prefix: string;
+	suffix: string;
+}) @{
+	const alpha = props.prefix;
+	const zulu = props.suffix;
+	<ul id="sparse-feed">
+		@for (const row of props.rows; key row.id) {
+			const alpha = 'plain: ';
+			@if (row.selected) {
+				<li data-row={row.id}>{row.label + zulu}</li>
+			} @else {
+				<li data-row={row.id}>{alpha + row.label}</li>
+			}
+		} @empty {
+			<li id="sparse-empty">{'empty: ' + alpha}</li>
+		}
+	</ul>
+}

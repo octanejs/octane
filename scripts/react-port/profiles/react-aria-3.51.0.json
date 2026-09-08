@@ -1,0 +1,17 @@
+{
+  "package": "react-aria",
+  "version": "3.51.0",
+  "commit": "5ecb3333001313e83898cd07644227897e3bae1f",
+  "helpers": [
+    {
+      "name": "resizingTests",
+      "modules": [
+        {
+          "path": "packages/react-aria/test/table/tableResizingTests.tsx",
+          "gitBlob": "baa57fc4271e49341f22266358c1afce47d5cff3",
+          "registrations": true
+        }
+      ]
+    }
+  ]
+}

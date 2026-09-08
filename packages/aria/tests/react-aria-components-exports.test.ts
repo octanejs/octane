@@ -10,9 +10,9 @@ describe('react-aria-components public exports', () => {
 		let result = assertReactAriaComponentsExports();
 
 		expect(result).toMatchObject({
-			version: '1.19.0',
-			runtime: { upstream: 280, local: 280, missing: [], extra: [] },
-			types: { upstream: 313, local: 313, missing: [], extra: [] },
+			version: '1.20.0',
+			runtime: { upstream: 286, local: 286, missing: [], extra: [] },
+			types: { upstream: 327, local: 327, missing: [], extra: [] },
 		});
 	});
 

@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "shadcn/ui for the octane renderer — the Radix-base shadcn component distribution ported onto octane: cva-variant components preserving the upstream data-slot/class contract, built on @octanejs/radix, published as importable source with a shadcn-CLI-compatible registry planned.",
+  "description": "shadcn/ui components for Octane, with Base UI, Radix, and React Aria implementations and an installable source registry.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -21,7 +21,8 @@
   },
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "sideEffects": [
     "./src/styles/theme.css"
@@ -127,10 +128,13 @@
     "./base-ui/Label": "./src/bases/base-ui/ui/label.tsrx",
     "./base-ui/Menubar": "./src/bases/base-ui/ui/menubar.tsrx",
     "./base-ui/NativeSelect": "./src/bases/base-ui/ui/native-select.tsrx",
+    "./base-ui/NavigationMenu": "./src/bases/base-ui/ui/navigation-menu.tsrx",
     "./base-ui/Pagination": "./src/bases/base-ui/ui/pagination.tsrx",
     "./base-ui/Popover": "./src/bases/base-ui/ui/popover.tsrx",
     "./base-ui/Progress": "./src/bases/base-ui/ui/progress.tsrx",
     "./base-ui/RadioGroup": "./src/bases/base-ui/ui/radio-group.tsrx",
+    "./base-ui/ScrollArea": "./src/bases/base-ui/ui/scroll-area.tsrx",
+    "./base-ui/Select": "./src/bases/base-ui/ui/select.tsrx",
     "./base-ui/Separator": "./src/bases/base-ui/ui/separator.tsrx",
     "./base-ui/Sheet": "./src/bases/base-ui/ui/sheet.tsrx",
     "./base-ui/Sidebar": "./src/bases/base-ui/ui/sidebar.tsrx",
@@ -166,12 +170,14 @@
     "@octanejs/sonner": "workspace:*",
     "class-variance-authority": "catalog:default",
     "clsx": "catalog:default",
+    "cn": "catalog:default",
     "tailwind-merge": "catalog:default"
   },
   "peerDependencies": {
     "octane": "workspace:^0.2.5"
   },
   "devDependencies": {
+    "@base-ui/react": "1.8.0",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "lucide-react": "catalog:default",

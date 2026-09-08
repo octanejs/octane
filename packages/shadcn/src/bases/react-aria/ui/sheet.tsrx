@@ -14,7 +14,7 @@ import {
 } from '@octanejs/aria/components';
 import type { HeadingProps } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 import { Button } from './button.tsrx';
 import { XIcon } from '@octanejs/lucide';

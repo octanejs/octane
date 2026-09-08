@@ -10,7 +10,7 @@ import { createContext, createElement, useContext, type OctaneNode } from 'octan
 import { type VariantProps } from 'class-variance-authority';
 import { ToggleGroup as ToggleGroupPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { toggleVariants } from './toggle.tsrx';
 
 const ToggleGroupContext = createContext<

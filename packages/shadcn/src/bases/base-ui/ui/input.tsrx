@@ -13,7 +13,7 @@
 // keeps its commit-on-blur meaning.
 import { Input as InputPrimitive } from '@octanejs/base-ui/input';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export function Input({ className, type, ...props }: Record<string, any>) @{
 	<InputPrimitive

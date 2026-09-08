@@ -20567,15 +20567,14 @@ function headElementArgNodes(node, index, ctx) {
 	];
 }
 
-// A Float style resource ships its authored CSS verbatim-by-meaning: the parsed
-// StyleSheet re-renders WITHOUT the scoping pipeline (no analyze/prepare), so
-// selectors and rules come out unscoped. Serialization normalizes whitespace,
-// which is invisible to the resource contract (identity is the href).
+// Float resources contain global CSS. Preserve the parser's CSS source rather
+// than sending it through the scoped stylesheet renderer, which prunes unused
+// selectors and renames keyframes even without the scoping analysis pass.
 /** @param {any} el @returns {any} */
 function styleResourceCssExpression(el) {
 	const sheet = (el.children || []).find((c) => c && c.type === 'StyleSheet');
 	if (!sheet) return b.literal('');
-	const css = renderStylesheets([cloneAstNode(sheet)]);
+	const css = sheet.source;
 	return b.literal(css, JSON.stringify(css), el);
 }
 
@@ -26559,7 +26558,7 @@ function helperCaptures(ctx, stmts, params) {
 
 // A construct's helpers (then+else, all switch cases, try+pending+catch,
 // item+empty) share ONE env tuple — `block.extra` is per construct block and
-// every helper destructures the same layout — so the emitted array is the
+// every helper reads from the same layout — so the emitted array is the
 // sorted UNION of each body's captures. Null propagates (no component
 // context → all of the construct's helpers stay inline).
 function unionEnv(ctx, bodies) {
@@ -26582,7 +26581,7 @@ function unionEnv(ctx, bodies) {
 // `__extra` ABI slot (renderBlock forwards `block.extra` as the third body
 // arg; the compiled call site passes the current values every parent render):
 //
-//   function __then$0(__props, __s, __extra) { const [label] = __extra; … }
+//   function __then$0(__props, __s, __extra) { const label = __extra[0]; … }
 //
 // `envNames: null` keeps the legacy placement — the helper is emitted INSIDE
 // the component function so its closures capture the parent's locals
@@ -26607,25 +26606,27 @@ function hoistBodyHelper(
 	const ownEnv = new Set(ownEnvNames || []);
 	let bodyStmts = stmts;
 	if (envNames && envNames.length > 0) {
-		// Destructure the construct's shared env tuple. The layout is the UNION
-		// across the construct's helpers. An arm leaves holes for union-only names:
-		// binding them could collide with a same-named local that shadows a capture
-		// used only by another arm.
-		// The env destructure maps to the construct body it feeds.
+		// Read only this helper's captures at their positions in the construct's
+		// shared UNION tuple. Union-only names must not become local bindings: an
+		// arm may have a same-named local shadowing another arm's capture. Direct
+		// indexed reads avoid iterator work before these helpers optimize.
+		// Each binding maps to the construct body it feeds.
 		const envOrigin =
 			(Array.isArray(stmts) && stmts.find((s) => s != null && s.loc != null)) ||
 			(params || []).find((p) => p != null && p.loc != null) ||
 			null;
-		bodyStmts = [
-			inheritOriginLoc(
-				b.const(
-					b.array_pattern(envNames.map((n) => (ownEnv.has(n) ? b.id(n) : null))),
-					b.id('__extra'),
+		const captures = [];
+		for (let i = 0; i < envNames.length; i++) {
+			const name = envNames[i];
+			if (!ownEnv.has(name)) continue;
+			captures.push(
+				inheritOriginLoc(
+					b.const(b.id(name), b.member(b.id('__extra'), b.literal(i), true)),
+					envOrigin,
 				),
-				envOrigin,
-			),
-			...stmts,
-		];
+			);
+		}
+		bodyStmts = [...captures, ...stmts];
 	}
 	// The synthetic helper shell maps to the construct body it hoists.
 	const fakeOrigin =
@@ -26654,7 +26655,7 @@ function hoistBodyHelper(
 	// Module-scope placement. Nested constructs compiled INSIDE this body
 	// compute THEIR captures against the names visible at their call sites —
 	// which live in THIS compiled body: the component's locals extended with
-	// this helper's params, env destructure, and body-level locals. (A nested
+	// this helper's params, env bindings, and body-level locals. (A nested
 	// helper's env values are emitted as plain identifiers at its call site.)
 	const prevLocals = ctx.currentComponentLocals;
 	const prevInvariantLocals = ctx.currentInvariantLocals;
@@ -28253,7 +28254,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// event-row captures in the same order improves the compressed fragment.
 		envNames = [envNames[1], envNames[0], ...envNames.slice(2)];
 	}
-	// The helper destructures only component-local captures (`envNames`) from the
+	// The helper reads only component-local captures (`envNames`) from the
 	// tuple prefix. Compiler memoization may additionally need live imported
 	// bindings as dependency witnesses; append them without disturbing that ABI.
 	const runtimeDepNames =

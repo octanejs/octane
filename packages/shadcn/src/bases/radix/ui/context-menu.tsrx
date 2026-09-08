@@ -8,7 +8,7 @@ import { createElement, type OctaneNode } from 'octane';
 import { ContextMenu as ContextMenuPrimitive } from '@octanejs/radix';
 import { CheckIcon, ChevronRightIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 

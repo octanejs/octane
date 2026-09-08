@@ -10,7 +10,7 @@ npm install @octanejs/shadcn
 pnpm add @octanejs/shadcn
 ```
 
-Upstream pin: `shadcn-ui/ui@4baadbc6` + CLI `shadcn@4.14.1`.
+Upstream pin: `shadcn-ui/ui@7c9eaba1` + CLI `shadcn@4.21.0`.
 
 ## What ships
 
@@ -33,16 +33,20 @@ Upstream pin: `shadcn-ui/ui@4baadbc6` + CLI `shadcn@4.14.1`.
 ## Component coverage
 
 The coverage table tracks the families ported for each primitive base.
-Switching `style` changes which primitive a component is built on — the `data-slot` contract and
-component names stay identical.
+Switching `style` changes which primitive a component uses. Each base retains its
+upstream API; for example, Base UI Navigation Menu exposes a Positioner that owns
+its viewport, and Base UI Select aliases its hostless Root.
 
-The Base UI wrappers target `@octanejs/base-ui`'s Base UI 1.8.0 API. Select,
-Combobox, Navigation Menu, and Scroll Area primitives are available from
-`@octanejs/base-ui`; their shadcn Base UI wrappers have not been ported yet.
+The Base UI wrappers target `@octanejs/base-ui`'s Base UI 1.8.0 API, including
+Select, Navigation Menu, and Scroll Area from the 4.21.0 registry with Nova
+utilities. Combobox is outside this package's current family inventory.
+
+All three bases use `cn@0.2.6`, matching the upstream update. Existing Octane
+adaptations and styling remain intact; `@octanejs/shadcn/cn` re-exports the same helper.
 
 <!-- BEGIN COVERAGE -->
 
-**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 40/44
+**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 43/44
 
 ✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
 
@@ -71,13 +75,13 @@ Combobox, Navigation Menu, and Scroll Area primitives are available from
 | `label` | ✅ | ✅ | ✅ |
 | `menubar` | ✅ | ⛔ | ✅ |
 | `native-select` | ✅ | ✅ | ✅ |
-| `navigation-menu` | ✅ | ⛔ | — |
+| `navigation-menu` | ✅ | ⛔ | ✅ |
 | `pagination` | ✅ | ✅ | ✅ |
 | `popover` | ✅ | ✅ | ✅ |
 | `progress` | ✅ | ⛔ | ✅ |
 | `radio-group` | ✅ | ✅ | ✅ |
-| `scroll-area` | ✅ | ✅ | — |
-| `select` | ✅ | ⛔ | — |
+| `scroll-area` | ✅ | ✅ | ✅ |
+| `select` | ✅ | ⛔ | ✅ |
 | `separator` | ✅ | ✅ | ✅ |
 | `sheet` | ✅ | ✅ | ✅ |
 | `sidebar` | ✅ | ⛔ | ✅ |
@@ -142,7 +146,7 @@ same mechanism shadcn uses upstream, where its own registry is
 
 | `style` | Primitives | Families |
 | --- | --- | --- |
-| `base-nova` *(default)* | `@octanejs/base-ui` | 40 |
+| `base-nova` *(default)* | `@octanejs/base-ui` | 43 |
 | `radix-nova` | `@octanejs/radix` | 44 |
 | `aria-nova` | `@octanejs/aria` | 33 |
 

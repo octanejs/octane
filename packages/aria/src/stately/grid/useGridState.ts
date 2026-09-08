@@ -118,20 +118,19 @@ export function useGridState(...args: any[]): GridState<any, IGridCollection<any
 					rows.length - 1,
 				);
 				let newRow: GridNode<any> | null = null;
-				while (index >= 0) {
-					if (!selectionManager.isDisabled(rows[index].key) && rows[index].type !== 'headerrow') {
-						newRow = rows[index];
+				for (let i = Math.max(0, index); i < rows.length; i++) {
+					if (!selectionManager.isDisabled(rows[i].key) && rows[i].type !== 'headerrow') {
+						newRow = rows[i];
 						break;
 					}
 					// Find next, not disabled row.
-					if (index < rows.length - 1) {
-						index++;
-						// Otherwise, find previous, not disabled row.
-					} else {
-						if (index > parentNode.index) {
-							index = parentNode.index;
+				}
+				if (newRow === null) {
+					for (let i = index - 1; i >= 0; i--) {
+						if (!selectionManager.isDisabled(rows[i].key) && rows[i].type !== 'headerrow') {
+							newRow = rows[i];
+							break;
 						}
-						index--;
 					}
 				}
 				if (newRow) {

@@ -10,7 +10,7 @@ const upstreamEntry = path.join(
 	'node_modules/react-aria-components/dist/types/exports/index.d.ts',
 );
 const localEntry = path.join(packageRoot, 'src/components/index.ts');
-const PINNED_VERSION = '1.19.0';
+const PINNED_VERSION = '1.20.0';
 
 function collectNamedExports(file) {
 	let source = ts.createSourceFile(

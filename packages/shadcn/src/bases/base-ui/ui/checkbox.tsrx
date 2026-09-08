@@ -18,7 +18,7 @@
 import { Checkbox as CheckboxPrimitive } from '@octanejs/base-ui/checkbox';
 import { CheckIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface CheckboxProps extends Record<string, unknown> {
 	className?: string;

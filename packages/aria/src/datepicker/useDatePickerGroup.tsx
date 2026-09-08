@@ -1,12 +1,13 @@
 /** @jsxImportSource octane */
-// Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria/src/datepicker/useDatePickerGroup.ts).
+// Ported from adobe/react-spectrum@5ecb3333001313e83898cd07644227897e3bae1f (packages/react-aria/src/datepicker/useDatePickerGroup.ts).
 import { createFocusManager, getFocusableTreeWalker } from '../focus/FocusScope';
 import { DateFieldState } from '../upstream-exports/react-stately/useDateFieldState';
 import { DatePickerState } from '../upstream-exports/react-stately/useDatePickerState';
 import { DateRangePickerState } from '../upstream-exports/react-stately/useDateRangePickerState';
-import { DOMAttributes, FocusableElement, KeyboardEvent, RefObject } from '@react-types/shared';
-import { getEventTarget, nodeContains } from '../utils/shadowdom/DOMFunctions';
+import { DOMAttributes, FocusableElement, RefObject } from '@react-types/shared';
+import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { mergeProps } from '../utils/mergeProps';
+import { useKeyboard } from '../interactions/useKeyboard';
 import { useLocale } from '../i18n/I18nProvider';
 import { useMemo } from '../compat/react';
 import { usePress } from '../interactions/usePress';
@@ -17,59 +18,68 @@ export function useDatePickerGroup(
 	disableArrowNavigation?: boolean,
 ): DOMAttributes<FocusableElement> {
 	let { direction } = useLocale();
+	// oxlint-disable-next-line react/react-compiler
 	let focusManager = useMemo(() => createFocusManager(ref), [ref]);
 
-	// Open the popover on alt + arrow down
-	let onKeyDown = (e: KeyboardEvent) => {
-		if (!nodeContains(e.currentTarget, getEventTarget(e as unknown as Event) as Element)) {
-			return;
-		}
-
-		if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && 'setOpen' in state) {
-			e.preventDefault();
-			e.stopPropagation();
-			state.setOpen(true);
-		}
-
-		if (disableArrowNavigation) {
-			return;
-		}
-
-		switch (e.key) {
-			case 'ArrowLeft':
-				e.preventDefault();
-				e.stopPropagation();
+	let { keyboardProps } = useKeyboard({
+		shortcuts: {
+			'Alt+ArrowDown': () => {
+				if ('setOpen' in state) {
+					state.setOpen(true);
+					return;
+				}
+				return false;
+			},
+			'Alt+ArrowUp': () => {
+				if ('setOpen' in state) {
+					state.setOpen(true);
+					return;
+				}
+				return false;
+			},
+			ArrowLeft: (e) => {
+				if (disableArrowNavigation) {
+					return false;
+				}
 				if (direction === 'rtl') {
 					if (ref.current) {
-						let target = getEventTarget(e as unknown as Event) as FocusableElement;
+						let target = getEventTarget(e) as FocusableElement;
 						let prev = findNextSegment(ref.current, target.getBoundingClientRect().left, -1);
 
 						if (prev) {
 							prev.focus();
+							return;
 						}
 					}
 				} else {
 					focusManager.focusPrevious();
+					return;
 				}
-				break;
-			case 'ArrowRight':
-				e.preventDefault();
-				e.stopPropagation();
+				return false;
+			},
+			ArrowRight: (e) => {
+				if (disableArrowNavigation) {
+					return false;
+				}
 				if (direction === 'rtl') {
 					if (ref.current) {
-						let target = getEventTarget(e as unknown as Event) as FocusableElement;
+						let target = getEventTarget(e) as FocusableElement;
 						let next = findNextSegment(ref.current, target.getBoundingClientRect().left, 1);
 
 						if (next) {
 							next.focus();
+							return;
 						}
 					}
 				} else {
 					focusManager.focusNext();
+					return;
 				}
-				break;
-		}
-	};
+				return false;
+			},
+		},
+		allowRepeats: true,
+	});
 
 	// Focus the first placeholder segment from the end on mouse down/touch up in the field.
 	let focusLast = () => {
@@ -125,7 +135,8 @@ export function useDatePickerGroup(
 		},
 	});
 
-	return mergeProps(pressProps, { onKeyDown });
+	// oxlint-disable-next-line react/react-compiler
+	return mergeProps(pressProps, keyboardProps);
 }
 
 function findNextSegment(group: Element, fromX: number, direction: number) {

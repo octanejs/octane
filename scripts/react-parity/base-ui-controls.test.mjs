@@ -16,7 +16,7 @@ const manifest = JSON.parse(
 );
 
 test('Base UI classifies every port-authored test exactly once', () => {
-	assert.deepEqual(verifyPortTestClassifications(root, 'base-ui'), { tests: 28 });
+	assert.deepEqual(verifyPortTestClassifications(root, 'base-ui'), { tests: 29 });
 });
 
 test('Base UI differential lane rejects a renamed declared case', () => {

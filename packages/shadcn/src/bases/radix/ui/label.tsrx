@@ -3,7 +3,7 @@
 // dropped — octane has no RSC axis).
 import { Label as LabelPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface LabelProps extends Record<string, unknown> {
 	className?: string;

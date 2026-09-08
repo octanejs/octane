@@ -1,4 +1,5 @@
 /** @jsxImportSource octane */
+import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 // Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria-components/src/DropZone.tsx).
 /*
  * Copyright 2023 Adobe. All rights reserved.
@@ -154,8 +155,8 @@ export const DropZone = forwardRef(function DropZone(
 					while (target && nodeContains(dropzoneRef.current, target)) {
 						if (isFocusable(target)) {
 							break;
-						} else if (target === dropzoneRef.current) {
-							buttonRef.current?.focus();
+						} else if (target === dropzoneRef.current && buttonRef.current) {
+							focusWithoutScrolling(buttonRef.current);
 							break;
 						}
 

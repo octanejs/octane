@@ -18,6 +18,9 @@ test('distinguishes custom registrars from render helpers with test-prefixed nam
 			testCustomMatrix('custom helper', () => {});
 			testNamedCase(getTitle(), handler);
 			await testRender(<App />, {width: 10, height: 6});
+			it('hydrates', async () => {
+				await testSSR(__filename, '<App />', () => {});
+			});
 		`),
 		[
 			{ name: 'testCustomMatrix', occurrences: 1 },
@@ -27,6 +30,20 @@ test('distinguishes custom registrars from render helpers with test-prefixed nam
 });
 
 describe('extractTestCases', () => {
+	test('counts conditional direct registrar aliases and retains their gate', () => {
+		const source = "const itBrowser = isWebKit() ? it.skip : it; itBrowser('works', () => {});";
+		assert.deepEqual(findPossibleUnexpandedRegistrars(source), []);
+		const cases = extractTestCases(source);
+		assert.equal(cases.length, 1);
+		assert.equal(cases[0].estimatedRegistrations, 1);
+		assert.equal(cases[0].gate.expression, 'isWebKit() ? it.skip : it');
+		assert.equal(
+			findPossibleUnexpandedRegistrars(
+				"const itBrowser = arbitrary(); itBrowser('works', () => {});",
+			).length,
+			1,
+		);
+	});
 	test('extracts direct registrations without matching comments, strings, or regexes', () => {
 		const cases = extractTestCases(
 			String.raw`

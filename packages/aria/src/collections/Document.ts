@@ -437,6 +437,9 @@ export class Document<T, C extends BaseCollection<T> = BaseCollection<T>> {
 
 	subscribe(fn: () => void): () => boolean {
 		this.subscriptions.add(fn);
+		if (this.queuedRender) {
+			fn();
+		}
 		return (): boolean => this.subscriptions.delete(fn);
 	}
 

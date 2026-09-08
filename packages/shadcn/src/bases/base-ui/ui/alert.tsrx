@@ -10,7 +10,7 @@
 // interleave, so every part uses the `@{ … }` shorthand.
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { DivProps } from '../../../lib/types';
 
 export const alertVariants = cva(

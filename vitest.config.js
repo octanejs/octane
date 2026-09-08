@@ -4496,13 +4496,14 @@ export default defineConfig({
 					],
 				},
 			},
-			{
+			...['shadcn-differential', 'shadcn-base-ui-differential'].map((name) => ({
 				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'shadcn-differential',
+					name,
 					include: [
-						'packages/shadcn/tests/differential/**/*.test.ts',
-						'packages/shadcn/tests/differential/**/*.test.tsx',
+						name === 'shadcn-differential'
+							? 'packages/shadcn/tests/differential/parity.test.ts'
+							: 'packages/shadcn/tests/differential/base-ui-latest.test.ts',
 					],
 					environment: 'jsdom',
 					// Rewrites @octanejs/shadcn subpaths to the matching vendored,
@@ -4521,7 +4522,7 @@ export default defineConfig({
 						},
 					],
 				},
-			},
+			})),
 			{
 				// No react-parity lane owns `project: "shadcn-ssr"`, so leave this on ordinary
 				// shards rather than marking the package-authored SSR suite as parity-owned.
@@ -4549,6 +4550,8 @@ export default defineConfig({
 						'packages/aria/tests/**/*.test.tsx',
 						'!packages/aria/tests/ssr/**/*.test.ts',
 						'!packages/aria/tests/differential/**/*.test.ts',
+						'!packages/aria/tests/token-field-value.test.ts',
+						'!packages/aria/tests/browser/**/*.test.ts',
 					],
 					environment: 'jsdom',
 					globals: false,
@@ -4570,6 +4573,36 @@ export default defineConfig({
 						},
 					],
 				},
+			},
+			{
+				testExecution: { group: 'heavy-browser', browsers: ['chromium'] },
+				test: {
+					name: 'aria-browser',
+					include: ['packages/aria/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'aria-token-value-pristine',
+					include: ['packages/aria/upstream/react-stately/test/tokenfield/TokenFieldValue.test.ts'],
+					environment: 'node',
+					globals: true,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'aria-token-value-adapted',
+					include: ['packages/aria/tests/token-field-value.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane()],
 			},
 			{
 				test: {

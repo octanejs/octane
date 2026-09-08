@@ -84,7 +84,7 @@ export interface DOMProps extends StyleProps, SharedDOMProps {
 
 export type ClassNameOrFunction<T> =
 	string | ((values: T & { defaultClassName: string | undefined }) => string);
-type StyleOrFunction<T> =
+export type StyleOrFunction<T> =
 	CSSProperties | ((values: T & { defaultStyle: CSSProperties }) => CSSProperties | undefined);
 
 export interface StyleRenderProps<T, E extends string = 'div'> extends DOMRenderProps<E, T> {

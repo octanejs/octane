@@ -28,7 +28,7 @@ import { RadioGroup as RadioGroupPrimitive } from '@octanejs/base-ui/radio-group
 import { Radio as RadioPrimitive } from '@octanejs/base-ui/radio';
 import { CircleIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string } & Record<string, unknown>;
 

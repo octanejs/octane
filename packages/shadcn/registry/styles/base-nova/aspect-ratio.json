@@ -8,11 +8,13 @@
       "path": "ui/aspect-ratio.tsrx",
       "type": "registry:ui",
       "target": "components/ui/aspect-ratio.tsrx",
-      "content": "// Base UI base aspect-ratio — presentational, no headless primitive in any base.\n//\n// UNVERIFIED PROVENANCE: derived from this package's React Aria base rather than transcribed\n// from upstream's `bases/base-ui/ui/aspect-ratio.tsx`, which was not available at port time.\n// `alert` was confirmed byte-identical between the two bases, which is why this is plausible —\n// but it is not proof, and the bases DO diverge elsewhere. Diff the class strings against the\n// upstream source before treating this as ported.\nimport { cn } from '@/lib/utils';\nimport type { DivProps } from '@/lib/types';\n\nexport interface AspectRatioProps extends DivProps {\n\tratio: number;\n}\n\nexport function AspectRatio({ ratio, className, ...props }: AspectRatioProps) @{\n\t<div\n\t\tdata-slot=\"aspect-ratio\"\n\t\tstyle={{\n\t\t\t'--ratio': ratio,\n\t\t} as Record<string, string | number>}\n\t\tclassName={cn('relative aspect-(--ratio)', className)}\n\t\t{...props}\n\t/>\n}\n"
+      "content": "// Base UI base aspect-ratio — presentational, no headless primitive in any base.\n//\n// UNVERIFIED PROVENANCE: derived from this package's React Aria base rather than transcribed\n// from upstream's `bases/base-ui/ui/aspect-ratio.tsx`, which was not available at port time.\n// `alert` was confirmed byte-identical between the two bases, which is why this is plausible —\n// but it is not proof, and the bases DO diverge elsewhere. Diff the class strings against the\n// upstream source before treating this as ported.\nimport { cn } from 'cn';\nimport type { DivProps } from '@/lib/types';\n\nexport interface AspectRatioProps extends DivProps {\n\tratio: number;\n}\n\nexport function AspectRatio({ ratio, className, ...props }: AspectRatioProps) @{\n\t<div\n\t\tdata-slot=\"aspect-ratio\"\n\t\tstyle={{\n\t\t\t'--ratio': ratio,\n\t\t} as Record<string, string | number>}\n\t\tclassName={cn('relative aspect-(--ratio)', className)}\n\t\t{...props}\n\t/>\n}\n"
     }
   ],
+  "dependencies": [
+    "cn"
+  ],
   "registryDependencies": [
-    "@octane/types",
-    "@octane/utils"
+    "@octane/types"
   ]
 }

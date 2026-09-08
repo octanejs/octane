@@ -786,7 +786,7 @@ function ListBoxDropIndicator(props: ListBoxDropIndicatorProps): any {
 
 export interface ListBoxLoadMoreItemProps
 	extends
-		Omit<LoadMoreSentinelProps, 'collection'>,
+		Omit<LoadMoreSentinelProps, 'collection' | 'direction'>,
 		StyleProps,
 		DOMRenderProps<'div', undefined>,
 		GlobalDOMAttributes {

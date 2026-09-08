@@ -16,7 +16,7 @@
 // rather than upstream's Base UI source.
 import { Switch as SwitchPrimitive } from '@octanejs/base-ui/switch';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface SwitchProps extends Record<string, unknown> {
 	className?: string;

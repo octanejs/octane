@@ -133,7 +133,8 @@ function viteConfigModuleRunner(vite) {
 			function visit(module) {
 				if (seen.has(module)) return;
 				seen.add(module);
-				if (module.file) dependencies.add(module.file);
+				// Virtual module IDs are not filesystem paths and cannot be watched.
+				if (module.file && !module.file.includes('\0')) dependencies.add(module.file);
 				for (const imported of module.importedModules) visit(imported);
 			}
 			for (const root of roots) visit(root);
