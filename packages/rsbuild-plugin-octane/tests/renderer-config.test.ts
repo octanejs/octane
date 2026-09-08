@@ -189,6 +189,24 @@ describe('Rsbuild renderer configuration', () => {
 		for (const plugin of plugins) expect(plugin.options.parallel).toEqual(parallel);
 	});
 
+	it('shares an explicit text type project with browser and server compilers', async () => {
+		writeProject(root, true);
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: {
+				plugins: [pluginOctane({ textTypes: { tsconfig: 'tsconfig.json' } })],
+			},
+		});
+		const plugins = (await instance.initConfigs({ action: 'build' }))
+			.flatMap((config) => config.plugins ?? [])
+			.filter((plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin);
+
+		expect(plugins).toHaveLength(2);
+		for (const plugin of plugins) {
+			expect(plugin.options.textTypes).toEqual({ tsconfig: 'tsconfig.json' });
+		}
+	});
+
 	it('enables Strong mode for compiler-only projects without an app config', async () => {
 		writeProject(root, false);
 		rmSync(join(root, 'octane.config.ts'));

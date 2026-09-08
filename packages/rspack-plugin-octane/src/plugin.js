@@ -14,6 +14,11 @@ import {
 	inferRspackEnvironment,
 	normalizePluginOptions,
 } from './shared.js';
+import {
+	disposeTextTypeCompiler,
+	invalidateTextTypeCompiler,
+	registerTextTypeCompiler,
+} from './text-types.js';
 
 const PLUGIN_NAME = 'OctaneRspackPlugin';
 const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
@@ -359,6 +364,16 @@ export class OctaneRspackPlugin {
 			compiler.options.mode === 'production' &&
 			!dev &&
 			!hotModuleReplacement;
+		// Loader worker pools cannot share one TypeScript Program. Watch and HMR
+		// use syntax-only compilation, including production-mode watch builds.
+		const textTypes =
+			this.options.textTypes !== undefined &&
+			compiler.options.mode === 'production' &&
+			!dev &&
+			!hotModuleReplacement;
+		const tsconfig = textTypes
+			? realRoot(resolve(root, this.options.textTypes.tsconfig))
+			: undefined;
 		assertProfilingDefineAvailable(compiler, profile);
 		saltPersistentCacheVersion(compiler, {
 			root,
@@ -377,7 +392,14 @@ export class OctaneRspackPlugin {
 			requireDirective: this.options.requireDirective === true,
 			transpile: this.options.transpile !== false,
 			cssModuleConstants,
+			textTypes: tsconfig,
 		});
+		if (tsconfig !== undefined) {
+			registerTextTypeCompiler(compiler, tsconfig, root);
+			compiler.hooks.run?.tap(PLUGIN_NAME, () => invalidateTextTypeCompiler(compiler));
+			compiler.hooks.watchRun?.tap(PLUGIN_NAME, () => invalidateTextTypeCompiler(compiler));
+			compiler.hooks.shutdown?.tap(PLUGIN_NAME, () => disposeTextTypeCompiler(compiler));
+		}
 		installProfilingDefine(compiler, profile);
 		if (cssModuleConstants) {
 			installCssModuleConstants(compiler, {
@@ -420,13 +442,14 @@ export class OctaneRspackPlugin {
 			...(this.options.requireDirective === undefined
 				? null
 				: { requireDirective: this.options.requireDirective }),
+			...(tsconfig === undefined ? null : { textTypes: { tsconfig } }),
 		};
 		compiler.options.module.rules.push({
 			test: OCTANE_RULE,
 			type: 'javascript/auto',
 			enforce: 'pre',
 			use:
-				this.options.parallel === false
+				this.options.parallel === false || textTypes
 					? [{ loader: loaderPath, options: loaderOptions }]
 					: [
 							{ loader: finalizeLoaderPath, options: loaderOptions },

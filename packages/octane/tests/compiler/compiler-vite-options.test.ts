@@ -4,6 +4,8 @@ import { parseModule } from '@tsrx/core';
 import { describe, expect, it, vi } from 'vitest';
 import type { Plugin } from 'vite';
 import { octane } from 'octane/compiler/vite';
+import { compile } from 'octane/compiler';
+import { createTextTypeFixture } from '../_text-type-project.js';
 import {
 	findDescriptorChildrenExports,
 	findDescriptorChildrenImports,
@@ -149,6 +151,125 @@ function isChildrenBlock(code: string, value: any): boolean {
 }
 
 describe('octane/compiler/vite public options', () => {
+	it('requires an explicit nonempty tsconfig path for typed text', () => {
+		expect(() => octane({ textTypes: { tsconfig: ' tsconfig.json ' } })).toThrow(
+			'`textTypes` requires { tsconfig: string }.',
+		);
+	});
+
+	it('uses one opted-in TypeScript text proof for client and server production transforms', async () => {
+		const source = `import type { Label } from './model';
+export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
+		const consumer = createTextTypeFixture({
+			'App.tsrx': source,
+			'model.ts': 'export type Label = string;',
+		});
+		const plugin = octane({ hmr: false, textTypes: { tsconfig: consumer.tsconfig } });
+		const filename = consumer.file('App.tsrx');
+		try {
+			await (plugin.config as any)({ root: consumer.directory }, { command: 'build' });
+			await (plugin.configResolved as any)({
+				root: consumer.directory,
+				command: 'build',
+				build: {},
+				define: {},
+			});
+			const facts = consumer.project.snapshot(filename, source);
+			const canonical = '/App.tsrx';
+			for (const ssr of [false, true]) {
+				const result = await transform(plugin, source, filename, { ssr });
+				const mode = ssr ? ('server' as const) : ('client' as const);
+				const options = { hmr: false, mode, textTypeFacts: { ...facts, filename: canonical } };
+				expect(result?.code).toBe(compile(source, canonical, options).code);
+				expect(result?.code).not.toBe(compile(source, canonical, { hmr: false, mode }).code);
+				// Vite can close one environment before beginning the other.
+				if (!ssr) await (plugin.closeBundle as any)?.();
+			}
+		} finally {
+			await (plugin.closeBundle as any)?.();
+			consumer.dispose();
+		}
+	});
+	it('fails if an imported type changes between production targets', async () => {
+		const source = `import type { Label } from './model';
+export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
+		const consumer = createTextTypeFixture({
+			'App.tsrx': source,
+			'model.ts': 'export type Label = string;',
+		});
+		const plugin = octane({ hmr: false, textTypes: { tsconfig: consumer.tsconfig } });
+		const filename = consumer.file('App.tsrx');
+		try {
+			await (plugin.config as any)({ root: consumer.directory }, { command: 'build' });
+			await (plugin.configResolved as any)({
+				root: consumer.directory,
+				command: 'build',
+				build: {},
+				define: {},
+			});
+			await transform(plugin, source, filename, { ssr: false });
+			consumer.write('model.ts', 'export type Label = number;');
+			(plugin.watchChange as any)?.(consumer.file('model.ts'));
+			await expect(
+				Promise.resolve().then(() => transform(plugin, source, filename, { ssr: true })),
+			).rejects.toThrow(/text types changed during the client\/server build/);
+		} finally {
+			await (plugin.closeBundle as any)?.();
+			consumer.dispose();
+		}
+	});
+
+	it('keeps the optional checker out of watched production builds', async () => {
+		const plugin = octane({ hmr: false, textTypes: { tsconfig: 'absent.json' } });
+		await (plugin.config as any)({ root: ROOT }, { command: 'build' });
+		await (plugin.configResolved as any)({
+			root: ROOT,
+			command: 'build',
+			build: { watch: {} },
+			define: {},
+		});
+		const code = (await transform(plugin))?.code;
+		expect(code).toBe(compile(SOURCE, '/src/App.tsrx', { hmr: false }).code);
+		await (plugin.closeBundle as any)?.();
+	});
+
+	it('keeps the optional checker out of development transforms', async () => {
+		const plugin = octane({ hmr: false, textTypes: { tsconfig: 'absent.json' } });
+		await (plugin.config as any)({ root: ROOT }, { command: 'serve' });
+		await (plugin.configResolved as any)({
+			root: ROOT,
+			command: 'serve',
+			build: {},
+			define: {},
+		});
+		const code = (await transform(plugin))?.code;
+		expect(code).toBe(compile(SOURCE, '/src/App.tsrx', { hmr: false }).code);
+		await (plugin.closeBundle as any)?.();
+	});
+
+	it('skips TypeScript analysis of host-owned project TSX modules', async () => {
+		const source = 'export function App() { return <p>host-owned</p>; }';
+		const consumer = createTextTypeFixture({ 'App.tsx': source });
+		const plugin = octane({
+			hmr: false,
+			requireDirective: true,
+			textTypes: { tsconfig: 'absent.json' },
+		});
+		try {
+			await (plugin.config as any)({ root: consumer.directory }, { command: 'build' });
+			await (plugin.configResolved as any)({
+				root: consumer.directory,
+				command: 'build',
+				build: {},
+				define: {},
+			});
+			expect(await transform(plugin, source, consumer.file('App.tsx'))).toBeNull();
+		} finally {
+			await (plugin.closeBundle as any)?.();
+			consumer.dispose();
+		}
+	});
+
 	it('classifies one immutable authored AST the same as the source string', () => {
 		const id = `${ROOT}/src/App.tsrx`;
 		const source = `

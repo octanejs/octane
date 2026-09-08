@@ -26,6 +26,7 @@ import {
 	findDescriptorChildrenExports,
 	findDescriptorChildrenImports,
 	findVoidComponentImports,
+	resolveRendererForFile,
 } from './bundler.js';
 import {
 	isPlainCssModuleId,
@@ -537,6 +538,18 @@ export function octane(options = {}) {
 		throw new TypeError('octane/compiler/vite: `strong` must be a boolean when provided.');
 	}
 	if (
+		options.textTypes !== undefined &&
+		(options.textTypes === null ||
+			typeof options.textTypes !== 'object' ||
+			Array.isArray(options.textTypes) ||
+			Object.keys(options.textTypes).some((key) => key !== 'tsconfig') ||
+			typeof options.textTypes.tsconfig !== 'string' ||
+			options.textTypes.tsconfig.trim() !== options.textTypes.tsconfig ||
+			options.textTypes.tsconfig.length === 0)
+	) {
+		throw new TypeError('octane/compiler/vite: `textTypes` requires { tsconfig: string }.');
+	}
+	if (
 		options.cssModuleConstants !== undefined &&
 		typeof options.cssModuleConstants !== 'function'
 	) {
@@ -592,6 +605,58 @@ export function octane(options = {}) {
 	// CSS naming/virtual providers can differ between them, so never key a proof
 	// merely by its path or share a previous build's final-module snapshot.
 	const cssModuleProofStates = new Map();
+	let textTypeProject = null;
+	let createTextTypeProject = null;
+	let typedTextEnabled = false;
+	const textTypeFiles = new Map();
+	const releaseTextTypeProject = () => {
+		textTypeProject?.dispose();
+		textTypeProject = null;
+	};
+	const resetTextTypes = () => {
+		releaseTextTypeProject();
+		createTextTypeProject = null;
+		typedTextEnabled = false;
+		textTypeFiles.clear();
+	};
+	const textFactsFor = (source, id) => {
+		if (!typedTextEnabled || createTextTypeProject === null) return undefined;
+		const file = cleanModuleId(id);
+		if (!nodePath.isAbsolute(file) || !/\.(?:tsrx|tsx)$/.test(file) || !nodeFs.existsSync(file)) {
+			return undefined;
+		}
+		// Installed source packages may use another tsconfig and need not be in
+		// this project's TypeScript graph. Their ordinary syntax path stays intact.
+		if (!compiler._isProjectOwnedSource(file)) return undefined;
+		const canonical = compiler._canonicalModuleId(file);
+		const pragmaOwned = file.endsWith('.tsx') && compiler._pragmaClaimsOwnership(source);
+		if (!compiler._passesOwnershipGate(file, canonical, pragmaOwned)) return undefined;
+		if (resolveRendererForFile(compiler.renderers, canonical).target !== 'dom') return undefined;
+		textTypeProject ??= createTextTypeProject({
+			tsconfig: nodePath.resolve(projectRoot, options.textTypes.tsconfig),
+			root: projectRoot,
+			renderers: options.renderers,
+		});
+		const facts = textTypeProject.snapshot(file, source);
+		const previous = textTypeFiles.get(canonical);
+		if (
+			previous !== undefined &&
+			(previous.sourceVersion !== facts.sourceVersion ||
+				previous.projectVersion !== facts.projectVersion)
+		) {
+			throw new Error(
+				`Octane text types changed during the client/server build for ${JSON.stringify(canonical)}. Restart the build to keep hydration consistent.`,
+			);
+		}
+		textTypeFiles.set(canonical, {
+			sourceVersion: facts.sourceVersion,
+			projectVersion: facts.projectVersion,
+		});
+		// Runtime compiler IDs are portable root-relative paths. TypeScript reads
+		// the real file; only its filename is translated after checking that exact
+		// source against the project. Both targets reuse this one proof generation.
+		return { ...facts, filename: canonical };
+	};
 	const cssModuleProofState = (context, environment) => {
 		const key = context.environment ?? environment;
 		let state = cssModuleProofStates.get(key);
@@ -622,6 +687,7 @@ export function octane(options = {}) {
 	const forceSsr = options.ssr;
 
 	const resetCompiler = (root) => {
+		resetTextTypes();
 		descriptorSourceCache.clear();
 		descriptorExportCache.clear();
 		descriptorGraphCache.clear();
@@ -701,12 +767,20 @@ export function octane(options = {}) {
 			// proof to one-shot production builds where the graph is compiled together.
 			specializeProductionRoots = config.command === 'build' && config.build?.watch == null;
 			specializeCssModuleConstants = specializeProductionRoots && !hmrEnabled;
+			typedTextEnabled =
+				options.textTypes !== undefined && specializeProductionRoots && !hmrEnabled;
+			if (typedTextEnabled) {
+				return import('./typescript.js').then((module) => {
+					createTextTypeProject = module.createTextTypeProject;
+				});
+			}
 		},
 		buildStart() {
 			if (this.environment === undefined) cssModuleProofStates.clear();
 			else cssModuleProofStates.delete(this.environment);
 		},
 		buildEnd(error) {
+			if (error) releaseTextTypeProject();
 			const keys = this.environment === undefined ? ['client', 'server'] : [this.environment];
 			for (const key of keys) {
 				const state = cssModuleProofStates.get(key);
@@ -720,12 +794,17 @@ export function octane(options = {}) {
 		},
 		watchChange(id) {
 			compiler.invalidate(id);
+			// A one-shot build can receive a watch event mid-build and must fail closed.
+			textTypeProject?.invalidate(cleanModuleId(id));
 			// A barrel can cache a classification reached through this source, so
 			// invalidate the small descriptor graph as a unit on authored edits.
 			descriptorSourceCache.clear();
 			descriptorExportCache.clear();
 			descriptorGraphCache.clear();
 			cssModuleProofStates.clear();
+		},
+		closeBundle() {
+			releaseTextTypeProject();
 		},
 		generateBundle(_outputOptions, bundle) {
 			if (!emitClientReferenceManifest) return;
@@ -814,6 +893,7 @@ export function octane(options = {}) {
 						? null
 						: { _descriptorChildrenExportsProof: preflight.descriptorExportsProof }),
 					environment,
+					...(typedTextEnabled ? { textTypeFacts: textFactsFor(code, id) } : null),
 					hmr: !server && hmrEnabled ? 'vite' : false,
 					// DEV server transforms also carry SSR-only diagnostics. HMR itself
 					// remains client-only; an explicit `hmr: false` keeps both transforms

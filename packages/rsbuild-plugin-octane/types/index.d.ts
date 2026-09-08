@@ -11,6 +11,13 @@ export {
 
 export interface OctaneRsbuildPluginOptions {
 	/**
+	 * @experimental TypeScript text proofs in one-shot production browser and
+	 * server builds. Relative tsconfig paths resolve from the project root.
+	 * Watch/HMR and development builds retain syntax-only classification.
+	 * Requires the optional TypeScript peer; see the Rspack option for caching.
+	 */
+	textTypes?: OctaneRspackPluginOptions['textTypes'];
+	/**
 	 * @experimental Fold authenticated JavaScript CSS-module exports in one-shot
 	 * production builds. Uses the Rspack plugin's exact-source provider contract;
 	 * native `css/module` remains unchanged. Disabled by default.

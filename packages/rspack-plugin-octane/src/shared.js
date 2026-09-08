@@ -46,6 +46,7 @@ const LOADER_OPTION_KEYS = new Set([
 	'requireDirective',
 	'universalRuntime',
 	'layerSpecializations',
+	'textTypes',
 ]);
 const PLUGIN_OPTION_KEYS = new Set([
 	...LOADER_OPTION_KEYS,
@@ -216,6 +217,21 @@ function normalizeOptions(value, plugin) {
 		throw new TypeError('@octanejs/rspack-plugin: `exclude` must be an array of path strings.');
 	}
 	if (plugin) assertBooleanOption(options, 'transpile');
+	if (options.textTypes !== undefined) {
+		if (
+			options.textTypes === null ||
+			typeof options.textTypes !== 'object' ||
+			Array.isArray(options.textTypes) ||
+			Object.keys(options.textTypes).some((key) => key !== 'tsconfig') ||
+			typeof options.textTypes.tsconfig !== 'string' ||
+			options.textTypes.tsconfig.trim() !== options.textTypes.tsconfig ||
+			!options.textTypes.tsconfig
+		) {
+			throw new TypeError(
+				'@octanejs/rspack-plugin: `textTypes` must be an object with a non-empty `tsconfig` path.',
+			);
+		}
+	}
 	if (
 		plugin &&
 		options.cssModuleConstants !== undefined &&
@@ -246,6 +262,9 @@ function normalizeOptions(value, plugin) {
 		...(options.requireDirective === undefined
 			? null
 			: { requireDirective: options.requireDirective }),
+		...(options.textTypes === undefined
+			? null
+			: { textTypes: Object.freeze({ tsconfig: options.textTypes.tsconfig }) }),
 		...(plugin && parallel !== undefined ? { parallel } : null),
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
 		...(plugin && options.runtime !== undefined ? { runtime: options.runtime } : null),

@@ -15,7 +15,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import rspack from '@rspack/core';
 import { JSDOM } from 'jsdom';
 import { compile as compileOctane } from 'octane/compiler';
+import { renderToString } from 'octane/server';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { evaluateCompiledFixtureCode } from '../../octane/tests/_server-fixture.js';
 import { getOctaneRspackBuildInfo, OctaneRspackPlugin } from '../src/index.js';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
@@ -978,6 +980,94 @@ globalThis.__octane_descriptor_result__ = renderToString(App, {}).html;
 		expect(profiled).toContain('/src/App.tsrx#App');
 		expect(normalAgain).not.toContain('/src/App.tsrx#App');
 	}, 30_000);
+
+	it('recompiles an unchanged component after an imported text type changes', async () => {
+		const component = write(
+			root,
+			'src/Typed.tsx',
+			`/** @jsxImportSource octane */
+import type { Label } from './model';
+export function Typed(props: { label: Label }) { return <p>before{props.label}after</p>; }
+`,
+		);
+		write(root, 'src/model.ts', 'export type Label = string;\n');
+		write(root, 'src/text-entry.js', `export { Typed } from './Typed.tsx';\n`);
+		const tsconfig = write(
+			root,
+			'tsconfig.json',
+			JSON.stringify({
+				compilerOptions: {
+					strict: true,
+					target: 'ESNext',
+					module: 'ESNext',
+					moduleResolution: 'Bundler',
+					jsx: 'react-jsx',
+					jsxImportSource: 'octane',
+					skipLibCheck: true,
+					types: [],
+				},
+				include: ['src/**/*'],
+			}),
+		);
+		const packageFile = join(root, 'node_modules/octane/package.json');
+		const packageManifest = JSON.parse(readFileSync(packageFile, 'utf8'));
+		packageManifest.exports['./jsx-runtime'] = './jsx-runtime.d.ts';
+		writeFileSync(packageFile, JSON.stringify(packageManifest));
+		write(
+			root,
+			'node_modules/octane/jsx-runtime.d.ts',
+			`export namespace JSX {
+	interface Element { readonly __element: unique symbol }
+	interface IntrinsicElements { [name: string]: any }
+}
+`,
+		);
+		const cacheDirectory = join(root, '.rspack-text-types-cache');
+		const build = async (index: number) => {
+			const stats = await compile({
+				name: 'text-type-import-cache',
+				context: root,
+				mode: 'production',
+				target: 'node',
+				entry: './src/text-entry.js',
+				optimization: { minimize: false },
+				output: { path: join(root, `dist-text-types-${index}`), filename: 'bundle.js' },
+				cache: {
+					type: 'persistent',
+					version: 'user-cache-v1',
+					storage: { type: 'filesystem', directory: cacheDirectory },
+				},
+				plugins: [new OctaneRspackPlugin({ textTypes: { tsconfig } })],
+			});
+			const module = [...stats.compilation.modules].find(
+				(item: any) => item.resource === component,
+			) as any;
+			expect(getOctaneRspackBuildInfo(module)?.transformKind).toBe('compile');
+			const code = module.originalSource()?.source();
+			expect(code).toBeTypeOf('string');
+			return evaluateCompiledFixtureCode(String(code), component, 'server', undefined).Typed;
+		};
+
+		const first = await build(1);
+		const initialHtml = (await renderToString(first, { label: 'first' })).html.replace(
+			/<!--.*?-->/g,
+			'',
+		);
+		expect(initialHtml).toContain('beforefirstafter');
+		// Exercise the boundary of the first build's static string proof to
+		// distinguish it from a syntax-only build before checking invalidation.
+		const { html: oldTypedHtml } = await renderToString(first, { label: true });
+		expect(oldTypedHtml.replace(/<!--.*?-->/g, '')).toContain('beforetrueafter');
+		// The component source is unchanged and its type-only import is absent
+		// from the emitted module graph. A persistent cached text binding would
+		// incorrectly stringify the newly valid boolean child.
+		write(root, 'src/model.ts', 'export type Label = boolean;\n');
+		const second = await build(2);
+		const { html: rendered } = await renderToString(second, { label: true });
+		const html = rendered.replace(/<!--.*?-->/g, '');
+		expect(html).toContain('beforeafter');
+		expect(html).not.toContain('true');
+	}, 60_000);
 
 	it.each(['before', 'after'] as const)(
 		'rejects a conflicting reserved define applied %s the Octane plugin',

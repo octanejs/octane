@@ -1184,6 +1184,9 @@ class OctaneBundlerCompiler {
 				hmr,
 				mode: environment,
 				dev,
+				...(renderer.target === 'dom' && options.textTypeFacts !== undefined
+					? { textTypeFacts: options.textTypeFacts }
+					: null),
 				profile,
 				profileFilename,
 				...(inlineHookMemo ? null : { inlineHookMemo: false }),

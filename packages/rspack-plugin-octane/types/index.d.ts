@@ -176,6 +176,17 @@ export interface OctaneRspackLoaderOptions {
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
 	/**
+	 * @experimental Prove primitive DOM text children from the TypeScript project
+	 * in one-shot production builds. Relative paths resolve from the plugin root.
+	 * Requires the optional TypeScript peer. Uses one main-thread checker per
+	 * compiler, and typed modules bypass Rspack's persistent module cache so
+	 * imported type edits are observed on the next build. Watch/HMR and
+	 * development builds retain syntax-only classification. Configure the same
+	 * tsconfig and renderers for browser and server compilation.
+	 * @default undefined
+	 */
+	textTypes?: { tsconfig: string };
+	/**
 	 * @experimental Fold proven CSS-module strings in one-shot production builds.
 	 * `true` accepts only pure, initialized named ESM string exports. A provider
 	 * may additionally authenticate immutable exports against the exact completed

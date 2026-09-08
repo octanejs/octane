@@ -195,6 +195,9 @@ describe('declarative options', () => {
 			/thread/,
 		],
 		[{ runtime: '' }, /runtime/],
+		[{ textTypes: true }, /textTypes/],
+		[{ textTypes: { tsconfig: '' } }, /textTypes/],
+		[{ textTypes: { tsconfig: 'tsconfig.json', unknown: true } }, /textTypes/],
 		[{ transform: () => {} }, /unknown option/],
 	] as const)('rejects invalid options %#', (value, message) => {
 		expect(() => normalizePluginOptions(value)).toThrow(message);
