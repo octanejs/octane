@@ -456,7 +456,11 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 		case 'ariaAttr':
 			return `${helper}IfChanged`;
 		case 'class':
-			return `${helper}IfChanged`;
+			return bind.fresh
+				? bind.ns && bind.ns !== 'html'
+					? 'updateFreshClassAttr'
+					: 'updateFreshClassName'
+				: `${helper}IfChanged`;
 		default:
 			return helper;
 	}
@@ -1172,6 +1176,8 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'setAriaAttributeIfChanged',
 	'setClassNameIfChanged',
 	'setClassAttrIfChanged',
+	'updateFreshClassName',
+	'updateFreshClassAttr',
 	'textHoleUpdate',
 	'childTextHoleUpdate',
 	...HOOK_MEMO_RUNTIME_HELPERS,
@@ -22464,7 +22470,8 @@ function planJsx(
 		// a mount-only import for deferred writes.
 		const attrHelper = attrBindingHelper(b);
 		if (attrHelper !== null) {
-			if (b.kind === 'class' && b.fresh && !b.mountOnly) ctx.runtimeNeeded.add('normalizeClass');
+			if (b.kind === 'class' && b.fresh && (!b.deferred || (!b.mountOnly && inlineBindingGuards)))
+				ctx.runtimeNeeded.add('normalizeClass');
 			if (!b.deferred) {
 				ctx.runtimeNeeded.add(attrHelper);
 				registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
@@ -24085,17 +24092,11 @@ function emitBindingMount(bind, elVar, bag) {
 		}
 		case 'class': {
 			// On SVG/MathML hosts the `className` property is read-only — fall back
-			// to setAttribute. The ordinary setter returns the composed string so a
-			// fresh literal can seed its update guard with no second composition.
-			if (bind.fresh)
-				return st(
-					b.block([
-						b.stmt(b.assignment('=', local(`_prev$${bind.id}`), b.call(callee(), el(), bind.expr))),
-						...mountHost(),
-					]),
-				);
+			// to setAttribute. A fresh literal is truthy even when it composes to
+			// an empty string, so caching its composition preserves class="".
+			const value = bind.fresh ? b.call('_$normalizeClass', bind.expr) : bind.expr;
 			const body = [
-				b.const('_v', bind.expr),
+				b.const('_v', value),
 				b.stmt(b.call(callee(), el(), V())),
 				...mountHost(),
 				b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
@@ -24396,7 +24397,8 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		case 'class': {
 			// Recompose fresh literal values on every render, including when their
 			// members have getters, but skip the DOM write for an unchanged class.
-			const value = bind.fresh ? b.call('_$normalizeClass', bind.expr) : bind.expr;
+			const value =
+				bind.fresh && inlineBindingGuards ? b.call('_$normalizeClass', bind.expr) : bind.expr;
 			if (inlineBindingGuards) {
 				return st(
 					b.block([

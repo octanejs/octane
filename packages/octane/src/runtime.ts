@@ -15052,6 +15052,22 @@ export function setClassAttrIfChanged(value: unknown, previous: unknown, el: Ele
 	return value;
 }
 
+// Compiler-only path for a fresh class literal: compare its composed value,
+// while still evaluating its array/object entries on every render. Fresh
+// literals are always truthy, so an empty result writes class="" rather than
+// removing the attribute. The ordinary setter owns hydration and journaling.
+export function updateFreshClassName(value: unknown, previous: unknown, el: Element): string {
+	const next = normalizeClass(value);
+	if (previous !== next) setClassName(el, next);
+	return next;
+}
+
+export function updateFreshClassAttr(value: unknown, previous: unknown, el: Element): string {
+	const next = normalizeClass(value);
+	if (previous !== next) setClassAttr(el, next);
+	return next;
+}
+
 /**
  * Set authored inline-script source without asking the HTML parser to interpret it.
  * This is the client half of the compiler's `<script dangerouslySetInnerHTML>`
@@ -16710,14 +16726,14 @@ import {
 } from './css.js';
 export { normalizeClass };
 
-export function setClassName(el: Element, value: unknown): string {
+export function setClassName(el: Element, value: unknown): void {
 	// clsx-compose first so arrays / objects become a class string (and the hydration
 	// compare below sees the value we actually write).
 	const cls = normalizeClass(value);
 	const hydration = activeHydration();
 	if (hydration !== null) {
 		hydration.queueClass(el, cls, true, false, value == null || value === false);
-		return cls;
+		return;
 	}
 	// Fast path on HTMLElement. For SVG/MathML hosts the compiler emits
 	// setAttribute(el, 'class', normalizeClass(...)) directly — never routes here —
@@ -16730,7 +16746,6 @@ export function setClassName(el: Element, value: unknown): string {
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (value == null || value === false) el.removeAttribute('class');
 	else (el as any).className = cls;
-	return cls;
 }
 
 // Attribute-based class setter: SVG/MathML compiled TEMPLATE bindings (where
@@ -16739,17 +16754,16 @@ export function setClassName(el: Element, value: unknown): string {
 // clsx-composes the value; a nullish/false value REMOVES the attribute (parity with
 // the generic setAttribute this binding routed through before clsx composition
 // existed).
-export function setClassAttr(el: Element, value: unknown): string | null {
+export function setClassAttr(el: Element, value: unknown): void {
 	const cls = value == null || value === false ? null : normalizeClass(value);
 	const hydration = activeHydration();
 	if (hydration !== null) {
 		hydration.queueClass(el, cls, false, true, cls === null);
-		return cls;
+		return;
 	}
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'class');
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
-	return cls;
 }
 
 // SVG-safe class setter for the de-opt / hostComponent paths, which (unlike the
