@@ -6676,93 +6676,94 @@ function schedulePostPaint(cb: () => void): void {
  * `slots[0]` binding bag, NOT on the Block/Scope instance (see Scope.slots),
  * so every BlockImpl instance shares one hidden class outright.
  *
- * All fields initialised in a single, fixed order. Item-only fields
+ * Type-only declarations leave the fixed-order constructor assignments as the
+ * only runtime field definitions, including in consumers that compile source
+ * with native class-field semantics. Item-only fields
  * (prev/next sibling, key, itemIndex) sit on every Block as null/0 so root
  * and dynamic blocks share the same shape with for-of item blocks.
  */
 class BlockImpl {
 	// Hot fields first (touched by every renderBlock / reconcile iteration).
-	body: ComponentBody;
-	props: any;
-	extra: any;
-	outputHandler: OutputHandler | null;
-	memoInChain: boolean;
-	parentNode: Node;
-	parentBlock: Block | null;
-	idState: RootIdState;
-	startMarker: Node | null;
-	endMarker: Node | null;
-	exclusiveMarkers: boolean;
-	itemIndex: number;
-	// A type-only field avoids emitting an undefined DefineNamedOwn before its Smi initialization.
+	declare body: ComponentBody;
+	declare props: any;
+	declare extra: any;
+	declare outputHandler: OutputHandler | null;
+	declare memoInChain: boolean;
+	declare parentNode: Node;
+	declare parentBlock: Block | null;
+	declare idState: RootIdState;
+	declare startMarker: Node | null;
+	declare endMarker: Node | null;
+	declare exclusiveMarkers: boolean;
+	declare itemIndex: number;
 	declare createdStamp: number;
 	// Scheduler / lifecycle.
-	pending: boolean;
-	disposed: boolean;
-	mounted: boolean;
-	renderStatus: number;
-	pendingMode: 'urgent' | 'transition' | null;
-	currentRenderMode: 'urgent' | 'transition' | null;
-	pendingDeferred: boolean;
-	currentRenderDeferred: boolean;
-	inactive: boolean;
+	declare pending: boolean;
+	declare disposed: boolean;
+	declare mounted: boolean;
+	declare renderStatus: number;
+	declare pendingMode: 'urgent' | 'transition' | null;
+	declare currentRenderMode: 'urgent' | 'transition' | null;
+	declare pendingDeferred: boolean;
+	declare currentRenderDeferred: boolean;
+	declare inactive: boolean;
 	// Hooks + cleanups (per-block state).
-	hooks: Map<HookSlot, any> | null;
-	cleanups: Cleanup[] | null;
-	effectSlots: EffectSlot[] | null;
-	children: ChildScope[] | null;
-	_slots: any[] | null;
-	refFields: string[] | null;
-	$$ctxValues: Map<Context<any>, any> | null;
+	declare hooks: Map<HookSlot, any> | null;
+	declare cleanups: Cleanup[] | null;
+	declare effectSlots: EffectSlot[] | null;
+	declare children: ChildScope[] | null;
+	declare _slots: any[] | null;
+	declare refFields: string[] | null;
+	declare $$ctxValues: Map<Context<any>, any> | null;
 	// Contexts whose value this block's subtree consumes — stamped on this block
 	// AND its memo ancestors by useContextInternal. The TRANSITIVE signal: a
 	// changed version here means "a consumer somewhere at/below me needs the new
 	// value", so the memo bailout descends rather than skipping.
-	$$ctxReads: Map<Context<any>, any> | null;
+	declare $$ctxReads: Map<Context<any>, any> | null;
 	// Contexts this block's OWN render directly read (its own body, or an inline
 	// lite descendant that shares this block). The DIRECT signal: a changed
 	// version here means THIS block must re-run; if only $$ctxReads changed, the
 	// block can bail its body and refresh just its consuming child blocks.
-	$$ctxDirect: Map<Context<any>, any> | null;
+	declare $$ctxDirect: Map<Context<any>, any> | null;
 	// Resolved-provider cache for `use(ctx)` — see Scope.$$ctxCache.
-	$$ctxCache: Map<Context<any>, any> | null;
+	declare $$ctxCache: Map<Context<any>, any> | null;
 	// Armed for React's IMPLICIT same-element bailout (beginWork's
 	// oldProps === newProps skip). Set at value-position component mounts
 	// (childSlot) — the only sites that can receive a cached descriptor back.
 	// Arming makes the block a stamping target (like __memo) so the bail's lazy
 	// consumer refresh has the context deps it needs.
-	$$implicitBail: boolean;
+	declare $$implicitBail: boolean;
 	// __thenableIdx is reset every renderBlock so pre-init costs nothing.
-	__thenableIdx: number;
+	declare __thenableIdx: number;
 	// Render-loop guard bookkeeping (see the Block interface).
-	drainStamp: number;
-	drainRenders: number;
-	crossRenderUpdate: boolean;
-	nestedUpdateChain: number;
-	nestedUpdateCount: number;
-	nestedUpdateError: boolean;
-	effectEventRenderVersion: number;
-	effectEventCompletedVersion: number;
+	declare drainStamp: number;
+	declare drainRenders: number;
+	declare crossRenderUpdate: boolean;
+	declare nestedUpdateChain: number;
+	declare nestedUpdateCount: number;
+	declare nestedUpdateError: boolean;
+	declare effectEventRenderVersion: number;
+	declare effectEventCompletedVersion: number;
 	// De-opt host node managed by this Block (deoptItemBody / hostElementBody), reused
 	// across renders. Null for all other blocks; declared so the shape stays monomorphic.
-	deoptNode: Node | null;
+	declare deoptNode: Node | null;
 	// A de-opt descriptor with a `ref` was stamped in this subtree (see Block).
-	deoptRefs: boolean;
+	declare deoptRefs: boolean;
 	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
 	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
-	slots: any[];
+	declare slots: any[];
 	// For-block item bookkeeping.
-	forSlot: ForSlot | null;
-	prevSibling: Block | null;
-	nextSibling: Block | null;
-	key: any;
+	declare forSlot: ForSlot | null;
+	declare prevSibling: Block | null;
+	declare nextSibling: Block | null;
+	declare key: any;
 	// ViewTransition boundary props (null on every other block — see Block).
-	vt: ViewTransitionProps | null;
+	declare vt: ViewTransitionProps | null;
 	// Scope contract: a Block is its own scope.
-	parent: Scope | null;
-	block: Block;
+	declare parent: Scope | null;
+	declare block: Block;
 	// Metadata.
-	kind: BlockKind;
+	declare kind: BlockKind;
 
 	constructor(
 		kind: BlockKind,
@@ -6791,7 +6792,6 @@ class BlockImpl {
 		this.endMarker = endMarker;
 		this.exclusiveMarkers = false;
 		this.itemIndex = 0;
-		this.createdStamp = 0;
 		this.pending = false;
 		this.disposed = false;
 		this.mounted = false;
@@ -6832,6 +6832,8 @@ class BlockImpl {
 		this.parent = null;
 		this.block = this as unknown as Block;
 		this.kind = kind;
+		// This field was already type-only; keep its original last own-property position.
+		this.createdStamp = 0;
 	}
 }
 
@@ -6847,21 +6849,21 @@ class BlockImpl {
  * registerSlot / unmountScope) sees identical structure.
  */
 class ScopeImpl {
-	block: Block;
-	parent: Scope | null;
-	hooks: Map<HookSlot, any> | null;
-	cleanups: Cleanup[] | null;
-	effectSlots: EffectSlot[] | null;
-	children: ChildScope[] | null;
-	_slots: any[] | null;
-	refFields: string[] | null;
-	$$ctxValues: Map<Context<any>, any> | null;
-	$$ctxReads: Map<Context<any>, any> | null;
-	$$ctxCache: Map<Context<any>, any> | null;
-	mounted: boolean;
+	declare block: Block;
+	declare parent: Scope | null;
+	declare hooks: Map<HookSlot, any> | null;
+	declare cleanups: Cleanup[] | null;
+	declare effectSlots: EffectSlot[] | null;
+	declare children: ChildScope[] | null;
+	declare _slots: any[] | null;
+	declare refFields: string[] | null;
+	declare $$ctxValues: Map<Context<any>, any> | null;
+	declare $$ctxReads: Map<Context<any>, any> | null;
+	declare $$ctxCache: Map<Context<any>, any> | null;
+	declare mounted: boolean;
 	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
 	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
-	slots: any[];
+	declare slots: any[];
 
 	constructor(parent: Scope, block: Block) {
 		this.block = block;
@@ -6872,11 +6874,11 @@ class ScopeImpl {
 		this.children = null;
 		this._slots = null;
 		this.refFields = null;
-		this.slots = [];
 		this.$$ctxValues = null;
 		this.$$ctxReads = null;
 		this.$$ctxCache = null;
 		this.mounted = false;
+		this.slots = [];
 	}
 }
 
@@ -7617,11 +7619,11 @@ function disposeReturnSlot(block: Block, state: any): void {
  * otherwise their independent updates would lose the enclosing root transaction.
  */
 class LiteBlockImpl {
-	parentNode: Node;
-	endMarker: Node | null;
-	parentBlock: Block;
-	$$ctxValues: Map<Context<any>, any> | null;
-	idState: RootIdState;
+	declare parentNode: Node;
+	declare endMarker: Node | null;
+	declare parentBlock: Block;
+	declare $$ctxValues: Map<Context<any>, any> | null;
+	declare idState: RootIdState;
 
 	constructor(parentNode: Node, endMarker: Node | null, parentBlock: Block) {
 		this.parentNode = parentNode;
