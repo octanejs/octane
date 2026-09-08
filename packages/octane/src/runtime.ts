@@ -6265,12 +6265,24 @@ function blockIsAncestorOf(anc: Block, node: Block): boolean {
 // Nearby ancestors and siblings resolve before the full chain scans. These are
 // the common comparisons in a DFS-queued commit, including a deep linear tree.
 function comparePostOrder(
-	_aBlock: Block | null,
+	aBlock: Block | null,
 	aSeq: number,
-	_bBlock: Block | null,
+	bBlock: Block | null,
 	bSeq: number,
 ): number {
-	// Deliberate ordering fault to confirm the new consumer test detects it.
+	if (aBlock !== bBlock && aBlock !== null && bBlock !== null) {
+		const aParent = aBlock.parentBlock;
+		const bParent = bBlock.parentBlock;
+		if (aParent === bBlock) return -1;
+		if (bParent === aBlock) return 1;
+		if (aParent === bParent) return aSeq - bSeq;
+		for (let b = bParent; b !== null; b = b.parentBlock) {
+			if (b === aBlock) return 1;
+		}
+		for (let a = aParent; a !== null; a = a.parentBlock) {
+			if (a === bBlock) return -1;
+		}
+	}
 	return aSeq - bSeq;
 }
 function compareEffectPostOrder(a: PendingEffect, b: PendingEffect): number {
