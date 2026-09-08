@@ -15063,6 +15063,22 @@ export function setClassAttrIfChanged(value: unknown, previous: unknown, el: Ele
 	return value;
 }
 
+// Compiler-only path for a fresh class literal: compare its composed value,
+// while still evaluating its array/object entries on every render. Fresh
+// literals are always truthy, so an empty result writes class="" rather than
+// removing the attribute. The ordinary setter owns hydration and journaling.
+export function updateFreshClassName(value: unknown, previous: unknown, el: Element): string {
+	const next = normalizeClass(value);
+	if (previous !== next) setClassName(el, next);
+	return next;
+}
+
+export function updateFreshClassAttr(value: unknown, previous: unknown, el: Element): string {
+	const next = normalizeClass(value);
+	if (previous !== next) setClassAttr(el, next);
+	return next;
+}
+
 /**
  * Set authored inline-script source without asking the HTML parser to interpret it.
  * This is the client half of the compiler's `<script dangerouslySetInnerHTML>`

@@ -29,6 +29,7 @@ describe('new scopes in a held root render', () => {
 		});
 		try {
 			const label = root.find('#committed-label');
+			expect(label.getAttribute('class')).toBe('initial');
 			const reader = root.find('#root-read');
 			root.update(FreshRootScopeHold, {
 				show: true,
@@ -40,12 +41,14 @@ describe('new scopes in a held root render', () => {
 			expect(root.find('#committed-label')).toBe(label);
 			expect(label.textContent).toBe('initial');
 			expect(label.getAttribute('title')).toBe('initial');
+			expect(label.getAttribute('class')).toBe('initial');
 			expect(root.find('#root-read')).toBe(reader);
 			expect(reader.textContent).toBe('first');
 			expect(external.textContent).toBe('external:initial');
 			expect(external.getAttribute('data-state')).toBe('initial');
 
 			await act(() => pending.resolve('second'));
+			expect(label.getAttribute('class')).toBe('next');
 			const row = root.find('#new-row');
 			expect(row.textContent).toBe('row:next:0');
 			expect(row.getAttribute('title')).toBe('row:next');
