@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
-import * as ClientRT from '../../src/index.js';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
 // P2 — hydration VALUE mismatch (text + attribute). When the server-rendered value at a
 // dynamic site differs from the client's computed value, the runtime PATCHES the DOM to the
@@ -20,30 +19,16 @@ const MARKERLESS = join(
 const SUPPRESS = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/suppress.tsrx');
 
 function serverModule(fixture: string, file: string): Record<string, any> {
-	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	// Preserve the module-local binding as well as exposing it. Compiled modules
-	// may attach definition metadata (for example `$$singleRoot`) after an
-	// exported function declaration, exactly as native ESM permits.
-	code = code.replace(/export function (\w+)/g, 'const $1 = __exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
+	return loadServerFixture(fixture, { id: file });
 }
 
-// DEV-compiled CLIENT module, eval'd against the test's runtime singleton (so the eval'd
-// component's htext/setAttribute see the SAME `hydrating` flag that hydrateRoot sets).
+// These diagnostic cases explicitly opt into development compilation in both projects.
 function devClientModule(fixture: string, file: string): Record<string, any> {
-	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'client', dev: true });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/internal\/client)?['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, 'const $1 = __exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});
+	return loadCompiledFixtureSource(readFileSync(fixture, 'utf8'), {
+		id: file,
+		mode: 'client',
+		compileOptions: { dev: true },
+	});
 }
 
 describe('hydrateRoot — VALUE mismatch (text + attribute) detect/patch/warn', () => {

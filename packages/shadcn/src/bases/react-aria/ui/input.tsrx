@@ -8,7 +8,7 @@
 import { composeRenderProps, Input as InputPrimitive } from '@octanejs/aria/components';
 import type { InputProps as InputPrimitiveProps } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface InputProps extends InputPrimitiveProps {}
 

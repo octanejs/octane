@@ -1,3 +1,16 @@
+import type { ChartOptions } from '../state/optionsSlice';
+import type { CartesianChartProps, Margin, TooltipEventType } from '../util/types';
+import type { TooltipPayloadSearcher } from '../state/tooltipSlice';
+import type { Ref } from '../util/OctaneTypes.ts';
+
+export type CartesianChartOptions = {
+	chartName: string;
+	defaultTooltipEventType: TooltipEventType;
+	validateTooltipEventTypes: ReadonlyArray<TooltipEventType>;
+	tooltipPayloadSearcher: TooltipPayloadSearcher;
+	categoricalChartProps: CartesianChartProps;
+	ref?: Ref<SVGSVGElement>;
+};
 // Port of chart/CartesianChart.tsx — the store provider + reporter components
 // every cartesian chart (BarChart, LineChart, …) shares.
 import { RechartsStoreProvider } from '../state/RechartsStoreProvider.tsrx';
@@ -9,7 +22,7 @@ import { CategoricalChart } from './CategoricalChart.tsrx';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { initialEventSettingsState } from '../state/eventSettingsSlice';
 
-const defaultMargin = { top: 5, right: 5, bottom: 5, left: 5 };
+const defaultMargin: Margin = { top: 5, right: 5, bottom: 5, left: 5 };
 
 export const defaultCartesianChartProps = {
 	accessibilityLayer: true,
@@ -22,13 +35,13 @@ export const defaultCartesianChartProps = {
 	stackOffset: 'none',
 	syncMethod: 'index',
 	...initialEventSettingsState,
-};
+} as const satisfies Partial<CartesianChartProps>;
 
 /**
  * One-time, immutable options deciding chart behavior — usually filled in by
  * the convenience wrappers (BarChart, LineChart, …).
  */
-export function CartesianChart(props) @{
+export function CartesianChart(props: CartesianChartOptions) @{
 	const rootChartProps = resolveDefaultProps(
 		props.categoricalChartProps,
 		defaultCartesianChartProps,
@@ -41,7 +54,7 @@ export function CartesianChart(props) @{
 		categoricalChartProps,
 		ref,
 	} = props;
-	const options = {
+	const options: ChartOptions = {
 		chartName,
 		defaultTooltipEventType,
 		validateTooltipEventTypes,

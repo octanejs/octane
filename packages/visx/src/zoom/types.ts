@@ -1,16 +1,8 @@
-import type { Handler, UserHandlers, WebKitGestureEvent } from '@use-gesture/core/types';
-import type {
-	MouseEvent as ReactMouseEvent,
-	PointerEvent as ReactPointerEvent,
-	RefObject,
-	TouchEvent as ReactTouchEvent,
-	WheelEvent as ReactWheelEvent,
-} from 'react';
+import type { RefObject } from 'react';
 
-export type GenericWheelEvent = ReactWheelEvent | WheelEvent;
+export type GenericWheelEvent = WheelEvent;
 
-export type InteractionEvent =
-	ReactMouseEvent | ReactTouchEvent | ReactPointerEvent | MouseEvent | TouchEvent | PointerEvent;
+export type InteractionEvent = MouseEvent | TouchEvent | PointerEvent;
 
 export interface TransformMatrix {
 	scaleX: number;
@@ -30,20 +22,15 @@ export type Translate = Pick<TransformMatrix, 'translateX' | 'translateY'>;
 
 export type Scale = Pick<TransformMatrix, 'scaleX' | 'scaleY'>;
 
-export type PinchDelta = (
-	params: Parameters<
-		Handler<
-			'pinch',
-			| TouchEvent
-			| ReactTouchEvent
-			| PointerEvent
-			| ReactPointerEvent
-			| WheelEvent
-			| ReactWheelEvent
-			| WebKitGestureEvent
-		>
-	>[0],
-) => Scale;
+type PinchDeltaState = {
+	event: TouchEvent | PointerEvent | WheelEvent;
+	origin: [number, number];
+	offset: [number, number];
+	lastOffset: [number, number];
+	memo: unknown;
+};
+
+export type PinchDelta = (params: PinchDeltaState) => Scale;
 
 export interface ScaleSignature {
 	scaleX: TransformMatrix['scaleX'];
@@ -72,9 +59,9 @@ export interface ProvidedZoom<ElementType> {
 	/** Resets the transform to the initial transform specified by props. */
 	reset: () => void;
 	/** Callback for a wheel event, updating scale based on props.wheelDelta, relative to the mouse position. */
-	handleWheel: (event: ReactWheelEvent | WheelEvent) => void;
+	handleWheel: (event: GenericWheelEvent) => void;
 	/** Callback for a pinch event, updating scale based on props.pinchDelta relative to the pinch position. */
-	handlePinch: UserHandlers['onPinch'];
+	handlePinch: (state: PinchDeltaState) => unknown;
 	/** Callback for dragEnd, sets isDragging to false. */
 	dragEnd: () => void;
 	/** Callback for dragMove, results in a scale transform. */

@@ -1,0 +1,242 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`snapshot - defaults 1`] = `
+.emotion-0 {
+  position: relative;
+  box-sizing: border-box;
+}
+
+.emotion-1 {
+  z-index: 9999;
+  border: 0;
+  clip: rect(1px, 1px, 1px, 1px);
+  height: 1px;
+  width: 1px;
+  position: absolute;
+  overflow: hidden;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.emotion-3 {
+  -webkit-align-items: center;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  cursor: default;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-flex-wrap: wrap;
+  -webkit-flex-wrap: wrap;
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+  -webkit-box-pack: justify;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+  min-height: 38px;
+  outline: 0!important;
+  position: relative;
+  -webkit-transition: all 100ms;
+  transition: all 100ms;
+  background-color: hsl(0, 0%, 100%);
+  border-color: hsl(0, 0%, 80%);
+  border-radius: 4px;
+  border-style: solid;
+  border-width: 1px;
+  box-sizing: border-box;
+}
+
+.emotion-3:hover {
+  border-color: hsl(0, 0%, 70%);
+}
+
+.emotion-4 {
+  -webkit-align-items: center;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  display: grid;
+  -webkit-flex: 1;
+  -ms-flex: 1;
+  flex: 1;
+  -webkit-box-flex-wrap: wrap;
+  -webkit-flex-wrap: wrap;
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  overflow: hidden;
+  padding: 2px 8px;
+  box-sizing: border-box;
+}
+
+.emotion-5 {
+  grid-area: 1/1/2/3;
+  color: hsl(0, 0%, 50%);
+  margin-left: 2px;
+  margin-right: 2px;
+  box-sizing: border-box;
+}
+
+.emotion-6 {
+  visibility: visible;
+  -webkit-flex: 1 1 auto;
+  -ms-flex: 1 1 auto;
+  flex: 1 1 auto;
+  display: inline-grid;
+  grid-area: 1/1/2/3;
+  grid-template-columns: 0 min-content;
+  margin: 2px;
+  padding-bottom: 2px;
+  padding-top: 2px;
+  color: hsl(0, 0%, 20%);
+  box-sizing: border-box;
+}
+
+.emotion-6:after {
+  content: attr(data-value) " ";
+  visibility: hidden;
+  white-space: pre;
+  grid-area: 1/2;
+  font: inherit;
+  min-width: 2px;
+  border: 0;
+  margin: 0;
+  outline: 0;
+  padding: 0;
+}
+
+.emotion-7 {
+  -webkit-align-items: center;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-align-self: stretch;
+  -ms-flex-item-align: stretch;
+  align-self: stretch;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-flex-shrink: 0;
+  -ms-flex-negative: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.emotion-8 {
+  -webkit-align-self: stretch;
+  -ms-flex-item-align: stretch;
+  align-self: stretch;
+  width: 1px;
+  background-color: hsl(0, 0%, 80%);
+  margin-bottom: 8px;
+  margin-top: 8px;
+  box-sizing: border-box;
+}
+
+.emotion-9 {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-transition: color 150ms;
+  transition: color 150ms;
+  color: hsl(0, 0%, 80%);
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.emotion-9:hover {
+  color: hsl(0, 0%, 60%);
+}
+
+.emotion-10 {
+  display: inline-block;
+  fill: currentColor;
+  line-height: 1;
+  stroke: currentColor;
+  stroke-width: 0;
+}
+
+<div>
+  <div
+    class=" emotion-0"
+  >
+    <span
+      class="emotion-1"
+      id="react-select-2-live-region"
+    />
+    <span
+      aria-atomic="false"
+      aria-live="polite"
+      aria-relevant="additions text"
+      class="emotion-1"
+      role="log"
+    />
+    <div
+      class=" emotion-3"
+    >
+      <div
+        class=" emotion-4"
+      >
+        <div
+          class=" emotion-5"
+          id="react-select-2-placeholder"
+        >
+          Select...
+        </div>
+        <div
+          class=" emotion-6"
+          data-value=""
+        >
+          <input
+            aria-activedescendant=""
+            aria-autocomplete="list"
+            aria-describedby="react-select-2-placeholder"
+            aria-expanded="false"
+            aria-haspopup="true"
+            autocapitalize="none"
+            autocomplete="off"
+            autocorrect="off"
+            class=""
+            id="react-select-2-input"
+            role="combobox"
+            spellcheck="false"
+            style="opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
+            tabindex="0"
+            type="text"
+            value=""
+          />
+        </div>
+      </div>
+      <div
+        class=" emotion-7"
+      >
+        <span
+          class=" emotion-8"
+        />
+        <div
+          aria-hidden="true"
+          class=" emotion-9"
+        >
+          <svg
+            aria-hidden="true"
+            class="emotion-10"
+            focusable="false"
+            height="20"
+            viewBox="0 0 20 20"
+            width="20"
+          >
+            <path
+              d="M4.516 7.548c0.436-0.446 1.043-0.481 1.576 0l3.908 3.747 3.908-3.747c0.533-0.481 1.141-0.446 1.574 0 0.436 0.445 0.408 1.197 0 1.615-0.406 0.418-4.695 4.502-4.695 4.502-0.217 0.223-0.502 0.335-0.787 0.335s-0.57-0.112-0.789-0.335c0 0-4.287-4.084-4.695-4.502s-0.436-1.17 0-1.615z"
+            />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;

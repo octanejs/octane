@@ -47,61 +47,7 @@ export function CodeBlock(props: CodeBlockProps) @{
 	const { copied, copy } = useCopyToClipboard();
 	const copyCode = () => copy(codeEl.current?.innerText ?? '');
 
-	<div class={['codeblock', 'codeblock-' + variant]}>
-		@if (showBar) {
-			<div class="codeblock-bar">
-				@if (variant === 'window') {
-					<>
-						<span class="codeblock-dot codeblock-dot-r"></span>
-						<span class="codeblock-dot codeblock-dot-y"></span>
-						<span class="codeblock-dot codeblock-dot-g"></span>
-					</>
-				}
-				@if (label) {
-					<span class="codeblock-name">{label as string}</span>
-				}
-				@if (showBarCopy) {
-					<button
-						type="button"
-						class="codeblock-copy codeblock-copy-bar"
-						aria-label="Copy the code to the clipboard"
-						onClick={copyCode}
-					>
-						<span
-							class="codeblock-copy-icon"
-							style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
-							aria-hidden="true"
-						></span>
-						<span>
-							{copied ? 'Copied' : 'Copy'}
-						</span>
-					</button>
-				}
-			</div>
-		}
-
-		<div class="codeblock-body">
-			<div class="codeblock-code" ref={codeEl}>{props.children}</div>
-			@if (showFloatCopy) {
-				<button
-					type="button"
-					class="codeblock-copy codeblock-copy-float"
-					aria-label="Copy the code to the clipboard"
-					onClick={copyCode}
-				>
-					<span
-						class="codeblock-copy-icon"
-						style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
-						aria-hidden="true"
-					></span>
-					<span>
-						{copied ? 'Copied' : 'Copy'}
-					</span>
-				</button>
-			}
-			{props.footer}
-		</div>
-
+	<>
 		<style>
 			.codeblock {
 				position: relative;
@@ -206,5 +152,60 @@ export function CodeBlock(props: CodeBlockProps) @{
 				border-radius: 0;
 			}
 		</style>
-	</div>
+		<div class={['codeblock', 'codeblock-' + variant]}>
+			@if (showBar) {
+				<div class="codeblock-bar">
+					@if (variant === 'window') {
+						<>
+							<span class="codeblock-dot codeblock-dot-r"></span>
+							<span class="codeblock-dot codeblock-dot-y"></span>
+							<span class="codeblock-dot codeblock-dot-g"></span>
+						</>
+					}
+					@if (label) {
+						<span class="codeblock-name">{label as string}</span>
+					}
+					@if (showBarCopy) {
+						<button
+							type="button"
+							class="codeblock-copy codeblock-copy-bar"
+							aria-label="Copy the code to the clipboard"
+							onClick={copyCode}
+						>
+							<span
+								class="codeblock-copy-icon"
+								style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
+								aria-hidden="true"
+							></span>
+							<span>
+								{copied ? 'Copied' : 'Copy'}
+							</span>
+						</button>
+					}
+				</div>
+			}
+
+			<div class="codeblock-body">
+				<div class="codeblock-code" ref={codeEl}>{props.children}</div>
+				@if (showFloatCopy) {
+					<button
+						type="button"
+						class="codeblock-copy codeblock-copy-float"
+						aria-label="Copy the code to the clipboard"
+						onClick={copyCode}
+					>
+						<span
+							class="codeblock-copy-icon"
+							style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
+							aria-hidden="true"
+						></span>
+						<span>
+							{copied ? 'Copied' : 'Copy'}
+						</span>
+					</button>
+				}
+				{props.footer}
+			</div>
+		</div>
+	</>
 }

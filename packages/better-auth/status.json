@@ -1,0 +1,13 @@
+{
+  "upstream": {
+    "package": "better-auth",
+    "version": "1.6.29"
+  },
+  "surface": "The public framework-agnostic Better Auth client is reused unchanged. `createAuthClient` converts the built-in session atom and plugin-provided atoms into Octane hooks while preserving endpoint actions, `$fetch`, `$store`, `$ERROR_CODES`, `$Infer`, and plugin inference. The upstream-compatible `useStore` helper is also included.",
+  "divergences": [
+    "React-framework server helpers such as `better-auth/tanstack-start` are not re-exported; use Better Auth's standard Fetch API handler or an Octane-specific server integration."
+  ],
+  "ssr": "`useStore` supplies the current Nanostore value as the server snapshot. Better Auth's session atom does not start browser refresh or network activity while rendering on the server.",
+  "verified": "2026-08-17",
+  "notes": []
+}

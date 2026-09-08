@@ -1,0 +1,27 @@
+diff --git a/tests/upstream/src/store/ReactStore.test.tsx b/tests/upstream/src/store/ReactStore.test.tsx
+--- a/tests/upstream/src/store/ReactStore.test.tsx
++++ b/tests/upstream/src/store/ReactStore.test.tsx
+@@ -80,7 +80,6 @@ describe('ReactStore', () => {
+       act(() => setProps({ controlled: 1 }));
+     }).toErrorDev([
+       'A component is changing the controlled state of value to be uncontrolled. Elements should not switch from uncontrolled to controlled (or vice versa).',
+-      'A component is changing the controlled state of value to be uncontrolled. Elements should not switch from uncontrolled to controlled (or vice versa).',
+     ]);
+   });
+ 
+@@ -97,7 +96,6 @@ describe('ReactStore', () => {
+       act(() => setProps({ controlled: undefined }));
+     }).toErrorDev([
+       'A component is changing the uncontrolled state of value to be controlled. Elements should not switch from uncontrolled to controlled (or vice versa).',
+-      'A component is changing the uncontrolled state of value to be controlled. Elements should not switch from uncontrolled to controlled (or vice versa).',
+     ]);
+   });
+ 
+@@ -202,7 +200,6 @@ describe('ReactStore', () => {
+       });
+     }).toErrorDev([
+       'ReactStore.useSyncedValues expects the same prop keys on every render. Keys should be stable.',
+-      'ReactStore.useSyncedValues expects the same prop keys on every render. Keys should be stable.',
+     ]);
+   });
+ 

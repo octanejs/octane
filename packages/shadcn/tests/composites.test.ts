@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, flushEffects } from '../../octane/tests/_helpers';
 import { flushSync } from '../../octane/src/index.js';
 import {
@@ -41,8 +41,29 @@ function pressShortcut(init: KeyboardEventInit): void {
 }
 
 describe('@octanejs/shadcn — Sidebar', () => {
+	beforeEach(() => {
+		// Sidebar's media-query effect runs during settle; jsdom has no matchMedia.
+		vi.stubGlobal(
+			'matchMedia',
+			vi.fn((media: string) => ({
+				matches: false,
+				media,
+				onchange: null,
+				addListener: () => {},
+				removeListener: () => {},
+				addEventListener: () => {},
+				removeEventListener: () => {},
+				dispatchEvent: () => false,
+			})),
+		);
+	});
+
 	afterEach(async () => {
-		await settle();
+		try {
+			await settle();
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 
 	it('provider defaults + the full desktop slot/data contract', async () => {

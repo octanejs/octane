@@ -1,0 +1,881 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@react-three/drei",
+    "version": "10.7.7",
+    "repository": {
+      "owner": "pmndrs",
+      "repo": "drei",
+      "subdirectory": null
+    },
+    "commit": "b8b99fd4ca1dfb8d821335671320512daa6efea4",
+    "integrity": "sha512-ff+J5iloR0k4tC++QtD/j9u3w5fzfgFAWDtAGQah9pF2B1YgOq/5JxqY0/aVoQG5r3xSZz0cv5tk2YuBob4xEQ=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "2e36b208b403882158daf95cae207087bbb830db4d434a79ebafffca177244c8"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "package.json", "src", "test", "tsconfig.json"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "55e1bd7f9a4bcd86361e735f17d740ee35757c7b",
+      "size": 1069
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "4663f42f19459fedcba6bf1144b0ac7879f71826",
+      "size": 4790
+    },
+    {
+      "path": "src/core/AccumulativeShadows.tsx",
+      "gitBlob": "33d3ea1587dc2bf87c7dc8b3557cbdf4a7d4b664",
+      "size": 15710
+    },
+    {
+      "path": "src/core/AdaptiveDpr.tsx",
+      "gitBlob": "98e809b73775b22e2da5a41cd850c3ba8c79265e",
+      "size": 918
+    },
+    {
+      "path": "src/core/AdaptiveEvents.tsx",
+      "gitBlob": "b02cdae11b0076e37b78557cde55700f288eeadc",
+      "size": 486
+    },
+    {
+      "path": "src/core/ArcballControls.tsx",
+      "gitBlob": "0e9eeac2f25fd596207c8a513992faea02e127cd",
+      "size": 2986
+    },
+    {
+      "path": "src/core/AsciiRenderer.tsx",
+      "gitBlob": "faa90a178f7a9ebc5c778a2eed8936bf459ec7df",
+      "size": 2088
+    },
+    {
+      "path": "src/core/Backdrop.tsx",
+      "gitBlob": "acc9172b6007d14dde4e92ebe30778feb39d003b",
+      "size": 1287
+    },
+    {
+      "path": "src/core/BakeShadows.tsx",
+      "gitBlob": "6da0a66f205fd29502d60643ec6a11048a748255",
+      "size": 374
+    },
+    {
+      "path": "src/core/BBAnchor.tsx",
+      "gitBlob": "e8346bb78b0e3237d26c359b8cd6483ee42e5b0f",
+      "size": 1474
+    },
+    {
+      "path": "src/core/Billboard.tsx",
+      "gitBlob": "637a05c7ada674c9d01fbe49198d079534d2bbcb",
+      "size": 1661
+    },
+    {
+      "path": "src/core/Bounds.tsx",
+      "gitBlob": "a6c37c2e93c4a2ff547c1c1d5961b436782144f1",
+      "size": 11687
+    },
+    {
+      "path": "src/core/Bvh.tsx",
+      "gitBlob": "c26e084cf692d7d2d5fe2ad08e52addeafcb7818",
+      "size": 4336
+    },
+    {
+      "path": "src/core/calculateScaleFactor.ts",
+      "gitBlob": "9c15c784d30299fc293aa2c5ab1a5c9d59185ed5",
+      "size": 1273
+    },
+    {
+      "path": "src/core/CameraControls.tsx",
+      "gitBlob": "588bfe87bb22efa639ad79f41673f51bd3cb051b",
+      "size": 6767
+    },
+    {
+      "path": "src/core/CameraShake.tsx",
+      "gitBlob": "6dea4553dfeca88a7cafa5a7792305bbb27456c5",
+      "size": 3297
+    },
+    {
+      "path": "src/core/CatmullRomLine.tsx",
+      "gitBlob": "4e38748b69efe4bfec5f97983665f9b0f94bb1bd",
+      "size": 2051
+    },
+    {
+      "path": "src/core/Caustics.tsx",
+      "gitBlob": "d19b1d05598d134dfab6cc506ace75055367fe0a",
+      "size": 19823
+    },
+    {
+      "path": "src/core/Center.tsx",
+      "gitBlob": "c3a70df4897940d61f10bc1fad44231fb228d951",
+      "size": 3740
+    },
+    {
+      "path": "src/core/Clone.tsx",
+      "gitBlob": "091431fa7e75400c6d6bc7aace68d9f381bdcaf4",
+      "size": 4025
+    },
+    {
+      "path": "src/core/Cloud.tsx",
+      "gitBlob": "cf8b48af58cdeb868c081f6c65472611253c7c6c",
+      "size": 11721
+    },
+    {
+      "path": "src/core/ComputedAttribute.tsx",
+      "gitBlob": "e9e7366b9d0ef432b3a25433ee9972a9e11aa6df",
+      "size": 1121
+    },
+    {
+      "path": "src/core/ContactShadows.tsx",
+      "gitBlob": "bfc6d0b9454ea4d52336f89abc1094f24d85586e",
+      "size": 5408
+    },
+    {
+      "path": "src/core/CubeCamera.tsx",
+      "gitBlob": "bd8d7c42e28b03a6a81143841df02068027f36ff",
+      "size": 2509
+    },
+    {
+      "path": "src/core/CubeTexture.tsx",
+      "gitBlob": "f11a07688c2a60d21d6e5563eb8226eb6239c7cc",
+      "size": 911
+    },
+    {
+      "path": "src/core/CubicBezierLine.tsx",
+      "gitBlob": "46a9fc9c30d8dd3526577ad9834138b6a99addd5",
+      "size": 1267
+    },
+    {
+      "path": "src/core/CurveModifier.tsx",
+      "gitBlob": "e5a9dd0713996202d05d38c94d547fc647f08e75",
+      "size": 1250
+    },
+    {
+      "path": "src/core/Decal.tsx",
+      "gitBlob": "63dabdd4265a6ab5e8c651272d7b605d62147654",
+      "size": 4663
+    },
+    {
+      "path": "src/core/Detailed.tsx",
+      "gitBlob": "a55cc8f30388f538c7e2b491f96d3683fe884a21",
+      "size": 990
+    },
+    {
+      "path": "src/core/DetectGPU.tsx",
+      "gitBlob": "953e953f561e28c6ea1ea6413b72a7aceefbf3a9",
+      "size": 520
+    },
+    {
+      "path": "src/core/DeviceOrientationControls.tsx",
+      "gitBlob": "65a6b5a8b691b06bac0cbe4325e5f198d40cd845",
+      "size": 2065
+    },
+    {
+      "path": "src/core/Edges.tsx",
+      "gitBlob": "39258bf3e9afe79e1df282293450b49a27f8c1d6",
+      "size": 2168
+    },
+    {
+      "path": "src/core/Effects.tsx",
+      "gitBlob": "a148d91313b55bd115c71339c3a66fb91b934c33",
+      "size": 3219
+    },
+    {
+      "path": "src/core/Environment.tsx",
+      "gitBlob": "f100fb32ca1cdd86498e82ffac6aa2262aa28b6e",
+      "size": 6749
+    },
+    {
+      "path": "src/core/Example.tsx",
+      "gitBlob": "053f1c773d9946816908f639b18d46ed58d6afe4",
+      "size": 1627
+    },
+    {
+      "path": "src/core/Fbo.tsx",
+      "gitBlob": "abce1c778f0a56f9cae29df8ec0dd5a36e3781be",
+      "size": 2459
+    },
+    {
+      "path": "src/core/Fbx.tsx",
+      "gitBlob": "e21867dfdcae0e28b666649d9a34ea3868a6b675",
+      "size": 667
+    },
+    {
+      "path": "src/core/FirstPersonControls.tsx",
+      "gitBlob": "422ab393717f72b987840dd12c1b0b32a047da53",
+      "size": 1520
+    },
+    {
+      "path": "src/core/Fisheye.tsx",
+      "gitBlob": "68a642078b1a3adb27c58cf56a0b1ec5abaed78f",
+      "size": 4198
+    },
+    {
+      "path": "src/core/Float.tsx",
+      "gitBlob": "9ff61cd999a46a5aa168cc3a56f46bb7abd29df1",
+      "size": 1815
+    },
+    {
+      "path": "src/core/FlyControls.tsx",
+      "gitBlob": "191687b590a430329be16894f23e133a82447165",
+      "size": 2026
+    },
+    {
+      "path": "src/core/GizmoHelper.tsx",
+      "gitBlob": "d3427806a49f949de1ba7f96395973be4ddc289f",
+      "size": 5854
+    },
+    {
+      "path": "src/core/GizmoViewcube.tsx",
+      "gitBlob": "77550dc1a05c5e9bfaf81edfe788633caf576a66",
+      "size": 4774
+    },
+    {
+      "path": "src/core/GizmoViewport.tsx",
+      "gitBlob": "60722cbd3dcc574e70dbfe6de6da9be53c5d5790",
+      "size": 4360
+    },
+    {
+      "path": "src/core/Gltf.tsx",
+      "gitBlob": "8e01adf2e573b7a04d71e0437ef03e0053c8bfb2",
+      "size": 2234
+    },
+    {
+      "path": "src/core/GradientTexture.tsx",
+      "gitBlob": "e1871f2765c1267937e56d5ede1d50eaa468443b",
+      "size": 1995
+    },
+    {
+      "path": "src/core/Grid.tsx",
+      "gitBlob": "69c1e1c896cdd171e5299a5cf5b22603de68bc81",
+      "size": 6065
+    },
+    {
+      "path": "src/core/Helper.tsx",
+      "gitBlob": "12262dde829486d8a0a3486e4fdbbdc32a7dc557",
+      "size": 1834
+    },
+    {
+      "path": "src/core/Hud.tsx",
+      "gitBlob": "b6f9f6d3c6c295797ec73ee7f6258fd3a26153ef",
+      "size": 1575
+    },
+    {
+      "path": "src/core/Image.tsx",
+      "gitBlob": "ce53d1adf07b913b83e2c7696336ad5fba470fff",
+      "size": 6034
+    },
+    {
+      "path": "src/core/index.ts",
+      "gitBlob": "014ee30af33b9d8b6b2b473470e92b24a9147636",
+      "size": 3816
+    },
+    {
+      "path": "src/core/Instances.tsx",
+      "gitBlob": "ab9e01849967f0c674c83997171d4b8172778966",
+      "size": 13114
+    },
+    {
+      "path": "src/core/Ktx2.tsx",
+      "gitBlob": "bf5b528333d529b172d7f661a1c42e058b3648eb",
+      "size": 1891
+    },
+    {
+      "path": "src/core/Lightformer.tsx",
+      "gitBlob": "a66645b36e149a326b2a4b318519365da02d212e",
+      "size": 2630
+    },
+    {
+      "path": "src/core/Line.tsx",
+      "gitBlob": "827405cdef8715524415e80d2f610b3230c4ac9d",
+      "size": 3329
+    },
+    {
+      "path": "src/core/MapControls.tsx",
+      "gitBlob": "f5eb3b069279ed792c3c63dfa924ba6b85711a36",
+      "size": 2586
+    },
+    {
+      "path": "src/core/MarchingCubes.tsx",
+      "gitBlob": "2eb56ae12145beff99dd74e27d4f336ee6dbe3a6",
+      "size": 3554
+    },
+    {
+      "path": "src/core/Mask.tsx",
+      "gitBlob": "b59e13fef96db7cee28156592d1ffb8f2eee8d7d",
+      "size": 1727
+    },
+    {
+      "path": "src/core/MatcapTexture.tsx",
+      "gitBlob": "8159512b1d2d2f68ef1129eb50fbe0c8461e39c7",
+      "size": 1809
+    },
+    {
+      "path": "src/core/meshBounds.tsx",
+      "gitBlob": "185d4ecf48a49ac8f072b43090d4176e30f64f11",
+      "size": 1102
+    },
+    {
+      "path": "src/core/MeshDiscardMaterial.tsx",
+      "gitBlob": "db345ce48d199a9b26e9911b75e319e628ce0b9c",
+      "size": 739
+    },
+    {
+      "path": "src/core/MeshDistortMaterial.tsx",
+      "gitBlob": "5350dc42cb0f75ef72df5499f23e618151ea3a8d",
+      "size": 2567
+    },
+    {
+      "path": "src/core/MeshPortalMaterial.tsx",
+      "gitBlob": "7471b8d150dc109b3af1bbb3cd8d391a4b945ba1",
+      "size": 18121
+    },
+    {
+      "path": "src/core/MeshReflectorMaterial.tsx",
+      "gitBlob": "f28b315ed81c5be68241a6361dc53c9adda74ffd",
+      "size": 9009
+    },
+    {
+      "path": "src/core/MeshRefractionMaterial.tsx",
+      "gitBlob": "8671431ecd305135b010fa9659154fa91256adb2",
+      "size": 3284
+    },
+    {
+      "path": "src/core/MeshTransmissionMaterial.tsx",
+      "gitBlob": "c26afc2517bb8b0c1ad1dd490b0701fcd6af6f65",
+      "size": 21011
+    },
+    {
+      "path": "src/core/MeshWobbleMaterial.tsx",
+      "gitBlob": "a79d076008e8384e66073f91b588e482e0281bb4",
+      "size": 2271
+    },
+    {
+      "path": "src/core/MotionPathControls.tsx",
+      "gitBlob": "38a953f5112861a43272546d35d28ded601b703a",
+      "size": 6471
+    },
+    {
+      "path": "src/core/MultiMaterial.tsx",
+      "gitBlob": "49b0cf596659e5d0ad1421c4907b48bee2c25ffc",
+      "size": 1183
+    },
+    {
+      "path": "src/core/NormalTexture.tsx",
+      "gitBlob": "a3938d896587cdcde3f3d276963eccf5da3e136b",
+      "size": 1843
+    },
+    {
+      "path": "src/core/OrbitControls.tsx",
+      "gitBlob": "eb3de5c464e5819b43ed6a1c33374c2208d73681",
+      "size": 3810
+    },
+    {
+      "path": "src/core/OrthographicCamera.tsx",
+      "gitBlob": "6f3bd989d5cbba7cad6a78cf98ab217618e9f5ff",
+      "size": 3475
+    },
+    {
+      "path": "src/core/Outlines.tsx",
+      "gitBlob": "648c29c3dc248d02b2b91419628b3f93b01a3118",
+      "size": 6009
+    },
+    {
+      "path": "src/core/PerformanceMonitor.tsx",
+      "gitBlob": "0eb67fca5fa496846a30ba43b5e15f4c65000489",
+      "size": 6213
+    },
+    {
+      "path": "src/core/PerspectiveCamera.tsx",
+      "gitBlob": "2f26c078aa9b853f88e82b00c007f6dacf03de62",
+      "size": 3297
+    },
+    {
+      "path": "src/core/PointerLockControls.tsx",
+      "gitBlob": "f8feecff76563e08c5a9d7d693eaf8e804bd3f9d",
+      "size": 3873
+    },
+    {
+      "path": "src/core/PointMaterial.tsx",
+      "gitBlob": "f747158627e6ae8fb0314e9e84dfc7c45669ae4e",
+      "size": 1610
+    },
+    {
+      "path": "src/core/Points.tsx",
+      "gitBlob": "0cdc83c5fbabbb5afa26af662cbc9e0a04adc52b",
+      "size": 8266
+    },
+    {
+      "path": "src/core/PositionalAudio.tsx",
+      "gitBlob": "71b51c66d63b52d997917030d1ae27412c0d4d1a",
+      "size": 1577
+    },
+    {
+      "path": "src/core/Preload.tsx",
+      "gitBlob": "e450c425ab2007f2c658c675d46bbd5ef606941a",
+      "size": 1299
+    },
+    {
+      "path": "src/core/Progress.tsx",
+      "gitBlob": "45152ab7dcf1f1ee8dbebb992844fe5172462915",
+      "size": 1328
+    },
+    {
+      "path": "src/core/QuadraticBezierLine.tsx",
+      "gitBlob": "4d9b5da340072515c8b21e9d9357d0fa2a7d6921",
+      "size": 2568
+    },
+    {
+      "path": "src/core/RenderCubeTexture.tsx",
+      "gitBlob": "833a7bd6fcc4bd45246a2513b3f73a8fe55aa564",
+      "size": 4643
+    },
+    {
+      "path": "src/core/RenderTexture.tsx",
+      "gitBlob": "58c7801da6f50c6d254fe2098442c8a2263d04c0",
+      "size": 5054
+    },
+    {
+      "path": "src/core/Resize.tsx",
+      "gitBlob": "58ed982b86f0b1d78e9a4fc2005abb551f0548cc",
+      "size": 1660
+    },
+    {
+      "path": "src/core/RoundedBox.tsx",
+      "gitBlob": "f8d55f7b47a0285ebaba865d6d6c5372d28d1252",
+      "size": 3010
+    },
+    {
+      "path": "src/core/Sampler.tsx",
+      "gitBlob": "827c28b103ed2292549820738d3ae5a0440eef34",
+      "size": 4673
+    },
+    {
+      "path": "src/core/ScreenQuad.tsx",
+      "gitBlob": "4f8b83b8549abbac8106542ddc0063c6e4d3beea",
+      "size": 1091
+    },
+    {
+      "path": "src/core/ScreenSizer.tsx",
+      "gitBlob": "ec86ef438dae33cb2fcf1121751f6d58ac437c5f",
+      "size": 1356
+    },
+    {
+      "path": "src/core/ScreenSpace.tsx",
+      "gitBlob": "9fada8950db569384e3a65720fcee839e62fefb4",
+      "size": 825
+    },
+    {
+      "path": "src/core/Segments.tsx",
+      "gitBlob": "025c85ae66cf80161eeee9558a9a77baf0388114",
+      "size": 4308
+    },
+    {
+      "path": "src/core/shaderMaterial.tsx",
+      "gitBlob": "3763af8f46c51a54f31c2bd441f4050c62c109f7",
+      "size": 1420
+    },
+    {
+      "path": "src/core/Shadow.tsx",
+      "gitBlob": "379821ed7f32d25fc2ca1e0f5c49af2ecd84d23f",
+      "size": 1766
+    },
+    {
+      "path": "src/core/ShadowAlpha.tsx",
+      "gitBlob": "d711ac7e26896debce787060e3448c244f544c97",
+      "size": 3668
+    },
+    {
+      "path": "src/core/shapes.tsx",
+      "gitBlob": "200380466d6649e2ab584921d942f256f9dc3db3",
+      "size": 3245
+    },
+    {
+      "path": "src/core/Sky.tsx",
+      "gitBlob": "90a43f8572c95c244c1ab6e08d0454bca2c82571",
+      "size": 1696
+    },
+    {
+      "path": "src/core/softShadows.tsx",
+      "gitBlob": "ca016c1b04ac66169e58e143a06305e28b67d1b0",
+      "size": 6056
+    },
+    {
+      "path": "src/core/Sparkles.tsx",
+      "gitBlob": "69f12a10fb079aad87057323b407d7e7142786be",
+      "size": 6379
+    },
+    {
+      "path": "src/core/Splat.tsx",
+      "gitBlob": "758af5990678f4caedc7661337e85c5445e87048",
+      "size": 23722
+    },
+    {
+      "path": "src/core/SpotLight.tsx",
+      "gitBlob": "63b38036331e1c8dece577fbfce304e7916f3d5b",
+      "size": 8556
+    },
+    {
+      "path": "src/core/SpriteAnimator.tsx",
+      "gitBlob": "1feb9bd76257305922bdfd5f4f7db377e863eaec",
+      "size": 18674
+    },
+    {
+      "path": "src/core/Stage.tsx",
+      "gitBlob": "59c3fad5d7b1c42b674a1032b1c8935462930d66",
+      "size": 5469
+    },
+    {
+      "path": "src/core/Stars.tsx",
+      "gitBlob": "3137b99651d528940405a38b3af84080cd341486",
+      "size": 3567
+    },
+    {
+      "path": "src/core/Stats.tsx",
+      "gitBlob": "bdb854229c9f1991aa6888651372df271291ddd6",
+      "size": 1115
+    },
+    {
+      "path": "src/core/StatsGl.tsx",
+      "gitBlob": "f660241bfa0be73618e6567542f84e8728596ede",
+      "size": 1853
+    },
+    {
+      "path": "src/core/Svg.tsx",
+      "gitBlob": "732e2204d47f166cd3b9ef165f8da4322c0c62d6",
+      "size": 3290
+    },
+    {
+      "path": "src/core/Text.tsx",
+      "gitBlob": "2f6b2fcce803267b15a48669755b3c9a669e8334",
+      "size": 2898
+    },
+    {
+      "path": "src/core/Text3D.tsx",
+      "gitBlob": "24d212982f6a03d466eba0a8689fea769a3afef2",
+      "size": 2965
+    },
+    {
+      "path": "src/core/Texture.tsx",
+      "gitBlob": "139d8a71270bcb90e01573b6dfef7c2b53127f45",
+      "size": 2607
+    },
+    {
+      "path": "src/core/TrackballControls.tsx",
+      "gitBlob": "84fc272b755b6f5d89e17f49ddb9ffbe2e38589b",
+      "size": 2765
+    },
+    {
+      "path": "src/core/Trail.tsx",
+      "gitBlob": "9ced0ddd05db24392d1c07295a3e68cbea691299",
+      "size": 4788
+    },
+    {
+      "path": "src/core/TrailTexture.tsx",
+      "gitBlob": "ebf30906c5beddb37e636640b6f0b9a23447ec70",
+      "size": 5899
+    },
+    {
+      "path": "src/core/TransformControls.tsx",
+      "gitBlob": "c17c99fe4577f3dbc85c7c65dca831f9d9b4dcd7",
+      "size": 5678
+    },
+    {
+      "path": "src/core/useAnimations.tsx",
+      "gitBlob": "8f82616fff98b345a6b9243d76fce5a34ff5b9e0",
+      "size": 2074
+    },
+    {
+      "path": "src/core/useAspect.tsx",
+      "gitBlob": "b971d6243c13460e0b41d1566f8e5f125deb8168",
+      "size": 458
+    },
+    {
+      "path": "src/core/useBoxProjectedEnv.tsx",
+      "gitBlob": "1b821e76e1cc9e175bceeb1354062c882a4ee75e",
+      "size": 4094
+    },
+    {
+      "path": "src/core/useCamera.tsx",
+      "gitBlob": "20bedecf15e1ce2de92bb0ba3f027fe297f6d785",
+      "size": 717
+    },
+    {
+      "path": "src/core/useContextBridge.tsx",
+      "gitBlob": "40a4cc1445fd62dfa44e3ecca23bd600f2ebd4ef",
+      "size": 826
+    },
+    {
+      "path": "src/core/useDepthBuffer.ts",
+      "gitBlob": "4fbe17e7f4156631916d409345bc5f36536f50f7",
+      "size": 1030
+    },
+    {
+      "path": "src/core/useEnvironment.tsx",
+      "gitBlob": "d2936fbb23020e06343c187969c629cb9409ec65",
+      "size": 5751
+    },
+    {
+      "path": "src/core/useFont.tsx",
+      "gitBlob": "5e5200afca5c65d2f1fc23f8ef1a61fae72fd8b1",
+      "size": 1040
+    },
+    {
+      "path": "src/core/useIntersect.tsx",
+      "gitBlob": "6e220e94ccca5018bac193b6dc58744d0a17cbd2",
+      "size": 1213
+    },
+    {
+      "path": "src/core/useSpriteLoader.tsx",
+      "gitBlob": "e0e56bb786ee3f4bdf573410eb17bef3908c6133",
+      "size": 16079
+    },
+    {
+      "path": "src/core/VideoTexture.tsx",
+      "gitBlob": "88176c84ceddc42a8a007bfd02c77ae4cb77c792",
+      "size": 4375
+    },
+    {
+      "path": "src/core/Wireframe.tsx",
+      "gitBlob": "b40bada27ff3440eb3198db99e1e09b7dc251f21",
+      "size": 5828
+    },
+    {
+      "path": "src/helpers/constants.ts",
+      "gitBlob": "e1889ba6365c0b642b8c3b67f9376e92c40899d6",
+      "size": 151
+    },
+    {
+      "path": "src/helpers/deprecated.ts",
+      "gitBlob": "e30f8f915cb1f81bf023fa5f60fddcc38317fccf",
+      "size": 263
+    },
+    {
+      "path": "src/helpers/environment-assets.ts",
+      "gitBlob": "d89e84be39c51e53a9b8fdb90847830f11539e03",
+      "size": 426
+    },
+    {
+      "path": "src/helpers/glsl/default.vert.glsl",
+      "gitBlob": "6193a9adaa25506ceaee9afe8b8a5cc44984e742",
+      "size": 120
+    },
+    {
+      "path": "src/helpers/glsl/DefaultSpotlightShadowShadows.glsl",
+      "gitBlob": "cce1ade366013349f9c4e8194785d75061e538c9",
+      "size": 172
+    },
+    {
+      "path": "src/helpers/glsl/distort.vert.glsl",
+      "gitBlob": "2b668456df99069a779887d65a4ff50e34480840",
+      "size": 58
+    },
+    {
+      "path": "src/helpers/ts-utils.tsx",
+      "gitBlob": "ee706ee9a07c67a3367feaafb69a77c0db98e1ef",
+      "size": 645
+    },
+    {
+      "path": "src/helpers/useEffectfulState.tsx",
+      "gitBlob": "27796fd6b7d682f1940ae51b8b06787e368623c9",
+      "size": 554
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "c73ad9981409b69d04adfecd2fb3803f65f03285",
+      "size": 22
+    },
+    {
+      "path": "src/materials/BlurPass.tsx",
+      "gitBlob": "50943c4e0e1a2457746733435219164bc37e698b",
+      "size": 3292
+    },
+    {
+      "path": "src/materials/ConvolutionMaterial.tsx",
+      "gitBlob": "525809b622e1d0b319e53532a2f66f41029745f4",
+      "size": 3518
+    },
+    {
+      "path": "src/materials/DiscardMaterial.tsx",
+      "gitBlob": "909fd5087cabb19a806dc91cdaf76de668345c99",
+      "size": 220
+    },
+    {
+      "path": "src/materials/MeshReflectorMaterial.tsx",
+      "gitBlob": "be7f21c0bb747650357259cdc570f2a025ada5d8",
+      "size": 7669
+    },
+    {
+      "path": "src/materials/MeshRefractionMaterial.tsx",
+      "gitBlob": "6fdf1afadce6efe614fc0db57800b3a4a885dbca",
+      "size": 6494
+    },
+    {
+      "path": "src/materials/SpotLightMaterial.tsx",
+      "gitBlob": "53615df771427f1c2aab4640db7e396a71eb36e3",
+      "size": 3090
+    },
+    {
+      "path": "src/materials/WireframeMaterial.tsx",
+      "gitBlob": "3db27c28c572a23a04f5d4d2c37de37da6ceafdf",
+      "size": 7774
+    },
+    {
+      "path": "src/native/index.ts",
+      "gitBlob": "a00c4b187f07f967fe710fdc413eb239356f140a",
+      "size": 24
+    },
+    {
+      "path": "src/native/package.json",
+      "gitBlob": "7454a265afc61b8e8bd1e509b07779519cdff808",
+      "size": 78
+    },
+    {
+      "path": "src/web/CycleRaycast.tsx",
+      "gitBlob": "e81f316642080a6f61dbc8459a380a341d606e2f",
+      "size": 3494
+    },
+    {
+      "path": "src/web/DragControls.tsx",
+      "gitBlob": "2b34e2b597af85fb70e3f190ac92b88e0ccc93b4",
+      "size": 6230
+    },
+    {
+      "path": "src/web/FaceControls.tsx",
+      "gitBlob": "3e42b8bd9e451268005295fcab4196ef4ae984f2",
+      "size": 9888
+    },
+    {
+      "path": "src/web/FaceLandmarker.tsx",
+      "gitBlob": "c680784eda309402e7b191b2ac4c071a294d19b1",
+      "size": 2015
+    },
+    {
+      "path": "src/web/Facemesh.tsx",
+      "gitBlob": "a0874f1396da9ce8cfd1d3b1180acacca92d406f",
+      "size": 108173
+    },
+    {
+      "path": "src/web/Html.tsx",
+      "gitBlob": "8249fcb3abf64062b22b7a7ed10281279adaf680",
+      "size": 16816
+    },
+    {
+      "path": "src/web/index.ts",
+      "gitBlob": "29fc9818f23090a3059cc8bfbc19dc9f0086e680",
+      "size": 639
+    },
+    {
+      "path": "src/web/KeyboardControls.tsx",
+      "gitBlob": "d02b73320391c4c91840dfff1c3147678b2426f3",
+      "size": 4777
+    },
+    {
+      "path": "src/web/Loader.tsx",
+      "gitBlob": "9f4bd158b0561d9d17acb90c0d71f7787ef21f5f",
+      "size": 3013
+    },
+    {
+      "path": "src/web/pivotControls/AxisArrow.tsx",
+      "gitBlob": "72fa144f2db6641c7d404cc34dd3560c9f802a55",
+      "size": 6921
+    },
+    {
+      "path": "src/web/pivotControls/AxisRotator.tsx",
+      "gitBlob": "3ae737ae3931aa3ecb06701ff06d6218728fae6a",
+      "size": 7896
+    },
+    {
+      "path": "src/web/pivotControls/context.ts",
+      "gitBlob": "b4f0eb1e0eab7e440df71099787fc2e3770fbc9b",
+      "size": 1133
+    },
+    {
+      "path": "src/web/pivotControls/index.tsx",
+      "gitBlob": "fa3736ea114dbf6b1279f344d1610337c7fe2646",
+      "size": 10687
+    },
+    {
+      "path": "src/web/pivotControls/PlaneSlider.tsx",
+      "gitBlob": "c80c6b9ee876a01e6bc4dbf10e8f1474724409e2",
+      "size": 8116
+    },
+    {
+      "path": "src/web/pivotControls/ScalingSphere.tsx",
+      "gitBlob": "d09e715974d3d59a236f299e75373ee2f71f3993",
+      "size": 7093
+    },
+    {
+      "path": "src/web/PresentationControls.tsx",
+      "gitBlob": "e306a068cf3c5502086e7a52c0c4258a16deebeb",
+      "size": 3158
+    },
+    {
+      "path": "src/web/ScreenVideoTexture.tsx",
+      "gitBlob": "6c8a7bcdbc9318a14efa1505a6f316f82bedd1df",
+      "size": 965
+    },
+    {
+      "path": "src/web/ScrollControls.tsx",
+      "gitBlob": "37414279892137d2ae7481fef566492334b66996",
+      "size": 10211
+    },
+    {
+      "path": "src/web/Select.tsx",
+      "gitBlob": "2924f323c1803d54dbbe4cd7fee524904fce8e6c",
+      "size": 6307
+    },
+    {
+      "path": "src/web/useCursor.tsx",
+      "gitBlob": "d270325a657937a14466e3a01a40e4547ba2d0f5",
+      "size": 356
+    },
+    {
+      "path": "src/web/View.tsx",
+      "gitBlob": "fd1b0817accde40d2f5efcb63fa8bea9f1539ca7",
+      "size": 9300
+    },
+    {
+      "path": "src/web/WebcamVideoTexture.tsx",
+      "gitBlob": "39a46ef1c723a6bc7b21b19870b00b3d5236d4a5",
+      "size": 1048
+    },
+    {
+      "path": "test/e2e/App.tsx",
+      "gitBlob": "b1e04fd6e8301420039683e617ffb201f876b460",
+      "size": 771
+    },
+    {
+      "path": "test/e2e/e2e.sh",
+      "gitBlob": "a5f803f1dba0ee6a96990138471434b83c196814",
+      "size": 4680
+    },
+    {
+      "path": "test/e2e/snapshot.test.ts",
+      "gitBlob": "8cee9b6928254c3997d1bcfc0224305c95b0daa2",
+      "size": 939
+    },
+    {
+      "path": "test/e2e/snapshot.test.ts-snapshots/should-match-previous-one-1-linux.png",
+      "gitBlob": "67d68bce41ffb5b26e2d497900d8a4e1dbf4c2ad",
+      "size": 26641
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "dd968d84258cba0412f17e768ce2d1118ca34689",
+      "size": 556
+    }
+  ],
+  "fingerprint": "06bd8288e26b883cd57151fe383a5642177d1d5fc3e8c28f5e1005316e031b4f"
+}

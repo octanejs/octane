@@ -1,9 +1,16 @@
 # @octanejs/input-otp
 
 An accessible one-time password input for the [Octane](https://github.com/octanejs/octane)
-renderer, ported from [`input-otp@1.4.2`](https://github.com/guilhermerodz/input-otp).
+renderer, ported from [`input-otp@1.5.0`](https://github.com/guilhermerodz/input-otp).
 It keeps one native input for keyboard, screen-reader, paste, and mobile autofill
 behavior while projecting the value into individually styled slots.
+
+## Installation
+
+```sh
+npm install @octanejs/input-otp
+pnpm add @octanejs/input-otp
+```
 
 ```tsx
 import { useContext, useState } from 'octane';
@@ -40,9 +47,10 @@ export function VerificationCode(_props: {}) @{
 The root package exports `OTPInput`, `OTPInputContext`, the three built-in regexp
 patterns, and the `OTPInputProps`, `RenderProps`, and `SlotProps` types. Prop names,
 callback payloads, intrinsic input attributes, context/render projection, selection,
-paste transformation, completion, password-manager displacement, SSR, and hydration
-match the pinned upstream contract. Octane's native `input` event drives edits
-internally; the public callback remains `onChange(newValue)`.
+paste transformation, completion, overflow-aware password-manager displacement, the
+`nonce` style-tag prop, default `spellCheck={false}`, container `translate="no"`,
+SSR, and hydration match the pinned 1.5.0 contract. Octane's native `input` event
+drives edits internally; the public callback remains `onChange(newValue)`.
 
 See [UPSTREAM.md](./UPSTREAM.md) for provenance and test inventory details. Current
 verification status is generated from [status.json](./status.json) into the repository's

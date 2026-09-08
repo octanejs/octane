@@ -66,4 +66,3 @@ export default packageJson(
   },
   runtimeDeps,
 )
-

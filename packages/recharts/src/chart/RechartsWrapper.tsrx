@@ -1,3 +1,39 @@
+import type {
+	CSSProperties,
+	HTMLAttributes,
+	MutableRefObject,
+	NativeKeyboardEvent,
+	NativeMouseEvent,
+	NativeTouchEvent,
+	OctaneNode,
+	Ref,
+} from '../util/OctaneTypes.ts';
+import type { ExternalMouseEvents } from './types';
+import type { Percent } from '../util/types';
+
+export type RechartsWrapperProps =
+	ExternalMouseEvents & {
+		children: OctaneNode;
+		width: number | Percent | undefined;
+		height: number | Percent | undefined;
+		responsive: boolean;
+		className?: string;
+		style?: CSSProperties;
+		ref?: Ref<HTMLDivElement>;
+		dispatchTouchEvents?: boolean;
+	};
+type WrapperDivProps =
+	Omit<HTMLAttributes<HTMLDivElement>, 'style'> & {
+		width: number | string | undefined;
+		height: number | string | undefined;
+		style?: CSSProperties;
+		ref?: Ref<HTMLDivElement>;
+	};
+type StaticDivProps =
+	Omit<WrapperDivProps, 'width' | 'height'> & {
+		width: number;
+		height: number;
+	};
 // Port of chart/RechartsWrapper.tsx — the outer <div class="recharts-wrapper">:
 // hosts the tooltip/legend portals, reports container size (static, read-once,
 // or ResizeObserver-driven), measures CSS scale, and feeds every user
@@ -27,7 +63,7 @@ function EventSynchronizer() {
 	return null;
 }
 
-function getNumberOrZero(value) {
+function getNumberOrZero(value: number | string | undefined) {
 	if (typeof value === 'number') {
 		return value;
 	}
@@ -40,9 +76,9 @@ function getNumberOrZero(value) {
 	return 0;
 }
 
-function ResponsiveDiv(props) {
+function ResponsiveDiv(props: WrapperDivProps) {
 	const { ref, ...divProps } = props;
-	const observerRef = useRef(null);
+	const observerRef: MutableRefObject<ResizeObserver | null> = useRef(null);
 	const [sizes, setSizes] = useState({
 		containerWidth: getNumberOrZero(props.style?.width),
 		containerHeight: getNumberOrZero(props.style?.height),
@@ -73,7 +109,7 @@ function ResponsiveDiv(props) {
 		if (node != null && typeof ResizeObserver !== 'undefined') {
 			const { width: containerWidth, height: containerHeight } = node.getBoundingClientRect();
 			setContainerSize(containerWidth, containerHeight);
-			const callback = (entries) => {
+			const callback = (entries: ResizeObserverEntry[]) => {
 				const entry = entries[0];
 				if (entry == null) {
 					return;
@@ -100,7 +136,7 @@ function ResponsiveDiv(props) {
 	</>;
 }
 
-function ReadSizeOnceDiv(props) {
+function ReadSizeOnceDiv(props: WrapperDivProps) {
 	// Upstream spreads the FULL props onto the div — width/height included
 	// (they pass through as plain attributes).
 	const { ref, width, height, ...rest } = props;
@@ -136,7 +172,7 @@ function ReadSizeOnceDiv(props) {
 	</>;
 }
 
-function StaticDiv(props) {
+function StaticDiv(props: StaticDivProps) {
 	const { ref, width, height, ...rest } = props;
 	const divProps = { width, height, ...rest };
 	return <>
@@ -145,7 +181,7 @@ function StaticDiv(props) {
 	</>;
 }
 
-function NonResponsiveDiv(props) {
+function NonResponsiveDiv(props: WrapperDivProps) {
 	const { width, height } = props;
 	// Percentage/CSS-string sizes: read the real size from the DOM once.
 	if (typeof width === 'string' || typeof height === 'string') {
@@ -164,7 +200,7 @@ function NonResponsiveDiv(props) {
 	</>;
 }
 
-export function RechartsWrapper(props) {
+export function RechartsWrapper(props: RechartsWrapperProps) {
 	const {
 		children,
 		className,
@@ -186,7 +222,7 @@ export function RechartsWrapper(props) {
 		dispatchTouchEvents = true,
 		ref,
 	} = props;
-	const containerRef = useRef(null);
+	const containerRef: MutableRefObject<HTMLDivElement | null> = useRef<HTMLDivElement | null>(null);
 	const dispatch = useAppDispatch();
 	const [tooltipPortal, setTooltipPortal] = useState(null);
 	const [legendPortal, setLegendPortal] = useState(null);
@@ -211,19 +247,19 @@ export function RechartsWrapper(props) {
 			containerRef.current = node;
 		}
 	}, [setScaleRef, ref, setTooltipPortal, setLegendPortal]);
-	const myOnClick = useCallback((e) => {
+	const myOnClick = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
 		dispatch(mouseClickAction(e));
 		dispatch(externalEventAction({ handler: onClick, reactEvent: e }));
 	}, [dispatch, onClick]);
-	const myOnMouseEnter = useCallback((e) => {
+	const myOnMouseEnter = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
 		dispatch(mouseMoveAction(e));
 		dispatch(externalEventAction({ handler: onMouseEnter, reactEvent: e }));
 	}, [dispatch, onMouseEnter]);
-	const myOnMouseLeave = useCallback((e) => {
+	const myOnMouseLeave = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
 		dispatch(mouseLeaveChart());
 		dispatch(externalEventAction({ handler: onMouseLeave, reactEvent: e }));
 	}, [dispatch, onMouseLeave]);
-	const myOnMouseMove = useCallback((e) => {
+	const myOnMouseMove = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
 		dispatch(mouseMoveAction(e));
 		dispatch(externalEventAction({ handler: onMouseMove, reactEvent: e }));
 	}, [dispatch, onMouseMove]);
@@ -233,33 +269,33 @@ export function RechartsWrapper(props) {
 	const onBlur = useCallback(() => {
 		dispatch(blurAction());
 	}, [dispatch]);
-	const onKeyDown = useCallback((e) => {
+	const onKeyDown = useCallback((e: NativeKeyboardEvent<HTMLDivElement>) => {
 		dispatch(keyDownAction(e.key));
 	}, [dispatch]);
-	const myOnContextMenu = useCallback((e) => {
+	const myOnContextMenu = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
 		dispatch(externalEventAction({ handler: onContextMenu, reactEvent: e }));
 	}, [dispatch, onContextMenu]);
-	const myOnDoubleClick = useCallback((e) => {
+	const myOnDoubleClick = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
 		dispatch(externalEventAction({ handler: onDoubleClick, reactEvent: e }));
 	}, [dispatch, onDoubleClick]);
-	const myOnMouseDown = useCallback((e) => {
+	const myOnMouseDown = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
 		dispatch(externalEventAction({ handler: onMouseDown, reactEvent: e }));
 	}, [dispatch, onMouseDown]);
-	const myOnMouseUp = useCallback((e) => {
+	const myOnMouseUp = useCallback((e: NativeMouseEvent<HTMLDivElement>) => {
 		dispatch(externalEventAction({ handler: onMouseUp, reactEvent: e }));
 	}, [dispatch, onMouseUp]);
-	const myOnTouchStart = useCallback((e) => {
+	const myOnTouchStart = useCallback((e: NativeTouchEvent<HTMLDivElement>) => {
 		dispatch(externalEventAction({ handler: onTouchStart, reactEvent: e }));
 	}, [dispatch, onTouchStart]);
 	// Touch has no enter/leave; the middleware resolves the touched element via
 	// document.elementFromPoint.
-	const myOnTouchMove = useCallback((e) => {
+	const myOnTouchMove = useCallback((e: NativeTouchEvent<HTMLDivElement>) => {
 		if (dispatchTouchEvents) {
 			dispatch(touchEventAction(e));
 		}
 		dispatch(externalEventAction({ handler: onTouchMove, reactEvent: e }));
 	}, [dispatch, dispatchTouchEvents, onTouchMove]);
-	const myOnTouchEnd = useCallback((e) => {
+	const myOnTouchEnd = useCallback((e: NativeTouchEvent<HTMLDivElement>) => {
 		dispatch(externalEventAction({ handler: onTouchEnd, reactEvent: e }));
 	}, [dispatch, onTouchEnd]);
 	const WrapperDiv = responsive ? ResponsiveDiv : NonResponsiveDiv;

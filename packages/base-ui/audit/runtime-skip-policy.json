@@ -1,0 +1,171 @@
+{
+  "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
+  "environment": "jsdom",
+  "tests": [
+    {
+      "file": "src/alert-dialog/root/AlertDialogRoot.test.tsx",
+      "fullName": "<AlertDialog.Root /> Popup conformance animations removes the popup when the animation finishes",
+      "rationale": "The immutable upstream popupConformanceTests helper unconditionally skips this animation test pending team feedback."
+    },
+    {
+      "file": "src/alert-dialog/root/AlertDialogRoot.test.tsx",
+      "fullName": "<AlertDialog.Root /> Popup conformance animations removes the popup when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/checkbox/indicator/CheckboxIndicator.test.tsx",
+      "fullName": "<Checkbox.Indicator /> should remove the indicator when the animation finishes",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/checkbox/indicator/CheckboxIndicator.test.tsx",
+      "fullName": "<Checkbox.Indicator /> should remove the indicator when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/combobox/root/ComboboxRoot.test.tsx",
+      "fullName": "<Combobox.Root /> Popup conformance animations removes the popup when the animation finishes",
+      "rationale": "The immutable upstream popupConformanceTests helper unconditionally skips this animation test pending team feedback."
+    },
+    {
+      "file": "src/combobox/root/ComboboxRoot.test.tsx",
+      "fullName": "<Combobox.Root /> Popup conformance animations removes the popup when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/dialog/root/DialogRoot.test.tsx",
+      "fullName": "<Dialog.Root /> Popup conformance animations removes the popup when the animation finishes",
+      "rationale": "The immutable upstream popupConformanceTests helper unconditionally skips this animation test pending team feedback."
+    },
+    {
+      "file": "src/dialog/root/DialogRoot.test.tsx",
+      "fullName": "<Dialog.Root /> Popup conformance animations removes the popup when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/menu/checkbox-item/MenuCheckboxItem.test.tsx",
+      "fullName": "<Menu.CheckboxItem /> perf: does not rerender menu items unnecessarily",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/menu/checkbox-item/MenuCheckboxItem.test.tsx",
+      "fullName": "<Menu.CheckboxItem /> state management toggles the checked state when Enter is pressed",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/menu/item/MenuItem.test.tsx",
+      "fullName": "<Menu.Item /> perf: does not rerender menu items unnecessarily",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/menu/radio-item/MenuRadioItem.test.tsx",
+      "fullName": "<Menu.RadioItem /> perf: does not rerender menu items unnecessarily",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/menu/root/MenuRoot.test.tsx",
+      "fullName": "<Menu.Root /> Popup conformance animations removes the popup when the animation finishes",
+      "rationale": "The immutable upstream popupConformanceTests helper unconditionally skips this animation test pending team feedback."
+    },
+    {
+      "file": "src/menu/root/MenuRoot.test.tsx",
+      "fullName": "<Menu.Root /> Popup conformance animations removes the popup when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/number-field/root/NumberFieldRoot.test.tsx",
+      "fullName": "<NumberField /> Form should include the input value in the form submission",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/number-field/root/NumberFieldRoot.test.tsx",
+      "fullName": "<NumberField /> Form should not include formatting in the submitted value",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/number-field/utils/parse.test.ts",
+      "fullName": "NumberField parse parseNumber parses a number with Arabic numerals",
+      "rationale": "The immutable upstream parse test unconditionally calls skip for Arabic numerals."
+    },
+    {
+      "file": "src/popover/root/PopoverRoot.test.tsx",
+      "fullName": "<Popover.Root /> Popup conformance animations removes the popup when the animation finishes",
+      "rationale": "The immutable upstream popupConformanceTests helper unconditionally skips this animation test pending team feedback."
+    },
+    {
+      "file": "src/popover/root/PopoverRoot.test.tsx",
+      "fullName": "<Popover.Root /> Popup conformance animations removes the popup when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/preview-card/root/PreviewCardRoot.test.tsx",
+      "fullName": "<PreviewCard.Root /> Popup conformance animations removes the popup when the animation finishes",
+      "rationale": "The immutable upstream popupConformanceTests helper unconditionally skips this animation test pending team feedback."
+    },
+    {
+      "file": "src/preview-card/root/PreviewCardRoot.test.tsx",
+      "fullName": "<PreviewCard.Root /> Popup conformance animations removes the popup when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/radio/indicator/RadioIndicator.test.tsx",
+      "fullName": "<Radio.Indicator /> should remove the indicator when the animation finishes",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/radio/indicator/RadioIndicator.test.tsx",
+      "fullName": "<Radio.Indicator /> should remove the indicator when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/select/root/SelectRoot.test.tsx",
+      "fullName": "<Select.Root /> conformance Popup conformance animations removes the popup when the animation finishes",
+      "rationale": "The immutable upstream popupConformanceTests helper unconditionally skips this animation test pending team feedback."
+    },
+    {
+      "file": "src/select/root/SelectRoot.test.tsx",
+      "fullName": "<Select.Root /> conformance Popup conformance animations removes the popup when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/toggle-group/ToggleGroup.test.tsx",
+      "fullName": "<ToggleGroup /> prop: onValueChange fires when the Enter is pressed",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/toggle-group/ToggleGroup.test.tsx",
+      "fullName": "<ToggleGroup /> prop: onValueChange fires when the Space is pressed",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/toggle-group/ToggleGroup.test.tsx",
+      "fullName": "<ToggleGroup /> uncontrolled pressed state",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/tooltip/root/TooltipRoot.test.tsx",
+      "fullName": "<Tooltip.Root /> Popup conformance animations removes the popup when the animation finishes",
+      "rationale": "The immutable upstream popupConformanceTests helper unconditionally skips this animation test pending team feedback."
+    },
+    {
+      "file": "src/tooltip/root/TooltipRoot.test.tsx",
+      "fullName": "<Tooltip.Root /> Popup conformance animations removes the popup when there is no exit animation defined",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/tooltip/root/TooltipRoot.test.tsx",
+      "fullName": "<Tooltip.Root /> when using 'contained triggers' uncontrolled open should open when the trigger is focused",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/tooltip/root/TooltipRoot.test.tsx",
+      "fullName": "<Tooltip.Root /> when using 'detached triggers' uncontrolled open should open when the trigger is focused",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    },
+    {
+      "file": "src/tooltip/root/TooltipRoot.test.tsx",
+      "fullName": "<Tooltip.Root /> when using 'multiple detached triggers' uncontrolled open should open when the trigger is focused",
+      "rationale": "The immutable upstream test calls skip in jsdom; its browser assertions remain required in the browser lane."
+    }
+  ]
+}

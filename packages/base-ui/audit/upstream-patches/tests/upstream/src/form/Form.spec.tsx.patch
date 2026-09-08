@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/src/form/Form.spec.tsx b/tests/upstream/src/form/Form.spec.tsx
+--- a/tests/upstream/src/form/Form.spec.tsx
++++ b/tests/upstream/src/form/Form.spec.tsx
+@@ -1,6 +1,6 @@
+ /** @jsxImportSource octane */
+ import * as React from 'octane';
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Form } from '@octanejs/base-ui/form';
+ 
+ interface Values {

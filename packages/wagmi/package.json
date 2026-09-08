@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/wagmi",
-  "version": "0.0.19",
+  "version": "0.0.33",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -45,7 +45,7 @@
     "viem": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@tanstack/react-query": "catalog:default",
@@ -55,6 +55,7 @@
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "vitest": "catalog:default",
-    "wagmi": "catalog:default"
+    "wagmi": "catalog:default",
+    "typescript": "catalog:default"
   }
 }

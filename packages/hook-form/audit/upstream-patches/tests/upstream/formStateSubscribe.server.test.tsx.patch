@@ -1,0 +1,19 @@
+diff --git a/tests/upstream/formStateSubscribe.server.test.tsx b/tests/upstream/formStateSubscribe.server.test.tsx
+--- a/tests/upstream/formStateSubscribe.server.test.tsx
++++ b/tests/upstream/formStateSubscribe.server.test.tsx
+@@ -15,11 +15,13 @@ describe('FormStateSubscribe with SSR', () => {
+         <FormStateSubscribe
+           control={control}
+           name="test"
+-          render={(state) => <span>{state.errors.test?.message}</span>}
++          render={(state) => (
++            <span>{state.errors.test?.message as string}</span>
++          )}
+         />
+       );
+     };
+ 
+-    renderToString(<Component />);
++    renderToStaticMarkup(Component);
+   });
+ });

@@ -1,16 +1,31 @@
-// Ported from .base-ui/packages/react/src/utils/getPseudoElementBounds.ts (v1.6.0). Returns an
-// element's bounding box widened to cover its `::before`/`::after` pseudo-elements, so hit-testing
-// (safe-polygon / mouse-tracking) accounts for decorations drawn outside the box.
-//
-// Pure — no renderer API is involved, so this is a straight transcription.
-import { ownerWindow } from './owner';
-import { platform } from './platform';
+import { ownerWindow } from '@octanejs/base-ui-utils/owner';
+import { platform } from '@octanejs/base-ui-utils/platform';
 
 interface ElementBounds {
 	left: number;
 	right: number;
 	top: number;
 	bottom: number;
+}
+
+// Tolerance around the element bounds so a fast click whose pointer drifts slightly
+// during press-release isn't mistaken for a drag-off-and-release cancellation.
+// Matches typical OS/browser drag-initiation thresholds.
+const BOUNDARY_OFFSET = 5;
+
+/**
+ * Determines if a mouse event occurred within the bounds of an element
+ * (including its pseudo-elements), with a small tolerance for pointer drift.
+ */
+export function isMouseWithinBounds(event: MouseEvent, element: HTMLElement): boolean {
+	const bounds = getPseudoElementBounds(element);
+
+	return (
+		event.clientX >= bounds.left - BOUNDARY_OFFSET &&
+		event.clientX <= bounds.right + BOUNDARY_OFFSET &&
+		event.clientY >= bounds.top - BOUNDARY_OFFSET &&
+		event.clientY <= bounds.bottom + BOUNDARY_OFFSET
+	);
 }
 
 export function getPseudoElementBounds(element: HTMLElement): ElementBounds {

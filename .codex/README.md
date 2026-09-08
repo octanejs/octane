@@ -16,7 +16,7 @@ through the `octane_skill` MCP tool.
 
 ## Skills
 
-- React ecosystem/package porting: `../.rulesync/skills/react-library-port/SKILL.md`
+- React ecosystem/package porting: `../.rulesync/skills/octane-react-library-port/SKILL.md`
 - Bug hunting/regression fixing: `../.rulesync/skills/bug-hunter/SKILL.md`
 - PR creation: `../.rulesync/skills/create-a-pr/SKILL.md`
 - Issue handling: `../.rulesync/skills/handle-issue/SKILL.md`

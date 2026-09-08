@@ -1,3 +1,5 @@
+import { parseModule } from '@tsrx/core';
+import { parseModule as parseCompilerModule } from 'oxc-tsrx/tsrx-core-compat';
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -45,6 +47,81 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it('accepts only a one-shot descriptor proof for its exact source', () => {
+		const authority = Symbol('test descriptor preflight');
+		const compiler = createOctaneCompiler({
+			_descriptorPreflightAuthority: authority,
+			root: '/project',
+		} as any);
+		const id = '/project/src/App.tsrx';
+		const marked = `
+			import { descriptorChildren } from 'octane';
+			function Impl(props) { return props.children; }
+			export const Marked = descriptorChildren(Impl);
+		`;
+		const ordinary = 'export const Ordinary = 1;';
+		expect(() =>
+			(compiler as any)._prepareDescriptorChildrenExports(
+				Symbol('unowned'),
+				marked,
+				id,
+				parseModule(marked, id),
+			),
+		).toThrow(/Invalid descriptor-children preflight input/);
+		const proof = (compiler as any)._prepareDescriptorChildrenExports(
+			authority,
+			marked,
+			id,
+			parseModule(marked, id),
+		);
+
+		const mismatched = compiler.transform(ordinary, id, {
+			_descriptorChildrenExportsProof: proof,
+		} as any);
+		expect(mismatched?.descriptorChildrenExports).toEqual([]);
+
+		const matchingProof = (compiler as any)._prepareDescriptorChildrenExports(
+			authority,
+			marked,
+			id,
+			parseModule(marked, id),
+		);
+		const matching = compiler.transform(marked, id, {
+			_descriptorChildrenExportsProof: matchingProof,
+		} as any);
+		expect(matching?.descriptorChildrenExports).toEqual(['Marked']);
+
+		// This syntax is accepted by the authoritative compiler parser but not the
+		// preflight parser, so string fallback returns no descriptor fact. It makes
+		// an id-mismatched proof observably distinct from an incorrectly reused one.
+		const parserDisagreement = `${marked}\nconst unicodeSets = /[a&&b]/v;`;
+		const oneShotProof = (compiler as any)._prepareDescriptorChildrenExports(
+			authority,
+			parserDisagreement,
+			id,
+			parseCompilerModule(parserDisagreement, id),
+		);
+		const firstUse = compiler.transform(parserDisagreement, id, {
+			_descriptorChildrenExportsProof: oneShotProof,
+		} as any);
+		expect(firstUse?.descriptorChildrenExports).toEqual(['Marked']);
+		const reused = compiler.transform(parserDisagreement, id, {
+			_descriptorChildrenExportsProof: oneShotProof,
+		} as any);
+		expect(reused?.descriptorChildrenExports).toEqual([]);
+
+		const idProof = (compiler as any)._prepareDescriptorChildrenExports(
+			authority,
+			parserDisagreement,
+			id,
+			parseCompilerModule(parserDisagreement, id),
+		);
+		const mismatchedId = compiler.transform(parserDisagreement, `${id}?changed`, {
+			_descriptorChildrenExportsProof: idProof,
+		} as any);
+		expect(mismatchedId?.descriptorChildrenExports).toEqual([]);
+	});
+
 	it('enforces project-wide Strong mode on both client and server without claiming dependencies', () => {
 		const compiler = createOctaneCompiler({ root: '/project', strong: true });
 
@@ -764,6 +841,38 @@ export default interface ErasedShape { value: string }
 		).toThrow(/Client-only export "\*".*server: "omit-child"/s);
 	});
 
+	it('preserves void exports through exact local memo alias chains in either declaration order', () => {
+		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const declarations = [
+			'export const App = cache(Middle);',
+			'const Middle = cache(Inner);',
+			'const Inner = cache(Leaf);',
+		];
+		const sourceFor = (dependencyFirst: boolean) =>
+			[
+				"import { memo as cache } from 'octane';",
+				'function Leaf() @{ <main /> }',
+				...(dependencyFirst ? declarations.toReversed() : declarations),
+			].join('\n');
+
+		for (const [name, dependencyFirst] of [
+			['dependent-first', false],
+			['dependency-first', true],
+		] as const) {
+			const result = compiler.transform(sourceFor(dependencyFirst), `/project/src/${name}.tsrx`, {
+				collectVoidComponentExports: true,
+			});
+			expect(result?.voidComponentExports).toEqual(['App']);
+		}
+
+		const compared = compiler.transform(
+			"import { memo } from 'octane';\nfunction Leaf() @{ <main /> }\nexport const App = memo(Leaf, () => true);",
+			'/project/src/comparator.tsrx',
+			{ collectVoidComponentExports: true },
+		);
+		expect(compared?.voidComponentExports).toEqual([]);
+	});
+
 	it('specializes only disposable production roots with proven void imports', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-void-root-'));
 		try {
@@ -937,6 +1046,29 @@ export default interface ErasedShape { value: string }
 		}
 	});
 
+	it('keeps mixed conditional-return reference positions conservatively classified', () => {
+		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const source =
+			"import { lazy as defer, memo as cache } from 'octane';\n" +
+			'export function Allowed(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export const AllowedMemo = cache(Allowed);\n' +
+			'const AllowedLazy = defer(Allowed);\n' +
+			'export function Direct(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export function PropValue(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export function Receiver(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export function Ambiguous(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'function shadow(Ambiguous) { return Ambiguous; }\n' +
+			'function Sink(p) { return <div>{p.item}</div>; }\n' +
+			'export function Host(p) { const called = Direct(p); const kind = Receiver.kind; return <section data-kind={kind}><Allowed flip={p.flip} /><AllowedLazy flip={p.flip} /><Sink item={PropValue} />{called}</section>; }\n';
+
+		const result = compiler.transform(source, '/project/src/Mixed.tsrx', {
+			collectVoidComponentExports: true,
+		});
+
+		expect(result?.voidComponentExports).toEqual(['Allowed', 'AllowedMemo']);
+		expect(result?.code.match(/_\$ifBlock\(/g)).toHaveLength(1);
+	});
+
 	it('lowers statically compilable ErrorBoundary JSX without retaining the builtin', () => {
 		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
 		const source = `
@@ -1088,6 +1220,9 @@ export const Indirect = indirect(Host);
 			`export type { OctaneNode } from 'octane';`,
 			`const runtime = import('octane');`,
 			`const untouched = 'octane';`,
+			`export { ReactCompat } from 'octane/react';`,
+			`const compat = import('octane/react');`,
+			`const compatText = 'octane/react';`,
 		].join('\n');
 		const compiler = createOctaneCompiler({ root: '/project' });
 
@@ -1108,9 +1243,16 @@ export const Indirect = indirect(Host);
 		expect(server?.code).toContain(`export type { OctaneNode } from 'octane';`);
 		expect(server?.code).toContain(`const runtime = import('octane/server');`);
 		expect(server?.code).toContain(`const untouched = 'octane';`);
+		expect(server?.code).toContain(`export { ReactCompat } from 'octane/react/server';`);
+		expect(server?.code).toContain(`const compat = import('octane/react/server');`);
+		expect(server?.code).toContain(`const compatText = 'octane/react';`);
 	});
 
 	it('returns manifest watch metadata for transforms and pass-through decisions', () => {
+		const countHook = HOOK.replace(
+			'return useState(0)',
+			'const [count] = useState(0); return count',
+		);
 		const root = mkdtempSync(join(tmpdir(), 'octane-bundler-transform-'));
 		try {
 			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
@@ -1134,18 +1276,22 @@ export const Indirect = indirect(Host);
 			expect(tsx?.kind).toBe('compile');
 			expect(tsx?.dependencies).toContain(manifest);
 
-			const manual = compiler.transform(HOOK, join(packageRoot, 'src/manual/useCount.ts'));
-			expect(manual).toMatchObject({ kind: 'none', code: HOOK, map: null });
+			const manual = compiler.transform(countHook, join(packageRoot, 'src/manual/useCount.ts'));
+			expect(manual).toMatchObject({ kind: 'slots', map: null });
 			expect(manual?.dependencies).toContain(manifest);
-			const manualServer = compiler.transform(HOOK, join(packageRoot, 'src/manual/useCount.ts'), {
-				environment: 'server',
-				explicitRuntimeRequests: true,
-			});
+			const manualServer = compiler.transform(
+				countHook,
+				join(packageRoot, 'src/manual/useCount.ts'),
+				{
+					environment: 'server',
+					explicitRuntimeRequests: true,
+				},
+			);
 			expect(manualServer).toMatchObject({
-				kind: 'runtime-requests',
-				code: HOOK.replace("from 'octane'", "from 'octane/server'"),
+				kind: 'slots',
 				map: null,
 			});
+			expect(manualServer?.code).toContain("from 'octane/server'");
 			expect(manualServer?.dependencies).toContain(manifest);
 			const automaticServer = compiler.transform(HOOK, join(packageRoot, 'src/useCount.ts'), {
 				environment: 'server',
@@ -1260,6 +1406,10 @@ export const Indirect = indirect(Host);
 	});
 
 	it('reports missing manifests and refreshes instance caches on invalidate', () => {
+		const countHook = HOOK.replace(
+			'return useState(0)',
+			'const [count] = useState(0); return count',
+		);
 		const root = mkdtempSync(join(tmpdir(), 'octane-bundler-invalidate-'));
 		try {
 			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
@@ -1268,7 +1418,7 @@ export const Indirect = indirect(Host);
 			const id = join(sourceDir, 'useCount.ts');
 			const compiler = createOctaneCompiler({ root });
 
-			const first = compiler.transform(HOOK, id);
+			const first = compiler.transform(countHook, id);
 			expect(first?.kind).toBe('slots');
 			expect(first?.missingDependencies).toContain(join(sourceDir, 'package.json'));
 
@@ -1283,10 +1433,12 @@ export const Indirect = indirect(Host);
 			);
 			// Cached nearest-manifest decisions are stable until the bundler reports
 			// a watched change.
-			expect(compiler.transform(HOOK, id)?.kind).toBe('slots');
-			compiler.invalidate(sourceManifest);
-			const refreshed = compiler.transform(HOOK, id);
-			expect(refreshed?.kind).toBe('none');
+			expect(compiler.transform(countHook, id)?.kind).toBe('slots');
+			compiler.invalidate(id);
+			expect(compiler.transform(countHook, id)?.kind).toBe('slots');
+			compiler.invalidate(sourceManifest + '?watch=1#created');
+			const refreshed = compiler.transform(countHook, id);
+			expect(refreshed?.kind).toBe('slots');
 			expect(refreshed?.dependencies).toContain(sourceManifest);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1340,7 +1492,8 @@ export const Indirect = indirect(Host);
 			);
 			writeFileSync(join(packageRoot, 'index.js'), 'export const value = 1;\n');
 
-			const discovered = createOctaneCompiler({ root }).discoverSourceDependencies();
+			const compiler = createOctaneCompiler({ root });
+			const discovered = compiler.discoverSourceDependencies();
 			const resolvedPackageRoot = realpathSync(packageRoot);
 			expect(discovered.packages).toEqual(['raw-octane']);
 			expect(discovered.viteOptimizeDepsExclusions).toEqual([
@@ -1357,6 +1510,11 @@ export const Indirect = indirect(Host);
 			expect(discovered.missingDependencies).toContain(
 				join(realpathSync(root), 'node_modules/missing-child/package.json'),
 			);
+
+			writeFileSync(projectManifest, JSON.stringify({ name: 'app', private: true }));
+			expect(compiler.discoverSourceDependencies().packages).toEqual(['raw-octane']);
+			compiler.invalidate();
+			expect(compiler.discoverSourceDependencies().packages).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

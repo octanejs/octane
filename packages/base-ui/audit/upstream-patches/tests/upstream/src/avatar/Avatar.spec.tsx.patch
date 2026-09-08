@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/avatar/Avatar.spec.tsx b/tests/upstream/src/avatar/Avatar.spec.tsx
+--- a/tests/upstream/src/avatar/Avatar.spec.tsx
++++ b/tests/upstream/src/avatar/Avatar.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Avatar, type ImageLoadingStatus } from '@octanejs/base-ui/avatar';
+ 
+ // `Avatar.Image` accepts and forwards the native responsive/loading `<img>` props.

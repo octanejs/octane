@@ -25,6 +25,7 @@
   "module": "src/index.ts",
   "types": "src/index.ts",
   "files": [
+    "audit",
     "src",
     "LICENSE",
     "LICENSE-APACHE-2.0",
@@ -59,7 +60,7 @@
   },
   "peerDependencies": {
     "@lynx-js/testing-environment": "catalog:lynx",
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "peerDependenciesMeta": {
     "@lynx-js/testing-environment": {

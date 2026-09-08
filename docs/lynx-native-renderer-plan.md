@@ -33,6 +33,8 @@ Post-Milestone-9 typed data-lifecycle source/test evidence date: **2026-07-22**
 Background native-event delivery and dual-thread render-cost evidence date:
 **2026-07-28**
 
+Issue #888 diagnostic source/fixture evidence date: **2026-09-02; fresh Android campaign pending**
+
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
 for ReactLynx can migrate without carrying React, Preact, React Reconciler, or a
@@ -320,6 +322,43 @@ does not turn thrown scheduler callbacks into Promise rejections.
 
 ### Proposed package layout
 
+```text
+packages/lynx/
+  README.md
+  UPSTREAM.md
+  status.json
+  audit/upstream-crosswalk.json
+  src/
+    index.ts
+    config.ts
+    intrinsics.ts
+    renderer.ts
+    main-renderer.ts
+    root.ts
+    first-screen.ts
+    main-thread.ts
+    platform.ts
+    testing.ts
+    core/
+      client-driver.ts
+      host-driver.ts
+      papi.ts
+      protocol.ts
+      transport.ts
+      props.ts
+      styles.ts
+      events.ts
+      refs.ts
+      lists.ts
+      lifecycle.ts
+      first-screen.ts
+      worklets.ts
+  tests/
+    _fixtures/
+    differential/
+    rspeedy/
+  typetests/
+
 packages/rspeedy-plugin-octane/
   README.md
   src/
@@ -565,6 +604,55 @@ not full ReactLynx `defer` parity. Its
 a recycled cell detaches refs but does not unmount the logical Octane subtree
 or run component/effect cleanup merely because it left the native viewport.
 
+### Native capacity evidence and issue #888 closure
+
+The issue #888 investigation keeps two Native workloads separate. The eager
+table renders seven native elements per logical row plus 42 fixed chrome
+elements and is an opt-in, unranked capacity probe. The bounded list renders 1k
+or 10k logical rows through Lynx `list`/`list-item` recycling. An eager bundle,
+`scroll-view`, Web observer, calculated element count, or this repository's
+deterministic fake-PAPI ratio cannot substitute for real Android list-allocation
+evidence.
+
+Diagnostic attempts distinguish measured, DNF, and not-measured outcomes.
+Measured means the semantic and evidence envelope was accepted; Native timing
+is reportable only with at least five accepted samples. DNF means a real attempt
+failed and retains a typed reason. Not-measured means the required device
+capability or observer was unavailable before a credible attempt; it is neither
+DNF nor zero. Optional capacity-threshold cells are outcome-only, and
+load-to-crash chronology is diagnostic detail rather than a latency sample.
+
+The Android ART capacity category requires one post-launch, same-PID sequence:
+the exact `global reference table overflow (max=51200)` marker, `Last 10
+entries`, the complete summary through the 51,200-reference total (including
+the exact 30,026 `PaintingContext$a` and 20,444 `m7.w` holders), SIGABRT, and
+matching Explorer process death. Truncated, late, reordered, wrong-PID, or
+restart evidence is a process failure rather than the capacity classification.
+
+The campaign force-stops Explorer before every repetition, uses a pinned
+DevTool-disabled preflight and no CDP session for capacity, requires an
+interactive/stay-awake display, thermal status 0, and battery temperature at or
+below 35 °C. Source commits, manifests, build receipts, runner sources,
+per-scale bundle bytes, workload contracts, policy, device cohort, and the real
+Native list observer's method revision and measured overhead form immutable
+campaign identity. For the reported issue cohort, the target remains aries_10,
+Android 10, LynxExplorer 1.0, Lynx Engine 3.9, and SDK 4.0, with eager→list and
+list→eager order control and cold processes throughout.
+
+The source contracts can be checked without making a device claim:
+
+```bash
+node --test benchmarks/lynx-table/stages/*.test.mjs
+node --test benchmarks/lynx-list/*.test.mjs
+```
+
+Closure requires the Octane fixture/source change, the corresponding
+`Huxpro/lynx-js-framework-benchmark` runner/artifact/presentation change, and a
+fresh Android campaign satisfying the protocol above. The first two source
+lanes are implemented; no connected-device campaign accompanies this change,
+so issue #888 remains open and Native allocation/capacity conclusions remain
+pending.
+
 ### Suspense, Activity, lazy bundles, and portals
 
 The universal core already supplies retained Suspense, errors, visibility, and
@@ -622,6 +710,28 @@ should include:
 ## Delivery milestones and exit gates
 
 ### Milestone 0 — upstream pin and real-engine spike (1–2 engineer-weeks)
+
+- Pin one exact, published Lynx SDK, Rspeedy, template plugin, types package,
+  and `@rsbuild/core` compatibility set plus its source commit.
+- Create `packages/lynx/audit/upstream-crosswalk.json` covering ReactLynx public
+  exports and executable behavioral tests. Classify each as port, differential,
+  intentional divergence, deferred milestone, or out of scope with a durable
+  reason.
+- Confirm the public framework hooks for:
+  - installing a custom main-thread lifecycle receiver;
+  - creating/mutating/flushing Element PAPI nodes;
+  - sending a background commit and returning an acknowledgement;
+  - registering a native event handler token and delivering its payload back to
+    the background runtime; and
+  - page destroy, reload, init data, and global props.
+- Produce a throwaway or committed probe that renders `view > text`, applies one
+  background state update, handles one tap, and tears down.
+- Encode a production `.lynx.bundle` and run it in the official JavaScript test
+  environment, Lynx Web/Explorer, Android, and iOS.
+- Record ReactLynx and imperative-PAPI baselines for first paint, background
+  update, patch bytes, one commit flush, minimal bundle bytes, and teardown.
+  Ratify numeric regression budgets from evidence rather than guessing them in
+  this document.
 
 Exit: the engine accepts an Octane-owned PAPI tree and one acknowledged
 background patch without importing React/Preact; Android and iOS display and
@@ -952,6 +1062,49 @@ observable behavioral tests; stale work/resources are released across both
 runtimes.
 
 ### Milestone 9 — parity and release stabilization (2–3 engineer-weeks)
+
+> **Progress (2026-07-22): repository-side stabilization implemented; formal
+> exit blocked.** The exact `@lynx-js/react@0.123.0` / `b6b809cd` oracle now has
+> a generated, validated Vitest runner crosswalk for all 1,725 runnable
+> JavaScript/TypeScript cases with zero unclassified entries. The source
+> inventory separately classifies all 89 source-defined Rust compiler cases as out of scope;
+> every classification, including `port` and `differential`, is a disposition
+> describing intended handling. Classification counts do not prove that the
+> corresponding Octane behavior is implemented, that tests ran against Octane,
+> or that parity passed. Octane permanently keeps `defer` boolean only: the
+> ReactLynx `defer.unmountRecycled` object form is rejected, physical cell
+> recycling detaches refs, and the logical item retains state and effects until
+> logical removal. A deterministic pinned-Rspeedy benchmark builds the
+> same semantic-checksummed app in background-preview and dual-thread IFR
+> shapes, verifies thread ownership and identical background semantics, and
+> records decoded/encoded raw, gzip, and Brotli bytes. It requires exact
+> background raw/gzip/Brotli metrics and guards whole-artifact gzip plus
+> decoded-main gzip ratios. This is source/build size evidence, not native
+> timing or first-paint evidence. Required `Lynx compatibility (minimum)` and
+> `Lynx compatibility (current)` CI lanes pack the Octane packages into strict
+> external consumers and perform two deterministic builds. They keep the
+> atomic Rspeedy `0.16.0` / Rsbuild `2.1.4` graph while covering Rspack `2.1.3`
+> and `2.1.5`; the current lane also checks live registry drift. The immutable
+> `audit/toolchain.json` provenance covers the Phase 0/Milestone 5 subset,
+> including the minimum Rspack edge, while the complete Milestone 9 lane maps
+> live in plugin source. It does not record every lane dependency or the current
+> Rspack artifact's integrity. These are source/build lanes, not native-engine
+> runs. The package surface, provenance, status, pack boundary, and experimental
+> universal ABI were reviewed for this private phase; both Lynx packages remain
+> `0.0.0` and `private` rather than becoming a technical preview.
+>
+> Formal exit still requires a public framework-neutral native string-event
+> receiver and reconstructing-reload contract; native verification of context,
+> delivery, ordering, and payload completeness for the source-integrated typed
+> data and page/background-destroy paths; a working Lynx Web transport;
+> Explorer, Android, and iOS execution;
+> minimum/current toolchain execution on native engines; native proof of first
+> bootstrap/first paint and node identity adoption, worklet/ref/call execution, list allocation
+> and lifecycle, lazy-chunk execution, portal placement, Native Modules/custom
+> elements, source maps, and reconstructing reload cleanup; and comparable
+> native semantic performance baselines. Until those gates exist, the
+> universal renderer ABI remains experimental and Milestone 9 has no formal
+> release exit.
 
 - Complete the upstream export/test crosswalk with zero unclassified cases.
 - Run minimum and current supported Lynx/Rspeedy/engine lanes.

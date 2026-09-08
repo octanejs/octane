@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createElement, Fragment, positionalChildren, useState } from 'octane';
+import { createElement, Fragment, positionalChildren, useState, type OctaneNode } from 'octane';
 import { mount } from './_helpers';
 import { RowsHole } from './_fixtures/deopt-child-keys.tsrx';
 
@@ -18,6 +18,90 @@ import { RowsHole } from './_fixtures/deopt-child-keys.tsrx';
 // spelling — the encoding may change as long as these hold.
 
 const text = (nodes: Element[]) => nodes.map((n) => n.textContent);
+
+function TextHost({ value }: { value: OctaneNode }) {
+	return createElement('p', { 'data-testid': 'text' }, value);
+}
+
+describe('scalar host children', () => {
+	it('updates strings and numbers without replacing the surviving text node', () => {
+		const root = mount(TextHost, { value: 'first' });
+		try {
+			const host = root.find('p');
+			const child = host.firstChild;
+			for (const value of ['first second', 0, -0, 42n, 'last']) {
+				root.update(TextHost, { value });
+				expect(root.find('p')).toBe(host);
+				expect(host.firstChild).toBe(child);
+				expect(host.textContent).toBe(String(value));
+			}
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('keeps scalar, empty, and nested positional children in their own slots', () => {
+		const root = mount(TextHost, { value: [null, 'second slot'] });
+		try {
+			const host = root.find('p');
+			const secondSlot = host.firstChild;
+			root.update(TextHost, { value: 'first slot' });
+			expect(host.textContent).toBe('first slot');
+			expect(host.firstChild).not.toBe(secondSlot);
+			const firstSlot = host.firstChild;
+
+			root.update(TextHost, { value: [['nested slot']] });
+			expect(host.textContent).toBe('nested slot');
+			expect(host.firstChild).not.toBe(firstSlot);
+			const nestedSlot = host.firstChild;
+			root.update(TextHost, { value: 'returned scalar' });
+			expect(host.textContent).toBe('returned scalar');
+			expect(host.firstChild).not.toBe(nestedSlot);
+
+			root.update(TextHost, { value: ['left', 'right'] });
+			const left = host.firstChild;
+			const right = host.lastChild!;
+			root.update(TextHost, { value: 'single' });
+			expect(host.textContent).toBe('single');
+			expect(host.firstChild).toBe(left);
+			expect(right.isConnected).toBe(false);
+
+			root.update(TextHost, { value: createElement('em', null, 'element child') });
+			const element = host.querySelector('em')!;
+			root.update(TextHost, { value: 'after element' });
+			expect(host.textContent).toBe('after element');
+			expect(element.isConnected).toBe(false);
+			for (const value of ['', false, null, 'restored', 0]) {
+				root.update(TextHost, { value });
+				expect(root.find('p')).toBe(host);
+				expect(host.textContent).toBe(value == null || value === false ? '' : String(value));
+			}
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('does not adopt or remove independently inserted text while its own text changes', () => {
+		const root = mount(TextHost, { value: null });
+		try {
+			const host = root.find('p');
+			const foreign = document.createTextNode('external:');
+			host.appendChild(foreign);
+			root.update(TextHost, { value: 'first' });
+			expect(host.textContent).toBe('external:first');
+			const own = foreign.nextSibling;
+			root.update(TextHost, { value: 'second' });
+			expect(host.textContent).toBe('external:second');
+			expect(host.firstChild).toBe(foreign);
+			expect(foreign.nextSibling).toBe(own);
+			root.update(TextHost, { value: null });
+			expect(host.textContent).toBe('external:');
+			expect(host.firstChild).toBe(foreign);
+		} finally {
+			root.unmount();
+		}
+	});
+});
 
 describe('de-opt child keys — an explicit key never aliases a positional index', () => {
 	it('keeps an unkeyed child and a child keyed "0" in separate slots', () => {

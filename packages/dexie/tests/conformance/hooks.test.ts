@@ -3,6 +3,7 @@ import Dexie from 'dexie';
 import { flushEffects, mount, nextPaint } from '../_helpers';
 import {
 	DocumentReader,
+	ExplicitDocumentReader,
 	FactoryReader,
 	ObservableReader,
 	TwoReaders,
@@ -36,8 +37,11 @@ describe('@octanejs/dexie hooks', () => {
 		await nextPaint();
 		expect(result.find('#value').textContent).toBe('ready');
 
+		const unsubscribesBeforeUnmount = observable.unsubscribeCount;
+		expect(observable.listeners.size).toBe(1);
 		result.unmount();
-		expect(observable.unsubscribeCount).toBe(1);
+		expect(observable.unsubscribeCount).toBe(unsubscribesBeforeUnmount + 1);
+		expect(observable.listeners.size).toBe(0);
 	});
 
 	it('keeps multiple hook call sites independent', async () => {
@@ -75,45 +79,51 @@ describe('@octanejs/dexie hooks', () => {
 		result.unmount();
 	});
 
-	it('loads and releases optional y-dexie document providers', () => {
-		const docs = new Map<object, { doc: object }>();
-		const released: object[] = [];
-		const provider = {
-			load(doc: object) {
-				const value = { doc };
-				docs.set(doc, value);
-				return value;
-			},
-			for(doc: object) {
-				return docs.get(doc);
-			},
-			release(doc: object) {
-				released.push(doc);
-				docs.delete(doc);
-			},
-		};
-		const dexieWithProvider = Dexie as typeof Dexie & { DexieYProvider?: typeof provider };
-		const previous = dexieWithProvider.DexieYProvider;
-		dexieWithProvider.DexieYProvider = provider;
-		try {
-			const first = { id: 'first' };
-			const second = { id: 'second' };
-			const result = mount(DocumentReader, { doc: first });
-			flushEffects();
-			expect(result.find('#document').textContent).toBe('first');
+	it.each([
+		['implicit', DocumentReader],
+		['explicit', ExplicitDocumentReader],
+	] as const)(
+		'loads and releases optional y-dexie document providers with %s slots',
+		(_kind, Reader) => {
+			const docs = new Map<object, { doc: object }>();
+			const released: object[] = [];
+			const provider = {
+				load(doc: object) {
+					const value = { doc };
+					docs.set(doc, value);
+					return value;
+				},
+				for(doc: object) {
+					return docs.get(doc);
+				},
+				release(doc: object) {
+					released.push(doc);
+					docs.delete(doc);
+				},
+			};
+			const dexieWithProvider = Dexie as typeof Dexie & { DexieYProvider?: typeof provider };
+			const previous = dexieWithProvider.DexieYProvider;
+			dexieWithProvider.DexieYProvider = provider;
+			try {
+				const first = { id: 'first' };
+				const second = { id: 'second' };
+				const result = mount(Reader, { doc: first });
+				flushEffects();
+				expect(result.find('#document').textContent).toBe('first');
 
-			result.update(DocumentReader, { doc: second });
-			flushEffects();
-			expect(result.find('#document').textContent).toBe('second');
-			expect(released).toEqual([first]);
+				result.update(Reader, { doc: second });
+				flushEffects();
+				expect(result.find('#document').textContent).toBe('second');
+				expect(released).toEqual([first]);
 
-			result.unmount();
-			flushEffects();
-			expect(released).toEqual([first, second]);
-		} finally {
-			dexieWithProvider.DexieYProvider = previous;
-		}
-	});
+				result.unmount();
+				flushEffects();
+				expect(released).toEqual([first, second]);
+			} finally {
+				dexieWithProvider.DexieYProvider = previous;
+			}
+		},
+	);
 
 	it('reports a clear error when the optional provider is unavailable', () => {
 		const dexieWithProvider = Dexie as typeof Dexie & { DexieYProvider?: unknown };

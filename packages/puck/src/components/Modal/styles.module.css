@@ -1,0 +1,28 @@
+.Modal {
+	background: color-mix(in srgb, var(--puck-color-black) 75%, transparent);
+	display: none;
+	justify-content: center;
+	align-items: center;
+	position: fixed;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	right: 0;
+	z-index: 1;
+	padding: 32px;
+}
+
+.Modal--isOpen {
+	display: flex;
+}
+
+.Modal-inner {
+	width: 100%;
+	max-width: 1024px;
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--puck-color-white);
+	display: flex;
+	flex-direction: column;
+	max-height: 90dvh;
+}

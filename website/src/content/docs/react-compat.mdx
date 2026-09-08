@@ -3,45 +3,41 @@ title: React compatibility
 ---
 
 <div className="doc-hero">
-	<p className="doc-eyebrow">Host Octane inside React</p>
+	<p className="doc-eyebrow">Use React and Octane together</p>
 	<h1>React compatibility</h1>
 	<p className="doc-lede">
 		{
-			'Already have a React 19 app? octane/react lets you render compiled Octane islands inside it — one component at a time, no rewrite. Events stay native, context is shared, and it renders on the server.'
+			'Host compiled Octane components in a React app with OctaneCompat, or use real React components in an Octane app with ReactCompat. Each renderer owns its subtree, including its hooks, state, and DOM.'
 		}
 	</p>
 </div>
 
-<aside className="doc-callout note">
-	<p className="doc-callout-title">Migrate incrementally</p>
-	<p>
-		{
-			'OctaneCompat is for adopting Octane inside an existing React tree, not for shipping a whole app. Wrap the parts you have ported; leave the rest as React and move at your own pace.'
-		}
-	</p>
-</aside>
+<h2 id="what-is-octanecompat">Choose a direction</h2>
 
-<h2 id="what-is-octanecompat">What OctaneCompat is</h2>
+`octane/react` exports both hosts:
 
-`octane/react` exports a single component, `<OctaneCompat>`, that hosts a compiled
-Octane subtree inside a real React 19 tree. React owns the wrapper and one host
-element; a private Octane root owns every descendant — the **island**.
+| Your app | Host           | What it renders                         |
+| -------- | -------------- | --------------------------------------- |
+| React 19 | `OctaneCompat` | Compiled Octane components inside React |
+| Octane   | `ReactCompat`  | Real React components inside Octane     |
 
-Because Octane compiles ahead of time, the island is already the framework's own
-render output. `<OctaneCompat>` just gives it a place to live inside React, so you can
-port a screen, a widget, or a single component without touching the React code around
-it.
+Use matching React and React DOM versions. `OctaneCompat` supports React 19;
+`ReactCompat` requires 19.2 or newer in the React 19 series.
 
-Local Octane `@try` / Suspense / error boundaries inside the island always get first
-chance to handle a throw or a pending state; only something that escapes the island's
-own root surfaces to the nearest **React** Suspense or error boundary.
+An **island** is the subtree owned by the other renderer. Use `OctaneCompat` to
+adopt Octane a component at a time in an existing React app. Use `ReactCompat`
+when an Octane app needs a React component or library that has not been ported.
+React stays React; do not alias React or React DOM to Octane.
+
+Every island adds a separate root and its scheduling, event, and lifecycle
+overhead. Prefer a boundary around a useful subtree over one per tiny widget.
+The native Octane client runtime does not include React; importing the integration
+adds it.
 
 <h2 id="set-up">Set up the toolchain</h2>
 
-An Octane island is a compiled `.tsrx` (or Octane-compiled `.tsx`) module, while the
-host app is compiled by React's own toolchain. `requireDirective: true` tells the two
-compilers apart: every `.tsrx` is Octane's by extension, and an Octane-owned
-`.tsx`/`.ts`/`.js` opts in with a leading `/** @jsxImportSource octane */` pragma:
+Keep each component under its own compiler. For a mixed Vite app, use the Octane
+and React plugins with explicit source ownership:
 
 ```ts
 // vite.config.ts
@@ -54,8 +50,23 @@ export default defineConfig({
 });
 ```
 
+`.tsrx` files always belong to Octane. With `requireDirective: true`, mark
+Octane-owned `.tsx`, `.ts`, and `.js` application files with a leading
+`/** @jsxImportSource octane */` pragma, including native hook and context helpers.
+Keep React JSX under React's transform with `/** @jsxImportSource react */`.
+
+`requireDirective` applies to application modules under the bundler root, so keep
+mixed application source inside that root. Installed and linked packages retain
+their package ownership rules; a React library that does not declare Octane remains
+React-owned. See [Build tools](/docs/build-tools#mixed-toolchains) for ownership
+and `exclude` rules.
+
+<h2 id="render-an-island">Render Octane in React</h2>
+
+Write the Octane component in `.tsrx`:
+
 ```tsrx
-// src/islands/Counter.tsrx — compiled by Octane, no marker needed
+// src/islands/Counter.tsrx
 import { useState } from 'octane';
 
 export function Counter(props: { start: number }) @{
@@ -64,19 +75,13 @@ export function Counter(props: { start: number }) @{
 }
 ```
 
-The ownership rules — what the pragma means and how `exclude` hands a path to
-another toolchain — live in
-[Build tools](/docs/build-tools#mixed-toolchains). This page is about what you do once
-the compilers are wired up.
-
-<h2 id="render-an-island">Render an island</h2>
-
-Import the compiled Octane component and the host, then wrap the component in
-`<OctaneCompat>`. It takes exactly one compiled Octane element as its child, consumed
-as a `{ component, props }` transport — React never invokes it:
+Then pass exactly one compiled Octane component element to `OctaneCompat` in
+the React app. React transports the component and its props; it never invokes
+the Octane component itself:
 
 ```tsx
-// App.tsx — compiled by React's toolchain
+/** @jsxImportSource react */
+// src/App.tsx
 import { OctaneCompat } from 'octane/react';
 import { Counter } from './islands/Counter.tsrx';
 
@@ -92,36 +97,79 @@ export function App() {
 }
 ```
 
-Both the child site and the island are fully typed: under octane's TypeScript tooling
-(`tsrx-tsc`, the editor plugin) the `.tsrx` export keeps its own octane-typed
-signature, React JSX accepts it zero-cast, and a wrong, missing, or unknown island
-prop is a type error at `<Counter …/>`. (Octane _element values_ remain rejected in
-ordinary React `ReactNode` positions — only the component transport crosses the
-boundary.)
-
-The equivalent `component`/`props` form passes the same transport explicitly, with
-`props` checked against the island's props parameter; island identity follows the
-React `key` on `<OctaneCompat>` itself, and `props` may be omitted for an island that
-takes none:
+The equivalent `component`/`props` form checks props against the component's
+signature. Omit `props` when the component needs none:
 
 ```tsx
 <OctaneCompat component={Counter} props={{ start: 3 }} />
 ```
 
-Events inside the island are native and **delegated at the island host**, so React
-ancestors observe real capture and bubble order, the real target, and
-`stopPropagation()` / `preventDefault()` exactly as the platform reports them — there
-is no synthetic event layer bridging the two.
+The `.tsrx` export keeps its Octane types through `tsrx-tsc` and the editor
+plugin. Missing, incorrect, or unknown props are errors at the child call site;
+no cast or ambient `.tsrx` shim is needed. Octane element values are still not
+ordinary React renderables outside this component transport.
 
-<h2 id="react-context">Share React context</h2>
+<h2 id="render-react-in-octane">Render React in Octane</h2>
 
-An island reads your app's real React contexts with ordinary `use()` / `useContext()` —
-pass the React context object straight through:
+Keep the React component in a React-owned module. Its hooks and JSX use the real
+React packages:
+
+```tsx
+/** @jsxImportSource react */
+// src/Counter.react.tsx
+import { useState } from 'react';
+
+export function Counter({ start }: { start: number }) {
+	const [count, setCount] = useState(start);
+	return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+Use `ReactCompat` around one React component element in the Octane template:
+
+```tsrx
+// src/App.tsrx
+import { ReactCompat } from 'octane/react';
+import { Counter } from './Counter.react';
+
+export function App() @{
+	<main>
+		<h1>My Octane app</h1>
+		<ReactCompat>
+			<Counter start={3} />
+		</ReactCompat>
+	</main>
+}
+```
+
+Use a named `ReactCompat` import; aliases are supported. The Octane compiler
+transports the child as an element descriptor so React can render it. Function,
+class, `memo`, `lazy`, and `forwardRef` components are accepted. A DOM element,
+fragment, array, or multiple children cannot be the island root; put those
+structures inside a React component.
+
+The explicit form is also typed:
+
+```tsrx
+<ReactCompat component={Counter} props={{ start: 3 }} />
+```
+
+Do not combine the child and `component`/`props` forms. Any children passed in
+props must be React renderables, not Octane template blocks. Prefer JavaScript
+default parameters for function defaults: the outer element is authored by
+Octane and follows Octane's descriptor and `defaultProps` normalization.
+
+<h2 id="react-context">Share context</h2>
+
+<h3 id="react-context-in-octane">React context in an Octane island</h3>
+
+An `OctaneCompat` island reads the React app's real context objects with Octane's
+ordinary `use()` or `useContext()`:
 
 ```tsrx
 // src/islands/ThemedBadge.tsrx
 import { use } from 'octane';
-import { ThemeContext } from '../theme.ts';
+import { ThemeContext } from '../react-theme.ts';
 
 export function ThemedBadge() @{
 	const theme = use(ThemeContext);
@@ -129,83 +177,186 @@ export function ThemedBadge() @{
 }
 ```
 
-The host resolves the nearest committed provider value and keeps the island in sync as
-the provider updates — no adapter or prop-drilling required. Reading a context that has
-no provider yields its `createContext` default, just as it does in React.
+Here `ThemeContext` comes from React's `createContext`. The host resolves the
+nearest committed React provider and updates the island when it changes. With no
+provider, the island receives the React context's default. No mapping is needed
+in this direction.
+
+<h3 id="octane-context-in-react">Octane context in a React island</h3>
+
+For `ReactCompat`, map a native Octane context to a real React context once with
+`bridgeReactContext`:
+
+```ts
+/** @jsxImportSource octane */
+// src/theme.ts
+import { createContext } from 'octane';
+import { createContext as createReactContext } from 'react';
+import { bridgeReactContext } from 'octane/react';
+
+export const Theme = createContext('light');
+export const ReactTheme = createReactContext('light');
+export const reactContexts = [bridgeReactContext(Theme, ReactTheme)];
+```
+
+```tsx
+/** @jsxImportSource react */
+// src/ThemedPanel.react.tsx
+import { useContext } from 'react';
+import { ReactTheme } from './theme';
+
+export function ThemedPanel() {
+	const theme = useContext(ReactTheme);
+	return <p>React theme: {theme}</p>;
+}
+```
+
+```tsrx
+// src/ThemedApp.tsrx
+import { ReactCompat } from 'octane/react';
+import { Theme, reactContexts } from './theme';
+import { ThemedPanel } from './ThemedPanel.react';
+
+export function ThemedApp() @{
+	<Theme value="dark">
+		<ReactCompat contexts={reactContexts}>
+			<ThemedPanel />
+		</ReactCompat>
+	</Theme>
+}
+```
+
+The React component receives the nearest Octane provider value, including an
+explicit `undefined`. Updates cross memo boundaries without resetting state.
+Mappings are local to each island; providers inside React keep their usual
+precedence. Keep the ordered source and target context identities stable for the
+boundary's lifetime, or change its key. Duplicate target contexts are rejected.
+
+<h2 id="state-refs-and-events">State, refs, and events</h2>
+
+Changing props preserves the island's component state and DOM identity. A child
+key or type change replaces the component; changing the outer compatibility
+boundary's key replaces the whole root.
+
+`ReactCompat` passes ordinary props, callbacks, and React 19 ref props through to
+React. Class refs target the React instance. React components keep React's event
+behavior, including their usual text-input `onChange` handlers.
+
+Octane components keep native events, including native `onInput` for per-keystroke
+text changes. In `OctaneCompat`, those events are delegated at the island host;
+React ancestors observe platform capture and bubble order, targets,
+`stopPropagation()`, and `preventDefault()`. The bridge does not translate events
+between the two systems.
+
+<h2 id="suspense-and-visibility">Suspense, errors, and visibility</h2>
+
+Local boundaries handle their descendants first. An Octane island's escaped
+suspension or error reaches the enclosing React Suspense or error boundary. In
+the other direction, an escaped React suspension reaches Octane's nearest
+`@pending`/Suspense boundary, and escaped render, layout, or passive-effect errors
+reach the nearest Octane catch boundary. Resetting that catch boundary remounts
+the React island. Event-handler errors follow the owning renderer's event error
+reporting, not its render error boundaries.
+
+`ReactCompat` starts or updates its React root after the Octane host commits.
+Octane `root.render()` and `flushSync()` do not synchronously flush React work.
+React-local transitions retain React's normal behavior, but an Octane transition
+does not wait for the separate React root or roll back committed Octane siblings.
+Neither compatibility host provides an atomic transaction across both renderers.
+
+While a React island has escaped as pending, new parent props and context
+snapshots are published on reveal. To cancel or replace that pending island,
+delete `ReactCompat` or change its outer key.
+
+When Octane Suspense hides a React island, React layout effects and refs
+disconnect and its portals hide; passive effects stay connected. Octane Activity
+hiding also disconnects passive effects. Reveal restores the same React state
+and nodes. Actual deletion invalidates the island immediately and unmounts React
+in a microtask, including when the island was hidden or pending. This allows
+nested React→Octane→React client trees to delete safely during a React commit.
 
 <h2 id="server-rendering">Server rendering and hydration</h2>
 
-Islands render on the server too. Wherever React runs on the server — Fizz streaming or
-`renderToString` — import the host from `octane/react/server`; the client entry
-(`octane/react`) hydrates its output.
+Both server hosts are exported from `octane/react/server`. The client entry,
+`octane/react`, hydrates their output. Octane's server compiler retargets
+`octane/react` imports automatically. A custom pipeline, or a React-owned server
+entry that does not pass through that compiler, must select the server entry:
 
 ```tsx
-// entry.server.tsx
-import { OctaneCompat } from 'octane/react/server';
+// Choose the host used by your server entry.
+import { OctaneCompat, ReactCompat } from 'octane/react/server';
 ```
 
-Each island runs one synchronous server pass; an unresolved island suspension is
-delegated to React so the shell can stream and fill in. Scoped island CSS is emitted as
-React 19 style resources (a stable per-hash `href` with `precedence="octane"`), so Fizz
-hoists and deduplicates it across islands. The island's HTML is written as an opaque
-region the client adopts without re-rendering, so hydration never touches the
-descendants React did not own.
+**Octane inside React:** `OctaneCompat` runs a synchronous Octane server attempt
+and delegates unresolved suspension to React's server renderer. Fizz can stream
+the surrounding fallback and retry the island. Scoped island CSS becomes React
+19 style resources, hoisted and deduplicated across islands. The client Octane
+root hydrates the island's HTML; React leaves its descendants opaque.
 
-<h2 id="not-supported">What isn't supported</h2>
+**React inside Octane:** use Octane's asynchronous or streaming server renderer.
+`ReactCompat` buffers the complete React HTML for each island. An enclosing
+Octane streaming boundary can send its fallback while the island is pending;
+React's internal progressive reveal scripts are not streamed separately. A
+synchronous Octane render can produce a surrounding fallback but cannot await
+the React island.
 
-One part of React does **not** cross over:
+React island HTML is limited to **8 MiB**. Pending React work belongs to the
+Octane server request and is released on abort, cancellation, timeout, or request
+completion. React server errors reach Octane's server catch path; React error
+boundaries do not catch server-render errors.
 
-- **React Server Components** — RSC, Flight, and `cache()`. Islands are client and
-  server-rendered function components; there is no Server Component boundary between
-  React and Octane.
+React `useId` receives a per-island prefix derived from Octane `useId`. React's
+`hydrateRoot` adopts the existing island DOM, preserving nodes, refs, and
+user-edited form state. Server and client must render the same component,
+context values, and tree; mismatches inside an island use React's normal
+hydration recovery.
 
-Everything else you rely on in a React app comes along: hooks, Suspense, transitions,
-context, portals, error boundaries, native events, and server rendering with hydration.
-See [Differences from React](/docs/differences-from-react#not-supported) for the full
-list of APIs Octane leaves out.
+<h2 id="not-supported">Limits</h2>
 
-<aside className="doc-callout tip">
-	<p className="doc-callout-title">Start small</p>
-	<p>
-		{
-			'Pick one leaf component, port it to .tsrx, and wrap it in OctaneCompat. When that ships cleanly, move up the tree. The React code around each island never has to change.'
-		}
-	</p>
-</aside>
+- Both hosts introduce a **div**: `div[data-octane-compat]` or
+  `div[data-react-compat]`. Place them where a div is valid, not directly inside a
+  table row, select, SVG tree, or another restricted content model. Do not let
+  another renderer reconcile or directly write the island's interior.
+- React Server Components, Flight, and React's server `cache()` do not cross
+  these boundaries.
+- Nested React→`OctaneCompat`→`ReactCompat` **server rendering** is unsupported.
+  Client nesting works in both directions.
+- An `OctaneCompat` island cannot hoist `title`, `meta`, or `link` output during
+  React SSR. Render those head resources from the React tree instead.
+
+See [Differences from React](/docs/differences-from-react) for the APIs and
+semantics of native Octane components. A component inside `ReactCompat` still
+runs under React's own rules.
 
 <h2 id="editor-and-type-checking">Editor and type checking</h2>
 
-Islands keep their real octane types across the boundary — no `declare module
-'*.tsrx'` shims. Two pieces of setup make that work in a React host project:
-
-1. **Type checking**: use `tsrx-tsc` instead of plain `tsc` so `.tsrx` islands
-   join the program with their exported types:
+Use `tsrx-tsc` for any program containing `.tsrx`, including a React host app.
+It preserves the component's exported types across both compatibility hosts:
 
 ```json
 { "scripts": { "typecheck": "tsrx-tsc --noEmit -p tsconfig.json" } }
 ```
 
-2. **Editor**: register the TypeScript plugin in `tsconfig.json` so imports
-   like `./islands/PriceBadge.tsrx` resolve with full types in `.tsx` files
-   (requires the editor to use TypeScript 5.9/6.x — the plugin API is not
-   available under TS 7 previews):
+Register the TypeScript plugin for typed `.tsrx` imports in the editor. Use
+TypeScript 5.9/6.x in the editor; the plugin API is unavailable in TS 7 previews:
 
 ```json
 { "compilerOptions": { "plugins": [{ "name": "@tsrx/typescript-plugin" }] } }
 ```
 
-The host tsconfig stays pure React (`"jsx": "react-jsx"`, no
-`jsxImportSource`) — each `.tsrx` island types against octane's JSX on its
-own, and prop mistakes at `<OctaneCompat component={Island} props={…} />` or
-`<Island />` call sites surface as ordinary type errors. See
-`examples/harbor` for a complete working setup.
+A React host keeps `"jsx": "react-jsx"` without a global `jsxImportSource`;
+each `.tsrx` file uses Octane's JSX types on its own. An Octane host uses
+`"jsxImportSource": "octane"` and marks React modules with
+`/** @jsxImportSource react */`. Do not add `declare module '*.tsrx'` shims:
+they erase the types that make the component and ref checks work.
 
 <h2 id="next">Next</h2>
 
-- [Build tools](/docs/build-tools#mixed-toolchains) — mixed-toolchain ownership:
-  `.tsrx` by extension, octane `.tsx`/`.ts`/`.js` via the
-  `@jsxImportSource octane` pragma.
-- [Quick start](/docs/quick-start) — install Octane and write your first `.tsrx`
+- [Playground](/playground) — choose **ReactCompat in Octane (multi-file)** for
+  live props, callbacks, refs, local Suspense, and unmount/remount controls, or
+  **OctaneCompat in React (multi-file)** for the other direction.
+- [Harbor example](https://github.com/octanejs/octane/tree/main/examples/harbor) —
+  a React app with compiled Octane islands and server rendering.
+- [Build tools](/docs/build-tools#mixed-toolchains) — configure compiler ownership.
+- [Quick start](/docs/quick-start) — create an Octane app and write its first `.tsrx`
   component.
-- [Differences from React](/docs/differences-from-react) — the deliberate divergences
-  (everything else matching React is the point).

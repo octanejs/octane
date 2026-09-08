@@ -3,6 +3,13 @@
 [Valtio](https://github.com/pmndrs/valtio) for the
 [Octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/valtio
+pnpm add @octanejs/valtio
+```
+
 The package reuses Valtio's framework-independent `valtio/vanilla` core and
 reimplements only `useSnapshot` with Octane hooks. Existing Valtio components
 can usually migrate by changing the import:

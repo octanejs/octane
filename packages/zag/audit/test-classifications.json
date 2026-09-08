@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/zag/tests/conformance/machine.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-authored useMachine lifecycle/regression coverage outside the adapted upstream suite identities."
+    },
+    {
+      "path": "packages/zag/tests/conformance/upstream-surface.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Public export surface and re-export contract checks for the Octane binding; not adapted upstream-suite identities."
+    },
+    {
+      "path": "packages/zag/tests/differential/machine.test.ts",
+      "disposition": "react-octane-differential",
+      "reason": "Repo-authored differential oracle comparing Octane and @zag-js/react@1.42.0 traces; supplementary to the full adapted suite."
+    },
+    {
+      "path": "packages/zag/tests/differential/portal.test.ts",
+      "disposition": "react-octane-differential",
+      "reason": "Repo-authored differential oracle comparing Octane and @zag-js/react@1.42.0 Portal mount/disabled behavior."
+    },
+    {
+      "path": "packages/zag/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "SSR/server rendering contract for the Octane binding; not React-parity ownership."
+    },
+    {
+      "path": "packages/zag/tests/upstream/machine.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted cases from pinned @zag-js/react 1.42.0 tests/machine.test.ts."
+    },
+    {
+      "path": "packages/zag/tests/upstream/nested-states.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted cases from pinned @zag-js/react 1.42.0 tests/nested-states.test.ts."
+    },
+    {
+      "path": "packages/zag/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the byte-exact pinned @zag-js/react 1.42.0 Vitest suite against React after vendored-byte verification."
+    }
+  ]
+}

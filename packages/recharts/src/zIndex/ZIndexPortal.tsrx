@@ -1,3 +1,5 @@
+import type { OctaneNode } from '../util/OctaneTypes.ts';
+
 // Port of zIndex/ZIndexPortal.tsx — SVG cannot use CSS z-index, so recharts
 // renders one <g> per registered zIndex (negatives before the default layer,
 // positives after) and ZIndexLayer portals content into them.
@@ -6,9 +8,12 @@ import { useAppDispatch, useAppSelector } from '../state/hooks';
 import { registerZIndexPortalElement, unregisterZIndexPortalElement } from '../state/zIndexSlice';
 import { selectAllRegisteredZIndexes } from './zIndexSelectors';
 
-function ZIndexSvgPortal(props) {
+function ZIndexSvgPortal(props: {
+	zIndex: number;
+	isPanorama: boolean;
+}) {
 	const { zIndex, isPanorama } = props;
-	const ref = useRef(null);
+	const ref = useRef<SVGGElement | null>(null);
 	const dispatch = useAppDispatch();
 	useLayoutEffect(() => {
 		if (ref.current) {
@@ -22,9 +27,14 @@ function ZIndexSvgPortal(props) {
 	return <g tabIndex={-1} ref={ref} className={'recharts-zIndex-layer_' + zIndex}></g>;
 }
 
-export function AllZIndexPortals(props) @{
+export function AllZIndexPortals(props: {
+	children?: OctaneNode;
+	isPanorama: boolean;
+}) @{
 	const { children, isPanorama } = props;
-	const allRegisteredZIndexes = useAppSelector(selectAllRegisteredZIndexes);
+	const allRegisteredZIndexes: ReadonlyArray<number> | undefined = useAppSelector(
+		selectAllRegisteredZIndexes,
+	);
 	if (!allRegisteredZIndexes || allRegisteredZIndexes.length === 0) {
 		return children;
 	}

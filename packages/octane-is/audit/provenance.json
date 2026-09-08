@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/package/LICENSE",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "path": "upstream-artifact/package/README.md",
+      "sha256": "6b0da973404ad1072055e38ee74d0b6d132fc142c1d1bb6fec6191c684724fa4"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/react-is.development.js",
+      "sha256": "44314886ebca6d96bdb050470894181ee4d27ab04484153a6918700fdc4f97e3"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/react-is.production.js",
+      "sha256": "7e1b24d0e2a3d9ede538feae7a480620f25e3ff0314a9fe1104a01c9373e56f7"
+    },
+    {
+      "path": "upstream-artifact/package/index.js",
+      "sha256": "793ea73dcc6ee7f02834b146f14fba1efd34834e86fbefe9cc095cda9add492d"
+    },
+    {
+      "path": "upstream-artifact/package/package.json",
+      "sha256": "06b53d3182d60f170c7ada7cc51f3027ec0aee58316d62ef4cec3ba970af0e85"
+    },
+    {
+      "path": "upstream-artifact/react-is-19.2.7.tgz",
+      "sha256": "70e0dac61c6782a508e77c70e0c459f8fbbbed82d5ab341921f2f85f8014f0e0"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream-artifact/package/package.json",
+    "name": "react-is",
+    "version": "19.2.7",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "scripts", "tests", "upstream", "upstream-artifact"],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream-artifact/package/LICENSE"
+    }
+  ]
+}

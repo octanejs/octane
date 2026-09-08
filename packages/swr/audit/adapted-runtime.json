@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "project": "swr",
+  "roots": ["packages/swr/tests/upstream"],
+  "files": [
+    "packages/swr/tests/upstream/root/root.test.ts",
+    "packages/swr/tests/upstream/specialized/specialized.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:483952ca70cf3e3e",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle deduplicates concurrent sibling requests by serialized key"
+    },
+    {
+      "id": "runtime:c00d484f4ecc81a0",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle exposes __SWR_DEVTOOLS_OCTANE__ and does not claim __SWR_DEVTOOLS_REACT__"
+    },
+    {
+      "id": "runtime:244dc543526ea047",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle fires loading-slow and polling timers deterministically and cleans polling up"
+    },
+    {
+      "id": "runtime:82aa3f73991637e6",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle prevents an older request from overwriting a newer revalidation"
+    },
+    {
+      "id": "runtime:faae9a8a39ef2c0c",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle publishes a cache mutation without revalidation"
+    },
+    {
+      "id": "runtime:121d216174b970e2",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle publishes loading, data, and validation state around a request"
+    },
+    {
+      "id": "runtime:1eca94e9f06bbd64",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle revalidates on focus and reconnect through the pinned environment adapters"
+    },
+    {
+      "id": "runtime:13290aa4e722363d",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle rolls optimistic data back when a mutation rejects"
+    },
+    {
+      "id": "runtime:a9b32f6bea7082b7",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle surfaces fetcher failures and invokes the pinned error callback"
+    },
+    {
+      "id": "runtime:ae2ae8b1e5ac59a6",
+      "file": "packages/swr/tests/upstream/root/root.test.ts",
+      "fullName": "SWR U3 root lifecycle suspends an uncached request and resumes with its resolved data"
+    },
+    {
+      "id": "runtime:7e0a8a0a9696996d",
+      "file": "packages/swr/tests/upstream/specialized/specialized.test.ts",
+      "fullName": "SWR U4 specialized entrypoints keeps immutable data stable across focus events"
+    },
+    {
+      "id": "runtime:2c4c93fa69d1946e",
+      "file": "packages/swr/tests/upstream/specialized/specialized.test.ts",
+      "fullName": "SWR U4 specialized entrypoints keeps only the latest remote mutation result and callback"
+    },
+    {
+      "id": "runtime:1dd3909020a5a4ee",
+      "file": "packages/swr/tests/upstream/specialized/specialized.test.ts",
+      "fullName": "SWR U4 specialized entrypoints loads infinite pages sequentially and grows with setSize"
+    },
+    {
+      "id": "runtime:af6731b511c219ab",
+      "file": "packages/swr/tests/upstream/specialized/specialized.test.ts",
+      "fullName": "SWR U4 specialized entrypoints passes null previous-page data in parallel infinite mode"
+    },
+    {
+      "id": "runtime:877b6a56242381c2",
+      "file": "packages/swr/tests/upstream/specialized/specialized.test.ts",
+      "fullName": "SWR U4 specialized entrypoints rejects an invalid subscription disposer"
+    },
+    {
+      "id": "runtime:3399fa1a2b02cad4",
+      "file": "packages/swr/tests/upstream/specialized/specialized.test.ts",
+      "fullName": "SWR U4 specialized entrypoints shares one subscription setup and disposes it after the final consumer"
+    },
+    {
+      "id": "runtime:ddbce961753342c3",
+      "file": "packages/swr/tests/upstream/specialized/specialized.test.ts",
+      "fullName": "SWR U4 specialized entrypoints surfaces remote mutation failures and honors throwOnError"
+    },
+    {
+      "id": "runtime:84fb15e298e79413",
+      "file": "packages/swr/tests/upstream/specialized/specialized.test.ts",
+      "fullName": "SWR U4 specialized entrypoints surfaces subscription errors"
+    },
+    {
+      "id": "runtime:8973db98176e37d9",
+      "file": "packages/swr/tests/upstream/specialized/specialized.test.ts",
+      "fullName": "SWR U4 specialized entrypoints tracks remote mutation trigger success and reset"
+    }
+  ]
+}

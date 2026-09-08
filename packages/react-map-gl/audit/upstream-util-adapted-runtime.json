@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "project": "react-map-gl-upstream-adapted",
+  "roots": ["packages/react-map-gl/tests/upstream", "packages/react-map-gl/tests/upstream-util"],
+  "files": ["packages/react-map-gl/tests/upstream-util/adapted.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:1ff2b50ac0224ec6",
+      "file": "packages/react-map-gl/tests/upstream-util/adapted.test.ts",
+      "fullName": "upstream util specs (adapted) applyReactStyle"
+    },
+    {
+      "id": "runtime:cd4a806eef1f7df2",
+      "file": "packages/react-map-gl/tests/upstream-util/adapted.test.ts",
+      "fullName": "upstream util specs (adapted) applyViewStateToTransform"
+    },
+    {
+      "id": "runtime:5b437d28553d0b2e",
+      "file": "packages/react-map-gl/tests/upstream-util/adapted.test.ts",
+      "fullName": "upstream util specs (adapted) arePointsEqual"
+    },
+    {
+      "id": "runtime:193fff636b894da2",
+      "file": "packages/react-map-gl/tests/upstream-util/adapted.test.ts",
+      "fullName": "upstream util specs (adapted) compareClassNames"
+    },
+    {
+      "id": "runtime:5401654554aaee26",
+      "file": "packages/react-map-gl/tests/upstream-util/adapted.test.ts",
+      "fullName": "upstream util specs (adapted) declares every collected upstream case"
+    },
+    {
+      "id": "runtime:aab6a104e8a1792a",
+      "file": "packages/react-map-gl/tests/upstream-util/adapted.test.ts",
+      "fullName": "upstream util specs (adapted) deepEqual"
+    },
+    {
+      "id": "runtime:d4d8ee1ce7efe7bf",
+      "file": "packages/react-map-gl/tests/upstream-util/adapted.test.ts",
+      "fullName": "upstream util specs (adapted) normalizeStyle"
+    }
+  ]
+}

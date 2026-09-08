@@ -9,6 +9,7 @@ import { flushEffects, mount, nextPaint } from '../_helpers';
 import {
 	BarChartApp,
 	CartesianChartsApp,
+	CartesianAxisRefApp,
 	ErrorBarAnimationOriginApp,
 	FunnelAnimationStabilityApp,
 	FunnelLegendApp,
@@ -16,6 +17,7 @@ import {
 	HiddenPieTooltipApp,
 	HierarchyChartsApp,
 	LineChartApp,
+	MissingRadialGeometryApp,
 	OverlayChartApp,
 	PolarAnimationStabilityApp,
 	PolarCellsApp,
@@ -78,6 +80,27 @@ function controlAnimationFrames() {
 }
 
 describe('Phase 1 chart pipeline (octane side)', () => {
+	it('keeps the CartesianAxis imperative ref off native hosts', async () => {
+		const received: unknown[] = [];
+		const r = mount(CartesianAxisRefApp, {
+			axisRef: (value: unknown) => {
+				received.push(value);
+			},
+		});
+		try {
+			await settle();
+			expect(r.container.querySelector('.recharts-cartesian-axis-line')).not.toBeNull();
+			const handles = received.filter((value) => value !== null);
+			expect(handles.length).toBeGreaterThan(0);
+			for (const handle of handles) {
+				expect(handle).toEqual({ getCalculatedWidth: expect.any(Function) });
+			}
+		} finally {
+			r.unmount();
+		}
+		expect(received.at(-1)).toBeNull();
+	});
+
 	it('BarChart renders bars and axes', async () => {
 		const r = mount(BarChartApp);
 		await settle();
@@ -161,13 +184,30 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 		await settle();
 		expect(result.container.querySelectorAll('.recharts-scatter-symbol')).toHaveLength(0);
 
-		result.update(HiddenScatterCellsApp, { hide: false });
-		const symbols = result.container.querySelectorAll(
-			'.recharts-scatter-symbol path.recharts-symbols',
-		);
-		const fills = Array.from(symbols, (symbol) => symbol.getAttribute('fill'));
-		result.unmount();
-		expect(fills).toEqual(['#ff0000', '#0000ff']);
+		let firstVisibleFills: Array<string | null> | undefined;
+		const captureFirstVisible = () => {
+			if (firstVisibleFills !== undefined) return;
+			const symbols = result.container.querySelectorAll(
+				'.recharts-scatter-symbol path.recharts-symbols',
+			);
+			if (symbols.length > 0) {
+				firstVisibleFills = Array.from(symbols, (symbol) => symbol.getAttribute('fill'));
+			}
+		};
+		const observer = new MutationObserver(captureFirstVisible);
+		observer.observe(result.container, { childList: true, subtree: true, attributes: true });
+		try {
+			result.update(HiddenScatterCellsApp, { hide: false });
+			captureFirstVisible();
+			// Store/layout cascades can finish at the next paint boundary. Capture
+			// the first visible mutation so a later color correction cannot pass.
+			await nextPaint();
+			captureFirstVisible();
+			expect(firstVisibleFills).toEqual(['#ff0000', '#0000ff']);
+		} finally {
+			observer.disconnect();
+			result.unmount();
+		}
 	});
 
 	it('renders a zero-valued ErrorBar', async () => {
@@ -322,6 +362,59 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 		expect(result.container.querySelector('.recharts-polar-angle-axis')).toBeTruthy();
 		expect(result.container.querySelector('.recharts-polar-radius-axis')).toBeTruthy();
 		result.unmount();
+	});
+
+	it('keeps a Pie Cell ref on its sector instead of forwarding it to labels', async () => {
+		const received: Array<SVGElement | null> = [];
+		const result = mount(PolarCellsApp, {
+			pieRef: (node: SVGElement | null) => {
+				received.push(node);
+			},
+			label: true,
+		});
+		try {
+			await settle();
+			expect(result.container.querySelector('.recharts-pie-label-text')).not.toBeNull();
+			const sector = result.container.querySelector('.recharts-pie-sector .recharts-sector');
+			expect(sector).not.toBeNull();
+			const attached = received.filter((node) => node !== null);
+			expect(attached.length).toBeGreaterThan(0);
+			for (const node of attached) expect(node).toBe(sector);
+		} finally {
+			result.unmount();
+		}
+		expect(received.at(-1)).toBeNull();
+	});
+
+	it('uses Sector defaults for missing radial geometry without shifting data indices', async () => {
+		const latest = new Map<
+			number,
+			{
+				payload: { name: string };
+				innerRadius: number;
+				outerRadius: number;
+				startAngle: number;
+				endAngle: number;
+			}
+		>();
+		const result = mount(MissingRadialGeometryApp, {
+			observe: (props: { index: number } & NonNullable<ReturnType<typeof latest.get>>) => {
+				latest.set(props.index, props);
+			},
+		});
+		try {
+			await settle();
+			expect(latest.get(0)?.payload.name).toBe('missing');
+			expect(latest.get(1)?.payload.name).toBe('present');
+			for (const item of latest.values()) {
+				for (const key of ['innerRadius', 'outerRadius', 'startAngle', 'endAngle'] as const) {
+					expect(Number.isFinite(item[key])).toBe(true);
+				}
+			}
+			expect(latest.get(0)?.outerRadius).toBe(0);
+		} finally {
+			result.unmount();
+		}
 	});
 
 	it('applies registered Cell presentation props to polar sectors', async () => {

@@ -1,4 +1,5 @@
 import type { Plugin, ViteDevServer } from 'vite';
+import type { OctaneVitePluginOptions } from 'octane/compiler/vite';
 import type {
 	ConfigModuleRunner,
 	ExperimentalRendererConfigOptions,
@@ -14,8 +15,10 @@ export interface OctanePluginOptions {
 	hmr?: boolean;
 	/** Enable component profiling in client transforms. */
 	profile?: boolean;
-	/** Enable Strong mode for app code, overriding `compiler.strong` in `octane.config.ts`. */
+	/** Assert Strong mode's pure immutable-snapshot render contract for app code. */
 	strong?: boolean;
+	/** Experimental native signal reads in DOM client/server render scopes. */
+	nativeReads?: boolean;
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.
@@ -42,6 +45,8 @@ export interface OctanePluginOptions {
 	 * reads `compiler.renderers` from `octane.config.ts` before transforming modules.
 	 */
 	renderers?: ExperimentalRendererConfigOptions;
+	/** @experimental Authenticate immutable CSS-module exports in production builds. */
+	cssModuleConstants?: OctaneVitePluginOptions['cssModuleConstants'];
 }
 
 /** The Octane compiler plugin plus Vite app/metaframework integration. */

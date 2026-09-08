@@ -18,7 +18,10 @@
 
 The published archive contains compiled runtime and declarations, but not the canonical
 Playwright suite. The byte-exact package source, all test specs and fixtures, test configuration,
-package metadata, and license from the tagged repository are vendored under `upstream/`.
+package metadata, and license from the tagged repository are vendored under `upstream/`,
+pinned by `audit/upstream.lock.json` (offline git-blob-sha verification:
+`pnpm react-port:materialize run --check --package-dir packages/cmdk`); the upstream MIT
+license is retained byte-exact as `LICENSE.upstream`, hash-matched to the lock.
 `upstream/SHA256SUMS` authenticates all 30 files.
 
 ## Export crosswalk

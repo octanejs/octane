@@ -98,4 +98,3 @@ const ItemWrapperMemo = React.memo(
     prev.index === next.index &&
     prev.isInitialListRender === next.isInitialListRender,
 ) as typeof ItemWrapper
-

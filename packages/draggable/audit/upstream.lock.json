@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-draggable",
+    "version": "4.7.1",
+    "repository": {
+      "owner": "react-grid-layout",
+      "repo": "react-draggable",
+      "subdirectory": null
+    },
+    "commit": "bcbaa8eb285aea49865ca8870c0b7b441c2fe6a4",
+    "integrity": "sha512-wa3tzfFnYt3yaZLuyU58fl1TNunfWfBekDgWhZA1+gb2jnp42wZ0ymuopR6M5kqDYmm4hKmzGlcKWjZf3Zb6RQ=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "6de5c13fa4cb2cef3d111d6f43ef4958aa1b9ea3f6f623200dfe1300a8e1d3d4"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "LICENSE",
+    "lib",
+    "package.json",
+    "test",
+    "tsconfig.json",
+    "tsup.config.ts",
+    "typings",
+    "vitest.browser.config.js",
+    "vitest.config.js"
+  ],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "lib/cjs.ts",
+      "gitBlob": "30ed1d2c964738e954bbc6362e2e864f4d1df62c",
+      "size": 3441
+    },
+    {
+      "path": "lib/Draggable.tsx",
+      "gitBlob": "3c4342193b312fd0f190e02555ca3563e6cbd6af",
+      "size": 15314
+    },
+    {
+      "path": "lib/DraggableCore.tsx",
+      "gitBlob": "c7f8004391dc8777d11e7ba1b18d13198b5ae0be",
+      "size": 19144
+    },
+    {
+      "path": "lib/umd.ts",
+      "gitBlob": "a79e421fe17dd3fef97b57b9ff952546c759fdb9",
+      "size": 1240
+    },
+    {
+      "path": "lib/utils/domFns.ts",
+      "gitBlob": "b49d95ed6c5ba6bf23f7cfb3f33339f65c65ddb5",
+      "size": 9914
+    },
+    {
+      "path": "lib/utils/getPrefix.ts",
+      "gitBlob": "ff87bfcd8c7a94f060eeb9fd6fa203ee755841af",
+      "size": 1532
+    },
+    {
+      "path": "lib/utils/log.ts",
+      "gitBlob": "9286b07bfdfb041c0d25a6baccf07a2aaf29a77b",
+      "size": 174
+    },
+    {
+      "path": "lib/utils/positionFns.ts",
+      "gitBlob": "66fa0226954b332c5536ee064665604ec1f5f0d7",
+      "size": 5474
+    },
+    {
+      "path": "lib/utils/shims.ts",
+      "gitBlob": "c4e0385d26fcc3259c575f1a7344813528ea34bf",
+      "size": 987
+    },
+    {
+      "path": "lib/utils/types.ts",
+      "gitBlob": "1fc8325048f28328babdf2e85eaeef07b5b2d475",
+      "size": 1418
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "8b1d6c985665e96062896aefcd7eb79f5cc9f262",
+      "size": 1111
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "58d215a27b6cec9e2029ed6b28416266e3c48e2d",
+      "size": 2921
+    },
+    {
+      "path": "test/browser/browser.test.js",
+      "gitBlob": "863369563afe7032bfad23b3e6a2e220625e0f28",
+      "size": 39781
+    },
+    {
+      "path": "test/browser/test.html",
+      "gitBlob": "6ddd169ee579c3285f6d4a157445acab6b85bbb0",
+      "size": 1309
+    },
+    {
+      "path": "test/Draggable.test.jsx",
+      "gitBlob": "546019883feea7864f824ed1e313549f8b2f367a",
+      "size": 13675
+    },
+    {
+      "path": "test/DraggableCore.test.jsx",
+      "gitBlob": "11ed75cdc5beb351f920bce693904b2521d8bfc6",
+      "size": 19378
+    },
+    {
+      "path": "test/setup.js",
+      "gitBlob": "6301d2ff6f43a32d6de6ad7f62f1666c7aaf01e7",
+      "size": 414
+    },
+    {
+      "path": "test/testUtils.js",
+      "gitBlob": "81630eec4589245298f86a676c60dc9828cb5957",
+      "size": 2786
+    },
+    {
+      "path": "test/typeCompat.test.ts",
+      "gitBlob": "7b5cbee339d6d8779a9c75e6b9f34478f7defc07",
+      "size": 3929
+    },
+    {
+      "path": "test/typeCompat/fixture.tsx",
+      "gitBlob": "151589e93062a258fecfef59bd018aabdc938d8a",
+      "size": 7980
+    },
+    {
+      "path": "test/typeCompat/tsconfig.json",
+      "gitBlob": "2f91d87d1994ff58698f975f2dfeec578d397502",
+      "size": 392
+    },
+    {
+      "path": "test/utils/domFns.extra.test.js",
+      "gitBlob": "4e37832d38f9b4e48d9d1f0ed5c7eddd7877dc6c",
+      "size": 11444
+    },
+    {
+      "path": "test/utils/domFns.test.js",
+      "gitBlob": "e81b190df07864d93a298eba41528164c296b3ef",
+      "size": 6651
+    },
+    {
+      "path": "test/utils/getPrefix.extra.test.js",
+      "gitBlob": "22f264577504bce056770366652d4699c944ffc3",
+      "size": 2492
+    },
+    {
+      "path": "test/utils/getPrefix.test.js",
+      "gitBlob": "d4e3e1fba5dc35d611ec5b1260ea35ff252edd28",
+      "size": 3479
+    },
+    {
+      "path": "test/utils/positionFns.bounds.test.js",
+      "gitBlob": "4da624f5d821e4ca008e3049a548440c98b4185c",
+      "size": 8359
+    },
+    {
+      "path": "test/utils/positionFns.test.js",
+      "gitBlob": "9e8d8731cf35ec4f80c26976adeaac1f369a4984",
+      "size": 5352
+    },
+    {
+      "path": "test/utils/shims.extra.test.js",
+      "gitBlob": "72876588e3e5f046835b4cf3c4e1cf6d66fd31d4",
+      "size": 3076
+    },
+    {
+      "path": "test/utils/shims.test.js",
+      "gitBlob": "f2a6b4c2e08d0fb24d3f5a67177cd13076a62ca0",
+      "size": 3694
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "b3008cb4741e1062ab67da082080055e640b5198",
+      "size": 524
+    },
+    {
+      "path": "tsup.config.ts",
+      "gitBlob": "2d67a7d3cb6e6154a5000f110a4b8cfa9f1a9031",
+      "size": 3077
+    },
+    {
+      "path": "typings/test.tsx",
+      "gitBlob": "50fe504b3a43613432d276fc34ce5b354c98033d",
+      "size": 1801
+    },
+    {
+      "path": "typings/tsconfig.json",
+      "gitBlob": "1c0312fc80d5663f5da91c8a91230bb3cb99d789",
+      "size": 272
+    },
+    {
+      "path": "typings/tsconfig.react18.json",
+      "gitBlob": "a3a1987dcff37db3e5b12f81c6d28e47d486255d",
+      "size": 1202
+    },
+    {
+      "path": "vitest.browser.config.js",
+      "gitBlob": "e7f2568630c6e82ffff79925016575e117262530",
+      "size": 188
+    },
+    {
+      "path": "vitest.config.js",
+      "gitBlob": "4c88a85e561d2dacb801f95f4b995f0e25fa6753",
+      "size": 800
+    }
+  ],
+  "fingerprint": "6e8bcc2ea4df372af35499d1636ca543d1cd26dab43055a5c5bbdbe2762c7a6b"
+}

@@ -1,0 +1,13 @@
+{
+  "upstream": {
+    "package": "thinking-orbs",
+    "version": "0.2.0"
+  },
+  "surface": "ThinkingOrb component, resolvePreset, MODE_DRAWS, and public types — nine animation states, two tuned size presets, auto/dark/light theme, reduced-motion static frame.",
+  "divergences": [],
+  "ssr": "Canvas is client-only; server render emits the canvas element without animation.",
+  "verified": "2026-08-07",
+  "notes": [
+    "Below the standard 10M npm downloads admission cutoff; explicit portfolio approval required."
+  ]
+}

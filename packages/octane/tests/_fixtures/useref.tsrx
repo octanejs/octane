@@ -159,6 +159,11 @@ export function ImperativeOwner(props) @{
 	</div>
 }
 
+export function ImperativeValue(props) @{
+	useImperativeHandle(props.handle, props.factory, []);
+	<span class="imperative-value">{props.label as string}</span>
+}
+
 // Initial value persists across renders — even though `props.factory()` is
 // evaluated each render (useRef is NOT lazy in React's API, only useState is),
 // the ref keeps the FIRST value it received and ignores later inputs.

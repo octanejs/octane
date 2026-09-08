@@ -14,8 +14,26 @@
  */
 import { useLayoutEffect, useRef } from 'octane';
 import { useCellsRegistry } from '../context/CellsContext';
+import type { SVGProps, SVGPropsForHost } from '../util/OctaneTypes';
 
-export function Cell(props: Record<string, unknown>): null {
+type CellGeometry = {
+	x?: number;
+	y?: number;
+	cx?: number;
+	cy?: number;
+	width?: number;
+	height?: number;
+	radius?: number;
+};
+
+// Cell geometry feeds calculated chart paths, whose coordinates are numeric.
+export type Props = Omit<SVGProps<SVGElement>, keyof CellGeometry> & CellGeometry;
+
+// A shape writes its narrower host into the Cell's broader SVG ref sink.
+// This write-only view is used at the renderer boundary; refs are never dropped.
+export type CellPropsFor<T extends SVGElement> = SVGPropsForHost<Props, T>;
+
+export function Cell(props: Props): null {
 	const registry = useCellsRegistry();
 	const token = useRef({});
 	useLayoutEffect(() => {

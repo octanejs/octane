@@ -1,0 +1,4 @@
+{
+  "extends": "../fetch-patterns/tsconfig.json",
+  "include": ["./*.ts", "./*.tsrx"]
+}

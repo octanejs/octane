@@ -1,12 +1,13 @@
 // Port of context/chartDataContext.tsx — reporter components that publish the
 // chart's `data` prop into the store, plus the read hooks.
 import { useEffect } from 'octane';
-import { setChartData, setComputedData } from '../state/chartDataSlice';
+import { setChartData, setComputedData, type ChartData } from '../state/chartDataSlice';
 import { useAppDispatch, useAppSelector } from '../state/hooks';
 import { useIsPanorama } from './PanoramaContext';
 import { splitSlot, subSlot } from '../internal';
+import type { RechartsRootState } from '../state/store';
 
-export const ChartDataContextProvider = (props: { chartData: unknown }): null => {
+export const ChartDataContextProvider = (props: { chartData: ChartData | undefined }): null => {
 	const { chartData } = props;
 	const dispatch = useAppDispatch();
 	const isPanorama = useIsPanorama();
@@ -37,7 +38,7 @@ export const SetComputedData = (props: { computedData: unknown }): null => {
 	return null;
 };
 
-const selectChartData = (state: any) => state.chartData.chartData;
+const selectChartData = (state: RechartsRootState) => state.chartData.chartData;
 
 /** @deprecated use one of the other selectors instead. */
 export const useChartData = (...rest: any[]) => {
@@ -45,7 +46,7 @@ export const useChartData = (...rest: any[]) => {
 	return useAppSelector(selectChartData, subSlot(slot, 'cdc:data'));
 };
 
-const selectDataIndex = (state: any) => {
+const selectDataIndex = (state: RechartsRootState) => {
 	const { dataStartIndex, dataEndIndex } = state.chartData;
 	return { startIndex: dataStartIndex, endIndex: dataEndIndex };
 };

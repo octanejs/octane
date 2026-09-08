@@ -1,0 +1,693 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-resizable-panels",
+    "version": "4.12.2",
+    "repository": {
+      "owner": "bvaughn",
+      "repo": "react-resizable-panels",
+      "subdirectory": null
+    },
+    "commit": "a1eeb7aefdb024bb5879a323218e0ac05f77f28e",
+    "integrity": "sha512-NwY5LCo4WrxVvDh0xoMML6EMLPONP/8ckKcIdpnojxexoatZdjLiRqLJQjQK5CPkd4SYiB/2M5BVrjZBQtOO7Q=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "a8f1e0280bf14adcf5d017547db85eb5c3bac0feb1690ca98650874002eaa8ea"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "LICENSE.md",
+    "lib",
+    "package.json",
+    "tsconfig.json",
+    "vitest.config.ts",
+    "vitest.d.ts",
+    "vitest.setup.ts"
+  ],
+  "adaptedMappings": [
+    {
+      "fromRoot": "lib",
+      "toRoot": "tests/upstream",
+      "include": "(?:\\.test\\.tsx?$|(?:global/test|test|utils/test)/.*\\.ts$)"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from \"react\"",
+      "replace": "from \"octane\""
+    },
+    {
+      "find": "from \"react-dom/client\"",
+      "replace": "from \"octane/client\""
+    },
+    {
+      "find": "from \"@testing-library/react\"",
+      "replace": "from \"@octanejs/testing-library\""
+    }
+  ],
+  "files": [
+    {
+      "path": "lib/components/group/auto-save/getStorageKey.ts",
+      "gitBlob": "10d635ae4388b63f80a48201d329bcaaf9d57f44",
+      "size": 140
+    },
+    {
+      "path": "lib/components/group/Group.test.tsx",
+      "gitBlob": "a088214f8d484d46ed8f94147c5544f1855fda8b",
+      "size": 30384
+    },
+    {
+      "path": "lib/components/group/Group.tsx",
+      "gitBlob": "a3693d3bff73a7bb6f7c46cb5649b6c5357e7453",
+      "size": 12794
+    },
+    {
+      "path": "lib/components/group/GroupContext.ts",
+      "gitBlob": "a637fd4f41f6a88e7e5977b73b995b0894515a8a",
+      "size": 163
+    },
+    {
+      "path": "lib/components/group/readLegacyLayout.ts",
+      "gitBlob": "f72f7a4ca0e6d0c509311e9a681390fbdde379bf",
+      "size": 2060
+    },
+    {
+      "path": "lib/components/group/sortByElementOffset.test.ts",
+      "gitBlob": "ad131f2426e36bae55733254b266a8e859652f65",
+      "size": 3316
+    },
+    {
+      "path": "lib/components/group/sortByElementOffset.ts",
+      "gitBlob": "fe6f3e7aa924cb19a650addf2f591782d3ae20f8",
+      "size": 849
+    },
+    {
+      "path": "lib/components/group/types.ts",
+      "gitBlob": "f096026a95ec68d76d906bef0a21d9c73cea2328",
+      "size": 6957
+    },
+    {
+      "path": "lib/components/group/useDefaultLayout.test.tsx",
+      "gitBlob": "f80bd3588762a04e8f2dfc6ab690b46f00fa6f6f",
+      "size": 25486
+    },
+    {
+      "path": "lib/components/group/useDefaultLayout.ts",
+      "gitBlob": "f5f5389dfe7d239f66bc25b34a28efd5b5ff6d3a",
+      "size": 5833
+    },
+    {
+      "path": "lib/components/group/useGroupCallbackRef.ts",
+      "gitBlob": "e0a1fa57654f6cebc1661ef9532a6dbb520f70d4",
+      "size": 362
+    },
+    {
+      "path": "lib/components/group/useGroupContext.ts",
+      "gitBlob": "be39347422f1a33ed0637c65f1a2d601a4da7deb",
+      "size": 345
+    },
+    {
+      "path": "lib/components/group/useGroupImperativeHandle.ts",
+      "gitBlob": "c0756db9775b73ae6a24eef69e19df3840149867",
+      "size": 809
+    },
+    {
+      "path": "lib/components/group/useGroupRef.ts",
+      "gitBlob": "4fa716601bd51d232a26c872ef597e18cc5d58bd",
+      "size": 258
+    },
+    {
+      "path": "lib/components/panel/constants.ts",
+      "gitBlob": "0fdebc6a0a2500af774d794b323396c7a3f6796d",
+      "size": 101
+    },
+    {
+      "path": "lib/components/panel/Panel.test.tsx",
+      "gitBlob": "d18609dfc5d0e30a7a289464f4b2d54b39d55665",
+      "size": 7426
+    },
+    {
+      "path": "lib/components/panel/Panel.tsx",
+      "gitBlob": "af68d477b91e05a58789f9b9109356e5c5b6afa9",
+      "size": 5951
+    },
+    {
+      "path": "lib/components/panel/types.ts",
+      "gitBlob": "7a31aa21aa9cecbe1179ab90d4700140a21e7f25",
+      "size": 7779
+    },
+    {
+      "path": "lib/components/panel/usePanelCallbackRef.ts",
+      "gitBlob": "f87c484f8d6d4c907cd6f907a180ca5a6dc3ccc2",
+      "size": 362
+    },
+    {
+      "path": "lib/components/panel/usePanelImperativeHandle.ts",
+      "gitBlob": "5730498592986c27de782666695a534e60880b76",
+      "size": 1043
+    },
+    {
+      "path": "lib/components/panel/usePanelRef.ts",
+      "gitBlob": "f929c61a73c407108fa90b0436ba48516c5d022a",
+      "size": 258
+    },
+    {
+      "path": "lib/components/separator/Separator.test.tsx",
+      "gitBlob": "fc81d806a16d339097985b84f1f7e2776256a6fd",
+      "size": 4626
+    },
+    {
+      "path": "lib/components/separator/Separator.tsx",
+      "gitBlob": "a63ff1aee43fef67e933e1f592fa1b2d0fb71d20",
+      "size": 6047
+    },
+    {
+      "path": "lib/components/separator/types.ts",
+      "gitBlob": "5844b411ae6e5ff41d4a64b3d9ed9c86582101df",
+      "size": 1690
+    },
+    {
+      "path": "lib/constants.ts",
+      "gitBlob": "976fde438592ab8dc81eb7b58e6d9fa2a7f05180",
+      "size": 772
+    },
+    {
+      "path": "lib/global/cursor/getCursorStyle.test.ts",
+      "gitBlob": "68bf62bf655a432778d9f7243484dedc1a54e126",
+      "size": 7896
+    },
+    {
+      "path": "lib/global/cursor/getCursorStyle.ts",
+      "gitBlob": "af8e328aee77c53f35ef0ee52e2e8c29c0995433",
+      "size": 2691
+    },
+    {
+      "path": "lib/global/cursor/supportsAdvancedCursorStyles.ts",
+      "gitBlob": "09c779e4211d595af3e1ad52c0cffcd4bcf9e4dc",
+      "size": 577
+    },
+    {
+      "path": "lib/global/cursor/updateCursorStyle.ts",
+      "gitBlob": "db10403dccfca3be9185ef554a7df92e5b571366",
+      "size": 2239
+    },
+    {
+      "path": "lib/global/dom/calculateAvailableGroupSize.test.ts",
+      "gitBlob": "b2d71a097f204d2115a4ed97ebd1e1d692515937",
+      "size": 1643
+    },
+    {
+      "path": "lib/global/dom/calculateAvailableGroupSize.ts",
+      "gitBlob": "0addaecce935db0931878677eda260813eaae039",
+      "size": 408
+    },
+    {
+      "path": "lib/global/dom/calculateHitRegions.test.ts",
+      "gitBlob": "11b2abb8c296e110d82e7c20c5f894ebb4770043",
+      "size": 11785
+    },
+    {
+      "path": "lib/global/dom/calculateHitRegions.ts",
+      "gitBlob": "49dfe067c2b6eafec1aa708e7a549d41f371482a",
+      "size": 8265
+    },
+    {
+      "path": "lib/global/dom/calculatePanelConstraints.ts",
+      "gitBlob": "0803b9c0b01b0fed6900c74aab738db02fdc9b0d",
+      "size": 2662
+    },
+    {
+      "path": "lib/global/event-handlers/onDocumentContextMenu.ts",
+      "gitBlob": "5d5dd27a10269594444db322de8fced1298d2d22",
+      "size": 262
+    },
+    {
+      "path": "lib/global/event-handlers/onDocumentDoubleClick.ts",
+      "gitBlob": "1a6a3f281ab12fa7a4fb2f0c2d13153b2389e47c",
+      "size": 1076
+    },
+    {
+      "path": "lib/global/event-handlers/onDocumentKeyDown.ts",
+      "gitBlob": "d11e9baee17d91821658aecbae57647d06b672ee",
+      "size": 3954
+    },
+    {
+      "path": "lib/global/event-handlers/onDocumentPointerDown.ts",
+      "gitBlob": "7bc92952ad2fced92f33399f0a37e7b001eea8cc",
+      "size": 1794
+    },
+    {
+      "path": "lib/global/event-handlers/onDocumentPointerLeave.ts",
+      "gitBlob": "8a53cddee05403b7a907ffff660a294495673b3d",
+      "size": 723
+    },
+    {
+      "path": "lib/global/event-handlers/onDocumentPointerMove.ts",
+      "gitBlob": "71cb257bd39d08cec16a68e92a04844310c89c82",
+      "size": 2900
+    },
+    {
+      "path": "lib/global/event-handlers/onDocumentPointerOut.ts",
+      "gitBlob": "8f8f48fbea9441a252b9868447ada99c12485fc6",
+      "size": 769
+    },
+    {
+      "path": "lib/global/event-handlers/onDocumentPointerUp.ts",
+      "gitBlob": "37157984bd43d4586f121e6c07c400cc192ffbeb",
+      "size": 405
+    },
+    {
+      "path": "lib/global/mountGroup.ts",
+      "gitBlob": "cf7c53e4b028b8f6f81648a916743e39a415a79f",
+      "size": 8373
+    },
+    {
+      "path": "lib/global/mutable-state/groups.ts",
+      "gitBlob": "37de938e7a4d033e991797a24ca083d5a9373ce1",
+      "size": 2684
+    },
+    {
+      "path": "lib/global/mutable-state/interactions.ts",
+      "gitBlob": "4c479c541500fa70bfd1e64fccb5c9946ea2f330",
+      "size": 920
+    },
+    {
+      "path": "lib/global/mutable-state/types.ts",
+      "gitBlob": "034f27c74ee015de9f3c953557200a929472b08b",
+      "size": 925
+    },
+    {
+      "path": "lib/global/styles/convertEmToPixels.ts",
+      "gitBlob": "93a5fd74fb3ee0284af92c95057c630779976b12",
+      "size": 189
+    },
+    {
+      "path": "lib/global/styles/convertRemToPixels.ts",
+      "gitBlob": "5a6bd4613ec30d6f49aa5e9fe17b4fcf5a205c47",
+      "size": 220
+    },
+    {
+      "path": "lib/global/styles/convertVhToPixels.ts",
+      "gitBlob": "77ac8670e82882dc84f739d205a665a63a312521",
+      "size": 98
+    },
+    {
+      "path": "lib/global/styles/convertVwToPixels.ts",
+      "gitBlob": "55b0bdbd5424506fba72f72d3e6f04a7e131acad",
+      "size": 97
+    },
+    {
+      "path": "lib/global/styles/parseSizeAndUnit.test.ts",
+      "gitBlob": "eb5c5b34f81fa0c962fab73aa549893e0da29640",
+      "size": 1007
+    },
+    {
+      "path": "lib/global/styles/parseSizeAndUnit.ts",
+      "gitBlob": "a49cc043b864595b09834edd5ae879b2152db871",
+      "size": 776
+    },
+    {
+      "path": "lib/global/styles/sizeStyleToPixels.test.ts",
+      "gitBlob": "3039526da00a1bee9ddbe3ccc5efe21b84f28041",
+      "size": 4791
+    },
+    {
+      "path": "lib/global/styles/sizeStyleToPixels.ts",
+      "gitBlob": "32d7caa60bc86be74e30084a5bd41446e077edd8",
+      "size": 1062
+    },
+    {
+      "path": "lib/global/test/mockGroup.ts",
+      "gitBlob": "9f66fb0bc9bef1181ebd6d000a9accf6d039d43e",
+      "size": 4212
+    },
+    {
+      "path": "lib/global/test/mockPointerEvent.ts",
+      "gitBlob": "700d35365ff3aac683f54a2e5aaa7671943e1644",
+      "size": 243
+    },
+    {
+      "path": "lib/global/test/moveSeparator.ts",
+      "gitBlob": "b052e2093d9ee5df8ef3b118fd0db7a5319baf49",
+      "size": 1562
+    },
+    {
+      "path": "lib/global/utils/adjustLayoutByDelta.test.ts",
+      "gitBlob": "34d501ca086e2ac4f8191a652d38fb851e76e772",
+      "size": 62343
+    },
+    {
+      "path": "lib/global/utils/adjustLayoutByDelta.ts",
+      "gitBlob": "6fa260f33a5b80928efe9a7938a0c0f45b256a51",
+      "size": 13527
+    },
+    {
+      "path": "lib/global/utils/adjustLayoutForSeparator.ts",
+      "gitBlob": "24a6a21700a84544558b127b94b366cbaf78e5e5",
+      "size": 2131
+    },
+    {
+      "path": "lib/global/utils/calculateDefaultLayout.test.ts",
+      "gitBlob": "3259c92cf57385fadd00ddf228511bd26f336515",
+      "size": 1682
+    },
+    {
+      "path": "lib/global/utils/calculateDefaultLayout.ts",
+      "gitBlob": "fac57a23b87792efd954a93a91cb8de2398ee013",
+      "size": 1154
+    },
+    {
+      "path": "lib/global/utils/calculateSeparatorAriaValues.test.ts",
+      "gitBlob": "7a0c0f7d22c5846d0434a307edff5804fd41f29a",
+      "size": 3105
+    },
+    {
+      "path": "lib/global/utils/calculateSeparatorAriaValues.ts",
+      "gitBlob": "a109a48115b1b57356f327846c18a918fe7637d8",
+      "size": 1795
+    },
+    {
+      "path": "lib/global/utils/compareLayoutNumbers.test.ts",
+      "gitBlob": "31de5447dfa791eed4d6142a2b99f689986141e4",
+      "size": 404
+    },
+    {
+      "path": "lib/global/utils/compareLayoutNumbers.ts",
+      "gitBlob": "3ac186a311af94907040a121db663d1619d950ca",
+      "size": 249
+    },
+    {
+      "path": "lib/global/utils/completeActivePointerResize.ts",
+      "gitBlob": "937a3312ebaa105836c0d9019ebf3196d24acdc9",
+      "size": 1237
+    },
+    {
+      "path": "lib/global/utils/doRectsIntersect.test.ts",
+      "gitBlob": "60010a30f573c604047c8c5336534c431d513194",
+      "size": 2217
+    },
+    {
+      "path": "lib/global/utils/doRectsIntersect.ts",
+      "gitBlob": "06ef302ee7e7bbef36d58bd4e7902b6d118a0694",
+      "size": 229
+    },
+    {
+      "path": "lib/global/utils/findClosestHitRegion.ts",
+      "gitBlob": "5ec66196bab9cf47c1a5c1f9f3f02f146287b76b",
+      "size": 1098
+    },
+    {
+      "path": "lib/global/utils/findClosestRect.ts",
+      "gitBlob": "00b5b789e9f5dff8ad9900e74cdbd76f25a5fafd",
+      "size": 925
+    },
+    {
+      "path": "lib/global/utils/findMatchingHitRegions.test.ts",
+      "gitBlob": "0cc76e8572a3ad6118d8373e97897e179ee788c2",
+      "size": 3585
+    },
+    {
+      "path": "lib/global/utils/findMatchingHitRegions.ts",
+      "gitBlob": "ed06e98254ec8f5c66edd7591963b7a3bc1f945e",
+      "size": 1119
+    },
+    {
+      "path": "lib/global/utils/findSeparatorGroup.ts",
+      "gitBlob": "2b4aee142331fd9a73b224618a4c5cbfebd2c027",
+      "size": 432
+    },
+    {
+      "path": "lib/global/utils/formatLayoutNumber.test.ts",
+      "gitBlob": "50bcd74b88604af4272e9e2b977de8e7c541a6c6",
+      "size": 552
+    },
+    {
+      "path": "lib/global/utils/formatLayoutNumber.ts",
+      "gitBlob": "3dd286af123ea72806be4f7346086205fbd6a089",
+      "size": 95
+    },
+    {
+      "path": "lib/global/utils/getDistanceBetweenPointAndRect.test.ts",
+      "gitBlob": "49b95b5f6fa8f54116c5ee1c6336e8338cfebc97",
+      "size": 1200
+    },
+    {
+      "path": "lib/global/utils/getDistanceBetweenPointAndRect.ts",
+      "gitBlob": "e082fc6bee79e6abaf239a77a88c2efc41b3847f",
+      "size": 532
+    },
+    {
+      "path": "lib/global/utils/getImperativeGroupMethods.test.ts",
+      "gitBlob": "e7585b3e1ea4f2e34fbcc52f37de3cb176134cda",
+      "size": 4081
+    },
+    {
+      "path": "lib/global/utils/getImperativeGroupMethods.ts",
+      "gitBlob": "ea38d5f296bef51f6788cd0fbed2455010111f19",
+      "size": 2199
+    },
+    {
+      "path": "lib/global/utils/getImperativePanelMethods.test.ts",
+      "gitBlob": "f14837753e46f23ae7f6aab398c3437db0551068",
+      "size": 12119
+    },
+    {
+      "path": "lib/global/utils/getImperativePanelMethods.ts",
+      "gitBlob": "7b9eca04dd601958c6bf958bca3b039fe1c7e8e3",
+      "size": 6748
+    },
+    {
+      "path": "lib/global/utils/isCoarsePointer.ts",
+      "gitBlob": "5b4bd5191d9d71614d4f6422950072414e014e44",
+      "size": 368
+    },
+    {
+      "path": "lib/global/utils/isViableHitTarget.ts",
+      "gitBlob": "377fda59a417bf3dd1c68cd1146341ab7eba6924",
+      "size": 2131
+    },
+    {
+      "path": "lib/global/utils/layoutNumbersEqual.test.ts",
+      "gitBlob": "bcd1113f2026519a476750266df24c3a169f2482",
+      "size": 411
+    },
+    {
+      "path": "lib/global/utils/layoutNumbersEqual.ts",
+      "gitBlob": "600616b88bd7a833373c9dd3ffba168cd95e5708",
+      "size": 267
+    },
+    {
+      "path": "lib/global/utils/layoutsEqual.test.ts",
+      "gitBlob": "ef65513a09ca840515b56c6970d1f9290e95ed60",
+      "size": 636
+    },
+    {
+      "path": "lib/global/utils/layoutsEqual.ts",
+      "gitBlob": "c1a88e6d8c92ba4b63bb58b9d9ac7b55e02f00fb",
+      "size": 457
+    },
+    {
+      "path": "lib/global/utils/notifyPanelOnResize.ts",
+      "gitBlob": "714a240810f2e8bd261f5b10981e70b97e2169b9",
+      "size": 1024
+    },
+    {
+      "path": "lib/global/utils/objectsEqual.test.ts",
+      "gitBlob": "d5cfcd819314232951e2b602705ea20d7568a1ba",
+      "size": 537
+    },
+    {
+      "path": "lib/global/utils/objectsEqual.ts",
+      "gitBlob": "6f6b771d02814c3746bef707dbe88879ba075433",
+      "size": 292
+    },
+    {
+      "path": "lib/global/utils/preserveFixedPanelSizes.ts",
+      "gitBlob": "5d2731eab001c0d43788f269f25ab34f8e31316f",
+      "size": 2164
+    },
+    {
+      "path": "lib/global/utils/updateActiveHitRegion.ts",
+      "gitBlob": "dcc2ca5a0beae1f5f2a95eb4123d49379806a557",
+      "size": 4355
+    },
+    {
+      "path": "lib/global/utils/validateLayoutKeys.ts",
+      "gitBlob": "88af2fd7ba9ad2b076e39b6b9fe680b5584cd164",
+      "size": 500
+    },
+    {
+      "path": "lib/global/utils/validatePanelGroupLayout.test.ts",
+      "gitBlob": "cc382c225f4ae735cf591c2c776110880aae44f3",
+      "size": 4469
+    },
+    {
+      "path": "lib/global/utils/validatePanelGroupLayout.ts",
+      "gitBlob": "ac058dba3e536f99a6f3c03184e1b9cd06da053e",
+      "size": 3158
+    },
+    {
+      "path": "lib/global/utils/validatePanelSize.ts",
+      "gitBlob": "eb32fbc11fe4bd04f227e83238235f173ce62525",
+      "size": 1208
+    },
+    {
+      "path": "lib/hooks/useForceUpdate.ts",
+      "gitBlob": "e8012cb77ae6409274c5788ba3881084a7840301",
+      "size": 239
+    },
+    {
+      "path": "lib/hooks/useId.test.ts",
+      "gitBlob": "99bd82cdbf19cd163b85a66fcdd80daf4fb0bc41",
+      "size": 671
+    },
+    {
+      "path": "lib/hooks/useId.ts",
+      "gitBlob": "a2d5175b733ff29d1cec5d69668c8ac9bb5d4e76",
+      "size": 183
+    },
+    {
+      "path": "lib/hooks/useIsomorphicLayoutEffect.ts",
+      "gitBlob": "ea6a0bc0166aaeba8cca3bc5ba793fe7e295af70",
+      "size": 157
+    },
+    {
+      "path": "lib/hooks/useMergedRefs.test.tsx",
+      "gitBlob": "bf02b05962675dd1eb7d91a7bd01717620c66baf",
+      "size": 1154
+    },
+    {
+      "path": "lib/hooks/useMergedRefs.ts",
+      "gitBlob": "492c14bf1b681079db99fb6edcd3cb8e8f807033",
+      "size": 546
+    },
+    {
+      "path": "lib/hooks/useStableArray.ts",
+      "gitBlob": "4bf3f1fd4d38814c5e79c6b09a26459488461307",
+      "size": 457
+    },
+    {
+      "path": "lib/hooks/useStableCallback.test.tsx",
+      "gitBlob": "1ed1c8f7767d5b77c5cc22e57f10580c5e6d206b",
+      "size": 801
+    },
+    {
+      "path": "lib/hooks/useStableCallback.ts",
+      "gitBlob": "7d6950de3900058ab5968230e11ba1da1efb9e10",
+      "size": 549
+    },
+    {
+      "path": "lib/hooks/useStableObject.ts",
+      "gitBlob": "f7907e582a3e8c5a0f1b2b9c63795d63e54d2efd",
+      "size": 422
+    },
+    {
+      "path": "lib/index.ts",
+      "gitBlob": "584e4bcdca86bbcc8975bc1bd1ca817180c19d5e",
+      "size": 952
+    },
+    {
+      "path": "lib/types.ts",
+      "gitBlob": "b26d326289d33d18a0d73933c96656efa14728de",
+      "size": 231
+    },
+    {
+      "path": "lib/utils/assert.ts",
+      "gitBlob": "9c70efc9c078ae7912513cd5833438d9c3232573",
+      "size": 183
+    },
+    {
+      "path": "lib/utils/EventEmitter.ts",
+      "gitBlob": "44c11acab2587633c762519967d9723489dbd01a",
+      "size": 1971
+    },
+    {
+      "path": "lib/utils/isArrayEqual.test.ts",
+      "gitBlob": "bdb106d4e0a01b7db555fe3cec58fb366eb00775",
+      "size": 331
+    },
+    {
+      "path": "lib/utils/isArrayEqual.ts",
+      "gitBlob": "62d383a811de2fa3022bd160f51150cbbbf46250",
+      "size": 261
+    },
+    {
+      "path": "lib/utils/isHTMLElement.ts",
+      "gitBlob": "5462d35cb84caa3d404302082de91ecd445fe56b",
+      "size": 283
+    },
+    {
+      "path": "lib/utils/isShadowRoot.ts",
+      "gitBlob": "3ab0e06b81250e7dbadf4b53ced793a2fa63b7a1",
+      "size": 290
+    },
+    {
+      "path": "lib/utils/parseNumericStyleValue.test.ts",
+      "gitBlob": "c631b0cf279e00f229a9825a5b287117e0fb364d",
+      "size": 971
+    },
+    {
+      "path": "lib/utils/parseNumericStyleValue.ts",
+      "gitBlob": "ff0a13a6113c4c184e18f4a6815e933209eb9241",
+      "size": 392
+    },
+    {
+      "path": "lib/utils/test/mockBoundingClientRect.ts",
+      "gitBlob": "cea0a5e077b9c738ea1f0f052e6b6bd6e96f10d6",
+      "size": 3726
+    },
+    {
+      "path": "lib/utils/test/mockGetComputedStyle.ts",
+      "gitBlob": "d2eb927fe57bf36c28d15d846606b80d190e5a56",
+      "size": 1215
+    },
+    {
+      "path": "lib/utils/test/mockResizeObserver.ts",
+      "gitBlob": "72c02db20830e0a8ac8583d1a5bb5ca1ace28f23",
+      "size": 2356
+    },
+    {
+      "path": "lib/vendor/stacking-order.ts",
+      "gitBlob": "20aac984ca46a17667f893afa57aab47d3ee653c",
+      "size": 4234
+    },
+    {
+      "path": "LICENSE.md",
+      "gitBlob": "0569d0a7b8b2156e35b1cc7680f65344dc68ba96",
+      "size": 1079
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "ccbddff4921ab71c193cbc66cb5acdedc7e7a955",
+      "size": 4411
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "15c781ae61565c8f95f552f2e5161256767ef169",
+      "size": 1057
+    },
+    {
+      "path": "vitest.config.ts",
+      "gitBlob": "acf15e940cdccc0e4dcc94e8f67c85a2d94449f6",
+      "size": 300
+    },
+    {
+      "path": "vitest.d.ts",
+      "gitBlob": "4a8c6141d34541d9f83b1bcdc53cf4c89daa2fdd",
+      "size": 128
+    },
+    {
+      "path": "vitest.setup.ts",
+      "gitBlob": "9d306aeb891a6c56f9fa99d11f7069f0f82ab7d2",
+      "size": 2170
+    }
+  ],
+  "fingerprint": "1fa5790f19b5bfdfe68debf6ef2e2f8bd5a76b90ee5e61e40c078b70aece25e4"
+}

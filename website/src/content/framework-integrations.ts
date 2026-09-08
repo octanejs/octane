@@ -8,13 +8,10 @@ export interface FrameworkIntegration {
 	packageName: string;
 	model: string;
 	description: string;
+	searchTerms?: readonly string[];
+	guideAnchor: string;
 }
 
 export const FRAMEWORK_INTEGRATIONS = frameworkIntegrations satisfies FrameworkIntegration[];
 
 export const FRAMEWORK_INTEGRATION_COUNT = FRAMEWORK_INTEGRATIONS.length;
-
-export function frameworkIntegrationRepositoryHref(packageName: string): string {
-	const directory = packageName.slice('@octanejs/'.length);
-	return `https://github.com/octanejs/octane/tree/main/packages/${directory}`;
-}

@@ -393,8 +393,10 @@ export interface OctaneConfigOptions {
 	adapter?: OctaneAdapter;
 	/** @experimental Compiler-owned configuration shared by all bundler integrations. */
 	compiler?: {
-		/** Reject unsafe state updates and ref writes in application-owned modules. @default false */
+		/** Assert pure immutable-snapshot renders and reject detectable violations. @default false */
 		strong?: boolean;
+		/** Experimental native signal reads in DOM client/server render scopes. */
+		nativeReads?: boolean;
 		renderers?: ExperimentalRendererConfigOptions;
 	};
 	router?: {
@@ -456,6 +458,7 @@ export interface ResolvedOctaneConfig {
 	compiler: {
 		/** @default false */
 		strong: boolean;
+		nativeReads: boolean;
 		renderers: ExperimentalResolvedRendererConfig;
 	};
 	router: {

@@ -19,7 +19,7 @@ import {
 	type TableProps,
 } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export function Table({ className, ...props }: TableProps) {

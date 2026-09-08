@@ -49,7 +49,7 @@ export function StepValidationProbe(props: {
 }) @{
 	const [step, actions] = useStep(2);
 	useLayoutEffect(() => props.onReady(actions), [actions, props.onReady]);
-	<p>{step as string}</p>
+	<p>{String(step)}</p>
 }
 
 export function TimingProbe(props: {

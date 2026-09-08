@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/src/dialog/root/DialogRoot.spec.tsx b/tests/upstream/src/dialog/root/DialogRoot.spec.tsx
+--- a/tests/upstream/src/dialog/root/DialogRoot.spec.tsx
++++ b/tests/upstream/src/dialog/root/DialogRoot.spec.tsx
+@@ -1,6 +1,6 @@
+ /** @jsxImportSource octane */
+ import * as React from 'octane';
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Dialog } from '@octanejs/base-ui/dialog';
+ 
+ const numberPayloadHandle = Dialog.createHandle<number>();

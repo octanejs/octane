@@ -288,7 +288,7 @@ export function App() @{
 			it(`is parseable JavaScript in ${mode} mode`, () => {
 				const { code } = compile(source, 'App.tsrx', { mode });
 				const evaluable = code
-					.replace(/^import[\s\S]*?from '[^']+';$/m, '')
+					.replace(/^import[\s\S]*?from '[^']+';$/gm, '')
 					.replace(/^export /gm, '');
 				expect(() => new Function(evaluable)).not.toThrow();
 			});
@@ -382,7 +382,7 @@ export function App() @{
 					// that read it are declared outside the callback.
 					const bound =
 						mode === 'client'
-							? /const \[[^\]]*\brow\b[^\]]*\] = __extra/
+							? /const row = __extra\[\d+\]/
 							: /const \[[^\]]*\brow\b[^\]]*\] = __props/;
 					expect(code).toMatch(bound);
 				});
@@ -400,7 +400,7 @@ export function App() @{
 					const { code } = compile(source, 'App.tsrx', { mode });
 					const bound =
 						mode === 'client'
-							? /const \[[^\]]*\brow\b[^\]]*\] = __extra/
+							? /const row = __extra\[\d+\]/
 							: /const \[[^\]]*\brow\b[^\]]*\] = __props/;
 					expect(code).toMatch(bound);
 				});
@@ -542,7 +542,7 @@ export function App() @{
 				// The attribute that follows the container is still bound.
 				expect(code).toContain('onChange');
 				const evaluable = code
-					.replace(/^import[\s\S]*?from '[^']+';$/m, '')
+					.replace(/^import[\s\S]*?from '[^']+';$/gm, '')
 					.replace(/^export /gm, '');
 				expect(() => new Function(evaluable)).not.toThrow();
 			});
@@ -568,7 +568,7 @@ export function App() @{
 				expect(code).toContain('armA');
 				expect(code).toContain('armB');
 				const evaluable = code
-					.replace(/^import[\s\S]*?from '[^']+';$/m, '')
+					.replace(/^import[\s\S]*?from '[^']+';$/gm, '')
 					.replace(/^export /gm, '');
 				expect(() => new Function(evaluable)).not.toThrow();
 			});
@@ -640,7 +640,7 @@ export function App() @{
 					expect(code).toContain('armA');
 					expect(code).toContain('armB');
 					const evaluable = code
-						.replace(/^import[\s\S]*?from '[^']+';$/m, '')
+						.replace(/^import[\s\S]*?from '[^']+';$/gm, '')
 						.replace(/^export /gm, '');
 					expect(() => new Function(evaluable)).not.toThrow();
 				});

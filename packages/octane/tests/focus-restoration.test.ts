@@ -344,6 +344,62 @@ describe('focus and text selection survive DOM updates', () => {
 		}
 	});
 
+	it('restores focus and selection when the document body hosts an open shadow tree', () => {
+		// A shadow root cannot be detached from its host. Give this case its own
+		// document so the suite's body remains available to subsequent tests.
+		const frame = document.createElement('iframe');
+		document.body.appendChild(frame);
+		const owner = frame.contentDocument!;
+		const bodyShadow = owner.body.attachShadow({ mode: 'open' });
+		const nestedHost = owner.createElement('section');
+		bodyShadow.appendChild(nestedHost);
+		const shadow = nestedHost.attachShadow({ mode: 'open' });
+		const container = owner.createElement('div');
+		shadow.appendChild(container);
+		const root = createRoot(container);
+		try {
+			root.render(FastHostControlledList, { items: rows });
+			flushSync(() => {});
+			const input = container.querySelectorAll('input')[1]!;
+			input.focus();
+			input.setSelectionRange(2, 9);
+			expect(owner.activeElement).toBe(owner.body);
+			expect(bodyShadow.activeElement).toBe(nestedHost);
+			expect(shadow.activeElement).toBe(input);
+
+			const parent = container.querySelector('#fast-host-controlled-list')!;
+			const originalInsert = parent.insertBefore;
+			let lostFocus = false;
+			const move = vi.spyOn(parent, 'insertBefore').mockImplementation(function <T extends Node>(
+				node: T,
+				anchor: Node | null,
+			): T {
+				const result = originalInsert.call(this, node, anchor) as T;
+				if (!lostFocus) {
+					input.blur();
+					input.setSelectionRange(0, 0);
+					lostFocus = shadow.activeElement !== input;
+				}
+				return result;
+			});
+			try {
+				flushSync(() => root.render(FastHostControlledList, { items: rows.toReversed() }));
+
+				expect(lostFocus).toBe(true);
+				expect(container.querySelectorAll('input')[2]).toBe(input);
+				expect(owner.activeElement).toBe(owner.body);
+				expect(bodyShadow.activeElement).toBe(nestedHost);
+				expect(shadow.activeElement).toBe(input);
+				expect([input.selectionStart, input.selectionEnd]).toEqual([2, 9]);
+			} finally {
+				move.mockRestore();
+			}
+		} finally {
+			root.unmount();
+			frame.remove();
+		}
+	});
+
 	it('restores focus to a moved content-editable host with an active selection', () => {
 		const rendered = mount(EditableRows, { items: rows });
 		try {

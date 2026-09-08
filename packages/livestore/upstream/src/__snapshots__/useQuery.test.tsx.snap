@@ -2281,4 +2281,3 @@ exports[`useQuery (strictMode={ strictMode: true }) > simple 2`] = `
   ],
 }
 `;
-

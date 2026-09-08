@@ -28,6 +28,11 @@ export type LogUpdate = {
 const visibleLineCount = (lines: string[], str: string): number =>
 	str.endsWith('\n') ? lines.length - 1 : lines.length;
 
+// Empty state stores no lines, but splitting an empty frame historically
+// produced one visible line. Preserve that geometry for cursor-only updates.
+const retainedVisibleLineCount = (lineCount: number, str: string): number =>
+	lineCount === 0 && str === '' ? 1 : str.endsWith('\n') ? lineCount - 1 : lineCount;
+
 const createStandard = (stream: Writable, { showCursor = false } = {}): LogUpdate => {
 	let previousLineCount = 0;
 	let previousOutput = '';
@@ -59,11 +64,8 @@ const createStandard = (stream: Writable, { showCursor = false } = {}): LogUpdat
 			return false;
 		}
 
-		const lines = str.split('\n');
-		const visibleCount = visibleLineCount(lines, str);
-		const cursorSuffix = buildCursorSuffix(visibleCount, activeCursor);
-
 		if (str === previousOutput && cursorChanged) {
+			const visibleCount = retainedVisibleLineCount(previousLineCount, previousOutput);
 			stream.write(
 				buildCursorOnlySequence({
 					cursorWasShown,
@@ -74,6 +76,9 @@ const createStandard = (stream: Writable, { showCursor = false } = {}): LogUpdat
 				}),
 			);
 		} else {
+			const lines = str.split('\n');
+			const visibleCount = visibleLineCount(lines, str);
+			const cursorSuffix = buildCursorSuffix(visibleCount, activeCursor);
 			previousOutput = str;
 			const returnPrefix = buildReturnToBottomPrefix(
 				cursorWasShown,
@@ -183,11 +188,8 @@ const createIncremental = (stream: Writable, { showCursor = false } = {}): LogUp
 			return false;
 		}
 
-		const nextLines = str.split('\n');
-		const visibleCount = visibleLineCount(nextLines, str);
-		const previousVisible = visibleLineCount(previousLines, previousOutput);
-
 		if (str === previousOutput && cursorChanged) {
+			const visibleCount = retainedVisibleLineCount(previousLines.length, previousOutput);
 			stream.write(
 				buildCursorOnlySequence({
 					cursorWasShown,
@@ -201,6 +203,10 @@ const createIncremental = (stream: Writable, { showCursor = false } = {}): LogUp
 			cursorWasShown = activeCursor !== undefined;
 			return true;
 		}
+
+		const nextLines = str.split('\n');
+		const visibleCount = visibleLineCount(nextLines, str);
+		const previousVisible = visibleLineCount(previousLines, previousOutput);
 
 		const returnPrefix = buildReturnToBottomPrefix(
 			cursorWasShown,

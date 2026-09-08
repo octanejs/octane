@@ -16,7 +16,9 @@
 - Framework-neutral core: the workspace-pinned `@dnd-kit/{abstract,collision,dom,state}` 0.5.0 packages
 
 The byte-exact React adapter source, package/build metadata, and license are vendored under
-`upstream/`; `SHA256SUMS` authenticates all 31 files. The canonical package directory at this pin
+`upstream/`, pinned by `audit/upstream.lock.json`: each committed file verifies offline against
+its upstream git blob sha (`pnpm react-port:materialize run --check --package-dir
+packages/dnd-kit`), and the upstream MIT license is retained byte-exact as `LICENSE.upstream`. The canonical package directory at this pin
 contains no runtime test files, fixtures, snapshots, or dedicated type assertion suite. This is a
 repository-tree observation, not an inference from the published archive.
 
@@ -36,8 +38,8 @@ pristine/adapted upstream type pair because upstream publishes no dedicated type
 
 The repo-authored differential runs one identical `.tsrx` programmatic manager-action lifecycle
 against both adapters (empty sensors; start/move/stop via `manager.actions`) and compares mount,
-pickup, movement, overlay, and drop output. Repo-authored contracts authenticate
-the pin and keep the two known adaptations explicit: compiled-child handling in `DragOverlay`, and
+pickup, movement, overlay, and drop output. Audit contracts authenticate the
+pin and keep the two known adaptations explicit: compiled-child handling in `DragOverlay`, and
 omission of the default optimistic sorting plugin because it can split renderer-owned keyed ranges.
 The binding remains `recorded-unverified`; jsdom equality is not evidence for real pointer geometry,
 observers, or every browser drag lifecycle.

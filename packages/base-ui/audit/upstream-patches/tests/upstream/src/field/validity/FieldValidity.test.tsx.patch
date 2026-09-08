@@ -1,0 +1,39 @@
+diff --git a/tests/upstream/src/field/validity/FieldValidity.test.tsx b/tests/upstream/src/field/validity/FieldValidity.test.tsx
+--- a/tests/upstream/src/field/validity/FieldValidity.test.tsx
++++ b/tests/upstream/src/field/validity/FieldValidity.test.tsx
+@@ -34,7 +34,7 @@ describe('<Field.Validity />', () => {
+       };
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: 'invalid' } });
++      fireEvent.input(input, { target: { value: 'invalid' } });
+       establishInvalidState();
+ 
+       expect(handleValidity.mock.lastCall?.[0].value).toBe('invalid');
+@@ -43,7 +43,7 @@ describe('<Field.Validity />', () => {
+       expect(validate).toHaveBeenCalledTimes(1);
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '' } });
++      fireEvent.input(input, { target: { value: '' } });
+ 
+       expect(handleValidity.mock.lastCall?.[0].value).toBe('');
+       expect(handleValidity.mock.lastCall?.[0].validity.customError).toBe(
+@@ -125,7 +125,7 @@ describe('<Field.Validity />', () => {
+       expect(handleValidity.mock.lastCall?.[0]).toHaveProperty('transitionStatus');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: 'test' } });
++      fireEvent.input(input, { target: { value: 'test' } });
+ 
+       expect(handleValidity.mock.lastCall?.[0].value).toBe('test');
+       expect(handleValidity.mock.lastCall?.[0].validity.valid).toBe(true);
+@@ -149,7 +149,7 @@ describe('<Field.Validity />', () => {
+       expect(handleValidity.mock.lastCall?.[0].validity.valid).toBe(null);
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: 'test' } });
++      fireEvent.input(input, { target: { value: 'test' } });
+       fireEvent.blur(input);
+ 
+       expect(handleValidity.mock.lastCall?.[0].value).toBe('test');

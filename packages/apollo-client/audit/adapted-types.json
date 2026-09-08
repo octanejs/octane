@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "files": ["packages/apollo-client/typetests/public-api.test-d.ts"],
+  "assertionGroups": [
+    "complete public React adapter declarations",
+    "framework-neutral root and testing exports"
+  ]
+}

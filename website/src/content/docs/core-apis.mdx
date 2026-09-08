@@ -295,9 +295,10 @@ On the first render, `previous` is `undefined`. When the source changes, it is
 Like `useState`, the hook also offers an optional third tuple item, `getValue`, for
 reading the latest value inside an async or delayed callback.
 
-<h3 id="strong-mode">Catch state mistakes with Strong mode</h3>
+<h3 id="strong-mode">Enforce render snapshots with Strong mode</h3>
 
-Strong mode is an optional compiler check. Add `"use strong"` before a module's
+Strong mode is an optional immutable render-snapshot and pure-render contract
+with compiler checks. Add `"use strong"` before a module's
 imports to try it one file at a time, or set `compiler: { strong: true }` in
 `octane.config.ts` to cover your application.
 
@@ -318,6 +319,21 @@ also follows provable calls through `useCallback`, `useEffectEvent`, and functio
 returned by analyzable `useMemo` factories. A statically known Effect Event cannot
 be called during render or listed in explicit hook dependencies. These hooks
 remain supported, and other explicit dependency lists keep their existing meaning.
+
+Strong also rejects detectable state-snapshot mutations and direct clock or
+random reads during render. Lazy state initialization may still obtain an
+initial value. Production client builds assume every user-authored render
+operation is pure, regardless of whether its callee is local, imported, a
+static or computed member, produced by another call, constructor-like, tagged,
+or receives callbacks. `use*` spelling is not a memoization veto or a Rules of
+Hooks check. Unknown calls that the compiler cannot inspect remain the author's
+responsibility; they do not make a Strong region fall back. See
+[Strong mode and memoization](/docs/differences-from-react#strong-mode).
+
+Do not hide ref contents, a state getter, mutable module or global data, a live
+external store, a clock, randomness, mutation, or another changing source behind
+a stable function or receiver. Keep that consumer in compatibility mode, or pass
+an actual snapshot into a separate Strong component.
 
 Event handlers can still update state. Genuinely deferred callbacks, effect
 cleanup, effects that synchronize external systems, and refs for DOM nodes or
@@ -1306,8 +1322,13 @@ For a direct SSG script outside Vite, preload the compiler for your runtime:
 The preload compiles imported `.tsrx`/`.tsx` modules and plain TypeScript custom hooks in
 server mode.
 
-Put `html` in the page body and the deduplicated scoped `css` in `<head>`. The streaming
-APIs can send the shell first and reveal Suspense content as it becomes ready.
+Put `html` in the page body and `css` in `<head>`. The `css` string holds every scoped
+`<style>` sheet and theme the rendered components injected during that request,
+deduplicated by hash and in [emission order](/docs/styling#ordering), as ready-to-place
+`<style data-octane="hash">` tags that the client's `injectStyle` recognizes and skips on
+hydration. The streaming APIs have no `css` field: they flush each scoped `<style>` inline
+with the content that uses it, send the shell first, and reveal Suspense content as it
+becomes ready.
 
 <h2 id="api-index">API index by job</h2>
 
@@ -1576,4 +1597,5 @@ Try these small changes in the counter example:
 - [Quick start](/docs/quick-start) — install Octane and run your first app.
 - [TSRX vs TSX/JSX](/docs/tsrx-vs-tsx) — choose an authoring format and learn the
   `.tsrx` control-flow syntax.
-- [Bindings](/docs/bindings) — use first-party Octane ports of popular libraries.
+- [Integrations and bindings](/docs/bindings) — connect an app framework or use
+  first-party Octane ports of popular libraries.

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/motion",
-  "version": "0.1.38",
+  "version": "0.1.52",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -32,7 +32,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",
@@ -40,21 +41,28 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project motion",
-    "typecheck": "tsgo --noEmit -p tsconfig.json"
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test:upstream": "vitest run --root ../.. --project motion-pristine",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
     "motion": "catalog:default",
     "motion-dom": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
+    "@swc/core": "1.15.41",
+    "@swc/jest": "0.2.39",
     "@testing-library/dom": "catalog:default",
     "@testing-library/jest-dom": "catalog:default",
     "@testing-library/react": "16.3.2",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "jest": "30.4.2",
+    "jest-environment-jsdom": "30.4.1",
+    "jest-fixed-jsdom": "0.0.10",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",

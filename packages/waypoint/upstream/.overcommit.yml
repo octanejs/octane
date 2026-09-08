@@ -1,0 +1,31 @@
+CommitMsg:
+  HardTabs:
+    enabled: true
+
+PreCommit:
+  ALL:
+    exclude:
+      - 'node_modules/**/*'
+
+  EsLint:
+    enabled: true
+    required_executable: './node_modules/.bin/eslint'
+    include:
+      - '**/*.js'
+      - '**/*.jsx'
+
+  HardTabs:
+    enabled: true
+    description: 'Checking for hard tabs'
+
+  JsonSyntax:
+    enabled: true
+
+  MergeConflicts:
+    enabled: true
+
+  TrailingWhitespace:
+    enabled: true
+
+  YamlSyntax:
+    enabled: true

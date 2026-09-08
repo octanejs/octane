@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "publicEntrypoints": [
+    {
+      "path": ".",
+      "octanePath": ".",
+      "disposition": "surface-present"
+    },
+    {
+      "path": "./package.json",
+      "disposition": "metadata-only"
+    }
+  ],
+  "exports": [
+    {
+      "name": "TanStackDevtools",
+      "kind": "value",
+      "upstreamPath": "packages/react-devtools/src/index.ts",
+      "octaneExport": "TanStackDevtools",
+      "disposition": "adapted",
+      "evidence": "packages/tanstack-devtools/tests/differential/parity.test.ts",
+      "notes": "Public runtime entrypoint; differential mounts the pinned index barrel, not the internal devtools module."
+    },
+    {
+      "name": "TanStackDevtoolsReactPlugin",
+      "kind": "type",
+      "upstreamPath": "packages/react-devtools/src/index.ts",
+      "octaneExport": "TanStackDevtoolsOctanePlugin",
+      "disposition": "renamed-divergence",
+      "divergenceId": "octane-type-names",
+      "evidence": "packages/tanstack-devtools/tests/parity/divergences.test.ts"
+    },
+    {
+      "name": "TanStackDevtoolsReactInit",
+      "kind": "type",
+      "upstreamPath": "packages/react-devtools/src/index.ts",
+      "octaneExport": "TanStackDevtoolsOctaneInit",
+      "disposition": "renamed-divergence",
+      "divergenceId": "octane-type-names",
+      "evidence": "packages/tanstack-devtools/tests/parity/divergences.test.ts"
+    }
+  ],
+  "octaneAdditiveExports": {
+    "disposition": "additive-divergence",
+    "divergenceId": "extra-core-reexports",
+    "evidence": "packages/tanstack-devtools/tests/parity/divergences.test.ts",
+    "names": [
+      "PLUGIN_CONTAINER_ID",
+      "PLUGIN_TITLE_CONTAINER_ID",
+      "TanStackDevtoolsCore",
+      "ClientEventBusConfig",
+      "TanStackDevtoolsConfig",
+      "TanStackDevtoolsInit",
+      "TanStackDevtoolsPlugin",
+      "TanStackDevtoolsPluginProps",
+      "TanStackDevtoolsTheme"
+    ]
+  },
+  "coreDependency": {
+    "upstreamVersion": "0.12.4",
+    "octaneVersion": "0.12.5",
+    "disposition": "version-divergence"
+  },
+  "upstreamTests": [],
+  "typeSuite": {
+    "disposition": "present",
+    "pristineProject": "packages/tanstack-devtools/typetests/pristine/tsconfig.json",
+    "adaptedProject": "packages/tanstack-devtools/typetests/adapted/tsconfig.json",
+    "reason": "Upstream test:types compiles the complete React adapter source with the package config; no dedicated expectType fixtures. The pristine lane runs that tsc compile; the adapted lane mirrors it with tsrx-tsc over the one-for-one mapped Octane source program. Repo-authored declaration probes are supplementary."
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "upstream": {
+    "package": "react-calendar",
+    "version": "6.0.1",
+    "source": "https://github.com/wojtekmaj/react-calendar/tree/dc73f86f68239cb694650b66e0795a2f7f9323ed/packages/react-calendar",
+    "license": "MIT"
+  },
+  "surface": "Public react-calendar 6.0.1 runtime and type surface: default and named Calendar, CenturyView, DecadeView, MonthView, YearView, Navigation, CalendarProps, and all types exported by the upstream root. The three framework-neutral shared suites run without weakened assertions; representative Calendar and tile cases are adapted to Octane.",
+  "inventory": {
+    "supported": [
+      "Calendar",
+      "CenturyView",
+      "DecadeView",
+      "MonthView",
+      "Navigation",
+      "YearView",
+      "CalendarProps",
+      "CalendarType",
+      "NavigationLabelFunc",
+      "OnArgs",
+      "OnClickFunc",
+      "OnClickWeekNumberFunc",
+      "TileArgs",
+      "TileClassNameFunc",
+      "TileContentFunc",
+      "TileDisabledFunc"
+    ],
+    "subpaths": ["Calendar.css", "dist/Calendar.css", "*"]
+  },
+  "divergences": [
+    "Component refs are ordinary Octane props. Calendar ref exposes the upstream imperative handle; inputRef remains the DOM wrapper ref.",
+    "Callbacks receive native MouseEvent objects, which persist without React's synthetic event.persist() method.",
+    "Renderable public types use OctaneNode instead of React.ReactNode."
+  ],
+  "ssr": "Supported. Pass locale explicitly when server and browser locale defaults may differ.",
+  "verified": "2026-08-20"
+}

@@ -24,6 +24,7 @@ const STABLE_TUPLE_RESULTS = new Map([
 	['useReducer', new Set([1, 2])],
 	['useTransition', new Set([1])],
 	['useActionState', new Set([1])],
+	['useFormState', new Set([1])],
 	['useOptimistic', new Set([1])],
 ]);
 
@@ -57,6 +58,7 @@ function declareName(scope, name, details = null) {
 			octaneNamespace: false,
 			hookRuntimeImport: null,
 			hookRuntimeNamespace: false,
+			customHookImport: null,
 		};
 		scope.bindings.set(name, binding);
 	}
@@ -66,6 +68,7 @@ function declareName(scope, name, details = null) {
 	if (details?.octaneNamespace) binding.octaneNamespace = true;
 	if (details?.hookRuntimeImport) binding.hookRuntimeImport = details.hookRuntimeImport;
 	if (details?.hookRuntimeNamespace) binding.hookRuntimeNamespace = true;
+	if (details?.customHookImport) binding.customHookImport = details.customHookImport;
 	return binding;
 }
 
@@ -133,6 +136,13 @@ function predeclareDirect(statements, scope, hookRuntimeModules, bindingsOnly = 
 					octaneNamespace: isOctane && specifier.type === 'ImportNamespaceSpecifier',
 					hookRuntimeImport: isHookRuntime ? imported : null,
 					hookRuntimeNamespace: isHookRuntime && specifier.type === 'ImportNamespaceSpecifier',
+					customHookImport:
+						!isHookRuntime &&
+						original.importKind !== 'type' &&
+						specifier.importKind !== 'type' &&
+						(/^use[A-Z]/.test(imported ?? '') || /^use[A-Z]/.test(specifier.local.name))
+							? (imported ?? specifier.local.name)
+							: null,
 				});
 			}
 			continue;
@@ -579,10 +589,20 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 			const name = canonicalHookName(node, scope, onlyImported);
 			const config = DEPENDENCY_HOOKS.get(name);
 			const hookRuntimeImportedName = canonicalHookName(node, scope, true);
-			if (octaneImportedName !== null || unboundCallee || hookRuntimeImportedName !== null) {
+			const customHookImport =
+				node.optional !== true && callee?.type === 'Identifier'
+					? resolveBinding(scope, callee.name)?.customHookImport
+					: null;
+			if (
+				octaneImportedName !== null ||
+				unboundCallee ||
+				hookRuntimeImportedName !== null ||
+				customHookImport
+			) {
 				const props = {};
 				if (octaneImportedName !== null) props._octaneImportedHook = octaneImportedName;
 				if (unboundCallee) props._octaneUnboundCallee = true;
+				if (customHookImport) props._octaneCustomHookCall = customHookImport;
 				if (octaneImportedName === null && hookRuntimeImportedName !== null) {
 					props._octaneHookRuntimeImportedHook = hookRuntimeImportedName;
 				}
@@ -665,8 +685,9 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 		declarationBindings,
 	};
 	if (bindingsOnly) return analysis;
-	// The surgical plain-TS pass slots base hooks only; without a custom-hook
-	// withSlot boundary, two local wrapper calls would share their inner slots.
+	if (onlyImported) annotateLocalHookAliases(analysis);
+	// The plain-TS pass slots base hooks and imported/aliased hook values. Local
+	// custom-hook functions still own their authored slot boundaries.
 	// Restrict custom-call inference to the full TSRX/TSX compiler, which emits
 	// that boundary for every plain-identifier custom hook call.
 	const customHooks = onlyImported ? new Map() : discoverCustomDependencyHooks(analysis);
@@ -685,6 +706,82 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 		}
 	}
 	return analysis;
+}
+
+// An immutable alias may select a base hook directly, or a zero-argument local
+// factory may return that selection (the usual isomorphic-effect pattern).
+// Follow only value aliases, never the body of an ordinary custom hook. This
+// proof needs the completed lexical graph so declaration order and shadowing
+// cannot change a call's identity.
+function annotateLocalHookAliases(analysis) {
+	// Ordinary modules with only direct imported hooks need no alias tables.
+	if (
+		!analysis.calls.some(({ call, scope }) => {
+			const binding = directCallBinding(call, scope);
+			return binding !== null && !binding.imported;
+		})
+	)
+		return;
+	const values = new Map();
+	const factories = new Map();
+	for (const { decl, bindings, kind } of analysis.declarators) {
+		if (kind !== 'const' || decl.id.type !== 'Identifier') continue;
+		const binding = bindings[0]?.binding;
+		if (binding && !binding.reassigned) values.set(binding, unwrapValue(decl.init));
+	}
+	if (values.size === 0) return;
+	for (const record of analysis.functions) {
+		if (record.binding && record.stableDefinition && !record.binding.reassigned) {
+			factories.set(record.binding, record.node);
+		}
+	}
+	function referencesHook(node, seen) {
+		const value = unwrapValue(node);
+		if (!value) return false;
+		if (value.type === 'Identifier') {
+			const binding = resolveBinding(analysis.nodeScopes.get(value), value.name);
+			if (!binding || binding.reassigned || seen.has(binding)) return false;
+			if (/^use[A-Z]/.test(binding.hookRuntimeImport ?? '') || binding.customHookImport)
+				return true;
+			seen.add(binding);
+			return referencesHook(values.get(binding), seen);
+		}
+		if (value.type === 'ConditionalExpression') {
+			return referencesHook(value.consequent, seen) || referencesHook(value.alternate, seen);
+		}
+		if (value.type === 'LogicalExpression') {
+			return referencesHook(value.left, seen) || referencesHook(value.right, seen);
+		}
+		if (
+			value.type === 'CallExpression' &&
+			value.optional !== true &&
+			value.arguments.length === 0
+		) {
+			const binding = directCallBinding(value, analysis.nodeScopes.get(value));
+			const factory = factories.get(binding);
+			if (!factory || factory.params.length !== 0 || seen.has(binding)) return false;
+			seen.add(binding);
+			const body = factory.body;
+			return referencesHook(
+				body.type === 'BlockStatement'
+					? body.body.length === 1 && body.body[0].type === 'ReturnStatement'
+						? body.body[0].argument
+						: null
+					: body,
+				seen,
+			);
+		}
+		return false;
+	}
+	for (const { call, scope } of analysis.calls) {
+		if (call.optional === true || call.callee.type !== 'Identifier') continue;
+		const binding = directCallBinding(call, scope);
+		if (!values.has(binding) || !referencesHook(values.get(binding), new Set([binding]))) continue;
+		analysis.callAnnotations.set(call, {
+			...analysis.callAnnotations.get(call),
+			_octaneCustomHookCall: binding.name,
+		});
+	}
 }
 
 function collectPatternBindings(pattern, scope, into) {
@@ -1366,13 +1463,17 @@ function cloneDependency(node) {
 	return { ...node };
 }
 
-/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string }} options */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, inferDependencies?: boolean }} options */
 function analyzeInternal(ast, options) {
 	const onlyImported = options.onlyImported === true;
 	const hookRuntimeModules = new Set(['octane', ...(options.hookRuntimeModules || [])]);
 	const analysis = buildScopes(ast, onlyImported, hookRuntimeModules);
-	markDependencyInvariantBindings(analysis);
 	const inferred = new Map();
+	// A hand-slotted module owns its authored dependency ABI. The production
+	// memo-only pass still needs lexical import provenance, but must not infer
+	// omitted lists or reject source the manual-slot path previously accepted.
+	if (options.inferDependencies === false) return { analysis, inferred };
+	markDependencyInvariantBindings(analysis);
 
 	for (const candidate of analysis.candidates) {
 		const rawCallback = candidate.call.arguments[candidate.config.callback];
@@ -1440,8 +1541,8 @@ export function analyzeHookDependencies(ast, options = {}) {
  * Untouched subtrees stay shared with the input by reference. Returns the
  * rebuilt module plus the inference map re-keyed to the rebuilt call nodes.
  */
-/** @param {any} ast @param {any} analysis @param {Map<any, any>} inferred @param {boolean} insertDeps */
-function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
+/** @param {any} ast @param {any} analysis @param {Map<any, any>} inferred @param {boolean} insertDeps @param {boolean} nativeReads */
+function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps, nativeReads = false) {
 	const annotations = analysis.callAnnotations;
 	const rekeyedInferred = new Map();
 	/** @param {any} node @returns {any} */
@@ -1471,6 +1572,9 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
 			if (out === null) out = { ...node };
 			if (props !== undefined) Object.assign(out, props);
 			if (result !== undefined) {
+				// Only an authored omission grants this capability. Explicit arrays,
+				// null, and dependency arguments forwarded by wrappers stay ordinary.
+				if (nativeReads && result.name === 'useMemo') out._octaneNativeInferredMemo = true;
 				if (insertDeps) {
 					const args = out.arguments.slice();
 					// The synthesized array maps to the hook call it belongs to; each
@@ -1501,10 +1605,10 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
  * keyed by the rebuilt calls. Dependency arrays are NOT inserted — that pass
  * edits source text from the inference results instead of reprinting the tree.
  */
-/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string }} [options] */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, inferDependencies?: boolean, nativeReads?: boolean }} [options] */
 export function annotateHookCalls(ast, options = {}) {
 	const { analysis, inferred } = analyzeInternal(ast, options);
-	return rebuildWithHookMetadata(ast, analysis, inferred, false);
+	return rebuildWithHookMetadata(ast, analysis, inferred, false, options.nativeReads === true);
 }
 
 /**
@@ -1512,7 +1616,7 @@ export function annotateHookCalls(ast, options = {}) {
  * dependency arrays inserted at each candidate call. Copy-on-write — the input
  * AST is never modified; callers must use the returned module.
  */
-/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, onRuntimeHelper?: (name: string) => void }} [options] */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, onRuntimeHelper?: (name: string) => void, nativeReads?: boolean }} [options] */
 export function applyHookDependencies(ast, options = {}) {
 	const { analysis, inferred } = analyzeInternal(ast, options);
 	// The inserted `_$__methodDep(...)` calls need their aliased runtime import;
@@ -1529,5 +1633,5 @@ export function applyHookDependencies(ast, options = {}) {
 			}
 		}
 	}
-	return rebuildWithHookMetadata(ast, analysis, inferred, true).ast;
+	return rebuildWithHookMetadata(ast, analysis, inferred, true, options.nativeReads === true).ast;
 }

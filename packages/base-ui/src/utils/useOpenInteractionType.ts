@@ -1,68 +1,66 @@
-// Ported from .base-ui/packages/react/src/utils/useOpenInteractionType.ts (v1.6.0), octane-adapted
-// (slot-threaded; native events). Records the interaction type (mouse/touch/pen/keyboard) that
-// opened a popup, so trigger-owned focus can behave correctly.
-import { useMemo, useState } from 'octane';
-
-import { subSlot } from '../internal';
-import { useStableCallback } from './useStableCallback';
-import { useEnhancedClickHandler, type InteractionType } from './useEnhancedClickHandler';
-import { useValueChanged } from './useValueChanged';
-import { platform } from './platform';
+/** @jsxImportSource octane */
+'use client';
+import * as React from 'octane';
+import { useStableCallback } from '@octanejs/base-ui-utils/useStableCallback';
+import {
+	type InteractionType,
+	useEnhancedClickHandler,
+} from '@octanejs/base-ui-utils/useEnhancedClickHandler';
+import { platform } from '@octanejs/base-ui-utils/platform';
+import { useValueChanged } from '../internals/useValueChanged';
 
 export function useOpenMethodTriggerProps(
 	open: boolean | (() => boolean),
 	setOpenMethod: (interactionType: InteractionType | null) => void,
-	slot: symbol | undefined,
-): { onClick: (event: any) => void; onPointerDown: (event: any) => void } {
+) {
 	const handleTriggerClick = useStableCallback(
-		(_: any, interactionType: InteractionType) => {
+		(_: React.MouseEvent, interactionType: InteractionType) => {
 			const isOpen = typeof open === 'function' ? open() : open;
+
 			if (!isOpen) {
-				setOpenMethod(interactionType || (platform.os.ios ? 'touch' : ''));
+				setOpenMethod(
+					interactionType ||
+						// On iOS Safari, the hitslop around touch targets means tapping outside an element's
+						// bounds does not fire `pointerdown` but does fire `mousedown`. The `interactionType`
+						// will be "" in that case.
+						(platform.os.ios ? 'touch' : ''),
+				);
 			}
 		},
-		subSlot(slot, 'h'),
 	);
 
-	const { onClick, onPointerDown } = useEnhancedClickHandler(
-		handleTriggerClick,
-		subSlot(slot, 'ech'),
-	);
+	const { onClick, onPointerDown } = useEnhancedClickHandler(handleTriggerClick);
 
-	return useMemo(() => ({ onClick, onPointerDown }), [onClick, onPointerDown], subSlot(slot, 'm'));
+	return React.useMemo(
+		() => ({
+			onClick,
+			onPointerDown,
+		}),
+		[onClick, onPointerDown],
+	);
 }
 
 /**
- * Determines the interaction type (keyboard, mouse, touch, etc.) that opened the component, and
- * returns it alongside the trigger props that record it. Resets to `null` once the popup closes.
+ * Determines the interaction type (keyboard, mouse, touch, etc.) that opened the component.
  *
- * Used by roots that own the open method locally (Menu) rather than delegating it to each trigger
- * (Popover, which calls `useOpenMethodTriggerProps` directly and stores the result in its store).
+ * @param open The open state of the component.
  */
-export function useOpenInteractionType(
-	open: boolean,
-	slot: symbol | undefined,
-): {
-	openMethod: InteractionType | null;
-	triggerProps: { onClick: (event: any) => void; onPointerDown: (event: any) => void };
-} {
-	const [openMethod, setOpenMethod] = useState<InteractionType | null>(null, subSlot(slot, 's'));
+export function useOpenInteractionType(open: boolean) {
+	const [openMethod, setOpenMethod] = React.useState<InteractionType | null>(null);
 
-	const triggerProps = useOpenMethodTriggerProps(open, setOpenMethod, subSlot(slot, 'tp'));
+	const triggerProps = useOpenMethodTriggerProps(open, setOpenMethod);
 
-	useValueChanged(
-		open,
-		(previousOpen: boolean) => {
-			if (previousOpen && !open) {
-				setOpenMethod(null);
-			}
-		},
-		subSlot(slot, 'vc'),
-	);
+	useValueChanged(open, (previousOpen) => {
+		if (previousOpen && !open) {
+			setOpenMethod(null);
+		}
+	});
 
-	return useMemo(
-		() => ({ openMethod, triggerProps }),
+	return React.useMemo(
+		() => ({
+			openMethod,
+			triggerProps,
+		}),
 		[openMethod, triggerProps],
-		subSlot(slot, 'r'),
 	);
 }

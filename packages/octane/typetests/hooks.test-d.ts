@@ -2,10 +2,30 @@ import {
 	type LinkedStateOptions,
 	type LinkedStatePrevious,
 	useEffect,
+	useImperativeHandle,
 	useLinkedState,
 } from 'octane';
 import { useLinkedState as useServerLinkedState } from 'octane/server';
 import { useLinkedState as useUniversalLinkedState } from 'octane/universal';
+import type { Octane } from 'octane/jsx-runtime';
+
+declare const nativeRefArray: Octane.Ref<HTMLDivElement>;
+useImperativeHandle(nativeRefArray, () => document.createElement('div'));
+useImperativeHandle([null, [{ current: null as number | null }, undefined]], () => 42);
+useImperativeHandle(
+	[
+		[
+			(value: number | null) => {
+				value?.toFixed();
+			},
+		],
+	],
+	() => 42,
+);
+// @ts-expect-error — each nested ref must accept the handle returned by the factory.
+useImperativeHandle([{ current: null as HTMLDivElement | null }], () => 42);
+// @ts-expect-error — a callback ref cannot receive an incompatible primitive handle.
+useImperativeHandle([[(value: string | null) => {}]], () => 42);
 
 useEffect(() => {});
 useEffect(() => () => {});

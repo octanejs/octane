@@ -63,6 +63,7 @@ const TARGETS = [
 	'ripple',
 	'svelte',
 	'vue-vapor',
+	'inferno',
 ];
 const bytes = Buffer.byteLength(out);
 for (const target of TARGETS) {

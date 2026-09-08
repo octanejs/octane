@@ -20,6 +20,7 @@ const contextChildProps = {
 	onMouseLeave: (_event: unknown) => undefined,
 	className: 'sr-only',
 	containerClassName: 'flex items-center',
+	nonce: 'style-nonce',
 	'aria-label': 'One-time password',
 } satisfies OTPInputProps;
 

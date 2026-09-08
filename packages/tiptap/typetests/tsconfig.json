@@ -14,5 +14,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["./*.test-d.ts", "./*.test-d.tsx"]
+  "include": ["./*.test-d.ts", "./*.test-d.tsx"],
+  "exclude": ["./pristine/**"]
 }

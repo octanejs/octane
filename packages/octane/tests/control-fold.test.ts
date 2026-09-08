@@ -893,7 +893,7 @@ describe('template directives in a returned fragment', () => {
 		container.remove();
 	});
 
-	it('preserves returned-fragment template diagnostics', () => {
+	it('accepts document head elements inside a returned fragment', () => {
 		for (const mode of ['client', 'server'] as const) {
 			expect(() =>
 				compile(
@@ -901,31 +901,36 @@ describe('template directives in a returned fragment', () => {
 					`returned-head-${mode}.tsrx`,
 					{ mode },
 				),
-			).toThrow(/<head>.*not supported/);
+			).not.toThrow();
+		}
+	});
+
+	it('compiles a setup-bearing child block in a returned fragment', () => {
+		for (const mode of ['client', 'server'] as const) {
 			expect(() =>
 				compile(
-					`export function BadBlock() { return <>@{ const value = 'bad'; <span>{value}</span> }</>; }`,
+					`export function ChildBlock() { return <>@{ const value = 'ok'; <span>{value}</span> }</>; }`,
 					`returned-child-block-${mode}.tsrx`,
 					{ mode },
 				),
-			).toThrow(/setup statements.*not supported at JSX child position/);
+			).not.toThrow();
 		}
 	});
 });
 
 describe('template directives in JSX setup values', () => {
-	it('preserves child-code-block diagnostics in client and server compilation', () => {
+	it('compiles a setup-bearing child block in a stored JSX value', () => {
 		for (const mode of ['client', 'server'] as const) {
 			expect(() =>
 				compile(
-					`export function BadSlot() @{
-						const slot = <div>@{ const value = 'bad'; <span>{value}</span> }</div>;
+					`export function Slot() @{
+						const slot = <div>@{ const value = 'ok'; <span>{value}</span> }</div>;
 						<main>{slot}</main>
 					}`,
 					`setup-value-child-block-${mode}.tsrx`,
 					{ mode },
 				),
-			).toThrow(/setup statements.*not supported at JSX child position/);
+			).not.toThrow();
 		}
 	});
 
@@ -1310,10 +1315,10 @@ describe('folded return-JSX single root matches the inline @{} oracle', () => {
 		const r = mount(RetCount as any);
 		const btn = r.container.querySelector('button')!;
 		expect(btn.textContent).toBe('0');
-		btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		flushSync(() => btn.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 		expect(btn.textContent).toBe('1');
 		expect(r.container.querySelector('button')).toBe(btn); // SAME node — patched
-		btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		flushSync(() => btn.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 		expect(btn.textContent).toBe('2');
 		expect(r.container.querySelector('button')).toBe(btn);
 		r.unmount();

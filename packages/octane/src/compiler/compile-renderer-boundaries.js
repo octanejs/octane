@@ -25,6 +25,7 @@ const AUTO_RUNTIME_HOOKS = new Set([
 	'useTransition',
 	'useSyncExternalStore',
 	'useActionState',
+	'useFormState',
 	'useFormStatus',
 	'useOptimistic',
 	'useContext',
@@ -499,7 +500,7 @@ function owningComponentForReference(components, node) {
 }
 
 function ownerReachableComponentsAst(ast, localSpecializations) {
-	const localNames = new Set(localSpecializations.components.keys());
+	const localNames = localSpecializations.components;
 	const dependencies = new Map();
 	const reachable = new Set(
 		[...localSpecializations.exported].filter((name) => localNames.has(name)),
@@ -520,8 +521,8 @@ function ownerReachableComponentsAst(ast, localSpecializations) {
 		tag: record,
 	});
 	const queue = [...reachable];
-	while (queue.length > 0) {
-		for (const dependency of dependencies.get(queue.shift()) ?? []) {
+	for (let queueIndex = 0; queueIndex < queue.length; queueIndex++) {
+		for (const dependency of dependencies.get(queue[queueIndex]) ?? []) {
 			if (reachable.has(dependency)) continue;
 			reachable.add(dependency);
 			queue.push(dependency);
@@ -702,14 +703,14 @@ function collectSpecializationAstReplacements(node, cloneNames, runtime, aliases
 }
 
 function specializeLocalComponentsAst(region, index, state) {
-	const localNames = new Set(state.localSpecializations.components.keys());
+	const localNames = state.localSpecializations.components;
 	const selected = new Set([
 		...jsxComponentReferences(region, localNames),
 		...localCallReferences(region, localNames),
 	]);
 	const queue = [...selected];
-	while (queue.length > 0) {
-		const name = queue.shift();
+	for (let queueIndex = 0; queueIndex < queue.length; queueIndex++) {
+		const name = queue[queueIndex];
 		const component = state.localSpecializations.components.get(name);
 		if (!component) continue;
 		for (const reference of new Set([

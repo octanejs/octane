@@ -3,35 +3,7 @@ import { Link } from '@octanejs/tanstack-router';
 import { BINDING_COUNT } from '../../../content/bindings.ts';
 
 export function Proven() @{
-	<section class="proven">
-		<div class="proven-stat">
-			<span class="proven-number">11,500+</span>
-			<span class="proven-label">
-				{'test executions across the compiler, runtime, SSR and bindings. This count ' +
-					'includes reruns in different compiler modes. The core suite has 3,900+ ' +
-					'distinct cases. '}
-				<a
-					href="https://github.com/octanejs/octane/blob/main/docs/react-parity-coverage.md"
-					target="_blank"
-					rel="noreferrer"
-				>React-derived coverage is tracked case by case</a>
-				{'.'}
-			</span>
-		</div>
-		<div class="proven-stat">
-			<span class="proven-number">0</span>
-			<span class="proven-label">
-				rules of hooks. Put hooks behind conditions or after an early return.
-			</span>
-		</div>
-		<div class="proven-stat">
-			<span class="proven-number">{BINDING_COUNT + ''}</span>
-			<span class="proven-label">
-				{'first-party ecosystem bindings for state, data, routing, UI, forms, charts, 3D, '}
-				<Link to="/docs/$slug" params={{ slug: 'bindings' }}>and more</Link>
-			</span>
-		</div>
-
+	<>
 		<style>
 			/* A three-up stat strip. It shares the card language of the feature grid
 			   above — panel fill, a faint accent wash, hairline border — but stays
@@ -84,5 +56,34 @@ export function Proven() @{
 				text-decoration-color: var(--accent);
 			}
 		</style>
-	</section>
+		<section class="proven">
+			<div class="proven-stat">
+				<span class="proven-number">11,500+</span>
+				<span class="proven-label">
+					{'test executions across the compiler, runtime, SSR and bindings. This count ' +
+						'includes reruns in different compiler modes. The core suite has 3,900+ ' +
+						'distinct cases. '}
+					<a
+						href="https://github.com/octanejs/octane/blob/main/docs/react-parity-coverage.md"
+						target="_blank"
+						rel="noreferrer"
+					>React-derived coverage is tracked case by case</a>
+					{'.'}
+				</span>
+			</div>
+			<div class="proven-stat">
+				<span class="proven-number">0</span>
+				<span class="proven-label">
+					rules of hooks. Put hooks behind conditions or after an early return.
+				</span>
+			</div>
+			<div class="proven-stat">
+				<span class="proven-number">{BINDING_COUNT + ''}</span>
+				<span class="proven-label">
+					{'first-party ecosystem bindings for state, data, routing, UI, forms, charts, 3D, '}
+					<Link to="/docs/$slug" params={{ slug: 'bindings' }}>and more</Link>
+				</span>
+			</div>
+		</section>
+	</>
 }

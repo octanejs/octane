@@ -5,10 +5,13 @@
  * selector result / no-op dispatch — recharts components stay usable
  * standalone), and the PanoramaContext flag.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { configureStore, createSlice } from '@reduxjs/toolkit';
 import { mount, nextPaint } from '../_helpers';
 import { referenceElementsReducer } from '../../src/state/referenceElementsSlice';
+import { createRechartsStore } from '../../src/state/store';
+import { externalEventAction } from '../../src/state/externalEventsMiddleware';
+import type { MouseHandlerDataParam } from '../../src/synchronisation/types';
 import {
 	LayoutApp,
 	LayoutView,
@@ -39,6 +42,33 @@ async function flush() {
 }
 
 describe('recharts redux plumbing', () => {
+	it('preserves native event targets and methods in throttled chart handlers', async () => {
+		const store = createRechartsStore();
+		const wrapper = document.createElement('div');
+		const observed: Array<{
+			currentTarget: EventTarget | null;
+			target: EventTarget | null;
+			clientX: number;
+		}> = [];
+		const handler = vi.fn((_state: MouseHandlerDataParam, event: MouseEvent) => {
+			observed.push({
+				currentTarget: event.currentTarget,
+				target: event.target,
+				clientX: event.clientX,
+			});
+			event.preventDefault();
+		});
+		wrapper.addEventListener('mousemove', (event) => {
+			store.dispatch(externalEventAction({ handler, reactEvent: event }));
+		});
+		const event = new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: 42 });
+		wrapper.dispatchEvent(event);
+		expect(handler).not.toHaveBeenCalled();
+		await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+		expect(observed).toEqual([{ currentTarget: wrapper, target: wrapper, clientX: 42 }]);
+		expect(event.defaultPrevented).toBe(true);
+	});
+
 	it('keeps an equivalent ReferenceLine registration stable across parent rerenders', async () => {
 		const actions: string[] = [];
 		const store = configureStore({

@@ -3,6 +3,13 @@
 [Dexie](https://dexie.org/) bindings for the [octane](https://github.com/octanejs/octane)
 UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/dexie
+pnpm add @octanejs/dexie
+```
+
 This package re-exports Dexie's framework-neutral IndexedDB API and ports the
 reactive hooks from `dexie-react-hooks` to Octane. Existing Dexie database,
 schema, transaction, and query code can remain unchanged.

@@ -1,10 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'octane';
+import { createSubSlot, useCallback, useEffect, useMemo, useState } from 'octane';
 
 import type { OTPInputProps } from './types';
 
 const PWM_BADGE_MARGIN_RIGHT = 18;
 const PWM_BADGE_SPACE_WIDTH_PX = 40;
 const PWM_BADGE_SPACE_WIDTH = `${PWM_BADGE_SPACE_WIDTH_PX}px` as const;
+
+function availableBadgeSpace(container: HTMLElement): number {
+	const containerRight = container.getBoundingClientRect().right;
+	let element: HTMLElement | null = container;
+	while (element) {
+		if (getComputedStyle(element).overflowX !== 'visible') {
+			const rect = element.getBoundingClientRect();
+			return rect.left + element.clientLeft + element.clientWidth - containerRight;
+		}
+		element = element.parentElement;
+	}
+	return document.documentElement.clientWidth - containerRight;
+}
 
 export const PASSWORD_MANAGERS_SELECTORS = [
 	'[data-lastpass-icon-root]',
@@ -13,22 +26,11 @@ export const PASSWORD_MANAGERS_SELECTORS = [
 	'[style$="2147483647 !important;"]',
 ].join(',');
 
-const childSlots = new Map<symbol, Map<string, symbol>>();
-
-function subSlot(slot: symbol | undefined, key: string): symbol | undefined {
-	if (!slot) return undefined;
-	let children = childSlots.get(slot);
-	if (!children) {
-		children = new Map();
-		childSlots.set(slot, children);
-	}
-	let child = children.get(key);
-	if (!child) {
-		child = Symbol(`input-otp:usePasswordManagerBadge:${key}`);
-		children.set(key, child);
-	}
-	return child;
-}
+const subSlot = createSubSlot({
+	parentPrefix: 'input-otp:usePasswordManagerBadge',
+	includeParentDescription: false,
+	global: false,
+});
 
 export function usePasswordManagerBadge(
 	options: {
@@ -73,12 +75,12 @@ export function usePasswordManagerBadge(
 			}
 
 			const bounds = container.getBoundingClientRect();
-			setHasPWMBadgeSpace(window.innerWidth - bounds.right >= PWM_BADGE_SPACE_WIDTH_PX);
 			const x = bounds.left + container.offsetWidth - PWM_BADGE_MARGIN_RIGHT;
 			const y = bounds.top + container.offsetHeight / 2;
 			const knownBadges = document.querySelectorAll(PASSWORD_MANAGERS_SELECTORS);
 			if (knownBadges.length === 0 && document.elementFromPoint(x, y) === container) return;
 
+			setHasPWMBadgeSpace(availableBadgeSpace(container) >= PWM_BADGE_SPACE_WIDTH_PX);
 			setHasPWMBadge(true);
 			setDone(true);
 		},
@@ -92,9 +94,9 @@ export function usePasswordManagerBadge(
 			if (!container || pushPasswordManagerStrategy === 'none' || typeof window === 'undefined') {
 				return;
 			}
+			const mountedContainer = container;
 			function checkHasSpace() {
-				const distanceToRightEdge = window.innerWidth - container!.getBoundingClientRect().right;
-				setHasPWMBadgeSpace(distanceToRightEdge >= PWM_BADGE_SPACE_WIDTH_PX);
+				setHasPWMBadgeSpace(availableBadgeSpace(mountedContainer) >= PWM_BADGE_SPACE_WIDTH_PX);
 			}
 			checkHasSpace();
 			const interval = setInterval(checkHasSpace, 1000);

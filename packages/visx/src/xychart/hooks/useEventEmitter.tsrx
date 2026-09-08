@@ -1,4 +1,3 @@
-import type { PointerEvent, FocusEvent } from 'react';
 import { useCallback, useContext, useEffect, useRef } from 'octane';
 import { localPoint } from '@octanejs/visx/event';
 import EventEmitterContext from '../context/EventEmitterContext.tsrx';
@@ -8,7 +7,7 @@ export type EventType =
 	'pointermove' | 'pointerout' | 'pointerup' | 'pointerdown' | 'focus' | 'blur';
 
 export type HandlerParams = {
-	/** The react PointerEvent or FocusEvent. */
+	/** The native PointerEvent or FocusEvent. */
 	event: PointerEvent | FocusEvent;
 	/** Position of the PointerEvent in svg coordinates. */
 	svgPoint: ReturnType<typeof localPoint>;

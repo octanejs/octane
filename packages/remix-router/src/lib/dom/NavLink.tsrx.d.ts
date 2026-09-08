@@ -28,6 +28,6 @@ export declare const NavLink: (props: {
 	preventScrollReset?: boolean;
 	viewTransition?: boolean;
 	defaultShouldRevalidate?: boolean;
-	ref?: unknown;
+	ref?: { current: HTMLAnchorElement | null } | ((node: HTMLAnchorElement | null) => void);
 	[key: string]: unknown;
 }) => unknown;

@@ -447,7 +447,7 @@ Proposed skeleton:
 # Octane
 
 Compiler-first UI framework with React's programming model. Components are
-authored in `.tsrx` and compiled ahead of time. Alpha: APIs can still change.
+authored in `.tsrx` and compiled ahead of time. Beta: APIs can still change.
 
 Read `packages/octane/src/runtime.ts` for runtime behavior: its comments are
 the design spec. `docs/differences-from-react.md` is the divergence contract.
@@ -546,7 +546,7 @@ Mapping (rename for trigger clarity):
 | --- | --- | --- |
 | `octane-core-extend.md` | `octane-core-extend/` | Strip the restated self-review prose (§1.4); reference `core-engineering.md` |
 | `performance-audit.md` | *drop* | Global `perf-audit` skill covers it; keep only Octane-specific benchmark routing, fold into `octane-core-extend` |
-| `react-library-port.md` | `octane-binding-port/` | Complements the global `port-parity` skill |
+| legacy React-library port skill | `octane-react-library-port/` | Complements the global `port-parity` skill |
 | `bug-hunter.md` | *drop* | Global `root-cause` covers it |
 | `triage.md` | `octane-triage/` | Keep: repo-specific area routing |
 | `create-a-pr.md` | *drop* | Global `land` + user's global CLAUDE.md cover it |
@@ -631,9 +631,9 @@ tests.
   curates: `differences-from-react.md`, `ssr.md`, `deferred-hydration.md`, plus
   `packages.md`, `bindings-status.md`, `parity-gaps.md`, `devtools.md`,
   `decallback-memo.md`.
-- `docs/plans/`, the ~35 historical `*-plan.md` / `*-audit.md` files. They stay
-  valuable as archaeology; they should not be in an agent's search path by
-  default.
+- `docs/plans/`, the historical agent-authored implementation plans. These are
+  local working artifacts and remain ignored; use issue and pull-request history
+  when archaeological context is needed.
 - `docs/README.md`: a real index: one line per durable doc, stating **when to
   read it**, not what it contains.
 

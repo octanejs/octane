@@ -121,3 +121,21 @@ export function EnumeratedBooleans(props) @{
 		<ol class="g4" reversed={props.on} start={props.num} />
 	</div>
 }
+
+export function HydratedAttributeValues(props: {
+	text: string | null;
+	on: boolean;
+}) @{
+	<div>
+		<button
+			title={props.text}
+			data-label={props.text as string}
+			disabled={props.on}
+			aria-expanded={props.on}
+		>{'attributes'}</button>
+		<svg>
+			<use xlinkHref={props.text} xmlLang={props.text} />
+		</svg>
+		<octane-attribute-probe customName={props.text} hidden={props.on} />
+	</div>
+}

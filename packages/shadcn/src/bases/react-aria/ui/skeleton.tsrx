@@ -1,4 +1,4 @@
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 
 export function Skeleton({ className, ...props }: HostProps<'div'>) {

@@ -6,6 +6,7 @@
 // octane ref-as-prop + our `Slot`.
 import { createElement, useEffect, useRef } from 'octane';
 
+import { sortCollectionItemsByDomOrder } from './collection-order';
 import { useComposedRefs } from './compose-refs';
 import { createContextScope } from './context';
 import { S, splitSlot, subSlot } from './internal';
@@ -81,11 +82,11 @@ export function createCollection(name: string): [
 		return () => {
 			const collectionNode = context.collectionRef.current;
 			if (!collectionNode) return [];
-			const orderedNodes = Array.from(collectionNode.querySelectorAll(`[${ITEM_DATA_ATTR}]`));
-			const items = Array.from(context.itemMap.values());
-			return items.sort(
-				(a, b) => orderedNodes.indexOf(a.ref.current!) - orderedNodes.indexOf(b.ref.current!),
+			const orderedNodes = Array.from(
+				collectionNode.querySelectorAll<HTMLElement>(`[${ITEM_DATA_ATTR}]`),
 			);
+			const items = Array.from(context.itemMap.values());
+			return sortCollectionItemsByDomOrder(orderedNodes, items);
 		};
 	}
 

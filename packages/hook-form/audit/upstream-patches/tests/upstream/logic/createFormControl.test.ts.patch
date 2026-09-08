@@ -1,0 +1,16 @@
+diff --git a/tests/upstream/logic/createFormControl.test.ts b/tests/upstream/logic/createFormControl.test.ts
+--- a/tests/upstream/logic/createFormControl.test.ts
++++ b/tests/upstream/logic/createFormControl.test.ts
+@@ -1,8 +1,10 @@
+ import { createFormControl } from '../../../src/logic/createFormControl';
+ import isEmptyObject from '../../../src/utils/isEmptyObject';
+ 
+-vi.mock('../../../src/utils/isEmptyObject', () => {
+-  const original = vi.requireActual('../../../src/utils/isEmptyObject');
++vi.mock('../../../src/utils/isEmptyObject', async () => {
++  const original = await vi.importActual<{
++    default: (value: unknown) => boolean;
++  }>('../../../src/utils/isEmptyObject');
+   return {
+     __esModule: true,
+     default: vi.fn(original.default),

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'octane';
-import type React from 'react';
 import type {
 	ChartTooltipItem,
 	ChartTooltipProps,
@@ -43,7 +42,7 @@ export type UseChartTooltipReturn<Datum = unknown> = {
 	open: boolean;
 	items: ChartTooltipItem<Datum>[];
 	anchor: TooltipAnchor | null;
-	containerRef: React.RefCallback<HTMLElement | SVGElement>;
+	containerRef: (node: HTMLElement | SVGElement | null) => void;
 	show: (args: {
 		anchor: TooltipAnchor | ChartTooltipLocalPoint | ChartTooltipSvgPoint;
 		items: ChartTooltipItem<Datum>[];

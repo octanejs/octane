@@ -9,6 +9,7 @@ import {
 	TrailingPanel,
 	ChainTrio,
 	TransitiveTrio,
+	MultiHopTransitiveTrio,
 	Pair,
 	Tree,
 	KeyedPair,
@@ -249,6 +250,19 @@ describe('all-component-children host sibling order', () => {
 		r.unmount();
 	});
 
+	it('a multi-hop empty leaf repeatedly reappears before its later sibling', () => {
+		const r = mount(MultiHopTransitiveTrio, { bBig: false });
+		expect(order(r)).toEqual(['leaf:C']);
+
+		r.update(MultiHopTransitiveTrio, { bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+		r.update(MultiHopTransitiveTrio, { bBig: false });
+		expect(order(r)).toEqual(['leaf:C']);
+		r.update(MultiHopTransitiveTrio, { bBig: true });
+		expect(order(r)).toEqual(['big:B', 'leaf:C']);
+		r.unmount();
+	});
+
 	it('a trailing panel that mounts empty appears after its earlier sibling', () => {
 		const r = mount(TrailingPanel, { zBig: false });
 		expect(order(r)).toEqual(['leaf:A']);
@@ -450,9 +464,7 @@ describe('host with only component children (@if-root components)', () => {
 		// content has landed in the (off-screen) host.
 		expect(m.findAll('.fb').length).toBe(1);
 		expect(m.findAll('.big').length).toBe(0);
-		resolve('A');
-		await nextPaint();
-		await nextPaint();
+		await act(() => resolve('A'));
 		expect(m.findAll('.fb').length).toBe(0);
 		expect(stripComments(m.find('.host').innerHTML)).toBe(
 			'<div class="big">A</div><div class="big">B:0</div>',

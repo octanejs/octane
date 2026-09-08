@@ -1,6 +1,8 @@
-import { renderToString } from 'octane/server';
+import { createElement, renderToString } from 'octane/server';
 
 export function run() {
-	const { html, css } = renderToString(() => '<main id="minimal-server">Octane</main>');
+	const { html, css } = renderToString(() =>
+		createElement('main', { id: 'minimal-server' }, 'Octane'),
+	);
 	return { html, css };
 }

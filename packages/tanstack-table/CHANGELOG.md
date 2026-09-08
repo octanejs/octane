@@ -1,5 +1,189 @@
 # @octanejs/tanstack-table
 
+## 0.1.51
+
+### Patch Changes
+
+- d3020df: Build atom options only when table-core supplies a comparator.
+
+  The reactivity bindings forwarded `{ compare: options?.compare }` into
+  `createAtom` for every atom, including the ones table-core creates without a
+  comparator. `AtomOptions.compare` is declared optional without `undefined`, so
+  that object is not an `AtomOptions` under `exactOptionalPropertyTypes`, and the
+  error is worse than it looks: the failure knocks out the second `createAtom`
+  overload, so `createWritableAtom` was reported as returning a `ReadonlyAtom`
+  that does not satisfy the `TableReactivityBindings` contract.
+
+  This package publishes `src/`, so those are the consumer's compiler options.
+  An application with the flag on could not build it. The options object is now
+  constructed only when there is a comparator to put in it. `createAtom` reads
+  `options?.compare ?? Object.is`, so an omitted object and one holding
+  `undefined` produce the same atom.
+
+- Updated dependencies [1ee2773]
+  - @octanejs/tanstack-store@0.0.48
+
+## 0.1.50
+
+### Patch Changes
+
+- Updated dependencies [44d50db]
+  - @octanejs/tanstack-store@0.0.47
+
+## 0.1.49
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/tanstack-store@0.0.46
+
+## 0.1.48
+
+### Patch Changes
+
+- Updated dependencies [9321d39]
+- Updated dependencies [fdb711a]
+- Updated dependencies [5e80135]
+- Updated dependencies [ad499d0]
+- Updated dependencies [892da9a]
+- Updated dependencies [babf8d7]
+- Updated dependencies [2785a2f]
+- Updated dependencies [df82fbc]
+- Updated dependencies [0824502]
+- Updated dependencies [47c8f54]
+  - octane@0.1.51
+  - @octanejs/tanstack-store@0.0.45
+
+## 0.1.47
+
+### Patch Changes
+
+- Updated dependencies [157543f]
+- Updated dependencies [4d13159]
+- Updated dependencies [a944ff3]
+- Updated dependencies [f9f0d23]
+- Updated dependencies [edf2b9d]
+- Updated dependencies [9779569]
+- Updated dependencies [96c86fc]
+  - octane@0.1.50
+  - @octanejs/tanstack-store@0.0.44
+
+## 0.1.46
+
+### Patch Changes
+
+- Updated dependencies [8adc693]
+- Updated dependencies [a51c8c6]
+  - octane@0.1.49
+  - @octanejs/tanstack-store@0.0.43
+
+## 0.1.45
+
+### Patch Changes
+
+- Updated dependencies [3ca30fc]
+- Updated dependencies [efdc8cb]
+- Updated dependencies [922df8c]
+- Updated dependencies [8a8afd8]
+- Updated dependencies [37a8ca1]
+- Updated dependencies [c84edbb]
+- Updated dependencies [d5175ca]
+- Updated dependencies [4a4996e]
+  - octane@0.1.48
+  - @octanejs/tanstack-store@0.0.42
+
+## 0.1.44
+
+### Patch Changes
+
+- Updated dependencies [af0d999]
+- Updated dependencies [c800a1f]
+- Updated dependencies [c1bb057]
+- Updated dependencies [97b9349]
+- Updated dependencies [4393bea]
+- Updated dependencies [7dfef16]
+- Updated dependencies [7e62361]
+- Updated dependencies [964783a]
+- Updated dependencies [d3dbd78]
+  - octane@0.1.47
+  - @octanejs/tanstack-store@0.0.41
+
+## 0.1.43
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+  - @octanejs/tanstack-store@0.0.40
+
+## 0.1.42
+
+### Patch Changes
+
+- Updated dependencies [5b1e6a3]
+- Updated dependencies [31abee5]
+- Updated dependencies [fd6ce69]
+- Updated dependencies [5f7a457]
+- Updated dependencies [5227d7b]
+- Updated dependencies [6927595]
+- Updated dependencies [f1a7802]
+  - octane@0.1.45
+  - @octanejs/tanstack-store@0.0.39
+
+## 0.1.41
+
+### Patch Changes
+
+- Updated dependencies [9b06e47]
+- Updated dependencies [7535acd]
+  - octane@0.1.44
+  - @octanejs/tanstack-store@0.0.38
+
+## 0.1.40
+
+### Patch Changes
+
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+  - @octanejs/tanstack-store@0.0.37
+
+## 0.1.39
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+  - @octanejs/tanstack-store@0.0.36
+
+## 0.1.38
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+  - @octanejs/tanstack-store@0.0.35
+
+## 0.1.37
+
+### Patch Changes
+
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+  - @octanejs/tanstack-store@0.0.34
+
 ## 0.1.36
 
 ### Patch Changes

@@ -1,6 +1,5 @@
 /* eslint jsx-a11y/mouse-events-have-key-events: 'off', @typescript-eslint/no-explicit-any: 'off' */
 import { useContext, useEffect } from 'octane';
-import type { PointerEvent } from 'react';
 import type { OctaneNode } from 'octane';
 import { ParentSize } from '@octanejs/visx/responsive';
 import type { ResizeObserverPolyfill } from '@octanejs/visx/responsive';
@@ -21,6 +20,10 @@ import useEventHandlers, {
 	POINTER_EVENTS_ALL,
 	POINTER_EVENTS_NEAREST,
 } from '../hooks/useEventHandlers.tsrx';
+
+// Keep the literal expression below available to bundler define substitution
+// without requiring Node ambient types in browser consumers.
+declare const process: { env: { NODE_ENV?: string } };
 
 const DEFAULT_MARGIN = { top: 50, right: 50, bottom: 50, left: 50 };
 

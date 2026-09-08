@@ -1,0 +1,40 @@
+{
+  "divergences": [
+    {
+      "id": "native-event-semantics",
+      "caseIds": ["differential:base-ui-switch-native-input"],
+      "upstreamResult": "Base UI integrates with React synthetic handlers while preserving native input behavior.",
+      "octaneResult": "The Octane binding integrates directly with native input events.",
+      "rationale": "Octane intentionally uses the browser event model rather than React's synthetic event layer.",
+      "classification": "event-model",
+      "consumerImpact": "Handler timing and event object details can differ when consumers inspect React-specific fields.",
+      "migrationGuidance": "Use native input semantics and avoid depending on React SyntheticEvent-only fields.",
+      "owner": "@octanejs/base-ui",
+      "reviewCondition": "Review if Octane adds a React-compatible synthetic event layer."
+    },
+    {
+      "id": "ref-as-prop-class-composition",
+      "caseIds": ["differential:base-ui-render-element"],
+      "upstreamResult": "React composes render-element refs and class names through React element cloning semantics.",
+      "octaneResult": "Octane reproduces the rendered result through its native ref-as-prop and class composition model.",
+      "rationale": "The frameworks expose different internal element and ref composition primitives.",
+      "classification": "rendering",
+      "consumerImpact": "React-only element identity or ref implementation details are not portable even when DOM output matches.",
+      "migrationGuidance": "Depend on the resulting DOM, composed class names, and public refs rather than React element identity.",
+      "owner": "@octanejs/base-ui",
+      "reviewCondition": "Review if Octane changes render-element or ref composition semantics."
+    },
+    {
+      "id": "active-effect-commit-counts",
+      "caseIds": ["runtime:5733dce426f267ed"],
+      "upstreamResult": "The active tooltip consumers record 11 and 7 passive commits; the unrelated consumer remains at its three initial commits.",
+      "octaneResult": "Active consumers can commit a different number of times while finite layout cascades settle. The unrelated consumer retains exactly its three initial commits.",
+      "rationale": "Octane completes layout-driven updates before DOM observer delivery and does not promise React's incidental commit counts. The test retains its no-unrelated-update assertion and verifies active consumers update.",
+      "classification": "rendering",
+      "consumerImpact": "Effects in actively updating components may execute a different number of times. Unrelated delay-group consumers remain unaffected.",
+      "migrationGuidance": "Use effect dependencies and cleanup; depend on visible state and unrelated-consumer isolation instead of absolute active commit counts.",
+      "owner": "octane",
+      "reviewCondition": "Review if Octane changes layout cascade scheduling or commits updates to unrelated delay-group consumers."
+    }
+  ]
+}

@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { createElement } from 'octane';
 import { compile } from 'octane/compiler';
 import { renderToString } from 'octane/server';
-import { loadServerFixture } from '../_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 import { collectPipeableStream } from '../_server-stream.js';
 import * as client from './_fixtures/server-input-spread-cascade.tsrx';
 import { createServerRenderMatrix } from './_helpers/server-render-matrix.js';
@@ -406,6 +406,31 @@ it('preserves arbitrary attribute evaluation order while resolving collisions', 
 // not move its insertion position in the JSX props snapshot.
 it('retains first insertion order when a later direct writer replaces the same prop', () => {
 	expect(renderToString(server.AttributeSpreadOrder).html).toBe('<div a="3" b="2"></div>');
+});
+
+// Distinct raw aliases share one host attribute, but the winning alias keeps
+// its own authored position for coercion and serialization.
+it('orders normalized alias winners by the winning raw prop position', () => {
+	const fixture = loadCompiledFixtureSource(
+		`export function AliasOrder(props) @{ <label htmlFor={props.firstFor} id={props.id} for={props.finalFor}>label</label> }`,
+		{ id: 'server-alias-application-order.tsrx', mode: 'server' },
+	);
+	const log: string[] = [];
+	const value = (label: string) => ({
+		toString() {
+			log.push(label);
+			return label;
+		},
+	});
+
+	expect(
+		renderToString(fixture.AliasOrder, {
+			firstFor: value('overwritten htmlFor'),
+			id: value('id'),
+			finalFor: value('final for'),
+		}).html,
+	).toBe('<label id="id" for="final for">label</label>');
+	expect(log).toEqual(['id', 'final for']);
 });
 
 // Per ReactJSXTransformIntegration-test.js:95. `children` participates in JSX

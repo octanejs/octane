@@ -8,7 +8,7 @@
 // reason. The non-conditional utilities stay in step with the Radix base.
 import { Separator as SeparatorPrimitive } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface SeparatorProps extends Record<string, unknown> {
 	className?: string;

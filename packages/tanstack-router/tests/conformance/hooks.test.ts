@@ -201,7 +201,138 @@ describe('@octanejs/tanstack-router — document asset ownership', () => {
 	});
 });
 
+interface TestAtom<T> {
+	get(): T;
+	publish(value: T): void;
+	subscribe(listener: () => void): { unsubscribe(): void };
+}
+
+function createTestAtom<T>(initial: T): TestAtom<T> {
+	let current = initial;
+	const listeners = new Set<() => void>();
+	return {
+		get: function get() {
+			return current;
+		},
+		publish: function publish(value: T) {
+			current = value;
+			for (const listener of listeners) {
+				listener();
+			}
+		},
+		subscribe: function subscribe(listener: () => void) {
+			listeners.add(listener);
+			return {
+				unsubscribe: function unsubscribe() {
+					listeners.delete(listener);
+				},
+			};
+		},
+	};
+}
+
+interface SelectedChildProps {
+	parentId: string;
+	atom: TestAtom<Array<string>>;
+}
+
+function SelectedChild(props: SelectedChildProps) {
+	const selected = useStore(props.atom, function selectChild(ids: Array<string>) {
+		const index = ids.indexOf(props.parentId);
+		return index >= 0 ? ids[index + 1] : undefined;
+	});
+	return createElement('output', { 'data-testid': 'selected-child' }, selected ?? 'none');
+}
+
+interface SelectedAtomValueProps {
+	atom: TestAtom<string>;
+}
+
+function SelectedAtomValue(props: SelectedAtomValueProps) {
+	const selected = useStore(props.atom, function selectValue(value: string) {
+		return value;
+	});
+	return createElement('output', { 'data-testid': 'selected-atom' }, selected);
+}
+
+interface AllocatedSelection {
+	label: string;
+}
+
+interface AllocatingSelectorProps {
+	atom: TestAtom<{ label: string; version: number }>;
+	nonce: number;
+}
+
 describe('@octanejs/tanstack-router — store selection', () => {
+	it('reselects when a captured parent id changes without another store publish', () => {
+		const atom = createTestAtom(['old', 'old-child']);
+
+		const result = mount(SelectedChild, { parentId: 'old', atom });
+		try {
+			flushEffects();
+			expect(result.find('[data-testid="selected-child"]').textContent).toBe('old-child');
+
+			flushSync(function publishWithoutParentChange() {
+				atom.publish(['new', 'new-child']);
+			});
+			expect(result.find('[data-testid="selected-child"]').textContent).toBe('none');
+
+			result.update(SelectedChild, { parentId: 'new', atom });
+			expect(result.find('[data-testid="selected-child"]').textContent).toBe('new-child');
+		} finally {
+			result.unmount();
+		}
+	});
+
+	it('reads the replacement atom when its identity changes without a publish', () => {
+		const first = createTestAtom('first');
+		const second = createTestAtom('second');
+
+		const result = mount(SelectedAtomValue, { atom: first });
+		try {
+			flushEffects();
+			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('first');
+
+			result.update(SelectedAtomValue, { atom: second });
+			expect(result.find('[data-testid="selected-atom"]').textContent).toBe('second');
+		} finally {
+			result.unmount();
+		}
+	});
+
+	it('keeps an allocating selector stable across parent rerenders when equality holds', () => {
+		const atom = createTestAtom({ label: 'kept', version: 0 });
+		const selections: Array<AllocatedSelection> = [];
+
+		function AllocatingSelectorProbe(props: AllocatingSelectorProps) {
+			const selected = useStore(
+				props.atom,
+				function selectLabel(value: { label: string; version: number }): AllocatedSelection {
+					return { label: value.label + String(props.nonce) };
+				},
+				function compareLabel(previous: AllocatedSelection, next: AllocatedSelection) {
+					return previous.label === next.label;
+				},
+			);
+			selections.push(selected);
+			return createElement('output', { 'data-testid': 'allocated-selection' }, selected.label);
+		}
+
+		const result = mount(AllocatingSelectorProbe, { atom, nonce: 0 });
+		try {
+			flushEffects();
+			expect(result.find('[data-testid="allocated-selection"]').textContent).toBe('kept0');
+			const first = selections[selections.length - 1];
+
+			result.update(AllocatingSelectorProbe, { atom, nonce: 0 });
+			expect(result.find('[data-testid="allocated-selection"]').textContent).toBe('kept0');
+			expect(selections[selections.length - 1]).toBe(first);
+		} finally {
+			result.unmount();
+		}
+	});
+
 	it('retains custom equality on reactive client stores and publishes changed selections', () => {
 		let current = { label: 'first', version: 0 };
 		const listeners = new Set<() => void>();

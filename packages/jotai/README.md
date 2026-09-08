@@ -2,6 +2,13 @@
 
 [jotai](https://github.com/pmndrs/jotai) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/jotai
+pnpm add @octanejs/jotai
+```
+
 jotai separates a framework-agnostic **vanilla core** (`atom`, `createStore`,
 `getDefaultStore` + all of `vanilla/utils`) from a small **React binding**
 (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`). This package

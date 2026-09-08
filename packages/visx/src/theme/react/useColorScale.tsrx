@@ -1,5 +1,6 @@
 import { useStructuralMemo } from '@octanejs/visx/kernel';
 import { useMemo } from 'octane';
+import createCategoricalIndex from './categoricalIndex';
 import { getCategoricalColor } from './categoricalColor';
 import useTheme from './useTheme.tsrx';
 import warn from './warn';
@@ -21,9 +22,10 @@ export default function useColorScale<Domain extends readonly string[]>(
 	const fallbackColors = theme.colors.categorical;
 	const colors = stableRange ?? fallbackColors;
 
-	return useMemo(
-		() => (key) => {
-			const index = stableDomain.indexOf(key);
+	return useMemo(() => {
+		const indexOf = createCategoricalIndex(stableDomain);
+		return (key) => {
+			const index = indexOf(key);
 
 			if (index < 0) {
 				warn(
@@ -33,7 +35,6 @@ export default function useColorScale<Domain extends readonly string[]>(
 			}
 
 			return colors[index % colors.length] ?? getCategoricalColor(fallbackColors, index);
-		},
-		[colors, fallbackColors, stableDomain],
-	);
+		};
+	}, [colors, fallbackColors, stableDomain]);
 }

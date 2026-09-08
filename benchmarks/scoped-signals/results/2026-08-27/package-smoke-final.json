@@ -1,0 +1,524 @@
+{
+  "version": 1,
+  "measuredAt": "2026-08-27T15:00:00.759Z",
+  "node": "v26.4.0",
+  "toolingRoot": "/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+  "tools": {
+    "esbuild": "0.28.1",
+    "typescript": "5.9.3",
+    "alienSignals": "3.2.0"
+  },
+  "scratch": "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-signals-package-nxbOMc",
+  "status": "passed",
+  "scope": "Targeted per-file ESM/CommonJS public imports, native SSR protocol identity, local hook retirement, and declaration consumer. Compiler/Volar build and full package tarball not verified.",
+  "commonjsEntries": [
+    "src/index.ts",
+    "src/server/index.ts",
+    "src/internal/client.ts",
+    "src/internal/server.ts",
+    "src/signals/index.ts",
+    "src/signals/client.ts",
+    "src/signals/server.ts"
+  ],
+  "commonjsModules": 50,
+  "declarationEntries": [
+    "src/index.ts",
+    "src/server/index.ts",
+    "src/signals/index.ts",
+    "src/signals/client.ts",
+    "src/signals/server.ts",
+    "src/internal/client.ts",
+    "src/internal/server.ts"
+  ],
+  "probes": [
+    {
+      "mode": "esm",
+      "html": true,
+      "seed": true,
+      "localRetired": true,
+      "notifications": 1
+    },
+    {
+      "mode": "cjs",
+      "html": true,
+      "seed": true,
+      "localRetired": true,
+      "notifications": 1
+    }
+  ],
+  "typeConsumer": "passed",
+  "sourceInputs": [
+    {
+      "path": "packages/octane/src/aria-diagnostics.ts",
+      "sha256": "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48"
+    },
+    {
+      "path": "packages/octane/src/behavior-root.ts",
+      "sha256": "b974712331fd8d705a451438e3f174948fafa2b6d3d707e289b641892e7c5617"
+    },
+    {
+      "path": "packages/octane/src/compiler/bundler.js",
+      "sha256": "dcc0a53ab53b77e546b0d012bba729401f98a292acd8605f2bc64aca8caf4008"
+    },
+    {
+      "path": "packages/octane/src/compiler/client-only-server.js",
+      "sha256": "d4b4fc2557835c5c21b56f769e5fd784fe0844a562e160e308be9b773d88b2da"
+    },
+    {
+      "path": "packages/octane/src/compiler/compile-renderer-boundaries.js",
+      "sha256": "5cc236a3344148e00ec84f3619df2240d45c30c126ca5f4901195e9a9a39d3a5"
+    },
+    {
+      "path": "packages/octane/src/compiler/compile-universal.js",
+      "sha256": "43adf02aec773446c5e6158ede491973064d4f8923e18d235aa5b2d1c55503ba"
+    },
+    {
+      "path": "packages/octane/src/compiler/compile-valdi.js",
+      "sha256": "57015f01c787d1c9418e6407fa9af11e81c8088a001b499a96f281bd24db626f"
+    },
+    {
+      "path": "packages/octane/src/compiler/compile.js",
+      "sha256": "c81c6ab2664dedb98a1a6499a0adf24c667d2d5b3ac7c209ba5d434bcfbd1a73"
+    },
+    {
+      "path": "packages/octane/src/compiler/css-module-constants.js",
+      "sha256": "1fa82c2d4a6192f50a471263ff2005e40230f7425c75734bc3ab22299da72edf"
+    },
+    {
+      "path": "packages/octane/src/compiler/css-module-imports.js",
+      "sha256": "773a8b72065e0a87ab7f26fc5008cb8fe84466b1a97528b432a4692bfd256b34"
+    },
+    {
+      "path": "packages/octane/src/compiler/fat-segments.js",
+      "sha256": "a52585e6658955f57bc8e6606ce1bb3d0994f97cde8d9e6de972a951847ac506"
+    },
+    {
+      "path": "packages/octane/src/compiler/hook-deps.js",
+      "sha256": "b75f0f521ec677f089dc4158b35b47e37cbdc1b6c20fb18df164883a6a18dae3"
+    },
+    {
+      "path": "packages/octane/src/compiler/hook-names.js",
+      "sha256": "26be46b93f38c217ad808f8431ddba699dc2684b05fb75b849b26f40fd03b68d"
+    },
+    {
+      "path": "packages/octane/src/compiler/hydrate-boundaries.js",
+      "sha256": "ae9e4338a436b13777b45550ec71b44a1a2ab2d7a08281deb3682ccf08563047"
+    },
+    {
+      "path": "packages/octane/src/compiler/index.d.ts",
+      "sha256": "34272ac1825e2011f0b0049e1bc7dfd38c76d0114d566d6874a1d61041e03382"
+    },
+    {
+      "path": "packages/octane/src/compiler/index.js",
+      "sha256": "c7ff03a70dee28acf8e971f3c80fa4dd3699cbf528426319e5f6e987870c5dba"
+    },
+    {
+      "path": "packages/octane/src/compiler/inline-hook-memo.js",
+      "sha256": "3abbca52516834edec1a2545773f7fdaf9dc6ad5aeabbbf1b3172dc17e719f4c"
+    },
+    {
+      "path": "packages/octane/src/compiler/jsx-namespace.js",
+      "sha256": "00a42ab13881cc8212e93692e604be1fb9d9fb36451a8319f3e824b9490c85ef"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-change-diagnostics.js",
+      "sha256": "f551acc8370c4f3d6a0828bc331292bb674271a627b0c487952b2d17670764ae"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-read-codegen.js",
+      "sha256": "1657027217688040ff4ed7b73236d66c42c74f5f54ea19869cd8b465d4ab57bc"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-read-diagnostics.js",
+      "sha256": "14090401ed07684a1123e7f19815dcf6dbadf3cb71b192863582dbde9c5959a2"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-read-facts.js",
+      "sha256": "c75d83fe712de902efaff4604bf5482e154b9759ffa267160f2f131036fb48bf"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-read-types.js",
+      "sha256": "dd9d59584603f9f358244f020004aabfdf3058f9c2d0440db2806231bfe0e137"
+    },
+    {
+      "path": "packages/octane/src/compiler/parser.browser.js",
+      "sha256": "ada30a0a075cf7c62b34da7bd2b51c229fff187cdcbe244ff7f2a86a4ca4983d"
+    },
+    {
+      "path": "packages/octane/src/compiler/parser.node.js",
+      "sha256": "92724194394182a8deff2c70006b76141f55931059270cf69bcc1e5037793b70"
+    },
+    {
+      "path": "packages/octane/src/compiler/plain-hook-memo.js",
+      "sha256": "792660882e3d71e7046ea0f810b246b43391d9dfb21bdac6f6ad901a35d2a0b8"
+    },
+    {
+      "path": "packages/octane/src/compiler/pragma.js",
+      "sha256": "b7163cba5e48122e0b58923759c5c6bc2ee7a20b65f880489c2ee61e16ffac5c"
+    },
+    {
+      "path": "packages/octane/src/compiler/register.js",
+      "sha256": "60f4c4d00758cde51da27a2756ac33f66a31452683f77c45b6601480ee7a69be"
+    },
+    {
+      "path": "packages/octane/src/compiler/renderer-boundaries.js",
+      "sha256": "62fd9d8769e0794be5e910321a54cbd7fbee9eeda582b23f49fda3f02df21872"
+    },
+    {
+      "path": "packages/octane/src/compiler/renderers.js",
+      "sha256": "80c4f1debbe8096b0bd61dfc93b3ef540d89800db06fcdfc9ba8438f64675c9d"
+    },
+    {
+      "path": "packages/octane/src/compiler/runtime-requests.js",
+      "sha256": "50aaf16128fde2ac6eaf4ea2e44ddacf2fdd07c60f8557cf4b6e1e8c95fb6b96"
+    },
+    {
+      "path": "packages/octane/src/compiler/slot-hooks.js",
+      "sha256": "209a07c40b7daa5b5caaee3c9a83ac90f517ee4dc4fee61d9fd2ce523d858bd4"
+    },
+    {
+      "path": "packages/octane/src/compiler/strong-mode.js",
+      "sha256": "cb672339136ab675b85153cfe9713a7874fdf27973bf1cf61c9215603986be0d"
+    },
+    {
+      "path": "packages/octane/src/compiler/text-type-facts.js",
+      "sha256": "50f2150438ce7a402ae41b647899d549d0e23f0a8193ff0b7967db2444c8a641"
+    },
+    {
+      "path": "packages/octane/src/compiler/typescript.d.ts",
+      "sha256": "ed79fb715f944e98f20c725975cccb179af98f745ec28439aaeed2c54bbf0c2c"
+    },
+    {
+      "path": "packages/octane/src/compiler/typescript.js",
+      "sha256": "ae4ef9206170846ae16fc8fd68df273d359beb697323c6d4451e33e3c5a6cdd2"
+    },
+    {
+      "path": "packages/octane/src/compiler/universal-runtime.js",
+      "sha256": "385bbb540e9a8bbfd4277b51623fb9ca6de618ff56b110e6d794f7884bdf453a"
+    },
+    {
+      "path": "packages/octane/src/compiler/vite.d.ts",
+      "sha256": "48d8ffcb4850168509f89aadde91a7abef7b8db850d8930dab57c5b0b7bbb8ac"
+    },
+    {
+      "path": "packages/octane/src/compiler/vite.js",
+      "sha256": "5b310833bb9ab4973264f0f99266e7b1fd177eb9055a1e05678565ade640da45"
+    },
+    {
+      "path": "packages/octane/src/compiler/volar.d.ts",
+      "sha256": "0905786c49b1de67ae9429cf88cecb9357afed487d05dfb781ef71e7108ce8a2"
+    },
+    {
+      "path": "packages/octane/src/compiler/volar.js",
+      "sha256": "9f8776350de4a5c3c9f75f3f655136ce3307d284dd2caa9b3a877a1cd9c04d51"
+    },
+    {
+      "path": "packages/octane/src/component-flags.ts",
+      "sha256": "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a"
+    },
+    {
+      "path": "packages/octane/src/constants.ts",
+      "sha256": "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7"
+    },
+    {
+      "path": "packages/octane/src/css.ts",
+      "sha256": "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57"
+    },
+    {
+      "path": "packages/octane/src/devtools-hook.ts",
+      "sha256": "a9974cd69d87b664465a5a78a9ecd3f19fba83bd4c67c3c31f60cf87595b96c0"
+    },
+    {
+      "path": "packages/octane/src/dom-tables.d.ts",
+      "sha256": "3d54e62a3ff4061cd5af4396b2f43a8a99e8949de72b341a6a3711c28c4a0c6a"
+    },
+    {
+      "path": "packages/octane/src/dom-tables.js",
+      "sha256": "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d"
+    },
+    {
+      "path": "packages/octane/src/error-codes.client.generated.ts",
+      "sha256": "3fac871a6372981f5ff6da8d64d8990f5128ee3144f73b129c462c2ff6e8063a"
+    },
+    {
+      "path": "packages/octane/src/error-codes.server.generated.ts",
+      "sha256": "68a911785707f93a13c78bd29a6c40c36c6c9b6e1ddf43802b2207dfe7d815aa"
+    },
+    {
+      "path": "packages/octane/src/error-message.ts",
+      "sha256": "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936"
+    },
+    {
+      "path": "packages/octane/src/form-diagnostics.ts",
+      "sha256": "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54"
+    },
+    {
+      "path": "packages/octane/src/has-own.ts",
+      "sha256": "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2"
+    },
+    {
+      "path": "packages/octane/src/head-ownership.ts",
+      "sha256": "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493"
+    },
+    {
+      "path": "packages/octane/src/host-property-diagnostics.ts",
+      "sha256": "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0"
+    },
+    {
+      "path": "packages/octane/src/html-tree-validation.ts",
+      "sha256": "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6"
+    },
+    {
+      "path": "packages/octane/src/hydration/condition.ts",
+      "sha256": "524ff50256ff823842b4f60bd9e281e0ab7579f7575c9bbb4f6156bdca126d04"
+    },
+    {
+      "path": "packages/octane/src/hydration/event-capture.ts",
+      "sha256": "a1c5c824509c079a53a93703e8e8fbc3f86e8d0663d2326d6ea30d6c0258773a"
+    },
+    {
+      "path": "packages/octane/src/hydration/idle.ts",
+      "sha256": "a6335fc272a18c63df21d29cefde68b9d713909cd37ab30c1f7db23b2962568b"
+    },
+    {
+      "path": "packages/octane/src/hydration/index.ts",
+      "sha256": "ed542822781256276f67c33ba1b4722b906617b87760dc7d2f604c33d060914d"
+    },
+    {
+      "path": "packages/octane/src/hydration/interaction-config.ts",
+      "sha256": "8ba375ff87f8a91f9a528b438909952c93eb4939d7906df4ddce9a094f9c0cbd"
+    },
+    {
+      "path": "packages/octane/src/hydration/interaction.ts",
+      "sha256": "6d827cde9b125b63900ec91c3b4478b30aac3bf67ffa91060245d076935ac163"
+    },
+    {
+      "path": "packages/octane/src/hydration/load.ts",
+      "sha256": "f0a74f3af4d80f426f12c45a04891853b0f7968bbd83b5886667373ef2bbd09d"
+    },
+    {
+      "path": "packages/octane/src/hydration/media.ts",
+      "sha256": "2853b8aedb7ac68ea03ee61d2dfafcb42dc3d108e7f47646e342ec795ce07486"
+    },
+    {
+      "path": "packages/octane/src/hydration/never.ts",
+      "sha256": "b9383f3252e3861ec0d7659c3d2fd74a92156d5cdc734d014f1ac7e7959b605a"
+    },
+    {
+      "path": "packages/octane/src/hydration/types.ts",
+      "sha256": "53355f242727209457c7720f6385bb3d2785f089eda28309198759ee0cf6ce02"
+    },
+    {
+      "path": "packages/octane/src/hydration/visible.ts",
+      "sha256": "ad0f9d194ea2f7957b0f683cbed78e8f4162e4ebd0a9ff10c0f23dc2361ea014"
+    },
+    {
+      "path": "packages/octane/src/index.ts",
+      "sha256": "61248363056932245b73648cb977dc54c9769ffd95879052d3266d6e741434ee"
+    },
+    {
+      "path": "packages/octane/src/internal/client.ts",
+      "sha256": "d1659b39f960af866dcbf4977f16f1cf6e215a77bb489a390893c69cf5bfddfe"
+    },
+    {
+      "path": "packages/octane/src/internal/server.ts",
+      "sha256": "06b606d0b1451e819fa12e2b4a34c28e40feac32a485f28fdb6c8f51ca9718e3"
+    },
+    {
+      "path": "packages/octane/src/jsx-runtime.d.ts",
+      "sha256": "ca269c09cee81daf13491f3df36277a81f1f81fc6ec9ee6c2647efa3f243a40e"
+    },
+    {
+      "path": "packages/octane/src/method-dep.ts",
+      "sha256": "4a9f35fdabd13fc43b01442c4bab936547d129ee8f19817cda8c4dcef8f50a6f"
+    },
+    {
+      "path": "packages/octane/src/profiling.ts",
+      "sha256": "0eb11ae3d569dad7a235ba856195db6b001a868bd772071165cb6c1e2d6881d1"
+    },
+    {
+      "path": "packages/octane/src/react/fiber-adapter.ts",
+      "sha256": "7da0054d4525d6c3e0c5c51cf32f072505d4127586e5f53c4e5123e748d3e660"
+    },
+    {
+      "path": "packages/octane/src/react/index.ts",
+      "sha256": "dd734ad65ddab90f7c770c5b2d4aa04e9a39e883363e130125d98f4ceed614c1"
+    },
+    {
+      "path": "packages/octane/src/react/server.ts",
+      "sha256": "fcd0c93269ea656265c4fccd1c56368b751e6e0dcfaaf318e0ed81bb661c2fd7"
+    },
+    {
+      "path": "packages/octane/src/react/shared.ts",
+      "sha256": "ba5a9879863cae4a86890c6e3391e76ec14c691b7309382325acc8e4c168a712"
+    },
+    {
+      "path": "packages/octane/src/renderer-bridge.ts",
+      "sha256": "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824"
+    },
+    {
+      "path": "packages/octane/src/resource-hint-diagnostics.ts",
+      "sha256": "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915"
+    },
+    {
+      "path": "packages/octane/src/runtime.server.ts",
+      "sha256": "66d094c2ab47ae21c85a7d62c328edafa4230d8a778afa37a563759029360803"
+    },
+    {
+      "path": "packages/octane/src/runtime.ts",
+      "sha256": "72d8c0efdb97e7763b2cfa7e74a13e8c24bd57a48b2b19aed121f17bd0537d49"
+    },
+    {
+      "path": "packages/octane/src/sanitize-url.d.ts",
+      "sha256": "c22a26a0c412caa40b28b8e2912be087970e9b766beefd28c65f876d1d714554"
+    },
+    {
+      "path": "packages/octane/src/sanitize-url.js",
+      "sha256": "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7"
+    },
+    {
+      "path": "packages/octane/src/server-rpc-client.ts",
+      "sha256": "c2c2f9ef0639bd92d7f13fda4756cdafb6a5b386e255a14f3d9e05648089848e"
+    },
+    {
+      "path": "packages/octane/src/server/index.ts",
+      "sha256": "349d0f1543b59852a2c677b06335f4032d71188d3692eb51354587958edf4ae1"
+    },
+    {
+      "path": "packages/octane/src/server/rpc.ts",
+      "sha256": "641fc3832cf6f2dc2a352b5fb37543cd45c04115719761c407dc8b0385c2ed23"
+    },
+    {
+      "path": "packages/octane/src/shared-value-helpers.ts",
+      "sha256": "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908"
+    },
+    {
+      "path": "packages/octane/src/signals/client.ts",
+      "sha256": "f64cfce5c9d17567cca9e5621c14d7ebd4f09db217bb0b2ce89dd697c684aac5"
+    },
+    {
+      "path": "packages/octane/src/signals/encoding.ts",
+      "sha256": "57625f36035059cca2c473a5ac0e8038b27b4d57eaa422a3bcd185b9dc38d88c"
+    },
+    {
+      "path": "packages/octane/src/signals/engine.ts",
+      "sha256": "18eb70cbf0e4e44affa31adbf61d4adbfdfb1965aa975803e14f2ee3df2ac729"
+    },
+    {
+      "path": "packages/octane/src/signals/errors.ts",
+      "sha256": "6a9a9561a4e37085c76ae714f6ec774f19646d3c6ef0e0f5dbc44ae6e16ee451"
+    },
+    {
+      "path": "packages/octane/src/signals/graph.ts",
+      "sha256": "719371959354ca916d11a76bb162eac93fb4efacf056d14290d5768bfe9dc3a5"
+    },
+    {
+      "path": "packages/octane/src/signals/index.ts",
+      "sha256": "c4400e3eacea0f52049d3559b26be14dd3485a897135b54ec8cd5f2ad43de17d"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-client.ts",
+      "sha256": "60bbe148943897f242f7d0d4682a4d3846a161a9649e78092f8380937c42327b"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-collector.ts",
+      "sha256": "a89c9f39847ae4c30cc11d39f1fe75fb5a156649938620555017b59af868422b"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-events.ts",
+      "sha256": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-inspection.ts",
+      "sha256": "83a05cd237aec68a18ce0ae37d265e4ddd5bf68d4e258c0584ab1f2eb9dcd8c2"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-retry.ts",
+      "sha256": "40abc7188a0b07a3665b410889bf725fdd0ba82c90b3568456282fe243b95ac7"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-seeds.ts",
+      "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-server.ts",
+      "sha256": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614"
+    },
+    {
+      "path": "packages/octane/src/signals/read-protocol.ts",
+      "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417"
+    },
+    {
+      "path": "packages/octane/src/signals/requests.ts",
+      "sha256": "71c13917b62d698b96fd74fbe23ac60fa8eae2c4515bb72b804c89693efd4a2a"
+    },
+    {
+      "path": "packages/octane/src/signals/server.ts",
+      "sha256": "7dfa84a92f00259350fefd7df5e7c866f752e3dad31d2ff8862a709958f681fd"
+    },
+    {
+      "path": "packages/octane/src/signals/types.ts",
+      "sha256": "e1bbc4c88950681c911cbe94a19b2dc1a4f979bce3b56a4358c7928f8c48a8b9"
+    },
+    {
+      "path": "packages/octane/src/static/index.ts",
+      "sha256": "d2060d6064eca67ff5eb102dc3fe2822b0854c64b751d29c749259801d907468"
+    },
+    {
+      "path": "packages/octane/src/stream-protocol.ts",
+      "sha256": "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce"
+    },
+    {
+      "path": "packages/octane/src/sub-slot.ts",
+      "sha256": "9d81f691d524c1938c86c5342096e53b853e8a03b79b33afd860f8b4d84d98db"
+    },
+    {
+      "path": "packages/octane/src/testing.ts",
+      "sha256": "95e7286e36dd3a64ea8679349c51889c126e9021eabb3365307f9875161019f0"
+    },
+    {
+      "path": "packages/octane/src/tsrx-iterable.ts",
+      "sha256": "8dfb16d235cd2bbaffe04df9e03745093158805424300b273c73de9ffe16fed1"
+    },
+    {
+      "path": "packages/octane/src/tsrx-spread.ts",
+      "sha256": "e06c59ecb3b90e15ecb1b9b0ed165b724902d74cb1b95605154797165e27ff1b"
+    },
+    {
+      "path": "packages/octane/src/universal-core.ts",
+      "sha256": "3417593f2d34134efc9dd757f9324972ec667178c03e54f83b246084ba96700c"
+    },
+    {
+      "path": "packages/octane/src/universal-dom-boundary.ts",
+      "sha256": "64008e1de161117e5bd3e3880d77bcbbb8b0e71d1a197f3f811aea6ee96d8e99"
+    },
+    {
+      "path": "packages/octane/src/universal-native.ts",
+      "sha256": "6e6bb62254667ecdb8bb47ac3b96d1fc1a745e5506894b1b1ef0b8939de138d3"
+    },
+    {
+      "path": "packages/octane/src/universal.ts",
+      "sha256": "9c5d25b95a562043652ff35a61198119297b6380ca68837fcdd13bba565ba7fb"
+    },
+    {
+      "path": "packages/octane/src/version.ts",
+      "sha256": "b9c17315c757b9ad8825f72249dd0a2771f1d12934d3726983abdb0747d2fbf3"
+    },
+    {
+      "path": "packages/octane/package.json",
+      "sha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+    },
+    {
+      "path": "packages/octane/scripts/build.mjs",
+      "sha256": "84c4092980357420df75d3f0fac5b912cc5f415791341a8709b3323ec591c281"
+    },
+    {
+      "path": "scripts/build-package-commonjs.mjs",
+      "sha256": "4fb3cf1a4480789cd2f03d17c0a33e596ead00cf1ada2c531447adb908d75c68"
+    },
+    {
+      "path": "benchmarks/scoped-signals/package-smoke.mjs",
+      "sha256": "25cd1febba95c51851b4c4eea8adb212e1c78d69cb4f7146db596f992e57d34a"
+    }
+  ]
+}

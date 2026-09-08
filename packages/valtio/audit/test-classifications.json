@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/valtio/tests/conformance/binding.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Broader Octane-only binding coverage for useSnapshot and useProxy; not claimed as adapted React parity evidence."
+    },
+    {
+      "path": "packages/valtio/tests/conformance/debug-labels.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Guards the intentional omission of React DevTools affected-path labels outside React parity execution."
+    },
+    {
+      "path": "packages/valtio/tests/conformance/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the framework-neutral vanilla re-export boundary for the public Octane entries."
+    },
+    {
+      "path": "packages/valtio/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the exact snapshot and useProxy scenarios against valtio@2.3.2 with React 19.2.7."
+    },
+    {
+      "path": "packages/valtio/tests/differential/setup.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks fail-closed React fixture compilation for the parity harness itself."
+    },
+    {
+      "path": "packages/valtio/typetests/pristine/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks an Octane-owned contract outside the React parity lanes."
+    },
+    {
+      "path": "packages/valtio/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks an Octane-owned contract outside the React parity lanes."
+    }
+  ]
+}

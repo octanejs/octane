@@ -1,0 +1,20 @@
+diff --git a/tests/upstream/src/toast/useToastManager.test.tsx b/tests/upstream/src/toast/useToastManager.test.tsx
+--- a/tests/upstream/src/toast/useToastManager.test.tsx
++++ b/tests/upstream/src/toast/useToastManager.test.tsx
+@@ -1461,13 +1461,13 @@ describe.skipIf(!isJSDOM)('useToast', () => {
+ 
+         await tick(clock, 1000);
+ 
+-        const toast = screen.getByTestId('root');
+-        fireEvent.mouseEnter(toast);
++        const viewport = screen.getByRole('region', { name: 'Notifications' });
++        fireEvent.mouseEnter(viewport);
+ 
+         await tick(clock, 5000);
+         expect(screen.getByTestId('root')).not.toBe(null);
+ 
+-        fireEvent.mouseLeave(toast);
++        fireEvent.mouseLeave(viewport);
+         await tick(clock, 2000);
+         expect(screen.queryByTestId('root')).toBe(null);
+       });

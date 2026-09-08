@@ -1,7 +1,7 @@
 # Weather app benchmark
 
 An app-shaped comparison of the same responsive weather UI in native Octane TSRX,
-React, Preact, Solid, Svelte, and Vue. It is ported from Alicia Sykes's framework
+React, Preact, Solid, Svelte, Vue, and Inferno. It is ported from Alicia Sykes's framework
 implementations in
 [`lissy93/framework-benchmarks`](https://github.com/lissy93/framework-benchmarks/tree/d3f0dcd07c9223c4847baddf9bfa49f060adf24a/apps).
 The original UI, styles, deterministic mock data, service behavior, accessibility
@@ -18,6 +18,7 @@ the same observable browser interactions.
 | `solid` | 5295 | Solid signals, effects, and keyed `<For>` control flow |
 | `svelte` | 5296 | Svelte 5 components with runes and keyed `{#each}` control flow |
 | `vue` | 5297 | Vue 3 single-file components with refs, computed values, watchers, and keyed `v-for` |
+| `inferno` | 5335 | Inferno 9 native class components and lifecycle-managed async requests, refs, and keyed children |
 
 All fixtures import the exact same weather service, utilities, styles, and mock JSON
 from `shared/`. Live Open-Meteo calls remain available for manual use, but the harness
@@ -25,7 +26,7 @@ always uses local mock mode so network conditions cannot affect the result.
 
 ## Port adaptations
 
-The following small fixes are applied equally to all six versions:
+The following small fixes are applied equally to all seven versions:
 
 - requests use `AbortController`, so a stale search cannot overwrite a newer city and
   unmounting cannot commit an abandoned response;
@@ -62,7 +63,7 @@ measurements beside these semantic controls.
 
 ## Lighthouse and shipped bytes
 
-`weather-app-lighthouse` runs all six production apps through Lighthouse's desktop Dense 4G
+`weather-app-lighthouse` runs all seven production apps through Lighthouse's desktop Dense 4G
 simulation with a fresh Chromium profile for every sample. It records performance,
 accessibility, best-practices, and SEO scores together with first and largest contentful
 paint, Speed Index, total blocking time, and cumulative layout shift. The existing
@@ -83,7 +84,7 @@ application behavior are unchanged. Compare the modeled and observed measurement
 separately and inspect the actual response transfer bytes before attributing a modeled
 paint difference to rendering work.
 
-The repository-wide `bundle-size` suite also builds all six weather targets with the same
+The repository-wide `bundle-size` suite also builds all seven weather targets with the same
 normalized production minifier used for its other app comparisons. Its `weather_*`
 operations report raw, gzip, and Brotli bytes for the total JavaScript, authored app
 bucket, and framework bucket. The displayed total models each emitted JavaScript file as
@@ -102,7 +103,7 @@ those observable correctness controls.
 `pnpm --filter octane-weather-app-benchmarks bench:delivery` runs a separate,
 explicitly labeled client-rendered versus streamed-server-shell delivery experiment.
 Octane and React both use their native streaming renderer and hydrate an equivalent
-server-rendered shell; the existing six-framework client-rendered Lighthouse suite and
+server-rendered shell; the existing seven-framework client-rendered Lighthouse suite and
 its ratio guards remain unchanged. Server effects do not run, so the shell does not
 pretend to contain prefetched weather: both streamed targets still fetch the same local
 mock after hydration and must satisfy the same weather and interaction checks.

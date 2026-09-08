@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "waypoint-browser",
+  "roots": ["packages/waypoint/tests/browser"],
+  "files": ["packages/waypoint/tests/browser/browser.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:waypoint-browser:0001",
+      "file": "packages/waypoint/tests/browser/browser.test.ts",
+      "fullName": "waypoint real-browser parity handles 500 scroll measurements inside the browser budget"
+    },
+    {
+      "id": "runtime:waypoint-browser:0002",
+      "file": "packages/waypoint/tests/browser/browser.test.ts",
+      "fullName": "waypoint real-browser parity matches React callback order while rapidly crossing the viewport"
+    }
+  ]
+}

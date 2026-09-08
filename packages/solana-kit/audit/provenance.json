@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "requiredFiles": [
+    "upstream/src/__tests__/ClientProvider-test.browser.tsx",
+    "upstream/src/__tests__/useClientCapability-test.browser.tsx",
+    "upstream/src/query/__tests__/useRequestQuery-test.browser.tsx",
+    "upstream/LICENSE"
+  ],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream/LICENSE"
+    }
+  ]
+}

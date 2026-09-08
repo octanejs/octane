@@ -1,0 +1,66 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - run: corepack enable
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install playwright
+        run: pnpm exec playwright install
+      - name: Lint
+        run: pnpm biome ci .
+      - name: Test
+        run: pnpm vitest --coverage
+        env:
+          CI: true
+      - name: Build
+        run: pnpm build
+
+  test_matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        react:
+          - 17
+          - 18
+          - 19
+          - latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: corepack enable
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install legacy testing-library
+        if: ${{  startsWith(matrix.react, '17') }}
+        run: pnpm add -D @testing-library/react@12.1.4
+      - name: Install React types
+        run: pnpm add -D @types/react@${{ matrix.react }} @types/react-dom@${{ matrix.react }}
+      - name: Install ${{ matrix.react }}
+        run: pnpm add -D react@${{ matrix.react }} react-dom@${{ matrix.react }}
+      - name: Validate types
+        run: pnpm tsc
+      - name: Run test
+        run: |
+          pnpm exec playwright install
+          pnpm test

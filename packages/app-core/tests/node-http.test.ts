@@ -1,5 +1,13 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { request } from 'node:http';
+import {
+	mkdtempSync,
+	mkdirSync,
+	renameSync,
+	rmSync,
+	symlinkSync,
+	unlinkSync,
+	writeFileSync,
+} from 'node:fs';
+import { createServer, request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
@@ -43,6 +51,150 @@ describe('serveStaticFile cache policy', () => {
 
 	it('keeps root public files revalidatable', () => {
 		expect(cacheControl('/robots.txt')).toBe('public, max-age=0, must-revalidate');
+	});
+});
+
+describe('built-in Node static file containment', () => {
+	let temporaryRoot: string;
+	let staticRoot: string;
+	let privateRoot: string;
+	let secretPath: string;
+	let origin: string;
+	let transport: ReturnType<typeof createNodeServer>;
+	let listener: import('node:http').Server;
+
+	beforeAll(async () => {
+		temporaryRoot = mkdtempSync(join(tmpdir(), 'octane-static-containment-'));
+		staticRoot = join(temporaryRoot, 'public');
+		privateRoot = join(temporaryRoot, 'private');
+		mkdirSync(join(staticRoot, 'assets'), { recursive: true });
+		mkdirSync(join(privateRoot, 'nested'), { recursive: true });
+		writeFileSync(join(staticRoot, 'assets', 'safe.txt'), 'public-asset');
+		secretPath = join(privateRoot, 'secret.txt');
+		writeFileSync(secretPath, 'private-data');
+		writeFileSync(join(privateRoot, 'nested', 'secret.txt'), 'nested-secret');
+		symlinkSync(secretPath, join(staticRoot, 'assets', 'file-link.txt'));
+		symlinkSync(privateRoot, join(staticRoot, 'directory-link'), 'dir');
+		symlinkSync(join(staticRoot, 'assets', 'safe.txt'), join(staticRoot, 'inside-link.txt'));
+
+		transport = createNodeServer(() => new Response('Not Found', { status: 404 }), {
+			staticDir: staticRoot,
+		});
+		listener = transport.listen(0);
+		await once(listener, 'listening');
+		const address = listener.address();
+		if (!address || typeof address === 'string') throw new Error('Node test server has no port');
+		origin = `http://127.0.0.1:${address.port}`;
+	});
+
+	afterAll(async () => {
+		const closed = once(listener, 'close');
+		transport.close();
+		await closed;
+		rmSync(temporaryRoot, { recursive: true, force: true });
+	});
+
+	it.each(['/assets/file-link.txt', '/directory-link/nested/secret.txt'])(
+		'keeps an outside symlink target private at %s',
+		async (pathname) => {
+			for (const method of ['GET', 'HEAD']) {
+				const response = await fetch(origin + pathname, { method });
+				expect(response.status).toBe(404);
+				expect(await response.text()).toBe(method === 'HEAD' ? '' : 'Not Found');
+			}
+		},
+	);
+
+	it('still serves direct files and symlinks whose targets remain inside the static root', async () => {
+		for (const pathname of ['/assets/safe.txt', '/inside-link.txt']) {
+			const response = await fetch(origin + pathname);
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe('public-asset');
+		}
+	});
+
+	it('does not follow a configured static root symlink retargeted after server startup', async () => {
+		const linkedRoot = join(temporaryRoot, 'configured-root');
+		symlinkSync(staticRoot, linkedRoot, 'dir');
+		const linkedTransport = createNodeServer(() => new Response('Not Found', { status: 404 }), {
+			staticDir: linkedRoot,
+		});
+		const linkedListener = linkedTransport.listen(0);
+		try {
+			await once(linkedListener, 'listening');
+			const address = linkedListener.address();
+			if (!address || typeof address === 'string') throw new Error('Node test server has no port');
+			const linkedOrigin = `http://127.0.0.1:${address.port}`;
+			const before = await fetch(linkedOrigin + '/assets/safe.txt', {
+				headers: { Connection: 'close' },
+			});
+			expect(before.status).toBe(200);
+			expect(await before.text()).toBe('public-asset');
+
+			unlinkSync(linkedRoot);
+			symlinkSync(privateRoot, linkedRoot, 'dir');
+			const after = await fetch(linkedOrigin + '/secret.txt', {
+				headers: { Connection: 'close' },
+			});
+			expect(after.status).toBe(404);
+			expect(await after.text()).toBe('Not Found');
+		} finally {
+			const closed = once(linkedListener, 'close');
+			linkedTransport.close();
+			await closed;
+		}
+	});
+
+	it('does not serve a static root first created as an outside symlink after startup', async () => {
+		const missingRoot = join(temporaryRoot, 'missing-at-startup');
+		const lateTransport = createNodeServer(() => new Response('Not Found', { status: 404 }), {
+			staticDir: missingRoot,
+		});
+		const lateListener = lateTransport.listen(0);
+		try {
+			await once(lateListener, 'listening');
+			symlinkSync(privateRoot, missingRoot, 'dir');
+			const address = lateListener.address();
+			if (!address || typeof address === 'string') throw new Error('Node test server has no port');
+			const response = await fetch(`http://127.0.0.1:${address.port}/secret.txt`, {
+				headers: { Connection: 'close' },
+			});
+			expect(response.status).toBe(404);
+			expect(await response.text()).toBe('Not Found');
+		} finally {
+			const closed = once(lateListener, 'close');
+			lateTransport.close();
+			await closed;
+		}
+	});
+
+	it('streams the verified file when its path is replaced before asynchronous reading', async () => {
+		const publicPath = join(staticRoot, 'race.txt');
+		writeFileSync(publicPath, 'public-asset');
+		const server = createServer((req, res) => {
+			if (!serveStaticFile(req, res, staticRoot)) {
+				res.statusCode = 404;
+				res.end('Not Found');
+				return;
+			}
+			renameSync(publicPath, join(staticRoot, 'race-original.txt'));
+			symlinkSync(secretPath, publicPath);
+		});
+		server.listen(0);
+		await once(server, 'listening');
+		try {
+			const address = server.address();
+			if (!address || typeof address === 'string') throw new Error('Node test server has no port');
+			const response = await fetch(`http://127.0.0.1:${address.port}/race.txt`, {
+				headers: { Connection: 'close' },
+			});
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe('public-asset');
+		} finally {
+			const closed = once(server, 'close');
+			server.close();
+			await closed;
+		}
 	});
 });
 

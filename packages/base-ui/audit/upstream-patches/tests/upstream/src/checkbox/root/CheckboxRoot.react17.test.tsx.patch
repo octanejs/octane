@@ -1,0 +1,45 @@
+diff --git a/tests/upstream/src/checkbox/root/CheckboxRoot.react17.test.tsx b/tests/upstream/src/checkbox/root/CheckboxRoot.react17.test.tsx
+--- a/tests/upstream/src/checkbox/root/CheckboxRoot.react17.test.tsx
++++ b/tests/upstream/src/checkbox/root/CheckboxRoot.react17.test.tsx
+@@ -1,4 +1,8 @@
+ /** @jsxImportSource octane */
++import { CheckboxRootreact17ExtraFixture1 } from './../../../../fixtures/CheckboxRootreact17-extra-ssr.tsrx';
++import { CheckboxRootreact17ExtraFixture1 as ServerCheckboxRootreact17ExtraFixture1 } from './../../../../fixtures/CheckboxRootreact17-extra-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(CheckboxRootreact17ExtraFixture1, ServerCheckboxRootreact17ExtraFixture1);
+ import { expect, vi, describe } from 'vitest';
+ import * as React from 'octane';
+ import { Checkbox } from '@octanejs/base-ui/checkbox';
+@@ -19,7 +23,10 @@ vi.mock('@octanejs/base-ui-utils/safeReact', async (importOriginal) => {
+   };
+ });
+ 
+-describe('<Checkbox.Root /> with the React 17 id fallback', () => {
++// React 17's missing useId fallback is outside Octane's renderer contract.
++// Retained verbatim as an attributed upstream disposition; native SSR IDs are
++// covered by the component and utility hydration suites.
++describe.skip('<Checkbox.Root /> with the React 17 id fallback', () => {
+   const { render, renderToString } = createRenderer();
+   const { render: renderNonStrict } = createRenderer({ strict: false });
+ 
+@@ -85,19 +92,7 @@ describe('<Checkbox.Root /> with the React 17 id fallback', () => {
+     'assigns the label association once the fallback ids arrive (nativeButton=%s)',
+     async (nativeButton) => {
+       const { hydrate } = renderToString(
+-        <Field.Root name="apple">
+-          <CheckboxGroup allValues={['fuji']}>
+-            <Field.Item>
+-              <Field.Label data-testid="label">Fuji</Field.Label>
+-              <Checkbox.Root
+-                value="fuji"
+-                data-testid="fuji"
+-                nativeButton={nativeButton}
+-                render={nativeButton ? <button /> : undefined}
+-              />
+-            </Field.Item>
+-          </CheckboxGroup>
+-        </Field.Root>,
++        <CheckboxRootreact17ExtraFixture1 nativeButton={nativeButton} />,
+       );
+ 
+       // No id is assigned yet, so nothing may render a partially built one.

@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { atom, getDefaultStore } from '@octanejs/jotai';
 import { loadable, unwrap } from '@octanejs/jotai/utils';
-import { mount, nextPaint } from '../_helpers';
+import { act, mount, nextPaint } from '../_helpers';
 import { AsyncApp, LoadableApp, UnwrapApp } from '../_fixtures/async.tsrx';
 
 function deferred<T>() {
@@ -36,8 +36,11 @@ describe('async atoms + suspense', () => {
 		await flush();
 		expect(r.find('#fallback').textContent).toBe('loading');
 
-		d.resolve(5);
-		await flush();
+		await act(async () => {
+			d.resolve(5);
+			await flush();
+		});
+		expect(r.container.querySelector('#fallback')).toBeNull();
 		expect(r.find('#async').textContent).toBe('v=5');
 		r.unmount();
 	});
@@ -46,17 +49,25 @@ describe('async atoms + suspense', () => {
 		const d1 = deferred<number>();
 		const asyncAtom = atom(d1.promise);
 		const r = mount(AsyncApp, { asyncAtom });
-		d1.resolve(1);
-		await flush();
+		await act(async () => {
+			d1.resolve(1);
+			await flush();
+		});
+		expect(r.container.querySelector('#fallback')).toBeNull();
 		expect(r.find('#async').textContent).toBe('v=1');
 
 		const d2 = deferred<number>();
-		getDefaultStore().set(asyncAtom, d2.promise);
-		await flush();
+		await act(async () => {
+			getDefaultStore().set(asyncAtom, d2.promise);
+			await flush();
+		});
 		expect(r.find('#fallback').textContent).toBe('loading');
 
-		d2.resolve(2);
-		await flush();
+		await act(async () => {
+			d2.resolve(2);
+			await flush();
+		});
+		expect(r.container.querySelector('#fallback')).toBeNull();
 		expect(r.find('#async').textContent).toBe('v=2');
 		r.unmount();
 	});
@@ -69,8 +80,11 @@ describe('async atoms + suspense', () => {
 		await flush();
 		expect(r.find('#fallback').textContent).toBe('loading');
 
-		d.resolve(21);
-		await flush();
+		await act(async () => {
+			d.resolve(21);
+			await flush();
+		});
+		expect(r.container.querySelector('#fallback')).toBeNull();
 		expect(r.find('#async').textContent).toBe('v=42');
 		r.unmount();
 	});
@@ -82,8 +96,11 @@ describe('async atoms + suspense', () => {
 		await flush();
 		expect(r.find('#fallback').textContent).toBe('loading');
 
-		d.reject(new Error('boom'));
-		await flush();
+		await act(async () => {
+			d.reject(new Error('boom'));
+			await flush();
+		});
+		expect(r.container.querySelector('#fallback')).toBeNull();
 		expect(r.find('#error').textContent).toBe('error:boom');
 		r.unmount();
 	});

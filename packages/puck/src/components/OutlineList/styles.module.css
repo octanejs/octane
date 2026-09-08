@@ -1,0 +1,69 @@
+.OutlineList {
+	color: var(--puck-color-grey-03);
+	font-family: var(--puck-font-family);
+	margin: 0;
+	padding-inline-start: 16px;
+	position: relative;
+	list-style: none;
+}
+
+.OutlineList::before {
+	background: var(--puck-color-grey-08);
+	position: absolute;
+	left: -1px;
+	top: 0px;
+	width: 1px;
+	height: calc(100% - 9px);
+	content: '';
+}
+
+.OutlineList:dir(rtl)::before {
+	left: unset;
+	right: -1px;
+}
+
+.OutlineListItem {
+	position: relative;
+	margin-bottom: 4px;
+}
+
+.OutlineListItem::before {
+	background: var(--puck-color-grey-08);
+	position: absolute;
+	left: -17px;
+	top: 9px;
+	width: 13px;
+	height: 1px;
+	content: '';
+}
+
+.OutlineListItem:dir(rtl)::before {
+	left: unset;
+	right: -17px;
+}
+
+.OutlineListItem--clickable {
+	cursor: pointer;
+	transition: color 50ms ease-in;
+}
+
+.OutlineListItem--clickable:focus-visible {
+	outline: 2px solid var(--puck-color-azure-05);
+	outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.OutlineListItem--clickable:hover {
+		color: var(--puck-color-azure-04);
+		transition: none;
+	}
+}
+
+.OutlineListItem--clickable:active {
+	color: var(--puck-color-azure-03);
+	transition: none;
+}
+
+.OutlineListItem > .OutlineList {
+	margin: 8px 0;
+}

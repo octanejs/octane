@@ -1,12 +1,13 @@
+import type { CSSProperties, NativeMouseEvent, OctaneNode } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { CSSProperties, useState, type OctaneNode } from 'octane';
+import { useState } from 'octane';
 import { scaleLinear } from 'victory-vendor/d3-scale';
 import { clsx } from 'clsx';
 import get from 'es-toolkit/compat/get';
-import { Surface } from '../container/Surface';
-import { Layer } from '../container/Layer';
-import { Sector } from '../shape/Sector';
-import { Text, Props as TextProps } from '../component/Text';
+import { Surface } from '../container/Surface.tsrx';
+import { Layer } from '../container/Layer.tsrx';
+import { Sector } from '../shape/Sector.tsrx';
+import { Text, Props as TextProps } from '../component/Text.tsrx';
 import { polarToCartesian } from '../util/PolarUtils';
 import {
 	ReportChartMargin,
@@ -15,7 +16,7 @@ import {
 	useChartWidth,
 } from '../context/chartLayoutContext';
 import { TooltipPortalContext } from '../context/tooltipPortalContext';
-import { RechartsWrapper } from './RechartsWrapper';
+import { RechartsWrapper } from './RechartsWrapper.tsrx';
 import {
 	mouseLeaveItem,
 	setActiveClickItemIndex,
@@ -25,12 +26,12 @@ import {
 	TooltipPayloadSearcher,
 } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { RechartsStoreProvider } from '../state/RechartsStoreProvider';
+import { RechartsStoreProvider } from '../state/RechartsStoreProvider.tsrx';
 import { ReportEventSettings } from '../state/ReportEventSettings';
 import { ChartCoordinate, DataKey, EventThrottlingProps, Margin, Percent } from '../util/types';
 import { useAppDispatch } from '../state/hooks';
 import { RechartsRootState } from '../state/store';
-import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId';
+import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import { WithIdRequired } from '../util/useUniqueId';
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { initialEventSettingsState } from '../state/eventSettingsSlice';
@@ -146,8 +147,8 @@ export interface SunburstChartProps extends EventThrottlingProps {
  * An object with svg text options to control the appearance of the chart labels.
  */
 	textOptions?: TextProps;
-	onMouseEnter?: (node: SunburstData, e: React.MouseEvent) => void;
-	onMouseLeave?: (node: SunburstData, e: React.MouseEvent) => void;
+	onMouseEnter?: (node: SunburstData, e: NativeMouseEvent) => void;
+	onMouseLeave?: (node: SunburstData, e: NativeMouseEvent) => void;
 	onClick?: (node: SunburstData) => void;
 	style?: CSSProperties;
 	id?: string;
@@ -312,7 +313,7 @@ const SunburstChartImpl = ({
 	const positions: SunburstPositionMap = new Map<string, ChartCoordinate>([]);
 
 	// event handlers
-	function handleMouseEnter(node: SunburstNode, e: React.MouseEvent) {
+	function handleMouseEnter(node: SunburstNode, e: NativeMouseEvent) {
 		if (onMouseEnter) onMouseEnter(node, e);
 
 		dispatch(
@@ -325,7 +326,7 @@ const SunburstChartImpl = ({
 		);
 	}
 
-	function handleMouseLeave(node: SunburstNode, e: React.MouseEvent) {
+	function handleMouseLeave(node: SunburstNode, e: NativeMouseEvent) {
 		if (onMouseLeave) onMouseLeave(node, e);
 
 		dispatch(mouseLeaveItem());
@@ -376,8 +377,14 @@ const SunburstChartImpl = ({
 				<g key={`sunburst-sector-${d.name}-${i}`}>
 					<Sector
 						onClick={() => handleClick(nodeWithIndex)}
-						onMouseEnter={(e) => handleMouseEnter(nodeWithIndex, e)}
-						onMouseLeave={(e) => handleMouseLeave(nodeWithIndex, e)}
+						onMouseEnter={(e: NativeMouseEvent<SVGPathElement>) => handleMouseEnter(
+							nodeWithIndex,
+							e,
+						)}
+						onMouseLeave={(e: NativeMouseEvent<SVGPathElement>) => handleMouseLeave(
+							nodeWithIndex,
+							e,
+						)}
 						fill={fillColor}
 						stroke={stroke}
 						strokeWidth={padding}

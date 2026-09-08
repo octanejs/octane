@@ -1,0 +1,45 @@
+diff --git a/tests/upstream/src/drawer/provider/DrawerProvider.test.tsx b/tests/upstream/src/drawer/provider/DrawerProvider.test.tsx
+--- a/tests/upstream/src/drawer/provider/DrawerProvider.test.tsx
++++ b/tests/upstream/src/drawer/provider/DrawerProvider.test.tsx
+@@ -1,6 +1,7 @@
+ /** @jsxImportSource octane */
+ import { describe, expect, it, vi } from 'vitest';
+ import * as React from 'octane';
++import { profiler } from 'octane/profiling';
+ import { Drawer } from '@octanejs/base-ui/drawer';
+ import { screen } from '@mui/internal-test-utils';
+ import { createRenderer } from '#test-utils';
+@@ -111,19 +112,23 @@ describe('<Drawer.Provider />', () => {
+   });
+ 
+   it('does not retain closed drawer registrations', async () => {
+-    const onRender = vi.fn();
+-    const { user } = await render(
+-      <React.Profiler id="provider" onRender={onRender}>
++    profiler.start({ timeline: false });
++    try {
++      const { user } = await render(
+         <Drawer.Provider>
+           <ProviderControls />
+         </Drawer.Provider>
+-      </React.Profiler>,
+-    );
+-
+-    onRender.mockClear();
+-    await user.click(screen.getByRole('button', { name: 'Register closed' }));
+-
+-    expect(onRender).not.toHaveBeenCalled();
++      );
++      // Establish that this build observes the provider before checking that
++      // a closed registration causes no new provider render.
++      expect(profiler.why(Drawer.Provider).some((event) => event.type === 'component-render')).toBe(true);
++      profiler.clear();
++      await user.click(screen.getByRole('button', { name: 'Register closed' }));
++      expect(profiler.why(Drawer.Provider).filter((event) => event.type === 'component-render')).toEqual([]);
++    } finally {
++      profiler.stop();
++      profiler.clear();
++    }
+   });
+ 
+   it('synchronizes and restores visual state on Drawer.Indent', async () => {

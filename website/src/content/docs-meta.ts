@@ -5,7 +5,7 @@
 // .mdx sources, so it never pulls compiled components into its bundle.
 // Its import chain must stay MDX-free (the imported catalogs are JSON-backed).
 import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
-import { FRAMEWORK_INTEGRATIONS, FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
+import { FRAMEWORK_INTEGRATION_COUNT } from './framework-integrations.ts';
 
 export interface DocSection {
 	id: string;
@@ -78,20 +78,6 @@ export const docsMeta: DocMeta[] = [
 		title: 'Framework integrations',
 		description: `Use Octane with ${FRAMEWORK_INTEGRATION_COUNT} app frameworks through first-party integrations.`,
 		group: 'Start here',
-		searchTerms: FRAMEWORK_INTEGRATIONS.flatMap((integration) => [
-			integration.title,
-			integration.packageName,
-			integration.model,
-			integration.description,
-			...(integration.packageName === '@octanejs/tanstack-start'
-				? [
-						'@octanejs/tanstack-router',
-						'@octanejs/tanstack-query',
-						'@octanejs/tanstack-form',
-						'TanStack bindings',
-					]
-				: []),
-		]),
 		sections: [
 			{ id: 'choose-a-framework', title: 'Find the right integration' },
 			{ id: 'astro', title: 'Astro islands' },
@@ -153,7 +139,7 @@ export const docsMeta: DocMeta[] = [
 				title: 'Keep editable state in sync with useLinkedState',
 				level: 3,
 			},
-			{ id: 'strong-mode', title: 'Catch state mistakes with Strong mode', level: 3 },
+			{ id: 'strong-mode', title: 'Enforce render snapshots with Strong mode', level: 3 },
 			{ id: 'lists-and-conditions', title: 'Lists and conditions' },
 			{ id: 'context', title: 'Sharing data with context' },
 			{ id: 'refs-and-effects', title: 'Refs and effects' },
@@ -202,6 +188,90 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'api-index', title: 'API index by job' },
 			{ id: 'practice', title: 'Practice' },
 			{ id: 'next-steps', title: 'Next steps' },
+		],
+	},
+	{
+		slug: 'styling',
+		title: 'Styling',
+		description:
+			'Sibling-scoped <style> blocks that style the items beside them and everything below them, class maps with $class, and apply for composing themes.',
+		group: 'Learn Octane',
+		searchTerms: [
+			'scoped styles',
+			'sibling scope',
+			'scoped CSS',
+			'style tag',
+			'style block',
+			'$class',
+			'class map',
+			'theme',
+			'apply',
+			'injectStyle',
+			':global',
+			'CSS',
+		],
+		sections: [
+			{ id: 'scoped-by-default', title: 'A block styles the elements beside it' },
+			{ id: 'fragment', title: 'Wrap the block and its markup in a fragment' },
+			{
+				id: 'static-css',
+				title: 'The CSS is static',
+				searchTerms: ['custom properties'],
+			},
+			{ id: 'scopes', title: 'What a scope is', searchTerms: ['hash class'] },
+			{ id: 'multiple-blocks', title: 'Several blocks, one scope' },
+			{ id: 'control-flow', title: 'Styles inside @if and @for', searchTerms: ['branch'] },
+			{
+				id: 'class-maps',
+				title: 'Assign a block to get a class map',
+				searchTerms: ['$class', 'theme object'],
+			},
+			{ id: 'apply', title: 'Apply a theme to a scope', searchTerms: ['apply', 'compose themes'] },
+			{
+				id: 'global',
+				title: 'Reach outside the scope with :global',
+				searchTerms: [
+					':global',
+					'global styles',
+					'unscoped',
+					'third-party component',
+					'specificity',
+					':where',
+					'CSS_GLOBAL_PLACEMENT',
+				],
+			},
+			{ id: 'global-when', title: 'Which one to use', level: 3 },
+			{ id: 'global-specificity', title: 'How a global rule ranks', level: 3 },
+			{ id: 'global-keyframes', title: 'Global Keyframes', level: 3 },
+			{
+				id: 'ordering',
+				title: 'Which rule wins',
+				searchTerms: ['ordering', 'precedence', 'cascade'],
+			},
+			{
+				id: 'runtime',
+				title: 'Where the CSS goes at runtime',
+				searchTerms: ['injectStyle', 'css field'],
+			},
+			{ id: 'float', title: 'A style with href is a head resource, not a scoped block' },
+			{
+				id: 'diagnostics',
+				title: 'Diagnostics',
+				searchTerms: [
+					'STYLE_APPLY_VALUE',
+					'STYLE_APPLY_TARGET',
+					'STYLE_APPLY_BEFORE_DECLARATION',
+					'STYLE_APPLY_DUPLICATE',
+					'STYLE_APPLY_UNSUPPORTED_HOST',
+					'STYLE_RESERVED_CLASS_KEY',
+					'STYLE_STANDALONE_AT_MODULE_SCOPE',
+					'STYLE_STANDALONE_OUTSIDE_TEMPLATE',
+					'STYLE_STANDALONE_NEEDS_FRAGMENT',
+					'STYLE_UNKNOWN_ATTRIBUTE',
+					'CSS_GLOBAL_PLACEMENT',
+				],
+			},
+			{ id: 'next', title: 'Next' },
 		],
 	},
 	{
@@ -278,16 +348,45 @@ export const docsMeta: DocMeta[] = [
 	{
 		slug: 'react-compat',
 		title: 'React compatibility',
-		description: 'Host compiled Octane islands inside an existing React 19 app with OctaneCompat.',
+		description:
+			'Use OctaneCompat for Octane components inside React, or ReactCompat for real React components inside Octane.',
 		group: 'Explore',
-		searchTerms: ['OctaneCompat', 'octane/react', 'islands', 'migrate', 'interop', 'React 19'],
+		searchTerms: [
+			'OctaneCompat',
+			'ReactCompat',
+			'bridgeReactContext',
+			'octane/react',
+			'octane/react/server',
+			'islands',
+			'migrate',
+			'interop',
+			'React 19',
+			'React 19.2',
+		],
 		sections: [
-			{ id: 'what-is-octanecompat', title: 'What OctaneCompat is' },
+			{ id: 'what-is-octanecompat', title: 'Choose a direction' },
 			{ id: 'set-up', title: 'Set up the toolchain' },
-			{ id: 'render-an-island', title: 'Render an island' },
-			{ id: 'react-context', title: 'Share React context' },
+			{
+				id: 'render-an-island',
+				title: 'Render Octane in React',
+				searchTerms: ['OctaneCompat', 'Octane in React'],
+			},
+			{
+				id: 'render-react-in-octane',
+				title: 'Render React in Octane',
+				searchTerms: ['ReactCompat', 'React in Octane', 'React components', 'React libraries'],
+			},
+			{
+				id: 'react-context',
+				title: 'Share context',
+				searchTerms: ['bridgeReactContext', 'ReactContextBridge', 'context mappings'],
+			},
+			{ id: 'react-context-in-octane', title: 'React context in an Octane island', level: 3 },
+			{ id: 'octane-context-in-react', title: 'Octane context in a React island', level: 3 },
+			{ id: 'state-refs-and-events', title: 'State, refs, and events' },
+			{ id: 'suspense-and-visibility', title: 'Suspense, errors, and visibility' },
 			{ id: 'server-rendering', title: 'Server rendering and hydration' },
-			{ id: 'not-supported', title: "What isn't supported" },
+			{ id: 'not-supported', title: 'Limits' },
 			{ id: 'editor-and-type-checking', title: 'Editor and type checking' },
 			{ id: 'next', title: 'Next' },
 		],
@@ -332,17 +431,39 @@ export const docsMeta: DocMeta[] = [
 		],
 	},
 	{
-		slug: 'bindings',
-		title: 'Bindings',
-		description: `Browse all ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
+		slug: 'browser-support',
+		title: 'Browser support',
+		description: 'Choose browser targets and understand required Web APIs and optional fallbacks.',
 		group: 'Explore',
-		searchTerms: BINDING_CATEGORIES.flatMap((category) => [
-			category.title,
-			category.description,
-			...category.packages,
-		]),
+		searchTerms: [
+			'browser compatibility',
+			'Chromium',
+			'Safari',
+			'WebKit',
+			'Samsung Internet',
+			'WebView',
+		],
 		sections: [
-			{ id: 'find-a-binding', title: 'Pick by the job' },
+			{ id: 'support-policy', title: 'Support policy' },
+			{
+				id: 'required-apis',
+				title: 'Required browser APIs',
+				searchTerms: ['replaceChildren', 'replaceAll', 'queueMicrotask', 'polyfills'],
+			},
+			{ id: 'feature-specific-apis', title: 'Feature-specific requirements' },
+			{ id: 'optional-features', title: 'Features with fallbacks' },
+			{ id: 'build-targets', title: 'Choose a build target' },
+		],
+	},
+	{
+		slug: 'bindings',
+		title: 'Integrations and bindings',
+		description: `Search ${FRAMEWORK_INTEGRATION_COUNT} framework integrations and ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
+		group: 'Explore',
+		searchTerms: BINDING_CATEGORIES.flatMap((category) => [category.title, category.description]),
+		sections: [
+			{ id: 'find-a-binding', title: 'Find an integration or binding' },
+			{ id: 'community-bindings', title: 'Community bindings' },
 			{ id: 'install-and-use', title: 'Install it, then change the import' },
 			{ id: 'check-support', title: 'Check the part you plan to use' },
 		],

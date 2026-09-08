@@ -1,5 +1,99 @@
 # @octanejs/adapter-cloudflare
 
+## 0.0.43
+
+### Patch Changes
+
+- Updated dependencies [aec5373]
+- Updated dependencies [1f19beb]
+- Updated dependencies [ab7bbc1]
+- Updated dependencies [56c850e]
+  - @octanejs/app-core@0.0.49
+
+## 0.0.42
+
+### Patch Changes
+
+- Updated dependencies [ddaa8c5]
+  - @octanejs/app-core@0.0.48
+
+## 0.0.41
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.47
+
+## 0.0.40
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.46
+
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies [8adc693]
+  - @octanejs/app-core@0.0.45
+
+## 0.0.38
+
+### Patch Changes
+
+- Updated dependencies [9dda682]
+  - @octanejs/app-core@0.0.44
+
+## 0.0.37
+
+### Patch Changes
+
+- Updated dependencies [60581f4]
+- Updated dependencies [7a639fd]
+  - @octanejs/app-core@0.0.43
+
+## 0.0.36
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.42
+
+## 0.0.35
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.41
+
+## 0.0.34
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.40
+
+## 0.0.33
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.39
+
+## 0.0.32
+
+### Patch Changes
+
+- Updated dependencies [afa3722]
+  - @octanejs/app-core@0.0.38
+
+## 0.0.31
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.37
+
+## 0.0.30
+
+### Patch Changes
+
+- @octanejs/app-core@0.0.36
+
 ## 0.0.29
 
 ### Patch Changes

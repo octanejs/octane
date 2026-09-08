@@ -8,9 +8,41 @@ import {
 	CoalescedPassiveArtifact,
 	ManyPassiveEffects,
 	PassiveBeforeCascadeRender,
+	LayoutBeforeObserver,
+	openLayoutPanel,
 } from './_fixtures/effect-timing.tsrx';
 
 describe('effect timing', () => {
+	it.each(['event', 'scheduled'])(
+		'commits %s layout-derived state before notifying DOM mutation observers',
+		async (mode) => {
+			const rendered = mount(LayoutBeforeObserver);
+			const panel = rendered.container.querySelector('[data-testid="panel"]') as HTMLElement;
+			const observedHeights: string[] = [];
+			let observed!: () => void;
+			const firstObservation = new Promise<void>((resolve) => {
+				observed = resolve;
+			});
+			const observer = new MutationObserver(() => {
+				if (panel.hasAttribute('data-open')) {
+					observedHeights.push(panel.style.height);
+					observed();
+				}
+			});
+			observer.observe(panel, { attributes: true });
+			try {
+				if (mode === 'event') rendered.container.querySelector('button')!.click();
+				else openLayoutPanel();
+				await firstObservation;
+				expect(observedHeights.length).toBeGreaterThan(0);
+				expect(observedHeights.every((height) => height === '160px')).toBe(true);
+			} finally {
+				observer.disconnect();
+				rendered.unmount();
+			}
+		},
+	);
+
 	it('phase order on mount: insertion → layout (sync) → passive (post-paint)', async () => {
 		const log: string[] = [];
 		const r = mount(PhaseOrder, { tick: 0, log });
@@ -43,20 +75,15 @@ describe('effect timing', () => {
 		r.unmount();
 	});
 
-	it('unmount destroys insertion+layout in declaration order sync; passive deferred', async () => {
-		// React's deletion contract (commitDeletionEffectsOnFiber): the deleted
-		// fiber's effect list is walked FORWARD (hook declaration order), firing
-		// insertion and layout destroys synchronously in their declared
-		// interleaving; passive destroys are deferred to the passive flush
-		// (commitPassiveUnmountEffects). The PhaseOrder fixture declares
-		// useEffect → useLayoutEffect → useInsertionEffect, so the sync walk
-		// yields layout → insertion, and the passive cleanup lands post-paint.
+	it('root unmount finishes insertion, layout, and passive cleanups before returning', async () => {
+		// Mutation cleanups run in declaration order; root unmount then drains
+		// deferred passive deletion work before returning.
 		const log: string[] = [];
 		const r = mount(PhaseOrder, { tick: 0, log });
 		await nextPaint();
 		log.length = 0;
 		r.unmount();
-		expect(log).toEqual(['lay:cleanup', 'ins:cleanup']);
+		expect(log).toEqual(['lay:cleanup', 'ins:cleanup', 'eff:cleanup']);
 		await nextPaint();
 		expect(log).toEqual(['lay:cleanup', 'ins:cleanup', 'eff:cleanup']);
 	});
@@ -191,15 +218,14 @@ describe('effect timing', () => {
 		r.unmount();
 	});
 
-	it('within a single phase, cleanups fire in declaration order on unmount (deferred for passive)', async () => {
+	it('within a single phase, root unmount cleanups fire in declaration order', async () => {
 		// Mirrors React's per-fiber unmount-cleanup contract: the fiber's effect
 		// list is walked FORWARD on deletion (commitHookEffectListUnmount starts
 		// at firstEffect), so multiple effects in the same phase destroy in
 		// declaration order — first-declared cleanup runs first (per
 		// ReactHooksWithNoopRenderer-test.js "unmounts all previous effects
 		// before creating any new ones": Unmount A before Unmount B). These are
-		// passive effects, so the destroys fire in the deferred passive flush,
-		// not synchronously at unmount.
+		// passive effects, and root unmount drains their deletion phase before returning.
 		const log: string[] = [];
 		const r = mount(ManyPassiveEffects, { log });
 		await nextPaint();
@@ -207,7 +233,7 @@ describe('effect timing', () => {
 
 		log.length = 0;
 		r.unmount();
-		expect(log).toEqual([]);
+		expect(log).toEqual(['A:cleanup', 'B:cleanup', 'C:cleanup']);
 		await nextPaint();
 		expect(log).toEqual(['A:cleanup', 'B:cleanup', 'C:cleanup']);
 	});

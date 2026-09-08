@@ -1,72 +1,109 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import * as ServerRT from 'octane/server';
 import { mount } from './_helpers';
 import { hydrateRoot, flushSync } from '../src/index.js';
 import { ConcatCount, Labelled } from './_fixtures/known-string.tsrx';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 
-// A dynamic text hole `{expr}` is classified as TEXT (an `htext` binding) vs a
-// RENDERABLE child (`textSlot`) by `isKnownStringExpression` in the compiler.
-// The explicit `{expr as string}` cast forces TEXT, but it is UNNECESSARY when
-// the compiler can already prove the value is a string — a string literal, a
-// template literal, or a `+`-concatenation involving a string. These tests pin
-// that the cast is optional in exactly those provably-string shapes, and still
-// required for values the (syntactic) compiler can't prove (bare identifier /
-// member access), which stay renderable holes.
+// Text can be authored without a cast when its expression is already a string.
+// Unknown values still retain renderable semantics (arrays flatten, booleans
+// disappear). Exercise those outcomes rather than a particular emitted helper.
+const compileOptions = {
+	hmr: false,
+	dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod',
+};
 
-function classify(holeOrSetup: string, hole?: string): 'text' | 'renderable' | string {
-	const setup = hole === undefined ? '' : holeOrSetup;
-	const theHole = hole === undefined ? holeOrSetup : hole;
-	const src = `import { useState } from 'octane';
-		export function C(props) @{ const [n, setN] = useState(0); ${setup} <p>${theHole}</p> }`;
-	const code = compile(src, 'ks.tsrx').code;
-	// A text hole mounts via `htext`; a renderable `{expr}` hole goes through the
-	// inline text-hole path (`textHole`, template bodies) or the `textSlot` wrapper
-	// (noTemplate bodies).
-	const isText = /htext\(/.test(code);
-	const isChild = /childTextHole\(|textHole\(|textSlot\(/.test(code);
-	if (isText && !isChild) return 'text';
-	if (isChild && !isText) return 'renderable';
-	return `ambiguous(htext=${isText},renderable=${isChild})`;
-}
-
-describe('text holes — `as string` cast is optional when provably a string', () => {
-	it('`+`-concatenation with a string literal → text (no cast)', () => {
-		expect(classify(`{'Count: ' + n}`)).toBe('text');
+describe('dynamic text authoring', () => {
+	it.each([
+		['left string concatenation', '', `{'Count: ' + n}`, 'Count: 0', 'Count: 1'],
+		['right string concatenation', '', `{n + ' items'}`, '0 items', '1 items'],
+		['template literal', '', '{`Count: ${n}`}', 'Count: 0', 'Count: 1'],
+		['concatenated member', '', `{'Hi ' + props.name}`, 'Hi Ada', 'Hi Grace'],
+		[
+			'string conditional',
+			'',
+			`{n === 1 ? ' item left' : ' items left'}`,
+			' items left',
+			' item left',
+		],
+		['mixed conditional', '', `{n === 1 ? ' item left' : props.label}`, 'zero!', ' item left'],
+		['explicit text cast', '', '{n as string}', '0', '1'],
+		['numeric identifier', '', '{n}', '0', '1'],
+		['renderable member', '', '{props.label}', 'zero!', 'one!'],
+		[
+			'tracked concatenation',
+			`const greeting = 'Hi ' + props.name;`,
+			'{greeting}',
+			'Hi Ada',
+			'Hi Grace',
+		],
+		['typed local', 'const label: string = props.x;', '{label}', 'first', 'second'],
+		['chained string locals', `const a = 'x'; const b = a + props.y;`, '{b}', 'xA', 'xB'],
+		['numeric local', 'const count = 5;', '{count}', '5', '5'],
+		[
+			'reassigned local',
+			`let label: unknown = 'first'; if (n === 1) label = props.label;`,
+			'{label}',
+			'first',
+			'one!',
+		],
+	])('renders and updates %s', (_name, setup, hole, first, second) => {
+		const source = `import { useState } from 'octane';
+			export function C(props) @{
+				const [n, setN] = useState(0);
+				${setup}
+				<div><button onClick={() => setN(n + 1)}>Next</button><p>${hole}</p></div>
+			}`;
+		const { C } = loadCompiledFixtureSource(source, {
+			id: 'known-string.tsrx',
+			mode: 'client',
+			compileOptions,
+		});
+		const root = mount(C, { name: 'Ada', label: ['zero', '!'], x: 'first', y: 'A' });
+		try {
+			expect(root.find('p').textContent).toBe(first);
+			root.click('button');
+			root.update(C, { name: 'Grace', label: ['one', '!'], x: 'second', y: 'B' });
+			expect(root.find('p').textContent).toBe(second);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('`+`-concatenation in either operand order → text (no cast)', () => {
-		expect(classify(`{n + ' items'}`)).toBe('text');
+	it('keeps renderable semantics when a loop shadows a string local', () => {
+		const { C } = loadCompiledFixtureSource(
+			`
+			export function C(props) @{
+				const item = 'outer';
+				<ul>@for (const item of props.items; key item) { <li>{item}</li> }</ul>
+			}`,
+			{ id: 'shadow.tsrx', mode: 'client', compileOptions },
+		);
+		const root = mount(C, { items: [true, false, 'word'] });
+		try {
+			expect(root.findAll('li').map((node) => node.textContent)).toEqual(['', '', 'word']);
+			root.update(C, { items: ['word', false, true] });
+			expect(root.findAll('li').map((node) => node.textContent)).toEqual(['word', '', '']);
+		} finally {
+			root.unmount();
+		}
 	});
 
-	it('template literal → text (no cast)', () => {
-		expect(classify('{`Count: ${n}`}')).toBe('text');
-	});
-
-	it('string literal `+` a member access → text (no cast)', () => {
-		expect(classify(`{'Hi ' + props.name}`)).toBe('text');
-	});
-
-	it('conditional with two string arms → text (no cast)', () => {
-		expect(classify(`{n === 1 ? ' item left' : ' items left'}`)).toBe('text');
-	});
-
-	it('conditional with an unproven arm stays renderable', () => {
-		expect(classify(`{n === 1 ? ' item left' : props.label}`)).toBe('renderable');
-	});
-
-	it('explicit `as string` cast → text', () => {
-		expect(classify('{n as string}')).toBe('text');
-	});
-
-	it('bare identifier (not provably a string) → renderable hole; cast still required', () => {
-		expect(classify('{n}')).toBe('renderable');
-	});
-
-	it('bare member access (not provably a string) → renderable hole; cast still required', () => {
-		expect(classify('{props.name}')).toBe('renderable');
+	it('renders and updates a string-typed parameter without a cast', () => {
+		const { C } = loadCompiledFixtureSource('export function C(name: string) @{ <p>{name}</p> }', {
+			id: 'param.tsrx',
+			mode: 'client',
+			compileOptions,
+		});
+		const root = mount(C, 'first');
+		try {
+			expect(root.find('p').textContent).toBe('first');
+			root.update(C, 'second');
+			expect(root.find('p').textContent).toBe('second');
+		} finally {
+			root.unmount();
+		}
 	});
 });
 
@@ -80,52 +117,6 @@ describe('known-string concat hole renders + updates at runtime (no cast)', () =
 	});
 });
 
-// A bare identifier hole `{x}` is normally a renderable hole, but when `x` is a
-// setup `const` the compiler can track back to a string (a provably-string
-// initializer, a `: string` annotation, or a `string`-typed param), it becomes a
-// text binding too — so the `as string` cast is unnecessary for tracked locals.
-// Render scopes that re-bind the name (a `@for` loop var) are excluded so the
-// inner hole is never misclassified.
-describe('text holes — bare identifier tracked back to a string (no cast)', () => {
-	it('const bound to a `+`-concat → text', () => {
-		expect(classify(`const greeting = 'Hi ' + props.name;`, '{greeting}')).toBe('text');
-	});
-
-	it('const with a `: string` annotation → text', () => {
-		expect(classify(`const label: string = props.x;`, '{label}')).toBe('text');
-	});
-
-	it('a chain of string consts → text', () => {
-		expect(classify(`const a = 'x'; const b = a + props.y;`, '{b}')).toBe('text');
-	});
-
-	it('a non-string const stays a renderable hole', () => {
-		expect(classify(`const count = 5;`, '{count}')).toBe('renderable');
-	});
-
-	it('a `let` (not const) is not tracked → renderable', () => {
-		expect(classify(`let s = 'x';`, '{s}')).toBe('renderable');
-	});
-
-	it('SHADOW GUARD: a `@for` loop var shadowing a string const is NOT treated as text', () => {
-		const src = `import { useState } from 'octane';
-			export function C(props) @{
-				const item = 'outer';
-				<ul>@for (const item of props.items; key item) { <li>{item}</li> } </ul>
-			}`;
-		const code = compile(src, 'shadow.tsrx').code;
-		// The inner {item} is the loop var, so it must be a renderable child (inline
-		// text-hole / textSlot), not a text binding stamped from the outer `const
-		// item` string.
-		expect(/childTextHole\(|textHole\(|textSlot\(/.test(code)).toBe(true);
-	});
-
-	it('`string`-typed param → text', () => {
-		const code = compile(`export function C(name: string) @{ <p>{name}</p> }`, 'param.tsrx').code;
-		expect(/htext\(/.test(code) && !/childTextHole\(|textHole\(|textSlot\(/.test(code)).toBe(true);
-	});
-});
-
 describe('tracked-identifier hole renders + updates at runtime (no cast)', () => {
 	it('renders the tracked const as text and reacts to state', () => {
 		const r = mount(Labelled as any);
@@ -136,27 +127,18 @@ describe('tracked-identifier hole renders + updates at runtime (no cast)', () =>
 	});
 });
 
-// The strongest cross-cutting check: server and client MUST classify a tracked
-// identifier hole identically, or the SSR markup wouldn't line up for hydration.
-// collectKnownStringLocals runs on both compile paths, so they agree by
-// construction — verify the round-trip adopts the server node and stays live.
+// Tracked string values adopt their server DOM and retain live state updates,
+// independently of how either compiler represents the text binding.
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/known-string.tsrx');
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'known-string.tsrx', { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, {});
+	return loadServerFixture(FIXTURE);
 }
 
-describe('tracked-identifier hole hydrates (server + client classify identically)', () => {
+describe('tracked text hydration', () => {
 	it('adopts the server text node for a tracked `{label}` hole and stays interactive', async () => {
 		const server = serverModule();
 		const { html } = await ServerRT.renderToString(server.Labelled, {});
-		expect(html).toContain('<button>n=0</button>'); // server emitted it as TEXT
+		expect(html).toContain('<button>n=0</button>');
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "policy": "intentional-workspace-oracle",
+  "notes": "The pinned upstream package.json ranges React 19.0.0 / Testing Library 16.2.0 / happy-dom 17.1.3, but the pristine bun suite intentionally runs against this workspace-selected oracle graph so React/Testing Library stay aligned with the rest of the monorepo. Versions below are enforced at pristine-run time against packages/alien-signals/node_modules.",
+  "upstreamDeclaredRanges": {
+    "react": ">=18 (peer; package.json pins react-dom ^19.0.0 and @types/react ^19.0.10)",
+    "@testing-library/react": "^16.2.0",
+    "@happy-dom/global-registrator": "^17.1.3"
+  },
+  "packages": {
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "@testing-library/react": "16.3.2",
+    "@happy-dom/global-registrator": "20.11.2",
+    "@testing-library/jest-dom": "6.9.1"
+  }
+}

@@ -2,6 +2,13 @@
 
 [TanStack Table v9](https://tanstack.com/table) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/tanstack-table
+pnpm add @octanejs/tanstack-table
+```
+
 TanStack Table v9 separates a framework-agnostic core (`@tanstack/table-core`:
 `constructTable` plus tree-shakeable features — sorting, filtering, pagination,
 selection, visibility, expanding, grouping, faceting, …) from a thin framework
@@ -94,6 +101,47 @@ opt in lower down with `table.Subscribe`:
   {(rowSelection) => <span>…</span>}
 </table.Subscribe>
 ```
+
+## Strong-mode snapshot boundaries
+
+This binding is pinned to `@tanstack/react-table@9.0.0-beta.58`. In that v9
+adapter, `useTable` returns a reactive wrapper whose `state` and `options` are
+fresh for the current render, while table-core row, header, and column objects
+remain stable live objects. A compatibility component may read their methods
+when its subscription rerenders it. Do not pass one of those objects into a
+Strong component and call `row.getIsSelected()` or
+`header.column.getIsSorted()` there: unchanged object identity is not an
+immutable snapshot.
+
+Subscribe and select on the compatibility side, then pass the selected value
+through the Strong boundary:
+
+```tsx
+// Compatibility module
+function SelectionBridge({ table, row }) @{
+  <table.Subscribe
+    source={table.atoms.rowSelection}
+    selector={(selection) => !!selection[row.id]}
+  >
+    {(selected) => <StrongRow label={row.original.name} selected={selected} />}
+  </table.Subscribe>
+}
+```
+
+```tsx
+// StrongRow.tsrx
+"use strong";
+
+function StrongRow({ label, selected }) @{
+  <li data-selected={selected ? '1' : '0'}>{label}</li>
+}
+```
+
+The conformance suite exercises this handoff with inline `.map`, keyed `@for`,
+and an extracted compatibility subscriber. It asserts selected and sorted
+output plus keyed DOM identity in development and production compilation.
+Shallow-copying a row or forcing a render without selecting the changing value
+does not create a snapshot and is intentionally unsupported in Strong mode.
 
 ## Composition with `createTableHook`
 

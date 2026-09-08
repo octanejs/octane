@@ -5,12 +5,13 @@ import { useIsPanorama } from '../context/PanoramaContext';
 import { selectChartLayout } from '../context/chartLayoutContext';
 import { useAppDispatch, useAppSelector } from './hooks';
 import { addLegendPayload, replaceLegendPayload, removeLegendPayload } from './legendSlice';
+import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
 
-export function SetLegendPayload(props: { legendPayload: unknown }): null {
+export function SetLegendPayload(props: { legendPayload: ReadonlyArray<LegendPayload> }): null {
 	const { legendPayload } = props;
 	const dispatch = useAppDispatch();
 	const isPanorama = useIsPanorama();
-	const prevPayloadRef = useRef<unknown>(null);
+	const prevPayloadRef = useRef<ReadonlyArray<LegendPayload> | null>(null);
 	useLayoutEffect(() => {
 		if (isPanorama) {
 			return;
@@ -33,11 +34,13 @@ export function SetLegendPayload(props: { legendPayload: unknown }): null {
 	return null;
 }
 
-export function SetPolarLegendPayload(props: { legendPayload: unknown }): null {
+export function SetPolarLegendPayload(props: {
+	legendPayload: ReadonlyArray<LegendPayload>;
+}): null {
 	const { legendPayload } = props;
 	const dispatch = useAppDispatch();
 	const layout = useAppSelector(selectChartLayout);
-	const prevPayloadRef = useRef<unknown>(null);
+	const prevPayloadRef = useRef<ReadonlyArray<LegendPayload> | null>(null);
 	useLayoutEffect(() => {
 		if (layout !== 'centric' && layout !== 'radial') {
 			return;

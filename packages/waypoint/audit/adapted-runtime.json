@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "project": "waypoint",
+  "roots": ["packages/waypoint/tests"],
+  "files": [
+    "packages/waypoint/tests/hydration/hydration.test.ts",
+    "packages/waypoint/tests/waypoint.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:waypoint:0001",
+      "file": "packages/waypoint/tests/hydration/hydration.test.ts",
+      "fullName": "@octanejs/waypoint hydration adopts default and custom server marker nodes"
+    },
+    {
+      "id": "runtime:waypoint:0002",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "Waypoint accepts scrollableAncestor=\"window\" for SSR-safe window targeting"
+    },
+    {
+      "id": "runtime:waypoint:0003",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "Waypoint clones a single child and attaches the measurement ref"
+    },
+    {
+      "id": "runtime:waypoint:0004",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "Waypoint does not re-fire onEnter when the measured host remounts still inside"
+    },
+    {
+      "id": "runtime:waypoint:0005",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "Waypoint exposes the upstream position statics"
+    },
+    {
+      "id": "runtime:waypoint:0006",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "Waypoint keeps a cloned child ref attached across updates"
+    },
+    {
+      "id": "runtime:waypoint:0007",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "Waypoint remeasures after an update when layout moves without scrolling"
+    },
+    {
+      "id": "runtime:waypoint:0008",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "Waypoint reports initial entry and leaves on scroll"
+    },
+    {
+      "id": "runtime:waypoint:0009",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "Waypoint synthesizes enter and leave when a scroll skips across the viewport"
+    },
+    {
+      "id": "runtime:waypoint:0010",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "geometry applies window-relative percentage offsets"
+    },
+    {
+      "id": "runtime:waypoint:0011",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "geometry classifies a zero-height viewport as invisible"
+    },
+    {
+      "id": "runtime:waypoint:0012",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "geometry classifies above, inside, and below bounds"
+    },
+    {
+      "id": "runtime:waypoint:0013",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "geometry converts pixel and percentage offsets"
+    },
+    {
+      "id": "runtime:waypoint:0014",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "geometry resolves the string window ancestor prop to window"
+    },
+    {
+      "id": "runtime:waypoint:0015",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "geometry sizes non-window ancestors with offsetWidth/offsetHeight for percentage offsets"
+    },
+    {
+      "id": "runtime:waypoint:0016",
+      "file": "packages/waypoint/tests/waypoint.test.ts",
+      "fullName": "geometry uses window for body and document scrolling"
+    }
+  ]
+}

@@ -131,6 +131,34 @@ export function SuspenseEffectOrderApp(props) @{
 	}
 }
 
+function RawRootSuspensionReader(props: { read: () => string }) @{
+	const value = props.read();
+	<strong id="raw-root-suspension-reader">{'resource:' + value}</strong>
+}
+
+export function RawRootSuspensionAfterSiblingApp(props: { label: string; read: () => string }) @{
+	<section id="raw-root-suspension-shell">
+		<span id="raw-root-suspension-label" title={props.label}>{props.label}</span>
+		<RawRootSuspensionReader read={props.read} />
+	</section>
+}
+
+function RootSuspensionReader(props: { promise: PromiseLike<string> }) @{
+	const value = use(props.promise);
+	<strong id="root-suspension-reader">{'resource:' + value}</strong>
+}
+
+export function RootSuspensionAfterSiblingApp(props: {
+	label: string;
+	promise: PromiseLike<string>;
+}) @{
+	<section id="root-suspension-shell">
+		<span id="root-suspension-label" title={props.label}>{props.label}</span>
+		<input id="root-suspension-draft" defaultValue="initial" />
+		<RootSuspensionReader promise={props.promise} />
+	</section>
+}
+
 function AsyncRoute(props) @{
 	const value = use(props.promise);
 	<main id="preserved-route">{'route:' + value}</main>

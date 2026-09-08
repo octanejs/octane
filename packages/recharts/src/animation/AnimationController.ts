@@ -1,73 +1,25 @@
-// Port of animation/AnimationController.ts — upstream ships this module as
-// types only (its compiled `es6/animation/AnimationController.js` is `export {}`),
-// so the vendoring pass that copies recharts' compiled JS skipped it and left
-// `CSSTransitionAnimate` importing a module that does not exist.
-//
-// `TimeoutController`, `CallbackType` and `CancelableTimeout` live in
-// `animation/timeoutController.ts` upstream, and `AnimationHandle` is exported
-// as a type from `animation/AnimationHandle.ts`. Both of those modules are
-// vendored here as compiled `.js`, which carries their runtime classes but
-// erases every type-only export, so they cannot be imported by name yet. They
-// are co-located here until those two modules are typed; move them back to
-// their upstream homes at that point rather than growing this module.
-import type { CSSTransitionAnimation, JavascriptAnimation } from './AnimationHandle';
+// Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
+import type { CancelableTimeout, TimeoutController } from './timeoutController';
+import { AnimationHandle } from './AnimationHandle';
 
 /**
- * Callback type for the timeout function.
- * Receives current time as an argument.
- */
-export type CallbackType = (now: number) => void;
-
-/**
- * A function that, when called, cancels the timeout.
- *
- * @since 3.9
- */
-export type CancelableTimeout = () => void;
-
-/**
- * TimeoutController is responsible for controlling the movement of time.
- * Think of it as a clock.
- *
- * Recharts default implementation uses requestAnimationFrame which works great
- * in a browser. You may choose to override this which is especially useful if
- * you want to control animations.
+ * JavaScript animations produce numbers and CSS transitions produce strings.
+ * Keep the listener's value type tied to the supplied animation handle.
  *
  * @see {@link https://recharts.github.io/en-US/guide/animations/ Animation guide}
  *
  * @since 3.9
  */
-export interface TimeoutController {
-	/**
-	 * Sets a timeout that executes a callback after a specified delay.
-	 * Allows setting multiple timeouts and provides a way to cancel them
-	 * independently.
-	 *
-	 * The input (`delay`) is relative — "wait for this long". The output (`now`,
-	 * the callback's parameter) is absolute — "this is the time now".
-	 */
-	setTimeout(callback: CallbackType, delay?: number): CancelableTimeout;
-}
+export type OnAnimationStateUpdate<T extends number | string = number | string> = (
+	newState: T,
+) => void;
 
-/**
- * Recharts animation state machine.
- *
- * @see {@link https://recharts.github.io/en-US/guide/animations/ Animation guide}
- *
- * @since 3.9
- */
-export type AnimationHandle = JavascriptAnimation | CSSTransitionAnimation;
-
-/**
- * It's actually always the case that JavaScript-based animations produce numbers,
- * and CSS transition-based animations always produce strings,
- * but it's so much easier to just have them together than to deal with all the generics.
- *
- * @see {@link https://recharts.github.io/en-US/guide/animations/ Animation guide}
- *
- * @since 3.9
- */
-export type OnAnimationStateUpdate = (newState: number | string) => void;
+export type AnimationControllerHandle<T extends number | string> = Omit<
+	AnimationHandle,
+	'getInterpolated'
+> & {
+	getInterpolated(): T;
+};
 
 /**
  * AnimationController accepts the animation state machine (= RechartsAnimation) plus a timeout controller,
@@ -83,8 +35,8 @@ export type OnAnimationStateUpdate = (newState: number | string) => void;
  *
  * @since 3.9
  */
-export type AnimationController = (
+export type AnimationController = <T extends number | string>(
 	timeoutController: TimeoutController,
-	animationHandle: AnimationHandle,
-	listener: OnAnimationStateUpdate,
+	animationHandle: AnimationControllerHandle<T>,
+	listener: OnAnimationStateUpdate<T>,
 ) => CancelableTimeout;

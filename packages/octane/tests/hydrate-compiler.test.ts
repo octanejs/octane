@@ -92,6 +92,18 @@ function runtimeExports(code: string): Set<string> {
 	return names;
 }
 
+function topLevelRuntimeBindings(code: string): string[] {
+	const names: string[] = [];
+	for (const node of parseModule(code, 'compiled.js').body as any[]) {
+		const declaration = node.type === 'ExportNamedDeclaration' ? node.declaration : node;
+		if (declaration?.id?.name) names.push(declaration.id.name);
+		for (const item of declaration?.declarations ?? []) {
+			if (item.id?.type === 'Identifier') names.push(item.id.name);
+		}
+	}
+	return names;
+}
+
 function hasReExport(code: string, request: string): boolean {
 	return (parseModule(code, 'compiled.js').body as any[]).some(
 		(node) => node.type === 'ExportNamedDeclaration' && node.source?.value === request,
@@ -350,6 +362,70 @@ export function App(props) @{
 		})!;
 		expect(staticImportLocals(child.code, './review-data.js')).toEqual(['reviewPrefix']);
 		expect(child.code).toContain('reviewPrefix + label');
+	});
+
+	it('keeps sibling split declarations isolated and dependency-ordered', () => {
+		const source = `
+import { Hydrate } from 'octane';
+const firstPrefix = 'first:';
+const firstLabel = firstPrefix + 'item';
+function First() @{ <span>{firstLabel}</span> }
+const secondPrefix = 'second:';
+const secondLabel = secondPrefix + 'item';
+function Second() @{ <span>{secondLabel}</span> }
+export function App() @{
+  <>
+    <Hydrate when={gate}><First /></Hydrate>
+    <Hydrate when={gate}><Second /></Hydrate>
+  </>
+}
+`;
+		const instance = compiler();
+		const root = instance.transform(source, FILE, { environment: 'client' })!;
+		expect(root.code).not.toContain("'first:'");
+		expect(root.code).not.toContain("'second:'");
+
+		const first = instance.transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		expect(first.code).toContain("'first:'");
+		expect(first.code).not.toContain("'second:'");
+		const firstBindings = topLevelRuntimeBindings(first.code);
+		expect(firstBindings.indexOf('firstPrefix')).toBeLessThan(firstBindings.indexOf('firstLabel'));
+		expect(firstBindings.indexOf('firstLabel')).toBeLessThan(firstBindings.indexOf('First'));
+
+		const second = instance.transform(source, `${FILE}?octane-hydrate=1`, {
+			environment: 'client',
+		})!;
+		expect(second.code).toContain("'second:'");
+		expect(second.code).not.toContain("'first:'");
+		const secondBindings = topLevelRuntimeBindings(second.code);
+		expect(secondBindings.indexOf('secondPrefix')).toBeLessThan(
+			secondBindings.indexOf('secondLabel'),
+		);
+		expect(secondBindings.indexOf('secondLabel')).toBeLessThan(secondBindings.indexOf('Second'));
+
+		const server = instance.transform(source, FILE, { environment: 'server' })!;
+		expect(server.code).toContain("'first:'");
+		expect(server.code).toContain("'second:'");
+	});
+
+	it('keeps a module declaration eager when an ancestor binding shadows it', () => {
+		const source = `
+import { Hydrate } from 'octane';
+const label = setupLabel();
+export function App(label) @{
+  <Hydrate when={true}><span>{label}</span></Hydrate>
+}
+`;
+		const instance = compiler();
+		const root = instance.transform(source, FILE, { environment: 'client' })!;
+		expect(root.code).toContain('setupLabel()');
+
+		const child = instance.transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		expect(child.code).not.toContain('setupLabel()');
 	});
 
 	it('keeps a same-module child eager when retained output also references it', () => {
@@ -887,8 +963,18 @@ export function App() @{
 		const serverCode = compile(source, FILE, { hmr: false, mode: 'server' }).code;
 		expect(hasStaticImport(clientCode, './StaticNavigation.tsrx')).toBe(false);
 		expect(clientCode).not.toContain('StaticNavigation');
-		expect(clientCode).toContain('.host.tsrx-');
-		expect(clientCode).toContain('live tsrx-');
+		// The erased children still own their sheet on the client, under the
+		// server's hash. The block's scope is the boundary's children list: the
+		// server stamps the static section and keeps `.static`, while `.host`
+		// (the container, outside the scope) prunes on both sides; the client
+		// never renders the erased section, so its copy prunes `.static` too —
+		// hydration adopts the server's sheet by hash. The live sibling outside
+		// the boundary carries no hash on either side.
+		expect(serverCode).toContain('/* (unused) .host,*/ .static.tsrx-');
+		expect(serverCode).toContain('static tsrx-');
+		expect(clientCode).toContain('/* (unused) .host, .static { color: red; }*/');
+		expect(clientCode).not.toContain('live tsrx-');
+		expect(serverCode).not.toContain('live tsrx-');
 		expect(hashes(clientCode).size).toBeGreaterThan(0);
 		expect(hashes(clientCode)).toEqual(hashes(serverCode));
 	});
@@ -916,7 +1002,7 @@ export function App() @{
 		},
 		{
 			code: 'OCTANE_HYDRATE_SPLIT_STYLE',
-			source: `import { Hydrate } from 'octane'; export function App() @{ <Hydrate when={gate}><div class="x"><style>.x { color: red; }</style></div></Hydrate> }`,
+			source: `import { Hydrate } from 'octane'; export function App() @{ <div><style>.x { color: red; }</style><p class="x">out</p><Hydrate when={gate}><span class="x">in</span></Hydrate></div> }`,
 		},
 	])('reports unsupported extraction as $code', ({ source, code }) => {
 		let thrown: any = null;
@@ -957,6 +1043,85 @@ export function App() @{
 }
 `;
 		expect(() => compiler().transform(source, FILE, { environment: 'client' })).not.toThrow();
+	});
+
+	it('compiles a complete style scope that sits entirely inside a split child', () => {
+		// Plan S8.5: the block and the hosts it stamps are all inside the
+		// boundary, so both compiles keep the authored-position hash.
+		const source = `
+import { Hydrate } from 'octane';
+export function App() @{
+  <Hydrate when={gate}>
+    <div>
+      <style>.x { color: red; }</style>
+      <span class="x">inside</span>
+    </div>
+  </Hydrate>
+}
+`;
+		const hashes = (code: string) => new Set(code.match(/tsrx-[0-9a-z]+/g) ?? []);
+		const instance = compiler();
+		const parent = instance.transform(source, FILE, { environment: 'client' })!;
+		const child = instance.transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		const server = instance.transform(source, FILE, { environment: 'server' })!;
+		expect(dynamicImports(parent.code)).toEqual(new Set(['./App.tsrx?octane-hydrate=0']));
+		expect(hashes(child.code).size).toBeGreaterThan(0);
+		expect(hashes(child.code)).toEqual(hashes(server.code));
+		expect(child.code).toContain('.x.tsrx-');
+		expect(server.code).toContain('.x.tsrx-');
+		expect(server.code).toContain('class="x tsrx-');
+	});
+
+	it('rejects a style scope that straddles a split boundary', () => {
+		const source = `
+import { Hydrate } from 'octane';
+export function App() @{
+  <div>
+    <style>.x { color: red; }</style>
+    <p class="x">outside</p>
+    <Hydrate when={gate}>
+      <span class="x">inside</span>
+    </Hydrate>
+  </div>
+}
+`;
+		let thrown: any = null;
+		try {
+			compiler().transform(source, FILE, { environment: 'client' });
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toMatchObject({ code: 'OCTANE_HYDRATE_SPLIT_STYLE', filename: '/src/App.tsrx' });
+		expect(thrown.message).toContain('straddle a split Hydrate boundary');
+		expect(thrown.message).toContain('split={false}');
+	});
+
+	it('rejects a style scope that straddles a split boundary through a namespaced host', () => {
+		// A namespaced host is stamped by the style-scope pass. If the
+		// straddle check missed it, a parent-list <style> would extract
+		// while the server still stamped the host — disagreeing class lists.
+		const source = `
+import { Hydrate } from 'octane';
+export function App() @{
+  <div>
+    <style>.x { color: red; }</style>
+    <Hydrate when={gate}>
+      <svg:rect class="x" />
+    </Hydrate>
+  </div>
+}
+`;
+		let thrown: any = null;
+		try {
+			compiler().transform(source, FILE, { environment: 'client' });
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toMatchObject({ code: 'OCTANE_HYDRATE_SPLIT_STYLE', filename: '/src/App.tsrx' });
+		expect(thrown.message).toContain('straddle a split Hydrate boundary');
+		expect(thrown.message).toContain('split={false}');
 	});
 
 	it('permits scoped styles under split={false} and inside nested split-child functions', () => {

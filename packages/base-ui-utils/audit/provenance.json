@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/utils-0.4.0.tgz",
+      "sha256": "2d29d6ec16ae3b79e50644b01023fb37d318dd89461df31c8825baadab740258"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "07fc1b39d69d14bc7d40482a628f47226258eb01265db68ae684944b916beb2a"
+    }
+  ],
+  "requiredFiles": [
+    "audit/upstream.lock.json",
+    "tests/types/published-contract.ts",
+    "tsconfig.pristine-specs.json",
+    "tsconfig.adapted-specs.json"
+  ],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@base-ui/utils",
+    "version": "0.4.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "upstream", "upstream-artifact"]
+}

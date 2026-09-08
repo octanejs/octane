@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'octane';
 
 import { getActiveElement, getEventTarget } from './shadowdom/DOMFunctions';
-import { isIOS } from './platform';
+import { isIOS, isWebKit } from './platform';
 import { S, splitSlot, subSlot } from '../internal';
 import { useIsSSR } from '../ssr/SSRProvider';
 import { willOpenKeyboard } from './keyboard';
@@ -75,7 +75,7 @@ export function useViewportSize(...args: any[]): ViewportSize {
 
 			updateSize(getViewportSize());
 
-			if (isIOS()) {
+			if (isIOS() && isWebKit()) {
 				window.addEventListener('blur', onBlur, true);
 			}
 
@@ -87,7 +87,7 @@ export function useViewportSize(...args: any[]): ViewportSize {
 
 			return () => {
 				cancelAnimationFrame(frame);
-				if (isIOS()) {
+				if (isIOS() && isWebKit()) {
 					window.removeEventListener('blur', onBlur, true);
 				}
 				if (!visualViewport) {

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-db",
+    "version": "0.1.96",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "db",
+      "subdirectory": "packages"
+    },
+    "commit": "2c35b5883907b4e9f155f849f92d6ebe0602e0f3",
+    "integrity": "sha512-NIjRiFH9KqNnWRtixFal22KA+9b2ktBxI7TbW7xIVa2/sKOHSxFcPAkz6HEC3V7O9PfDTh3j8aezj02CxjHrLw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "dd5fd3a2e8ca256521b80e46d7fb0aa953c842ef1420fb31f4b1f08ae31d82e7"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["react-db/package.json", "react-db/src"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "react-db/package.json",
+      "gitBlob": "9c84f9ea43afa4d86cbe71de5a40ff876690f78f",
+      "size": 1574
+    },
+    {
+      "path": "react-db/src/index.ts",
+      "gitBlob": "96db7e2796a3f7b74abc8d7b27581463646030e5",
+      "size": 454
+    },
+    {
+      "path": "react-db/src/useLiveInfiniteQuery.ts",
+      "gitBlob": "c3d4c629c679ca7d1be703e43e973173c1d69958",
+      "size": 10777
+    },
+    {
+      "path": "react-db/src/useLiveQuery.ts",
+      "gitBlob": "2ada3907701af7c0002eec9aef825a04c69b1133",
+      "size": 15616
+    },
+    {
+      "path": "react-db/src/useLiveQueryEffect.ts",
+      "gitBlob": "ab39558e6a5515b5a3a057080fc643cd574b0531",
+      "size": 1929
+    },
+    {
+      "path": "react-db/src/useLiveSuspenseQuery.ts",
+      "gitBlob": "162bf1f3fe62086bb621e5f57251462de22c6f4c",
+      "size": 7684
+    },
+    {
+      "path": "react-db/src/usePacedMutations.ts",
+      "gitBlob": "7fc001e4a6bcc5ac1b0f755d7d59349d077ccb84",
+      "size": 4261
+    }
+  ],
+  "fingerprint": "18505251265caf7ef77e62fb8a98c1d982479a21a3c00e37d227615cf5216714"
+}

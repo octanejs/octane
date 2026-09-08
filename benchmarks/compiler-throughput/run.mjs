@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { transformSync } from '@babel/core';
 import reactCompilerPlugin from 'babel-plugin-react-compiler';
+import infernoCompilerPlugin from 'babel-plugin-inferno';
 import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -14,7 +15,7 @@ const { transformWithEsbuild } = await import(pathToFileURL(newsRequire.resolve(
 const { compile: compileOctane } = await import(
 	pathToFileURL(octaneRequire.resolve('octane/compiler')).href
 );
-const TARGETS = ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'];
+const TARGETS = ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor', 'inferno'];
 const iterations = Number.parseInt(process.argv[2] ?? '5', 10);
 const sizes = iterations <= 2 ? [10, 100] : [10, 100, 1_000];
 
@@ -92,6 +93,19 @@ async function compilerFor(target) {
 					minify: false,
 				})
 			).code;
+	}
+	if (target === 'inferno') {
+		return (source, filename) => {
+			const compiled = transformSync(source, {
+				babelrc: false,
+				configFile: false,
+				filename,
+				parserOpts: { plugins: ['jsx'] },
+				plugins: [[infernoCompilerPlugin, { imports: true }]],
+			});
+			if (!compiled?.code) throw new Error('Inferno compiler emitted no JavaScript');
+			return compiled.code;
+		};
 	}
 	if (target === 'solid') {
 		const babel = await loadFromTarget(target, '@babel/core');

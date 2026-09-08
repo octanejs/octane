@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "outDir": "dist",
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "NodeNext",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "declaration": true,
+    "jsx": "react",
+
+    /* Linting */
+    "strict": true,
+    "isolatedDeclarations": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}

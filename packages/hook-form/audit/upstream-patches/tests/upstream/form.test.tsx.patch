@@ -1,0 +1,94 @@
+diff --git a/tests/upstream/form.test.tsx b/tests/upstream/form.test.tsx
+--- a/tests/upstream/form.test.tsx
++++ b/tests/upstream/form.test.tsx
+@@ -101,9 +101,9 @@ describe('Form', () => {
+   });
+ 
+   it('should handle error request callback', async () => {
+-    jest
+-      .spyOn(global, 'fetch')
+-      .mockResolvedValueOnce(new Response(null, { status: 500 }));
++    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
++      new Response(null, { status: 500 }),
++    );
+ 
+     const onSubmit = vi.fn();
+     const onSuccess = vi.fn();
+@@ -143,9 +143,9 @@ describe('Form', () => {
+   });
+ 
+   it('should validate custom status code', async () => {
+-    jest
+-      .spyOn(global, 'fetch')
+-      .mockResolvedValueOnce(new Response(null, { status: 201 }));
++    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
++      new Response(null, { status: 201 }),
++    );
+ 
+     const App = () => {
+       const {
+@@ -176,9 +176,9 @@ describe('Form', () => {
+   });
+ 
+   it('should support other request type', async () => {
+-    jest
+-      .spyOn(global, 'fetch')
+-      .mockResolvedValueOnce(new Response(null, { status: 200 }));
++    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
++      new Response(null, { status: 200 }),
++    );
+ 
+     const App = () => {
+       const {
+@@ -204,9 +204,9 @@ describe('Form', () => {
+   });
+ 
+   it('should support render props for react native', async () => {
+-    jest
+-      .spyOn(global, 'fetch')
+-      .mockResolvedValueOnce(new Response(null, { status: 200 }));
++    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
++      new Response(null, { status: 200 }),
++    );
+ 
+     const App = () => {
+       const {
+@@ -242,9 +242,9 @@ describe('Form', () => {
+ 
+   it('should support fetcher prop with external request', async () => {
+     const fetcher = vi.fn().mockResolvedValue({});
+-    jest
+-      .spyOn(global, 'fetch')
+-      .mockResolvedValueOnce(new Response(null, { status: 200 }));
++    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
++      new Response(null, { status: 200 }),
++    );
+ 
+     const App = () => {
+       const {
+@@ -277,9 +277,9 @@ describe('Form', () => {
+   });
+ 
+   it('should include application/json header with encType supplied', async () => {
+-    jest
+-      .spyOn(global, 'fetch')
+-      .mockResolvedValueOnce(new Response(null, { status: 200 }));
++    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
++      new Response(null, { status: 200 }),
++    );
+ 
+     const onSuccess = vi.fn();
+ 
+@@ -312,9 +312,9 @@ describe('Form', () => {
+   });
+ 
+   it('should support explicit "multipart/form-data" encType', async () => {
+-    jest
+-      .spyOn(global, 'fetch')
+-      .mockResolvedValueOnce(new Response(null, { status: 200 }));
++    vi.spyOn(global, 'fetch').mockResolvedValueOnce(
++      new Response(null, { status: 200 }),
++    );
+ 
+     const onSuccess = vi.fn();
+ 

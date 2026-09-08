@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "project": "popper",
+  "roots": ["packages/popper/tests/upstream"],
+  "files": [
+    "packages/popper/tests/upstream/Manager.test.tsx",
+    "packages/popper/tests/upstream/Popper.test.tsx",
+    "packages/popper/tests/upstream/Reference.test.tsx",
+    "packages/popper/tests/upstream/usePopper.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:a6f8c295081467b8",
+      "file": "packages/popper/tests/upstream/Manager.test.tsx",
+      "fullName": "Manager component connects Popper and Reference"
+    },
+    {
+      "id": "runtime:d0f5530b2f0f6808",
+      "file": "packages/popper/tests/upstream/Manager.test.tsx",
+      "fullName": "Manager component renders the expected markup"
+    },
+    {
+      "id": "runtime:b0171ed7837da1b0",
+      "file": "packages/popper/tests/upstream/Popper.test.tsx",
+      "fullName": "Popper component accepts a `referenceElement` property"
+    },
+    {
+      "id": "runtime:9bc3e2eeef047ef6",
+      "file": "packages/popper/tests/upstream/Popper.test.tsx",
+      "fullName": "Popper component accepts a ref function"
+    },
+    {
+      "id": "runtime:f421876ae610e477",
+      "file": "packages/popper/tests/upstream/Popper.test.tsx",
+      "fullName": "Popper component accepts a ref object"
+    },
+    {
+      "id": "runtime:6bec9751912f51c1",
+      "file": "packages/popper/tests/upstream/Popper.test.tsx",
+      "fullName": "Popper component handles changing refs gracefully"
+    },
+    {
+      "id": "runtime:1134ab3186504ef9",
+      "file": "packages/popper/tests/upstream/Popper.test.tsx",
+      "fullName": "Popper component renders the expected markup"
+    },
+    {
+      "id": "runtime:798456c12546f62a",
+      "file": "packages/popper/tests/upstream/Popper.test.tsx",
+      "fullName": "Popper component should update placement when property is changed"
+    },
+    {
+      "id": "runtime:e4172b9396ba504d",
+      "file": "packages/popper/tests/upstream/Reference.test.tsx",
+      "fullName": "Arrow component consumes the ManagerReferenceNodeSetterContext from Manager"
+    },
+    {
+      "id": "runtime:0b915a414d29321d",
+      "file": "packages/popper/tests/upstream/Reference.test.tsx",
+      "fullName": "Arrow component does not warn when setReferenceNode is not present"
+    },
+    {
+      "id": "runtime:209ab5a28156e406",
+      "file": "packages/popper/tests/upstream/Reference.test.tsx",
+      "fullName": "Arrow component renders the expected markup"
+    },
+    {
+      "id": "runtime:baa5fd0dba1358db",
+      "file": "packages/popper/tests/upstream/Reference.test.tsx",
+      "fullName": "Arrow component warns when setReferenceNode is present"
+    },
+    {
+      "id": "runtime:3f6e2c6e71061cd1",
+      "file": "packages/popper/tests/upstream/usePopper.test.tsx",
+      "fullName": "usePopper Initializes the arrow positioning"
+    },
+    {
+      "id": "runtime:0574028192a5eeb6",
+      "file": "packages/popper/tests/upstream/usePopper.test.tsx",
+      "fullName": "usePopper destroys Popper on instance on unmount"
+    },
+    {
+      "id": "runtime:37288cc527cc4061",
+      "file": "packages/popper/tests/upstream/usePopper.test.tsx",
+      "fullName": "usePopper does not update Popper on generic props change"
+    },
+    {
+      "id": "runtime:745906db89de70ec",
+      "file": "packages/popper/tests/upstream/usePopper.test.tsx",
+      "fullName": "usePopper doesn't update Popper instance on props update if not needed by Popper"
+    },
+    {
+      "id": "runtime:56b1e09a28170fee",
+      "file": "packages/popper/tests/upstream/usePopper.test.tsx",
+      "fullName": "usePopper initializes the Popper instance"
+    },
+    {
+      "id": "runtime:0d1533eaed06c946",
+      "file": "packages/popper/tests/upstream/usePopper.test.tsx",
+      "fullName": "usePopper updates Popper on explicitly listed props change"
+    }
+  ]
+}

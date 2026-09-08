@@ -1,0 +1,91 @@
+diff --git a/tests/upstream/global/utils/findMatchingHitRegions.test.ts b/tests/upstream/global/utils/findMatchingHitRegions.test.ts
+--- a/tests/upstream/global/utils/findMatchingHitRegions.test.ts
++++ b/tests/upstream/global/utils/findMatchingHitRegions.test.ts
+@@ -1,9 +1,37 @@
+-import { describe, expect, test } from "vitest";
+-import { mountGroup } from "../mountGroup";
+-import { getMountedGroups, type MountedGroups } from "../mutable-state/groups";
+-import { mockGroup } from "../test/mockGroup";
++// Fidelity: exact upstream assertions and test identities; harness setup and deterministic unmount are adapted.
++import { afterEach, beforeEach, describe, expect, test } from "vitest";
++import { mountGroup as mountGroupExternal } from "../../../../src/global/mountGroup";
++import { getMountedGroups, type MountedGroups } from "../../../../src/global/mutable-state/groups";
++import { mockGroup, resetMockGroupIdCounter } from "../test/mockGroup";
+ import { mockPointerEvent } from "../test/mockPointerEvent";
+-import { findMatchingHitRegions } from "./findMatchingHitRegions";
++import { findMatchingHitRegions } from "../../../../src/global/utils/findMatchingHitRegions";
++import {
++  mockBoundingClientRect,
++  unmockBoundingClientRect
++} from "../../utils/test/mockBoundingClientRect";
++import {
++  mockGetComputedStyle,
++  unmockGetComputedStyle
++} from "../../utils/test/mockGetComputedStyle";
++import { mockResizeObserver, unmockResizeObserver } from "../../utils/test/mockResizeObserver";
++
++const unmounts: Array<() => void> = [];
++function mountGroup(group: Parameters<typeof mountGroupExternal>[0]) {
++  unmounts.push(mountGroupExternal(group));
++}
++
++beforeEach(() => {
++  mockBoundingClientRect();
++  mockGetComputedStyle();
++  mockResizeObserver();
++});
++afterEach(() => {
++  for (const unmount of unmounts.splice(0).reverse()) unmount();
++  resetMockGroupIdCounter();
++  unmockResizeObserver();
++  unmockGetComputedStyle();
++  unmockBoundingClientRect();
++});
+ 
+ describe("findMatchingHitRegions", () => {
+   function serialize(event: PointerEvent, mountedGroups: MountedGroups) {
+@@ -34,8 +62,7 @@ describe("findMatchingHitRegions", () => {
+     group.addPanel(new DOMRect(50, 0, 50, 50), "right");
+     mountGroup(group);
+ 
+-    expect(serialize(mockPointerEvent({ clientX: 50 }), getMountedGroups()))
+-      .toMatchInlineSnapshot(`
++    expect(serialize(mockPointerEvent({ clientX: 50 }), getMountedGroups())).toMatchInlineSnapshot(`
+         "[
+           {
+             "panels": [
+@@ -55,8 +82,7 @@ describe("findMatchingHitRegions", () => {
+     group.addPanel(new DOMRect(70, 0, 50, 50), "right");
+     mountGroup(group);
+ 
+-    expect(serialize(mockPointerEvent({ clientX: 60 }), getMountedGroups()))
+-      .toMatchInlineSnapshot(`
++    expect(serialize(mockPointerEvent({ clientX: 60 }), getMountedGroups())).toMatchInlineSnapshot(`
+         "[
+           {
+             "panels": [
+@@ -83,12 +109,8 @@ describe("findMatchingHitRegions", () => {
+     innerGroup.addPanel(new DOMRect(0, 25, 50, 25), "bottom");
+     mountGroup(innerGroup);
+ 
+-    expect(
+-      serialize(
+-        mockPointerEvent({ clientX: 50, clientY: 25 }),
+-        getMountedGroups()
+-      )
+-    ).toMatchInlineSnapshot(`
++    expect(serialize(mockPointerEvent({ clientX: 50, clientY: 25 }), getMountedGroups()))
++      .toMatchInlineSnapshot(`
+       "[
+         {
+           "panels": [
+@@ -114,8 +136,7 @@ describe("findMatchingHitRegions", () => {
+     group.addPanel(new DOMRect(50, 0, 50, 50), "right");
+     mountGroup(group);
+ 
+-    expect(serialize(mockPointerEvent({ clientX: 50 }), getMountedGroups()))
+-      .toMatchInlineSnapshot(`
++    expect(serialize(mockPointerEvent({ clientX: 50 }), getMountedGroups())).toMatchInlineSnapshot(`
+       "[]"
+     `);
+   });

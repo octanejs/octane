@@ -22,6 +22,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { LYNX_TOOLCHAIN_LANES } from '../src/toolchain-lanes.js';
+import { renderPackedExampleWorkspace } from '../../../scripts/package-pack-canaries.mjs';
 
 const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
 const APPLICATION_FIXTURE = resolve(import.meta.dirname, '_fixtures/application');
@@ -70,9 +71,11 @@ function packWorkspacePackages(root: string): Record<keyof typeof PACKAGES, stri
 }
 
 function renderOverrides(archives: Record<keyof typeof PACKAGES, string>): string {
-	return `overrides:\n${Object.entries(archives)
-		.map(([name, archive]) => `  ${JSON.stringify(name)}: ${JSON.stringify(`file:${archive}`)}`)
-		.join('\n')}\n`;
+	return renderPackedExampleWorkspace(
+		Object.fromEntries(
+			Object.entries(archives).map(([name, archive]) => [name, `file:${archive}`]),
+		),
+	);
 }
 
 async function decodeNativeBundle(content: Buffer): Promise<Record<string, unknown>> {

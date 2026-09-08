@@ -1,0 +1,45 @@
+{
+  "upstream": {
+    "package": "wouter",
+    "version": "3.10.0",
+    "source": "https://github.com/molefrog/wouter/tree/708c23639d4174ba7deda06c40c8208118899da7",
+    "license": "Unlicense"
+  },
+  "surface": "Wouter 3.10.0 main router surface plus browser, hash, and memory location subpaths, ported to Octane with manual trailing hook-slot forwarding.",
+  "inventory": {
+    "supported": [
+      "Router",
+      "Route",
+      "Link",
+      "Switch",
+      "Redirect",
+      "useRouter",
+      "useParams",
+      "useLocation",
+      "useSearch",
+      "useSearchParams",
+      "useRoute",
+      "matchRoute"
+    ],
+    "subpaths": ["use-browser-location", "use-hash-location", "memory-location", "package.json"],
+    "gaps": [
+      "use-sync-external-store.native.js",
+      "Preact package",
+      "one-for-one upstream type-test lane"
+    ]
+  },
+  "divergences": [
+    "Link accepts ref as an ordinary Octane prop; forwardRef is not used.",
+    "Switch inspects explicit element descriptors, while nested TSRX children are opaque and must be supplied as descriptor arrays or createElement results.",
+    "Octane useSyncExternalStore replaces the upstream shim and requires forwarded compiler hook slots.",
+    "The React Native use-sync-external-store shim and Wouter's separate Preact package are not exported."
+  ],
+  "ssr": "Router ssrPath, ssrSearch, and redirect context behavior is ported and covered by tests/ssr.test.ts.",
+  "verified": "2026-08-20",
+  "provenance": {
+    "source": "https://github.com/molefrog/wouter",
+    "license": "Unlicense",
+    "commit": "708c23639d4174ba7deda06c40c8208118899da7",
+    "verification": "recorded"
+  }
+}

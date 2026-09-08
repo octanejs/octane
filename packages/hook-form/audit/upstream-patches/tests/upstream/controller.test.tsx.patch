@@ -1,0 +1,139 @@
+diff --git a/tests/upstream/controller.test.tsx b/tests/upstream/controller.test.tsx
+--- a/tests/upstream/controller.test.tsx
++++ b/tests/upstream/controller.test.tsx
+@@ -25,13 +25,16 @@ function Input<TFieldValues extends FieldValues>({
+   onChange,
+   onBlur,
+   placeholder,
+-}: Pick<ControllerRenderProps<TFieldValues>, 'onChange' | 'onBlur'> & {
++}: Pick<ControllerRenderProps<TFieldValues>, 'onBlur'> & {
++  // octane: field's handler key is onInput; this helper still RECEIVES it
++  // under a plain `onChange` prop name from the render-prop tests.
++  onChange: ControllerRenderProps<TFieldValues>['onInput'];
+   placeholder?: string;
+ }) {
+   return (
+     <input
+       placeholder={placeholder}
+-      onChange={() => onChange(1)}
++      onInput={() => onChange(1)}
+       onBlur={() => onBlur()}
+     />
+   );
+@@ -225,7 +228,7 @@ describe('Controller', () => {
+               name="name"
+               control={control}
+               render={({ field }) => (
+-                <button type="button" onClick={() => field.onChange('test')}>
++                <button type="button" onClick={() => field.onInput('test')}>
+                   Change Name
+                 </button>
+               )}
+@@ -383,6 +386,10 @@ describe('Controller', () => {
+ 
+     expect(validatingFields).toEqual({});
+     expect(screen.getByText('isValidating: false')).toBeVisible();
++    // octane: restore real timers — upstream leans on jest's global fake-timer
++    // detection inside testing-library's waitFor; vitest runs with
++    // `globals: false`, so leaked fake timers would hang every later waitFor.
++    vi.useRealTimers();
+   });
+ 
+   it('should call trigger method when re-validate mode is onBlur with blur event', async () => {
+@@ -512,7 +519,7 @@ describe('Controller', () => {
+           <Controller
+             defaultValue=""
+             name="test"
+-            render={({ field: { onChange, value } }) => {
++            render={({ field: { onInput: onChange, value } }) => {
+               return <Input {...{ onChange, onBlur, value }} />;
+             }}
+             control={control}
+@@ -1022,7 +1029,7 @@ describe('Controller', () => {
+         <>
+           <Controller
+             render={({ field }) => (
+-              <input value={field.value} onChange={field.onChange} />
++              <input value={field.value} onInput={field.onInput} />
+             )}
+             rules={{ required: true }}
+             name={'test'}
+@@ -1030,7 +1037,7 @@ describe('Controller', () => {
+           />
+           <Controller
+             render={({ field }) => (
+-              <input value={field.value} onChange={field.onChange} />
++              <input value={field.value} onInput={field.onInput} />
+             )}
+             rules={{ required: true }}
+             name={'test1'}
+@@ -1168,7 +1175,7 @@ describe('Controller', () => {
+               rules={{ required: true }}
+               control={control}
+               render={({ field }) => (
+-                <input value={field.value} onChange={field.onChange} />
++                <input value={field.value} onInput={field.onInput} />
+               )}
+             />
+           )}
+@@ -1595,7 +1602,7 @@ describe('Controller', () => {
+             }}
+             render={({ field, fieldState }) => (
+               <>
+-                <button type="button" onClick={() => field.onChange([1])}>
++                <button type="button" onClick={() => field.onInput([1])}>
+                   [1]
+                 </button>
+                 <p data-testid="error">{fieldState.error?.message}</p>
+@@ -1652,9 +1659,7 @@ describe('Controller', () => {
+             render={({ field }) => (
+               <input
+                 value={field.value.x}
+-                onChange={(e) =>
+-                  field.onChange(new NonCoercible(e.target.value))
+-                }
++                onInput={(e) => field.onInput(new NonCoercible(e.target.value))}
+               />
+             )}
+           />
+@@ -1737,11 +1742,11 @@ describe('Controller', () => {
+             defaultValue=""
+             name={name}
+             control={control}
+-            render={({ field: { onChange } }) => (
++            render={({ field: { onInput: onChange } }) => (
+               <input
+                 type="text"
+                 value={text}
+-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
++                onInput={(e: Event & { target: HTMLInputElement }) => {
+                   setText(e.target.value);
+                   const dateValue = new Date(e.target.value);
+                   onChange(dateValue);
+@@ -1774,17 +1779,15 @@ describe('Controller', () => {
+       test: string;
+     };
+ 
+-    const MemoField = React.memo(
+-      ({ control }: { control: Control<FormValues> }) => (
+-        <Controller
+-          control={control}
+-          name="test"
+-          render={({ field }) => (
+-            <input value={field.value} onChange={field.onChange} />
+-          )}
+-        />
+-      ),
+-    );
++    const MemoField = React.memo(({ control }: { control: Control<FormValues> }) => (
++      <Controller
++        control={control}
++        name="test"
++        render={({ field }) => (
++          <input value={field.value} onInput={field.onInput} />
++        )}
++      />
++    ));
+ 
+     const App = () => {
+       const { control, reset } = useForm<FormValues>({

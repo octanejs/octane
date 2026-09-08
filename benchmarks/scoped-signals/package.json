@@ -1,0 +1,15 @@
+{
+  "name": "octane-scoped-signals-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Correctness-gated scoped signal graph scaling and continuous ownership disposal.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "test": "node --test workloads.test.mjs"
+  },
+  "dependencies": {
+    "esbuild": "catalog:default",
+    "octane": "workspace:*"
+  }
+}

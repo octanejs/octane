@@ -1,0 +1,16 @@
+diff --git a/tests/upstream/src/store/ReactStore.spec.ts b/tests/upstream/src/store/ReactStore.spec.ts
+--- a/tests/upstream/src/store/ReactStore.spec.ts
++++ b/tests/upstream/src/store/ReactStore.spec.ts
+@@ -1,7 +1,8 @@
+-import { expectType } from '../testUtils';
+-import { createSelector } from './createSelector';
+-import type { Store } from './Store';
+-import { ReactStore } from './ReactStore';
++/** @jsxImportSource octane */
++import { expectType } from "../../../../src/testUtils.ts";
++import { createSelector } from "../../../../src/store/createSelector.ts";
++import type { Store } from "../../../../src/store/Store.ts";
++import { ReactStore } from "../../../../src/store/ReactStore.ts";
+ 
+ interface TestState {
+   count: number | undefined;

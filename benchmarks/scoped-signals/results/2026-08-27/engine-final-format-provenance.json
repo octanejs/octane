@@ -1,0 +1,15 @@
+{
+  "operation": "One repository-style JSON formatting pass after final full engine timing",
+  "formatter": "prettier@3.9.6",
+  "rawOriginalLocalPath": "/private/tmp/octane-scoped-signals-original-reports-20260827/engine-final.json",
+  "rawRunSha256": "cebab1abf72833aabb8f4f6c84016d65c1cee28a4b0e09a035b3e1f3faccfb5c",
+  "formattedSha256": "40613c171569e7264e345e49a54235c8d7635e2877e77560237f738bf34cc393",
+  "parsedValuesUnchanged": true,
+  "comparedWithEarlierRun": {
+    "optionsUnchanged": true,
+    "workloadSha256Unchanged": true,
+    "rawAlienBundleSha256Unchanged": true,
+    "runnerDiffIsReportIndentationOnly": true
+  },
+  "scopedBundleMatchesFinalAsyncRetention": true
+}

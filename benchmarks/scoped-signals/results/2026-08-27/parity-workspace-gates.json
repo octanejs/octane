@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-27T22:11:11.149080+00:00",
+  "purpose": "Fresh canonical workspace gate attempts after the TSRX performance follow-up; these failures are not replaced by supplemental passes.",
+  "workingTree": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+  "startingCommit": "422c2c937784af835c64d6fae5a39162143c7a44",
+  "environment": {
+    "node": "v26.4.0",
+    "pnpm": "11.15.1",
+    "pnpm_config_verify_deps_before_run": "warn"
+  },
+  "environmentQualification": "The pnpm warning setting permits commands to run without another automatic install. It does not establish a complete locked node_modules installation.",
+  "checks": [
+    {
+      "name": "sync",
+      "command": "pnpm sync",
+      "environment": {
+        "pnpm_config_verify_deps_before_run": "warn"
+      },
+      "observedExitCode": 1,
+      "failure": "Cannot find package '@tsrx/prettier-plugin' while generating CLI data after package inventory.",
+      "log": {
+        "path": "/private/tmp/octane-tsrx-parity-sync-20260827.log",
+        "sha256": "71f3a6a7a42a4533e695a0c1cd8983bd04b5011bedf612f32bb45d190c6e3480",
+        "bytes": 7874,
+        "modifiedAt": "2026-08-27T22:08:38.225875+00:00"
+      }
+    },
+    {
+      "name": "scopedFormatting",
+      "command": "pnpm format:files:check packages/octane/src/runtime.ts packages/octane/src/signals/native-read-client.ts packages/octane/src/signals/native-read-collector.ts packages/octane/tests/_fixtures/native-read-collection.tsrx packages/octane/tests/signals-native-collection.test.ts",
+      "environment": {
+        "pnpm_config_verify_deps_before_run": "warn"
+      },
+      "observedExitCode": 1,
+      "failure": "spawnSync prettier ENOENT",
+      "log": {
+        "path": "/private/tmp/octane-tsrx-parity-format-gate-20260827.log",
+        "sha256": "c3fd9b80c125ec405e97c77e2e949e62d59ffa98d592c053c42e0865edd6e2b7",
+        "bytes": 473,
+        "modifiedAt": "2026-08-27T22:09:10.064036+00:00"
+      }
+    },
+    {
+      "name": "scopedTypecheck",
+      "command": "pnpm typecheck:files packages/octane/src/runtime.ts packages/octane/src/signals/native-read-client.ts packages/octane/src/signals/native-read-collector.ts packages/octane/tests/_fixtures/native-read-collection.tsrx packages/octane/tests/signals-native-collection.test.ts",
+      "environment": {
+        "pnpm_config_verify_deps_before_run": "warn"
+      },
+      "observedExitCode": 1,
+      "failure": "spawnSync tsrx-tsc ENOENT",
+      "log": {
+        "path": "/private/tmp/octane-tsrx-parity-types-gate-20260827.log",
+        "sha256": "dcd602944c9f1204af23f6626cc5d146299c383845ea09dc0202fd24d544d5b4",
+        "bytes": 468,
+        "modifiedAt": "2026-08-27T22:09:10.297050+00:00"
+      }
+    },
+    {
+      "name": "scopedTests",
+      "command": "pnpm exec vitest run packages/octane/tests/signals-native-collection.test.ts --reporter=verbose",
+      "environment": {
+        "pnpm_config_verify_deps_before_run": "warn"
+      },
+      "observedExitCode": 1,
+      "failure": "Command \"vitest\" not found",
+      "log": {
+        "path": "/private/tmp/octane-tsrx-parity-test-gate-20260827.log",
+        "sha256": "cb73519607eafd2e8edce89bc6946c3365cdbf0baef51a4f7200f21cbb1a41d2",
+        "bytes": 182,
+        "modifiedAt": "2026-08-27T22:09:56.239186+00:00"
+      }
+    },
+    {
+      "name": "finalSyncBeforeCommit",
+      "command": "pnpm sync",
+      "environment": {
+        "pnpm_config_verify_deps_before_run": "warn"
+      },
+      "observedExitCode": 1,
+      "failure": "Cannot find package '@tsrx/prettier-plugin' while generating CLI data after package inventory.",
+      "log": {
+        "path": "/private/tmp/octane-tsrx-parity-sync-final-20260827.log",
+        "sha256": "71f3a6a7a42a4533e695a0c1cd8983bd04b5011bedf612f32bb45d190c6e3480",
+        "bytes": 7874,
+        "modifiedAt": "2026-08-27T22:20:47.594719+00:00"
+      }
+    }
+  ],
+  "syncGeneratedDiff": [],
+  "sourceVerification": {
+    "report": "parity-correctness.json",
+    "manifestSha256": "896eae5e434107205f7050ba2bd6031b6ba055eb6ff8fd848ad78517ab0a3e46",
+    "entries": 1072,
+    "mismatchesAfterSync": [],
+    "mismatchesAfterFinalSync": []
+  },
+  "publicationSmoke": {
+    "command": "node benchmarks/scoped-signals/package-smoke.mjs --tooling-root /private/tmp/octane-scoped-signals-tooling.n1e5b0 --output benchmarks/scoped-signals/results/2026-08-27/parity-package-smoke.json",
+    "observedExitCode": 0,
+    "report": "parity-package-smoke.json",
+    "sourceMismatches": [],
+    "limitation": "Per-file ESM/CommonJS and declaration consumer only, not a full compiler/Volar build or tarball."
+  },
+  "limitations": [
+    "No fresh complete locked install, full workspace test/typecheck/format pass, full package build, or CI success is asserted.",
+    "The previous approved registry retry and supplemental public-source provenance remain recorded in consolidation-source-validation.json.",
+    "Required CI remains a separate current-head gate. Draft-skipped checks are not green CI."
+  ],
+  "supplementalFormatting": {
+    "command": "node --import /private/tmp/octane-native-source-compiler-NVcMdO/register.mjs /private/tmp/octane-native-source-compiler-NVcMdO/format-changed.mjs",
+    "observedExitCode": 0,
+    "report": {
+      "path": "/private/tmp/octane-tsrx-parity-final-format-20260827.json",
+      "sha256": "e2a779b68825203eb72129cc7e98960b93241bd4caa7b262a8c16e3f4d1d6346"
+    },
+    "checked": 28,
+    "changed": [],
+    "failed": [],
+    "ignored": [
+      ".changeset/experimental-scoped-async-signals.md",
+      "benchmarks/scoped-signals/README.md",
+      "docs/experimental-scoped-signals-evidence.md",
+      "docs/plans/2026-08-27-experimental-scoped-async-signals-plan.md",
+      "benchmarks/scoped-signals/results/2026-08-27/parity-focused-original-runner.mjs.txt",
+      "benchmarks/scoped-signals/results/2026-08-27/parity-performance.md"
+    ],
+    "qualification": "Source-staged formatter with each file’s actual repository config; not a canonical locked-toolchain pass."
+  }
+}

@@ -3,6 +3,13 @@
 [TanStack Store](https://tanstack.com/store) bindings for the
 [Octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/tanstack-store
+pnpm add @octanejs/tanstack-store
+```
+
 This package ports `@tanstack/react-store@0.11.0` by reusing the
 framework-agnostic `@tanstack/store` core unchanged and transcribing its small
 React hook layer onto Octane. The supported runtime and type surfaces match the

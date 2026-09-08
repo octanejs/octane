@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/field/label/FieldLabel.test.tsx b/tests/upstream/src/field/label/FieldLabel.test.tsx
+--- a/tests/upstream/src/field/label/FieldLabel.test.tsx
++++ b/tests/upstream/src/field/label/FieldLabel.test.tsx
+@@ -116,7 +116,7 @@ describe('<Field.Label />', () => {
+         .mockName('console.error')
+         .mockImplementation(() => {});
+ 
+-      const EmptyLabel = React.forwardRef(function EmptyLabel() {
++      const EmptyLabel = (function EmptyLabel() {
+         return null;
+       });
+ 

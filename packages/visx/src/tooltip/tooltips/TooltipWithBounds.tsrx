@@ -1,4 +1,6 @@
-import type { HTMLAttributes, Ref, CSSProperties } from 'react';
+import type { Ref, CSSProperties } from 'react';
+import type { ElementDescriptor } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
 import type { WithBoundingRectsProps } from '@octanejs/visx/bounds';
 import { withBoundingRects } from '@octanejs/visx/bounds';
 
@@ -7,7 +9,7 @@ import Tooltip, { defaultStyles } from './Tooltip.tsrx';
 import { TooltipPositionProvider } from '../context/TooltipPositionContext.tsrx';
 
 export type TooltipWithBoundsProps =
-	TooltipProps & HTMLAttributes<HTMLDivElement> & WithBoundingRectsProps & {
+	TooltipProps & Omit<Octane.HTMLAttributes<HTMLDivElement>, keyof TooltipProps> & WithBoundingRectsProps & {
 		nodeRef?: Ref<HTMLDivElement>;
 	};
 
@@ -79,4 +81,8 @@ function TooltipWithBounds({
 	</Tooltip>;
 }
 
-export default withBoundingRects(TooltipWithBounds)
+const TooltipWithBoundsComponent = withBoundingRects(TooltipWithBounds) as unknown as (
+	props: TooltipWithBoundsProps,
+) => ElementDescriptor;
+
+export default TooltipWithBoundsComponent;

@@ -1,25 +1,8 @@
 // Shared internals for the binding hooks.
 import { shouldThrowError } from '@tanstack/query-core';
-import { use, useRef } from 'octane';
+import { subSlot, use, useMemo } from 'octane';
 
-// Derive a stable, distinct sub-slot from a wrapper's compiler-injected slot, so
-// a hook composing multiple base hooks gives each one its own identity. Tags are
-// namespaced per hook (e.g. ':oq:obs', ':ms:cb') to avoid cross-hook collisions.
-// Memoized: subSlot runs on EVERY hook call every render, and the naive form
-// pays a string concat + global symbol-registry lookup each time. The cache is
-// keyed by the slot symbol itself; the minted value is byte-identical to the
-// uncached Symbol.for result, so identity is preserved across HMR re-evals and
-// the per-package copies of this helper. Key universe is bounded: slots are
-// per-call-site module constants (never minted per render).
-const subSlotCache = new Map<symbol, Map<string, symbol>>();
-export function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	if (slot === undefined) return undefined;
-	let byTag = subSlotCache.get(slot);
-	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
-	let sym = byTag.get(tag);
-	if (sym === undefined) byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':' + tag)));
-	return sym;
-}
+export { subSlot };
 
 // Split the compiler-injected trailing slot off a hook's runtime args, returning
 // the user args (everything before it) and the slot.
@@ -95,12 +78,11 @@ type SuspensePromise = PromiseLike<unknown> & {
 };
 
 interface SuspensePromiseCache {
-	key: unknown;
 	promise: SuspensePromise | undefined;
 }
 
 /**
- * Octane suspense divergence:
+ * Octane suspense divergence (see audit/test-classifications.json):
  * Suspend through a stable `use()` occurrence for one query-hook call site.
  *
  * `use()` tracks thenables by dynamic call order. A component with two
@@ -112,8 +94,10 @@ interface SuspensePromiseCache {
  *
  * Retain the promise that suspended this query hook and keep reading it after
  * it settles. That reserves the query hook's call-order position throughout
- * the replay episode. A new query key or retry replaces a settled promise;
- * re-renders during the same pending fetch reuse the in-flight promise.
+ * the replay episode. A key-specific memo lets a held transition restore the
+ * committed key's promise when publishing its pending cue. A mutable ref would
+ * make that old-key render read the new key's pending promise and show fallback.
+ * Re-renders during the same pending fetch reuse the in-flight promise.
  */
 export function useSuspensePromise(
 	shouldSuspend: boolean,
@@ -121,12 +105,8 @@ export function useSuspensePromise(
 	createPromise: () => PromiseLike<unknown>,
 	slot: symbol | undefined,
 ): void {
-	const cache = useRef<SuspensePromiseCache>({ key: undefined, promise: undefined }, slot).current;
-	if (
-		shouldSuspend &&
-		(cache.promise === undefined || cache.key !== key || cache.promise.status !== 'pending')
-	) {
-		cache.key = key;
+	const cache = useMemo<SuspensePromiseCache>(() => ({ promise: undefined }), [key], slot);
+	if (shouldSuspend && (cache.promise === undefined || cache.promise.status !== 'pending')) {
 		cache.promise = createPromise() as SuspensePromise;
 	}
 	if (cache.promise !== undefined) use(cache.promise);

@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/avatar/fallback/AvatarFallback.test.tsx b/tests/upstream/src/avatar/fallback/AvatarFallback.test.tsx
+--- a/tests/upstream/src/avatar/fallback/AvatarFallback.test.tsx
++++ b/tests/upstream/src/avatar/fallback/AvatarFallback.test.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { Mock, vi, expect, describe, beforeEach, afterEach, it } from 'vitest';
++import { type Mock, vi, expect, describe, beforeEach, afterEach, it } from 'vitest';
+ import * as React from 'octane';
+ import { Avatar } from '@octanejs/base-ui/avatar';
+ import { waitFor, screen } from '@mui/internal-test-utils';

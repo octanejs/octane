@@ -2,6 +2,32 @@ import { collectReassignedBindings } from './hook-deps.js';
 
 const STATE_HOOKS = new Set(['useState', 'useReducer', 'useLinkedState']);
 const EFFECT_HOOKS = new Set(['useEffect', 'useLayoutEffect', 'useInsertionEffect']);
+const ARRAY_MUTATORS = new Set([
+	'copyWithin',
+	'fill',
+	'pop',
+	'push',
+	'reverse',
+	'shift',
+	'sort',
+	'splice',
+	'unshift',
+]);
+const LOCAL_VALUE_HOOKS = new Set([
+	...STATE_HOOKS,
+	'useMemo',
+	'useCallback',
+	'useRef',
+	'useId',
+	'useEffectEvent',
+	'useDeferredValue',
+	'useTransition',
+	'useSyncExternalStore',
+	'useActionState',
+	'useFormState',
+	'useFormStatus',
+	'useOptimistic',
+]);
 const FUNCTION_TYPES = new Set([
 	'FunctionDeclaration',
 	'FunctionExpression',
@@ -25,6 +51,10 @@ const UNKNOWN_VALUE = NULLISH_VALUE | FALSY_VALUE | TRUTHY_VALUE;
 const UNKNOWN_PRIMITIVE = Symbol('unknown primitive');
 const NO_RETURN_VALUE = Symbol('no return value');
 const OTHER_BINDING = { kind: 'other' };
+const SNAPSHOT_BINDING = { kind: 'snapshot' };
+const ARRAY_SNAPSHOT_BINDING = { kind: 'snapshot', array: true };
+const STATE_TUPLE_BINDING = { kind: 'state-tuple', snapshot: SNAPSHOT_BINDING };
+const ARRAY_STATE_TUPLE_BINDING = { kind: 'state-tuple', snapshot: ARRAY_SNAPSHOT_BINDING };
 const UNDEFINED_BINDING = { kind: 'constant', value: UNDEFINED_VALUE, primitive: undefined };
 const SKIP_KEYS = new Set([
 	'type',
@@ -44,9 +74,14 @@ const SKIP_KEYS = new Set([
 export const STRONG_RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 export const STRONG_EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 export const STRONG_RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
+export const STRONG_RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
+export const STRONG_RETAINED_ROW_MUTATION = 'OCTANE_STRONG_RETAINED_ROW_MUTATION';
+export const STRONG_RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
 export const STRONG_RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
 export const STRONG_EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 export const STRONG_DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
+export const STRONG_HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
+export const STRONG_EVENT_HANDLER_LOCALITY = 'OCTANE_STRONG_EVENT_HANDLER_LOCALITY';
 
 function primitiveValueMask(value) {
 	return value === undefined
@@ -106,6 +141,23 @@ function addPatternNames(pattern, bindings, value, overwrite = true) {
 	}
 }
 
+function bindSnapshotPattern(pattern, value, bind) {
+	if (pattern?.type === 'Identifier') {
+		bind(pattern, value);
+	} else if (pattern?.type === 'ObjectPattern') {
+		for (const property of pattern.properties ?? []) {
+			if (property.type === 'Property') {
+				bindSnapshotPattern(property.value, SNAPSHOT_BINDING, bind);
+			}
+		}
+	} else if (pattern?.type === 'ArrayPattern') {
+		for (const element of pattern.elements ?? []) {
+			bindSnapshotPattern(element, SNAPSHOT_BINDING, bind);
+		}
+	}
+	// Rest copies and default expressions can produce new mutable values.
+}
+
 function declarationOf(statement) {
 	return statement?.type === 'ExportNamedDeclaration' ||
 		statement?.type === 'ExportDefaultDeclaration'
@@ -115,7 +167,9 @@ function declarationOf(statement) {
 
 function nearestFunctionScope(scope) {
 	let current = scope;
-	while (current?.parent && current.kind !== 'function') current = current.parent;
+	while (current?.parent && current.kind !== 'function' && current.kind !== 'retained-row') {
+		current = current.parent;
+	}
 	return current;
 }
 
@@ -220,6 +274,13 @@ function resolve(scope, name) {
 	return null;
 }
 
+function resolveScope(scope, name) {
+	for (let current = scope; current; current = current.parent) {
+		if (current.bindings.has(name)) return current;
+	}
+	return null;
+}
+
 function importedHook(callee, scope) {
 	const value = unwrap(callee);
 	if (value?.type === 'Identifier') {
@@ -298,6 +359,812 @@ function strongDirectives(ast) {
 	return { enabled, misplaced };
 }
 
+// Template arms create their own hook lifetimes. A value used only by one arm
+// can be declared there; a value used by siblings belongs to their parent.
+// Keep this source-level check separate from the phase analysis above: it never
+// annotates the parser tree or changes the code emitted for a valid module.
+function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
+	const diagnostics = [];
+	const values = [];
+	const effects = [];
+	const handlers = [];
+	const effectByCall = new WeakMap();
+	const valueByCall = new WeakMap();
+	const hostAttributes = new WeakSet();
+	const componentHandlers = new WeakSet();
+	const moduleScope = createScope(null, 'module', ast.body ?? []);
+	const mayHaveHoistedVars = source.includes('var');
+	let activeHandler = null;
+	let activeDerivedValue = null;
+
+	function predeclareNestedVars(node, functionScope, root = true) {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) predeclareNestedVars(child, functionScope, false);
+			return;
+		}
+		if (
+			FUNCTION_TYPES.has(node.type) ||
+			(!root && node.type === 'JSXCodeBlock') ||
+			node.type === 'JSXIfExpression' ||
+			node.type === 'JSXForExpression' ||
+			node.type === 'JSXSwitchExpression' ||
+			node.type === 'JSXTryExpression' ||
+			node.type === 'ClassDeclaration' ||
+			node.type === 'ClassExpression' ||
+			node.type === 'StaticBlock' ||
+			(node.type?.startsWith('TS') && !TRANSPARENT_EXPRESSIONS.has(node.type))
+		)
+			return;
+		if (node.type === 'VariableDeclaration' && node.kind === 'var') {
+			for (const declaration of node.declarations ?? []) {
+				addPatternNames(declaration.id, functionScope.bindings, OTHER_BINDING, false);
+			}
+		}
+		for (const key in node) {
+			if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) {
+				predeclareNestedVars(node[key], functionScope, false);
+			}
+		}
+	}
+
+	function templateArm(node, parent, label, sameLifetime = false) {
+		return { node, parent, label, sameLifetime };
+	}
+
+	function register(statements, scope, region) {
+		if (region === null) return;
+		for (const statement of statements ?? []) {
+			const node = declarationOf(statement);
+			if (node?.type === 'FunctionDeclaration' && node.id?.name) {
+				const handler = { kind: 'locality-handler', node, region, uses: [] };
+				scope.bindings.set(node.id.name, handler);
+				handlers.push(handler);
+			} else if (node?.type === 'VariableDeclaration' && node.kind === 'const') {
+				for (const declaration of node.declarations ?? []) {
+					const init = unwrap(declaration.init);
+					const hook = init?.type === 'CallExpression' ? importedHook(init.callee, scope) : null;
+					if (hook !== null && LOCAL_VALUE_HOOKS.has(hook)) {
+						const value = {
+							kind: 'locality-value',
+							node: init,
+							hook,
+							region,
+							uses: [],
+							dependencies: new Set(),
+							helpers: new Set(),
+						};
+						valueByCall.set(init, value);
+						addPatternNames(declaration.id, scope.bindings, value);
+						values.push(value);
+					} else if (declaration.id?.type === 'Identifier' && FUNCTION_TYPES.has(init?.type)) {
+						const handler = { kind: 'locality-handler', node: declaration, region, uses: [] };
+						scope.bindings.set(declaration.id.name, handler);
+						handlers.push(handler);
+					}
+				}
+			} else if (node?.type === 'ExpressionStatement') {
+				const call = unwrap(node.expression);
+				if (call?.type !== 'CallExpression') continue;
+				const hook = importedHook(call.callee, scope);
+				if (!EFFECT_HOOKS.has(hook)) continue;
+				const effect = { node: call, hook, region, dependencies: new Set(), helpers: new Set() };
+				effectByCall.set(call, effect);
+				effects.push(effect);
+			}
+		}
+	}
+
+	function block(body, parentScope, region, effect = null, template = false, event = null) {
+		const scope = createScope(parentScope, template ? 'function' : 'block', body?.body ?? []);
+		if (template && mayHaveHoistedVars) predeclareNestedVars(body, scope);
+		register(body?.body, scope, region);
+		for (const statement of body?.body ?? []) walk(statement, scope, region, effect, event);
+		if (body?.render) walk(body.render, scope, region, effect, event);
+	}
+
+	function arm(body, scope, parent, directive, label) {
+		if (body == null) return;
+		if (body.type === 'BlockStatement' || body.type === 'JSXCodeBlock') {
+			block(body, scope, templateArm(directive, parent, label), null, true);
+		} else {
+			walk(body, scope, parent);
+		}
+	}
+
+	function conditionalArms(node, scope, region, effect) {
+		walk(node.test, scope, region, effect);
+		arm(node.consequent, scope, region, node, '@if arm');
+		if (node.alternate?.type === 'IfStatement') {
+			conditionalArms(node.alternate, scope, region, effect);
+		} else {
+			arm(node.alternate, scope, region, node, '@else arm');
+		}
+	}
+
+	function useBinding(name, scope, region, effect, event) {
+		const binding = resolve(scope, name);
+		if (binding?.kind === 'locality-value') {
+			if (effect !== null) {
+				effect.dependencies.add(binding);
+			} else if (activeDerivedValue !== null && activeDerivedValue !== binding) {
+				activeDerivedValue.dependencies.add(binding);
+			} else {
+				binding.uses.push(activeHandler ? { viaHandler: activeHandler } : region);
+			}
+		} else if (binding?.kind === 'locality-handler') {
+			if (activeDerivedValue !== null && effect === null) {
+				binding.uses.push({ region, viaHandler: activeHandler, viaDerived: activeDerivedValue });
+				activeDerivedValue.helpers.add(binding);
+			} else {
+				binding.uses.push({ region, event, viaHandler: activeHandler, effect });
+				if (effect !== null) effect.helpers.add(binding);
+			}
+		}
+	}
+
+	function ownsTemplate(body, name) {
+		body = unwrap(body);
+		if (body?.type === 'JSXCodeBlock') return true;
+		if (!/^[A-Z]/.test(name ?? '')) return false;
+		if (body?.type === 'JSXElement' || body?.type === 'JSXFragment') return true;
+		return (
+			body?.type === 'BlockStatement' &&
+			(body.body ?? []).some((statement) => {
+				const argument = statement.type === 'ReturnStatement' ? unwrap(statement.argument) : null;
+				return argument?.type === 'JSXElement' || argument?.type === 'JSXFragment';
+			})
+		);
+	}
+
+	function walkPatternExpressions(pattern, scope, region, effect) {
+		if (pattern == null) return;
+		switch (pattern.type) {
+			case 'AssignmentPattern':
+				walkPatternExpressions(pattern.left, scope, region, effect);
+				walk(pattern.right, scope, region, effect);
+				return;
+			case 'ArrayPattern':
+				for (const element of pattern.elements ?? []) {
+					walkPatternExpressions(element, scope, region, effect);
+				}
+				return;
+			case 'ObjectPattern':
+				for (const property of pattern.properties ?? []) {
+					if (property.type === 'Property') {
+						if (property.computed) walk(property.key, scope, region, effect);
+						walkPatternExpressions(property.value, scope, region, effect);
+					} else walkPatternExpressions(property, scope, region, effect);
+				}
+				return;
+			case 'RestElement':
+				walkPatternExpressions(pattern.argument, scope, region, effect);
+				return;
+			case 'TSParameterProperty':
+				walkPatternExpressions(pattern.parameter, scope, region, effect);
+				return;
+		}
+	}
+
+	function walk(node, scope, region, effect = null, event = null) {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child, scope, region, effect, event);
+			return;
+		}
+		if (TRANSPARENT_EXPRESSIONS.has(node.type)) {
+			walk(node.expression, scope, region, effect, event);
+			return;
+		}
+		if (node.type === 'TSEnumDeclaration') {
+			for (const member of node.body?.members ?? node.members ?? []) {
+				walk(member.initializer, scope, region, effect);
+			}
+			return;
+		}
+		if (node.type === 'TSModuleDeclaration') {
+			walk(node.body, scope, region, effect);
+			return;
+		}
+		if (node.type === 'TSModuleBlock') {
+			const namespaceScope = createScope(scope, 'block', node.body ?? []);
+			for (const statement of node.body ?? []) walk(statement, namespaceScope, region, effect);
+			return;
+		}
+		if (node.type?.startsWith('TS')) return;
+		switch (node.type) {
+			case 'ImportDeclaration':
+			case 'JSXIdentifier':
+			case 'Literal':
+				return;
+			case 'Identifier': {
+				useBinding(node.name, scope, region, effect, event);
+				return;
+			}
+			case 'ExportNamedDeclaration':
+			case 'ExportDefaultDeclaration':
+				walk(node.declaration, scope, region, effect);
+				return;
+			case 'FunctionDeclaration':
+			case 'FunctionExpression':
+			case 'ArrowFunctionExpression': {
+				const previousHandler = activeHandler;
+				const declared =
+					node.type === 'FunctionDeclaration' && node.id?.name
+						? resolve(scope, node.id.name)
+						: null;
+				const ownTemplate = ownsTemplate(node.body, node.id?.name ?? activeHandler?.node.id?.name);
+				if (ownTemplate) activeHandler = null;
+				else if (declared?.kind === 'locality-handler') activeHandler = declared;
+				try {
+					const body = node.body;
+					// A new component owns its own template; ordinary closures retain the
+					// owner's region so inline event callbacks count as local uses.
+					const owner =
+						ownTemplate || region === null ? templateArm(node, null, 'component') : region;
+					const statements =
+						body?.type === 'BlockStatement' || body?.type === 'JSXCodeBlock' ? body.body : [];
+					const functionScope = createScope(scope, 'function', statements, node.params ?? []);
+					if (mayHaveHoistedVars) predeclareNestedVars(body, functionScope);
+					if (node.id?.name) functionScope.bindings.set(node.id.name, OTHER_BINDING);
+					if (ownTemplate || region === null) register(statements, functionScope, owner);
+					const parameterScope = createScope(scope, 'function', [], node.params ?? []);
+					for (const parameter of node.params ?? []) {
+						walkPatternExpressions(parameter, parameterScope, region, effect);
+					}
+					if (body?.type === 'BlockStatement' || body?.type === 'JSXCodeBlock') {
+						for (const statement of statements ?? [])
+							walk(statement, functionScope, owner, effect, event);
+						if (body.render) walk(body.render, functionScope, owner, effect, event);
+					} else {
+						walk(body, functionScope, owner, effect, event);
+					}
+					return;
+				} finally {
+					activeHandler = previousHandler;
+				}
+			}
+			case 'BlockStatement':
+				block(node, scope, region, effect, false, event);
+				return;
+			case 'JSXCodeBlock':
+				block(node, scope, templateArm(node, region, '@{} block', true), effect, true, event);
+				return;
+			case 'CatchClause': {
+				const catchScope = createScope(scope, 'block', [], [node.param]);
+				walkPatternExpressions(node.param, catchScope, region, effect);
+				walk(node.body, catchScope, region, effect);
+				return;
+			}
+			case 'ForStatement': {
+				const loopScope = createScope(
+					scope,
+					'block',
+					node.init?.type === 'VariableDeclaration' ? [node.init] : [],
+				);
+				walk(node.init, loopScope, region, effect);
+				walk(node.test, loopScope, region, effect);
+				walk(node.update, loopScope, region, effect);
+				walk(node.body, loopScope, region, effect);
+				return;
+			}
+			case 'ForInStatement':
+			case 'ForOfStatement': {
+				walk(node.right, scope, region, effect);
+				const loopScope = createScope(
+					scope,
+					'block',
+					node.left?.type === 'VariableDeclaration' ? [node.left] : [],
+				);
+				walk(node.left, loopScope, region, effect);
+				walk(node.body, loopScope, region, effect);
+				return;
+			}
+			case 'SwitchStatement': {
+				walk(node.discriminant, scope, region, effect);
+				const statements = (node.cases ?? []).flatMap((branch) => branch.consequent ?? []);
+				const switchScope = createScope(scope, 'block', statements);
+				register(statements, switchScope, region);
+				for (const branch of node.cases ?? []) {
+					walk(branch.test, switchScope, region, effect);
+					for (const statement of branch.consequent ?? []) {
+						walk(statement, switchScope, region, effect);
+					}
+				}
+				return;
+			}
+			case 'StaticBlock': {
+				const staticScope = createScope(scope, 'block', node.body ?? []);
+				register(node.body, staticScope, region);
+				for (const statement of node.body ?? []) walk(statement, staticScope, region, effect);
+				return;
+			}
+			case 'ClassDeclaration':
+			case 'ClassExpression': {
+				walk(node.superClass, scope, region, effect);
+				const classScope = createScope(scope, 'block', [], node.id ? [node.id] : []);
+				walk(node.body, classScope, region, effect);
+				return;
+			}
+			case 'MethodDefinition':
+			case 'PropertyDefinition':
+			case 'AccessorProperty':
+				if (node.computed) walk(node.key, scope, region, effect);
+				walk(node.value, scope, region, effect);
+				return;
+			case 'LabeledStatement':
+				walk(node.body, scope, region, effect);
+				return;
+			case 'BreakStatement':
+			case 'ContinueStatement':
+				return;
+			case 'JSXIfExpression':
+				conditionalArms(node, scope, region, effect);
+				return;
+			case 'JSXForExpression': {
+				walk(node.right, scope, region, effect);
+				const rowScope = createScope(scope, 'function', [node.left]);
+				addPatternNames(node.index, rowScope.bindings, OTHER_BINDING);
+				for (const declaration of node.left?.declarations ?? []) {
+					walkPatternExpressions(declaration.id, rowScope, region, effect);
+				}
+				walkPatternExpressions(node.index, rowScope, region, effect);
+				walk(node.key, rowScope, region, effect);
+				arm(node.body, rowScope, region, node, '@for row');
+				arm(node.empty, scope, region, node, '@empty arm');
+				return;
+			}
+			case 'JSXSwitchExpression':
+				walk(node.discriminant, scope, region, effect);
+				for (const branch of node.cases ?? []) {
+					walk(branch.test, scope, region, effect);
+					const owner = templateArm(
+						branch,
+						region,
+						branch.test == null ? '@default arm' : '@case arm',
+					);
+					const caseScope = createScope(scope, 'function', branch.consequent ?? []);
+					if (mayHaveHoistedVars) predeclareNestedVars(branch.consequent, caseScope);
+					register(branch.consequent, caseScope, owner);
+					for (const statement of branch.consequent ?? []) walk(statement, caseScope, owner);
+				}
+				return;
+			case 'JSXTryExpression':
+				arm(node.block, scope, region, node, '@try arm');
+				arm(node.pending, scope, region, node, '@pending arm');
+				if (node.handler) {
+					const catchScope = createScope(
+						scope,
+						'block',
+						[],
+						[node.handler.param, node.handler.resetParam],
+					);
+					arm(node.handler.body, catchScope, region, node, '@catch arm');
+				}
+				return;
+			case 'VariableDeclaration':
+				for (const declaration of node.declarations ?? []) {
+					walkPatternExpressions(declaration.id, scope, region, effect);
+					const previousHandler = activeHandler;
+					const declared =
+						declaration.id?.type === 'Identifier' ? resolve(scope, declaration.id.name) : null;
+					if (declared?.kind === 'locality-handler' && declared.node === declaration) {
+						activeHandler = declared;
+					}
+					try {
+						walk(declaration.init, scope, region, effect);
+					} finally {
+						activeHandler = previousHandler;
+					}
+				}
+				return;
+			case 'Property':
+				if (node.computed) walk(node.key, scope, region, effect);
+				walk(node.value, scope, region, effect);
+				return;
+			case 'MemberExpression':
+				walk(node.object, scope, region, effect);
+				if (node.computed) walk(node.property, scope, region, effect);
+				return;
+			case 'JSXElement': {
+				const name = node.openingElement?.name;
+				if (name?.type === 'JSXIdentifier' && /^[a-z]/.test(name.name)) {
+					for (const attribute of node.openingElement.attributes ?? []) {
+						if (attribute.type === 'JSXAttribute') hostAttributes.add(attribute);
+					}
+				}
+				walk(node.openingElement, scope, region, effect);
+				walk(node.children, scope, region, effect);
+				return;
+			}
+			case 'JSXOpeningElement': {
+				let tag = node.name;
+				const member = tag?.type === 'JSXMemberExpression';
+				while (tag?.type === 'JSXMemberExpression') tag = tag.object;
+				if (tag?.type === 'JSXIdentifier' && (member || /^[A-Z]/.test(tag.name))) {
+					const binding = resolve(scope, tag.name);
+					if (!member && binding?.kind === 'locality-handler') componentHandlers.add(binding);
+					useBinding(tag.name, scope, region, effect, null);
+				}
+				walk(node.attributes, scope, region, effect);
+				return;
+			}
+			case 'JSXAttribute': {
+				const name = node.name?.name;
+				const expression = unwrap(node.value?.expression);
+				const attribute =
+					hostAttributes.has(node) &&
+					typeof name === 'string' &&
+					/^on[A-Z]/.test(name) &&
+					(expression?.type === 'Identifier' || FUNCTION_TYPES.has(expression?.type))
+						? node
+						: null;
+				walk(node.value, scope, region, effect, attribute);
+				return;
+			}
+			case 'CallExpression': {
+				const localEffect = effectByCall.get(node) ?? effect;
+				const previousDerived = activeDerivedValue;
+				activeDerivedValue = valueByCall.get(node) ?? previousDerived;
+				try {
+					walk(node.callee, scope, region, localEffect, event);
+					walk(node.arguments, scope, region, localEffect, event);
+				} finally {
+					activeDerivedValue = previousDerived;
+				}
+				return;
+			}
+			case 'MetaProperty':
+				return;
+		}
+		for (const key in node) {
+			if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) {
+				walk(node[key], scope, region, effect, event);
+			}
+		}
+	}
+
+	for (const statement of ast.body ?? []) walk(statement, moduleScope, null);
+
+	function within(region, ancestor) {
+		for (let current = region; current !== null; current = current.parent) {
+			if (current === ancestor) return true;
+		}
+		return false;
+	}
+
+	// A hook, the callbacks that capture it, and effects that observe it must
+	// agree on one owner. Grouping these dependencies once avoids repeatedly
+	// recalculating every owner for a chain of effects.
+	// Only referenced helpers constrain ownership. An unused closure can read
+	// several hooks needed by separate blocks without sharing their lifetime.
+	const consumedHandlers = new Set();
+	const capturedHandlers = new Map();
+	for (const handler of handlers) {
+		if (componentHandlers.has(handler)) consumedHandlers.add(handler);
+		for (const use of handler.uses) {
+			if (use.viaHandler) {
+				let captured = capturedHandlers.get(use.viaHandler);
+				if (captured === undefined) capturedHandlers.set(use.viaHandler, (captured = []));
+				captured.push(handler);
+			} else {
+				consumedHandlers.add(handler);
+			}
+		}
+	}
+	const reachable = [...consumedHandlers];
+	for (let index = 0; index < reachable.length; index++) {
+		for (const captured of capturedHandlers.get(reachable[index]) ?? []) {
+			if (consumedHandlers.has(captured)) continue;
+			consumedHandlers.add(captured);
+			reachable.push(captured);
+		}
+	}
+	const unusedCaptures = new Map();
+	const nodes = [...values, ...effects, ...handlers];
+	const edges = new Map(nodes.map((node) => [node, new Set()]));
+	const directUses = new Map(nodes.map((node) => [node, []]));
+	function connect(left, right) {
+		if (left === right || !edges.has(left) || !edges.has(right)) return;
+		edges.get(left).add(right);
+		edges.get(right).add(left);
+	}
+	for (const value of values) {
+		for (const use of value.uses) {
+			if (use?.viaHandler) {
+				if (consumedHandlers.has(use.viaHandler)) {
+					connect(value, use.viaHandler);
+				} else {
+					let unused = unusedCaptures.get(value);
+					if (unused === undefined) unusedCaptures.set(value, (unused = new Set()));
+					unused.add(use.viaHandler);
+				}
+			} else directUses.get(value).push(use?.region ?? use);
+		}
+		for (const dependency of value.dependencies) connect(value, dependency);
+		for (const helper of value.helpers) connect(value, helper);
+	}
+	for (const effect of effects) {
+		for (const dependency of effect.dependencies) connect(effect, dependency);
+		for (const helper of effect.helpers) connect(effect, helper);
+		// An effect already declared in a nested block uses its dependencies
+		// there. A parent effect can instead move with its dependencies.
+		if (effect.region?.sameLifetime) directUses.get(effect).push(effect.region);
+	}
+	for (const handler of handlers) {
+		for (const use of handler.uses) {
+			if (use.viaHandler) {
+				if (consumedHandlers.has(use.viaHandler)) connect(handler, use.viaHandler);
+			} else if (use.viaDerived) connect(handler, use.viaDerived);
+			else if (use.effect) connect(handler, use.effect);
+			else directUses.get(handler).push(use.region);
+		}
+		// An unused helper does not consume its captured hooks in this region;
+		// keep an actual component reference anchored to its own lifetime.
+		if (componentHandlers.has(handler)) {
+			directUses.get(handler).push(handler.region);
+		}
+	}
+
+	function commonAncestor(left, right) {
+		for (let current = left; current !== null; current = current.parent) {
+			if (within(right, current)) return current;
+		}
+		return null;
+	}
+
+	function canMoveInto(owner, declarationRegion) {
+		for (let current = owner; current !== null; current = current.parent) {
+			if (current === declarationRegion) return true;
+			// A directive arm or keyed row changes hook lifetime. Only a
+			// nested @{} block within the same lifetime can own this value.
+			if (!current.sameLifetime) return false;
+		}
+		return false;
+	}
+
+	const visited = new Set();
+	for (const node of nodes) {
+		if (visited.has(node)) continue;
+		const group = [];
+		const pending = [node];
+		visited.add(node);
+		while (pending.length > 0) {
+			const member = pending.pop();
+			group.push(member);
+			for (const neighbor of edges.get(member)) {
+				if (visited.has(neighbor)) continue;
+				visited.add(neighbor);
+				pending.push(neighbor);
+			}
+		}
+		let common;
+		for (const member of group) {
+			for (const use of directUses.get(member)) {
+				common = common === undefined ? use : commonAncestor(common, use);
+			}
+		}
+		if (common == null) continue;
+		let owner = common;
+		while (owner !== null && !group.every((member) => canMoveInto(owner, member.region))) {
+			owner = owner.parent;
+		}
+		if (owner === null) continue;
+		// A rewritten function declaration is not a stable capture of the hook
+		// values seen in its original body. Check this only for candidate moves,
+		// leaving the expensive reassignment scan lazy on ordinary modules.
+		if (
+			group.some(
+				(member) =>
+					member.kind === 'locality-handler' &&
+					member.region !== owner &&
+					member.node.type === 'FunctionDeclaration' &&
+					isReassigned(member.node.id),
+			)
+		)
+			continue;
+
+		const toMove = group.filter(
+			(member) => member.kind === 'locality-handler' && member.region !== owner,
+		);
+		const names = toMove
+			.slice(0, 3)
+			.map((helper) => helper.node.id?.name)
+			.filter(Boolean);
+		const helperText =
+			toMove.length === 0
+				? ''
+				: ` and ${toMove.length === 1 ? 'its helper' : 'its helpers'} ${names.join(', ')}${toMove.length > 3 ? ` and ${toMove.length - 3} more` : ''}`;
+		for (const member of group) {
+			if (member.region === owner) continue;
+			if (member.kind === 'locality-value') {
+				const unused = unusedCaptures.get(member);
+				const unusedNames = unused
+					? [...unused].slice(0, 3).map((helper) => helper.node.id.name)
+					: [];
+				const unusedText =
+					unusedNames.length === 0
+						? ''
+						: ` Remove unused ${unused.size === 1 ? 'helper' : 'helpers'} ${unusedNames.join(', ')}${unused.size > 3 ? ` and ${unused.size - 3} more` : ''}, which still ${unused.size === 1 ? 'captures' : 'capture'} this value, before moving it.`;
+				diagnostics.push(
+					diagnostic(
+						STRONG_HOOK_LOCALITY,
+						filename,
+						member.node,
+						`Move ${member.hook}${helperText} into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, before the JSX or local effect that uses its value.${unusedText}`,
+					),
+				);
+			} else if (
+				member.kind !== 'locality-handler' &&
+				(member.dependencies.size > 0 || member.helpers.size > 0)
+			) {
+				diagnostics.push(
+					diagnostic(
+						STRONG_HOOK_LOCALITY,
+						filename,
+						member.node,
+						`Move ${member.hook} into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, beside the local hook values it reads and before that scope's JSX output.`,
+					),
+				);
+			}
+		}
+	}
+	// A callback may safely move beside its sole event even when a hook it
+	// captures is also consumed by the parent or by a sibling block. Determine
+	// handler placement from handler uses separately from hook ownership.
+	const eventHandlers = handlers.filter((handler) => handler.uses.some((use) => use.event != null));
+	if (eventHandlers.length === 0) return diagnostics;
+
+	function mergeOwner(left, right) {
+		if (left === undefined) return right;
+		if (right === undefined) return left;
+		return commonAncestor(left, right);
+	}
+	const eventOwners = new Map();
+	if (
+		eventHandlers.length <= 2 ||
+		!handlers.some((handler) => handler.uses.some((use) => use.viaHandler))
+	) {
+		// A couple of walks, or independent handlers, cost less than building
+		// a graph in the common case.
+		for (const handler of eventHandlers) {
+			const seen = new Set();
+			const pending = [handler];
+			let owner;
+			while (pending.length > 0) {
+				const current = pending.pop();
+				if (seen.has(current)) continue;
+				seen.add(current);
+				if (componentHandlers.has(current) || current.uses.length === 0) {
+					owner = mergeOwner(owner, current.region);
+					continue;
+				}
+				for (const use of current.uses) {
+					if (use.viaHandler) pending.push(use.viaHandler);
+					else owner = mergeOwner(owner, use.viaDerived ? current.region : use.region);
+				}
+			}
+			eventOwners.set(handler, owner);
+		}
+	} else {
+		// A helper can be used by several callbacks, including a recursive cycle.
+		// Collapse those cycles, then inherit the common use region through the
+		// resulting DAG once instead of retraversing a chain for every event.
+		const handlerIndex = new Map(handlers.map((handler, index) => [handler, index]));
+		const dependencies = handlers.map(() => []);
+		const dependents = handlers.map(() => []);
+		const directOwners = new Array(handlers.length);
+		for (let index = 0; index < handlers.length; index++) {
+			const handler = handlers[index];
+			if (componentHandlers.has(handler) || handler.uses.length === 0) {
+				directOwners[index] = handler.region;
+				continue;
+			}
+			for (const use of handler.uses) {
+				if (use.viaHandler) {
+					const target = handlerIndex.get(use.viaHandler);
+					if (target !== undefined) {
+						dependencies[index].push(target);
+						dependents[target].push(index);
+					}
+				} else {
+					directOwners[index] = mergeOwner(
+						directOwners[index],
+						use.viaDerived ? handler.region : use.region,
+					);
+				}
+			}
+		}
+		const visitedHandlers = new Uint8Array(handlers.length);
+		const nextDependency = new Uint32Array(handlers.length);
+		const finishOrder = [];
+		for (let index = 0; index < handlers.length; index++) {
+			if (visitedHandlers[index]) continue;
+			visitedHandlers[index] = 1;
+			const pending = [index];
+			while (pending.length > 0) {
+				const current = pending[pending.length - 1];
+				const target = dependencies[current][nextDependency[current]++];
+				if (target !== undefined) {
+					if (!visitedHandlers[target]) {
+						visitedHandlers[target] = 1;
+						pending.push(target);
+					}
+				} else {
+					finishOrder.push(current);
+					pending.pop();
+				}
+			}
+		}
+		const componentByHandler = new Int32Array(handlers.length).fill(-1);
+		const componentOwners = [];
+		for (let index = finishOrder.length - 1; index >= 0; index--) {
+			const start = finishOrder[index];
+			if (componentByHandler[start] !== -1) continue;
+			const component = componentOwners.length;
+			let owner;
+			const pending = [start];
+			componentByHandler[start] = component;
+			while (pending.length > 0) {
+				const current = pending.pop();
+				owner = mergeOwner(owner, directOwners[current]);
+				for (const previous of dependents[current]) {
+					if (componentByHandler[previous] !== -1) continue;
+					componentByHandler[previous] = component;
+					pending.push(previous);
+				}
+			}
+			componentOwners.push(owner);
+		}
+		const componentDependencies = componentOwners.map(() => new Set());
+		const componentDependents = componentOwners.map(() => []);
+		for (let index = 0; index < handlers.length; index++) {
+			const from = componentByHandler[index];
+			for (const target of dependencies[index]) {
+				const to = componentByHandler[target];
+				if (from === to || componentDependencies[from].has(to)) continue;
+				componentDependencies[from].add(to);
+				componentDependents[to].push(from);
+			}
+		}
+		const remainingDependencies = componentDependencies.map((targets) => targets.size);
+		const ready = [];
+		for (let index = 0; index < remainingDependencies.length; index++) {
+			if (remainingDependencies[index] === 0) ready.push(index);
+		}
+		for (let index = 0; index < ready.length; index++) {
+			const current = ready[index];
+			for (const previous of componentDependents[current]) {
+				componentOwners[previous] = mergeOwner(componentOwners[previous], componentOwners[current]);
+				if (--remainingDependencies[previous] === 0) ready.push(previous);
+			}
+		}
+		for (const handler of eventHandlers) {
+			eventOwners.set(handler, componentOwners[componentByHandler[handlerIndex.get(handler)]]);
+		}
+	}
+	for (const handler of eventHandlers) {
+		let owner = eventOwners.get(handler);
+		while (owner != null && !canMoveInto(owner, handler.region)) owner = owner.parent;
+		if (owner == null || owner === handler.region) continue;
+		if (handler.node.type === 'FunctionDeclaration' && isReassigned(handler.node.id)) continue;
+		const name = handler.node.id?.name;
+		const inlineAlternative =
+			handler.uses.length === 1
+				? ' Alternatively, define the callback inline at that event attribute.'
+				: '';
+		diagnostics.push(
+			diagnostic(
+				STRONG_EVENT_HANDLER_LOCALITY,
+				filename,
+				handler.node,
+				`Move the ${name ?? 'event'} handler into the ${owner.label} at line ${owner.node.loc?.start?.line ?? 1}, before the JSX event attribute that uses it.${inlineAlternative}`,
+			),
+		);
+	}
+	return diagnostics;
+}
+
 /**
  * Analyze only modules that explicitly opted in. The authored parser tree is
  * read-only: scope information stays in local maps instead of annotating AST
@@ -339,22 +1206,86 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	const reportedDiagnostics = new WeakMap();
 	const hoistedVarNames = new WeakMap();
 	const mayHaveHoistedVars = source.includes('var');
+	const renderRoots = new WeakSet();
+	let hasNestedCodeBlock = false;
+	const renderOutputs = new WeakMap();
+	function hasRenderOutput(fn) {
+		if (!FUNCTION_TYPES.has(fn?.type)) return false;
+		const known = renderOutputs.get(fn);
+		if (known !== undefined) return known;
+		function containsJsx(value) {
+			if (value == null || typeof value !== 'object') return false;
+			if (Array.isArray(value)) return value.some(containsJsx);
+			if (
+				FUNCTION_TYPES.has(value.type) ||
+				value.type === 'ClassDeclaration' ||
+				value.type === 'ClassExpression'
+			) {
+				return false;
+			}
+			if (
+				value.type === 'JSXCodeBlock' ||
+				value.type === 'JSXElement' ||
+				value.type === 'JSXFragment'
+			) {
+				return true;
+			}
+			for (const key in value) {
+				if (!SKIP_KEYS.has(key) && !key.startsWith('_octane') && containsJsx(value[key]))
+					return true;
+			}
+			return false;
+		}
+		const result = containsJsx(fn.body);
+		renderOutputs.set(fn, result);
+		return result;
+	}
+	function addNamedRenderRoot(fn, name) {
+		if (
+			FUNCTION_TYPES.has(fn?.type) &&
+			(/^(?:unstable_)?use[A-Z0-9]/.test(name) || (/^[A-Z]/.test(name) && hasRenderOutput(fn)))
+		) {
+			renderRoots.add(fn);
+		}
+	}
+	for (const statement of ast.body ?? []) {
+		const declaration = declarationOf(statement);
+		if (declaration?.type === 'VariableDeclaration') {
+			for (const binding of declaration.declarations ?? []) {
+				if (binding.id?.type === 'Identifier') {
+					addNamedRenderRoot(unwrap(binding.init), binding.id.name);
+				}
+			}
+		} else {
+			addNamedRenderRoot(declaration, declaration?.id?.name ?? '');
+			if (statement.type === 'ExportDefaultDeclaration' && hasRenderOutput(declaration)) {
+				renderRoots.add(declaration);
+			}
+		}
+	}
 	let returnCycles = 0;
 	let currentFunctionIsAsync = false;
+	let currentFunctionChecksImpureCalls = false;
+	let currentRetainedRowScope = null;
 
 	function predeclareHoistedVars(node, scope) {
 		if (!mayHaveHoistedVars || node == null) return;
 		let names = hoistedVarNames.get(node);
 		if (names === undefined) {
 			names = new Map();
-			function collect(value) {
+			function collect(value, root = true) {
 				if (value == null || typeof value !== 'object') return;
 				if (Array.isArray(value)) {
-					for (const child of value) collect(child);
+					for (const child of value) collect(child, false);
 					return;
 				}
 				if (
 					FUNCTION_TYPES.has(value.type) ||
+					(!root && value.type === 'JSXCodeBlock') ||
+					value.type === 'JSXIfExpression' ||
+					value.type === 'JSXForExpression' ||
+					value.type === 'JSXSwitchExpression' ||
+					value.type === 'JSXTryExpression' ||
 					value.type === 'ClassDeclaration' ||
 					value.type === 'ClassExpression' ||
 					value.type === 'StaticBlock' ||
@@ -368,7 +1299,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					}
 				}
 				for (const key in value) {
-					if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) collect(value[key]);
+					if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) collect(value[key], false);
 				}
 			}
 			collect(node);
@@ -403,6 +1334,87 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			node,
 			'Strong mode does not allow writing to useRef.current during render. Move the write to an event or effect, or express the value as state.',
 		);
+	}
+
+	function reportSnapshotMutation(node) {
+		report(
+			STRONG_RENDER_SNAPSHOT_MUTATION,
+			node,
+			'Strong mode does not allow mutating a state snapshot during render. Derive a local copy, or pass a new value to the state updater from an event.',
+		);
+	}
+
+	function reportSnapshotWrite(target, scope) {
+		const member = unwrap(target);
+		if (member?.type === 'MemberExpression' && snapshotBinding(member.object, scope) !== null) {
+			reportSnapshotMutation(member);
+		}
+	}
+
+	function reportRetainedRowMutation(target, scope) {
+		if (currentRetainedRowScope === null) return;
+		const identifiers = [];
+		function collectWriteRoots(value) {
+			const node = unwrap(value);
+			if (node?.type === 'Identifier') {
+				identifiers.push(node);
+			} else if (node?.type === 'MemberExpression') {
+				collectWriteRoots(node.object);
+			} else if (node?.type === 'AssignmentPattern') {
+				collectWriteRoots(node.left);
+			} else if (node?.type === 'ArrayPattern') {
+				for (const element of node.elements ?? []) collectWriteRoots(element);
+			} else if (node?.type === 'ObjectPattern') {
+				for (const property of node.properties ?? []) {
+					collectWriteRoots(property.argument ?? property.value);
+				}
+			} else if (node?.type === 'RestElement' || node?.type === 'TSParameterProperty') {
+				collectWriteRoots(node.argument ?? node.parameter);
+			}
+		}
+		collectWriteRoots(target);
+		for (const identifier of identifiers) {
+			const owner = resolveScope(scope, identifier.name);
+			for (let outer = currentRetainedRowScope.parent; outer; outer = outer.parent) {
+				if (owner !== outer) continue;
+				report(
+					STRONG_RETAINED_ROW_MUTATION,
+					identifier,
+					'Strong mode does not allow a keyed @for row to mutate a binding declared outside that row. Build mutable data before the @for, or derive each row only from its item and witnessed snapshots.',
+				);
+				return;
+			}
+		}
+	}
+
+	function reportImpureCall(node) {
+		report(
+			STRONG_RENDER_IMPURE_CALL,
+			node,
+			'Strong mode does not allow nondeterministic calls during render. Read time or randomness outside render and pass the result as a prop or state snapshot.',
+		);
+	}
+
+	function unshadowedGlobal(node, scope, name) {
+		const value = unwrap(node);
+		return value?.type === 'Identifier' && value.name === name && resolve(scope, name) === null;
+	}
+
+	function impureStandardCall(callee, scope) {
+		if (unshadowedGlobal(callee, scope, 'Date')) return true;
+		if (callee?.type !== 'MemberExpression') return false;
+		const object = unwrap(callee.object);
+		if (
+			object?.type !== 'Identifier' ||
+			(object.name !== 'Date' && object.name !== 'Math' && object.name !== 'performance') ||
+			resolve(scope, object.name) !== null
+		) {
+			return false;
+		}
+		const property = callee.computed
+			? staticPrimitiveValue(callee.property, scope)
+			: callee.property?.name;
+		return object.name === 'Math' ? property === 'random' : property === 'now';
 	}
 
 	function reportEffectEventCall(node) {
@@ -805,7 +1817,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 
 	function visitFunction(node, parentScope, phase, args = null) {
 		const enclosingFunctionIsAsync = currentFunctionIsAsync;
+		const enclosingFunctionChecksImpureCalls = currentFunctionChecksImpureCalls;
 		currentFunctionIsAsync = node.async === true;
+		if (phase === 'render' && !activeCallbacks.has(node)) {
+			// Ordinary module helpers may be used only by events. Check their
+			// standard calls when a known render root invokes them synchronously.
+			currentFunctionChecksImpureCalls =
+				renderRoots.has(node) || node.body?.type === 'JSXCodeBlock';
+		}
 		try {
 			const body = node.body;
 			let functionScope;
@@ -834,6 +1853,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			}
 		} finally {
 			currentFunctionIsAsync = enclosingFunctionIsAsync;
+			currentFunctionChecksImpureCalls = enclosingFunctionChecksImpureCalls;
 		}
 	}
 
@@ -841,6 +1861,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		let executionPhase = phase;
 		if (pattern?.type === 'TSParameterProperty') {
 			return visitPatternExpressions(pattern.parameter, scope, phase);
+		} else if (pattern?.type === 'Identifier') {
+			if (executionPhase === 'render') reportRetainedRowMutation(pattern, scope);
 		} else if (pattern?.type === 'AssignmentPattern') {
 			executionPhase = visitPatternExpressions(pattern.left, scope, executionPhase);
 			visit(pattern.right, scope, executionPhase);
@@ -862,6 +1884,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			}
 		} else if (pattern?.type === 'RestElement') {
 			executionPhase = visitPatternExpressions(pattern.argument, scope, executionPhase);
+		} else if (pattern?.type === 'MemberExpression') {
+			visit(pattern, scope, executionPhase);
+			executionPhase = phaseAfter(pattern, executionPhase, true);
+			if (executionPhase === 'render') {
+				reportSnapshotWrite(pattern, scope);
+				reportRetainedRowMutation(pattern, scope);
+			}
 		}
 		return executionPhase;
 	}
@@ -876,11 +1905,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				declarationKind === 'const' || !isReassigned(identifier) ? value : OTHER_BINDING,
 			);
 		}
-		const stateTuple =
-			(initial?.type === 'CallExpression' &&
-				STATE_HOOKS.has(importedHook(initial.callee, scope))) ||
-			(initial?.type === 'Identifier' && resolve(scope, initial.name)?.kind === 'state-tuple');
+		const stateTuple = stateTupleBinding(initial, scope);
+		const snapshot =
+			stateTuple === null && declarationKind === 'const' ? snapshotBinding(initial, scope) : null;
 		if (declaration.id?.type === 'ArrayPattern' && stateTuple) {
+			bindSnapshotPattern(declaration.id.elements?.[0], stateTuple.snapshot, bind);
 			const element = declaration.id.elements?.[1];
 			const setter = element?.type === 'AssignmentPattern' ? element.left : element;
 			bind(setter, { kind: 'setter' });
@@ -896,11 +1925,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const setter = value?.type === 'AssignmentPattern' ? value.left : value;
 				if ((key === 1 || key === '1') && setter?.type === 'Identifier') {
 					bind(setter, { kind: 'setter' });
+				} else if (key === 0 || key === '0') {
+					bindSnapshotPattern(value, stateTuple.snapshot, bind);
 				}
 			}
 		} else if (declaration.id?.type === 'Identifier') {
 			if (stateTuple) {
-				bind(declaration.id, { kind: 'state-tuple' });
+				bind(declaration.id, stateTuple);
 			} else if (
 				initial?.type === 'CallExpression' &&
 				importedHook(initial.callee, scope) === 'useRef'
@@ -908,6 +1939,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				bind(declaration.id, { kind: 'ref' });
 			} else if (declarationKind === 'const' && stateTupleUpdater(initial, scope)) {
 				target.bindings.set(declaration.id.name, { kind: 'setter' });
+			} else if (snapshot !== null) {
+				target.bindings.set(declaration.id.name, snapshot);
 			} else if (declarationKind === 'const' && initial?.type === 'Identifier') {
 				const value = resolve(scope, initial.name);
 				if (
@@ -966,7 +1999,40 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					});
 				}
 			}
+		} else if (snapshot !== null) {
+			bindSnapshotPattern(declaration.id, snapshot, bind);
 		}
+	}
+
+	function stateTupleBinding(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type === 'Identifier') {
+			const binding = resolve(scope, node.name);
+			return binding?.kind === 'state-tuple' ? binding : null;
+		}
+		if (node?.type !== 'CallExpression') return null;
+		const hook = importedHook(node.callee, scope);
+		if (!STATE_HOOKS.has(hook)) return null;
+		// A known array initializer is a narrow mutator check, not a judgment
+		// about arbitrary methods on object snapshots or opaque hook outputs.
+		return hook === 'useState' && unwrap(node.arguments?.[0])?.type === 'ArrayExpression'
+			? ARRAY_STATE_TUPLE_BINDING
+			: STATE_TUPLE_BINDING;
+	}
+
+	function snapshotBinding(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type === 'Identifier') {
+			const binding = resolve(scope, node.name);
+			return binding?.kind === 'snapshot' ? binding : null;
+		}
+		if (node?.type !== 'MemberExpression') return null;
+		const tuple = stateTupleBinding(node.object, scope);
+		if (tuple !== null && node.computed === true) {
+			const key = staticPrimitiveValue(node.property, scope);
+			if (key === 0 || key === '0') return tuple.snapshot;
+		}
+		return snapshotBinding(node.object, scope) !== null ? SNAPSHOT_BINDING : null;
 	}
 
 	function bindDeclaration(declaration, declarationKind, scope, phase) {
@@ -1437,6 +2503,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			if (
 				isCallableValue(binding) ||
 				binding?.kind === 'ref' ||
+				binding?.kind === 'snapshot' ||
 				binding?.kind === 'state-tuple' ||
 				binding?.kind === 'constant' ||
 				binding?.kind === 'linked-key'
@@ -1444,6 +2511,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return binding;
 			}
 		}
+		const snapshot = snapshotBinding(node, scope);
+		if (snapshot !== null) return snapshot;
+		const tuple = stateTupleBinding(node, scope);
+		if (tuple !== null) return tuple;
 		const result = returnedExpression(node, scope);
 		if (result.callback !== null) return result.callback;
 		return result.value === UNKNOWN_VALUE && result.primitive === UNKNOWN_PRIMITIVE
@@ -1613,8 +2684,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function visitSynchronousHookCallback(value, scope, phase) {
-		visitCallable(callableValue(value, scope), unwrap(value), phase);
+	function visitSynchronousHookCallback(value, scope, phase, stateInitializer = false) {
+		const checkImpureCalls = currentFunctionChecksImpureCalls;
+		// Lazy state initialization may read a clock or randomness. Keep its
+		// existing state/ref/Effect Event checks at the synchronous render phase.
+		if (stateInitializer) currentFunctionChecksImpureCalls = false;
+		try {
+			visitCallable(callableValue(value, scope), unwrap(value), phase);
+		} finally {
+			currentFunctionChecksImpureCalls = checkImpureCalls;
+		}
 	}
 
 	function containsEffectEvent(value) {
@@ -1805,6 +2884,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return;
 			case 'BlockStatement':
 			case 'JSXCodeBlock': {
+				if (node.type === 'JSXCodeBlock') hasNestedCodeBlock = true;
 				const block = createScope(scope, 'block', node.body ?? []);
 				const executionPhase = visitStatements(node.body, block, phase);
 				if (node.render) visit(node.render, block, executionPhase);
@@ -1927,6 +3007,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'CallExpression': {
 				const hook = importedHook(node.callee, scope);
 				const callee = unwrap(node.callee);
+				const wrapped =
+					hook === 'memo' || hook === 'lazy' ? callableValue(node.arguments?.[0], scope) : null;
+				const component =
+					wrapped?.kind === 'callback' && (hook === 'memo' || hasRenderOutput(wrapped.node))
+						? wrapped
+						: null;
 				if (!FUNCTION_TYPES.has(callee?.type)) {
 					visit(node.callee, scope, phase);
 				}
@@ -1941,7 +3027,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 								: -1;
 				for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
 					const argument = node.arguments[index];
-					if (index !== synchronousCallbackIndex || !FUNCTION_TYPES.has(unwrap(argument)?.type)) {
+					if (
+						(index !== synchronousCallbackIndex && !(index === 0 && component !== null)) ||
+						!FUNCTION_TYPES.has(unwrap(argument)?.type)
+					) {
 						visit(argument, scope, executionPhase);
 					}
 					executionPhase = phaseAfter(argument, executionPhase);
@@ -1965,17 +3054,50 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					return;
 				}
 				if (hook === 'useState' || hook === 'useMemo') {
-					visitSynchronousHookCallback(node.arguments?.[0], scope, executionPhase);
+					visitSynchronousHookCallback(
+						node.arguments?.[0],
+						scope,
+						executionPhase,
+						hook === 'useState',
+					);
 					return;
 				}
 				if (hook === 'useReducer') {
-					visitSynchronousHookCallback(node.arguments?.[2], scope, executionPhase);
+					visitSynchronousHookCallback(node.arguments?.[2], scope, executionPhase, true);
 					return;
 				}
 				if (hook === 'useLinkedState') {
 					visitSynchronousHookCallback(node.arguments?.[1], scope, executionPhase);
 					visitLinkedStateComparators(node.arguments?.[2], scope, executionPhase);
 					return;
+				}
+				if (component !== null) {
+					// memo owns a component callback. lazy also accepts a module
+					// loader, so require JSX evidence before treating it as a render.
+					const checkImpureCalls = currentFunctionChecksImpureCalls;
+					currentFunctionChecksImpureCalls = true;
+					try {
+						visitCallback(component.node, component.scope, 'render');
+					} finally {
+						currentFunctionChecksImpureCalls = checkImpureCalls;
+					}
+					return;
+				}
+				if (executionPhase === 'render') {
+					if (currentFunctionChecksImpureCalls && impureStandardCall(callee, scope)) {
+						reportImpureCall(callee);
+					}
+					if (callee?.type === 'MemberExpression') {
+						const method = callee.computed
+							? staticPrimitiveValue(callee.property, scope)
+							: callee.property?.name;
+						if (ARRAY_MUTATORS.has(method)) {
+							if (snapshotBinding(callee.object, scope)?.array === true) {
+								reportSnapshotMutation(callee);
+							}
+							reportRetainedRowMutation(callee.object, scope);
+						}
+					}
 				}
 				if (
 					executionPhase === 'render' ||
@@ -2007,6 +3129,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					scope,
 					phaseAfter(node.callee, phase),
 				);
+				if (
+					executionPhase === 'render' &&
+					currentFunctionChecksImpureCalls &&
+					node.arguments?.length === 0 &&
+					unshadowedGlobal(callee, scope, 'Date')
+				) {
+					reportImpureCall(callee);
+				}
 				if (inlineConstructor) {
 					visitCallback(callee, scope, executionPhase, argumentValues(node.arguments, scope));
 				} else if (
@@ -2062,12 +3192,27 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const rightPhase = phaseAfter(node.left, phase, true);
 				visit(node.right, scope, rightPhase);
 				const executionPhase = phaseAfter(node.right, rightPhase);
-				if (executionPhase === 'render' && currentRef(node.left, scope)) reportRef(node.left);
+				if (executionPhase === 'render') {
+					if (currentRef(node.left, scope)) reportRef(node.left);
+					reportSnapshotWrite(node.left, scope);
+					reportRetainedRowMutation(node.left, scope);
+				}
 				return;
 			}
 			case 'UpdateExpression':
 				if (phase === 'render' && currentRef(node.argument, scope)) reportRef(node.argument);
 				visit(node.argument, scope, phase);
+				if (phaseAfter(node.argument, phase, true) === 'render') {
+					reportSnapshotWrite(node.argument, scope);
+					reportRetainedRowMutation(node.argument, scope);
+				}
+				return;
+			case 'UnaryExpression':
+				visit(node.argument, scope, phase);
+				if (node.operator === 'delete' && phaseAfter(node.argument, phase, true) === 'render') {
+					reportSnapshotWrite(node.argument, scope);
+					reportRetainedRowMutation(node.argument, scope);
+				}
 				return;
 			case 'CatchClause': {
 				const catchScope = createScope(scope, 'block', [], node.param ? [node.param] : []);
@@ -2100,6 +3245,33 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				visit(node.body, loop, executionPhase);
 				visit(node.update, loop, executionPhase);
+				return;
+			}
+			case 'JSXForExpression': {
+				visit(node.right, scope, phase);
+				const executionPhase =
+					currentFunctionIsAsync &&
+					phase !== 'deferred' &&
+					(alwaysAwaits(node.right) || node.await === true)
+						? 'deferred'
+						: phase;
+				const row = createScope(scope, 'retained-row');
+				if (node.left?.type === 'VariableDeclaration') {
+					for (const declaration of node.left.declarations ?? []) {
+						addPatternNames(declaration.id, row.bindings, OTHER_BINDING);
+					}
+				}
+				addPatternNames(node.index, row.bindings, OTHER_BINDING);
+				visit(node.left, row, executionPhase);
+				const enclosingRetainedRowScope = currentRetainedRowScope;
+				currentRetainedRowScope = row;
+				try {
+					visit(node.key, row, executionPhase);
+					visit(node.body, row, executionPhase);
+				} finally {
+					currentRetainedRowScope = enclosingRetainedRowScope;
+				}
+				visit(node.empty, scope, executionPhase);
 				return;
 			}
 			case 'ForInStatement':
@@ -2152,6 +3324,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	for (const statement of ast.body ?? []) visit(statement, moduleScope, 'module');
+	if (hasNestedCodeBlock) {
+		diagnostics.push(...strongLocalityDiagnostics(ast, source, filename, isReassigned));
+	}
 	return { enabled, diagnostics };
 }
 

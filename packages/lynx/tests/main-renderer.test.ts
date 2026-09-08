@@ -32,6 +32,7 @@ import {
 	firstScreenEvent,
 	hmrUniversalComponent,
 	lazy,
+	markWarm,
 	renderLynxFirstScreen,
 	UNIVERSAL_HMR,
 	universalComponent,
@@ -524,10 +525,11 @@ describe('Lynx main-thread first-screen renderer', () => {
 			(props: { child: UniversalComponent<any>; childProps: Record<string, unknown> }) =>
 				universalComponent('lynx', props.child, props.childProps),
 		);
-		(Branch as any).__warm = (props: {
-			child: UniversalComponent<any>;
-			childProps: Record<string, unknown>;
-		}) => warmChild(props.child, props.childProps);
+		markWarm(
+			Branch,
+			(props: { child: UniversalComponent<any>; childProps: Record<string, unknown> }) =>
+				warmChild(props.child, props.childProps),
+		);
 		const branchProps = { child: Right, childProps: { label: 'right' } };
 		const Boundary = defineUniversalComponent('lynx', () => {
 			useBatch([], () => warmChild(Branch, branchProps));
@@ -542,6 +544,33 @@ describe('Lynx main-thread first-screen renderer', () => {
 			props: { state: 'pending' },
 		});
 		expect(calls).toEqual(['left', 'right']);
+	});
+
+	it('does not warm another component after its static descriptors are hoisted', () => {
+		const calls: string[] = [];
+		const Owner = markWarm(
+			() => null,
+			() => calls.push('stolen'),
+		);
+		const Wrapper = () => null;
+		Object.defineProperty(Wrapper, '__warm', Object.getOwnPropertyDescriptor(Owner, '__warm')!);
+		const Lazy = lazy(() => {
+			calls.push('lazy');
+			return new Promise<never>(() => {});
+		});
+		const Boundary = defineUniversalComponent('lynx', () => {
+			useBatch([], () => warmChild(Wrapper, {}));
+			return universalTry(
+				() => universalComponent('lynx', Lazy),
+				() => universalValue(rowPlan, [universalProps([['set', 'state', 'pending']])]),
+			);
+		});
+
+		expect(renderLynxFirstScreen(Boundary, {}).batch.commands[0]).toMatchObject({
+			op: 'create',
+			props: { state: 'pending' },
+		});
+		expect(calls).toEqual(['lazy']);
 	});
 
 	it('diagnoses pending lazy content that has no authored first-screen boundary', () => {

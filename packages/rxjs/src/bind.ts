@@ -27,6 +27,8 @@ export function bind(source: unknown, defaultValue?: unknown): readonly [unknown
 		const bound = hasDefault
 			? state(source as (...args: unknown[]) => Observable<unknown>, defaultValue)
 			: state(source as (...args: unknown[]) => Observable<unknown>);
+		// The manual provider adapter appends the call-site slot after every
+		// authored argument, so a factory's final Symbol remains user data.
 		const useBound = (...runtimeArgs: unknown[]) => {
 			const [args, slot] = splitSlot(runtimeArgs);
 			return useStateObservable(bound(...args), slot, args);

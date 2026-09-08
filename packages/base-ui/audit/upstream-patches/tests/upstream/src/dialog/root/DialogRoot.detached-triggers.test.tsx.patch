@@ -1,0 +1,95 @@
+diff --git a/tests/upstream/src/dialog/root/DialogRoot.detached-triggers.test.tsx b/tests/upstream/src/dialog/root/DialogRoot.detached-triggers.test.tsx
+--- a/tests/upstream/src/dialog/root/DialogRoot.detached-triggers.test.tsx
++++ b/tests/upstream/src/dialog/root/DialogRoot.detached-triggers.test.tsx
+@@ -1,4 +1,11 @@
+ /** @jsxImportSource octane */
++import { DelayedDialogFixture } from '../../../../fixtures/delayed-popup-ssr.tsrx';
++import { DelayedDialogFixture as ServerDelayedDialogFixture, createDialogHandle } from '../../../../fixtures/delayed-popup-ssr.tsrx?octane-ssr';
++registerServerComponent(DelayedDialogFixture, ServerDelayedDialogFixture);
++import { DialogDetachedTriggerFixture1 } from './../../../../fixtures/DialogRootdetached-triggers-extra-ssr.tsrx';
++import { DialogDetachedTriggerFixture1 as ServerDialogDetachedTriggerFixture1, createDialogHandle as createDetachedDialogHandle } from './../../../../fixtures/DialogRootdetached-triggers-extra-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(DialogDetachedTriggerFixture1, ServerDialogDetachedTriggerFixture1);
+ import { expect, vi, describe, beforeEach, it } from 'vitest';
+ import * as React from 'octane';
+ import type { UserEvent } from '@testing-library/user-event';
+@@ -21,12 +28,8 @@ describe('<Dialog.Root />', () => {
+       const handle = Dialog.createHandle();
+ 
+       const { hydrate } = renderToString(
+-        <React.Fragment>
+-          <Dialog.Root handle={handle} defaultOpen defaultTriggerId="trigger" />
+-          <Dialog.Trigger handle={handle} id="trigger">
+-            Trigger
+-          </Dialog.Trigger>
+-        </React.Fragment>,
++        <DialogDetachedTriggerFixture1 handle={handle} />,
++        { handle: createDetachedDialogHandle() },
+       );
+ 
+       const trigger = screen.getByRole('button', { name: 'Trigger' });
+@@ -43,40 +46,18 @@ describe('<Dialog.Root />', () => {
+ 
+     it('keeps the server snapshot stable when the root closes before a delayed trigger hydrates', async () => {
+       const handle = Dialog.createHandle();
+-      let suspend = false;
+       let resume: (() => void) | undefined;
+       const hydrationGate = new Promise<void>((resolve) => {
+         resume = resolve;
+       });
+ 
+-      function DelayedTrigger(): React.JSX.Element {
+-        if (suspend) {
+-          throw hydrationGate;
+-        }
++      const gate = { suspend: false, promise: hydrationGate };
+ 
+-        return (
+-          <Dialog.Trigger handle={handle} id="trigger">
+-            Trigger
+-          </Dialog.Trigger>
+-        );
+-      }
+-
+-      function App() {
+-        return (
+-          <React.Fragment>
+-            <Dialog.Root handle={handle} defaultOpen defaultTriggerId="trigger" />
+-            <React.Suspense fallback="Loading">
+-              <DelayedTrigger />
+-            </React.Suspense>
+-          </React.Fragment>
+-        );
+-      }
+-
+-      const { hydrate } = renderToString(<App />);
++      const { hydrate } = renderToString(<DelayedDialogFixture handle={handle} gate={gate} />, { handle: createDialogHandle(), gate });
+       const trigger = screen.getByRole('button', { name: 'Trigger' });
+       expect(trigger).toHaveAttribute('aria-expanded', 'false');
+ 
+-      suspend = true;
++      gate.suspend = true;
+       hydrate();
+ 
+       await waitFor(() => {
+@@ -86,7 +67,7 @@ describe('<Dialog.Root />', () => {
+       act(() => handle.close());
+       expect(trigger).toHaveAttribute('aria-expanded', 'false');
+ 
+-      suspend = false;
++      gate.suspend = false;
+       await act(async () => {
+         resume?.();
+         await hydrationGate;
+@@ -401,7 +382,10 @@ describe('<Dialog.Root />', () => {
+       expect(trigger).toHaveAttribute('aria-expanded', 'true');
+       expect(handle.isOpen).toBe(true);
+ 
+-      fireEvent.click(screen.getByRole('button', { name: 'Cancel replacement' }));
++      // Finishing useTransition publishes its pending state in a microtask.
++      await act(async () => {
++        fireEvent.click(screen.getByRole('button', { name: 'Cancel replacement' }));
++      });
+ 
+       expect(screen.queryByText('Replacement dialog')).toBe(null);
+       expect(screen.getByText('Current dialog')).toBeVisible();

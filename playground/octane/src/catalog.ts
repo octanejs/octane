@@ -18,6 +18,7 @@ import { InputOTPDemo } from './demos/InputOTP.tsrx';
 import { KeyedList } from './demos/KeyedList.tsrx';
 import { ReactSpringDemo } from './demos/ReactSpring.tsrx';
 import { ErrorBoundaryDemo } from './demos/ErrorBoundary.tsrx';
+import { FormischDemo } from './demos/Formisch.tsrx';
 import { LiveStoreDemo } from './demos/LiveStore.tsrx';
 import { ReactTextareaAutosizeDemo } from './demos/ReactTextareaAutosize.tsrx';
 import { ReactSyntaxHighlighterDemo } from './demos/ReactSyntaxHighlighter.tsrx';
@@ -31,6 +32,7 @@ import { PhosphorIconsDemo } from './demos/PhosphorIcons.tsrx';
 import { RxJSDemo } from './demos/RxJS.tsrx';
 import { RainbowKitDemo } from './demos/RainbowKit.tsrx';
 import { ReactDropzoneDemo } from './demos/ReactDropzone.tsrx';
+import { ReactResizablePanelsDemo } from './demos/ReactResizablePanels.tsrx';
 import { ReactMarkdownDemo } from './demos/ReactMarkdown.tsrx';
 import { ReactWindowDemo } from './demos/ReactWindow.tsrx';
 import { ShadcnBasesDemo } from './demos/ShadcnBases.tsrx';
@@ -58,6 +60,7 @@ import inputOTPSource from './demos/InputOTP.tsrx?raw';
 import keyedListSource from './demos/KeyedList.tsrx?raw';
 import reactSpringSource from './demos/ReactSpring.tsrx?raw';
 import errorBoundarySource from './demos/ErrorBoundary.tsrx?raw';
+import formischSource from './demos/Formisch.tsrx?raw';
 import liveStoreSource from './demos/LiveStore.tsrx?raw';
 import reactTextareaAutosizeSource from './demos/ReactTextareaAutosize.tsrx?raw';
 import reactSyntaxHighlighterSource from './demos/ReactSyntaxHighlighter.tsrx?raw';
@@ -71,6 +74,7 @@ import phosphorIconsSource from './demos/PhosphorIcons.tsrx?raw';
 import rxjsSource from './demos/RxJS.tsrx?raw';
 import rainbowKitSource from './demos/RainbowKit.tsrx?raw';
 import reactDropzoneSource from './demos/ReactDropzone.tsrx?raw';
+import reactResizablePanelsSource from './demos/ReactResizablePanels.tsrx?raw';
 import reactMarkdownSource from './demos/ReactMarkdown.tsrx?raw';
 import reactWindowSource from './demos/ReactWindow.tsrx?raw';
 import shadcnSource from './demos/ShadcnBases.tsrx?raw';
@@ -224,6 +228,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				source: intersectionObserverSource,
 			},
 			{
+				id: 'react-resizable-panels',
+				title: 'Resizable panels',
+				Component: ReactResizablePanelsDemo,
+				source: reactResizablePanelsSource,
+			},
+			{
 				id: 'cmdk',
 				title: 'Command menu',
 				Component: CommandMenu,
@@ -306,6 +316,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'MobX',
 				Component: MobxDemo,
 				source: mobxSource,
+			},
+			{
+				id: 'formisch',
+				title: 'Formisch',
+				Component: FormischDemo,
+				source: formischSource,
 			},
 			{
 				id: 'error-boundary',

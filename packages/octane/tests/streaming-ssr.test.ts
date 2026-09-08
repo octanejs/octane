@@ -2,24 +2,29 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
+import { setImmediate as nextHostTurn } from 'node:timers/promises';
 import { compile } from 'octane/compiler';
-import { act, hydrateRoot, flushSync } from '../src/index.js';
+import { act, createRoot, hydrateRoot, flushSync } from '../src/index.js';
 import * as ServerRT from 'octane/server';
 import * as HydrationRT from 'octane/hydration';
 import { prerender } from 'octane/static';
 import { initializeHydrationEventCapture, interaction } from 'octane/hydration';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
+import { collectPipeableStream, collectReadableStream } from './_server-stream.js';
 // CLIENT-compiled fixture (registers click delegation at import).
 import {
 	Boundary,
 	DeferredAsyncLeaf,
 	DeferredStreamWithLiveSibling,
+	DeferredStreamWithRetrySibling,
 	DeferredStreamedSuspense,
+	FactoryRejectionBoundary,
 	IdBoundary,
 	LateStyledBoundary,
 	NestedDeferredStreamedHydrates,
 	NestedStreamSeedScopes,
 	ReasonBoundary,
+	ReplayedStreamBoundary,
 	Siblings,
 	StyledBoundary,
 } from './_fixtures/ssr-suspense.tsrx';
@@ -126,6 +131,46 @@ afterEach(() => {
 });
 
 describe('renderToPipeableStream — chunk protocol', () => {
+	it.each([
+		['pipeable', collectPipeableStream],
+		['readable', collectReadableStream],
+	] as const)(
+		'hydrates the accepted render-phase content of a %s stream',
+		async (_name, collect) => {
+			const value = deferred<string>();
+			const rendered = collect(server.ReplayedStreamBoundary, { promise: value.promise });
+			value.resolve('ready');
+			const result = await rendered;
+			expect(result.errors).toEqual([]);
+			container.innerHTML = result.html;
+			activate(container);
+			const button = container.querySelector<HTMLButtonElement>('[data-replayed-stream]')!;
+			const shell = container.querySelector('p')!;
+			expect(button.textContent).toBe('Accepted: ready');
+			expect(button.id).not.toBe(shell.id);
+			const contentId = button.id;
+			const onClick = vi.fn();
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(
+				container,
+				ReplayedStreamBoundary as any,
+				{ promise: new Promise<string>(() => {}), onClick },
+				{ onRecoverableError },
+			);
+			try {
+				flushSync(() => {});
+				expect(container.querySelector('[data-replayed-stream]')).toBe(button);
+				expect(container.querySelector('p')).toBe(shell);
+				expect(button.id).toBe(contentId);
+				button.click();
+				expect(onClick).toHaveBeenCalledWith('ready');
+				expect(onRecoverableError).not.toHaveBeenCalled();
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
 	it('streams a deferred Hydrate child and later adopts its revealed DOM and seed', async () => {
 		const serverValue = deferred<string>();
 		const c = collector();
@@ -548,57 +593,177 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(onAllReady).toHaveBeenCalledOnce();
 	});
 
-	it('releases deferred activation when a pending stream degrades to client rendering', async () => {
-		const serverValue = deferred<string>();
-		const clientValue = deferred<string>();
-		const onClick = vi.fn();
-		const onHydrated = vi.fn();
-		const onError = vi.fn();
-		const when = interaction({ events: 'click' });
-		const c = collector();
-		const render = ServerRT.renderToPipeableStream(
-			server.DeferredStreamedSuspense,
-			{ promise: serverValue.promise, when },
-			{ onError },
-		);
-		render.pipe(c.dest);
+	it.each([
+		'act',
+		'retry deadline',
+		'retry deadline after sibling removal',
+		'retry deadline after replacement',
+	] as const)(
+		'releases deferred activation when a pending stream degrades to client rendering (%s)',
+		async (mode) => {
+			const timed = mode !== 'act';
+			const withSibling = mode === 'retry deadline after sibling removal';
+			const withReplacement = mode === 'retry deadline after replacement';
+			const recoveredValue = withReplacement ? 'Updated recovery' : 'Client recovery';
+			if (timed) {
+				vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+			}
+			const advance = async (ms = 0): Promise<void> => {
+				await vi.advanceTimersByTimeAsync(ms);
+				// Keep paint/host work real while the retry clock stays fixed. An empty
+				// act would obscure the distinction between a completed retry and commit.
+				await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+				for (let turn = 0; turn < 4; turn++) await nextHostTurn();
+			};
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			let recentFallbackRoot: ReturnType<typeof createRoot> | undefined;
+			const recentFallbackContainer = document.createElement('div');
+			try {
+				const visibleActions = () =>
+					Array.from(
+						container.querySelectorAll<HTMLButtonElement>('#deferred-stream-action'),
+					).filter((button) => {
+						for (
+							let ancestor: HTMLElement | null = button;
+							ancestor !== null;
+							ancestor = ancestor.parentElement
+						) {
+							if (ancestor.style.display === 'none' || ancestor.hidden) return false;
+						}
+						return true;
+					});
+				const started = performance.now();
+				const deliveries: Array<{ event: string; time: number; value: string | null }> = [];
+				const serverValue = deferred<string>();
+				const clientValue = deferred<string>();
+				const siblingValue = deferred<string>();
+				const onClick = vi.fn((value: string) => {
+					deliveries.push({ event: 'click', time: performance.now() - started, value });
+				});
+				const onHydrated = vi.fn(() => {
+					deliveries.push({
+						event: 'hydrated',
+						time: performance.now() - started,
+						value: visibleActions()[0]?.textContent ?? null,
+					});
+				});
+				const onError = vi.fn();
+				const when = interaction({ events: 'click' });
+				const c = collector();
+				const clientComponent = withSibling
+					? DeferredStreamWithRetrySibling
+					: DeferredStreamedSuspense;
+				const render = ServerRT.renderToPipeableStream(
+					withSibling ? server.DeferredStreamWithRetrySibling : server.DeferredStreamedSuspense,
+					{ promise: serverValue.promise, siblingPromise: serverValue.promise, when },
+					{ onError },
+				);
+				render.pipe(c.dest);
 
-		container.innerHTML = c.chunks.join('');
-		activate(container);
-		const shellChunkCount = c.chunks.length;
-		const fallback = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
-		const root = hydrateRoot(container, DeferredStreamedSuspense as any, {
-			promise: clientValue.promise,
-			when,
-			onClick,
-			onHydrated,
-		});
-		try {
-			fallback.click();
-			await act(() => {});
-			expect(onHydrated).not.toHaveBeenCalled();
+				container.innerHTML = c.chunks.join('');
+				activate(container);
+				const shellChunkCount = c.chunks.length;
+				const fallback = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
+				const clientProps = {
+					promise: clientValue.promise,
+					siblingPromise: siblingValue.promise,
+					when,
+					onClick,
+					onHydrated,
+				};
+				root = hydrateRoot(container, clientComponent as any, clientProps);
+				if (timed) {
+					// React 19.2.7 also throttles an aborted stream's client retry after
+					// a recent fallback, even when a click requested hydration. A real
+					// client fallback supplies the shared clock's observable starting point.
+					document.body.appendChild(recentFallbackContainer);
+					recentFallbackRoot = createRoot(recentFallbackContainer);
+					recentFallbackRoot.render(Boundary, { promise: new Promise<string>(() => {}) });
+					expect(recentFallbackContainer.querySelector('.loading')?.textContent).toBe('loading');
+				}
+				fallback.click();
+				if (timed) await advance();
+				else await act(() => {});
+				expect(onHydrated).not.toHaveBeenCalled();
 
-			render.abort(new Error('defer to client'));
-			await c.ended;
-			container.insertAdjacentHTML('beforeend', c.chunks.slice(shellChunkCount).join(''));
-			activate(container);
-			expect(container.querySelector('#deferred-stream-action')).toBe(fallback);
-			expect(onError).toHaveBeenCalled();
+				render.abort(new Error('defer to client'));
+				await c.ended;
+				container.insertAdjacentHTML('beforeend', c.chunks.slice(shellChunkCount).join(''));
+				activate(container);
+				expect(container.querySelector('#deferred-stream-action')).toBe(fallback);
+				expect(onError).toHaveBeenCalled();
 
-			clientValue.resolve('Client recovery');
-			await vi.waitFor(async () => {
-				await act(() => {});
+				if (timed) {
+					// Resolve before post-abort activation drains, as in the act case.
+					// Ordinary hydration is not required to wait for unknown pending data.
+					clientValue.resolve('Client recovery');
+					siblingValue.resolve('Sibling recovery');
+					await advance();
+					const observeAfter = async (elapsed: number) => {
+						await advance(elapsed);
+						return {
+							time: performance.now() - started,
+							content: visibleActions().map((button) => button.textContent),
+							hydrated: onHydrated.mock.calls.length,
+							clicks: onClick.mock.calls.length,
+						};
+					};
+					// Observe only connected, visible controls: a completed primary may
+					// already exist hidden alongside the fallback while its commit waits.
+					const beforeUpdate = await observeAfter(100);
+					if (withSibling) {
+						expect(container.querySelector('#stream-sibling-pending')?.textContent).toBe(
+							'Loading sibling',
+						);
+						flushSync(() => {
+							container.querySelector<HTMLButtonElement>('#remove-stream-sibling')!.click();
+						});
+						await advance();
+						expect(container.querySelector('#stream-sibling-pending')).toBeNull();
+					} else if (withReplacement) {
+						flushSync(() => {
+							root!.render(clientComponent as any, {
+								...clientProps,
+								promise: Promise.resolve('Updated recovery'),
+							});
+						});
+						await advance();
+					}
+					// Superseding one completed retry does not make another staged
+					// primary visible, or authorize replay into its loading control.
+					expect(onHydrated).not.toHaveBeenCalled();
+					expect(onClick).not.toHaveBeenCalled();
+					expect([beforeUpdate, await observeAfter(199), await observeAfter(1)]).toEqual([
+						{ time: 100, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
+						{ time: 299, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
+						{ time: 300, content: [recoveredValue], hydrated: 1, clicks: 1 },
+					]);
+					expect(deliveries).toEqual([
+						{ event: 'hydrated', time: 300, value: recoveredValue },
+						{ event: 'click', time: 300, value: recoveredValue },
+					]);
+				} else {
+					await act(() => clientValue.resolve('Client recovery'));
+					await vi.waitFor(async () => {
+						await act(() => {});
+						expect(onHydrated).toHaveBeenCalledOnce();
+					});
+				}
+				expect(visibleActions().map((button) => button.textContent)).toEqual([recoveredValue]);
 				expect(onHydrated).toHaveBeenCalledOnce();
-			});
-			expect(container.querySelector('#deferred-stream-action')?.textContent).toBe(
-				'Client recovery',
-			);
-			expect(onClick).toHaveBeenCalledOnce();
-			expect(onClick).toHaveBeenCalledWith('Client recovery');
-		} finally {
-			root.unmount();
-		}
-	});
+				expect(onClick).toHaveBeenCalledOnce();
+				expect(onClick).toHaveBeenCalledWith(recoveredValue);
+			} finally {
+				root?.unmount();
+				recentFallbackRoot?.unmount();
+				recentFallbackContainer.remove();
+				if (timed) {
+					await advance();
+					vi.useRealTimers();
+				}
+			}
+		},
+	);
 
 	it('flushes the shell with the fallback + template sentinel, then the segment', async () => {
 		const d = deferred<string>();
@@ -838,8 +1003,8 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		flushSync(() => {});
 		expect(rootA.querySelector('.ok')).toBe(firstNode);
 		expect(rootB.querySelector('.ok')).toBe(secondNode);
-		expect((window as any).$OCTS[firstId]).toContain('first');
-		expect((window as any).$OCTS[secondId]).toContain('second');
+		expect(rootA.querySelector('.ok')!.textContent).toBe('first');
+		expect(rootB.querySelector('.ok')!.textContent).toBe('second');
 		hydratedA.unmount();
 		hydratedB.unmount();
 	});
@@ -854,7 +1019,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			if (prerenders.length === 0) {
 				prerenders.push(prerender(server.Boundary, { promise: data.promise }));
 			}
-			return '<main>outer-only</main>';
+			return ServerRT.createElement('main', null, 'outer-only');
 		};
 		const c = collector();
 		const onError = vi.fn();
@@ -869,7 +1034,10 @@ describe('renderToPipeableStream — chunk protocol', () => {
 			expect(html).not.toContain('data-oct-b');
 		}
 		expect(nestedResult.html).toContain('nested-ready');
-		expect(c.chunks.join('')).toBe('<main>outer-only</main>');
+		const container = document.createElement('div');
+		container.innerHTML = c.chunks.join('');
+		expect(container.querySelector('main')?.textContent).toBe('outer-only');
+		expect(container.textContent).toBe('outer-only');
 		expect(onError).not.toHaveBeenCalled();
 	});
 
@@ -959,25 +1127,29 @@ describe('renderToPipeableStream — chunk protocol', () => {
 
 	it('defers an inner segment until its outer segment introduces the template', async () => {
 		const NestedInnerFirst = (props: any, scope: any) =>
-			ServerRT.ssrTry(
-				scope,
-				'outer-inner-first',
-				() => {
-					const inner = ServerRT.ssrTry(
-						scope,
-						'inner-first',
-						() =>
-							ServerRT.ssrBlock(
-								'<span class="inner-value">' + ServerRT.use(props.inner, 'inner-value') + '</span>',
-							),
-						() => ServerRT.ssrBlock('<span class="inner-pending">inner…</span>'),
-						null,
-					);
-					const outer = ServerRT.use(props.outer, 'outer-value');
-					return inner + ServerRT.ssrBlock('<span class="outer-value">' + outer + '</span>');
-				},
-				() => ServerRT.ssrBlock('<span class="outer-pending">outer…</span>'),
-				null,
+			ServerRT.ssrHtml(
+				ServerRT.ssrTry(
+					scope,
+					'outer-inner-first',
+					() => {
+						const inner = ServerRT.ssrTry(
+							scope,
+							'inner-first',
+							() =>
+								ServerRT.ssrBlock(
+									'<span class="inner-value">' +
+										ServerRT.use(props.inner, 'inner-value') +
+										'</span>',
+								),
+							() => ServerRT.ssrBlock('<span class="inner-pending">inner…</span>'),
+							null,
+						);
+						const outer = ServerRT.use(props.outer, 'outer-value');
+						return inner + ServerRT.ssrBlock('<span class="outer-value">' + outer + '</span>');
+					},
+					() => ServerRT.ssrBlock('<span class="outer-pending">outer…</span>'),
+					null,
+				),
 			);
 		const outer = deferred<string>();
 		const inner = deferred<string>();
@@ -1251,6 +1423,138 @@ describe('renderToPipeableStream — chunk protocol', () => {
 });
 
 describe('renderToReadableStream', () => {
+	async function settlesWithin<T>(value: Promise<T>): Promise<T> {
+		let timer: ReturnType<typeof setTimeout>;
+		try {
+			return await Promise.race([
+				value,
+				new Promise<never>((_resolve, reject) => {
+					timer = setTimeout(() => reject(new Error('render did not settle')), 1000);
+				}),
+			]);
+		} finally {
+			clearTimeout(timer!);
+		}
+	}
+
+	it('rejects when onShellReady throws before the stream promise settles', async () => {
+		const callbackError = new Error('shell callback failed');
+		const onError = vi.fn();
+		await expect(
+			settlesWithin(
+				ServerRT.renderToReadableStream(() => 'shell', undefined, {
+					onShellReady() {
+						throw callbackError;
+					},
+					onError,
+				}),
+			),
+		).rejects.toBe(callbackError);
+		expect(onError).toHaveBeenCalledWith(callbackError);
+	});
+
+	it('rejects when onError throws before the stream promise settles', async () => {
+		const callbackError = new Error('error callback failed');
+		const Broken = () => {
+			throw new Error('render failed');
+		};
+		await expect(
+			settlesWithin(
+				ServerRT.renderToReadableStream(Broken, undefined, {
+					onError() {
+						throw callbackError;
+					},
+				}),
+			),
+		).rejects.toBe(callbackError);
+	});
+
+	it('rejects when onShellError throws before the stream promise settles', async () => {
+		const callbackError = new Error('shell-error callback failed');
+		await expect(
+			settlesWithin(
+				ServerRT.renderToReadableStream(
+					() => {
+						throw new Error('render failed');
+					},
+					undefined,
+					{
+						onShellError() {
+							throw callbackError;
+						},
+					},
+				),
+			),
+		).rejects.toBe(callbackError);
+	});
+
+	it('rejects allReady and closes output when onAllReady throws', async () => {
+		const callbackError = new Error('completion callback failed');
+		const onError = vi.fn();
+		const stream = await ServerRT.renderToReadableStream(() => 'shell', undefined, {
+			onAllReady() {
+				throw callbackError;
+			},
+			onError,
+		});
+		const output = new Response(stream).text();
+		await expect(settlesWithin(stream.allReady)).rejects.toBe(callbackError);
+		expect(await output).toBe('shell');
+		expect(onError).toHaveBeenCalledWith(callbackError);
+	});
+
+	it('rejects allReady after a recoverable boundary error if onError throws', async () => {
+		const value = deferred<string>();
+		const callbackError = new Error('recoverable-error callback failed');
+		const stream = await ServerRT.renderToReadableStream(
+			permanentStaticServer.PermanentStaticRejectedStream,
+			{ promise: value.promise },
+			{
+				onError() {
+					throw callbackError;
+				},
+			},
+		);
+		const output = new Response(stream).text();
+		value.reject(new Error('boundary failed'));
+		await expect(settlesWithin(stream.allReady)).rejects.toBe(callbackError);
+		const html = await output;
+		expect(html).toContain('permanent-static-rejected-fallback');
+		const [id] = protocolIds(html);
+		expect(html).toContain(staticErrorCall(id));
+	});
+
+	it('rejects allReady and finalizes injection when onError throws after abort', async () => {
+		const value = deferred<string>();
+		let unsubscribed = false;
+		let renderCompleteCalls = 0;
+		const injection: ServerRT.StreamInjectionSource = {
+			take: () => '',
+			subscribe: () => () => {
+				unsubscribed = true;
+			},
+			done: new Promise<void>(() => {}),
+			renderComplete() {
+				renderCompleteCalls++;
+			},
+		};
+		const callbackError = new Error('error callback failed');
+		const stream = await ServerRT.renderToReadableStream(
+			server.Boundary,
+			{ promise: value.promise },
+			{
+				injection,
+				onError() {
+					throw callbackError;
+				},
+			},
+		);
+		await stream.cancel(new Error('consumer left'));
+		await expect(settlesWithin(stream.allReady)).rejects.toBe(callbackError);
+		expect(renderCompleteCalls).toBe(1);
+		expect(unsubscribed).toBe(true);
+	});
+
 	it('resolves at shell-ready; allReady settles after the last segment', async () => {
 		const d = deferred<string>();
 		const stream = await ServerRT.renderToReadableStream(server.Boundary, {
@@ -1486,9 +1790,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 					onId: (arm: string, value: string) => seen.push([arm, value]),
 				});
 			});
-			replacement.resolve('client-ready');
-			await Promise.resolve();
-			flushSync(() => {});
+			await act(() => replacement.resolve('client-ready'));
 			expect(container.querySelectorAll('.id-ok')).toHaveLength(1);
 			expect(container.querySelector('.id-ok')?.textContent).toBe('client-ready');
 			expect(container.querySelector('.id-loading')).toBeNull();
@@ -1513,6 +1815,30 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			root.unmount();
 			render.abort(new Error('test complete'));
 			await c.ended;
+		}
+	});
+
+	it('adopts a streamed factory-rejection catch without duplicating the alert', async () => {
+		const rendered = collectPipeableStream(server.FactoryRejectionBoundary, {
+			scenario: 'weather-failure',
+		});
+		const result = await rendered;
+		expect(result.errors).toEqual([]);
+		container.innerHTML = result.html;
+		activate(container);
+		const serverCatch = container.querySelector('.factory-error');
+		expect(serverCatch).not.toBeNull();
+		expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
+
+		const root = hydrateRoot(container, FactoryRejectionBoundary as any, {
+			scenario: 'weather-failure',
+		});
+		try {
+			flushSync(function () {});
+			expect(container.querySelectorAll('.factory-error')).toHaveLength(1);
+			expect(container.querySelector('.factory-error')).toBe(serverCatch);
+		} finally {
+			root.unmount();
 		}
 	});
 
@@ -1556,7 +1882,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		);
 		try {
 			flushSync(() => {});
-			expect(container.querySelector('.id-error')).toBe(errorSpan);
+			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
 			expect(container.querySelector('.id-loading')).toBeNull();
 			expect(seen).toContainEqual(['root', rootId]);
 			expect(seen).toContainEqual(['catch', boundaryId]);
@@ -1568,7 +1894,7 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 			clientPending.reject(new Error('client request also rejected'));
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
 			expect(unhandledClientRejections).toEqual([]);
-			expect(container.querySelector('.id-error')).toBe(errorSpan);
+			expect(Array.from(container.querySelectorAll('.id-error'))).toEqual([errorSpan]);
 			expect(errorSpan!.textContent).toBe('server-no');
 			expect(errSpy).not.toHaveBeenCalled();
 		} finally {
@@ -1650,7 +1976,6 @@ describe('streamed page → swap runtime → hydration (end to end)', () => {
 		expect(container.querySelector('.ok')).toBe(okSpan); // adopted, not rebuilt
 		expect(container.querySelector('.ok')!.textContent).toBe('streamed!');
 		expect(errSpy).not.toHaveBeenCalled();
-		expect((window as any).$OCTS[id]).toContain('streamed!');
 		errSpy.mockRestore();
 		root.unmount();
 	});

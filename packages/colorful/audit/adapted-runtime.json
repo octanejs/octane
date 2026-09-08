@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "project": "colorful-upstream",
+  "roots": ["packages/colorful/tests/upstream"],
+  "files": [
+    "packages/colorful/tests/upstream/components.test.ts",
+    "packages/colorful/tests/upstream/csp.test.ts",
+    "packages/colorful/tests/upstream/shadowDom.test.ts",
+    "packages/colorful/tests/upstream/utils.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Accepts an additional `className`",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Accepts an additional `className`"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Accepts any valid `div` attributes",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Accepts any valid `div` attributes"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Allows to enter `#rgba` and `#rrggbbaa` in `HexColorInput` if `alpha` is turned on",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Allows to enter `#rgba` and `#rrggbbaa` in `HexColorInput` if `alpha` is turned on"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Captures arrow keys only",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Captures arrow keys only"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Changes alpha channel value after an interaction",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Changes alpha channel value after an interaction"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Changes alpha with arrow keys",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Changes alpha with arrow keys"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Changes hue with arrow keys",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Changes hue with arrow keys"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Changes saturation with arrow keys",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Changes saturation with arrow keys"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Displays `#` prefix in `HexColorInput` if `prefixed` is turned on",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Displays `#` prefix in `HexColorInput` if `prefixed` is turned on"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Does not allow to enter `#rrggbbaa` in `HexColorInput` if `alpha` is turned off",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Does not allow to enter `#rrggbbaa` in `HexColorInput` if `alpha` is turned off"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't call `onChange` when user changes a hue of a grayscale color",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Doesn't call `onChange` when user changes a hue of a grayscale color"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't react on mouse events after a touch interaction",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Doesn't react on mouse events after a touch interaction"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't trigger `onChangeEnd` if the color didn't change",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Doesn't trigger `onChangeEnd` if the color didn't change"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't trigger `onChangeEnd` if the color prop was updated mid-drag",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Doesn't trigger `onChangeEnd` if the color prop was updated mid-drag"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't trigger `onChange` after controlled rerender",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Doesn't trigger `onChange` after controlled rerender"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't trigger `onChange` after mounting",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Doesn't trigger `onChange` after mounting"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Fires `onChange` when user changes `HexColorInput` value",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Fires `onChange` when user changes `HexColorInput` value"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Fires custom `onBlur` when `HexColorInput` has lost focus",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Fires custom `onBlur` when `HexColorInput` has lost focus"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Ignores keyboard commands if the pointer is already on a alpha edge",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Ignores keyboard commands if the pointer is already on a alpha edge"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Ignores keyboard commands if the pointer is already on a saturation edge",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Ignores keyboard commands if the pointer is already on a saturation edge"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Pointer doesn't follow the mouse if it was released outside of the document bounds",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Pointer doesn't follow the mouse if it was released outside of the document bounds"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Renders `HexColorInput` component properly",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Renders `HexColorInput` component properly"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Renders proper alpha color picker markup",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Renders proper alpha color picker markup"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Renders proper color picker markup",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Renders proper color picker markup"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Sets proper `aria-valuetext` attribute value",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Sets proper `aria-valuetext` attribute value"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Supports any event that a regular div does",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Supports any event that a regular div does"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Supports multitouch",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Supports multitouch"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Triggers `onChangeEnd` after a keyboard interaction",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Triggers `onChangeEnd` after a keyboard interaction"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Triggers `onChangeEnd` after a mouse interaction",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Triggers `onChangeEnd` after a mouse interaction"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Triggers `onChangeEnd` after a touch interaction",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Triggers `onChangeEnd` after a touch interaction"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Triggers `onChangeEnd` when the pointer is released outside of the window",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Triggers `onChangeEnd` when the pointer is released outside of the window"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Triggers `onChange` after a mouse interaction",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Triggers `onChange` after a mouse interaction"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Triggers `onChange` after a touch interaction",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Triggers `onChange` after a touch interaction"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Uses #rrggbbaa format if alpha channel value is less than 1",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Uses #rrggbbaa format if alpha channel value is less than 1"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Works with no props",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Works with no props"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/csp.test.ts::Signs the `style` element with a nonce",
+      "file": "packages/colorful/tests/upstream/csp.test.ts",
+      "fullName": "Signs the `style` element with a nonce"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/shadowDom.test.ts::Injects styles into the closest ShadowRoot when mounted inside one",
+      "file": "packages/colorful/tests/upstream/shadowDom.test.ts",
+      "fullName": "Injects styles into the closest ShadowRoot when mounted inside one"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Clamps a number between bounds",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Clamps a number between bounds"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Compares two HEX colors",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Compares two HEX colors"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Compares two object colors",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Compares two object colors"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Compares two string colors",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Compares two string colors"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HEX to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HEX to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSL string to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSL string to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSLA string to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSLA string to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSLA to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSLA to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSV string to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSV string to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA string to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSVA string to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HEX",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSVA to HEX"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HSL string",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSVA to HSL string"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HSLA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSVA to HSLA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HSV string",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSVA to HSV string"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HSVA string",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSVA to HSVA string"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to RGB string",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSVA to RGB string"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to RGBA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSVA to RGBA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to RGBA string",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts HSVA to RGBA string"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts RGB string to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts RGB string to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts RGBA string to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts RGBA string to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts RGBA to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts RGBA to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts shorthand HEX to HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Converts shorthand HEX to HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Formats a class name",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Formats a class name"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Rounds HSVA",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Rounds HSVA"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Rounds a number",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Rounds a number"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Trims alpha-channel",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Trims alpha-channel"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Validates HEX colors",
+      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "fullName": "Validates HEX colors"
+    }
+  ]
+}

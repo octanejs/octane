@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "project": "tiptap-upstream",
+  "roots": ["packages/tiptap/tests/upstream"],
+  "files": [
+    "packages/tiptap/tests/upstream/BubbleMenu.test.ts",
+    "packages/tiptap/tests/upstream/EditorContent.test.ts",
+    "packages/tiptap/tests/upstream/FloatingMenu.test.ts",
+    "packages/tiptap/tests/upstream/use-client.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:6b2bf62b801a2b07",
+      "file": "packages/tiptap/tests/upstream/BubbleMenu.test.ts",
+      "fullName": "BubbleMenu applies html props to the actual menu element"
+    },
+    {
+      "id": "runtime:14e6284f7f1f79c4",
+      "file": "packages/tiptap/tests/upstream/BubbleMenu.test.ts",
+      "fullName": "BubbleMenu creates unique plugin keys when none are provided"
+    },
+    {
+      "id": "runtime:7df1d1a4bee7c478",
+      "file": "packages/tiptap/tests/upstream/EditorContent.test.ts",
+      "fullName": "createContentComponent batches synchronous renderer change notifications"
+    },
+    {
+      "id": "runtime:6bc8a52565b3783a",
+      "file": "packages/tiptap/tests/upstream/FloatingMenu.test.ts",
+      "fullName": "FloatingMenu applies html props to the actual menu element"
+    },
+    {
+      "id": "runtime:a66dc79784e02b02",
+      "file": "packages/tiptap/tests/upstream/FloatingMenu.test.ts",
+      "fullName": "FloatingMenu creates unique plugin keys when none are provided"
+    },
+    {
+      "id": "runtime:a8bad2d748af2d22",
+      "file": "packages/tiptap/tests/upstream/use-client.test.ts",
+      "fullName": "use client boundary ./index.ts starts with the \"use client\" directive"
+    },
+    {
+      "id": "runtime:b37c30c97d344fe6",
+      "file": "packages/tiptap/tests/upstream/use-client.test.ts",
+      "fullName": "use client boundary ./menus/index.ts starts with the \"use client\" directive"
+    }
+  ]
+}

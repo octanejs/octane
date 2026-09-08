@@ -8,6 +8,5 @@
     "React, ReactDOM, StrictMode, forwardRef, and synthetic events are not runtime dependencies; the Octane adapter uses Octane roots, refs-as-props, and native events."
   ],
   "ssr": "The framework-neutral Inertia server entry is exposed. Hook initialization is request-local and covered in the server runtime; Octane page rendering and hydration are completed by the adapter SSR unit.",
-  "verified": "2026-07-30",
-  "docs": ["docs/plans/2026-07-30-001-feat-inertia-binding-plan.md"]
+  "verified": "2026-07-30"
 }

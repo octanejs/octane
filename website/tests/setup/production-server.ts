@@ -92,13 +92,15 @@ let tearingDown = false;
 function buildWebsite(): Promise<void> {
 	// Captured module-side so teardown can kill a build still in flight — the
 	// run can be cancelled while this is the only thing still working.
-	build = spawn('pnpm', ['exec', 'vite', 'build', '--configLoader', 'runner'], {
+	// Use the deployment build, including the packaged assets fetched by Lynx
+	// previews. A bare Vite build omits them on a clean checkout.
+	build = spawn('pnpm', ['run', 'build'], {
 		cwd: WEBSITE,
 		stdio: ['ignore', 'pipe', 'pipe'],
 		detached: true,
 		env: { ...process.env, ...PRODUCTION_ENV },
 	});
-	return waitForChildExit(build, 'website vite build', BUILD_TIMEOUT_MS);
+	return waitForChildExit(build, 'website build', BUILD_TIMEOUT_MS);
 }
 
 export async function setup(project: TestProject): Promise<void> {

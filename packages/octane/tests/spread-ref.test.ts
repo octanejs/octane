@@ -38,17 +38,18 @@ describe('spread-supplied ref (React 19 parity with ref={})', () => {
 		r.unmount();
 	});
 
-	it('array ref via spread attaches every member (no .current corruption)', () => {
+	it('array ref via spread ignores empty entries and attaches every nested ref', () => {
 		const objRef: { current: any } = { current: null };
 		const cbHits: any[] = [];
 		const r = mount(SpreadDirect, {
-			attrs: { id: 'target', ref: [objRef, (el: any) => cbHits.push(el)] },
+			attrs: { id: 'target', ref: [undefined, [objRef, null], (el: any) => cbHits.push(el)] },
 		});
-		expect(objRef.current).toBeInstanceOf(HTMLElement);
-		expect(cbHits).toHaveLength(1);
-		expect(cbHits[0]).toBeInstanceOf(HTMLElement);
+		const node = r.find('#target');
+		expect(objRef.current).toBe(node);
+		expect(cbHits).toEqual([node]);
 		r.unmount();
 		expect(objRef.current).toBe(null);
+		expect(cbHits).toEqual([node, null]);
 	});
 
 	it('changing the spread ref across renders detaches old before attaching new', () => {

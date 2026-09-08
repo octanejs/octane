@@ -1,0 +1,22 @@
+diff --git a/tests/upstream/src/preview-card/root/PreviewCardRoot.test.tsx b/tests/upstream/src/preview-card/root/PreviewCardRoot.test.tsx
+--- a/tests/upstream/src/preview-card/root/PreviewCardRoot.test.tsx
++++ b/tests/upstream/src/preview-card/root/PreviewCardRoot.test.tsx
+@@ -522,7 +522,7 @@ describe('<PreviewCard.Root />', () => {
+ 
+       it('closes the preview card when the `close` method is called', async () => {
+         const onOpenChange = vi.fn();
+-        const actionsRef = React.createRef<PreviewCard.Root.Actions>();
++        const actionsRef = ({current:null} as React.RefObject<PreviewCard.Root.Actions | null>);
+ 
+         const { user } = await render(
+           <TestPreviewCard rootProps={{ actionsRef, onOpenChange }} triggerProps={{ delay: 0 }} />,
+@@ -665,7 +665,8 @@ describe('<PreviewCard.Root />', () => {
+           expect(screen.queryByTestId('popup')).not.toBe(null);
+         });
+ 
+-        expect(onOpenChangeComplete.mock.calls.length).toBe(2);
++        // Octane does not replay mount effects in Strict Mode (renderer contract).
++        expect(onOpenChangeComplete.mock.calls.length).toBe(1);
+         expect(onOpenChangeComplete.mock.calls[0][0]).toBe(true);
+       });
+ 

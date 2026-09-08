@@ -9,6 +9,7 @@ import {
 	reconcileGithubReleases,
 	releaseTag,
 	runGit,
+	waitForNpmPublication,
 } from './reconcile-github-releases.mjs';
 
 async function git(cwd, args) {
@@ -43,7 +44,62 @@ async function createRepositoryFixture() {
 }
 
 describe('GitHub release reconciliation', () => {
-	test('pushes missing tags atomically and creates every missing release sequentially', async () => {
+	test('waits for npm registry propagation after a successful publish', async () => {
+		const pkg = { name: 'octane', version: '0.3.4' };
+		const pending = {
+			invalid: [],
+			pending: [pkg],
+			published: [],
+			unbootstrapped: [],
+			unreachable: [],
+		};
+		const published = {
+			...pending,
+			pending: [],
+			published: [pkg],
+		};
+		const states = [pending, pending, published];
+		const delays = [];
+		const logs = [];
+
+		const state = await waitForNpmPublication([pkg], {
+			inspectReleaseState: async () => states.shift(),
+			log: (message) => logs.push(message),
+			retryDelays: [5_000, 10_000, 20_000],
+			sleep: async (delay) => delays.push(delay),
+		});
+
+		assert.equal(state, published);
+		assert.deepEqual(delays, [5_000, 10_000]);
+		assert.equal(logs.length, 2);
+	});
+
+	test('returns the final npm state when the propagation window expires', async () => {
+		const pkg = { name: 'octane', version: '0.3.4' };
+		const pending = {
+			invalid: [],
+			pending: [pkg],
+			published: [],
+			unbootstrapped: [],
+			unreachable: [],
+		};
+		let inspections = 0;
+
+		const state = await waitForNpmPublication([pkg], {
+			inspectReleaseState: async () => {
+				inspections++;
+				return pending;
+			},
+			log: () => {},
+			retryDelays: [5_000, 10_000],
+			sleep: async () => {},
+		});
+
+		assert.equal(state, pending);
+		assert.equal(inspections, 3);
+	});
+
+	test('pushes annotated missing tags atomically without repository identity and creates every missing release sequentially', async () => {
 		const { expectedSha, remote, repository, root } = await createRepositoryFixture();
 		try {
 			const packages = await Promise.all([
@@ -57,6 +113,8 @@ describe('GitHub release reconciliation', () => {
 				'origin',
 				`refs/tags/${releaseTag(packages[0])}:refs/tags/${releaseTag(packages[0])}`,
 			]);
+			await git(repository, ['config', 'user.name', '']);
+			await git(repository, ['config', 'user.email', '']);
 
 			let pushCount = 0;
 			const instrumentedGit = async (args, options = {}) => {
@@ -99,6 +157,8 @@ describe('GitHub release reconciliation', () => {
 			const remoteTags = await listRemoteTags({ cwd: repository });
 			assert.deepEqual([...remoteTags].sort(), packages.map(releaseTag).sort());
 			for (const pkg of packages) {
+				const objectType = await git(remote, ['cat-file', '-t', `refs/tags/${releaseTag(pkg)}`]);
+				assert.equal(objectType.stdout.trim(), 'tag');
 				const target = await git(remote, ['rev-list', '-n', '1', `refs/tags/${releaseTag(pkg)}`]);
 				assert.equal(target.stdout.trim(), expectedSha);
 			}

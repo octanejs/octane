@@ -14,6 +14,8 @@ import {
 	TransitionChildWipReentrantUnmountApp,
 	TransitionComponentWipReentrantUnmountApp,
 	SuspensePreservationApp,
+	RootSuspensionAfterSiblingApp,
+	RawRootSuspensionAfterSiblingApp,
 	UrgentChildSlotSuspenseApp,
 	UrgentComponentSlotSuspenseApp,
 	UrgentReturnKindSuspenseApp,
@@ -82,7 +84,134 @@ function setup(shape: 'same' | 'swap' = 'swap') {
 	return { root, pending, portalTarget, store, log, renderLog, refLog, controls: () => controls };
 }
 
+function setupNestedPortal(onDetach?: (mounted: ReturnType<typeof mount>) => void) {
+	const inner = deferred<string>();
+	const outer = deferred<string>();
+	const portalTarget = document.createElement('div');
+	document.body.appendChild(portalTarget);
+	const store = makeStore();
+	const log: string[] = [];
+	let mounted!: ReturnType<typeof mount>;
+	const portalRef = vi.fn((node: Element | null) => {
+		if (node === null) onDetach?.(mounted);
+	});
+	const common = { portalTarget, store, log, portalRef };
+	mounted = mount(NestedPortalPreservation, {
+		...common,
+		innerPromise: fulfilled('inner-a'),
+		outerPromise: fulfilled('outer-a'),
+	});
+	const portal = portalTarget.querySelector('#preserved-portal') as HTMLElement;
+	expect(portal).toBeTruthy();
+	expect(portalRef.mock.calls.map(([node]) => node)).toEqual([portal]);
+	return {
+		mounted,
+		inner,
+		outer,
+		portal,
+		portalTarget,
+		portalRef,
+		store,
+		hide() {
+			mounted.update(NestedPortalPreservation, {
+				...common,
+				innerPromise: inner.promise,
+				outerPromise: outer.promise,
+			});
+		},
+		dispose() {
+			onDetach = undefined;
+			try {
+				mounted.unmount();
+			} finally {
+				portalTarget.remove();
+			}
+		},
+	};
+}
+
 describe('Suspense preserves committed host DOM', () => {
+	it('keeps committed siblings when a previously synchronous reader throws its first thenable', async () => {
+		const pending = deferred<string>();
+		let value: string | null = 'A';
+		const read = () => {
+			if (value === null) throw pending.promise;
+			return value;
+		};
+		const root = mount(RawRootSuspensionAfterSiblingApp, { label: 'original', read });
+		try {
+			const shell = root.find('#raw-root-suspension-shell');
+			const label = root.find('#raw-root-suspension-label');
+			const reader = root.find('#raw-root-suspension-reader');
+			value = null;
+			root.update(RawRootSuspensionAfterSiblingApp, { label: 'replacement', read });
+			expect(root.find('#raw-root-suspension-shell')).toBe(shell);
+			expect(root.find('#raw-root-suspension-label')).toBe(label);
+			expect(label.textContent).toBe('original');
+			expect(label.getAttribute('title')).toBe('original');
+			expect(root.find('#raw-root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:A');
+
+			value = 'B';
+			await act(() => pending.resolve('ready'));
+			expect(root.find('#raw-root-suspension-shell')).toBe(shell);
+			expect(root.find('#raw-root-suspension-label')).toBe(label);
+			expect(label.textContent).toBe('replacement');
+			expect(root.find('#raw-root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:B');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('keeps earlier sibling writes and an edited input intact while a root props refresh suspends', async () => {
+		const pending = deferred<string>();
+		const root = mount(RootSuspensionAfterSiblingApp, {
+			label: 'original',
+			promise: fulfilled('A'),
+		});
+		try {
+			const shell = root.find('#root-suspension-shell');
+			const label = root.find('#root-suspension-label');
+			const reader = root.find('#root-suspension-reader');
+			const draft = root.find('#root-suspension-draft') as HTMLInputElement;
+			draft.value = 'edited';
+			draft.focus();
+			draft.setSelectionRange(2, 4);
+			// An external owner may have changed live DOM since Octane's last commit.
+			// A suspended write must put that exact browser state back.
+			label.firstChild!.nodeValue = 'external text';
+			label.setAttribute('title', 'external title');
+
+			root.update(RootSuspensionAfterSiblingApp, {
+				label: 'replacement',
+				promise: pending.promise,
+			});
+			expect(root.find('#root-suspension-shell')).toBe(shell);
+			expect(root.find('#root-suspension-label')).toBe(label);
+			expect(label.textContent).toBe('external text');
+			expect(label.getAttribute('title')).toBe('external title');
+			expect(root.find('#root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:A');
+			expect(root.find('#root-suspension-draft')).toBe(draft);
+			expect(draft.value).toBe('edited');
+			expect(document.activeElement).toBe(draft);
+			expect([draft.selectionStart, draft.selectionEnd]).toEqual([2, 4]);
+
+			await act(() => pending.resolve('B'));
+			expect(root.find('#root-suspension-shell')).toBe(shell);
+			expect(root.find('#root-suspension-label')).toBe(label);
+			expect(label.textContent).toBe('replacement');
+			expect(label.getAttribute('title')).toBe('replacement');
+			expect(root.find('#root-suspension-reader')).toBe(reader);
+			expect(reader.textContent).toBe('resource:B');
+			expect(root.find('#root-suspension-draft')).toBe(draft);
+			expect(draft.value).toBe('edited');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	async function expectPreservedHosts(shape: 'same' | 'swap'): Promise<void> {
 		const t = setup(shape);
 		const panel = t.root.find('#preserved-panel') as HTMLElement;
@@ -302,6 +431,73 @@ describe('Suspense preserves committed host DOM', () => {
 		root.unmount();
 		portalTarget.remove();
 	});
+
+	it('keeps a nested portal hidden when the outer boundary resolves first', async () => {
+		const t = setupNestedPortal();
+		try {
+			t.hide();
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+			await act(() => t.outer.resolve('outer-b'));
+			expect(t.mounted.findAll('#outer-fallback')).toHaveLength(0);
+			expect(t.mounted.find('#inner-fallback')).toBeTruthy();
+			expect(t.portalTarget.querySelector('#preserved-portal')).toBe(t.portal);
+			expect(t.portal.style.display).toBe('none');
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+			await act(() => t.inner.resolve('inner-b'));
+			expect(t.mounted.findAll('#inner-fallback')).toHaveLength(0);
+			expect(t.portalTarget.querySelector('#preserved-portal')).toBe(t.portal);
+			expect(t.portal.style.display).toBe('');
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null, t.portal]);
+		} finally {
+			t.dispose();
+		}
+	});
+
+	it('reconnects a nested portal once when both hidden boundaries resolve together', async () => {
+		const t = setupNestedPortal();
+		try {
+			t.hide();
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+			await act(() => {
+				t.inner.resolve('inner-b');
+				t.outer.resolve('outer-b');
+			});
+			expect(t.mounted.findAll('#outer-fallback')).toHaveLength(0);
+			expect(t.mounted.findAll('#inner-fallback')).toHaveLength(0);
+			expect(t.portalTarget.querySelector('#preserved-portal')).toBe(t.portal);
+			expect(t.portal.style.display).toBe('');
+			expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null, t.portal]);
+		} finally {
+			t.dispose();
+		}
+	});
+
+	it.each(['unmount', 'replace'] as const)(
+		'stops nested publication when the portal detach callback requests %s',
+		async (request) => {
+			const Replacement = () => 'replacement';
+			const t = setupNestedPortal((mounted) => {
+				if (request === 'unmount') mounted.root.unmount();
+				else mounted.root.render(Replacement);
+			});
+			try {
+				expect(() => t.hide()).not.toThrow();
+				expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+				expect(t.portalTarget.childNodes).toHaveLength(0);
+				expect(t.mounted.container.textContent).toBe(request === 'replace' ? 'replacement' : '');
+				await act(() => {
+					t.inner.resolve('inner-b');
+					t.outer.resolve('outer-b');
+				});
+				expect(t.portalRef.mock.calls.map(([node]) => node)).toEqual([t.portal, null]);
+				expect(t.portalTarget.childNodes).toHaveLength(0);
+				expect(t.mounted.container.textContent).toBe(request === 'replace' ? 'replacement' : '');
+				expect(t.store.listenerCount()).toBe(0);
+			} finally {
+				t.dispose();
+			}
+		},
+	);
 
 	it('does not detach a hidden primary ref again when its retry enters catch', async () => {
 		const rejected = deferred<string>();

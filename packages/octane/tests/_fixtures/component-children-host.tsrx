@@ -82,6 +82,36 @@ export function TransitiveTrio(props: { bBig?: boolean }) @{
 	</section>
 }
 
+/** A root-first multi-hop chain whose leaf can mount empty. */
+export function MultiHopTransitiveTrio(props: { bBig?: boolean }) @{
+	<section class="host">
+		<MultiHopOuter big={props.bBig} label="B" />
+		<Leaf label="C" />
+	</section>
+}
+
+function MultiHopOuter(props: { fallback?: boolean; big?: boolean; label: string }) @{
+	@if (props.fallback) {
+		<span class="fallback">outer</span>
+	} @else {
+		<MultiHopMiddle big={props.big} label={props.label} />
+	}
+}
+
+function MultiHopMiddle(props: { fallback?: boolean; big?: boolean; label: string }) @{
+	@if (props.fallback) {
+		<span class="fallback">middle</span>
+	} @else {
+		<MultiHopEmptyLeaf big={props.big} label={props.label} />
+	}
+}
+
+function MultiHopEmptyLeaf(props: { big?: boolean; label: string }) @{
+	@if (props.big) {
+		<div class="big">{props.label as string}</div>
+	}
+}
+
 // ---- Single-root proven children (anchorless componentSlot regime) ----
 
 // Local state inside the flipping component: the @if flip replaces only the

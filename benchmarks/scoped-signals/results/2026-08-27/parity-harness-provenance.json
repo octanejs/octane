@@ -1,0 +1,276 @@
+{
+  "status": "passed",
+  "method": "Parse standalone helper functions, seeded order expressions, and complete warmup/measured loops, then require exact esbuild-normalized code identity. Source text hashes are recorded separately. This supplements emitted-bundle equality checks in the subsequent real runs; it does not replace them.",
+  "esbuildVersion": "0.28.1",
+  "typescriptVersion": "5.9.3",
+  "focused": {
+    "original": {
+      "file": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/run-focused-props.mjs",
+      "sha256": "833b7c1247cc4d2599ab885780363854f7be24e4aa0caef965425c22d3c8c6e1"
+    },
+    "repository": {
+      "file": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/run-native-props.mjs",
+      "sha256": "5b6e57c70111da5c72704c4fbbecb28b1c5dd4ced510a07aa8da1b78b17afc93"
+    },
+    "changesOutsideLoops": [
+      "Portable repository-relative imports and fixture directory; equivalent original paths resolve on this worktree.",
+      "Full defaults are25 paired rounds and10000 updates; prior runs supplied exactly those settings explicitly.",
+      "Remove unused original collector builder and option fields.",
+      "Known immutable cd9/422 refs still require exact historical bundle hashes; other refs still require source/Git equality but have no historic bundle reference."
+    ],
+    "functions": [
+      {
+        "label": "function integer",
+        "originalSha256": "b9db2b7a95f46ee66eff7641b023a3aa4656e9c170ee4bf4bcef77835ff89a3c",
+        "repositorySha256": "b9db2b7a95f46ee66eff7641b023a3aa4656e9c170ee4bf4bcef77835ff89a3c",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "b27ced46dc37e19f7e316ee818215423ed014beaa597d9d214bd5c12cef862f8",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function readInput",
+        "originalSha256": "9a4c2585ba68902dd81a2b4d4b7b8a1aa5064498c2b98768f84c1c5723752a77",
+        "repositorySha256": "9a4c2585ba68902dd81a2b4d4b7b8a1aa5064498c2b98768f84c1c5723752a77",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "a22ea0f50b7837322447fd3121353fb0cfe2965362303058c311a1b5fc1f0402",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function packageEvidence",
+        "originalSha256": "4d9a058da0ea4429336664406f3e7fd13273245bb6288716acd23cbd5b75741a",
+        "repositorySha256": "4d9a058da0ea4429336664406f3e7fd13273245bb6288716acd23cbd5b75741a",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "07f867a986549ad84506fd4bf8ff6040287449e8c364076915a09fbbb864a670",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function setupDom",
+        "originalSha256": "ecfaee137d4078a42312641f73b2aa99aa4af9a73cc07e95c5d5a216f33a0169",
+        "repositorySha256": "ecfaee137d4078a42312641f73b2aa99aa4af9a73cc07e95c5d5a216f33a0169",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "febada020cf6511e2cc41595d078d3199d00076ee8f5ee0bd65978aa1eb36e8a",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function compilerSnapshot",
+        "originalSha256": "f5fc72351e0064f99ef19fa8277cb9a6a25fe5b3caa75aabef1a979d9a473a02",
+        "repositorySha256": "f5fc72351e0064f99ef19fa8277cb9a6a25fe5b3caa75aabef1a979d9a473a02",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "252d6d7bd47c2e069e9c9a52803474ca76e2188b25eb3a9daa9ab81b548ce4f0",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function buildCase",
+        "originalSha256": "a6585b6086581412ad82a6f39c4cd74048ccea9a5f3e7806c874171c0317c128",
+        "repositorySha256": "a6585b6086581412ad82a6f39c4cd74048ccea9a5f3e7806c874171c0317c128",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "8b4548211b5718c0e40c98933f165ca222d240c86e1034fb9849bd1bfffe226f",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function dataFor",
+        "originalSha256": "b108e39ec767c2ed3003302d25879f8b3fae10b0f95b9002ffd53ac1aa3528da",
+        "repositorySha256": "b108e39ec767c2ed3003302d25879f8b3fae10b0f95b9002ffd53ac1aa3528da",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "2cf01d3acc738c0f4442163a3cc09c30748ce24946eb8f6878b693dddbe4d98c",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function checkElement",
+        "originalSha256": "29710865b2e1f0c74e7f8e331fa98ee826b6edeaa6d4aaa9d65ac6990655fc5d",
+        "repositorySha256": "29710865b2e1f0c74e7f8e331fa98ee826b6edeaa6d4aaa9d65ac6990655fc5d",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "0762e5a03f079452f3dd163b1622173beac2bf666f1f267bf0d1e8521741be1f",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function prepare",
+        "originalSha256": "27b2d5713d019b284be06d2696edf45116039f8f18d9c3e0fb99fcf82d566c4f",
+        "repositorySha256": "96cda3d5eace90c7d61aed140579d1af5076ac3392524964cd4ed09369019ea0",
+        "sourceTextIdentical": false,
+        "normalizedCodeSha256": "0e730f4e558e968633c872f808cc4142347fa83331b192782017404df369b1d2",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function measure",
+        "originalSha256": "fd29336afb0fdacb598d7e661e97d496d43ef3a610e09c975c0f15718d1f4293",
+        "repositorySha256": "b7b9c7b38afdea5e0b02ead214d3a60812e2ad20b24b2d6edfa8e629a1b01d3c",
+        "sourceTextIdentical": false,
+        "normalizedCodeSha256": "9bda38fa29c7e2349b0743a8d8ef098102237a1ad5e994bdd7b1d1b3fef85fb1",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function verifySignal",
+        "originalSha256": "e70c7780f027224b99e6c5ba693f1868e117b818ca5ded46777ecd500576706d",
+        "repositorySha256": "f0654a094b4529b0744fa07a052d1b241b3bfdf68a4a63a1421c4b747e00d2c4",
+        "sourceTextIdentical": false,
+        "normalizedCodeSha256": "36df6f4ed9eb5ef982084ef3e955454380af52a7d6debcf82d36a1e48934442a",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function ratioSummary",
+        "originalSha256": "2b25924c7f98c2192b1cd633103f0fd46b01c9916bbc2af5d78616d56f01903b",
+        "repositorySha256": "4ebec4a28e0a902552f564bea15f1610a8c1e06e76ece8bb91e7ce98bb660a34",
+        "sourceTextIdentical": false,
+        "normalizedCodeSha256": "6f9d5fac24e12d3461bbbc832eaa424efc2fdad83d5ee28b2711b3a9b206e4d8",
+        "normalizedCodeIdentical": true
+      }
+    ],
+    "order": [
+      {
+        "label": "variable randomState",
+        "originalSha256": "ce6d5703d70e03ebb677344965424220ad584bc6608ad943542edf52691caa9e",
+        "repositorySha256": "ce6d5703d70e03ebb677344965424220ad584bc6608ad943542edf52691caa9e",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "add129997660cf0b280d92805450f49e75ef9c2f0635ace5513d9357cbc72943",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "variable nextRandom",
+        "originalSha256": "3dcc74063ae9b9de4eb4dd7148df18837d7da98bc817e0433fb3e10ff61a7449",
+        "repositorySha256": "d7557f34af8f31cb01b8f5ca1006f962ed3be92f3bfa7ce3e95daa9fd4189509",
+        "sourceTextIdentical": false,
+        "normalizedCodeSha256": "4f405741fbe414509b9e5c4cdab3dff90b30c93a61c024d89cfe261f8fabfcf1",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "variable shuffled",
+        "originalSha256": "265a4d0f063fbc78857c12a185a47201249f0824ce4882a93cbb79421d2ecec9",
+        "repositorySha256": "b71f664c8f01c8aab8c1d83ee527f315755ed08e0114f859622bd2016722b9ef",
+        "sourceTextIdentical": false,
+        "normalizedCodeSha256": "e24e2fb0c42b7b8dc372c8de918206257f20ad26123f35a554e0485c16a93b8f",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "variable totalCpu",
+        "originalSha256": "0562303a9e9303d0b7e064519a2db05709b9ddd6e3ec0cccadda17c06ec1f35b",
+        "repositorySha256": "0562303a9e9303d0b7e064519a2db05709b9ddd6e3ec0cccadda17c06ec1f35b",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "fdeb7cd8a1d44b5c37c778748b1b4ca4930cc422903e8bc04efb021ac8aa53d3",
+        "normalizedCodeIdentical": true
+      }
+    ],
+    "loops": [
+      {
+        "label": "loop warmup",
+        "originalSha256": "a4ed0473014126038bdde78d757e9bcf96f9005833a7557e4f4e97feea426bd9",
+        "repositorySha256": "6c1e7e021fb7c0e57548b30b23bd34a84dec9bc6ed0e9044961c4b5b610fef90",
+        "sourceTextIdentical": false,
+        "normalizedCodeSha256": "46ef5f83bf2552827d2f218f86432665e83b4510d1c910d07af40070036de09c",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "loop round",
+        "originalSha256": "87f7f6390cbf1a9f3a03deef0c77be146621224d3ad171711e4f30e7be72ea75",
+        "repositorySha256": "c7bcb012fc070e2ba1e42cf64ffc99561059ef601f6ca3b99ad59401f69b5c67",
+        "sourceTextIdentical": false,
+        "normalizedCodeSha256": "3cf54c2f577af555c8922f1d6484b437bf6e7dac7544c2dcdd0a5111bb68dd20",
+        "normalizedCodeIdentical": true
+      }
+    ],
+    "statsSha256": "50aece53e529b11d096cde638acfd8927ded4372d5ab2b6dbd0fc0ac2792c176"
+  },
+  "full": {
+    "original": {
+      "file": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/baseline/benchmarks/scoped-signals/run-native-costs.mjs",
+      "sha256": "93e81cbecb25551c5afa02db25a81f3af73d4ae872e2886755f8b3f71e2374c0"
+    },
+    "repository": {
+      "file": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/run-native-costs.mjs",
+      "sha256": "ae28dcf260a1f05a1b867c58bb49d9c6c253c11f18d80f98d701f1eb249c3c57"
+    },
+    "changesOutsideLoops": [
+      "Run isolated untimed observer/write-guard restoration controls before building measured cases."
+    ],
+    "functions": [
+      {
+        "label": "function buildCase",
+        "originalSha256": "a6585b6086581412ad82a6f39c4cd74048ccea9a5f3e7806c874171c0317c128",
+        "repositorySha256": "a6585b6086581412ad82a6f39c4cd74048ccea9a5f3e7806c874171c0317c128",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "8b4548211b5718c0e40c98933f165ca222d240c86e1034fb9849bd1bfffe226f",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function buildCollector",
+        "originalSha256": "7e3ee7c843595941441ab54cb24fdc4803630cd997090e1d299fda008d4af955",
+        "repositorySha256": "7e3ee7c843595941441ab54cb24fdc4803630cd997090e1d299fda008d4af955",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "446ea1559a4d07e95bd5cab27c389771f097f150ef5970276dedb5267b347179",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function dataFor",
+        "originalSha256": "b108e39ec767c2ed3003302d25879f8b3fae10b0f95b9002ffd53ac1aa3528da",
+        "repositorySha256": "b108e39ec767c2ed3003302d25879f8b3fae10b0f95b9002ffd53ac1aa3528da",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "2cf01d3acc738c0f4442163a3cc09c30748ce24946eb8f6878b693dddbe4d98c",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function checkElement",
+        "originalSha256": "29710865b2e1f0c74e7f8e331fa98ee826b6edeaa6d4aaa9d65ac6990655fc5d",
+        "repositorySha256": "29710865b2e1f0c74e7f8e331fa98ee826b6edeaa6d4aaa9d65ac6990655fc5d",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "0762e5a03f079452f3dd163b1622173beac2bf666f1f267bf0d1e8521741be1f",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function measureClient",
+        "originalSha256": "73fd490d2aea18aa5a68da9133a488beecd361221acdced5dcf8c21561248d94",
+        "repositorySha256": "73fd490d2aea18aa5a68da9133a488beecd361221acdced5dcf8c21561248d94",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "44d601c3a3741fe1215bdc7fc0c38e26d0fa8bbdd245d6575d314e176de3be12",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function measureServer",
+        "originalSha256": "f7af7ea7c8dbe309db115e4f77cbad5f978e02a53b173f178c503227e5ce8901",
+        "repositorySha256": "f7af7ea7c8dbe309db115e4f77cbad5f978e02a53b173f178c503227e5ce8901",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "08a1431de9da4e06df142bfe4d3f23217a200599ef47db9bd8b3bd3569b28a50",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function measureCollector",
+        "originalSha256": "7cae64015f6f038bec2e58b71cf4511898dc725e0436aa1e10af18e60a385e20",
+        "repositorySha256": "7cae64015f6f038bec2e58b71cf4511898dc725e0436aa1e10af18e60a385e20",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "d1a0f79d82955a3d7c7a5520b838400ad84a07f8964a712e1a7f9424e8d268cd",
+        "normalizedCodeIdentical": true
+      },
+      {
+        "label": "function fiveDependencies",
+        "originalSha256": "bcc7e2082dbfdc473550df2462b45ab1adac794cd6b421e9abf4864092c1993e",
+        "repositorySha256": "bcc7e2082dbfdc473550df2462b45ab1adac794cd6b421e9abf4864092c1993e",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "6ac1729a370787a1162d35f30ea3a79993e0b4cb84a6532cd5039620e00028ed",
+        "normalizedCodeIdentical": true
+      }
+    ],
+    "loops": [
+      {
+        "label": "loop sample",
+        "originalSha256": "709cfd61a2240816c200af61df45c76412c0665977c5c8d7748b5257633e1967",
+        "repositorySha256": "709cfd61a2240816c200af61df45c76412c0665977c5c8d7748b5257633e1967",
+        "sourceTextIdentical": true,
+        "normalizedCodeSha256": "cca265b4b84fec375849d5b508c76620b3c434e9c888183d930203cb4f273075",
+        "normalizedCodeIdentical": true
+      }
+    ]
+  },
+  "snapshot": {
+    "file": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/parity-focused-original-runner.mjs.txt",
+    "sha256": "833b7c1247cc4d2599ab885780363854f7be24e4aa0caef965425c22d3c8c6e1"
+  },
+  "parityEvidence": {
+    "rawResultSha256": "c21e936c7159de2205a0ac5b15ee275021722bbc6abea42fb66e2d0357c7400b",
+    "originalFullRunnerSha256": "93e81cbecb25551c5afa02db25a81f3af73d4ae872e2886755f8b3f71e2374c0",
+    "originalFocusedRunnerSha256": "833b7c1247cc4d2599ab885780363854f7be24e4aa0caef965425c22d3c8c6e1",
+    "durableSmoke": "parity-focused-durable-smoke.json",
+    "originalSmoke": "parity-focused-original-smoke.json",
+    "allTenArchivedRendererBundleHashesMatchAcrossBothSmokes": true,
+    "finalFiveRendererBundlesIdenticalAcrossFourFocusedRunsAndFullRunner": true,
+    "notes": "The exact original focused source is preserved as text to avoid formatting its bytes. Changes to command defaults and paths were outside the identical normalized timing loops; all actual timing commands explicitly used25pairs and10000updates."
+  }
+}

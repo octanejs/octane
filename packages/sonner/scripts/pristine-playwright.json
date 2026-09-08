@@ -1,0 +1,7 @@
+{
+  "packageName": "sonner",
+  "packageVersion": "2.0.7",
+  "dependencyWorkspace": "scripts/react-parity/fixtures/sonner",
+  "mode": "sonner-vite",
+  "project": "chromium"
+}

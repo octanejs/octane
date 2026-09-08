@@ -296,29 +296,7 @@ export function OnThisPage(props: {
 		else navigate();
 	};
 
-	<nav class="on-this-page" aria-label="On this page">
-		<div class="toc-reveal">
-			<div class="toc-reveal-inner">
-				<div class={['toc-track', activeId !== '' && 'is-active']} ref={tocTrack}>
-					<span class="toc-indicator" aria-hidden="true"></span>
-					<ul class="toc-list">
-						@for (const section of sections; key section.id) {
-							<li class="toc-item" data-level={section.level === 3 ? '3' : '2'}>
-								<a
-									href={'#' + section.id}
-									class="toc-link"
-									data-id={section.id}
-									aria-current={activeId === section.id ? 'true' : undefined}
-									onClick={(event: MouseEvent) => scrollToSection(event, section.id)}
-								>
-									<span class="toc-link-text">{section.title as string}</span>
-								</a>
-							</li>
-						}
-					</ul>
-				</div>
-			</div>
-		</div>
+	<>
 		<style>
 			.on-this-page {
 				margin: 0.2rem 0.45rem 0.55rem 0.75rem;
@@ -412,5 +390,29 @@ export function OnThisPage(props: {
 				}
 			}
 		</style>
-	</nav>
+		<nav class="on-this-page" aria-label="On this page">
+			<div class="toc-reveal">
+				<div class="toc-reveal-inner">
+					<div class={['toc-track', activeId !== '' && 'is-active']} ref={tocTrack}>
+						<span class="toc-indicator" aria-hidden="true"></span>
+						<ul class="toc-list">
+							@for (const section of sections; key section.id) {
+								<li class="toc-item" data-level={section.level === 3 ? '3' : '2'}>
+									<a
+										href={'#' + section.id}
+										class="toc-link"
+										data-id={section.id}
+										aria-current={activeId === section.id ? 'true' : undefined}
+										onClick={(event: MouseEvent) => scrollToSection(event, section.id)}
+									>
+										<span class="toc-link-text">{section.title as string}</span>
+									</a>
+								</li>
+							}
+						</ul>
+					</div>
+				</div>
+			</div>
+		</nav>
+	</>
 }

@@ -1,0 +1,53 @@
+{
+  "suite": "tsrx-renderer-selection",
+  "iterations": 3,
+  "targets": [
+    {
+      "name": "raw-config",
+      "ops": {
+        "resolve": {
+          "score": 15.411208000000002,
+          "median": 15.411208000000002,
+          "min": 15.274124999999998,
+          "mean": 15.500291666666664,
+          "p95": 15.815541999999994,
+          "sd": 0.28148715196671337,
+          "rme": 4.511587922482647,
+          "scoreRme": 4.511587922482647,
+          "warmupRatio": 1,
+          "samples": 3
+        }
+      },
+      "meta": {
+        "callsPerSample": 512,
+        "cases": 16,
+        "checksum": 2178790725,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "normalized-config",
+      "ops": {
+        "resolve": {
+          "score": 15.766833000000005,
+          "median": 15.766833000000005,
+          "min": 15.275834000000003,
+          "mean": 15.717722333333336,
+          "p95": 16.110500000000002,
+          "sd": 0.41949460792045096,
+          "rme": 6.630518471700335,
+          "scoreRme": 6.630518471700335,
+          "warmupRatio": 1,
+          "samples": 3
+        }
+      },
+      "meta": {
+        "callsPerSample": 512,
+        "cases": 16,
+        "checksum": 2178790725,
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

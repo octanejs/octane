@@ -1,0 +1,27 @@
+{
+  "upstream": {
+    "package": "@opentui/react",
+    "version": "0.5.8"
+  },
+  "surface": "Technical-preview OpenTUI 0.5.8 renderer: renderer-local TSRX intrinsics for the complete built-in catalogue and text modifiers, custom `extend()` renderables, component-plus-props roots, OpenTUI prop/style/event application, refs and retained visibility, same-renderer `RootRenderable` portals, terminal error fallback, `act`/`flushSync`, all public hooks, `TimeToFirstDraw`, the core slot/plugin registry adapted to universal renderables, and an FFI-backed test utility. Native behavioral coverage exercises terminal frames, state and prop updates, host identity, keyboard and resize hooks, multi-argument select callbacks, subscription cleanup, portals, slots, errors, and teardown under Bun.",
+  "divergences": [
+    "Octane owns reconciliation, components, hooks, context, scheduling, errors, refs, and effects instead of embedding React Reconciler.",
+    "Components are authored in `.opentui.tsrx`; the package does not export React `createElement` or accept React element trees. Programmatic roots render an Octane component plus props.",
+    "Refs are ordinary Octane props and may be composed with `ref={[a, b]}`; there is no `forwardRef` layer.",
+    "Slot plugins return universal renderables and plugin errors use source `octane` instead of `react`. `createReactSlotRegistry` and the upstream `React*` type names remain migration aliases for the canonical Octane-named API.",
+    "React DevTools and OpenTUI's React runtime-plugin bundling subpaths are not ported. Applications configure the Octane compiler with `opentuiRenderers`.",
+    "Portal targets are explicitly limited to borrowed `RootRenderable` instances from the same `CliRenderer` context and are never destroyed by the binding."
+  ],
+  "ssr": "Unsupported. OpenTUI is a native terminal renderer; `.opentui.tsrx` modules are rejected from server graphs and have no HTML hydration contract.",
+  "verified": "2026-08-25",
+  "provenance": {
+    "source": "https://github.com/anomalyco/opentui",
+    "license": "MIT",
+    "commit": "21b002174255ca2236ed3115e2bb2294642f2cf5",
+    "verification": "recorded-unverified"
+  },
+  "notes": [
+    "OpenTUI 0.5.8 requires Bun 1.3+ or Node.js 26.4+ with `--experimental-ffi`. The package's native integration suite runs as an always-executed Bun lane; the repository's Node Vitest project owns the framework-neutral configuration and prop coverage.",
+    "The port reuses `@opentui/core@0.5.8` unchanged and preserves OpenTUI callback names and multi-argument callback shapes, including select and tab-select `onChange(index, option)` and `onSelect(index, option)`."
+  ]
+}

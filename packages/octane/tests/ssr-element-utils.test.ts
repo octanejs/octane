@@ -27,6 +27,23 @@ function captureThrown(run: () => unknown): unknown {
 }
 
 describe('octane/server element utilities', () => {
+	it.each(['renderToString', 'renderToStaticMarkup'] as const)(
+		'%s preserves omitted children when a component forwards merged props',
+		(renderMethod) => {
+			function Forwarder({ defaults, ...props }: { defaults: object; children?: unknown }) {
+				return Server.createElement('span', { ...defaults, ...props });
+			}
+			const defaults = { children: 'forwarded' };
+			const render = (props: { defaults: object; children?: unknown }) =>
+				Server[renderMethod](() => Server.createElement(Forwarder, props)).html;
+			expect(render({ defaults })).toContain('>forwarded</span>');
+			for (const children of [null, undefined, false]) {
+				expect(render({ defaults, children })).not.toContain('forwarded');
+			}
+			expect(render({ defaults, children: 'explicit' })).toContain('>explicit</span>');
+		},
+	);
+
 	it('isValidElement recognizes server createElement descriptors only', () => {
 		const element = createElement('li', { class: 'row' }, 'x');
 		expect(isValidElement(element)).toBe(true);
@@ -149,15 +166,17 @@ describe('octane/server element utilities', () => {
 	it('Children promises keep SSR boundary suspension bookkeeping during render', () => {
 		const promise = new Promise(() => {});
 		const App = (props: { promise: Promise<unknown> }, scope: unknown) =>
-			(Server as any).ssrTry(
-				scope,
-				'children-promise',
-				() => {
-					Children.toArray(props.promise);
-					return '<strong>ready</strong>';
-				},
-				() => '<em>loading</em>',
-				null,
+			Server.ssrHtml(
+				(Server as any).ssrTry(
+					scope,
+					'children-promise',
+					() => {
+						Children.toArray(props.promise);
+						return '<strong>ready</strong>';
+					},
+					() => '<em>loading</em>',
+					null,
+				),
 			);
 		const { html } = renderToStaticMarkup(App, { promise });
 		expect(html).toContain('<em>loading</em>');

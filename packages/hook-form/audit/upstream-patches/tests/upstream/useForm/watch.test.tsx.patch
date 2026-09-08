@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/useForm/watch.test.tsx b/tests/upstream/useForm/watch.test.tsx
+--- a/tests/upstream/useForm/watch.test.tsx
++++ b/tests/upstream/useForm/watch.test.tsx
+@@ -722,8 +722,8 @@ describe('watch', () => {
+             render={({ field }) => (
+               <input
+                 {...field}
+-                onChange={(e) => {
+-                  field.onChange(e);
++                onInput={(e) => {
++                  field.onInput(e);
+                   trigger('name');
+                 }}
+               />

@@ -1,5 +1,6 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
+import { createOctaneSourcePlugin } from './packed-source-compiler.mjs';
 import {
 	cpSync,
 	existsSync,
@@ -17,12 +18,15 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
 	getWorkspacePackages,
+	octanePeerRangeFor,
 	REPO_ROOT,
 	validateWorkspacePackages,
 } from './workspace-packages.mjs';
 import {
 	createPackedJavascriptConsumerManifest,
+	assertPackedTsrxConsumerSucceeded,
 	createPackedTsrxConsumerConfig,
+	resolvePackedTsrxSourceDirectories,
 	createPackedTsrxConsumerManifest,
 	createPackedExampleManifest,
 	isWithinDirectory,
@@ -35,14 +39,20 @@ import {
 	PACKED_COMMONJS_CONSUMER_PACKAGES,
 	PACKED_JAVASCRIPT_CONSUMER_PACKAGES,
 	PACKED_TSRX_CONSUMER_PROJECTS,
+	PACKED_TSRX_CONSUMER_ESRAP_VERSION,
+	PACKED_TSRX_BROWSER_AMBIENT_FILE,
 	PACKED_TSRX_PROBE_PACKAGES,
+	PACKED_STRICT_BROWSER_SOURCE_PACKAGES,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
 	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
+	renderPackedTsrxBrowserAmbientProbe,
 	renderPackedTsrxSourceImports,
 	renderPackedTsrxConsumerTypeProbe,
+	renderPackedStrictBrowserConsumerTypeProbe,
+	renderPackedStrictBrowserConsumerSource,
 } from './package-pack-canaries.mjs';
 import { LYNX_TOOLCHAIN_LANES } from '../packages/rspeedy-plugin-octane/src/toolchain-lanes.js';
 import {
@@ -105,11 +115,10 @@ const packedExampleCanaries = [
 		packages: ['octane', '@octanejs/vite-plugin', '@octanejs/app-core', '@octanejs/seo'],
 	},
 ];
-// Keep known upstream type-graph debt explicit while every new source binding
-// is enrolled automatically. Issue #721 owns removing these exceptions.
+// Keep other upstream type-graph debt explicit while new source bindings are
+// enrolled automatically. The five bindings reported in #721 must stay enrolled.
 const packedTsrxSourceExceptions = new Map([
 	['@octanejs/aria', 'its browser source still reads process.env.NODE_ENV'],
-	['@octanejs/base-ui', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/cmdk', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/dnd-kit', 'its browser source still reads process.env.NODE_ENV'],
 	[
@@ -132,20 +141,10 @@ const packedTsrxSourceExceptions = new Map([
 		'@octanejs/rainbowkit',
 		'its Wagmi and TanStack Query peer declarations are not yet mutually compatible under strict checking',
 	],
-	['@octanejs/jotai', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/popper', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/react-map-gl', 'its published source requires Mapbox GeoJSON ambient declarations'],
 	[
-		'@octanejs/recharts',
-		'extensionless relative imports do not yet resolve to sibling TSRX modules in tsrx-tsc',
-	],
-	[
-		'@octanejs/remix-router',
-		'its ref and browser-global source typing debt is tracked by companion PR #734',
-	],
-	['@octanejs/redux', 'its browser source still reads process.env.NODE_ENV'],
-	[
-		'@octanejs/solana-react',
+		'@octanejs/solana-kit',
 		'its TanStack Query peer declarations are not yet compatible with the installed strict consumer graph',
 	],
 	['@octanejs/tanstack-query', 'its browser source still reads process.env.NODE_ENV'],
@@ -154,7 +153,6 @@ const packedTsrxSourceExceptions = new Map([
 		'its browser source reads process.env.NODE_ENV and its upstream declarations import node:http2',
 	],
 	['@octanejs/tiptap', 'its browser source still reads process.env.NODE_ENV'],
-	['@octanejs/visx', 'React SVG and event prop types are not yet Octane-native'],
 	[
 		'@octanejs/wagmi',
 		'its Wagmi and TanStack Query peer declarations are not yet mutually compatible under strict checking',
@@ -236,10 +234,10 @@ function validatePackedPackage(pkg, manifest, files, executableFiles) {
 		if (manifest.dependencies?.octane !== undefined) {
 			errors.push('packed manifest installs a duplicate octane runtime dependency');
 		}
-		const expectedOctane = packageVersions.get('octane');
+		const expectedOctane = octanePeerRangeFor(pkg.name).replace(/^workspace:/, '');
 		if (manifest.peerDependencies?.octane !== expectedOctane) {
 			errors.push(
-				`packed octane peer is ${JSON.stringify(manifest.peerDependencies?.octane)}, expected exact ${JSON.stringify(expectedOctane)}`,
+				`packed octane peer is ${JSON.stringify(manifest.peerDependencies?.octane)}, expected ${JSON.stringify(expectedOctane)}`,
 			);
 		}
 	}
@@ -484,6 +482,13 @@ async function validatePackedConsumer(tempRoot, archives) {
 			null,
 			2,
 		) + '\n',
+	);
+	// postcss 8.5.28 makes DeclarationProps extend NodeProps, but tsrx-tsc
+	// cannot resolve that named export from node.d.ts (TS2304). pnpm 11 reads
+	// overrides from pnpm-workspace.yaml, matching the other packed consumers.
+	writeFileSync(
+		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
+		'overrides:\n  postcss: "8.5.26"\n',
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'App.tsrx'),
@@ -867,6 +872,10 @@ export function renderProbe() {
 	);
 
 	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
+	const installedPostcss = consumerRequire('postcss/package.json').version;
+	if (installedPostcss !== '8.5.26') {
+		throw new Error(`packed consumer resolved postcss ${installedPostcss}; expected 8.5.26`);
+	}
 	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
 	// Resolve through real ESM package specifiers from the installed consumer,
 	// not a CommonJS-resolved file URL, so conditional `import` branches remain
@@ -1112,6 +1121,8 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 
 	const sourceDirectory = path.join(consumerDirectory, 'src');
 	mkdirSync(sourceDirectory, { recursive: true });
+	const strictBrowserDirectory = path.join(consumerDirectory, 'strict-browser');
+	mkdirSync(strictBrowserDirectory, { recursive: true });
 	const sourceConsumerPackages = findPackedTsrxSourceConsumerPackages(
 		packages,
 		packedFiles,
@@ -1146,6 +1157,13 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 			sourceConsumerSpecifiers.get(packageName),
 		]),
 	);
+	const strictBrowserSpecifiers = PACKED_STRICT_BROWSER_SOURCE_PACKAGES.flatMap((packageName) => {
+		const specifiers = browserSourceConsumerSpecifiers.get(packageName);
+		if (!specifiers) {
+			throw new Error(`${packageName} must remain enrolled in strict packed browser validation`);
+		}
+		return specifiers;
+	});
 	const validatedPackages = [...sourceConsumerSpecifiers.keys(), 'octane'];
 	const installedPackages = findPackedWorkspaceDependencyClosure(packedManifests, [
 		...new Set([...validatedPackages, ...PACKED_TSRX_PROBE_PACKAGES]),
@@ -1171,35 +1189,12 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		`${JSON.stringify(manifest, null, 2)}\n`,
 	);
 	writeFileSync(
-		path.join(consumerDirectory, 'tsconfig.json'),
-		`${JSON.stringify(
-			createPackedTsrxConsumerConfig({
-				nodeTypes: true,
-				sourcePackageNames: [...sourceConsumerSpecifiers.keys()],
-			}),
-			null,
-			2,
-		)}\n`,
-	);
-	writeFileSync(
-		path.join(consumerDirectory, 'tsconfig.browser.json'),
-		`${JSON.stringify(
-			createPackedTsrxConsumerConfig({
-				consumerSourceFiles: ['src/published-browser-source-imports.ts'],
-				nodeTypes: false,
-				sourcePackageNames: [...browserSourceConsumerSpecifiers.keys()],
-			}),
-			null,
-			2,
-		)}\n`,
-	);
-	writeFileSync(
 		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
 		renderPackedExampleWorkspace(archiveSpecs),
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'PublishedSourceConsumer.tsrx'),
-		renderPackedTsrxConsumerSource({ includeRecharts: false }),
+		renderPackedTsrxConsumerSource(),
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'published-types.ts'),
@@ -1212,6 +1207,22 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	writeFileSync(
 		path.join(sourceDirectory, 'published-browser-source-imports.ts'),
 		renderPackedTsrxSourceImports([...browserSourceConsumerSpecifiers.values()].flat()),
+	);
+	writeFileSync(
+		path.join(consumerDirectory, PACKED_TSRX_BROWSER_AMBIENT_FILE),
+		renderPackedTsrxBrowserAmbientProbe(),
+	);
+	writeFileSync(
+		path.join(strictBrowserDirectory, 'published-source-imports.ts'),
+		renderPackedTsrxSourceImports(strictBrowserSpecifiers),
+	);
+	writeFileSync(
+		path.join(strictBrowserDirectory, 'published-types.ts'),
+		renderPackedStrictBrowserConsumerTypeProbe(),
+	);
+	writeFileSync(
+		path.join(strictBrowserDirectory, 'App.tsrx'),
+		renderPackedStrictBrowserConsumerSource(),
 	);
 
 	execFileSync(
@@ -1242,25 +1253,76 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		}
 	}
 
-	for (const toolingSpecifier of ['@tsrx/typescript-plugin', 'octane/compiler/volar']) {
+	for (const toolingSpecifier of ['@tsrx/typescript-plugin', 'octane/compiler/volar', 'esrap']) {
 		const entry = realpathSync(consumerRequire.resolve(toolingSpecifier));
 		if (isWithinDirectory(REPO_ROOT, entry)) {
 			throw new Error(`${toolingSpecifier} resolved back into the workspace: ${entry}`);
 		}
 	}
 
+	const consumerPrinter = JSON.parse(
+		readFileSync(path.join(consumerDirectory, 'node_modules/esrap/package.json'), 'utf8'),
+	);
+	if (consumerPrinter.version !== PACKED_TSRX_CONSUMER_ESRAP_VERSION) {
+		throw new Error(`packed TSRX consumer resolved unexpected esrap ${consumerPrinter.version}`);
+	}
+
+	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.json'),
+		`${JSON.stringify(
+			createPackedTsrxConsumerConfig({
+				nodeTypes: true,
+				sourcePackageDirectories: resolvePackedTsrxSourceDirectories(consumerDirectory, [
+					...sourceConsumerSpecifiers.keys(),
+				]),
+			}),
+			null,
+			2,
+		)}\n`,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.browser.json'),
+		`${JSON.stringify(
+			createPackedTsrxConsumerConfig({
+				consumerSourceFiles: ['src/published-browser-source-imports.ts'],
+				nodeTypes: false,
+				sourcePackageDirectories: resolvePackedTsrxSourceDirectories(consumerDirectory, [
+					...browserSourceConsumerSpecifiers.keys(),
+				]),
+			}),
+			null,
+			2,
+		)}\n`,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.strict-browser.json'),
+		`${JSON.stringify(
+			createPackedTsrxConsumerConfig({
+				consumerSourceFiles: ['strict-browser/**/*'],
+				ecmaVersion: 'esnext',
+				nodeTypes: false,
+			}),
+			null,
+			2,
+		)}\n`,
+	);
+
 	const tsrxTsc = path.join(consumerDirectory, 'node_modules', '.bin', 'tsrx-tsc');
 	for (const project of PACKED_TSRX_CONSUMER_PROJECTS) {
-		execFileSync(tsrxTsc, ['--noEmit', '-p', project], {
+		const result = spawnSync(tsrxTsc, ['--noEmit', '-p', project], {
 			cwd: consumerDirectory,
 			encoding: 'utf8',
 			stdio: ['ignore', 'pipe', 'pipe'],
 			timeout: 120_000,
 		});
+		assertPackedTsrxConsumerSucceeded(result, project);
 	}
 
 	console.log(
 		`strict tsrx-tsc validated ${validatedPackages.length - 1} packed TSRX bindings with and without Node ambient types using the installed Octane Volar compiler`,
+	);
+	console.log(
+		`strict ESNext browser source and public contracts passed for ${PACKED_STRICT_BROWSER_SOURCE_PACKAGES.join(', ')} with consumer esrap ${consumerPrinter.version}`,
 	);
 	for (const [packageName, reason] of packedTsrxSourceExceptions) {
 		console.warn(`deferred strict packed TSRX validation for ${packageName}: ${reason}`);
@@ -1289,6 +1351,10 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 	);
 	writeFileSync(path.join(consumerDirectory, 'require.cjs'), renderPackedCommonjsConsumerSource());
 	writeFileSync(path.join(consumerDirectory, 'import.mjs'), renderPackedEsmConsumerSource());
+	cpSync(
+		path.join(REPO_ROOT, 'scripts/fixtures/packed-base-ui-consumer.cjs'),
+		path.join(consumerDirectory, 'base-ui-behavior.cjs'),
+	);
 	writeFileSync(
 		path.join(consumerDirectory, 'draggable-import.mjs'),
 		renderPackedDraggableEsmConsumerSource(),
@@ -1351,12 +1417,42 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 	);
 	await build({
 		absWorkingDir: consumerDirectory,
+		entryPoints: ['base-ui-behavior.cjs'],
+		outfile: 'base-ui-behavior-bundle.cjs',
+		bundle: true,
+		format: 'cjs',
+		platform: 'node',
+		target: 'node22',
+		external: ['octane', 'octane/*'],
+		plugins: [
+			await createOctaneSourcePlugin(
+				consumerDirectory,
+				pathToFileURL(consumerRequire.resolve('octane/compiler/bundler')).href,
+			),
+		],
+		logLevel: 'silent',
+	});
+	execFileSync(process.execPath, ['base-ui-behavior-bundle.cjs'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+		timeout: 30_000,
+		env: { ...process.env, OCTANE_PACK_CHECK_JSDOM: repositoryRequire.resolve('jsdom') },
+	});
+	await build({
+		absWorkingDir: consumerDirectory,
 		entryPoints: ['import.mjs'],
 		outfile: 'import-bundle.mjs',
 		bundle: true,
 		format: 'esm',
 		platform: 'node',
 		target: 'node22',
+		plugins: [
+			await createOctaneSourcePlugin(
+				consumerDirectory,
+				pathToFileURL(consumerRequire.resolve('octane/compiler/bundler')).href,
+			),
+		],
 		logLevel: 'silent',
 	});
 	const esmSurface = JSON.parse(
@@ -1370,6 +1466,45 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 	const compilerPluginEntry = consumerRequire.resolve('octane/compiler/vite');
 	const { octane } = await import(pathToFileURL(compilerPluginEntry).href);
 	const { build: viteBuild } = await import(pathToFileURL(viteToolRequire.resolve('vite')).href);
+	cpSync(
+		path.join(REPO_ROOT, 'scripts/fixtures/packed-base-ui-server.tsrx'),
+		path.join(consumerDirectory, 'base-ui-server.tsrx'),
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'base-ui-server.mjs'),
+		`
+import assert from 'node:assert/strict';
+import { renderToString } from 'octane/server';
+import { PackedBindingForm } from './base-ui-server.tsrx';
+const { html } = renderToString(PackedBindingForm);
+assert.match(html, /name="selected"[^>]*value="pear"|value="pear"[^>]*name="selected"/);
+assert.match(html, /name="search"[^>]*value="Apple"|value="Apple"[^>]*name="search"/);
+assert.match(html, /Pear/);
+assert.match(html, /aria-label="Search fruit"/);
+assert.equal(typeof globalThis.document, 'undefined');
+console.log('Packed Select and Combobox server form values passed without a DOM.');
+`,
+	);
+	await viteBuild({
+		root: consumerDirectory,
+		configFile: false,
+		logLevel: 'silent',
+		plugins: [octane({ hmr: false })],
+		ssr: { noExternal: ['@octanejs/base-ui', '@octanejs/base-ui-utils', '@octanejs/floating-ui'] },
+		build: {
+			ssr: 'base-ui-server.mjs',
+			outDir: 'dist-base-ui-server',
+			target: 'node22',
+			rollupOptions: { output: { entryFileNames: 'base-ui-server.mjs' } },
+		},
+	});
+	execFileSync(process.execPath, ['dist-base-ui-server/base-ui-server.mjs'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+		timeout: 30_000,
+	});
+
 	await viteBuild({
 		root: consumerDirectory,
 		configFile: false,
@@ -1395,7 +1530,7 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 	);
 	assertRequiredPublicValueExports('.', commonjsSurface.octane);
 	assertRequiredPublicValueExports('.', esmSurface.octane);
-	for (const packageName of ['base', 'floating', 'radix']) {
+	for (const packageName of ['floating', 'radix']) {
 		if (!Array.isArray(commonjsSurface[packageName]) || commonjsSurface[packageName].length === 0) {
 			throw new Error(`packed CommonJS ${packageName} surface is empty`);
 		}
@@ -1403,10 +1538,13 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 			throw new Error(`packed ESM ${packageName} surface is empty`);
 		}
 	}
+	if (!Array.isArray(esmSurface.base) || esmSurface.base.length === 0) {
+		throw new Error('packed ESM Base UI surface is empty');
+	}
 	if (!Array.isArray(esmSurface.draggable) || esmSurface.draggable.length === 0) {
 		throw new Error('packed ESM draggable surface is empty');
 	}
-	for (const packageName of ['base', 'floating', 'octane', 'radix']) {
+	for (const packageName of ['floating', 'octane', 'radix']) {
 		if (
 			JSON.stringify([...commonjsSurface[packageName]].sort()) !==
 			JSON.stringify([...esmSurface[packageName]].sort())
@@ -1418,7 +1556,7 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 		throw new Error('packed ESM and CommonJS SSR output differs');
 	}
 	console.log(
-		'installed packed Octane, Floating UI, Base UI, Radix, and Draggable without React; CommonJS packages selected require conditions and Draggable compiled through its ESM source entry',
+		'installed packed Octane, Floating UI, Base UI, Radix, and Draggable without React; CommonJS packages selected require conditions and Base UI and Draggable compiled through their authored source entries',
 	);
 }
 

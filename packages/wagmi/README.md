@@ -5,6 +5,7 @@ official connectors, while replacing the React provider and hooks with Octane
 bindings backed by `@octanejs/tanstack-query`.
 
 ```bash
+npm install @octanejs/wagmi @octanejs/tanstack-query viem
 pnpm add @octanejs/wagmi @octanejs/tanstack-query viem
 ```
 

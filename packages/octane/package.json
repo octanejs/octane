@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.1.39",
+  "version": "0.2.6",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -44,6 +44,9 @@
     "./behavior": "./src/behavior-root.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
+    "./signals": "./src/signals/index.ts",
+    "./signals/client": "./src/signals/client.ts",
+    "./signals/server": "./src/signals/server.ts",
     "./internal/client": "./src/internal/client.ts",
     "./internal/server": "./src/internal/server.ts",
     "./static": "./src/static/index.ts",
@@ -52,10 +55,17 @@
     "./profiling": "./src/profiling.ts",
     "./universal": "./src/universal.ts",
     "./universal/native": "./src/universal-native.ts",
-    "./compiler": "./src/compiler/index.js",
+    "./compiler": {
+      "types": "./src/compiler/index.d.ts",
+      "default": "./src/compiler/index.js"
+    },
     "./compiler/bundler": "./src/compiler/bundler.js",
     "./compiler/register": "./src/compiler/register.js",
     "./compiler/renderers": "./src/compiler/renderers.js",
+    "./compiler/typescript": {
+      "types": "./src/compiler/typescript.d.ts",
+      "default": "./src/compiler/typescript.js"
+    },
     "./compiler/vite": {
       "types": "./src/compiler/vite.d.ts",
       "default": "./src/compiler/vite.js"
@@ -116,14 +126,34 @@
         "require": "./dist/cjs/server/index.cjs",
         "default": "./dist/server/index.js"
       },
+      "./signals": {
+        "types": "./dist/signals/index.d.ts",
+        "import": "./dist/signals/index.js",
+        "require": "./dist/cjs/signals/index.cjs",
+        "default": "./dist/signals/index.js"
+      },
+      "./signals/client": {
+        "types": "./dist/signals/client.d.ts",
+        "import": "./dist/signals/client.js",
+        "require": "./dist/cjs/signals/client.cjs",
+        "default": "./dist/signals/client.js"
+      },
+      "./signals/server": {
+        "types": "./dist/signals/server.d.ts",
+        "import": "./dist/signals/server.js",
+        "require": "./dist/cjs/signals/server.cjs",
+        "default": "./dist/signals/server.js"
+      },
       "./internal/client": {
         "types": "./dist/internal/client.d.ts",
         "import": "./dist/internal/client.js",
+        "require": "./dist/cjs/internal/client.cjs",
         "default": "./dist/internal/client.js"
       },
       "./internal/server": {
         "types": "./dist/internal/server.d.ts",
         "import": "./dist/internal/server.js",
+        "require": "./dist/cjs/internal/server.cjs",
         "default": "./dist/internal/server.js"
       },
       "./static": {
@@ -150,10 +180,17 @@
         "types": "./dist/universal-native.d.ts",
         "default": "./dist/universal-native.js"
       },
-      "./compiler": "./dist/compiler/index.js",
+      "./compiler": {
+        "types": "./dist/compiler/index.d.ts",
+        "default": "./dist/compiler/index.js"
+      },
       "./compiler/bundler": "./dist/compiler/bundler.js",
       "./compiler/register": "./dist/compiler/register.js",
       "./compiler/renderers": "./dist/compiler/renderers.js",
+      "./compiler/typescript": {
+        "types": "./dist/compiler/typescript.d.ts",
+        "default": "./dist/compiler/typescript.js"
+      },
       "./compiler/vite": {
         "types": "./dist/compiler/vite.d.ts",
         "default": "./dist/compiler/vite.js"
@@ -170,7 +207,11 @@
   "dependencies": {
     "@tsrx/core": "catalog:default",
     "@types/react": "catalog:default",
+    "@volar/language-core": "catalog:default",
+    "@volar/typescript": "catalog:default",
+    "alien-signals": "3.2.0",
     "devalue": "catalog:default",
+    "entities": "7.0.1",
     "es-module-lexer": "catalog:default",
     "esrap": "catalog:default",
     "oxc-tsrx": "catalog:default"
@@ -178,6 +219,7 @@
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "typescript": "^5.9.3",
     "vite": "^8.0.16"
   },
   "peerDependenciesMeta": {
@@ -187,12 +229,16 @@
     "react-dom": {
       "optional": true
     },
+    "typescript": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     }
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
     "@wagmi/connectors": "catalog:default",
     "@wagmi/core": "catalog:default",
     "esbuild": "catalog:default",
@@ -200,6 +246,7 @@
     "playwright": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "typescript": "catalog:default",
     "viem": "catalog:default",
     "vite": "catalog:default",
     "vitest": "catalog:default"

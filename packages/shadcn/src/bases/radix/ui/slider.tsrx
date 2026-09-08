@@ -9,7 +9,7 @@
 import { createElement, useMemo } from 'octane';
 import { Slider as SliderPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface SliderProps extends Record<string, unknown> {
 	className?: string;

@@ -1,7 +1,7 @@
 # External-store integrations
 
 Compare 512 real browser subscribers backed by actual Zustand vanilla stores,
-Jotai atoms, and TanStack Query caches. Each of the six frameworks uses its
+Jotai atoms, and TanStack Query caches. Each of the seven frameworks uses its
 native subscriber lifecycle over the same framework-independent production
 store core. Chromium checks narrow selectors, full fan-out, rapid updates,
 and exact subscription teardown for all three libraries. TanStack Query

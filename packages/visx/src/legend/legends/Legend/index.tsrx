@@ -1,6 +1,5 @@
 import type { CSSProperties } from 'react';
 import type { OctaneNode } from 'octane';
-import { createElement } from 'octane';
 import cx from 'classnames';
 import type { AnyD3Scale, ScaleInput } from '@octanejs/visx/scale';
 import LegendItem from './LegendItem.tsrx';
@@ -100,36 +99,36 @@ export default function Legend<Scale extends AnyD3Scale>({
 	if (children) return <>
 		{children(labels)}
 	</>;
-	const legendItems = labels.map(
-		(label, i) => createElement(
-			LegendItem,
-			{
-				key: `legend-${label.text}-${i}`,
-				margin: itemMargin,
-				flexDirection: itemDirection,
-				...legendItemProps,
-			},
-			createElement(LegendShape, {
-				shape,
-				height: shapeHeight,
-				width: shapeWidth,
-				margin: shapeMargin,
-				item: domain[i],
-				itemIndex: i,
-				label,
-				fill,
-				size,
-				shapeStyle,
-			}),
-			createElement(LegendLabel, {
-				label: label.text,
-				flex: labelFlex,
-				margin: labelMargin,
-				align: labelAlign,
-				...legendLabelProps,
-			}),
-		),
-	);
+	const legendItems = labels.map(function (label, i) {
+		return (
+			<LegendItem
+				key={`legend-${label.text}-${i}`}
+				margin={itemMargin}
+				flexDirection={itemDirection}
+				{...legendItemProps}
+			>
+				<LegendShape
+					shape={shape}
+					height={shapeHeight}
+					width={shapeWidth}
+					margin={shapeMargin}
+					item={domain[i]}
+					itemIndex={i}
+					label={label}
+					fill={fill}
+					size={size}
+					shapeStyle={shapeStyle}
+				/>
+				<LegendLabel
+					label={label.text}
+					flex={labelFlex}
+					margin={labelMargin}
+					align={labelAlign}
+					{...legendLabelProps}
+				/>
+			</LegendItem>
+		);
+	});
 
 	return <div
 		className={cx('visx-legend', className)}

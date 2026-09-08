@@ -1,3 +1,32 @@
+import type { Props as DotProps } from '../shape/Dot.tsrx';
+import type { OctaneElement } from '../util/OctaneTypes.ts';
+import type { DataKey, DotItemDotProps, DotType } from '../util/types';
+import type { ZIndexable } from '../zIndex/ZIndexLayer.tsrx';
+
+export interface DotPoint {
+	readonly x: number | null;
+	readonly y: number | null;
+	readonly value?: any;
+	readonly payload?: any;
+}
+type DotItemProps = {
+	option: DotType;
+	dotProps: DotItemDotProps;
+	className: string;
+};
+type DotElementProps = Extract<DotType, OctaneElement>['props'];
+export type DotsDotProps =
+	Omit<DotProps, 'cx' | 'cy' | 'key' | 'index' | 'dataKey' | 'value' | 'payload'>;
+interface DotsProps extends ZIndexable {
+	points: ReadonlyArray<DotPoint>;
+	dot: DotType;
+	className: string;
+	dotClassName: string;
+	dataKey: DataKey<any> | undefined;
+	baseProps: DotsDotProps;
+	needClip?: boolean;
+	clipPathId?: string;
+}
 // Port of component/Dots.tsx — the dot layer Line/Area/Radar render per data
 // point; `dot` accepts boolean | props object | element | render function.
 import { cloneElement, isValidElement } from 'octane';
@@ -9,9 +38,9 @@ import { svgPropertiesAndEventsFromUnknown } from '../util/svgPropertiesAndEvent
 import { ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 
-function DotItem(props) {
+function DotItem(props: DotItemProps) {
 	const { option, dotProps, className } = props;
-	if (isValidElement(option)) {
+	if (isValidElement<DotElementProps>(option)) {
 		return cloneElement(option, dotProps);
 	}
 	if (typeof option === 'function') {
@@ -22,7 +51,7 @@ function DotItem(props) {
 	return <Dot {...rest} className={finalClassName} />;
 }
 
-function shouldRenderDots(points, dot) {
+function shouldRenderDots(points: ReadonlyArray<DotPoint> | undefined, dot: DotType) {
 	if (points == null) {
 		return false;
 	}
@@ -32,7 +61,7 @@ function shouldRenderDots(points, dot) {
 	return points.length === 1;
 }
 
-export function Dots(dotsProps) {
+export function Dots(dotsProps: DotsProps) {
 	const {
 		points,
 		dot,
@@ -50,7 +79,7 @@ export function Dots(dotsProps) {
 	const clipDot = isClipDot(dot);
 	const customDotProps = svgPropertiesAndEventsFromUnknown(dot);
 	const dots = points.map((entry, i) => {
-		const dotProps = {
+		const dotProps: DotItemDotProps = {
 			r: 3,
 			...baseProps,
 			...customDotProps,
@@ -64,7 +93,9 @@ export function Dots(dotsProps) {
 		};
 		return <DotItem key={'dot-' + i} option={dot} dotProps={dotProps} className={dotClassName} />;
 	});
-	const layerProps = {};
+	const layerProps: {
+		clipPath?: string;
+	} = {};
 	if (needClip && clipPathId != null) {
 		layerProps.clipPath = 'url(#clipPath-' + (clipDot ? '' : 'dots-') + clipPathId + ')';
 	}

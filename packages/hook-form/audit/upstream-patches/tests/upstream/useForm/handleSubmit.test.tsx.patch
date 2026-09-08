@@ -1,0 +1,156 @@
+diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useForm/handleSubmit.test.tsx
+--- a/tests/upstream/useForm/handleSubmit.test.tsx
++++ b/tests/upstream/useForm/handleSubmit.test.tsx
+@@ -23,7 +23,7 @@ describe('handleSubmit', () => {
+       await result.current.handleSubmit(callback)({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+     expect(callback).toHaveBeenCalled();
+   });
+@@ -57,7 +57,7 @@ describe('handleSubmit', () => {
+       })({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+   });
+ 
+@@ -85,7 +85,7 @@ describe('handleSubmit', () => {
+       })({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+   });
+ 
+@@ -108,7 +108,7 @@ describe('handleSubmit', () => {
+       })({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+ 
+     await act(async () => {
+@@ -117,7 +117,7 @@ describe('handleSubmit', () => {
+       })({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+   });
+ 
+@@ -132,7 +132,7 @@ describe('handleSubmit', () => {
+       await result.current.handleSubmit(callback)({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+     expect(callback).not.toHaveBeenCalled();
+   });
+@@ -154,7 +154,7 @@ describe('handleSubmit', () => {
+       await result.current.handleSubmit(callback)({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+ 
+     expect(callback).not.toHaveBeenCalled();
+@@ -179,7 +179,7 @@ describe('handleSubmit', () => {
+       await result.current.handleSubmit(callback)({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+ 
+     expect(callback).not.toHaveBeenCalled();
+@@ -236,7 +236,7 @@ describe('handleSubmit', () => {
+       await result.current.handleSubmit(noop)({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+ 
+     await act(async () => {
+@@ -269,7 +269,7 @@ describe('handleSubmit', () => {
+       })({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent),
++      }),
+     );
+   });
+ 
+@@ -303,7 +303,7 @@ describe('handleSubmit', () => {
+       await result.current.handleSubmit(callback)({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+ 
+     expect(callback).not.toHaveBeenCalled();
+@@ -314,7 +314,7 @@ describe('handleSubmit', () => {
+       await result.current.handleSubmit(callback)({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+ 
+     expect(callback).toHaveBeenCalled();
+@@ -390,7 +390,7 @@ describe('handleSubmit', () => {
+         await result.current.handleSubmit(callback)({
+           preventDefault: noop,
+           persist: noop,
+-        } as React.SyntheticEvent);
++        });
+       });
+       expect(callback).toHaveBeenCalled();
+     });
+@@ -418,7 +418,7 @@ describe('handleSubmit', () => {
+         await result.current.handleSubmit(callback)({
+           preventDefault: noop,
+           persist: noop,
+-        } as React.SyntheticEvent);
++        });
+       });
+       expect(callback.mock.calls[0][0]).toEqual({ test: 'test' });
+     });
+@@ -437,7 +437,7 @@ describe('handleSubmit', () => {
+         )({
+           preventDefault: noop,
+           persist: noop,
+-        } as React.SyntheticEvent);
++        });
+       });
+       expect(onValidCallback).toHaveBeenCalledTimes(1);
+       expect(onInvalidCallback).not.toHaveBeenCalledTimes(1);
+@@ -460,7 +460,7 @@ describe('handleSubmit', () => {
+         )({
+           preventDefault: noop,
+           persist: noop,
+-        } as React.SyntheticEvent);
++        });
+       });
+ 
+       expect(onValidCallback).not.toHaveBeenCalledTimes(1);
+@@ -482,7 +482,7 @@ describe('handleSubmit', () => {
+       })({
+         preventDefault: noop,
+         persist: noop,
+-      } as React.SyntheticEvent);
++      });
+     });
+ 
+     await act(async () => {

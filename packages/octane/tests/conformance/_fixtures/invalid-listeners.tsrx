@@ -3,6 +3,21 @@
 // non-function value the test wants validated and stamped as the target's click
 // slot; the ancestor handler proves Octane's guarded native dispatch walk keeps
 // propagating after reporting it.
+declare module 'octane/jsx-runtime' {
+	namespace Octane {
+		namespace JSX {
+			interface IntrinsicElements {
+				'diagnostic-widget': IntrinsicElements['div'] & {
+					onCustomEvent?: unknown;
+					oncustomevent?: unknown;
+					'oncustom-event'?: unknown;
+					oncustomeventCapture?: unknown;
+				};
+			}
+		}
+	}
+}
+
 export function BadListenerTree(props: { onAnc: (e: Event) => void; bad: any }) @{
 	<div class="anc" onClick={props.onAnc}>
 		<div class="target" onClick={props.bad}>{'x'}</div>

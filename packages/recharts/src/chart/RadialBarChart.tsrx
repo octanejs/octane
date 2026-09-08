@@ -1,7 +1,9 @@
+import type { Ref } from '../util/OctaneTypes.ts';
+
 import { arrayTooltipSearcher } from '../state/optionsSlice';
 import { PolarChartProps, TooltipEventType } from '../util/types';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
-import { defaultPolarChartProps, PolarChart } from './PolarChart';
+import { defaultPolarChartProps, PolarChart } from './PolarChart.tsrx';
 
 const allowedTooltipTypes: ReadonlyArray<TooltipEventType> = ['axis', 'item'];
 
@@ -17,7 +19,9 @@ export const defaultRadialBarChartProps = {
  * @provides PolarViewBoxContext
  * @provides PolarChartContext
  */
-export function RadialBarChart(props: PolarChartProps<unknown>) {
+export function RadialBarChart<DataPointType = unknown>(props: PolarChartProps<DataPointType> & {
+	ref?: Ref<SVGSVGElement>;
+}) {
 	const { ref, ...rest } = props;
 	const propsWithDefaults = resolveDefaultProps(rest, defaultRadialBarChartProps);
 	return <PolarChart

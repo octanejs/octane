@@ -41,7 +41,7 @@ function ReactFixture(props: {
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
 	try {
-		// input-otp@1.4.2 schedules uncancelled 0/10/50ms React state syncs.
+		// input-otp@1.5.0 cancels sync timeouts on unmount; drain any leftover PWM timers.
 		cleanup();
 		// Drain only the callbacks upstream failed to cancel, while the jsdom
 		// window still exists, so a busy runner cannot strand them past teardown.
@@ -65,8 +65,12 @@ describe('@octanejs/input-otp differential React oracle', () => {
 			'inputMode',
 			'pattern',
 			'name',
+			'spellcheck',
 		] as const)
 			expect(octaneInput[key]).toBe(reactInput[key]);
+		expect(octane.find('[data-input-otp-container]').getAttribute('translate')).toBe(
+			react.container.querySelector('[data-input-otp-container]')?.getAttribute('translate'),
+		);
 		expect(octane.find('[data-testid="context"]').getAttribute('data-slots')).toBe(
 			react.container.querySelector('[data-testid="react-context"]')?.getAttribute('data-slots'),
 		);

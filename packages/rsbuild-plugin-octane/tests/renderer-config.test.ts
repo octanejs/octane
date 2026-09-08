@@ -116,6 +116,32 @@ describe('Rsbuild renderer configuration', () => {
 		}
 	});
 
+	it('forwards the CSS-module proof option to both Rspack environments', async () => {
+		writeProject(root, true);
+		const provider = () => ({ named: { root: 'mapped_root' } });
+		for (const cssModuleConstants of [true, false, provider]) {
+			const instance = await createRsbuild({
+				cwd: root,
+				rsbuildConfig: {
+					plugins: [pluginOctane({ cssModuleConstants })],
+				},
+			});
+			const configs = await instance.initConfigs({ action: 'build' });
+			const plugins = configs.map((config) =>
+				(config.plugins ?? []).find(
+					(plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin,
+				),
+			);
+			expect(plugins.map((plugin) => plugin?.options.environment).sort()).toEqual([
+				'client',
+				'server',
+			]);
+			for (const plugin of plugins) {
+				expect(plugin?.options.cssModuleConstants).toBe(cssModuleConstants);
+			}
+		}
+	});
+
 	it.each([
 		['application configuration', true, undefined, true],
 		['explicit compatibility override', true, false, false],

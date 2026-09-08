@@ -1,0 +1,65 @@
+{
+  "suite": "universal-template-events",
+  "iterations": 7,
+  "targets": [
+    {
+      "name": "events-128",
+      "ops": {
+        "event_update_ms": {
+          "score": 0.061176250000007704,
+          "median": 0.06114375000001928,
+          "min": 0.05889584999999897,
+          "mean": 0.06373958571428895,
+          "p95": 0.079168750000008,
+          "sd": 0.00692897726241845,
+          "rme": 10.054138167355617,
+          "scoreRme": 3.260638653935202,
+          "warmupRatio": 1.0490183690566197,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "nodeVersion": "v26.7.0",
+        "platform": "darwin",
+        "architecture": "arm64",
+        "eventSites": 128,
+        "hostInstances": 129,
+        "retainedHosts": 128,
+        "templateMounts": 1,
+        "handlerOnlyEventCommands": 0,
+        "semanticDispatches": 3,
+        "finalEpoch": 156
+      }
+    },
+    {
+      "name": "events-1024",
+      "ops": {
+        "event_update_ms": {
+          "score": 0.4792458299999998,
+          "median": 0.47781039999999847,
+          "min": 0.4725791500000014,
+          "mean": 0.5013681571428541,
+          "p95": 0.5728604500000074,
+          "sd": 0.03966431197822671,
+          "rme": 7.316916974411878,
+          "scoreRme": 2.42691300631043,
+          "warmupRatio": 1.05844340888682,
+          "samples": 7
+        }
+      },
+      "meta": {
+        "nodeVersion": "v26.7.0",
+        "platform": "darwin",
+        "architecture": "arm64",
+        "eventSites": 1024,
+        "hostInstances": 1025,
+        "retainedHosts": 1024,
+        "templateMounts": 1,
+        "handlerOnlyEventCommands": 0,
+        "semanticDispatches": 3,
+        "finalEpoch": 156
+      }
+    }
+  ],
+  "harnessExit": 0
+}

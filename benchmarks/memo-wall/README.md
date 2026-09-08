@@ -166,6 +166,13 @@ consumers update selectively, and object keys recreate exactly one changed row.
 The canonical **React 19 + React Compiler** target runs at `:5226`; its
 explicitly uncompiled control runs at `:5208`.
 
+**Inferno is intentionally N/A for this suite.** Inferno 9 exposes legacy
+child context but no public context object with consumer subscriptions. A
+legacy-context update stops at the required `shouldComponentUpdate(false)`
+walls, so it cannot satisfy the suite's defining gate: update exactly the 1000
+leaf consumers while invoking zero Row and Inner bodies. Relaxing those walls
+would measure a different workload.
+
 ## Running
 
 The unified runner builds and starts every production preview server before it

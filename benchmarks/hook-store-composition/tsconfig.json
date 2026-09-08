@@ -1,0 +1,27 @@
+{
+  "include": ["*.ts", "*.tsrx"],
+  "compilerOptions": {
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["DOM", "DOM.Iterable", "ES2024"],
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "target": "ES2024",
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "paths": {
+      "octane": ["../../packages/octane/src/index.ts"],
+      "octane/*": ["../../packages/octane/src/*"],
+      "@octanejs/zustand/vanilla": ["../../packages/zustand/src/vanilla.ts"],
+      "@octanejs/zustand/traditional": ["../../packages/zustand/src/traditional.ts"],
+      "@octanejs/mobx": ["../../packages/mobx/src/index.ts"],
+      "zustand/vanilla": ["../../packages/zustand/node_modules/zustand/vanilla"],
+      "mobx": ["../../packages/mobx/node_modules/mobx"]
+    },
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }]
+  }
+}

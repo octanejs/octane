@@ -1,6 +1,7 @@
 /**
  * Known public-surface divergence: React Table publishes ./legacy; the Octane
- * binding omits it.
+ * binding omits it. Linked to audit/react-parity.json divergence
+ * `legacy-migration-subpath`.
  */
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';

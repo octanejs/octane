@@ -146,4 +146,3 @@ export const useClientDocument: {
 
   return [queryRef.valueRef.current, setState, idStr, queryRef.queryRcRef.value]
 }
-

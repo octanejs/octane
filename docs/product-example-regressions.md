@@ -115,6 +115,19 @@ a binding, or the application. The PR and commit fields intentionally remain
 | `EX-ZS-005` | Draftboard and Gridlab callback refs expected a non-public second `previous` argument to remove keyed element-map entries, even though Octane implements the React 19 cleanup-return contract. | Application API misuse — Draftboard and Gridlab ref registries. | Application-owned regressions: [`draftboard.spec.ts`](../examples/draftboard/e2e/draftboard.spec.ts) proves a deleted keyed shape is released before undo, and [`gridlab.spec.ts`](../examples/gridlab/e2e/gridlab.spec.ts) proves a virtualized cell is released before remount, using weak references and explicit browser GC. The framework contract remains covered by [`refs.test.ts`](../packages/octane/tests/conformance/refs.test.ts), [`ref-identity.test.ts`](../packages/octane/tests/ref-identity.test.ts), and [`spread-ref.test.ts`](../packages/octane/tests/spread-ref.test.ts). | Draftboard’s imperative-focus/history journey and Gridlab’s focused two-axis virtualization journey retain the full consumer behavior. | this change | Fixed in the applications in this change by returning per-element cleanup functions; no Octane change required. |
 | `EX-ZS-006` | Concurrent Hacker News JSX and TSRX client/SSR Vite processes shared one mutable optimizer cache, so one server could disappear while the other graph continued and SSR journeys then saw `ERR_CONNECTION_REFUSED`. | Application fixture tooling — Hacker News multi-process Vite orchestration. | Application-owned regression: the complete JSX and TSRX Playwright suites in [`nav.spec.ts`](../examples/hacker-news/e2e/nav.spec.ts), [`page-more-hold.spec.ts`](../examples/hacker-news/e2e/page-more-hold.spec.ts), and [`ssr.spec.ts`](../examples/hacker-news/e2e/ssr.spec.ts) exercise the independently cached client and SSR graphs. | Those suites form the production-preview release gate; `test:e2e:dev` exercises the source-serving client mode separately. | this change | Fixed in the fixture harness in this change; no Octane change required. |
 
+## Scoped styles — current change
+
+The sibling-scope style pass (`packages/octane/src/compiler/style-scopes.js`,
+RFC tsrx-org/RFCs#1) replaced the single per-component style scope. Its
+regression class is a sibling of `EX-W4-002`: the CSS of a `<style>` block is
+owned by the sibling scope the block sits in — the children list of one element
+or fragment, whose blocks share one hash — and any scope that is not the
+component render can be lost or mis-hashed independently.
+
+| ID | Consumer-visible symptom | Classification and owner | Focused owning regression | Retained application journey | Fix | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `EX-SS-001` | An element-rooted assigned template (`const card = <div><style>…</style>…</div>`, at module scope or in a component body) rendered without its CSS, or a nested `@{ … }`/control-flow scope collapsed into the component's hash so its rules matched the wrong elements between client rendering, SSR, and hydration. | Framework — Octane compiler style-scope pass and client/server emitters. | [`element-rooted-templates.tsrx`](../packages/octane/tests/_fixtures/tsrx-conformance/scoped-styles/element-rooted-templates.tsrx), [`control-flow.tsrx`](../packages/octane/tests/_fixtures/tsrx-conformance/scoped-styles/control-flow.tsrx), and the other target-neutral fixtures in [`scoped-styles/`](../packages/octane/tests/_fixtures/tsrx-conformance/scoped-styles/README.md), which pin element class chains, sheet emission order, and pruning. | The Wave 4 production builds and Wayfinder’s streamed/hydrated journey in [`wayfinder.spec.ts`](../examples/wayfinder/e2e/wayfinder.spec.ts) remain the application-level gate. | this change | Fixed in Octane in this change; no example shim retained. |
+
 ## Adding future entries
 
 Place a finding in the delivery wave that introduced it, or in a named hardening

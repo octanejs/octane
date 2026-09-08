@@ -1,0 +1,624 @@
+// Production compiler/runtime comparison with public output controls. happy-dom
+// measures synchronous renderer work only: no browser layout, paint, or frames.
+process.env.NODE_ENV = 'production';
+
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { gzipSync, brotliCompressSync, constants as zlib } from 'node:zlib';
+import { summarizeSamples, timingStatForJson } from '/private/tmp/octane-tsrx-parity-422c-DGLjhq/baseline/benchmarks/lib/stats.mjs';
+
+const HERE = "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals";
+const REPO = path.resolve(HERE, '../..');
+const options = new Map();
+const allowed = new Set([
+	'baseline-root',
+	'current-root',
+	'current-ref',
+	'baseline-ref',
+	'tooling-root',
+	'samples',
+	'updates',
+	'mounts',
+	'ssr',
+	'collector',
+]);
+let quick = false;
+for (const arg of process.argv.slice(2)) {
+	if (arg === '--quick') {
+		quick = true;
+		continue;
+	}
+	const match = /^--([^=]+)=(.+)$/.exec(arg);
+	assert.ok(match && allowed.has(match[1]) && !options.has(match[1]), `Invalid option: ${arg}`);
+	options.set(match[1], match[2]);
+}
+function integer(name, fallback) {
+	const value = options.get(name) ?? String(fallback);
+	assert.match(value, /^[1-9]\d*$/, name);
+	assert.ok(Number.isSafeInteger(Number(value)), name);
+	return Number(value);
+}
+const samples = integer('samples', quick ? 3 : 9);
+const updates = integer('updates', quick ? 200 : 2000);
+const mounts = integer('mounts', quick ? 8 : 64);
+const ssrRenders = integer('ssr', quick ? 100 : 1000);
+const collectorCycles = integer('collector', quick ? 2000 : 100000);
+const warmups = 8;
+const hash = (data) => createHash('sha256').update(data).digest('hex');
+const hashFile = (file) => hash(fs.readFileSync(file));
+const git = (...args) =>
+	execFileSync('git', args, { cwd: REPO, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-native-costs-'));
+const fixtureFile = path.join(HERE, 'native-costs.tsrx');
+const fixture = fs.readFileSync(fixtureFile, 'utf8');
+const roots = [{ label: 'current', root: options.has('current-root') ? fs.realpathSync(path.resolve(options.get('current-root'))) : REPO }];
+if (options.has('baseline-root')) {
+	assert.ok(options.has('baseline-ref'), '--baseline-root requires an immutable --baseline-ref');
+	roots.unshift({
+		label: 'baseline',
+		root: fs.realpathSync(path.resolve(options.get('baseline-root'))),
+	});
+}
+const toolingRoot = fs.realpathSync(
+	path.resolve(options.get('tooling-root') ?? path.join(REPO, 'packages/octane')),
+);
+const requireTool = createRequire(path.join(toolingRoot, 'package.json'));
+const { build, transformSync, version: esbuildVersion } = requireTool('esbuild');
+const { Window } = await import(pathToFileURL(requireTool.resolve('happy-dom')).href);
+const snapshotInputs = new Map();
+
+function readInput(file) {
+	const real = fs.realpathSync(file);
+	if (!snapshotInputs.has(real)) snapshotInputs.set(real, fs.readFileSync(real));
+	return snapshotInputs.get(real);
+}
+
+function packageEvidence(specifier, expectedName) {
+	const entry = fs.realpathSync(requireTool.resolve(specifier));
+	let directory = path.dirname(entry);
+	for (;;) {
+		const manifest = path.join(directory, 'package.json');
+		if (fs.existsSync(manifest)) {
+			const source = readInput(manifest);
+			const data = JSON.parse(source);
+			if (data.name === expectedName)
+				return {
+					name: data.name,
+					version: data.version,
+					entry,
+					entrySha256: hash(readInput(entry)),
+					root: directory,
+					manifestSha256: hash(source),
+				};
+		}
+		const parent = path.dirname(directory);
+		assert.notEqual(parent, directory, 'Missing dependency manifest: ' + expectedName);
+		directory = parent;
+	}
+}
+
+const dependencies = {
+	esbuild: packageEvidence('esbuild', 'esbuild'),
+	core: packageEvidence('@tsrx/core', '@tsrx/core'),
+	dom: packageEvidence('happy-dom', 'happy-dom'),
+	alien: packageEvidence('alien-signals', 'alien-signals'),
+	devalue: packageEvidence('devalue', 'devalue'),
+};
+assert.equal(dependencies.alien.version, '3.2.0');
+assert.equal(dependencies.esbuild.version, esbuildVersion);
+const CASES = [
+	{ name: 'unread-block', component: 'UnreadBlock', reads: 0 },
+	{ name: 'unread-return', component: 'UnreadReturn', reads: 0 },
+	{ name: 'single-block', component: 'ReadBlock', reads: 1 },
+	{ name: 'single-return', component: 'ReadReturn', reads: 1 },
+	{ name: 'repeated-block', component: 'RepeatedReadBlock', reads: 16, repeated: true },
+	{ name: 'distinct-block', component: 'DistinctReadBlock', reads: 16, distinct: true },
+];
+const compiled = [];
+const timings = [];
+const deterministic = [];
+const payload = {
+	suite: 'scoped-native-reads',
+	iterations: samples,
+	startedAt: new Date().toISOString(),
+	request: process.argv,
+	limits: [
+		'Synchronous production source renderer work in happy-dom; no layout, paint, browser frame, or hydration timing.',
+		'Compile and bundle times, source hashing, semantic checks, and teardown verification are outside measured render intervals.',
+		'Native source dependencies may come from an explicitly supplied supplemental source toolchain; this is not a locked workspace or CI gate.',
+		'Five-dependency use() calls are deterministic source-factory work, not V8 allocation counts.',
+		'An overlapping timing uncertainty interval is inconclusive; no wall-clock pass threshold is introduced.',
+	],
+	environment: {
+		node: process.version,
+		execArgv: process.execArgv,
+		platform: process.platform,
+		arch: process.arch,
+		cpu: os.cpus()[0]?.model,
+		currentRef: git('rev-parse', 'HEAD').trim(),
+		currentDirty: git('status', '--porcelain').trim() !== '',
+		baselineRef: options.has('baseline-ref')
+			? git('rev-parse', '--verify', options.get('baseline-ref') + '^{commit}').trim()
+			: null,
+		baselineArchive:
+			options.has('baseline-root') &&
+			fs.existsSync(path.join(options.get('baseline-root'), 'source.tar'))
+				? {
+						path: path.resolve(options.get('baseline-root'), 'source.tar'),
+						sha256: hashFile(path.join(options.get('baseline-root'), 'source.tar')),
+					}
+				: null,
+		baselineLockfileSha256: options.has('baseline-ref')
+			? hash(git('show', options.get('baseline-ref') + ':pnpm-lock.yaml'))
+			: null,
+		toolingRoot,
+		dependencies,
+		fixtureSha256: hash(fixture),
+		factorySha256: hashFile(path.join(HERE, 'native-cost-factory.mjs')),
+		runnerSha256: hashFile(import.meta.filename),
+		lockfileSha256: hashFile(path.join(REPO, 'pnpm-lock.yaml')),
+	},
+	configuration: {
+		samples,
+		updates,
+		mounts,
+		ssrRenders,
+		collectorCycles,
+		warmups,
+		fiveDependencyRepeats: 32,
+	},
+	compiled,
+	timings,
+	deterministic,
+};
+
+function setupDom() {
+	const window = new Window({ url: 'http://localhost/' });
+	for (const key of [
+		'window',
+		'document',
+		'navigator',
+		'Node',
+		'Element',
+		'HTMLElement',
+		'SVGElement',
+		'Text',
+		'Comment',
+		'DocumentFragment',
+		'Event',
+		'EventTarget',
+		'MutationObserver',
+		'HTMLInputElement',
+		'HTMLSelectElement',
+		'HTMLTextAreaElement',
+		'getComputedStyle',
+		'requestAnimationFrame',
+		'cancelAnimationFrame',
+	]) {
+		const value = key === 'window' ? window : window[key];
+		if (value !== undefined)
+			Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+	}
+	return window;
+}
+
+function compilerSnapshot(root) {
+	const directory = path.join(root, 'packages/octane/src/compiler');
+	const files = fs
+		.readdirSync(directory, { recursive: true })
+		.filter((name) => /\.[cm]?js$/.test(name));
+	return files.sort().map((name) => {
+		const file = path.join(directory, name);
+		const source = readInput(file);
+		return { path: path.relative(root, file), sha256: hash(source) };
+	});
+}
+
+async function buildCase(target, scenario, nativeReads, mode) {
+	const packageRoot = path.join(target.root, 'packages/octane');
+	const manifest = JSON.parse(readInput(path.join(packageRoot, 'package.json')));
+	const { compile } = await import(
+		pathToFileURL(path.join(packageRoot, 'src/compiler/compile.js')).href
+	);
+	const compilerOptions = { mode, dev: false, hmr: false, nativeReads };
+	const result = compile(fixture, fixtureFile, compilerOptions);
+	assert.deepEqual(result.diagnostics, [], 'Benchmark fixture must compile without diagnostics');
+	const name = [target.label, nativeReads ? 'native' : 'ordinary', scenario.name, mode].join(':');
+	const entry = [
+		`export { ${scenario.component} as Component } from ${JSON.stringify(fixtureFile)};`,
+		mode === 'client'
+			? 'export { createRoot, flushSync } from "octane";'
+			: 'export { renderToString } from "octane/server";',
+		scenario.reads ? 'export { createScope } from "octane/signals";' : '',
+		scenario.name === 'five-dependencies'
+			? `export { factoryCalls, resetFactoryCalls } from ${JSON.stringify(path.join(HERE, 'native-cost-factory.mjs'))};`
+			: '',
+	].join('\n');
+	const output = await build({
+		absWorkingDir: REPO,
+		stdin: { contents: entry, sourcefile: name + '.mjs', resolveDir: HERE },
+		bundle: true,
+		write: false,
+		metafile: true,
+		minify: true,
+		treeShaking: true,
+		platform: 'node',
+		format: 'esm',
+		target: 'es2022',
+		legalComments: 'none',
+		tsconfigRaw: { compilerOptions: {} },
+		define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+		logLevel: 'silent',
+		plugins: [
+			{
+				name: 'native-costs-public-source',
+				setup(plugin) {
+					plugin.onResolve({ filter: /^octane(?:\/|$)/ }, ({ path: request }) => {
+						const key = request === 'octane' ? '.' : './' + request.slice(7);
+						const value = manifest.exports[key];
+						const destination = typeof value === 'string' ? value : value?.default;
+						assert.equal(typeof destination, 'string', 'Public source export: ' + request);
+						return { path: path.resolve(packageRoot, destination) };
+					});
+					plugin.onResolve({ filter: /^(?:alien-signals|devalue)(?:\/|$)/ }, (request) => {
+						if (request.pluginData?.nativeCostsDependency) return null;
+						return plugin.resolve(request.path, {
+							kind: request.kind,
+							resolveDir: toolingRoot,
+							pluginData: { nativeCostsDependency: true },
+						});
+					});
+					plugin.onLoad({ filter: /\.tsrx$/ }, ({ path: file }) => {
+						assert.equal(file, fixtureFile);
+						return { contents: result.code, loader: 'js', resolveDir: HERE };
+					});
+					plugin.onLoad({ filter: /\.(?:[cm]?[jt]s|json)$/ }, ({ path: file }) => {
+						const source = readInput(file);
+						const extension = path.extname(file);
+						return {
+							contents: source,
+							loader: extension === '.ts' ? 'ts' : extension === '.json' ? 'json' : 'js',
+							resolveDir: path.dirname(file),
+						};
+					});
+				},
+			},
+		],
+	});
+	const code = output.outputFiles[0].text;
+	const file = path.join(scratch, name.replaceAll(':', '-') + '.mjs');
+	fs.writeFileSync(file, code);
+	const inputs = Object.keys(output.metafile.inputs)
+		.filter((input) => !input.endsWith(name + '.mjs'))
+		.map((input) => {
+			if (path.resolve(REPO, input) === fixtureFile)
+				return { path: input, sha256: hash(result.code), compiledFixture: true };
+			const absolute = fs.realpathSync(path.resolve(REPO, input));
+			const source = readInput(absolute);
+			return { path: input, absolutePath: absolute, sha256: hash(source) };
+		});
+	for (const input of inputs) {
+		if (input.compiledFixture) continue;
+		for (const dependency of [dependencies.alien, dependencies.devalue]) {
+			if (!input.path.includes('/node_modules/' + dependency.name + '/')) continue;
+			assert.ok(
+				input.absolutePath.startsWith(dependency.root + path.sep),
+				'Bundled dependency differs from selected installation: ' + dependency.name,
+			);
+		}
+	}
+	if (!scenario.reads) {
+		assert.ok(
+			inputs.every(
+				(input) => !/alien-signals|\/signals\/(?:engine|graph|requests)\.ts/.test(input.path),
+			),
+			'Unread control imported a signal engine',
+		);
+	}
+	const codeMinified = transformSync(result.code, { minify: true }).code;
+	compiled.push({
+		name,
+		compilerOptions,
+		entrySha256: hash(entry),
+		codeSha256: hash(result.code),
+		codeBytes: Buffer.byteLength(result.code),
+		codeMinifiedBytes: Buffer.byteLength(codeMinified),
+		bundleSha256: hash(code),
+		bundleBytes: Buffer.byteLength(code),
+		gzipBytes: gzipSync(code, { level: zlib.Z_BEST_COMPRESSION }).length,
+		brotliBytes: brotliCompressSync(code, {
+			params: { [zlib.BROTLI_PARAM_QUALITY]: zlib.BROTLI_MAX_QUALITY },
+		}).length,
+		inputs,
+	});
+	return {
+		name,
+		target: target.label,
+		nativeReads,
+		mode,
+		scenario,
+		api: await import(pathToFileURL(file).href),
+	};
+}
+
+async function buildCollector(target) {
+	const name = target.label + ':collector';
+	const entry = [
+		`export { createNativeReadCollector, validateNativeReadWitness } from ${JSON.stringify(path.join(target.root, 'packages/octane/src/signals/native-read-collector.ts'))};`,
+		`export { reportNativeRead, getNativeReadObserver, isNativeWriteGuarded } from ${JSON.stringify(path.join(target.root, 'packages/octane/src/signals/read-protocol.ts'))};`,
+	].join('\n');
+	const output = await build({
+		absWorkingDir: REPO,
+		stdin: { contents: entry, sourcefile: name + '.mjs', resolveDir: HERE },
+		bundle: true,
+		write: false,
+		metafile: true,
+		minify: true,
+		treeShaking: true,
+		platform: 'node',
+		format: 'esm',
+		target: 'es2022',
+		legalComments: 'none',
+		tsconfigRaw: { compilerOptions: {} },
+		define: { 'process.env.NODE_ENV': '"production"' },
+		logLevel: 'silent',
+		plugins: [
+			{
+				name: 'native-collector-source-inputs',
+				setup(plugin) {
+					plugin.onLoad({ filter: /\.ts$/ }, ({ path: file }) => ({
+						contents: readInput(file),
+						loader: 'ts',
+						resolveDir: path.dirname(file),
+					}));
+				},
+			},
+		],
+	});
+	const code = output.outputFiles[0].text;
+	const file = path.join(scratch, target.label + '-collector.mjs');
+	fs.writeFileSync(file, code);
+	compiled.push({
+		name,
+		entrySha256: hash(entry),
+		bundleSha256: hash(code),
+		bundleBytes: Buffer.byteLength(code),
+		method:
+			'Direct collector protocol microbenchmark; supplementary to public compiled renderer controls.',
+		inputs: Object.keys(output.metafile.inputs)
+			.filter((input) => !input.endsWith(name + '.mjs'))
+			.map((input) => ({ path: input, sha256: hash(readInput(path.resolve(REPO, input))) })),
+	});
+	const api = await import(pathToFileURL(file).href);
+	return ['empty', 'repeated', 'distinct', 'nested-witness', 'replay'].map((scenario) => ({
+		name: name + ':' + scenario,
+		target: target.label,
+		nativeReads: true,
+		mode: 'collector',
+		scenario: { name: scenario },
+		api,
+	}));
+}
+
+function dataFor(entry) {
+	if (!entry.scenario.reads)
+		return {
+			props: { tick: 0, value: 7 },
+			value: () => '7',
+			update: null,
+			dispose() {},
+		};
+	const scope = entry.api.createScope({ scopeKey: 'native-cost-' + entry.name });
+	const sources$ = Array.from({ length: 16 }, (_, index) => scope.signal$('source-' + index, 7));
+	let current = 7;
+	return {
+		props: { tick: 0, source$: sources$[0], sources$ },
+		value: () => String(current * entry.scenario.reads),
+		update(value) {
+			current = value;
+			scope.batch(() => {
+				for (const source$ of entry.scenario.distinct ? sources$ : [sources$[0]])
+					source$.set(value);
+			});
+		},
+		dispose() {
+			scope.dispose();
+		},
+	};
+}
+
+function checkElement(container, expected, tick, host) {
+	const output = container.querySelector('output');
+	assert.ok(output, 'Output must remain mounted');
+	assert.equal(output.textContent, expected);
+	assert.equal(output.getAttribute('data-tick'), String(tick));
+	if (host)
+		assert.equal(output, host, 'Ordinary prop and native value updates preserve host identity');
+	return output;
+}
+
+
+const { PerformanceObserver } = await import('node:perf_hooks');
+const { setImmediate: nextTurn } = await import('node:timers/promises');
+assert.equal(quick, false, 'Focused comparisons use explicit full settings');
+assert.ok(options.has('baseline-root') && options.has('baseline-ref'));
+if (options.has('current-root')) assert.ok(options.has('current-ref'));
+const referenceFile = path.join(REPO, 'benchmarks/scoped-signals/results/2026-08-27/consolidation-native-costs.json');
+const reference = JSON.parse(fs.readFileSync(referenceFile, 'utf8'));
+const referenceLabelByRef = new Map([['cd9ed33754bfc3eeb144ba256dc9b437614e3e92', 'baseline'], ['422c2c937784af835c64d6fae5a39162143c7a44', 'current']]);
+const sourceRefs = {
+  baseline: payload.environment.baselineRef,
+  current: options.has('current-ref') ? git('rev-parse', '--verify', options.get('current-ref') + '^{commit}').trim() : null,
+};
+const gcEvents = [];
+const observer = new PerformanceObserver((list) => {
+  for (const event of list.getEntries()) gcEvents.push({ startTime: event.startTime, duration: event.duration, kind: event.detail?.kind, flags: event.detail?.flags });
+});
+observer.observe({ entryTypes: ['gc'] });
+let randomState = 0x422c2c93;
+const nextRandom = () => { randomState ^= randomState << 13; randomState ^= randomState >>> 17; randomState ^= randomState << 5; return randomState >>> 0; };
+const shuffled = (values) => { const result=[...values]; for(let i=result.length-1;i>0;i--){const j=nextRandom()%(i+1);[result[i],result[j]]=[result[j],result[i]];} return result; };
+const window = setupDom();
+const cases = [];
+const samplesByCase = new Map();
+let failure;
+let pairIndex = 0;
+Object.assign(payload, {
+  suite: 'scoped-native-reads-focused-props',
+  mode: process.execArgv.some((arg) => arg.startsWith('--cpu-prof')) ? 'profile-diagnostic-not-primary-timing' : 'focused-paired-timing',
+  limits: [
+    'Synchronous production source renderer updates in happy-dom; no layout, paint, browser frame, mount, SSR, hydration, or async timing.',
+    'Compile and bundle times, source hashing, public semantic checks, CPU counter calls, GC event delivery, and teardown verification are outside measured update intervals.',
+    'The selected supplemental source toolchain is unchanged; this is not a locked workspace or CI gate.',
+    'All measured wall samples, including samples overlapping GC or host scheduling delays, remain in the primary results.',
+    'A wide paired uncertainty interval is inconclusive; no wall-clock pass threshold or outlier filter is introduced.',
+  ],
+  method: 'Use the unchanged production buildCase/dataFor/checkElement helpers and authored TSRX fixture; keep one live root per case/version, preallocate props, warm each version eight full update blocks, then time seeded ABBA/BAAB blocks with randomized case order. Public output/identity and native signal updates are verified outside each timed block. All timing samples are retained.',
+  configuration: { pairs: samples, updatesPerBlock: updates, warmupBlocksPerVersion: warmups, seed: '0x422c2c93', cases: ['unread-block/native-off','unread-block/native-on','single-block/native-on','repeated-block/native-on','distinct-block/native-on'], pairOrder: 'Seeded ABBA or BAAB; both versions run twice per pair', lifecycle: 'Roots live across the focused update measurement; mounting and SSR remain in the separate unchanged full harness.' },
+  sourceRefs,
+  sourceRoots: roots.map(({label,root})=>({label,root,immutableRef:sourceRefs[label]})),
+  diagnosticsPolicy: "Process CPU, main-thread CPU and GC overlaps are separate diagnostics and never replace primary wall timing or justify removing samples.",
+  invocationParity: "Every version uses the same measure function, same loop body, one flushSync callback per update, preallocated props arrays of equal length and identical public output/identity checks. No per-version wrapper or special-case timed path.",
+  referenceEvidence: { file: referenceFile, sha256: hashFile(referenceFile), role: 'Require exact bundle bytes when rebuilding archived cd9/422c; final candidate records hashes without claiming equality.' },
+  preservedOriginalRunnerSha256: '93e81cbecb25551c5afa02db25a81f3af73d4ae872e2886755f8b3f71e2374c0',
+  scratch,
+  warmupRecords: [],
+  pairs: [],
+  summaries: [],
+  outlierPolicy: 'Retain every sample and GC event. Report arithmetic absolute timings, paired ratio distribution, geometric mean ratio and Student-t95% interval on log ratios. Never drop outliers or infer parity from a wide interval.',
+  hostBefore: { loadAverage: os.loadavg(), freeMemory: os.freemem(), resourceUsage: process.resourceUsage() },
+});
+const totalCpu = (value) => value.user + value.system;
+function prepare(entry) {
+  const data = dataFor(entry);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = entry.api.createRoot(container);
+  root.render(entry.api.Component, data.props);
+  const host = checkElement(container, data.value(), 0);
+  const props = Array.from({length:updates},(_,tick)=>({...data.props,tick:tick+1}));
+  return { entry, data, container, root, host, props };
+}
+function measure(prepared) {
+  const { entry, root, props } = prepared;
+  const cpuBefore = process.cpuUsage();
+  const threadBefore = typeof process.threadCpuUsage === 'function' ? process.threadCpuUsage() : null;
+  const start = performance.now();
+  for (const value of props) entry.api.flushSync(() => root.render(entry.api.Component, value));
+  const end = performance.now();
+  const cpu = process.cpuUsage(cpuBefore);
+  const thread = threadBefore === null ? null : process.threadCpuUsage(threadBefore);
+  checkElement(prepared.container, prepared.data.value(), updates, prepared.host);
+  return { target:entry.target, start, end, wall_us:(end-start)*1000/updates, cpu_us:totalCpu(cpu)/updates, main_thread_cpu_us:thread===null?null:totalCpu(thread)/updates };
+}
+function verifySignal(prepared, value) {
+  if (prepared.data.update === null) return;
+  prepared.entry.api.flushSync(() => prepared.data.update(value));
+  checkElement(prepared.container, prepared.data.value(), updates, prepared.host);
+}
+function ratioSummary(values) {
+  const sorted=[...values].sort((a,b)=>a-b);
+  const logs=values.map(Math.log);
+  const stats=summarizeSamples(logs,{scoreMode:'mean'});
+  const q=(p)=>sorted[Math.min(sorted.length-1,Math.floor(sorted.length*p))];
+  return { samples:values.length, arithmeticMean:values.reduce((a,b)=>a+b,0)/values.length, geometricMean:Math.exp(stats.mean), geometricCi95:[Math.exp(stats.mean-stats.moe),Math.exp(stats.mean+stats.moe)], min:sorted[0], p10:q(.1), p25:q(.25), median:q(.5), p75:q(.75), p90:q(.9), max:sorted.at(-1), raw:values };
+}
+try {
+  for (const target of roots) {
+    const refs=sourceRefs[target.label];
+    target.compilerInputs=compilerSnapshot(target.root);
+    if(refs!==null)for(const input of target.compilerInputs)assert.equal(input.sha256,hash(git('show',refs+':'+input.path)),'Archived compiler differs from Git');
+  }
+  payload.compilerInputs=roots.map(({label,compilerInputs})=>({label,inputs:compilerInputs}));
+  for(const scenario of CASES.filter((item)=>item.name.endsWith('-block'))){
+    for(const enabled of scenario.reads?[true]:[false,true]){
+      const pair=[];
+      for(const target of roots){
+        const entry=await buildCase(target,scenario,enabled,'client');
+        const record=compiled.at(-1);
+        if(sourceRefs[target.label]!==null){
+          const expectedLabel=referenceLabelByRef.get(sourceRefs[target.label]);
+          assert.ok(expectedLabel, "Missing frozen bundle reference for immutable source");
+          const expectedName=expectedLabel+record.name.slice(record.name.indexOf(":"));
+          const old=reference.compiled.find((item)=>item.name===expectedName);
+          assert.ok(old);
+          assert.equal(record.bundleSha256,old.bundleSha256,'Frozen source must produce the exact existing measured bundle');
+          record.matchesExistingBundle=true;
+        }
+        pair.push(prepare(entry));
+      }
+      assert.deepEqual(pair.map((entry)=>entry.entry.target),['baseline','current']);
+      const name=scenario.name+(enabled?':native':':ordinary');
+      cases.push({name,pair});samplesByCase.set(name,[]);
+    }
+  }
+  for(let warmup=0;warmup<warmups;warmup++){
+    for(const scenario of shuffled(cases)){
+      const order=warmup%2===0?[0,1]:[1,0];
+      const records=order.map((side)=>measure(scenario.pair[side]));
+      payload.warmupRecords.push({warmup,case:scenario.name,records});
+    }
+    await nextTurn();
+    console.log('Focused TSRX warmup '+(warmup+1)+'/'+warmups+' complete; output and identity controls passed.');
+  }
+  for(let round=0;round<samples;round++){
+    for(const scenario of shuffled(cases)){
+      const order=nextRandom()%2===0?[0,1,1,0]:[1,0,0,1];
+      const records=order.map((side)=>measure(scenario.pair[side]));
+      const byTarget=(target,metric)=>records.filter((row)=>row.target===target).reduce((sum,row)=>sum+row[metric],0)/2;
+      const row={index:pairIndex++,round,case:scenario.name,order:order.map((side)=>side===0?'baseline':'current'),records,ratio:{}};
+      for(const metric of ['wall_us','cpu_us','main_thread_cpu_us']){
+        if(records.some((record)=>record[metric]===null))continue;
+        row.ratio[metric]=byTarget('current',metric)/byTarget('baseline',metric);
+      }
+      payload.pairs.push(row);samplesByCase.get(scenario.name).push(row);
+      for(const prepared of scenario.pair){verifySignal(prepared,round+8);verifySignal(prepared,7);}
+      await nextTurn();
+    }
+    if((round+1)%5===0||round===samples-1)console.log('Focused TSRX pair round '+(round+1)+'/'+samples+' complete; native signal controls passed.');
+  }
+  for(const scenario of cases){
+    const rows=samplesByCase.get(scenario.name);
+    const summary={case:scenario.name,pairs:rows.length,ratios:{},absolute:{}};
+    for(const metric of ['wall_us','cpu_us','main_thread_cpu_us']){
+      if(rows.some(row=>row.ratio[metric]===undefined))continue;
+      summary.ratios[metric]=ratioSummary(rows.map((row)=>row.ratio[metric]));
+      summary.absolute[metric]={};
+      for(const target of ['baseline','current'])summary.absolute[metric][target]=timingStatForJson(summarizeSamples(rows.flatMap(row=>row.records.filter(record=>record.target===target).map(record=>record[metric])),{scoreMode:'mean'}));
+    }
+    payload.summaries.push(summary);
+  }
+  for(const scenario of cases)for(const prepared of scenario.pair){
+    prepared.root.unmount();assert.equal(prepared.container.textContent,'');
+    prepared.data.update?.(999);
+    assert.equal(prepared.container.textContent,'','A live producer must not revive a retired root');
+    prepared.container.remove();prepared.data.dispose();
+  }
+  await nextTurn();
+  for(const row of payload.pairs)for(const record of row.records){
+    const events=gcEvents.filter((event)=>event.startTime<record.end&&event.startTime+event.duration>record.start);
+    record.gcEvents=events.length;record.gcWallMs=events.reduce((sum,event)=>sum+Math.min(record.end,event.startTime+event.duration)-Math.max(record.start,event.startTime),0);
+  }
+  assert.equal(hashFile(fixtureFile),hash(fixture),'Authored fixture changed during focused measurement');
+  for(const[file,contents]of snapshotInputs)assert.equal(hashFile(file),hash(contents),'Source changed during focused measurement: '+file);
+  for(const target of roots){const ref=sourceRefs[target.label];if(ref===null)continue;for(const[file,contents]of snapshotInputs){if(!file.startsWith(path.join(target.root,'packages/octane')+path.sep))continue;const relative=path.relative(target.root,file).replaceAll('\\','/');assert.equal(hash(contents),hash(git('show',ref+':'+relative)),'Archived package bytes differ from Git');}}
+  payload.sourceUnchanged=true;payload.status='passed';
+}catch(error){failure=error instanceof Error?error.stack:String(error);payload.failed=failure;console.error(failure);}
+finally{
+  observer.disconnect();
+  payload.gcEvents=gcEvents;
+  payload.finishedAt=new Date().toISOString();
+  payload.hostAfter={loadAverage:os.loadavg(),freeMemory:os.freemem(),resourceUsage:process.resourceUsage()};
+  payload.sourceInputs=[...snapshotInputs].map(([file,contents])=>({file,sha256:hash(contents)}));
+  await window.happyDOM.close();
+  assert.ok(process.env.BENCH_JSON,'Focused evidence requires a fresh BENCH_JSON path');
+  assert.equal(fs.existsSync(process.env.BENCH_JSON),false,'Never overwrite focused evidence');
+  fs.writeFileSync(process.env.BENCH_JSON,JSON.stringify(payload,null,2)+'\n');
+}
+if(failure)process.exitCode=1;

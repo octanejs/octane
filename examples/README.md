@@ -10,6 +10,13 @@ framework features, commands, browser journeys, and deterministic fault
 scenarios. See the [product examples roadmap](../docs/examples-roadmap.md) for
 the delivery waves and the distinct regression responsibility of each app.
 
+Harbor demonstrates React hosting Octane through `OctaneCompat`. For smaller
+examples of both directions, open the [Playground](https://octanejs.dev/playground)
+and choose **OctaneCompat in React (multi-file)** or
+**ReactCompat in Octane (multi-file)**. The
+[React compatibility guide](https://octanejs.dev/docs/react-compat) explains
+which renderer owns each subtree and how to configure their compilers.
+
 ## Current applications
 
 | Application | Purpose | Validation |

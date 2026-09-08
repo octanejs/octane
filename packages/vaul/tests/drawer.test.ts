@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, mount } from '../../octane/tests/_helpers.ts';
 import { DrawerFixture } from './_fixtures/drawer.tsrx';
 
@@ -11,6 +11,28 @@ function findButton(container: ParentNode, label: string): HTMLButtonElement {
 }
 
 describe('vaul v1.1.2 adapted drawer behavior', () => {
+	beforeEach(() => {
+		// jsdom lacks matchMedia; match the React oracle's non-standalone environment.
+		vi.stubGlobal('matchMedia', function matchMedia(query: string): MediaQueryList {
+			return {
+				matches: false,
+				media: query,
+				onchange: null,
+				addListener() {},
+				removeListener() {},
+				addEventListener() {},
+				removeEventListener() {},
+				dispatchEvent() {
+					return false;
+				},
+			};
+		});
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
 	// @parity-case runtime:controlled-open-close
 	// Per upstream/test/tests/base.spec.ts:10 (should open drawer).
 	// Per upstream/test/tests/base.spec.ts:27 (should close when `Drawer.Close` is clicked).

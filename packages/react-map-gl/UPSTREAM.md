@@ -1,4 +1,4 @@
-# @vis.gl/react-mapbox upstream provenance
+# Upstream @vis.gl/react-mapbox audit
 
 This port targets the immutable release `@vis.gl/react-mapbox@8.1.2`:
 
@@ -39,7 +39,13 @@ own settings through `upstream/`. Everything the port authors is fully strict.
 
 `upstream/tsconfig.json` is deliberately not vendored: it is vis.gl monorepo
 build config, excluded from the published package by its own `files` field, and
-its `extends` path does not resolve outside that repository.
+its `extends` path does not resolve outside that repository. The lock's scopes
+(`package.json`, `src`, `test`) record that exclusion.
+
+Every vendored file under `upstream/` verifies offline against the upstream git
+blob shas recorded in `audit/upstream.lock.json` (pinned to the tag commit
+above). The pinned upstream MIT license is republished at the package root as
+`LICENSE.upstream`, hash-matched to the lock's license evidence.
 
 Everything else is re-implemented against Octane hooks.
 
@@ -173,6 +179,8 @@ lane remains open work.
 
 ## Divergences
 
+Four, two of them recorded in `audit/react-parity.json` and bound to a case:
+
 1. **`react-map-gl-source-id-by-context`** — upstream delivers a `<Source>` id to
    child layers with `cloneElement(child, {source: id})`. Octane cannot clone a
    compiled children block, so the id travels by context. Same override
@@ -185,12 +193,7 @@ lane remains open work.
 2. **`react-map-gl-refs-as-props`** — `forwardRef` does not exist in Octane, so
    `Map`, `Marker`, `Popup` and `GeolocateControl` take `ref` as a plain prop.
    `<Map ref={mapRef} />` is unchanged for consumers.
-3. **Teardown timing** — effect cleanups run on the passive drain after
-   `root.unmount()`, not inside it, so the map's WebGL context and workers are
-   released one drain later. This is an Octane runtime property rather than a
-   binding behavior and no parity lane observes it, so it is deliberately not a
-   manifest divergence; it is pinned by `tests/runtime/lifecycle.test.ts`.
-4. **`Marker` element chosen from rendered output** — upstream asks
+3. **`Marker` element chosen from rendered output** — upstream asks
    `React.Children.forEach` whether it was handed a truthy child and, if so,
    gives the marker its own element to portal into. A `.tsrx` children block is
    an opaque render function, and evaluating it to look inside would re-run any
@@ -207,3 +210,8 @@ lane remains open work.
    React, by `differential:6`.
 
 ## Regenerating
+
+`node scripts/generate-parity-manifest.mjs` rebuilds `audit/react-parity.json`
+and the runtime inventories from actual Vitest runs. Editing a lane file without
+rerunning it fails `pnpm react-parity:check` on the integrity hash, which is the
+point.

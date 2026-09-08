@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/three",
-  "version": "0.1.32",
+  "version": "0.1.45",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -46,15 +46,16 @@
     "./intrinsics/jsx-runtime": "./src/intrinsics.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project three",
-    "test:compat": "vitest run --root ../.. --project three --exclude 'packages/three/tests/**/*differential.test.ts' --exclude 'packages/three/tests/browser/**/*.test.ts'"
+    "test": "pnpm upstream:check && vitest run --root ../.. --project three",
+    "test:compat": "pnpm upstream:check && vitest run --root ../.. --project three --exclude 'packages/three/tests/**/*differential.test.ts' --exclude 'packages/three/tests/browser/**/*.test.ts'",
+    "upstream:check": "node scripts/check-upstream-crosswalk.mjs"
   },
   "dependencies": {
     "zustand": "catalog:default"
   },
   "peerDependencies": {
     "@types/three": ">=0.156.0",
-    "octane": "workspace:*",
+    "octane": "workspace:^0.1.51 || ^0.2.0",
     "three": ">=0.156.0"
   },
   "peerDependenciesMeta": {

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/livestore",
-  "version": "0.0.9",
+  "version": "0.0.22",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -34,7 +34,8 @@
     "src",
     "README.md",
     "UPSTREAM.md",
-    "LICENSE"
+    "LICENSE",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/mod.ts",
@@ -42,7 +43,9 @@
   },
   "scripts": {
     "test": "vitest run --config vitest.config.ts && vitest run --config vitest.ssr.config.ts",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs livestore",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
     "@livestore/common": "catalog:default",
@@ -52,7 +55,7 @@
     "@opentelemetry/api": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@livestore/adapter-web": "catalog:default",

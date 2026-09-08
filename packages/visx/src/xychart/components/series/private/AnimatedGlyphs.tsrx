@@ -1,6 +1,5 @@
 import type { AxisScale } from '@octanejs/visx/axis';
 import { useMemo } from 'octane';
-import type { FC } from 'react';
 import type { OctaneNode } from 'octane';
 import {
 	useTransition as useSpringTransition,
@@ -72,7 +71,7 @@ export default function AnimatedGlyphs<XScale extends AxisScale, YScale extends 
 	// unanimated Glyph component
 	// unanimated Glyph component
 	// unanimated Glyph component
-	renderGlyph: FC<GlyphProps<Datum>>;
+	renderGlyph: (props: GlyphProps<Datum>) => OctaneNode;
 } & GlyphsProps<XScale, YScale, Datum>) {
 	const animatedGlyphs = useSpringTransition(glyphs, {
 		...useAnimatedGlyphsConfig({ xScale, yScale, horizontal }),

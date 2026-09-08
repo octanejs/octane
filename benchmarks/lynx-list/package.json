@@ -1,0 +1,20 @@
+{
+  "name": "octane-lynx-list-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "A real-native Octane Lynx fixture that renders a 10,000-row logical list through bounded native recycling.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "build:app": "node scripts/build-app.mjs",
+    "test": "node --test native-fixture.test.mjs"
+  },
+  "devDependencies": {
+    "@lynx-js/rspeedy": "catalog:lynx",
+    "@octanejs/lynx": "workspace:*",
+    "@octanejs/rspeedy-plugin": "workspace:*",
+    "@tsrx/typescript-plugin": "catalog:default",
+    "octane": "workspace:*",
+    "typescript": "catalog:lynx"
+  }
+}

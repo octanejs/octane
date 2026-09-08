@@ -1,6 +1,27 @@
-import { use } from 'octane';
+import { Fragment, use, type FragmentInstance } from 'octane';
 
 type ElementRef = (element: Element | null) => void;
+type RootRefProps = {
+	innerRef: (instance: Element | FragmentInstance | null) => void;
+	read: () => string;
+};
+
+function RootResource(props: { read: () => string }) @{
+	const value = props.read();
+	<span class="root-resource">{value}</span>
+}
+
+export function RootHostRef(props: RootRefProps) @{
+	<section ref={props.innerRef}>
+		<RootResource read={props.read} />
+	</section>
+}
+
+export function RootFragmentRef(props: RootRefProps) @{
+	<Fragment ref={props.innerRef}>
+		<RootResource read={props.read} />
+	</Fragment>
+}
 
 function RenderProbe(props: { value: string }) @{
 	<i class="render-probe" data-value={props.value}>{'probe'}</i>

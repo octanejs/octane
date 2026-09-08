@@ -6,7 +6,7 @@ import type { ScaleInput } from '@octanejs/visx/scale';
 import type { AddSVGProps, PositionScale, BaseBarStackProps, StackKey, Accessor } from '../types';
 import { getFirstItem, getSecondItem } from '../util/accessors';
 import getBandwidth from '../util/getBandwidth';
-import setNumOrAccessor from '../util/setNumberOrNumberAccessor';
+import setNumOrAccessor from '../../internal/setNumberOrNumberAccessor';
 import stackOrder from '../util/stackOrder';
 import stackOffset from '../util/stackOffset';
 import Bar from './Bar.tsrx';

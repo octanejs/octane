@@ -1,4 +1,3 @@
-import type { PointerEvent, FocusEvent } from 'react';
 import type { Octane } from 'octane/jsx-runtime';
 import type { AxisScale } from '@octanejs/visx/axis';
 import type { ScaleInput } from '@octanejs/visx/scale';

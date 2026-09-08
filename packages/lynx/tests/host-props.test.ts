@@ -11,6 +11,7 @@ import {
 	normalizeLynxInlineStyle,
 	planLynxHostPropPatch,
 } from '../src/core/host-props.js';
+import { decodeLynxTransportValue, encodeLynxTransportValue } from '../src/core/transport-codec.js';
 import { attachThreadFunction } from '../src/core/worklets.js';
 
 function attributes(patch: ReturnType<typeof planLynxHostPropPatch>): Record<string, unknown> {
@@ -454,5 +455,47 @@ describe('Lynx host prop routing', () => {
 		expect(() =>
 			planLynxHostPropPatch('view', {}, { 'main-thread:gesture': { _wkltId: 'gesture' } }),
 		).toThrow(/not a supported Lynx host capability/);
+	});
+
+	// The fast path in `planLynxHostPropPatch` reads only own enumerable keys,
+	// so it is gated on the bag's prototype being this realm's `Object.prototype`
+	// or none — the proof that there is nothing else to read. The neighbouring
+	// test shows what that gate is worth: a bag with an inherited `id` and
+	// `style` must not take it.
+	//
+	// Now that props are decoded on the receiving thread, every bag the applier
+	// sees is `JSON.parse` output, which is always on the permissive side of that
+	// gate. What has to stay true is that nothing in a bag's own contents can put
+	// it back on the other side. `__proto__` is the case that could: the renderer
+	// defines it as data on the sending side, the codec restores it as data on
+	// the receiving side, and either end using assignment instead would make the
+	// object it names the bag's prototype — at which point the slow path reads an
+	// `id` and a `style` that nobody set onto the node.
+	it('keeps a decoded prop bag ordinary, so nothing it names becomes a channel', () => {
+		const sent: Record<string, unknown> = {};
+		Object.defineProperty(sent, '__proto__', {
+			configurable: true,
+			enumerable: true,
+			value: { id: 'injected', style: { width: '99px' } },
+			writable: true,
+		});
+		sent.class = 'row';
+
+		const delivered = decodeLynxTransportValue(encodeLynxTransportValue(sent)) as Record<
+			string,
+			unknown
+		>;
+		expect(Object.getPrototypeOf(delivered)).toBe(Object.prototype);
+		expect(Object.keys(delivered).sort()).toEqual(['__proto__', 'class']);
+
+		const patch = planLynxHostPropPatch('view', {}, delivered);
+		expect(patch.id).toBeUndefined();
+		expect(patch.inlineStyles).toBeUndefined();
+		expect(patch.classes?.value).toBe('row');
+		// It is an ordinary prop the host does not recognize, which is what a
+		// field named `__proto__` in someone's props always meant.
+		expect(patch.attributes).toEqual([
+			{ name: '__proto__', value: { id: 'injected', style: { width: '99px' } } },
+		]);
 	});
 });

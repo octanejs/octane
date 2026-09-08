@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "recorded-production-metafile-regression-control",
+  "recordedAt": "2026-08-27T20:38:55.944Z",
+  "method": "Replay the strengthened verifyBundleInputs against the unchanged meta.inputs saved by the preceding production esbuild run. This is an offline boundary check, not a new bundle measurement.",
+  "inputReport": {
+    "file": "consolidation-bundles-before-reachability-fix.json",
+    "sha256": "da7233f87b8f0844d7c743c705a5d4ef5549de1f736e87102fce30a743b316f6",
+    "sha256Kind": "original-raw-report-bytes-before-optional-formatting; published JSON may have normalized whitespace"
+  },
+  "verifier": {
+    "file": "benchmarks/scoped-signals/bundle-boundaries.mjs",
+    "sha256": "428f2df69ec1e1c920c71056651bd42992c2a9b231a85d7a3b66f6c3821c1843"
+  },
+  "targets": [
+    {
+      "name": "baseline/ordinary-client",
+      "status": "baseline-passed",
+      "failure": null,
+      "retainedNativeInputs": [
+        {
+          "path": "packages/octane/src/signals/read-protocol.ts",
+          "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+          "bytesInOutput": 358
+        },
+        {
+          "path": "packages/octane/src/signals/native-read-events.ts",
+          "sha256": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41",
+          "bytesInOutput": 574
+        }
+      ]
+    },
+    {
+      "name": "candidate/ordinary-client",
+      "status": "expected-regression-detected",
+      "failure": "ordinary-client: ordinary entry retained native adapter packages/octane/src/signals/native-read-collector.ts\n\n1373 !== 0\n",
+      "retainedNativeInputs": [
+        {
+          "path": "packages/octane/src/signals/read-protocol.ts",
+          "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+          "bytesInOutput": 496
+        },
+        {
+          "path": "packages/octane/src/signals/native-read-collector.ts",
+          "sha256": "da41ce3b9b2c0bec7a79a4b3efaaef1a47a105ca9b85261ac665c003938a9234",
+          "bytesInOutput": 1373
+        },
+        {
+          "path": "packages/octane/src/signals/native-read-inspection.ts",
+          "sha256": "83a05cd237aec68a18ce0ae37d265e4ddd5bf68d4e258c0584ab1f2eb9dcd8c2",
+          "bytesInOutput": 180
+        },
+        {
+          "path": "packages/octane/src/signals/native-read-client.ts",
+          "sha256": "0584da538e6ba5631479a81e78c29aa8665afb5cd15cf2f03d6afdd9fedf7048",
+          "bytesInOutput": 4257
+        },
+        {
+          "path": "packages/octane/src/signals/native-read-retry.ts",
+          "sha256": "40abc7188a0b07a3665b410889bf725fdd0ba82c90b3568456282fe243b95ac7",
+          "bytesInOutput": 287
+        },
+        {
+          "path": "packages/octane/src/signals/native-read-events.ts",
+          "sha256": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41",
+          "bytesInOutput": 574
+        }
+      ]
+    },
+    {
+      "name": "baseline/ordinary-server",
+      "status": "baseline-passed",
+      "failure": null,
+      "retainedNativeInputs": [
+        {
+          "path": "packages/octane/src/signals/native-read-seeds.ts",
+          "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8",
+          "bytesInOutput": 36
+        }
+      ]
+    },
+    {
+      "name": "candidate/ordinary-server",
+      "status": "expected-regression-detected",
+      "failure": "ordinary-server: ordinary entry retained native adapter packages/octane/src/signals/native-read-collector.ts\n\n1255 !== 0\n",
+      "retainedNativeInputs": [
+        {
+          "path": "packages/octane/src/signals/read-protocol.ts",
+          "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+          "bytesInOutput": 138
+        },
+        {
+          "path": "packages/octane/src/signals/native-read-collector.ts",
+          "sha256": "da41ce3b9b2c0bec7a79a4b3efaaef1a47a105ca9b85261ac665c003938a9234",
+          "bytesInOutput": 1255
+        },
+        {
+          "path": "packages/octane/src/signals/native-read-seeds.ts",
+          "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8",
+          "bytesInOutput": 1424
+        },
+        {
+          "path": "packages/octane/src/signals/native-read-server.ts",
+          "sha256": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614",
+          "bytesInOutput": 1280
+        }
+      ]
+    }
+  ],
+  "status": "all-controls-passed"
+}

@@ -1,0 +1,155 @@
+{
+  "suite": "tsrx-void-memo-aliases",
+  "iterations": 9,
+  "targets": [
+    {
+      "name": "dependent-first-250",
+      "ops": {
+        "classification": {
+          "score": 0.04319160000000011,
+          "median": 0.044666000000006534,
+          "min": 0.03958299999999326,
+          "mean": 0.04964811111111089,
+          "p95": 0.08325000000000671,
+          "sd": 0.014255510201714297,
+          "rme": 22.07080040539977,
+          "scoreRme": 7.1083945588093655,
+          "warmupRatio": 1,
+          "samples": 9
+        },
+        "classification_per_100_aliases": {
+          "score": 0.017276640000000044,
+          "median": 0.017866400000002614,
+          "min": 0.015833199999997306,
+          "mean": 0.019859244444444358,
+          "p95": 0.03330000000000268,
+          "sd": 0.0057022040806857174,
+          "rme": 22.070800405399762,
+          "scoreRme": 7.108394558809361,
+          "warmupRatio": 1,
+          "samples": 9
+        }
+      },
+      "meta": {
+        "aliases": 250,
+        "dependencyFirst": false,
+        "exports": ["Memo0"],
+        "sourceBytes": 7854,
+        "sourceDigest": "81d241dfb2ef430f7ceb571ecb4fcab8e77180626a9a1d0dbe7d4161945ca50e",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "dependency-first-250",
+      "ops": {
+        "classification": {
+          "score": 0.044758399999997776,
+          "median": 0.04379199999999628,
+          "min": 0.04033299999998974,
+          "mean": 0.05057855555555256,
+          "p95": 0.09029099999999346,
+          "sd": 0.01579465485624094,
+          "rme": 24.00389763239171,
+          "scoreRme": 10.474392604800364,
+          "warmupRatio": 0.999995531565036,
+          "samples": 9
+        },
+        "classification_per_100_aliases": {
+          "score": 0.017903359999999112,
+          "median": 0.01751679999999851,
+          "min": 0.016133199999995896,
+          "mean": 0.020231422222221025,
+          "p95": 0.036116399999997384,
+          "sd": 0.006317861942496377,
+          "rme": 24.00389763239171,
+          "scoreRme": 10.474392604800359,
+          "warmupRatio": 0.9999955315650357,
+          "samples": 9
+        }
+      },
+      "meta": {
+        "aliases": 250,
+        "dependencyFirst": true,
+        "exports": ["Memo0"],
+        "sourceBytes": 7854,
+        "sourceDigest": "0edb81b366f79710d68d266805c5aa9de9806b30f67f72e8fef60aa3e0b7f1fc",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "dependent-first-1000",
+      "ops": {
+        "classification": {
+          "score": 0.17676680000000147,
+          "median": 0.17637500000000728,
+          "min": 0.1572919999999982,
+          "mean": 0.18003244444444513,
+          "p95": 0.21058299999999974,
+          "sd": 0.018775167689738508,
+          "rme": 8.016247076305412,
+          "scoreRme": 14.042889035415326,
+          "warmupRatio": 1.0112193013620088,
+          "samples": 9
+        },
+        "classification_per_100_aliases": {
+          "score": 0.017676680000000146,
+          "median": 0.01763750000000073,
+          "min": 0.015729199999999822,
+          "mean": 0.01800324444444451,
+          "p95": 0.021058299999999974,
+          "sd": 0.0018775167689738508,
+          "rme": 8.016247076305415,
+          "scoreRme": 14.042889035415328,
+          "warmupRatio": 1.011219301362009,
+          "samples": 9
+        }
+      },
+      "meta": {
+        "aliases": 1000,
+        "dependencyFirst": false,
+        "exports": ["Memo0"],
+        "sourceBytes": 31854,
+        "sourceDigest": "adb1610aaa1bf477ae7aeb952d1a0ccef87f6dfe26b3e932e055e8aedcf90a3e",
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "dependency-first-1000",
+      "ops": {
+        "classification": {
+          "score": 0.2016584000000023,
+          "median": 0.18837500000000773,
+          "min": 0.16391699999999787,
+          "mean": 0.22909722222222387,
+          "p95": 0.4915419999999955,
+          "sd": 0.10558444157258355,
+          "rme": 35.425676474040756,
+          "scoreRme": 31.932727473791093,
+          "warmupRatio": 1.2276532988459643,
+          "samples": 9
+        },
+        "classification_per_100_aliases": {
+          "score": 0.02016584000000023,
+          "median": 0.018837500000000774,
+          "min": 0.016391699999999787,
+          "mean": 0.022909722222222387,
+          "p95": 0.04915419999999955,
+          "sd": 0.010558444157258354,
+          "rme": 35.42567647404075,
+          "scoreRme": 31.932727473791093,
+          "warmupRatio": 1.227653298845964,
+          "samples": 9
+        }
+      },
+      "meta": {
+        "aliases": 1000,
+        "dependencyFirst": true,
+        "exports": ["Memo0"],
+        "sourceBytes": 31854,
+        "sourceDigest": "91601083ba86472889414be6c03b0e668b4c80bdf20a8714c4ac51a682a8258a",
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

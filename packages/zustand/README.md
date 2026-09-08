@@ -2,6 +2,13 @@
 
 [zustand](https://github.com/pmndrs/zustand) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/zustand
+pnpm add @octanejs/zustand
+```
+
 zustand separates a framework-agnostic **vanilla store** (`createStore`) from a tiny
 **React binding** (`create` + `useStore`) built on `useSyncExternalStore`. This package
 reuses the vanilla store unchanged (re-exported verbatim from `zustand/vanilla`) and
@@ -50,8 +57,9 @@ hook used twice) stay independent, exactly like in React.
 ## Selecting object slices — `useShallow`
 
 A selector that returns a fresh object/array each call (`(s) => ({ a: s.a })`) never
-compares Object.is-equal, so it re-renders on every store change. Wrap it with
-`useShallow` to compare by shallow equality:
+compares Object.is-equal, so it violates `useSyncExternalStore` snapshot stability
+and reaches the maximum update depth guard. Wrap it with `useShallow` to cache
+the selection by shallow equality:
 
 ```tsx
 import { useShallow } from '@octanejs/zustand/shallow';
@@ -61,14 +69,6 @@ function Sliced() @{
   // re-renders only when a or b actually changes
 }
 ```
-
-## Divergences from React
-
-- **Unstable selectors don't loop.** React's `useSyncExternalStore` throws the dev
-  warning _"The result of getSnapshot should be cached"_ and re-renders in a loop when
-  a selector returns a new reference every render. octane settles after a bounded
-  number of renders instead — no loop, no warning. Prefer `useShallow` regardless, for
-  the same reason you would in React (avoid the extra renders).
 
 ## Equality functions — `traditional`
 

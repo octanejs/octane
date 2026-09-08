@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-hotkeys",
+    "version": "0.10.0",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "hotkeys",
+      "subdirectory": "packages/react-hotkeys"
+    },
+    "commit": "c73a3a167c979d500e1008341ecad096a6c4e635",
+    "integrity": "sha512-GwOSndI5j3qBVYTmgP1mYyRTnlxb2MS17cwGlsavSxMQPSnmDf+m3LzMIpRMs+3zzQMjg3cYhHsFYizYlFI2tw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "a7434fcc02922f5e616e66431ba665a90dc3765197451459307f06e272fc17e2"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "'../src/useHotkeyRegistrations'",
+      "replace": "'@octanejs/tanstack-hotkeys'"
+    },
+    {
+      "find": "'../src/useHotkeySequences'",
+      "replace": "'@octanejs/tanstack-hotkeys'"
+    },
+    {
+      "find": "'../src/useHotkeys'",
+      "replace": "'@octanejs/tanstack-hotkeys'"
+    },
+    {
+      "find": "'../src/useHotkey'",
+      "replace": "'@octanejs/tanstack-hotkeys'"
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "from 'react'",
+      "replace": "from 'octane'"
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "9c1bf3c795773384897a1a933c2fa206a5618763",
+      "size": 7135
+    },
+    {
+      "path": "eslint.config.js",
+      "gitBlob": "5b70673464802aaea605fe28b100afef17f12806",
+      "size": 864
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "e1955203e197960bedcb19390b9f487b35215f15",
+      "size": 1686
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "c047368671813f49761a6a7e933573a004b26838",
+      "size": 5982
+    },
+    {
+      "path": "src/HotkeysProvider.tsx",
+      "gitBlob": "da6dc2136cf1a45f95435bac4b84196fa7408093",
+      "size": 1753
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "66dc881d76b95680fc7facd32d94dff4d466b9b3",
+      "size": 498
+    },
+    {
+      "path": "src/useHeldKeyCodes.ts",
+      "gitBlob": "d8b81749c364ff106f942018edb84c20d9a1c6f8",
+      "size": 944
+    },
+    {
+      "path": "src/useHeldKeys.ts",
+      "gitBlob": "beefd4092b4e860aa67085a0217771b8ec2a2331",
+      "size": 761
+    },
+    {
+      "path": "src/useHotkey.ts",
+      "gitBlob": "e5d3a749ca820922cf41a9fd40cbd6303f47dbc2",
+      "size": 5916
+    },
+    {
+      "path": "src/useHotkeyRecorder.ts",
+      "gitBlob": "36405c9b2831b0db4810aba2a48777dd64e823d5",
+      "size": 2992
+    },
+    {
+      "path": "src/useHotkeyRegistrations.ts",
+      "gitBlob": "96c8d01f176aa564a1be03ceae2b80420e6badfd",
+      "size": 1817
+    },
+    {
+      "path": "src/useHotkeys.ts",
+      "gitBlob": "74c3532101429007c36d6f51bf8f78398822ca3a",
+      "size": 6313
+    },
+    {
+      "path": "src/useHotkeySequence.ts",
+      "gitBlob": "ab0041094eb2b1ce86837c56f7ace8c672bca1b3",
+      "size": 6006
+    },
+    {
+      "path": "src/useHotkeySequenceRecorder.ts",
+      "gitBlob": "7f09830dc5c0aa6b8521547041873f9c44d0d5ff",
+      "size": 2055
+    },
+    {
+      "path": "src/useHotkeySequences.ts",
+      "gitBlob": "467fabdb6d890c6120c4ec38a7ffc5903bd3120b",
+      "size": 6438
+    },
+    {
+      "path": "src/useKeyHold.ts",
+      "gitBlob": "d1e67d9d25575e84d092c724fb36cd2f8de7c6c1",
+      "size": 1507
+    },
+    {
+      "path": "src/utils.ts",
+      "gitBlob": "4299313a06eab48ca6f23fe1b300f5248607760a",
+      "size": 270
+    },
+    {
+      "path": "tests/useHotkey.test.tsx",
+      "gitBlob": "03da08c81fa62c0e9095e184d72c4d0aa39d55bf",
+      "size": 6929
+    },
+    {
+      "path": "tests/useHotkeyRegistrations.test.tsx",
+      "gitBlob": "682ff79e7dc6cf65c4d276b48f638e81a3161b0e",
+      "size": 5942
+    },
+    {
+      "path": "tests/useHotkeys.test.tsx",
+      "gitBlob": "ae8a1d081df3a0ed6adc923db61f6f4d0bf830b4",
+      "size": 10217
+    },
+    {
+      "path": "tests/useHotkeySequences.test.tsx",
+      "gitBlob": "03f264c89157dabbed6e551374d8e98b071a1261",
+      "size": 7886
+    },
+    {
+      "path": "tsconfig.docs.json",
+      "gitBlob": "08866d6b60e5ba503d3b60a1be70ece0ccad9b2c",
+      "size": 152
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "98bb38dfe84397d9d9b315cdd15050379c19a656",
+      "size": 172
+    },
+    {
+      "path": "tsdown.config.ts",
+      "gitBlob": "71071cb903d158d9ce9dc5f0cbfb01e1e764971a",
+      "size": 287
+    },
+    {
+      "path": "vitest.config.ts",
+      "gitBlob": "ffea6da67f6abf82fe3c944c62c0961e41b449fe",
+      "size": 381
+    }
+  ],
+  "fingerprint": "c91e5faeea614466294bdc007241445cab756a0e76cfc3006cae3db8a7b05bc7"
+}

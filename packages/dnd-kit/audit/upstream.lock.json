@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@dnd-kit/react",
+    "version": "0.5.0",
+    "repository": {
+      "owner": "clauderic",
+      "repo": "dnd-kit",
+      "subdirectory": "packages/react"
+    },
+    "commit": "cc98bdd52c06e55221e8cf77aaa0c2ec0f55b86f",
+    "integrity": "sha512-abQPLI8lmfVE+v/n+pqy5WFxrw6T2Yg0UQZsL78dp5DKci7dKTVDjvLWqvass+XTFtzJmsZEjk1NdqE6xG8Jiw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "6fdf84a73d062925aa339ef281196dfee3bd73aa825739c7fdc349b360f46993"
+      },
+      {
+        "path": "packages/react/LICENSE",
+        "sha256": "537607e3f1533ad2c5b12978967f5ab27f34ffb7e626e321017a7ccca6cc24ff"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "909273053d907c451df02854015c35b4306f6ee1",
+      "size": 49503
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "f26f4536c972561fbbffe4858a0254a8732d9a22",
+      "size": 1075
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "1f99bfc0056495fe84c34aa8abfe14b35686d7cf",
+      "size": 2364
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "531fa49b6c1badf2bf7566dd22f079e601020bfb",
+      "size": 1553
+    },
+    {
+      "path": "src/core/context/context.ts",
+      "gitBlob": "651c95315e8b715ee592aabab59927b15829164d",
+      "size": 243
+    },
+    {
+      "path": "src/core/context/DragDropProvider.tsx",
+      "gitBlob": "73adb2d50b47f4bd83e59d6003c8296f85785cf6",
+      "size": 4771
+    },
+    {
+      "path": "src/core/context/hooks.ts",
+      "gitBlob": "c1b5fafec1d5039db9cb378d781e7fac9fffd146",
+      "size": 555
+    },
+    {
+      "path": "src/core/context/renderer.ts",
+      "gitBlob": "8872367a0f719c918227bac80c695d689442e96e",
+      "size": 1439
+    },
+    {
+      "path": "src/core/draggable/DragOverlay.tsx",
+      "gitBlob": "08835464c523eb7c7b1ba2cbca7233be5350addb",
+      "size": 3541
+    },
+    {
+      "path": "src/core/draggable/useDraggable.ts",
+      "gitBlob": "52a2833eb16f74114de12ad9b5130402b9a921f0",
+      "size": 2848
+    },
+    {
+      "path": "src/core/droppable/useDroppable.ts",
+      "gitBlob": "88f8e848859f9933467ddcd882f964e3d92111b7",
+      "size": 2116
+    },
+    {
+      "path": "src/core/hooks/useDragDropManager.ts",
+      "gitBlob": "e9d0a8740f8d636b15127a465d21fc7722434a55",
+      "size": 485
+    },
+    {
+      "path": "src/core/hooks/useDragDropMonitor.ts",
+      "gitBlob": "cea79a771360e848f00852954720f0000f50e063",
+      "size": 2524
+    },
+    {
+      "path": "src/core/hooks/useDragOperation.ts",
+      "gitBlob": "33731453f830d468fe20cf3d8652752b294134d8",
+      "size": 775
+    },
+    {
+      "path": "src/core/hooks/useInstance.ts",
+      "gitBlob": "0391650a2d088eeb6354dbe905d373ed210d4859",
+      "size": 839
+    },
+    {
+      "path": "src/core/index.ts",
+      "gitBlob": "e290a46d3716a1885eb393ceae4f4a6fee079a4b",
+      "size": 846
+    },
+    {
+      "path": "src/hooks/index.ts",
+      "gitBlob": "a985607d47af9a72187fc098d40dc0be0b7efd38",
+      "size": 449
+    },
+    {
+      "path": "src/hooks/useComputed.ts",
+      "gitBlob": "83122a02482d3da20fbc2a7e6de24b4bec5537bf",
+      "size": 401
+    },
+    {
+      "path": "src/hooks/useConstant.ts",
+      "gitBlob": "854a125308e73b4f470096c6eea5e848e064705d",
+      "size": 254
+    },
+    {
+      "path": "src/hooks/useDeepSignal.ts",
+      "gitBlob": "00f1ad0eee2bd7a85a37eee19edc6de07c1f0e86",
+      "size": 1862
+    },
+    {
+      "path": "src/hooks/useForceUpdate.ts",
+      "gitBlob": "67459cb61f439924956b48efef1b351a52d59f2d",
+      "size": 202
+    },
+    {
+      "path": "src/hooks/useImmediateEffect.ts",
+      "gitBlob": "316362401b7470f844fb356cdeff8090eb9bf52b",
+      "size": 165
+    },
+    {
+      "path": "src/hooks/useIsomorphicLayoutEffect.ts",
+      "gitBlob": "01219cbeb19f406838505e632e9f599210d2f35f",
+      "size": 585
+    },
+    {
+      "path": "src/hooks/useLatest.ts",
+      "gitBlob": "fc7485e859455ae5bdf626a5ae9d0d99e8717d62",
+      "size": 300
+    },
+    {
+      "path": "src/hooks/useOnElementChange.ts",
+      "gitBlob": "6773451e491a9044f7ffa27aa188e03414574be9",
+      "size": 537
+    },
+    {
+      "path": "src/hooks/useOnValueChange.ts",
+      "gitBlob": "98308aa7b0a94683d0b51f3259715583a3fd0aee",
+      "size": 411
+    },
+    {
+      "path": "src/hooks/useSignal.ts",
+      "gitBlob": "79389ec77e5958280d44baa845bb681f3b23c35a",
+      "size": 1038
+    },
+    {
+      "path": "src/sortable/index.ts",
+      "gitBlob": "a689f065146526fae8f9a2b48561962f6b788047",
+      "size": 189
+    },
+    {
+      "path": "src/sortable/useSortable.ts",
+      "gitBlob": "d9aab1f6da6392bc26702a540b13531cba576e58",
+      "size": 4889
+    },
+    {
+      "path": "src/utilities/currentValue.ts",
+      "gitBlob": "fb21e63cdb90f8e0fdabcb824f11e347f64b6860",
+      "size": 553
+    },
+    {
+      "path": "src/utilities/index.ts",
+      "gitBlob": "cf437422b573f446da831a83473c4a4e9b95fdf4",
+      "size": 65
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "5af960d91a2fcbf63638e62845ac051ccb010d96",
+      "size": 129
+    },
+    {
+      "path": "tsup.config.ts",
+      "gitBlob": "e916a5781d43918769624ac3013a15dd8bcd4e09",
+      "size": 296
+    }
+  ],
+  "fingerprint": "8aa31ce9f67af9b8687af478bb3bce2e0ee2053d1a1558ac9dc797423a94d6c1"
+}

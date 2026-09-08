@@ -1,0 +1,1188 @@
+{
+  "schemaVersion": 3,
+  "recordedAt": "2026-08-23T21:20:50.028Z",
+  "status": {
+    "ordinaryWork": "six recorded controls pass",
+    "rootJournalEntry": "supplemental v3 diagnostic retained as historical, not rerun for the cold v4 correction",
+    "affectedWork": "10 Octane +10 React controls pass",
+    "executableBundles": "five public oracles pass",
+    "timing": "v4 quiet pair recorded with material ordinary-control overhead; both v3 pairs retained as historical",
+    "currentHeadCI": "tracked separately"
+  },
+  "baseline": {
+    "revision": "fd6ce69c13daf7aa4eb41b4450382d6370b7993f",
+    "packageSha256": "c3eaf6e17163b89a9f74e66b8b8c337679d2e2b33eba17bdbc11d466a55af887",
+    "filesSha256": {
+      "src/runtime.ts": "1cd872c2dde77ecb24d8ffbc9baf765ba36a358234c34ed6f8a0ca5716a44bf5",
+      "src/compiler/compile.js": "d7a95a8975e76b46dec86a6c4d7097dc9dfcc019755574d4be7b18de4e6db73c"
+    }
+  },
+  "candidate": {
+    "basedOn": "fd6ce69c13daf7aa4eb41b4450382d6370b7993f",
+    "revision": null,
+    "packageSha256": "ab4765b11ebc7413ec49e8a367cc8f40367ad758e6c7d6c60d6835b4499238d9",
+    "filesSha256": {
+      "src/runtime.ts": "0994fe76a7dc2af6a056bc5f0321fc6c9038eac791744570b5128efecd4bc1d5",
+      "src/compiler/compile.js": "272ea9cae362b0c9d6a4616e740db0ebaf75e212f40608297f58839f2e7fec73"
+    },
+    "note": "Measured working source after the recorded checkout revision; identified by package/file hashes. Audit-only changes do not affect the package-source hash.",
+    "measuredCheckoutRevision": "3f9b7c6bb62caaeea00046db9c748819a0c02395"
+  },
+  "environment": {
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "osRelease": "25.6.0",
+    "cpu": "Apple M5 Max",
+    "chromium": "149.0.7827.55"
+  },
+  "toolchain": {
+    "parser": "package-default",
+    "tsrxCore": "0.1.58",
+    "vite": "8.1.5",
+    "esbuild": "0.28.1",
+    "playwright": "1.61.1",
+    "lockfileSha256": "047dfc5585e0dc60fbc9c3e3622af61d52bbb45dbc64ac717d9dd1bbdce91372",
+    "fixtureSourceSha256": "4c3f53573e455c085b557a3e121851f91cb67d730e643588c90086bc1676fb04"
+  },
+  "reactSemanticControlVersion": "19.2.7",
+  "affectedInputsSha256": {
+    "index.html": "e73beec0d39ba2fea3c08e5a5f50d44bbdefb87102c54e1bbf636898d0616a3b",
+    "main.ts": "f3c7bebea73771907d0ddb967977a7f313709ad739757c74bd38a6c00e407991",
+    "root-suspension.tsrx": "ec698e7c0311c73c128cfb2456aa143acfc0c0d27630ff38b074033021413532"
+  },
+  "affectedAssetsSha256": {
+    "assets/index-CcMdRmU_.js": "1cf331b92b031097c6c2292a5e655a2357f4f0ce7e3abaaa84701a9aba4a7a7c"
+  },
+  "measurement": {
+    "production": true,
+    "workMinified": false,
+    "workJitless": true,
+    "workIterations": 1,
+    "bundleMinifier": "esbuild",
+    "baselineProductionWorkAndBytesEqualHistorical31abee": true
+  },
+  "ordinaryWork": {
+    "allSixRecordedCallDOMAndSemanticObservationsEqualBaseline": true,
+    "rows": 256,
+    "updatesPerSample": 12,
+    "zeroListSnapshotGuard": {
+      "operation": "plain_updates_journalForSlot",
+      "count": 0,
+      "denominator": 3072,
+      "maxRatio": 0,
+      "ratio": 0,
+      "passed": true
+    },
+    "columns": [
+      "operation",
+      "renderBlock",
+      "journalForSlot",
+      "forEachSubtreeChild",
+      "styleWrites",
+      "stateAttributeWrites",
+      "addedRows",
+      "removedRows"
+    ],
+    "values": [
+      ["hide_reveal", 8256, 0, 4120, 4096, 0, 0, 0],
+      ["hidden_burst", 6192, 0, 0, 0, 3072, 0, 0],
+      ["hidden_descendant_updates", 256, 0, 0, 0, 256, 0, 0],
+      ["nested_hide_reveal", 17536, 0, 8848, 4096, 0, 0, 0],
+      ["plain_updates", 6168, 0, 0, 0, 3072, 0, 0],
+      ["plain_descendant_updates", 256, 0, 0, 0, 256, 0, 0]
+    ]
+  },
+  "supplementalHelpers": {
+    "method": "Existing unminified production work assets, jitless precise coverage; setup, verification and cleanup outside the measured window; no source/component/DOM instrumentation.",
+    "bothControlsEnterRootJournal": true,
+    "columns": [
+      "operation",
+      "Row",
+      "beginRootRender",
+      "createOffscreenCapture",
+      "commitRootRenders",
+      "journalObjectOnce",
+      "journalBag",
+      "journalRootProperty",
+      "journalText",
+      "journalAttr",
+      "journalForSlot"
+    ],
+    "values": [
+      ["plain_updates", 3072, 12, 12, 12, 6156, 6156, 6180, 3084, 3072, 0],
+      ["plain_descendant_updates", 256, 256, 1, 1, 512, 512, 0, 256, 256, 0]
+    ],
+    "assetsSha256": {
+      "assets/octane-BaSHRGZ4.js": "38bb56d1979553801ef7b93b9f63763f1c3866c3e1fa8c2a5b6f9c4168cd6637"
+    },
+    "command": "node /private/tmp/octane-821-perf/collect-root-helper-counts-v3.mjs final-v3",
+    "measuredSourcePackageSha256": "fd3719abbc2b5336a05c4004f41d2b137c8ee96f3acb8ab407d2646038fb46ac",
+    "remeasuredForV4": false,
+    "scope": "Historical v3 helper-entry counts, before the cold uncaught-error ref-detachment correction. Current-v4 ordinary/affected work and bundle controls are measured separately."
+  },
+  "affectedWork": {
+    "octaneWindows": 10,
+    "reactSemanticControls": 10,
+    "allSemanticsPassed": true,
+    "columns": [
+      "shape",
+      "window",
+      "replacementBodies",
+      "readerBodies",
+      "retiredInputBodies",
+      "renderBlock",
+      "createBlock",
+      "renderOffscreen",
+      "journalForSlot",
+      "childListRecords",
+      "addedNodes",
+      "removedNodes",
+      "characterDataWrites",
+      "removedInputRanges",
+      "removedKeepRanges"
+    ],
+    "values": [
+      ["component", "hold", 1, 1, 0, 5, 1, 1, 0, 6, 3, 3, 2, 0, 0],
+      ["component", "retry", 1, 1, 0, 5, 1, 1, 0, 6, 3, 3, 3, 1, 0],
+      ["branch", "hold", 1, 1, 0, 6, 2, 1, 0, 6, 3, 3, 2, 0, 0],
+      ["branch", "retry", 1, 1, 0, 6, 2, 1, 0, 4, 3, 1, 3, 1, 0],
+      ["root", "hold", 1, 1, 0, 3, 3, 0, 0, 7, 4, 4, 0, 0, 0],
+      ["root", "retry", 1, 1, 0, 3, 3, 0, 0, 5, 5, 1, 0, 1, 0],
+      ["keyed", "hold", 0, 1, 0, 5, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+      ["keyed", "retry", 0, 1, 0, 5, 0, 0, 1, 1, 0, 1, 1, 1, 0],
+      ["empty", "hold", 0, 1, 0, 4, 1, 0, 2, 2, 1, 1, 0, 0, 0],
+      ["empty", "retry", 0, 1, 0, 4, 1, 0, 2, 3, 1, 2, 1, 1, 1]
+    ]
+  },
+  "bundles": [
+    {
+      "fixture": "root-static-specialized",
+      "baseline": {
+        "raw": 37862,
+        "gzip": 13069,
+        "brotli": 11865
+      },
+      "candidate": {
+        "raw": 47491,
+        "gzip": 16071,
+        "brotli": 14568
+      },
+      "delta": {
+        "raw": 9629,
+        "gzip": 3002,
+        "brotli": 2703
+      },
+      "gzipPercent": 22.970387940928916,
+      "activityReachable": false
+    },
+    {
+      "fixture": "root-static",
+      "baseline": {
+        "raw": 117281,
+        "gzip": 37811,
+        "brotli": 33249
+      },
+      "candidate": {
+        "raw": 136062,
+        "gzip": 43458,
+        "brotli": 38065
+      },
+      "delta": {
+        "raw": 18781,
+        "gzip": 5647,
+        "brotli": 4816
+      },
+      "gzipPercent": 14.934807331199915,
+      "activityReachable": false
+    },
+    {
+      "fixture": "hooks-state",
+      "baseline": {
+        "raw": 120457,
+        "gzip": 38982,
+        "brotli": 34213
+      },
+      "candidate": {
+        "raw": 139436,
+        "gzip": 44714,
+        "brotli": 39197
+      },
+      "delta": {
+        "raw": 18979,
+        "gzip": 5732,
+        "brotli": 4984
+      },
+      "gzipPercent": 14.704222461648966,
+      "activityReachable": false
+    },
+    {
+      "fixture": "component-owned-effects",
+      "baseline": {
+        "raw": 118269,
+        "gzip": 38213,
+        "brotli": 33557
+      },
+      "candidate": {
+        "raw": 137062,
+        "gzip": 43877,
+        "brotli": 38437
+      },
+      "delta": {
+        "raw": 18793,
+        "gzip": 5664,
+        "brotli": 4880
+      },
+      "gzipPercent": 14.822180933190277,
+      "activityReachable": false
+    },
+    {
+      "fixture": "root-descriptor",
+      "baseline": {
+        "raw": 117102,
+        "gzip": 37751,
+        "brotli": 33163
+      },
+      "candidate": {
+        "raw": 135959,
+        "gzip": 43422,
+        "brotli": 38112
+      },
+      "delta": {
+        "raw": 18857,
+        "gzip": 5671,
+        "brotli": 4949
+      },
+      "gzipPercent": 15.022118619374321,
+      "activityReachable": false
+    }
+  ],
+  "codegen": {
+    "activity-codegen-App": {
+      "raw": {
+        "before": 5884,
+        "after": 5941,
+        "difference": 57,
+        "percent": 0.9687287559483344
+      },
+      "minified": {
+        "before": 2838,
+        "after": 2866,
+        "difference": 28,
+        "percent": 0.9866102889358703
+      },
+      "gzip": {
+        "before": 1207,
+        "after": 1221,
+        "difference": 14,
+        "percent": 1.15990057995029
+      }
+    },
+    "activity-codegen-RefControl": {
+      "raw": {
+        "before": 4012,
+        "after": 4012,
+        "difference": 0,
+        "percent": 0
+      },
+      "minified": {
+        "before": 1965,
+        "after": 1965,
+        "difference": 0,
+        "percent": 0
+      },
+      "gzip": {
+        "before": 903,
+        "after": 903,
+        "difference": 0,
+        "percent": 0
+      }
+    }
+  },
+  "reachability": {
+    "specializedExcluded": [
+      "activityBlock",
+      "hideActivityRange",
+      "recordSuspenseCommit",
+      "holdRootTransition",
+      "retryRootTransition",
+      "commitRootTransition",
+      "discardRootTransition",
+      "restoreForSlot",
+      "journalForSlot"
+    ],
+    "activityExcludedAllFive": true,
+    "concreteSuspensePublisherRemovedFromReusableControls": true,
+    "rootP1HelpersRetainedWithPreviouslyReachableStartTransition": true,
+    "preservedAssets": "/private/tmp/octane-821-perf/final-v4-activity-bundles"
+  },
+  "allocationAndHotPathReview": [
+    "Each affected root commit wave opens a RootRenderTransaction, flat undo log, touched-object Map, and OffscreenCapture. The capture has eight arrays (effects outer/three inner, events, eventActions, refs, stores), even when empty; there is no buffer/frame pool.",
+    "Each queued origin entering the root window allocates a RootRenderFrame; nested renders within that same active owner reuse the window. The v3 descendant diagnostic entered 256 times while sharing one capture/commit wave.",
+    "The first touched object at a checkpoint copies one own-value snapshot; cold rollback enumerates keys, removes additions, and restores array length separately. Repeated journalObjectOnce calls can deduplicate, so calls are not allocation counts.",
+    "Stable active effects update an attempt-local presence stamp without journaling it; retries mint a fresh version. Whole-record snapshots remain on dependency changes and omitted/reactivated effect paths. Scalar undo uses flat log entries. Structural Maps/Sets, node ranges, closures, and WIP are lazy and tied to actual shape changes.",
+    "The added root entry path does not prewalk the subtree. Owner lookup reads inherited block.idState.renderOwner, now also inherited through lite wrappers. The added retired-subtree ancestry check runs only for a nonempty retired Set; existing effect/Activity ancestry work is not claimed absent.",
+    "Actual component/branch replacement bodies execute once per captured WIP attempt, not an extra preflight followed by a second successful render. Staging still creates blocks and performs real DOM work."
+  ],
+  "timing": {
+    "quietSequentialBaselineThenCandidate": true,
+    "warmup": 3,
+    "measuredSamples": 8,
+    "jitless": false,
+    "gcBeforeSampleOutsideTimer": true,
+    "scoreDefinition": "Latest contiguous five-sample mean within 8% of the best five-sample mean among 8 retained samples; median/p95/RME use all 8. Raw reports also retain score-window RME.",
+    "identicalSemanticChecksums": true,
+    "columns": [
+      "operation",
+      "baselineScoreMs",
+      "candidateScoreMs",
+      "deltaPercent",
+      "baselineMedianMs",
+      "candidateMedianMs",
+      "baselineP95Ms",
+      "candidateP95Ms",
+      "baselineRmePercent",
+      "candidateRmePercent"
+    ],
+    "values": [
+      ["mount_visible", 1.14, 1.44, 26.31579, 1.2, 1.5, 1.8, 1.6, 15.405723, 4.253801],
+      ["mount_hidden_commit", 1.16, 1.42, 22.413795, 1.2, 1.4, 1.4, 1.6, 8.758258, 5.86658],
+      ["mount_hidden_ready", 1.16, 1.42, 22.413795, 1.2, 1.4, 1.4, 1.6, 8.758258, 5.86658],
+      ["hide_reveal", 3.86, 5.4, 39.896373, 4.2, 5.6, 5.3, 6.1, 12.342514, 5.036425],
+      ["visible_updates", 1.94, 3.34, 72.164949, 2, 3.4, 2.2, 3.6, 4.678272, 5.660354],
+      ["hidden_burst_commit", 2.26, 3.9, 72.566373, 2.3, 3.8, 2.4, 4, 3.440569, 3.405251],
+      ["hidden_burst_ready", 2.26, 3.9, 72.566373, 2.3, 3.8, 2.4, 4, 3.440569, 3.405251],
+      [
+        "hidden_descendant_updates_commit",
+        0.28,
+        0.36,
+        28.571413,
+        0.3,
+        0.4,
+        0.3,
+        0.5,
+        10.282611,
+        16.916114
+      ],
+      [
+        "hidden_descendant_updates_ready",
+        0.28,
+        0.36,
+        28.571413,
+        0.3,
+        0.4,
+        0.3,
+        0.5,
+        10.282611,
+        16.916114
+      ],
+      ["nested_hide_reveal", 7.42, 10.3, 38.814016, 7.5, 10.5, 7.9, 12.2, 2.580394, 6.800039],
+      ["plain_updates", 2, 3.36, 67.999999, 2.1, 3.5, 2.4, 3.7, 6.219172, 4.296644],
+      ["plain_descendant_updates", 0.32, 0.36, 12.500011, 0.3, 0.4, 0.4, 0.5, 17.147708, 13.828794]
+    ],
+    "rawSamplesMs": {
+      "mount_visible": {
+        "baseline": [
+          1.300000011920929, 1.300000011920929, 1.800000011920929, 1.100000023841858,
+          1.199999988079071, 1.100000023841858, 1.0999999642372131, 1.199999988079071
+        ],
+        "candidate": [
+          1.600000023841858, 1.5, 1.399999976158142, 1.4000000357627869, 1.399999976158142, 1.5,
+          1.5, 1.399999976158142
+        ]
+      },
+      "mount_hidden_commit": {
+        "baseline": [
+          1.399999976158142, 1.399999976158142, 1.4000000357627869, 1.199999988079071,
+          1.199999988079071, 1.100000023841858, 1.0999999642372131, 1.199999988079071
+        ],
+        "candidate": [
+          1.399999976158142, 1.4000000357627869, 1.4000000357627869, 1.300000011920929,
+          1.399999976158142, 1.300000011920929, 1.600000023841858, 1.5
+        ]
+      },
+      "mount_hidden_ready": {
+        "baseline": [
+          1.399999976158142, 1.399999976158142, 1.4000000357627869, 1.199999988079071,
+          1.199999988079071, 1.100000023841858, 1.0999999642372131, 1.199999988079071
+        ],
+        "candidate": [
+          1.399999976158142, 1.4000000357627869, 1.4000000357627869, 1.300000011920929,
+          1.399999976158142, 1.300000011920929, 1.600000023841858, 1.5
+        ]
+      },
+      "hide_reveal": {
+        "baseline": [
+          4.199999988079071, 5.300000011920929, 5.100000023841858, 4.200000047683716,
+          3.800000011920929, 3.699999988079071, 3.800000011920929, 3.800000011920929
+        ],
+        "candidate": [
+          6.099999964237213, 5.600000023841858, 5.599999964237213, 5.699999988079071,
+          5.400000035762787, 5.100000023841858, 5.700000047683716, 5.100000023841858
+        ]
+      },
+      "visible_updates": {
+        "baseline": [
+          2.099999964237213, 2.200000047683716, 2.100000023841858, 2, 1.899999976158142,
+          1.899999976158142, 2, 1.9000000357627869
+        ],
+        "candidate": [
+          3.100000023841858, 3.599999964237213, 3.399999976158142, 3.5, 3.600000023841858, 3,
+          3.399999976158142, 3.199999988079071
+        ]
+      },
+      "hidden_burst_commit": {
+        "baseline": [
+          2.199999988079071, 2.400000035762787, 2.099999964237213, 2.300000011920929,
+          2.199999988079071, 2.299999952316284, 2.199999988079071, 2.299999952316284
+        ],
+        "candidate": [
+          3.600000023841858, 3.800000011920929, 3.599999964237213, 4, 3.800000011920929, 4,
+          3.800000011920929, 3.899999976158142
+        ]
+      },
+      "hidden_burst_ready": {
+        "baseline": [
+          2.199999988079071, 2.400000035762787, 2.099999964237213, 2.300000011920929,
+          2.199999988079071, 2.299999952316284, 2.199999988079071, 2.299999952316284
+        ],
+        "candidate": [
+          3.600000023841858, 3.800000011920929, 3.599999964237213, 4, 3.800000011920929, 4,
+          3.800000011920929, 3.899999976158142
+        ]
+      },
+      "hidden_descendant_updates_commit": {
+        "baseline": [
+          0.30000001192092896, 0.30000001192092896, 0.30000001192092896, 0.30000001192092896,
+          0.30000001192092896, 0.19999998807907104, 0.30000001192092896, 0.30000001192092896
+        ],
+        "candidate": [
+          0.5, 0.5, 0.5, 0.2999999523162842, 0.3999999761581421, 0.3999999761581421,
+          0.2999999523162842, 0.3999999761581421
+        ]
+      },
+      "hidden_descendant_updates_ready": {
+        "baseline": [
+          0.30000001192092896, 0.30000001192092896, 0.30000001192092896, 0.30000001192092896,
+          0.30000001192092896, 0.19999998807907104, 0.30000001192092896, 0.30000001192092896
+        ],
+        "candidate": [
+          0.5, 0.5, 0.5, 0.2999999523162842, 0.3999999761581421, 0.3999999761581421,
+          0.2999999523162842, 0.3999999761581421
+        ]
+      },
+      "nested_hide_reveal": {
+        "baseline": [
+          7.799999952316284, 7.899999976158142, 7.5, 7.5, 7.300000011920929, 7.199999988079071, 7.5,
+          7.600000023841858
+        ],
+        "candidate": [
+          12.199999988079071, 10.900000035762787, 10.5, 10.5, 10.5, 9.199999988079071,
+          10.100000023841858, 11.199999988079071
+        ]
+      },
+      "plain_updates": {
+        "baseline": [
+          2.400000035762787, 2.100000023841858, 2.199999988079071, 2.100000023841858, 2, 2,
+          1.9000000357627869, 2
+        ],
+        "candidate": [
+          3.599999964237213, 3.700000047683716, 3.5, 3.399999976158142, 3.100000023841858,
+          3.399999976158142, 3.399999976158142, 3.5
+        ]
+      },
+      "plain_descendant_updates": {
+        "baseline": [
+          0.30000001192092896, 0.30000001192092896, 0.30000001192092896, 0.2999999523162842,
+          0.2999999523162842, 0.40000003576278687, 0.19999998807907104, 0.3999999761581421
+        ],
+        "candidate": [
+          0.30000001192092896, 0.3999999761581421, 0.30000001192092896, 0.40000003576278687,
+          0.40000003576278687, 0.5, 0.3999999761581421, 0.3999999761581421
+        ]
+      }
+    },
+    "interpretation": "The v4 ordinary parent-update control measures 2.00→3.36ms (+68.0%); median 2.10→3.50ms, p95 2.40→3.70ms. This is a cold uncaught-error ref-detachment correction, not a performance optimization. Cross-run timing drift prevents attributing differences from v3 to that change; no CPU gain is claimed. The preserved v3 ordinary-control pairs measured 2.98→6.44ms (+116.1%) and 1.84→3.58ms (+94.6%). Neither is discarded.",
+    "order": "baseline then candidate",
+    "additionalV4TimingRuns": 0
+  },
+  "historicalExperiments": [
+    {
+      "source": "8d041c1326cc05e0117347bb63a1e5143e35199947454a3cb5b43d61acb85108",
+      "change": "Stable effects use scalar stamp undo; lite descendants inherit root ownership.",
+      "plainUpdateScoreMs": {
+        "baseline": 1.96,
+        "candidate": 3.34,
+        "deltaPercent": 70.408162
+      },
+      "evidence": "/private/tmp/octane-821-perf/final-v2-build-manifest.json"
+    },
+    {
+      "source": "9474dcbc30aab2dd42e361df576825966790d5893ab716f26a3087c92b5e792c",
+      "change": "Initial complete candidate before snapshot optimizations.",
+      "plainUpdateScoreMs": {
+        "baseline": 1.82,
+        "candidate": 4.04,
+        "deltaPercent": 121.978022
+      },
+      "evidence": "/private/tmp/octane-821-perf/preopt-9474-manifest.json"
+    },
+    {
+      "source": "5c2558f31ae3a34aa83ea8aa341674a9075ec083348aa4c46df860fa0f7a4d2f",
+      "change": "One-object rather than keys-plus-values snapshot.",
+      "plainUpdateScoreMs": {
+        "baseline": 1.94,
+        "candidate": 3.68,
+        "deltaPercent": 89.690722
+      },
+      "profile": {
+        "operations": 40,
+        "intervalMicroseconds": 100,
+        "journalObjectOnceAssetSelfPercent": 14.228618,
+        "journalTextAssetSelfPercent": 11.70676,
+        "unchangedEffectRecordCalls": 6144
+      },
+      "invalidatedControl": "Independent lite-wrapper descendants did not enter the required root journal; fixed and explicitly remeasured in the main candidate.",
+      "evidence": "/private/tmp/octane-821-perf/opt1-hotspot-summary.json"
+    }
+  ],
+  "commands": {
+    "baselineWork": "BENCH_JSON=/private/tmp/octane-821-perf/baseline-fd6ce69-activity-work.json node benchmarks/activity/work.mjs --target=octane-tsrx --octane-revision=fd6ce69c13daf7aa4eb41b4450382d6370b7993f",
+    "baselineBundle": "BENCH_JSON=/private/tmp/octane-821-perf/baseline-fd6ce69-activity-bundle.json node benchmarks/activity/bundle.mjs --target=octane-tsrx --octane-revision=fd6ce69c13daf7aa4eb41b4450382d6370b7993f",
+    "candidateWork": "BENCH_JSON=/private/tmp/octane-821-perf/final-v4-activity-work.json node benchmarks/activity/work.mjs --target=octane-tsrx",
+    "candidateBundle": "BENCH_JSON=/private/tmp/octane-821-perf/final-v4-activity-bundle.json node benchmarks/activity/bundle.mjs --target=octane-tsrx",
+    "affectedWork": "BENCH_JSON=/private/tmp/octane-821-perf/final-v4-root-suspension-work.json node benchmarks/suspense-recovery/root-work.mjs",
+    "supplementalHelpers": "node /private/tmp/octane-821-perf/collect-root-helper-counts-v3.mjs final-v3",
+    "baselineTiming": "BENCH_JSON=/private/tmp/octane-821-perf/final-v4-baseline-activity-timing.json node benchmarks/activity/run.mjs 8 --target=octane-tsrx --octane-revision=fd6ce69c13daf7aa4eb41b4450382d6370b7993f",
+    "candidateTiming": "BENCH_JSON=/private/tmp/octane-821-perf/final-v4-activity-timing.json node benchmarks/activity/run.mjs 8 --target=octane-tsrx"
+  },
+  "rawEvidence": [
+    "/private/tmp/octane-821-perf/baseline-fd6ce69-summary.json",
+    "/private/tmp/octane-821-perf/baseline-fd6ce69-activity-work.json",
+    "/private/tmp/octane-821-perf/baseline-fd6ce69-activity-bundle.json",
+    "/private/tmp/octane-821-perf/final-v4-activity-work.json",
+    "/private/tmp/octane-821-perf/final-v4-activity-bundle.json",
+    "/private/tmp/octane-821-perf/final-v4-activity-comparison.json",
+    "/private/tmp/octane-821-perf/final-v4-root-suspension-work.json",
+    "/private/tmp/octane-821-perf/final-v4-root-suspension-summary.json",
+    "/private/tmp/octane-821-perf/final-v4-activity-function-reachability.json",
+    "/private/tmp/octane-821-perf/final-v4-baseline-activity-timing.json",
+    "/private/tmp/octane-821-perf/final-v4-activity-timing.json",
+    "/private/tmp/octane-821-perf/final-v4-activity-timing-comparison.json",
+    "/private/tmp/octane-821-perf/final-v4-build-manifest.json",
+    "/private/tmp/octane-821-perf/collect-root-helper-counts-v3.mjs",
+    "/private/tmp/octane-821-perf/final-v3-root-helper-counts.json",
+    "/private/tmp/octane-821-perf/root-work-marker-control-mismatch.json",
+    "/private/tmp/octane-821-perf/preopt-9474-manifest.json",
+    "/private/tmp/octane-821-perf/preopt-9474-activity-timing-comparison.json",
+    "/private/tmp/octane-821-perf/opt1-activity-timing-comparison.json",
+    "/private/tmp/octane-821-perf/opt1-hotspot-diagnostic.json",
+    "/private/tmp/octane-821-perf/opt1-hotspot-summary.json",
+    "/private/tmp/octane-821-perf/final-v2-build-manifest.json",
+    "/private/tmp/octane-821-perf/final-v2-activity-timing-comparison.json",
+    "/private/tmp/octane-821-perf/final-v2-committed-audit.json",
+    "/private/tmp/octane-821-perf/final-v3-committed-audit.json",
+    "/private/tmp/octane-821-perf/final-v3-build-manifest.json",
+    "/private/tmp/octane-821-perf/final-v3-activity-timing-comparison.json",
+    "/private/tmp/octane-821-perf/final-v3-reverse-candidate-activity-timing-comparison.json"
+  ],
+  "limitations": [
+    "The pre-fix no-boundary path is semantically broken, so no suspended-path speed ratio is claimed. The React twin checks observable behavior, not internal work or speed; this is not a React Compiler comparison.",
+    "Named calls and container MutationObserver records do not measure arbitrary allocation, detached-DOM writes, GC pressure or asymptotic scaling. Equal named ordinary counters are not zero overhead.",
+    "Five urgent public-root-render shapes use public use(promise); raw thenables, hydration, transitions, errors, supersession, and universal ownership are regression-suite coverage outside this work measurement.",
+    "The v4 pair is sequential baseline then candidate; the historical v3 confirmation reversed order. None uses randomized interleaving. Short descendant windows are timer/noise sensitive, and cross-run baseline drift is not covered by within-run RME.",
+    "Node 26.4.0 differs from CI Node 24. Do not ratchet committed bundle budgets from these local results; existing baseline controls already exceed some older ceilings.",
+    "Unminified function-name reachability and the historical CPU sample profile are diagnostics, not exact minified-byte or allocation attribution. Current-head CI is tracked separately.",
+    "This is a cold uncaught-error ref-detachment correction, not a performance optimization. Cross-run timing drift prevents attributing differences from v3 to that change; no CPU gain is claimed."
+  ],
+  "historicalFinalV3": {
+    "candidate": {
+      "basedOn": "fd6ce69c13daf7aa4eb41b4450382d6370b7993f",
+      "revision": null,
+      "packageSha256": "fd3719abbc2b5336a05c4004f41d2b137c8ee96f3acb8ab407d2646038fb46ac",
+      "filesSha256": {
+        "src/runtime.ts": "eeab62c2f34c897f9bd712bb6786a73cfd94e5d822421450e116360d7b2efff8",
+        "src/compiler/compile.js": "272ea9cae362b0c9d6a4616e740db0ebaf75e212f40608297f58839f2e7fec73"
+      },
+      "note": "Uncommitted source identified by package/file hashes; audit-only changes do not affect the package-source hash."
+    },
+    "retainedWithoutNumericalChanges": true,
+    "timing": {
+      "quietSequentialBaselineThenCandidate": true,
+      "warmup": 3,
+      "measuredSamples": 8,
+      "jitless": false,
+      "gcBeforeSampleOutsideTimer": true,
+      "scoreDefinition": "Latest contiguous five-sample mean within 8% of the best five-sample mean among 8 retained samples; median/p95/RME use all 8. Raw reports also retain score-window RME.",
+      "identicalSemanticChecksums": true,
+      "columns": [
+        "operation",
+        "baselineScoreMs",
+        "candidateScoreMs",
+        "deltaPercent",
+        "baselineMedianMs",
+        "candidateMedianMs",
+        "baselineP95Ms",
+        "candidateP95Ms",
+        "baselineRmePercent",
+        "candidateRmePercent"
+      ],
+      "values": [
+        ["mount_visible", 2.08, 2.6, 25, 2.2, 2.7, 2.6, 3, 8.505908, 5.490156],
+        ["mount_hidden_commit", 2.06, 2.42, 17.475728, 2.1, 2.5, 2.1, 2.5, 1.865369, 3.724525],
+        ["mount_hidden_ready", 2.06, 2.42, 17.475728, 2.1, 2.5, 2.1, 2.5, 1.865369, 3.724525],
+        ["hide_reveal", 7.94, 9.2, 15.869018, 8.2, 9.5, 9, 11.3, 7.064767, 7.451828],
+        ["visible_updates", 3.12, 5.54, 77.564103, 3.2, 5.7, 3.3, 5.9, 1.967173, 4.265602],
+        ["hidden_burst_commit", 3.58, 6.7, 87.150839, 3.7, 6.5, 3.8, 7.2, 2.884987, 5.93578],
+        ["hidden_burst_ready", 3.58, 6.7, 87.150839, 3.7, 6.5, 3.8, 7.2, 2.884987, 5.93578],
+        [
+          "hidden_descendant_updates_commit",
+          0.46,
+          0.78,
+          69.565222,
+          0.5,
+          0.8,
+          0.6,
+          0.9,
+          12.641458,
+          7.900911
+        ],
+        [
+          "hidden_descendant_updates_ready",
+          0.46,
+          0.78,
+          69.565222,
+          0.5,
+          0.8,
+          0.6,
+          0.9,
+          12.641458,
+          7.900911
+        ],
+        ["nested_hide_reveal", 16.34, 20.78, 27.172583, 16.6, 20.8, 17.9, 21.4, 7.329919, 2.808203],
+        ["plain_updates", 2.98, 6.44, 116.107383, 3.1, 6.7, 3.3, 6.9, 4.600601, 4.462736],
+        ["plain_descendant_updates", 0.42, 0.7, 66.66666, 0.4, 0.7, 0.6, 0.7, 16.562631, 0.000003]
+      ],
+      "rawSamplesMs": {
+        "mount_visible": {
+          "baseline": [
+            2.199999988079071, 2.099999964237213, 2.600000023841858, 1.9000000357627869,
+            2.300000011920929, 2.199999988079071, 2, 2
+          ],
+          "candidate": [
+            2.899999976158142, 3, 2.699999988079071, 2.600000023841858, 2.699999988079071, 2.5,
+            2.699999988079071, 2.5
+          ]
+        },
+        "mount_hidden_commit": {
+          "baseline": [
+            2.100000023841858, 2.099999964237213, 2.100000023841858, 2, 2.099999964237213, 2,
+            2.100000023841858, 2.100000023841858
+          ],
+          "candidate": [
+            2.5, 2.299999952316284, 2.299999952316284, 2.5, 2.5, 2.5, 2.300000011920929,
+            2.300000011920929
+          ]
+        },
+        "mount_hidden_ready": {
+          "baseline": [
+            2.100000023841858, 2.099999964237213, 2.100000023841858, 2, 2.099999964237213, 2,
+            2.100000023841858, 2.100000023841858
+          ],
+          "candidate": [
+            2.5, 2.299999952316284, 2.299999952316284, 2.5, 2.5, 2.5, 2.300000011920929,
+            2.300000011920929
+          ]
+        },
+        "hide_reveal": {
+          "baseline": [
+            8.199999988079071, 9, 8, 9, 7.300000011920929, 8.199999988079071, 8.099999964237213,
+            7.100000023841858
+          ],
+          "candidate": [
+            11.300000011920929, 10.700000047683716, 10.099999964237213, 9.099999964237213,
+            9.099999964237213, 9.5, 9.5, 8.800000011920929
+          ]
+        },
+        "visible_updates": {
+          "baseline": [
+            3.300000011920929, 3.199999988079071, 3.199999988079071, 3.199999988079071,
+            3.099999964237213, 3.099999964237213, 3.100000023841858, 3.100000023841858
+          ],
+          "candidate": [
+            5.399999976158142, 5.899999976158142, 5.700000047683716, 5.699999988079071,
+            5.800000011920929, 5, 5.700000047683716, 5.5
+          ]
+        },
+        "hidden_burst_commit": {
+          "baseline": [
+            3.800000011920929, 3.699999988079071, 3.5, 3.699999988079071, 3.5, 3.699999988079071,
+            3.5, 3.5
+          ],
+          "candidate": [
+            6.100000023841858, 6.399999976158142, 6.199999988079071, 6.5, 6.399999976158142,
+            7.200000047683716, 7.200000047683716, 7.199999988079071
+          ]
+        },
+        "hidden_burst_ready": {
+          "baseline": [
+            3.800000011920929, 3.699999988079071, 3.5, 3.699999988079071, 3.5, 3.699999988079071,
+            3.5, 3.5
+          ],
+          "candidate": [
+            6.100000023841858, 6.399999976158142, 6.199999988079071, 6.5, 6.399999976158142,
+            7.200000047683716, 7.200000047683716, 7.199999988079071
+          ]
+        },
+        "hidden_descendant_updates_commit": {
+          "baseline": [
+            0.5, 0.5999999642372131, 0.6000000238418579, 0.5, 0.3999999761581421,
+            0.3999999761581421, 0.5, 0.5
+          ],
+          "candidate": [
+            0.800000011920929, 0.8999999761581421, 0.800000011920929, 0.699999988079071,
+            0.800000011920929, 0.699999988079071, 0.800000011920929, 0.9000000357627869
+          ]
+        },
+        "hidden_descendant_updates_ready": {
+          "baseline": [
+            0.5, 0.5999999642372131, 0.6000000238418579, 0.5, 0.3999999761581421,
+            0.3999999761581421, 0.5, 0.5
+          ],
+          "candidate": [
+            0.800000011920929, 0.8999999761581421, 0.800000011920929, 0.699999988079071,
+            0.800000011920929, 0.699999988079071, 0.800000011920929, 0.9000000357627869
+          ]
+        },
+        "nested_hide_reveal": {
+          "baseline": [
+            15.800000011920929, 13.099999964237213, 17.899999976158142, 17, 15.699999988079071,
+            15.800000011920929, 16.600000023841858, 16.600000023841858
+          ],
+          "candidate": [
+            21.400000035762787, 20.600000023841858, 19.5, 21.400000035762787, 21.30000001192093, 20,
+            20.400000035762787, 20.80000001192093
+          ]
+        },
+        "plain_updates": {
+          "baseline": [
+            3.300000011920929, 3.299999952316284, 3, 3.099999964237213, 2.899999976158142,
+            2.900000035762787, 3.100000023841858, 2.899999976158142
+          ],
+          "candidate": [
+            6.800000011920929, 6.800000011920929, 6.700000047683716, 6.899999976158142,
+            5.800000011920929, 6.599999964237213, 6.5, 6.400000035762787
+          ]
+        },
+        "plain_descendant_updates": {
+          "baseline": [
+            0.3999999761581421, 0.6000000238418579, 0.6000000238418579, 0.5, 0.40000003576278687,
+            0.40000003576278687, 0.3999999761581421, 0.40000003576278687
+          ],
+          "candidate": [
+            0.699999988079071, 0.699999988079071, 0.699999988079071, 0.699999988079071,
+            0.699999988079071, 0.699999988079071, 0.699999988079071, 0.7000000476837158
+          ]
+        }
+      },
+      "interpretation": "First final-source pair: ordinary parent updates 2.98→6.44ms (+116.1%). Reverse-order pair: 1.84→3.58ms (+94.6%). Between-run baseline drift and possible order effects limit a precise speed ratio. These local measurements establish material overhead, not a general application slowdown or a confidence interval.",
+      "baselineDriftFromPreviousPair": {
+        "assetSha256": "771c38cca4300e1ad45556839e5bed0291f0a12e754547a604363c9ca80af9ac",
+        "identicalSourceAndRecordedEnvironment": true,
+        "columns": ["operation", "previousBaselineMs", "firstV3BaselineMs", "percentChange"],
+        "values": [
+          ["mount_visible", 1.3199999809265137, 2.0800000071525573, 57.575760394526384],
+          ["mount_hidden_commit", 1.1600000023841859, 2.060000002384186, 77.58620673708624],
+          ["mount_hidden_ready", 1.1600000023841859, 2.060000002384186, 77.58620673708624],
+          ["hide_reveal", 4.220000004768371, 7.939999997615814, 88.15165849867404],
+          ["visible_updates", 2.019999992847443, 3.1199999928474424, 54.455445737374085],
+          ["hidden_burst_commit", 2.239999997615814, 3.5799999952316286, 59.82142852866379],
+          ["hidden_burst_ready", 2.239999997615814, 3.5799999952316286, 59.82142852866379],
+          [
+            "hidden_descendant_updates_commit",
+            0.32000001668930056,
+            0.45999999046325685,
+            43.74998952262157
+          ],
+          [
+            "hidden_descendant_updates_ready",
+            0.32000001668930056,
+            0.45999999046325685,
+            43.74998952262157
+          ],
+          ["nested_hide_reveal", 7.3800000071525576, 16.340000009536745, 121.40921400677946],
+          ["plain_updates", 1.9600000143051148, 2.9799999952316285, 52.0408149735722],
+          ["plain_descendant_updates", 0.3199999928474426, 0.42000001668930054, 31.250008149072706]
+        ],
+        "interpretation": "Byte-identical baseline timings drifted between separate quiet pairs. The cause is unmeasured; within-run RME does not account for this cross-run drift."
+      },
+      "reverseOrderConfirmation": {
+        "status": "completed",
+        "order": "candidate then baseline",
+        "noBuild": true,
+        "commands": {
+          "candidate": "BENCH_JSON=/private/tmp/octane-821-perf/final-v3-reverse-candidate-activity-timing.json node benchmarks/activity/run.mjs 8 --target=octane-tsrx --no-build",
+          "baseline": "BENCH_JSON=/private/tmp/octane-821-perf/final-v3-reverse-baseline-activity-timing.json node benchmarks/activity/run.mjs 8 --target=octane-tsrx --octane-revision=fd6ce69c13daf7aa4eb41b4450382d6370b7993f --no-build"
+        },
+        "warmup": 3,
+        "measuredSamples": 8,
+        "plannedIdleSeconds": 30,
+        "idle": {
+          "startedAt": "2026-08-23T20:45:54.245Z",
+          "completedAt": "2026-08-23T20:46:24.247Z",
+          "elapsedMilliseconds": 30002.143375,
+          "requestedIdleMilliseconds": 30000,
+          "scope": "Coordinated task-heavy-process idle interval; not proof of machine-wide idle or a fixed power/thermal state."
+        },
+        "powerContext": {
+          "before": {
+            "point": "before",
+            "recordedAt": "2026-08-23T20:46:41.871Z",
+            "readOnly": true,
+            "observations": [
+              {
+                "command": "/usr/bin/pmset",
+                "args": ["-g", "batt"],
+                "status": 0,
+                "stdout": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36438115)\t100%; charged; 0:00 remaining present: true\n",
+                "stderr": ""
+              },
+              {
+                "command": "/usr/bin/pmset",
+                "args": ["-g", "therm"],
+                "status": 0,
+                "stdout": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
+                "stderr": ""
+              }
+            ],
+            "limitation": "Endpoint context only. No power settings changed; this does not establish the cause of earlier timing drift or prove a constant power/thermal state during the measurements."
+          },
+          "after": {
+            "point": "after",
+            "recordedAt": "2026-08-23T20:47:52.835Z",
+            "readOnly": true,
+            "observations": [
+              {
+                "command": "/usr/bin/pmset",
+                "args": ["-g", "batt"],
+                "status": 0,
+                "stdout": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=36438115)\t100%; charged; 0:00 remaining present: true\n",
+                "stderr": ""
+              },
+              {
+                "command": "/usr/bin/pmset",
+                "args": ["-g", "therm"],
+                "status": 0,
+                "stdout": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
+                "stderr": ""
+              }
+            ],
+            "limitation": "Endpoint context only. No power settings changed; this does not establish the cause of earlier timing drift or prove a constant power/thermal state during the measurements."
+          }
+        },
+        "exactFirstPairExecutableHashesReused": true,
+        "identicalSemanticChecksums": true,
+        "columns": [
+          "operation",
+          "baselineScoreMs",
+          "candidateScoreMs",
+          "deltaPercent",
+          "baselineMedianMs",
+          "candidateMedianMs",
+          "baselineP95Ms",
+          "candidateP95Ms",
+          "baselineRmePercent",
+          "candidateRmePercent"
+        ],
+        "values": [
+          [
+            "mount_visible",
+            1.0399999976158143,
+            1.5399999976158143,
+            48.07692318713877,
+            1,
+            1.5999999642372131,
+            1.2999999523162842,
+            2,
+            10.497014166927814,
+            10.898521008389366
+          ],
+          [
+            "mount_hidden_commit",
+            1.1799999952316285,
+            1.5799999952316284,
+            33.89830522172856,
+            1.199999988079071,
+            1.5999999642372131,
+            1.2999999523162842,
+            1.699999988079071,
+            5.3515545493641685,
+            4.994374179753054
+          ],
+          [
+            "mount_hidden_ready",
+            1.1799999952316285,
+            1.5799999952316284,
+            33.89830522172856,
+            1.199999988079071,
+            1.5999999642372131,
+            1.2999999523162842,
+            1.699999988079071,
+            5.3515545493641685,
+            4.994374179753054
+          ],
+          [
+            "hide_reveal",
+            4.739999997615814,
+            5.5,
+            16.033755332625745,
+            4.900000035762787,
+            5.699999988079071,
+            5.599999964237213,
+            6.5,
+            8.998362326389907,
+            5.670062669557302
+          ],
+          [
+            "visible_updates",
+            1.9399999976158142,
+            3.4799999952316285,
+            79.38144327362966,
+            2,
+            3.599999964237213,
+            2.100000023841858,
+            3.800000011920929,
+            4.169330664070505,
+            5.035312186413634
+          ],
+          [
+            "hidden_burst_commit",
+            2.2399999856948853,
+            4.160000014305115,
+            85.7142875389177,
+            2.299999952316284,
+            4.100000023841858,
+            2.399999976158142,
+            4.200000047683716,
+            2.7496941268334982,
+            2.8495512822480804
+          ],
+          [
+            "hidden_burst_ready",
+            2.2399999856948853,
+            4.160000014305115,
+            85.7142875389177,
+            2.299999952316284,
+            4.100000023841858,
+            2.399999976158142,
+            4.200000047683716,
+            2.7496941268334982,
+            2.8495512822480804
+          ],
+          [
+            "hidden_descendant_updates_commit",
+            0.27999999523162844,
+            0.4399999976158142,
+            57.14285896748914,
+            0.30000001192092896,
+            0.5,
+            0.40000003576278687,
+            0.6000000238418579,
+            18.192310313804903,
+            12.44736975985784
+          ],
+          [
+            "hidden_descendant_updates_ready",
+            0.27999999523162844,
+            0.4399999976158142,
+            57.14285896748914,
+            0.30000001192092896,
+            0.5,
+            0.40000003576278687,
+            0.6000000238418579,
+            18.192310313804903,
+            12.44736975985784
+          ],
+          [
+            "nested_hide_reveal",
+            8.159999990463257,
+            10.739999985694885,
+            31.617647037339715,
+            7.599999964237213,
+            11,
+            10.199999988079071,
+            11.800000011920929,
+            10.6516403380899,
+            4.836349401485603
+          ],
+          [
+            "plain_updates",
+            1.8400000095367433,
+            3.5800000071525573,
+            94.56521677159631,
+            1.9000000357627869,
+            3.599999964237213,
+            2.100000023841858,
+            4.099999964237213,
+            4.922887341386934,
+            5.917741863964739
+          ],
+          [
+            "plain_descendant_updates",
+            0.21999999284744262,
+            0.42000000476837157,
+            90.90909928329746,
+            0.19999998807907104,
+            0.3999999761581421,
+            0.30000001192092896,
+            0.5,
+            18.221086198072687,
+            15.801820045077154
+          ]
+        ],
+        "rawSamplesMs": {
+          "mount_visible": {
+            "baseline": [
+              1.0999999642372131, 0.8999999761581421, 1.100000023841858, 0.9000000357627869, 1, 1,
+              1, 1.2999999523162842
+            ],
+            "candidate": [
+              2, 1.5, 1.4000000357627869, 1.4000000357627869, 1.699999988079071, 1.600000023841858,
+              1.5999999642372131, 1.399999976158142
+            ]
+          },
+          "mount_hidden_commit": {
+            "baseline": [
+              1.0999999642372131, 1.199999988079071, 1.0999999642372131, 1.2999999523162842,
+              1.199999988079071, 1.100000023841858, 1.199999988079071, 1.100000023841858
+            ],
+            "candidate": [
+              1.600000023841858, 1.399999976158142, 1.5, 1.5, 1.600000023841858, 1.699999988079071,
+              1.5999999642372131, 1.5
+            ]
+          },
+          "mount_hidden_ready": {
+            "baseline": [
+              1.0999999642372131, 1.199999988079071, 1.0999999642372131, 1.2999999523162842,
+              1.199999988079071, 1.100000023841858, 1.199999988079071, 1.100000023841858
+            ],
+            "candidate": [
+              1.600000023841858, 1.399999976158142, 1.5, 1.5, 1.600000023841858, 1.699999988079071,
+              1.5999999642372131, 1.5
+            ]
+          },
+          "hide_reveal": {
+            "baseline": [
+              5.599999964237213, 4.900000035762787, 3.900000035762787, 5.100000023841858, 5, 4.5,
+              4.699999988079071, 4.399999976158142
+            ],
+            "candidate": [
+              6.5, 5.899999976158142, 5.899999976158142, 5.699999988079071, 5.5, 5.200000047683716,
+              5.599999964237213, 5.5
+            ]
+          },
+          "visible_updates": {
+            "baseline": [
+              2.100000023841858, 2.100000023841858, 2, 1.9000000357627869, 1.899999976158142,
+              1.899999976158142, 1.9000000357627869, 2.099999964237213
+            ],
+            "candidate": [
+              3.199999988079071, 3.800000011920929, 3.5, 3.599999964237213, 3.600000023841858,
+              3.199999988079071, 3.599999964237213, 3.400000035762787
+            ]
+          },
+          "hidden_burst_commit": {
+            "baseline": [
+              2.300000011920929, 2.399999976158142, 2.199999988079071, 2.299999952316284,
+              2.300000011920929, 2.199999988079071, 2.199999988079071, 2.199999988079071
+            ],
+            "candidate": [
+              3.799999952316284, 4, 4, 4.199999988079071, 4.200000047683716, 4.099999964237213,
+              4.100000023841858, 4.200000047683716
+            ]
+          },
+          "hidden_burst_ready": {
+            "baseline": [
+              2.300000011920929, 2.399999976158142, 2.199999988079071, 2.299999952316284,
+              2.300000011920929, 2.199999988079071, 2.199999988079071, 2.199999988079071
+            ],
+            "candidate": [
+              3.799999952316284, 4, 4, 4.199999988079071, 4.200000047683716, 4.099999964237213,
+              4.100000023841858, 4.200000047683716
+            ]
+          },
+          "hidden_descendant_updates_commit": {
+            "baseline": [
+              0.40000003576278687, 0.3999999761581421, 0.40000003576278687, 0.30000001192092896,
+              0.2999999523162842, 0.30000001192092896, 0.19999998807907104, 0.30000001192092896
+            ],
+            "candidate": [
+              0.6000000238418579, 0.5, 0.5, 0.5, 0.40000003576278687, 0.3999999761581421, 0.5,
+              0.3999999761581421
+            ]
+          },
+          "hidden_descendant_updates_ready": {
+            "baseline": [
+              0.40000003576278687, 0.3999999761581421, 0.40000003576278687, 0.30000001192092896,
+              0.2999999523162842, 0.30000001192092896, 0.19999998807907104, 0.30000001192092896
+            ],
+            "candidate": [
+              0.6000000238418579, 0.5, 0.5, 0.5, 0.40000003576278687, 0.3999999761581421, 0.5,
+              0.3999999761581421
+            ]
+          },
+          "nested_hide_reveal": {
+            "baseline": [
+              7.399999976158142, 7.300000011920929, 7.300000011920929, 7.199999988079071,
+              10.199999988079071, 8.199999988079071, 7.600000023841858, 7.599999964237213
+            ],
+            "candidate": [
+              11.800000011920929, 10.600000023841858, 11.199999988079071, 10.399999976158142,
+              11.699999988079071, 10, 11, 10.599999964237213
+            ]
+          },
+          "plain_updates": {
+            "baseline": [
+              2, 2.100000023841858, 2, 1.800000011920929, 1.800000011920929, 1.9000000357627869,
+              1.7999999523162842, 1.9000000357627869
+            ],
+            "candidate": [
+              4, 4.099999964237213, 3.599999964237213, 3.900000035762787, 3.400000035762787,
+              3.599999964237213, 3.5, 3.5
+            ]
+          },
+          "plain_descendant_updates": {
+            "baseline": [
+              0.30000001192092896, 0.30000001192092896, 0.19999998807907104, 0.19999998807907104,
+              0.19999998807907104, 0.19999998807907104, 0.30000001192092896, 0.19999998807907104
+            ],
+            "candidate": [
+              0.3999999761581421, 0.30000001192092896, 0.3999999761581421, 0.5, 0.5,
+              0.30000001192092896, 0.3999999761581421, 0.40000003576278687
+            ]
+          }
+        }
+      }
+    },
+    "evidence": [
+      "/private/tmp/octane-821-perf/final-v3-committed-audit.json",
+      "/private/tmp/octane-821-perf/final-v3-build-manifest.json",
+      "/private/tmp/octane-821-perf/final-v3-activity-timing-comparison.json",
+      "/private/tmp/octane-821-perf/final-v3-reverse-candidate-activity-timing-comparison.json"
+    ]
+  },
+  "coldErrorPathRevalidation": {
+    "description": "Drain queued ref detaches after unmounting a live DOM root and before reporting an uncaught error.",
+    "previousSourcePackageSha256": "fd3719abbc2b5336a05c4004f41d2b137c8ee96f3acb8ab407d2646038fb46ac",
+    "currentSourcePackageSha256": "ab4765b11ebc7413ec49e8a367cc8f40367ad758e6c7d6c60d6835b4499238d9",
+    "freshControls": {
+      "ordinaryWork": 6,
+      "affectedOctaneWindows": 10,
+      "affectedReactWindows": 10,
+      "executableBundles": 5,
+      "timingPairs": 1
+    },
+    "noNewProfilingOrSupplementalDiagnostic": true,
+    "noCpuGainClaim": true
+  }
+}

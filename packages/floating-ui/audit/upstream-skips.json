@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "disposition": "upstream-declared-skip-non-evidence",
+  "tests": [
+    {
+      "id": "skip:1cd77b29f760542c",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "restoreFocus false: does not restore focus to nearest tabbable element if currently focused element is removed",
+      "pristineFile": "packages/floating-ui/upstream/packages/react/test/unit/FloatingFocusManager.test.tsx",
+      "adaptedFile": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx"
+    },
+    {
+      "id": "skip:53a792b1a41477b1",
+      "normalizedFile": "react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "restoreFocus true: restores focus to nearest tabbable element if currently focused element is removed",
+      "pristineFile": "packages/floating-ui/upstream/packages/react/test/unit/FloatingFocusManager.test.tsx",
+      "adaptedFile": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx"
+    },
+    {
+      "id": "skip:2fa4232d8f355e3c",
+      "normalizedFile": "react/unit/useFocus.test.tsx",
+      "fullName": "blurs when hitting an \"inside\" focus guard",
+      "pristineFile": "packages/floating-ui/upstream/packages/react/test/unit/useFocus.test.tsx",
+      "adaptedFile": "packages/floating-ui/tests/upstream/react/unit/useFocus.test.tsx"
+    },
+    {
+      "id": "skip:26e078327c191830",
+      "normalizedFile": "react/unit/useFocus.test.tsx",
+      "fullName": "stays open when focus moves to element inside reference that is rendered inside a shadow root",
+      "pristineFile": "packages/floating-ui/upstream/packages/react/test/unit/useFocus.test.tsx",
+      "adaptedFile": "packages/floating-ui/tests/upstream/react/unit/useFocus.test.tsx"
+    },
+    {
+      "id": "skip:b29bec1b66fdc044",
+      "normalizedFile": "react/unit/useFocus.test.tsx",
+      "fullName": "stays open when focus moves to tooltip rendered inside a shadow root",
+      "pristineFile": "packages/floating-ui/upstream/packages/react/test/unit/useFocus.test.tsx",
+      "adaptedFile": "packages/floating-ui/tests/upstream/react/unit/useFocus.test.tsx"
+    },
+    {
+      "id": "skip:51ca1f1f18cd0f4e",
+      "normalizedFile": "react/unit/useListNavigation.test.tsx",
+      "fullName": "focusItemOnOpen browser tests does not override \"auto\" setting when using Enter/Space",
+      "pristineFile": "packages/floating-ui/upstream/packages/react/test/unit/useListNavigation.test.tsx",
+      "adaptedFile": "packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx"
+    }
+  ]
+}

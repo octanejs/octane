@@ -1,4 +1,5 @@
 import { act, createElement, useState } from 'react';
+import { act as octaneAct } from 'octane';
 import { createRoot } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { cleanup, render } from '@octanejs/testing-library';
@@ -35,8 +36,10 @@ describe('differential: @octanejs/testing-library vs a raw React root', () => {
 		const octaneButton = octaneResult.container.querySelector('button')!;
 		expect(octaneButton.outerHTML).toBe(reactButton.outerHTML);
 
+		// Both renderers commit a script click's update once the dispatching script
+		// yields; each side's act() drains that microtask before the comparison.
 		await act(async () => reactButton.click());
-		octaneButton.click();
+		await octaneAct(async () => octaneButton.click());
 		expect(octaneButton.outerHTML).toBe(reactButton.outerHTML);
 
 		await act(async () => reactRoot.unmount());

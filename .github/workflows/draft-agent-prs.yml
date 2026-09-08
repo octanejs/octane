@@ -22,7 +22,7 @@ jobs:
       github.event.pull_request.state == 'open' &&
       (github.event.action == 'opened' || github.event.label.name == 'agent-authored') &&
       contains(github.event.pull_request.labels.*.name, 'agent-authored')
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     # `pull_request_target` is what gives a fork pull request a writable token.
     # Nothing here checks out or executes the pull request's code.
     permissions:

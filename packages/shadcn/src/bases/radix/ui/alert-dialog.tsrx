@@ -6,7 +6,7 @@
 import { createElement, type OctaneNode } from 'octane';
 import { AlertDialog as AlertDialogPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { Button, type ButtonProps } from './button.tsrx';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;

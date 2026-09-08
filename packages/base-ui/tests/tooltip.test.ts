@@ -20,12 +20,9 @@ function trigger(m: { container: Element }): Element {
 	return el;
 }
 
-function dispatch(el: Element, type: string, init: MouseEventInit | FocusEventInit = {}): void {
+function dispatch(el: Element, type: string, init: MouseEventInit = {}): void {
 	flushSync(() => {
-		const event =
-			type === 'focus' || type === 'blur'
-				? new FocusEvent(type, { bubbles: false, ...init })
-				: new MouseEvent(type, { bubbles: false, cancelable: true, ...init });
+		const event = new MouseEvent(type, { bubbles: false, cancelable: true, ...init });
 		el.dispatchEvent(event);
 	});
 }
@@ -52,7 +49,7 @@ describe('@octanejs/base-ui — Tooltip behavior', () => {
 		const m = mount(TooltipInteractive);
 		await settle();
 
-		dispatch(trigger(m), 'focus');
+		flushSync(() => (trigger(m) as HTMLElement).focus());
 		await settle();
 		expect(m.container.querySelector('.tip-popup')).not.toBe(null);
 

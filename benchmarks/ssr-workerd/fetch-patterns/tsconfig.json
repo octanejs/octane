@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
+  },
+  "include": ["./*.ts", "./*.tsrx"]
+}

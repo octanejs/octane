@@ -1,0 +1,66 @@
+diff --git a/tests/upstream/src/floating-ui-react/hooks/useDismiss.test.tsx b/tests/upstream/src/floating-ui-react/hooks/useDismiss.test.tsx
+--- a/tests/upstream/src/floating-ui-react/hooks/useDismiss.test.tsx
++++ b/tests/upstream/src/floating-ui-react/hooks/useDismiss.test.tsx
+@@ -393,7 +393,7 @@ describe.skipIf(!isJSDOM)('useDismiss', () => {
+         id,
+         modal,
+       }: {
+-        children?: React.ReactNode;
++        children?: React.OctaneNode;
+         id: string;
+         modal?: boolean | null;
+       }) {
+@@ -561,7 +561,7 @@ describe.skipIf(!isJSDOM)('useDismiss', () => {
+       testId,
+       children,
+       ...props
+-    }: UseDismissProps & { testId: string; children: React.ReactNode }) {
++    }: UseDismissProps & { testId: string; children: React.OctaneNode }) {
+       const [open, setOpen] = React.useState(true);
+       const nodeId = useFloatingNodeId();
+ 
+@@ -589,7 +589,7 @@ describe.skipIf(!isJSDOM)('useDismiss', () => {
+       );
+     }
+ 
+-    function NestedDialog(props: UseDismissProps & { testId: string; children: React.ReactNode }) {
++    function NestedDialog(props: UseDismissProps & { testId: string; children: React.OctaneNode }) {
+       const parentId = useFloatingParentNodeId();
+ 
+       if (parentId == null) {
+@@ -902,7 +902,7 @@ describe.skipIf(!isJSDOM)('useDismiss', () => {
+       });
+     });
+ 
+-    function Overlay({ children }: { children: React.ReactNode }) {
++    function Overlay({ children }: { children: React.OctaneNode }) {
+       return (
+         <div
+           style={{ width: '100vw', height: '100vh' }}
+@@ -923,7 +923,7 @@ describe.skipIf(!isJSDOM)('useDismiss', () => {
+       id,
+       children,
+       ...props
+-    }: UseDismissProps & { id: string; children: React.ReactNode }) {
++    }: UseDismissProps & { id: string; children: React.OctaneNode }) {
+       const [open, setOpen] = React.useState(true);
+       const nodeId = useFloatingNodeId();
+ 
+@@ -954,7 +954,7 @@ describe.skipIf(!isJSDOM)('useDismiss', () => {
+       );
+     }
+ 
+-    function NestedDialog(props: UseDismissProps & { id: string; children: React.ReactNode }) {
++    function NestedDialog(props: UseDismissProps & { id: string; children: React.OctaneNode }) {
+       const parentId = useFloatingParentNodeId();
+ 
+       if (parentId == null) {
+@@ -1513,7 +1513,7 @@ describe.skipIf(!isJSDOM)('useDismiss', () => {
+       portalContainer,
+       triggerText,
+     }: {
+-      children?: React.ReactNode;
++      children?: React.OctaneNode;
+       portalContainer?: HTMLElement | null;
+       triggerText: string;
+     }) {

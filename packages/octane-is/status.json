@@ -1,0 +1,24 @@
+{
+  "upstream": {
+    "package": "react-is",
+    "version": "19.2.7"
+  },
+  "surface": "All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata.",
+  "divergences": [
+    "Kind labels use Octane symbols and reject React elements.",
+    "Context.Consumer, forwardRef, Profiler and SuspenseList have no Octane kind; their predicates return false.",
+    "StrictMode identifies Octane's pass-through wrapper without double invocation.",
+    "React Server Component references are not valid Octane types."
+  ],
+  "ssr": "Predicates are pure; they never render a component or start a lazy loader.",
+  "notes": [
+    "Requires the coordinated Octane core release containing the behavioral-audit fixes, planned for 0.2.3, or a later compatible release. Its new StrictMode export and owner-bound component-kind metadata are required even though repository policy mandates a broader beta peer range. Publish the binding and that core release together."
+  ],
+  "verified": "2026-09-03",
+  "provenance": {
+    "source": "https://github.com/facebook/react",
+    "license": "MIT",
+    "commit": "6117d7cca4906492c51fe6a03381e35adfd86e7d",
+    "verification": "verified"
+  }
+}

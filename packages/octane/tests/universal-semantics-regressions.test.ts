@@ -6,6 +6,7 @@ import {
 	createUniversalRoot,
 	defineUniversalComponent,
 	rendererRegion,
+	universalFor,
 	universalKey,
 	universalPlan,
 	universalValue,
@@ -125,7 +126,120 @@ const DuplicateKeyFailureDraftScene = defineUniversalComponent(
 	},
 );
 
+const objectDriverLeafPlan = universalPlan('object', {
+	kind: 'host',
+	type: 'object-driver-leaf',
+	bindings: [['label', 0]],
+});
+const objectDriverGroupPlan = universalPlan('object', {
+	kind: 'host',
+	type: 'object-driver-group',
+	bindings: [['label', 0]],
+	children: [{ kind: 'slot', slot: 1 }],
+});
+const ObjectDriverSiblingScene = defineUniversalComponent<{
+	groups: Array<{ id: string; items: string[] }>;
+}>('object', ({ groups }) =>
+	universalFor(
+		groups,
+		(group) => group.id,
+		(group) =>
+			universalValue(objectDriverGroupPlan, [
+				group.id,
+				universalFor(
+					group.items,
+					(item) => item,
+					(item) => universalValue(objectDriverLeafPlan, [item]),
+				),
+			]),
+	),
+);
+
 describe('universal runtime semantic regressions', () => {
+	it('empties a wide object-driver parent and its root in one teardown batch', () => {
+		const { container, root } = objectRoot();
+		const items = Array.from({ length: 4_096 }, (_, index) => `item-${index}`);
+		root.render(ObjectDriverSiblingScene, { groups: [{ id: 'wide', items }] });
+		const group = container.children[0];
+		expect(group.children).toHaveLength(items.length);
+		expect(container.instanceCount).toBe(items.length + 1);
+
+		root.unmount();
+
+		expect(group.children).toEqual([]);
+		expect(container.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+	});
+
+	it('preserves wide object-driver order when batched removals precede moves', () => {
+		const { container, root } = objectRoot();
+		const items = Array.from({ length: 4_096 }, (_, index) => `item-${index}`);
+		root.render(ObjectDriverSiblingScene, { groups: [{ id: 'wide', items }] });
+		const group = container.children[0];
+		const survivorLabels = [items.at(-1)!, items[2_048]!, items[0]!];
+		const survivors = new Map(
+			group.children
+				.filter((child) => survivorLabels.includes(child.props.label as string))
+				.map((child) => [child.props.label, child]),
+		);
+
+		root.render(ObjectDriverSiblingScene, {
+			groups: [{ id: 'wide', items: survivorLabels }],
+		});
+
+		expect(container.children).toEqual([group]);
+		expect(group.children.map((child) => child.props.label)).toEqual(survivorLabels);
+		for (const child of group.children) expect(child).toBe(survivors.get(child.props.label));
+		expect(container.instanceCount).toBe(survivorLabels.length + 1);
+
+		root.unmount();
+		expect(container.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+	});
+
+	it('preserves object-driver sibling order and empties every detached parent', () => {
+		const { container, root } = objectRoot();
+		root.render(ObjectDriverSiblingScene, {
+			groups: [
+				{ id: 'a', items: ['a1', 'a2', 'a3', 'a4'] },
+				{ id: 'b', items: ['b1', 'b2', 'b3'] },
+				{ id: 'removed', items: ['r1', 'r2'] },
+			],
+		});
+		const groupA = container.children[0];
+		const groupB = container.children[1];
+		const removedGroup = container.children[2];
+		const retained = new Map(
+			[...groupA.children, ...groupB.children].map((child) => [child.props.label, child]),
+		);
+
+		root.render(ObjectDriverSiblingScene, {
+			groups: [
+				{ id: 'b', items: ['b3', 'b1', 'b4'] },
+				{ id: 'a', items: ['a4', 'a2'] },
+				{ id: 'new', items: ['n1', 'n2'] },
+			],
+		});
+
+		expect(container.children.map((group) => group.props.label)).toEqual(['b', 'a', 'new']);
+		expect(container.children[0]).toBe(groupB);
+		expect(container.children[1]).toBe(groupA);
+		expect(groupB.children.map((child) => child.props.label)).toEqual(['b3', 'b1', 'b4']);
+		expect(groupA.children.map((child) => child.props.label)).toEqual(['a4', 'a2']);
+		for (const label of ['b3', 'b1', 'a4', 'a2']) {
+			expect(allInstances(container).find((child) => child.props.label === label)).toBe(
+				retained.get(label),
+			);
+		}
+		expect(removedGroup.children).toEqual([]);
+
+		const mountedGroups = [...container.children];
+		root.unmount();
+		expect(container.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
+		for (const group of mountedGroups) expect(group.children).toEqual([]);
+	});
+
 	it('retains fresh compiler-memoized promises through every initial suspension stratum', async () => {
 		const { container, root } = objectRoot();
 		const first = deferred<string>();

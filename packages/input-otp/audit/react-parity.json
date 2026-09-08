@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/guilhermerodz/input-otp.git",
+    "version": "1.5.0",
+    "commit": "3daad8fc88c9a041dbce98e97185efd65b3d87de",
+    "sourceRoot": "packages/input-otp",
+    "testRoot": "apps/playground/src/tests",
+    "license": "MIT",
+    "integrity": "sha256:62112dac2d8eea337fb8bafb5c9ce5a5d3574f03e06adfe1411ae40e3cc84d97",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/input-otp/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/input-otp/tests"],
+      "include": ["\\.(?:test|spec)\\.(?:ts|tsx|tsrx)$"],
+      "exclude": ["/tests/(?:browser|differential|pristine)/"]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 12,
+    "uniqueIdentities": 12,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "c05298b5a1159c771a641dac417549a61072199d9588d5273964781958dbf5ae"
+    }
+  },
+  "lanes": [
+    {
+      "id": "input-otp-pristine-browser",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "input-otp-pristine-browser",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Adapted execution of all 19 pinned upstream React identities in real Chromium; complete pinned-source hashes, rewritten-source hash, and allowed transforms are recorded in the crosswalk.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/input-otp/audit/pristine-runtime-browser.json"
+      },
+      "files": [
+        {
+          "path": "packages/input-otp/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "d6bd52249741567e5eb647d2f71b74afb43666ae7d4b9f05a5c8b5559afec244"
+        },
+        {
+          "path": "packages/input-otp/audit/pristine-runtime-browser.json",
+          "role": "support",
+          "sha256": "94bba26296d62da407ff2a792b1bec5941a9caec32dbb6634df5638be1f66e3d"
+        },
+        {
+          "path": "packages/input-otp/audit/pristine-runtime-crosswalk.json",
+          "role": "support",
+          "sha256": "79e436f2f9415119037b98b63d7a6ffb308d623b055e89f427e69816588e43a3"
+        },
+        {
+          "path": "packages/input-otp/audit/pristine-adaptation-ledger.json",
+          "role": "support",
+          "sha256": "7bf59feb3860ef6a035a98e238eb287a09c47551c0d3efa409557642440e22fc"
+        },
+        {
+          "path": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
+          "role": "support",
+          "sha256": "f9257765451998e0b6103c0b014f39680dce85ec9637411126ba3bf17a671f3a"
+        },
+        {
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.delete-word.spec.ts",
+          "role": "support",
+          "sha256": "ae78b0365739b9a7f2d1a349a841b0d69dd9371d5cb7078af743772c34f19eb7"
+        },
+        {
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.props.spec.ts",
+          "role": "support",
+          "sha256": "9a6ed238323b02cb34efef3224982597ac5130d5ec117903d32de955feebc666"
+        },
+        {
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.render.spec.ts",
+          "role": "support",
+          "sha256": "b7924a0b71da35dbd0ca95bc6882a5980c082878c92b050bcdd9b85b7d868c99"
+        },
+        {
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.selections.spec.ts",
+          "role": "support",
+          "sha256": "fa47b6afed3b0db73814306777345175ce3d9921bbe0b4a163e6d3d6fced5a76"
+        },
+        {
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.slot.spec.ts",
+          "role": "support",
+          "sha256": "370090e7e678b2099aa4f00126d98b3d0ff479a7fc336d3b25c31b19845e68ec"
+        },
+        {
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.typing.spec.ts",
+          "role": "support",
+          "sha256": "802df2eb14aab655e291f2d08386c588b5f8ab37ba111de9f7add86f16ca2f3b"
+        },
+        {
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/pwm-space.spec.ts",
+          "role": "support",
+          "sha256": "edef8c0fa30fd4784f5a0814baad8a1d59534ed5b0ef3011412f3153ef8df83a"
+        },
+        {
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/with-autofocus.spec.ts",
+          "role": "support",
+          "sha256": "df34526e673189c1561d61d82089736344bb670f528ab649193f60954570c939"
+        },
+        {
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/with-on-complete.spec.ts",
+          "role": "support",
+          "sha256": "3b380592c0f0374ff423b9d346377e9e1cd285455c6f1985b03af68778233452"
+        }
+      ]
+    },
+    {
+      "id": "input-otp-adapted",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "input-otp",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Complete adapted DOM and hydration suite.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/input-otp/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/input-otp/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "39d3002869fb4eccec87dbecc50fd5c88b49b764bbab612c7b3350d4319d379a"
+        }
+      ]
+    },
+    {
+      "id": "input-otp-server",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "input-otp-server",
+      "evidenceOrigin": "repo-authored",
+      "notes": "React-free SSR lane.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/input-otp/audit/adapted-runtime-server.json"
+      },
+      "files": [
+        {
+          "path": "packages/input-otp/audit/adapted-runtime-server.json",
+          "role": "support",
+          "sha256": "b097490a9d7a1c6beff0a20ae66433cc4eaf0fc63484e50938bb8a4056d32996"
+        }
+      ]
+    },
+    {
+      "id": "input-otp-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "input-otp-browser",
+      "notes": "Existing Vitest-full real Chromium lane containing all nine adapted upstream files and three port conformance cases.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/input-otp/audit/adapted-runtime-browser.json",
+        "fileParallelism": true
+      },
+      "files": [
+        {
+          "path": "packages/input-otp/audit/adapted-runtime-browser.json",
+          "role": "support",
+          "sha256": "752861cc4de3f4ea5c4e255c6169dbea9d7d4087ae16943c57690012bbb9d319"
+        }
+      ]
+    },
+    {
+      "id": "input-otp-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "input-otp-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Independent React/Octane public-input checkpoints for attributes, projection, edits, callbacks, and pattern rejection.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/input-otp/audit/differential-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/input-otp/audit/differential-runtime.json",
+          "role": "support",
+          "sha256": "f20958bf328bec5502928bb962f00de4d9158222044e11a85a189992a58233c8"
+        }
+      ]
+    },
+    {
+      "id": "input-otp-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "input-otp-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Pinned published React declaration probes.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/input-otp/audit/type-probes/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/input-otp/audit/type-probes/pristine.ts",
+          "role": "test",
+          "sha256": "383d0d644d9afc44f2c7d8d5a1fba0efb1456c4e47cfc408c430cc9593686de0",
+          "cases": [
+            {
+              "id": "types:input-otp-pristine",
+              "testName": "pinned published declaration probes",
+              "fullName": "pinned published declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/input-otp/audit/type-probes/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "65e220c35ee7902d114d24d7e9ebea9f477400c6f6dc072c3adbc4e8edb8636e"
+        }
+      ]
+    },
+    {
+      "id": "input-otp-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "input-otp-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Strict Octane public type probes.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/input-otp/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/input-otp/typetests/public-api.test-d.ts",
+          "role": "test",
+          "sha256": "dae2067a7d6a4888bfa3cf7d06566013a9102f9eb658e535d44e26f9bacbf2c7",
+          "cases": [
+            {
+              "id": "types:input-otp-adapted-public",
+              "testName": "strict public declaration probes",
+              "fullName": "strict public declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/input-otp/typetests/shadcn-adoption.test-d.ts",
+          "role": "test",
+          "sha256": "915d92bb8e581c4e75d897028073b63828bf8aca9192d876f01080e88f60c48e",
+          "cases": [
+            {
+              "id": "types:input-otp-adapted-shadcn",
+              "testName": "shadcn adoption declaration probes",
+              "fullName": "shadcn adoption declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/input-otp/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "8576907e90b92f96e9714a27549ec16e3161e04fdd66907de6446b3709f20d32"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

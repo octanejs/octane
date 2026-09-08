@@ -37,7 +37,7 @@ import { gzipSync, constants as zc } from 'node:zlib';
 import { summarizeSamples } from '../lib/stats.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TARGETS = ['octane-tsrx', 'react'];
+const TARGETS = ['octane-tsrx', 'react', 'inferno'];
 const ACTIVE_DIR = path.join(__dirname, 'dist-active');
 const BINARY = path.join(__dirname, 'src-tauri/target/release/tauri-shell-bench');
 const WARMUPS = 1;
@@ -189,7 +189,7 @@ const kb = (n) => `${(n / 1024).toFixed(1)} kB`;
 const ms = (n) => `${n.toFixed(1)} ms`;
 const ratio = (a, b) => (b === 0 ? '-' : `${(a / b).toFixed(2)}x`);
 
-console.log('\n=== Tauri desktop shell: octane vs React (WKWebView) ===\n');
+console.log('\n=== Tauri desktop shell: Octane, React, and Inferno (WKWebView) ===\n');
 const TIMED = [
 	['boot_ms', 'cold start'],
 	['stream_async_ms', '4000 IPC events, default batching'],

@@ -1,0 +1,24 @@
+diff --git a/tests/upstream/src/switch/root/SwitchRoot.test.tsx b/tests/upstream/src/switch/root/SwitchRoot.test.tsx
+--- a/tests/upstream/src/switch/root/SwitchRoot.test.tsx
++++ b/tests/upstream/src/switch/root/SwitchRoot.test.tsx
+@@ -198,7 +198,10 @@ describe('<Switch.Root />', () => {
+       await user.keyboard('{/Shift}');
+ 
+       expect(handleChange.mock.calls.length).toBe(1);
+-      expect(handleChange.mock.results[0]?.value.event.shiftKey).toBe(true);
++      // OCTANE DIVERGENCE[native-event-semantics]: native checkbox/radio change events carry no keyboard modifiers.
++      // Modifier state remains on the native click; the change callback receives its actual event.
++      expect(handleChange.mock.results[0]?.value.event).toBeInstanceOf(Event);
++      expect(handleChange.mock.results[0]?.value.event.type).toBe('change');
+     });
+ 
+     it('does not change state when canceled via a root click', async () => {
+@@ -402,7 +405,7 @@ describe('<Switch.Root />', () => {
+ 
+   describe('prop: inputRef', () => {
+     it('should be able to access the native input', async () => {
+-      const inputRef = React.createRef<HTMLInputElement>();
++      const inputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+       await render(<Switch.Root inputRef={inputRef} />);
+       const internalInput = screen.getByRole('checkbox', { hidden: true });
+ 

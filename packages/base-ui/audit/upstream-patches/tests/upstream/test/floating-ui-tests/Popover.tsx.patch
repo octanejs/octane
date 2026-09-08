@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/test/floating-ui-tests/Popover.tsx b/tests/upstream/test/floating-ui-tests/Popover.tsx
+--- a/tests/upstream/test/floating-ui-tests/Popover.tsx
++++ b/tests/upstream/test/floating-ui-tests/Popover.tsx
+@@ -91,7 +91,7 @@ export function Main() {
+   );
+ }
+ interface Props {
+-  render: (data: { close: () => void; labelId: string; descriptionId: string }) => React.ReactNode;
++  render: (data: { close: () => void; labelId: string; descriptionId: string }) => React.OctaneNode;
+   placement?: Placement;
+   modal?: boolean;
+   children?: React.ReactElement<HTMLElement>;

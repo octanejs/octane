@@ -1,3 +1,4 @@
+/** @jsxImportSource octane */
 import { expectTypeOf, it } from 'vitest';
 import { useForm } from '../src/index';
 
@@ -97,9 +98,7 @@ it('should type array subfields', () => {
 							{(subField) => (
 								<input
 									value={subField.state.value}
-									onInput={(e: { target: { value: string } }) =>
-										subField.handleChange(e.target.value)
-									}
+									onInput={(event) => subField.handleChange(event.currentTarget.value)}
 								/>
 							)}
 						</form.Field>

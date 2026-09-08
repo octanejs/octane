@@ -3,6 +3,13 @@
 An evidence-scoped Octane port of the host-safe `usehooks-ts@3.1.1` hook cohort.
 Change supported imports from `usehooks-ts` to `@octanejs/usehooks-ts`.
 
+## Installation
+
+```sh
+npm install @octanejs/usehooks-ts
+pnpm add @octanejs/usehooks-ts
+```
+
 ```ts
 import { useBoolean, useDebounceValue, useInterval } from '@octanejs/usehooks-ts';
 ```

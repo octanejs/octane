@@ -9,6 +9,8 @@ import {
 	ChildrenArm,
 	NestedTernary,
 	RootFragArm,
+	PropertyArm,
+	WrappedChildrenArm,
 } from '../_fixtures/ternary-mixed-arms.tsrx';
 
 // The server has always rendered BOTH arms of `{cond ? A : B}` correctly; the
@@ -28,6 +30,32 @@ beforeEach(() => {
 afterEach(() => container.remove());
 
 describe('hydrateRoot — ternary child hole with one JSX arm', () => {
+	it.each([
+		['template child', 'PropertyArm', PropertyArm],
+		['host inside component children', 'WrappedChildrenArm', WrappedChildrenArm],
+	] as const)('adopts and updates a value arm in a %s', (_name, exportName, Component) => {
+		const props = { on: false, label: 'first' };
+		container.innerHTML = ServerRT.renderToString(server[exportName], props).html;
+		const host = container.querySelector('.host')!;
+		const text = Array.from(host.childNodes).find((node) => node.nodeType === 3);
+		const root = hydrateRoot(container, Component, props);
+		try {
+			expect(container.querySelector('.host')).toBe(host);
+			expect(host.textContent).toBe('first');
+			expect(Array.from(host.childNodes)).toContain(text);
+			flushSync(() => root.render(Component, { on: false, label: 'second' }));
+			expect(host.textContent).toBe('second');
+			expect(Array.from(host.childNodes)).toContain(text);
+			flushSync(() => root.render(Component, { on: true, label: 'second' }));
+			expect(host.querySelector('b')?.textContent).toBe('yes');
+			flushSync(() => root.render(Component, { on: false, label: ['back', ' again'] }));
+			expect(host.textContent).toBe('back again');
+			expect(host.querySelector('b')).toBeNull();
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('adopts the keyed `.map` array arm and swaps branches after a click', async () => {
 		const { html } = await ServerRT.renderToString(server.MapArm, {});
 		expect(html).toContain('<i>x</i>');

@@ -1,4 +1,3 @@
-import type { FocusEvent, PointerEvent } from 'react';
 import { useCallback, useContext } from 'octane';
 import type { AxisScale } from '@octanejs/visx/axis';
 import TooltipContext from '../context/TooltipContext.tsrx';

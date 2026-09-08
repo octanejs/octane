@@ -17,6 +17,13 @@ async function renderRoute(url: string) {
 }
 
 describe('error decoder', () => {
+	it('keeps the published root-container diagnostic decodable after its replacement', async () => {
+		const { container } = await renderRoute('/errors/28');
+		expect(container.querySelector('.error-message')?.textContent).toBe(
+			'Target container is not a DOM element.',
+		);
+	});
+
 	it('preserves opaque and repeated production-error arguments', () => {
 		const parsed = parseWebsiteSearch(
 			'?args%5B%5D=%22quoted%22&args%5B%5D=null&args%5B%5D=true&note=01',
@@ -31,7 +38,7 @@ describe('error decoder', () => {
 		expect(roundTrip.get('note')).toBe('01');
 	});
 
-	it('retains the default search codec for keys outside the error arguments', () => {
+	it('retains the default search codec for keys outside text-valued search fields', () => {
 		const parsed = parseWebsiteSearch('?page=2&filters=%7B%22active%22%3Atrue%7D&args%5B%5D=true');
 		expect(parsed).toEqual({
 			page: 2,
@@ -42,6 +49,15 @@ describe('error decoder', () => {
 		const roundTrip = parseWebsiteSearch(stringifyWebsiteSearch(parsed));
 		expect(roundTrip).toEqual(parsed);
 	});
+
+	it.each(['3', 'true', 'false', 'null', '3d', '"quoted"'])(
+		'preserves the free-text query %s through the website codec',
+		(query) => {
+			const parsed = parseWebsiteSearch('?q=' + encodeURIComponent(query) + '&page=2');
+			expect(parsed).toEqual({ q: query, page: 2 });
+			expect(parseWebsiteSearch(stringifyWebsiteSearch(parsed))).toEqual(parsed);
+		},
+	);
 
 	it('lists every catalog entry and filters by its public message', async () => {
 		const { container } = await renderRoute('/errors');

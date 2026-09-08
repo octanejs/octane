@@ -1,0 +1,86 @@
+{
+  "name": "@formisch/react",
+  "description": "The lightweight, schema-first, and fully type-safe form library for React",
+  "version": "1.0.0-rc.0",
+  "license": "MIT",
+  "author": "Fabian Hiller",
+  "homepage": "https://formisch.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-circle/formisch.git"
+  },
+  "keywords": [
+    "react",
+    "react-form",
+    "form",
+    "forms",
+    "form-validation",
+    "validation",
+    "schema",
+    "typescript",
+    "type-safe",
+    "signals",
+    "bundle-size",
+    "modular",
+    "valibot"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run --typecheck",
+    "lint": "eslint \"src/**/*.ts*\" && tsc --noEmit",
+    "lint.fix": "eslint \"src/**/*.ts*\" --fix",
+    "format": "prettier --write ./src",
+    "format.check": "prettier --check ./src"
+  },
+  "devDependencies": {
+    "@formisch/core": "workspace:*",
+    "@formisch/eslint-config": "workspace:*",
+    "@formisch/methods": "workspace:*",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^4.1.7",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "jsdom": "^26.1.0",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "tsdown": "^0.16.8",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "vitest": "^4.1.7"
+  },
+  "peerDependencies": {
+    "react": "^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
+    "react-dom": "^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
+    "typescript": ">=5",
+    "valibot": "^1.4.1"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { useContext, useCallback } from 'octane';
-import type { ReactElement, FC } from 'react';
+import type { ComponentBody, ElementDescriptor } from 'octane';
 import type { SeriesPoint } from 'd3-shape';
 import type { PositionScale, StackPathConfig } from '@octanejs/visx/shape';
 import { getFirstItem, getSecondItem, getBandwidth } from '@octanejs/visx/shape';
@@ -19,6 +19,7 @@ import type {
 import isValidNumber from '../../../typeguards/isValidNumber';
 import { getStackValue } from '../../../utils/combineBarStackData';
 import { BARSTACK_EVENT_SOURCE, XYCHART_EVENT_SOURCE } from '../../../constants';
+import type { SeriesEventsParams } from '../../../hooks/useSeriesEvents.tsrx';
 import useSeriesEvents from '../../../hooks/useSeriesEvents.tsrx';
 import findNearestStackDatum from '../../../utils/findNearestStackDatum';
 import useStackedData from '../../../hooks/useStackedData.tsrx';
@@ -32,10 +33,10 @@ type StackBar<XScale extends PositionScale, YScale extends PositionScale> =
 export type BaseBarStackProps<XScale extends PositionScale, YScale extends PositionScale, Datum extends object> =
 	{
 		/** `BarSeries` elements, note we can't strictly enforce this with TS yet. */
-		children: | ReactElement<BarStackChildProps<XScale, YScale, Datum>>
-		| ReactElement<BarStackChildProps<XScale, YScale, Datum>>[];
+		children: | ElementDescriptor<BarStackChildProps<XScale, YScale, Datum>>
+		| ElementDescriptor<BarStackChildProps<XScale, YScale, Datum>>[];
 		/** Rendered component which is passed BarsProps by BaseBarStack after processing. */
-		BarsComponent: FC<BarsProps<XScale, YScale>>;
+		BarsComponent: ComponentBody<BarsProps<XScale, YScale>>;
 	} & Pick<StackPathConfig<Datum, string>, | 'offset'
 	| 'order'> & Pick<SeriesProps<XScale, YScale, Datum>, | 'onPointerMove'
 	| 'onPointerOut'
@@ -88,8 +89,11 @@ function BaseBarStack<XScale extends PositionScale, YScale extends PositionScale
 	const eventEmitters = useSeriesEvents<XScale, YScale, Datum>({
 		dataKey: dataKeys,
 		enableEvents,
-		// @ts-expect-error Datum input + return type are expected to be the same type but they differ for BarStack (registry data is StackedDatum, return type is user Datum)
-		findNearestDatum,
+		findNearestDatum: findNearestDatum as unknown as SeriesEventsParams<
+			XScale,
+			YScale,
+			Datum
+		>['findNearestDatum'],
 		onBlur,
 		onFocus,
 		onPointerMove,
@@ -136,7 +140,7 @@ function BaseBarStack<XScale extends PositionScale, YScale extends PositionScale
 		if (!entry) return null;
 
 		// get props from child BarSeries, if available
-		const childBarSeries: ReactElement<BaseBarSeriesProps<XScale, YScale, Datum>> | undefined =
+		const childBarSeries: ElementDescriptor<BaseBarSeriesProps<XScale, YScale, Datum>> | undefined =
 			seriesChildren.find((child) => child.props.dataKey === barStack.key);
 		const { colorAccessor, radius, radiusAll, radiusBottom, radiusLeft, radiusRight, radiusTop } =
 			childBarSeries?.props || {};

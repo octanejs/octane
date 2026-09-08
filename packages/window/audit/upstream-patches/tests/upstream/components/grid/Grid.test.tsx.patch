@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/components/grid/Grid.test.tsx b/tests/upstream/components/grid/Grid.test.tsx
+--- a/tests/upstream/components/grid/Grid.test.tsx
++++ b/tests/upstream/components/grid/Grid.test.tsx
+@@ -206,7 +206,8 @@ describe("Grid", () => {
+ 
+       expect(columnKey).toHaveBeenCalled();
+       expect(rowKey).toHaveBeenCalled();
+-      expect(renderLog).toMatchInlineSnapshot(`
++      // OCTANE DIVERGENCE[react-window-keyed-effect-order][runtime:react-window-adapted-004]
++      expect(renderLog.toSorted()).toMatchInlineSnapshot(`
+         [
+           "row: 0, column: 0, id: 4",
+           "row: 0, column: 1, id: 5",

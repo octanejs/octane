@@ -12,7 +12,9 @@ import type { Octane } from 'octane/jsx-runtime';
 import type { Dimensions } from '@floating-ui/dom';
 
 import { subSlot } from '../internal';
-import type { Delay, FloatingNodeType, MutableRefObject, ReferenceType } from '../types';
+import type { Delay, MutableRefObject } from '../types';
+
+export { getDeepestNode, getNodeAncestors, getNodeChildren } from './nodes';
 
 /**
  * The OBJECT form of octane's `style` prop — the port's analog of
@@ -153,54 +155,6 @@ export function getFloatingFocusElement(
 		? floatingElement
 		: floatingElement.querySelector<HTMLElement>('[' + FOCUSABLE_ATTRIBUTE + ']') ||
 				floatingElement;
-}
-
-export function getNodeChildren<RT extends ReferenceType = ReferenceType>(
-	nodes: Array<FloatingNodeType<RT>>,
-	id: string | undefined,
-	onlyOpenChildren = true,
-): Array<FloatingNodeType<RT>> {
-	const directChildren = nodes.filter(
-		(node) => node.parentId === id && (!onlyOpenChildren || node.context?.open),
-	);
-	return directChildren.flatMap((child) => [
-		child,
-		...getNodeChildren(nodes, child.id, onlyOpenChildren),
-	]);
-}
-export function getDeepestNode<RT extends ReferenceType = ReferenceType>(
-	nodes: Array<FloatingNodeType<RT>>,
-	id: string | undefined,
-): FloatingNodeType<RT> | undefined {
-	let deepestNodeId: string | undefined;
-	let maxDepth = -1;
-	function findDeepest(nodeId: string | undefined, depth: number) {
-		if (depth > maxDepth) {
-			deepestNodeId = nodeId;
-			maxDepth = depth;
-		}
-		const children = getNodeChildren(nodes, nodeId);
-		children.forEach((child) => {
-			findDeepest(child.id, depth + 1);
-		});
-	}
-	findDeepest(id, 0);
-	return nodes.find((node) => node.id === deepestNodeId);
-}
-export function getNodeAncestors<RT extends ReferenceType = ReferenceType>(
-	nodes: Array<FloatingNodeType<RT>>,
-	id: string | undefined,
-): Array<FloatingNodeType<RT>> {
-	let allAncestors: Array<FloatingNodeType<RT>> = [];
-	let currentParentId = nodes.find((node) => node.id === id)?.parentId;
-	while (currentParentId) {
-		const currentNode = nodes.find((node) => node.id === currentParentId);
-		currentParentId = currentNode?.parentId;
-		if (currentNode) {
-			allAncestors = allAncestors.concat(currentNode);
-		}
-	}
-	return allAncestors;
 }
 
 export function stopEvent(event: Event): void {

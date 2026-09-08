@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/src/alert-dialog/root/AlertDialogRoot.spec.tsx b/tests/upstream/src/alert-dialog/root/AlertDialogRoot.spec.tsx
+--- a/tests/upstream/src/alert-dialog/root/AlertDialogRoot.spec.tsx
++++ b/tests/upstream/src/alert-dialog/root/AlertDialogRoot.spec.tsx
+@@ -1,6 +1,6 @@
+ /** @jsxImportSource octane */
+ import * as React from 'octane';
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { AlertDialog } from '@octanejs/base-ui/alert-dialog';
+ import { Dialog } from '@octanejs/base-ui/dialog';
+ 

@@ -1,0 +1,60 @@
+diff --git a/tests/upstream/src/accordion/panel/AccordionPanel.test.tsx b/tests/upstream/src/accordion/panel/AccordionPanel.test.tsx
+--- a/tests/upstream/src/accordion/panel/AccordionPanel.test.tsx
++++ b/tests/upstream/src/accordion/panel/AccordionPanel.test.tsx
+@@ -1,4 +1,8 @@
+ /** @jsxImportSource octane */
++import { AccordionPanelServerCase1 } from './../../../../fixtures/AccordionPanel-ssr.tsrx';
++import { AccordionPanelServerCase1 as ServerAccordionPanelServerCase1 } from './../../../../fixtures/AccordionPanel-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(AccordionPanelServerCase1, ServerAccordionPanelServerCase1);
+ import { expect, vi, describe, it } from 'vitest';
+ import { reactMajor, screen, waitFor } from '@mui/internal-test-utils';
+ import * as React from 'octane';
+@@ -13,7 +17,7 @@ describe('<Accordion.Panel />', () => {
+   function getActivity() {
+     type ActivityProps = {
+       mode: 'visible' | 'hidden';
+-      children: React.ReactNode;
++      children: React.OctaneNode;
+     };
+ 
+     return (React as typeof React & { Activity: React.ComponentType<ActivityProps> }).Activity;
+@@ -55,37 +59,7 @@ describe('<Accordion.Panel />', () => {
+   describe('server-side rendering', () => {
+     it('suppresses the initial keyframe animation from inline styles when rendered open', async () => {
+       await renderToString(
+-        <React.Fragment>
+-          <style>{`
+-            @keyframes panel-slide-down {
+-              from {
+-                height: 0;
+-              }
+-
+-              to {
+-                height: var(--accordion-panel-height);
+-              }
+-            }
+-          `}</style>
+-
+-          <Accordion.Root defaultValue={[0]}>
+-            <Accordion.Item value={0}>
+-              <Accordion.Header>
+-                <Accordion.Trigger>Trigger</Accordion.Trigger>
+-              </Accordion.Header>
+-              <Accordion.Panel
+-                data-testid="panel"
+-                style={{
+-                  animationDuration: '100ms',
+-                  animationName: 'panel-slide-down',
+-                  animationTimingFunction: 'linear',
+-                }}
+-              >
+-                {PANEL_CONTENT}
+-              </Accordion.Panel>
+-            </Accordion.Item>
+-          </Accordion.Root>
+-        </React.Fragment>,
++        <AccordionPanelServerCase1 PANEL_CONTENT={PANEL_CONTENT} />,
+       );
+ 
+       const panel = screen.getByTestId('panel');

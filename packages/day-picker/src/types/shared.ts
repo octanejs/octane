@@ -1,3 +1,4 @@
+import type { KeyboardEvent, MouseEvent } from 'octane';
 import type { CSSProperties } from 'react';
 import type * as components from '../components/custom-components.tsrx';
 import type {
@@ -215,13 +216,15 @@ export type DayOfWeek = { dayOfWeek: number | number[] };
 /**
  * The event handler triggered when clicking or interacting with a day.
  *
- * @template EventType - The event type that triggered the event (e.g.
- *   `React.MouseEvent`, `React.KeyboardEvent`, etc.).
+ * @template EventType - The native event type that triggered the event.
  * @param date - The date that has triggered the event.
  * @param modifiers - The modifiers belonging to the date.
  * @param e - The DOM event that triggered the event.
  */
 export type DayEventHandler<EventType> = (date: Date, modifiers: Modifiers, e: EventType) => void;
+
+/** Native button event delivered to a selection callback. */
+export type DaySelectionEvent = MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>;
 
 /**
  * The event handler when a month is changed in the calendar.

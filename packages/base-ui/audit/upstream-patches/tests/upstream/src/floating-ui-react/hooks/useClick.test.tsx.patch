@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/src/floating-ui-react/hooks/useClick.test.tsx b/tests/upstream/src/floating-ui-react/hooks/useClick.test.tsx
+--- a/tests/upstream/src/floating-ui-react/hooks/useClick.test.tsx
++++ b/tests/upstream/src/floating-ui-react/hooks/useClick.test.tsx
+@@ -222,6 +222,7 @@ describe.skipIf(!isJSDOM)('useClick', () => {
+     fireEvent.click(button);
+ 
+     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
++    await flushMicrotasks();
+   });
+ 
+   test('uses the configured reason', async () => {

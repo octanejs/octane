@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "better-auth-differential",
+  "roots": ["packages/better-auth/tests/differential"],
+  "files": ["packages/better-auth/tests/differential/parity.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:better-auth-client-surface",
+      "file": "packages/better-auth/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/better-auth vs better-auth/react matches session, plugin atom, and plugin action behavior"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
+import type { OctaneElement, SVGProps } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { ReactElement, SVGProps } from 'octane';
 
 import { warn } from '../util/LogUtils';
 import { isNumber } from '../util/DataUtils';
@@ -11,7 +11,7 @@ import {
 	getTicksOfAxis,
 } from '../util/ChartUtils';
 import { getTicks, GetTicksInput } from './getTicks';
-import { defaultCartesianAxisProps } from './CartesianAxis';
+import { defaultCartesianAxisProps } from './CartesianAxis.tsrx';
 import { useChartHeight, useChartWidth, useOffsetInternal } from '../context/chartLayoutContext';
 import { AxisId } from '../state/cartesianAxisSlice';
 import {
@@ -22,7 +22,7 @@ import { useIsPanorama } from '../context/PanoramaContext';
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import { isPositiveNumber } from '../util/isWellBehavedNumber';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 
 /**
@@ -41,8 +41,8 @@ export type AxisPropsForCartesianGridTicksGeneration =
 
 type GridLineType =
 	| SVGProps<SVGLineElement>
-	| ReactElement<SVGElement>
-	| ((props: GridLineTypeFunctionProps) => ReactElement<SVGElement>)
+	| OctaneElement<SVGElement>
+	| ((props: GridLineTypeFunctionProps) => OctaneElement<SVGElement>)
 	| boolean;
 
 export type HorizontalCoordinatesGenerator =
@@ -265,7 +265,6 @@ function LineItem({
 	let lineItem;
 
 	if (React.isValidElement(option)) {
-		// @ts-expect-error typescript does not see the props type when cloning an element
 		lineItem = React.cloneElement(option, lineItemProps);
 	} else if (typeof option === 'function') {
 		lineItem = option(lineItemProps);

@@ -26,7 +26,7 @@
 import { ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';
 import { type OctaneNode } from 'octane';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string } & Record<string, unknown>;
 

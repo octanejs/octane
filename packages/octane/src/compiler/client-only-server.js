@@ -151,12 +151,16 @@ export function createClientReferenceManifest(entries) {
 /** Return the runtime import/re-export requests that a bundler should resolve. */
 export function findStaticRuntimeImportRequests(source, filename = 'unknown') {
 	let ast;
-	try {
-		ast = parseModule(source, filename);
-	} catch {
-		// The owning compiler/parser will report the useful syntax diagnostic. Import
-		// classification is an adapter prepass and must not replace it.
-		return [];
+	if (source && typeof source === 'object' && source.type === 'Program') {
+		ast = source;
+	} else {
+		try {
+			ast = parseModule(source, filename);
+		} catch {
+			// The owning compiler/parser will report the useful syntax diagnostic. Import
+			// classification is an adapter prepass and must not replace it.
+			return [];
+		}
 	}
 	const requests = new Set();
 	for (const statement of ast.body ?? []) {

@@ -6,7 +6,7 @@ import {
 	radialLine as d3RadialLine,
 	stack as d3Stack,
 } from 'd3-shape';
-import setNumberOrNumberAccessor from './setNumberOrNumberAccessor';
+import setNumberOrNumberAccessor from '../../internal/setNumberOrNumberAccessor';
 import type {
 	ArcPathConfig,
 	AreaPathConfig,

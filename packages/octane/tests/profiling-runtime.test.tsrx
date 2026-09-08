@@ -56,6 +56,12 @@ function ErrorBoundaryApp(props) @{
 	</>
 }
 
+function ThrownResourceApp(props: { value: PromiseLike<unknown> }) @{
+	<Suspense fallback={<em>pending</em>}>
+		<ThrowingChild value={props.value} />
+	</Suspense>
+}
+
 function useCounter() {
 	return useState(0);
 }
@@ -230,10 +236,11 @@ describe('profile build component events', () => {
 		mounted.unmount();
 	});
 
-	it('does not mistake an arbitrary thrown Promise for use() suspension', () => {
-		const mounted = mount(ErrorBoundaryApp, { value: Promise.resolve('value') });
+	it('reports a resource-thrown thenable as a suspended render attempt', () => {
+		const mounted = mount(ThrownResourceApp, { value: new Promise<string>(() => {}) });
 
-		expect(render('ThrowingChild', 'mount').outcome).toBe('errored');
+		expect(render('ThrowingChild', 'mount').outcome).toBe('suspended');
+		expect(mounted.container.textContent).toBe('pending');
 
 		mounted.unmount();
 	});
@@ -301,14 +308,34 @@ describe('profile build render causes', () => {
 		const mounted = mount(TransitionRebaseApp, { gate });
 		mounted.click('#stage');
 		mounted.click('#urgent');
+		expect(mounted.find('#urgent').textContent).toBe('0');
 		profiler.clear();
 
 		await act(() => resolveGate());
 
 		const causes = profiler.getEvents().flatMap((event) => event.causes);
+		expect(mounted.find('#urgent').textContent).toBe('0');
 		expect(causes.some((entry) => entry.type === 'state')).toBe(false);
 		expect(causes.some((entry) => entry.type === 'transition-pending')).toBe(true);
 
+		mounted.unmount();
+	});
+
+	it('reports a transition state cause when the settled value changes', async () => {
+		let resolveGate!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			resolveGate = resolve;
+		});
+		const mounted = mount(TransitionRebaseApp, { gate });
+		mounted.click('#stage');
+		expect(mounted.find('#urgent').textContent).toBe('1');
+		profiler.clear();
+
+		await act(() => resolveGate());
+
+		expect(mounted.find('#urgent').textContent).toBe('0');
+		const causes = profiler.getEvents().flatMap((event) => event.causes);
+		expect(causes.some((entry) => entry.type === 'state')).toBe(true);
 		mounted.unmount();
 	});
 

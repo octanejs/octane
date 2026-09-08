@@ -1008,10 +1008,19 @@ export function prepareLynxHandleDeltas(
 			runCommands.splice(matched, 1);
 			const last = delta.firstId + delta.hostCount - 1;
 			const entries: LynxHandleEntry[] = [];
-			for (const [id, entry] of state.handles) {
-				if (id >= delta.firstId && id <= last) {
+			if (delta.hostCount < state.handles.size) {
+				for (let id = delta.firstId; id <= last; id++) {
+					const entry = state.handles.get(id);
+					if (entry === undefined) continue;
 					entries.push(entry);
 					priorStates.set(entry, captureHandleState(entry));
+				}
+			} else {
+				for (const [id, entry] of state.handles) {
+					if (id >= delta.firstId && id <= last) {
+						entries.push(entry);
+						priorStates.set(entry, captureHandleState(entry));
+					}
 				}
 			}
 			runRemovals.push({ firstId: delta.firstId, hostCount: delta.hostCount, entries });

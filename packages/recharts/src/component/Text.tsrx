@@ -1,3 +1,41 @@
+import type { CSSProperties, OctaneNode, SVGProps } from '../util/OctaneTypes.ts';
+
+interface Words {
+	words: Array<string>;
+	width: number | undefined;
+}
+interface WordsWithWidth {
+	words: Array<string>;
+	width: number;
+}
+interface WordWithComputedWidth {
+	word: string;
+	width: number;
+}
+interface CalculatedWordWidths {
+	wordsWithComputedWidth: Array<WordWithComputedWidth>;
+	spaceWidth: number;
+}
+type CalculateWordWidthsParam = Pick<Props, 'children' | 'breakAll' | 'style'>;
+export type TextAnchor = 'start' | 'middle' | 'end' | 'inherit';
+export type TextVerticalAnchor = 'start' | 'middle' | 'end';
+export type RenderableText = string | number | boolean | null | undefined;
+interface TextProps {
+	scaleToFit?: boolean;
+	angle?: number;
+	textAnchor?: TextAnchor;
+	verticalAnchor?: TextVerticalAnchor;
+	style?: CSSProperties;
+	lineHeight?: number | string;
+	breakAll?: boolean;
+	children?: RenderableText;
+	maxLines?: number;
+	width?: number | string;
+}
+export type Props = Omit<SVGProps<SVGTextElement>, 'textAnchor' | 'verticalAnchor'> & TextProps;
+type CalculateWordsByLinesProps = Pick<Props, 'maxLines' | 'children' | 'style' | 'breakAll'>;
+type GetWordsByLinesProps =
+	Pick<Props, 'width' | 'scaleToFit' | 'children' | 'style' | 'breakAll' | 'maxLines'>;
 // Port of component/Text.tsx — the SVG text renderer with word wrapping,
 // maxLines binary-search truncation, scaleToFit, and rotation. Measurement
 // runs through the vendored getStringSize (0×0 under SSR, so SSR renders the
@@ -14,9 +52,13 @@ import { isWellBehavedNumber } from '../util/isWellBehavedNumber';
 
 const BREAKING_SPACES = /[ \f\n\r\t\v\u2028\u2029]+/;
 
-const calculateWordWidths = ({ children, breakAll, style }) => {
+const calculateWordWidths = ({
+	children,
+	breakAll,
+	style,
+}: CalculateWordWidthsParam): CalculatedWordWidths | null => {
 	try {
-		let words = [];
+		let words: string[] = [];
 		if (!isNullish(children)) {
 			if (breakAll) {
 				words = children.toString().split('');
@@ -37,19 +79,21 @@ const calculateWordWidths = ({ children, breakAll, style }) => {
 	}
 };
 
-export function isValidTextAnchor(value) {
+export function isValidTextAnchor(value: string | undefined): value is TextAnchor {
 	return value === 'start' || value === 'middle' || value === 'end' || value === 'inherit';
 }
 
-export function isRenderableText(val) {
+export function isRenderableText(val: unknown): val is RenderableText {
 	return isNullish(val) || typeof val === 'string' || typeof val === 'number' ||
 		typeof val === 'boolean';
 }
 
-const calculate = (words, lineWidth, spaceWidth, scaleToFit) => words.reduce((
-	result,
-	{ word, width },
-) => {
+const calculate = (
+	words: ReadonlyArray<WordWithComputedWidth>,
+	lineWidth: number | string | undefined,
+	spaceWidth: number,
+	scaleToFit: boolean,
+): WordsWithWidth[] => words.reduce<WordsWithWidth[]>((result, { word, width }) => {
 	const currentLine = result[result.length - 1];
 	if (
 		currentLine && width != null &&
@@ -66,41 +110,53 @@ const calculate = (words, lineWidth, spaceWidth, scaleToFit) => words.reduce((
 	return result;
 }, []);
 
-const findLongestLine = (words) => words.reduce((a, b) => (a.width > b.width ? a : b));
+const findLongestLine = (words: ReadonlyArray<WordsWithWidth>) => words.reduce(
+	(a, b) => (a.width > b.width ? a : b),
+);
 
 const suffix = '…';
 
 const checkOverflow = (
-	text,
-	index,
-	breakAll,
-	style,
-	maxLines,
-	lineWidth,
-	spaceWidth,
-	scaleToFit,
-) => {
+	text: string,
+	index: number,
+	breakAll: TextProps['breakAll'],
+	style: TextProps['style'],
+	maxLines: number,
+	lineWidth: number | string | undefined,
+	spaceWidth: number,
+	scaleToFit: boolean,
+): [boolean, ReadonlyArray<WordsWithWidth>] => {
 	const tempText = text.slice(0, index);
 	const words = calculateWordWidths({ breakAll, style, children: tempText + suffix });
 	if (!words) {
 		return [false, []];
 	}
-	const result = calculate(words.wordsWithComputedWidth, lineWidth, spaceWidth, scaleToFit);
+	const result: ReadonlyArray<WordsWithWidth> = calculate(
+		words.wordsWithComputedWidth,
+		lineWidth,
+		spaceWidth,
+		scaleToFit,
+	);
 	const doesOverflow =
 		result.length > maxLines || findLongestLine(result).width > Number(lineWidth);
 	return [doesOverflow, result];
 };
 
 const calculateWordsByLines = (
-	{ maxLines, children, style, breakAll },
-	initialWordsWithComputedWith,
-	spaceWidth,
-	lineWidth,
-	scaleToFit,
+	{ maxLines, children, style, breakAll }: CalculateWordsByLinesProps,
+	initialWordsWithComputedWith: ReadonlyArray<WordWithComputedWidth>,
+	spaceWidth: number,
+	lineWidth: number | string | undefined,
+	scaleToFit: boolean,
 ) => {
 	const shouldLimitLines = isNumber(maxLines);
 	const text = String(children);
-	const originalResult = calculate(initialWordsWithComputedWith, lineWidth, spaceWidth, scaleToFit);
+	const originalResult: ReadonlyArray<WordsWithWidth> = calculate(
+		initialWordsWithComputedWith,
+		lineWidth,
+		spaceWidth,
+		scaleToFit,
+	);
 	if (!shouldLimitLines || scaleToFit) {
 		return originalResult;
 	}
@@ -112,7 +168,7 @@ const calculateWordsByLines = (
 	let start = 0;
 	let end = text.length - 1;
 	let iterations = 0;
-	let trimmedResult;
+	let trimmedResult: ReadonlyArray<WordsWithWidth> | undefined;
 	while (start <= end && iterations <= text.length - 1) {
 		const middle = Math.floor((start + end) / 2);
 		const prev = middle - 1;
@@ -153,7 +209,7 @@ const calculateWordsByLines = (
 	return trimmedResult || originalResult;
 };
 
-const getWordsWithoutCalculate = (children) => {
+const getWordsWithoutCalculate = (children: OctaneNode) => {
 	const words =
 		!isNullish(children) ? children.toString().split(BREAKING_SPACES) : [];
 	return [
@@ -161,7 +217,14 @@ const getWordsWithoutCalculate = (children) => {
 	];
 };
 
-export const getWordsByLines = ({ width, scaleToFit, children, style, breakAll, maxLines }) => {
+export const getWordsByLines = ({
+	width,
+	scaleToFit,
+	children,
+	style,
+	breakAll,
+	maxLines,
+}: GetWordsByLinesProps) => {
 	// Only perform calculations if using features that require them (multiline, scaleToFit)
 	if ((width || scaleToFit) && !Global.isSsr) {
 		const wordWidths = calculateWordWidths({ breakAll, children, style });
@@ -195,9 +258,9 @@ export const textDefaultProps = {
 	verticalAnchor: 'end',
 	x: 0,
 	y: 0,
-};
+} as const satisfies Partial<Props>;
 
-export function Text(outsideProps) @{
+export function Text(outsideProps: Props) @{
 	const {
 		x: propsX,
 		y: propsY,
@@ -210,7 +273,7 @@ export function Text(outsideProps) @{
 		ref,
 		...props
 	} = resolveDefaultProps(outsideProps, textDefaultProps);
-	const wordsByLines = useMemo(() => {
+	const wordsByLines: ReadonlyArray<Words> = useMemo(() => {
 		return getWordsByLines({
 			breakAll: props.breakAll,
 			children: props.children,
@@ -229,7 +292,7 @@ export function Text(outsideProps) @{
 	if (!isWellBehavedNumber(x) || !isWellBehavedNumber(y)) {
 		return null;
 	}
-	let startDy;
+	let startDy: string;
 	switch (verticalAnchor) {
 		case 'start':
 			startDy = reduceCSSCalc('calc(' + capHeight + ')');

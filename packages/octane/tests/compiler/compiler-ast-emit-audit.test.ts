@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { compile } from 'octane/compiler';
 
 const COMPILER_DIR = join(process.cwd(), 'packages/octane/src/compiler');
 const BASELINE_COMPILER = 'compile-2f-baseline.js';
@@ -35,7 +36,7 @@ const sources = collectCompilerFiles().map((path) => ({
 }));
 
 describe('compiler AST emit architecture', () => {
-	it('keeps final JavaScript printing at the two owning emit boundaries', () => {
+	it('keeps final Program printing at the owning emit boundaries', () => {
 		const printSites: string[] = [];
 		for (const { code, path } of sources) {
 			for (const _match of code.matchAll(/\besrapPrint\s*\(/g)) {
@@ -44,9 +45,13 @@ describe('compiler AST emit architecture', () => {
 		}
 
 		// Volar delegates its one Program print to @tsrx/core's transform() with
-		// boundaryTokens enabled. The main compiler and client-only stub are the
-		// only compiler-owned Program printers.
-		expect(printSites.sort()).toEqual(['client-only-server.js', 'compile.js']);
+		// boundaryTokens enabled. Plain-hook memo lowering owns a TS-preserving
+		// whole-Program print; its surgical fallback never prints fragments.
+		expect(printSites.sort()).toEqual([
+			'client-only-server.js',
+			'compile.js',
+			'plain-hook-memo.js',
+		]);
 	});
 
 	it('only parses authored module inputs', () => {
@@ -85,10 +90,11 @@ describe('compiler AST emit architecture', () => {
 		expect(violations).toEqual([]);
 	});
 
-	it('has no retired generated-text or source-map compatibility layer', () => {
+	it('has no retired AST emit compatibility layer', () => {
 		const retiredNames = [
 			'addSourceMapNeedles',
 			'applyMappedReplacements',
+			'buildSourceMap',
 			'composeSourceMaps',
 			'expandDomRendererRegions',
 			'generatedText',
@@ -97,6 +103,11 @@ describe('compiler AST emit architecture', () => {
 			'retargetRuntimeImport',
 			'sourceMapFromOrigins',
 		];
+		const retiredDefinitionsByFile = new Map([
+			// Renderer-boundary and hydrate transforms still own live walkers with
+			// this name. Universal lowering has no copy-on-write rewrite pass left.
+			['compile-universal.js', ['mapAstCow']],
+		]);
 		const retiredProperties = [
 			'__styleRemap',
 			'__universalValidationRemap',
@@ -107,9 +118,17 @@ describe('compiler AST emit architecture', () => {
 		const violations: string[] = [];
 
 		for (const { code, path } of sources) {
+			const relativePath = displayPath(path);
 			for (const name of retiredNames) {
 				violations.push(
 					...locations(path, code, new RegExp(`\\b${name}\\s*\\(`, 'g')).map(
+						(location) => `${location}: ${name}`,
+					),
+				);
+			}
+			for (const name of retiredDefinitionsByFile.get(relativePath) ?? []) {
+				violations.push(
+					...locations(path, code, new RegExp(`\\bfunction\\s+${name}\\s*\\(`, 'g')).map(
 						(location) => `${location}: ${name}`,
 					),
 				);
@@ -135,6 +154,8 @@ describe('compiler AST emit architecture', () => {
 			'MetaProperty',
 			'Program',
 			'ThrowStatement',
+			// @tsrx/core has a type-argument builder but no expression-instantiation builder.
+			'TSInstantiationExpression',
 		]);
 		const compilerRecordShapes = new Set([
 			'ActivityStatement',
@@ -167,5 +188,44 @@ describe('compiler AST emit architecture', () => {
 		}
 
 		expect(violations).toEqual([]);
+	});
+});
+
+// RFC tsrx-org/RFCs#1: `{style(expr)}` is resolved by the scope pre-pass
+// (style-scopes.js) into the scope chain plus the value. By the time the
+// emitters run — and compile.js's `resolveStyleExpr` fallback with them — no
+// `style(...)` call is left on the AST, so the output never carries one.
+describe('scoped style pre-pass', () => {
+	const SOURCE = `export function App(props) @{
+	<>
+		<style>.x { color: red; }</style>
+		<p class={style('x')}>{style('x y')}</p>
+		<i class={style(props.cls)}>{'i'}</i>
+	</>
+}`;
+
+	it.each([
+		['client', {}],
+		['client prod', { hmr: false as const }],
+		['server', { mode: 'server' as const }],
+	])('resolves every {style(...)} call before the emitters run — %s', (_label, options) => {
+		const { code } = compile(SOURCE, 'style-call.tsrx', options);
+		expect(code).not.toMatch(/\bstyle\(/);
+		const hash = code.match(/injectStyle\("(tsrx-[0-9a-f]+)"/)![1];
+		// Static values fold to a literal that opens with the scope chain…
+		expect(code).toContain(`${hash} x`);
+		expect(code).toContain(`${hash} x y`);
+		// …and a dynamic value concatenates after the chain at runtime.
+		expect(code).toContain(`"${hash} " + props.cls`);
+	});
+
+	it('keeps the emitter fallback out of the shipped path (no cssHash-driven rewrite)', () => {
+		// The pre-pass leaves `cssHash` only as a "this root owns scoped CSS" flag;
+		// resolveStyleExpr must not expand anything on its own.
+		const compileSource = sources.find(({ path }) => path.endsWith('compile.js'))!.code;
+		const at = compileSource.indexOf('function resolveStyleExpr(');
+		expect(at).toBeGreaterThan(-1);
+		const body = compileSource.slice(at, compileSource.indexOf('\n}', at));
+		expect(body).not.toContain('injectStyle');
 	});
 });

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "runtime": [
+    "OTPInput",
+    "OTPInputContext",
+    "REGEXP_ONLY_DIGITS",
+    "REGEXP_ONLY_CHARS",
+    "REGEXP_ONLY_DIGITS_AND_CHARS"
+  ],
+  "types": ["OTPInputProps", "SlotProps", "RenderProps"]
+}

@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { createElement, useState } from 'octane';
-import { mount } from './_helpers';
+import { Suspense, createElement, lazy, useState } from 'octane';
+import { act, mount } from './_helpers';
+
+function deferred<T>() {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((done) => {
+		resolve = done;
+	});
+	return { promise, resolve };
+}
 
 // Pure-host → component-bearing upgrade ADOPTS the existing host tree.
 //
@@ -26,7 +34,7 @@ function Comp() {
 		'form',
 		null,
 		createElement('p', { 'data-testid': 'p' }, String(on)),
-		createElement('button', { 'data-testid': 'btn', onClick: () => setOn(true) }, 'flip'),
+		createElement('button', { 'data-testid': 'btn', onClick: () => setOn(!on) }, 'flip'),
 		on && createElement(Inner, null),
 	);
 }
@@ -41,6 +49,25 @@ function Keyed() {
 			'button',
 			{ 'data-testid': 'grow', onClick: () => (setItems(['a', 'b', 'c']), setOn(true)) },
 			'grow',
+		),
+		items.map((v) => createElement('li', { key: v, 'data-testid': `li-${v}` }, v)),
+		on && createElement(Inner, null),
+	);
+}
+
+function KeyedWithStaleTail() {
+	const [items, setItems] = useState(['a', 'b', 'c']);
+	const [on, setOn] = useState(false);
+	return createElement(
+		'ul',
+		null,
+		createElement(
+			'button',
+			{
+				'data-testid': 'replace',
+				onClick: () => (setItems(['a', 'x', 'c']), setOn(true)),
+			},
+			'replace',
 		),
 		items.map((v) => createElement('li', { key: v, 'data-testid': `li-${v}` }, v)),
 		on && createElement(Inner, null),
@@ -90,6 +117,67 @@ describe('de-opt pure-host → component upgrade', () => {
 		r.unmount();
 	});
 
+	it('keeps an adopted prefix while removing incompatible stale list nodes', () => {
+		const r = mount(KeyedWithStaleTail);
+		const liA = r.find('[data-testid="li-a"]');
+		const staleB = r.find('[data-testid="li-b"]');
+		const staleC = r.find('[data-testid="li-c"]');
+		r.click('[data-testid="replace"]');
+		expect(r.find('[data-testid="li-a"]')).toBe(liA);
+		expect(r.find('[data-testid="li-c"]')).not.toBe(staleC);
+		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'x', 'c']);
+		expect(staleB.isConnected).toBe(false);
+		expect(staleC.isConnected).toBe(false);
+		r.unmount();
+	});
+
+	it('re-adopts a retained keyed prefix when a later component suspends', async () => {
+		const loaded = deferred<{ default: typeof Inner }>();
+		const LazyInner = lazy(() => loaded.promise);
+
+		function SuspendedUpgrade() {
+			const [items, setItems] = useState(['a', 'b', 'c']);
+			const [on, setOn] = useState(false);
+			return createElement(Suspense, {
+				fallback: createElement('p', { 'data-testid': 'pending' }, 'pending'),
+				children: createElement(
+					'ul',
+					null,
+					createElement(
+						'button',
+						{
+							'data-testid': 'replace-lazily',
+							onClick: () => (setItems(['a', 'x', 'c']), setOn(true)),
+						},
+						'replace lazily',
+					),
+					items.map((value) =>
+						createElement('li', { key: value, 'data-testid': `li-${value}` }, value),
+					),
+					on && createElement(LazyInner, { key: 'lazy' }),
+				),
+			});
+		}
+
+		const r = mount(SuspendedUpgrade);
+		try {
+			const retainedA = r.find('[data-testid="li-a"]');
+			const staleB = r.find('[data-testid="li-b"]');
+			const staleC = r.find('[data-testid="li-c"]');
+			r.click('[data-testid="replace-lazily"]');
+			expect(r.find('[data-testid="pending"]').textContent).toBe('pending');
+
+			await act(() => loaded.resolve({ default: Inner }));
+			expect(r.find('[data-testid="li-a"]')).toBe(retainedA);
+			expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'x', 'c']);
+			expect(staleB.isConnected).toBe(false);
+			expect(staleC.isConnected).toBe(false);
+			expect(r.find('[data-testid="inner"]')).toBeTruthy();
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('adopts recursively when the flip is nested deeper in the tree', () => {
 		const r = mount(NestedFlip);
 		const wrap = r.find('[data-testid="wrap"]');
@@ -103,11 +191,33 @@ describe('de-opt pure-host → component upgrade', () => {
 		r.unmount();
 	});
 
-	it('tears the upgraded tree down cleanly (flip off again)', () => {
+	it('preserves the host and siblings when the last component disappears and returns', () => {
 		const r = mount(Comp);
-		r.click('[data-testid="btn"]');
-		expect(r.find('[data-testid="inner"]')).toBeTruthy();
-		r.unmount();
+		try {
+			const form = r.find('form');
+			const paragraph = r.find('[data-testid="p"]');
+			const button = r.find('[data-testid="btn"]');
+			r.click('[data-testid="btn"]');
+			const input = r.find('[data-testid="inner"]') as HTMLInputElement;
+			input.value = 'temporary detail';
+
+			r.click('[data-testid="btn"]');
+			expect(r.findAll('[data-testid="inner"]')).toEqual([]);
+			expect(input.isConnected).toBe(false);
+			expect(r.find('form')).toBe(form);
+			expect(r.find('[data-testid="p"]')).toBe(paragraph);
+			expect(paragraph.textContent).toBe('false');
+			expect(r.find('[data-testid="btn"]')).toBe(button);
+
+			r.click('[data-testid="btn"]');
+			expect(r.find('form')).toBe(form);
+			expect(r.find('[data-testid="p"]')).toBe(paragraph);
+			expect(paragraph.textContent).toBe('true');
+			expect(r.find('[data-testid="inner"]')).not.toBe(input);
+			expect((r.find('[data-testid="inner"]') as HTMLInputElement).value).toBe('');
+		} finally {
+			r.unmount();
+		}
 		expect(document.querySelector('[data-testid="inner"]')).toBeNull();
 	});
 });

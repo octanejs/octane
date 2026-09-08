@@ -32,6 +32,23 @@ export function WrapperChain() @{
 	</section>
 }
 
+function RecursiveWrapper(props: { remaining: number }) {
+	if (props.remaining === 0) return <DeepStructuralLeaf />;
+	return <RecursiveWrapper remaining={props.remaining - 1} />;
+}
+
+function DeepStructuralLeaf() {
+	const [active, setActive] = useState(true);
+	if (!active) return <strong class="deep-wrapper-replacement">replaced</strong>;
+	return <button class="deep-wrapper-button" onClick={() => setActive(false)}>replace</button>;
+}
+
+export function DeepWrapperChain(props: { depth: number }) @{
+	<section class="deep-wrapper-chain">
+		<RecursiveWrapper remaining={props.depth} />
+	</section>
+}
+
 function KeyedReturnMiddle(props: { itemKey?: string }) {
 	return <InteractiveLeaf key={props.itemKey} label="keyed" className="keyed-return-button" />;
 }

@@ -3,7 +3,7 @@
 This directory now contains nine deliberately separate pieces of the
 ReactLynx-to-Octane migration:
 
-- the immutable Milestone 0 provenance record and React-free framework probe;
+- the immutable Milestone 0 audit and React-free framework probe;
 - the private Milestone 1 compiler/package scaffold plus the source-level
   Milestones 2–4 background renderer, host boundary, native list, and platform
   API boundary;
@@ -352,6 +352,30 @@ export default defineConfig({
 explicit one-thread compiler diagnostic mode. It is not a second application
 entry in normal application mode.
 
+Milestone 9 CI covers two exact, atomic source/build lanes. Both use Lynx SDK
+`3.9.0` with target SDK `3.9`, Rspeedy `0.16.0`, Rsbuild `2.1.4`, template
+plugin `0.13.0`, CSS extract plugin `0.9.0`, runtime wrapper `0.2.2`, dev
+transport `0.3.0`, tasm `0.0.39`, testing environment `0.3.0`, Lynx types
+`4.1.0`, TypeScript `5.9.3`, and the blocked Web control
+`@lynx-js/web-core@0.22.2`. The minimum lane uses Rspack `2.1.3`; the current
+lane uses Rspack `2.1.5`, the newest patch allowed by Rsbuild `2.1.4`, and
+verifies registry drift for that upstream build graph. Both lanes retain the
+audited Webpack `5.108.4` tooling peer; the strict external install and builds
+prove its compatibility without requiring every new Webpack 5 release. Newer
+standalone Lynx types releases remain excluded until their renderer-owned
+compatibility slice is audited. Each required CI job packs the Octane packages,
+installs a strict external consumer without changing the repository lockfile,
+and performs two deterministic production builds. This is minimum/current
+source/build coverage, not native-engine or device execution. The immutable
+version and integrity audit in `audit/toolchain.json` covers the Phase 0 and
+Milestone 5 subset, including the minimum Rspack edge; it does not cover every
+Milestone 9 lane dependency, the current Rspack artifact, or the live Lynx types
+package. The renderer-local declarations remain adapted from the audited Lynx
+types `4.0.0` artifact. The canonical full lane maps live in the Rspeedy
+plugin's `src/toolchain-lanes.js`, and the current lane is supported here by
+that exact source map plus its live registry-drift check, not by committed
+tarball-integrity provenance.
+
 Native applications keep Lynx's event spelling: `bind`, `catch`,
 `capture-bind`, `capture-catch`, and `global-bind`. There is no DOM-style event
 alias or synthetic event layer. Page destroy now has a public typed,
@@ -439,6 +463,21 @@ The `imperative` entry is a small direct-PAPI control. The `main` entry runs the
 same visible tree through the Phase 0 background commit protocol.
 
 See:
+
+- [`audit/toolchain.json`](./audit/toolchain.json) for the immutable Phase 0 and
+  Milestone 5 package subset, commits, tarball integrities, and host constraints.
+- [`audit/upstream-crosswalk.json`](./audit/upstream-crosswalk.json) for the
+  ReactLynx public/source inventory and its complete runner-expanded summary.
+- [`audit/upstream-runner-cases.json`](./audit/upstream-runner-cases.json) for
+  the generated case-level Vitest identities and classifications.
+- [`audit/framework-contracts.md`](./audit/framework-contracts.md) for the
+  public/private framework boundary.
+- [`audit/phase-0-evidence.json`](./audit/phase-0-evidence.json) for captured
+  results and blocked device/runtime gates.
+- [`audit/runtime-compatibility.json`](./audit/runtime-compatibility.json) for
+  checked Milestone 1–6 syntax, built-in, and runtime-graph assumptions and
+  their qualifications.
+- [`UPSTREAM.md`](./UPSTREAM.md) for provenance and reuse policy.
 
 ## Reproduce the Phase 0 evidence
 

@@ -1,3 +1,4 @@
+/// <reference path="../external.d.ts" />
 // @octanejs/visx/xychart
 // components
 export { default as Annotation } from './components/annotation/Annotation.tsrx';

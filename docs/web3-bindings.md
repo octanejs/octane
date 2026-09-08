@@ -3,6 +3,13 @@
 Octane's Web3 bindings are designed for both full Octane applications and
 incremental adoption inside an existing React 19 application.
 
+The React-hosted example below uses `OctaneCompat`. For the opposite direction,
+`ReactCompat` from `octane/react` hosts a React-owned component inside Octane;
+that component's hooks and providers remain React's. See the
+[React compatibility guide](https://octanejs.dev/docs/react-compat) for both
+directions and the [ReactCompat contract](./react-compat.md) for its compiler,
+commit, context, and SSR requirements.
+
 ## Packages
 
 - `@octanejs/wagmi` provides Octane hooks and a provider over Wagmi v3 core.

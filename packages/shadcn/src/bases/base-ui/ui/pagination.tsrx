@@ -21,7 +21,7 @@
 import { createElement, type OctaneNode } from 'octane';
 import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { Button, type ButtonProps } from './button.tsrx';
 
 type Props = { className?: string } & Record<string, unknown>;

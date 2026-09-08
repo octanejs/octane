@@ -30,7 +30,14 @@ function inheritGeneratedOrigin(root, origin) {
 			for (const item of value) visit(item);
 			return;
 		}
-		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
+		// Adopted parser nodes (including StyleSheet subtrees) may be frozen
+		// and already carry CSS-relative positions; only stamp generated nodes.
+		if (
+			typeof value.type === 'string' &&
+			value.loc == null &&
+			origin?.loc != null &&
+			!Object.isFrozen(value)
+		) {
 			value.start = origin.start;
 			value.end = origin.end;
 			value.loc = origin.loc;
@@ -440,6 +447,161 @@ function isHookCall(node, hookNames) {
 	);
 }
 
+function collectSubtreeNodes(value, output) {
+	if (!value || typeof value !== 'object') return;
+	if (Array.isArray(value)) {
+		for (const child of value) collectSubtreeNodes(child, output);
+		return;
+	}
+	if (output.has(value)) return;
+	output.add(value);
+	for (const [key, child] of Object.entries(value)) {
+		if (!SKIP_KEYS.has(key)) collectSubtreeNodes(child, output);
+	}
+}
+
+function subtreeContainsNode(root, target) {
+	if (root === target) return true;
+	const seen = new WeakSet();
+	const visit = (value) => {
+		if (!value || typeof value !== 'object') return false;
+		if (Array.isArray(value)) {
+			for (const child of value) {
+				if (visit(child)) return true;
+			}
+			return false;
+		}
+		if (seen.has(value)) return false;
+		seen.add(value);
+		if (value === target) return true;
+		for (const [key, child] of Object.entries(value)) {
+			if (!SKIP_KEYS.has(key) && visit(child)) return true;
+		}
+		return false;
+	};
+	return visit(root);
+}
+
+function collectOwnStyleBlocks(nodes) {
+	const blocks = [];
+	for (const node of nodes ?? []) {
+		if (node?.type === 'JSXStyleElement' && !isFloatStyleResource(node)) blocks.push(node);
+	}
+	return blocks;
+}
+
+function isFloatStyleResource(node) {
+	let hasHref = false;
+	let hasPrecedence = false;
+	for (const attribute of node.openingElement?.attributes ?? []) {
+		if (attribute?.type !== 'JSXAttribute' && attribute?.type !== 'Attribute') continue;
+		const name = jsxAttributeName(attribute);
+		if (name === 'href') hasHref = true;
+		else if (name === 'precedence') hasPrecedence = true;
+	}
+	return hasHref && hasPrecedence;
+}
+
+function isStampableHost(node) {
+	if (node?.type !== 'JSXElement' && node?.type !== 'Element') return false;
+	if (node.metadata?.dynamicElement) return true;
+	const name = node.openingElement?.name ?? node.name;
+	if (!name) return false;
+	if (name.type === 'JSXIdentifier' || name.type === 'Identifier') {
+		return name.name !== 'style' && !/^[A-Z]/.test(name.name);
+	}
+	// Namespaced hosts (`svg:rect`) are stamped by the style-scope pass;
+	// member expressions are composites and are not.
+	return name.type === 'JSXNamespacedName' || name.type === 'NamespacedName';
+}
+
+function walkStampableHosts(node, visitHost) {
+	if (!node || typeof node !== 'object') return;
+	if (Array.isArray(node)) {
+		for (const child of node) walkStampableHosts(child, visitHost);
+		return;
+	}
+	if (isFunction(node)) return;
+	if (isStampableHost(node)) visitHost(node);
+	for (const [key, child] of Object.entries(node)) {
+		if (!SKIP_KEYS.has(key)) walkStampableHosts(child, visitHost);
+	}
+}
+
+/**
+ * A children list that holds standalone `<style>` blocks is one lexical style
+ * scope (plan S8.5 / RFC sibling scopes). Extraction is safe when that whole
+ * scope — its blocks and the host elements they stamp — sits inside the split
+ * boundary, because both compiles keep the authored-position hash. A scope
+ * that has blocks or stamped hosts on both sides of the boundary would emit
+ * disagreeing class lists; that is still `OCTANE_HYDRATE_SPLIT_STYLE`. Styles
+ * nested in functions never joined the enclosing scopes and are not checked.
+ */
+function styleScopeStraddlesBoundary(list, own, inside) {
+	let hasInside = false;
+	let hasOutside = false;
+	const mark = (node) => {
+		if (inside.has(node)) hasInside = true;
+		else hasOutside = true;
+	};
+	for (const block of own) mark(block);
+	for (const item of list) {
+		if (own.includes(item)) continue;
+		walkStampableHosts(item, mark);
+	}
+	return hasInside && hasOutside;
+}
+
+function assertHydrateStyleScopes(boundary, filename) {
+	const inside = new WeakSet();
+	collectSubtreeNodes(boundary.node.children, inside);
+	const seenLists = new WeakSet();
+	const seen = new WeakSet();
+	const visit = (node, inFunction) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, inFunction);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (TRANSPARENT_TS_EXPRESSIONS.has(node.type)) {
+			visit(node.expression, inFunction);
+			return;
+		}
+		if (!inFunction && isFunction(node)) {
+			const nested = !subtreeContainsNode(node, boundary.node);
+			for (const [key, child] of Object.entries(node)) {
+				if (!SKIP_KEYS.has(key)) visit(child, nested);
+			}
+			return;
+		}
+		if (
+			!inFunction &&
+			(node.type === 'JSXElement' || node.type === 'JSXFragment' || node.type === 'Element') &&
+			Array.isArray(node.children)
+		) {
+			const own = collectOwnStyleBlocks(node.children);
+			if (own.length > 0 && !seenLists.has(node.children)) {
+				seenLists.add(node.children);
+				if (styleScopeStraddlesBoundary(node.children, own, inside)) {
+					const reported = own.find((block) => inside.has(block)) ?? own[0];
+					throw extractionError(
+						'OCTANE_HYDRATE_SPLIT_STYLE',
+						filename,
+						reported,
+						'a scoped <style> cannot straddle a split Hydrate boundary — its style scope has blocks or stamped elements on both sides. Keep the whole scope inside the boundary, move it entirely outside, extract a child component, or set `split={false}`',
+					);
+				}
+			}
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!SKIP_KEYS.has(key)) visit(child, inFunction);
+		}
+	};
+	visit(boundary.ast ?? boundary.node, false);
+}
+
 function validateBoundary(boundary, filename, hookNames) {
 	for (const child of boundary.node.children ?? []) {
 		if (child?.type === 'JSXExpressionContainer' && isFunction(child.expression)) {
@@ -489,20 +651,6 @@ function validateBoundary(boundary, filename, hookNames) {
 				'direct hook calls cannot move into a split child. Call the hook in a child component or set `split={false}`',
 			);
 		}
-		// `directHooks` also marks the owning component's direct render scope: a
-		// scoped <style> there belongs to that component's single style scope,
-		// which extraction would tear in half (the server annotates the whole
-		// component with one scope hash; the split chunk would compile the sheet
-		// under another). Styles nested inside functions never joined the
-		// component scope, so they move freely.
-		if (directHooks && node.type === 'JSXStyleElement') {
-			throw extractionError(
-				'OCTANE_HYDRATE_SPLIT_STYLE',
-				filename,
-				node,
-				'a scoped <style> cannot move into a split child — its rules belong to the owning component’s style scope. Move the <style> outside the boundary, into a child component, or set `split={false}`',
-			);
-		}
 		if (isFunction(node)) {
 			// A nested function keeps hook calls in its own invocation. Ordinary
 			// functions also bind their own receiver; arrows still capture `this`
@@ -530,6 +678,7 @@ function validateBoundary(boundary, filename, hookNames) {
 		}
 	};
 	visit(boundary.node.children);
+	assertHydrateStyleScopes(boundary, filename);
 }
 
 /** Resolve Hydrate boundaries and assign source-order paths under their nearest boundary. */
@@ -693,17 +842,38 @@ function visitJsxTag(name, visitIdentifier) {
 }
 
 /** Collect names whose values must cross from the parent module into a queried child. */
-function collectCaptures(nodes, importBindings, shadowedImports = new Set()) {
+function collectCaptures(
+	nodes,
+	importBindings,
+	shadowedImports = new Set(),
+	additionalBindings = null,
+) {
 	const captures = new Set();
 	const scopes = [];
 	const seen = new WeakSet();
-	const isBound = (name) => {
-		if (importBindings.has(name) && !shadowedImports.has(name)) return true;
-		for (let index = scopes.length - 1; index >= 0; index--) {
-			if (scopes[index].has(name)) return true;
-		}
-		return false;
-	};
+	// Module slicing can consult a second binding set without materializing its
+	// union for every boundary. Preserve the single-set path for all other walks.
+	const isBound =
+		additionalBindings === null
+			? (name) => {
+					if (importBindings.has(name) && !shadowedImports.has(name)) return true;
+					for (let index = scopes.length - 1; index >= 0; index--) {
+						if (scopes[index].has(name)) return true;
+					}
+					return false;
+				}
+			: (name) => {
+					if (
+						(importBindings.has(name) || additionalBindings.has(name)) &&
+						!shadowedImports.has(name)
+					) {
+						return true;
+					}
+					for (let index = scopes.length - 1; index >= 0; index--) {
+						if (scopes[index].has(name)) return true;
+					}
+					return false;
+				};
 	const reference = (node) => {
 		if (node?.name && !isBound(node.name)) captures.add(node.name);
 	};
@@ -976,8 +1146,31 @@ function privateModuleDeclarationGraph(ast, importBindings) {
 	return { byBinding, records };
 }
 
+function sortedBoundaryRanges(boundaries) {
+	return boundaries
+		.map((boundary) => ({ end: boundary.node.end, start: boundary.node.start }))
+		.sort((left, right) => left.start - right.start || left.end - right.end);
+}
+
+function declarationContainsBoundary(node, boundaryRanges) {
+	let low = 0;
+	let high = boundaryRanges.length;
+	while (low < high) {
+		const middle = (low + high) >>> 1;
+		if (boundaryRanges[middle].start < node.start) low = middle + 1;
+		else high = middle;
+	}
+	for (let index = low; index < boundaryRanges.length; index++) {
+		const boundary = boundaryRanges[index];
+		if (boundary.start > node.end) break;
+		if (boundary.end <= node.end) return true;
+	}
+	return false;
+}
+
 function movableModuleDeclarations(analysis) {
 	const records = [];
+	let boundaryRanges = null;
 	const moduleBindings = topLevelBindingNames(analysis.ast);
 	const exportedBindings = localExportBindings(analysis.ast);
 	for (const node of analysis.ast.body ?? []) {
@@ -994,11 +1187,8 @@ function movableModuleDeclarations(analysis) {
 		// A declaration containing its own Hydrate site needs another extraction
 		// pass after it moves. Keep that uncommon declaration in the parent until
 		// recursive declaration slicing has an explicit protocol of its own.
-		if (
-			analysis.boundaries.some(
-				(boundary) => boundary.node.start >= node.start && boundary.node.end <= node.end,
-			)
-		) {
+		boundaryRanges ??= sortedBoundaryRanges(analysis.boundaries);
+		if (declarationContainsBoundary(node, boundaryRanges)) {
 			continue;
 		}
 		const bindings = declarationBindingSet(node);
@@ -1007,6 +1197,7 @@ function movableModuleDeclarations(analysis) {
 		records.push({
 			bindings,
 			dependencies: new Set(),
+			order: records.length,
 			retainedDependencies: new Set(),
 			node,
 		});
@@ -1123,8 +1314,12 @@ function hydrateBoundaryElement(
 	if (boundary.disabled) return node;
 	assertDirectChildren(boundary, boundary.filename);
 	validateBoundary(boundary, boundary.filename, boundary.hookNames);
-	const availableBindings = new Set([...importBindings, ...additionalModuleBindings]);
-	const captures = collectCaptures(node.children, availableBindings, boundary.shadowedImports);
+	const captures = collectCaptures(
+		node.children,
+		importBindings,
+		boundary.shadowedImports,
+		additionalModuleBindings.size === 0 ? null : additionalModuleBindings,
+	);
 	const attributes = [
 		...(opening.attributes ?? []),
 		jsxExpressionAttribute('__load', hydrateLoaderExpression(boundary, request), opening),
@@ -1222,8 +1417,9 @@ function extractedModuleAst(
 	const moduleBindings = moduleBindingsByPath.get(boundary.path) ?? new Set();
 	const captures = collectCaptures(
 		boundary.node.children,
-		new Set([...analysis.imports.importBindings, ...moduleBindings]),
+		analysis.imports.importBindings,
 		boundary.shadowedImports,
+		moduleBindings.size === 0 ? null : moduleBindings,
 	);
 	const pathName = boundary.path.replace(/[^A-Za-z0-9_$]/g, '_');
 	const componentName = uniqueGeneratedName(source, `__OctaneHydrateBoundary_${pathName}`);
@@ -1276,7 +1472,35 @@ function extractedModuleAst(
 	return pruneUnusedImportsAst(program, false);
 }
 
-function createModuleMovePlanAst(source, analysis, request) {
+function moduleReferencesForBoundary(analysis, boundary, request, moduleBindingsByPath) {
+	assertDirectChildren(boundary, boundary.filename);
+	validateBoundary(boundary, boundary.filename, analysis.imports.hookNames);
+	const collectModuleReferences = (nodes) =>
+		collectCaptures(nodes, analysis.imports.importBindings).filter(
+			(name) => !boundary.shadowedImports.has(name),
+		);
+	if (boundary.children.length === 0) {
+		return collectModuleReferences(boundary.node.children);
+	}
+	const nestedAnalysis = {
+		...analysis,
+		roots: boundary.children,
+	};
+	const fragment = transformHydrateAst(
+		{
+			type: 'Program',
+			sourceType: 'module',
+			body: boundary.node.children,
+			metadata: { path: [] },
+		},
+		nestedAnalysis,
+		request,
+		moduleBindingsByPath,
+	);
+	return collectModuleReferences(fragment.body);
+}
+
+function createModuleMovePlanAst(analysis, request) {
 	const candidates = movableModuleDeclarations(analysis);
 	if (candidates.records.length === 0) {
 		return {
@@ -1340,13 +1564,9 @@ function createModuleMovePlanAst(source, analysis, request) {
 	const referencesByPath = new Map();
 	for (const boundary of analysis.boundaries) {
 		if (boundary.disabled || hasPermanentStaticAncestor(boundary)) continue;
-		const childAst = extractedModuleAst(source, analysis, boundary, request, allBindingsByPath);
 		referencesByPath.set(
 			boundary.path,
-			collectCaptures(
-				(childAst.body ?? []).filter((node) => node.type !== 'ImportDeclaration'),
-				analysis.imports.importBindings,
-			),
+			moduleReferencesForBoundary(analysis, boundary, request, allBindingsByPath),
 		);
 	}
 	const recordsForReferences = (childReferences) => {
@@ -1371,8 +1591,11 @@ function createModuleMovePlanAst(source, analysis, request) {
 		return records;
 	};
 	const preliminaryCounts = new Map();
-	for (const references of referencesByPath.values()) {
-		for (const record of recordsForReferences(references)) {
+	const preliminaryRecordsByPath = new Map();
+	for (const [path, references] of referencesByPath) {
+		const records = recordsForReferences(references);
+		preliminaryRecordsByPath.set(path, records);
+		for (const record of records) {
 			preliminaryCounts.set(record, (preliminaryCounts.get(record) ?? 0) + 1);
 		}
 	}
@@ -1383,9 +1606,12 @@ function createModuleMovePlanAst(source, analysis, request) {
 	const movedRecords = new Set();
 	for (const boundary of analysis.boundaries) {
 		if (boundary.disabled || hasPermanentStaticAncestor(boundary)) continue;
-		const records = recordsForReferences(referencesByPath.get(boundary.path) ?? []);
-		if (records.size === 0) continue;
-		const ordered = candidates.records.filter((record) => records.has(record));
+		const records = preliminaryRecordsByPath.get(boundary.path);
+		if (records === undefined) continue;
+		const ordered = [...records]
+			.filter((record) => !eagerRecords.has(record))
+			.sort((left, right) => left.order - right.order);
+		if (ordered.length === 0) continue;
 		bindingsByPath.set(boundary.path, new Set(ordered.flatMap((record) => [...record.bindings])));
 		declarationsByPath.set(boundary.path, ordered);
 		for (const record of ordered) movedRecords.add(record);
@@ -1530,9 +1756,10 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null, 
 	for (const boundary of analysis.boundaries) {
 		boundary.filename = filename;
 		boundary.hookNames = analysis.imports.hookNames;
+		boundary.ast = analysis.ast;
 	}
 	const request = sameSourceRequest(filename);
-	const moduleMovePlan = createModuleMovePlanAst(source, analysis, request);
+	const moduleMovePlan = createModuleMovePlanAst(analysis, request);
 	const permanentStaticRemoved =
 		boundaryPath === null
 			? createPermanentStaticRemovalPlanAst(analysis, request, moduleMovePlan)

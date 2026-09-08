@@ -1,5 +1,172 @@
 # @octanejs/seo
 
+## 0.0.38
+
+### Patch Changes
+
+- 395ebe8: Compile and run this package's published source outside Node.
+
+  The package ships `src/` and points its exports at it, so an application
+  compiles these files with its own tsconfig and runs them in its own host. Both
+  halves of that were broken.
+
+  `useStrayOwnerDiagnostic` read `process.env.NODE_ENV` with nothing declaring
+  `process`. In the repository the package's own tsconfig pins `types: ["node"]`,
+  which hid it; a browser application has no `@types/node`, so the file failed to
+  compile, and a host that substitutes nothing threw a ReferenceError out of every
+  `<Head>` render. The reference is now declared locally and guarded with `typeof`,
+  and stays spelled out as `process.env.NODE_ENV` so bundlers still substitute it.
+
+  The rest is `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess`, which
+  plenty of applications turn on. `SeoConfig`'s fields now admit `undefined`
+  alongside being optional, which is what they have always meant: `applyConfig`
+  and the registry merge read every one of them with an `!== undefined` test, so
+  an absent key and a present `undefined` behave identically, and `<Seo>` can go
+  on passing its optional props straight through. The two loops that index an
+  array they just measured say so.
+
+  No behavior changes for an application that already built.
+
+## 0.0.37
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
+## 0.0.36
+
+### Patch Changes
+
+- Updated dependencies [9321d39]
+- Updated dependencies [fdb711a]
+- Updated dependencies [5e80135]
+- Updated dependencies [ad499d0]
+- Updated dependencies [892da9a]
+- Updated dependencies [babf8d7]
+- Updated dependencies [2785a2f]
+- Updated dependencies [df82fbc]
+- Updated dependencies [0824502]
+- Updated dependencies [47c8f54]
+  - octane@0.1.51
+
+## 0.0.35
+
+### Patch Changes
+
+- Updated dependencies [157543f]
+- Updated dependencies [4d13159]
+- Updated dependencies [a944ff3]
+- Updated dependencies [f9f0d23]
+- Updated dependencies [edf2b9d]
+- Updated dependencies [9779569]
+- Updated dependencies [96c86fc]
+  - octane@0.1.50
+
+## 0.0.34
+
+### Patch Changes
+
+- Updated dependencies [8adc693]
+- Updated dependencies [a51c8c6]
+  - octane@0.1.49
+
+## 0.0.33
+
+### Patch Changes
+
+- Updated dependencies [3ca30fc]
+- Updated dependencies [efdc8cb]
+- Updated dependencies [922df8c]
+- Updated dependencies [8a8afd8]
+- Updated dependencies [37a8ca1]
+- Updated dependencies [c84edbb]
+- Updated dependencies [d5175ca]
+- Updated dependencies [4a4996e]
+  - octane@0.1.48
+
+## 0.0.32
+
+### Patch Changes
+
+- Updated dependencies [af0d999]
+- Updated dependencies [c800a1f]
+- Updated dependencies [c1bb057]
+- Updated dependencies [97b9349]
+- Updated dependencies [4393bea]
+- Updated dependencies [7dfef16]
+- Updated dependencies [7e62361]
+- Updated dependencies [964783a]
+- Updated dependencies [d3dbd78]
+  - octane@0.1.47
+
+## 0.0.31
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+
+## 0.0.30
+
+### Patch Changes
+
+- Updated dependencies [5b1e6a3]
+- Updated dependencies [31abee5]
+- Updated dependencies [fd6ce69]
+- Updated dependencies [5f7a457]
+- Updated dependencies [5227d7b]
+- Updated dependencies [6927595]
+- Updated dependencies [f1a7802]
+  - octane@0.1.45
+
+## 0.0.29
+
+### Patch Changes
+
+- Updated dependencies [9b06e47]
+- Updated dependencies [7535acd]
+  - octane@0.1.44
+
+## 0.0.28
+
+### Patch Changes
+
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+
+## 0.0.27
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+
+## 0.0.26
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+
+## 0.0.25
+
+### Patch Changes
+
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+
 ## 0.0.24
 
 ### Patch Changes

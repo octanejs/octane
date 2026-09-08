@@ -7,6 +7,13 @@ primitives) on octane's hooks. It mirrors the unified `radix-ui` package's shape
 low-level composition utilities are exported directly, and each component is a namespace
 (`Separator.Root`, `Label.Root`).
 
+## Installation
+
+```sh
+npm install @octanejs/radix
+pnpm add @octanejs/radix
+```
+
 ```tsx
 import { Separator, Label } from '@octanejs/radix';
 

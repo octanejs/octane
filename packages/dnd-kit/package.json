@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/dnd-kit",
-  "version": "0.1.34",
+  "version": "0.1.47",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -31,7 +31,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",
@@ -40,8 +41,8 @@
     "./utilities": "./src/utilities/index.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project dnd-kit --project dnd-kit-differential --project dnd-kit-ssr",
-    "test:coverage": "vitest run --root ../.. --project dnd-kit --project dnd-kit-differential --project dnd-kit-ssr --coverage.enabled --coverage.provider=v8 --coverage.include=packages/dnd-kit/src/** --coverage.reporter=text --coverage.thresholds.lines=100 --coverage.thresholds.statements=98 --coverage.thresholds.functions=98 --coverage.thresholds.branches=86"
+    "test": "vitest run --root ../.. --project dnd-kit --project dnd-kit-differential --project dnd-kit-parity-audit --project dnd-kit-ssr",
+    "test:coverage": "vitest run --root ../.. --project dnd-kit --project dnd-kit-differential --project dnd-kit-parity-audit --project dnd-kit-ssr --coverage.enabled --coverage.provider=v8 --coverage.include=packages/dnd-kit/src/** --coverage.reporter=text --coverage.thresholds.lines=100 --coverage.thresholds.statements=98 --coverage.thresholds.functions=98 --coverage.thresholds.branches=86"
   },
   "dependencies": {
     "@dnd-kit/abstract": "catalog:default",
@@ -50,7 +51,7 @@
     "@dnd-kit/state": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@dnd-kit/helpers": "catalog:default",

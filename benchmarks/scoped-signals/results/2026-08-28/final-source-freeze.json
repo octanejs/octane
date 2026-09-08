@@ -1,0 +1,51 @@
+{
+  "capturedAt": "2026-08-27T23:58:21.312Z",
+  "sourceManifest": {
+    "path": "/private/tmp/octane-final-verification-yCm8IZ/correctness-source-v2.json",
+    "sha256": "fe3cae2cfdc6f92ad71e2e242d90683430a116e4b5a31fb66d3ea9d78e878c53"
+  },
+  "sources": {
+    "live": {
+      "root": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+      "files": 1144,
+      "differences": []
+    },
+    "copy": {
+      "root": "/private/tmp/octane-final-verification-yCm8IZ/current-correctness-01",
+      "files": 1144,
+      "differences": []
+    }
+  },
+  "baseline": {
+    "root": "/private/tmp/octane-final-verification-yCm8IZ/baseline-cd9-monorepo",
+    "ref": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+    "files": 120,
+    "archiveSha256": "d2c512c27e8a88a9ab50e1864cfdae2522d4694ce2a27ccc63539424e1af5b46",
+    "unchanged": true
+  },
+  "extra": {
+    "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/run-native-props.mjs": "5b6e57c70111da5c72704c4fbbecb28b1c5dd4ced510a07aa8da1b78b17afc93",
+    "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/run-native-costs.mjs": "ae28dcf260a1f05a1b867c58bb49d9c6c253c11f18d80f98d701f1eb249c3c57",
+    "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/native-collector-controls.mjs": "13ff8f3a35c4fce0b388d6757e3e96981629af93248bcd5ef9c6adae1f61868d",
+    "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/lib/stats.mjs": "50aece53e529b11d096cde638acfd8927ded4372d5ab2b6dbd0fc0ac2792c176",
+    "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-native-costs.json": "49e20127b9766d49778a212b70fe0e5257ce36c04873fbd96db626c94849d46a",
+    "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+    "/private/tmp/octane-native-source-compiler-NVcMdO/provenance.json": "c2a7a3413da743b296371698a87160f184869767d4dd568540445fd055b86e09",
+    "/private/tmp/octane-final-verification-yCm8IZ/run-correctness.mjs": "195dcb988c0330e983ef94de3be367cad1642e09096fce50cc5fab06ccaed130",
+    "/private/tmp/octane-final-verification-yCm8IZ/final-correctness.config.mjs": "a9da552cc6798a7fb7ad11b479c59234904236d49ff530b8c35bc50230f5818a"
+  },
+  "correctness": {
+    "fullPath": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-55-35.275Z-n1yqsu",
+    "fullReportSha256": "71c08670f8d83520f3e36abaaee07f00feefc12ee1023c07aa394262bb982515",
+    "fullPassed": 1352,
+    "fullFilesPassed": 81,
+    "browserSetupFailure": "Chromium MachPortRendezvous Permission denied in sandbox; original log preserved",
+    "browserPath": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-57-18.419Z-s3pf5v",
+    "browserReportSha256": "b402e5994ef4cf97f0e15de4abcd7c3c8be272516ba999415d77edcf35401b0b",
+    "approvedBrowserRerunPassed": 4,
+    "combinedPassed": 1356,
+    "combinedFailures": 0,
+    "profileIncluded": false,
+    "authority": "Supplemental public-source toolchain; not locked-workspace CI"
+  }
+}

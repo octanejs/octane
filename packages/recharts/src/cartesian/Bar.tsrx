@@ -1,3 +1,177 @@
+import type { RegisteredCell } from '../context/CellsContext.ts';
+import type { CellPropsFor } from '../component/Cell.ts';
+import type {
+	MutableRefObject,
+	NativeMouseEvent,
+	OctaneElement,
+	OctaneNode,
+} from '../util/OctaneTypes.ts';
+import type { Octane } from 'octane/jsx-runtime';
+
+type Key = Octane.Key;
+import type { Series } from 'victory-vendor/d3-shape';
+import type { Props as RectangleProps, RectRadius } from '../shape/Rectangle.tsrx';
+import type { ErrorBarDataPointFormatter } from './ErrorBar.tsrx';
+import type { CartesianLabelListEntry, ImplicitLabelListType } from '../component/LabelList.tsrx';
+import type { BarPositionPosition, StackId } from '../util/ChartUtils';
+import type {
+	ActiveShape,
+	AnimationDuration,
+	CartesianLayout,
+	CartesianViewBoxRequired,
+	ChartOffsetInternal,
+	Coordinate,
+	DataConsumer,
+	DataKey,
+	LegendType,
+	PresentationAttributesAdaptChildEvent,
+	ShapeAnimationProps,
+	TickItem,
+	TooltipType,
+	TrapezoidViewBox,
+} from '../util/types';
+import type { BarBackgroundRectangleProps, MinPointSize } from '../util/BarUtils.tsrx';
+import type { Formatter } from '../component/DefaultTooltipContent.tsrx';
+import type { TooltipPayloadConfiguration } from '../state/tooltipSlice';
+import type { BaseAxisWithScale } from '../state/selectors/axisSelectors';
+import type { BarSettings } from '../state/types/BarSettings';
+import type { SVGPropsNoEvents } from '../util/svgPropertiesNoEvents';
+import type { AnimationInterpolateFn } from '../animation/AnimatedItems.tsrx';
+import type { AnimationMatchByProp } from '../animation/matchBy';
+import type { EasingInput } from '../animation/easing';
+import type { WithoutId } from '../util/useUniqueId';
+import type { ZIndexable } from '../zIndex/ZIndexLayer.tsrx';
+import type { AxisId } from '../state/cartesianAxisSlice';
+import type { GraphicalItemId } from '../state/graphicalItemsSlice';
+import type { ChartData } from '../state/chartDataSlice';
+
+type BarRectangleType = {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+};
+export interface BarRectangleItem extends RectangleProps {
+	value: number | [number, number];
+	background?: BarRectangleType;
+	tooltipPosition: Coordinate;
+	readonly payload?: any;
+	parentViewBox: CartesianViewBoxRequired;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	stackedBarStart: number | undefined;
+	originalDataIndex: number;
+}
+export type BarShapeProps =
+	BarRectangleItem & ShapeAnimationProps & {
+		isActive: boolean;
+		index: number;
+	};
+export type BarBackgroundShapeProps = Omit<BarShapeProps, 'value' | 'tooltipPosition'>;
+interface BarProps<DataPointType, ValueAxisType> extends DataConsumer<
+	DataPointType,
+	ValueAxisType
+>, ZIndexable {
+	className?: string;
+	index?: Key;
+	xAxisId?: AxisId;
+	yAxisId?: AxisId;
+	stackId?: StackId;
+	barSize?: string | number;
+	unit?: string | number;
+	name?: string | number;
+	tooltipType?: TooltipType;
+	formatter?: Formatter;
+	legendType?: LegendType;
+	minPointSize?: MinPointSize;
+	maxBarSize?: number;
+	hide?: boolean;
+	shape?: ActiveShape<BarShapeProps, SVGPathElement>;
+	activeBar?: ActiveShape<BarShapeProps, SVGPathElement>;
+	background?: ActiveShape<BarBackgroundShapeProps, SVGPathElement> & ZIndexable;
+	radius?: RectRadius;
+	onAnimationStart?: () => void;
+	onAnimationEnd?: () => void;
+	isAnimationActive?: boolean | 'auto';
+	animationBegin?: number;
+	animationDuration?: AnimationDuration;
+	animationEasing?: EasingInput;
+	animationInterpolateFn?: AnimationInterpolateFn<BarRectangleItem, CartesianLayout>;
+	animationMatchBy?: AnimationMatchByProp<BarRectangleItem>;
+	id?: string;
+	label?: ImplicitLabelListType;
+	zIndex?: number;
+}
+type BarMouseEvent =
+	(data: BarRectangleItem, index: number, event: NativeMouseEvent<SVGGElement>) => void;
+interface BarEvents {
+	onClick: BarMouseEvent;
+	onMouseEnter: BarMouseEvent;
+	onMouseLeave: BarMouseEvent;
+	onMouseMove: BarMouseEvent;
+	onMouseDown: BarMouseEvent;
+	onMouseUp: BarMouseEvent;
+	onMouseOver: BarMouseEvent;
+	onMouseOut: BarMouseEvent;
+}
+type InternalBarProps = {
+	layout: 'horizontal' | 'vertical';
+	data: ReadonlyArray<BarRectangleItem> | undefined;
+	xAxisId: string | number;
+	yAxisId: string | number;
+	hide: boolean;
+	legendType: LegendType;
+	minPointSize: MinPointSize;
+	activeBar: ActiveShape<BarShapeProps, SVGPathElement>;
+	isAnimationActive: boolean | 'auto';
+	animationBegin: number;
+	animationDuration: AnimationDuration;
+	animationEasing: EasingInput;
+	needClip?: boolean;
+	className?: string;
+	index?: Key;
+	stackId?: string | number;
+	barSize?: string | number;
+	unit?: string | number;
+	name?: string | number;
+	dataKey?: DataKey<any>;
+	tooltipType?: TooltipType;
+	formatter?: Formatter;
+	maxBarSize?: number;
+	shape: ActiveShape<BarShapeProps, SVGPathElement>;
+	background?: ActiveShape<BarBackgroundShapeProps, SVGPathElement>;
+	radius?: number | [number, number, number, number];
+	onAnimationStart?: () => void;
+	onAnimationEnd?: () => void;
+	animationInterpolateFn: AnimationInterpolateFn<BarRectangleItem, CartesianLayout>;
+	animationMatchBy: AnimationMatchByProp<BarRectangleItem>;
+	id: GraphicalItemId;
+	label?: ImplicitLabelListType;
+};
+type BarSvgProps =
+	Omit<
+		PresentationAttributesAdaptChildEvent<BarRectangleItem, SVGGElement>,
+		'radius' | 'name' | 'ref'
+	>;
+export type Props<DataPointType = any, ValueAxisType = any> =
+	Partial<BarEvents> & BarProps<DataPointType, ValueAxisType> & Omit<BarSvgProps, keyof BarEvents>;
+type InternalProps = BarSvgProps & InternalBarProps;
+type BarBackgroundProps = {
+	background?: ActiveShape<BarBackgroundShapeProps, SVGPathElement>;
+	data: ReadonlyArray<BarRectangleItem> | undefined;
+	dataKey: DataKey<any> | undefined;
+	allOtherBarProps: InternalProps;
+};
+type BarRectanglesProps =
+	InternalProps & {
+		data: ReadonlyArray<BarRectangleItem> | undefined;
+	};
+type BarImplProps =
+	Omit<InternalBarProps, 'layout' | 'data'> & {
+		children?: OctaneNode;
+	};
 // Port of cartesian/Bar.tsx — the bar graphical item: redux registration
 // (graphical item, legend, tooltip settings), store-computed rectangles,
 // background bars, active-bar highlight, stack clipping, labels, animation.
@@ -21,7 +195,12 @@ import {
 	truncateByDomain,
 } from '../util/ChartUtils';
 import { adaptEventsOfChild } from '../util/types.ts';
-import { BarRectangle, defaultBarShape, minPointSizeCallback } from '../util/BarUtils.tsrx';
+import {
+	BarRectangle,
+	BarBackgroundRectangle,
+	defaultBarShape,
+	minPointSizeCallback,
+} from '../util/BarUtils.tsrx';
 import {
 	useMouseClickItemDispatch,
 	useMouseEnterItemDispatch,
@@ -55,7 +234,7 @@ import { propsAreEqual } from '../util/propsAreEqual';
 import { BarStackClipLayer, useStackId } from './BarStack.tsrx';
 import { CellsContext, useCellRegistry } from '../context/CellsContext';
 
-const computeLegendPayloadFromBarData = (props) => {
+const computeLegendPayloadFromBarData = (props: Props) => {
 	const { dataKey, name, fill, legendType, hide } = props;
 	return [
 		{
@@ -69,7 +248,21 @@ const computeLegendPayloadFromBarData = (props) => {
 	];
 };
 
-const SetBarTooltipEntrySettings = memo((props) => {
+const SetBarTooltipEntrySettings = memo((
+	props: Pick<
+		InternalProps,
+		| 'dataKey'
+		| 'stroke'
+		| 'strokeWidth'
+		| 'fill'
+		| 'name'
+		| 'hide'
+		| 'unit'
+		| 'formatter'
+		| 'tooltipType'
+		| 'id'
+	>,
+) => {
 	const {
 		dataKey,
 		stroke,
@@ -82,7 +275,7 @@ const SetBarTooltipEntrySettings = memo((props) => {
 		tooltipType,
 		id,
 	} = props;
-	const tooltipEntrySettings = {
+	const tooltipEntrySettings: TooltipPayloadConfiguration = {
 		dataDefinedOnItem: undefined,
 		getPosition: noop,
 		settings: {
@@ -103,7 +296,7 @@ const SetBarTooltipEntrySettings = memo((props) => {
 	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
 });
 
-function BarBackground(props) {
+function BarBackground(props: BarBackgroundProps) {
 	const activeIndex = useAppSelector(selectActiveTooltipIndex);
 	const { data, dataKey, background: backgroundFromProps, allOtherBarProps } = props;
 	const {
@@ -137,7 +330,7 @@ function BarBackground(props) {
 		const onMouseEnter = onMouseEnterFromContext(entry, entry.originalDataIndex);
 		const onMouseLeave = onMouseLeaveFromContext(entry, entry.originalDataIndex);
 		const onClick = onClickFromContext(entry, entry.originalDataIndex);
-		const barRectangleProps = {
+		const barRectangleProps: BarBackgroundRectangleProps = {
 			option: backgroundFromProps,
 			isActive: String(entry.originalDataIndex) === activeIndex,
 			...rest,
@@ -152,14 +345,20 @@ function BarBackground(props) {
 			index: i,
 			className: 'recharts-bar-background-rectangle',
 		};
-		return <BarRectangle key={'background-bar-' + i} {...barRectangleProps} />;
+		return <BarBackgroundRectangle key={'background-bar-' + i} {...barRectangleProps} />;
 	})}</ZIndexLayer>;
 }
 
-function BarLabelListProvider(props) @{
+function BarLabelListProvider(props: {
+	showLabels: boolean;
+	children: OctaneNode;
+	rects: ReadonlyArray<BarRectangleItem> | undefined;
+}) @{
 	const { showLabels, children, rects } = props;
-	const labelListEntries = rects?.map((entry) => {
-		const viewBox = {
+	const labelListEntries: ReadonlyArray<CartesianLabelListEntry> | undefined = rects?.map((
+		entry: BarRectangleItem,
+	) => {
+		const viewBox: TrapezoidViewBox = {
 			x: entry.x,
 			y: entry.y,
 			width: entry.width,
@@ -181,20 +380,27 @@ function BarLabelListProvider(props) @{
 	>{children}</CartesianLabelListContextProvider>
 }
 
-function BarRectangleWithActiveState(props) {
+function BarRectangleWithActiveState(props: ShapeAnimationProps & {
+	shape: ActiveShape<BarShapeProps, SVGPathElement>;
+	activeBar: ActiveShape<BarShapeProps, SVGPathElement>;
+	baseProps: WithoutId<SVGPropsNoEvents<BarRectanglesProps>>;
+	entry: BarRectangleItem;
+	index: number;
+	dataKey: DataKey<any> | undefined;
+}) {
 	const { shape, activeBar, baseProps, entry, index, dataKey } = props;
 	const activeIndex = useAppSelector(selectActiveTooltipIndex);
 	const activeDataKey = useAppSelector(selectActiveTooltipDataKey);
 	// Only highlight this bar when it matches the active index AND (for
 	// non-shared tooltips) the active dataKey. originalDataIndex matches
 	// against the pre-filter data slice.
-	const isActive =
+	const isActive: boolean =
 		activeBar && String(entry.originalDataIndex) === activeIndex &&
 			(activeDataKey == null || dataKey === activeDataKey);
 	const [stayInLayer, setStayInLayer] = useState(false);
 	const [hasMountedActive, setHasMountedActive] = useState(false);
 	useEffect(() => {
-		let rafId;
+		let rafId: number;
 		if (isActive) {
 			// 1. Enter the layer immediately
 			setStayInLayer(true);
@@ -218,7 +424,7 @@ function BarRectangleWithActiveState(props) {
 	}, [isActive]);
 	const isVisuallyActive = isActive && hasMountedActive;
 	const shouldRenderInLayer = isActive || stayInLayer;
-	let option;
+	let option: ActiveShape<BarShapeProps, SVGPathElement>;
 	if (isActive) {
 		if (activeBar === true) {
 			option = shape;
@@ -249,7 +455,13 @@ function BarRectangleWithActiveState(props) {
 	return content;
 }
 
-function BarRectangleNeverActive(props) {
+function BarRectangleNeverActive(props: ShapeAnimationProps & {
+	shape: ActiveShape<BarShapeProps, SVGPathElement>;
+	baseProps: WithoutId<SVGPropsNoEvents<BarRectanglesProps>>;
+	entry: BarRectangleItem;
+	index: number;
+	dataKey: DataKey<any> | undefined;
+}) {
 	const { shape, baseProps, entry, index, dataKey } = props;
 	return <BarRectangle
 		{...baseProps}
@@ -265,7 +477,10 @@ function BarRectangleNeverActive(props) {
 	/>;
 }
 
-function BarRectangles(rectanglesProps) {
+function BarRectangles(rectanglesProps: ShapeAnimationProps & {
+	data: ReadonlyArray<BarRectangleItem> | undefined;
+	props: BarRectanglesProps;
+}) {
 	const { data, props, animationElapsedTime, isAnimating, isEntrance } = rectanglesProps;
 	const { id, ...baseProps } = svgPropertiesNoEvents(props) ?? {};
 	const { shape, dataKey, activeBar } = props;
@@ -321,7 +536,11 @@ function BarRectangles(rectanglesProps) {
 	</>;
 }
 
-const defaultBarAnimateItems = (items, animationElapsedTime, layout) => {
+const defaultBarAnimateItems: AnimationInterpolateFn<BarRectangleItem, CartesianLayout> = (
+	items,
+	animationElapsedTime,
+	layout,
+) => {
 	if (items == null) return [];
 	if (animationElapsedTime === 1) {
 		return items.flatMap((item) => (item.status === 'removed' ? [] : [item.next]));
@@ -374,7 +593,10 @@ const defaultBarAnimateItems = (items, animationElapsedTime, layout) => {
 	});
 };
 
-function RectanglesWithAnimation(rectanglesWithAnimationProps) {
+function RectanglesWithAnimation(rectanglesWithAnimationProps: {
+	props: InternalProps;
+	previousRectanglesRef: MutableRefObject<null | ReadonlyArray<BarRectangleItem>>;
+}) {
 	const { props, previousRectanglesRef } = rectanglesWithAnimationProps;
 	const {
 		data,
@@ -420,14 +642,17 @@ function RectanglesWithAnimation(rectanglesWithAnimationProps) {
 	</BarLabelListProvider>;
 }
 
-function RenderRectangles(props) {
-	const previousRectanglesRef = useRef(null);
+function RenderRectangles(props: InternalProps) {
+	const previousRectanglesRef = useRef<ReadonlyArray<BarRectangleItem> | null>(null);
 	return <RectanglesWithAnimation previousRectanglesRef={previousRectanglesRef} props={props} />;
 }
 
-const defaultMinPointSize = 0;
+const defaultMinPointSize: number = 0;
 
-const errorBarDataPointFormatter = (dataPoint, dataKey) => {
+const errorBarDataPointFormatter: ErrorBarDataPointFormatter<BarRectangleItem> = (
+	dataPoint: BarRectangleItem,
+	dataKey,
+) => {
 	// A value array means a stacked bar: arr[1] is the bar's end value.
 	const value = Array.isArray(dataPoint.value) ? dataPoint.value[1] : dataPoint.value;
 	return {
@@ -439,7 +664,7 @@ const errorBarDataPointFormatter = (dataPoint, dataKey) => {
 	};
 };
 
-function BarWithState(props) @{
+function BarWithState(props: InternalProps) @{
 	const { hide, data, dataKey, className, xAxisId, yAxisId, needClip, background, id } = props;
 	if (hide || data == null) {
 		return null;
@@ -484,9 +709,9 @@ export const defaultBarProps = {
 	xAxisId: 0,
 	yAxisId: 0,
 	zIndex: DefaultZIndexes.bar,
-};
+} as const satisfies Partial<Props>;
 
-function BarImpl(props) {
+function BarImpl(props: BarImplProps) {
 	const {
 		xAxisId,
 		yAxisId,
@@ -505,11 +730,13 @@ function BarImpl(props) {
 	// octane divergence: cells arrive via registration (children render inside
 	// the CellsContext provider below), not children introspection.
 	const [cells, cellRegistry] = useCellRegistry();
-	const rects = useAppSelector((state) => selectBarRectangles(state, props.id, isPanorama, cells));
+	const rects: ReadonlyArray<BarRectangleItem> | undefined = useAppSelector(
+		(state) => selectBarRectangles(state, props.id, isPanorama, cells),
+	);
 	if (layout !== 'vertical' && layout !== 'horizontal') {
 		return null;
 	}
-	let errorBarOffset;
+	let errorBarOffset: number;
 	const firstDataPoint = rects?.[0];
 	if (firstDataPoint == null || firstDataPoint.height == null || firstDataPoint.width == null) {
 		errorBarOffset = 0;
@@ -559,22 +786,39 @@ export function computeBarRectangles({
 	cells,
 	parentViewBox,
 	dataStartIndex,
+}: {
+	layout: 'horizontal' | 'vertical';
+	barSettings: BarSettings;
+	pos: BarPositionPosition;
+	bandSize: number;
+	xAxis: BaseAxisWithScale;
+	yAxis: BaseAxisWithScale;
+	xAxisTicks: TickItem[];
+	yAxisTicks: TickItem[];
+	stackedData: Series<Record<number, number>, DataKey<any>> | undefined;
+	offset: ChartOffsetInternal;
+	displayedData: ChartData;
+	cells: ReadonlyArray<RegisteredCell> | undefined;
+	parentViewBox: CartesianViewBoxRequired;
+	dataStartIndex: number;
 }) {
 	const numericAxis =
 		layout === 'horizontal' ? yAxis : xAxis;
-	const stackedDomain =
-		stackedData ? numericAxis.scale.domain() : null;
+	const stackedDomain = stackedData ? numericAxis.scale.domain() as readonly number[] : null;
 	const baseValue = getBaseValueOfBar({ numericAxis });
-	const stackedBarStart = numericAxis.scale.map(baseValue);
-	return displayedData.map((entry, index) => {
-		let value, x, y, width, height, background;
+	const stackedBarStart: number | undefined = numericAxis.scale.map(baseValue);
+	const rectangles = displayedData.map((entry, index) => {
+		let value, x: number | null, y, width, height, background: Omit<BarRectangleType, 'x' | 'y'> & {
+			x: number | null;
+			y: number | null;
+		};
 		if (stackedData) {
 			// Use dataStartIndex to access the correct element in the full stackedData array
 			const untruncatedValue = stackedData[index + dataStartIndex];
 			if (untruncatedValue == null) {
 				return null;
 			}
-			value = truncateByDomain(untruncatedValue, stackedDomain);
+			value = truncateByDomain(untruncatedValue, stackedDomain!);
 		} else {
 			value = getValueByDataKey(entry, dataKey);
 			if (!Array.isArray(value)) {
@@ -643,7 +887,7 @@ export function computeBarRectangles({
 			return null;
 		}
 		return {
-			...entry,
+			...entry as Record<string, unknown>,
 			stackedBarStart,
 			x,
 			y,
@@ -651,16 +895,26 @@ export function computeBarRectangles({
 			height,
 			value: stackedData ? value : value[1],
 			payload: entry,
-			background,
+			// Background origins come from x/y or chart offsets; the guard above
+			// has removed every entry with unresolved x/y coordinates.
+			background: background as BarRectangleType,
 			tooltipPosition: { x: x + width / 2, y: y + height / 2 },
 			parentViewBox,
 			originalDataIndex: index,
-			...cells && cells[index] && cells[index].props,
+			...cells && cells[index] && cells[index].props as CellPropsFor<SVGPathElement>,
 		};
-	}).filter(Boolean);
+	});
+	// This map returns only objects or null, so Boolean removes exactly the nulls.
+	return rectangles.filter(
+		Boolean as BooleanConstructor & ((rectangle: (typeof rectangles)[number]) => rectangle is NonNullable<
+			typeof rectangle
+		>),
+	);
 }
 
-function BarFn(outsideProps) {
+function BarFn<DataPointType = any, ValueAxisType = any>(
+	outsideProps: Props<DataPointType, ValueAxisType>,
+) {
 	const props = resolveDefaultProps(outsideProps, defaultBarProps);
 	// stackId may arrive from props or from BarStack context
 	const stackId = useStackId(props.stackId);
@@ -712,5 +966,5 @@ function BarFn(outsideProps) {
  * @consumes CartesianChartContext
  * @consumes BarStackContext
  */
-export const Bar = memo(BarFn, propsAreEqual);
+export const Bar = memo(BarFn, propsAreEqual) as typeof BarFn & { displayName?: string };
 Bar.displayName = 'Bar';

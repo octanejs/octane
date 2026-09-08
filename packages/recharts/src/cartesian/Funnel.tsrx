@@ -1,19 +1,20 @@
+import type { MutableRefObject, NativeMouseEvent, OctaneNode } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { MutableRefObject, ReactElement, ReactNode, useMemo, useRef } from 'octane';
+import { useMemo, useRef } from 'octane';
 import { shallowEqual } from '@octanejs/redux';
 import omit from 'es-toolkit/compat/omit';
 
 import { clsx } from 'clsx';
 import { selectActiveIndex } from '../state/selectors/selectors';
 import { useAppSelector } from '../state/hooks';
-import { Layer } from '../container/Layer';
-import { Props as TrapezoidProps } from '../shape/Trapezoid';
+import { Layer } from '../container/Layer.tsrx';
+import { Props as TrapezoidProps } from '../shape/Trapezoid.tsrx';
 import {
 	CartesianLabelListContextProvider,
 	CartesianLabelListEntry,
 	ImplicitLabelListType,
 	LabelListFromLabelProp,
-} from '../component/LabelList';
+} from '../component/LabelList.tsrx';
 import { getPercentValue, interpolate } from '../util/DataUtils';
 import { getValueByDataKey } from '../util/ChartUtils';
 import {
@@ -34,7 +35,11 @@ import {
 	TrapezoidViewBox,
 	CartesianLayout,
 } from '../util/types';
-import { defaultFunnelShape, FunnelTrapezoid, FunnelTrapezoidProps } from '../util/FunnelUtils';
+import {
+	defaultFunnelShape,
+	FunnelTrapezoid,
+	FunnelTrapezoidProps,
+} from '../util/FunnelUtils.tsrx';
 import {
 	useMouseClickItemDispatch,
 	useMouseEnterItemDispatch,
@@ -42,8 +47,8 @@ import {
 } from '../context/tooltipContext';
 import { TooltipPayload, TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { Formatter } from '../component/DefaultTooltipContent';
-import type { LegendPayload } from '../component/DefaultLegendContent';
+import { Formatter } from '../component/DefaultTooltipContent.tsrx';
+import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
 import { ResolvedFunnelSettings, selectFunnelTrapezoids } from '../state/selectors/funnelSelectors';
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { usePlotArea } from '../hooks';
@@ -52,10 +57,10 @@ import {
 	AnimatedItems,
 	AnimationInterpolateFn,
 	useAnimationCallbacks,
-} from '../animation/AnimatedItems';
+} from '../animation/AnimatedItems.tsrx';
 import { AnimationMatchByProp, matchAppend } from '../animation/matchBy';
 import { GraphicalItemId } from '../state/graphicalItemsSlice';
-import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId';
+import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import { WithIdRequired } from '../util/useUniqueId';
 import { SetLegendPayload } from '../state/SetLegendPayload';
 import { CellsContext, useCellRegistry } from '../context/CellsContext';
@@ -196,7 +201,7 @@ interface FunnelProps<DataPointType = any, DataValueType = any> extends DataProv
 	onAnimationStart?: () => void;
 	reversed?: boolean;
 	/**
- * If set a ReactElement, the shape of funnel can be customized.
+ * If set a OctaneElement, the shape of funnel can be customized.
  * If set a function, the function will be called to render customized shape.
  * During animations, the function shape also receives `animationElapsedTime`, `isAnimating`, and `isEntrance`.
  * By default, renders a trapezoid.
@@ -211,48 +216,44 @@ interface FunnelProps<DataPointType = any, DataValueType = any> extends DataProv
 	/**
  * The customized event handler of click on the area in this group
  */
-	onClick?: (data: FunnelTrapezoidItem, index: number, e: React.MouseEvent<SVGPathElement>) => void;
+	onClick?: (data: FunnelTrapezoidItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousedown on the area in this group
  */
-	onMouseDown?: (data: FunnelTrapezoidItem, index: number, e: React.MouseEvent<
-		SVGPathElement
+	onMouseDown?: (data: FunnelTrapezoidItem, index: number, e: NativeMouseEvent<
+		SVGGElement
 	>) => void;
 	/**
  * The customized event handler of mouseup on the area in this group
  */
-	onMouseUp?: (data: FunnelTrapezoidItem, index: number, e: React.MouseEvent<
-		SVGPathElement
-	>) => void;
+	onMouseUp?: (data: FunnelTrapezoidItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousemove on the area in this group
  */
-	onMouseMove?: (data: FunnelTrapezoidItem, index: number, e: React.MouseEvent<
-		SVGPathElement
+	onMouseMove?: (data: FunnelTrapezoidItem, index: number, e: NativeMouseEvent<
+		SVGGElement
 	>) => void;
 	/**
  * The customized event handler of mouseover on the area in this group
  */
-	onMouseOver?: (data: FunnelTrapezoidItem, index: number, e: React.MouseEvent<
-		SVGPathElement
+	onMouseOver?: (data: FunnelTrapezoidItem, index: number, e: NativeMouseEvent<
+		SVGGElement
 	>) => void;
 	/**
  * The customized event handler of mouseout on the area in this group
  */
-	onMouseOut?: (data: FunnelTrapezoidItem, index: number, e: React.MouseEvent<
-		SVGPathElement
-	>) => void;
+	onMouseOut?: (data: FunnelTrapezoidItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseenter on the area in this group
  */
-	onMouseEnter?: (data: FunnelTrapezoidItem, index: number, e: React.MouseEvent<
-		SVGPathElement
+	onMouseEnter?: (data: FunnelTrapezoidItem, index: number, e: NativeMouseEvent<
+		SVGGElement
 	>) => void;
 	/**
  * The customized event handler of mouseleave on the area in this group
  */
-	onMouseLeave?: (data: FunnelTrapezoidItem, index: number, e: React.MouseEvent<
-		SVGPathElement
+	onMouseLeave?: (data: FunnelTrapezoidItem, index: number, e: NativeMouseEvent<
+		SVGGElement
 	>) => void;
 }
 
@@ -299,11 +300,11 @@ const SetFunnelTooltipEntrySettings = React.memo(({
 	| 'data'
 	| 'id'
 > & {
-	trapezoids: ReadonlyArray<FunnelTrapezoidItem>;
+	trapezoids: ReadonlyArray<FunnelTrapezoidItem> | undefined;
 }) => {
 	const tooltipEntrySettings: TooltipPayloadConfiguration = {
 		dataDefinedOnItem: data,
-		getPosition: (index) => trapezoids[Number(index)]?.tooltipPosition,
+		getPosition: (index) => trapezoids?.[Number(index)]?.tooltipPosition,
 		settings: {
 			stroke,
 			strokeWidth,
@@ -329,7 +330,7 @@ function FunnelLabelListProvider({
 }: {
 	showLabels: boolean;
 	trapezoids: ReadonlyArray<FunnelTrapezoidItem> | undefined;
-	children: ReactNode;
+	children: OctaneNode;
 }) {
 	const labelListEntries: ReadonlyArray<CartesianLabelListEntry> | undefined = useMemo(() => {
 		if (!showLabels) {
@@ -818,16 +819,18 @@ export function computeFunnelTrapezoids({
  * @provides LabelListContext
  * @provides CellReader
  */
-function FunnelFn(outsideProps: Props) {
-	const { id: externalId, ...props } = resolveDefaultProps(outsideProps, defaultFunnelProps);
+function FunnelFn<DataPointType = any, DataValueType = any>(
+	outsideProps: Props<DataPointType, DataValueType>,
+) {
+	// Internal chart data also supports the built-in 'name' key when no nameKey is supplied.
+	const { id: externalId, ...props } = resolveDefaultProps<Props, typeof defaultFunnelProps>(
+		outsideProps,
+		defaultFunnelProps,
+	);
 	return <RegisterGraphicalItemId id={externalId} type="funnel">
 		{(id) => <FunnelImpl {...props} id={id} />}
 	</RegisterGraphicalItemId>;
 }
 
-export const Funnel = FunnelFn as (outsideProps: Props<
-	DataPointType,
-	DataValueType
->) => ReactElement;
-// @ts-expect-error we need to set the displayName for debugging purposes
+export const Funnel = FunnelFn as typeof FunnelFn & { displayName?: string };
 Funnel.displayName = 'Funnel';

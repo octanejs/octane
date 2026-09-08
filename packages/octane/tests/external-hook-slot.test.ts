@@ -698,7 +698,8 @@ describe('manifest-declared manual hook slots', () => {
 		// removing the flag from a listed one) means its .ts/.js sources double-slot the
 		// moment ANOTHER project imports them — the exact drift the declaration
 		// exists to prevent. Redux, Recharts, and Hook Form are auto-slotted by
-		// design and therefore carry no flag. Bindings whose hooks all live in
+		// design and therefore carry no flag. Base UI is also auto-slotted after its
+		// authored source migration. Bindings whose hooks all live in
 		// .tsrx (tanstack-form, tanstack-hotkeys, tanstack-ai, tanstack-table) are
 		// fully compiled, so they hand-forward nothing and carry no flag either.
 		const packagesDir = join(process.cwd(), 'packages');
@@ -716,17 +717,19 @@ describe('manifest-declared manual hook slots', () => {
 			'alien-signals',
 			'animejs',
 			'aria',
-			'base-ui',
+			'better-auth',
 			'devtools',
 			'dexie',
 			'dnd-kit',
 			'drei',
 			'electron',
 			'floating-ui',
+			'formisch',
 			'gsap',
 			'i18next',
 			'inertia',
 			'ink',
+			'input-otp',
 			'jotai',
 			'lexical',
 			'livestore',
@@ -734,14 +737,17 @@ describe('manifest-declared manual hook slots', () => {
 			'mdx',
 			'mobx',
 			'motion',
+			'opentui',
 			'phosphor-icons',
+			'puck',
 			'radix',
 			'rainbowkit',
 			'react-error-boundary',
 			'remix-router',
 			'rxjs',
-			'solana-react',
+			'solana-kit',
 			'spring',
+			'stick-to-bottom',
 			'styled-components',
 			'stylex',
 			'syntax-highlighter',
@@ -755,13 +761,24 @@ describe('manifest-declared manual hook slots', () => {
 			'testing-library',
 			'three',
 			'tiptap',
+			'to-print',
 			'usehooks-ts',
 			'valtio',
 			'vaul',
 			'wagmi',
+			'waypoint',
 			'window',
+			'wouter',
+			'xstate',
+			'xstate-store',
+			'xyflow',
 			'zag',
 			'zustand',
+		]);
+		const inputOtp = JSON.parse(readFileSync(join(packagesDir, 'input-otp/package.json'), 'utf8'));
+		expect(inputOtp.octane.hookSlots.manual).toEqual([
+			'src/use-previous.ts',
+			'src/use-pwm-badge.ts',
 		]);
 	});
 });

@@ -15,7 +15,7 @@
 import { createElement, Fragment, type OctaneNode } from 'octane';
 import { Tooltip as TooltipPrimitive } from '@octanejs/base-ui/tooltip';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface TooltipProviderProps extends Record<string, unknown> {
 	delay?: number;
@@ -39,21 +39,23 @@ export interface TooltipContentProps extends Record<string, unknown> {
 	children?: OctaneNode;
 }
 
-export interface BaseUiPositioningProps {
-	/** Forwarded to the Positioner; see the note at the top of this file. */
-	side?: 'top' | 'right' | 'bottom' | 'left';
-	sideOffset?: number;
-	align?: 'start' | 'center' | 'end';
-	alignOffset?: number;
-	anchor?: unknown;
-	positionMethod?: 'absolute' | 'fixed';
-	collisionBoundary?: unknown;
-	collisionPadding?: unknown;
-	collisionAvoidance?: unknown;
-	arrowPadding?: number;
-	sticky?: boolean;
-	disableAnchorTracking?: boolean;
-}
+/** Props routed to the Positioner rather than the popup. */
+export type BaseUiPositioningProps =
+	Pick<
+		TooltipPrimitive.Positioner.Props,
+		| 'side'
+		| 'sideOffset'
+		| 'align'
+		| 'alignOffset'
+		| 'anchor'
+		| 'positionMethod'
+		| 'collisionBoundary'
+		| 'collisionPadding'
+		| 'collisionAvoidance'
+		| 'arrowPadding'
+		| 'sticky'
+		| 'disableAnchorTracking'
+	>;
 
 export function TooltipContent({
 	className,

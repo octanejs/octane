@@ -10,6 +10,12 @@ export interface BindingCategory {
 	packages: string[];
 }
 
+interface AuthoredBindingCategory {
+	title: string;
+	description: string;
+	packages: Array<{ packageName: string }>;
+}
+
 export interface BindingStatus {
 	/** Full npm name, e.g. '@octanejs/zustand'. */
 	package: string;
@@ -24,7 +30,13 @@ export interface BindingStatus {
 	docs?: string[];
 }
 
-export const BINDING_CATEGORIES = categories as BindingCategory[];
+export const BINDING_CATEGORIES: BindingCategory[] = (categories as AuthoredBindingCategory[]).map(
+	(category) => ({
+		title: category.title,
+		description: category.description,
+		packages: category.packages.map((binding) => binding.packageName),
+	}),
+);
 
 export { KNOWN_BINDINGS };
 

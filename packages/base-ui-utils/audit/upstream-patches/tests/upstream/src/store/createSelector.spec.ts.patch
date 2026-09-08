@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/src/store/createSelector.spec.ts b/tests/upstream/src/store/createSelector.spec.ts
+--- a/tests/upstream/src/store/createSelector.spec.ts
++++ b/tests/upstream/src/store/createSelector.spec.ts
+@@ -1,5 +1,5 @@
+-import { expectType } from '../testUtils';
+-import { createSelector } from './createSelector';
++import { expectType } from "../../../../src/testUtils.ts";
++import { createSelector } from "../../../../src/store/createSelector.ts";
+ 
+ interface State {
+   value: number;

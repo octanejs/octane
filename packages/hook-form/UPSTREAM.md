@@ -16,10 +16,18 @@ The npm artifact publishes compiled `dist/` output and declarations only. The
 byte-exact source, original tests, snapshots, Jest configuration, package
 metadata, and license therefore come from the canonical repository at the tag
 commit above. They live under `upstream/`, are excluded from the published
-package, and are locked file-by-file by `upstream/SHA256SUMS`.
+package, and verify offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`. The pinned license is republished at the package
+root as `LICENSE.upstream`.
 
 Run `pnpm --dir packages/hook-form upstream:verify` to check the vendored bytes
-and the one-for-one adapted-suite inventory. Run
+and the one-for-one adapted-suite inventory. The adapted suite under
+`tests/upstream/` is regenerated, never committed: the lock's mechanical
+`adaptedRewrites` retarget every import at Octane (react → octane,
+`@testing-library/react` → `@octanejs/testing-library`, upstream source paths →
+the binding's `src/`), and the committed patches under `audit/upstream-patches/`
+carry only the genuine divergences (44 of 119 files; the other 75 need no
+patch). Run
 `pnpm --dir packages/hook-form test:upstream` to execute the original React/Jest
 suite unchanged.
 
@@ -65,7 +73,7 @@ covered by every adapted `*.server.test.tsx` counterpart.
 The tagged repository contains 119 test artifacts: 115 test files plus four
 snapshots. Every relative path under upstream `src/__tests__/` has an adapted
 counterpart under `tests/upstream/`. The verifier extracts registrations from
-both trees and currently accounts for 1,178 upstream registrations and 1,181
+both trees and currently accounts for 1,183 upstream registrations and 1,186
 adapted registrations.
 
 The unfiltered execution inventories are a separate collection-time

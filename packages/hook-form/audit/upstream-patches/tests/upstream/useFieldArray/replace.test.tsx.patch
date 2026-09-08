@@ -1,0 +1,24 @@
+diff --git a/tests/upstream/useFieldArray/replace.test.tsx b/tests/upstream/useFieldArray/replace.test.tsx
+--- a/tests/upstream/useFieldArray/replace.test.tsx
++++ b/tests/upstream/useFieldArray/replace.test.tsx
+@@ -17,7 +17,10 @@ interface DefaultValues {
+ 
+ let i = 0;
+ 
+-vi.mock('../../../src/logic/generateId', () => () => String(i++));
++// octane: vitest module mock — path resolved from tests/upstream/useFieldArray/, factory returns { default }
++vi.mock('../../../src/logic/generateId', () => ({
++  default: () => String(i++),
++}));
+ 
+ describe('replace', () => {
+   beforeEach(() => {
+@@ -322,7 +325,7 @@ describe('replace', () => {
+ 
+   describe('with resolver', () => {
+     it('should not invoke resolver per register during replace, but run after replace completes', async () => {
+-      const resolver = jest
++      const resolver = vi
+         .fn()
+         .mockImplementation((values) => ({ values, errors: {} }));
+ 

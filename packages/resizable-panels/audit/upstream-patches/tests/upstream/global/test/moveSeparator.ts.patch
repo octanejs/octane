@@ -1,0 +1,32 @@
+diff --git a/tests/upstream/global/test/moveSeparator.ts b/tests/upstream/global/test/moveSeparator.ts
+--- a/tests/upstream/global/test/moveSeparator.ts
++++ b/tests/upstream/global/test/moveSeparator.ts
+@@ -1,22 +1,16 @@
+-import userEvent from "@testing-library/user-event";
+-import assert from "node:assert";
++// Fidelity: exact upstream pointer sequence; only the assertion import is adapted.
++import userEvent from "../../../support/userEvent";
++import { assert } from "../../../../src/utils/assert";
+ 
+-export async function moveSeparator(
+-  deltaInPixels: number,
+-  separatorId?: string
+-) {
++export async function moveSeparator(deltaInPixels: number, separatorId?: string) {
+   const separatorElement = document.querySelector(
+-    separatorId
+-      ? `[data-separator][data-testid="${separatorId}"]`
+-      : "[data-separator]"
++    separatorId ? `[data-separator][data-testid="${separatorId}"]` : "[data-separator]"
+   );
+ 
+   assert(separatorElement instanceof HTMLElement);
+ 
+   const groupOrientation =
+-    separatorElement.getAttribute("aria-orientation") === "horizontal"
+-      ? "vertical"
+-      : "horizontal";
++    separatorElement.getAttribute("aria-orientation") === "horizontal" ? "vertical" : "horizontal";
+ 
+   let clientX = 0;
+   let clientY = 0;

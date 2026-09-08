@@ -1,3 +1,10 @@
+import type { PayloadAction } from '@reduxjs/toolkit';
+import type { BrushStartEndIndex } from '../context/brushUpdateContext';
+import type { TooltipIndex, TooltipSyncState } from '../state/tooltipSlice';
+import type { Coordinate, TickItem, TooltipEventType } from '../util/types';
+import type { TooltipTrigger } from '../chart/types';
+import type { ActiveLabel, MouseHandlerDataParam } from './types';
+
 // Port of synchronisation/useChartSynchronisation.ts — cross-chart tooltip and
 // brush synchronisation over the shared eventemitter3 event center. A `.tsrx`
 // module so the compiler slots every store read (these hooks read many
@@ -42,7 +49,11 @@ function useTooltipSyncEventsListener() {
 			// This chart is not synchronised with any other chart.
 			return noop;
 		}
-		const listener = (incomingSyncId, action, emitter) => {
+		const listener = (
+			incomingSyncId: number | string,
+			action: PayloadAction<TooltipSyncState>,
+			emitter: symbol,
+		) => {
 			if (myEventEmitter === emitter) {
 				// We don't want to dispatch actions that we sent ourselves.
 				return;
@@ -94,10 +105,10 @@ function useTooltipSyncEventsListener() {
 				// for the other two sync methods, we need the ticks to be available
 				return;
 			}
-			let activeTick;
+			let activeTick: TickItem | undefined;
 			if (typeof syncMethod === 'function') {
 				// The 2.x CategoricalChartState data shape, kept for compatibility.
-				const syncMethodParam = {
+				const syncMethodParam: MouseHandlerDataParam = {
 					activeTooltipIndex: action.payload.index == null
 						? undefined
 						: Number(action.payload.index),
@@ -148,7 +159,7 @@ function useTooltipSyncEventsListener() {
 			const { x, y } = coordinate;
 			const validateChartX = Math.min(x, viewBox.x + viewBox.width);
 			const validateChartY = Math.min(y, viewBox.y + viewBox.height);
-			const activeCoordinate = {
+			const activeCoordinate: Coordinate = {
 				x: layout === 'horizontal' ? activeTick.coordinate : validateChartX,
 				y: layout === 'horizontal' ? validateChartY : activeTick.coordinate,
 			};
@@ -182,7 +193,11 @@ function useBrushSyncEventsListener() {
 		if (mySyncId == null) {
 			return noop;
 		}
-		const listener = (incomingSyncId, action, emitter) => {
+		const listener = (
+			incomingSyncId: number | string,
+			action: BrushStartEndIndex,
+			emitter: symbol,
+		) => {
 			if (myEventEmitter === emitter) {
 				return;
 			}
@@ -213,12 +228,12 @@ export function useSynchronisedEventsFromOtherCharts() {
  * which prevents sparse-data charts from cascade-clearing other tooltips.
  */
 export function useTooltipChartSynchronisation(
-	tooltipEventType,
-	trigger,
-	activeCoordinate,
-	activeLabel,
-	activeIndex,
-	isTooltipActive,
+	tooltipEventType: TooltipEventType | undefined,
+	trigger: TooltipTrigger,
+	activeCoordinate: Coordinate | undefined,
+	activeLabel: ActiveLabel,
+	activeIndex: TooltipIndex | undefined,
+	isTooltipActive: boolean,
 ) {
 	const activeDataKey = useAppSelector(
 		(state) => selectTooltipDataKey(state, tooltipEventType, trigger),

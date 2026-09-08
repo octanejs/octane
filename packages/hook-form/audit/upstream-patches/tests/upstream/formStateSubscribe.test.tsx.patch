@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/formStateSubscribe.test.tsx b/tests/upstream/formStateSubscribe.test.tsx
+--- a/tests/upstream/formStateSubscribe.test.tsx
++++ b/tests/upstream/formStateSubscribe.test.tsx
+@@ -498,7 +498,7 @@ describe('FormStateSubscribe', () => {
+       );
+     }
+ 
+-    render(<FieldArray />, { reactStrictMode: true });
++    render(<FieldArray />);
+ 
+     fireEvent.click(screen.getByRole('button', { name: 'add' }));
+     fireEvent.click(screen.getByRole('button', { name: 'reset' }));

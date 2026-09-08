@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'octane';
 
+export function DerivedCounter() @{
+	const [count, setCount] = useState(0);
+	const [derived, setDerived] = useState(0);
+	useEffect(() => {
+		setDerived(count);
+	}, [count]);
+	<button onClick={() => setCount(count + 1)}>{`${count}:${derived}`}</button>
+}
+
 // Click → state fixture (the fireEvent + state-update port).
 export function Counter() @{
 	const [count, setCount] = useState(0);

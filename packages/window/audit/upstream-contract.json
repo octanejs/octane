@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "package": "react-window",
+  "version": "2.3.0",
+  "commit": "4d9eebbb510262b3b7e95463cf49a10de53ea77d",
+  "license": "MIT",
+  "runtimeExports": [
+    "Grid",
+    "List",
+    "getScrollbarSize",
+    "useDynamicRowHeight",
+    "useGridCallbackRef",
+    "useGridRef",
+    "useListCallbackRef",
+    "useListRef"
+  ],
+  "typeExports": [
+    "Align",
+    "CellComponentProps",
+    "DynamicRowHeight",
+    "GridImperativeAPI",
+    "GridProps",
+    "ListImperativeAPI",
+    "ListProps",
+    "RowComponentProps"
+  ],
+  "testFiles": 14,
+  "testCases": 117,
+  "testInventorySha256": "954cb70a2892ee613fa31d34a4b4fb9e57b01d2bca7e9303dcb5296584e15b48",
+  "artifactFiles": [
+    {
+      "path": "upstream-artifact/dist/react-window.d.ts",
+      "sha256": "16bdb4d5404dc4e487e9ddbe5f1417b82ef320dad10a14580349acb18a03f7cc"
+    }
+  ]
+}

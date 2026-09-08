@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursor.test.tsx b/tests/upstream/src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursor.test.tsx
+--- a/tests/upstream/src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursor.test.tsx
++++ b/tests/upstream/src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursor.test.tsx
+@@ -13,7 +13,7 @@ const defaultScrubAreaContext: NumberFieldScrubAreaContext = {
+   isScrubbing: true,
+   isTouchInput: false,
+   isPointerLockDenied: false,
+-  scrubAreaCursorRef: React.createRef<HTMLSpanElement>(),
++  scrubAreaCursorRef: ({current:null} as React.RefObject<HTMLSpanElement | null>),
+ };
+ 
+ // This component doesn't render on WebKit.

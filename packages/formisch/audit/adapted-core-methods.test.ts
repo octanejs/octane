@@ -1,0 +1,44 @@
+// A distinct Vitest entrypoint lets the parity shard execute the byte-exact
+// upstream suite through the Octane aliases without assigning the same
+// physical test files to both the pristine and adapted projects.
+import '../upstream/packages/core/src/array/copyItemState/copyItemState.test.ts';
+import '../upstream/packages/core/src/array/resetItemState/resetItemState.test.ts';
+import '../upstream/packages/core/src/array/swapItemState/swapItemState.test.ts';
+import '../upstream/packages/core/src/field/focusFieldElement/focusFieldElement.test.ts';
+import '../upstream/packages/core/src/field/getDirtyFieldInput/getDirtyFieldInput.test.ts';
+import '../upstream/packages/core/src/field/getElementInput/getElementInput.test.ts';
+import '../upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts';
+import '../upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts';
+import '../upstream/packages/core/src/field/getFieldStore/getFieldStore.test.ts';
+import '../upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts';
+import '../upstream/packages/core/src/field/setFieldBool/setFieldBool.test.ts';
+import '../upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts';
+import '../upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts';
+import '../upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts';
+import '../upstream/packages/core/src/form/createFormStore/createFormStore.test.ts';
+import '../upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts';
+import '../upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts';
+import '../upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts';
+import '../upstream/packages/methods/src/focus/focus.test.ts';
+import '../upstream/packages/methods/src/getDeepErrorEntries/getDeepErrorEntries.test.ts';
+import '../upstream/packages/methods/src/getDeepErrors/getDeepErrors.test.ts';
+import '../upstream/packages/methods/src/getDirtyInput/getDirtyInput.test.ts';
+import '../upstream/packages/methods/src/getDirtyPaths/getDirtyPaths.test.ts';
+import '../upstream/packages/methods/src/getErrors/getErrors.test.ts';
+import '../upstream/packages/methods/src/getInput/getInput.test.ts';
+import '../upstream/packages/methods/src/handleSubmit/handleSubmit.test.ts';
+import '../upstream/packages/methods/src/insert/insert.test.ts';
+import '../upstream/packages/methods/src/isDirty/isDirty.test.ts';
+import '../upstream/packages/methods/src/isEdited/isEdited.test.ts';
+import '../upstream/packages/methods/src/isTouched/isTouched.test.ts';
+import '../upstream/packages/methods/src/isValid/isValid.test.ts';
+import '../upstream/packages/methods/src/move/move.test.ts';
+import '../upstream/packages/methods/src/pickDirty/pickDirty.test.ts';
+import '../upstream/packages/methods/src/remove/remove.test.ts';
+import '../upstream/packages/methods/src/replace/replace.test.ts';
+import '../upstream/packages/methods/src/reset/reset.test.ts';
+import '../upstream/packages/methods/src/setErrors/setErrors.test.ts';
+import '../upstream/packages/methods/src/setInput/setInput.test.ts';
+import '../upstream/packages/methods/src/submit/submit.test.ts';
+import '../upstream/packages/methods/src/swap/swap.test.ts';
+import '../upstream/packages/methods/src/validate/validate.test.ts';

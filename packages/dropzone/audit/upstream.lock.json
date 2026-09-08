@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-dropzone",
+    "version": "20.0.0",
+    "repository": {
+      "owner": "react-dropzone",
+      "repo": "react-dropzone",
+      "subdirectory": null
+    },
+    "commit": "01fc05c5996bf615caf812627f7491375e647c7d",
+    "integrity": "sha512-Xw8tvvVPJQzj8ir5wivUMzA+G6R+aGhdU5KQzUMvVBlJNb26AW/0137VoYVmb5UgZcbhM9OCpjE4KOqqSL9QuQ=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "7b93b62069ec28d00cc7cf3696b5d243ad9887517f8e709dce4811747f0e2dc2"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "LICENSE",
+    "package-lock.json",
+    "package.json",
+    "src",
+    "test-setup.js",
+    "tsconfig.build.json",
+    "tsconfig.json",
+    "tsconfig.type-tests.json",
+    "tsdown.config.ts",
+    "type-tests",
+    "vitest.config.ts"
+  ],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "3f894344e927d6c724b753a97d1d9780904a9439",
+      "size": 1082
+    },
+    {
+      "path": "package-lock.json",
+      "gitBlob": "d9a3b274e6c413ec2dbdf242727e836bd0e57ae3",
+      "size": 710811
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "aa86e0a2e899ff1099ffee7f5e0dbd2d61403d5a",
+      "size": 3141
+    },
+    {
+      "path": "src/__snapshots__/index.spec.tsx.snap",
+      "gitBlob": "daa6d132f0ddcff9205c8760437ef6a6caeac73f",
+      "size": 407
+    },
+    {
+      "path": "src/index.spec.tsx",
+      "gitBlob": "2ce555375f6e981f0226ca842383c9d8030afdfb",
+      "size": 146919
+    },
+    {
+      "path": "src/index.tsx",
+      "gitBlob": "466ff21907671e8d58fb40a6f9574dd5b0bd3ca7",
+      "size": 37904
+    },
+    {
+      "path": "src/utils/index.spec.ts",
+      "gitBlob": "c05496f1e43f4639c010c9d96b4ff3a360343549",
+      "size": 28628
+    },
+    {
+      "path": "src/utils/index.ts",
+      "gitBlob": "74deac7266aa78b8ee8d3286735c38c2a23047e7",
+      "size": 20639
+    },
+    {
+      "path": "test-setup.js",
+      "gitBlob": "ae850c266ec2ee4195de522585a0a50ca4d5452c",
+      "size": 254
+    },
+    {
+      "path": "tsconfig.build.json",
+      "gitBlob": "7c97eec73904b9a4360a3252a9d12366976926c2",
+      "size": 113
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "85d861759f113e16776387e26646443c1d27b35a",
+      "size": 650
+    },
+    {
+      "path": "tsconfig.type-tests.json",
+      "gitBlob": "b93537b930cb5c49b6ef5b7887265beaddc0fe53",
+      "size": 382
+    },
+    {
+      "path": "tsdown.config.ts",
+      "gitBlob": "9d59a076b226ebcfc1c3c354bafae4f2ee7cb0e6",
+      "size": 734
+    },
+    {
+      "path": "type-tests/accept.tsx",
+      "gitBlob": "cad9280762d915bce66a3e3fe7a01bfe4c2b57d3",
+      "size": 2218
+    },
+    {
+      "path": "type-tests/all.tsx",
+      "gitBlob": "ff3665794b27b19a41ba6471f0a60d9f7444ad88",
+      "size": 1146
+    },
+    {
+      "path": "type-tests/basic.tsx",
+      "gitBlob": "52b67b4ef566fd71acc0f57bf27afa40fa95a20d",
+      "size": 1172
+    },
+    {
+      "path": "type-tests/events.tsx",
+      "gitBlob": "fdae9b2133459d14103c28faa0cce50401d22646",
+      "size": 933
+    },
+    {
+      "path": "type-tests/file-dialog.tsx",
+      "gitBlob": "516b8fb53f9279ddf11cbd7e734763e9af8b8e4f",
+      "size": 543
+    },
+    {
+      "path": "type-tests/hook.tsx",
+      "gitBlob": "c0a7e0a4fc6fd9d6bdaaab43748949200d4ef8eb",
+      "size": 425
+    },
+    {
+      "path": "type-tests/plugin.tsx",
+      "gitBlob": "e6a51ef183e58c7a6caae94201b29624aa92e04e",
+      "size": 991
+    },
+    {
+      "path": "type-tests/refs.tsx",
+      "gitBlob": "6aa97229fe5e72f37451c6438b39876c369be11a",
+      "size": 495
+    },
+    {
+      "path": "type-tests/validator.tsx",
+      "gitBlob": "1fa4b381257b272cab28ea146224d02fc3dde637",
+      "size": 1202
+    },
+    {
+      "path": "vitest.config.ts",
+      "gitBlob": "745c66da7d3774830a1c4fea5843b6ebf0b6122c",
+      "size": 396
+    }
+  ],
+  "fingerprint": "5feac109590508d0e645b62732b83bad8391e6de1f6c8797d735b39b6002eb21"
+}

@@ -55,4 +55,22 @@ describe('misuse diagnostics', () => {
 		app.cleanup();
 		error.mockRestore();
 	});
+
+	it('stays silent in a production build', () => {
+		// The report is a development check, and the guard around it was rewritten
+		// so a host without a `process` global stops throwing. A production build
+		// that still has one must keep skipping it.
+		vi.stubEnv('NODE_ENV', 'production');
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const app = mount(StrayOwners);
+
+		try {
+			app.render();
+			expect(error).not.toHaveBeenCalled();
+		} finally {
+			app.cleanup();
+			error.mockRestore();
+			vi.unstubAllEnvs();
+		}
+	});
 });

@@ -16,10 +16,17 @@
 
 ## Source, exports, and suites
 
-The byte-exact tagged adapter directory and root license are vendored under `upstream/`.
-`SHA256SUMS` authenticates all 26 files: 13 adapter source files, four runtime test files, and
-nine package/build/documentation files. The runtime suite has 41 cases. Upstream's `test:types` script compiles package source with `tsc`; that lane runs pristine, and an
+The byte-exact tagged adapter directory is vendored under `upstream/` and pinned by
+`audit/upstream.lock.json`: each committed file verifies offline against its upstream git blob
+sha at the pinned commit (`pnpm react-port:materialize run --check --package-dir
+packages/tanstack-hotkeys`). The upstream MIT license is retained byte-exact as
+`LICENSE.upstream`, hash-matched to the lock.
+The lock authenticates all 25 adapter files: 13 source files, four runtime test files, and
+eight package/build/documentation files. The runtime suite has 41 cases. Upstream's `test:types` script compiles package source with `tsc`; that lane runs pristine, and an
 Octane `tsrx-tsc` typetest lane covers the adapted surface including the plain target-ref divergence.
+
+`audit/upstream-crosswalk.json` accounts for both published entrypoints, all 22 adapter exports,
+the byte-identical core wildcard re-export, and all four canonical runtime test files. The runtime suite runs pristine and adapted in full under `provenance.verification: verified`.
 
 ## Executable evidence
 

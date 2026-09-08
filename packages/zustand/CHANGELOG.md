@@ -1,5 +1,189 @@
 # @octanejs/zustand
 
+## 0.1.52
+
+### Patch Changes
+
+- 1846318: Support library components that use transitive and method-based custom hooks,
+  typed namespaces, and generic interfaces in Octane source. Preserve committed
+  render-phase state when a render suspends, retain server DOM and hydration data
+  while a resolved Suspense boundary waits for client data, and support portals
+  into document fragments and shadow roots.
+
+  Make testing-library rendering and hydration settle native effects consistently,
+  and accept the full Octane renderable input surface.
+
+  Batch nested `act` callbacks and testing-library rerenders within their outer
+  callback. Await the complete promise queue before resolving `act`, including
+  with frozen timeout clocks, so asynchronous positioning updates settle before
+  assertions. Expose `isInActScope` for testing helpers to preserve this batching.
+
+  Render synchronous iterable template loops on the client and during hydration,
+  including sets and generators, while preserving the array reconciliation path.
+
+  Run native event handlers outside component render scope when a DOM update
+  synchronously dispatches an event, such as blur from disabling a focused input.
+
+  Complete finite layout-effect update cascades before publishing DOM mutations to
+  observers, including scheduled updates and repeated measurements in one component.
+
+  Preserve optional method-hook chains, including skipped arguments, method
+  receivers, and short-circuit boundaries in both compiler emission paths.
+
+  Retain resolved Suspense native data in the public SSR result as well as its
+  boundary hydration payload. Retire four Floating UI expected failures now
+  covered by passing upstream ref and positioning assertions.
+
+  Enforce the existing external-store snapshot stability contract during commit
+  cascades. Uncached Zustand object selectors reach the update-depth guard; use
+  `useShallow` to cache their selected values.
+
+  Require Octane 0.2.5 for the updated Base UI, Base UI Utils, shadcn, and
+  testing-library packages so the compiler and `isInActScope` API are available.
+  Preserve exact server catch-node adoption when an initially resolved Suspense
+  arm contains a rejected resource.
+
+## 0.1.51
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+
+## 0.1.50
+
+### Patch Changes
+
+- Updated dependencies [9321d39]
+- Updated dependencies [fdb711a]
+- Updated dependencies [5e80135]
+- Updated dependencies [ad499d0]
+- Updated dependencies [892da9a]
+- Updated dependencies [babf8d7]
+- Updated dependencies [2785a2f]
+- Updated dependencies [df82fbc]
+- Updated dependencies [0824502]
+- Updated dependencies [47c8f54]
+  - octane@0.1.51
+
+## 0.1.49
+
+### Patch Changes
+
+- Updated dependencies [157543f]
+- Updated dependencies [4d13159]
+- Updated dependencies [a944ff3]
+- Updated dependencies [f9f0d23]
+- Updated dependencies [edf2b9d]
+- Updated dependencies [9779569]
+- Updated dependencies [96c86fc]
+  - octane@0.1.50
+
+## 0.1.48
+
+### Patch Changes
+
+- Updated dependencies [8adc693]
+- Updated dependencies [a51c8c6]
+  - octane@0.1.49
+
+## 0.1.47
+
+### Patch Changes
+
+- Updated dependencies [3ca30fc]
+- Updated dependencies [efdc8cb]
+- Updated dependencies [922df8c]
+- Updated dependencies [8a8afd8]
+- Updated dependencies [37a8ca1]
+- Updated dependencies [c84edbb]
+- Updated dependencies [d5175ca]
+- Updated dependencies [4a4996e]
+  - octane@0.1.48
+
+## 0.1.46
+
+### Patch Changes
+
+- Updated dependencies [af0d999]
+- Updated dependencies [c800a1f]
+- Updated dependencies [c1bb057]
+- Updated dependencies [97b9349]
+- Updated dependencies [4393bea]
+- Updated dependencies [7dfef16]
+- Updated dependencies [7e62361]
+- Updated dependencies [964783a]
+- Updated dependencies [d3dbd78]
+  - octane@0.1.47
+
+## 0.1.45
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+
+## 0.1.44
+
+### Patch Changes
+
+- Updated dependencies [5b1e6a3]
+- Updated dependencies [31abee5]
+- Updated dependencies [fd6ce69]
+- Updated dependencies [5f7a457]
+- Updated dependencies [5227d7b]
+- Updated dependencies [6927595]
+- Updated dependencies [f1a7802]
+  - octane@0.1.45
+
+## 0.1.43
+
+### Patch Changes
+
+- 7535acd: Deduplicate binding hook sub-slot derivation behind Octane's shared helper while preserving each binding's slotless and symbol-identity behavior.
+- Updated dependencies [9b06e47]
+- Updated dependencies [7535acd]
+  - octane@0.1.44
+
+## 0.1.42
+
+### Patch Changes
+
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+
+## 0.1.41
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+
+## 0.1.40
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+
+## 0.1.39
+
+### Patch Changes
+
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+
 ## 0.1.38
 
 ### Patch Changes

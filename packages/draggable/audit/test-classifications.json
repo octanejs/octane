@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/draggable/tests/audit/upstream-inventory.test.mjs",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Negative controls prove provenance, case-structure, type-inventory, and classification machinery fails closed; upstream has no equivalent self-audit."
+    },
+    {
+      "path": "packages/draggable/tests/browser/parity.browser.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adaptedCase browser identities from pinned react-draggable 4.7.1 tag/test/browser/browser.test.js."
+    },
+    {
+      "path": "packages/draggable/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs shared differential scenarios against pinned react-draggable and @octanejs/draggable."
+    },
+    {
+      "path": "packages/draggable/tests/feasibility/hydration.test.ts",
+      "disposition": "feasibility-probe",
+      "reason": "Feasibility probe for hydration lane wiring; not used as React-parity evidence."
+    },
+    {
+      "path": "packages/draggable/tests/feasibility/react-pristine.test.ts",
+      "disposition": "feasibility-probe",
+      "reason": "Feasibility probe for pristine React lane wiring; not used as React-parity evidence."
+    },
+    {
+      "path": "packages/draggable/tests/feasibility/ssr.test.ts",
+      "disposition": "feasibility-probe",
+      "reason": "Feasibility probe for SSR lane wiring; not used as React-parity evidence."
+    },
+    {
+      "path": "packages/draggable/tests/hydration/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane hydration contract coverage with parity markers; unpaired as an adapted upstream-suite identity."
+    },
+    {
+      "path": "packages/draggable/tests/runtime/core.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane DraggableCore runtime contract coverage with parity markers; unpaired as an adapted upstream-suite identity."
+    },
+    {
+      "path": "packages/draggable/tests/runtime/draggable.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane Draggable runtime contract coverage with parity markers; unpaired as an adapted upstream-suite identity."
+    },
+    {
+      "path": "packages/draggable/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane SSR contract coverage with parity markers; unpaired as an adapted upstream-suite identity."
+    },
+    {
+      "path": "packages/draggable/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the byte-exact pinned react-draggable 4.7.1 Vitest suite against React."
+    },
+    {
+      "path": "packages/draggable/tests/upstream/public-root.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adaptedCase public unit identities from pinned react-draggable 4.7.1 tag/test public suites."
+    }
+  ]
+}

@@ -38,6 +38,9 @@ import {
 	ToggleHost,
 	setSheetVisible,
 } from './_fixtures/float-resources.tsrx';
+import { FloatSibling } from './_fixtures/style-scopes.tsrx';
+import { theme } from './_fixtures/style-theme.tsrx';
+import { SelfClosedApply } from './_fixtures/style-theme-consumer.tsrx';
 import {
 	ParentChild,
 	LateArmAfterSibling,
@@ -127,6 +130,9 @@ describe('Float resources — client', () => {
 		expect(styles[0].getAttribute('data-precedence')).toBe('default');
 		expect(styles[0].textContent).toContain('.tokens');
 		expect(styles[0].textContent).toContain('teal');
+		const rule = (styles[0] as HTMLStyleElement).sheet!.cssRules[0] as CSSStyleRule;
+		expect(rule.selectorText).toBe('.tokens');
+		expect(rule.style.color).toBe('teal');
 		// Unscoped: the CSS ships verbatim-by-meaning, no component hash class.
 		expect(styles[0].textContent).not.toMatch(/\.tokens\.[a-z0-9]/i);
 		// Group order: default (link then style, discovery order) then high.
@@ -155,6 +161,39 @@ describe('Float resources — client', () => {
 		const injected = document.head.querySelector('style[data-octane]');
 		expect(injected).not.toBeNull();
 		expect(injected!.textContent).toContain('.scoped.');
+	});
+
+	it('a scoped block beside a Float style resource: the resource hoists, the block stays scoped', async () => {
+		await act(() => mountInto(FloatSibling));
+		const resource = document.head.querySelector('style[data-href="scope-sibling-tokens"]');
+		expect(resource).not.toBeNull();
+		expect(resource!.getAttribute('data-precedence')).toBe('default');
+		expect(resource!.textContent).toContain('.fs-tokens');
+		// Resources sit outside the scope model: no hash in the sheet.
+		expect(resource!.textContent).not.toContain('tsrx-');
+		const host = document.querySelector('#fs-host')!;
+		const hash = Array.from(host.classList).find((c) => c.startsWith('tsrx-'));
+		expect(hash).toBeTruthy();
+		const scoped = document.head.querySelector(`style[data-octane="${hash}"]`);
+		expect(scoped).not.toBeNull();
+		expect(scoped!.textContent).toContain(`.fs-scoped.${hash}`);
+		expect(scoped!.textContent).not.toContain('.fs-tokens');
+		expect(scoped!.hasAttribute('data-href')).toBe(false);
+		expect(scoped!.hasAttribute('data-precedence')).toBe(false);
+		expect(document.body.querySelector('style')).toBeNull();
+	});
+
+	it('<style apply={theme} /> is a scope stamp, not a Float resource', async () => {
+		await act(() => mountInto(SelfClosedApply));
+		expect(document.head.querySelector('style[data-href]')).toBeNull();
+		expect(document.head.querySelector('[data-precedence]')).toBeNull();
+		expect(document.body.querySelector('style')).toBeNull();
+		const host = document.querySelector('#sca-host')!;
+		// No block of its own: the element carries only the applied theme.
+		expect(host.className).toBe(`sca ${theme.$class}`);
+		for (const hash of theme.$class.split(' ')) {
+			expect(document.head.querySelector(`style[data-octane="${hash}"]`)).not.toBeNull();
+		}
 	});
 
 	it('return-position (value-body) trees classify resources like @{} bodies', async () => {
@@ -256,6 +295,19 @@ describe('Float resources — SSR + hydration dedupe', () => {
 		const r = await Server.renderToString(App as any);
 		expect(r.html.match(/data-href="inline-tokens"/g) || []).toHaveLength(1);
 		expect(r.html).toContain('.tokens');
+		const parsed = document.createElement('div');
+		parsed.innerHTML = r.html;
+		const serverStyle = parsed.querySelector<HTMLStyleElement>('style[data-href="inline-tokens"]')!;
+		const style = document.createElement('style');
+		style.textContent = serverStyle.textContent;
+		document.head.appendChild(style);
+		try {
+			const rule = style.sheet!.cssRules[0] as CSSStyleRule;
+			expect(rule.selectorText).toBe('.tokens');
+			expect(rule.style.color).toBe('teal');
+		} finally {
+			style.remove();
+		}
 		// Same default group, discovery order: the link precedes the style tag.
 		expect(r.html.indexOf('/base.css')).toBeLessThan(r.html.indexOf('inline-tokens'));
 

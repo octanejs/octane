@@ -1,0 +1,108 @@
+'use client';
+import * as React from 'octane';
+import type { BaseUIComponentProps, HTMLProps } from '../../internals/types';
+import { useFocusableWhenDisabled } from '../../utils/useFocusableWhenDisabled';
+import type { ToolbarRootState } from '../root/ToolbarRoot.tsrx';
+import { useToolbarRootContext } from '../root/ToolbarRootContext';
+import { useToolbarGroupContext } from '../group/ToolbarGroupContext';
+import { CompositeItem } from '../../internals/composite/item/CompositeItem.tsrx';
+
+/**
+ * A native input element that integrates with Toolbar keyboard navigation.
+ * Renders an `<input>` element.
+ *
+ * Documentation: [Base UI Toolbar](https://base-ui.com/react/components/toolbar)
+ */
+export const ToolbarInput = function ToolbarInput(
+	componentPropsWithRef: React.PropsWithoutRef<ToolbarInput.Props> & {
+		ref?: React.Ref<HTMLInputElement>;
+	},
+) {
+	const { ref: forwardedRef = null, ...componentProps } = componentPropsWithRef;
+	const {
+		className,
+		focusableWhenDisabled = true,
+		render,
+		disabled: disabledProp = false,
+		style,
+		...elementProps
+	} = componentProps;
+
+	const { disabled: toolbarDisabled, orientation } = useToolbarRootContext();
+
+	const groupContext = useToolbarGroupContext();
+
+	const disabled = toolbarDisabled || (groupContext?.disabled ?? false) || disabledProp;
+
+	const itemMetadata = React.useMemo(
+		() => ({ disabled, focusableWhenDisabled }),
+		[disabled, focusableWhenDisabled],
+	);
+
+	const { props: focusableWhenDisabledProps } = useFocusableWhenDisabled({
+		composite: true,
+		disabled,
+		focusableWhenDisabled,
+		isNativeButton: false,
+	});
+
+	const state: ToolbarInputState = {
+		disabled,
+		orientation,
+		focusable: focusableWhenDisabled,
+	};
+
+	const preventWhenDisabled = (event: React.NativeEvent) => {
+		if (disabled) {
+			event.preventDefault();
+		}
+	};
+
+	const defaultProps: HTMLProps = {
+		onClick: preventWhenDisabled,
+		onPointerDown: preventWhenDisabled,
+	};
+
+	return (
+		<CompositeItem
+			tag="input"
+			render={render}
+			className={className}
+			style={style}
+			metadata={itemMetadata}
+			state={state}
+			refs={[forwardedRef]}
+			props={[defaultProps, elementProps, focusableWhenDisabledProps]}
+		/>
+	);
+};
+
+export interface ToolbarInputState extends ToolbarRootState {
+	/**
+	 * Whether the component is disabled.
+	 */
+	disabled: boolean;
+	/**
+	 * Whether the component remains focusable when disabled.
+	 */
+	focusable: boolean;
+}
+
+export interface ToolbarInputProps extends BaseUIComponentProps<'input', ToolbarInputState> {
+	/**
+	 * When `true` the item is disabled.
+	 * @default false
+	 */
+	disabled?: boolean | undefined;
+	/**
+	 * When `true` the item remains focusable when disabled.
+	 * @default true
+	 */
+	focusableWhenDisabled?: boolean | undefined;
+	defaultValue?: React.ComponentProps<'input'>['defaultValue'] | undefined;
+}
+
+export namespace ToolbarInput {
+	export type State = ToolbarInputState;
+	export type Props = ToolbarInputProps;
+}

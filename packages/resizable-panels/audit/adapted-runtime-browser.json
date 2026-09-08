@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "project": "resizable-panels-browser",
+  "roots": ["packages/resizable-panels/tests"],
+  "files": ["packages/resizable-panels/tests/browser/interactions.browser.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:react-resizable-panels-browser:0001",
+      "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+      "fullName": "@octanejs/resizable-panels real Chromium behavior drags a geometry-derived pointer hit region"
+    },
+    {
+      "id": "runtime:react-resizable-panels-browser:0004",
+      "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+      "fullName": "@octanejs/resizable-panels real Chromium behavior installs and cleans up document cursor state"
+    },
+    {
+      "id": "runtime:react-resizable-panels-browser:0005",
+      "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+      "fullName": "@octanejs/resizable-panels real Chromium behavior isolates sibling group layout state"
+    },
+    {
+      "id": "runtime:react-resizable-panels-browser:0006",
+      "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+      "fullName": "@octanejs/resizable-panels real Chromium behavior restores a user layout after a full page reload"
+    },
+    {
+      "id": "runtime:react-resizable-panels-browser:0003",
+      "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+      "fullName": "@octanejs/resizable-panels real Chromium behavior revalidates percentages through a real ResizeObserver"
+    },
+    {
+      "id": "runtime:react-resizable-panels-browser:0002",
+      "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+      "fullName": "@octanejs/resizable-panels real Chromium behavior supports keyboard focus and updates splitter ARIA"
+    }
+  ]
+}

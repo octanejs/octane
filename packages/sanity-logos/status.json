@@ -1,0 +1,19 @@
+{
+  "upstream": {
+    "package": "@sanity/logos",
+    "version": "2.2.5",
+    "commit": "e6c37d2d4f7f121254c077b3ae83e199ec0aec9c"
+  },
+  "surface": "Complete @sanity/logos@2.2.5 runtime surface: SanityLogo, SanityMonogram, GroqLogo and GroqMonogram, including dark/scheme/custom-color variants.",
+  "divergences": [
+    "Refs are normal Octane ref props rather than React forwardRef wrappers.",
+    "Event callbacks receive native DOM events rather than React synthetic events."
+  ],
+  "ssr": "Supported and differential-tested against @sanity/logos@2.2.5 static SVG markup.",
+  "verified": "2026-08-24",
+  "notes": [
+    "Generated SVG data is derived from the pinned official React package.",
+    "Custom monogram colors are escaped before insertion into generated SVG markup."
+  ],
+  "docs": ["docs/sanity-react-port-research.md"]
+}

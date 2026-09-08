@@ -1,0 +1,232 @@
+{
+  "version": 1,
+  "status": "passed",
+  "node": "v26.4.0",
+  "mode": "isolated-engine",
+  "toolingRoot": "/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+  "config": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/vitest.config.mjs",
+  "test": "packages/octane/tests/signals-model.test.ts",
+  "casesPerSeed": 50,
+  "operationsPerCase": 100,
+  "runs": [
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-0",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-0.json",
+      "rawReportSha256": "c7eea01228d611ae8fa2e8b83562f68cf2f9bc7106795afc6f2e1461b6264f4f"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-1",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-1.json",
+      "rawReportSha256": "1f3c3089f160ace8c09e7559e30e14ffa9489ac962e139502381d5194af04ec4"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-2",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-2.json",
+      "rawReportSha256": "4a6b2ef19484e4767d9a20279c33651c138928845bb7333b18033fa7d143e7bc"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-3",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-3.json",
+      "rawReportSha256": "23fc647a923392169b8ad98feac76f8ecdf54c339eeb316834f5307fc21afb2b"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-4",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-4.json",
+      "rawReportSha256": "dce2ab1f7a0bafe33adca6d473096e1622b85f9dea1261f4a614bbdc1d239727"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-5",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-5.json",
+      "rawReportSha256": "a26b66a364b17a2a967e67dcf69d6da1562d8266d87e2ecfcbd5e2bd29b89b64"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-6",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-6.json",
+      "rawReportSha256": "308ecc36a7572600605ec0b70e61c5da138b3570532a3417561ba00f31ff37bb"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-7",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-7.json",
+      "rawReportSha256": "348a56dadff8592447e540ea30c513ce79f319ff95c07b0e5bfcc7187b151333"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-8",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-8.json",
+      "rawReportSha256": "596a8331d8700df7e7f85bb6fc56d0456d3088b8acbb8e4a385a4d18dfbfdf64"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-9",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-9.json",
+      "rawReportSha256": "65a5227fb2b1ba963a866a0eaad901f93659e5af4885a15fc7901b554c168ac9"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-10",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-10.json",
+      "rawReportSha256": "29babd2891112ffc4aeb8a04d0428a67c30abcf6186ea3a64d3d66b5c1c64c7c"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-11",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-11.json",
+      "rawReportSha256": "6909b46ea0ac3110684d73e9caddf8a23379b71c1db361558731dbe5315b6361"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-12",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-12.json",
+      "rawReportSha256": "b262b2932de5da37082a4b0d8402e7771d1ea6a400a11a81a839cea13ed3d780"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-13",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-13.json",
+      "rawReportSha256": "0d3fdcfba6561761a6be8478fc10a447d8528c8ee1167f7dd02858ff165e49b7"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-14",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-14.json",
+      "rawReportSha256": "2d0a20bb97f9b33e78b23b3670bbc9c1448f30f2ac4689241a405bedc5e8689b"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-15",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-15.json",
+      "rawReportSha256": "2be7ab1b76126401fe46c449abfbe1eef778a2bfa544224544ce7497e01bafe9"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-16",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-16.json",
+      "rawReportSha256": "d3c116cc0a9b2a4a35b26fa56a76cce172b05d80fa6e03160a55e23561843f91"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-17",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-17.json",
+      "rawReportSha256": "cc7ea2a9ef617791542f47391fc475c745f89466870b84809e51dfd3dc62d0e1"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-18",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-18.json",
+      "rawReportSha256": "b2db53c7459d507a4f69e69c3c9a01f7e43975e2516ac18b44ad68206d588f7d"
+    },
+    {
+      "seed": "scoped-signals-expanded-2026-08-27-19",
+      "passed": 50,
+      "failed": 0,
+      "rawReport": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/model-expanded-mnvoUa/model-19.json",
+      "rawReportSha256": "ee7f2b0d4501e815146388e5fe8ad90ec229fb603feab6c8be1d99d9f2c7e258"
+    }
+  ],
+  "sourceHashes": [
+    {
+      "file": "packages/octane/src/signals/client.ts",
+      "sha256": "f64cfce5c9d17567cca9e5621c14d7ebd4f09db217bb0b2ce89dd697c684aac5"
+    },
+    {
+      "file": "packages/octane/src/signals/encoding.ts",
+      "sha256": "57625f36035059cca2c473a5ac0e8038b27b4d57eaa422a3bcd185b9dc38d88c"
+    },
+    {
+      "file": "packages/octane/src/signals/engine.ts",
+      "sha256": "18eb70cbf0e4e44affa31adbf61d4adbfdfb1965aa975803e14f2ee3df2ac729"
+    },
+    {
+      "file": "packages/octane/src/signals/errors.ts",
+      "sha256": "6a9a9561a4e37085c76ae714f6ec774f19646d3c6ef0e0f5dbc44ae6e16ee451"
+    },
+    {
+      "file": "packages/octane/src/signals/graph.ts",
+      "sha256": "719371959354ca916d11a76bb162eac93fb4efacf056d14290d5768bfe9dc3a5"
+    },
+    {
+      "file": "packages/octane/src/signals/index.ts",
+      "sha256": "c4400e3eacea0f52049d3559b26be14dd3485a897135b54ec8cd5f2ad43de17d"
+    },
+    {
+      "file": "packages/octane/src/signals/native-read-client.ts",
+      "sha256": "3da1a9682526557d57df61f57592887306916f63ed7407c4a2c8f310fb80d129"
+    },
+    {
+      "file": "packages/octane/src/signals/native-read-collector.ts",
+      "sha256": "295419e06172f8c534ee434422548cf7089432da22d2611a07fb9b2c171a7af9"
+    },
+    {
+      "file": "packages/octane/src/signals/native-read-events.ts",
+      "sha256": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41"
+    },
+    {
+      "file": "packages/octane/src/signals/native-read-inspection.ts",
+      "sha256": "83a05cd237aec68a18ce0ae37d265e4ddd5bf68d4e258c0584ab1f2eb9dcd8c2"
+    },
+    {
+      "file": "packages/octane/src/signals/native-read-retry.ts",
+      "sha256": "40abc7188a0b07a3665b410889bf725fdd0ba82c90b3568456282fe243b95ac7"
+    },
+    {
+      "file": "packages/octane/src/signals/native-read-seeds.ts",
+      "sha256": "d2a0a52aebc763ce154fc78ce5bfdeeb797fa62783ee47f4b81b2cddc3cd6de9"
+    },
+    {
+      "file": "packages/octane/src/signals/native-read-server.ts",
+      "sha256": "d7fd676a8e5e4b932b355efff0e97cb88031d79720b796640fd03ba5a36336ad"
+    },
+    {
+      "file": "packages/octane/src/signals/read-protocol.ts",
+      "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417"
+    },
+    {
+      "file": "packages/octane/src/signals/requests.ts",
+      "sha256": "0a26ea7d05796349f38ebd5212bc2e512f2a72c1342c3983a33c83ed129d00bf"
+    },
+    {
+      "file": "packages/octane/src/signals/server.ts",
+      "sha256": "7dfa84a92f00259350fefd7df5e7c866f752e3dad31d2ff8862a709958f681fd"
+    },
+    {
+      "file": "packages/octane/src/signals/types.ts",
+      "sha256": "e1bbc4c88950681c911cbe94a19b2dc1a4f979bce3b56a4358c7928f8c48a8b9"
+    },
+    {
+      "file": "packages/octane/tests/signals-model.test.ts",
+      "sha256": "8b5d16b793e3b75000e5f3d1a4b3738b64bada4dbd3ced0422de9cb87f3076c2"
+    },
+    {
+      "file": "packages/octane/tests/conformance/_helpers/fuzz-prng.ts",
+      "sha256": "6de6ac7c5047abe08e35d9c04b85c609ab928ab8be485bfc7bfe62b3caa480ef"
+    }
+  ],
+  "finishedAt": "2026-08-27T14:43:59.544Z"
+}

@@ -3,7 +3,7 @@
 // is dropped — octane has no RSC axis).
 import { Separator as SeparatorPrimitive } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 export interface SeparatorProps extends Record<string, unknown> {
 	className?: string;

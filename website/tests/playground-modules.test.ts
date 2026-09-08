@@ -122,6 +122,27 @@ describe('third-party import policy', () => {
 		expect(graph.modules[0].code).not.toContain('esm.sh/octane');
 	});
 
+	it('keeps compiler-only client helpers on the shared runtime import map', async () => {
+		const graph = await buildModuleGraph(
+			[
+				app(
+					"import { useMemo } from 'octane';\nexport default function App({ value }) @{\n\tconst doubled = useMemo(() => value * 2, [value]);\n\t<b>{doubled as string}</b>\n}",
+				),
+			],
+			APP,
+		);
+		expect(graph.ok).toBe(true);
+		if (!graph.ok) return;
+		const { init, parse } = await import('es-module-lexer');
+		await init;
+		const [imports] = parse(graph.modules[0].code);
+		const specifiers = imports.map((entry) => entry.n);
+		expect(specifiers).toContain('octane/internal/client');
+		expect(specifiers.some((specifier) => specifier?.startsWith('https://esm.sh/octane'))).toBe(
+			false,
+		);
+	});
+
 	it('allows verbatim esm.sh URLs but no other URL imports', async () => {
 		const ok = await buildModuleGraph(
 			[app("import x from 'https://esm.sh/canvas-confetti';\nexport const y = x;")],
@@ -136,9 +157,14 @@ describe('third-party import policy', () => {
 	});
 
 	it('rejects octane subpaths the sandbox does not provide', async () => {
-		const graph = await buildModuleGraph([app("import { compile } from 'octane/compiler';")], APP);
-		expect(graph.ok).toBe(false);
-		if (!graph.ok) expect(graph.error).toContain('octane/compiler');
+		for (const specifier of ['octane/compiler', 'octane/internal/server', 'octane/not-provided']) {
+			const graph = await buildModuleGraph(
+				[app(`import * as unavailable from '${specifier}'; export const value = unavailable;`)],
+				APP,
+			);
+			expect(graph.ok).toBe(false);
+			if (!graph.ok) expect(graph.error).toContain(specifier);
+		}
 	});
 });
 

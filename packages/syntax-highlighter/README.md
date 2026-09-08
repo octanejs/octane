@@ -4,6 +4,13 @@ The Octane binding for `react-syntax-highlighter@16.1.1`. It preserves the
 default, Light, Prism, async, language, style, renderer, and deep-import
 surfaces without adding React to the runtime graph.
 
+## Installation
+
+```sh
+npm install @octanejs/syntax-highlighter
+pnpm add @octanejs/syntax-highlighter
+```
+
 ```tsrx
 import { Prism } from '@octanejs/syntax-highlighter';
 import vscDarkPlus from '@octanejs/syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus';
@@ -40,6 +47,7 @@ source text cannot unwrap:
 + <SyntaxHighlighter children={source} />
 ```
 
-See [`UPSTREAM.md`](UPSTREAM.md) for immutable provenance. Ordinary runtime,
-type, SSR, hydration, differential, and real-browser tests cover the supported
-surface.
+See [`UPSTREAM.md`](UPSTREAM.md) for immutable provenance. The fail-closed
+parity audit runs all 19 upstream suites and 51 test identities, 40 snapshots,
+paired type contracts, SSR/hydration, a React differential, and real Chromium
+and Firefox rendering.

@@ -246,6 +246,7 @@ const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 	'startTransition',
 	'use',
 	'useActionState',
+	'useFormState',
 	'useCallback',
 	'useContext',
 	'useDebugValue',
@@ -420,31 +421,6 @@ function inheritGeneratedOrigin(root, origin) {
 	};
 	visit(root);
 	return root;
-}
-
-function mapAstCow(value, replace) {
-	if (!value || typeof value !== 'object') return value;
-	if (Array.isArray(value)) {
-		let output = null;
-		for (let index = 0; index < value.length; index++) {
-			const mapped = mapAstCow(value[index], replace);
-			if (output === null && mapped !== value[index]) output = value.slice(0, index);
-			if (output !== null && mapped !== null) output.push(mapped);
-		}
-		return output ?? value;
-	}
-	const replacement = replace(value);
-	if (replacement !== undefined) return replacement;
-	let output = null;
-	for (const [key, child] of Object.entries(value)) {
-		if (AST_SKIP_KEYS.has(key)) continue;
-		const mapped = mapAstCow(child, replace);
-		if (mapped !== child) {
-			if (output === null) output = { ...value };
-			output[key] = mapped;
-		}
-	}
-	return output ?? value;
 }
 
 function jsonValueToAst(value, origin) {
@@ -685,7 +661,7 @@ function createLexicalScope(parent, isFunction = false) {
 	return scope;
 }
 
-function createLexicalAnalysis(ast) {
+export function createLexicalAnalysis(ast) {
 	const bindingNodes = new WeakSet();
 	const nonReferenceNodes = new WeakSet();
 	const nodeScopes = new WeakMap();
@@ -1622,6 +1598,12 @@ function importSourceRanges(sources) {
 export function validateRendererModuleSource(source, filename, renderer) {
 	if (renderer?.validation === undefined) return;
 	const ast = parseModule(source, filename);
+	validateRendererAst(ast, filename, renderer);
+}
+
+/** Reuse renderer restrictions without reparsing an already adopted AST. */
+export function validateRendererAst(ast, filename, renderer) {
+	if (renderer?.validation === undefined) return;
 	validateRendererSource(ast, { filename, renderer });
 }
 
@@ -1876,15 +1858,44 @@ function validateRendererSource(ast, state) {
 	validateHostTemplates(ast, state, validation, isAuthored);
 }
 
+function createSourceRangeContainmentIndex(ranges) {
+	const orderedRanges = ranges
+		.filter(
+			(range) =>
+				typeof range?.start === 'number' &&
+				typeof range?.end === 'number' &&
+				range.end >= range.start,
+		)
+		.sort((left, right) => left.start - right.start || left.end - right.end);
+	const maximumEnds = new Array(orderedRanges.length);
+	let maximumEnd = -Infinity;
+	for (let index = 0; index < orderedRanges.length; index++) {
+		maximumEnd = Math.max(maximumEnd, orderedRanges[index].end);
+		maximumEnds[index] = maximumEnd;
+	}
+	return { maximumEnds, ranges: orderedRanges };
+}
+
+function sourceRangeIndexContains(index, node) {
+	if (typeof node?.start !== 'number' || typeof node?.end !== 'number') return false;
+	let low = 0;
+	let high = index.ranges.length;
+	while (low < high) {
+		const middle = (low + high) >>> 1;
+		if (index.ranges[middle].start <= node.start) low = middle + 1;
+		else high = middle;
+	}
+	// Keep each range's original extent. Merging adjacent ranges would select a
+	// parent that spans them even though neither authored range contains it.
+	return low > 0 && index.maximumEnds[low - 1] >= node.end;
+}
+
 function validateRendererSourceRanges(ast, state, ranges, exclusions = []) {
 	const validation = state.renderer.validation;
 	if (validation === undefined) return;
-	const selected = ranges.filter(
-		(range) =>
-			typeof range?.start === 'number' &&
-			typeof range?.end === 'number' &&
-			range.end >= range.start,
-	);
+	const selected = createSourceRangeContainmentIndex(ranges);
+	const excluded =
+		exclusions.length === 0 ? undefined : createSourceRangeContainmentIndex(exclusions);
 	const staticModuleSources = new WeakSet();
 	for (const statement of ast.body ?? []) {
 		const source =
@@ -1894,16 +1905,8 @@ function validateRendererSourceRanges(ast, state, ranges, exclusions = []) {
 		if (source && typeof source === 'object') staticModuleSources.add(source);
 	}
 	const isSelected = (node) =>
-		typeof node?.start === 'number' &&
-		typeof node?.end === 'number' &&
-		selected.some((range) => range.start <= node.start && node.end <= range.end) &&
-		!exclusions.some(
-			(range) =>
-				typeof range?.start === 'number' &&
-				typeof range?.end === 'number' &&
-				range.start <= node.start &&
-				node.end <= range.end,
-		);
+		sourceRangeIndexContains(selected, node) &&
+		(excluded === undefined || !sourceRangeIndexContains(excluded, node));
 	const isAuthored = (node) => isSelected(node) && !staticModuleSources.has(node);
 	const needsLexicalAnalysis =
 		(validation.forbiddenImports?.length ?? 0) > 0 ||
@@ -3788,7 +3791,7 @@ function emitComponentAst(shape, state) {
 		name,
 		wrapped,
 		fn,
-		state.hmrDialect === 'webpack' && exportKind !== null ? 'let' : 'const',
+		state.hmr && exportKind !== null ? 'let' : 'const',
 	);
 	if (exportKind === 'named') {
 		return [inheritGeneratedOrigin(b.export(declaration), fn)];
@@ -3796,7 +3799,12 @@ function emitComponentAst(shape, state) {
 	if (exportKind === 'default') {
 		return [
 			declaration,
-			inheritGeneratedOrigin(b.export_default(generatedIdentifier(name, fn)), fn),
+			inheritGeneratedOrigin(
+				state.hmr
+					? b.export(null, [b.export_specifier(name, 'default')])
+					: b.export_default(generatedIdentifier(name, fn)),
+				fn,
+			),
 		];
 	}
 	return [declaration];
@@ -3811,6 +3819,7 @@ export const UNIVERSAL_COMPILER_RUNTIME_IMPORTS = new Set([
 	'useBatch',
 	'warmChild',
 	'warmMemo',
+	'markWarm',
 	'withSlot',
 ]);
 
@@ -3975,7 +3984,8 @@ function hmrHandoffStatements(state, hot, origin) {
 	const output = [];
 	for (const component of state.hmrComponents) {
 		const componentOrigin = component.origin ?? origin;
-		const existing = b.member(hmrComponentStore(hot, componentOrigin), component.name);
+		const exportName = component.exportKind === 'default' ? 'default' : component.name;
+		const existing = b.member(hmrComponentStore(hot, componentOrigin), exportName);
 		// Webpack/rspack leave `hot.data` undefined until a previous instance of
 		// the module has disposed, so first evaluation must guard the bag itself.
 		const test = b.logical(
@@ -3985,7 +3995,16 @@ function hmrHandoffStatements(state, hot, origin) {
 				memberPath(hot, ['data'], componentOrigin),
 				hmrComponentStore(hot, componentOrigin),
 			),
-			existing,
+			// Newly added exports can share names with Object.prototype properties.
+			b.logical(
+				'&&',
+				b.call(
+					b.member(b.member(b.object([]), 'hasOwnProperty'), 'call'),
+					hmrComponentStore(hot, componentOrigin),
+					b.literal(exportName),
+				),
+				existing,
+			),
 		);
 		const update = b.stmt(
 			b.call(
@@ -4003,9 +4022,19 @@ function hmrComponentObject(state, existing, origin) {
 	return inheritGeneratedOrigin(
 		b.object([
 			b.spread(existing),
-			...state.hmrComponents.map((component) =>
-				b.prop('init', b.id(component.name), b.id(component.name), false, true),
-			),
+			...state.hmrComponents.map((component) => {
+				const exportName = component.exportKind === 'default' ? 'default' : component.name;
+				// Export lowering can expand __proto__ shorthand into a prototype setter.
+				// A computed key keeps the retained wrapper an own data property.
+				const computed = exportName === '__proto__';
+				return b.prop(
+					'init',
+					computed ? b.literal(exportName) : b.id(exportName),
+					b.id(component.name),
+					computed,
+					!computed && component.exportKind !== 'default',
+				);
+			}),
 		]),
 		origin,
 	);
@@ -4016,58 +4045,32 @@ function buildUniversalHmrBlocksAst(state, origin) {
 	if (state.hmrComponents.length === 0 && disposals.length === 0) {
 		return { prelude: [], tail: [] };
 	}
-	if (state.hmrDialect === 'webpack') {
-		// Rspack only guarantees that the `import.meta.webpackHot` root is lowered.
-		// Keep `.data` and the HMR methods on an ordinary local so Rsbuild's React
-		// transform cannot turn a deeper meta-property chain into `undefined`.
-		const hotName = allocName(state, '__octaneWebpackHot');
-		const hot = generatedIdentifier(hotName, origin);
-		const prelude = [generatedConst(hotName, importMetaMember('webpackHot', origin), origin)];
-		const tail = [];
-		if (disposals.length === 0) {
-			const data = generatedIdentifier('data', origin);
-			const store = inheritGeneratedOrigin(b.member(data, '__octaneUniversalComponents'), origin);
-			const dispose = b.stmt(
-				b.call(
-					b.member(hot, 'dispose'),
-					b.arrow(
-						[data],
-						b.block([b.stmt(b.assignment('=', store, hmrComponentObject(state, store, origin)))]),
-					),
-				),
-			);
-			tail.push(
-				inheritGeneratedOrigin(
-					b.if(
-						hot,
-						b.block([
-							...hmrHandoffStatements(state, hot, origin),
-							dispose,
-							b.stmt(b.call(b.member(hot, 'accept'))),
-						]),
-					),
-					origin,
-				),
-			);
-			return { prelude, tail };
-		}
-		const ready =
-			state.hmrComponents.length === 0
-				? null
-				: allocName(state, '__octaneUniversalHmrComponentsReady');
-		if (ready !== null) prelude.push(generatedConst(ready, b.literal(false), origin, 'let'));
-		const data = generatedIdentifier('data', origin);
-		const store = inheritGeneratedOrigin(b.member(data, '__octaneUniversalComponents'), origin);
-		const disposalBody = [];
-		if (ready !== null) {
-			disposalBody.push(
-				b.if(
-					b.id(ready),
-					b.block([b.stmt(b.assignment('=', store, hmrComponentObject(state, store, origin)))]),
-				),
-			);
-		}
-		disposalBody.push(...disposals);
+	// Rspack only lowers the webpackHot root reliably. Vite's self-accept call
+	// must stay a direct import.meta.hot.accept(...) for its static analysis.
+	const webpack = state.hmrDialect === 'webpack';
+	const hotName = webpack ? allocName(state, '__octaneWebpackHot') : null;
+	const hot =
+		hotName === null ? importMetaMember('hot', origin) : generatedIdentifier(hotName, origin);
+	const prelude =
+		hotName === null
+			? []
+			: [generatedConst(hotName, importMetaMember('webpackHot', origin), origin)];
+	const tail = [];
+	const data = generatedIdentifier('data', origin);
+	const store = inheritGeneratedOrigin(b.member(data, '__octaneUniversalComponents'), origin);
+	const save = b.stmt(b.assignment('=', store, hmrComponentObject(state, store, origin)));
+	const ready =
+		webpack && state.hmrComponents.length > 0 && disposals.length > 0
+			? allocName(state, '__octaneUniversalHmrComponentsReady')
+			: null;
+	if (ready !== null) prelude.push(generatedConst(ready, b.literal(false), origin, 'let'));
+	if (disposals.length > 0) {
+		// Register thread cleanup before any registration can throw. A failed
+		// webpack evaluation must not read component bindings still in their TDZ.
+		const disposalBody = [
+			...(ready === null ? [] : [b.if(b.id(ready), b.block([save]))]),
+			...disposals,
+		];
 		prelude.push(
 			inheritGeneratedOrigin(
 				b.if(
@@ -4079,74 +4082,63 @@ function buildUniversalHmrBlocksAst(state, origin) {
 				origin,
 			),
 		);
-		if (ready !== null) {
-			tail.push(
-				inheritGeneratedOrigin(
-					b.if(
-						hot,
-						b.block([
-							...hmrHandoffStatements(state, hot, origin),
-							b.stmt(b.assignment('=', b.id(ready), b.literal(true))),
-							b.stmt(b.call(b.member(hot, 'accept'))),
-						]),
-					),
-					origin,
+	}
+	if (state.hmrComponents.length > 0) {
+		// Each evaluation must keep exporting the wrapper that owns mounted roots.
+		// Updating a fresh wrapper from its own accept callback loses those owners
+		// on the second edit. Hand off once while evaluating the replacement.
+		const handoff = hmrHandoffStatements(state, hot, origin);
+		if (webpack) {
+			handoff.push(
+				ready === null
+					? b.stmt(b.call(b.member(hot, 'dispose'), b.arrow([data], b.block([save]))))
+					: b.stmt(b.assignment('=', b.id(ready), b.literal(true))),
+			);
+		} else {
+			// Vite keeps hot.data across evaluations but has only one dispose handler
+			// per module. Persist now so DOM and sibling regions cannot replace thread
+			// cleanup or each other's retained component tables.
+			const currentStore = hmrComponentStore(hot, origin);
+			// Without persistent data, the accept callback falls back to invalidation.
+			handoff.push(
+				b.if(
+					b.member(hot, 'data'),
+					b.stmt(b.assignment('=', currentStore, hmrComponentObject(state, currentStore, origin))),
 				),
 			);
 		}
-		return { prelude, tail };
+		const acceptArgs = [];
+		if (!webpack) {
+			const moduleName = allocName(state, '__octaneUniversalHmrModule');
+			const changedExports = state.hmrComponents
+				.map((component) =>
+					b.binary(
+						'!==',
+						b.member(
+							b.id(moduleName),
+							component.exportKind === 'default' ? 'default' : component.name,
+						),
+						b.id(component.name),
+					),
+				)
+				.reduce((left, right) => b.logical('||', left, right));
+			// The handoff already refreshed compatible exports. Missing or changed
+			// boundaries must invalidate rather than leave the previous owner live.
+			acceptArgs.push(
+				b.arrow(
+					[b.id(moduleName)],
+					b.block([
+						b.if(
+							b.logical('&&', b.id(moduleName), changedExports),
+							b.stmt(b.call(b.member(hot, 'invalidate'))),
+						),
+					]),
+				),
+			);
+		}
+		handoff.push(b.stmt(b.call(b.member(hot, 'accept'), ...acceptArgs)));
+		tail.push(inheritGeneratedOrigin(b.if(hot, b.block(handoff)), origin));
 	}
-	const hot = importMetaMember('hot', origin);
-	const prelude =
-		disposals.length === 0
-			? []
-			: [
-					inheritGeneratedOrigin(
-						b.if(
-							hot,
-							b.block([b.stmt(b.call(b.member(hot, 'dispose'), b.arrow([], b.block(disposals))))]),
-						),
-						origin,
-					),
-				];
-	const tail =
-		state.hmrComponents.length === 0
-			? []
-			: [
-					inheritGeneratedOrigin(
-						b.if(
-							hot,
-							b.block([
-								b.stmt(
-									b.call(
-										b.member(hot, 'accept'),
-										b.arrow(
-											[b.id('module')],
-											b.block(
-												state.hmrComponents.map((component) => {
-													const incoming =
-														component.exportKind === 'default'
-															? b.member(b.id('module'), 'default')
-															: b.member(b.id('module'), component.name);
-													return b.stmt(
-														b.call(
-															b.member(
-																b.member(b.id(component.name), b.id(state.helpers.hmrSymbol), true),
-																'update',
-															),
-															incoming,
-														),
-													);
-												}),
-											),
-										),
-									),
-								),
-							]),
-						),
-						origin,
-					),
-				];
 	return { prelude, tail };
 }
 
@@ -4247,6 +4239,7 @@ export function lowerUniversalRendererRegionAst(
 				'useBatch',
 				'warmMemo',
 				'warmChild',
+				'markWarm',
 				'withSlot',
 				'hookSlots',
 			].map((imported) => [
@@ -4420,14 +4413,7 @@ export function lowerUniversalRendererRegionAst(
 		);
 	}
 	const componentDeclaration = inheritGeneratedOrigin(
-		b.export(
-			generatedConst(
-				componentName,
-				componentValue,
-				origin,
-				state.hmrDialect === 'webpack' ? 'let' : 'const',
-			),
-		),
+		b.export(generatedConst(componentName, componentValue, origin, state.hmr ? 'let' : 'const')),
 		origin,
 	);
 	specializationBindings.add(componentName);

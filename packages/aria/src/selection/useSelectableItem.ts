@@ -24,6 +24,7 @@ import { focusSafely } from '../interactions/focusSafely';
 import { getActiveElement, getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { getCollectionId, isNonContiguousSelectionModifier } from './utils';
 import { isCtrlKeyPressed } from '../utils/keyboard';
+import { isTabbable } from '../utils/isFocusable';
 import { mergeProps } from '../utils/mergeProps';
 import { moveVirtualFocus } from '../focus/virtualFocus';
 import type { MultipleSelectionManager } from '../stately/selection/types';
@@ -380,7 +381,8 @@ export function useSelectableItem(...args: any[]): SelectableItemAria {
 		};
 	}
 
-	itemProps['data-collection'] = getCollectionId(manager.collection);
+	let collectionId = getCollectionId(manager.collection);
+	itemProps['data-collection'] = collectionId;
 	itemProps['data-key'] = key;
 	itemPressProps.preventFocusOnPress = shouldUseVirtualFocus;
 
@@ -470,17 +472,52 @@ export function useSelectableItem(...args: any[]): SelectableItemAria {
 				}
 			: undefined;
 
+	let mergedItemProps = mergeProps(
+		itemProps,
+		allowsSelection || hasPrimaryAction || (shouldUseVirtualFocus && !isDisabled) ? pressProps : {},
+		longPressEnabled ? longPressProps : {},
+		{ onDoubleClick, onDragStartCapture, onClick, id },
+		// Prevent DOM focus from moving on mouse down when using virtual focus
+		shouldUseVirtualFocus ? { onMouseDown: (e: MouseEvent) => e.preventDefault() } : undefined,
+	);
+
+	// Guard against presses triggering selection when they happen on interactive children or collection items from different collections
+	// will need to trigger selection if the target is itself a collection item belonging to the same collection parent (aka a cell in a row) but
+	// not if the target is a child of a different collections aka taggroup in table cell.
+	let isChildInteraction = (target: Element) => {
+		let el: Element | null = target;
+		while (el && el !== ref.current) {
+			let elCollection = el.getAttribute('data-collection');
+			if (elCollection != null) {
+				return elCollection !== collectionId;
+			}
+			el = el.parentElement;
+		}
+		return isTabbable(target);
+	};
+
+	let baseOnPointerDown = mergedItemProps.onPointerDown;
+	mergedItemProps.onPointerDown = (e: PointerEvent) => {
+		let target = getEventTarget(e) as Element | null;
+		if (target && target !== ref.current && isChildInteraction(target)) {
+			e.stopPropagation();
+			return;
+		}
+		baseOnPointerDown?.(e);
+	};
+
+	let baseOnMouseDown = mergedItemProps.onMouseDown;
+	mergedItemProps.onMouseDown = (e) => {
+		let target = getEventTarget(e) as Element | null;
+		if (target && target !== ref.current && isChildInteraction(target)) {
+			e.stopPropagation();
+			return;
+		}
+		baseOnMouseDown?.(e);
+	};
+
 	return {
-		itemProps: mergeProps(
-			itemProps,
-			allowsSelection || hasPrimaryAction || (shouldUseVirtualFocus && !isDisabled)
-				? pressProps
-				: {},
-			longPressEnabled ? longPressProps : {},
-			{ onDoubleClick, onDragStartCapture, onClick, id },
-			// Prevent DOM focus from moving on mouse down when using virtual focus
-			shouldUseVirtualFocus ? { onMouseDown: (e: MouseEvent) => e.preventDefault() } : undefined,
-		),
+		itemProps: mergedItemProps,
 		isPressed,
 		isSelected: manager.isSelected(key),
 		isFocused: manager.isFocused && manager.focusedKey === key,

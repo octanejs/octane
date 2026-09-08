@@ -1,0 +1,31 @@
+diff --git a/tests/upstream/utils/test/mockBoundingClientRect.ts b/tests/upstream/utils/test/mockBoundingClientRect.ts
+--- a/tests/upstream/utils/test/mockBoundingClientRect.ts
++++ b/tests/upstream/utils/test/mockBoundingClientRect.ts
+@@ -79,19 +79,16 @@ export function setElementBounds(element: HTMLElement, rect: DOMRect) {
+ }
+ 
+ export function mockBoundingClientRect() {
+-  HTMLElement.prototype.getBoundingClientRect =
+-    function getBoundingClientRect() {
+-      if (getDOMRect) {
+-        const rectOverride = getDOMRect(this);
+-        if (rectOverride) {
+-          return rectOverride;
+-        }
++  HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
++    if (getDOMRect) {
++      const rectOverride = getDOMRect(this);
++      if (rectOverride) {
++        return rectOverride;
+       }
++    }
+ 
+-      return (
+-        elementToDOMRect.get(this) || defaultGetDOMRect(this) || defaultDomRect
+-      );
+-    };
++    return elementToDOMRect.get(this) || defaultGetDOMRect(this) || defaultDomRect;
++  };
+ 
+   Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+     configurable: true,

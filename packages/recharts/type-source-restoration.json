@@ -1,0 +1,1115 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Bounded plain-module TypeScript restoration for Octane issues #726 and #721; not a full upstream parity verification.",
+  "baselineCommit": "fd6ce69c13daf7aa4eb41b4450382d6370b7993f",
+  "upstream": {
+    "package": "recharts",
+    "version": "3.9.2",
+    "commit": "b3451050c027a23957ffa50a2665c9119df21e47",
+    "archiveUrl": "https://codeload.github.com/recharts/recharts/tar.gz/b3451050c027a23957ffa50a2665c9119df21e47",
+    "archiveSha256": "4ea18e2d740eb795be14cfae42861fde31a024535ad853128efdf959c75045ff",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2015-present recharts",
+    "npmArtifact": {
+      "url": "https://registry.npmjs.org/recharts/-/recharts-3.9.2.tgz",
+      "integrity": "sha512-G4fy+Pk46RaXgwWMh+Nzhyo/lbFAVqXo9gtetlyehe6Ehge9CsgDuOTwQDD+i1+llaLktNBiNq4bhnGlDRXFtw=="
+    },
+    "licenseFile": {
+      "path": "LICENSE.recharts",
+      "sha256": "2d3aa48a8d1d3b93093680e8e68d3a64cfb590c3ade377ffcaefc69dac7c2ce5",
+      "source": "LICENSE"
+    }
+  },
+  "scope": {
+    "convertedJavaScriptModules": 123,
+    "copiedTypeScriptSources": 139,
+    "newNativeTypeHelper": "src/util/OctaneTypes.ts",
+    "excluded": [
+      ".tsrx component restorations (tracked separately)",
+      "upstream test-suite inventory or full-surface parity"
+    ]
+  },
+  "sourceFiles": {
+    "animation/AnimationController.ts": {
+      "upstreamSource": "src/animation/AnimationController.ts",
+      "upstreamSha256": "69f6ff9c7eac0f95dff39545550c8253cbfed905cf65ed7ba6a6d2f6603545d3",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "animation/AnimationControllerImpl.ts": {
+      "upstreamSource": "src/animation/AnimationControllerImpl.ts",
+      "upstreamSha256": "090b804f98b3a37e8f1793101d375f2e6303ed474938be862561a501d6d47952",
+      "previousJavaScript": "src/animation/AnimationControllerImpl.js",
+      "restoredNormalizedRuntimeSha256": "b0fa309c67cc1d15d8d01e258597f6c194b3f8215f03f60723d08c7b27ac0c2b"
+    },
+    "animation/AnimationHandle.ts": {
+      "upstreamSource": "src/animation/AnimationHandle.ts",
+      "upstreamSha256": "36a969d1d9ec8491fade22c58e56be52a7c3b551b65f02985c7f5999f98bbb19",
+      "previousJavaScript": "src/animation/AnimationHandle.js",
+      "restoredNormalizedRuntimeSha256": "b81dc59abd0062b8c8ee914130b8c0a9e1d7f2c1ebfd192f728698e9b945a4c1"
+    },
+    "animation/easing.ts": {
+      "upstreamSource": "src/animation/easing.ts",
+      "upstreamSha256": "315543a01ebc8edfb4ef92b1b0da18c832d737eb59dbee2448d5e1107180ec1f",
+      "previousJavaScript": "src/animation/easing.js",
+      "restoredNormalizedRuntimeSha256": "bd6c9f22a8042bf2d6214279171b96d1a4d82283eaa58f2525c31f3db55501ae"
+    },
+    "animation/matchBy.ts": {
+      "upstreamSource": "src/animation/matchBy.ts",
+      "upstreamSha256": "298c65ba207b4ebe67086ffc51d91578569c4f6ed70f09ee1b4c67220404c7af",
+      "previousJavaScript": "src/animation/matchBy.js",
+      "restoredNormalizedRuntimeSha256": "02684619db67943f77749e548246417aca0be4fbe34e7c87963f7085d18f2a93"
+    },
+    "animation/timeoutController.ts": {
+      "upstreamSource": "src/animation/timeoutController.ts",
+      "upstreamSha256": "c58a9d2ae982ff81391a0615025f7cb31827214859847b04062911da77589f5a",
+      "previousJavaScript": "src/animation/timeoutController.js",
+      "restoredNormalizedRuntimeSha256": "dbf6a047588f4b37283070ca99b6d542c84b5d038871b36a3b3834d2bd71f59c"
+    },
+    "animation/util.ts": {
+      "upstreamSource": "src/animation/util.ts",
+      "upstreamSha256": "55084fa627255c085011048ac51d99955b389a0355d5af4f05fbba011f38adcc",
+      "previousJavaScript": "src/animation/util.js",
+      "restoredNormalizedRuntimeSha256": "866be4776139d5d401e89581f779985fcaba772a2f53719ef4db693e4d929acd"
+    },
+    "cartesian/getCartesianPosition.ts": {
+      "upstreamSource": "src/cartesian/getCartesianPosition.tsx",
+      "upstreamSha256": "1e8e7b03be429318f933bfc928576686590d4d18872702281f2464e30c6ae703",
+      "previousJavaScript": "src/cartesian/getCartesianPosition.js",
+      "restoredNormalizedRuntimeSha256": "52fd9c8f74cca603a6c040a8a8517dc14d7df2c6000e4d2f54b817ddeb78d792"
+    },
+    "cartesian/getEquidistantTicks.ts": {
+      "upstreamSource": "src/cartesian/getEquidistantTicks.ts",
+      "upstreamSha256": "e4e355a3300f944ec1856394e4aa88670c16f6dc48cfbd15c06e4b635fcb2aa5",
+      "previousJavaScript": "src/cartesian/getEquidistantTicks.js",
+      "restoredNormalizedRuntimeSha256": "73a1c8a82c837854c0ac93dc2fb16294aaaddc3aa2a01089b03f44571fcb9161"
+    },
+    "cartesian/getTicks.ts": {
+      "upstreamSource": "src/cartesian/getTicks.ts",
+      "upstreamSha256": "dedd79a248bc0d0e1a63783ba18d97b45fe953f9a8db72d6af0d780c39cbc2ce",
+      "previousJavaScript": "src/cartesian/getTicks.js",
+      "restoredNormalizedRuntimeSha256": "c74a37b02dd072bde9ac4d21fc41468025c299cb38e10e2192d244a791af03c2"
+    },
+    "component/responsiveContainerUtils.ts": {
+      "upstreamSource": "src/component/responsiveContainerUtils.ts",
+      "upstreamSha256": "2f68da7e55dde61a6d0ebbfbedf594bc2464c721c68d6526e99c41e83a638406",
+      "previousJavaScript": "src/component/responsiveContainerUtils.js",
+      "restoredNormalizedRuntimeSha256": "8792689ea5dd04d963f9c8c76a7c5c897c74f7e994858f64c32819d583fe6e52"
+    },
+    "context/accessibilityContext.ts": {
+      "upstreamSource": "src/context/accessibilityContext.tsx",
+      "upstreamSha256": "02fedcf145bfe25a514be9ec5b4f3217dacebf25b05432eac5af31cf5aa45073",
+      "previousJavaScript": "src/context/accessibilityContext.js",
+      "restoredNormalizedRuntimeSha256": "5d67551cda25a4aff0b8599382af6247bce3f6c508dcddaace37d6f7d01958e5"
+    },
+    "context/brushUpdateContext.ts": {
+      "upstreamSource": "src/context/brushUpdateContext.tsx",
+      "upstreamSha256": "ac6e8db370d3836f640beb96d3377c8ecfc5d04974373870aaaee5a2468dd257",
+      "restoredNormalizedRuntimeSha256": "d3d058abd028f2af30e964c21608698ab7e8485a1f51658743cee6a77cc42b91"
+    },
+    "context/tooltipContext.ts": {
+      "upstreamSource": "src/context/tooltipContext.tsx",
+      "upstreamSha256": "5bd12749a5409b7d03356ac9b949c9ecd93ac1c231094767aa17fa51f9c5442d",
+      "previousJavaScript": "src/context/tooltipContext.js",
+      "restoredNormalizedRuntimeSha256": "24234da1b35d366700e5d362a6e09cf62a45325077c168de637a1423a7b07941"
+    },
+    "hooks.ts": {
+      "upstreamSource": "src/hooks.ts",
+      "upstreamSha256": "26807c0b218430cf7b0188d1b3f943d9da1a29256f5512316acffc1130b8a9f8",
+      "previousJavaScript": "src/hooks.js",
+      "restoredNormalizedRuntimeSha256": "d8acfb9f62caf9c9fe01301d6c496e1407f52f71c5e65ca6bfc312866938bde0"
+    },
+    "polar/defaultPolarAngleAxisProps.ts": {
+      "upstreamSource": "src/polar/defaultPolarAngleAxisProps.tsx",
+      "upstreamSha256": "dfc625c8824239dd91a416da72f47d9c1f7086fa605ee5b97ebd2d088504d63a",
+      "previousJavaScript": "src/polar/defaultPolarAngleAxisProps.js",
+      "restoredNormalizedRuntimeSha256": "29ef4c54b7ada88843c5f75a7e2d157e6938250abffa355c683b36e5a3da28a0"
+    },
+    "polar/defaultPolarRadiusAxisProps.ts": {
+      "upstreamSource": "src/polar/defaultPolarRadiusAxisProps.tsx",
+      "upstreamSha256": "99c3c87d9f56e595851cb81e954aa7cd59bc37b87a060106fff36cf28944e244",
+      "previousJavaScript": "src/polar/defaultPolarRadiusAxisProps.js",
+      "restoredNormalizedRuntimeSha256": "6a2b2b5e2dc5a2246789b2728b37c7c5074607d956e60e63cc72f41e521c87d6"
+    },
+    "state/brushSlice.ts": {
+      "upstreamSource": "src/state/brushSlice.ts",
+      "upstreamSha256": "d849bc9187792be73fe02a10c2c6d7d1f4c9ddbe1b990e7e3439902211ca0b94",
+      "previousJavaScript": "src/state/brushSlice.js",
+      "restoredNormalizedRuntimeSha256": "76cdc00f32952756dcad3eba88e6c28522e9101367bb615291bad0178e2fcc3e"
+    },
+    "state/cartesianAxisSlice.ts": {
+      "upstreamSource": "src/state/cartesianAxisSlice.ts",
+      "upstreamSha256": "29024a18f8bc150badd52988d621d9113fe65fffa52dc782a40aa6b0cdbbfd37",
+      "previousJavaScript": "src/state/cartesianAxisSlice.js",
+      "restoredNormalizedRuntimeSha256": "0d2f8cdfca287212b516cd7d4bd2d7fd31eb06b8d029a52a7ae8084bf451e4c1"
+    },
+    "state/chartDataSlice.ts": {
+      "upstreamSource": "src/state/chartDataSlice.ts",
+      "upstreamSha256": "8860ca14bbbeb0362272ac63daa3e1449baefdf0495238f1f18300048ddd583f",
+      "previousJavaScript": "src/state/chartDataSlice.js",
+      "restoredNormalizedRuntimeSha256": "216432f276f32e2e4282e57100350c46871751062ddac671985a678b756bce35"
+    },
+    "state/errorBarSlice.ts": {
+      "upstreamSource": "src/state/errorBarSlice.ts",
+      "upstreamSha256": "1f96700065a397c09ddf275ac4d7f586a5b1b5b5bff2e58a889597ade670e55c",
+      "previousJavaScript": "src/state/errorBarSlice.js",
+      "restoredNormalizedRuntimeSha256": "1d45947a24329168c42c662ea62a8d3a07503662d05b36d8e29ea7d388d371c4"
+    },
+    "state/eventSettingsSlice.ts": {
+      "upstreamSource": "src/state/eventSettingsSlice.ts",
+      "upstreamSha256": "e40bac73e88899fcb70de855eb149b1a5ff80f1e0d738a53bec4d20da17b8ce5",
+      "previousJavaScript": "src/state/eventSettingsSlice.js",
+      "restoredNormalizedRuntimeSha256": "735cb339d83c63aa431c85acb8dcecf174e44bbecf3d7c2df9eac2e51ebd0d78"
+    },
+    "state/externalEventsMiddleware.ts": {
+      "upstreamSource": "src/state/externalEventsMiddleware.ts",
+      "upstreamSha256": "2cbd948a2844b476810a9bb940affb668b1cc1c42ddbdf20833fa63f2a0b03ce",
+      "previousJavaScript": "src/state/externalEventsMiddleware.js",
+      "restoredNormalizedRuntimeSha256": "fd796829a7ae80bb8d2e1dc5f1d205a74c8d972bbed1bd9a317e7bdced5692a5"
+    },
+    "state/graphicalItemsSlice.ts": {
+      "upstreamSource": "src/state/graphicalItemsSlice.ts",
+      "upstreamSha256": "3a807bc206e388398a0d1eee52a84254b97317f9017b55b864f94b54e1143d81",
+      "previousJavaScript": "src/state/graphicalItemsSlice.js",
+      "restoredNormalizedRuntimeSha256": "1e2f871f008515ecd5a4da870bfef5b9abac8cdba6c1d74486ebff54f1fc927b"
+    },
+    "state/keyboardEventsMiddleware.ts": {
+      "upstreamSource": "src/state/keyboardEventsMiddleware.ts",
+      "upstreamSha256": "776f6b8c2a70c84b1a3c261b83ff903ea6bb9f70718e9f374726659638beab49",
+      "previousJavaScript": "src/state/keyboardEventsMiddleware.js",
+      "restoredNormalizedRuntimeSha256": "7c9f68b0e52abb677bc8d8faca679b1f64a55f31f5615fcf5da966aa7e9da6e3"
+    },
+    "state/layoutSlice.ts": {
+      "upstreamSource": "src/state/layoutSlice.ts",
+      "upstreamSha256": "b4b31b2eb569f601d61373fdc2a88f8083be20104378fb33bfb3551df4938174",
+      "previousJavaScript": "src/state/layoutSlice.js",
+      "restoredNormalizedRuntimeSha256": "9a0ab41620a0cded0aa3bc98cf1f7d37c0802d3d62492054b90d908d68270450"
+    },
+    "state/legendSlice.ts": {
+      "upstreamSource": "src/state/legendSlice.ts",
+      "upstreamSha256": "7970ec7a66329eadea0a67301557d9441759b70b7bf60b61256e98a6ba47724f",
+      "previousJavaScript": "src/state/legendSlice.js",
+      "restoredNormalizedRuntimeSha256": "d18c5dc93dcaeaa51a813ef0eb267eea68cd97a70d552cb45f72f5599b98618f"
+    },
+    "state/mouseEventsMiddleware.ts": {
+      "upstreamSource": "src/state/mouseEventsMiddleware.ts",
+      "upstreamSha256": "17647c55556a9dde98feef70cca1481d88a6bc904014cc1414fdfd38e878406d",
+      "previousJavaScript": "src/state/mouseEventsMiddleware.js",
+      "restoredNormalizedRuntimeSha256": "193f6ff8f540e0fa8ca3960f6a9c8adb8ce96cce6da2f1ff21f1d63fd281aaac"
+    },
+    "state/optionsSlice.ts": {
+      "upstreamSource": "src/state/optionsSlice.ts",
+      "upstreamSha256": "4de37f2e477e29be095f73c349c70aa418c102e5a9ba15e661a6397ca21bfc5c",
+      "previousJavaScript": "src/state/optionsSlice.js",
+      "restoredNormalizedRuntimeSha256": "be24fb8c389a90a895b75b7ff6120515de703d360cb24aa4e1244ac2772cc1af"
+    },
+    "state/polarAxisSlice.ts": {
+      "upstreamSource": "src/state/polarAxisSlice.ts",
+      "upstreamSha256": "e41f4efb4d4381db779d73a4b42e178d8fae3bc4b9d3e2d5a7124a1da4a5ba8f",
+      "previousJavaScript": "src/state/polarAxisSlice.js",
+      "restoredNormalizedRuntimeSha256": "840ae67b9a3799bb667d714265ab30d643027ba2e0ffbe88e42a5e1a4e665b45"
+    },
+    "state/polarOptionsSlice.ts": {
+      "upstreamSource": "src/state/polarOptionsSlice.ts",
+      "upstreamSha256": "2e61643456e443fd2ee8786fe581c3d5a86193827c8283400989cf6e1e58e650",
+      "previousJavaScript": "src/state/polarOptionsSlice.js",
+      "restoredNormalizedRuntimeSha256": "98c49f24c7760d80eca92f7f81f832ecfbb70591a5b0ab546a5c6b9cdc8bfa09"
+    },
+    "state/reduxDevtoolsJsonStringifyReplacer.ts": {
+      "upstreamSource": "src/state/reduxDevtoolsJsonStringifyReplacer.ts",
+      "upstreamSha256": "ace4d7f83cef27334807ea39a37cc78eb24643b434db66a99a1785472bdec1ba",
+      "previousJavaScript": "src/state/reduxDevtoolsJsonStringifyReplacer.js",
+      "restoredNormalizedRuntimeSha256": "2ba6d424ab10942f68792f27da88d5fbe54f0b3bbba198e2edd0b7f41b828a4e"
+    },
+    "state/referenceElementsSlice.ts": {
+      "upstreamSource": "src/state/referenceElementsSlice.ts",
+      "upstreamSha256": "62f91894d1a42e67ebcfad17614f3aefc6eda98022634c31fe7906ec3842913c",
+      "previousJavaScript": "src/state/referenceElementsSlice.js",
+      "restoredNormalizedRuntimeSha256": "9189a4bd246ca7640a82b4e69eb27efea5ecc6149abea6249e4a06d79f5b5773"
+    },
+    "state/renderedTicksSlice.ts": {
+      "upstreamSource": "src/state/renderedTicksSlice.ts",
+      "upstreamSha256": "2aae8164ec9c288a929a8a062ab89b68c3c80fa3291e3602a9fd6aed0caec4d9",
+      "previousJavaScript": "src/state/renderedTicksSlice.js",
+      "restoredNormalizedRuntimeSha256": "c9a8ee716decdab75e050764afe91613b756c009ecb596527a8a6af734c9ffec"
+    },
+    "state/rootPropsSlice.ts": {
+      "upstreamSource": "src/state/rootPropsSlice.ts",
+      "upstreamSha256": "2fff5c615d1b995af7cef0555629957ac8e7859c9b65a65e4646d9464c9348fb",
+      "previousJavaScript": "src/state/rootPropsSlice.js",
+      "restoredNormalizedRuntimeSha256": "8810ce354c05c5f75d8388e2d263f3277ec55b0f5ae63be7f3e62e8721113339"
+    },
+    "state/selectors/arrayEqualityCheck.ts": {
+      "upstreamSource": "src/state/selectors/arrayEqualityCheck.ts",
+      "upstreamSha256": "3e7ac6c14110c9913dce44901d0286931fcff6081796922dce608e0e55a20920",
+      "previousJavaScript": "src/state/selectors/arrayEqualityCheck.js",
+      "restoredNormalizedRuntimeSha256": "dbc12484fbf45e4938a59b1d5f2348702d6ad737d9174c02d8b1468d0ba19df7"
+    },
+    "state/selectors/axisSelectors.ts": {
+      "upstreamSource": "src/state/selectors/axisSelectors.ts",
+      "upstreamSha256": "a5e2f8c48bf793664bceb365bf426aa6c1dd531b5b15366a5dc55d398319e913",
+      "previousJavaScript": "src/state/selectors/axisSelectors.js",
+      "restoredNormalizedRuntimeSha256": "46239b635a795e868dd8047cf9cf5adc2eda60f3817802c73b6568fe0710d322"
+    },
+    "state/selectors/barSelectors.ts": {
+      "upstreamSource": "src/state/selectors/barSelectors.ts",
+      "upstreamSha256": "1f307df405b9ce9f148719953a451d16d3362ed612493f71f40795cd7773cd3e",
+      "previousJavaScript": "src/state/selectors/barSelectors.js",
+      "restoredNormalizedRuntimeSha256": "7f4a5b299f71f6c5c220709cb9a551df1db8a9b43bf2ce8b1e6f64ad2e8fddef"
+    },
+    "state/selectors/barStackSelectors.ts": {
+      "upstreamSource": "src/state/selectors/barStackSelectors.ts",
+      "upstreamSha256": "bfe2d4d3a87a6a0c90360aaf980730c508ac54e3ee8197f60653f59d8f63f9e5",
+      "previousJavaScript": "src/state/selectors/barStackSelectors.js",
+      "restoredNormalizedRuntimeSha256": "82f1cab479766c3297f8410ebfed3afec0798c5c055ad91ff7c16a2ce1790a09"
+    },
+    "state/selectors/brushSelectors.ts": {
+      "upstreamSource": "src/state/selectors/brushSelectors.ts",
+      "upstreamSha256": "eba00803e2f326abf05805468b87feaddcb97ab36bfd446e9ce896ece6af54ba",
+      "previousJavaScript": "src/state/selectors/brushSelectors.js",
+      "restoredNormalizedRuntimeSha256": "9b9dea8e24b94626b95e948c61a08239d317514705f516e1fadcd330382f0f17"
+    },
+    "state/selectors/combiners/combineActiveLabel.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineActiveLabel.ts",
+      "upstreamSha256": "59f636a267fb3fc4f6620305049028345220c03c30c12c0a51f47f6e078df117",
+      "previousJavaScript": "src/state/selectors/combiners/combineActiveLabel.js",
+      "restoredNormalizedRuntimeSha256": "cc5215f447566b09e247a16eea35dacf2fda766a931b291c5454e46a5a41e63e"
+    },
+    "state/selectors/combiners/combineActiveTooltipIndex.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineActiveTooltipIndex.ts",
+      "upstreamSha256": "234502807ab073128a7a2ec8b89a0d1db3572f50420f15fb28c90f2a0bcdcbe5",
+      "previousJavaScript": "src/state/selectors/combiners/combineActiveTooltipIndex.js",
+      "restoredNormalizedRuntimeSha256": "ffa0e716875e79c495346559fca66c6447fe0f963dc50320bae77b580dc27cbe"
+    },
+    "state/selectors/combiners/combineAllBarPositions.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineAllBarPositions.ts",
+      "upstreamSha256": "341de7832a3ac8788c3be2350edb98f6ebc2667c788dad8c63cacd247a568a0d",
+      "previousJavaScript": "src/state/selectors/combiners/combineAllBarPositions.js",
+      "restoredNormalizedRuntimeSha256": "aa653396cf1b262dad58b4afaad8f03395f7a26ecc69e1fb51e9a8f2bd9393ea"
+    },
+    "state/selectors/combiners/combineAxisRangeWithReverse.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineAxisRangeWithReverse.ts",
+      "upstreamSha256": "637f23101e6251367e6b77594632455e1c8ac496282bcd4a955cfe42fadc4260",
+      "previousJavaScript": "src/state/selectors/combiners/combineAxisRangeWithReverse.js",
+      "restoredNormalizedRuntimeSha256": "d0c9801ad43ef7f2b53eb1f77e203058e20cfc4e78aa7635f7373736931a3c2a"
+    },
+    "state/selectors/combiners/combineBarPosition.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineBarPosition.ts",
+      "upstreamSha256": "ce1d95b3f1c8c171a7535ee8e428331be53ec2a38de8dda21b3a6bf54e130464",
+      "previousJavaScript": "src/state/selectors/combiners/combineBarPosition.js",
+      "restoredNormalizedRuntimeSha256": "38f86c5e6e51951eb66601e25d4f062966ac9266327eecfbada0890a2572aa5d"
+    },
+    "state/selectors/combiners/combineBarSizeList.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineBarSizeList.ts",
+      "upstreamSha256": "8a4f2a45fa9b4f95a5e6a7e369379c2784b14a992d738b8d9b72c16ffb2d5694",
+      "previousJavaScript": "src/state/selectors/combiners/combineBarSizeList.js",
+      "restoredNormalizedRuntimeSha256": "c08032465859a997000834a4bde35bab52d3c1df1fa6cb9bc9005034cadf0a88"
+    },
+    "state/selectors/combiners/combineCheckedDomain.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineCheckedDomain.ts",
+      "upstreamSha256": "5faa80a260baf2d15fc6002029c43242213385368447c335320d1a4af5f3854b",
+      "previousJavaScript": "src/state/selectors/combiners/combineCheckedDomain.js",
+      "restoredNormalizedRuntimeSha256": "105826ee8ce279cf2adc8450fe0a8cb2b817c4aa567a892fe55900b6781a05bf"
+    },
+    "state/selectors/combiners/combineConfiguredScale.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineConfiguredScale.ts",
+      "upstreamSha256": "8a73336c2b1e5a028bddd4dae067ed128cba7fafc0803cae3892b5aa96f29671",
+      "previousJavaScript": "src/state/selectors/combiners/combineConfiguredScale.js",
+      "restoredNormalizedRuntimeSha256": "27f0b7089e7c80069e01d61972c9d77f52257748e5bf621e4163686036fe65ea"
+    },
+    "state/selectors/combiners/combineCoordinateForDefaultIndex.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineCoordinateForDefaultIndex.ts",
+      "upstreamSha256": "0618af8fe3c3e5435cbd0a5ace5a58be4f013d7ec58bd049ede02822b6513b0e",
+      "previousJavaScript": "src/state/selectors/combiners/combineCoordinateForDefaultIndex.js",
+      "restoredNormalizedRuntimeSha256": "46a6462e403acdbfd6ac0e2520beb1fae203f1dacabbb56ef66e58f4d5b73d56"
+    },
+    "state/selectors/combiners/combineDisplayedStackedData.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineDisplayedStackedData.ts",
+      "upstreamSha256": "6506092968a7c53f3ddc4f77c74e2517d00f6b1a434a64e2726e8e47780c9348",
+      "previousJavaScript": "src/state/selectors/combiners/combineDisplayedStackedData.js",
+      "restoredNormalizedRuntimeSha256": "4df9499fc6ff8d96ed8435d13f980d30c3b2b25db468c2927202d7ef9d7397a1"
+    },
+    "state/selectors/combiners/combineInverseScaleFunction.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineInverseScaleFunction.ts",
+      "upstreamSha256": "d73ce06bf1c9ea0c3375803af2294ff8251849ae02615cd67d56b12ec2f110b9",
+      "previousJavaScript": "src/state/selectors/combiners/combineInverseScaleFunction.js",
+      "restoredNormalizedRuntimeSha256": "4154ad3d688e691a7102ab4672f03a55a58e56e9e307a4cfb04e09a760785475"
+    },
+    "state/selectors/combiners/combineRealScaleType.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineRealScaleType.ts",
+      "upstreamSha256": "4275717ec64e899ef98757b636fc10d54d14adb160b9447ba72e7fc58a291660",
+      "previousJavaScript": "src/state/selectors/combiners/combineRealScaleType.js",
+      "restoredNormalizedRuntimeSha256": "7a24675f5867454197efa9c74cd25a728ae53d962d1c19ff9a5856c1e768a903"
+    },
+    "state/selectors/combiners/combineStackedData.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineStackedData.ts",
+      "upstreamSha256": "932cdb0d873505203b470aa457d6c0c05777b17341c15a74f618255b097b7a99",
+      "previousJavaScript": "src/state/selectors/combiners/combineStackedData.js",
+      "restoredNormalizedRuntimeSha256": "5ef9386d8dd4bc697bc8b9e43c0f36fb02c78ed03134c2ad07109971d59d6369"
+    },
+    "state/selectors/combiners/combineTooltipInteractionState.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineTooltipInteractionState.ts",
+      "upstreamSha256": "cb79272c8acc568302c6107e9544a7caf741886a165ac0f79dcdb5001a20c973",
+      "previousJavaScript": "src/state/selectors/combiners/combineTooltipInteractionState.js",
+      "restoredNormalizedRuntimeSha256": "4d4f0fcca8d3841131708180b4c1b6028a7d085b4b9aa0388f5b00c656f4a02f"
+    },
+    "state/selectors/combiners/combineTooltipPayload.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineTooltipPayload.ts",
+      "upstreamSha256": "6614d5b0e7274f7f77b10b76d88360aa59d97f1ed474fe811b73b311fda61c9e",
+      "previousJavaScript": "src/state/selectors/combiners/combineTooltipPayload.js",
+      "restoredNormalizedRuntimeSha256": "c341bd056fd1b234ec775a3c978bc947558e5004bdce199aa01f25ca32e39268"
+    },
+    "state/selectors/combiners/combineTooltipPayloadConfigurations.ts": {
+      "upstreamSource": "src/state/selectors/combiners/combineTooltipPayloadConfigurations.ts",
+      "upstreamSha256": "072f7f33dcc2329ed42a0dd6cbb3cc1e6a563ecc33b808cd910803b147a7a8be",
+      "previousJavaScript": "src/state/selectors/combiners/combineTooltipPayloadConfigurations.js",
+      "restoredNormalizedRuntimeSha256": "b83b53672cd0d8af059f3173953ba7af6b2d6174ffa5f24ee54087730ede9f6b"
+    },
+    "state/selectors/containerSelectors.ts": {
+      "upstreamSource": "src/state/selectors/containerSelectors.ts",
+      "upstreamSha256": "61640dfa62528ad695b1078af730e4b4ed1cf1b3a9889bfa56d54e430d44a684",
+      "previousJavaScript": "src/state/selectors/containerSelectors.js",
+      "restoredNormalizedRuntimeSha256": "eba74fbf612d5fa59ec3c4544cac0c53ec8b60b5869d79bcc8e7f63d16f39772"
+    },
+    "state/selectors/dataSelectors.ts": {
+      "upstreamSource": "src/state/selectors/dataSelectors.ts",
+      "upstreamSha256": "75821355d22e085df8cf67a0ae1efee2b703a9b9adc8677df512ef11b8529221",
+      "previousJavaScript": "src/state/selectors/dataSelectors.js",
+      "restoredNormalizedRuntimeSha256": "9ba56ae2fc17609b132eff5c89f75eaf92444e67126d6248fd2a3348aecb8934"
+    },
+    "state/selectors/graphicalItemSelectors.ts": {
+      "upstreamSource": "src/state/selectors/graphicalItemSelectors.ts",
+      "upstreamSha256": "6663e7a716880282ef2e9873bbe2cda9bb0690806f498cec52f680862fe6d6c7",
+      "previousJavaScript": "src/state/selectors/graphicalItemSelectors.js",
+      "restoredNormalizedRuntimeSha256": "31b73c26bbe7e62f3083cefee41b88397913f5ef68923808e326af2355f331a9"
+    },
+    "state/selectors/legendSelectors.ts": {
+      "upstreamSource": "src/state/selectors/legendSelectors.ts",
+      "upstreamSha256": "bf8649309aec580767f55a727212d327fa994ce3d093232bb6b6191b46887004",
+      "previousJavaScript": "src/state/selectors/legendSelectors.js",
+      "restoredNormalizedRuntimeSha256": "985e016b2bf7a27a990fdbb7717dcd57afc425f27231621e327b00356ce9a5dc"
+    },
+    "state/selectors/lineSelectors.ts": {
+      "upstreamSource": "src/state/selectors/lineSelectors.ts",
+      "upstreamSha256": "a64197e0d4724f083de0e40bb9df6a1b7cdb9b98a77dec8041b08bc7f86c0ffa",
+      "previousJavaScript": "src/state/selectors/lineSelectors.js",
+      "restoredNormalizedRuntimeSha256": "99393d8418185a5297781d53ac86da8c5cfeb5519bbda81406e0c271232fc155"
+    },
+    "state/selectors/numberDomainEqualityCheck.ts": {
+      "upstreamSource": "src/state/selectors/numberDomainEqualityCheck.ts",
+      "upstreamSha256": "24126c1242f608aa8a1b4ea5dca127da3a6d1dc0e3f8643bfd487a50be795dc5",
+      "previousJavaScript": "src/state/selectors/numberDomainEqualityCheck.js",
+      "restoredNormalizedRuntimeSha256": "2805717b065569b37135d68be6063f0729e06876c1348986c10ad2f63bc4a962"
+    },
+    "state/selectors/pickAxisId.ts": {
+      "upstreamSource": "src/state/selectors/pickAxisId.ts",
+      "upstreamSha256": "f090805c9eee0436629b3f063ed553508724aab8b9f6134f5756aa5f7bb7f9e4",
+      "previousJavaScript": "src/state/selectors/pickAxisId.js",
+      "restoredNormalizedRuntimeSha256": "d3f7f4326d18a78f653fd58b384b4b50afe9105bc8afc8cec55b88871f97b515"
+    },
+    "state/selectors/pickAxisType.ts": {
+      "upstreamSource": "src/state/selectors/pickAxisType.ts",
+      "upstreamSha256": "cf5905fbaa5d43369aa88eabc457284954e8b5d42a2ecef725076ba659d95ee5",
+      "previousJavaScript": "src/state/selectors/pickAxisType.js",
+      "restoredNormalizedRuntimeSha256": "beb80aa15775748fabc1e647e6d097d4e95574da431e83c271cc7231c080ec6c"
+    },
+    "state/selectors/polarAxisSelectors.ts": {
+      "upstreamSource": "src/state/selectors/polarAxisSelectors.ts",
+      "upstreamSha256": "8735b3a6575144e1e658175da0c9e12de13607019cbb3ea320d1587aa1531b9b",
+      "previousJavaScript": "src/state/selectors/polarAxisSelectors.js",
+      "restoredNormalizedRuntimeSha256": "8316353c4e6effe8be92fb1eb56ded69f67c5b9d92ac75422dcbf3e6a3b34da9"
+    },
+    "state/selectors/rootPropsSelectors.ts": {
+      "upstreamSource": "src/state/selectors/rootPropsSelectors.ts",
+      "upstreamSha256": "2992c3a844a86a1240b95948d5c7e55b1a4ff49ec6371027893c16b81063395b",
+      "previousJavaScript": "src/state/selectors/rootPropsSelectors.js",
+      "restoredNormalizedRuntimeSha256": "b0ed73b593721a9b103003c0620c275f0e8eaf8a6931f3f2e653d168bdfc662d"
+    },
+    "state/selectors/selectActivePropsFromChartPointer.ts": {
+      "upstreamSource": "src/state/selectors/selectActivePropsFromChartPointer.ts",
+      "upstreamSha256": "c554aca96e1f4893f492e2e937974ecf061b6c874ea11ae0361e150fce332511",
+      "previousJavaScript": "src/state/selectors/selectActivePropsFromChartPointer.js",
+      "restoredNormalizedRuntimeSha256": "9ddb4e2344e2cefa4ffb02ef32d8d063c1325a0b2408da9ca312b56e15517510"
+    },
+    "state/selectors/selectAllAxes.ts": {
+      "upstreamSource": "src/state/selectors/selectAllAxes.ts",
+      "upstreamSha256": "23951f0ea5013049af7203cdd083a4ed6be3bbad33cd8b5d0ee86c34ed7fe738",
+      "previousJavaScript": "src/state/selectors/selectAllAxes.js",
+      "restoredNormalizedRuntimeSha256": "d6d348d5be18c8f43fa7214f1a8982cb82159d8d486d7d8b14c97b6025dea9e1"
+    },
+    "state/selectors/selectChartOffset.ts": {
+      "upstreamSource": "src/state/selectors/selectChartOffset.ts",
+      "upstreamSha256": "4aad92b1c18d5a0744e56ef0fa07dcd13bd64d4a549080778e727ee27dc5161b",
+      "previousJavaScript": "src/state/selectors/selectChartOffset.js",
+      "restoredNormalizedRuntimeSha256": "dea33147fe148268b581dd34402d4809dde5e3a0332060dde803806856edaf61"
+    },
+    "state/selectors/selectChartOffsetInternal.ts": {
+      "upstreamSource": "src/state/selectors/selectChartOffsetInternal.ts",
+      "upstreamSha256": "5e4850c1da840dfea71607594ddce23404d5142eb48fcf6433be50e26ac6eaf6",
+      "previousJavaScript": "src/state/selectors/selectChartOffsetInternal.js",
+      "restoredNormalizedRuntimeSha256": "13eb7d7ad904f82b0b7faf7e2df1d2309aaa5eceae0d054bf8374d2096f3c777"
+    },
+    "state/selectors/selectPlotArea.ts": {
+      "upstreamSource": "src/state/selectors/selectPlotArea.ts",
+      "upstreamSha256": "695444bde25f75a0ce401e7625a4ac0116ebb3e0b592e7698dedfac9e0820198",
+      "previousJavaScript": "src/state/selectors/selectPlotArea.js",
+      "restoredNormalizedRuntimeSha256": "47a0793c4b5161b0ab94f706248ea8516011681a470f5cc588097b97dc44b4ab"
+    },
+    "state/selectors/selectTooltipAxisId.ts": {
+      "upstreamSource": "src/state/selectors/selectTooltipAxisId.ts",
+      "upstreamSha256": "ee08efa0cadab72833d9d1a7c283bd873be5d2bc33bd3b1760f7be65ea815c55",
+      "previousJavaScript": "src/state/selectors/selectTooltipAxisId.js",
+      "restoredNormalizedRuntimeSha256": "85e28199021d80e2c06914ecb6e8ea0ae3b358fae088c4c71f15c4ff6a447674"
+    },
+    "state/selectors/selectTooltipAxisType.ts": {
+      "upstreamSource": "src/state/selectors/selectTooltipAxisType.ts",
+      "upstreamSha256": "e4431c2aa878c3315aaeee68dfe669f8bf17356ce80d80c628a77fce3f8d13ac",
+      "previousJavaScript": "src/state/selectors/selectTooltipAxisType.js",
+      "restoredNormalizedRuntimeSha256": "f67b17dbf7afe51bdb78e32f3b858161fbf47dd0e93868cdad52646df80fd100"
+    },
+    "state/selectors/selectTooltipEventType.ts": {
+      "upstreamSource": "src/state/selectors/selectTooltipEventType.ts",
+      "upstreamSha256": "f75e26380ef0d8c961be4d9e6de5e26ef859586d13442b55dac6a6666941d5ce",
+      "previousJavaScript": "src/state/selectors/selectTooltipEventType.js",
+      "restoredNormalizedRuntimeSha256": "0e624395aeab9158dbd1f39b506b66720bb02107572973500a8b94a01138f8f7"
+    },
+    "state/selectors/selectTooltipPayloadSearcher.ts": {
+      "upstreamSource": "src/state/selectors/selectTooltipPayloadSearcher.ts",
+      "upstreamSha256": "18ac71c89dd3afe63dd30023562e8075fa89bacf697161f4d9b93241f0b2a6cf",
+      "previousJavaScript": "src/state/selectors/selectTooltipPayloadSearcher.js",
+      "restoredNormalizedRuntimeSha256": "e43090947777813e4b8cb6dd0b37b441f5fbc753362c7241eabdaabe7d2b5723"
+    },
+    "state/selectors/selectTooltipSettings.ts": {
+      "upstreamSource": "src/state/selectors/selectTooltipSettings.ts",
+      "upstreamSha256": "1577e60fba3769e2057f6fdb8a43af819ba3b1a1d3e98f7b60c9b47c02df5d9d",
+      "previousJavaScript": "src/state/selectors/selectTooltipSettings.js",
+      "restoredNormalizedRuntimeSha256": "2c9ec8308d45238976cfe4666788f59d800f6dd11c96c0830afc69e7c5813d1c"
+    },
+    "state/selectors/selectTooltipState.ts": {
+      "upstreamSource": "src/state/selectors/selectTooltipState.ts",
+      "upstreamSha256": "1d6d0ce528309b80c2db4080c3339788ef511d15eac3252e9a5e0980862643dd",
+      "previousJavaScript": "src/state/selectors/selectTooltipState.js",
+      "restoredNormalizedRuntimeSha256": "e81833d948c44717e47638fdaa98b9aae3611097dd77ec320151c3c0a5321021"
+    },
+    "state/selectors/selectors.ts": {
+      "upstreamSource": "src/state/selectors/selectors.ts",
+      "upstreamSha256": "7dd6a2287255afc2eb001a3066a14da65200b820ae62c08c8d98333695442ae1",
+      "previousJavaScript": "src/state/selectors/selectors.js",
+      "restoredNormalizedRuntimeSha256": "c682913e7916a564773866a3034d99a9587ff83225682fd1ea434c72185d92bc"
+    },
+    "state/selectors/tooltipSelectors.ts": {
+      "upstreamSource": "src/state/selectors/tooltipSelectors.ts",
+      "upstreamSha256": "4d75f3dbea76a83d53f3c1da4784a44ed8dc2449c9df601cc19760d9729fb504",
+      "previousJavaScript": "src/state/selectors/tooltipSelectors.js",
+      "restoredNormalizedRuntimeSha256": "f9d3cff0bf37abd8141bb901265dc23a44a8ecd8b76358799ab9eee95bae8882"
+    },
+    "state/selectors/touchSelectors.ts": {
+      "upstreamSource": "src/state/selectors/touchSelectors.ts",
+      "upstreamSha256": "c9f2f459a8ee4d744045c609a6c75e8cf421f6c006d7d60891a2a77052f57238",
+      "previousJavaScript": "src/state/selectors/touchSelectors.js",
+      "restoredNormalizedRuntimeSha256": "ff47f3e9874ec42cb6e73885653de470fbf0b07bcf64cc3642a6a586412d394b"
+    },
+    "state/store.ts": {
+      "upstreamSource": "src/state/store.ts",
+      "upstreamSha256": "b7984c734cf3d6f3bdd491b3060920429f4ce1c2cdbb8bdb7c5687d05a45d85c",
+      "previousJavaScript": "src/state/store.js",
+      "restoredNormalizedRuntimeSha256": "17b9836feaa8ab952da7c5ee53aaf1cec4113bbb2477cf7b1dadcbe476d6a5d0"
+    },
+    "state/tooltipSlice.ts": {
+      "upstreamSource": "src/state/tooltipSlice.ts",
+      "upstreamSha256": "24143a804410d12c98d85569b2c214c9c56346227aa5fc031a965d21c7eac31c",
+      "previousJavaScript": "src/state/tooltipSlice.js",
+      "restoredNormalizedRuntimeSha256": "53be9d911c97b4e227f1b9a38fc9cf3214a4713974953f2ea8fb2d4c161d31ac"
+    },
+    "state/touchEventsMiddleware.ts": {
+      "upstreamSource": "src/state/touchEventsMiddleware.ts",
+      "upstreamSha256": "c5271339b5512153a2884750396c5f31838c69fa78b72b41a690325f0a3d0b00",
+      "previousJavaScript": "src/state/touchEventsMiddleware.js",
+      "restoredNormalizedRuntimeSha256": "13c58fc39271e6d0e85403146426fb4d781f1bf0898156b342c929debe018e21"
+    },
+    "state/types/AreaSettings.ts": {
+      "upstreamSource": "src/state/types/AreaSettings.ts",
+      "upstreamSha256": "ae5ccc7ff9bbf0fdbc78a40818d1f0ba02e9de36a82e46d24ac4e7d14824c31a",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "state/types/BarSettings.ts": {
+      "upstreamSource": "src/state/types/BarSettings.ts",
+      "upstreamSha256": "d5a688f88f042231dc0b8419a7c1d0af0832d2671f5dbc898a0b8841be343c55",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "state/types/LineSettings.ts": {
+      "upstreamSource": "src/state/types/LineSettings.ts",
+      "upstreamSha256": "1a472a10dcc9662af926e3b4e9a6e08c9b0d5b69f951058596bcb2a3ec2ceef6",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "state/types/PieSettings.ts": {
+      "upstreamSource": "src/state/types/PieSettings.ts",
+      "upstreamSha256": "5e0bbb398d0adbb351ff8124dd7b3c1facdaa007cc8c48b347b615fd97b1d3c7",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "state/types/RadarSettings.ts": {
+      "upstreamSource": "src/state/types/RadarSettings.ts",
+      "upstreamSha256": "ceb372f390360acb1ae28df720800f0d715e67566ec3d2a2c8adcb5fbcb04cc7",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "state/types/RadialBarSettings.ts": {
+      "upstreamSource": "src/state/types/RadialBarSettings.ts",
+      "upstreamSha256": "c619fe1aa73ebbed89ec23d3f8376c052ea773d1238daa45028a1eda94c1bbad",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "state/types/ScatterSettings.ts": {
+      "upstreamSource": "src/state/types/ScatterSettings.ts",
+      "upstreamSha256": "97b53135e1228c49a21d05c6d29f07b8a0494415531288452c54948b518f0d51",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "state/types/StackedGraphicalItem.ts": {
+      "upstreamSource": "src/state/types/StackedGraphicalItem.ts",
+      "upstreamSha256": "2c2f2507f7eb1fbc1f3aaf103148e68eba268036cf055ac7077e1660df222ff7",
+      "previousJavaScript": "src/state/types/StackedGraphicalItem.js",
+      "restoredNormalizedRuntimeSha256": "6399809858fd4ca4fe8fc2479ae8001c2c84eb2df33c7f463e6969bda0f1ecc9"
+    },
+    "state/zIndexSlice.ts": {
+      "upstreamSource": "src/state/zIndexSlice.ts",
+      "upstreamSha256": "9916f44597ed2b3d39e9bec37e237efbda22026887735251541ebf6772bfb5a8",
+      "previousJavaScript": "src/state/zIndexSlice.js",
+      "restoredNormalizedRuntimeSha256": "7f649fc00648ecc8c16506386ceb6aa1942d348dbb3d945231dcf7e89d4df039"
+    },
+    "synchronisation/syncSelectors.ts": {
+      "upstreamSource": "src/synchronisation/syncSelectors.ts",
+      "upstreamSha256": "01fb7819f6d5c61a8f222d616a2a41c9fb65f10506bc0b5d26c182ec38454861",
+      "previousJavaScript": "src/synchronisation/syncSelectors.js",
+      "restoredNormalizedRuntimeSha256": "a43e7cc59fdb2732e90a151a34206140d288b552c307d2095112d5f252cd4ed4"
+    },
+    "synchronisation/types.ts": {
+      "upstreamSource": "src/synchronisation/types.ts",
+      "upstreamSha256": "ac96a047b8b470dbae3bd8b08f6bdab8a03bfe48a8c8cee261df2a6612d19440",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "types.ts": {
+      "upstreamSource": "src/types.ts",
+      "upstreamSha256": "d00bd970d53d8cda1c5ebc307c7e90ed17ef0e66a3cd603e916074127e2512c2",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "util/CartesianUtils.ts": {
+      "upstreamSource": "src/util/CartesianUtils.ts",
+      "upstreamSha256": "9ba094bd07da12e2688f2b4442f03e92a79a61f33f0f69a8f1f1322613ca9344",
+      "previousJavaScript": "src/util/CartesianUtils.js",
+      "restoredNormalizedRuntimeSha256": "6cd7c97b26725ad3c0a459833859550d28fe6bcc8a9362149e87478db31a0e9f"
+    },
+    "util/ChartUtils.ts": {
+      "upstreamSource": "src/util/ChartUtils.ts",
+      "upstreamSha256": "808e129fc6600d39b5beb2c2cfbf8c9b0066f48d88a0c04b85e8c92d5b2a78ce",
+      "previousJavaScript": "src/util/ChartUtils.js",
+      "restoredNormalizedRuntimeSha256": "af74473a085a5ea5be4b6e963b175ae9bc94ac0dd6ebb28faa16b36c654f9ba1"
+    },
+    "util/Constants.ts": {
+      "upstreamSource": "src/util/Constants.ts",
+      "upstreamSha256": "ef8da66b4475f04161e1a11adf8cfa1fc6efdaf54f2dcb8dd1e64e767f3ff518",
+      "previousJavaScript": "src/util/Constants.js",
+      "restoredNormalizedRuntimeSha256": "c409053d7b1e6a5f0c757a33bb9d6ecd6825a4a2e022671d27230b48f058e119"
+    },
+    "util/DOMUtils.ts": {
+      "upstreamSource": "src/util/DOMUtils.ts",
+      "upstreamSha256": "73b7aade3ed9a67906ec85d00ac678374fbd9d2ed53790b324ba6534342e6565",
+      "previousJavaScript": "src/util/DOMUtils.js",
+      "restoredNormalizedRuntimeSha256": "23341e353072104f388943ce0e5b867afd83cf221303da41c49e10b63e27a736"
+    },
+    "util/DataUtils.ts": {
+      "upstreamSource": "src/util/DataUtils.ts",
+      "upstreamSha256": "6fe262fae7d57d323fbcee53f1ded87b38adf23c0e08d320e4f2c33ee7cfacd3",
+      "previousJavaScript": "src/util/DataUtils.js",
+      "restoredNormalizedRuntimeSha256": "17d58725115a88170c1ed1e4d9ba9407a438c33bf02984925e3413e61fc5f5d7"
+    },
+    "util/Events.ts": {
+      "upstreamSource": "src/util/Events.ts",
+      "upstreamSha256": "354a1ba02a3355506546279c7bffccd0fd47a6def890fc34e97456006d12ce8e",
+      "previousJavaScript": "src/util/Events.js",
+      "restoredNormalizedRuntimeSha256": "de6d539749d6fefc0cd563685772f04c9a09a2ba26efca5ff57005981a6e7d3d"
+    },
+    "util/Global.ts": {
+      "upstreamSource": "src/util/Global.ts",
+      "upstreamSha256": "c2d47241c262a364eed5308b48ead47a9fd0938b1258b3ac97b4e2a24d55959c",
+      "previousJavaScript": "src/util/Global.js",
+      "restoredNormalizedRuntimeSha256": "f9ed1254d50f5d87b88ce78b2633048c1c55102b879729bf021aeb7fc42338e2"
+    },
+    "util/IfOverflow.ts": {
+      "upstreamSource": "src/util/IfOverflow.ts",
+      "upstreamSha256": "c333a19f305d2a1e3638262a2690d3ea1db750872ebd5b695ea5038323aeff61",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "util/LRUCache.ts": {
+      "upstreamSource": "src/util/LRUCache.ts",
+      "upstreamSha256": "b1473944125312bbd612e993e7772c2712c4267483413a7c233bb28481e1ab6a",
+      "previousJavaScript": "src/util/LRUCache.js",
+      "restoredNormalizedRuntimeSha256": "7e36a88e926ff4a061ec343915f8f7680974f892bd7ff595fa28df3377fe0b1a"
+    },
+    "util/LogUtils.ts": {
+      "upstreamSource": "src/util/LogUtils.ts",
+      "upstreamSha256": "ecab0585006e5991545cb87cb71043ed0523af312ccdc72a9ca81391dd9a1138",
+      "previousJavaScript": "src/util/LogUtils.js",
+      "restoredNormalizedRuntimeSha256": "558cafb43005a7690ac83030f905fc72b6213e91c78eb4c77e238aff2d67da9f"
+    },
+    "util/PolarUtils.ts": {
+      "upstreamSource": "src/util/PolarUtils.ts",
+      "upstreamSha256": "42a5cbcb70b05ed260a255e888c5c10d3c73bc0639f857beb82610cd5f4ad225",
+      "previousJavaScript": "src/util/PolarUtils.js",
+      "restoredNormalizedRuntimeSha256": "04d80b005269e8043eaf1665a1981a8c4105b3b8e48485761daaf69604086522"
+    },
+    "util/ReduceCSSCalc.ts": {
+      "upstreamSource": "src/util/ReduceCSSCalc.ts",
+      "upstreamSha256": "7160563b7bbb9f38c014d0ca4642a376dbf17875968a93b1e76fec335681e111",
+      "previousJavaScript": "src/util/ReduceCSSCalc.js",
+      "restoredNormalizedRuntimeSha256": "6f47cb5f96821e6f87b96cdc817203018da2b44908dafff75b9411e21fefcdd5"
+    },
+    "util/TickUtils.ts": {
+      "upstreamSource": "src/util/TickUtils.ts",
+      "upstreamSha256": "747f1edd853a01f38a92301f7e855b62846b3745cd9596171e6dd473a5fa21f9",
+      "previousJavaScript": "src/util/TickUtils.js",
+      "restoredNormalizedRuntimeSha256": "648ba4492b7ae66e26d329c3c63dd0fb47c2d6b9fd68a3efcc35af34fbf63714"
+    },
+    "util/YAxisUtils.ts": {
+      "upstreamSource": "src/util/YAxisUtils.tsx",
+      "upstreamSha256": "a386c84e5333a8e4486a4b45bc1db2832661adaf519c45a99f839852e6cea0f6",
+      "previousJavaScript": "src/util/YAxisUtils.js",
+      "restoredNormalizedRuntimeSha256": "02282dc8474332a29aa2a3367d8feff5403c640e2f14d337794d5fab9f00315b"
+    },
+    "util/axisPropsAreEqual.ts": {
+      "upstreamSource": "src/util/axisPropsAreEqual.ts",
+      "upstreamSha256": "2cc5a541b36b9844d6484aefee463e63e8ee2cd8b47c33094c117563939500a4",
+      "previousJavaScript": "src/util/axisPropsAreEqual.js",
+      "restoredNormalizedRuntimeSha256": "444f61c3ddc8f0f72f2a929ccbbee555fb439211f10fab4d381d61c82dd51c44"
+    },
+    "util/createEventProxy.ts": {
+      "upstreamSource": "src/util/createEventProxy.ts",
+      "upstreamSha256": "653bb0417a6e3dc14c0a6f333a920b19e856d6af37aebe560cfbe8aa4432aef7",
+      "previousJavaScript": "src/util/createEventProxy.js",
+      "restoredNormalizedRuntimeSha256": "18d3573e5798c2ea7f6987fe2836cbca66d72d22ec2311d27027b75c2700f971"
+    },
+    "util/excludeEventProps.ts": {
+      "upstreamSource": "src/util/excludeEventProps.ts",
+      "upstreamSha256": "3f6b6ef5c12cedf07e6dffe8eb0d595d55677cb94af00484a87e3b5a0a79c150",
+      "previousJavaScript": "src/util/excludeEventProps.js",
+      "restoredNormalizedRuntimeSha256": "16f3116812874c0976631a05c29bd7d847e9f40e56eba7fbded2a0bb67d491fe"
+    },
+    "util/getActiveCoordinate.ts": {
+      "upstreamSource": "src/util/getActiveCoordinate.ts",
+      "upstreamSha256": "5511b2ba75cbd8861d8eb42f922b43d69d689159cbb3553a76675e61bb49a67e",
+      "previousJavaScript": "src/util/getActiveCoordinate.js",
+      "restoredNormalizedRuntimeSha256": "6899edf8fc275eaf9126bca95146d58849141d818f0aabfe1d69ec5afa7ec701"
+    },
+    "util/getAxisTypeBasedOnLayout.ts": {
+      "upstreamSource": "src/util/getAxisTypeBasedOnLayout.ts",
+      "upstreamSha256": "3202ea3d158ab6245f1cd58f907a86cb2ef694a2d221075f8c90c848b4dcb2d2",
+      "previousJavaScript": "src/util/getAxisTypeBasedOnLayout.js",
+      "restoredNormalizedRuntimeSha256": "8941ee88f8504e94135a1813819ed5246da796d4e26a4b08b7327987cdb38615"
+    },
+    "util/getClassNameFromUnknown.ts": {
+      "upstreamSource": "src/util/getClassNameFromUnknown.tsx",
+      "upstreamSha256": "eb07bd9747ff0611d35a56132306cd919eff208faedc8d709361c4cbcc38e3fe",
+      "previousJavaScript": "src/util/getClassNameFromUnknown.js",
+      "restoredNormalizedRuntimeSha256": "07f7ece05e000beb568f10c6386b20aafc3e51ed713d5bef473a2f263ec355a3"
+    },
+    "util/getEveryNth.ts": {
+      "upstreamSource": "src/util/getEveryNth.ts",
+      "upstreamSha256": "c855b3b88b9201de6da5fc53c6e0c1a3d527ecf2c425ec8bf0cff9c3f40ea499",
+      "previousJavaScript": "src/util/getEveryNth.js",
+      "restoredNormalizedRuntimeSha256": "7657e458bfd3ec94769ce929f064926d46b7397a08975c3717b9c4a13a09ee01"
+    },
+    "util/getRadiusAndStrokeWidthFromDot.ts": {
+      "upstreamSource": "src/util/getRadiusAndStrokeWidthFromDot.tsx",
+      "upstreamSha256": "711ceef1328e49f00a8f33d08fa4387c378bbb1769c08a85f6402358ed3c61ac",
+      "previousJavaScript": "src/util/getRadiusAndStrokeWidthFromDot.js",
+      "restoredNormalizedRuntimeSha256": "da6cf29396e4722ddf23bbf4d80b80b7ffe78c57ff0fa5da04bf2f51e68cd081"
+    },
+    "util/getRelativeCoordinate.ts": {
+      "upstreamSource": "src/util/getRelativeCoordinate.ts",
+      "upstreamSha256": "2107e928ac3d3892c112de5fc70913b0384f60ac5ebf0dc9d1dc46606b7fcc0a",
+      "previousJavaScript": "src/util/getRelativeCoordinate.js",
+      "restoredNormalizedRuntimeSha256": "87763c4ac0af409dfae4dcf238c1339a401d2c84965149bab0c54b1b2ac44c05"
+    },
+    "util/getSliced.ts": {
+      "upstreamSource": "src/util/getSliced.ts",
+      "upstreamSha256": "95a10a552abc3c92b85d90a55af156217e0c0a48db57ca3e937560448049f36f",
+      "previousJavaScript": "src/util/getSliced.js",
+      "restoredNormalizedRuntimeSha256": "b49727d41159ed22465fb5a7e8e71460b9ad006e815dcc71a390c36836a2d904"
+    },
+    "util/isDomainSpecifiedByUser.ts": {
+      "upstreamSource": "src/util/isDomainSpecifiedByUser.ts",
+      "upstreamSha256": "19330d60887eb84da5a8473474088ee9d9f7a7bef614b432547d7548067f176b",
+      "previousJavaScript": "src/util/isDomainSpecifiedByUser.js",
+      "restoredNormalizedRuntimeSha256": "e6648c9f99acc3785abe51ed17093dcdc04b26f591eb8e0f4a19db2773ef913c"
+    },
+    "util/isWellBehavedNumber.ts": {
+      "upstreamSource": "src/util/isWellBehavedNumber.ts",
+      "upstreamSha256": "f7f35bcd970ee8fa73ede712b61cd4171dd409964b0a0f1be3f63b8aef397a4a",
+      "previousJavaScript": "src/util/isWellBehavedNumber.js",
+      "restoredNormalizedRuntimeSha256": "fb0f0f4a5c7809960aa7005fb949cf15d0a561057601a2d526fb85b34997afc0"
+    },
+    "util/propsAreEqual.ts": {
+      "upstreamSource": "src/util/propsAreEqual.ts",
+      "upstreamSha256": "2d212d0e36e6b38dc7ebfcb083250da208741522e6d3fef8cafc05186f3e2e85",
+      "previousJavaScript": "src/util/propsAreEqual.js",
+      "restoredNormalizedRuntimeSha256": "b4491378daea78dc9d52c4dac76ad76916559b82be153b0319c9be9146edfb0a"
+    },
+    "util/resolveDefaultProps.ts": {
+      "upstreamSource": "src/util/resolveDefaultProps.tsx",
+      "upstreamSha256": "53f810d984592e295292deb005cdecd4d2a77bad52ba5bd2095afb526bd72219",
+      "previousJavaScript": "src/util/resolveDefaultProps.js",
+      "restoredNormalizedRuntimeSha256": "365e9b8e61096d11aa6b1b8a179317b81398cb6250ea127d39737670a92e5332"
+    },
+    "util/round.ts": {
+      "upstreamSource": "src/util/round.ts",
+      "upstreamSha256": "3f596ed648d9f226305349d3142c9cc57e1b65575f6801a52c79bb41be6553e4",
+      "previousJavaScript": "src/util/round.js",
+      "restoredNormalizedRuntimeSha256": "26b1459c840e631010c2ccaf42c9f7a31952a7f54fd840f6a2bbe68ca79f46f8"
+    },
+    "util/scale/CustomScaleDefinition.ts": {
+      "upstreamSource": "src/util/scale/CustomScaleDefinition.ts",
+      "upstreamSha256": "30e51edb9160c511f2ade4d10fdfc0eb1cf799cad60df3320c2ad15b95d885d6",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "util/scale/RechartsScale.ts": {
+      "upstreamSource": "src/util/scale/RechartsScale.ts",
+      "upstreamSha256": "c479bda04124e9e2960251fcf94d78024fa969cf2c2c238845d020c68ac56170",
+      "previousJavaScript": "src/util/scale/RechartsScale.js",
+      "restoredNormalizedRuntimeSha256": "51a370e5f6ba19016dae4b7bc691c0e915e139b8ca3e402b5d21b357aa525414"
+    },
+    "util/scale/createCategoricalInverse.ts": {
+      "upstreamSource": "src/util/scale/createCategoricalInverse.ts",
+      "upstreamSha256": "e98d55bba3be5fd2a92b99c6ef84cad82d80098226a2c029977f992317f1b7c5",
+      "previousJavaScript": "src/util/scale/createCategoricalInverse.js",
+      "restoredNormalizedRuntimeSha256": "38d566720cb945e6e56736f1259472e49964b1ac0b2749e511a00a7018a5b66a"
+    },
+    "util/scale/getNiceTickValues.ts": {
+      "upstreamSource": "src/util/scale/getNiceTickValues.ts",
+      "upstreamSha256": "8d2dcc2b3292a15a0a5c0bebd8ab3e3cb43b0bd9c7e3422540c1aab7b9823737",
+      "previousJavaScript": "src/util/scale/getNiceTickValues.js",
+      "restoredNormalizedRuntimeSha256": "8af71c2a16a457704937145fceb47835a02781a0aa777407691384058efc7cc3"
+    },
+    "util/scale/index.ts": {
+      "upstreamSource": "src/util/scale/index.ts",
+      "upstreamSha256": "3a43ed8742ce4f1aeddcf028467cb3176eb1a31d7204a1cbd68a5bc136df1f70",
+      "previousJavaScript": "src/util/scale/index.js",
+      "restoredNormalizedRuntimeSha256": "0423fbb27ce547b6096aa8d9574c97fea1f076ae5bc4b727dafba5205d9a96ac"
+    },
+    "util/scale/util/arithmetic.ts": {
+      "upstreamSource": "src/util/scale/util/arithmetic.ts",
+      "upstreamSha256": "0705482c5f5e78c2d31cb9a1b21ba873581e98aaf8c01d0fcdbed4a010f72434",
+      "previousJavaScript": "src/util/scale/util/arithmetic.js",
+      "restoredNormalizedRuntimeSha256": "9fd2c0e5df4e86f4c45452803883892102096f8359b4086950ea2a9838f05a9b"
+    },
+    "util/stacks/getStackSeriesIdentifier.ts": {
+      "upstreamSource": "src/util/stacks/getStackSeriesIdentifier.ts",
+      "upstreamSha256": "48c7377073bc3c6c9a6e6e2f64dde5677b27bdfb5cf943d32476013a11b8d9e3",
+      "previousJavaScript": "src/util/stacks/getStackSeriesIdentifier.js",
+      "restoredNormalizedRuntimeSha256": "c1733498334a07077624eb21a338d6dca8dfe52a23a47da96dbc8ada58e889d7"
+    },
+    "util/stacks/stackTypes.ts": {
+      "upstreamSource": "src/util/stacks/stackTypes.ts",
+      "upstreamSha256": "847f75c5c082750462a341ac9acfe20b2d9cd2d8308c8f5977a020864ec76162",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "util/svgPropertiesNoEvents.ts": {
+      "upstreamSource": "src/util/svgPropertiesNoEvents.ts",
+      "upstreamSha256": "e8574385abf5eaee9fa83bd42cc5b1c7d053d1d06c37bda915b87c1af6ab0cdc",
+      "previousJavaScript": "src/util/svgPropertiesNoEvents.js",
+      "restoredNormalizedRuntimeSha256": "a6b82bf3dba1584797c61efed59c2f0c161fb06be35857e24f732582cd73140f"
+    },
+    "util/typedDataKey.ts": {
+      "upstreamSource": "src/util/typedDataKey.ts",
+      "upstreamSha256": "21e3ef4b1fdb5d9e94ee8a99e76e303899a356a7385858cec3eca037b1df4069",
+      "restoredNormalizedRuntimeSha256": "c5e4b387ab65abedb6f8d1f00e50b5bda5de751210aa86f02ef3f62864a942b5"
+    },
+    "util/types.ts": {
+      "upstreamSource": "src/util/types.ts",
+      "upstreamSha256": "c16dc049ca4d2f2b8e9aaa3601f89d09a4bc6bb8167001cf0640eef0e2b25017",
+      "restoredNormalizedRuntimeSha256": "4e03a07f696b69cbedd6e2274a6bce764db3f1a4d3cd55028f7b12b6a4e9569c"
+    },
+    "util/useUniqueId.ts": {
+      "upstreamSource": "src/util/useUniqueId.ts",
+      "upstreamSha256": "7dcb4336a7eef89844d59de052530b9342ff869c1d913a4b9d7e2792b63d75dd",
+      "previousJavaScript": "src/util/useUniqueId.js",
+      "restoredNormalizedRuntimeSha256": "2e1975e48eb9f6c97c1b0260d125d27fc1da055829c32780864bf10bc9d395f3"
+    },
+    "zIndex/DefaultZIndexes.ts": {
+      "upstreamSource": "src/zIndex/DefaultZIndexes.tsx",
+      "upstreamSha256": "df2264e2ca24da7c05706f9d5c45636a18048357828bbf68b5578fefee1416f5",
+      "previousJavaScript": "src/zIndex/DefaultZIndexes.js",
+      "restoredNormalizedRuntimeSha256": "c672846c49b0e6f6df9460d753d72a2c33ddfb643b5158235f5e27c12de276d5"
+    },
+    "zIndex/getZIndexFromUnknown.ts": {
+      "upstreamSource": "src/zIndex/getZIndexFromUnknown.tsx",
+      "upstreamSha256": "f2e53dc9598a8ee1572b5b6f895e9f0207960f1d79006f054882bd9fa18b26dc",
+      "previousJavaScript": "src/zIndex/getZIndexFromUnknown.js",
+      "restoredNormalizedRuntimeSha256": "2c9b8851667a0570b3f91e6aa4914c348091242723060e5acc80bf5b73fe2139"
+    },
+    "zIndex/zIndexSelectors.ts": {
+      "upstreamSource": "src/zIndex/zIndexSelectors.ts",
+      "upstreamSha256": "eaccac66d498f30da69d2037474f4c4f34d2900f3a39a45784d905789bba8447",
+      "previousJavaScript": "src/zIndex/zIndexSelectors.js",
+      "restoredNormalizedRuntimeSha256": "b02beaf51e09524a552c531a1ce0200eeec5eebaee71b4b9b2c4ade0464e8141"
+    }
+  },
+  "authoredSourceFiles": [
+    "src/animation/AnimationController.ts",
+    "src/animation/useAnimationController.ts",
+    "src/animation/useAnimationStartSnapshot.ts",
+    "src/cartesian/Bar.ts",
+    "src/cartesian/Line.ts",
+    "src/chart/types.ts",
+    "src/component/Cell.ts",
+    "src/context/CellsContext.ts",
+    "src/context/chartDataContext.ts",
+    "src/context/chartLayoutContext.ts",
+    "src/state/ReportChartProps.ts",
+    "src/state/ReportMainChartProps.ts",
+    "src/state/SetGraphicalItem.ts",
+    "src/state/SetLegendPayload.ts",
+    "src/state/SetTooltipEntrySettings.ts",
+    "src/state/selectors/areaSelectors.ts",
+    "src/state/selectors/funnelSelectors.ts",
+    "src/state/selectors/pieSelectors.ts",
+    "src/state/selectors/polarSelectors.ts",
+    "src/state/selectors/radarSelectors.ts",
+    "src/state/selectors/radialBarSelectors.ts",
+    "src/state/selectors/scatterSelectors.ts",
+    "src/util/payload/getUniqPayload.ts",
+    "src/util/tooltip/translate.ts",
+    "src/util/types.ts"
+  ],
+  "adaptations": [
+    {
+      "paths": ["src/**"],
+      "description": "Preserve the reviewed Recharts 3.9.2 algorithms and source comments; restore annotations and omitted type-only support modules. Replace React renderable/event/ref types with Octane/native contracts and resolve authored component imports explicitly through .tsrx."
+    },
+    {
+      "paths": ["src/**"],
+      "description": "Retain the existing react-to-octane, react-redux-to-@octanejs/redux, and es-toolkit compatibility-barrel import adaptations. These substitutions are disclosed normalization steps, not claims that the two renderer APIs are identical."
+    },
+    {
+      "paths": ["src/util/Global.ts", "src/util/LogUtils.ts", "src/state/store.ts"],
+      "description": "Preserve the previous compiled port constants: devToolsEnabled=true, isDev=true, and immutableCheck=false. Do not reintroduce source-level process.env reads into browser consumer programs."
+    },
+    {
+      "paths": ["src/util/types.ts"],
+      "description": "Retain the existing port native-event adapter bodies. Derive native event argument types from Octane SVG props, but keep the existing runtime event whitelist; unsupported inherited native event keys are not silently exposed as child callbacks."
+    },
+    {
+      "paths": [
+        "src/state/cartesianAxisSlice.ts",
+        "src/state/graphicalItemsSlice.ts",
+        "src/state/tooltipSlice.ts"
+      ],
+      "description": "Retain each original inline reducer object. Private callbacks accept unknown state only at the RTK validation boundary; every access is asserted to Draft<ExactState>, and public state/action types remain exact. Assertions erase, avoiding recursive DOM-ref comparisons without extra runtime objects, operations, or changed mutations."
+    },
+    {
+      "paths": ["src/state/store.ts"],
+      "description": "Retain the original enhancer callback and legacy array branch. A private union and ReturnType assertion describe the installed Redux Toolkit 2 callback API without changing emitted runtime code, auto-batching or middleware order."
+    },
+    {
+      "paths": ["src/util/createEventProxy.ts"],
+      "description": "Remove the React-only persist() call from native events. Retain currentTarget capture and native method binding across the existing requestAnimationFrame throttle. This is the intentional runtime defect correction."
+    },
+    {
+      "paths": [
+        "src/component/Cell.ts",
+        "src/context/CellsContext.ts",
+        "src/util/OctaneTypes.ts",
+        "src/util/svgPropertiesNoEvents.ts"
+      ],
+      "description": "Type the existing Cell registry and numeric shape geometry, preserve SVG ref sinks via type-only renderer views, and retain known prop value types through SVG attribute filtering. Registry/filter runtime bodies are unchanged."
+    },
+    {
+      "paths": ["src/cartesian/Bar.ts", "src/cartesian/Line.ts"],
+      "description": "Expose component types with export type * while retaining every original runtime re-export: Bar, computeBarRectangles, defaultBarProps, Line, computeLinePoints and defaultLineProps."
+    },
+    {
+      "paths": ["src/util/types.ts"],
+      "description": "Restore the exact pinned isPolarCoordinate runtime guard, which existing cursor paths import but the previous handwritten type module omitted. Retain the prior event adapter and isNonEmptyArray runtime bodies."
+    },
+    {
+      "paths": ["src/state/selectors/axisSelectors.ts"],
+      "description": "Add a bounded predicate overload to Boolean for array-or-undefined domains while retaining its existing callable/constructor signatures. The assertion erases to the original filter(Boolean) callback; it adds no runtime wrapper."
+    },
+    {
+      "paths": ["src/util/ChartUtils.ts"],
+      "description": "Preserve generic stack Datum and Key types, including numeric and function DataKeys. The @types/d3-shape 3.1.7 declarations used by a combined packed Visx/Recharts consumer incorrectly describe offsets as receiving one Series; 3.1.8 and the actual D3 runtime pass an array of Series. Bounded intersection overloads adapt imported offsets and the same-stack offset setter to the verified array contract. The assertions erase, and both exact declaration versions pass strict source checks; no dependency pin or callback wrapper is introduced."
+    }
+  ],
+  "verification": {
+    "sourceArchive": "SHA-256 matched the existing reviewed UPSTREAM.md pin; archive members were checked for traversal and links before extraction.",
+    "npmArtifact": "Official package name, version, MIT license and registry SHA-512 integrity were verified before extracting the comparison artifact.",
+    "structuralComparator": {
+      "status": "completed-with-reviewed-differences",
+      "script": "scripts/compare-type-source-restoration.cjs",
+      "description": "Compares original JS against pristine npm es6, restored TS against immutable repository TS after erasure, and existing authored TS against the baseline commit. Results and reviewed differences are bounded structural evidence, not proof of complete runtime parity.",
+      "arguments": [
+        "<extracted upstream repository root>",
+        "<extracted npm package root>",
+        "<output directory>"
+      ],
+      "typescriptVersion": "5.9.3",
+      "normalizations": [
+        "TypeScript-only declarations and assertions erased using transpileModule(target=ES2022,module=ESNext)",
+        "AST kinds, literal/identifier text, declaration kind and ordered children compared; comments/formatting/redundant parentheses ignored",
+        "Relative module dot segments and .js/.ts/.tsrx suffixes normalized for authored-source resolution",
+        "Import groups sorted, preserving imported/local names; documented react->octane, react-redux->@octanejs/redux and es-toolkit compatibility-barrel substitutions applied"
+      ],
+      "source": {
+        "compared": 139,
+        "equalAfterDocumentedNormalization": 134,
+        "reviewedDifferences": 5
+      },
+      "compiledBaseline": {
+        "compared": 123,
+        "equalAfterDocumentedNormalization": 123,
+        "reviewedDifferences": 0
+      },
+      "existingAuthoredSource": {
+        "compared": 25,
+        "equalAfterDocumentedNormalization": 24,
+        "reviewedDifferences": 1
+      },
+      "reviewedSourceDifferences": [
+        {
+          "target": "src/state/store.ts",
+          "beforeNormalizedSha256": "c3d239176303ab48ea11a7ca301e68579c043a5f38d8584a609f74664b578979",
+          "afterNormalizedSha256": "17b9836feaa8ab952da7c5ee53aaf1cec4113bbb2477cf7b1dadcbe476d6a5d0",
+          "classification": "Only immutableCheck=false differs from the pinned repository body; this preserves the previous compiled port preset. The original enhancer callback and array branch are retained."
+        },
+        {
+          "target": "src/util/Global.ts",
+          "beforeNormalizedSha256": "cf0c135a3795e8f56d521b971488d0b468e14ba931e76070bfa29ea7350391e4",
+          "afterNormalizedSha256": "f9ed1254d50f5d87b88ce78b2633048c1c55102b879729bf021aeb7fc42338e2",
+          "classification": "Only devToolsEnabled=true differs, preserving the previous compiled port preset."
+        },
+        {
+          "target": "src/util/LogUtils.ts",
+          "beforeNormalizedSha256": "a64feb8988764946f5cb6c11a5869545974c456aae2c0dd34ec1b3a43287e996",
+          "afterNormalizedSha256": "558cafb43005a7690ac83030f905fc72b6213e91c78eb4c77e238aff2d67da9f",
+          "classification": "Only isDev=true differs, preserving the previous compiled port preset."
+        },
+        {
+          "target": "src/util/createEventProxy.ts",
+          "beforeNormalizedSha256": "c976e0fbfe993df246c547f8a68db8d8c6a0a3f982b596caa803df25fd0b456f",
+          "afterNormalizedSha256": "18d3573e5798c2ea7f6987fe2836cbca66d72d22ec2311d27027b75c2700f971",
+          "classification": "Exactly one React-only persist() call is removed; all remaining proxy statements match the pinned source. Native event regression fails before the fix and passes after it.",
+          "nativeEventProxy": {
+            "removedPersistCalls": 1,
+            "remainingStatementsEqual": true
+          }
+        },
+        {
+          "target": "src/util/types.ts",
+          "beforeNormalizedSha256": "4ccf0772f8aa463baeafbb666882c16199fa37d6105e51d35c5bd268bc1ee46d",
+          "afterNormalizedSha256": "4e03a07f696b69cbedd6e2274a6bce764db3f1a4d3cd55028f7b12b6a4e9569c",
+          "classification": "Retains the original Octane-native event adapters and isNonEmptyArray body instead of React-owned helpers. Restores isPolarCoordinate with a body identical to the pin; the four existing runtime helper bodies match the previous authored port.",
+          "restoredPolarGuard": {
+            "equal": true,
+            "beforeNormalizedSha256": "3c8b4afa29a663099db1536dfb4b0de1c6a2fb6c2bb03569710c00761072ad35",
+            "afterNormalizedSha256": "3c8b4afa29a663099db1536dfb4b0de1c6a2fb6c2bb03569710c00761072ad35"
+          }
+        }
+      ],
+      "preservedInlineReducers": {
+        "src/state/cartesianAxisSlice.ts": {
+          "equal": true,
+          "beforeNormalizedSha256": "9cbbd46a82cc232706dc74324632d8b1cb587726dd6ad9664bb93b041270d004",
+          "afterNormalizedSha256": "9cbbd46a82cc232706dc74324632d8b1cb587726dd6ad9664bb93b041270d004"
+        },
+        "src/state/graphicalItemsSlice.ts": {
+          "equal": true,
+          "beforeNormalizedSha256": "a44d66bc0eea763d09b07a3f3d92b190cf0cb27b419fc9f79a98e2dd50b45c40",
+          "afterNormalizedSha256": "a44d66bc0eea763d09b07a3f3d92b190cf0cb27b419fc9f79a98e2dd50b45c40"
+        },
+        "src/state/tooltipSlice.ts": {
+          "equal": true,
+          "beforeNormalizedSha256": "4ec9f59348ceab235d92fe7abd4fbac4a41c008500407fbf951730ef95c9acbb",
+          "afterNormalizedSha256": "4ec9f59348ceab235d92fe7abd4fbac4a41c008500407fbf951730ef95c9acbb"
+        }
+      },
+      "preservedAuthoredFunctions": {
+        "adaptEventHandlers": {
+          "equal": true,
+          "beforeNormalizedSha256": "5f7b91c3cf347335a3b60e2d6fb02dfc5cb2bd07697896588b54ae81a18fe558",
+          "afterNormalizedSha256": "5f7b91c3cf347335a3b60e2d6fb02dfc5cb2bd07697896588b54ae81a18fe558"
+        },
+        "adaptEventsOfChild": {
+          "equal": true,
+          "beforeNormalizedSha256": "d28a68d2f5934da8a5ed0b06dac46026867536769f1ffe5972d00cd9eb83b980",
+          "afterNormalizedSha256": "d28a68d2f5934da8a5ed0b06dac46026867536769f1ffe5972d00cd9eb83b980"
+        },
+        "getEventHandlerOfChild": {
+          "equal": true,
+          "beforeNormalizedSha256": "ab24402aa22593a1280f75c0c559214c2efc1daae456257b3fee00313aedd176",
+          "afterNormalizedSha256": "ab24402aa22593a1280f75c0c559214c2efc1daae456257b3fee00313aedd176"
+        },
+        "isNonEmptyArray": {
+          "equal": true,
+          "beforeNormalizedSha256": "d481b1b1e436e721e780c19f697f013d653729ed25d42efb587984a465e9a8a0",
+          "afterNormalizedSha256": "d481b1b1e436e721e780c19f697f013d653729ed25d42efb587984a465e9a8a0"
+        }
+      },
+      "authoredTypesDifference": {
+        "target": "src/util/types.ts",
+        "beforeNormalizedSha256": "6852c4ae80e853625131bdaef57d5faa1e74061a61de0269915ed9b2daafd430",
+        "afterNormalizedSha256": "a26ee45ed5c80b0525c2662f6b127ccff23c6249b42d1079ab7198ab7a190519",
+        "classification": "The only authored-source runtime addition is the pinned isPolarCoordinate guard; existing helper bodies are preserved."
+      }
+    },
+    "nativeEventRegression": {
+      "status": "passed",
+      "command": "node_modules/.bin/vitest run --project recharts packages/recharts/tests/conformance/store.test.ts --silent=false",
+      "result": "5 tests passed on the installed Redux Toolkit 2.10.1 / Immer 10.2.0 graph. The original persist() behavior failed with TypeError and did not invoke the chart callback."
+    },
+    "strictSourceCheck": {
+      "status": "passed",
+      "commands": [
+        "node_modules/.bin/tsrx-tsc --noEmit -p scripts/consumer-tsconfigs/recharts.json --skipLibCheck false",
+        "node_modules/.bin/tsrx-tsc --noEmit -p packages/recharts/tsconfig.json"
+      ],
+      "result": "Final restored source passes without diagnostics against installed Redux Toolkit 2.10.1 / Immer 10.2.0 and @types/d3-shape 3.1.8, including inline reducer assertions, erased Boolean narrowing, and the unchanged enhancer body.",
+      "d3CompatibilityExperiment": {
+        "status": "passed",
+        "versions": ["3.1.7", "3.1.8"],
+        "method": "Run the same strict consumer source program with skipLibCheck=false, overriding only the d3-shape declaration path to the exact 3.1.7 package resolved by the fresh combined packed consumer. This verifies the local declaration adapter, not the complete packed consumer."
+      }
+    },
+    "conformance": {
+      "status": "passed",
+      "command": "node_modules/.bin/vitest run --project recharts --silent=passed-only",
+      "passedTests": 36,
+      "passedFiles": 4,
+      "scope": "Repository-authored conformance tests; separate recharts-differential project is not included.",
+      "note": "The focused run passed all 36 conformance tests. The final normal-root shards subsequently passed all 39 Recharts cases across these four files and the three-case differential file; that coverage is part of the full-root result, not a separate 39-test invocation."
+    },
+    "formatting": {
+      "status": "passed",
+      "checkedFiles": 167,
+      "scope": "Owned ordinary TypeScript, native regression test, comparison script, package manifest, and restoration record."
+    },
+    "fullRootRuntime": {
+      "status": "passed",
+      "command": "pnpm exec vitest run --shard=N/4 --maxWorkers=2 --silent=passed-only",
+      "completedShards": [1, 2, 3, 4],
+      "nodeVersion": "24.19.0",
+      "maxOldSpaceSizeMiB": 8192,
+      "passedFiles": 2300,
+      "passedTests": 23986,
+      "scope": "All normal-root Vitest projects, with no project or test exclusions, including Recharts conformance and differential cases. The root test prechecks passed separately. The original unsharded run exhausted the default 4 GiB heap and is not counted as a pass."
+    },
+    "packedConsumer": {
+      "status": "passed",
+      "command": "pnpm packages:pack:check",
+      "validatedTarballs": 101,
+      "preservedTsrxSources": 792,
+      "strictBindings": 37,
+      "focusedIssueBindings": 5,
+      "focusedPublicSpecifiers": 60,
+      "focusedTsrxImplementations": 348,
+      "typescriptVersion": "5.9.3",
+      "tsrxTypeScriptPluginVersion": "0.3.120",
+      "consumerEsrapVersion": "2.3.6",
+      "scope": "Actual tarballs installed outside the workspace. The five issue bindings pass a normal source-only ESNext browser application and canonical full-implementation browser/Node programs with strict checking and skipLibCheck=false. Negative Node ambient, prop, callback, ref, generic, and tuple probes remain active. All 348 shipped TSRX implementations are in the forced program. Runtime/tooling resolutions stay outside the workspace, with one Octane installation and no consumer dependency overrides or patches. The old Recharts facade fails the same public probes. Other existing binding exceptions remain explicit; current-head CI is reported separately on the PR."
+    }
+  }
+}

@@ -49,6 +49,7 @@ import {
 	type LynxContextProxy,
 } from '../src/core/protocol.js';
 import { BackgroundRootFixture, ClassAliasFixture } from './_fixtures/background-root.lynx.tsrx';
+import { unwire, wire } from './_fixtures/lynx-wire.js';
 
 interface FixtureItem {
 	readonly id: string;
@@ -290,7 +291,7 @@ function sendLifecycleToBackground(env: LynxTestingEnv, message: Record<string, 
 	const context = backgroundContext();
 	env.switchToMainThread();
 	try {
-		context.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: message });
+		context.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: wire(message) });
 	} finally {
 		env.switchToBackgroundThread();
 	}
@@ -782,11 +783,11 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 						replayDestroy = false;
 						listener({
 							type,
-							data: {
+							data: wire({
 								protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
 								renderer: LYNX_TRANSPORT_RENDERER,
 								type: 'page-destroy',
-							},
+							}),
 						});
 					}
 				},
@@ -852,7 +853,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 			env.switchToBackgroundThread();
 			const inbound: LynxBackgroundInboundMessage[] = [];
 			backgroundContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-				inbound.push(event.data as LynxBackgroundInboundMessage);
+				inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 			});
 			backgroundRoot = createLynxRoot();
 			const rendering = backgroundRoot.render(SimpleScene, { id: 'must-not-become-ready' });
@@ -932,7 +933,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		installEnvironment((target) => {
 			mainContext(target).addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-				inbound.push(event.data as LynxBackgroundInboundMessage);
+				inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 			});
 		});
 
@@ -980,7 +981,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const { dom, main } = installEnvironment(undefined, (delegate) =>
 			Object.freeze({
 				dispatchEvent(event) {
-					const data = event.data as {
+					const data = unwire(event.data) as {
 						type?: unknown;
 						handles?: readonly Record<string, unknown>[];
 					};
@@ -993,10 +994,15 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 					) {
 						corruptAcknowledgement = false;
 						const first = data.handles[0];
+						// A hostile wire: the message is rewritten in flight and put
+						// back on the channel encoded, because that is the only way
+						// anything reaches the receiver now. What this proves is
+						// unchanged — a payload that parses but does not match the
+						// schema has to be rejected, not adopted.
 						return delegate.dispatchEvent({
 							...event,
-							data: {
-								...(event.data as Record<string, unknown>),
+							data: wire({
+								...data,
 								handles: [
 									{
 										...first,
@@ -1006,7 +1012,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 										},
 									},
 								],
-							},
+							}),
 						});
 					}
 					return delegate.dispatchEvent(event);
@@ -1035,7 +1041,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const deliveryError = new Error('injected post-delivery commit failure');
 		let failCommit = true;
 		backgroundContext().addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
-			if (failCommit && (event.data as { type?: unknown }).type === 'commit') {
+			if (failCommit && (unwire(event.data) as { type?: unknown }).type === 'commit') {
 				failCommit = false;
 				throw deliveryError;
 			}
@@ -1069,7 +1075,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 					if (
 						failReadyReply &&
 						event.type === LYNX_MAIN_TO_BACKGROUND_EVENT &&
-						(event.data as { type?: unknown }).type === 'main-ready'
+						(unwire(event.data) as { type?: unknown }).type === 'main-ready'
 					) {
 						throw deliveryError;
 					}
@@ -1085,7 +1091,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		);
 		const deliveredTypes: string[] = [];
 		backgroundContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			const type = (event.data as { readonly type?: unknown }).type;
+			const type = (unwire(event.data) as { readonly type?: unknown }).type;
 			if (typeof type === 'string') deliveredTypes.push(type);
 		});
 		failReadyReply = true;
@@ -1274,7 +1280,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 		const page = dom.window.document.querySelector('page')!;
 		const program = Object.freeze({
@@ -1310,13 +1316,13 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const send = (command: typeof range | typeof run, lazy = false): void => {
 			context.dispatchEvent({
 				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-				data: {
+				data: wire({
 					...identity(509, 1),
 					type: 'commit',
 					ack: LYNX_COMPACT_ACKNOWLEDGEMENT,
 					...(lazy ? { instances: LYNX_LAZY_PUBLIC_INSTANCES } : null),
 					batch: { renderer: 'lynx', version: 1, commands: [command] },
-				},
+				}),
 			});
 		};
 
@@ -1335,12 +1341,12 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
+			data: wire({
 				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
 				renderer: LYNX_TRANSPORT_RENDERER,
 				type: 'main-ready-request',
 				request: LYNX_CAPABILITY_READY_REQUEST_BASE + 19,
-			},
+			}),
 		});
 		const olderPeerReply = inbound.at(-1);
 		expect(olderPeerReply).toMatchObject({
@@ -1373,12 +1379,12 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
+			data: wire({
 				...identity(501, 1),
 				type: 'commit',
 				batch: {
@@ -1389,7 +1395,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 						{ op: 'insert', parent: null, id: 1, before: null },
 					],
 				},
-			},
+			}),
 		});
 		const page = dom.window.document.querySelector('page')!;
 		const survivor = page.querySelector('#survivor')!;
@@ -1397,7 +1403,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
+			data: wire({
 				...identity(501, 3),
 				type: 'commit',
 				batch: {
@@ -1408,7 +1414,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 						{ op: 'insert', parent: null, id: 2, before: 999 },
 					],
 				},
-			},
+			}),
 		});
 
 		expect(inbound.map((message) => message.type)).toEqual(['ack', 'complete', 'reject']);
@@ -1419,7 +1425,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
+			data: wire({
 				...identity(501, 4),
 				type: 'commit',
 				batch: {
@@ -1427,14 +1433,14 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 					version: 4,
 					commands: [{ op: 'update', id: 1, props: { id: 'survivor-next' } }],
 				},
-			},
+			}),
 		});
 		expect(page.querySelector('#survivor-next')).toBe(survivor);
 		expect(main.activeIdentity()).toMatchObject({ root: 501, version: 4 });
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: { ...identity(501, 4), type: 'dispose' },
+			data: wire({ ...identity(501, 4), type: 'dispose' }),
 		});
 		expect(page.innerHTML).toBe('');
 		expect(inbound.at(-1)?.type).toBe('dispose-ack');
@@ -1442,11 +1448,11 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
+			data: wire({
 				...identity(501, 5),
 				type: 'commit',
 				batch: { renderer: 'lynx', version: 5, commands: [] },
-			},
+			}),
 		});
 		expect(inbound.at(-1)).toMatchObject({ root: 501, version: 5, type: 'reject' });
 		expect(page.innerHTML).toBe('');
@@ -1457,7 +1463,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 		const sendCommit = (
 			root: number,
@@ -1466,11 +1472,11 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		) => {
 			context.dispatchEvent({
 				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-				data: {
+				data: wire({
 					...identity(root, version),
 					type: 'commit',
 					batch: { renderer: 'lynx', version, commands },
-				},
+				}),
 			});
 		};
 
@@ -1492,7 +1498,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		expect(page.querySelector('#first-root')).not.toBeNull();
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: { ...identity(601, 1), type: 'dispose' },
+			data: wire({ ...identity(601, 1), type: 'dispose' }),
 		});
 		expect(inbound.at(-1)?.type).toBe('dispose-ack');
 		expect(page.innerHTML).toBe('');
@@ -1511,12 +1517,12 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
+			data: wire({
 				...identity(603, 1),
 				type: 'commit',
 				batch: {
@@ -1527,7 +1533,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 						{ op: 'insert', parent: null, id: 1, before: null },
 					],
 				},
-			},
+			}),
 		});
 
 		const page = dom.window.document.querySelector('page')!;
@@ -1536,7 +1542,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: { ...identity(603, 2), type: 'terminal-dispose' },
+			data: wire({ ...identity(603, 2), type: 'terminal-dispose' }),
 		});
 
 		expect(page.innerHTML).toBe('');
@@ -1735,7 +1741,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 				reenter = false;
 				context.dispatchEvent({
 					type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-					data: {
+					data: wire({
 						...identity(701, 3),
 						type: 'commit',
 						batch: {
@@ -1743,23 +1749,23 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 							version: 3,
 							commands: [{ op: 'update', id: 1, props: { id: 'reentrant' } }],
 						},
-					},
+					}),
 				});
 			};
 		});
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 		const sendCommit = (version: number, commands: readonly Record<string, unknown>[]) => {
 			context.dispatchEvent({
 				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-				data: {
+				data: wire({
 					...identity(701, version),
 					type: 'commit',
 					batch: { renderer: 'lynx', version, commands },
-				},
+				}),
 			});
 		};
 
@@ -1799,7 +1805,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 					dispatchEvent(event) {
 						if (
 							event.type === LYNX_MAIN_TO_BACKGROUND_EVENT &&
-							(event.data as { type?: unknown }).type === 'complete'
+							(unwire(event.data) as { type?: unknown }).type === 'complete'
 						) {
 							throw deliveryError;
 						}
@@ -1816,13 +1822,13 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 
 		expect(() => {
 			context.dispatchEvent({
 				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-				data: {
+				data: wire({
 					...identity(751, 1),
 					type: 'commit',
 					batch: {
@@ -1833,7 +1839,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 							{ op: 'insert', parent: null, id: 1, before: null },
 						],
 					},
-				},
+				}),
 			});
 		}).toThrow(deliveryError);
 		expect(inbound.map(({ type }) => type)).toEqual(['ack']);
@@ -1847,13 +1853,13 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
+			data: wire({
 				...identity(751, 1),
 				type: 'call-main',
 				call: 1,
 				worklet: { _wkltId: 'app:after-completion-fault' },
 				args: [],
-			},
+			}),
 		});
 		expect(inbound.at(-1)).toMatchObject({
 			type: 'call-main-error',
@@ -1862,7 +1868,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: { ...identity(751, 1), type: 'terminal-dispose' },
+			data: wire({ ...identity(751, 1), type: 'terminal-dispose' }),
 		});
 		expect(inbound.at(-1)?.type).toBe('dispose-ack');
 		expect(main.activeIdentity()).toBeNull();
@@ -1878,7 +1884,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 					if (
 						failDisposeAcknowledgement &&
 						event.type === LYNX_MAIN_TO_BACKGROUND_EVENT &&
-						(event.data as { type?: unknown }).type === 'dispose-ack'
+						(unwire(event.data) as { type?: unknown }).type === 'dispose-ack'
 					) {
 						throw deliveryError;
 					}
@@ -1895,11 +1901,11 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
+			data: wire({
 				...identity(761, 1),
 				type: 'commit',
 				batch: {
@@ -1910,14 +1916,14 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 						{ op: 'insert', parent: null, id: 1, before: null },
 					],
 				},
-			},
+			}),
 		});
 		failDisposeAcknowledgement = true;
 
 		expect(() => {
 			context.dispatchEvent({
 				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-				data: { ...identity(761, 1), type: 'dispose' },
+				data: wire({ ...identity(761, 1), type: 'dispose' }),
 			});
 		}).toThrow(deliveryError);
 		expect(main.activeIdentity()).toBeNull();
@@ -1927,7 +1933,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		failDisposeAcknowledgement = false;
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: { ...identity(761, 1), type: 'dispose' },
+			data: wire({ ...identity(761, 1), type: 'dispose' }),
 		});
 		expect(inbound.at(-1)?.type).toBe('dispose-ack');
 	});
@@ -1947,11 +1953,11 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: {
+			data: wire({
 				...identity(801, 1),
 				type: 'commit',
 				batch: {
@@ -1962,11 +1968,11 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 						{ op: 'insert', parent: null, id: 1, before: null },
 					],
 				},
-			},
+			}),
 		});
 		const dispose = { ...identity(801, 1), type: 'dispose' } as const;
 		failRemove = true;
-		context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: dispose });
+		context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: wire(dispose) });
 
 		expect(inbound.filter(({ type }) => type === 'dispose-ack')).toHaveLength(0);
 		expect(inbound.at(-1)).toMatchObject({
@@ -1984,7 +1990,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 			]),
 		);
 
-		context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: dispose });
+		context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: wire(dispose) });
 		expect(inbound.filter(({ type }) => type === 'dispose-ack')).toHaveLength(1);
 		expect(main.activeIdentity()).toBeNull();
 		expect(dom.window.document.querySelector('page')?.innerHTML).toBe('');
@@ -2066,7 +2072,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 			};
 		});
 		backgroundContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			const type = (event.data as { type?: unknown }).type;
+			const type = (unwire(event.data) as { type?: unknown }).type;
 			if (type === 'dispose-retry' || type === 'dispose-ack') timeline.push(`message:${type}`);
 		});
 		backgroundRoot = createLynxRoot();
@@ -2109,16 +2115,16 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
 		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
-			inbound.push(event.data as LynxBackgroundInboundMessage);
+			inbound.push(unwire(event.data) as LynxBackgroundInboundMessage);
 		});
 		const sendCommit = (version: number, commands: readonly Record<string, unknown>[]) => {
 			context.dispatchEvent({
 				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-				data: {
+				data: wire({
 					...identity(777, version),
 					type: 'commit',
 					batch: { renderer: 'lynx', version, commands },
-				},
+				}),
 			});
 		};
 
@@ -2153,7 +2159,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 
 		context.dispatchEvent({
 			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-			data: { ...identity(777, 3), type: 'dispose' },
+			data: wire({ ...identity(777, 3), type: 'dispose' }),
 		});
 		expect(page.innerHTML).toBe('');
 		expect(inbound.at(-1)?.type).toBe('dispose-ack');

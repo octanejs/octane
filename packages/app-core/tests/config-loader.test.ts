@@ -1,7 +1,8 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { build } from 'esbuild';
 import { createTempProject, type TempProject } from '../../octane/tests/_temp-project.js';
 import { loadOctaneConfig, loadOctaneConfigWithMetadata } from '../src/config-loader.js';
 
@@ -42,6 +43,71 @@ describe('loadOctaneConfig', () => {
 		expect(loaded.missingDependencies).toEqual([]);
 	});
 
+	it('reevaluates unchanged config source when its environment changes', async () => {
+		write(
+			'octane.config.ts',
+			`export default { build: { outDir: process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR } };\n`,
+		);
+		const previous = process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR;
+		try {
+			process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR = 'first-build';
+			const first = await loadOctaneConfig(fixtureRoot);
+			process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR = 'second-build';
+			const second = await loadOctaneConfig(fixtureRoot);
+			expect(first.build.outDir).toBe('first-build');
+			expect(second.build.outDir).toBe('second-build');
+		} finally {
+			if (previous === undefined) delete process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR;
+			else process.env.OCTANE_CONFIG_LOADER_TEST_OUT_DIR = previous;
+		}
+	});
+
+	it('keeps concurrent config evaluations isolated when they share a cache directory', async () => {
+		const other = createTempProject('octane-app-config-concurrent');
+		try {
+			write('octane.config.ts', `export default { build: { outDir: 'first-build' } };\n`);
+			fs.writeFileSync(
+				path.join(other.root, 'octane.config.ts'),
+				`export default { build: { outDir: 'second-build' } };\n`,
+			);
+			const cacheDir = path.join(fixtureRoot, '.cache', 'shared');
+			const [first, second] = await Promise.all([
+				loadOctaneConfig(fixtureRoot, { cacheDir }),
+				loadOctaneConfig(other.root, { cacheDir }),
+			]);
+			expect(first.build.outDir).toBe('first-build');
+			expect(second.build.outDir).toBe('second-build');
+		} finally {
+			other.dispose();
+		}
+	});
+
+	it('accepts an identical config already published when rename cannot replace it', async () => {
+		write('octane.config.ts', `export default { build: { outDir: 'shared-build' } };\n`);
+		const cacheDir = path.join(fixtureRoot, '.cache', 'shared');
+		expect((await loadOctaneConfig(fixtureRoot, { cacheDir })).build.outDir).toBe('shared-build');
+		const [filename] = fs.readdirSync(cacheDir).filter((name) => name.endsWith('.mjs'));
+		const outputPath = path.join(cacheDir, filename);
+		fs.rmSync(outputPath);
+
+		// Emulate a second process completing the same-hash publish just before
+		// Windows rejects rename onto its newly-created destination.
+		const originalRenameSync = fs.renameSync.bind(fs);
+		const rename = vi.spyOn(fs, 'renameSync').mockImplementation((source, destination) => {
+			if (destination === outputPath) {
+				fs.copyFileSync(source, destination);
+				throw Object.assign(new Error('Destination exists'), { code: 'EEXIST' });
+			}
+			return originalRenameSync(source, destination);
+		});
+		try {
+			expect((await loadOctaneConfig(fixtureRoot, { cacheDir })).build.outDir).toBe('shared-build');
+			expect(fs.readFileSync(outputPath, 'utf8')).toContain('shared-build');
+		} finally {
+			rename.mockRestore();
+		}
+	});
+
 	it('uses an injected integration module runner without esbuild', async () => {
 		write('octane.config.ts', `export default {};\n`);
 		const dependency = path.join(fixtureRoot, 'config-helper.ts');
@@ -60,15 +126,40 @@ describe('loadOctaneConfig', () => {
 	});
 
 	it('server-compiles TSRX imported by the config evaluator', async () => {
+		// Config evaluation externalizes packages like a real application's Node
+		// process. Give the isolated project the current server runtime: compiled
+		// TSRX can import helpers even when its authored source has no imports.
+		write(
+			'node_modules/octane/package.json',
+			JSON.stringify({
+				name: 'octane',
+				type: 'module',
+				exports: { './server': './server.mjs' },
+			}),
+		);
+		await build({
+			entryPoints: [path.resolve(import.meta.dirname, '../../octane/src/server/index.ts')],
+			outfile: path.join(fixtureRoot, 'node_modules/octane/server.mjs'),
+			bundle: true,
+			format: 'esm',
+			platform: 'node',
+			target: 'node22',
+		});
 		write('ConfigMarker.tsrx', `export function ConfigMarker() @{ <span>ready</span> }\n`);
 		write(
 			'octane.config.ts',
-			`import { ConfigMarker } from './ConfigMarker.tsrx';\nexport default { platform: { env: { marker: typeof ConfigMarker } } };\n`,
+			`import { ConfigMarker } from './ConfigMarker.tsrx';
+import { renderToString } from 'octane/server';
+export default { platform: { env: { marker: typeof ConfigMarker, html: (await renderToString(ConfigMarker)).html } } };
+`,
 		);
 
 		const loaded = await loadOctaneConfigWithMetadata(fixtureRoot);
 		expect(loaded.config.platform.env.marker).toBe('function');
+		expect(loaded.config.platform.env.html).toBe('<span>ready</span>');
 		expect(loaded.dependencies).toContain(path.join(fixtureRoot, 'ConfigMarker.tsrx'));
+		expect(loaded.dependencies).toContain(path.join(fixtureRoot, 'node_modules/octane/server.mjs'));
+		expect(loaded.missingDependencies).toEqual([]);
 	});
 
 	it('attaches missing dependencies to config evaluation failures', async () => {

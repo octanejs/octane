@@ -1,0 +1,35 @@
+diff --git a/tests/upstream/src/combobox/store.test.tsx b/tests/upstream/src/combobox/store.test.tsx
+--- a/tests/upstream/src/combobox/store.test.tsx
++++ b/tests/upstream/src/combobox/store.test.tsx
+@@ -1,4 +1,8 @@
+ /** @jsxImportSource octane */
++import { StoreServerCase1 } from './../../../fixtures/store-ssr.tsrx';
++import { StoreServerCase1 as ServerStoreServerCase1 } from './../../../fixtures/store-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../support/renderer';
++registerServerComponent(StoreServerCase1, ServerStoreServerCase1);
+ import { expect, vi, describe, beforeEach, it } from 'vitest';
+ import * as React from 'octane';
+ import { screen } from '@mui/internal-test-utils';
+@@ -51,7 +55,7 @@ describe('combobox store synchronization', () => {
+   }: {
+     inline: boolean;
+     storeRef: { current: ComboboxStore | null };
+-    children?: React.ReactNode;
++    children?: React.OctaneNode;
+     withPopupInput?: boolean;
+   }) {
+     return (
+@@ -223,12 +227,7 @@ describe('combobox store synchronization', () => {
+     // owns the form value itself. The existing SSR suite already covers the ARIA attributes
+     // (`ComboboxRoot.test.tsx`), so this asserts the ownership that survives into hydration.
+     const { hydrate } = await renderToString(
+-      <Autocomplete.Root items={['alpha', 'beta']} name="search">
+-        <Autocomplete.Input data-testid="input" />
+-        <Autocomplete.Portal>
+-          <Autocomplete.Positioner />
+-        </Autocomplete.Portal>
+-      </Autocomplete.Root>,
++      <StoreServerCase1 />,
+     );
+ 
+     expect(screen.getByTestId('input')).toHaveAttribute('role', 'combobox');

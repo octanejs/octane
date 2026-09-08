@@ -1,0 +1,78 @@
+import { describe, expect, it } from 'vitest';
+import { injectStyle } from '../../src/index.js';
+
+// Plan S3.6 — the client `injectStyle(id, css)` dedupes by id (a per-runtime
+// Set plus a DOM query for `style[data-octane=id]`). A module re-evaluation
+// that keeps a scope hash but changes the CSS (an HMR edit inside a later
+// block; the hash is position-derived) reaches the runtime as a second call
+// with the same id. These tests pin what that second call does.
+
+let counter = 0;
+function freshId(): string {
+	counter += 1;
+	return `tsrx-hmr-reinject-${counter}`;
+}
+
+function sheets(id: string): HTMLStyleElement[] {
+	return Array.from(document.head.querySelectorAll(`style[data-octane="${id}"]`));
+}
+
+describe('injectStyle dedupe (S3.6)', () => {
+	it('injects one <style data-octane> per id and ignores an identical repeat', () => {
+		const id = freshId();
+		const css = `.a.${id} { color: rgb(1, 1, 1); }`;
+		injectStyle(id, css);
+		injectStyle(id, css);
+		const tags = sheets(id);
+		expect(tags).toHaveLength(1);
+		expect(tags[0].textContent).toBe(css);
+	});
+
+	it('adopts a server-emitted sheet instead of appending a duplicate', () => {
+		const id = freshId();
+		const serverCss = `.b.${id} { color: rgb(2, 2, 2); }`;
+		const serverSheet = document.createElement('style');
+		serverSheet.setAttribute('data-octane', id);
+		serverSheet.textContent = serverCss;
+		document.head.appendChild(serverSheet);
+
+		injectStyle(id, `.b.${id} { color: rgb(3, 3, 3); }`);
+		const tags = sheets(id);
+		expect(tags).toHaveLength(1);
+		expect(tags[0]).toBe(serverSheet);
+		expect(tags[0].textContent).toBe(serverCss);
+		serverSheet.remove();
+	});
+
+	// After an HMR re-evaluation the scope hash is unchanged (it derives from
+	// the first block's position and content) but a later block's CSS may
+	// differ; the runtime refreshes the sheet in place instead of keeping the
+	// stale one.
+	it('re-injecting an unchanged hash with changed css replaces the sheet', () => {
+		const id = freshId();
+		const before = `.d.${id} { color: rgb(6, 6, 6); }`;
+		const after = `.d.${id} { color: rgb(7, 7, 7); }`;
+		injectStyle(id, before);
+		injectStyle(id, after);
+		const tags = sheets(id);
+		expect(tags).toHaveLength(1);
+		expect(tags[0].textContent).toBe(after);
+	});
+
+	it('records the id without creating a sheet when document is missing', () => {
+		const id = freshId();
+		const first = `.e.${id} { color: rgb(8, 8, 8); }`;
+		const second = `.e.${id} { color: rgb(9, 9, 9); }`;
+		const held = globalThis.document;
+		Reflect.deleteProperty(globalThis, 'document');
+		try {
+			injectStyle(id, first);
+			injectStyle(id, second);
+		} finally {
+			globalThis.document = held;
+		}
+		expect(sheets(id)).toHaveLength(0);
+		injectStyle(id, first);
+		expect(sheets(id)).toHaveLength(0);
+	});
+});

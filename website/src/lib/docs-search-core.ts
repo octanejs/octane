@@ -16,7 +16,8 @@ export interface SearchBlock {
 	code: boolean;
 }
 
-export interface SearchRecord {
+export interface DocumentSearchRecord {
+	kind: 'doc';
 	slug: string;
 	docTitle: string;
 	/** Anchor id of the `<h2>` this section opens with; '' for the lede. */
@@ -30,6 +31,35 @@ export interface SearchRecord {
 	order: number;
 }
 
+export interface PackageSearchRecord {
+	kind: 'package';
+	/** Canonical project identifier, independent of which authored name matched. */
+	key: string;
+	/** Canonical first-party package name or community project title. */
+	title: string;
+	/** Authored package names, aliases, and public entry points, in display order. */
+	names: readonly string[];
+	purpose: string;
+	owner: string;
+	url: string;
+	normalizedTitle: string;
+	normalizedNames: readonly string[];
+	normalizedPurpose: string;
+	/** Searchable fields only; owner is deliberately excluded. */
+	haystack: string;
+}
+
+export type SearchRecord = DocumentSearchRecord | PackageSearchRecord;
+
+export interface PackageRecordInput {
+	key: string;
+	title: string;
+	names: readonly string[];
+	purpose: string;
+	owner: string;
+	url: string;
+}
+
 export interface DocHeading {
 	id: string;
 	title: string;
@@ -37,7 +67,8 @@ export interface DocHeading {
 }
 
 /** One section of one document, with the lines inside it that matched. */
-export interface SearchGroup {
+export interface DocumentSearchResult {
+	kind: 'doc';
 	key: string;
 	slug: string;
 	id: string;
@@ -46,6 +77,22 @@ export interface SearchGroup {
 	score: number;
 	lines: SearchLine[];
 }
+
+/** One canonical package/project, regardless of which authored name matched. */
+export interface PackageSearchResult {
+	kind: 'package';
+	key: string;
+	title: string;
+	matchedName: string;
+	purpose: string;
+	owner: string;
+	url: string;
+	score: number;
+}
+
+export type SearchResult = DocumentSearchResult | PackageSearchResult;
+/** Existing exported name retained while consumers migrate to the discriminant. */
+export type SearchGroup = SearchResult;
 
 export interface SearchLine {
 	key: string;
@@ -132,14 +179,15 @@ export function recordsFor(
 	docTitle: string,
 	order: number,
 	source: string,
-): SearchRecord[] {
+): DocumentSearchRecord[] {
 	const body = source.replace(/^---[\s\S]*?---/, '');
-	const records: SearchRecord[] = [];
+	const records: DocumentSearchRecord[] = [];
 	const push = (id: string, title: string, raw: string) => {
 		const blocks = blocksFor(raw);
 		const text = blocks.map((b) => b.text).join(' ');
 		if (!text) return;
 		records.push({
+			kind: 'doc',
 			slug,
 			docTitle,
 			id,
@@ -167,7 +215,7 @@ export function recordsFor(
 
 /** Add metadata-only aliases to one section without putting them in rendered prose. */
 export function addSearchTerms(
-	record: SearchRecord | undefined,
+	record: DocumentSearchRecord | undefined,
 	terms: readonly string[] | undefined,
 ): void {
 	if (!record || !terms?.length) return;
@@ -175,6 +223,48 @@ export function addSearchTerms(
 	record.blocks.push(block);
 	record.text += ' ' + block.text;
 	record.haystack += ' ' + block.text.toLowerCase();
+}
+
+function normalize(value: string): string {
+	return value.normalize('NFKC').trim().toLowerCase();
+}
+
+function authoredNameMatches(name: string, value: string): boolean {
+	if (name.includes(value)) return true;
+	const wildcardAt = name.indexOf('*');
+	if (wildcardAt === -1) return false;
+	const prefix = name.slice(0, wildcardAt);
+	return value.length > prefix.length && value.startsWith(prefix);
+}
+
+/** Build one canonical package record from consumer-owned package metadata. */
+export function packageRecordFor(input: PackageRecordInput): PackageSearchRecord {
+	const names: string[] = [];
+	const seen = new Set<string>();
+	for (const name of input.names) {
+		const normalized = normalize(name);
+		if (!normalized || seen.has(normalized)) continue;
+		seen.add(normalized);
+		names.push(name);
+	}
+	if (names.length === 0) names.push(input.title);
+	const normalizedTitle = normalize(input.title);
+	const normalizedNames = names.map(normalize);
+	const normalizedPurpose = normalize(input.purpose);
+
+	return {
+		kind: 'package',
+		key: input.key,
+		title: input.title,
+		names,
+		purpose: input.purpose,
+		owner: input.owner,
+		url: input.url,
+		normalizedTitle,
+		normalizedNames,
+		normalizedPurpose,
+		haystack: [normalizedTitle, ...normalizedNames, normalizedPurpose].join(' '),
+	};
 }
 
 function escapeRegExp(term: string): string {
@@ -219,25 +309,95 @@ function markLine(text: string, pattern: RegExp): SnippetPart[] {
 }
 
 /**
- * Rank sections against a query. Every term must appear somewhere in the
- * section (AND); title matches outrank prose matches, a contiguous phrase
- * outranks scattered terms, and a section that keeps returning to a term
- * outranks one that merely mentions it. Each result carries the individual
- * lines that matched (up to `linesPerGroup`), so the dialog can show them.
+ * Rank document sections and canonical packages against a query. Every term
+ * must appear somewhere in one record (AND). Document scoring is unchanged;
+ * package scoring considers only canonical/authored names and purpose, never
+ * ownership or catalog source.
  */
+export function searchDocs(
+	index: readonly DocumentSearchRecord[],
+	query: string,
+	limit?: number,
+	linesPerGroup?: number,
+): DocumentSearchResult[];
+export function searchDocs(
+	index: readonly PackageSearchRecord[],
+	query: string,
+	limit?: number,
+	linesPerGroup?: number,
+): PackageSearchResult[];
+export function searchDocs(
+	index: readonly SearchRecord[],
+	query: string,
+	limit?: number,
+	linesPerGroup?: number,
+): SearchResult[];
 export function searchDocs(
 	index: readonly SearchRecord[],
 	query: string,
 	limit = 6,
 	linesPerGroup = 4,
-): SearchGroup[] {
-	const q = query.trim().toLowerCase();
+): SearchResult[] {
+	const q = normalize(query);
 	if (q.length < 2) return [];
 	const terms = q.split(/\s+/);
 	const pattern = new RegExp('(' + terms.map(escapeRegExp).join('|') + ')', 'ig');
+	const phrasePattern = new RegExp('\\b' + escapeRegExp(q) + '\\b');
 
-	const groups: SearchGroup[] = [];
+	const groups: SearchResult[] = [];
 	for (const record of index) {
+		if (record.kind === 'package') {
+			const title = record.normalizedTitle;
+			const names = record.normalizedNames;
+			const purpose = record.normalizedPurpose;
+			if (
+				!terms.every(
+					(term) =>
+						title.includes(term) ||
+						purpose.includes(term) ||
+						names.some((name) => authoredNameMatches(name, term)),
+				)
+			) {
+				continue;
+			}
+			let score = 0;
+			for (const term of terms) {
+				if (title.includes(term)) score += 8;
+				if (names.some((name) => authoredNameMatches(name, term))) score += 8;
+				if (purpose.includes(term)) score += 2;
+			}
+			const exact = names.findIndex((name) => name === q);
+			const wildcard = names.findIndex((name) => {
+				const wildcardAt = name.indexOf('*');
+				return (
+					wildcardAt !== -1 && q.length > wildcardAt && q.startsWith(name.slice(0, wildcardAt))
+				);
+			});
+			const containing = names.findIndex((name) => name.includes(q));
+			if (exact >= 0 || wildcard >= 0) score += 28;
+			else if (containing >= 0) score += 16;
+			if (title.includes(q)) score += 12;
+			if (purpose.includes(q)) score += 6;
+			if (phrasePattern.test(purpose)) score += 4;
+			score += Math.min(occurrences(purpose, q), 6) * 2;
+
+			const matchedName =
+				record.names[
+					exact >= 0 ? exact : wildcard >= 0 ? wildcard : containing >= 0 ? containing : 0
+				];
+			groups.push({
+				kind: 'package',
+				key: 'package:' + record.key,
+				title: record.title,
+				matchedName,
+				purpose: record.purpose,
+				owner: record.owner,
+				url: record.url,
+				score,
+			});
+			continue;
+		}
+
 		if (!terms.every((term) => record.haystack.includes(term))) continue;
 
 		const title = record.title.toLowerCase();
@@ -273,6 +433,7 @@ export function searchDocs(
 			}));
 
 		groups.push({
+			kind: 'doc',
 			key: record.slug + '#' + record.id,
 			slug: record.slug,
 			id: record.id,
@@ -283,10 +444,26 @@ export function searchDocs(
 		});
 	}
 
-	// Ties are common (two docs can both title a section "Install …"), so fall
-	// back to the curated registry order — earlier docs are the friendlier answer.
-	const rank = new Map(index.map((r) => [r.slug + '#' + r.id, r.order]));
+	// Document ties retain curated registry order. Package ties use their
+	// normalized canonical key, never ownership or catalog source.
+	const rank = new Map(
+		index
+			.filter((record): record is DocumentSearchRecord => record.kind === 'doc')
+			.map((record) => [record.slug + '#' + record.id, record.order]),
+	);
 	return groups
-		.sort((a, b) => b.score - a.score || (rank.get(a.key) ?? 0) - (rank.get(b.key) ?? 0))
+		.sort((a, b) => {
+			const score = b.score - a.score;
+			if (score !== 0) return score;
+			if (a.kind === 'doc' && b.kind === 'doc') {
+				return (rank.get(a.key) ?? 0) - (rank.get(b.key) ?? 0);
+			}
+			if (a.kind === 'package' && b.kind === 'package') {
+				const aKey = normalize(a.key);
+				const bKey = normalize(b.key);
+				return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+			}
+			return a.kind === 'package' ? -1 : 1;
+		})
 		.slice(0, limit);
 }

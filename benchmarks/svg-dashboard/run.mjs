@@ -86,6 +86,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5303/' },
 			{ name: 'solid', url: 'http://localhost:5304/' },
 			{ name: 'svelte', url: 'http://localhost:5305/' },
+			{ name: 'inferno', url: 'http://localhost:5324/' },
 		];
 
 const OPS = [

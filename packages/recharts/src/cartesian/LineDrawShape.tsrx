@@ -1,3 +1,12 @@
+import type { RefObject } from '../util/OctaneTypes.ts';
+import type { Props as CurveProps } from '../shape/Curve.tsrx';
+import type { ShapeAnimationProps } from '../util/types';
+
+export type LineDrawShapeProps =
+	Omit<CurveProps, 'pathRef'> & ShapeAnimationProps & {
+		pathRef: RefObject<SVGPathElement | null>;
+		visibleLength?: number | null;
+	};
 // Port of cartesian/LineDrawShape.tsx — the default Line shape: the entrance
 // animation progressively reveals the path via stroke-dasharray.
 import { Curve } from '../shape/Curve.tsrx';
@@ -6,7 +15,7 @@ import { Curve } from '../shape/Curve.tsrx';
  * Reads the total length of an SVG path element, returning 0 if the element
  * is null or the measurement fails (e.g. in JSDOM).
  */
-function getTotalLength(path) {
+function getTotalLength(path: SVGPathElement | null) {
 	try {
 		return path && path.getTotalLength && path.getTotalLength() || 0;
 	} catch {
@@ -17,17 +26,17 @@ function getTotalLength(path) {
 // Uses `totalLength` as the gap (not totalLength - length) to dodge a
 // float-serialization artifact that paints a phantom endpoint dot with
 // round/square linecaps.
-function generateSimpleStrokeDasharray(totalLength, length) {
+function generateSimpleStrokeDasharray(totalLength: number, length: number) {
 	return length + 'px ' + totalLength + 'px';
 }
 
 // Odd-length stroke-dasharray values repeat once ("5" behaves like "5 5").
-function normalizeDashPattern(lines) {
+function normalizeDashPattern(lines: number[]) {
 	return lines.length % 2 !== 0 ? [...lines, ...lines] : lines;
 }
 
-function repeat(lines, count) {
-	const result = [];
+function repeat(lines: number[], count: number) {
+	const result: number[] = [];
 	for (let i = 0; i < count; ++i) {
 		result.push(...lines);
 	}
@@ -38,7 +47,7 @@ function repeat(lines, count) {
  * Builds a dasharray that reveals exactly `length` pixels of the user's dash
  * pattern, followed by a `totalLength` gap hiding the rest.
  */
-function getStrokeDasharray(length, totalLength, lines) {
+function getStrokeDasharray(length: number, totalLength: number, lines: number[]) {
 	const normalizedLines = normalizeDashPattern(lines);
 	const lineLength = normalizedLines.reduce((pre, next) => pre + next, 0);
 	// if lineLength is 0 return the default when no strokeDasharray is provided
@@ -47,7 +56,7 @@ function getStrokeDasharray(length, totalLength, lines) {
 	}
 	const count = Math.floor(length / lineLength);
 	const remainLength = length % lineLength;
-	let remainLines = [];
+	let remainLines: number[] = [];
 	for (let i = 0, sum = 0; i < normalizedLines.length; (sum += normalizedLines[i] ?? 0, ++i)) {
 		const lineValue = normalizedLines[i];
 		if (lineValue != null && sum + lineValue > remainLength) {
@@ -62,7 +71,11 @@ function getStrokeDasharray(length, totalLength, lines) {
 	).join(', ');
 }
 
-function computeAnimatedStrokeDasharray(userStrokeDasharray, totalLength, visibleLength) {
+function computeAnimatedStrokeDasharray(
+	userStrokeDasharray: string | number | undefined,
+	totalLength: number,
+	visibleLength: number,
+) {
 	if (userStrokeDasharray) {
 		const lines = String(userStrokeDasharray).split(/[,\s]+/gim).map((num) => parseFloat(num));
 		return getStrokeDasharray(visibleLength, totalLength, lines);
@@ -75,7 +88,7 @@ function computeAnimatedStrokeDasharray(userStrokeDasharray, totalLength, visibl
  * `strokeDasharray` as animationElapsedTime goes 0 → 1.
  * @since 3.9
  */
-export function LineDrawShape(props) {
+export function LineDrawShape(props: LineDrawShapeProps) {
 	const {
 		animationElapsedTime,
 		isAnimating,
@@ -86,7 +99,7 @@ export function LineDrawShape(props) {
 		...curveProps
 	} = props;
 	const finalConnectNulls = connectNulls ?? false;
-	let strokeDasharray;
+	let strokeDasharray: string | undefined;
 	if (visibleLength != null) {
 		const { pathRef } = curveProps;
 		const totalLength = getTotalLength(pathRef?.current ?? null);

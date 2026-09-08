@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
-import * as ClientRT from '../src/index.js';
 import * as ServerRT from 'octane/server';
 import { mount } from './_helpers';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
+import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync, normalizeClass } from '../src/index.js';
+import { theme } from './_fixtures/style-theme.tsrx';
+import { SpreadApplied } from './_fixtures/style-theme-consumer.tsrx';
 import {
 	ArrayClass,
 	ObjectClass,
@@ -158,6 +160,54 @@ describe('clsx class composition — client mount', () => {
 		r.unmount();
 	});
 
+	it('writes a composed object class only when its value changes', () => {
+		const r = mount(ObjectClass, { active: true, disabled: false });
+		const div = r.find('div');
+		const observer = new MutationObserver(() => {});
+		observer.observe(div, { attributes: true, attributeFilter: ['class'] });
+		try {
+			r.update(ObjectClass, { active: true, disabled: false });
+			expect(r.find('div')).toBe(div);
+			expect(div.getAttribute('class')).toBe('active');
+			expect(observer.takeRecords()).toHaveLength(0);
+
+			r.update(ObjectClass, { active: false, disabled: true });
+			expect(div.getAttribute('class')).toBe('disabled');
+			expect(observer.takeRecords()).toHaveLength(1);
+
+			r.update(ObjectClass, { active: false, disabled: false });
+			expect(div.getAttribute('class')).toBe('');
+			expect(div.hasAttribute('class')).toBe(true);
+			expect(observer.takeRecords()).toHaveLength(1);
+
+			r.update(ObjectClass, { active: false, disabled: false });
+			expect(observer.takeRecords()).toHaveLength(0);
+		} finally {
+			observer.disconnect();
+			r.unmount();
+		}
+	});
+
+	it('writes a composed array class only when its value changes on SVG', () => {
+		const r = mount(SvgClass, { on: true });
+		const svg = r.find('svg');
+		const observer = new MutationObserver(() => {});
+		observer.observe(svg, { attributes: true, attributeFilter: ['class'] });
+		try {
+			r.update(SvgClass, { on: true });
+			expect(r.find('svg')).toBe(svg);
+			expect(svg.getAttribute('class')).toBe('a b');
+			expect(observer.takeRecords()).toHaveLength(0);
+
+			r.update(SvgClass, { on: false });
+			expect(svg.getAttribute('class')).toBe('a');
+			expect(observer.takeRecords()).toHaveLength(1);
+		} finally {
+			observer.disconnect();
+			r.unmount();
+		}
+	});
+
 	it('scoped component composes the array AND appends the scope hash', () => {
 		const r = mount(ScopedArray, { on: true });
 		const cls = r.find('div').className;
@@ -186,24 +236,16 @@ describe('clsx class composition — client mount', () => {
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/clsx-class.tsrx');
 const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
 
-function evalModule(mode: 'server' | 'client', rt: unknown): Record<string, any> {
-	const src =
-		mode === 'server' ? 'octane/(?:server|internal/server)' : 'octane(?:/internal/client)?';
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'clsx-class.tsrx', {
+function evalModule(mode: 'server' | 'client'): Record<string, any> {
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: 'clsx-class.tsrx',
 		mode,
-		dev: mode === 'client' && !PROD_COMPILE,
+		compileOptions: { dev: mode === 'client' && !PROD_COMPILE },
 	});
-	code = code.replace(
-		new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*['"]${src}['"];?`, 'g'),
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(rt, {});
 }
 
 describe('clsx class composition — SSR output', () => {
-	const server = evalModule('server', ServerRT);
+	const server = evalModule('server');
 
 	it('serialises an array class', async () => {
 		const { html } = await ServerRT.renderToString(server.ArrayClass, { on: true });
@@ -258,8 +300,8 @@ describe('clsx class composition — SSR output', () => {
 });
 
 describe('clsx class composition — hydration parity', () => {
-	const server = evalModule('server', ServerRT);
-	const client = evalModule('client', ClientRT);
+	const server = evalModule('server');
+	const client = evalModule('client');
 	let container: HTMLElement;
 	let errSpy: ReturnType<typeof vi.spyOn>;
 	beforeEach(() => {
@@ -448,5 +490,70 @@ describe('clsx class composition — hydration parity', () => {
 		expect(container.querySelector('div')!.className).toMatch(/^a tsrx-[0-9a-f]+$/);
 		const warned = errSpy.mock.calls.map((c) => String(c[0])).some((m) => m.includes('hydration'));
 		expect(warned).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// RFC tsrx-org/RFCs#1: a dynamic class under a spread, inside a scope applying
+// an IMPORTED theme, composes as `normalizeClass(value)`, the enclosing scope
+// hashes, then the runtime `theme.$class` read — identically on both sides.
+// ---------------------------------------------------------------------------
+
+const THEME_FIXTURE = 'packages/octane/tests/_fixtures/style-theme.tsrx';
+const CONSUMER_FIXTURE = 'packages/octane/tests/_fixtures/style-theme-consumer.tsrx';
+
+describe('clsx class composition — scope hashes and an imported theme', () => {
+	it('client: spread + array class + theme.$class compose in that order', () => {
+		const r = mount(SpreadApplied, { attrs: { 'data-x': '1' }, cond: true });
+		const div = r.find('#sa-host');
+		expect(div.getAttribute('data-x')).toBe('1');
+		const themeHashes = theme.$class.split(' ');
+		const hash = Array.from(div.classList).find(
+			(c) => c.startsWith('tsrx-') && !themeHashes.includes(c),
+		)!;
+		expect(hash).toBeTruthy();
+		expect(div.className).toBe(`sa on ${hash} ${theme.$class}`);
+		expect(getComputedStyle(div).padding).toBe('1px');
+		r.update(SpreadApplied, { attrs: { 'data-x': '2' }, cond: false });
+		expect(div.getAttribute('data-x')).toBe('2');
+		expect(div.className).toBe(`sa ${hash} ${theme.$class}`);
+		r.unmount();
+	});
+
+	it('compiles to a normalizeClass wrap, then the scope hash, then the theme.$class read', () => {
+		const source = `import { theme } from './theme.tsrx';
+export function S(props) @{
+	<>
+		<style apply={theme}>.sa { padding: 1px; }</style>
+		<div {...props.attrs} class={['a', props.cond && 'b']}>{'x'}</div>
+	</>
+}`;
+		for (const options of [{}, { hmr: false }, { mode: 'server' as const }]) {
+			const { code } = compile(source, 'spread-applied.tsrx', options);
+			expect(code).toMatch(
+				/`\$\{_\$normalizeClass\(\['a', props\.cond && 'b'\]\)\} tsrx-[0-9a-f]+ \$\{theme\.\$class\}`/,
+			);
+		}
+	});
+
+	it('SSR serialises the same composed class as the client', async () => {
+		// Root-relative ids, like the plugin's: hashes derive from positions.
+		const serverTheme = loadServerFixture(THEME_FIXTURE);
+		const server = loadServerFixture(CONSUMER_FIXTURE, {
+			runtimeModules: { './style-theme.tsrx': serverTheme },
+		});
+		// Both compiles derive the theme's `$class` from the same positions.
+		expect(serverTheme.theme.$class).toBe(theme.$class);
+		const { html, css } = await ServerRT.renderToString(server.SpreadApplied, {
+			attrs: { 'data-x': '1' },
+			cond: true,
+		});
+		const hash = html.match(/class="sa on (tsrx-[0-9a-f]+) /)![1];
+		expect(html).toContain(`data-x="1" class="sa on ${hash} ${theme.$class}"`);
+		expect(css).toContain(`.sa.${hash}`);
+
+		const r = mount(SpreadApplied, { attrs: { 'data-x': '1' }, cond: true });
+		expect(r.find('#sa-host').className).toBe(`sa on ${hash} ${theme.$class}`);
+		r.unmount();
 	});
 });

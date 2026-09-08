@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "waypoint-ssr",
+  "roots": ["packages/waypoint/tests/ssr"],
+  "files": ["packages/waypoint/tests/ssr/server.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:waypoint-ssr:0001",
+      "file": "packages/waypoint/tests/ssr/server.test.ts",
+      "fullName": "@octanejs/waypoint server contract matches the pinned React marker markup without touching window"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+diff --git a/tests/upstream/src/scroll-area/content/ScrollAreaContent.test.tsx b/tests/upstream/src/scroll-area/content/ScrollAreaContent.test.tsx
+--- a/tests/upstream/src/scroll-area/content/ScrollAreaContent.test.tsx
++++ b/tests/upstream/src/scroll-area/content/ScrollAreaContent.test.tsx
+@@ -58,10 +58,8 @@ describe('<ScrollArea.Content />', () => {
+   });
+ 
+   it('supports a custom content renderer that does not forward its ref', async () => {
+-    const ContentWithoutRef = React.forwardRef<
+-      HTMLDivElement,
+-      React.ComponentPropsWithoutRef<'div'>
+-    >(function ContentWithoutRef(props, _ref) {
++    const ContentWithoutRef = (function ContentWithoutRef(propsWithRef: (React.ComponentPropsWithoutRef<'div'>) & { ref?: React.Ref<HTMLDivElement> }) {
++  const { ref: _ref = null, ...props } = propsWithRef;
+       return <div {...props} />;
+     });
+ 

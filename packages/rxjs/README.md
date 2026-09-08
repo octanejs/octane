@@ -3,6 +3,13 @@
 [React-RxJS](https://github.com/re-rxjs/react-rxjs) bindings for
 [octane](https://github.com/octanejs/octane).
 
+## Installation
+
+```sh
+npm install @octanejs/rxjs rxjs
+pnpm add @octanejs/rxjs rxjs
+```
+
 The package reuses RxJS and `@rx-state/core`, replacing only the React hook and
 component layer. Most applications can migrate by changing imports:
 

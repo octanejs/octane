@@ -404,9 +404,13 @@ it('Fires custom `onBlur` when `HexColorInput` has lost focus', function firesIn
 	const onBlur = vi.fn();
 	const root = mountTracked(InputHarness, { color: '#112233', onBlur });
 	const input = root.find('input') as HTMLInputElement;
-	input.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+	input.focus();
+	expect(document.activeElement).toBe(input);
+	input.blur();
 	settle();
 	expect(onBlur).toHaveBeenCalledTimes(1);
+	expect(onBlur.mock.calls[0]![0].type).toBe('focusout');
+	expect(onBlur.mock.calls[0]![0].target).toBe(input);
 });
 
 it('Displays `#` prefix in `HexColorInput` if `prefixed` is turned on', function displaysPrefix() {

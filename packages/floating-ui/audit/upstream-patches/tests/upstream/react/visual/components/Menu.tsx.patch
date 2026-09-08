@@ -1,0 +1,89 @@
+diff --git a/tests/upstream/react/visual/components/Menu.tsx b/tests/upstream/react/visual/components/Menu.tsx
+--- a/tests/upstream/react/visual/components/Menu.tsx
++++ b/tests/upstream/react/visual/components/Menu.tsx
+@@ -60,21 +60,17 @@ interface MenuProps {
+   openOnFocus?: boolean;
+ }
+ 
+-export const MenuComponent = React.forwardRef<
+-  HTMLButtonElement,
+-  MenuProps & React.HTMLProps<HTMLButtonElement>
+->(function Menu(
+-  {
+-    children,
+-    label,
+-    keepMounted = false,
+-    cols,
+-    orientation: orientationOption,
+-    openOnFocus = false,
+-    ...props
+-  },
+-  forwardedRef,
+-) {
++// OCTANE DIVERGENCE[floating-ui-ref-prop]: Octane passes refs as ordinary props.
++export function MenuComponent({
++  children,
++  label,
++  keepMounted = false,
++  cols,
++  orientation: orientationOption,
++  openOnFocus = false,
++  ref: forwardedRef,
++  ...props
++}: MenuProps & React.HTMLProps<HTMLButtonElement> & {ref?: unknown}) {
+   const [isOpen, setIsOpen] = React.useState(false);
+   const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
+   const [allowHover, setAllowHover] = React.useState(false);
+@@ -302,17 +298,20 @@ export const MenuComponent = React.forwardRef<
+       </MenuContext.Provider>
+     </FloatingNode>
+   );
+-});
++}
+ 
+ interface MenuItemProps {
+   label: string;
+   disabled?: boolean;
+ }
+ 
+-export const MenuItem = React.forwardRef<
+-  HTMLButtonElement,
+-  MenuItemProps & React.ButtonHTMLAttributes<HTMLButtonElement>
+->(function MenuItem({label, disabled, ...props}, forwardedRef) {
++export function MenuItem({
++  label,
++  disabled,
++  ref: forwardedRef,
++  ...props
++}: MenuItemProps &
++  React.ButtonHTMLAttributes<HTMLButtonElement> & {ref?: unknown}) {
+   const menu = React.useContext(MenuContext);
+   const item = useListItem({label: disabled ? null : label});
+   const tree = useFloatingTree();
+@@ -369,12 +368,12 @@ export const MenuItem = React.forwardRef<
+       {label}
+     </button>
+   );
+-});
++}
+ 
+-export const Menu = React.forwardRef<
+-  HTMLButtonElement,
+-  MenuProps & React.HTMLProps<HTMLButtonElement>
+->(function MenuWrapper(props, ref) {
++export function Menu({
++  ref,
++  ...props
++}: MenuProps & React.HTMLProps<HTMLButtonElement> & {ref?: unknown}) {
+   const parentId = useFloatingParentNodeId();
+ 
+   if (parentId === null) {
+@@ -386,7 +385,7 @@ export const Menu = React.forwardRef<
+   }
+ 
+   return <MenuComponent {...props} ref={ref} />;
+-});
++}
+ 
+ export const Main = () => {
+   return (

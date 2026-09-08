@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/monaco-editor",
-  "version": "0.0.7",
+  "version": "0.0.20",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -27,21 +27,23 @@
     "src",
     "LICENSE",
     "README.md",
-    "UPSTREAM.md"
+    "UPSTREAM.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "test": "vitest run --root ../.. --project monaco-editor",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "parity:generate": "node ./scripts/generate-parity-manifest.mjs"
   },
   "dependencies": {
     "@monaco-editor/loader": "catalog:default"
   },
   "peerDependencies": {
     "monaco-editor": ">=0.25.0 <1",
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@monaco-editor/react": "catalog:default",

@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/global/cursor/getCursorStyle.test.ts b/tests/upstream/global/cursor/getCursorStyle.test.ts
+--- a/tests/upstream/global/cursor/getCursorStyle.test.ts
++++ b/tests/upstream/global/cursor/getCursorStyle.test.ts
+@@ -1,13 +1,14 @@
++// Fidelity: exact pinned upstream test identities and assertions; imports and runtime harness are Octane-adapted.
+ import { beforeEach, describe, expect, test } from "vitest";
+ import {
+   CURSOR_FLAG_HORIZONTAL_MAX,
+   CURSOR_FLAG_HORIZONTAL_MIN,
+   CURSOR_FLAG_VERTICAL_MAX,
+   CURSOR_FLAG_VERTICAL_MIN
+-} from "../../constants";
++} from "../../../../src/constants";
+ import { mockGroup } from "../test/mockGroup";
+-import { getCursorStyle } from "./getCursorStyle";
+-import { overrideSupportsAdvancedCursorStylesForTesting } from "./supportsAdvancedCursorStyles";
++import { getCursorStyle } from "../../../../src/global/cursor/getCursorStyle";
++import { overrideSupportsAdvancedCursorStylesForTesting } from "../../../../src/global/cursor/supportsAdvancedCursorStyles";
+ 
+ describe("getCursorStyle", () => {
+   const horizontalGroup = mockGroup(new DOMRect(0, 0, 100, 50), {

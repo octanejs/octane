@@ -17,7 +17,7 @@ import { parseModule } from '@tsrx/core';
 import {
 	compile,
 	compileForBundler,
-	hasLowerableJsxReturnBranches,
+	createJsxReturnBranchClassifier,
 	hasOnlyLowerableNullishExits,
 	isVoidJsxCodeBlockFunction,
 } from './compile.js';
@@ -33,7 +33,8 @@ import { normalizeUniversalRuntime } from './universal-runtime.js';
 import { formatCompileDiagnostic } from './native-change-diagnostics.js';
 import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
 import { rewriteServerRuntimeRequests } from './runtime-requests.js';
-import { assertStrongMode } from './strong-mode.js';
+import { assertNativeReadOptions } from './native-read-diagnostics.js';
+import { findCssModuleImportRequests } from './css-module-imports.js';
 import {
 	assertNoLiveClientOnlyImports,
 	createClientOnlyServerStub,
@@ -42,6 +43,11 @@ import {
 } from './client-only-server.js';
 
 export { findVoidComponentImports, findVoidRootImports };
+export {
+	isPlainCssModuleId,
+	readCssModuleExports,
+	validateCssModuleConstants,
+} from './css-module-imports.js';
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
@@ -67,6 +73,21 @@ export const OCTANE_RUNTIME_REQUESTS = Object.freeze({
 	client: 'octane',
 	server: 'octane/server',
 });
+
+// Vite can classify descriptor exports from its transform-local preflight AST,
+// but the neutral compiler must never trust caller-supplied facts or a naked
+// authored AST. Only opaque objects registered here can bypass the established
+// string classifier, and each proof is consumed once for its exact source/id.
+const descriptorChildrenExportProofs = new WeakMap();
+const descriptorChildrenExportAuthorities = new WeakMap();
+
+function consumeDescriptorChildrenExportProof(proof, source, id) {
+	if (proof === null || typeof proof !== 'object') return null;
+	const prepared = descriptorChildrenExportProofs.get(proof);
+	descriptorChildrenExportProofs.delete(proof);
+	if (prepared?.source !== source || prepared.id !== id) return null;
+	return prepared.exports;
+}
 
 /** Strip bundler query/hash suffixes without changing the underlying path. */
 export function cleanModuleId(id) {
@@ -108,13 +129,17 @@ export function canonicalModuleId(id, projectRoot) {
 }
 
 export function resolveOctaneRuntimeRequest(request, environment) {
-	if (request !== 'octane') return null;
+	if (request !== 'octane' && request !== 'octane/signals/client') return null;
 	if (environment !== 'client' && environment !== 'server') {
 		throw new Error(
 			`Unknown Octane environment ${JSON.stringify(environment)} — expected 'client' or 'server'.`,
 		);
 	}
-	return OCTANE_RUNTIME_REQUESTS[environment];
+	return request === 'octane/signals/client'
+		? environment === 'server'
+			? 'octane/signals/server'
+			: request
+		: OCTANE_RUNTIME_REQUESTS[environment];
 }
 
 function packageUsesOctane(pkg) {
@@ -248,54 +273,55 @@ export function findVoidComponentExports(source, id) {
 	}
 
 	const voidBindings = new Set();
+	const memoDependents = new Map();
+	const hasLowerableJsxReturnBranches = createJsxReturnBranchClassifier(ast.body || []);
 	// Mirrors the compile-time lowering decisions exactly (nullish-guard @{}
 	// bodies AND React-style conditional JSX returns), so cross-module call-site
 	// classification agrees with what each module actually compiled to.
 	const isVoidFunction = (node) =>
 		isVoidJsxCodeBlockFunction(node) ||
 		hasOnlyLowerableNullishExits(node) ||
-		hasLowerableJsxReturnBranches(node, ast.body || []);
+		hasLowerableJsxReturnBranches(node);
 	for (const declaration of declarations) {
 		if (declaration.type === 'FunctionDeclaration' && declaration.id?.name) {
 			if (isVoidFunction(declaration)) voidBindings.add(declaration.id.name);
 			continue;
 		}
 		if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		// Resolve only the exact, immutable `const Export = memo(Local)` form. The
+		// imported memo identity is lexical proof; method calls, comparators, and
+		// arbitrary wrappers stay unknown. Index the reverse edges once so a chain
+		// declared outermost-first does not rescan every declaration per link.
 		for (const item of declaration.declarations || []) {
+			const init = item.init;
 			if (
 				item.id?.type === 'Identifier' &&
-				(item.init?.type === 'FunctionExpression' ||
-					item.init?.type === 'ArrowFunctionExpression') &&
-				isVoidFunction(item.init)
+				(init?.type === 'FunctionExpression' || init?.type === 'ArrowFunctionExpression') &&
+				isVoidFunction(init)
 			) {
 				voidBindings.add(item.id.name);
 			}
+			if (
+				item.id?.type !== 'Identifier' ||
+				init?.type !== 'CallExpression' ||
+				init.callee?.type !== 'Identifier' ||
+				!memoLocals.has(init.callee.name) ||
+				init.arguments?.length !== 1 ||
+				init.arguments[0]?.type !== 'Identifier'
+			)
+				continue;
+			const target = init.arguments[0].name;
+			let dependents = memoDependents.get(target);
+			if (dependents === undefined) memoDependents.set(target, (dependents = []));
+			dependents.push(item.id.name);
 		}
 	}
-	// Resolve only the exact, immutable `const Export = memo(Local)` form. The
-	// imported memo identity is lexical proof; method calls, comparators, and
-	// arbitrary wrappers stay unknown.
-	let changed = true;
-	while (changed) {
-		changed = false;
-		for (const declaration of declarations) {
-			if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
-			for (const item of declaration.declarations || []) {
-				const init = item.init;
-				if (
-					item.id?.type !== 'Identifier' ||
-					voidBindings.has(item.id.name) ||
-					init?.type !== 'CallExpression' ||
-					init.callee?.type !== 'Identifier' ||
-					!memoLocals.has(init.callee.name) ||
-					init.arguments?.length !== 1 ||
-					init.arguments[0]?.type !== 'Identifier' ||
-					!voidBindings.has(init.arguments[0].name)
-				)
-					continue;
-				voidBindings.add(item.id.name);
-				changed = true;
-			}
+	const pending = [...voidBindings];
+	for (let index = 0; index < pending.length; index++) {
+		for (const dependent of memoDependents.get(pending[index]) ?? []) {
+			if (voidBindings.has(dependent)) continue;
+			voidBindings.add(dependent);
+			pending.push(dependent);
 		}
 	}
 
@@ -445,6 +471,13 @@ export function findDescriptorChildrenImports(source, id) {
 		if (jsxBindings.has(local)) candidates.push({ ...imported, local });
 	}
 	for (const node of ast.body || []) {
+		if (node.type === 'ExportDefaultDeclaration') {
+			if (node.declaration?.type === 'Identifier') {
+				const imported = importedBindings.get(node.declaration.name);
+				if (imported !== undefined) candidates.push({ ...imported, exported: 'default' });
+			}
+			continue;
+		}
 		if (node.type !== 'ExportNamedDeclaration') continue;
 		for (const specifier of node.specifiers || []) {
 			const exported = specifier.exported?.name ?? specifier.exported?.value;
@@ -465,6 +498,7 @@ export function findDescriptorChildrenImports(source, id) {
 
 class OctaneBundlerCompiler {
 	constructor(options) {
+		assertNativeReadOptions(options);
 		if (options.strong !== undefined && typeof options.strong !== 'boolean') {
 			throw new TypeError('Octane compiler `strong` must be a boolean when provided.');
 		}
@@ -480,7 +514,9 @@ class OctaneBundlerCompiler {
 			hmr: normalizeHmrDialect(options.hmr),
 			dev: options.dev,
 			profile: options.profile === true,
+			inlineHookMemo: options.inlineHookMemo !== false,
 			strong: options.strong === true,
+			nativeReads: options.nativeReads === true,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
@@ -503,6 +539,7 @@ class OctaneBundlerCompiler {
 			if (renderer.intrinsics !== undefined) this.pragmaOwnedModules.add(renderer.intrinsics);
 		}
 		this.warn = typeof options.warn === 'function' ? options.warn : null;
+		descriptorChildrenExportAuthorities.set(this, options._descriptorPreflightAuthority ?? null);
 		this.warnedOwnership = new Set();
 		this.warnedCompileDiagnostics = new Set();
 		// Deliberately instance-scoped: separate projects/build environments must
@@ -523,6 +560,10 @@ class OctaneBundlerCompiler {
 			return;
 		}
 		const changed = nodePath.resolve(cleanModuleId(path));
+		// Both cache families retain only present or missing package manifests.
+		// Ordinary source edits still start a diagnostic generation above, but
+		// cannot invalidate either cache.
+		if (nodePath.basename(changed) !== 'package.json') return;
 		for (const [directory, entry] of this.manifestRuleCache) {
 			if (entry.dependencies.includes(changed) || entry.missingDependencies.includes(changed)) {
 				this.manifestRuleCache.delete(directory);
@@ -714,7 +755,7 @@ class OctaneBundlerCompiler {
 	 */
 	_warnUnmarkedOctaneImport(code, filename) {
 		if (this.warn === null || this.warnedOwnership.has(filename)) return;
-		if (!/from\s*['"]octane['"]/.test(code)) return;
+		if (!/from\s*['"]octane(?:\/signals\/(?:client|server))?['"]/.test(code)) return;
 		this.warnedOwnership.add(filename);
 		this.warn(
 			`${filename} imports from 'octane' but has no leading /** @jsxImportSource octane */ pragma — with requireDirective enabled, Octane will not compile or transform it. Add the pragma at the top of the module if Octane should own it.`,
@@ -914,6 +955,54 @@ class OctaneBundlerCompiler {
 		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
 	}
 
+	/** @internal Create a one-transform descriptor-export proof from a read-only AST. */
+	_prepareDescriptorChildrenExports(authority, source, id, ast) {
+		if (
+			authority === null ||
+			authority !== descriptorChildrenExportAuthorities.get(this) ||
+			typeof source !== 'string' ||
+			typeof id !== 'string' ||
+			ast === null ||
+			typeof ast !== 'object' ||
+			ast.type !== 'Program'
+		) {
+			throw new TypeError('Invalid descriptor-children preflight input.');
+		}
+		const proof = Object.freeze({});
+		descriptorChildrenExportProofs.set(proof, {
+			source,
+			id,
+			exports: Object.freeze(findDescriptorChildrenExports(ast, id)),
+		});
+		return proof;
+	}
+
+	/** CSS proof discovery uses the same ownership gate as the eventual compile. */
+	findCssModuleImportRequests(code, id, environment = 'client', parsedAst = null) {
+		if (typeof code !== 'string' || !code.includes('.module.')) return [];
+		// The live-read witness currently follows DOM host ownership only. Even
+		// a DOM-owned module can delegate a JSX-valued prop to another renderer.
+		if (Object.keys(this.renderers.boundaries).length > 0) return [];
+		const file = cleanModuleId(id);
+		const collected = { dependencies: new Set(), missingDependencies: new Set() };
+		if (!this._isFullCompileSource(file, collected)) return [];
+		const filename = this._canonicalModuleId(file);
+		const pragmaOwned =
+			this.requireDirective &&
+			file.endsWith('.tsx') &&
+			this._isProjectOwnedSource(file) &&
+			this._pragmaClaimsOwnership(code);
+		if (!this._passesOwnershipGate(file, filename, pragmaOwned)) return [];
+		const renderer = resolveRendererForFile(this.renderers, filename);
+		if (
+			renderer.target !== 'dom' ||
+			(environment === 'server' && renderer.server === 'client-only')
+		) {
+			return [];
+		}
+		return findCssModuleImportRequests(parsedAst ?? code, filename);
+	}
+
 	/**
 	 * requireDirective ownership for code-less classification: a project
 	 * `.tsrx` is Octane's by extension; any other project module needs its
@@ -968,6 +1057,12 @@ class OctaneBundlerCompiler {
 	}
 
 	transform(code, id, options = {}) {
+		assertNativeReadOptions(options);
+		const preparedDescriptorChildrenExports = consumeDescriptorChildrenExportProof(
+			options._descriptorChildrenExportsProof,
+			code,
+			id,
+		);
 		const file = cleanModuleId(id);
 		const hydrateBoundaryPath = hydrateBoundaryPathFromId(id);
 		const collected = {
@@ -990,6 +1085,8 @@ class OctaneBundlerCompiler {
 		// of both HMR and dev hydration diagnostics. Server transforms stay byte-for-
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
+		const inlineHookMemo = (options.inlineHookMemo ?? this.defaults.inlineHookMemo) !== false;
+		const nativeReads = (options.nativeReads ?? this.defaults.nativeReads) === true;
 		// An application's global policy never leaks into installed or linked
 		// compatibility packages, including workspace packages nested inside the
 		// project root. Modules may still opt themselves in with their own
@@ -1048,7 +1145,7 @@ class OctaneBundlerCompiler {
 		if (!hostOwned) this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		if (
 			plainHelperSource &&
-			renderer.target === 'universal' &&
+			(renderer.target === 'universal' || renderer.target === 'valdi') &&
 			renderer.validation !== undefined &&
 			this._isProjectOwnedSource(file) &&
 			!this.exclude.some((path) => file.includes(path)) &&
@@ -1077,6 +1174,10 @@ class OctaneBundlerCompiler {
 				};
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
+			const collectCssModuleConstants =
+				renderer.target === 'dom' &&
+				!hasRendererBoundaries &&
+				typeof options.resolveCssModuleConstant === 'function';
 			const compileFilename =
 				hydrateBoundaryPath === null
 					? filename
@@ -1087,7 +1188,9 @@ class OctaneBundlerCompiler {
 				dev,
 				profile,
 				profileFilename,
+				...(inlineHookMemo ? null : { inlineHookMemo: false }),
 				...(strong ? { strong: true } : null),
+				...(nativeReads ? { nativeReads: true } : null),
 				...(universalRuntime === undefined ? null : { universalRuntime }),
 				// Keep the established DOM compiler call byte-for-byte equivalent. A
 				// renderer descriptor is an orthogonal compiler input only for the
@@ -1106,15 +1209,27 @@ class OctaneBundlerCompiler {
 				...(typeof options.isDescriptorChildrenImport === 'function'
 					? { isDescriptorChildrenImport: options.isDescriptorChildrenImport }
 					: null),
+				...(collectCssModuleConstants
+					? {
+							resolveCssModuleConstant: options.resolveCssModuleConstant,
+							...(options.preserveCssModuleReferences === undefined
+								? null
+								: { preserveCssModuleReferences: options.preserveCssModuleReferences }),
+						}
+					: null),
 			};
 			const collectVoidComponentExports =
 				environment === 'client' && options.collectVoidComponentExports === true;
 			let out;
 			let voidComponentAst = null;
-			if (collectVoidComponentExports) {
+			let cssModuleConstantImports;
+			if (collectVoidComponentExports || collectCssModuleConstants) {
 				const compilation = compileForBundler(code, compileFilename, compileOptions);
 				out = compilation.result;
-				voidComponentAst = compilation.hydrateAst;
+				if (collectVoidComponentExports) voidComponentAst = compilation.hydrateAst;
+				if (collectCssModuleConstants) {
+					cssModuleConstantImports = compilation.cssModuleConstantImports;
+				}
 			} else {
 				out = compile(code, compileFilename, compileOptions);
 			}
@@ -1132,7 +1247,11 @@ class OctaneBundlerCompiler {
 					: {
 							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
-				descriptorChildrenExports: findDescriptorChildrenExports(code, filename),
+				...(cssModuleConstantImports === undefined ? null : { cssModuleConstantImports }),
+				descriptorChildrenExports:
+					preparedDescriptorChildrenExports === null
+						? findDescriptorChildrenExports(code, filename)
+						: [...preparedDescriptorChildrenExports],
 				...finishMetadata(collected),
 			};
 		}
@@ -1158,7 +1277,16 @@ class OctaneBundlerCompiler {
 				}
 				return passThrough();
 			}
-			if (!/from\s*['"]octane['"]/.test(code)) return passThrough();
+			const nativeHookImport = /from\s*['"]octane\/signals\/(?:client|server)['"]/.test(code);
+			const hasHookRuntimeImport =
+				/from\s*['"]octane['"]/.test(code) ||
+				(nativeReads && /from\s*['"]octane\/server['"]/.test(code)) ||
+				nativeHookImport ||
+				(nativeReads && /from\s*['"]octane\/signals['"]/.test(code));
+			// Manual factories can import only other binding helpers, so their
+			// escaping hooks still need a provider boundary. Unrelated helpers keep
+			// their cheap pass-through without collecting unused manifest watches.
+			if (!hasHookRuntimeImport && !/(?:\b|_)use[A-Z]/.test(code)) return passThrough();
 			if (!this._isInstalledOctaneSource(file, collected)) {
 				return passThrough();
 			}
@@ -1170,26 +1298,41 @@ class OctaneBundlerCompiler {
 				this._warnUnmarkedOctaneImport(code, filename);
 				return passThrough();
 			}
-			if (this._hasManualHookSlots(file, collected)) {
-				// Hand-slotted bindings still own their authored policy. Opting one
-				// module in must not require changing its established slot ABI.
-				if (strong || code.includes('use strong')) {
-					const authoredSource = code;
-					assertStrongMode(parseModule(authoredSource, filename), authoredSource, filename, {
-						strong,
-					});
-				}
+			const manualSlots = this._hasManualHookSlots(file, collected);
+			if (
+				!hasHookRuntimeImport &&
+				!manualSlots &&
+				!pragmaOwned &&
+				!this._pragmaClaimsOwnership(code)
+			)
 				return passThrough();
-			}
+			const inlinePlainMemo =
+				inlineHookMemo &&
+				environment === 'client' &&
+				hmr === false &&
+				dev === false &&
+				profile === false &&
+				renderer.target === 'dom' &&
+				universalRuntime === undefined;
+			// Manual modules still need observed tuple capabilities. slotHooks keeps
+			// their authored slots and dependencies while selecting getter helpers.
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
-				environment === 'client' && hmr === false && dev === false && profile === false;
+				!manualSlots &&
+				environment === 'client' &&
+				hmr === false &&
+				dev === false &&
+				profile === false;
 			const out = slotHooks(code, filename, {
 				environment,
 				hmr: !!hmr,
+				dev,
 				profile,
 				profileFilename,
+				inlineHookMemo: inlinePlainMemo,
+				...(manualSlots ? { manualSlots: true } : null),
 				...(strong ? { strong: true } : null),
+				...(nativeReads ? { nativeReads: true, renderer } : null),
 				...(specializeVoidRoot
 					? {
 							isVoidComponentImport: options.isVoidComponentImport,

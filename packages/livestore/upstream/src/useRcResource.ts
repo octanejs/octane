@@ -190,4 +190,3 @@ const getBucket = (scope: object): Bucket => {
 export const __resetUseRcResourceCache = () => {
   scopedBuckets = new WeakMap()
 }
-

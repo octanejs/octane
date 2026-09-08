@@ -1,3 +1,30 @@
+import type { MutableRefObject, OctaneNode } from '../util/OctaneTypes.ts';
+import type { EasingInput } from './easing';
+import type { AnimationItem, AnimationMatchByProp } from './matchBy';
+import type { CartesianLayout, PolarLayout } from '../util/types';
+
+export type AnimationInterpolateFn<ItemType, LayoutType extends CartesianLayout | PolarLayout> =
+	(items: | ReadonlyArray<AnimationItem<ItemType>>
+	| null, animationElapsedTime: number, layout: LayoutType) => ReadonlyArray<ItemType>;
+export type AnimatedItemsProps<ItemType, LayoutType extends CartesianLayout | PolarLayout> = {
+	animationInput: unknown;
+	animationIdPrefix: string;
+	items: ReadonlyArray<ItemType> | undefined;
+	previousItemsRef: MutableRefObject<ReadonlyArray<ItemType> | null | undefined>;
+	isAnimationActive: boolean | 'auto';
+	animationBegin: number;
+	animationDuration: number;
+	animationEasing: EasingInput;
+	onAnimationStart?: () => void;
+	onAnimationEnd?: () => void;
+	animationInterpolateFn: AnimationInterpolateFn<ItemType, LayoutType>;
+	animationMatchBy?: AnimationMatchByProp<ItemType>;
+	shouldUpdatePreviousRef?: (animationElapsedTime: number) => boolean;
+	children: (items: ReadonlyArray<
+		ItemType
+	>, animationElapsedTime: number, isEntrance: boolean) => OctaneNode;
+	layout: LayoutType;
+};
 // Port of animation/AnimatedItems.tsx — the reusable enter/update/exit
 // animation wrapper for array-based chart data (Bar, Line, Area, Pie, …).
 import { useCallback, useState } from 'octane';
@@ -9,7 +36,7 @@ import { useAnimationStartSnapshot } from './useAnimationStartSnapshot.ts';
 /**
  * Tracks animation state and provides callbacks for animation start/end.
  */
-export function useAnimationCallbacks(onAnimationStart, onAnimationEnd) {
+export function useAnimationCallbacks(onAnimationStart?: () => void, onAnimationEnd?: () => void) {
 	const [isAnimating, setIsAnimating] = useState(false);
 	const handleAnimationStart = useCallback(() => {
 		if (typeof onAnimationStart === 'function') {
@@ -30,7 +57,9 @@ export function useAnimationCallbacks(onAnimationStart, onAnimationEnd) {
 	};
 }
 
-export function AnimatedItems(props) {
+export function AnimatedItems<ItemType, LayoutType extends CartesianLayout | PolarLayout>(
+	props: AnimatedItemsProps<ItemType, LayoutType>,
+) {
 	const {
 		animationInput,
 		animationIdPrefix,
@@ -51,7 +80,11 @@ export function AnimatedItems(props) {
 	const animationId = useAnimationId(animationInput, animationIdPrefix);
 	const animationStartItems = useAnimationStartSnapshot(animationId, previousItemsRef);
 	const rawPrevItems = animationStartItems.startValue ?? null;
-	const animationItems = matchAnimationItems(rawPrevItems, items, animationMatchBy ?? matchByIndex);
+	const animationItems: ReadonlyArray<AnimationItem<ItemType>> | null = matchAnimationItems(
+		rawPrevItems,
+		items,
+		animationMatchBy ?? matchByIndex,
+	);
 	return <JavascriptAnimate
 		animationId={animationId}
 		begin={animationBegin}

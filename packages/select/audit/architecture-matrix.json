@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 2,
+  "pin": {
+    "package": "react-select",
+    "version": "5.10.2",
+    "commit": "052e864b4990a67c4ee416851c34d1eb7b58267b",
+    "license": "MIT",
+    "emotion": {
+      "react": "11.9.3",
+      "cache": "11.9.3",
+      "serialize": "1.1.0",
+      "utils": "1.2.0"
+    }
+  },
+  "octaneBaseline": "b20a96d277bd57e5ea04b13c2b71a4109eb2d24e",
+  "publicEntryPoints": [".", "./base", "./async", "./animated", "./creatable", "./async-creatable"],
+  "candidates": [
+    {
+      "id": "generic-emotion-jsx-runtime",
+      "scope": "arbitrary authored css props",
+      "result": "STOP",
+      "evidence": "Octane compilation removes the Emotion jsx boundary, while pass-through removes Octane hook and SSR lowering"
+    },
+    {
+      "id": "react-select-explicit-style-adapter",
+      "scope": "finite port-owned built-in component callsites",
+      "mechanism": "reuse pinned Emotion serialization and cache primitives, then pass generated classes to ordinary Octane DOM output",
+      "result": "PASS",
+      "requiredGates": [
+        "serialization-identity",
+        "class-composition",
+        "client-cache-and-nonce",
+        "server-string-stream-static",
+        "hydration-adoption",
+        "custom-component-contract",
+        "zero-unmatched-hot-path",
+        "single-renderer-identity"
+      ],
+      "evidence": {
+        "command": "pnpm --filter @octanejs/select-u1 test",
+        "nodeTests": 9,
+        "octaneSsrTests": 4,
+        "renderers": ["renderToString", "renderToStaticMarkup", "renderToPipeableStream"],
+        "reactSelectContracts": [
+          "styles",
+          "classNames",
+          "classNamePrefix",
+          "unstyled",
+          "custom Control props"
+        ],
+        "clientContracts": [
+          "deduplication",
+          "insertion order",
+          "cache isolation",
+          "nonce",
+          "automatic hydration adoption"
+        ]
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "animated-transition-runtime",
+      "prerequisite": "exact react-transition-group behavior",
+      "currentState": "merged as @octanejs/transition-group",
+      "result": "REUSE"
+    },
+    {
+      "id": "class-select-reimplementation",
+      "prerequisite": "functional Octane reimplementation plus complete pinned runtime, interaction, accessibility, and type evidence",
+      "currentState": "allowed after the style candidate passes",
+      "result": "REIMPLEMENT"
+    }
+  ],
+  "rejectedSubstitutes": [
+    "inline-style serializer",
+    "class-name-only subset",
+    "unstyled-only subset",
+    "private incompatible Emotion clone"
+  ],
+  "decision": "PROCEED",
+  "nextDecision": "Vendor the pinned source and tests, build the six-entry-point crosswalk, and implement the first production parity unit while retaining U1 as a permanent gate."
+}

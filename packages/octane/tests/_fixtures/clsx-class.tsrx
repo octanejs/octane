@@ -64,25 +64,25 @@ export function Toggling() @{
 // that normalizes the value BEFORE the scope hash is appended, so the composed classes
 // and the hash both land in the final `class`.
 export function ScopedArray(props) @{
-	<div class={['a', props.on && 'b']}>
-		{'x'}
+	<>
 		<style>
 			.a {
 				color: rgb(1, 2, 3);
 			}
 		</style>
-	</div>
+		<div class={['a', props.on && 'b']}>{'x'}</div>
+	</>
 }
 
 // Scoped component with a nullish class — must render just the hash, never the literal
 // string "undefined" (the pre-normalization fixes the old `${undefined} <hash>` bug).
 export function ScopedNullish(props) @{
-	<div class={props.cls}>
-		{'x'}
+	<>
 		<style>
 			.z {
 				color: rgb(4, 5, 6);
 			}
 		</style>
-	</div>
+		<div class={props.cls}>{'x'}</div>
+	</>
 }

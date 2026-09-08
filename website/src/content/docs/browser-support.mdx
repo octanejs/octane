@@ -1,0 +1,127 @@
+---
+title: Browser support
+---
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">Choose the browsers you ship to</p>
+	<h1>Browser support</h1>
+	<p className="doc-lede">
+		{
+			'Know which browser features Octane needs, which ones have fallbacks, and what your build target can actually guarantee.'
+		}
+	</p>
+</div>
+
+This page covers Octane's core DOM renderer, hydration, server-function client,
+and first-party build integrations. Your application and its other dependencies
+may have additional requirements.
+
+<h2 id="support-policy">Support policy</h2>
+
+Octane targets current evergreen Chrome, Edge, Firefox, and Safari. For a new
+application, a useful starting point is the explicit target used by this
+website's playground runtime and by [Vite 8's default build target](https://vite.dev/config/build-options#build-target):
+
+| Browser               | Starting build target |
+| --------------------- | --------------------- |
+| Chrome / Chromium     | 111 or newer          |
+| Microsoft Edge        | 111 or newer          |
+| Firefox               | 114 or newer          |
+| Safari and iOS Safari | 16.4 or newer         |
+
+<h2 id="required-apis">Required browser APIs</h2>
+
+Octane uses modern JavaScript and DOM APIs directly. These are particularly
+important when choosing an older target:
+
+| API                                                                                                                                   | Where Octane uses it                                                                                                        | Native availability                       |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| [`Element.replaceChildren()`](https://developer.mozilla.org/en-US/docs/Web/API/Element/replaceChildren)                               | Hydration recovery, adopted DOM nodes, and explicitly clearing a behavior root. These calls have no compatibility fallback. | Chrome / Edge 86, Firefox 78, Safari 14   |
+| [`String.prototype.replaceAll()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replaceAll) | Shared style-property handling, including numeric object styles.                                                            | Chrome / Edge 85, Firefox 77, Safari 13.1 |
+| [`queueMicrotask()`](https://developer.mozilla.org/en-US/docs/Web/API/Window/queueMicrotask)                                          | Scheduling component updates and asynchronous work.                                                                         | Chrome 71, Firefox 69, Safari 12.1        |
+
+The ordinary DOM runtime also expects native DOM events, template elements,
+document fragments, `Map`, `Set`, `WeakMap`, `WeakSet`, `Symbol`, `Promise`, and
+standard modern object and array methods. The versions above come from
+[MDN's browser compatibility data](https://github.com/mdn/browser-compat-data).
+They put a **known lower bound** on the ordinary DOM path: Chromium / Edge 86,
+Firefox 78, and Safari 14 without polyfills. They do not establish that every
+Octane feature, dependency, or emitted bundle works at that bound.
+
+These requirements and fallbacks describe current Octane. Releases 0.1.9 through
+0.1.34 also called `Object.hasOwn()` in ordinary component capability checks.
+[Octane 0.1.35](https://github.com/octanejs/octane/blob/main/packages/octane/CHANGELOG.md#0135)
+removed that core dependency and added browser scheduling, observer, media-query,
+and mobile-input compatibility fixes. Check your installed version before
+applying this page to an older release.
+
+In particular, an older Chromium browser can successfully load a page and then
+fail when a later hydration or cleanup path calls `replaceChildren()`. Setting
+`build.target` to that browser does not create the missing DOM method. A passing
+test in a newer browser does not exercise the missing API either.
+
+<h2 id="feature-specific-apis">Feature-specific requirements</h2>
+
+Some core features need more than the ordinary DOM path:
+
+| Feature                                    | Requirement or limitation                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Function form actions                      | `FormData` and [`SubmitEvent.submitter`](https://developer.mozilla.org/en-US/docs/Web/API/SubmitEvent/submitter). The submitter selects a button's `formAction` and contributes its name/value. Full submitter support needs Safari 15.4; Safari 15–15.3 has a button limitation. Octane appends the submitter manually instead of requiring the newer two-argument `FormData` constructor.                                                                                  |
+| `module server` RPC                        | `fetch` and the core RPC serializer. The current `devalue` dependency uses [`Object.hasOwn()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/hasOwn), including for ordinary argument arrays: Chrome / Edge 93, Firefox 92, Safari 15.4, or a polyfill. Rich return values also need their constructors on the receiving browser; do not send newer values such as `Float16Array` or `Temporal` unless that browser supports them. |
+| Deferred hydration and behavior-only roots | `AbortController` for cancelable work and `MutationObserver` when watching streamed DOM. Preserving a custom abort reason additionally needs [`AbortSignal.reason`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/reason) and `abort(reason)` (Chrome / Edge 98, Firefox 97, Safari 15.4). Older implementations can cancel without preserving that reason.                                                                                                   |
+| Native HTML features                       | Octane forwards platform behavior. For example, [`inert`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/inert) needs native support (Chrome / Edge 102, Firefox 112, Safari 15.5) or an application-supplied polyfill.                                                                                                                                                                                                                                        |
+| Web-stream SSR                             | `ReadableStream` and `TextEncoder` are required in the environment running `renderToReadableStream`, normally the server. Ordinary browser hydration consumes HTML and does not itself require the browser to run that server API.                                                                                                                                                                                                                                           |
+
+See [Core APIs](/docs/core-apis) for the behavior of each feature. Recheck the
+requirements when upgrading Octane or changing the kinds of data sent through
+server functions.
+
+<h2 id="optional-features">Features with fallbacks</h2>
+
+These APIs improve behavior when available, but their absence does not by itself
+raise the ordinary rendering requirement:
+
+| API or feature                                 | Fallback                                                                                      |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `document.startViewTransition()`               | Rendering still updates the DOM without a browser view-transition animation.                  |
+| `Element.moveBefore()`                         | The reconciler uses ordinary DOM insertion when state-preserving moves are unavailable.       |
+| `requestIdleCallback()`                        | The `idle()` hydration strategy uses a timer.                                                 |
+| `IntersectionObserver`                         | The `visible()` hydration strategy activates immediately when observation is unavailable.     |
+| `MediaQueryList.addEventListener()`            | The `media()` strategy accepts legacy `addListener()`; `matchMedia()` itself is still needed. |
+| `MessageChannel` and `requestAnimationFrame()` | Scheduling has timer-based fallbacks.                                                         |
+
+Do not add all of these to an application-wide browser gate. Test whether a
+missing optional feature changes the experience you intend to provide.
+
+<h2 id="build-targets">Choose a build target</h2>
+
+The published core runtime is modern ESM; its package build targets `esnext`.
+The consuming application must lower JavaScript syntax for its own browsers.
+For a routed Vite or Rsbuild app, set the shared target explicitly:
+
+```ts
+// octane.config.ts
+export default {
+	build: {
+		target: ['chrome111', 'edge111', 'firefox114', 'safari16.4', 'ios16.4'],
+	},
+};
+```
+
+For a client-only Vite app, put the same `build.target` in `vite.config.ts`.
+With low-level Rspack, configure both the JavaScript transform and Rspack's
+generated runtime. See [Build tools](/docs/build-tools) for the integrations.
+
+Rsbuild's `modules` target maps to Chrome 87, Edge 88, Firefox 78, Safari / iOS
+14, and Samsung Internet 14. It is a syntax target, **not** a promise that form
+actions, RPC, native `inert`, or every application dependency works there.
+Explicit browser arrays work across the full Vite and Rsbuild integrations;
+Vite's `baseline-widely-available` shorthand is not an Octane-wide target name.
+
+Syntax transforms and API polyfills solve different problems. If your target
+lacks an API in the tables above, load an appropriate, maintained polyfill
+before importing the application, avoid the feature, or raise the target.
+Check the final production chunks, including dependencies and lazy-loaded code.
+Neither a successful build nor a JavaScript syntax target supplies missing DOM
+methods. [Rsbuild's compatibility guide](https://rsbuild.rs/guide/advanced/browser-compatibility)
+explains its separate syntax and polyfill settings.

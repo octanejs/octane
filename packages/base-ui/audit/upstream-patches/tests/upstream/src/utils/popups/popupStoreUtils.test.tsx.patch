@@ -1,0 +1,25 @@
+diff --git a/tests/upstream/src/utils/popups/popupStoreUtils.test.tsx b/tests/upstream/src/utils/popups/popupStoreUtils.test.tsx
+--- a/tests/upstream/src/utils/popups/popupStoreUtils.test.tsx
++++ b/tests/upstream/src/utils/popups/popupStoreUtils.test.tsx
+@@ -9,9 +9,9 @@ import {
+   applyPopupOpenChange,
+   createInitialPopupStoreState,
+   createPopupOpenState,
+-  PopupStoreContext,
+-  PopupStoreState,
+-  PopupStoreSelectors,
++  type PopupStoreContext,
++  type PopupStoreState,
++  type PopupStoreSelectors,
+   PopupTriggerMap,
+   popupStoreSelectors,
+   useImplicitActiveTrigger,
+@@ -42,7 +42,7 @@ function createStore() {
+     createInitialPopupStoreState(triggerElements),
+     {
+       triggerElements,
+-      popupRef: React.createRef<HTMLElement | null>(),
++      popupRef: ({current:null} as React.RefObject<HTMLElement | null | null>),
+       onOpenChangeComplete: undefined,
+     },
+     popupStoreSelectors,

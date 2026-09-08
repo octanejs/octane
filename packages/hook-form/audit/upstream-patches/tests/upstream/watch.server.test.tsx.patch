@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/watch.server.test.tsx b/tests/upstream/watch.server.test.tsx
+--- a/tests/upstream/watch.server.test.tsx
++++ b/tests/upstream/watch.server.test.tsx
+@@ -12,11 +12,11 @@ describe('Watch with SSR', () => {
+         <Watch
+           control={control}
+           names={['foo']}
+-          render={([foo]) => <span>{foo}</span>}
++          render={([foo]: [string]) => <span>{foo}</span>}
+         />
+       );
+     };
+ 
+-    expect(renderToString(<Component />)).toBe('<span>bar</span>');
++    expect(renderToStaticMarkup(Component).html).toBe('<span>bar</span>');
+   });
+ });

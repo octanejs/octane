@@ -66,22 +66,26 @@ export function ProviderChildrenDialectFlipWithSiblings() @{
 // A cleanup that throws while the Provider swaps dialects. The deletion happens mid-render rather
 // than through the normal unmount path, so this checks the teardown error still reaches the
 // enclosing boundary instead of being logged and swallowed.
-function ThrowingCleanup() @{
+type ThrowingCleanupProps = { failure?: Error; lifecycle?: string[] };
+
+function ThrowingCleanup(props: ThrowingCleanupProps = {}) @{
 	useLayoutEffect(() => {
+		props.lifecycle?.push('connect');
 		return () => {
-			throw new Error('cleanup-boom');
+			props.lifecycle?.push('cleanup');
+			throw props.failure ?? new Error('cleanup-boom');
 		};
 	}, []);
 	<span class="throwing" />
 }
 
-export function ProviderDialectFlipCleanupThrows() @{
+export function ProviderDialectFlipCleanupThrows(props: ThrowingCleanupProps = {}) @{
 	const [wrapped, setWrapped, getWrapped] = useState(false);
 	<div>
 		<button class="toggle" onClick={() => setWrapped(!getWrapped())}>toggle</button>
 		@try {
 			<DialectRoot wrapped={wrapped} value="ctx">
-				<ThrowingCleanup />
+				<ThrowingCleanup failure={props.failure} lifecycle={props.lifecycle} />
 			</DialectRoot>
 		} @catch (err) {
 			<span class="caught">{(err.message ?? String(err)) as string}</span>

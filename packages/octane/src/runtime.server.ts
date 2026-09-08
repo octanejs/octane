@@ -31,6 +31,9 @@ import {
 	FOR_BLOCK_OPEN_ITEMS,
 	EMPTY_COMMENT,
 	SUSPENSE_SCRIPT_ATTR,
+	SUSPENSE_RESOLVED_COMMENT,
+	SUSPENSE_RESOLVED_SEED_ATTR,
+	SUSPENSE_RESOLVED_NATIVE_ATTR,
 	SUSPENSE_SEED_WIRE_PREFIX,
 	REJECTION_SENTINEL_KEY,
 	EXTERNAL_HYDRATION_PROMISE,
@@ -87,7 +90,13 @@ import {
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
-import { devWarnStyleCoercion, devWarnStyleProperty, normalizeClass, styleName } from './css.js';
+import {
+	devWarnStyleCoercion,
+	devWarnStyleProperty,
+	mergeClass,
+	normalizeClass,
+	styleName,
+} from './css.js';
 import {
 	invalidHtmlNestingWithAncestor,
 	invalidHtmlNestingWithParent,
@@ -102,7 +111,21 @@ import {
 import { formatServerError } from './error-codes.server.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
 import { isRendererContext, registerServerRendererContextProvider } from './renderer-bridge.js';
+import {
+	validateNativeReadWitness,
+	type NativeReadWitness,
+} from './signals/native-read-collector.js';
+import { createNativeServerReadDriver } from './signals/native-read-server.js';
+import {
+	NATIVE_SIGNAL_SEED_ATTR,
+	NATIVE_SIGNAL_FRESH_COMMENT,
+	mergeNativeSeedReads,
+	type NativeSeedReads,
+	type NativeSignalManifest,
+} from './signals/native-read-seeds.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
+export { validateNativeReadWitness };
+export type { NativeSignalManifest };
 
 const NATIVE_ARRAY_MAP = Array.prototype.map;
 const NATIVE_REFLECT_APPLY = Reflect.apply;
@@ -181,7 +204,105 @@ type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
  */
 export type ServerEntryComponent = ServerComponent | ((props: any) => unknown);
 
+export type ServerRenderNode =
+	| ServerEntryComponent
+	| ElementDescriptor
+	| Iterable<unknown>
+	| PromiseLike<unknown>
+	| Context<unknown>
+	| string
+	| number
+	| bigint
+	| boolean
+	| null
+	| undefined;
+
 let CURRENT_SCOPE: SSRScope | null = null;
+// Server helpers use the same synchronous read/witness ABI without importing
+// the client renderer or attaching a subscription to any shared producer.
+let NATIVE_READ_COLLECTOR: ReturnType<typeof createNativeServerReadDriver> | null = null;
+let NATIVE_SERVER_PASS = -1;
+let NATIVE_SERVER_READS: NativeSeedReads | null = null;
+let NATIVE_SERVER_FAILURES = 0;
+let NATIVE_LOCAL_HOOK_DISPOSES: Array<() => void> | null = null;
+
+/** @internal Enable invocation collection before an opted-in module renders. */
+export function enableNativeReadCollection(abi = 1): void {
+	if (abi !== 1) throw new Error(formatServerError(58));
+	ensureNativeServerReadCollector();
+}
+
+/** @internal Compiler/runtime native-read capability version 1. */
+export function beginNativeReadScope(scope: SSRScope | undefined, abi = 1): number {
+	if (abi !== 1) throw new Error(formatServerError(58));
+	const owner = scope ?? CURRENT_SCOPE;
+	if (owner === null) return -1;
+	ensureNativeServerReadCollector();
+	return beginActiveNativeReadScope(owner);
+}
+
+// Internal invocation scopes must not retain the collector factory in ordinary
+// server entries. Late activation still needs the same pass/detached handling.
+function beginActiveNativeReadScope(owner: SSRScope): number {
+	const collector = NATIVE_READ_COLLECTOR!;
+	if (NATIVE_SERVER_PASS < 0 && !collector.isDetached()) NATIVE_SERVER_PASS = collector.beginPass();
+	return collector.beginScope(owner);
+}
+
+function ensureNativeServerReadCollector() {
+	return (NATIVE_READ_COLLECTOR ??= createNativeServerReadDriver(
+		(reads) => {
+			NATIVE_SERVER_READS = mergeNativeSeedReads(NATIVE_SERVER_READS, reads);
+		},
+		() => {
+			NATIVE_SERVER_FAILURES++;
+		},
+	));
+}
+
+function finishNativeSeedCapture(
+	token: number,
+	previous: NativeSeedReads | null,
+	merge: boolean,
+): NativeSeedReads | null {
+	if (token >= 0) return NATIVE_READ_COLLECTOR!.finishCapture(token, merge);
+	// The first native component may install its collector inside an otherwise
+	// ordinary boundary. Before installation no enclosing native scope exists,
+	// so the existing pass-local collection is the capture in that case.
+	const reads = NATIVE_SERVER_READS;
+	NATIVE_SERVER_READS = previous;
+	if (merge && reads !== null) NATIVE_SERVER_READS = NATIVE_READ_COLLECTOR!.merge(previous, reads);
+	return reads;
+}
+
+function appendNativeSeedReads(reads: NativeSeedReads | null): void {
+	if (reads !== null) NATIVE_READ_COLLECTOR!.append(reads);
+}
+
+/** @internal Native read context never survives an asynchronous server gap. */
+export function endNativeReadScope(token: number, completed: boolean): void {
+	if (token >= 0) NATIVE_READ_COLLECTOR!.endScope(token, completed);
+}
+
+/** @internal Shared automatic-cache witness ABI. */
+export function beginNativeReadWitness(detached = false): number {
+	return detached
+		? ensureNativeServerReadCollector().beginWitness(true)
+		: (NATIVE_READ_COLLECTOR?.beginWitness() ?? -1);
+}
+
+/** @internal Shared automatic-cache witness ABI. */
+export function finishNativeReadWitness(
+	token: number,
+	completed: boolean,
+): NativeReadWitness | null {
+	return token < 0 ? null : NATIVE_READ_COLLECTOR!.finishWitness(token, completed);
+}
+
+/** @internal Shared automatic-cache witness ABI. */
+export function replayNativeReadWitness(witness: NativeReadWitness | null | undefined): void {
+	NATIVE_READ_COLLECTOR?.replay(witness);
+}
 // Empty compiler batches register child-only warm plans for the synchronous
 // component call stack. A pending descendant batch activates the live plans;
 // invokeComponentBody checkpoints keep nested renders and retries isolated.
@@ -189,7 +310,11 @@ const ACTIVE_PU_WARM_PLANS: Array<() => void> = [];
 let CURRENT_PU_WARM_CLAIMS: Set<object> | null = null;
 let ID_COUNTER = 0;
 let ID_PREFIX = '';
-let CSS: Map<string, string> | null = null;
+interface InjectedStyle {
+	css: string;
+	nonce?: string;
+}
+let CSS: Map<string, InjectedStyle> | null = null;
 // Pre-escaped ` nonce="..."` fragment for renderer-owned inline tags emitted
 // during the active pass. Saved/restored with every other ambient so nested or
 // concurrent server renders cannot leak a CSP nonce across requests.
@@ -552,18 +677,23 @@ const PORTAL_TAG = Symbol.for('octane.portal');
 export const Fragment: unique symbol = Symbol.for('octane.Fragment');
 
 /**
- * React-19 `<Activity>` sentinel. Server-compiled template sites lower directly
- * to `ssrActivity`; this export keeps `import { Activity } from 'octane'`
- * resolvable after the server compiler retargets it to `octane/server`.
+ * React-19 `<Activity>` sentinel. Direct template sites lower to `ssrActivity`;
+ * generic component and descriptor sites dispatch by this same symbol identity.
+ * Its public type is component-shaped so aliases and JSX values type-check.
  */
-export const Activity: unique symbol = Symbol.for('octane.Activity');
+export const Activity = Symbol.for('octane.Activity') as unknown as (props: {
+	mode?: 'visible' | 'hidden';
+	children?: unknown;
+	name?: string;
+	key?: string | number | bigint | null | undefined;
+}) => unknown;
 
 interface ElementDescriptor {
 	$$kind: typeof ELEMENT_TAG;
 	// A server ComponentBody (component-value form, e.g. `{<Comp/>}`) OR a host tag
 	// string (`'li'`), produced when host JSX appears at a VALUE position (a
 	// `.map(...)` callback, a render-prop arrow body, an array literal).
-	type: ServerComponent | string | typeof Fragment;
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity;
 	props: any;
 	// React-style `key`, lifted out of props (consulted by the client's de-opt list
 	// path on hydration; the server only renders it into markup).
@@ -615,6 +745,47 @@ function finalizeElementDescriptor(descriptor: ElementDescriptor): ElementDescri
 	return descriptor;
 }
 
+function createNativeServerScopedResolver<T>(read: () => T): () => T {
+	let resolved = false;
+	let resolvedScope: SSRScope | null = null;
+	let resolvedWitness: NativeReadWitness | null | undefined;
+	let resolvedValue: T;
+	return (): T => {
+		const scope = CURRENT_SCOPE;
+		const token = beginNativeReadScope(undefined);
+		let completed = false;
+		try {
+			if (
+				!resolved ||
+				resolvedScope !== scope ||
+				(token >= 0 && resolvedWitness === undefined) ||
+				!validateNativeReadWitness(resolvedWitness)
+			) {
+				const witnessToken = beginNativeReadWitness();
+				let readCompleted = false;
+				let next: T;
+				let nextWitness: NativeReadWitness | null;
+				try {
+					next = read();
+					readCompleted = true;
+				} finally {
+					nextWitness = finishNativeReadWitness(witnessToken, readCompleted);
+				}
+				resolvedScope = scope;
+				resolvedWitness = token < 0 ? undefined : nextWitness;
+				resolvedValue = next;
+				resolved = true;
+			} else if (token >= 0) {
+				replayNativeReadWitness(resolvedWitness);
+			}
+			completed = true;
+			return resolvedValue;
+		} finally {
+			endNativeReadScope(token, completed);
+		}
+	};
+}
+
 /** Server twin of the compiler-only complete JSX-record deferral helper. */
 export function createScopedValue(readElement: () => ElementDescriptor): ElementDescriptor {
 	let resolved: ElementDescriptor | undefined;
@@ -629,7 +800,15 @@ export function createScopedValue(readElement: () => ElementDescriptor): Element
 		}
 		return resolved;
 	};
+	return scopedValueDescriptor(resolve);
+}
 
+/** @internal Native complete-record deferral with request-local evidence. */
+export function nativeCreateScopedValue(readElement: () => ElementDescriptor): ElementDescriptor {
+	return scopedValueDescriptor(createNativeServerScopedResolver(readElement));
+}
+
+function scopedValueDescriptor(resolve: () => ElementDescriptor): ElementDescriptor {
 	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		get type() {
@@ -654,7 +833,7 @@ export function createScopedValue(readElement: () => ElementDescriptor): Element
 
 /** Server twin of the compiler-only scope-preserving JSX descriptor factory. */
 export function createScopedElement(
-	type: ServerComponent | string | typeof Fragment,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
 ): ElementDescriptor {
@@ -676,6 +855,33 @@ export function createScopedElement(
 		}
 		return resolvedChildren;
 	};
+	return scopedElementDescriptor(type, copiedProps, key, children);
+}
+
+/** @internal Native child deferral with evidence on every resolving scope. */
+export function nativeCreateScopedElement(
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
+	props: any,
+	readChildren: () => unknown,
+): ElementDescriptor {
+	const src = (props ?? null) as any;
+	const key = hasElementConfigKey(src) ? '' + src.key : null;
+	const copiedProps = copyElementConfig(src);
+	applyElementDefaultProps(type, copiedProps);
+	return scopedElementDescriptor(
+		type,
+		copiedProps,
+		key,
+		createNativeServerScopedResolver(readChildren),
+	);
+}
+
+function scopedElementDescriptor(
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
+	copiedProps: any,
+	key: string | null,
+	children: () => unknown,
+): ElementDescriptor {
 	const childProperty = { configurable: true, enumerable: true, get: children };
 	Object.defineProperty(copiedProps, 'children', childProperty);
 	SCOPED_ELEMENT_PROPS.add(copiedProps);
@@ -697,7 +903,7 @@ export function createScopedElement(
 // literal) to this call in BOTH modes, so the same lowered call resolves to the
 // client-or-server `createElement` per build, and `ssrChild` renders the result.
 export function createElement(
-	type: ServerComponent | string | typeof Fragment,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
@@ -766,10 +972,10 @@ function fragmentRefDescriptor(value: ElementDescriptor): ElementDescriptor {
 
 /** Retain the exact range adopted by the client without attaching its ref. */
 function renderFragmentRefDescriptor(descriptor: ElementDescriptor, scope: SSRScope): string {
-	return (
+	return ssrHtml(
 		ssrFragmentMarker(true, descriptor.ref) +
-		ssrChild(descriptor.children, scope) +
-		ssrFragmentMarker(false)
+			ssrChild(descriptor.children, scope) +
+			ssrFragmentMarker(false),
 	);
 }
 
@@ -1186,7 +1392,8 @@ export const Children = {
 // PORTAL_TAG descriptor shape; `ssrChild` renders it as a bare site anchor
 // (portal content mounts into its client-side container on hydration).
 export function createPortal(body: unknown, target: unknown, props: any = undefined): unknown {
-	return { $$kind: PORTAL_TAG, body, target, props };
+	const key = typeof props === 'string' || typeof props === 'number' ? String(props) : null;
+	return { $$kind: PORTAL_TAG, body, target, key, props: key === null ? props : undefined };
 }
 
 // ---------------------------------------------------------------------------
@@ -1199,6 +1406,33 @@ export function createPortal(body: unknown, target: unknown, props: any = undefi
 // measured faster than an exec-loop or replace-with-callback single pass on V8
 // for both sparse and dense escape densities.
 const HTML_ESCAPE_RE = /[&<>]/g;
+
+// A primitive component return is user text. Only compiler-owned HTML may
+// bypass escaping; carrying the proof with the value also preserves it through
+// ordinary wrappers that call another component directly.
+const SERVER_HTML = Symbol.for('octane.serverHtml');
+class ServerHtml {
+	readonly [SERVER_HTML]: string;
+	constructor(html: string) {
+		this[SERVER_HTML] = html;
+	}
+	toString(): string {
+		return this[SERVER_HTML];
+	}
+}
+
+/** @internal Brand the final serialized output of a compiled server body. */
+export function ssrHtml(html: string): string {
+	return typeof html === 'string' ? (new ServerHtml(html) as unknown as string) : html;
+}
+
+function serverComponentOutput(out: unknown, scope: SSRScope): string {
+	if (out == null) return '';
+	if (typeof out === 'string') return escapeHtml(out);
+	if (typeof out === 'object' && SERVER_HTML in out) return (out as ServerHtml)[SERVER_HTML];
+	return ssrChild(out, scope);
+}
+
 export function escapeHtml(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
 	HTML_ESCAPE_RE.lastIndex = 0;
@@ -1248,18 +1482,21 @@ export function ssrTextPre(v: unknown): string {
 	return s.charCodeAt(0) === 10 ? '\n' + s : s;
 }
 
-// Render a COMPONENT `ElementDescriptor` (`d.type` is a function) via ssrComponent,
-// threading positional `d.children` through as `props.children` (don't drop them).
-// `createElement` already mirrors positional children into `props.children`, so for
-// its descriptors the spread is a no-op copy — it stays as a defensive guard for
-// hand-rolled descriptors whose props/children were never reconciled.
+// Preserve omitted children as omitted: wrappers can merge these props over a
+// separate children source. Scoped children must remain lazy. createElement
+// already mirrors positional children into props, so only legacy descriptors
+// with a distinct non-null children field need a repaired props object.
 function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
 	if (SCOPED_ELEMENT_PROPS.has(d.props)) {
 		return ssrComponent(scope, d.type as ServerComponent, d.props);
 	}
+	const children = d.children;
+	if (children == null || children === d.props?.children) {
+		return ssrComponent(scope, d.type as ServerComponent, d.props);
+	}
 	return ssrComponent(scope, d.type as ServerComponent, {
 		...d.props,
-		children: d.children ?? d.props?.children,
+		children,
 	});
 }
 
@@ -1281,6 +1518,9 @@ function ssrChildValue(
 	includeKeyedSingle: boolean,
 	selfMarkItem: boolean = false,
 ): string {
+	if (v !== null && typeof v === 'object' && SERVER_HTML in v) {
+		return (v as ServerHtml)[SERVER_HTML];
+	}
 	// Every renderable hole serializes to ONE `<!--[-->…<!--]-->` range so the
 	// client's childSlot adopts a uniform marker pair on hydration regardless of
 	// whether the value is a component, an element, a primitive, or empty — and
@@ -1370,6 +1610,18 @@ export function ssrChildText(v: unknown, scope: SSRScope): string {
 	if (v == null || v === false || v === true) return '';
 	if (typeof v === 'object' || typeof v === 'function') return ssrChild(v, scope);
 	return escapeHtml(v);
+}
+
+/** @internal First-child renderable hole in a newline-eating HTML element. */
+export function ssrChildTextPre(v: unknown, scope: SSRScope): string {
+	const content = ssrChildText(v, scope);
+	return content.charCodeAt(0) === 10 ? '\n' + content : content;
+}
+
+/** @internal First renderable child when static output has no shielding markers. */
+export function ssrChildPre(v: unknown, scope: SSRScope): string {
+	const content = ssrChild(v, scope);
+	return content.charCodeAt(0) === 10 ? '\n' + content : content;
 }
 
 // Serialize a HOST element descriptor (`createElement('span', props, ...children)`)
@@ -1506,9 +1758,13 @@ function ssrHostElement(
 			// descriptor therefore needs the same whole-body serializer as the direct
 			// template path. Join primitive arrays before escaping so a breakout token
 			// split across adjacent children cannot evade the boundary guard.
-			const scriptText = semanticTag === 'script' ? scriptDescriptorText(children) : null;
-			if (scriptText !== null) {
-				inner = escapeEntireInlineScriptContent(scriptText);
+			const rawText =
+				semanticTag === 'script' || semanticTag === 'style' ? scriptDescriptorText(children) : null;
+			if (rawText !== null) {
+				inner =
+					semanticTag === 'script'
+						? escapeEntireInlineScriptContent(rawText)
+						: escapeEntireInlineStyleContent(rawText);
 			} else {
 				// A de-opt host whose children contain COMPONENTS renders those children on the
 				// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
@@ -1540,6 +1796,12 @@ function ssrHostElement(
 				attrs,
 				inner,
 			);
+		}
+		if (
+			(semanticTag === 'pre' || semanticTag === 'textarea' || semanticTag === 'listing') &&
+			inner.charCodeAt(0) === 10
+		) {
+			inner = '\n' + inner;
 		}
 		return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
 	} finally {
@@ -1587,6 +1849,7 @@ function ssrDeoptBlockChildren(children: unknown, scope: SSRScope): string {
 // through the block-bearing `ssrChild` path rather than plain markup).
 function serverDescNeedsBlocks(v: unknown): boolean {
 	if (v == null || typeof v !== 'object') return false;
+	if ((v as any).$$kind === CONTEXT_TAG || typeof (v as any).then === 'function') return true;
 	// Arrays are the ordinary descriptor-children container. Inspect their
 	// descendants before the generic iterable check below; treating every array
 	// as an opaque iterable forces pure host/text trees onto the block path and
@@ -1601,9 +1864,9 @@ function serverDescNeedsBlocks(v: unknown): boolean {
 	if (!isElementDescriptor(v) && childrenIterator(v) !== null) return true;
 	const d = v as ElementDescriptor;
 	if (d.$$kind === ELEMENT_TAG) {
-		// A Fragment below a host descriptor is reconciled by childSlot's
-		// fragment-aware list path, including when all of its leaves are pure hosts.
-		if (d.type === Fragment) return true;
+		// Fragment and Activity descriptors own reconcilable boundaries even when
+		// all of their descendants are pure hosts/text.
+		if (d.type === Fragment || d.type === Activity) return true;
 		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
 	}
 	return false;
@@ -1664,6 +1927,7 @@ function ssrDeoptItemContent(value: unknown, scope: SSRScope): string {
 // boundary even inside de-opt markup), primitives coerce to escaped text.
 function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
 	if (v == null || v === false || v === true || v === '') return '';
+	if (typeof v === 'object' && SERVER_HTML in v) return (v as ServerHtml)[SERVER_HTML];
 	if (Array.isArray(v)) {
 		let out = '';
 		for (let i = 0; i < v.length; i++) out += ssrDescriptorContent(v[i], scope);
@@ -1691,7 +1955,7 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  * protocol (shared constants in ./constants).
  */
 export function ssrBlock(content: string): string {
-	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : content;
+	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : String(content);
 }
 
 /**
@@ -1715,6 +1979,16 @@ export function ssrActivity(mode: string, render: () => string): string {
 	return ssrBlock(mode === 'hidden' ? '' : render());
 }
 
+/** Cold twin of the client's generic Activity body and its ordinary child slot. */
+function renderActivityDescriptor(
+	props: { mode?: 'visible' | 'hidden'; children?: unknown },
+	scope: SSRScope,
+): string {
+	// Keep the accessor inside the visibility branch: scoped JSX children may
+	// start data work or throw, and hidden server Activities must evaluate neither.
+	return ssrHtml(ssrActivity(props.mode ?? 'visible', () => ssrChild(props.children, scope)));
+}
+
 /**
  * Wrap an @for in its single outer pair and encode which arm the server chose.
  * Markerless direct-host items make populated content indistinguishable from a
@@ -1724,7 +1998,7 @@ export function ssrActivity(mode: string, render: () => string): string {
 export function ssrForBlock(content: string, hasItems: boolean): string {
 	return MARKERS
 		? (hasItems ? FOR_BLOCK_OPEN_ITEMS : FOR_BLOCK_OPEN_EMPTY) + content + BLOCK_CLOSE
-		: content;
+		: String(content);
 }
 
 // URI encoders reject lone UTF-16 surrogates, while UTF-8 encoders generally
@@ -2026,11 +2300,13 @@ export function ssrAttr(
 	// `aria-*` attributes are ENUMERATED (React parity): `false` serialises as "false"
 	// and `true` as "true"; only null/undefined drops them.
 	if (name.charCodeAt(0) === 97 /* a */ && name.startsWith('aria-')) {
-		if (v == null) return '';
+		if (v == null || typeof v === 'function' || typeof v === 'symbol') return '';
 		return ' ' + name + '="' + escapeAttr(String(v)) + '"';
 	}
 	// React-only warning-suppression hints never serialize (client parity).
 	if (
+		name === 'innerText' ||
+		name === 'textContent' ||
 		name === 'suppressContentEditableWarning' ||
 		name === 'suppressHydrationWarning' ||
 		name === 'suppressNativeChangeWarning' ||
@@ -2135,6 +2411,7 @@ export function ssrAttr(
 			return '';
 		}
 		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && !(Number(v) >= 1)) return '';
+		if ((lower === 'rowspan' || lower === 'start') && Number.isNaN(Number(v))) return '';
 	}
 	if (v == null || v === false) return '';
 	// A plain object has no useful attribute representation. Objects with an
@@ -2270,7 +2547,12 @@ function ssrAttrEntry(
 	return '';
 }
 
-type SsrAttributeSource = readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown];
+type SsrAttributeSource = readonly [
+	isSpread: boolean,
+	sourceOrName: unknown,
+	value?: unknown,
+	merge?: boolean,
+];
 
 function normalizeSsrAttributeName(
 	name: string,
@@ -2300,6 +2582,10 @@ function isAggregatedFormAttribute(tag: string | undefined, name: string): boole
  * writes of the same JSX prop retain its first insertion position like
  * Object.assign. Distinct aliases that target one native attr still choose the
  * latest authored writer and retain that winning prop's insertion position.
+ *
+ * A synthesized scope-hash class (4th tuple flag) composes onto the winning
+ * class identity after that last-writer fold, matching the client so a spread
+ * `class` is not replaced by the hash alone.
  */
 export function ssrAttrs(
 	sources: readonly SsrAttributeSource[],
@@ -2315,8 +2601,9 @@ export function ssrAttrs(
 		lastOrder: number;
 	}
 	const props = new Map<string, PropWriter>();
+	let classMerges: Array<{ rawName: string; value: unknown; order: number }> | null = null;
 	let sourceOrder = 0;
-	const record = (rawName: unknown, value: unknown): void => {
+	function record(rawName: unknown, value: unknown): void {
 		if (typeof rawName !== 'string') return;
 		const order = sourceOrder++;
 		const previous = props.get(rawName);
@@ -2326,10 +2613,22 @@ export function ssrAttrs(
 			firstOrder: previous?.firstOrder ?? order,
 			lastOrder: order,
 		});
-	};
+	}
 
-	for (const [isSpread, sourceOrName, directValue] of sources) {
+	for (const [isSpread, sourceOrName, directValue, merge] of sources) {
 		if (!isSpread) {
+			if (
+				merge === true &&
+				typeof sourceOrName === 'string' &&
+				(sourceOrName === 'class' || sourceOrName === 'className')
+			) {
+				(classMerges ??= []).push({
+					rawName: sourceOrName,
+					value: directValue,
+					order: sourceOrder++,
+				});
+				continue;
+			}
 			record(sourceOrName, directValue);
 			continue;
 		}
@@ -2342,10 +2641,38 @@ export function ssrAttrs(
 		}
 	}
 
+	if (process.env.NODE_ENV === 'production' && classMerges === null) {
+		let canonical = true;
+		for (const name of props.keys()) {
+			if (
+				normalizeSsrAttributeName(name, tag, namespace) !== name ||
+				(namespace === 'html' && name.toLowerCase() !== name)
+			) {
+				canonical = false;
+				break;
+			}
+		}
+		// Canonical names cannot alias another raw writer. After all source reads,
+		// the original Map already holds their final values in insertion order.
+		if (canonical) {
+			let out = '';
+			for (const { rawName, value } of props.values()) {
+				if (
+					rawName === 'dangerouslySetInnerHTML' ||
+					(skipFormControls && isAggregatedFormAttribute(tag, rawName))
+				)
+					continue;
+				out += ssrAttrEntry(rawName, value, tag, namespace);
+			}
+			return out;
+		}
+	}
+
 	const resolved = new Map<
 		string,
 		readonly [name: string, value: unknown, firstOrder: number, lastOrder: number]
 	>();
+	let needsWinningOrderSort = false;
 	for (const writer of props.values()) {
 		const { rawName, value, firstOrder, lastOrder } = writer;
 		if (
@@ -2370,20 +2697,43 @@ export function ssrAttrs(
 		// SVG/MathML retain their case-sensitive qualified names.
 		const identity = namespace === 'html' ? name.toLowerCase() : name;
 		const previous = resolved.get(identity);
-		if (previous === undefined || previous[3] < lastOrder) {
-			resolved.set(identity, [
-				process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
-					? rawName
-					: name,
-				value,
-				firstOrder,
-				lastOrder,
-			]);
+		if (previous !== undefined) {
+			if (previous[3] >= lastOrder) continue;
+			// Map order already matches firstOrder unless a later raw alias replaces
+			// an earlier normalized identity without moving its Map entry.
+			needsWinningOrderSort = true;
+		}
+		resolved.set(identity, [
+			process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
+				? rawName
+				: name,
+			value,
+			firstOrder,
+			lastOrder,
+		]);
+	}
+	if (classMerges !== null) {
+		for (const extra of classMerges) {
+			const name = normalizeSsrAttributeName(extra.rawName, tag, namespace);
+			if (!VALID_ATTR_NAME.test(name)) continue;
+			const identity = namespace === 'html' ? name.toLowerCase() : name;
+			const previous = resolved.get(identity);
+			if (previous !== undefined) {
+				resolved.set(identity, [
+					previous[0],
+					mergeClass(previous[1], extra.value),
+					previous[2],
+					extra.order,
+				]);
+				continue;
+			}
+			resolved.set(identity, [name, extra.value, extra.order, extra.order]);
 		}
 	}
 
 	let out = '';
-	const ordered = [...resolved.values()].sort((a, b) => a[2] - b[2]);
+	const ordered = [...resolved.values()];
+	if (needsWinningOrderSort) ordered.sort((a, b) => a[2] - b[2]);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrAriaProps(
 			ordered.map(([name]) => name),
@@ -2708,7 +3058,7 @@ export function ssrFormAuthoringDiagnostics(
  * (the generic ssrAttr would DROP a false boolean); only nullish omits.
  */
 export function ssrValueAttr(v: unknown): string {
-	if (v == null) return '';
+	if (v == null || typeof v === 'function' || typeof v === 'symbol') return '';
 	return ' value="' + escapeAttr(typeof v === 'string' ? v : String(v)) + '"';
 }
 
@@ -3016,7 +3366,10 @@ interface MemoHookRec {
 interface RefHookRec {
 	ref: { current: unknown };
 }
-type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec;
+interface NativeLocalHookRec {
+	nativeValue: unknown;
+}
+type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec | NativeLocalHookRec;
 type ServerHookSlot = symbol | string | number;
 
 // Server twin of the client helper/custom-hook ABI. Modules reserve a range
@@ -3100,6 +3453,24 @@ function hookPosition(slot: unknown): {
 	let list = hp.hooks.get(key);
 	if (list === undefined) hp.hooks.set(key, (list = []));
 	return { hp, list, index };
+}
+
+/** @internal Server local hooks live only for this synchronous rendering pass. */
+export function nativeLocalHook<T>(
+	name: string,
+	initialize: () => T,
+	dispose: (value: T) => void,
+	slot?: ServerHookSlot,
+): T {
+	if (CURRENT_SCOPE === null || HOOK_PASS === null) throw new Error(formatServerError(59, name));
+	const { list, index } = hookPosition(slot)!;
+	let record = list[index] as NativeLocalHookRec | undefined;
+	if (record === undefined) {
+		const value = initialize();
+		list[index] = record = { nativeValue: value };
+		(NATIVE_LOCAL_HOOK_DISPOSES ??= []).push(() => dispose(value));
+	}
+	return record.nativeValue as T;
 }
 
 // The shared useState/useReducer server cell. Getter-free hooks keep Fizz's lean
@@ -3197,6 +3568,11 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 	const stream = STREAM;
 	return {
 		id: ID_COUNTER,
+		native: NATIVE_READ_COLLECTOR?.checkpoint() ?? null,
+		nativeReads: NATIVE_SERVER_READS,
+		nativeReadCount: NATIVE_SERVER_READS?.reads.size ?? 0,
+		nativeMixed: NATIVE_SERVER_READS?.mixed ?? false,
+		nativeFailures: NATIVE_SERVER_FAILURES,
 		css,
 		cssEntries: css === null ? null : new Map(css),
 		head,
@@ -3224,27 +3600,9 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		streamNextId: stream?.nextId ?? 0,
 		streamActiveTryKeys: stream?.activeTryKeys.slice() ?? [],
 		streamActiveOwnerKeys: stream?.activeOwnerKeys.slice() ?? [],
-		streamPassBoundaryKeys:
-			stream?.activePassBoundaryKeys === null || stream?.activePassBoundaryKeys === undefined
-				? null
-				: new Set(stream.activePassBoundaryKeys),
+		streamPassBoundaryCount: stream?.activePassBoundaryKeys?.size ?? 0,
 		asyncScope: ASYNC_SCOPE,
-		streamBoundaries:
-			stream === null
-				? null
-				: Array.from(stream.boundaries, ([key, entry]) => ({
-						key,
-						entry,
-						id: entry.id,
-						order: entry.order,
-						state: entry.state,
-						html: entry.html,
-						seeds: entry.seeds.slice(),
-						pendingIdOffset: entry.pendingIdOffset,
-						ancestors: entry.ancestors.slice(),
-						owners: entry.owners.slice(),
-						namespace: entry.namespace,
-					})),
+		streamReplayCheckpoint: stream?.replay?.length ?? 0,
 		frameDeferred: frame?.deferred ?? false,
 		frameNextChild: frame?.nextChild ?? 0,
 		frameScopedChildren:
@@ -3261,6 +3619,14 @@ function rewindComponentReplayState(
 	frame: Frame | null,
 ): void {
 	ID_COUNTER = snapshot.id;
+	if (snapshot.native !== null) NATIVE_READ_COLLECTOR!.rewind(snapshot.native);
+	NATIVE_SERVER_READS = snapshot.nativeReads;
+	NATIVE_READ_COLLECTOR?.rewindReads(
+		NATIVE_SERVER_READS,
+		snapshot.nativeReadCount,
+		snapshot.nativeMixed,
+	);
+	NATIVE_SERVER_FAILURES = snapshot.nativeFailures;
 	ASYNC_SCOPE = snapshot.asyncScope;
 	if (snapshot.css !== null && snapshot.cssEntries !== null) {
 		snapshot.css.clear();
@@ -3304,30 +3670,21 @@ function rewindComponentReplayState(
 		VT_SSR_STACK.push(entry.candidate);
 	}
 	const stream = snapshot.stream;
-	if (stream !== null && snapshot.streamBoundaries !== null) {
+	if (stream !== null) {
 		stream.nextId = snapshot.streamNextId;
-		if (stream.activePassBoundaryKeys !== null && snapshot.streamPassBoundaryKeys !== null) {
-			stream.activePassBoundaryKeys.clear();
-			for (const key of snapshot.streamPassBoundaryKeys) stream.activePassBoundaryKeys.add(key);
+		if (stream.activePassBoundaryKeys !== null) {
+			// Discovery only appends during a pass. Trim the discarded suffix on
+			// the rare retry instead of copying the growing set for every component.
+			let index = 0;
+			for (const key of stream.activePassBoundaryKeys) {
+				if (index++ >= snapshot.streamPassBoundaryCount) stream.activePassBoundaryKeys.delete(key);
+			}
 		}
 		stream.activeTryKeys.length = 0;
 		stream.activeTryKeys.push(...snapshot.streamActiveTryKeys);
 		stream.activeOwnerKeys.length = 0;
 		stream.activeOwnerKeys.push(...snapshot.streamActiveOwnerKeys);
-		stream.boundaries.clear();
-		for (const saved of snapshot.streamBoundaries) {
-			const entry = saved.entry;
-			entry.id = saved.id;
-			entry.order = saved.order;
-			entry.state = saved.state;
-			entry.html = saved.html;
-			entry.seeds = saved.seeds.slice();
-			entry.pendingIdOffset = saved.pendingIdOffset;
-			entry.ancestors = saved.ancestors.slice();
-			entry.owners = saved.owners.slice();
-			entry.namespace = saved.namespace;
-			stream.boundaries.set(saved.key, entry);
-		}
+		rewindStreamBoundaryReplay(stream, snapshot.streamReplayCheckpoint);
 	}
 	scope.$$ctxValues = snapshot.context;
 	if (frame !== null) {
@@ -3389,6 +3746,8 @@ function invokeComponentBody(
 			out = replayUpdatedComponentBody(comp, props, scope, frame, hp, snapshot, warmPlanCheckpoint);
 		}
 		return out;
+	} catch (error) {
+		throw normalizeThrownServerThenable(error);
 	} finally {
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		HOOK_PASS = prevHP;
@@ -3425,6 +3784,8 @@ function renderComponentFramed(
 	CURRENT_PROPS = props;
 	CURRENT_PARENT_SCOPE = parentScope;
 	ASYNC_SCOPE = frame.asyncScope;
+	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(scope);
+	let nativeCompleted = false;
 	try {
 		// The compiled body normally returns its HTML string, but a component that
 		// early-returns non-template JSX (the de-opt path — e.g. a `.tsx` `if (…)
@@ -3462,15 +3823,19 @@ function renderComponentFramed(
 			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 			HOOK_PASS = previousHookPass;
 		}
-		const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, scope);
+		const inner = serverComponentOutput(out, scope);
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
 		// become the slot's start/end markers, exactly like control-flow blocks).
 		// `renderToStaticMarkup` sets MARKERS=false — no hydration, so no markers.
 		// An inherit-range site (M3) skips the wrap: the parent's own pair bounds
 		// this output, and the client borrows it instead of adopting.
+		nativeCompleted = true;
 		return MARKERS && !inherit ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
+	} catch (error) {
+		throw normalizeThrownServerThenable(error);
 	} finally {
+		if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativeCompleted);
 		CURRENT_SCOPE = prevScope;
 		FRAME = prevFrame;
 		CURRENT_COMP = prevComp;
@@ -3489,12 +3854,21 @@ function renderComponentFramed(
  */
 export function ssrComponent(
 	parent: SSRScope,
-	comp: ServerComponent | string,
+	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	inherit?: boolean,
 	key?: unknown,
 	identityScoped?: boolean,
 ): string {
+	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
+	// original identity for async keys, then use the stable cold body below. A
+	// spread-only key has not been split into the compiler's explicit key argument.
+	// Unlike the client cold registration, SSR must also accept a public
+	// `octane` Activity descriptor when this server export was tree-shaken away.
+	// The shared Symbol.for identity keeps that mixed-entry path working; retaining
+	// this small string-rendering wrapper does not retain the client Activity engine.
+	const activity = comp === Activity;
+	if (activity && key === undefined) key = props?.key;
 	// Component recursion is one of SSR's hottest and deepest paths. Install the
 	// same async-identity membrane inline instead of recursing back through
 	// ssrComponent from two wrapper callbacks. Besides avoiding callback overhead,
@@ -3508,6 +3882,12 @@ export function ssrComponent(
 	try {
 		const explicitNamespace = NEXT_COMPONENT_NAMESPACE;
 		NEXT_COMPONENT_NAMESPACE = null;
+		if (activity) {
+			comp = renderActivityDescriptor;
+			// The generic component and inner Activity both own hydratable ranges.
+			// This mirrors the client even for a sole-root dynamic Activity tag.
+			inherit = false;
+		}
 		// Boundary builtins decline inherit through their component capability bit —
 		// mirrors componentSlot's
 		// client-side decline exactly (member/aliased/dynamic tags resolving to
@@ -3526,9 +3906,10 @@ export function ssrComponent(
 		// value-position call site (ssrHostElement's content path handles those), or
 		// a render FUNCTION from a template one.
 		if (typeof comp === 'string') {
+			const tag = comp;
 			const inheritedNamespace = explicitNamespace ?? FRAME?.namespace ?? 'html';
 			const childNamespace = parserNamespacesForTag(
-				comp.toLowerCase(),
+				tag.toLowerCase(),
 				inheritedNamespace,
 			).childrenNamespace;
 			return ssrInNamespace(childNamespace, () => {
@@ -3545,11 +3926,11 @@ export function ssrComponent(
 					// string) returns a descriptor, not HTML — normalize via ssrChild, exactly
 					// like renderComponentFramed normalizes a de-opt body's return.
 					const out = (kids as any)(undefined, parent);
-					const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, parent);
-					const html = ssrHostElement(comp, props, null, parent, inner);
+					const inner = serverComponentOutput(out, parent);
+					const html = ssrHostElement(tag, props, null, parent, inner);
 					return inherit ? html : ssrBlock(html);
 				}
-				const html = ssrHostElement(comp, props, kids, parent);
+				const html = ssrHostElement(tag, props, kids, parent);
 				return inherit ? html : ssrBlock(html);
 			});
 		}
@@ -3586,7 +3967,7 @@ export function ssrComponent(
 		// namespace through arbitrary wrapper chains; an explicitly compiled host
 		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the
 		// next component frame through ssrComponentNS.
-		return renderComponentFramed(comp, props, parent, frame, inherit);
+		return renderComponentFramed(comp as ServerComponent, props, parent, frame, inherit);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
 	}
@@ -3597,7 +3978,7 @@ let NEXT_COMPONENT_NAMESPACE: 'html' | 'svg' | 'mathml' | null = null;
 /** Compiler ABI for a component call whose output is parsed in foreign content. */
 export function ssrComponentNS(
 	parent: SSRScope,
-	comp: ServerComponent | string,
+	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	namespace: 'html' | 'svg' | 'mathml',
 	inherit?: boolean,
@@ -3632,7 +4013,8 @@ export function ssrInNamespace(namespace: 'html' | 'svg' | 'mathml', render: () 
 // the client `childrenAsBody`, so the JSX `<Suspense>`/`<ErrorBoundary>` built-ins
 // render their children whichever dialect authored the parent.
 function ssrChildrenHtml(children: unknown, scope: SSRScope): string {
-	if (typeof children === 'function') return (children as any)(undefined, scope) ?? '';
+	if (typeof children === 'function')
+		return serverComponentOutput(children(undefined, scope), scope);
 	return ssrChild(children, scope);
 }
 
@@ -3674,6 +4056,7 @@ function ssrHydrateAttrs(
 			name === HYDRATE_ID_COUNT_ATTR ||
 			name === HYDRATE_STREAM_TOKEN_ATTR ||
 			name === HYDRATE_SEED_ATTR ||
+			name === NATIVE_SIGNAL_SEED_ATTR ||
 			!VALID_ATTR_NAME.test(name)
 		)
 			continue;
@@ -3700,12 +4083,16 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 		// reserved by the client-side paired private range marker.
 		useId();
 		const inheritedPermanentStatic = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
+		const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+		const previousNativeReads = NATIVE_SERVER_READS;
+		if (nativeCapture < 0) NATIVE_SERVER_READS = null;
 		PERMANENT_STATIC_HYDRATE_DEPTH++;
 		try {
 			// The outer static range already erases this client subtree and reserves
 			// all descendant IDs. Collapse nested exact boundaries to their authored
 			// children instead of leaving orphaned private sidecars.
-			if (inheritedPermanentStatic || !MARKERS) return ssrChildrenHtml(props.children, scope);
+			if (inheritedPermanentStatic || !MARKERS)
+				return ssrHtml(ssrChildrenHtml(props.children, scope));
 			const childIdStart = ID_COUNTER;
 			const serialStart = SERIAL?.length ?? 0;
 			const children = ssrBlock(
@@ -3722,12 +4109,15 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 			const streamToken = streamTokenForPendingHtml(children);
 			const markerToken = streamToken === null ? '' : streamToken + ':';
 			const endToken = streamToken === null ? '' : ':' + streamToken;
-			return (
+			return ssrHtml(
 				`<!--${HYDRATE_STATIC_ID_COUNT_PREFIX}${markerToken}${idCount}-->` +
-				children +
-				`<!--${HYDRATE_STATIC_END}${endToken}-->`
+					children +
+					`<!--${HYDRATE_STATIC_END}${endToken}-->`,
 			);
 		} finally {
+			// The compiler erases this client subtree. Its data cannot be borrowed
+			// by a hydratable sibling that happens to use the same scope key.
+			finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 			PERMANENT_STATIC_HYDRATE_DEPTH--;
 		}
 	},
@@ -3742,58 +4132,74 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 		// SSR children and attribute semantics instead of inheriting SVG/MathML from
 		// the call site. Direct placement in foreign content remains unsupported: an
 		// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
-		return withSsrElementContext(
-			'div',
-			undefined,
-			() =>
-				ssrInNamespace('html', () => {
-					if (!MARKERS) {
-						return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
-					}
+		return ssrHtml(
+			withSsrElementContext(
+				'div',
+				undefined,
+				() =>
+					ssrInNamespace('html', () => {
+						if (!MARKERS) {
+							return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
+						}
 
-					const childIdStart = ID_COUNTER;
-					const serialStart = SERIAL?.length ?? 0;
-					// The outer range belongs to Hydrate itself. ssrTry supplies the nested
-					// Suspense slot/content ranges and makes a suspending child a real stream
-					// boundary. `fallback` remains client-only, so the server pending arm is
-					// intentionally empty.
-					const children = ssrBlock(
-						ssrTry(
-							scope,
-							'jsx-hydrate',
-							(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
-							null,
-							null,
-							'html',
-						),
-					);
-					const idCount = ID_COUNTER - childIdStart;
-					const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
-					const permanentStaticAncestor = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
-					const attrs = ssrHydrateAttrs(
-						id,
-						props.when,
-						idCount,
-						permanentStaticAncestor,
-						streamTokenForPendingHtml(children),
-					);
-					const seedJson =
-						permanentStaticAncestor || childSeeds.length === 0
-							? null
-							: serializeSuspenseSeedJson(childSeeds);
-					const seedSidecar =
-						seedJson === null || seedJson === '[]'
-							? ''
-							: '<script type="application/json" ' +
-								HYDRATE_SEED_ATTR +
-								NONCE_ATTR +
-								'>' +
-								seedJson +
-								'</script>';
+						const childIdStart = ID_COUNTER;
+						const serialStart = SERIAL?.length ?? 0;
+						const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+						const previousNativeReads = NATIVE_SERVER_READS;
+						if (nativeCapture < 0) NATIVE_SERVER_READS = null;
+						// The outer range belongs to Hydrate itself. ssrTry supplies the nested
+						// Suspense slot/content ranges and makes a suspending child a real stream
+						// boundary. `fallback` remains client-only, so the server pending arm is
+						// intentionally empty.
+						let children: string;
+						let nativeReads: NativeSeedReads | null = null;
+						try {
+							children = ssrBlock(
+								ssrTry(
+									scope,
+									'jsx-hydrate',
+									(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+									null,
+									null,
+									'html',
+								),
+							);
+						} finally {
+							nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
+						}
+						const idCount = ID_COUNTER - childIdStart;
+						const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+						const permanentStaticAncestor = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
+						const attrs = ssrHydrateAttrs(
+							id,
+							props.when,
+							idCount,
+							permanentStaticAncestor,
+							streamTokenForPendingHtml(children),
+						);
+						const seedJson =
+							permanentStaticAncestor || childSeeds.length === 0
+								? null
+								: serializeSuspenseSeedJson(childSeeds);
+						const seedSidecar =
+							seedJson === null || seedJson === '[]'
+								? ''
+								: '<script type="application/json" ' +
+									HYDRATE_SEED_ATTR +
+									NONCE_ATTR +
+									'>' +
+									seedJson +
+									'</script>';
+						const nativeSeeds = permanentStaticAncestor
+							? undefined
+							: NATIVE_READ_COLLECTOR?.serialize(nativeReads);
+						const nativeSidecar =
+							nativeSeeds === undefined ? '' : serializeNativeSignalSeeds(nativeSeeds, NONCE_ATTR);
 
-					return '<div' + attrs + '>' + children + seedSidecar + '</div>';
-				}),
-			'html',
+						return '<div' + attrs + '>' + children + seedSidecar + nativeSidecar + '</div>';
+					}),
+				'html',
+			),
 		);
 	},
 	COMPONENT_FLAG_BOUNDARY,
@@ -3815,25 +4221,31 @@ export const Hydrate: ServerComponent = /* @__PURE__ */ initializeHydrateCompone
  * branch's inner `ssrBlock`, so the client's `<Suspense>` (componentSlot →
  * tryBlock) adopts it byte-for-byte. A descendant `use(thenable)` that hasn't
  * resolved throws `SSR_SUSPENSE` → the `fallback` renders for this pass and
- * render()'s loop awaits + re-renders; a real error rethrows to an outer boundary.
+ * render()'s loop awaits + re-renders. A render error publishes the fallback,
+ * reports onError, and leaves the boundary ready for a fresh client render.
  */
 export const Suspense = /* @__PURE__ */ markComponentFlags(
 	function Suspense(props: { fallback?: unknown; children?: unknown }, scope: SSRScope): string {
 		// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
 		// real STREAMING boundary too (registration + template sentinel), with the
-		// identical nested-block byte shape as before for buffered renders. Errors
-		// rethrow to an outer boundary (catchFn = null), matching the old emit.
-		return ssrTry(
-			scope,
-			'jsx-suspense',
-			(_arg, s) => ssrChildrenHtml(props.children, s),
-			(_arg, s) => ssrChild(props.fallback, s),
-			null,
-			FRAME?.namespace ?? 'html',
+		// identical nested-block shape for buffered renders. Unlike an authored
+		// @try/@pending, JSX Suspense recovers server errors for a client retry.
+		return ssrHtml(
+			ssrTry(
+				scope,
+				'jsx-suspense',
+				(_arg, s) => ssrChildrenHtml(props.children, s),
+				(_arg, s) => ssrChild(props.fallback, s),
+				null,
+				FRAME?.namespace ?? 'html',
+				false,
+				true,
+			),
 		);
 	},
 	COMPONENT_FLAG_BOUNDARY,
 	'Suspense',
+	Symbol.for('octane.suspense'),
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4027,7 +4439,7 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 		attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
 		attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
 		if (named) attrs.push(['vt-share', cand.share]);
-		return ssrBlock(vtSsrAnnotate(inner, attrs));
+		return ssrHtml(ssrBlock(vtSsrAnnotate(inner, attrs)));
 	},
 	COMPONENT_FLAG_BOUNDARY,
 	'ViewTransition',
@@ -4053,21 +4465,26 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 		props: { fallback?: unknown; children?: unknown },
 		scope: SSRScope,
 	): string {
-		return ssrBlock(
-			(() => {
-				try {
-					return withAsyncIdentity('error-boundary', 'content', () =>
-						ssrBlock(ssrChildrenHtml(props.children, scope)),
-					);
-				} catch (e) {
-					if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
-					const fb =
-						typeof props.fallback === 'function'
-							? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
-							: props.fallback;
-					return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
-				}
-			})(),
+		return ssrHtml(
+			ssrBlock(
+				(() => {
+					try {
+						return withAsyncIdentity('error-boundary', 'content', () =>
+							ssrBlock(ssrChildrenHtml(props.children, scope)),
+						);
+					} catch (e) {
+						e = normalizeThrownServerThenable(e);
+						if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
+						const fb =
+							typeof props.fallback === 'function'
+								? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
+								: props.fallback;
+						return withAsyncIdentity('error-boundary', 'catch', () =>
+							ssrBlock(ssrChild(fb, scope)),
+						);
+					}
+				})(),
+			),
 		);
 	},
 	COMPONENT_FLAG_BOUNDARY,
@@ -4092,7 +4509,7 @@ export interface Context<T> {
 
 export function createContext<T>(defaultValue: T): Context<T> {
 	const ctx = function ProviderBody(props, scope) {
-		return renderServerContextProvider(ctx, props, scope);
+		return ssrHtml(renderServerContextProvider(ctx, props, scope));
 	} as Context<T>;
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
@@ -4131,9 +4548,7 @@ function renderServerContextProvider(
 	if (children == null) return '';
 	// `.tsrx` children are render functions; `.tsx` children are descriptors,
 	// arrays, or primitives and must keep the ordinary server serializer.
-	return typeof children === 'function'
-		? (children(undefined, scope) ?? '')
-		: ssrChild(children, scope);
+	return ssrHtml(ssrChildrenHtml(children, scope));
 }
 
 function readContext<T>(ctx: Context<T>): T {
@@ -4156,6 +4571,34 @@ export function useContext<T>(ctx: Context<T>): T {
 const SSR_SUSPENSE = Symbol('octane.ssr.suspense');
 export function ssrIsSuspense(err: unknown): boolean {
 	return err === SSR_SUSPENSE;
+}
+
+function normalizeThrownServerThenable(error: unknown): unknown {
+	if (error === null || typeof error !== 'object') return error;
+	try {
+		if (typeof (error as PromiseLike<unknown>).then !== 'function') return error;
+	} catch {
+		// An opaque rejection reason need not permit property access. Preserve it
+		// for the application's catch arm instead of replacing it with a probe error.
+		return error;
+	}
+	// Resource readers own their resolved values. Register only retry work, not
+	// a synthetic use() occurrence or hydration seed. Each throw gets a fresh
+	// registration because the same reader can discover another pending resource.
+	if (SUSPENDED !== null) {
+		SUSPENDED.push({ promise: error as PromiseLike<unknown>, key: '|throw#' + PU_ID++ });
+	}
+	const frame = FRAME;
+	if (DEFERRED !== null && CURRENT_COMP !== null && frame !== null && !frame.deferred) {
+		frame.deferred = true;
+		DEFERRED.push({
+			comp: CURRENT_COMP,
+			props: CURRENT_PROPS,
+			parentScope: CURRENT_PARENT_SCOPE,
+			frame,
+		});
+	}
+	return SSR_SUSPENSE;
 }
 
 type HydrationRejectionPayload =
@@ -4392,6 +4835,11 @@ export function use<T>(
 	siteKey?: ServerHookSlot,
 	directSite?: string,
 ): T {
+	if (process.env.NODE_ENV !== 'production' && devMemoComputeDepth !== 0) {
+		console.error(
+			'Do not call use() inside a useMemo() factory. Cached factories can skip context or promise reads; call use() before useMemo() and memoize the returned value instead.',
+		);
+	}
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) {
 		recordSkippedHydrationSite(SERIAL, directSite);
 		return readContext(usable as Context<T>);
@@ -4573,6 +5021,39 @@ function serverDepsEqual(a: readonly unknown[], b: readonly unknown[]): boolean 
 // unique so the settle loops' per-key dedupe doesn't conflate entries.
 let PU_ID = 0;
 
+interface ServerPuCreation {
+	deps: unknown[];
+	value: unknown;
+	site: ServerHookSlot | undefined;
+	frame: Frame | null;
+	nativeWitness?: NativeReadWitness | null;
+}
+
+interface ServerWarmEntry {
+	deps: unknown[];
+	value: unknown;
+	available: boolean;
+	nativeWitness?: NativeReadWitness | null;
+}
+
+type ServerMemoEvidence = ServerPuCreation | ServerWarmEntry;
+
+interface NativeServerMemoMode {
+	accept: (entry: ServerMemoEvidence) => boolean;
+	replay: (entry: ServerMemoEvidence) => void;
+	create: (
+		compute: () => unknown,
+		deps: unknown[],
+		site: ServerHookSlot | undefined,
+		frame: Frame | null,
+	) => ServerPuCreation;
+}
+
+interface NativeServerWarmMode {
+	accept: (entry: ServerMemoEvidence) => boolean;
+	create: (compute: () => unknown, deps: unknown[]) => ServerWarmEntry;
+}
+
 /**
  * Cross-pass creation cache. Keyed like use(): frame path + compiler site key
  * + per-frame occurrence, so the key is identical between the pass a boundary
@@ -4581,7 +5062,12 @@ let PU_ID = 0;
  * the same in-flight/settled promise instance, which is what lets puBatch and
  * use() resolve by identity and what stops re-runs duplicating network calls.
  */
-export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot): T {
+export function puMemo<T>(
+	fn: () => T,
+	deps: unknown[],
+	siteKey?: ServerHookSlot,
+	native?: NativeServerMemoMode,
+): T {
 	const res = RESOLVED as ResolvedMap | null;
 	if (res === null) return fn();
 	const resolvedSiteKey = siteKey === undefined ? undefined : resolveHookSlot(siteKey);
@@ -4600,7 +5086,14 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
 	}
 	const key = prefix + '|' + base + '#' + n;
 	const hit = res.pu.created.get(key);
-	if (hit !== undefined && serverDepsEqual(hit.deps, deps)) return hit.value as T;
+	if (
+		hit !== undefined &&
+		serverDepsEqual(hit.deps, deps) &&
+		(native === undefined || native.accept(hit))
+	) {
+		if (native !== undefined) native.replay(hit);
+		return hit.value as T;
+	}
 	// Warm adoption: a parent's warm walk may have prefetched this creation
 	// (keyed by the shared slot symbol). Deps must match — a drift between the
 	// warm-time and render-time props is a clean miss (the orphaned entry dies
@@ -4610,24 +5103,71 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
 		const wlist = res.pu.warm.get(siteKey);
 		if (wlist !== undefined) {
 			for (let i = 0; i < wlist.length; i++) {
-				if (serverDepsEqual(wlist[i].deps, deps)) {
-					if (!wlist[i].available) continue;
-					wlist[i].available = false;
-					const value = wlist[i].value;
-					res.pu.created.set(key, {
+				const warmed = wlist[i];
+				if (serverDepsEqual(warmed.deps, deps)) {
+					if (!warmed.available || (native !== undefined && !native.accept(warmed))) continue;
+					warmed.available = false;
+					const value = warmed.value;
+					const creation: ServerPuCreation = {
 						deps,
 						value,
 						site: resolvedSiteKey,
 						frame,
-					});
+					};
+					if (native !== undefined) {
+						creation.nativeWitness = warmed.nativeWitness;
+						native.replay(creation);
+					}
+					res.pu.created.set(key, creation);
 					return value as T;
 				}
 			}
 		}
 	}
-	const value = fn();
-	res.pu.created.set(key, { deps, value, site: resolvedSiteKey, frame });
-	return value;
+	const creation =
+		native === undefined
+			? { deps, value: fn(), site: resolvedSiteKey, frame }
+			: native.create(fn, deps, resolvedSiteKey, frame);
+	res.pu.created.set(key, creation);
+	return creation.value as T;
+}
+
+function nativeServerMemoEvidenceValid(entry: ServerMemoEvidence): boolean {
+	return entry.nativeWitness !== undefined && validateNativeReadWitness(entry.nativeWitness);
+}
+
+function replayNativeServerMemo(entry: ServerMemoEvidence): void {
+	replayNativeReadWitness(entry.nativeWitness);
+}
+
+function createNativeServerMemo(
+	compute: () => unknown,
+	deps: unknown[],
+	site: ServerHookSlot | undefined,
+	frame: Frame | null,
+): ServerPuCreation {
+	const token = beginNativeReadWitness();
+	let completed = false;
+	let value: unknown;
+	let nativeWitness: NativeReadWitness | null;
+	try {
+		value = compute();
+		completed = true;
+	} finally {
+		nativeWitness = finishNativeReadWitness(token, completed);
+	}
+	return { deps, value, site, frame, nativeWitness };
+}
+
+const NATIVE_SERVER_MEMO_MODE: NativeServerMemoMode = {
+	accept: nativeServerMemoEvidenceValid,
+	replay: replayNativeServerMemo,
+	create: createNativeServerMemo,
+};
+
+/** @internal Native evidence shares the existing cross-pass creation cache. */
+export function nativePuMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot): T {
+	return puMemo(fn, deps, siteKey, NATIVE_SERVER_MEMO_MODE);
 }
 
 /**
@@ -4781,7 +5321,12 @@ const WARM_DEPTH_CAP = 64;
  * re-evaluating its creation (undefined when nothing could be claimed or
  * created — the descent then just prefetches less).
  */
-export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHookSlot): unknown {
+export function warmMemo(
+	compute: () => unknown,
+	deps: unknown[],
+	slot: ServerHookSlot,
+	native?: NativeServerWarmMode,
+): unknown {
 	const res = RESOLVED;
 	if (res === null) return undefined;
 	const warm = res.pu.warm;
@@ -4789,7 +5334,12 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 	if (list !== undefined) {
 		for (let i = 0; i < list.length; i++) {
 			const entry = list[i];
-			if (!serverDepsEqual(entry.deps, deps) || CURRENT_PU_WARM_CLAIMS?.has(entry)) continue;
+			if (
+				!serverDepsEqual(entry.deps, deps) ||
+				CURRENT_PU_WARM_CLAIMS?.has(entry) ||
+				(native !== undefined && !native.accept(entry))
+			)
+				continue;
 			CURRENT_PU_WARM_CLAIMS?.add(entry);
 			return entry.value; // this concrete occurrence already ran or warmed
 		}
@@ -4797,14 +5347,13 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 	// A parent plan recurses through the currently-rendering source component as
 	// well as earlier siblings. Claim every matching created occurrence across
 	// the current render request, not only frame ancestors, before speculating.
-	let activeCreation:
-		| { deps: unknown[]; value: unknown; site: ServerHookSlot | undefined; frame: Frame | null }
-		| undefined;
+	let activeCreation: ServerPuCreation | undefined;
 	for (const created of res.pu.created.values()) {
 		if (
 			created.site === slot &&
 			serverDepsEqual(created.deps, deps) &&
-			!CURRENT_PU_WARM_CLAIMS?.has(created)
+			!CURRENT_PU_WARM_CLAIMS?.has(created) &&
+			(native === undefined || native.accept(created))
 		) {
 			activeCreation = created;
 			break;
@@ -4819,22 +5368,26 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 		// available:false — the render pass owns this creation under its own
 		// frame key; the tombstone only blocks a later speculative refetch. The
 		// value still rides along so warm-plan PROP claims can hand it onward.
-		const entry = { deps, value: activeCreation.value, available: false };
+		const entry: ServerWarmEntry = { deps, value: activeCreation.value, available: false };
+		if (native !== undefined) entry.nativeWitness = activeCreation.nativeWitness;
 		list.push(entry);
 		CURRENT_PU_WARM_CLAIMS?.add(entry);
 		return activeCreation.value;
 	}
-	let value: unknown;
+	let entry: ServerWarmEntry;
 	try {
-		value = compute();
+		entry =
+			native === undefined
+				? { deps, value: compute(), available: true }
+				: native.create(compute, deps);
 	} catch {
 		return undefined;
 	}
+	const value = entry.value;
 	if (list === undefined) {
 		list = [];
 		warm.set(slot, list);
 	}
-	const entry = { deps, value, available: true };
 	list.push(entry);
 	CURRENT_PU_WARM_CLAIMS?.add(entry);
 	if (
@@ -4846,6 +5399,34 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 			SUSPENDED.push({ promise: value as PromiseLike<unknown>, key: '|pu#' + PU_ID++ });
 	}
 	return value;
+}
+
+function createNativeServerWarm(compute: () => unknown, deps: unknown[]): ServerWarmEntry {
+	const token = beginNativeReadWitness(true);
+	let completed = false;
+	let value: unknown;
+	let nativeWitness: NativeReadWitness | null;
+	try {
+		value = compute();
+		completed = true;
+	} finally {
+		nativeWitness = finishNativeReadWitness(token, completed);
+	}
+	return { deps, value, available: true, nativeWitness };
+}
+
+const NATIVE_SERVER_WARM_MODE: NativeServerWarmMode = {
+	accept: nativeServerMemoEvidenceValid,
+	create: createNativeServerWarm,
+};
+
+/** @internal Warmed reads become request-owned only when the real body adopts them. */
+export function nativeWarmMemo(
+	compute: () => unknown,
+	deps: unknown[],
+	slot: ServerHookSlot,
+): unknown {
+	return warmMemo(compute, deps, slot, NATIVE_SERVER_WARM_MODE);
 }
 
 /**
@@ -4896,14 +5477,6 @@ function resolveLazyModule(mod: any): ServerComponent {
 	return comp as ServerComponent;
 }
 
-function callLazyComponent(mod: any, props: any, scope: SSRScope, extra?: any): unknown {
-	// Resolve `.default` at render time. If an accessor throws, a later render
-	// reads it again without re-running the already-fulfilled loader, matching the
-	// client and React payload semantics.
-	const comp = resolveLazyModule(mod);
-	return comp(lazyResolvedProps(comp, props), scope, extra);
-}
-
 /**
  * React's `lazy(load)` — the server mirror of the client wrapper. Unresolved,
  * it records its promise for render()'s await loop and throws the suspense
@@ -4913,14 +5486,23 @@ function callLazyComponent(mod: any, props: any, scope: SSRScope, extra?: any): 
  * `use()` — a module namespace must never enter the client-seed stream
  * (`SERIAL`), which serializes resolved use() values in render order.
  */
-export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
+export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C & { displayName?: string } {
 	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
 	let result: any = null; // fulfilled → module value; rejected → the reason
 	let promise: PromiseLike<unknown> | null = null;
 	const key = '|lazy#' + LAZY_ID++;
+	let displayName: string | undefined;
+	let resolvedName = 'Lazy';
+	const callResolved = (props: any, scope: SSRScope, extra?: any): unknown => {
+		// Access `.default` only during rendering; introspection must not load the
+		// module or invoke a possibly throwing accessor.
+		const comp = resolveLazyModule(result);
+		resolvedName = (comp as any).displayName || comp.name || 'Lazy';
+		return comp(lazyResolvedProps(comp, props), scope, extra);
+	};
 	const lazyWrapper = (props: any, scope: SSRScope, extra?: any): unknown => {
 		if (status === 'fulfilled') {
-			return callLazyComponent(result as ServerComponent, props, scope, extra);
+			return callResolved(props, scope, extra);
 		}
 		if (status === 'rejected') throw result;
 		if (status === 'uninitialized') {
@@ -4950,7 +5532,7 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
 			if (status === 'uninitialized') status = 'pending';
 			const settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
 			if (settledStatus === 'fulfilled') {
-				return callLazyComponent(result as ServerComponent, props, scope, extra);
+				return callResolved(props, scope, extra);
 			}
 			if (settledStatus === 'rejected') throw result;
 		}
@@ -4968,8 +5550,19 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C {
 		}
 		throw SSR_SUSPENSE;
 	};
-	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, { value: true });
-	return lazyWrapper as unknown as C;
+	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, {
+		get() {
+			return this === lazyWrapper;
+		},
+	});
+	Object.defineProperty(lazyWrapper, 'displayName', {
+		configurable: true,
+		get: () => displayName ?? resolvedName,
+		set: (value: string | undefined) => {
+			displayName = value;
+		},
+	});
+	return lazyWrapper as unknown as C & { displayName?: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -4992,9 +5585,14 @@ export function useState<T>(
 	initial?: T | (() => T),
 	slot?: ServerHookSlot,
 ): [T, (next: T | ((value: T) => T)) => void, () => T] {
-	// A compiled zero-argument call is emitted as `useState(slot)`. Mirror the
-	// client trailing-slot ABI so the injected symbol is not mistaken for state.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Compiled calls pass a separate slot. Preserve legacy lone-slot calls outside
+	// a custom path while keeping aliases' authored Symbol initial values inside it.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		(HOOK_SLOT_PATH.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
+	) {
 		slot = initial;
 		initial = undefined as T;
 	}
@@ -5025,9 +5623,14 @@ export function __useStateWithGetter<T>(
 	initial: T | (() => T),
 	slot?: ServerHookSlot,
 ): [T, (next: any) => void, () => T] {
-	// A compiled zero-argument call is emitted as `__useStateWithGetter(slot)`.
-	// Mirror the public hook's trailing-slot ABI before creating the getter cell.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Mirror the public hook's legacy lone-slot compatibility before creating
+	// the getter cell, preserving authored alias arguments inside a custom path.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		(HOOK_SLOT_PATH.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
+	) {
 		slot = initial;
 		initial = undefined as T;
 	}
@@ -5198,9 +5801,11 @@ export const useLayoutEffect = useEffect;
 export const useInsertionEffect = useEffect;
 export function useImperativeHandle(): void {}
 
-export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: symbol): T;
-export function useMemo<T>(
-	compute: () => T,
+let devMemoComputeDepth = 0;
+
+function memoHookValue<T>(
+	input: T | (() => T),
+	compute: boolean,
 	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
 	maybeSlot?: ServerHookSlot,
 ): T {
@@ -5209,18 +5814,39 @@ export function useMemo<T>(
 		maybeSlot ?? (Array.isArray(depsOrSlot) || depsOrSlot === null ? undefined : depsOrSlot);
 	// `null` means recompute every pass. Omitted dependency arrays reach the
 	// runtime as compiler-inferred arrays, preserving Octane's documented API.
-	if (deps === null) return compute();
+	if (deps === null) return compute ? (input as () => T)() : (input as T);
 	const position = hookPosition(slot);
-	if (position === null) return compute();
+	if (position === null)
+		return compute ? (input as (...deps: readonly unknown[]) => T)(...deps) : (input as T);
 	let rec = position.list[position.index] as MemoHookRec | undefined;
 	if (rec === undefined) {
-		rec = { value: compute(), deps: deps.slice() };
+		rec = {
+			value: compute ? (input as (...deps: readonly unknown[]) => T)(...deps) : input,
+			deps: deps.slice(),
+		};
 		position.list[position.index] = rec;
 	} else if (!serverDepsEqual(rec.deps, deps)) {
-		rec.value = compute();
+		rec.value = compute ? (input as (...deps: readonly unknown[]) => T)(...deps) : input;
 		rec.deps = deps.slice();
 	}
 	return rec.value as T;
+}
+
+export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: symbol): T;
+export function useMemo<T>(
+	compute: () => T,
+	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
+	maybeSlot?: ServerHookSlot,
+): T {
+	if (process.env.NODE_ENV !== 'production') {
+		devMemoComputeDepth++;
+		try {
+			return memoHookValue<T>(compute, true, depsOrSlot, maybeSlot);
+		} finally {
+			devMemoComputeDepth--;
+		}
+	}
+	return memoHookValue<T>(compute, true, depsOrSlot, maybeSlot);
 }
 
 export function useCallback<F>(fn: F, deps?: readonly unknown[] | null, slot?: symbol): F;
@@ -5229,15 +5855,20 @@ export function useCallback<F>(
 	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
 	maybeSlot?: ServerHookSlot,
 ): F {
-	return (useMemo as any)(() => fn, depsOrSlot, maybeSlot) as F;
+	return memoHookValue<F>(fn, false, depsOrSlot, maybeSlot);
 }
 
 export function useRef<T = undefined>(): { current: T | undefined };
 export function useRef<T>(initial: T, slot?: symbol): { current: T };
 export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | undefined } {
-	// A spread-shaped zero-argument call cannot be padded positionally, so the
-	// compiler retains the self-identifying Symbol ABI: `useRef(slot)`.
-	if (slot === undefined && typeof initial === 'symbol') {
+	// Legacy lone-slot calls remain valid outside custom paths. Compiled spread
+	// calls use the path for identity and preserve the original argument count.
+	if (
+		slot === undefined &&
+		typeof initial === 'symbol' &&
+		arguments.length === 1 &&
+		(HOOK_SLOT_PATH.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
+	) {
 		slot = initial;
 		initial = undefined;
 	}
@@ -5307,18 +5938,51 @@ export function useActionState<S>(
 export interface FormStatus {
 	pending: boolean;
 	data: FormData | null;
-	method: string;
+	method: string | null;
 	action: ((formData: FormData) => unknown) | string | null;
 }
 export function useFormStatus(): FormStatus {
-	return { pending: false, data: null, method: 'get', action: null };
+	return { pending: false, data: null, method: null, action: null };
 }
 
 export function useOptimistic<S, V = S>(state: S): [S, (value: V) => void] {
 	return [state, NOOP];
 }
 
-export function memo<P>(component: P): P {
+export function memo<C extends (...args: any[]) => any>(
+	component: C,
+): C & { readonly type: C; displayName?: string } {
+	const memoWrapper = (props: any, scope: SSRScope, extra?: any): unknown =>
+		component(props, scope, extra);
+	Object.defineProperty(memoWrapper, 'type', { value: component });
+	Object.defineProperty(memoWrapper, 'displayName', {
+		configurable: true,
+		writable: true,
+		value: (component as any).displayName || component.name || 'Memo',
+	});
+	Object.defineProperty(memoWrapper, '__memo', {
+		get() {
+			return this === memoWrapper;
+		},
+	});
+	Object.defineProperty(memoWrapper, 'defaultProps', {
+		configurable: true,
+		get: () => (component as any).defaultProps,
+		set: (value) => {
+			(component as any).defaultProps = value;
+		},
+	});
+	return memoWrapper as unknown as C & { readonly type: C; displayName?: string };
+}
+
+/** @internal Keep a copied static descriptor from warming an unrelated wrapper. */
+export function markWarm<T extends Function>(component: T, plan: unknown): T {
+	Object.defineProperty(component, '__warm', {
+		configurable: true,
+		get() {
+			return this === component ? plan : undefined;
+		},
+	});
 	return component;
 }
 
@@ -5327,13 +5991,90 @@ export function memo<P>(component: P): P {
 // whole nested call-site path ambient while the wrapped hook runs so its base
 // hooks resolve by definition site + every call boundary, rather than by a
 // render-pass occurrence that can shift when a conditional call disappears.
+let MANUAL_HOOK_DRIVER: { pending: ServerHookSlot | undefined; active: boolean } | null = null;
+
+/** @internal Invoke a provider that owns the trailing hook-slot ABI. */
+export function invokeManualHook<T>(
+	fn: (...args: any[]) => T,
+	receiver: unknown,
+	args: IArguments,
+): T {
+	// Hoisted provider declarations need no module initialization. Establish
+	// their capability on first invocation, including inside an existing call.
+	const driver = (MANUAL_HOOK_DRIVER ??= {
+		pending: HOOK_SLOT_PATH[HOOK_SLOT_PATH.length - 1],
+		active: false,
+	});
+	const pending = driver.pending;
+	const active = driver.active;
+	driver.pending = undefined;
+	driver.active = true;
+	try {
+		if (pending === undefined) return Reflect.apply(fn, receiver, args);
+		// Forward the wrapper's arguments object directly for common arities.
+		// Only larger calls need an array to append the compiler's slot.
+		switch (args.length) {
+			case 0:
+				return fn.call(receiver, pending);
+			case 1:
+				return fn.call(receiver, args[0], pending);
+			case 2:
+				return fn.call(receiver, args[0], args[1], pending);
+			case 3:
+				return fn.call(receiver, args[0], args[1], args[2], pending);
+			case 4:
+				return fn.call(receiver, args[0], args[1], args[2], args[3], pending);
+			default: {
+				const forwarded = new Array(args.length + 1);
+				for (let index = 0; index < args.length; index++) forwarded[index] = args[index];
+				forwarded[args.length] = pending;
+				return fn.apply(receiver, forwarded);
+			}
+		}
+	} finally {
+		driver.pending = pending;
+		driver.active = active;
+	}
+}
+
+/** @internal Adapt an expression provider that owns the trailing hook-slot ABI. */
+export function manualHook<F extends (...args: any[]) => any>(fn: F, name?: string): F {
+	function provider(this: unknown) {
+		return invokeManualHook(fn, this, arguments);
+	}
+	Object.defineProperty(provider, 'name', { value: name ?? fn.name, configurable: true });
+	Object.defineProperty(provider, 'length', { value: fn.length, configurable: true });
+	return provider as F;
+}
+
+/** Invoke a cached optional-chain method without consulting its call/bind properties. */
+export function callWithReceiver<T>(
+	fn: (...args: any[]) => T,
+	receiver: unknown,
+	...args: any[]
+): T {
+	return NATIVE_REFLECT_APPLY(fn, receiver, args);
+}
+
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: ServerHookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
+	const driver = MANUAL_HOOK_DRIVER;
+	const pending = driver?.pending;
+	const active = driver?.active ?? false;
+	if (driver !== null) {
+		driver.pending = sym;
+		driver.active = false;
+	}
 	HOOK_SLOT_PATH.push(sym);
 	try {
 		return fn(...args);
 	} finally {
 		HOOK_SLOT_PATH.pop();
+		if (MANUAL_HOOK_DRIVER !== null) {
+			MANUAL_HOOK_DRIVER.pending =
+				driver === null ? HOOK_SLOT_PATH[HOOK_SLOT_PATH.length - 1] : pending;
+			MANUAL_HOOK_DRIVER.active = active;
+		}
 	}
 }
 
@@ -5391,8 +6132,53 @@ export function isChildrenBlock(value: unknown): boolean {
 // hash) for the RenderResult.css field.
 // ---------------------------------------------------------------------------
 
-export function injectStyle(id: string, css: string): void {
-	if (CSS !== null) CSS.set(id, css);
+export function injectStyle(id: string, css: string, nonce?: string): void {
+	if (CSS !== null) CSS.set(id, nonce === undefined ? { css } : { css, nonce });
+}
+
+/**
+ * A compiled assigned `<style>` block (`const theme = <style>…</style>`) on the
+ * server. Its CSS belongs to whichever request reads the map — a component in
+ * another module applying `theme` or using `theme.card` — so injection happens
+ * on property access into the active render's collector, after the CSS of the
+ * themes this block itself applies (`applied`: every applied map, same-module
+ * or imported, each a wrapper of its own, so a chain injects transitively in
+ * "applied before applier" order and each sheet once). A body-less bundle
+ * (`<style apply={[a, b]} />`) has no sheet — `id` and `css` are `null` — and
+ * only forwards the touch. Reads outside a render are no-ops.
+ */
+export function styleMap<T extends object>(
+	id: string | null,
+	css: string | null,
+	map: T,
+	applied: ReadonlyArray<unknown> = [],
+): T {
+	let touching = false;
+	const touch = () => {
+		if (CSS === null || touching) return;
+		touching = true;
+		try {
+			for (const dependency of applied) touchStyleMap(dependency);
+			if (id !== null && css !== null) injectStyle(id, css);
+		} finally {
+			touching = false;
+		}
+	};
+	return new Proxy(map, {
+		get(target, key, receiver) {
+			touch();
+			return Reflect.get(target, key, receiver);
+		},
+	});
+}
+
+/**
+ * Compiled at the top of a server component body for every imported theme it
+ * applies, before its own `injectStyle` calls: reading the map injects the
+ * theme's CSS first, so the applying scope's rules win the cascade.
+ */
+export function touchStyleMap(map: unknown): void {
+	if (map !== null && typeof map === 'object') void (map as { $class?: unknown }).$class;
 }
 
 // Compiler-emitted for each hoisted `<title>`/`<meta>`/`<link>` (rendered
@@ -5521,6 +6307,8 @@ export interface RenderResult {
 	html: string;
 	css: string;
 	head?: string;
+	/** Ready native values represented by this result's own HTML. */
+	signals?: NativeSignalManifest;
 }
 
 /** Options accepted by the buffered render entry points (React-shaped subset). */
@@ -5567,12 +6355,24 @@ export interface RenderOptions {
 // Insert the hoisted head markup into `body`: before `</head>` when the render
 // produced a document (React-19 resource-hoisting shape), otherwise prepend it so
 // the caller/metaframework can place `html` in a document whose `<head>` then
-// contains the metadata. Empty head → body unchanged.
+// contains the metadata. A document root always gains a `<head>`; any other
+// body with nothing to splice is returned as is, decided from its first bytes so
+// the common fragment response is never scanned for a `</head>`.
 function spliceHead(body: string, head: string): string {
-	if (head === '') return body;
+	if (head === '' && !isDocumentRoot(body)) return body;
 	const headClose = body.indexOf('</head>');
 	if (headClose !== -1) return body.slice(0, headClose) + head + body.slice(headClose);
+	if (isDocumentRoot(body)) {
+		const openingEnd = documentTagEnd(body, body.indexOf('<html') + 5);
+		if (openingEnd !== -1)
+			return body.slice(0, openingEnd) + '<head>' + head + '</head>' + body.slice(openingEnd);
+	}
+	if (head === '') return body;
 	return head + body;
+}
+
+function renderEntryValue(props: { value: ServerRenderNode }, scope: SSRScope): string {
+	return ssrHtml(ssrChild(props.value, scope));
 }
 
 /** Guard against a `use(thenable)` that never resolves wedging the render loop. */
@@ -5659,16 +6459,30 @@ function serializeSuspenseSeedJson(values: unknown[]): string {
  * `\u003c` so the JSON payload can't terminate the `<script>` element or open
  * an HTML comment. Only emitted when at least one value was resolved.
  */
-function serializeSuspenseSeeds(values: unknown[], nonceAttr: string): string {
+function serializeSuspenseSeeds(
+	values: unknown[],
+	nonceAttr: string,
+	attr = SUSPENSE_SCRIPT_ATTR,
+): string {
 	// Encode `undefined` (which JSON drops/nulls) through the seed wire escape so a
 	// `use(thenable)` that resolved to `undefined` round-trips to `undefined` on
 	// the client — not `null`. Prefix-leading user strings are escaped first, so
 	// neither sentinel-shaped objects nor user strings can collide with it.
 	const json = serializeSuspenseSeedJson(values);
 	if (json === '[]') return '';
-	return (
-		'<script type="application/json" ' + SUSPENSE_SCRIPT_ATTR + nonceAttr + '>' + json + '</script>'
-	);
+	return '<script type="application/json" ' + attr + nonceAttr + '>' + json + '</script>';
+}
+
+function serializeNativeSignalSeeds(
+	signals: NativeSignalManifest,
+	nonceAttr: string,
+	attr = NATIVE_SIGNAL_SEED_ATTR,
+): string {
+	// Native values already have an unambiguous tagged JSON grammar. Apply the
+	// same script-text '<' escaping as use() seeds, without their positional
+	// undefined/string-prefix wire encoding.
+	const json = JSON.stringify(signals).replace(/</g, '\\u003c');
+	return '<script type="application/json" ' + attr + nonceAttr + '>' + json + '</script>';
 }
 
 /**
@@ -5703,6 +6517,12 @@ type SuspenseOutcome = SuspenseResult & {
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
+	/** Recoverable buffered-boundary errors are reported once across async retries. */
+	bufferedErrors?: Map<string, { error: unknown; reported: boolean }>;
+	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
+	resourceOptions?: RenderOptions | null;
+	/** Optional renderer resources; allocated only by a participating adapter. */
+	resources?: ServerRenderResources;
 	/** Render-local stable ids for non-primitive and long string control/list keys. */
 	asyncIdentities: Map<unknown, number>;
 	/** Cross-pass fallback ids for transient object keys at one lexical position. */
@@ -5711,21 +6531,18 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	/** Lazily allocated DEV SSR invalid-nesting warnings reported by this render. */
 	nestingWarnings?: Set<string>;
 	pu: {
-		created: Map<
-			string,
-			{ deps: unknown[]; value: unknown; site: ServerHookSlot | undefined; frame: Frame | null }
-		>;
+		created: Map<string, ServerPuCreation>;
 		resolvedT: Map<PromiseLike<unknown>, SuspenseResult>;
 		// Warm-walk prefetches (warmMemo), keyed by the creation's SLOT symbol —
 		// a value is adoptable once, while its retained tombstone prevents a later
 		// dependency stratum from speculatively recreating the same request.
-		warm: Map<ServerHookSlot, { deps: unknown[]; value: unknown; available: boolean }[]>;
+		warm: Map<ServerHookSlot, ServerWarmEntry[]>;
 		/** Livelock guard tripped (see observeSuspenseWave): puBatch stops
 		 *  registering/suspending for the rest of this render so plain use()
 		 *  string-key replay drives progress instead. */
 		batchDisabled?: boolean;
-		/** observeSuspenseWave state — consecutive recreation strikes + the
-		 *  puMemo creation-cache size at the previous observation. */
+		/** Consecutive recreation strikes + the creation-cache size at the
+		 *  initial pending pass, then at each observeSuspenseWave observation. */
 		recreate?: { strikes: number; prevCreated: number };
 		/** Armed by observeSuspenseWave after a first strike: identity-resolved
 		 *  thenables (use() / puBatch resolvedT hits) are recorded here during
@@ -5736,13 +6553,82 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		touched?: Set<PromiseLike<unknown>>;
 	};
 };
-function newResolvedMap(): ResolvedMap {
+function newResolvedMap(resourceOptions?: RenderOptions | null): ResolvedMap {
 	const m = new Map() as ResolvedMap;
+	if (resourceOptions !== undefined) m.resourceOptions = resourceOptions;
 	m.asyncIdentities = new Map();
 	m.asyncPositionIdentities = new Map();
 	m.nextAsyncIdentity = 0;
 	m.pu = { created: new Map(), resolvedT: new Map(), warm: new Map() };
 	return m;
+}
+
+/** @internal Request lifetime for an optional renderer's asynchronous server work. */
+export interface ServerRenderResourceContext {
+	readonly signal: AbortSignal | undefined;
+	readonly nonce: string | undefined;
+	readonly timeoutMs: number;
+	/** Release unfinished work on success, failure, cancellation, or a synchronous shell return. */
+	registerCleanup(cleanup: () => void): () => void;
+}
+
+interface ServerRenderResources extends ServerRenderResourceContext {
+	finished: boolean;
+	cleanups: Map<() => void, () => void>;
+}
+
+/**
+ * Only an owned Octane request can retain foreign work between server passes.
+ * A hosted pass has no authority to observe its external renderer's completion
+ * or cancellation; return null so its adapter can reject before starting work.
+ */
+export function getServerRenderResourceContext(): ServerRenderResourceContext | null {
+	const resolved = RESOLVED;
+	if (resolved === null || resolved.resourceOptions === undefined) return null;
+	if (resolved.resources !== undefined) return resolved.resources;
+	const options = resolved.resourceOptions;
+	const resources: ServerRenderResources = {
+		signal: options?.signal,
+		nonce: options?.nonce,
+		timeoutMs: options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS,
+		finished: false,
+		cleanups: new Map(),
+		registerCleanup(cleanup) {
+			if (resources.finished) {
+				cleanup();
+				return NOOP;
+			}
+			// Registration identity, not callback identity, owns the resource.
+			// Two islands may intentionally use the same cleanup function.
+			const release = () => {
+				resources.cleanups.delete(release);
+			};
+			resources.cleanups.set(release, cleanup);
+			return release;
+		},
+	};
+	resolved.resources = resources;
+	return resources;
+}
+
+function releaseServerRenderResources(resolved: ResolvedMap): void {
+	const resources = resolved.resources;
+	// Native thenable settlement callbacks can retain this cache after an abort.
+	// They must not also keep a completed request's options or foreign resources.
+	resolved.resourceOptions = undefined;
+	if (resources !== undefined) resolved.resources = undefined;
+	if (resources === undefined || resources.finished) return;
+	resources.finished = true;
+	let failure: { error: unknown } | undefined;
+	for (const [release, cleanup] of resources.cleanups) {
+		resources.cleanups.delete(release);
+		try {
+			cleanup();
+		} catch (error) {
+			failure ??= { error };
+		}
+	}
+	if (failure !== undefined) throw failure.error;
 }
 
 interface FullPassResult {
@@ -5759,10 +6645,11 @@ interface FullPassResult {
 	vtCandidates: boolean;
 	/** Per-hash scoped stylesheets from this pass — the streaming renderer diffs
 	 *  these against what it already flushed to emit late boundaries' styles. */
-	cssEntries: Map<string, string>;
+	cssEntries: Map<string, InjectedStyle>;
 	/** Per-resource Float sheet tags from this pass (see HeadBuffer.sheets) —
 	 *  diffed the same way so late-discovered resources ride the wave chunks. */
 	sheets: Map<string, { precedence: string; html: string }> | null;
+	signals?: NativeSignalManifest;
 }
 
 // Snapshot / install / restore the module globals around ONE synchronous pass
@@ -5771,11 +6658,15 @@ interface FullPassResult {
 // in-flight pass — the globals are always restored before we yield the tick.
 interface Ambient {
 	scope: SSRScope | null;
+	nativePass: number;
+	nativeReads: NativeSeedReads | null;
+	nativeFailures: number;
+	nativeLocalDisposes: Array<() => void> | null;
 	warmPlans: Array<() => void>;
 	warmClaims: Set<object> | null;
 	id: number;
 	idPrefix: string;
-	css: Map<string, string> | null;
+	css: Map<string, InjectedStyle> | null;
 	nonceAttr: string;
 	markers: boolean;
 	permanentStaticHydrateDepth: number;
@@ -5799,6 +6690,10 @@ interface Ambient {
 function saveAmbient(): Ambient {
 	return {
 		scope: CURRENT_SCOPE,
+		nativePass: NATIVE_SERVER_PASS,
+		nativeReads: NATIVE_SERVER_READS,
+		nativeFailures: NATIVE_SERVER_FAILURES,
+		nativeLocalDisposes: NATIVE_LOCAL_HOOK_DISPOSES,
 		warmPlans: ACTIVE_PU_WARM_PLANS.slice(),
 		warmClaims: CURRENT_PU_WARM_CLAIMS,
 		id: ID_COUNTER,
@@ -5826,6 +6721,29 @@ function saveAmbient(): Ambient {
 	};
 }
 function restoreAmbient(a: Ambient): void {
+	let disposalError: { value: unknown } | undefined;
+	if (NATIVE_LOCAL_HOOK_DISPOSES !== null) {
+		const disposes = NATIVE_LOCAL_HOOK_DISPOSES;
+		NATIVE_LOCAL_HOOK_DISPOSES = null;
+		const collector = NATIVE_READ_COLLECTOR;
+		const token = collector?.pauseLifecycle() ?? -1;
+		try {
+			for (let i = disposes.length - 1; i >= 0; i--) {
+				try {
+					disposes[i]();
+				} catch (error) {
+					disposalError ??= { value: error };
+				}
+			}
+		} finally {
+			if (token >= 0) collector!.resumeLifecycle(token);
+		}
+	}
+	if (NATIVE_SERVER_PASS >= 0) NATIVE_READ_COLLECTOR!.endPass(NATIVE_SERVER_PASS);
+	NATIVE_SERVER_PASS = a.nativePass;
+	NATIVE_SERVER_READS = a.nativeReads;
+	NATIVE_SERVER_FAILURES = a.nativeFailures;
+	NATIVE_LOCAL_HOOK_DISPOSES = a.nativeLocalDisposes;
 	CURRENT_SCOPE = a.scope;
 	ACTIVE_PU_WARM_PLANS.length = 0;
 	ACTIVE_PU_WARM_PLANS.push(...a.warmPlans);
@@ -5856,6 +6774,7 @@ function restoreAmbient(a: Ambient): void {
 		snapshot.candidate.consumed = snapshot.consumed;
 		VT_SSR_STACK.push(snapshot.candidate);
 	}
+	if (disposalError !== undefined) throw disposalError.value;
 }
 
 // Run ONE full canonical pass over the whole tree, synchronously within this
@@ -5876,6 +6795,10 @@ function runFullFramedPass(
 	markers: boolean = true,
 ): FullPassResult {
 	const saved = saveAmbient();
+	NATIVE_SERVER_PASS = NATIVE_READ_COLLECTOR?.beginPass() ?? -1;
+	NATIVE_SERVER_READS = null;
+	NATIVE_SERVER_FAILURES = 0;
+	NATIVE_LOCAL_HOOK_DISPOSES = null;
 	ACTIVE_PU_WARM_PLANS.length = 0;
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
@@ -5887,7 +6810,7 @@ function runFullFramedPass(
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
-	const cssMap = (CSS = new Map<string, string>());
+	const cssMap = (CSS = new Map<string, InjectedStyle>());
 	const headBuf = (HEAD = {
 		html: '',
 		charset: '',
@@ -5926,14 +6849,19 @@ function runFullFramedPass(
 	let body = '';
 	let vtCandidates = false;
 	let rootSuspended = false;
+	let signals: NativeSignalManifest | undefined;
+	let nativePassCompleted = false;
+	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(root);
 	try {
 		// Normalize the root's return the same way ssrComponent normalizes child
 		// components: a compiled component returns its HTML string, but a plain
 		// `.ts` root (the shape every @octanejs binding produces) returns a
 		// createElement descriptor that must render through ssrChild.
 		const out = invokeComponentBody(component, props, root, FRAME);
-		body = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, root);
+		body = serverComponentOutput(out, root);
+		nativePassCompleted = true;
 	} catch (err) {
+		err = normalizeThrownServerThenable(err);
 		// A suspension with no enclosing @try unwinds to here; its thenable is
 		// already in `suspended`, so fall through to the await + retry. Any other
 		// throw is a genuine render failure — propagate it (the finally restores).
@@ -5941,7 +6869,21 @@ function runFullFramedPass(
 		rootSuspended = true;
 	} finally {
 		vtCandidates = VT_SSR_HAS_CANDIDATES;
-		restoreAmbient(saved);
+		try {
+			if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativePassCompleted);
+			if (markers && nativePassCompleted)
+				signals = NATIVE_READ_COLLECTOR?.serialize(NATIVE_SERVER_READS);
+		} finally {
+			restoreAmbient(saved);
+		}
+	}
+	if (resolved.bufferedErrors !== undefined) {
+		for (const report of resolved.bufferedErrors.values()) {
+			if (!report.reported) {
+				report.reported = true;
+				resolved.resourceOptions?.onError?.(report.error);
+			}
+		}
 	}
 	let css = '';
 	for (const [hash, sheet] of cssMap) {
@@ -5949,12 +6891,12 @@ function runFullFramedPass(
 			'<style data-octane="' +
 			hash +
 			'"' +
-			nonceAttr +
+			(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
 			'>' +
-			escapeEntireInlineStyleContent(sheet) +
+			escapeEntireInlineStyleContent(sheet.css) +
 			'</style>';
 	}
-	return {
+	const result: FullPassResult = {
 		body,
 		head: headHtmlWithSheets(headBuf),
 		css,
@@ -5966,6 +6908,8 @@ function runFullFramedPass(
 		cssEntries: cssMap,
 		sheets: headBuf.sheets,
 	};
+	if (signals !== undefined) result.signals = signals;
+	return result;
 }
 
 // Re-run a set of discovery jobs (each an innermost suspending COMPONENT) in
@@ -5980,6 +6924,10 @@ function runDiscoveryRound(
 	identifierPrefix: string,
 ): { suspended: SuspendedList; deferred: Job[] } {
 	const saved = saveAmbient();
+	NATIVE_SERVER_PASS = NATIVE_READ_COLLECTOR?.beginPass() ?? -1;
+	NATIVE_SERVER_READS = null;
+	NATIVE_SERVER_FAILURES = 0;
+	NATIVE_LOCAL_HOOK_DISPOSES = null;
 	ACTIVE_PU_WARM_PLANS.length = 0;
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
@@ -6102,6 +7050,9 @@ async function settleSuspended(
 	signal: AbortSignal | undefined,
 ): Promise<void> {
 	const pu = (resolved as ResolvedMap).pu;
+	// Snapshot the first pass, not an artificial -1: existing creation sites
+	// are not evidence of new work on the first canonical retry.
+	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
 	const settleAll = Promise.all(
 		suspended.map(async ({ promise, key }) => {
 			if (resolved.has(key)) return;
@@ -6150,6 +7101,7 @@ async function settleFirstOfWave(
 	signal: AbortSignal | undefined,
 ): Promise<void> {
 	const pu = (resolved as ResolvedMap).pu;
+	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
 	const recorders: Promise<void>[] = [];
 	for (const { promise, key } of suspended) {
 		if (resolved.has(key)) continue;
@@ -6234,11 +7186,11 @@ function observeSuspenseWave(
 	settled: SuspendedList,
 	next: SuspendedList,
 	boundaryProgress: boolean,
-): void {
+): boolean {
 	const pu = resolved.pu;
 	if (pu.batchDisabled === true) {
 		pu.touched = undefined;
-		return;
+		return false;
 	}
 	let state = pu.recreate;
 	if (state === undefined) state = pu.recreate = { strikes: 0, prevCreated: -1 };
@@ -6246,8 +7198,9 @@ function observeSuspenseWave(
 	state.prevCreated = pu.created.size;
 	const touched = pu.touched;
 	pu.touched = undefined;
-	const reset = (): void => {
+	const reset = (): false => {
 		state.strikes = 0;
+		return false;
 	};
 	if (boundaryProgress || createdGrew) return reset();
 	let prevPu: Set<PromiseLike<unknown>> | null = null;
@@ -6280,9 +7233,14 @@ function observeSuspenseWave(
 	}
 	if (++state.strikes < 2) {
 		pu.touched = new Set(); // arm consumption tracking for the next pass
-		return;
+		return false;
 	}
 	pu.batchDisabled = true;
+	// The immediate retry abandons this pass's registrations. puBatch usually
+	// observes its own promises, but directly thrown resources and speculative
+	// warm work may not have subscribers yet. Observe every outcome without
+	// waiting or recording obsolete string-key results into the replay cache.
+	for (const { promise } of next) Promise.resolve(promise).then(NOOP, NOOP);
 	if (process.env.NODE_ENV !== 'production') {
 		console.error(
 			'octane SSR: use() thenables appear to be re-created on every render pass — ' +
@@ -6293,6 +7251,10 @@ function observeSuspenseWave(
 				'Falling back to per-site replay for the rest of this render.',
 		);
 	}
+	// The caller must recollect suspensions under the new per-site regime.
+	// Waiting for the just-created batch would settle identities that this
+	// canonical retry is about to replace again.
+	return true;
 }
 
 // The await-everything render core. Runs full canonical passes interleaved with
@@ -6304,13 +7266,11 @@ async function runBuffered(
 	props: any,
 	options: RenderOptions | undefined,
 	nonceAttr: string,
+	resolved: ResolvedMap,
 ): Promise<FullPassResult> {
 	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
 	const signal = options?.signal;
 	const identifierPrefix = options?.identifierPrefix ?? '';
-	// The suspense cache persists across this render's passes; it is render-local
-	// (never a module global) so concurrent renders can't share it.
-	const resolved: ResolvedMap = newResolvedMap();
 	let attempt = 0;
 	let lastSettled: SuspendedList | null = null;
 	for (;;) {
@@ -6328,7 +7288,9 @@ async function runBuffered(
 			throw err;
 		}
 		if (pass.suspended.length === 0) return pass;
-		if (lastSettled !== null) observeSuspenseWave(resolved, lastSettled, pass.suspended, false);
+		if (lastSettled !== null && observeSuspenseWave(resolved, lastSettled, pass.suspended, false)) {
+			continue;
+		}
 		// Between full passes, greedily discover deeper waterfall levels with cheap
 		// SUBTREE re-runs (skipping the static bulk) so the NEXT full pass jumps
 		// straight to canonical. A root-level boundary (job.frame.parent === null)
@@ -6370,19 +7332,24 @@ function passToResult(
 ): RenderResult {
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
 	// Unclaimed view-transition arm candidates strip at emission (see vtSsrStrip).
 	// Stripping the two channels separately equals stripping the folded string -
 	// no match spans the join, which is what keeps `head + html` byte-identical
 	// to the folded `html`.
+	let result: RenderResult;
 	if (separateHead) {
-		return {
+		result = {
 			html: pass.vtCandidates ? vtSsrStrip(body) : body,
 			css: pass.css,
 			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
 		};
+	} else {
+		const html = spliceHead(body, pass.head);
+		result = { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
 	}
-	const html = spliceHead(body, pass.head);
-	return { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
+	if (pass.signals !== undefined) result.signals = pass.signals;
+	return result;
 }
 
 /**
@@ -6392,17 +7359,27 @@ function passToResult(
  * This is the buffered, await-everything behaviour of the old `render()`.
  */
 export async function prerender(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: RenderOptions,
 ): Promise<RenderResult> {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	const nonceAttr = nonceAttrOf(options);
-	return passToResult(
-		await runBuffered(component, props, options, nonceAttr),
-		nonceAttr,
-		options?.headChannel === 'separate',
-	);
+	const resolved = newResolvedMap(options ?? null);
+	try {
+		return passToResult(
+			await runBuffered(component, props, options, nonceAttr, resolved),
+			nonceAttr,
+			options?.headChannel === 'separate',
+		);
+	} finally {
+		releaseServerRenderResources(resolved);
+	}
 }
 
 /**
@@ -6417,10 +7394,14 @@ export async function prerender(
  * (the head folds), with a development diagnostic.
  */
 export async function prerenderToNodeStream(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: RenderOptions,
 ): Promise<{ prelude: import('node:stream').Readable }> {
+	if (typeof entryComponent !== 'function' && options === undefined) {
+		options = props;
+		props = undefined;
+	}
 	let resolved = options;
 	if (options?.headChannel === 'separate') {
 		if (process.env.NODE_ENV !== 'production') {
@@ -6459,7 +7440,7 @@ export async function prerenderToNodeStream(
 // outcomes into the session as they settle; the host delegates the wait to
 // `React.use(stratum)` (Fizz's positional replay state — Phase 0 evidence).
 // Do NOT call public renderToString for this: its bare-root suspension
-// contract returns partial output and a fresh resolved map per call.
+// contract throws and each call owns a fresh resolved map.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Read hook for FOREIGN host contexts during a hosted pass (§6.4): the server
@@ -6499,7 +7480,7 @@ export type HostedAttemptResult =
 			/** Hoisted head output — the host must translate or reject it (§9.2). */
 			head: string;
 			/** Per-hash scoped stylesheets for host-level dedupe (§9.2). */
-			cssEntries: Map<string, string>;
+			cssEntries: Map<string, InjectedStyle>;
 	  }
 	| { status: 'suspended'; stratum: PromiseLike<void> };
 
@@ -6580,6 +7561,7 @@ export function renderHostedAttempt(
 	}
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
 	if (pass.vtCandidates) body = vtSsrStrip(body);
 	return { status: 'complete', html: body, head: pass.head, cssEntries: pass.cssEntries };
 }
@@ -6587,27 +7569,35 @@ export function renderHostedAttempt(
 /**
  * React `react-dom/server` `renderToString` — a SINGLE synchronous pass, no
  * awaiting. A Suspense boundary that suspends renders its fallback (the inline
- * `@try`/`@pending` arm); a bare `use(thenable)` with no enclosing boundary ends
- * the render early (its partial output is returned). Synchronously-resolved
+ * `@try`/`@pending` arm); a bare `use(thenable)` with no enclosing boundary throws
+ * instead of returning an incomplete document. Synchronously-resolved
  * `use()` in the shell still seeds. Use `prerender` when you need the data awaited.
  */
 export function renderToString(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
-	const resolved: ResolvedMap = newResolvedMap();
+	const resolved: ResolvedMap = newResolvedMap(options ?? null);
 	let pass: FullPassResult;
 	try {
 		pass = withStream(null, () =>
 			runFullFramedPass(component, props, resolved, nonceAttr, options?.identifierPrefix ?? ''),
 		);
+		if (pass.rootSuspended) throw new Error(formatServerError(60));
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
+	} finally {
+		releaseServerRenderResources(resolved);
 	}
 	return passToResult(pass, nonceAttr, options?.headChannel === 'separate');
 }
@@ -6618,14 +7608,19 @@ export function renderToString(
  * no head-adoption markers, no suspense seed script. For static pages / email.
  */
 export function renderToStaticMarkup(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
-	const resolved: ResolvedMap = newResolvedMap();
+	const resolved: ResolvedMap = newResolvedMap(options ?? null);
 	let pass: FullPassResult;
 	try {
 		pass = withStream(null, () =>
@@ -6638,9 +7633,12 @@ export function renderToStaticMarkup(
 				false,
 			),
 		);
+		if (pass.rootSuspended) throw new Error(formatServerError(60));
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
+	} finally {
+		releaseServerRenderResources(resolved);
 	}
 	// No seeds (non-hydratable). Head is folded in without adoption markers, or
 	// handed over on its own under `headChannel: 'separate'`.
@@ -6726,6 +7724,8 @@ interface StreamBoundary {
 	html: string;
 	/** This boundary's `use()` seed slice from the resolving pass. */
 	seeds: unknown[];
+	/** Ready native values captured with this exact accepted segment. */
+	signals?: NativeSignalManifest;
 	/** Number of boundary-local useIds consumed before the shell suspended. */
 	pendingIdOffset: number;
 	/** Namespace inherited by this boundary's content arm. */
@@ -6738,6 +7738,8 @@ interface StreamBoundary {
 
 interface StreamState {
 	boundaries: Map<string, StreamBoundary>;
+	/** Conservative index of registered boundary owners; stale entries only cost a scan. */
+	boundaryOwnerKeys: Set<string>;
 	nextId: number;
 	token: string;
 	/** Boundary positions reached by the active full-tree pass, when tracked. */
@@ -6746,6 +7748,62 @@ interface StreamState {
 	activeTryKeys: string[];
 	/** All arm owners (content/catch/fallback) while walking nested `ssrTry` calls. */
 	activeOwnerKeys: string[];
+	/** Undo log scoped to one synchronous full pass; null between passes. */
+	replay: StreamBoundaryReplayEntry[] | null;
+}
+
+interface StreamBoundaryReplayEntry {
+	key: string;
+	boundary: StreamBoundary | undefined;
+	value: StreamBoundary | undefined;
+}
+
+// Render-phase retries need the stream registry as it stood on entry to the
+// component. Copying every boundary at EVERY component multiplies a full wave's
+// work by the already-discovered boundary count. Checkpoint this pass-local log
+// instead, recording only actual registry mutations. Boundary arrays are replaced,
+// never mutated, so their previous references are sufficient for rollback.
+function recordStreamBoundaryMutation(stream: StreamState, key: string): void {
+	if (stream.replay === null) return;
+	const boundary = stream.boundaries.get(key);
+	stream.replay.push({
+		key,
+		boundary,
+		value: boundary === undefined ? undefined : { ...boundary },
+	});
+}
+
+function rewindStreamBoundaryReplay(stream: StreamState, checkpoint: number): void {
+	const replay = stream.replay;
+	if (replay === null) return;
+	let restoredDeletion = false;
+	while (replay.length > checkpoint) {
+		const saved = replay.pop()!;
+		if (saved.boundary === undefined) {
+			stream.boundaries.delete(saved.key);
+		} else {
+			const boundary = saved.boundary;
+			const value = saved.value!;
+			Object.assign(boundary, value);
+			// These optional fields can be introduced by the discarded pass.
+			boundary.error = value.error;
+			boundary.errorReported = value.errorReported;
+			boundary.errorFlushed = value.errorFlushed;
+			if (!stream.boundaries.has(saved.key)) restoredDeletion = true;
+			stream.boundaries.set(saved.key, boundary);
+		}
+	}
+	if (restoredDeletion) {
+		// Restoring a pruned boundary appends it to Map. Re-establish discovery
+		// order only on this rare path, including recoverable-error report order.
+		const ordered = [...stream.boundaries].sort((a, b) => a[1].order - b[1].order);
+		stream.boundaries.clear();
+		for (const [key, boundary] of ordered) stream.boundaries.set(key, boundary);
+	}
+}
+
+function recordStreamBoundaryOwners(stream: StreamState, owners: string[]): void {
+	for (const owner of owners) stream.boundaryOwnerKeys.add(owner);
 }
 
 // Every boundary id includes a render-unique token. The counter proves
@@ -6788,6 +7846,9 @@ function pruneUnrepresentedStreamDescendants(
 	ownerKey: string,
 	ownerHtml: string,
 ): void {
+	// Independent siblings are the common case. Without this guard every
+	// completed sibling scans every other registered sibling in the wave.
+	if (!stream.boundaryOwnerKeys.has(ownerKey)) return;
 	let removed = true;
 	while (removed) {
 		removed = false;
@@ -6803,6 +7864,7 @@ function pruneUnrepresentedStreamDescendants(
 			}
 			if (nearestOwner !== ownerKey) continue;
 			if (ownerHtml.includes(STREAM_BOUNDARY_ATTR + '="' + child.id + '"')) continue;
+			recordStreamBoundaryMutation(stream, childKey);
 			stream.boundaries.delete(childKey);
 			removed = true;
 		}
@@ -6831,7 +7893,8 @@ function pruneStreamBoundariesAbsentFromShell(
  *   suspend, @pending  → ssrBlock(ssrBlock(pendingHtml))
  *   suspend, no arm    → ssrBlock('')
  *   error, @catch      → ssrBlock(ssrBlock(catchHtml))
- *   error, no @catch   → rethrow (buffered) / stream fallback for client recovery
+ *   error, no @catch   → rethrow for authored buffered @try; JSX Suspense and
+ *                       streamed boundaries publish fallback for client recovery
  * In streaming mode a suspended boundary additionally carries the
  * `<template data-oct-b>` sentinel, and a REGISTERED boundary keeps returning
  * its pending form (content ships via its segment).
@@ -6844,6 +7907,7 @@ export function ssrTry(
 	catchFn: ((err: unknown, scope: SSRScope, reset: () => void) => string) | null,
 	namespace: 'html' | 'svg' | 'mathml' = FRAME?.namespace ?? 'html',
 	propagateSuspense = false,
+	recoverErrors = false,
 ): string {
 	VT_SSR_TRY_SEQ++;
 	// Consume the nearest un-consumed outer ViewTransition candidate: its
@@ -6871,7 +7935,7 @@ export function ssrTry(
 	const outerAsyncScope = ASYNC_SCOPE;
 	const armScope = outerAsyncScope + '|@arm:' + siteKey + '#' + occurrence.toString(36) + ':';
 	let entry: StreamBoundary | undefined;
-	let serialStart = 0;
+	const serialStart = SERIAL?.length ?? 0;
 	let ancestorKeys: string[] = [];
 	let ownerKeys: string[] = [];
 	if (stream !== null) {
@@ -6879,12 +7943,15 @@ export function ssrTry(
 		ancestorKeys = stream.activeTryKeys.slice();
 		ownerKeys = stream.activeOwnerKeys.slice();
 		entry = stream.boundaries.get(key);
-		if (entry !== undefined) entry.namespace = namespace;
+		if (entry !== undefined) {
+			recordStreamBoundaryMutation(stream, key);
+			if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
+			entry.namespace = namespace;
+		}
 		if (entry !== undefined && entry.state === 'pending') {
 			entry.ancestors = ancestorKeys;
 			entry.owners = ownerKeys;
 		}
-		serialStart = SERIAL !== null ? SERIAL.length : 0;
 	}
 	const withArmScope = <T>(arm: 'content' | 'pending' | 'catch', fn: () => T): T => {
 		const prev = ASYNC_SCOPE;
@@ -6954,13 +8021,41 @@ export function ssrTry(
 		boundaryIds = false;
 	};
 	if (entry !== undefined) enterBoundaryIds(0);
+	let nativeFresh = false;
+	const nativeFailureStart = NATIVE_SERVER_FAILURES;
+	const nativeFreshArm = (inner: string): string => {
+		if (!MARKERS || !nativeFresh) return inner;
+		// This body cannot be replayed from ready values alone. Remove its
+		// positional seeds too; the fresh client body must not shift a sibling's
+		// use() cursor. Its original useId range remains reserved by the marker.
+		if (SERIAL !== null) SERIAL.length = serialStart;
+		const idCount = Math.max(0, ID_COUNTER - (boundaryIds ? 0 : outerIdCounter));
+		return '<!--' + NATIVE_SIGNAL_FRESH_COMMENT + idCount + '-->' + inner;
+	};
 	const pendingForm = (): string => {
 		// A ViewTransition at the top of the FALLBACK arm exits when the boundary
 		// reveals — claim its vt-exit candidate (see vtSsrClaimArm).
-		const renderFallback = (): string =>
-			withPendingArm(() =>
-				pendFn !== null ? vtSsrClaimArm(ssrBlock(pendFn(undefined, scope)), 'exit') : '',
-			);
+		const renderFallback = (): string => {
+			const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+			const previousNativeReads = NATIVE_SERVER_READS;
+			if (nativeCapture < 0) NATIVE_SERVER_READS = null;
+			let completed = false;
+			try {
+				const fallback = withPendingArm(() =>
+					pendFn !== null ? vtSsrClaimArm(ssrBlock(pendFn(undefined, scope)), 'exit') : '',
+				);
+				completed = true;
+				return fallback;
+			} finally {
+				// A stream placeholder is always replaced or mounted fresh by the
+				// client. Its reads never seed the root or the later content segment.
+				finishNativeSeedCapture(
+					nativeCapture,
+					previousNativeReads,
+					completed && entry === undefined && !nativeFresh,
+				);
+			}
+		};
 		// Once this boundary has final content, any fallback-only descendants are
 		// doomed. Render the placeholder shape without registering new stream work.
 		let fallback: string;
@@ -6971,6 +8066,9 @@ export function ssrTry(
 			// `finally`: a nested @try may catch its own suspension and return normally,
 			// so cleanup cannot live only in the outer-suspension catch path.
 			const suspendedStart = SUSPENDED?.length ?? 0;
+			const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+			const previousNativeReads = NATIVE_SERVER_READS;
+			if (nativeCapture < 0) NATIVE_SERVER_READS = null;
 			const deferredStart = DEFERRED?.length ?? 0;
 			const serialStart = SERIAL?.length ?? 0;
 			const css = CSS;
@@ -6995,9 +8093,13 @@ export function ssrTry(
 			} catch (error) {
 				// A direct suspension has no nested pending arm whose HTML can be kept.
 				// The outer template remains balanced with an empty fallback range.
+				// Inline resource reads can throw before a component normalizes them;
+				// the finally below discards their registration along with use() work.
+				error = normalizeThrownServerThenable(error);
 				if (!ssrIsSuspense(error)) throw error;
 				fallback = '';
 			} finally {
+				finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 				if (SUSPENDED !== null) SUSPENDED.length = suspendedStart;
 				if (DEFERRED !== null) DEFERRED.length = deferredStart;
 				if (SERIAL !== null) SERIAL.length = serialStart;
@@ -7046,18 +8148,29 @@ export function ssrTry(
 				'<template ' + STREAM_BOUNDARY_ATTR + '="' + entry.id + '"></template>' + fallback,
 			);
 		}
-		return ssrBlock(pendFn !== null ? fallback : '');
+		return ssrBlock(nativeFreshArm(pendFn !== null ? fallback : ''));
 	};
 	try {
 		try {
 			// A ViewTransition at the top of the CONTENT arm enters when the content
 			// streams in — claim its vt-enter candidate.
-			const inner = vtSsrClaimArm(ssrBlock(withContentArm(() => tryFn(undefined, scope))), 'enter');
+			const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+			const previousNativeReads = NATIVE_SERVER_READS;
+			if (nativeCapture < 0) NATIVE_SERVER_READS = null;
+			let nativeReads: NativeSeedReads | null = null;
+			let inner: string;
+			try {
+				inner = vtSsrClaimArm(ssrBlock(withContentArm(() => tryFn(undefined, scope))), 'enter');
+			} finally {
+				nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
+			}
 			if (entry !== undefined) {
 				// Registered (was pending in an earlier pass): capture the content +
 				// this boundary's seed slice for its segment; the surrounding pass
 				// keeps seeing the pending form so the shell shape stays stable.
 				if (entry.state === 'pending') {
+					if (!entry.serverOwnedStatic)
+						entry.signals = NATIVE_READ_COLLECTOR?.serialize(nativeReads);
 					entry.state = 'done';
 					entry.html =
 						vtOuter !== null
@@ -7079,8 +8192,31 @@ export function ssrTry(
 				ID_COUNTER = entry.pendingIdOffset;
 				return pendingForm();
 			}
+			// Accepted boundary reads still belong to this result's HTML and its
+			// revision checks. The sidecar also keeps them available to a boundary
+			// that hydrates after the root's adoption frame has been released.
+			appendNativeSeedReads(nativeReads);
+			if (MARKERS && pendFn !== null) {
+				// Reserve sequential IDs and isolate positional use() seeds from siblings.
+				// A client-owned promise can suspend even though the server resolved it.
+				const idCount = ID_COUNTER - outerIdCounter;
+				const seeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+				const native = NATIVE_READ_COLLECTOR?.serialize(nativeReads);
+				return ssrBlock(
+					`<!--${SUSPENSE_RESOLVED_COMMENT}${idCount}-->` +
+						(seeds.length === 0
+							? ''
+							: serializeSuspenseSeeds(seeds, NONCE_ATTR, SUSPENSE_RESOLVED_SEED_ATTR)) +
+						(native === undefined
+							? ''
+							: serializeNativeSignalSeeds(native, NONCE_ATTR, SUSPENSE_RESOLVED_NATIVE_ATTR)) +
+						inner,
+				);
+			}
 			return ssrBlock(inner);
 		} catch (e) {
+			nativeFresh = NATIVE_SERVER_FAILURES !== nativeFailureStart;
+			e = normalizeThrownServerThenable(e);
 			if (ssrIsSuspense(e)) {
 				if (propagateSuspense) throw e;
 				if (stream !== null) {
@@ -7103,7 +8239,9 @@ export function ssrTry(
 							ancestors: ancestorKeys,
 							owners: ownerKeys,
 						};
+						recordStreamBoundaryMutation(stream, key);
 						stream.boundaries.set(key, entry);
+						if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
 						enterBoundaryIds(pendingIdOffset);
 					} else {
 						ID_COUNTER = entry.pendingIdOffset;
@@ -7121,9 +8259,21 @@ export function ssrTry(
 						? SERIAL.slice(serialStart)
 						: [];
 				if (entry !== undefined && SERIAL !== null) SERIAL.length = serialStart;
-				const inner = ssrBlock(withCatchArm(() => catchFn(e, scope, NOOP)));
+				const nativeCapture = NATIVE_READ_COLLECTOR?.beginCapture() ?? -1;
+				const previousNativeReads = NATIVE_SERVER_READS;
+				if (nativeCapture < 0) NATIVE_SERVER_READS = null;
+				let catchReads: NativeSeedReads | null = null;
+				let inner: string;
+				try {
+					inner = ssrBlock(withCatchArm(() => catchFn(e, scope, NOOP)));
+				} finally {
+					catchReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
+				}
+				inner = nativeFreshArm(inner);
 				if (entry !== undefined) {
 					if (entry.state !== 'done') {
+						if (!entry.serverOwnedStatic && !nativeFresh)
+							entry.signals = NATIVE_READ_COLLECTOR?.serialize(catchReads);
 						if (SERIAL !== null) {
 							if (!entry.serverOwnedStatic) {
 								caughtSeeds.push(...SERIAL.slice(serialStart));
@@ -7132,7 +8282,7 @@ export function ssrTry(
 						}
 						entry.state = 'done';
 						entry.html = inner;
-						entry.seeds = caughtSeeds;
+						entry.seeds = nativeFresh ? [] : caughtSeeds;
 						pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
 					} else if (SERIAL !== null) {
 						SERIAL.length = serialStart;
@@ -7140,13 +8290,13 @@ export function ssrTry(
 					ID_COUNTER = entry.pendingIdOffset;
 					return pendingForm();
 				}
+				if (!nativeFresh) appendNativeSeedReads(catchReads);
 				return ssrBlock(inner);
 			}
 			if (stream !== null) {
 				// Fizz keeps a Suspense shell valid when its primary content throws:
 				// publish the fallback, report the error, and mark this boundary for a
-				// client render. Buffered renderers still rethrow below because they have
-				// no progressive recovery channel.
+				// client render. Buffered JSX Suspense uses a fresh-arm marker below.
 				if (SERIAL !== null) SERIAL.length = serialStart;
 				if (entry === undefined && PERMANENT_STATIC_HYDRATE_DEPTH !== 0) throw e;
 				if (entry === undefined) {
@@ -7166,7 +8316,9 @@ export function ssrTry(
 						ancestors: ancestorKeys,
 						owners: ownerKeys,
 					};
+					recordStreamBoundaryMutation(stream, key);
 					stream.boundaries.set(key, entry);
+					if (ownerKeys.length !== 0) recordStreamBoundaryOwners(stream, ownerKeys);
 					enterBoundaryIds(pendingIdOffset);
 				} else if (entry.state === 'pending') {
 					entry.state = 'errored';
@@ -7180,6 +8332,16 @@ export function ssrTry(
 				const fallback = pendingForm();
 				pruneUnrepresentedStreamDescendants(stream, key, fallback);
 				return fallback;
+			}
+			if (recoverErrors && pendFn !== null && PERMANENT_STATIC_HYDRATE_DEPTH === 0) {
+				// A buffered Suspense boundary can retry on hydration just like a
+				// streamed boundary. Discard failed-content seeds and mark only this
+				// arm for a fresh client render; surrounding server hosts still adopt.
+				if (SERIAL !== null) SERIAL.length = serialStart;
+				const reports = RESOLVED?.bufferedErrors ?? (RESOLVED!.bufferedErrors = new Map());
+				if (!reports.has(key)) reports.set(key, { error: e, reported: false });
+				nativeFresh = true;
+				return pendingForm();
 			}
 			throw e;
 		}
@@ -7221,6 +8383,10 @@ function streamRuntimeJs(): string {
 		STREAM_SEED_ATTR +
 		']");' +
 		'if(sd){S[id]=sd.textContent;sd.parentNode.removeChild(sd);}' +
+		'var ns=c.firstElementChild;while(ns&&!(ns.localName==="script"&&ns.hasAttribute("' +
+		NATIVE_SIGNAL_SEED_ATTR +
+		'")))ns=ns.nextElementSibling;' +
+		'if(ns){S[id+"$signals"]=ns.textContent;ns.parentNode.removeChild(ns);}' +
 		'if(nc)c=c.firstElementChild;' +
 		'var n=t.nextSibling,depth=1;' +
 		'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
@@ -7263,9 +8429,16 @@ interface StreamSink {
 	/**
 	 * Returns a promise only when the transport applies pressure. `terminal`
 	 * permits the final degraded-boundary markers after an external abort; a
-	 * disconnected/cancelled consumer still rejects it.
+	 * disconnected/cancelled consumer still rejects it. `onUnaccepted` is only
+	 * called when an external abort rejects before web enqueue or Node
+	 * `dest.write`; Node writes that returned false already accepted bytes. The
+	 * `recovery` mode accepts writes after external abort but respects demand.
 	 */
-	write(chunk: string, terminal?: boolean): void | Promise<void>;
+	write(
+		chunk: string,
+		terminal?: boolean | 'recovery',
+		onUnaccepted?: (chunk: string) => void,
+	): void | Promise<void>;
 	shellReady(): void;
 	shellError(err: unknown): void;
 	allReady(): void;
@@ -7387,18 +8560,22 @@ function documentHeadInsertionPoint(body: string): number {
 		const next = body.charCodeAt(start + 5);
 		if (next === 62 /* > */) return start + 6;
 		if (next === 32 || next === 9 || next === 10 || next === 13) {
-			let quote = 0;
-			for (let i = start + 6; i < body.length; i++) {
-				const code = body.charCodeAt(i);
-				if (quote !== 0) {
-					if (code === quote) quote = 0;
-				} else if (code === 34 /* " */ || code === 39 /* ' */) quote = code;
-				else if (code === 62 /* > */) return i + 1;
-			}
-			return -1;
+			return documentTagEnd(body, start + 6);
 		}
 		searchFrom = start + 5;
 	}
+}
+
+function documentTagEnd(body: string, from: number): number {
+	let quote = 0;
+	for (let i = from; i < body.length; i++) {
+		const code = body.charCodeAt(i);
+		if (quote !== 0) {
+			if (code === quote) quote = 0;
+		} else if (code === 34 /* " */ || code === 39 /* ' */) quote = code;
+		else if (code === 62 /* > */) return i + 1;
+	}
+	return -1;
 }
 
 function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
@@ -7415,6 +8592,7 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 				'</script>';
 		}
 	}
+	if (b.signals !== undefined) seedScript += serializeNativeSignalSeeds(b.signals, nonceAttr);
 	// ViewTransition arm candidates are renderer-only staging attributes. Strip
 	// them while this is still markup: once the parsing-safe carrier below turns
 	// the segment into a JSON string, vtSsrStrip can no longer recognize quoted
@@ -7499,19 +8677,21 @@ async function runStream(
 	props: any,
 	options: StreamOptions | undefined,
 	sink: StreamSink,
+	resolved: ResolvedMap,
 ): Promise<void> {
 	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
 	const signal = options?.signal;
 	const nonceAttr = nonceAttrOf(options);
 	const identifierPrefix = options?.identifierPrefix ?? '';
-	const resolved: ResolvedMap = newResolvedMap();
 	const stream: StreamState = {
 		boundaries: new Map(),
+		boundaryOwnerKeys: new Set(),
 		nextId: 0,
 		token: createStreamToken(),
 		activePassBoundaryKeys: null,
 		activeTryKeys: [],
 		activeOwnerKeys: [],
+		replay: null,
 	};
 	const renderFullPass = (): {
 		pass: FullPassResult;
@@ -7519,7 +8699,9 @@ async function runStream(
 	} => {
 		const boundaryKeys = new Set<string>();
 		const previousBoundaryKeys = stream.activePassBoundaryKeys;
+		const previousReplay = stream.replay;
 		stream.activePassBoundaryKeys = boundaryKeys;
+		stream.replay = [];
 		try {
 			return {
 				pass: withStream(stream, () =>
@@ -7529,6 +8711,7 @@ async function runStream(
 			};
 		} finally {
 			stream.activePassBoundaryKeys = previousBoundaryKeys;
+			stream.replay = previousReplay;
 		}
 	};
 	// ── External injection (cold path: every hook below no-ops when absent) ──
@@ -7536,11 +8719,30 @@ async function runStream(
 	// Early fatal paths can return before `done` is awaited; observe it up
 	// front so a later rejection never surfaces as an unhandled rejection.
 	if (injection !== undefined) injection.done.then(NOOP, NOOP);
+	let injectionCompleted = false;
+	const completeInjection: () => void =
+		injection === undefined
+			? NOOP
+			: () => {
+					if (injectionCompleted) return;
+					injectionCompleted = true;
+					injection.renderComplete?.();
+				};
 	let injectionUnsubscribe: (() => void) | undefined;
 	let injectionFailure: unknown;
 	let injectionFailed = false;
+	const unacceptedInjection: string[] | undefined = injection === undefined ? undefined : [];
+	const rememberUnaccepted: (chunk: string) => void =
+		injection === undefined
+			? NOOP
+			: (chunk) => {
+					unacceptedInjection!.push(chunk);
+				};
 	let signalInjectionFailure: (() => void) | undefined;
 	const failInjection = (err: unknown): void => {
+		// An external abort rejects a sink write before it was accepted. Its
+		// payload is terminal salvage, not a failure of the injection source.
+		if (signal?.aborted && err === signal.reason) return;
 		if (injectionFailed) return;
 		injectionFailed = true;
 		injectionFailure = err;
@@ -7553,11 +8755,15 @@ async function runStream(
 	// its caller. Without injection, writes go to the sink directly — the
 	// established path, no chain, no extra microtasks.
 	let writeChain: Promise<void> | null = injection === undefined ? null : Promise.resolve();
-	const write: (chunk: string, terminal?: boolean) => void | Promise<void> =
+	const write: (
+		chunk: string,
+		terminal?: boolean | 'recovery',
+		onUnaccepted?: (chunk: string) => void,
+	) => void | Promise<void> =
 		injection === undefined
 			? (chunk, terminal) => sink.write(chunk, terminal)
-			: (chunk, terminal) => {
-					const operation = writeChain!.then(() => sink.write(chunk, terminal));
+			: (chunk, terminal, onUnaccepted) => {
+					const operation = writeChain!.then(() => sink.write(chunk, terminal, onUnaccepted));
 					writeChain = operation.then(NOOP, NOOP);
 					return operation;
 				};
@@ -7571,14 +8777,42 @@ async function runStream(
 			return;
 		}
 		if (!html) return;
-		return write(html);
+		return write(html, false, rememberUnaccepted);
 	};
+	const recoveryInjection: (() => Promise<string>) | undefined =
+		injection === undefined
+			? undefined
+			: async () => {
+					if (signal?.aborted) {
+						// Pending notification writes can reject before web enqueue or
+						// Node dest.write. Replay each taken chunk through demand; only
+						// the final recovery markers bypass pressure.
+						await writeChain;
+						for (const html of unacceptedInjection!) {
+							const replay = write(html, 'recovery');
+							if (replay !== undefined) await replay;
+						}
+						unacceptedInjection!.length = 0;
+					}
+					if (injectionFailed) return '';
+					let queued: string;
+					try {
+						queued = injection.take();
+					} catch {
+						return '';
+					}
+					if (queued !== '' && signal?.aborted) {
+						const replay = write(queued, 'recovery');
+						if (replay !== undefined) await replay;
+						return '';
+					}
+					return queued;
+				};
 	const notifyInjection = (): void => {
 		const drained = drainInjection();
-		// A transport failure here is re-observed by the next awaited render
-		// write (or the completion wait); the notify path only must not
-		// produce an unhandled rejection.
-		if (drained !== undefined) drained.catch(NOOP);
+		// Notifications write outside the render loop; surface their transport
+		// failure even when no later render chunk needs to pass through the gate.
+		if (drained !== undefined) drained.catch(failInjection);
 	};
 	/** Resolves when `done` settles; rejects on abort, take() failure, or done rejection. */
 	const waitForInjectionDone = (): Promise<void> =>
@@ -7666,6 +8900,10 @@ async function runStream(
 	let pass: FullPassResult;
 	let shellBoundaryKeys: Set<string>;
 	let preShellSuspended: SuspendedList = [];
+	// One-shot retry when batching is disabled. Keep it across shell publication
+	// so the final root retry cannot strand the same obsolete batch in the
+	// boundary loop. Both loops retain their abort checks and attempt bounds.
+	let retryWithoutSettling = false;
 	try {
 		signal?.throwIfAborted();
 		({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
@@ -7686,20 +8924,36 @@ async function runStream(
 				throw new Error(formatServerError(35, MAX_SUSPENSE_PASSES));
 			}
 			const settledWave = pass.suspended;
-			await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			if (!retryWithoutSettling) {
+				await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			}
 			({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
 			preShellSuspended = pass.suspended;
-			observeSuspenseWave(resolved, settledWave, pass.suspended, false);
+			retryWithoutSettling = observeSuspenseWave(resolved, settledWave, pass.suspended, false);
 			signal?.throwIfAborted();
 		}
 		pruneStreamBoundariesAbsentFromShell(stream, shellBoundaryKeys);
 	} catch (err) {
+		try {
+			completeInjection();
+		} catch {
+			// Keep the shell failure; source finalization is best effort here.
+		}
 		const reports = signal?.aborted ? Math.max(1, preShellSuspended.length) : 1;
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
 		sink.shellError(err);
 		return;
 	}
-	reportRecoverableBoundaryErrors();
+	try {
+		reportRecoverableBoundaryErrors();
+	} catch (err) {
+		try {
+			completeInjection();
+		} catch {
+			// The callback already failed; still release the injection source.
+		}
+		throw err;
+	}
 	// SHELL: styles first (so painted fallbacks are styled), hoisted head, body,
 	// the shell-scope seed script, then the swap runtime iff anything is pending.
 	// Every Float sheet the shell pass collected rides the shell head fold
@@ -7713,9 +8967,9 @@ async function runStream(
 			'<style data-octane="' +
 			hash +
 			'"' +
-			nonceAttr +
+			(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
 			'>' +
-			escapeEntireInlineStyleContent(sheet) +
+			escapeEntireInlineStyleContent(sheet.css) +
 			'</style>';
 	}
 	// Streaming DOCUMENT renders always lead with `<!DOCTYPE html>` — React
@@ -7740,7 +8994,18 @@ async function runStream(
 	// The shell is vt-stripped as a whole below, so the withheld head is stripped
 	// here to keep both channels equivalent to the folded shell.
 	const separateHead = options?.headChannel === 'separate';
-	if (separateHead) options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head);
+	if (separateHead) {
+		try {
+			options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head);
+		} catch (err) {
+			try {
+				completeInjection();
+			} catch {
+				// The head callback already failed; still release the source.
+			}
+			throw err;
+		}
+	}
 	const shellHead = separateHead ? '' : pass.head;
 	const documentRoot = isDocumentRoot(pass.body);
 	let shell = documentRoot ? '<!DOCTYPE html>' : '';
@@ -7749,19 +9014,22 @@ async function runStream(
 		const tailStart = documentTailStart(pass.body);
 		if (tailStart !== -1) {
 			heldDocumentTail = pass.body.slice(tailStart);
-			const bodyHtml = pass.body.slice(0, tailStart);
+			const bodyHtml = spliceHead(pass.body.slice(0, tailStart), '');
 			const headInsert = documentHeadInsertionPoint(bodyHtml);
 			shell +=
 				headInsert !== -1
 					? bodyHtml.slice(0, headInsert) + leadingStyles + shellHead + bodyHtml.slice(headInsert)
 					: leadingStyles + shellHead + bodyHtml;
 		} else {
-			shell += leadingStyles + shellHead + pass.body;
+			shell += spliceHead(pass.body, leadingStyles + shellHead);
 		}
 	} else {
-		shell += leadingStyles + shellHead + pass.body;
+		shell += documentRoot
+			? spliceHead(pass.body, leadingStyles + shellHead)
+			: leadingStyles + shellHead + pass.body;
 	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	if (pass.signals !== undefined) shell += serializeNativeSignalSeeds(pass.signals, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending)
 		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + streamRuntimeJs() + '</script>';
@@ -7769,11 +9037,25 @@ async function runStream(
 		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
+		try {
+			completeInjection();
+		} catch {
+			// The shell write already failed; source finalization is best effort.
+		}
 		options?.onError?.(err);
 		sink.shellError(err);
 		return;
 	}
-	sink.shellReady();
+	try {
+		sink.shellReady();
+	} catch (err) {
+		try {
+			completeInjection();
+		} catch {
+			// Preserve the shell callback failure for the stream's rejection.
+		}
+		throw err;
+	}
 	if (injection !== undefined) {
 		// Subscribe only once the shell is on the wire: injected HTML must never
 		// precede it. HTML queued before this point is picked up by the initial
@@ -7822,7 +9104,9 @@ async function runStream(
 				throw new Error(formatServerError(48, MAX_SUSPENSE_PASSES));
 			}
 			const settledWave = suspended;
-			await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			if (!retryWithoutSettling) {
+				await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
+			}
 			pass = renderFullPass().pass;
 			suspended = pass.suspended;
 			reportRecoverableBoundaryErrors();
@@ -7834,9 +9118,9 @@ async function runStream(
 					'<style data-octane="' +
 					hash +
 					'"' +
-					nonceAttr +
+					(sheet.nonce === undefined ? nonceAttr : ' nonce="' + escapeAttr(sheet.nonce) + '"') +
 					'>' +
-					escapeEntireInlineStyleContent(sheet) +
+					escapeEntireInlineStyleContent(sheet.css) +
 					'</style>';
 			}
 			// Float sheet resources this pass discovered that are not on the wire
@@ -7868,7 +9152,7 @@ async function runStream(
 				}
 			}
 			if (madeProgress) attempt = 0; // a boundary completed — this wave was legitimate
-			observeSuspenseWave(resolved, settledWave, suspended, madeProgress);
+			retryWithoutSettling = observeSuspenseWave(resolved, settledWave, suspended, madeProgress);
 
 			// A nested boundary's template may live inside an enclosing boundary's
 			// not-yet-flushed segment. Build a topological emission order: roots and
@@ -7907,20 +9191,17 @@ async function runStream(
 			injectionUnsubscribe?.();
 			injectionUnsubscribe = undefined;
 			try {
-				injection.renderComplete?.();
+				completeInjection();
 			} catch {
 				// The stream is already failing; the source's error cannot improve it.
 			}
 		}
 		let tail = '';
-		if (injection !== undefined && !injectionFailed) {
-			// Terminal salvage: queued injection HTML (typically the source's
-			// just-flushed serialization remainder) still ships, ahead of the
-			// recovery markers and the held tail.
+		if (recoveryInjection !== undefined) {
 			try {
-				tail += injection.take();
+				tail = await recoveryInjection();
 			} catch {
-				// A failing source forfeits its remainder; the terminal write goes on.
+				// A disconnected consumer cannot receive the remaining HTML.
 			}
 		}
 		for (const b of stream.boundaries.values()) {
@@ -7947,7 +9228,7 @@ async function runStream(
 		// `done` settles; abort and source failures route through the same
 		// degraded terminal path as a mid-render abort.
 		try {
-			injection.renderComplete?.();
+			completeInjection();
 		} catch (err) {
 			failInjection(err);
 		}
@@ -7955,13 +9236,18 @@ async function runStream(
 			await waitForInjectionDone();
 			const finalDrain = drainInjection();
 			if (finalDrain !== undefined) await finalDrain;
+			// A notification may already have taken the last HTML while its write
+			// waits for consumer demand. No final drain remains to await in that case.
+			await writeChain;
 			if (injectionFailed) throw injectionFailure;
 			if (heldDocumentTail !== '') {
-				// Cleared before awaiting: a post-acceptance rejection (abort racing
-				// the drain wait) must not resend the tail through the catch below.
+				// Restore the held tail only if the transport rejected before
+				// enqueueing it; Node may reject after accepting bytes under pressure.
 				const tailChunk = heldDocumentTail;
 				heldDocumentTail = '';
-				const tailWrite = write(tailChunk);
+				const tailWrite = write(tailChunk, false, (unaccepted) => {
+					heldDocumentTail = unaccepted;
+				});
 				if (tailWrite !== undefined) await tailWrite;
 			}
 		} catch (err) {
@@ -7971,14 +9257,10 @@ async function runStream(
 			injectionUnsubscribe?.();
 			injectionUnsubscribe = undefined;
 			let terminal = '';
-			if (!injectionFailed) {
-				// Terminal salvage: the source may have queued HTML (e.g. its
-				// serialization remainder) between the failure and this close.
-				try {
-					terminal = injection.take();
-				} catch {
-					// A failing source forfeits its remainder; the tail still ships.
-				}
+			try {
+				terminal = await recoveryInjection!();
+			} catch {
+				// A disconnected consumer cannot receive the remaining HTML.
 			}
 			terminal += heldDocumentTail;
 			if (terminal !== '') {
@@ -8005,17 +9287,23 @@ async function runStream(
  * `(Component, props?, options?)`.
  */
 export function renderToPipeableStream(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: StreamOptions,
 ): {
 	pipe: <T extends { write(chunk: string): unknown; end(): unknown }>(destination: T) => T;
 	abort: (reason?: unknown) => void;
 } {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	interface Destination {
 		write(chunk: string): unknown;
 		end(): unknown;
+		destroy?: (error: unknown) => unknown;
 		once?: (event: string, listener: (...args: any[]) => void) => unknown;
 		off?: (event: string, listener: (...args: any[]) => void) => unknown;
 		removeListener?: (event: string, listener: (...args: any[]) => void) => unknown;
@@ -8033,12 +9321,17 @@ export function renderToPipeableStream(
 		}
 	}
 	let destination: Destination | null = null;
-	const buffered: { chunk: string; terminal: boolean }[] = [];
+	const buffered: {
+		chunk: string;
+		terminal: boolean | 'recovery';
+		onUnaccepted?: (chunk: string) => void;
+	}[] = [];
 	let ended = false;
 	let closed = false;
 	let endCalled = false;
 	let pipeCalled = false;
 	let writeGate: Promise<void> | null = null;
+	let shellFailure: { error: unknown } | null = null;
 
 	const destinationFailure = (reason: unknown): void => {
 		if (closed) return;
@@ -8057,13 +9350,23 @@ export function renderToPipeableStream(
 		if (!ended || destination === null || writeGate !== null || endCalled || closed) return;
 		endCalled = true;
 		try {
+			if (shellFailure !== null && destination.destroy !== undefined) {
+				// No shell exists to hydrate. Fail the transport instead of reporting
+				// an empty response as successful; the render callbacks already ran.
+				closed = true;
+				destination.destroy(shellFailure.error);
+				return;
+			}
 			destination.end();
 		} catch (err) {
 			destinationFailure(err);
 		}
 	};
 
-	const waitForDrain = (dest: Destination): Promise<void> => {
+	const waitForDrain = (dest: Destination, allowAborted = false): Promise<void> => {
+		// A recovery write can close the destination synchronously inside
+		// dest.write(false), before these one-shot listeners are installed.
+		if (allowAborted && closed) return Promise.reject(new Error(formatServerError(38)));
 		if (dest.once === undefined) {
 			return Promise.reject(new TypeError(formatServerError(39)));
 		}
@@ -8101,15 +9404,22 @@ export function renderToPipeableStream(
 			dest.once!('drain', onDrain);
 			dest.once!('error', onError);
 			dest.once!('close', onClose);
-			if (controller.signal.aborted) onAbort();
-			else controller.signal.addEventListener('abort', onAbort, { once: true });
+			if (!allowAborted) {
+				if (controller.signal.aborted) onAbort();
+				else controller.signal.addEventListener('abort', onAbort, { once: true });
+			}
 		});
 	};
 
-	const writeNow = (chunk: string, terminal: boolean): void | Promise<void> => {
+	const writeNow = (
+		chunk: string,
+		terminal: boolean | 'recovery',
+		onUnaccepted?: (chunk: string) => void,
+	): void | Promise<void> => {
 		const dest = destination!;
 		if (closed) return Promise.reject(new Error(formatServerError(40)));
-		if (!terminal && controller.signal.aborted) {
+		if (terminal === false && controller.signal.aborted) {
+			onUnaccepted?.(chunk);
 			return Promise.reject(controller.signal.reason);
 		}
 		let accepted: unknown;
@@ -8122,7 +9432,9 @@ export function renderToPipeableStream(
 		// `write(false)` still accepted the bytes. Normal chunks wait for drain
 		// before rendering more; a terminal recovery marker can call end()
 		// immediately and let the Writable flush its already-buffered final bytes.
-		return accepted === false && !terminal ? waitForDrain(dest) : undefined;
+		return accepted === false && terminal !== true
+			? waitForDrain(dest, terminal === 'recovery')
+			: undefined;
 	};
 
 	const trackWrite = (operation: Promise<void>): Promise<void> => {
@@ -8147,16 +9459,22 @@ export function renderToPipeableStream(
 		return operation;
 	};
 
-	const queueWrite = (chunk: string, terminal = false): void | Promise<void> => {
+	const queueWrite = (
+		chunk: string,
+		terminal: boolean | 'recovery' = false,
+		onUnaccepted?: (chunk: string) => void,
+	): void | Promise<void> => {
 		if (destination === null) {
-			buffered.push({ chunk, terminal });
+			buffered.push(
+				onUnaccepted === undefined ? { chunk, terminal } : { chunk, terminal, onUnaccepted },
+			);
 			return;
 		}
 		if (writeGate !== null) {
-			const operation = writeGate.then(() => writeNow(chunk, terminal));
+			const operation = writeGate.then(() => writeNow(chunk, terminal, onUnaccepted));
 			return trackWrite(operation);
 		}
-		const operation = writeNow(chunk, terminal);
+		const operation = writeNow(chunk, terminal, onUnaccepted);
 		return operation === undefined ? undefined : trackWrite(operation);
 	};
 
@@ -8170,26 +9488,32 @@ export function renderToPipeableStream(
 	const startRender = (): void => {
 		if (started) return;
 		started = true;
+		const renderOptions = { ...options, signal: controller.signal };
+		const resolved = newResolvedMap(renderOptions);
 		void runStream(
 			component,
 			props,
-			{ ...options, signal: controller.signal },
+			renderOptions,
 			{
-				write(chunk, terminal) {
-					return queueWrite(chunk, terminal);
+				write(chunk, terminal, onUnaccepted) {
+					return queueWrite(chunk, terminal, onUnaccepted);
 				},
 				shellReady() {
 					options?.onShellReady?.();
 				},
 				shellError(err) {
+					releaseServerRenderResources(resolved);
+					shellFailure = { error: err };
 					options?.onShellError?.(err);
 					flushEnd();
 				},
 				allReady() {
+					releaseServerRenderResources(resolved);
 					options?.onAllReady?.();
 					flushEnd();
 				},
 				fatal() {
+					releaseServerRenderResources(resolved);
 					// Once the shell exists, abort/error degradation is a terminal
 					// completion of the pipeable request. Fizz fires onAllReady after its
 					// recovery instructions have been accepted even though onError also
@@ -8199,7 +9523,9 @@ export function renderToPipeableStream(
 					flushEnd();
 				},
 			},
+			resolved,
 		).catch((err) => {
+			releaseServerRenderResources(resolved);
 			options?.onError?.(err);
 			flushEnd();
 		});
@@ -8230,7 +9556,11 @@ export function renderToPipeableStream(
 			// Chunks accepted into the pre-pipe buffer remain deliverable even if
 			// abort() ran meanwhile (the final item is the degraded $OCTRX tail).
 			for (const item of buffered) {
-				queueWrite(item.chunk, item.terminal || controller.signal.aborted);
+				queueWrite(
+					item.chunk,
+					item.terminal === 'recovery' ? 'recovery' : item.terminal || controller.signal.aborted,
+					item.onUnaccepted,
+				);
 			}
 			buffered.length = 0;
 			finishEnd();
@@ -8250,11 +9580,16 @@ export function renderToPipeableStream(
  * pauses `allReady`; read concurrently when waiting for it.
  */
 export function renderToReadableStream(
-	entryComponent: ServerEntryComponent,
+	entryComponent: ServerRenderNode,
 	props?: any,
 	options?: StreamOptions,
 ): Promise<ReadableStream<Uint8Array> & { allReady: Promise<void> }> {
-	const component = entryComponent as ServerComponent;
+	const component =
+		typeof entryComponent === 'function' ? (entryComponent as ServerComponent) : renderEntryValue;
+	if (typeof entryComponent !== 'function') {
+		options ??= props;
+		props = { value: entryComponent };
+	}
 	return new Promise((resolveShell, rejectShell) => {
 		const encoder = new TextEncoder();
 		const renderController = new AbortController();
@@ -8305,8 +9640,11 @@ export function renderToReadableStream(
 		}) as ReadableStream<Uint8Array> & { allReady: Promise<void> };
 		stream.allReady = allReady;
 		let shellDone = false;
+		let terminal = false;
+		let released = false;
+		let callbackFailure: { error: unknown } | undefined;
 
-		const waitForDemand = (): Promise<void> =>
+		const waitForDemand = (allowAborted = false): Promise<void> =>
 			new Promise<void>((resolve, reject) => {
 				let settled = false;
 				const cleanup = (): void => {
@@ -8322,19 +9660,26 @@ export function renderToReadableStream(
 				const onDemand = () => finish(resolve);
 				const onAbort = () => finish(() => reject(renderController.signal.reason));
 				wakeDemand = onDemand;
-				if (renderController.signal.aborted) onAbort();
-				else renderController.signal.addEventListener('abort', onAbort, { once: true });
+				if (!allowAborted) {
+					if (renderController.signal.aborted) onAbort();
+					else renderController.signal.addEventListener('abort', onAbort, { once: true });
+				}
 			});
 
-		const writeReadable = (chunk: string, terminal = false): void | Promise<void> => {
+		const writeReadable = (
+			chunk: string,
+			terminal: boolean | 'recovery' = false,
+			onUnaccepted?: (chunk: string) => void,
+		): void | Promise<void> => {
 			if (closed || consumerCancelled) {
 				return Promise.reject(cancelReason ?? new Error(formatServerError(44)));
 			}
-			if (!terminal && renderController.signal.aborted) {
+			if (terminal === false && renderController.signal.aborted) {
+				onUnaccepted?.(chunk);
 				return Promise.reject(renderController.signal.reason);
 			}
 			const bytes = encoder.encode(chunk);
-			if (terminal) {
+			if (terminal === true) {
 				// Recovery is the sole bounded-pressure exception: enqueue at most one
 				// final $OCTRX chunk even when the shell fills the high-water mark. That
 				// keeps abort/error `allReady` rejection deterministic without losing
@@ -8347,13 +9692,18 @@ export function renderToReadableStream(
 				return;
 			}
 			return (async () => {
-				while ((readableController.desiredSize ?? 0) <= 0) {
-					await waitForDemand();
-					if (closed || consumerCancelled) {
-						throw cancelReason ?? new Error(formatServerError(44));
+				try {
+					while ((readableController.desiredSize ?? 0) <= 0) {
+						await waitForDemand(terminal === 'recovery');
+						if (closed || consumerCancelled) {
+							throw cancelReason ?? new Error(formatServerError(44));
+						}
 					}
+					readableController.enqueue(bytes);
+				} catch (err) {
+					if (!consumerCancelled && renderController.signal.aborted) onUnaccepted?.(chunk);
+					throw err;
 				}
-				readableController.enqueue(bytes);
 			})();
 		};
 
@@ -8369,40 +9719,83 @@ export function renderToReadableStream(
 			}
 		};
 
+		const renderOptions = { ...options, signal: renderController.signal };
+		if (options?.onError !== undefined) {
+			// An observer must not interrupt the renderer's recovery or leave the
+			// shell/allReady promises pending. Keep its first failure for settlement.
+			renderOptions.onError = (error) => {
+				try {
+					options.onError!(error);
+				} catch (err) {
+					callbackFailure ??= { error: err };
+				}
+			};
+		}
+		const resolved = newResolvedMap(renderOptions);
+		const release = (): void => {
+			if (released) return;
+			released = true;
+			releaseServerRenderResources(resolved);
+		};
+		const settleFailure = (error: unknown): void => {
+			if (terminal) return;
+			terminal = true;
+			try {
+				release();
+			} catch (err) {
+				error = err;
+			}
+			const reason = callbackFailure === undefined ? error : callbackFailure.error;
+			if (!shellDone) rejectShell(reason);
+			allReadyReject(reason);
+			closeReadable();
+		};
 		runStream(
 			component,
 			props,
-			{ ...options, signal: renderController.signal },
+			renderOptions,
 			{
-				write(chunk, terminal) {
-					return writeReadable(chunk, terminal);
+				write(chunk, terminal, onUnaccepted) {
+					return writeReadable(chunk, terminal, onUnaccepted);
 				},
 				shellReady() {
-					shellDone = true;
 					options?.onShellReady?.();
+					shellDone = true;
 					resolveShell(stream);
 				},
 				shellError(err) {
-					options?.onShellError?.(err);
-					if (!shellDone) rejectShell(err);
-					allReadyReject(err);
-					closeReadable();
+					try {
+						release();
+						options?.onShellError?.(err);
+					} catch (callbackError) {
+						settleFailure(callbackError);
+						return;
+					}
+					settleFailure(err);
 				},
 				allReady() {
-					options?.onAllReady?.();
-					allReadyResolve();
+					if (terminal) return;
+					try {
+						release();
+						options?.onAllReady?.();
+					} catch (err) {
+						renderOptions.onError?.(err);
+						settleFailure(err);
+						return;
+					}
+					terminal = true;
+					if (callbackFailure === undefined) allReadyResolve();
+					else allReadyReject(callbackFailure.error);
 					closeReadable();
 				},
 				fatal(err) {
-					allReadyReject(err);
-					closeReadable();
+					settleFailure(err);
 				},
 			},
+			resolved,
 		).catch((err) => {
-			options?.onError?.(err);
-			if (!shellDone) rejectShell(err);
-			allReadyReject(err);
-			closeReadable();
+			renderOptions.onError?.(err);
+			settleFailure(err);
 		});
 	});
 }

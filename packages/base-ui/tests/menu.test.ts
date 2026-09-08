@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount, flushEffects } from '../../octane/tests/_helpers';
 import { flushSync } from '../../octane/src/index.js';
-import { TYPEAHEAD_RESET_MS } from '@octanejs/base-ui/utils/constants';
+import { TYPEAHEAD_RESET_MS } from '@octanejs/base-ui/internals/constants';
 import { Menu } from '@octanejs/base-ui/menu';
 import {
 	MenuInteractive,
@@ -103,18 +103,17 @@ describe('@octanejs/base-ui — Menu behavior', () => {
 		m.unmount();
 	});
 
-	it('publishes the Phase 3e list-navigation props onto the popup', async () => {
+	it('publishes the menu role with implicit vertical orientation', async () => {
 		const m = mount(MenuInteractive);
 		await settle();
 
 		m.click('.menu-trigger');
 		await settle();
 
-		// `useListNavigation`'s `floating` bag reaches the popup through
-		// `Menu.Root` → `usePopupInteractionProps` → the store's `popupProps`. The orientation
-		// attribute is the observable proof that the hook is wired to this popup (the fixture's
-		// Root uses the default `orientation="vertical"`).
-		expect(m.find('.menu-popup').getAttribute('aria-orientation')).toBe('vertical');
+		// Base UI 1.8 uses the menu role's implicit vertical orientation.
+		// The pinned React control verifies the same omission.
+		expect(m.find('.menu-popup').getAttribute('role')).toBe('menu');
+		expect(m.find('.menu-popup').getAttribute('aria-orientation')).toBeNull();
 
 		m.unmount();
 	});
@@ -226,7 +225,7 @@ describe('@octanejs/base-ui — Menu behavior', () => {
 			const m = mount(MenuWithHandle, { handle });
 			await settle();
 
-			expect(() => handle.open('no-such-trigger')).toThrow(/No trigger found with id/);
+			expect(() => handle.open('no-such-trigger')).toThrow(/no matching trigger is registered/);
 
 			m.unmount();
 		});

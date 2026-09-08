@@ -1,0 +1,92 @@
+diff --git a/tests/upstream/useForm/formState.test.tsx b/tests/upstream/useForm/formState.test.tsx
+--- a/tests/upstream/useForm/formState.test.tsx
++++ b/tests/upstream/useForm/formState.test.tsx
+@@ -369,7 +369,7 @@ describe('formState', () => {
+   });
+ 
+   it('should not update form state when there is a promise reject', async () => {
+-    const rejectPromiseFn = jest
++    const rejectPromiseFn = vi
+       .fn()
+       .mockRejectedValue(new Error('this is an error'));
+ 
+@@ -712,6 +712,40 @@ describe('formState', () => {
+     expect(dirtyFieldsState).toEqual({});
+   });
+ 
++  it('should mark an array-valued registered field dirty as a boolean rather than diffing its elements (#13584)', async () => {
++    function App() {
++      const {
++        register,
++        formState: { isDirty, dirtyFields },
++      } = useForm({
++        defaultValues: { fruits: [] as string[] },
++      });
++
++      return (
++        <div>
++          <select multiple {...register('fruits')}>
++            <option value="apple">apple</option>
++            <option value="banana">banana</option>
++          </select>
++          <p>{isDirty ? 'dirty' : 'notDirty'}</p>
++          <p>{JSON.stringify(dirtyFields)}</p>
++        </div>
++      );
++    }
++
++    render(<App />);
++
++    const select = screen.getAllByRole('listbox')[0] as HTMLSelectElement;
++
++    await act(async () => {
++      select.options[0].selected = true;
++      fireEvent.input(select);
++    });
++
++    expect(await screen.findByText('dirty')).toBeVisible();
++    expect(screen.getByText(JSON.stringify({ fruits: true }))).toBeVisible();
++  });
++
+   it('should update isDirty with getFieldState at child component', () => {
+     type FormValues = {
+       test?: string;
+@@ -885,12 +919,21 @@ describe('formState', () => {
+ 
+       expect(screen.queryByText(message)).not.toBeInTheDocument();
+ 
+-      vi.advanceTimersByTime(500);
++      // octane: let the async validation settle so the delayError timeout is
++      // actually scheduled, then advance the clock inside act — upstream's
++      // jest waitFor auto-advances fake timers in a drain/advance loop, which
++      // vitest (no jest global) cannot do.
++      await act(async () => {});
++      await act(async () => {
++        vi.advanceTimersByTime(500);
++      });
+ 
+       expect(await screen.findByText(message)).toBeVisible();
++      vi.useRealTimers();
+     });
+ 
+     it('should only show error after 500ms with Controller', async () => {
++      vi.useFakeTimers();
+       const App = () => {
+         const {
+           control,
+@@ -928,11 +971,14 @@ describe('formState', () => {
+ 
+       expect(screen.queryByText(message)).not.toBeInTheDocument();
+ 
+-      act(() => {
++      // octane: settle async validation first (see the register variant).
++      await act(async () => {});
++      await act(async () => {
+         vi.advanceTimersByTime(500);
+       });
+ 
+       expect(await screen.findByText(message)).toBeVisible();
++      vi.useRealTimers();
+     });
+ 
+     it('should prevent error from showing once input is validated', async () => {

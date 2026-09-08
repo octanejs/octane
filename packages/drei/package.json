@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/drei",
-  "version": "0.0.5",
+  "version": "0.0.19",
   "description": "Octane port of @react-three/drei",
   "type": "module",
   "sideEffects": false,
@@ -21,10 +21,16 @@
     "README.md",
     "UPSTREAM.md",
     "LICENSE",
+    "LICENSE.upstream",
     "status.json"
   ],
   "scripts": {
-    "test": "vitest run --root ../.. --project drei-differential --project drei-guards --project drei-adapted-browser",
+    "upstream:generate": "node scripts/generate-upstream-crosswalk.mjs",
+    "upstream:check": "node scripts/check-upstream-crosswalk.mjs",
+    "upstream:ready": "node scripts/check-upstream-crosswalk.mjs --ready",
+    "react-parity:generate": "node scripts/generate-react-parity.mjs",
+    "react-parity:check": "node scripts/check-react-parity.mjs",
+    "test": "node scripts/check-react-parity.mjs && vitest run --root ../.. --project drei-differential --project drei-guards --project drei-adapted-browser",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "dependencies": {
@@ -49,7 +55,7 @@
   "peerDependencies": {
     "@octanejs/three": "workspace:*",
     "@types/three": ">=0.159",
-    "octane": "workspace:*",
+    "octane": "workspace:^0.1.51 || ^0.2.0",
     "three": ">=0.159"
   },
   "peerDependenciesMeta": {

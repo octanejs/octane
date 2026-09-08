@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>ReactCompat stock React root controls</title>
+		<style>
+			body {
+				font-family: system-ui, sans-serif;
+				margin: 2rem;
+				max-width: 72rem;
+			}
+			button {
+				margin: 0 0.5rem 0.5rem 0;
+			}
+			#probe-arena > section {
+				border: 1px solid #aaa;
+				margin: 1rem 0;
+				padding: 1rem;
+			}
+			output {
+				display: block;
+				margin: 0.5rem 0;
+			}
+			pre {
+				background: #eee;
+				padding: 1rem;
+				white-space: pre-wrap;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Stock React root controls</h1>
+		<p>
+			These probes measure the limits of a stock ReactDOM root. They do not implement ReactCompat or
+			coordinate React with an Octane boundary.
+		</p>
+		<div id="probe-controls"></div>
+		<p id="probe-status" role="status">Loading probes…</p>
+		<div id="probe-arena"></div>
+		<pre id="probe-results" aria-label="Probe results"></pre>
+		<script type="module" src="./stock-react-root-probes.tsx"></script>
+	</body>
+</html>

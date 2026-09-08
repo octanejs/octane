@@ -20,8 +20,9 @@ repository release commit whose package versions and unified manifest are `1.6.4
 
 The unified package has 55 direct workspace dependencies. Following those dependencies through the
 pinned monorepo produces 61 packages, 207 source files, and 38 canonical runtime test files. The
-byte-exact package directories and root MIT license are vendored under `upstream/repository`;
-`upstream/SHA256SUMS` authenticates all 452 files. The executable checker rejects file, byte,
+byte-exact package directories and root MIT license are vendored under `upstream/`; all 452 files
+verify offline against the upstream git blob shas recorded in `audit/upstream.lock.json`, and the
+pinned license is republished at the package root as `LICENSE.upstream`. The executable checker rejects file,
 package-graph, source, test inventory, or root-export crosswalk drift.
 
 The 38 canonical tests are preserved as provenance. Pristine React execution and a case-by-case
@@ -29,6 +30,10 @@ adapted Octane lane for that suite remain open follow-up work; until those lanes
 stays `recorded-unverified`. Vendoring alone is not behavioral evidence.
 
 ## Root export crosswalk
+
+`packages/radix/audit/export-crosswalk.json` (enforced by
+`packages/radix/scripts/check-upstream-ledger.mjs`) maps every unified `radix-ui` root export to its
+Octane binding, disposition, and evidence. Notable root-surface differences:
 
 | Upstream export | Octane mapping | Disposition |
 | --- | --- | --- |
@@ -46,8 +51,9 @@ Octane also exposes composition substrates that are not unified root exports (`A
   pinned real `radix-ui` package (byte-identical DOM).
 - Type lanes: repo-authored pristine `tsc` and adapted `tsrx-tsc` root-export smokes (not a
   one-for-one upstream type suite).
-- Repo-authored contracts authenticate the vendored boundary and keep the Slot descriptor /
-  ref-as-prop adaptations explicit; they are not an adapted upstream runtime suite.
+- Ordinary audit contracts: authenticate the vendored boundary and keep the Slot descriptor /
+  ref-as-prop adaptations explicit. Those contracts are repo-authored ledger evidence, not an
+  adapted upstream runtime suite.
 
 The other local tests are Octane framework contracts. They cover additional component behavior but
 are not counted as React parity. The differential suite is bounded jsdom evidence, not exhaustive

@@ -81,7 +81,11 @@ export function mouse(
 			return pageY;
 		},
 	});
-	target.dispatchEvent(event);
+	// Upstream fires each event through act-wrapped fireEvent, so every simulated
+	// event commits on its own instead of coalescing with the next dispatch.
+	flushSync(function dispatch() {
+		target.dispatchEvent(event);
+	});
 }
 
 type TouchPoint = { pageX: number; pageY: number; identifier?: number };
@@ -109,7 +113,9 @@ function dispatchTouch(
 		touches: { configurable: true, value: toTouchList(touches) },
 		changedTouches: { configurable: true, value: toTouchList(changedTouches) },
 	});
-	target.dispatchEvent(event);
+	flushSync(function dispatch() {
+		target.dispatchEvent(event);
+	});
 }
 
 export function touchStart(

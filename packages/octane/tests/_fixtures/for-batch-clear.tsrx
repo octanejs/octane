@@ -3,7 +3,7 @@
 // slot-stashed cross-module component (componentSlot lives on the item's
 // `_slots`, not `.children`), a cleanup-returning callback ref on the item
 // template itself, and a portal whose DOM lives in a foreign target.
-import { useEffect, useState, createPortal } from '../../src/index.js';
+import { use, useEffect, useState, createPortal } from '../../src/index.js';
 
 export const log: string[] = [];
 export const resetLog = () => {
@@ -25,6 +25,8 @@ const items3b: Item[] = [
 	{ id: 5, label: 'e' },
 	{ id: 6, label: 'f' },
 ];
+const ownedItems: Item[] = [];
+for (let i = 0; i < 1000; i++) ownedItems.push({ id: i + 10, label: 'row-' + i });
 
 function Row({ item }: { item: Item }) @{
 	useEffect(() => {
@@ -50,7 +52,7 @@ export function ComponentRows() @{
 	</div>
 }
 
-const rowRef = (el: Element) => {
+const rowRef = (_el: Element) => {
 	log.push('ref:attach');
 	return () => {
 		log.push('ref:cleanup');
@@ -67,6 +69,135 @@ export function RefRows() @{
 				<li ref={rowRef}>{item.label}</li>
 			}
 		</ul>
+	</div>
+}
+
+/** Large enough for owned-parent clear, but each row still needs ref teardown. */
+export function LargeRefRows() @{
+	const [items, setItems] = useState(ownedItems);
+	<div>
+		<button id="clear" onClick={() => setItems([])}>clear</button>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li ref={rowRef}>
+					<span>{item.label}</span>
+				</li>
+			}
+		</ul>
+	</div>
+}
+
+/** The list is the only child of its parent, including while a root attempt suspends. */
+export function OwnedParentRows({
+	suspendOnClear,
+	insertForeignOnClear,
+	refillDuringClear,
+	clearTwiceOnSuspend,
+	reorderBeforeClearOnSuspend,
+}: {
+	suspendOnClear?: Promise<string>;
+	insertForeignOnClear?: boolean;
+	refillDuringClear?: boolean;
+	clearTwiceOnSuspend?: boolean;
+	reorderBeforeClearOnSuspend?: boolean;
+}) @{
+	const [items, setItems] = useState(ownedItems);
+	const [pending, setPending] = useState(false);
+	const [clearStage, setClearStage] = useState(0);
+	<div>
+		<button
+			id="clear"
+			onClick={() => {
+				setItems(reorderBeforeClearOnSuspend ? ownedItems.toReversed() : []);
+				if (suspendOnClear || insertForeignOnClear || refillDuringClear) setPending(true);
+				if (clearTwiceOnSuspend) setClearStage(1);
+				if (reorderBeforeClearOnSuspend) setClearStage(4);
+			}}
+		>clear</button>
+		<button
+			id="append"
+			onClick={() => {
+				setPending(false);
+				setItems(items3b);
+			}}
+		>append</button>
+		<button
+			id="reverse"
+			onClick={() => {
+				setPending(false);
+				setItems(ownedItems.toReversed());
+			}}
+		>reverse</button>
+		<ul id="owned-list">
+			@for (const item of items; key item.id) {
+				<li class="row">
+					<span>{item.label}</span>
+					<i aria-hidden="true" />
+				</li>
+			}
+		</ul>
+		@{
+			if (pending && suspendOnClear && !clearTwiceOnSuspend && !reorderBeforeClearOnSuspend) use(
+				suspendOnClear,
+			);
+			if (pending && refillDuringClear && items.length === 0) setItems(items3b);
+			if (clearTwiceOnSuspend) {
+				if (clearStage === 1 && items.length === 0) {
+					setItems(ownedItems.toReversed());
+					setClearStage(2);
+				} else if (clearStage === 2 && items.length === ownedItems.length) {
+					setItems([]);
+					setClearStage(3);
+				} else if (clearStage === 3 && suspendOnClear) use(suspendOnClear);
+			}
+			if (reorderBeforeClearOnSuspend) {
+				if (clearStage === 4) {
+					setItems([]);
+					setClearStage(5);
+				} else if (clearStage === 5 && suspendOnClear) use(suspendOnClear);
+			}
+			if (pending && insertForeignOnClear) {
+				const list = document.getElementById('owned-list')!;
+				const foreign = document.createElement('li');
+				foreign.id = 'foreign';
+				foreign.textContent = 'external';
+				list.insertBefore(foreign, list.lastChild);
+			}
+		}
+	</div>
+}
+
+/** An empty branch is new DOM between the markers when the owned list clears. */
+export function OwnedParentEmptyRows({ suspendOnClear }: { suspendOnClear?: Promise<string> }) @{
+	const [items, setItems] = useState(ownedItems);
+	const [pending, setPending] = useState(false);
+	<div>
+		<button
+			id="clear"
+			onClick={() => {
+				setItems([]);
+				setPending(true);
+			}}
+		>clear</button>
+		<button
+			id="append"
+			onClick={() => {
+				setPending(false);
+				setItems(items3b);
+			}}
+		>append</button>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li class="row">
+					<span>{item.label}</span>
+				</li>
+			} @empty {
+				<li class="empty">No rows</li>
+			}
+		</ul>
+		@{
+			if (pending && suspendOnClear) use(suspendOnClear);
+		}
 	</div>
 }
 

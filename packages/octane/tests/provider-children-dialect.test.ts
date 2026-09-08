@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { createRoot, flushSync } from '../src/index.js';
 import { mount } from './_helpers';
 import {
 	ProviderChildrenDialectFlip,
@@ -98,6 +99,37 @@ describe('context Provider — children dialect changes', () => {
 		} finally {
 			error.mockRestore();
 			m.unmount();
+		}
+	});
+
+	it('reports the original cleanup error without connecting children abandoned by its catch', () => {
+		const failure = new Error('cleanup-boom');
+		const lifecycle: string[] = [];
+		const onCaughtError = vi.fn();
+		const onUncaughtError = vi.fn();
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container, { onCaughtError, onUncaughtError });
+		try {
+			flushSync(() => root.render(ProviderDialectFlipCleanupThrows, { failure, lifecycle }));
+			expect(lifecycle).toEqual(['connect']);
+
+			const toggle = container.querySelector<HTMLButtonElement>('.toggle')!;
+			flushSync(() => toggle.click());
+
+			expect(container.querySelector('.caught')?.textContent).toBe(failure.message);
+			// The cleanup sends this update to catch before the replacement can commit.
+			// Connecting its effect would expose abandoned work and produce another cleanup error.
+			expect(lifecycle).toEqual(['connect', 'cleanup']);
+			expect(onCaughtError).toHaveBeenCalledTimes(1);
+			expect(onCaughtError.mock.calls[0][0]).toBe(failure);
+			expect(onUncaughtError).not.toHaveBeenCalled();
+			expect(error).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			container.remove();
+			error.mockRestore();
 		}
 	});
 

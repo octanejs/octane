@@ -1,15 +1,20 @@
 # @octanejs/shadcn
 
-shadcn/ui for the [octane](https://github.com/octanejs/octane) renderer — a port
-of the **Radix base** of [shadcn-ui/ui](https://github.com/shadcn-ui/ui) onto
-octane's hooks and native events, built on
-[`@octanejs/radix`](../radix).
+shadcn/ui for the [octane](https://github.com/octanejs/octane) renderer, with
+Base UI, Radix, and React Aria bases adapted to octane's hooks and native events.
 
-Upstream pin: `shadcn-ui/ui@4baadbc6` + CLI `shadcn@4.14.1`.
+## Installation
+
+```sh
+npm install @octanejs/shadcn
+pnpm add @octanejs/shadcn
+```
+
+Upstream pin: `shadcn-ui/ui@7c9eaba1` + CLI `shadcn@4.21.0`.
 
 ## What ships
 
-- **40 component families (~185 exports)**: the full Tier-1 static set, all 24
+- **44 component families across three bases**: the full Tier-1 static set, all 24
   radix-backed Tier-2 components, and the first Tier-3 composites (Sidebar with
   `useSidebar`/`useIsMobile`, Field), plus `cn()` and the default neutral theme
   tokens (`@octanejs/shadcn/theme.css`).
@@ -27,13 +32,21 @@ Upstream pin: `shadcn-ui/ui@4baadbc6` + CLI `shadcn@4.14.1`.
 
 ## Component coverage
 
-Each primitive base ships the families its primitives support, exactly as upstream's do.
-Switching `style` changes which primitive a component is built on — the `data-slot` contract and
-component names stay identical.
+The coverage table tracks the families ported for each primitive base.
+Switching `style` changes which primitive a component uses. Each base retains its
+upstream API; for example, Base UI Navigation Menu exposes a Positioner that owns
+its viewport, and Base UI Select aliases its hostless Root.
+
+The Base UI wrappers target `@octanejs/base-ui`'s Base UI 1.8.0 API, including
+Select, Navigation Menu, and Scroll Area from the 4.21.0 registry with Nova
+utilities. Combobox is outside this package's current family inventory.
+
+All three bases use `cn@0.2.6`, matching the upstream update. Existing Octane
+adaptations and styling remain intact; `@octanejs/shadcn/cn` re-exports the same helper.
 
 <!-- BEGIN COVERAGE -->
 
-**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 40/44
+**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 43/44
 
 ✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
 
@@ -62,13 +75,13 @@ component names stay identical.
 | `label` | ✅ | ✅ | ✅ |
 | `menubar` | ✅ | ⛔ | ✅ |
 | `native-select` | ✅ | ✅ | ✅ |
-| `navigation-menu` | ✅ | ⛔ | ⛔ |
+| `navigation-menu` | ✅ | ⛔ | ✅ |
 | `pagination` | ✅ | ✅ | ✅ |
 | `popover` | ✅ | ✅ | ✅ |
 | `progress` | ✅ | ⛔ | ✅ |
 | `radio-group` | ✅ | ✅ | ✅ |
-| `scroll-area` | ✅ | ✅ | ⛔ |
-| `select` | ✅ | ⛔ | ⛔ |
+| `scroll-area` | ✅ | ✅ | ✅ |
+| `select` | ✅ | ⛔ | ✅ |
 | `separator` | ✅ | ✅ | ✅ |
 | `sheet` | ✅ | ✅ | ✅ |
 | `sidebar` | ✅ | ⛔ | ✅ |
@@ -88,9 +101,6 @@ component names stay identical.
 
 | Base | Family | Reason |
 | --- | --- | --- |
-| Base UI | `navigation-menu` | @octanejs/base-ui has no navigation-menu primitive |
-| Base UI | `scroll-area` | @octanejs/base-ui has no scroll-area primitive |
-| Base UI | `select` | @octanejs/base-ui has no select primitive |
 | Base UI | `sonner` | needs next-themes, which has no octane binding |
 | React Aria | `context-menu` | no counterpart in upstream’s aria base |
 | React Aria | `dropdown-menu` | no counterpart in upstream’s aria base |
@@ -136,12 +146,12 @@ same mechanism shadcn uses upstream, where its own registry is
 
 | `style` | Primitives | Families |
 | --- | --- | --- |
-| `base-nova` *(default)* | `@octanejs/base-ui` | 21 |
+| `base-nova` *(default)* | `@octanejs/base-ui` | 43 |
 | `radix-nova` | `@octanejs/radix` | 44 |
 | `aria-nova` | `@octanejs/aria` | 33 |
 
-The bases deliberately ship different family counts, exactly as upstream's do — a base only
-has the families its primitives support. Switching `style` changes which primitive a component
+The bases currently ship different family counts; see the coverage table for remaining ports.
+Switching `style` changes which primitive a component
 is built on; the `data-slot` contract and component names stay identical, so your markup and
 styling do not change.
 

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/mui/base-ui",
+  "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
+  "files": [
+    {
+      "path": "test/setupVitest.ts",
+      "gitBlob": "e2c7d3128f27f8841c592bf629c095e0c74e3ccf",
+      "sha256": "24fa3cb89ecf743a3b9ebf21cd4040abd5db040073fb33940653499b508aa48d"
+    },
+    {
+      "path": "test/vite.shared.config.mjs",
+      "gitBlob": "e561938a02573d5c5668f46c856ab4e2b2539683",
+      "sha256": "122dea7449528a078122a54e1977cff65afcbfcda3928e8bf3cbb11dfa76c840"
+    },
+    {
+      "path": "vitest.shared.mts",
+      "gitBlob": "eff903492ba2e3e058beb22ce537a9af7828794e",
+      "sha256": "c9bfcdce9d0011c9b0eb66bfe35aceb068afa675f0b9aa383e15b89d85674ab0"
+    }
+  ]
+}

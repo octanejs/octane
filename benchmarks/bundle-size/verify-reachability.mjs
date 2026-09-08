@@ -209,6 +209,23 @@ export async function verifyScenario(id, code) {
 		// Objects produced by an isolated browser realm have different prototypes.
 		// The fixtures intentionally return JSON-only public observations.
 		const snapshot = JSON.parse(JSON.stringify(actual));
+		if (id === 'server-render') {
+			// Hydratable output may contain compiler-owned boundary comments. Compare
+			// its rendered markup without depending on that private marker protocol.
+			const markup = window.document.createElement('template');
+			markup.innerHTML = snapshot.html;
+			const comments = window.document.createTreeWalker(
+				markup.content,
+				window.NodeFilter.SHOW_COMMENT,
+			);
+			let comment = comments.nextNode();
+			while (comment !== null) {
+				const next = comments.nextNode();
+				comment.remove();
+				comment = next;
+			}
+			snapshot.html = markup.innerHTML;
+		}
 		assert.deepEqual(snapshot, expected, `${id}: production bundle changed observable behavior`);
 		if (expected.cleaned === true) {
 			assert.equal(

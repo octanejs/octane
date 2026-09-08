@@ -1,4 +1,4 @@
-import { createElement, createPortal } from 'octane';
+import { createElement, createPortal, use } from 'octane';
 
 // Every host below intentionally defers its final event/type decision to the
 // runtime. The tests exercise public JSX/render paths rather than diagnostic
@@ -55,6 +55,28 @@ export function NegativeHosts(props) @{
 			<option>one</option>
 		</select>
 		<commit-input id="custom" {...props.hostProps} />
+	</section>
+}
+
+interface DiagnosticBatchProps {
+	items: Array<{ id: string; type: string }>;
+	hostProps: Record<string, unknown>;
+	promise?: Promise<string>;
+}
+
+function DiagnosticBatchReader(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<span hidden>{value as string}</span>
+}
+
+export function DiagnosticBatch(props: DiagnosticBatchProps) @{
+	<section>
+		@for (const item of props.items; key item.id) {
+			<input id={item.id} type={item.type} {...props.hostProps} />
+		}
+		@if (props.promise !== undefined) {
+			<DiagnosticBatchReader promise={props.promise} />
+		}
 	</section>
 }
 

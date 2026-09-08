@@ -4,7 +4,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { Slot } from '@octanejs/radix';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { Separator } from './separator.tsrx';
 
 type DivProps = { className?: string } & Record<string, unknown>;

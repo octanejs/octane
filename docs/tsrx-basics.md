@@ -50,6 +50,40 @@ function Label(props) {
 }
 ```
 
+### Nested child scopes
+
+Inside JSX, a nested `@{ … }` block owns a child render scope at that exact
+sibling position. Its setup runs when the child renders, may use hooks and
+capture parent locals, and keeps its hook state across parent updates. The final
+JSX node is optional: a code-only block runs its setup and renders no element.
+
+```jsx
+export function AccountRow(props: {
+	name: string;
+	observe: (name: string) => void;
+}) @{
+	<li>
+		<span>{props.name as string}</span>
+		@{
+			const [expanded, setExpanded] = useState(false);
+			<button onClick={() => setExpanded(!expanded)}>
+				{expanded ? 'Hide details' : 'Show details'}
+			</button>
+		}
+		@{
+			props.observe(props.name);
+		}
+	</li>
+}
+```
+
+An empty child block disappears. A child block containing only a JSX node is
+transparent grouping and does not create an extra render scope.
+
+A child block's output fragment is also a style scope: a `<style>` among its
+children styles the siblings beside it under its own hash, while the parent's
+rules keep reaching the block's elements. See [Styles](#styles).
+
 Dynamic text needs a cast, `{expr as string}`, unless the expression is provably
 a string. A bare `{expr}` is a renderable hole, not text.
 
@@ -319,10 +353,10 @@ export function Button(props) @{
 ```
 
 Composition is native to the runtime (no dependency) and works everywhere a class
-does: dynamic bindings, `{...spread}` props, SVG elements, scoped-`<style>`
-components (the scope hash is appended after your classes), and server rendering.
-SSR output and the client render compose byte-identically, so hydration never
-mismatches.
+does: dynamic bindings, `{...spread}` props, SVG elements, elements inside a
+scoped `<style>` scope (every enclosing scope hash, outer to inner, and then every
+applied theme class follow your classes), and server rendering. SSR output and
+the client render compose byte-identically, so hydration never mismatches.
 
 > React coerces `className={['a', 'b']}` to the string `"a,b"`. This is a
 > deliberate Octane convenience, and a plain string still takes the fast path.
@@ -362,9 +396,316 @@ without HTML-escaping ordinary JavaScript or JSON characters, which stops the
 value from creating sibling markup but does not validate or sanitize executable
 JavaScript. Only inject source you trust.
 
+## Styles
+
+A `<style>` block written among the children of an element or a fragment is
+scoped CSS. The block is scoped to its siblings, not to the `@{ … }` body around
+it: it styles the items beside it and everything below them and never the
+element that contains it. The compiler gives that children
+list a hash, adds it to every selector in the block, and adds the same class —
+the block's **hash class** — to those siblings and their descendants, so the
+selectors match only there and rules never leak into a parent, an outer sibling,
+or a child component. `:global(…)` reaches outside the scope (below).
+
+```jsx
+export function Panel() @{
+	<>
+		<style>
+			div { color: black; }
+			p { margin: 0; }
+		</style>
+		<div>Black</div>
+		<p>No margin</p>
+	</>
+}
+```
+
+To style an element, put the block beside it — both siblings in a fragment, as
+above. A block written inside the element styles the element's other children:
+
+```jsx
+export function Card() @{
+	<article class="card">
+		<style>
+			h2 { margin: 0; } /* the h2, not .card */
+		</style>
+		<h2>Title</h2>
+	</article>
+}
+```
+
+A `@{ … }` body and every `@if`/`@for`/`@switch`/`@try` branch hold setup
+statements and exactly one output node, and a block counts as an output node: a
+block beside the output node is the multiple-outputs parser error, and a lone
+block as the output styles nothing (`STYLE_STANDALONE_NEEDS_FRAGMENT`). Wrap the
+block and the output in a fragment, inside branches too.
+
+### Scopes
+
+Every children list that holds a block is a sibling scope with its own hash: an
+element's children, a fragment's children, the fragment a nested `@{ … }` or a
+control-flow branch renders, an assigned or returned element's children. An
+element gets the hash class of every enclosing scope, outer to inner, so an outer
+block's rules still reach the elements of a nested scope while the nested block's
+rules stay inside it:
+
+```jsx
+export function Panel() @{
+	<>
+		<style>
+			div { color: black; }
+		</style>
+		<div>Black</div>
+		@{
+			<>
+				<style>
+					div { font-weight: bold; }
+				</style>
+				<div>Black and bold: both scopes reach here</div>
+			</>
+		}
+	</>
+}
+```
+
+Several blocks among the same children share the list's hash class and compile
+to one `injectStyle` call, so a block can sit wherever it reads best next to the
+elements it styles.
+
+A block inside an `@if` or `@for` branch styles only the elements that branch
+renders. Its CSS is still always part of the module's stylesheet, whether or not
+the branch ever renders, because CSS is static; only the hash class follows the
+branch. That is why there is no style flash when a branch first renders. Rules
+you want everywhere belong outside the branch.
+
+### Raw CSS is TSRX syntax
+
+Raw CSS text in `<style>` is TSRX template syntax. A standalone block is allowed
+only lexically inside a `@{ … }` body or an `@if`/`@for`/`@switch`/`@try` body —
+at any depth of elements, fragments, holes, callbacks, or templates assigned in
+that body. In a plain function that returns JSX, or in an element assigned at
+module scope, it is `STYLE_STANDALONE_OUTSIDE_TEMPLATE`. Plain TSX keeps the TSX
+rule: `<style>` is an ordinary element whose content is an expression child,
+`<style>{css}</style>`, and the compiler passes it through untouched — no scope,
+no hash, no injection.
+
+### Assigned blocks and class maps
+
+Assign a block to a variable — at module scope, in a component body, inside a
+nested block, anywhere a declaration is legal — and it becomes a **class map**
+instead of scoping a template. `$class` is the block's hash, and every class
+selector in the block gets an entry pairing the hash with the class name, ready
+for `class=`:
+
+```jsx
+export const theme = <style>
+	div { color: green; }
+	.dark { color: purple; }
+</style>;
+// theme → { $class: 'tsrx-063ca812', dark: 'tsrx-063ca812 dark' }
+
+export function Label() @{
+	<span class={theme.dark}>Purple</span>
+}
+```
+
+The sheet is injected where the declaration is. A block that is exported,
+applied (below), or whose `$class` is read anywhere in the module is a **theme**
+and keeps every selector; a local block that is none of these keeps only the
+class selectors its map exposes, and the rest are removed as unused.
+`.$class` is reserved as a selector name in an assigned block
+(`STYLE_RESERVED_CLASS_KEY`), and a bare standalone block at module scope is an
+error (`STYLE_STANDALONE_AT_MODULE_SCOPE`): assign it.
+
+### `apply`
+
+`<style apply={theme} />` adds `theme.$class` to the items beside it and
+everything below them (never to the element that contains it), so the theme's
+rules match there. A self-closed block only applies the theme; a block with CSS
+in it applies the theme and scopes its own rules too, and the local rules win
+over the theme's because they come later in the CSS:
+
+```jsx
+import { theme } from './theme.tsrx';
+
+export function Panel() @{
+	<>
+		<style apply={theme}>
+			div { color: black; } /* beats the theme's green */
+		</style>
+		<div>Black, from the local rule</div>
+		<span class={theme.dark}>Purple, from the theme</span>
+	</>
+}
+```
+
+`apply={[a, b]}` composes several themes; their classes land in array order. An
+assigned block can apply themes as well — `export const both = <style
+apply={[a, b]} />` bundles them and `const mixed = <style apply={base}>…</style>`
+extends one — and its `$class` is the applied themes' classes (transitively)
+followed by its own hash.
+
+A theme from the same module with a statically known class becomes a string
+literal, so the element's static HTML is still built once, up front. An imported
+theme is read at runtime through `theme.$class`, so the elements that carry it
+are built when they render, with a dynamic class. A target must be declared before the block that applies it
+(`STYLE_APPLY_BEFORE_DECLARATION`). `apply` needs an expression value
+(`STYLE_APPLY_VALUE`) that resolves to a style block or an import
+(`STYLE_APPLY_TARGET`), and appears once per block (`STYLE_APPLY_DUPLICATE`; use
+an array). Any other attribute on a scoped block is `STYLE_UNKNOWN_ATTRIBUTE`.
+
+### Opting elements in with `$class`
+
+`apply` puts a theme on every element of its scope. To pick the elements
+yourself, put `theme.$class` in their `class` instead and leave `apply` out:
+only the elements that carry it match the theme's element and descendant
+selectors, and the rest of the scope is untouched. The class is a plain string,
+so a child component can take it through a prop and put it on its own elements;
+the passed class lands before the child's own hash class:
+
+```jsx
+function Card({ parentClass }: { parentClass: string }) @{
+	<>
+		<style>
+			.local { padding: 0; }
+		</style>
+		<article class={['local', parentClass]}>
+			<h2 class={parentClass}>Blue, from the parent's theme</h2>
+		</article>
+	</>
+}
+
+export function App() @{
+	const theme = <style>
+		div, h2 { color: blue; }
+		.card { color: red; }
+	</style>;
+	<>
+		<Card parentClass={theme.$class} />
+		<div class={theme.$class}>Blue: opted in</div>
+		<div class={theme.card}>Red: a class entry carries the hash too</div>
+		<p>Untouched</p>
+	</>
+}
+```
+
+Reading `theme.$class` is what makes `theme` a theme here: the `div, h2` rule
+survives although nothing exports or applies the block. A block whose only reads
+are class entries (`theme.card`) stays a class map and drops its element
+selectors. `class={[a.$class, b.$class]}` opts one element into several themes,
+the way `apply={[a, b]}` does for a whole scope, and the two forms compose: a
+scope can apply a base theme while single elements opt into an accent.
+
+### `:global(…)`
+
+Wrap part of a selector in `:global(…)` and that part gets no hash class;
+everything outside the parentheses is still scoped. It may sit at the start or
+the end of a selector, not in the middle (`.card :global(.x) .title` is
+`CSS_GLOBAL_PLACEMENT`):
+
+```jsx
+export function Post(props) @{
+	<>
+		<style>
+			:global(.toast) { position: fixed; }        /* → .toast: page-wide, matches anywhere */
+			.post :global(pre) { overflow-x: auto; }     /* → .post.<hash> pre: only below .post */
+			:global(.theme-dark) .post { color: white; } /* → .theme-dark .post.<hash>: under a page class */
+			.post:global(.is-open) { display: block; }   /* → .post.<hash>.is-open: a class a library toggles */
+		</style>
+		<article class="post">
+			<Markdown source={props.body} />
+		</article>
+	</>
+}
+```
+
+`:global { … }` is the block form: the wrapper is dropped (it stays as a
+comment in the output) and every rule inside it is unscoped. Nested under a
+scoped rule it reaches only below that rule, the same as the prefixed selector
+form with the scoped prefix written once:
+
+```jsx
+<style>
+	:global { .toast { position: fixed; } body { margin: 0; } } /* → .toast { … } body { … } */
+	.post { :global { pre { overflow-x: auto; } .footnote { font-size: 0.875rem; } } } /* → .post.<hash> { pre { … } .footnote { … } } */
+	.post { :global(pre) { overflow-x: auto; } } /* → the same, selector form */
+	.post { pre { margin: 0; } } /* → .post.<hash> { pre.<hash> { … } }: both parts scoped */
+</style>
+```
+
+Which form to use:
+
+| I want to …                                                     | Use …                                                                  |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Style my own elements                                           | A block beside them. Nothing global.                                   |
+| Let a child component pick up my styles                         | Pass `theme.$class` or a class-map entry (`theme.card`) as a prop.     |
+| Style a child I cannot change (a library component, rendered HTML) | `.wrapper :global(.their-class)`, or `.wrapper { :global { … } }` for several classes, with a scoped selector in front. |
+| React to page-level state (a theme class on `<html>`)           | `:global(.theme-dark) .card` or `:global([data-theme='dark']) .card`.  |
+| Write page-wide rules (`body`, resets, fonts)                   | A `.css` file the page links, not a bare `:global`.                    |
+
+For a child you own, pass the class rather than reaching in: the dependency is
+a visible prop, the child chooses which elements take it, renaming a class in
+the child cannot silently break the parent, and the hash keeps the rule on the
+elements that carry it. With `:global` the child has no say and cannot see who
+styles it; when you must, nest one `:global { … }` under the scoped wrapper so
+the prefix is written once. A bare `:global(.toast)` is a global stylesheet hidden inside a
+component: it matches anywhere on the page with nothing pointing back to the
+file. Write one only for page-level elements, and prefer a linked `.css` file.
+
+Specificity: a scoped rule adds its hash class to the first compound only and
+`:where(.<hash>)` to the rest (`.card .title` → `.card.<hash>
+.title:where(.<hash>)`), so a scoped `.note.<hash>` (0,2,0) beats a bare
+`:global(.note)` (0,1,0) from anywhere on the page, a `theme.$class` or
+class-map rule beats a bare global for the same reason, and a prefixed
+`.card.<hash> .note` (0,3,0) beats the child's own `.note.<hash>`: it overrides
+the child, so keep it narrow. At equal specificity the later sheet wins.
+
+### Class order and `style()`
+
+An element's class list is `authored classes, enclosing hash classes (outer to
+inner), applied theme classes`, composed as described in
+[Class composition](#class-composition). `{style(expr)}` in a class position
+resolves to that same chain plus the value: `class={style('row')}` yields
+`"<hashes> row"`, and a dynamic value is concatenated at runtime so the chain is
+always present. When the call is only part of a stamped element's class value —
+`class={[style('row'), extra]}`, `class={on ? style('row') : 'plain'}` — it
+yields its value alone and the element's stamp appends the chain once to the
+composed value, so the chain is present whichever branch runs and never twice.
+
+### Ordering guarantees
+
+Sheets come out in source order, outer scope first. A scope's sheet sits where
+its first block is, after the assigned blocks declared before it in the enclosing
+statement list and before the scopes and assigned blocks nested inside it;
+sibling scopes follow source order. On the client every sheet is a module-level
+`injectStyle(hash, css)` statement, so module evaluation — import order — orders
+sheets across modules, and the runtime injects each hash once. On the server
+`injectStyle` runs inside the component body, per request, so a render collects
+CSS only for the components it actually rendered; the buffered renderers return
+it as `css` and the streaming renderers send it with the shell. An assigned
+block's sheet joins the request when the block is read: on the server the
+class-map object injects its CSS (after the CSS of the themes it applies) on
+property access, and a component that applies an imported theme touches it
+before its own sheets, so a theme from another module still precedes the scope
+that applies it. Hydration matches the server's `<style data-octane="hash">`
+tags by hash and never re-injects them.
+
+### `<style href precedence>`
+
+`<style href="…" precedence="…">` is a React Float style resource, not a scoped
+block: its CSS ships unscoped, one copy per href, is moved into `document.head`
+under its precedence group, and stays outside the scope model. `apply` on a
+resource, or on a `<style>` inside `<head>`, is an error
+(`STYLE_APPLY_UNSUPPORTED_HOST`). Resource semantics are in
+[differences-from-react.md](./differences-from-react.md#document-metadata-and-float-resources).
+
 ## Strong mode
 
-Strong mode is an optional compiler check for state, refs, and Effect Events.
+Strong mode is an optional immutable render-snapshot contract with compiler
+checks for state, refs, Effect Events, and detectable impure render calls. It is
+also an author assertion that rendering is pure, which production memoization
+is allowed to trust without proving every call body. It also checks where hook
+values and event handlers belong in a template.
 Start with one module by putting `"use strong"` before its imports:
 
 ```tsx
@@ -405,6 +746,140 @@ These patterns become compile errors:
   (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
 - Including a statically known Effect Event in an explicit hook dependency list
   (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
+- Mutating a provable state snapshot during render, including supported aliases
+  and array mutations on state initialized with an array literal
+  (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).
+- Mutating a binding declared outside a retained keyed `@for` row from that row
+  (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh scratch data built in ordinary
+  setup or owned entirely by one row remains valid.
+- Calling unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`,
+  or `new Date()` without arguments during render
+  (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
+- Declaring a built-in hook value outside the sole nested `@{…}` block that
+  uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
+- Declaring a named callback outside the sole nested `@{…}` block containing
+  its native `onX` event (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
+
+### Keep work with its nested template block
+
+A nested `@{…}` block can own setup beside its JSX. When every use of a
+built-in hook value is in one nested block, declare the hook there. An effect
+that observes only those local values belongs there too. In this example, both
+calls are outside the sole child block that uses them:
+
+```jsx
+"use strong";
+
+import { useEffect, useState } from 'octane';
+
+export function Counter({ title, observe }) @{
+	const [count, setCount] = useState(0);
+	useEffect(() => observe(count), [count]);
+	<div>
+		<h2>{title as string}</h2>
+		@{
+			const onClick = () => setCount(count + 1);
+			<button {onClick}>{count as string}</button>
+		}
+	</div>
+}
+```
+
+`OCTANE_STRONG_HOOK_LOCALITY` points to both hook calls and names the nested
+block and its source line. Move them beside the handler and button:
+
+```jsx
+"use strong";
+
+import { useEffect, useState } from 'octane';
+
+export function Counter({ title, observe }) @{
+	<div>
+		<h2>{title as string}</h2>
+		@{
+			const [count, setCount] = useState(0);
+			useEffect(() => observe(count), [count]);
+			const onClick = () => setCount(count + 1);
+			<button {onClick}>{count as string}</button>
+		}
+	</div>
+}
+```
+
+For ordinary markup, no nested block is needed. This direct JSX use already
+passes with the hook in root setup:
+
+```jsx
+"use strong";
+
+import { useState } from 'octane';
+
+export function Label() @{
+	const [label] = useState('ready');
+	<div><span>{label as string}</span></div>
+}
+```
+
+Hooks and effects used only by an `@if`, keyed `@for`, `@switch`, or `@try` arm
+may stay in the parent scope. This state persists while the `@if` arm is hidden:
+
+```jsx
+"use strong";
+
+import { useState } from 'octane';
+
+export function Search({ open }) @{
+	const [query, setQuery] = useState('');
+	<section>@if (open) {
+		<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
+	}</section>
+}
+```
+
+Move a hook into an arm when its lifecycle should follow the arm; a keyed
+`@for` row then gives each item its own state.
+A `@{…}` block with only JSX is transparent grouping until it contains setup.
+Moving a hook into that block gives it the block's local lifetime. A state value
+shared by sibling blocks stays in their common scope. A local helper that
+captures a hook value must move with it; the diagnostic names that helper. This
+placement check recognizes built-in hooks imported from Octane; custom hook
+calls are outside it.
+
+An outer named callback also fails if its only native event is inside a child
+block:
+
+```jsx
+"use strong";
+
+export function Save({ save }) @{
+	const onClick = () => save();
+	<div>@{ <button {onClick}>Save</button> }</div>
+}
+```
+
+`OCTANE_STRONG_EVENT_HANDLER_LOCALITY` points to `onClick` and names the
+`@{…}` block and its line. Move the named callback beside its button to pass:
+
+```jsx
+"use strong";
+
+export function Save({ save }) @{
+	<div>@{
+		const onClick = () => save();
+		<button {onClick}>Save</button>
+	}</div>
+}
+```
+
+The one-use alternative is an inline callback:
+`<button onClick={() => save()}>Save</button>`.
+The named form also works as `<button onClick={onClick}>` in the same template
+block, arm, or root template. Declaring the callback outside a child `@{…}`
+block that is its only use reports `OCTANE_STRONG_EVENT_HANDLER_LOCALITY` at the
+declaration and names the owning block. Callbacks shared by several arms,
+forwarded through component props, or imported from another module can retain
+their named bindings. These placement checks apply only to modules that opt into
+Strong mode; ordinary modules keep their existing behavior.
 
 The checks follow provable synchronous calls through local helpers,
 `useCallback` and `useEffectEvent` results, and functions returned by analyzable
@@ -421,8 +896,47 @@ or externally produced array is unchanged.
 Update state in event handlers instead. When state should reset or adjust after
 an input changes, use `useLinkedState`. Effects that connect to external systems,
 genuinely deferred callbacks, effect cleanup, and refs used for DOM elements,
-timers, or event callbacks remain valid. Strong mode does not restrict
-`Date.now()`, `Math.random()`, or similar values.
+timers, or event callbacks remain valid. Obtain changing timestamps or random
+values in events or effects and put them in state. A lazy state initializer such
+as `useState(() => new Date())` may also capture the initial value.
+
+For every user-authored operation evaluated to produce render output, Strong
+asserts all of the following:
+
+- The same witnessed props, state, context, receiver, arguments, and captured
+  values produce the same result.
+- Calls, computed methods, call-produced callees, constructors, tagged
+  templates, and synchronously invoked callbacks have no application-visible
+  render side effects.
+- Results do not depend on changing `ref.current` contents, state getters,
+  mutable module or global state, external live stores, clocks, randomness, or
+  hook state hidden behind a stable value.
+- Code does not rely on how often a render expression is evaluated. Development,
+  production, HMR, profiling, server rendering, hydration, retries, and aborted
+  work can evaluate it different numbers of times.
+
+Production client builds may condition every eligible call shape on those
+witnessed inputs. A `use*`-shaped ordinary function is treated like any other
+projection; Strong does not require React's hook naming convention to establish
+purity. Actual hooks still belong in component or custom-hook setup and retain
+their compiler-owned behavior. Built-in hook provenance, including optional
+calls, and lexically resolved same-module custom-hook declarations keep context,
+state, suspension, and effect lifecycle handling even through aliases or cyclic
+call graphs. Projection guards witness both a method/callable and its receiver,
+plus explicit arguments; derived receivers are witnessed through the operation
+and inputs that produce them rather than their transient result identity. Guard
+equality at component and ordinary-list projection boundaries is `Object.is`,
+including its `NaN` and signed-zero behavior; a certified keyed-selection
+operand retains authored strict equality.
+
+The diagnostics above are bounded; they do not prove arbitrary imported code or
+method bodies pure, and an unknown call does not make memoization fall back. A
+Strong caller is asserting that its use of an imported API is snapshot-safe. Keep
+live-accessor consumers in compatibility mode, or pass actual snapshots to a
+Strong component. See
+[Automatic memoization and calls in templates](./differences-from-react.md#automatic-memoization-and-calls-in-templates)
+for the exact boundary and why changing event captures still invalidates keyed
+rows.
 
 `"use strong"` only affects its own module. Put it at the top of the file, before
 imports or other code; comments and other directives may come first. In files

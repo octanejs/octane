@@ -3,6 +3,7 @@
 // option forwarding to the bundled compiler, the appType default, and the
 // config resolution of `router.preHydrate` / RenderRoute `status`.
 import { fileURLToPath } from 'node:url';
+import { statSync } from 'node:fs';
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -93,6 +94,43 @@ describe('production client assets', () => {
 			'/src/Page.tsrx': {
 				js: 'assets/Page-hash.js',
 				css: ['assets/Page-deferred.css'],
+			},
+		});
+	});
+
+	it('preserves route-local CSS order when manifest imports form a cycle', () => {
+		const assets = createClientAssetMap(
+			{
+				'src/Alpha.tsrx': {
+					file: 'assets/Alpha.js',
+					imports: ['_cycle-a.js'],
+				},
+				'src/Beta.tsrx': {
+					file: 'assets/Beta.js',
+					imports: ['_cycle-b.js'],
+				},
+				'_cycle-a.js': {
+					file: 'assets/cycle-a.js',
+					css: ['assets/a.css'],
+					imports: ['_cycle-b.js'],
+				},
+				'_cycle-b.js': {
+					file: 'assets/cycle-b.js',
+					css: ['assets/b.css'],
+					imports: ['_cycle-a.js'],
+				},
+			},
+			['/src/Alpha.tsrx', '/src/Beta.tsrx'],
+		);
+
+		expect(assets).toEqual({
+			'/src/Alpha.tsrx': {
+				js: 'assets/Alpha.js',
+				css: ['assets/a.css', 'assets/b.css'],
+			},
+			'/src/Beta.tsrx': {
+				js: 'assets/Beta.js',
+				css: ['assets/b.css', 'assets/a.css'],
 			},
 		});
 	});
@@ -207,6 +245,44 @@ describe('octane() plugin factory', () => {
 		}
 	});
 
+	it('forwards immutable CSS-provider facts to the bundled compiler', async () => {
+		const cssId = '/repo/src/panel.module.css';
+		const cssCode = 'export default Object.freeze({root:"_panel_root",label:"_panel_label"});';
+		const cssModule = { id: cssId, code: cssCode, meta: {}, moduleSideEffects: false };
+		const provider = vi.fn(() => ({
+			default: { root: '_panel_root', label: '_panel_label' },
+		}));
+		const [compiler] = octane({ hmr: false, cssModuleConstants: provider });
+		await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+		(compiler.configResolved as (config: unknown) => void)({
+			root: '/repo',
+			command: 'build',
+			build: {},
+			define: {},
+		});
+		const source =
+			'import styles from "./panel.module.css"; ' +
+			'export function Panel() @{ <section class={styles.root}><span class={styles.label}>Ready</span></section> }';
+		const output = await (compiler.transform as any).call(
+			{
+				resolve: async (request: string) =>
+					request === './panel.module.css' ? { id: cssId } : null,
+				load: async () => cssModule,
+				getModuleInfo: (id: string) => (id === cssId ? cssModule : null),
+			},
+			source,
+			'/repo/src/Panel.tsrx',
+		);
+		expect(provider).toHaveBeenCalledWith({
+			id: cssId,
+			code: cssCode,
+			meta: {},
+			environment: 'client',
+		});
+		expect(output.code).toContain('_panel_label');
+		expect(cssModule.moduleSideEffects).toBe(false);
+	});
+
 	it.each([true, false])('forwards strong=%s to the bundled compiler', async (strong) => {
 		const [compiler] = octane({ hmr: false, strong });
 		await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
@@ -305,6 +381,49 @@ describe('octane() plugin factory', () => {
 			await hotUpdate.handler.call(
 				{ environment: { name: 'client' } },
 				{ file: watchedPolicyPath, modules: [], server: { restart } },
+			);
+			expect(restart).toHaveBeenCalledOnce();
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
+	it('watches real config imports when an imported module uses decorators', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-decorated-config-'));
+		const configPath = join(root, 'octane.config.ts');
+		const entityPath = join(root, 'entity.ts');
+		try {
+			await writeFile(
+				join(root, 'tsconfig.json'),
+				JSON.stringify({ compilerOptions: { experimentalDecorators: true } }),
+			);
+			await writeFile(
+				entityPath,
+				'function entity(value) { return value; }\n@entity class Entity {}\nexport const strong = Entity.name === "Entity";\n',
+			);
+			await writeFile(
+				configPath,
+				"import { strong } from './entity.ts';\nexport default { compiler: { strong } };\n",
+			);
+
+			const [compiler, meta] = octane({ hmr: false });
+			await (compiler.config as (config: { root: string }) => unknown)({ root });
+
+			const add = vi.fn((files: string[]) => {
+				for (const file of files) statSync(file);
+			});
+			(meta.configureServer as (server: unknown) => void)({
+				watcher: { add },
+				middlewares: { use: vi.fn() },
+			});
+			const watchedEntityPath = await realpath(entityPath);
+			expect(add).toHaveBeenCalledWith(expect.arrayContaining([configPath, watchedEntityPath]));
+
+			const restart = vi.fn(async () => undefined);
+			const hotUpdate = meta.hotUpdate as { handler(context: unknown): Promise<unknown> };
+			await hotUpdate.handler.call(
+				{ environment: { name: 'client' } },
+				{ file: watchedEntityPath, modules: [], server: { restart } },
 			);
 			expect(restart).toHaveBeenCalledOnce();
 		} finally {

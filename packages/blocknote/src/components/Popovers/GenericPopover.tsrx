@@ -1,0 +1,243 @@
+import {
+	autoUpdate,
+	FloatingFocusManager,
+	FloatingPortal,
+	useDismiss,
+	useFloating,
+	UseFloatingOptions,
+	useHover,
+	useInteractions,
+	useMergeRefs,
+	useTransitionStatus,
+	useTransitionStyles,
+} from '@octanejs/floating-ui';
+import { HTMLAttributes, OctaneNode, useEffect, useRef } from 'octane';
+
+import { useBlockNoteEditor } from '../../hooks/useBlockNoteEditor.js';
+import { FloatingUIOptions } from './FloatingUIOptions.js';
+
+export type GenericPopoverReference =
+	| {
+			// A DOM element to use as the reference element for the popover.
+			element: Element;
+			// To update the popover position, `element.getReferenceBoundingRect`
+			// is called. This flag caches the last result of the call while the
+			// element is mounted to the DOM, so it doesn't update while the
+			// popover is closing and transitioning out. Useful for if the
+			// reference element unmounts, as `element.getReferenceBoundingRect`
+			// would return a `DOMRect` with x, y, width, and height of 0.
+			// Defaults to `true`.
+			cacheMountedBoundingClientRect?: boolean;
+	  }
+	| {
+			element: undefined;
+			// When no reference element is provided, this can be provided as an
+			// alternative "virtual" element to position the popover around.
+			getBoundingClientRect: () => DOMRect;
+			// Optional per-line client rects, required by floating-ui's `inline()`
+			// middleware. Virtual elements have no default `getClientRects`, so it
+			// must be provided explicitly when `inline()` is used.
+			getClientRects?: () => DOMRectList;
+	  }
+	| {
+			element: Element;
+			cacheMountedBoundingClientRect?: boolean;
+			// If both `element` and `getBoundingClientRect` are provided, uses
+			// `getBoundingClientRect` to position the popover, but still treats
+			// `element` as the reference element for all other purposes. When
+			// `cacheMountedBoundingClientRect` is `true` or unspecified, this
+			// function is not called while the reference element is not mounted.
+			getBoundingClientRect: () => DOMRect;
+			// See above.
+			getClientRects?: () => DOMRectList;
+	  };
+
+// Returns a modified version of `getBoundingClientRect`, if
+// `reference.element` is passed and `reference.cacheMountedBoundingClientRect`
+// is `true` or `undefined`. In the modified version, each new result is cached
+// and returned while `reference.element` is connected to the DOM. If it is no
+// longer connected, the cache is no longer updated and the last cached result
+// is used.
+//
+// In all other cases, just returns `reference.getBoundingClientRect`, or
+// `reference.element.getBoundingClientRect` if it's not defined.
+export function getMountedBoundingClientRectCache(reference: GenericPopoverReference) {
+	let lastBoundingClientRect = new DOMRect();
+	const getBoundingClientRect =
+		'getBoundingClientRect' in reference
+			? () => reference.getBoundingClientRect()
+			: () => reference.element.getBoundingClientRect();
+
+	return () => {
+		if (reference.element && (reference.cacheMountedBoundingClientRect ?? true)) {
+			if (reference.element.isConnected) {
+				lastBoundingClientRect = getBoundingClientRect();
+			}
+
+			return lastBoundingClientRect;
+		}
+
+		return getBoundingClientRect();
+	};
+}
+
+/**
+ * Merges two `whileElementsMounted` handlers into one. Both run when elements
+ * mount, and both cleanup functions are called on unmount.
+ */
+function mergeWhileElementsMounted(
+	a: UseFloatingOptions['whileElementsMounted'],
+	b: UseFloatingOptions['whileElementsMounted'],
+): UseFloatingOptions['whileElementsMounted'] {
+	if (!a) {
+		return b;
+	}
+	if (!b) {
+		return a;
+	}
+
+	return (reference, floating, update) => {
+		const cleanupA = a(reference, floating, update);
+		const cleanupB = b(reference, floating, update);
+		return () => {
+			cleanupA?.();
+			cleanupB?.();
+		};
+	};
+}
+
+export const GenericPopover = (props: FloatingUIOptions & {
+	reference?: GenericPopoverReference;
+	children: OctaneNode;
+	/**
+ * Override the DOM node this popover portals into. If omitted, falls back
+ * to `editor.portalElement`.
+ */
+	portalElement?: HTMLElement | null;
+}) => {
+	const editor = useBlockNoteEditor();
+	const portalRoot =
+		props.portalElement === null
+			? typeof document !== 'undefined'
+				? document.body
+				: undefined
+			: props.portalElement ?? editor?.portalElement;
+	if (!portalRoot) {
+		throw new Error('Portal element not found');
+	}
+	const { whileElementsMounted: _whileElementsMounted, ...restFloatingOptions } =
+		props.useFloatingOptions ?? {};
+
+	const { refs, floatingStyles, context } = useFloating<HTMLDivElement>({
+		whileElementsMounted: mergeWhileElementsMounted(
+			autoUpdate,
+			props.useFloatingOptions?.whileElementsMounted,
+		),
+		...restFloatingOptions,
+	});
+
+	const { isMounted, styles } = useTransitionStyles(context, props.useTransitionStylesProps);
+	const { status } = useTransitionStatus(context, props.useTransitionStatusProps);
+
+	const dismiss = useDismiss(context, props.useDismissProps);
+	const hover = useHover(context, { enabled: false, ...props.useHoverProps });
+	// Also returns `getReferenceProps` but unused as the reference element may
+	// not even be managed by React, so we may be unable to set them. Seems like
+	// `refs.setReferences` attaches most of the same listeners anyway, but
+	// possible both are needed.
+	const { getFloatingProps } = useInteractions([dismiss, hover]);
+
+	const innerHTML = useRef<string>('');
+	const ref = useRef<HTMLDivElement>(null);
+	const mergedRefs = useMergeRefs([ref, refs.setFloating]);
+
+	useEffect(() => {
+		if (props.reference) {
+			const element =
+				'element' in props.reference ? props.reference.element : undefined;
+
+			if (
+				element !== undefined &&
+					(props.focusManagerProps?.disabled || !editor.isWithinEditor(element))
+			) {
+				// Only set domReference when FloatingFocusManager is disabled.
+				// When FloatingFocusManager is active (disabled !== false) and the
+				// reference is inside the ProseMirror editor, setting domReference
+				// causes floating-ui to call insertAdjacentElement on the reference,
+				// inserting a focus-return <span> into the PM contenteditable. This
+				// triggers PM's MutationObserver and resets the editor selection.
+				// (issue #2525)
+				refs.setReference(element);
+			}
+
+			// Forward `getClientRects` when provided, so floating-ui's `inline()`
+			// middleware can read per-line rects off a virtual reference (it calls
+			// `getClientRects()`, which virtual elements lack by default).
+			const getClientRects =
+				'getClientRects' in props.reference ? props.reference.getClientRects : undefined;
+
+			refs.setPositionReference({
+				getBoundingClientRect: getMountedBoundingClientRectCache(props.reference),
+				...(getClientRects ? { getClientRects } : {}),
+				contextElement: element,
+			});
+		}
+	}, [props.reference, refs, props.focusManagerProps?.disabled, editor]);
+
+	// Stores the last rendered `innerHTML` of the popover while it was open. The
+	// `innerHTML` is used while the popover is closing, as the React children
+	// may rerender during this time, causing unwanted behaviour.
+	useEffect(() => {
+		if (status === 'initial' || status === 'open') {
+			if (ref.current?.innerHTML) {
+				innerHTML.current = ref.current.innerHTML;
+			}
+		}
+	}, [status, props.reference, props.children]); // the children that we're storing. // `props.children` is added to the deps, since it's ultimately the HTML of
+
+	if (!isMounted) {
+		return false;
+	}
+
+	const mergedProps: HTMLAttributes<HTMLDivElement> = {
+		...props.elementProps,
+		style: {
+			display: 'flex',
+			...props.elementProps?.style,
+			zIndex: `calc(var(--bn-ui-base-z-index, 0) + ${props.elementProps?.style?.zIndex || 0})`,
+			...floatingStyles,
+			...styles,
+		},
+		...getFloatingProps(),
+	};
+
+	if (status === 'close') {
+		// While the popover is closing, shows its last rendered `innerHTML` while
+		// it was open, instead of the React children. This is because they may
+		// rerender during this time, causing unwanted behaviour.
+		//
+		// When we use the `GenericPopover` for BlockNote's internal UI elements
+		// this isn't a huge deal, as we only pass child components if the popover
+		// should be open. So without this fix, the popover just won't transition
+		// out and will instead appear to hide instantly.
+		return <FloatingPortal root={portalRoot}>
+			<div
+				ref={mergedRefs}
+				{...mergedProps}
+				dangerouslySetInnerHTML={{ __html: innerHTML.current }}
+			/>
+		</FloatingPortal>;
+	}
+
+	if (!props.focusManagerProps?.disabled) {
+		return <FloatingPortal root={portalRoot}>
+			<FloatingFocusManager {...props.focusManagerProps} context={context}>
+				<div ref={mergedRefs} {...mergedProps}>{props.children}</div>
+			</FloatingFocusManager>
+		</FloatingPortal>;
+	}
+
+	return <FloatingPortal root={portalRoot}>
+		<div ref={mergedRefs} {...mergedProps}>{props.children}</div>
+	</FloatingPortal>;
+};

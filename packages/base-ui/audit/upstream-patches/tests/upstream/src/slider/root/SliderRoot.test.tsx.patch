@@ -1,0 +1,28 @@
+diff --git a/tests/upstream/src/slider/root/SliderRoot.test.tsx b/tests/upstream/src/slider/root/SliderRoot.test.tsx
+--- a/tests/upstream/src/slider/root/SliderRoot.test.tsx
++++ b/tests/upstream/src/slider/root/SliderRoot.test.tsx
+@@ -1,4 +1,8 @@
+ /** @jsxImportSource octane */
++import { SliderRootServerCase1 } from './../../../../fixtures/SliderRoot-ssr.tsrx';
++import { SliderRootServerCase1 as ServerSliderRootServerCase1 } from './../../../../fixtures/SliderRoot-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(SliderRootServerCase1, ServerSliderRootServerCase1);
+ import { expect, vi, describe, beforeAll, it } from 'vitest';
+ import * as React from 'octane';
+ import { act, flushMicrotasks, fireEvent, screen, waitFor } from '@mui/internal-test-utils';
+@@ -100,14 +104,7 @@ describe('<Slider.Root />', () => {
+   describe('server-side rendering', () => {
+     it('does not link Slider.Label before hydration', () => {
+       renderToString(
+-        <Slider.Root defaultValue={30} data-testid="root">
+-          <Slider.Label data-testid="label">Volume</Slider.Label>
+-          <Slider.Control>
+-            <Slider.Track>
+-              <Slider.Thumb />
+-            </Slider.Track>
+-          </Slider.Control>
+-        </Slider.Root>,
++        <SliderRootServerCase1 />,
+       );
+ 
+       const root = screen.getByTestId('root');

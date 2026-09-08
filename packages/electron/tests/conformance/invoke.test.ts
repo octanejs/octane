@@ -5,7 +5,7 @@ import {
 	DynamicCommandApp,
 	GreetingApp,
 } from '../_fixtures/commands.tsrx';
-import { flush, installMockBridge, mount, resetBridge } from '../_helpers';
+import { act, flush, installMockBridge, mount, resetBridge } from '../_helpers';
 
 afterEach(async () => {
 	await flush();
@@ -18,7 +18,8 @@ describe('useInvoke', () => {
 		const result = mount(GreetingApp, { name: 'ada' });
 
 		expect(result.find('#fallback').textContent).toBe('loading');
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#greeting').textContent).toBe('hello ada');
 		result.unmount();
 	});
@@ -26,8 +27,10 @@ describe('useInvoke', () => {
 	it('invokes once across the suspend and replay of one episode', async () => {
 		const { calls } = installMockBridge(() => 'hello');
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
 
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('hello');
 		expect(calls.filter((call) => call.channel === 'greet')).toHaveLength(1);
 		result.unmount();
 	});
@@ -37,10 +40,14 @@ describe('useInvoke', () => {
 			(_channel, args) => `hello ${(args[0] as { name: string }).name}`,
 		);
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('hello ada');
 
 		result.update(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('hello ada');
 		expect(calls.filter((call) => call.channel === 'greet')).toHaveLength(1);
 		result.unmount();
 	});
@@ -48,8 +55,9 @@ describe('useInvoke', () => {
 	it('runs a channel called with neither args nor options', async () => {
 		const { calls } = installMockBridge((channel) => `ran ${channel}`);
 		const result = mount(BareGreetingApp);
-		await flush();
+		await act(flush);
 
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#greeting').textContent).toBe('ran greet');
 		expect(calls.filter((call) => call.channel === 'greet')[0].args).toEqual([]);
 		result.unmount();
@@ -58,11 +66,13 @@ describe('useInvoke', () => {
 	it('refetches on a changed channel name even under explicit deps', async () => {
 		installMockBridge((channel) => `ran ${channel}`);
 		const result = mount(DynamicCommandApp, { cmd: 'first', version: 1 });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#dynamic').textContent).toBe('ran first');
 
 		result.update(DynamicCommandApp, { cmd: 'second', version: 1 });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#dynamic').textContent).toBe('ran second');
 		result.unmount();
 	});
@@ -72,10 +82,13 @@ describe('useInvoke', () => {
 			(_channel, args) => `hello ${(args[0] as { name: string }).name}`,
 		);
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('hello ada');
 
 		result.update(GreetingApp, { name: 'grace' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(calls.filter((call) => call.channel === 'greet')).toHaveLength(2);
 		expect(result.find('#greeting').textContent).toBe('hello grace');
 		result.unmount();
@@ -84,14 +97,16 @@ describe('useInvoke', () => {
 	it('routes a rejected command to the error boundary', async () => {
 		installMockBridge(() => Promise.reject(new Error('command failed')));
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#caught').textContent).toBe('Error');
 		result.unmount();
 	});
 
 	it('rejects with ElectronUnavailableError when the bridge is missing', async () => {
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#caught').textContent).toBe('ElectronUnavailableError');
 		result.unmount();
 	});

@@ -4,7 +4,21 @@
 // risk resolving a second copy — atoms compare by identity, so a duplicate
 // would silently break every subscription.
 import { batch, createAtom } from '@octanejs/tanstack-store';
+import type { AtomOptions } from '@octanejs/tanstack-store';
 import type { TableAtomOptions, TableReactivityBindings } from '@tanstack/table-core/reactivity';
+
+/**
+ * table-core supplies a comparator for some atoms and nothing for the rest, and
+ * carries a `debugName` that `createAtom` has no use for. `AtomOptions.compare`
+ * is optional without `undefined`, so building the object unconditionally makes
+ * the call a type error under `exactOptionalPropertyTypes`, which is the
+ * consumer's flag because this package publishes source. The object therefore
+ * exists only when there is a comparator to put in it.
+ */
+function atomOptions<T>(options?: TableAtomOptions<T>): AtomOptions<T> | undefined {
+	const compare = options?.compare;
+	return compare === undefined ? undefined : { compare };
+}
 
 /**
  * Creates the table-core reactivity bindings used by the octane adapter.
@@ -31,14 +45,10 @@ export function octaneReactivity(): TableReactivityBindings {
 		batch,
 		untrack: (fn) => fn(),
 		createReadonlyAtom: <T>(fn: () => T, options?: TableAtomOptions<T>) => {
-			return createAtom(() => fn(), {
-				compare: options?.compare,
-			});
+			return createAtom(() => fn(), atomOptions<T>(options));
 		},
 		createWritableAtom: <T>(value: T, options?: TableAtomOptions<T>) => {
-			return createAtom(value, {
-				compare: options?.compare,
-			});
+			return createAtom(value, atomOptions<T>(options));
 		},
 	};
 }

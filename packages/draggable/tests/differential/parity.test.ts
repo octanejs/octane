@@ -3,7 +3,7 @@ import { createRoot as createOctaneRoot, flushSync } from 'octane';
 import { createElement, createRef, type ComponentType } from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import { act } from 'react';
-import ReactDraggable from '../../upstream/npm/build/cjs/cjs.mjs';
+import ReactDraggable from '../../upstream-artifact/build/cjs/cjs.mjs';
 import { normaliseHtml } from '../../../octane/tests/differential/_rig';
 import { DraggableHarness } from '../runtime/_fixtures/DraggableHarness.tsrx';
 

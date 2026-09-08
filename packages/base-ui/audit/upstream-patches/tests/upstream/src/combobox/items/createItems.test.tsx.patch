@@ -1,0 +1,47 @@
+diff --git a/tests/upstream/src/combobox/items/createItems.test.tsx b/tests/upstream/src/combobox/items/createItems.test.tsx
+--- a/tests/upstream/src/combobox/items/createItems.test.tsx
++++ b/tests/upstream/src/combobox/items/createItems.test.tsx
+@@ -1,4 +1,8 @@
+ /** @jsxImportSource octane */
++import { CollectionFixture, sharedPersonItems, type Person } from '../../../../fixtures/collection-ssr.tsrx';
++import { CollectionFixture as ServerFixture } from '../../../../fixtures/collection-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from '../../../../support/renderer';
++registerServerComponent(CollectionFixture, ServerFixture);
+ import { expect, vi, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { Combobox } from '@octanejs/base-ui/combobox';
+@@ -58,17 +62,6 @@ const userItems = Combobox.createItems(users, {
+   getLabel: (user) => user.name,
+ });
+ 
+-interface Person {
+-  id: string;
+-  name: string;
+-}
+-
+-// Created once and reused by more than one root, the way a module-scope collection is.
+-const sharedPersonItems = Combobox.createItems([] as Person[], {
+-  getValue: (person: Person) => person.id,
+-  getLabel: (person: Person) => person.name,
+-});
+-
+ describe('Combobox.createItems', () => {
+   const { render, renderToString } = createRenderer();
+ 
+@@ -1528,15 +1521,7 @@ describe('Combobox.createItems', () => {
+     });
+ 
+     it('resolves a server-rendered defaultValue label from the external window', () => {
+-      renderToString(
+-        <Combobox.Root
+-          items={sharedPersonItems}
+-          filteredItems={[{ id: 'user-1', name: 'Alice' }]}
+-          defaultValue="user-1"
+-        >
+-          <Combobox.Input data-testid="input" />
+-        </Combobox.Root>,
+-      );
++      renderToString(<CollectionFixture />);
+ 
+       expect(screen.getByTestId('input')).toHaveValue('Alice');
+     });

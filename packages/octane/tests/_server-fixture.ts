@@ -8,9 +8,13 @@
  */
 import { readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
+import ts from 'typescript';
 import { compile } from 'octane/compiler';
+import { slotHooks } from '../src/compiler/slot-hooks.js';
 import * as ServerRuntime from 'octane/server';
 import * as HydrationRuntime from 'octane/hydration';
+import * as InternalClientRuntime from 'octane/internal/client';
+import * as InternalServerRuntime from 'octane/internal/server';
 import * as ClientRuntime from '../src/index.js';
 
 export type CompiledFixtureModule = Record<string, any>;
@@ -20,6 +24,8 @@ export interface ServerFixtureOptions {
 	id?: string;
 	/** Additional public compiler options; `mode: 'server'` is always enforced. */
 	compileOptions?: Record<string, unknown>;
+	/** Real optional runtime entrypoints used by the authored fixture. */
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
 export interface CompiledFixtureSourceOptions {
@@ -28,6 +34,18 @@ export interface CompiledFixtureSourceOptions {
 	mode: 'client' | 'server';
 	/** Additional public compiler options; `mode` is always enforced. */
 	compileOptions?: Record<string, unknown>;
+	/** Self-contained external modules used by custom-renderer fixtures. */
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
+}
+
+export interface PlainHookFixtureSourceOptions {
+	id: string;
+	inlineHookMemo: boolean;
+	mode?: 'client' | 'server';
+	hmr?: boolean;
+	manualSlots?: boolean;
+	nativeReads?: boolean;
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
 export function loadCompiledFixtureSource<T extends CompiledFixtureModule = CompiledFixtureModule>(
@@ -35,20 +53,91 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 	options: CompiledFixtureSourceOptions,
 ): T {
 	const { id, mode } = options;
-	let { code } = compile(source, id, {
+	const { code } = compile(source, id, {
 		...options.compileOptions,
 		mode,
 	});
+	return evaluateCompiledFixtureCode<T>(code, id, mode, options.runtimeModules);
+}
 
+/** Execute the public plain-module transform through the shared module loader. */
+export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = CompiledFixtureModule>(
+	source: string,
+	options: PlainHookFixtureSourceOptions,
+): T {
+	const mode = options.mode ?? 'client';
+	const out = slotHooks(source, options.id, {
+		environment: mode,
+		hmr: options.hmr ?? false,
+		dev: options.hmr ?? false,
+		profile: false,
+		inlineHookMemo: options.inlineHookMemo,
+		manualSlots: options.manualSlots,
+		nativeReads: options.nativeReads,
+	});
+	// The plain path deliberately leaves TypeScript to its host toolchain.
+	// Strip it here exactly once, then use the same evaluation boundary as the
+	// component compiler fixtures. No generated module is recompiled by Octane.
+	const { outputText } = ts.transpileModule(out?.code ?? source, {
+		fileName: options.id,
+		compilerOptions: {
+			target: ts.ScriptTarget.ESNext,
+			module: ts.ModuleKind.ESNext,
+			verbatimModuleSyntax: true,
+		},
+	});
+	return evaluateCompiledFixtureCode<T>(outputText, options.id, mode, options.runtimeModules);
+}
+
+export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
+	code: string,
+	id: string,
+	mode: 'client' | 'server',
+	runtimeModules: Readonly<Record<string, CompiledFixtureModule>> | undefined,
+): T {
 	const runtime = mode === 'server' ? ServerRuntime : ClientRuntime;
+	const internalRuntime = mode === 'server' ? InternalServerRuntime : InternalClientRuntime;
+	// ESM imports initialize before module statements even when emitted at the
+	// module tail. Keep that ordering when replacing imports with fixture values.
+	const imports: string[] = [];
+	const importBinding = (binding: string): string => {
+		imports.push(binding);
+		return '';
+	};
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/(?:server|internal\/(?:client|server)))?['"];?/g,
-		(_match: string, names: string) => `const {${names.replace(/\s+as\s+/g, ': ')}} = __runtime;`,
+		/import\s*\*\s*as\s+([\w$]+)\s*from\s*['"]octane\/internal\/(?:client|server)['"];?/g,
+		(_match: string, name: string) => importBinding(`const ${name} = __internalRuntime;`),
+	);
+	code = code.replace(
+		/import\s*\*\s*as\s+([\w$]+)\s*from\s*['"]octane(?:\/server)?['"];?/g,
+		(_match: string, name: string) => importBinding(`const ${name} = __runtime;`),
+	);
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/internal\/(?:client|server)['"];?/g,
+		(_match: string, names: string) =>
+			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __internalRuntime;`),
+	);
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
+		(_match: string, names: string) =>
+			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __runtime;`),
 	);
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/hydration['"];?/g,
 		(_match: string, names: string) =>
-			`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`,
+			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`),
+	);
+	code = code.replace(
+		/import\s+(\*\s+as\s+[\w$]+|\{[^}]*\}|[\w$]+)\s+from\s*['"]([^'"]+)['"];?/g,
+		(match: string, binding: string, request: string) => {
+			if (runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)) return match;
+			const module = `__runtimeModules[${JSON.stringify(request)}]`;
+			if (binding.startsWith('*'))
+				return importBinding(`const ${binding.replace(/^\*\s+as\s+/, '')} = ${module};`);
+			if (binding.startsWith('{'))
+				return importBinding(`const ${binding.replace(/\s+as\s+/g, ': ')} = ${module};`);
+			return importBinding(`const ${binding} = ${module}.default;`);
+		},
 	);
 
 	// `export function X` must stay a real function *declaration*: compiled
@@ -60,14 +149,14 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 	// reassignment of the binding.
 	const functionExports: string[] = [];
 	code = code.replace(
-		/export\s+(async\s+)?function\s+(\w+)/g,
+		/export\s+(async\s+)?function\s+([\w$]+)/g,
 		(_match: string, asyncKeyword: string | undefined, name: string) => {
 			functionExports.push(name);
 			return `${asyncKeyword ?? ''}function ${name}`;
 		},
 	);
 	code = code.replace(
-		/export\s+(const|let|var)\s+(\w+)\s*=/g,
+		/export\s+(const|let|var)\s+([\w$]+)\s*=/g,
 		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
 	);
 	code = code.replace(/export\s+default\s+/g, '__exports.default = ');
@@ -84,11 +173,13 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 
 	const evaluate = new Function(
 		'__runtime',
+		'__internalRuntime',
 		'__hydrationRuntime',
+		'__runtimeModules',
 		'__exports',
-		`'use strict';\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
+		`'use strict';\n${imports.join('\n')}\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
 	);
-	return evaluate(runtime, HydrationRuntime, {}) as T;
+	return evaluate(runtime, internalRuntime, HydrationRuntime, runtimeModules, {}) as T;
 }
 
 export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixtureModule>(
@@ -101,5 +192,6 @@ export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixt
 		id: options.id ?? defaultId,
 		mode: 'server',
 		compileOptions: options.compileOptions,
+		runtimeModules: options.runtimeModules,
 	});
 }

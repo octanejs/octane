@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@octanejs/testing-library": ["../../../testing-library/src/index.ts"]
+    }
+  },
+  "include": ["./*.ts"]
+}

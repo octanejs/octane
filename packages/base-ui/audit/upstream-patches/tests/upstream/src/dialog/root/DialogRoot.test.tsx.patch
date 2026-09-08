@@ -1,0 +1,32 @@
+diff --git a/tests/upstream/src/dialog/root/DialogRoot.test.tsx b/tests/upstream/src/dialog/root/DialogRoot.test.tsx
+--- a/tests/upstream/src/dialog/root/DialogRoot.test.tsx
++++ b/tests/upstream/src/dialog/root/DialogRoot.test.tsx
+@@ -431,7 +431,7 @@ describe('<Dialog.Root />', () => {
+ 
+       it('reports no trigger when closing with an initial trigger id that is not mounted', async () => {
+         const handleOpenChange = vi.fn();
+-        const actionsRef = React.createRef<Dialog.Root.Actions>();
++        const actionsRef = ({current:null} as React.RefObject<Dialog.Root.Actions | null>);
+ 
+         await render(
+           <Dialog.Root
+@@ -1419,7 +1419,8 @@ describe('<Dialog.Root />', () => {
+           expect(screen.queryByTestId('dialog-popup')).not.toBe(null);
+         });
+ 
+-        expect(onOpenChangeComplete.mock.calls.length).toBe(2);
++        // Octane does not replay mount effects in Strict Mode (renderer contract).
++        expect(onOpenChangeComplete.mock.calls.length).toBe(1);
+         expect(onOpenChangeComplete.mock.calls[0][0]).toBe(true);
+       });
+ 
+@@ -2131,7 +2132,8 @@ describe('<Dialog.Root />', () => {
+                 <textarea
+                   data-testid="textarea"
+                   value={value}
+-                  onChange={(event) => setValue(event.target.value)}
++                  // OCTANE DIVERGENCE[native-event-semantics]: text edits use native input events.
++                  onInput={(event) => setValue(event.currentTarget.value)}
+                 />
+               </Dialog.Popup>
+             </Dialog.Portal>

@@ -119,8 +119,11 @@ type EntryRecord = {
 	readiness: Readiness;
 	status: 'pending' | 'active' | 'failed' | 'disposed';
 	adoptions: Map<Element, AdoptionRecord>;
+	pendingAdoptionCount: number;
 	waitingRanges: Set<RangeRecord>;
 	queuedEvents: Array<{ event: Event; element: Element; range: RangeRecord | undefined }>;
+	queuedEventHead: number;
+	queuedEventFlushDepth: number;
 	unlinks: Array<() => void>;
 	initialScanComplete: boolean;
 };
@@ -311,9 +314,16 @@ function adoptionContext(adoption: AdoptionRecord, event?: Event): BehaviorConte
 	return context;
 }
 
+function finishPendingAdoption(adoption: AdoptionRecord): void {
+	if (!adoption.pending) return;
+	adoption.pending = false;
+	adoption.entry.pendingAdoptionCount--;
+}
+
 function disposeAdoption(adoption: AdoptionRecord): void {
 	if (adoption.disposed) return;
 	adoption.disposed = true;
+	finishPendingAdoption(adoption);
 	adoption.entry.adoptions.delete(adoption.element);
 	adoption.controller.abort();
 	for (const unlink of adoption.unlinks) unlink();
@@ -325,29 +335,53 @@ function disposeAdoption(adoption: AdoptionRecord): void {
 
 function flushQueuedEvents(record: EntryRecord): void {
 	if (record.status !== 'active') return;
-	while (record.queuedEvents.length !== 0) {
-		const queued = record.queuedEvents[0];
-		if (!contains(record.root, queued.element)) {
-			record.queuedEvents.shift();
-			continue;
+	const queue = record.queuedEvents;
+	// Recursive native dispatch shares the cursor and defers compaction to the
+	// outermost flush so an in-flight item remains stable across callbacks.
+	record.queuedEventFlushDepth++;
+	try {
+		while (record.queuedEventHead < queue.length) {
+			const index = record.queuedEventHead;
+			const queued = queue[index];
+			if (!contains(record.root, queued.element)) {
+				record.queuedEventHead = index + 1;
+				continue;
+			}
+			const range = nearestRange(record.root, queued.element);
+			if (range !== queued.range || !rangeMatches(record, range)) {
+				record.queuedEventHead = index + 1;
+				continue;
+			}
+			if (range?.status === 'pending') return;
+			let adoption = record.adoptions.get(queued.element);
+			if (adoption === undefined) {
+				adoption = adoptElement(record, queued.element, range, queued.event);
+			}
+			if (adoption === undefined || adoption.pending) return;
+			// Adoption can synchronously dispatch and recursively flush this item.
+			if (record.queuedEventHead !== index || queue[index] !== queued) continue;
+			record.queuedEventHead = index + 1;
+			record.entry.handleEvent?.(
+				queued.event,
+				queued.element,
+				adoptionContext(adoption, queued.event),
+			);
 		}
-		const range = nearestRange(record.root, queued.element);
-		if (range !== queued.range || !rangeMatches(record, range)) {
-			record.queuedEvents.shift();
-			continue;
+	} finally {
+		record.queuedEventFlushDepth--;
+		if (record.queuedEventFlushDepth === 0 && record.queuedEventHead !== 0) {
+			const consumed = record.queuedEventHead;
+			if (consumed >= queue.length) {
+				queue.length = 0;
+				record.queuedEventHead = 0;
+			} else if (consumed >= queue.length - consumed) {
+				// Shift only after the dead prefix reaches the live suffix. Across
+				// one-event async resumes, shifted suffixes then shrink geometrically
+				// while retained storage stays below twice the outstanding events.
+				queue.splice(0, consumed);
+				record.queuedEventHead = 0;
+			}
 		}
-		if (range?.status === 'pending') return;
-		let adoption = record.adoptions.get(queued.element);
-		if (adoption === undefined) {
-			adoption = adoptElement(record, queued.element, range, queued.event);
-		}
-		if (adoption === undefined || adoption.pending) return;
-		record.queuedEvents.shift();
-		record.entry.handleEvent?.(
-			queued.event,
-			queued.element,
-			adoptionContext(adoption, queued.event),
-		);
 	}
 }
 
@@ -357,9 +391,7 @@ function completeBehavior(record: EntryRecord): void {
 		if (range.status === 'pending') return;
 		record.waitingRanges.delete(range);
 	}
-	for (const adoption of record.adoptions.values()) {
-		if (adoption.pending) return;
-	}
+	if (record.pendingAdoptionCount !== 0) return;
 	flushQueuedEvents(record);
 	if (record.queuedEvents.length !== 0) return;
 	record.readiness.resolve();
@@ -420,11 +452,12 @@ function adoptElement(
 	}
 	if (typeof result === 'object' && result !== null && typeof result.then === 'function') {
 		adoption.pending = true;
+		record.pendingAdoptionCount++;
 		// The underlying adoption must still be observed after cancellation so a
 		// late cleanup can run exactly once, but public readiness races its signal.
 		const settled = Promise.resolve(result).then(
 			(cleanup) => {
-				adoption.pending = false;
+				finishPendingAdoption(adoption);
 				if (typeof cleanup === 'function') {
 					if (adoption.disposed || adoption.controller.signal.aborted) cleanup();
 					else adoption.cleanup = cleanup;
@@ -435,7 +468,7 @@ function adoptElement(
 				}
 			},
 			(error) => {
-				adoption.pending = false;
+				finishPendingAdoption(adoption);
 				if (adoption.disposed || record.controller.signal.aborted) return;
 				disposeAdoption(adoption);
 				failBehavior(record, error);
@@ -592,6 +625,7 @@ function disposeBehavior(record: EntryRecord): void {
 		record.root.behaviorsById.delete(record.entry.id);
 	}
 	record.queuedEvents.length = 0;
+	record.queuedEventHead = 0;
 	record.waitingRanges.clear();
 	let firstError: unknown;
 	for (const adoption of [...record.adoptions.values()]) {
@@ -651,8 +685,11 @@ function registerBehavior(root: RootRecord, entry: BehaviorEntry): BehaviorRegis
 		readiness,
 		status: 'pending',
 		adoptions: new Map(),
+		pendingAdoptionCount: 0,
 		waitingRanges: new Set(),
 		queuedEvents: [],
+		queuedEventHead: 0,
+		queuedEventFlushDepth: 0,
 		unlinks: [linkSignal(root.controller.signal, controller)],
 		initialScanComplete: false,
 	};

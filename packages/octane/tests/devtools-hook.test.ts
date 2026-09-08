@@ -5,6 +5,8 @@ import {
 	__devtoolsUnregisterRoot,
 	__devtoolsNotifyFlush,
 	__devtoolsSetNameResolver,
+	__devtoolsSetChildWalker,
+	__devtoolsSetNativeReadInspector,
 	__devtoolsSetTransitionCount,
 	__devtoolsSetBoundaryState,
 	__devtoolsClearBoundary,
@@ -31,10 +33,84 @@ function scope(partial: Partial<DevtoolsScopeLike>): DevtoolsScopeLike {
 }
 
 afterEach(() => {
+	__devtoolsSetChildWalker(null);
+	__devtoolsSetNativeReadInspector(null);
 	delete (globalThis as any).__OCTANE_DEVTOOLS__;
 });
 
 describe('devtools hook registry', () => {
+	it('uses the runtime child walker once per scope and drops obsolete inspection ids', () => {
+		const leaf = scope({ body: { name: 'Leaf' } });
+		const slotChild = scope({ body: { name: 'SlotChild' } });
+		const disposed = scope({ body: { name: 'Disposed' }, disposed: true });
+		const root = scope({
+			kind: 'root',
+			body: { name: 'Root' },
+			children: [{ key: 0, scope: leaf }],
+		});
+		__devtoolsSetNameResolver((candidate) => candidate?.body?.name ?? 'Unknown');
+		__devtoolsSetChildWalker((candidate, visit) => {
+			if (candidate === root) {
+				visit(leaf);
+				visit(slotChild);
+				visit(disposed);
+			}
+		});
+		__devtoolsRegisterRoot(root);
+		try {
+			const hook = globalThis.__OCTANE_DEVTOOLS__!;
+			const tree = hook.getTree();
+			expect(tree[0].children.map((child) => child.name)).toEqual(['Leaf', 'SlotChild']);
+			const id = tree[0].children[1].id;
+			expect(hook.inspect(id)?.name).toBe('SlotChild');
+			__devtoolsUnregisterRoot(root);
+			expect(hook.inspect(id)).toBeNull();
+		} finally {
+			__devtoolsUnregisterRoot(root);
+		}
+	});
+
+	it('adds native read metadata only through the optional selected-scope inspector', () => {
+		const leaf = scope({ body: { name: 'Reader' } });
+		const root = scope({
+			kind: 'root',
+			body: { name: 'Root' },
+			children: [{ key: 0, scope: leaf }],
+		});
+		__devtoolsRegisterRoot(root);
+		try {
+			const hook = globalThis.__OCTANE_DEVTOOLS__!;
+			const tree = hook.getTree();
+			const id = tree[0].children[0].id;
+			expect(hook.inspect(id)?.nativeReads).toBeUndefined();
+			__devtoolsSetNativeReadInspector((candidate) =>
+				candidate === leaf
+					? {
+							block: root,
+							committed: {
+								mixed: false,
+								reads: [{ observedVersion: 1, currentVersion: 2, source: null }],
+							},
+							pending: [],
+							retry: [],
+						}
+					: null,
+			);
+			expect(hook.inspect(id)?.nativeReads).toEqual({
+				ownerId: tree[0].id,
+				committed: {
+					mixed: false,
+					reads: [{ observedVersion: 1, currentVersion: 2, source: null }],
+				},
+				pending: [],
+				retry: [],
+			});
+			expect(hook.inspect(tree[0].id)?.nativeReads).toBeUndefined();
+		} finally {
+			__devtoolsUnregisterRoot(root);
+		}
+	});
+
 	it('installs a versioned global and enumerates registered roots as a tree', () => {
 		__devtoolsSetNameResolver((b) => b?.body?.name ?? 'Unknown');
 		const leaf = scope({ body: { name: 'Leaf' } });
@@ -77,7 +153,7 @@ describe('devtools hook registry', () => {
 			effectSlots: [{ effect: true, phase: 2 } as any],
 		});
 		__devtoolsRegisterRoot(comp);
-		const hook = (globalThis as any).__OCTANE_DEVTOOLS__!;
+		const hook = globalThis.__OCTANE_DEVTOOLS__!;
 		const id = hook.getTree()[0].id;
 		const detail = hook.inspect(id)!;
 		expect(detail.name).toBe('Stateful');
@@ -101,6 +177,40 @@ describe('devtools hook registry', () => {
 		off();
 		__devtoolsNotifyFlush();
 		expect(calls).toBe(2);
+	});
+
+	it('previews state without invoking object or array accessors', () => {
+		let reads = 0;
+		const object = Object.defineProperty({}, 'value', {
+			enumerable: true,
+			get() {
+				reads++;
+				return 'secret';
+			},
+		});
+		const array = Object.defineProperty([], '0', {
+			enumerable: true,
+			get() {
+				reads++;
+				throw new Error('inspector evaluated an accessor');
+			},
+		});
+		const comp = scope({
+			kind: 'root',
+			hooks: new Map([
+				[0, { value: object, setter() {} }],
+				[1, { value: array, setter() {} }],
+			]),
+		});
+		__devtoolsRegisterRoot(comp);
+		try {
+			const hook = globalThis.__OCTANE_DEVTOOLS__!;
+			const detail = hook.inspect(hook.getTree()[0].id)!;
+			expect(reads).toBe(0);
+			expect(detail.hooks.map((cell) => cell.value)).toEqual([{ value: '[Getter]' }, ['[Getter]']]);
+		} finally {
+			__devtoolsUnregisterRoot(comp);
+		}
 	});
 
 	it('tracks transition count and boundary state via the hook', () => {

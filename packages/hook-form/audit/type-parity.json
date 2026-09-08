@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/hook-form/upstream/src/__typetest__",
+  "adaptedRoot": "packages/hook-form/typetests",
+  "inventories": {
+    "upstream": "packages/hook-form/audit/upstream-types.json",
+    "adapted": "packages/hook-form/audit/adapted-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/hook-form/upstream/src/__typetest__/tsconfig.json",
+      "sourcePolicy": "byte-exact pinned upstream"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/hook-form/typetests/tsconfig.json",
+      "sourcePolicy": "structurally equivalent after permitted transformations"
+    }
+  },
+  "permittedTransformations": [
+    {
+      "kind": "formatting",
+      "rule": "TypeScript printer output must remain structurally identical"
+    },
+    {
+      "kind": "import-root",
+      "rule": "relative upstream source imports gain the src/ path segment"
+    },
+    {
+      "kind": "component-extension",
+      "rule": "ported component imports may gain the .tsrx extension when that exact adapted import exists"
+    }
+  ],
+  "divergences": []
+}

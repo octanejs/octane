@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+	act,
 	createElement,
 	createRoot,
 	flushSync,
@@ -417,9 +418,10 @@ describe('compiler-owned renderer child regions', () => {
 		expect(mounted.find('.projected-pending').textContent).toBe('pending');
 		expect(bridged.container.children[0].props).toMatchObject({ value: 'first', count: 0 });
 
-		second.resolve('second');
-		await flushBridgeWork();
-		flushSync(() => {});
+		await act(async () => {
+			second.resolve('second');
+			await flushBridgeWork();
+		});
 		expect(mounted.container.querySelector('.projected-pending')).toBeNull();
 		expect(bridged.container.children[0].props).toMatchObject({ value: 'second', count: 1 });
 
@@ -490,6 +492,48 @@ describe('compiler-owned renderer child regions', () => {
 		expect(container.children).toEqual([]);
 	});
 
+	it.each(['commit', 'unmount'] as const)(
+		'keeps a projected retry private until its delayed %s',
+		async (outcome) => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+			const { container, root } = objectRoot();
+			const resource = deferred<string>();
+			let mounted: ReturnType<typeof mount> | undefined;
+			try {
+				mounted = mount(ProjectedBoundaryApp, { root, resource: resource.promise });
+				await vi.advanceTimersByTimeAsync(100);
+				resource.resolve('staged scene');
+				await resource.promise;
+				await flushBridgeWork();
+				expect(mounted.find('.projected-pending').textContent).toBe('pending');
+				expect(container.children).toEqual([]);
+
+				if (outcome === 'unmount') {
+					mounted.unmount();
+					mounted = undefined;
+					await vi.advanceTimersByTimeAsync(200);
+					expect(container.children).toEqual([]);
+					// A discarded first attempt must release its bridge without
+					// consuming the still-uncommitted universal root's lifetime.
+					mounted = mount(ProjectedBoundaryApp, { root, resource: fulfilled('new owner') });
+					expect(container.children).toHaveLength(1);
+					expect(container.children[0].props.value).toBe('new owner');
+				} else {
+					await vi.advanceTimersByTimeAsync(199);
+					expect(mounted.find('.projected-pending').textContent).toBe('pending');
+					expect(container.children).toEqual([]);
+					await vi.advanceTimersByTimeAsync(1);
+					expect(mounted.container.querySelector('.projected-pending')).toBeNull();
+					expect(container.children).toHaveLength(1);
+					expect(container.children[0].props.value).toBe('staged scene');
+				}
+			} finally {
+				mounted?.unmount();
+				vi.useRealTimers();
+			}
+		},
+	);
+
 	it('keeps the DOM fallback visible across sequential projected suspensions', async () => {
 		const { container, root } = objectRoot();
 		let resolveFirst!: (value: string) => void;
@@ -506,16 +550,20 @@ describe('compiler-owned renderer child regions', () => {
 		expect(mounted.find('.projected-pending').textContent).toBe('pending');
 		expect(container.children).toEqual([]);
 
-		resolveFirst('asset-key');
-		await first;
-		await flushBridgeWork();
+		await act(async () => {
+			resolveFirst('asset-key');
+			await first;
+			await flushBridgeWork();
+		});
 		expect(secondFor).toHaveBeenCalledWith('asset-key');
 		expect(mounted.find('.projected-pending').textContent).toBe('pending');
 		expect(container.children).toEqual([]);
 
-		resolveSecond('sequential asset ready');
-		await second;
-		await flushBridgeWork();
+		await act(async () => {
+			resolveSecond('sequential asset ready');
+			await second;
+			await flushBridgeWork();
+		});
 		expect(mounted.container.querySelector('.projected-pending')).toBeNull();
 		expect(container.children).toHaveLength(1);
 		expect(container.children[0].props.value).toBe('sequential asset ready');
@@ -540,9 +588,11 @@ describe('compiler-owned renderer child regions', () => {
 		expect(container.children).toEqual([]);
 		await flushBridgeWork();
 
-		resolve('sibling ready');
-		await resource;
-		await flushBridgeWork();
+		await act(async () => {
+			resolve('sibling ready');
+			await resource;
+			await flushBridgeWork();
+		});
 		expect(mounted.container.querySelector('.projected-pending')).toBeNull();
 		expect(mounted.find('.projected-sibling').textContent).toBe('sibling ready');
 		expect(container.children).toHaveLength(1);

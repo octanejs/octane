@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/src/menu/link-item/MenuLinkItem.spec.tsx b/tests/upstream/src/menu/link-item/MenuLinkItem.spec.tsx
+--- a/tests/upstream/src/menu/link-item/MenuLinkItem.spec.tsx
++++ b/tests/upstream/src/menu/link-item/MenuLinkItem.spec.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { expectType } from '#test-utils';
++import { expectType } from '@octanejs/base-ui-utils/testUtils';
+ import { Menu } from '@octanejs/base-ui/menu';
+ 
+ // `Menu.LinkItem` exposes the native `<a>` props in its `render` callback.

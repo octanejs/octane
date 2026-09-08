@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/combobox/input/ComboboxInput.android.test.tsx b/tests/upstream/src/combobox/input/ComboboxInput.android.test.tsx
+--- a/tests/upstream/src/combobox/input/ComboboxInput.android.test.tsx
++++ b/tests/upstream/src/combobox/input/ComboboxInput.android.test.tsx
+@@ -31,7 +31,7 @@ describe('<Combobox.Input /> on Android', () => {
+ 
+     const input = screen.getByRole('combobox');
+     fireEvent.compositionStart(input);
+-    fireEvent.change(input, { target: { value: 'a' } });
++    fireEvent.input(input, { target: { value: 'a' } });
+ 
+     expect(onInputValueChange).toHaveBeenCalledWith('a', expect.anything());
+   });

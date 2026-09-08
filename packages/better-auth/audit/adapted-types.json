@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "files": ["packages/better-auth/typetests/parity/public-api.test-d.ts"],
+  "assertionGroups": [
+    "session hook state",
+    "plugin atom hook inference",
+    "plugin action inference",
+    "vanilla client members",
+    "endpoint action inference",
+    "readonly useStore dependencies",
+    "plugin atom rejection"
+  ]
+}

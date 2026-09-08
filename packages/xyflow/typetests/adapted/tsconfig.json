@@ -1,0 +1,20 @@
+{
+  "tsrx": { "compiler": "octane/compiler/volar" },
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "target": "esnext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "strict": true,
+    "paths": {
+      "@octanejs/xyflow": ["../../src/index.ts"]
+    }
+  },
+  "include": ["./types.test-d.ts"]
+}

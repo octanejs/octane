@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/popover/popup/PopoverPopup.test.tsx b/tests/upstream/src/popover/popup/PopoverPopup.test.tsx
+--- a/tests/upstream/src/popover/popup/PopoverPopup.test.tsx
++++ b/tests/upstream/src/popover/popup/PopoverPopup.test.tsx
+@@ -656,7 +656,7 @@ describe('<Popover.Popup />', () => {
+   });
+ 
+   describe('inside a toolbar', () => {
+-    function ToolbarPopover({ children }: { children: React.ReactNode }) {
++    function ToolbarPopover({ children }: { children: React.OctaneNode }) {
+       return (
+         <Toolbar.Root>
+           <Toolbar.Button>First</Toolbar.Button>

@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, flushEffects, mount } from '../../../octane/tests/_helpers';
 import {
 	ListHookInitializerFixture,
+	ListChangedPropKeyFixture,
+	ListDelimitedKeysFixture,
 	ListRuntimeFixture,
+	ListPropShapeFixture,
 	listHookInitializerEvents,
 	listRuntimeEvents,
 	resetListRuntimeEvents,
@@ -75,5 +78,45 @@ describe('List runtime', () => {
 		expect(() => listRuntimeEvents.ref?.current?.scrollToRow({ index: 100 })).toThrow(
 			'Invalid index specified: 100',
 		);
+	});
+
+	it('updates row props when a same-valued property is renamed', async () => {
+		const result = mount(ListChangedPropKeyFixture);
+		unmount = result.unmount;
+		flushEffects();
+		expect(result.find('[data-index="0"]').textContent).toContain('left 1');
+
+		await act(() => result.find('button').click());
+		expect(result.find('[data-index="0"]').textContent).toContain('right 1');
+	});
+
+	it('adds a row prop whose key matches the old prop value', async () => {
+		const result = mount(ListPropShapeFixture, { initialExpanded: false });
+		unmount = result.unmount;
+		flushEffects();
+		expect(result.find('[data-index="0"]').textContent).toBe('x=y');
+
+		await act(() => result.find('button').click());
+		expect(result.find('[data-index="0"]').textContent).toBe('x=y y=1');
+	});
+
+	it('removes a row prop whose key matches another prop value', async () => {
+		const result = mount(ListPropShapeFixture, { initialExpanded: true });
+		unmount = result.unmount;
+		flushEffects();
+		expect(result.find('[data-index="0"]').textContent).toBe('x=y y=1');
+
+		await act(() => result.find('button').click());
+		expect(result.find('[data-index="0"]').textContent).toBe('x=y');
+	});
+
+	it('distinguishes a comma in one key from two separate keys', async () => {
+		const result = mount(ListDelimitedKeysFixture);
+		unmount = result.unmount;
+		flushEffects();
+		expect(result.find('[data-index="0"]').textContent).toBe('a,b');
+
+		await act(() => result.find('button').click());
+		expect(result.find('[data-index="0"]').textContent).toBe('a|b');
 	});
 });

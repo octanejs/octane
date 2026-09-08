@@ -35,9 +35,9 @@ export async function handleServerRoute(route, context, globalMiddlewares) {
 	} catch (error) {
 		console.error('[octane] API route error:', error);
 
-		// Return error response
-		const message = error instanceof Error ? error.message : 'Internal Server Error';
-		return new Response(JSON.stringify({ error: message }), {
+		// Thrown messages can contain credentials or internal details. The server
+		// log above retains the original error for diagnostics.
+		return new Response(JSON.stringify({ error: 'Internal Server Error' }), {
 			status: 500,
 			headers: {
 				'Content-Type': 'application/json',

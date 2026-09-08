@@ -1,0 +1,123 @@
+diff --git a/tests/upstream/src/tooltip/root/TooltipRoot.detached-triggers.test.tsx b/tests/upstream/src/tooltip/root/TooltipRoot.detached-triggers.test.tsx
+--- a/tests/upstream/src/tooltip/root/TooltipRoot.detached-triggers.test.tsx
++++ b/tests/upstream/src/tooltip/root/TooltipRoot.detached-triggers.test.tsx
+@@ -1,4 +1,10 @@
+ /** @jsxImportSource octane */
++import { DelayedTooltipFixture, TooltipOwnershipFixture, TooltipTriggerBFixture } from '../../../../fixtures/delayed-popup-ssr.tsrx';
++import { DelayedTooltipFixture as ServerDelayedTooltipFixture, TooltipOwnershipFixture as ServerTooltipOwnershipFixture, TooltipTriggerBFixture as ServerTooltipTriggerBFixture, createTooltipHandle } from '../../../../fixtures/delayed-popup-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from '../../../../support/renderer';
++registerServerComponent(DelayedTooltipFixture, ServerDelayedTooltipFixture);
++registerServerComponent(TooltipOwnershipFixture, ServerTooltipOwnershipFixture);
++registerServerComponent(TooltipTriggerBFixture, ServerTooltipTriggerBFixture);
+ import { vi, expect, describe, beforeEach, it } from 'vitest';
+ import * as React from 'octane';
+ import * as ReactDOMClient from 'octane';
+@@ -41,40 +47,18 @@ describe('<Tooltip.Root />', () => {
+     'keeps a default-open root open until its detached trigger hydrates',
+     async () => {
+       const handle = Tooltip.createHandle();
+-      let suspend = false;
+       let resume: (() => void) | undefined;
+       const hydrationGate = new Promise<void>((resolve) => {
+         resume = resolve;
+       });
+ 
+-      function DelayedTrigger(): React.JSX.Element {
+-        if (suspend) {
+-          throw hydrationGate;
+-        }
+-
+-        return (
+-          <Tooltip.Trigger handle={handle} id="trigger">
+-            Trigger
+-          </Tooltip.Trigger>
+-        );
+-      }
+-
+-      function App() {
+-        return (
+-          <React.Fragment>
+-            <Tooltip.Root handle={handle} defaultOpen defaultTriggerId="trigger" />
+-            <React.Suspense fallback="Loading">
+-              <DelayedTrigger />
+-            </React.Suspense>
+-          </React.Fragment>
+-        );
+-      }
++      const gate = { suspend: false, promise: hydrationGate };
+ 
+-      const { hydrate } = renderToString(<App />);
++      const { hydrate } = renderToString(<DelayedTooltipFixture handle={handle} gate={gate} />, { handle: createTooltipHandle(), gate });
+       const trigger = screen.getByRole('button', { name: 'Trigger' });
+       expect(trigger).not.toHaveAttribute('data-popup-open');
+ 
+-      suspend = true;
++      gate.suspend = true;
+       hydrate();
+ 
+       try {
+@@ -84,7 +68,7 @@ describe('<Tooltip.Root />', () => {
+         await flushMicrotasks();
+         expect(handle.isOpen).toBe(true);
+       } finally {
+-        suspend = false;
++        gate.suspend = false;
+         await act(async () => {
+           resume?.();
+           await hydrationGate;
+@@ -103,44 +87,9 @@ describe('<Tooltip.Root />', () => {
+       const handle = Tooltip.createHandle();
+       const onOpenChange = vi.fn();
+ 
+-      function TriggerB(): React.JSX.Element {
+-        return (
+-          <Tooltip.Trigger handle={handle} id="trigger-b">
+-            Trigger B
+-          </Tooltip.Trigger>
+-        );
+-      }
+-
+-      function App() {
+-        const [open, setOpen] = React.useState(true);
+-        const [activeTriggerId, setActiveTriggerId] = React.useState('trigger-a');
+-
+-        return (
+-          <React.Fragment>
+-            <button type="button" onClick={() => setActiveTriggerId('trigger-b')}>
+-              Switch to B
+-            </button>
+-            <Tooltip.Root
+-              handle={handle}
+-              open={open}
+-              triggerId={activeTriggerId}
+-              onOpenChange={(nextOpen, eventDetails) => {
+-                onOpenChange(nextOpen, eventDetails);
+-                setOpen(nextOpen);
+-              }}
+-            />
+-            {activeTriggerId === 'trigger-a' && (
+-              <Tooltip.Trigger handle={handle} id="trigger-a">
+-                Trigger A
+-              </Tooltip.Trigger>
+-            )}
+-          </React.Fragment>
+-        );
+-      }
+-
+-      const { hydrate } = renderToString(<App />);
++      const { hydrate } = renderToString(<TooltipOwnershipFixture handle={handle} onOpenChange={onOpenChange} />, { handle: createTooltipHandle(), onOpenChange });
+       const triggerBContainer = document.createElement('div');
+-      triggerBContainer.innerHTML = ReactDOMServer.renderToString(<TriggerB />);
++      triggerBContainer.innerHTML = ReactDOMServer.renderToString(ServerTooltipTriggerBFixture, { handle: createTooltipHandle() }).html;
+       document.body.appendChild(triggerBContainer);
+ 
+       let triggerBRoot: ReactDOMClient.Root | undefined;
+@@ -158,7 +107,7 @@ describe('<Tooltip.Root />', () => {
+         expect(handle.isOpen).toBe(true);
+ 
+         await act(async () => {
+-          triggerBRoot = ReactDOMClient.hydrateRoot(triggerBContainer, <TriggerB />);
++          triggerBRoot = ReactDOMClient.hydrateRoot(triggerBContainer, <TooltipTriggerBFixture handle={handle} />);
+         });
+ 
+         await waitFor(() => {

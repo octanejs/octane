@@ -359,6 +359,11 @@ export function __profileTrackComponent(subject: object, component: Function | n
 	else trackedComponents.set(subject, component);
 }
 
+/** DevTools reads the existing weak association, including lightweight scopes. */
+export function __profileGetComponent(subject: object): Function | undefined {
+	return trackedComponents.get(subject);
+}
+
 /** Runtime ABI: merge a scheduling reason without retaining the updated value. */
 export function __profileSchedule(subject: object, type: string, slot?: symbol | number): void {
 	if (!active) return;

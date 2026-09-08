@@ -1,0 +1,572 @@
+{
+  "schemaVersion": 1,
+  "materializedTests": "packages/base-ui",
+  "provenance": {
+    "repo": "https://github.com/mui/base-ui.git",
+    "version": "1.8.0",
+    "commit": "47b40521eab921c2756bf9bdb0b0f07fbfdb8c8c",
+    "sourceRoot": "packages/react/src",
+    "testRoot": "packages/react/src; packages/react/test",
+    "license": "MIT",
+    "integrity": "sha256:699d86811d03011bd2b1f8eba6f8945b1c9912a635ddda6b31edcdd6e5d2cf7b",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/base-ui/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/base-ui/tests/upstream"],
+      "include": ["\\.test\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 7758,
+    "uniqueIdentities": 7356,
+    "duplicateEntriesWithinLanes": 402,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "c05298b5a1159c771a641dac417549a61072199d9588d5273964781958dbf5ae"
+    }
+  },
+  "lanes": [
+    {
+      "id": "base-ui-differential-full-suite",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the complete same-fixture differential suite and rejects test identity drift.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/base-ui/audit/differential-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/audit/differential-runtime.json",
+          "role": "support",
+          "sha256": "1a8f8235c2c1dd4061ae728493647b7d3a135cf4b7dff1f701ec993299f128c0"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
+        },
+        {
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "5901b513679395f5f7e134f96aa7c714f04e6ca8e9f308832f124d6099e35bc9"
+        },
+        {
+          "path": "packages/base-ui/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "30174974012decd794b9ecdc78d3e79b4a4245de7187211c61c00bf5e0ab9b5c",
+          "cases": [
+            {
+              "id": "differential:base-ui-render-element",
+              "testName": "Separator: render-prop element form (clones onto <hr>, className concatenates)",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Separator: render-prop element form (clones onto <hr>, className concatenates)"
+            },
+            {
+              "id": "differential:base-ui-switch-native-input",
+              "testName": "Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)"
+            },
+            {
+              "id": "differential:base-ui-number-field",
+              "testName": "NumberField: Root/Group/Input/steppers render the formatted value byte-identically",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React NumberField: Root/Group/Input/steppers render the formatted value byte-identically"
+            },
+            {
+              "id": "differential:base-ui-dialog-open",
+              "testName": "Dialog: open modal (Portal/Backdrop/Popup/Title/Description/Close) renders byte-identically",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Dialog: open modal (Portal/Backdrop/Popup/Title/Description/Close) renders byte-identically"
+            },
+            {
+              "id": "differential:base-ui-slider-keyboard",
+              "testName": "Slider: ArrowUp on the thumb steps the value (aria-valuenow + indicator % + output re-render)",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Slider: ArrowUp on the thumb steps the value (aria-valuenow + indicator % + output re-render)"
+            },
+            {
+              "id": "differential:base-ui-tooltip-open",
+              "testName": "Tooltip: open (portal + anchored positioner + popup + arrow)",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Tooltip: open (portal + anchored positioner + popup + arrow)"
+            },
+            {
+              "id": "differential:base-ui-menu-checkbox",
+              "testName": "Menu: toggling a checkbox item matches Base UI, including the immediate indicator unmount",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: toggling a checkbox item matches Base UI, including the immediate indicator unmount"
+            },
+            {
+              "id": "differential:base-ui-toast-limit",
+              "testName": "Toast: limit marks older toasts limited rather than removing them",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Toast: limit marks older toasts limited rather than removing them"
+            }
+          ]
+        },
+        {
+          "path": "packages/base-ui/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "887878cfaa58b5213e5bcc3d71caf0f97ab63bee7778e24d56c3cf71173f369e"
+        },
+        {
+          "path": "packages/base-ui/tests/_fixtures/base-ui-diff.tsrx",
+          "role": "support",
+          "sha256": "7260bf8da6f79bbb4bd12a654917f9551d933fe9b1c51c36218956241079a543"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-pristine-upstream-full-suite",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Requires 7775 passes in the pinned React unit environment. The same report must contain exactly 1317 declared skip/todo outcomes; none count as passes. Collection modes and execution identities are checked separately.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/base-ui/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "6558b01da4f3b1246a21ec27bf51f10cd699f36d21767a6b69bafcbe56e64c10"
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/audit/provenance.json",
+          "role": "support",
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
+        },
+        {
+          "path": "packages/base-ui/audit/parity-policy.json",
+          "role": "support",
+          "sha256": "9a71a4cf4d10dbc049b4f908871f8e45c1eef9afc7ffca7f76eb1a4172f25b00"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
+        },
+        {
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "5901b513679395f5f7e134f96aa7c714f04e6ca8e9f308832f124d6099e35bc9"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-hook-order.ts",
+          "role": "support",
+          "sha256": "4cb606846eb6acaf140f496acf036ccea995c171a845cea3741932c03507c828"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.pristine.config.ts",
+          "role": "support",
+          "sha256": "107a8e432261e28c71f381ab3a3a25db698f8537a52db4db07c04bb25e075e44"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-pristine-config.mjs",
+          "role": "support",
+          "sha256": "87e828ef56540913957b25dec93023ab85be41439ff0129536ff9f1ef2a769ae"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-adapted-upstream-full-suite",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Requires 7758 passes in the adapted Octane unit environment. The same report must contain exactly 1335 declared skip/todo outcomes; none count as passes. Collection modes and execution identities are checked separately.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/base-ui/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "b6730b33f226fb67febb052055008e2f6cd1edf1e9c3cdf91bd3f1fd2b84b849"
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/audit/provenance.json",
+          "role": "support",
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
+        },
+        {
+          "path": "packages/base-ui/audit/parity-policy.json",
+          "role": "support",
+          "sha256": "9a71a4cf4d10dbc049b4f908871f8e45c1eef9afc7ffca7f76eb1a4172f25b00"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
+        },
+        {
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "5901b513679395f5f7e134f96aa7c714f04e6ca8e9f308832f124d6099e35bc9"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-hook-order.ts",
+          "role": "support",
+          "sha256": "4cb606846eb6acaf140f496acf036ccea995c171a845cea3741932c03507c828"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.config.ts",
+          "role": "support",
+          "sha256": "05069c86d4ce6a2d0e6b0a48ae4a76bb9033dea0fff8a5e99d93131a32b81458"
+        },
+        {
+          "path": "packages/base-ui/tests/support/renderer.ts",
+          "role": "support",
+          "sha256": "6e740c4d30574e9a935e304ff783c67d9bf46d3e6fd34a661cf89291571ebf88"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-pristine-browser-upstream-full-suite",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-pristine-browser",
+      "notes": "Requires 8726 passes in the pinned React Chromium environment. The same report must contain exactly 380 declared skip/todo outcomes; none count as passes. Collection modes and execution identities are checked separately.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/base-ui/audit/pristine-browser-runtime.json",
+        "fileParallelism": false
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/audit/pristine-browser-runtime.json",
+          "role": "support",
+          "sha256": "54686f568f704da39d8e8c43161ea4b428f0e4540f4be1bb989e1a958c863914"
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/audit/provenance.json",
+          "role": "support",
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
+        },
+        {
+          "path": "packages/base-ui/audit/parity-policy.json",
+          "role": "support",
+          "sha256": "9a71a4cf4d10dbc049b4f908871f8e45c1eef9afc7ffca7f76eb1a4172f25b00"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
+        },
+        {
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/browser-runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "0171c3e92181c0d45f4facc214630af8f5d2d68c0a1eb4371ee8bd36a4545fff"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-hook-order.ts",
+          "role": "support",
+          "sha256": "4cb606846eb6acaf140f496acf036ccea995c171a845cea3741932c03507c828"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.pristine.config.ts",
+          "role": "support",
+          "sha256": "107a8e432261e28c71f381ab3a3a25db698f8537a52db4db07c04bb25e075e44"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.pristine.browser.config.ts",
+          "role": "support",
+          "sha256": "70d88078b10d12c9d128488be3e730d6abcfd0c69ce9eab60868042879574215"
+        },
+        {
+          "path": "patches/@vitest__browser@4.1.10.patch",
+          "role": "support",
+          "sha256": "d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0"
+        },
+        {
+          "path": "patches/@vitest__mocker@4.1.10.patch",
+          "role": "support",
+          "sha256": "538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-pristine-config.mjs",
+          "role": "support",
+          "sha256": "87e828ef56540913957b25dec93023ab85be41439ff0129536ff9f1ef2a769ae"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-adapted-browser-upstream-full-suite",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-adapted-browser",
+      "notes": "Requires 8709 passes in the adapted Octane Chromium environment. The same report must contain exactly 398 declared skip/todo outcomes; none count as passes. Collection modes and execution identities are checked separately.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/base-ui/audit/adapted-browser-runtime.json",
+        "fileParallelism": false
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/audit/adapted-browser-runtime.json",
+          "role": "support",
+          "sha256": "5ee08774e56d59359b8b08c549e6de1ca821d6e9796faf4d19d9723c9ccee672"
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/audit/provenance.json",
+          "role": "support",
+          "sha256": "70f35f2c770c4ef482ef7439db0d87ae28598d38e9a401abe149a7b0cd8fa38c"
+        },
+        {
+          "path": "packages/base-ui/audit/parity-policy.json",
+          "role": "support",
+          "sha256": "9a71a4cf4d10dbc049b4f908871f8e45c1eef9afc7ffca7f76eb1a4172f25b00"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "9e114fdedab484b91a0ff7593ce0d43fe58f9d0f4007adee1ec90a7a1270d501"
+        },
+        {
+          "path": "scripts/react-parity/collect-vitest-tests.mjs",
+          "role": "support",
+          "sha256": "8098b81da15a053907212fba4a11f478a2af63d211c171a2588e1417f7aedb16"
+        },
+        {
+          "path": "packages/base-ui/audit/browser-runtime-skip-policy.json",
+          "role": "support",
+          "sha256": "0171c3e92181c0d45f4facc214630af8f5d2d68c0a1eb4371ee8bd36a4545fff"
+        },
+        {
+          "path": "scripts/react-parity/base-ui-hook-order.ts",
+          "role": "support",
+          "sha256": "4cb606846eb6acaf140f496acf036ccea995c171a845cea3741932c03507c828"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.config.ts",
+          "role": "support",
+          "sha256": "05069c86d4ce6a2d0e6b0a48ae4a76bb9033dea0fff8a5e99d93131a32b81458"
+        },
+        {
+          "path": "packages/base-ui/tests/vitest.browser.config.ts",
+          "role": "support",
+          "sha256": "2fb077defa09dc8b6968892fe2a4e668b6eca0852d59d0a4869374db6c892b37"
+        },
+        {
+          "path": "patches/@vitest__browser@4.1.10.patch",
+          "role": "support",
+          "sha256": "d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0"
+        },
+        {
+          "path": "patches/@vitest__mocker@4.1.10.patch",
+          "role": "support",
+          "sha256": "538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4"
+        },
+        {
+          "path": "packages/base-ui/tests/support/browser-renderer.ts",
+          "role": "support",
+          "sha256": "09a77ef4e0c0788619f985e2d8bedcc47aa945e00b5ba3369f81c325d35a78fb"
+        },
+        {
+          "path": "packages/base-ui/tests/support/renderer.ts",
+          "role": "support",
+          "sha256": "6e740c4d30574e9a935e304ff783c67d9bf46d3e6fd34a661cf89291571ebf88"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles every pinned upstream type-test file, preserving the positive assertions and negative controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/base-ui/tsconfig.pristine-specs.json",
+        "compilerBins": ["packages/base-ui/node_modules/typescript-pristine-native/bin/tsc"]
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/tsconfig.pristine-specs.json",
+          "role": "test",
+          "sha256": "cd57cb4af1e95e3418a60112313576873b48f4dad37e1f8a5820bd723a215801",
+          "cases": [
+            {
+              "id": "types:base-ui-pristine-types",
+              "testName": "complete pristine @base-ui/react 1.8.0 type suite",
+              "fullName": "complete pristine @base-ui/react 1.8.0 type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        }
+      ]
+    },
+    {
+      "id": "base-ui-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "base-ui-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles every pinned upstream type-test file, preserving the positive assertions and negative controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/base-ui/tsconfig.adapted-specs.json"
+      },
+      "files": [
+        {
+          "path": "packages/base-ui/tsconfig.adapted-specs.json",
+          "role": "test",
+          "sha256": "f218a2e9d4d2e506956f3ad287c5341c08a4995a52c26f0c3bb5206b0d93cd4f",
+          "cases": [
+            {
+              "id": "types:base-ui-adapted-types",
+              "testName": "complete adapted @base-ui/react 1.8.0 type suite",
+              "fullName": "complete adapted @base-ui/react 1.8.0 type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "64d6ad040d0d5e0b30d59100dc4fd8bce22542aca4c171a4e9f4dba6471e6acf"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
+          "role": "support",
+          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "native-event-semantics",
+      "caseIds": ["differential:base-ui-switch-native-input"],
+      "upstreamResult": "Base UI integrates with React synthetic handlers while preserving native input behavior.",
+      "octaneResult": "The Octane binding integrates directly with native input events.",
+      "rationale": "Octane intentionally uses the browser event model rather than React's synthetic event layer.",
+      "classification": "event-model",
+      "consumerImpact": "Handler timing and event object details can differ when consumers inspect React-specific fields.",
+      "migrationGuidance": "Use native input semantics and avoid depending on React SyntheticEvent-only fields.",
+      "owner": "@octanejs/base-ui",
+      "reviewCondition": "Review if Octane adds a React-compatible synthetic event layer."
+    },
+    {
+      "id": "ref-as-prop-class-composition",
+      "caseIds": ["differential:base-ui-render-element"],
+      "upstreamResult": "React composes render-element refs and class names through React element cloning semantics.",
+      "octaneResult": "Octane reproduces the rendered result through its native ref-as-prop and class composition model.",
+      "rationale": "The frameworks expose different internal element and ref composition primitives.",
+      "classification": "rendering",
+      "consumerImpact": "React-only element identity or ref implementation details are not portable even when DOM output matches.",
+      "migrationGuidance": "Depend on the resulting DOM, composed class names, and public refs rather than React element identity.",
+      "owner": "@octanejs/base-ui",
+      "reviewCondition": "Review if Octane changes render-element or ref composition semantics."
+    },
+    {
+      "id": "active-effect-commit-counts",
+      "caseIds": ["runtime:5733dce426f267ed"],
+      "upstreamResult": "The active tooltip consumers record 11 and 7 passive commits; the unrelated consumer remains at its three initial commits.",
+      "octaneResult": "Active consumers can commit a different number of times while finite layout cascades settle. The unrelated consumer retains exactly its three initial commits.",
+      "rationale": "Octane completes layout-driven updates before DOM observer delivery and does not promise React's incidental commit counts. The test retains its no-unrelated-update assertion and verifies active consumers update.",
+      "classification": "rendering",
+      "consumerImpact": "Effects in actively updating components may execute a different number of times. Unrelated delay-group consumers remain unaffected.",
+      "migrationGuidance": "Use effect dependencies and cleanup; depend on visible state and unrelated-consumer isolation instead of absolute active commit counts.",
+      "owner": "octane",
+      "reviewCondition": "Review if Octane changes layout cascade scheduling or commits updates to unrelated delay-group consumers."
+    }
+  ]
+}

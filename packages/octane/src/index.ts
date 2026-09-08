@@ -1,11 +1,20 @@
 // Keep package metadata behind an isolated re-export: applications that do not
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';
+export type * from './public-types.js';
+export { StrictMode, unstable_batchedUpdates } from './compatibility.js';
 export { initializeHydrationEventCapture } from './hydration/event-capture.js';
 // Keep external DOM ownership separate from the reconciling runtime so
 // behavior-only consumers never retain component or hydration machinery.
 export { attachBehaviorRoot } from './behavior-root.js';
 export type * from './behavior-root.js';
+export {
+	createSubSlot,
+	subSlot,
+	type SubSlot,
+	type SlotlessSubSlot,
+	type SubSlotOptions,
+} from './sub-slot.js';
 
 // Profiling's application API and compiler ABI live at `octane/profiling`;
 // neither belongs on the React-shaped main namespace.
@@ -24,7 +33,9 @@ export {
 	hydrateRoot,
 	flushSync,
 	act,
+	isInActScope,
 	type Root,
+	type RootContainer,
 	type RootOptions,
 	// Hooks (octane extension: each accepts a trailing compiler slot — required
 	// when calling from plain .ts, injected by the compiler in .tsrx/.tsx)
@@ -46,6 +57,7 @@ export {
 	useDeferredValue,
 	useTransition,
 	useActionState,
+	useActionState as useFormState,
 	useFormStatus,
 	useOptimistic,
 	useDebugValue,
@@ -92,6 +104,7 @@ export {
 	cloneElement,
 	isValidElement,
 	isChildrenBlock,
+	descriptorChildren,
 	Children,
 	type ElementDescriptor,
 	type ComponentBody,
@@ -134,7 +147,7 @@ export {
 	bag15,
 	bag16,
 	bagOf,
-	// Event-bundle helpers (3b) — build the `{ fn, args }` descriptor once at
+	// Event-bundle helpers (3b) — build an arity-specific descriptor once at
 	// mount, mutate it in place on update (dispatch reads `el[key]` per event).
 	evt0,
 	evt0u,
@@ -144,6 +157,7 @@ export {
 	evt2u,
 	evtN,
 	evtNu,
+	setEventHandler,
 	devEventListener,
 	devHtmlNesting,
 	htext,
@@ -220,10 +234,10 @@ export {
 	compilerCacheContext,
 	compilerOwnsContextProvider,
 	markSingleRoot,
+	markWarm,
 	// Compact compiler ABI; keep the descriptive export for older compiled output.
 	markSingleRoot as __s,
 	markChildrenBlock,
-	descriptorChildren,
 	createScopedValue,
 	createScopedElement,
 	childSlot,
@@ -236,6 +250,8 @@ export {
 	portal,
 	hookSlots,
 	withSlot,
+	manualHook,
+	invokeManualHook,
 	// Compiler-emitted parallel use(): batched stratum unwrap + fetch-tree
 	// warming (docs/suspense-parallel-use-plan.md).
 	useBatch,

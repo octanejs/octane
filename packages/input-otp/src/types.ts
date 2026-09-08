@@ -33,6 +33,7 @@ type OTPInputBaseProps = OverrideProps<
 		pasteTransformer?: (pasted: string) => string;
 		containerClassName?: string;
 		noScriptCSSFallback?: string | null;
+		nonce?: string;
 	}
 >;
 

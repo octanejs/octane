@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/number-field/scrub-area/NumberFieldScrubArea.test.tsx b/tests/upstream/src/number-field/scrub-area/NumberFieldScrubArea.test.tsx
+--- a/tests/upstream/src/number-field/scrub-area/NumberFieldScrubArea.test.tsx
++++ b/tests/upstream/src/number-field/scrub-area/NumberFieldScrubArea.test.tsx
+@@ -415,7 +415,7 @@ describe('<NumberField.ScrubArea />', () => {
+     it('does not resume scrubbing when a hidden scrub area is revealed again', async () => {
+       const Activity = (
+         React as typeof React & {
+-          Activity: React.ComponentType<{ mode: 'visible' | 'hidden'; children: React.ReactNode }>;
++          Activity: React.ComponentType<{ mode: 'visible' | 'hidden'; children: React.OctaneNode }>;
+         }
+       ).Activity;
+ 

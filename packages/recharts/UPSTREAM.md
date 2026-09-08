@@ -14,8 +14,47 @@
 
 The npm artifact publishes compiled output and declarations. The canonical
 repository contains the TypeScript source and the large runtime/type-oriented
-suite under `test/`. Those pristine artifacts are not yet vendored or executed
-here, so the parity manifest records this pin as `recorded-unverified`.
+suite under `test/`. The complete pristine suite is not yet vendored or executed
+here, so the parity manifest remains `recorded-unverified`.
+
+## Strict consumer source restoration
+
+The repair for Octane issues #726 and #721 restores the authored TypeScript
+counterparts of 123 compiled JavaScript modules, together with missing type
+support, from the same immutable commit. This does not upgrade Recharts.
+[`type-source-restoration.json`](./type-source-restoration.json) records the
+139 copied source paths and hashes, existing port import adaptations, and the
+status of the bounded source/runtime checks. [`LICENSE.recharts`](./LICENSE.recharts)
+is the exact upstream MIT notice and is included in the published package.
+
+Existing Octane hook-slot routing, Cell registration, and native event adapters
+are retained. Restored types describe native events, Octane renderables, and
+renderer-specific SVG props and ref sinks. The intentional event correction
+removes React's `persist()` call from the existing deferred native-event proxy;
+target capture, native method binding, and frame scheduling remain unchanged.
+The missing pinned polar-coordinate guard is also restored for existing cursor
+paths; the other handwritten runtime helpers are preserved.
+
+The private store uses the compatible Redux Toolkit 2.10 / Immer 10 dependency
+family. This avoids Immer 11's conflicting global `Iterator` declaration in
+strict ESNext consumer programs without a consumer-side library-check bypass.
+
+The source audit separately compares the old JavaScript to the pinned npm
+artifact and type-erased restored TypeScript to the pinned repository source.
+It does not equate modern authored syntax with downlevel compiler output.
+All 123 old JavaScript modules match the pinned npm artifact after the
+documented import normalization. Of 139 restored source modules, 134 match
+after type erasure; the five reviewed differences preserve three existing
+compiled presets, correct native-event persistence, and retain the handwritten
+Octane helpers while restoring the missing polar guard. The 25 existing
+authored TypeScript modules retain their runtime bodies except for that guard.
+Strict source checks pass, including both D3 declaration versions encountered
+in combined consumer installs. All normal-root runtime shards and the complete
+tarball validation pass, including a browser-only ESNext consumer of all five
+bindings reported in #721. The record distinguishes focused conformance counts
+from the full-root result; current-head CI is reported separately on the PR.
+These checks do not replace the upstream suite disposition below or establish
+complete upstream parity.
 
 ## Export crosswalk
 

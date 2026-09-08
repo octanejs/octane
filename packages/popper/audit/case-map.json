@@ -1,0 +1,22 @@
+{
+  "src/Manager.test.js::renders the expected markup": "tests/upstream/Manager.test.tsx::renders the expected markup",
+  "src/Manager.test.js::connects Popper and Reference": "tests/upstream/Manager.test.tsx::connects Popper and Reference",
+  "src/Reference.test.js::renders the expected markup": "tests/upstream/Reference.test.tsx::renders the expected markup",
+  "src/Reference.test.js::consumes the ManagerReferenceNodeSetterContext from Manager": "tests/upstream/Reference.test.tsx::consumes the ManagerReferenceNodeSetterContext from Manager",
+  "src/Reference.test.js::warns when setReferenceNode is present": "tests/upstream/Reference.test.tsx::warns when setReferenceNode is present",
+  "src/Reference.test.js::does not warn when setReferenceNode is not present": "tests/upstream/Reference.test.tsx::does not warn when setReferenceNode is not present",
+  "src/Popper.test.js::renders the expected markup": "tests/upstream/Popper.test.tsx::renders the expected markup",
+  "src/Popper.test.js::handles changing refs gracefully": "tests/upstream/Popper.test.tsx::handles changing refs gracefully",
+  "src/Popper.test.js::accepts a ref function": "tests/upstream/Popper.test.tsx::accepts a ref function",
+  "src/Popper.test.js::accepts a ref object": "tests/upstream/Popper.test.tsx::accepts a ref object",
+  "src/Popper.test.js::accepts a `referenceElement` property": "tests/upstream/Popper.test.tsx::accepts a `referenceElement` property",
+  "src/Popper.test.js::should update placement when property is changed": "tests/upstream/Popper.test.tsx::should update placement when property is changed",
+  "src/usePopper.test.js::initializes the Popper instance": "tests/upstream/usePopper.test.tsx::initializes the Popper instance",
+  "src/usePopper.test.js::doesn't update Popper instance on props update if not needed by Popper": "tests/upstream/usePopper.test.tsx::doesn't update Popper instance on props update if not needed by Popper",
+  "src/usePopper.test.js::updates Popper on explicitly listed props change": "tests/upstream/usePopper.test.tsx::updates Popper on explicitly listed props change",
+  "src/usePopper.test.js::does not update Popper on generic props change": "tests/upstream/usePopper.test.tsx::does not update Popper on generic props change",
+  "src/usePopper.test.js::destroys Popper on instance on unmount": "tests/upstream/usePopper.test.tsx::destroys Popper on instance on unmount",
+  "src/usePopper.test.js::Initializes the arrow positioning": "tests/upstream/usePopper.test.tsx::Initializes the arrow positioning",
+  "typings/tests/main-test.tsx::type program": "typescript::typetests/main-test.tsx",
+  "typings/tests/svg-test.tsx::type program": "typescript::typetests/svg-test.tsx"
+}

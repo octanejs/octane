@@ -13,13 +13,16 @@ adapter over the same core, so the two adapters read side by side under
 
 - Package: `@tanstack/react-db@0.1.96` (adapter) over `@tanstack/db@0.7.0` (core)
 - Repository: `https://github.com/TanStack/db.git`
-- Release tag: `@tanstack/react-db@0.1.96` (the npm artifact does not embed a
-  `gitHead`; the pin is by version + integrity below)
+- Release tag: `@tanstack/react-db@0.1.96`
+- Immutable commit: `2c35b5883907b4e9f155f849f92d6ebe0602e0f3` (the release
+  tag's target; the npm artifact embeds no `gitHead`, and the pinned commit's
+  own `packages/react-db/package.json` declares exactly this package and
+  version)
 - Source root: `src` (adapter); core is consumed from the published
   `@tanstack/db` package, not vendored
 - Test root: `packages/react-db/tests` in the repository (NOT published in the
   npm artifact — see the suite disposition)
-- License: MIT (vendored at `upstream/react-db/LICENSE`)
+- License: MIT (retained byte-exact as `LICENSE.upstream`, hash-matched to the lock)
 - npm archive SHA-256 (`@tanstack/react-db@0.1.96`):
   `2c9f6022aab930ada80d82fdadef6c7ec23bcd42b2e776c44f1806e70b7a228c`
 - npm integrity (`@tanstack/react-db@0.1.96`):
@@ -29,6 +32,16 @@ adapter over the same core, so the two adapters read side by side under
 - Supported upstream range: `@tanstack/db@^0.7.0`
 - React oracle: `@tanstack/react-db@0.1.96` on `react`/`react-dom` (the upstream
   adapter this port mirrors)
+
+The npm archive publishes the adapter source and declarations but NOT the
+repository test suite, so the pinned runtime and type suites have not been
+vendored or adapted one-for-one. The manifest is therefore `recorded-unverified`
+(see `audit/react-parity.json`): bounded evidence is the shared `@tanstack/db`
+live-query conformance suite run against the Octane adapter plus local hook
+coverage. The adapter source IS vendored byte-exact under
+`upstream/react-db/src` (with `upstream/SHA256SUMS`) so an upstream bump is a
+reviewable diff there; it is `.prettierignore`d and excluded from the published
+`files`.
 
 ## Public surface crosswalk
 
@@ -60,6 +73,7 @@ local hook coverage. Their disposition:
 | `useLiveSuspenseQuery.test.tsx` | Not adapted one-for-one; local `tests/useLiveSuspenseQuery.test.tsx` covers suspend/fallback (async), error, and stale-while-revalidate. |
 | `useLiveQueryEffect.test.tsx` | Not adapted one-for-one; local `tests/useLiveQueryEffect.test.tsx` covers create/dispose/deps. |
 | `usePacedMutations.test.tsx` | Not adapted one-for-one; local `tests/usePacedMutations.test.tsx`. |
+| StrictMode double-invocation case | NOT APPLICABLE — Octane has no StrictMode development double-invoke; recorded in `audit/test-classifications.json` and pinned by an `// OCTANE DIVERGENCE:` note in the suspense suite rather than a skipped test. |
 | Upstream type tests (`*.test-d.tsx`) | Not adapted one-for-one; local `typetests/useLiveQuery.test-d.tsx` covers the overload families. Exhaustive type parity remains open. |
 
 ## Bounded evidence

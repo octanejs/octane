@@ -16,35 +16,7 @@ import { Link } from '@octanejs/tanstack-router';
 import { LynxShowcase } from './LynxShowcase.tsrx';
 
 export function Lynx() @{
-	<section class="lynx" aria-labelledby="lynx-heading">
-		<div class="lynx-body">
-			<div class="lynx-copy">
-				<h2 id="lynx-heading" class="lynx-title">
-					{'Build Native Apps, '}
-					<span class="lynx-accent">with Lynx and Octane</span>
-				</h2>
-				<p class="lynx-lead">
-					{'Use Octane to build apps that render with native views on iOS and Android ' +
-						'through Lynx. These demos are running live in the browser with Lynx for Web, ' +
-						'not shown as screenshots.'}
-				</p>
-				<p class="lynx-note">
-					{'Hooks, context, Suspense and transitions work the same way. Mark only ' +
-						'frame-critical code to run on the main thread. Octane support for Lynx' +
-						' is currently in early access.'}
-				</p>
-				<Link to="/docs/$slug" params={{ slug: 'lynx' }} class="lynx-link">
-					Learn how Octane works with Lynx →
-				</Link>
-			</div>
-
-			<div class="lynx-stage">
-				<Hydrate when={visible()}>
-					<LynxShowcase />
-				</Hydrate>
-			</div>
-		</div>
-
+	<>
 		<style>
 			/* Shares the hairline top border the other lower sections use. */
 			.lynx {
@@ -114,5 +86,34 @@ export function Lynx() @{
 				}
 			}
 		</style>
-	</section>
+		<section class="lynx" aria-labelledby="lynx-heading">
+			<div class="lynx-body">
+				<div class="lynx-copy">
+					<h2 id="lynx-heading" class="lynx-title">
+						{'Build Native Apps, '}
+						<span class="lynx-accent">with Lynx and Octane</span>
+					</h2>
+					<p class="lynx-lead">
+						{'Use Octane to build apps that render with native views on iOS and Android ' +
+							'through Lynx. These demos are running live in the browser with Lynx for Web, ' +
+							'not shown as screenshots.'}
+					</p>
+					<p class="lynx-note">
+						{'Hooks, context, Suspense and transitions work the same way. Mark only ' +
+							'frame-critical code to run on the main thread. Octane support for Lynx' +
+							' is currently in early access.'}
+					</p>
+					<Link to="/docs/$slug" params={{ slug: 'lynx' }} class="lynx-link">
+						Learn how Octane works with Lynx →
+					</Link>
+				</div>
+
+				<div class="lynx-stage">
+					<Hydrate when={visible()}>
+						<LynxShowcase />
+					</Hydrate>
+				</div>
+			</div>
+		</section>
+	</>
 }

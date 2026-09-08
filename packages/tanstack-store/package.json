@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-store",
-  "version": "0.0.33",
+  "version": "0.0.48",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -31,20 +31,23 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs tanstack-store",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
     "@tanstack/store": "0.11.0"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

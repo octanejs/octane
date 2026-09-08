@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE",
+      "sha256": "2c2a938456c54cab1c4ecd38ea08230c063d9f1a478fc30ec5b172682f9fb1b1"
+    },
+    {
+      "path": "upstream-artifact/react-textarea-autosize-8.5.9.tgz",
+      "sha256": "648a3eae6d4a8708e215b7272907ba018b5f77430acbb568a2c5aebd238ce945"
+    },
+    {
+      "path": "upstream-artifact/dist/declarations/src/index.d.ts",
+      "sha256": "4b44a78900c844368d8f27ce485bb55bd17ba164cb31e3b8bbc64c6800da506c"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "react-textarea-autosize",
+    "version": "8.5.9",
+    "license": "MIT"
+  },
+  "exportConditionsMatchUpstream": true,
+  "unpublishedDirs": ["audit", "scripts", "tests", "typetests", "upstream", "upstream-artifact"],
+  "filesInclude": [
+    {
+      "path": "src/index.tsrx",
+      "includes": [
+        "export default function TextareaAutosize",
+        "export interface TextareaAutosizeProps",
+        "export type TextareaHeightChangeMeta"
+      ]
+    }
+  ],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "LICENSE"
+    }
+  ]
+}

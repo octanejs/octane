@@ -1,3 +1,5 @@
+// OCTANE DIVERGENCE[native-input-event-wiring][differential:aria-leaf-textfield]
+// Native text edits use onInput; public value callbacks retain upstream names.
 // Ported from react-aria (source: .react-spectrum/packages/react-aria/src/textfield/useTextField.ts).
 // octane adaptations:
 // - onChange→onInput DOM wiring: the per-keystroke state update rides octane's native
@@ -179,6 +181,9 @@ export function useTextField(...args: any[]): TextFieldAria {
 		subSlot(slot, 'field'),
 	);
 	let domProps = filterDOMProps(props, { labelable: true });
+	// `onChange` above is the public value callback consumed by useControlledState,
+	// not a native DOM commit handler. Octane wires per-edit updates through onInput.
+	delete domProps.onChange;
 
 	const inputOnlyProps = {
 		type,

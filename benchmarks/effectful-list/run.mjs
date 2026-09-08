@@ -72,6 +72,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'vue-vapor', url: 'http://localhost:5221/' },
 			{ name: 'preact', url: 'http://localhost:5266/' },
 			{ name: 'svelte', url: 'http://localhost:5277/' },
+			{ name: 'inferno', url: 'http://localhost:5330/' },
 		];
 
 // perSamplePre: the op consumes its pre-state (empty / fresh 1k), so the pre

@@ -52,7 +52,7 @@ describe('@octanejs/pdf packed consumer', () => {
 			'pdfjs-dist': '5.4.296',
 		});
 		expect(publishedManifest.peerDependencies).toEqual({
-			octane: expect.stringMatching(/^\d+\.\d+\.\d+$/),
+			octane: '^0.1.51 || ^0.2.0',
 		});
 		expect([
 			...Object.keys(publishedManifest.dependencies ?? {}),

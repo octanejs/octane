@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@zag-js/react",
+    "version": "1.42.0",
+    "repository": {
+      "owner": "chakra-ui",
+      "repo": "zag",
+      "subdirectory": "packages/frameworks/react"
+    },
+    "commit": "df65e4c87c75a1c84eb6eb08a8e30dac0e1bb77f",
+    "integrity": "sha512-5rVcXTpOK0i4enXwFtz+Tlwvo+uVxemJBe4loYu14D/e9QC8yJd6XY5V/AEudI4em5505/0K7h+3hGF26c6Mog=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "2e9d3d03c7f5bd727f8e53dda3795edc0873e6479d0cb32225b9390c1db72433"
+      }
+    ],
+    "notices": []
+  },
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "\"@testing-library/react\"",
+      "replace": "\"@octanejs/testing-library\""
+    },
+    {
+      "find": "from \"../src\"",
+      "replace": "from \"@octanejs/zag\""
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "38a4e4c45f854b758e022886a486d1e2ef970bb0",
+      "size": 61311
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "7e135b1167a4331ec1a138026202815725fb1826",
+      "size": 1473
+    },
+    {
+      "path": "src/bindable.ts",
+      "gitBlob": "dbe0c2b94a71eb0199240ab3d8aff59acb3d51b9",
+      "size": 1925
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "9363a0737d0da5655c890a1ab71920d31206aa82",
+      "size": 172
+    },
+    {
+      "path": "src/machine.ts",
+      "gitBlob": "72d75e17e5aa9b8a0010d8db0350052681f4b329",
+      "size": 8994
+    },
+    {
+      "path": "src/normalize-props.ts",
+      "gitBlob": "3e9078e635e25aeb079d65fc8b81856d34e0374f",
+      "size": 449
+    },
+    {
+      "path": "src/portal.tsx",
+      "gitBlob": "b944d699a3af46a2da2d34a4c5ba65a81dc9e92e",
+      "size": 830
+    },
+    {
+      "path": "src/refs.ts",
+      "gitBlob": "e342b5573aee502b4d2d91f7fb89dd03d02cb459",
+      "size": 296
+    },
+    {
+      "path": "src/track.ts",
+      "gitBlob": "e9eb34d5128d5744e7b1b75b0bb43cd23d771405",
+      "size": 521
+    },
+    {
+      "path": "src/use-layout-effect.ts",
+      "gitBlob": "f148c9b161149c0a600fa24a5bda33a3edccbef2",
+      "size": 174
+    },
+    {
+      "path": "tests/machine.test.ts",
+      "gitBlob": "d4cd20da17b5106d0ac40643b19f4b55242b903f",
+      "size": 26771
+    },
+    {
+      "path": "tests/nested-states.test.ts",
+      "gitBlob": "70f236116bb55d86a5ffc422e39ca7b0ee4836c6",
+      "size": 9593
+    },
+    {
+      "path": "tests/render.ts",
+      "gitBlob": "a51dd4db1679780be188765c6d1bd1d037995f3d",
+      "size": 472
+    },
+    {
+      "path": "tests/strict-mode.test.tsx",
+      "gitBlob": "b5ff53b14bb4cbcb8e96c131b0eac778ca732659",
+      "size": 5563
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "a5c290990281225fc8e64c8e710df41a6cc58580",
+      "size": 183
+    },
+    {
+      "path": "tsup.config.ts",
+      "gitBlob": "da00695af0f9362ac312d842481290b9a87069f3",
+      "size": 133
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "fa91577310b61fdb43b42f8ec968c8b9bd57bc2a",
+      "size": 269
+    },
+    {
+      "path": "vitest.setup.ts",
+      "gitBlob": "d96f01d6f519c75c385ab472634b4b08dc1a45d8",
+      "size": 260
+    }
+  ],
+  "fingerprint": "61d0ef6a4b826a6fbfc5c24b16d184939cb4c4d3e2f118e6f36a2a7cb7db065b"
+}

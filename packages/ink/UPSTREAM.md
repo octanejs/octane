@@ -16,7 +16,9 @@
 
 `upstream/src`, `upstream/test`, the upstream package metadata, TypeScript
 configuration, XO configuration, and license are vendored from the canonical
-tag. The authored port lives in `src`; compiler-facing component modules use
+tag; every file verifies offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`, and the pinned license is republished at the package
+root as `LICENSE.upstream`. The authored port lives in `src`; compiler-facing component modules use
 the `.ink.tsrx` suffix and the renderer is replaced by Octane's universal host
 driver. Framework-neutral terminal, layout, ANSI, and input modules remain
 source-level ports.

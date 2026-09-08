@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/src/tabs/tab/TabsTab.test.tsx b/tests/upstream/src/tabs/tab/TabsTab.test.tsx
+--- a/tests/upstream/src/tabs/tab/TabsTab.test.tsx
++++ b/tests/upstream/src/tabs/tab/TabsTab.test.tsx
+@@ -6,10 +6,10 @@ import { act, fireEvent, screen } from '@mui/internal-test-utils';
+ import { Tabs } from '@octanejs/base-ui/tabs';
+ import { createRenderer, describeConformance, isJSDOM, mergeRefs } from '#test-utils';
+ 
+-const UnstableRefTab = React.forwardRef(function UnstableRefTab(
+-  props: React.ComponentPropsWithoutRef<'a'>,
+-  forwardedRef: React.ForwardedRef<HTMLAnchorElement>,
++const UnstableRefTab = (function UnstableRefTab(
++  propsWithRef: (React.ComponentPropsWithoutRef<'a'>) & { ref?: React.Ref<HTMLAnchorElement> },
+ ) {
++  const { ref: forwardedRef = null, ...props } = propsWithRef;
+   const internalRef = React.useRef<HTMLAnchorElement>(null);
+ 
+   // Deliberately recreate the merged host ref on every render.

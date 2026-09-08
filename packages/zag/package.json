@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/zag",
-  "version": "0.0.5",
+  "version": "0.0.18",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -32,14 +32,18 @@
   "files": [
     "src",
     "README.md",
-    "UPSTREAM.md"
+    "UPSTREAM.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project zag --project zag-differential --project zag-ssr",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "test": "pnpm upstream:materialize && vitest run --root ../.. --project zag --project zag-differential --project zag-ssr --project zag-pristine",
+    "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs zag",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
     "@zag-js/core": "catalog:default",
@@ -48,7 +52,7 @@
     "@zag-js/utils": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

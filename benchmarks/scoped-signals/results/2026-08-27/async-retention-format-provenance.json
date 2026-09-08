@@ -1,0 +1,25 @@
+{
+  "operation": "One repository-style JSON formatting pass after async retention measurements",
+  "formatter": "prettier@3.9.6",
+  "rawOriginalsLocalDirectory": "/private/tmp/octane-scoped-signals-original-reports-20260827",
+  "reports": [
+    {
+      "name": "async-retention.json",
+      "rawRunSha256": "705b5e663add7f5415426e772fd4bd2932d6c2d335c69fe18e8150f7ad0055b4",
+      "formattedSha256": "835329acc4178bc61f9d6fa101c8d5ed99b3cfd15c7f306fe0f5289c5f18c4ff",
+      "parsedValuesUnchanged": true
+    },
+    {
+      "name": "async-retention-before-fix-analysis.json",
+      "rawRunSha256": "d5922df00fd1352cb36b08e89603e982319ea4dffee85636e850f04e0f8cc491",
+      "formattedSha256": "ddf837c53271e5e2f91da768e83bc02f60bb758aa7c20146bd8b12f6c775f201",
+      "parsedValuesUnchanged": true
+    },
+    {
+      "name": "async-retention-fixed.json",
+      "rawRunSha256": "931e93df0b1d21166abbbc3dda091ef96f41557809d5c63b1a7ecea3e965475c",
+      "formattedSha256": "3263a4fa9ba85a65a2edf4c5dbbadaea04ef45ea1d2e35214bb7fb038b089b6b",
+      "parsedValuesUnchanged": true
+    }
+  ]
+}

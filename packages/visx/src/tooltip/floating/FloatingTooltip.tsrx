@@ -1,6 +1,9 @@
 import { FloatingArrow, FloatingDelayGroup, FloatingPortal } from '@octanejs/floating-ui';
 import { cloneElement, isValidElement, useCallback } from 'octane';
-import type React from 'react';
+import type { ElementDescriptor } from 'octane';
+import type { CSSProperties } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
+import type { HTMLProps } from '@octanejs/floating-ui';
 import { FloatingTooltipContextProvider, useFloatingTooltipContext } from './context.tsrx';
 import useFloatingTooltip from './useFloatingTooltip.tsrx';
 import type {
@@ -18,13 +21,13 @@ import type {
 } from './types';
 
 type RenderElementProps<ElementProps, State> = {
-	defaultElement: React.ReactElement;
+	defaultElement: ElementDescriptor;
 	props: ElementProps;
-	render?: React.ReactElement | ((props: ElementProps, state: State) => React.ReactElement);
+	render?: ElementDescriptor | ((props: ElementProps, state: State) => ElementDescriptor);
 	state: State;
 };
 
-type FloatingCssVariables = React.CSSProperties & {
+type FloatingCssVariables = CSSProperties & {
 		'--visx-tooltip-transform-origin'?: string;
 		'--visx-tooltip-arrow-x'?: string;
 		'--visx-tooltip-arrow-y'?: string;
@@ -34,9 +37,9 @@ type FloatingDataAttributes = {
 	[key: `data-${string}`]: string | undefined;
 };
 
-type FloatingReferenceProps = React.HTMLProps<Element> & FloatingDataAttributes;
-type FloatingDivProps = React.HTMLProps<HTMLDivElement> & FloatingDataAttributes;
-type FloatingSvgProps = React.SVGProps<SVGSVGElement> & FloatingDataAttributes;
+type FloatingReferenceProps = HTMLProps<Element> & FloatingDataAttributes;
+type FloatingDivProps = HTMLProps<HTMLDivElement> & FloatingDataAttributes;
+type FloatingSvgProps = Octane.SVGProps<SVGSVGElement> & FloatingDataAttributes;
 
 function renderElement<ElementProps, State>({
 	defaultElement,
@@ -47,10 +50,10 @@ function renderElement<ElementProps, State>({
 	if (typeof render === 'function') return render(props, state);
 
 	if (isValidElement(render)) {
-		return cloneElement(render, props as Partial<unknown> & React.Attributes);
+		return cloneElement(render, props as Partial<unknown>);
 	}
 
-	return cloneElement(defaultElement, props as Partial<unknown> & React.Attributes);
+	return cloneElement(defaultElement, props as Partial<unknown>);
 }
 
 function getTransformOrigin(state: FloatingTooltipRootState) {
@@ -149,7 +152,7 @@ function Trigger({ disabled = false, render }: FloatingTooltipTriggerProps) {
 
 	if (typeof render === 'function') return render(triggerProps, triggerState);
 
-	return cloneElement(render, triggerProps as Partial<unknown> & React.Attributes);
+	return cloneElement(render, triggerProps as Partial<unknown>);
 }
 
 function Portal({ children, container, disabled = false }: FloatingTooltipPortalProps) {
@@ -182,12 +185,14 @@ function Positioner({ children, id, render, style, ...restProps }: FloatingToolt
 		style: {
 			...state.floatingStyles,
 			...getFloatingCssVariables(state),
-			...style,
+			...(typeof style === 'object' && style != null ? style : null),
 		},
 	};
-	const positionerProps = state.getFloatingProps(basePositionerProps);
+	const positionerProps = state.getFloatingProps(
+		basePositionerProps as HTMLProps<HTMLElement>,
+	) as HTMLProps<HTMLDivElement>;
 
-	return renderElement<React.HTMLProps<HTMLDivElement>, FloatingTooltipPositionerState>({
+	return renderElement<HTMLProps<HTMLDivElement>, FloatingTooltipPositionerState>({
 		defaultElement: <div />,
 		props: positionerProps,
 		render,
@@ -207,7 +212,7 @@ function Content({ children, render, ...restProps }: FloatingTooltipContentProps
 		'data-visx-tooltip-content': '',
 	};
 
-	return renderElement<React.HTMLProps<HTMLDivElement>, FloatingTooltipContentState>({
+	return renderElement<HTMLProps<HTMLDivElement>, FloatingTooltipContentState>({
 		defaultElement: <div />,
 		props: contentProps,
 		render,
@@ -228,16 +233,17 @@ function Arrow({
 	if (!state.mounted) return null;
 
 	if (render) {
+		const svgRest = restProps as Octane.SVGProps<SVGSVGElement>;
 		const baseArrowProps: FloatingSvgProps = {
-			...restProps,
+			...svgRest,
 			height,
 			'data-visx-tooltip-arrow': '',
 			ref: state.arrowRef,
 			width,
 		};
-		const arrowProps = state.getArrowProps(baseArrowProps);
+		const arrowProps = state.getArrowProps(baseArrowProps) as Octane.SVGProps<SVGSVGElement>;
 
-		return renderElement<React.SVGProps<SVGSVGElement>, FloatingTooltipArrowState>({
+		return renderElement<Octane.SVGProps<SVGSVGElement>, FloatingTooltipArrowState>({
 			defaultElement: <svg />,
 			props: arrowProps,
 			render,
@@ -246,7 +252,7 @@ function Arrow({
 	}
 
 	return <FloatingArrow
-		{...restProps}
+		{...(restProps as object)}
 		data-visx-tooltip-arrow=""
 		ref={state.arrowRef}
 		context={state.context}

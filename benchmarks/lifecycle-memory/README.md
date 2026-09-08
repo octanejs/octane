@@ -1,7 +1,7 @@
 # Lifecycle and memory soak
 
-This benchmark production-builds Octane, React, Preact, Solid 2, Svelte, and Vue
-Vapor and repeatedly mounts and unmounts 96 keyed, effectful components in real
+This benchmark production-builds Octane, React, Preact, Solid 2, Svelte, Vue
+Vapor, and Inferno and repeatedly mounts and unmounts 96 keyed, effectful components in real
 Chromium. A normal run performs more than 1,000 complete mount/unmount cycles
 per renderer.
 

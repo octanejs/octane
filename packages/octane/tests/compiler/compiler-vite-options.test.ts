@@ -4,6 +4,13 @@ import { parseModule } from '@tsrx/core';
 import { describe, expect, it, vi } from 'vitest';
 import type { Plugin } from 'vite';
 import { octane } from 'octane/compiler/vite';
+import {
+	findDescriptorChildrenExports,
+	findDescriptorChildrenImports,
+	findVoidComponentImports,
+} from '../../src/compiler/bundler.js';
+import { findStaticRuntimeImportRequests } from '../../src/compiler/client-only-server.js';
+import { findCssModuleImportRequests } from '../../src/compiler/css-module-imports.js';
 
 const ROOT = '/project';
 const SOURCE = "export function App() @{ <main>{'configured'}</main> }\n";
@@ -21,6 +28,19 @@ const RENDER_STATE_UPDATE =
 	'\tif (count !== props.count) setCount(props.count);\n' +
 	'\t<main>{count as string}</main>\n' +
 	'}\n';
+
+function deepFreeze(value: unknown, seen = new WeakSet<object>()): void {
+	if (value === null || typeof value !== 'object' || seen.has(value)) return;
+	seen.add(value);
+	for (const child of Object.values(value)) {
+		if (Array.isArray(child)) {
+			for (const item of child) deepFreeze(item, seen);
+		} else {
+			deepFreeze(child, seen);
+		}
+	}
+	Object.freeze(value);
+}
 
 function configure(plugin: Plugin, command: 'serve' | 'build', build: { ssr?: boolean } = {}) {
 	(plugin.config as (config: { root: string }) => unknown)({ root: ROOT });
@@ -129,9 +149,57 @@ function isChildrenBlock(code: string, value: any): boolean {
 }
 
 describe('octane/compiler/vite public options', () => {
+	it('classifies one immutable authored AST the same as the source string', () => {
+		const id = `${ROOT}/src/App.tsrx`;
+		const source = `
+			import { descriptorChildren } from 'octane';
+			import VoidLeaf from './VoidLeaf.tsrx';
+			import Slot from './Slot.tsrx';
+			import styles from './App.module.css';
+			function Impl(props) { return props.children; }
+			export const Marked = descriptorChildren(Impl);
+			export function App() @{ <main class={styles.root}><VoidLeaf /><Slot /></main> }
+		`;
+		const ast = parseModule(source, id);
+		deepFreeze(ast);
+
+		for (const classify of [
+			findVoidComponentImports,
+			findDescriptorChildrenImports,
+			findDescriptorChildrenExports,
+			findStaticRuntimeImportRequests,
+			findCssModuleImportRequests,
+		]) {
+			expect(classify(ast, id), classify.name).toEqual(classify(source, id));
+		}
+	});
+
+	it('leaves parser-disagreement syntax to authoritative compilation', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build');
+		const result = await transform(
+			plugin,
+			`using resource = acquire();
+			export function App() @{ <main>{resource.label as string}</main> }`,
+		);
+
+		expect(result).not.toBeNull();
+		expect(result?.code).toContain('using resource = acquire()');
+	});
+
+	it('keeps authoritative syntax diagnostics after preflight failure', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build');
+
+		await expect(
+			Promise.resolve(transform(plugin, 'export function App( @{ <main /> }')),
+		).rejects.toThrow();
+	});
+
 	it('carries descriptor-children export metadata through the Vite module graph', async () => {
 		const childId = `${ROOT}/src/Slot.tsrx`;
 		const barrelId = `${ROOT}/src/index.ts`;
+		const defaultBarrelId = `${ROOT}/src/default-barrel.ts`;
 		const childSource = `
 			import { Children, cloneElement, descriptorChildren } from 'octane';
 			function Impl(props) { return cloneElement(Children.only(props.children), { class: 'cloned' }); }
@@ -139,14 +207,17 @@ describe('octane/compiler/vite public options', () => {
 			export default descriptorChildren(Impl);
 			export function Ordinary(props) @{ <section>{props.children}</section> }`;
 		const barrelSource = `export { Slottable as BarrelSlot } from './Slot.tsrx';`;
+		const defaultBarrelSource = `import { Slottable } from './Slot.tsrx'; export default Slottable;`;
 		const consumerSource = `
 			import DefaultSlot, { Slottable as Alias, Ordinary } from './Slot.tsrx';
 			import { BarrelSlot } from './index.ts';
+			import BarrelDefault from './default-barrel.ts';
 			export function App() @{
 				<main>
 					<Alias><button>marked</button></Alias>
 					<DefaultSlot><button>default</button></DefaultSlot>
 					<BarrelSlot><button>barrel</button></BarrelSlot>
+					<BarrelDefault><button>default barrel</button></BarrelDefault>
 					<Ordinary><i>ordinary</i></Ordinary>
 				</main>
 			}`;
@@ -167,10 +238,21 @@ describe('octane/compiler/vite public options', () => {
 				barrelId,
 				{ ssr },
 			)) as { code: string; meta: Record<string, unknown> };
+			const defaultBarrel = (await (plugin.transform as any).call(
+				{
+					resolve: async (request: string) => (request === './Slot.tsrx' ? { id: childId } : null),
+					load: async () => ({ code: child.code, meta: child.meta }),
+				},
+				defaultBarrelSource,
+				defaultBarrelId,
+				{ ssr },
+			)) as { code: string; meta: Record<string, unknown> };
 			const consumerLoad = vi.fn(async ({ id }: { id: string }) =>
 				id === childId
 					? { code: child.code, meta: child.meta }
-					: { code: barrel.code, meta: barrel.meta },
+					: id === barrelId
+						? { code: barrel.code, meta: barrel.meta }
+						: { code: defaultBarrel.code, meta: defaultBarrel.meta },
 			);
 			const consumer = (await (plugin.transform as any).call(
 				{
@@ -179,7 +261,9 @@ describe('octane/compiler/vite public options', () => {
 							? { id: childId }
 							: request === './index.ts'
 								? { id: barrelId }
-								: null,
+								: request === './default-barrel.ts'
+									? { id: defaultBarrelId }
+									: null,
 					load: consumerLoad,
 				},
 				consumerSource,
@@ -188,10 +272,9 @@ describe('octane/compiler/vite public options', () => {
 			)) as { code: string };
 			expect(barrelLoad).toHaveBeenCalledTimes(1);
 			// Descriptor metadata is loaded once per resolved virtual module and is
-			// retained across transforms. The client pass performs two additional
-			// loads for void-component metadata.
-			expect(consumerLoad).toHaveBeenCalledTimes(ssr ? 1 : 3);
-			for (const component of ['Alias', 'DefaultSlot', 'BarrelSlot']) {
+			// retained across transforms. The client pass also loads void-component metadata.
+			expect(consumerLoad).toHaveBeenCalledTimes(ssr ? 2 : 5);
+			for (const component of ['Alias', 'DefaultSlot', 'BarrelSlot', 'BarrelDefault']) {
 				const children = componentChildren(consumer.code, component);
 				expect(children, component).toBeDefined();
 				expect(isChildrenBlock(consumer.code, children)).toBe(false);
@@ -223,6 +306,16 @@ describe('octane/compiler/vite public options', () => {
 		expect(findDescriptorChildrenImports(jsxSource, `${ROOT}/src/App.tsrx`)).toEqual([
 			{ request: './Slot.tsrx', imported: 'default', local: 'Slot' },
 		]);
+		const defaultBarrel = "import { Marked as Local } from './Slot.tsrx'; export default Local;";
+		const expectedBarrel = [{ request: './Slot.tsrx', imported: 'Marked', exported: 'default' }];
+		expect(findDescriptorChildrenImports(defaultBarrel, `${ROOT}/src/barrel.ts`)).toEqual(
+			expectedBarrel,
+		);
+		const barrelAst = parseModule(defaultBarrel, `${ROOT}/src/barrel.ts`);
+		deepFreeze(barrelAst);
+		expect(findDescriptorChildrenImports(barrelAst, `${ROOT}/src/barrel.ts`)).toEqual(
+			expectedBarrel,
+		);
 
 		// Legacy/compiler Element nodes expose the tag as Identifier `id`, not
 		// JSXOpeningElement/JSXIdentifier — the same shape void-import scanning covers.

@@ -714,6 +714,35 @@ describe('deferred hydration contract edges', () => {
 		expect(onHydrated).toHaveBeenCalledOnce();
 	});
 
+	it('resolves every concurrent procedural waitFor subscriber when hydration starts', async () => {
+		let reasons: string[] | undefined;
+		const onHydrated = vi.fn();
+		const prefetch = vi.fn(async ({ waitFor }: HydrationPrefetchContext) => {
+			reasons = await Promise.all([
+				waitFor(idle({ timeout: 100_000 })),
+				waitFor(idle({ timeout: 100_000 })),
+			]);
+		});
+		const props = { when: condition(false), prefetch, onHydrated };
+		container.innerHTML = renderToString(server.ProceduralPrefetchHydration, props).html;
+
+		root = hydrateRoot(container, client.ProceduralPrefetchHydration, props);
+		flushSync(() => {});
+		flushEffects();
+		expect(prefetch).toHaveBeenCalledOnce();
+		expect(reasons).toBeUndefined();
+
+		await act(() =>
+			root!.render(client.ProceduralPrefetchHydration, {
+				...props,
+				when: load(),
+			}),
+		);
+
+		expect(reasons).toEqual(['hydrate', 'hydrate']);
+		expect(onHydrated).toHaveBeenCalledOnce();
+	});
+
 	it('blocks load hydration on awaited procedural work but not fire-and-forget work', async () => {
 		const required = deferred<void>();
 		const onRequiredHydrated = vi.fn();

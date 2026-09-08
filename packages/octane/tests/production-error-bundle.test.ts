@@ -154,6 +154,46 @@ async function executePublicProductionError(surface: 'client' | 'server'): Promi
 	return module.message;
 }
 
+async function executeNativeCompilerErrors(
+	surface: 'client' | 'server',
+	mode: 'development' | 'production',
+): Promise<readonly { name: string; message: string }[]> {
+	const runtime = surface === 'client' ? './runtime.ts' : './runtime.server.ts';
+	const contents = `
+		import { enableNativeReadCollection, beginNativeReadScope } from ${JSON.stringify(runtime)};
+		${surface === 'server' ? "import { useSignal$ } from './signals/server.ts';" : ''}
+		const failures = [
+			() => enableNativeReadCollection(0),
+			() => beginNativeReadScope(undefined, 0),
+			${surface === 'server' ? "() => useSignal$(() => { throw new Error('unexpected initialization'); })," : ''}
+		];
+		export const errors = failures.map((fail) => {
+			try { fail(); } catch (error) { return { name: error.name, message: error.message }; }
+			return null;
+		});`;
+	const result = await build({
+		stdin: {
+			contents,
+			loader: 'js',
+			resolveDir: OCTANE_SOURCE,
+			sourcefile: `${surface}-${mode}-native-errors.js`,
+		},
+		bundle: true,
+		define: { 'process.env.NODE_ENV': JSON.stringify(mode) },
+		format: 'esm',
+		logLevel: 'silent',
+		minify: true,
+		platform: surface === 'client' ? 'browser' : 'node',
+		target: 'esnext',
+		treeShaking: true,
+		write: false,
+	});
+	const module = (await import(
+		`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`
+	)) as { errors: readonly { name: string; message: string }[] };
+	return module.errors;
+}
+
 async function executePublicProductionListenerError(): Promise<{
 	message: string;
 	called: number;
@@ -256,6 +296,30 @@ function decodedErrorUrl(message: string): URL {
 }
 
 describe('production error bundles', () => {
+	it.each(['client', 'server'] as const)(
+		'preserves native compiler and hook diagnostics in %s development and production bundles',
+		async (surface) => {
+			const [development, production] = await Promise.all([
+				executeNativeCompilerErrors(surface, 'development'),
+				executeNativeCompilerErrors(surface, 'production'),
+			]);
+			const messages = [
+				'Unsupported native-read compiler/runtime version.',
+				'Unsupported native-read compiler/runtime version.',
+				...(surface === 'server' ? ['useSignal$ requires an active server component.'] : []),
+			];
+			expect(development).toEqual(messages.map((message) => ({ name: 'Error', message })));
+			expect(production).toHaveLength(messages.length);
+			for (const [index, error] of production.entries()) {
+				expect(error.name).toBe('Error');
+				const url = decodedErrorUrl(error.message);
+				expect(url.pathname).toBe(index < 2 ? '/errors/58' : '/errors/59');
+				expect(url.searchParams.getAll('args[]')).toEqual(index < 2 ? [] : ['useSignal$']);
+				expect(error.message).not.toContain(messages[index]);
+			}
+		},
+	);
+
 	it.each([{ surface: 'client' as const }, { surface: 'server' as const }])(
 		'keeps complete $surface diagnostics in development',
 		async ({ surface }) => {

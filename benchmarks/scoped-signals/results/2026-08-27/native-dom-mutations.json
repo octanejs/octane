@@ -1,0 +1,47 @@
+{
+  "suite": "scoped-signals-native-dom-mutation-evidence",
+  "status": "guards-detected",
+  "baselineReport": "benchmarks/scoped-signals/results/2026-08-27/native-dom-abi.json",
+  "baselineReportSha256": "a1be07c24ac10098de845bfacdc8ed4818e07c1372025505553483970cd45c66",
+  "baselinePassed": 27,
+  "baselineTotal": 27,
+  "temporaryRunner": "/private/tmp/octane-native-dom-mutation.mjs",
+  "temporaryRunnerSha256": "d2b075f5d9434e85b5e3ea9a638f329e224390e5879a2036bf8d28c7cbbe116f",
+  "mutations": [
+    {
+      "mutation": "publication",
+      "method": "esbuild onLoad replacement in memory; shared source files were not written",
+      "guard": "publication.owner.generation === publication.generation",
+      "replacement": "true",
+      "firstOccurrenceOnly": true,
+      "expectedNonzeroExit": true,
+      "total": 27,
+      "passed": 23,
+      "failedTests": [
+        "root supersession in ref cancels later accepted native callbacks",
+        "root supersession in layout cancels later accepted native callbacks",
+        "superseded stable callback ref and explicit-deps setup publish on the next accepted render",
+        "superseded stable object ref and explicit-deps setup publish on the next accepted render"
+      ],
+      "changedInputs": [],
+      "rawReport": "/private/tmp/octane-native-publication-mutation.json"
+    },
+    {
+      "mutation": "server-identity",
+      "method": "esbuild onLoad replacement in memory; shared source files were not written",
+      "guard": "claimant !== undefined && claimant !== owner",
+      "replacement": "false",
+      "firstOccurrenceOnly": true,
+      "expectedNonzeroExit": true,
+      "total": 27,
+      "passed": 26,
+      "failedTests": ["SSR rejects equal seeds from distinct scopes with the same scope key"],
+      "changedInputs": [],
+      "rawReport": "/private/tmp/octane-native-server-identity-mutation.json"
+    }
+  ],
+  "limitations": [
+    "Supplemental manual compiler ABI tests; canonical .tsrx and browser suites remain unexecuted.",
+    "Representative guard mutations do not establish complete mutation coverage."
+  ]
+}

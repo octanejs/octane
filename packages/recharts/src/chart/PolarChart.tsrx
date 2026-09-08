@@ -1,15 +1,16 @@
 import { ChartOptions } from '../state/optionsSlice';
-import { RechartsStoreProvider } from '../state/RechartsStoreProvider';
+import { RechartsStoreProvider } from '../state/RechartsStoreProvider.tsrx';
 import { ChartDataContextProvider } from '../context/chartDataContext';
 import { ReportMainChartProps } from '../state/ReportMainChartProps';
 import { ReportChartProps } from '../state/ReportChartProps';
 import { ReportEventSettings } from '../state/ReportEventSettings';
-import { ReportPolarOptions } from '../state/ReportPolarOptions';
+import { ReportPolarOptions } from '../state/ReportPolarOptions.tsrx';
 import { Margin, PolarChartProps, TooltipEventType } from '../util/types';
 import { TooltipPayloadSearcher } from '../state/tooltipSlice';
-import { CategoricalChart } from './CategoricalChart';
+import { CategoricalChart } from './CategoricalChart.tsrx';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { initialEventSettingsState } from '../state/eventSettingsSlice';
+import type { Ref } from '../util/OctaneTypes.ts';
 
 const defaultMargin: Margin = { top: 5, right: 5, bottom: 5, left: 5 };
 
@@ -64,7 +65,7 @@ export type PolarChartOptions = {
 	categoricalChartProps: PolarChartPropsWithDefaults;
 };
 
-export function PolarChart(props: PolarChartOptions & { ref?: unknown }) {
+export function PolarChart(props: PolarChartOptions & { ref?: Ref<SVGSVGElement> }) {
 	const { ref } = props;
 	const polarChartProps = resolveDefaultProps(props.categoricalChartProps, defaultPolarChartProps);
 

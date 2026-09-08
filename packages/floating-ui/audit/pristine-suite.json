@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "project": "floating-ui-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "FLOATING_UI_PRISTINE_ROOT",
+  "copy": [
+    "packages/core/src",
+    "packages/dom/src",
+    "packages/react/src",
+    "packages/react/test",
+    "packages/react-dom/src",
+    "packages/react-dom/test",
+    "packages/utils/src"
+  ],
+  "inlineFiles": {
+    "tsconfig.json": {
+      "compilerOptions": {
+        "esModuleInterop": true,
+        "jsx": "react-jsx",
+        "jsxImportSource": "react",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "target": "ES2020"
+      }
+    }
+  }
+}

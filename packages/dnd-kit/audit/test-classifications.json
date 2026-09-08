@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/dnd-kit/tests/conformance/core.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane adapter integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/dnd-kit/tests/conformance/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks local runtime exports but is not an upstream suite."
+    },
+    {
+      "path": "packages/dnd-kit/tests/conformance/hooks.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane hook slots and is not counted as React parity."
+    },
+    {
+      "path": "packages/dnd-kit/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs one identical authored programmatic manager-action drag fixture against both adapters (sensors=[], manager.actions), plus behavioral cases for the structured DragOverlay and OptimisticSortingPlugin adaptations."
+    },
+    {
+      "path": "packages/dnd-kit/tests/hydration/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane hydration and is not counted as React parity."
+    },
+    {
+      "path": "packages/dnd-kit/tests/parity/contracts.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Authenticates evidence and the two structured DragOverlay / OptimisticSortingPlugin adaptations without claiming React behavior parity.",
+      "divergenceIds": [
+        "dnd-kit-drag-overlay-compiled-children",
+        "dnd-kit-sortable-omit-optimistic-sorting"
+      ]
+    },
+    {
+      "path": "packages/dnd-kit/tests/ssr/ssr.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane server rendering and is not counted as React parity."
+    },
+    {
+      "path": "packages/dnd-kit/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane declaration coverage for the public surface; not a pristine/adapted upstream type pair and outside React parity evidence."
+    }
+  ]
+}

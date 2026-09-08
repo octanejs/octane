@@ -20,6 +20,7 @@ import type {
 } from '../../packages/lynx/src/core/protocol.js';
 import type { LynxElementEventListener } from '../../packages/lynx/src/core/papi.js';
 import type { LynxWireProfile } from '../../packages/lynx/src/core/profiling.js';
+import { decodeLynxTransportValue } from '../../packages/lynx/src/core/transport-codec.js';
 import { App } from './app/src/App.lynx.tsrx';
 
 interface FakeNode {
@@ -77,7 +78,12 @@ function createContextPair(): {
 			if (list.length === 0) own.delete(type);
 		},
 		dispatchEvent(event) {
-			const data = event.data as {
+			// The transport encodes, so what crosses is a string. Observing it
+			// means decoding it, the same as the receiver does — reading
+			// `event.data` directly would silently report every message as
+			// `<unknown>` with no commands, which is a measurement that looks
+			// like a result.
+			const data = decodeLynxTransportValue(event.data) as {
 				type?: unknown;
 				batch?: { commands?: readonly { op?: unknown }[] };
 				handles?: readonly { op?: unknown }[];

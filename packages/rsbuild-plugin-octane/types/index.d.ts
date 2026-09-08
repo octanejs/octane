@@ -1,4 +1,5 @@
 import type { RsbuildPlugin } from '@rsbuild/core';
+import type { OctaneRspackPluginOptions } from '@octanejs/rspack-plugin';
 
 export * from '@octanejs/app-core';
 export {
@@ -9,6 +10,12 @@ export {
 } from '@octanejs/app-core/config-loader';
 
 export interface OctaneRsbuildPluginOptions {
+	/**
+	 * @experimental Fold authenticated JavaScript CSS-module exports in one-shot
+	 * production builds. Uses the Rspack plugin's exact-source provider contract;
+	 * native `css/module` remains unchanged. Disabled by default.
+	 */
+	cssModuleConstants?: OctaneRspackPluginOptions['cssModuleConstants'];
 	/** Override component HMR in the browser environment. */
 	hmr?: boolean;
 	/**
@@ -21,10 +28,13 @@ export interface OctaneRsbuildPluginOptions {
 	/** Enable component profiling in the browser environment. */
 	profile?: boolean;
 	/**
-	 * Override `compiler.strong` for this integration. Strong mode applies to
-	 * project-owned modules; dependencies can opt in with `"use strong"`.
+	 * Override `compiler.strong` for this integration. Strong asserts pure
+	 * immutable-snapshot renders in project-owned modules; dependencies can opt
+	 * in with `"use strong"`.
 	 */
 	strong?: boolean;
+	/** Experimental native signal reads in DOM client/server render scopes. */
+	nativeReads?: boolean;
 	/**
 	 * Ad-hoc path fragments skipped by the plain TypeScript/JavaScript
 	 * hook-slot pass. With `requireDirective`, excluded paths are exempt from

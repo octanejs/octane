@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/LICENSE.md",
+      "sha256": "a8f1e0280bf14adcf5d017547db85eb5c3bac0feb1690ca98650874002eaa8ea"
+    },
+    {
+      "path": "upstream-artifact/README.md",
+      "sha256": "a8b1281257f2b14903d64208a03c9e3668fbfdf554fb2ec9480872f2be421df8"
+    },
+    {
+      "path": "upstream-artifact/package.json",
+      "sha256": "0a852bc5e8aa621a2d0c14318056bc6b1227e012a1ff5ebc6e36ac7f47dffa38"
+    },
+    {
+      "path": "upstream-artifact/dist/react-resizable-panels.cjs",
+      "sha256": "e79b50ab38ebcfd4db12efa2c380ea085574ca8ce65327bf7407f6a993984bad"
+    },
+    {
+      "path": "upstream-artifact/dist/react-resizable-panels.cjs.map",
+      "sha256": "d90643abe78dc7a26da59e20d8302dfe1ce596420039e65e8a6d9904ef8695d0"
+    },
+    {
+      "path": "upstream-artifact/dist/react-resizable-panels.d.ts",
+      "sha256": "1524f0130d0d299fee642580758b16ee5642ea371238f5bd53317b69daac9e12"
+    },
+    {
+      "path": "upstream-artifact/dist/react-resizable-panels.js",
+      "sha256": "64f0a97209e9279b1190a51730fd946fc7565e97b0dd0bfadbd0b9776ab49382"
+    },
+    {
+      "path": "upstream-artifact/dist/react-resizable-panels.js.map",
+      "sha256": "dd7675732c304d03ba60733eb130d667a1f15af8b3821f73f86700b78d179c3c"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "react-resizable-panels",
+    "version": "4.12.2",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream/LICENSE.md"
+    }
+  ]
+}

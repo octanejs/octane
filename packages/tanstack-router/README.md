@@ -2,6 +2,13 @@
 
 [TanStack Router](https://tanstack.com/router) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/tanstack-router
+pnpm add @octanejs/tanstack-router
+```
+
 TanStack Router splits a framework-agnostic core (`@tanstack/router-core` — the
 router, route tree, matching, history, and the reactive store) from a thin React
 binding (`@tanstack/react-router`). Mirroring `@octanejs/tanstack-query`, this package
@@ -55,6 +62,15 @@ tree renders **pull-based**: `RouterProvider` renders the first match, and each 
 component's `<Outlet/>` looks up the next match via `matchContext` — so navigation
 re-renders only the matches that changed.
 
+## Same-route search navigation
+
+Same-route search navigations now render store updates urgently. If the route
+component suspends on the new search input, its pending fallback can replace the
+current content; the previous automatic same-route hold no longer applies. To
+retain stale content while the new data loads, use `useDeferredValue` from `octane`
+on the search input (for example, `page`) and render the suspending content from
+that deferred value. The router location still advances when navigation commits.
+
 ## Scope
 
 Included: `createRouter`, `createRootRoute`, `createRoute`, `RouterProvider`,
@@ -69,7 +85,7 @@ layout, per TanStack's fuzzy/root boundary rules), plus the full
 types). The typed route factories, route-bound hooks, and `Link` surface preserve
 TanStack Router's registered-route inference.
 
-The 2026-07-06 gap-closure sweep additionally
+The 2026-07-06 gap-closure sweep (see `docs/tanstack-parity-audit.md`) additionally
 landed the full Match pipeline (per-route Suspense/CatchBoundary/CatchNotFound,
 pending/error/redirected/notFound statuses), router lifecycle events, `useBlocker`/
 `Block`, the complete read-hook family (`useMatch`, `useRouteContext`,

@@ -1,0 +1,180 @@
+import { BlockSchema, InlineContentSchema, StyleSchema } from '@blocknote/core';
+import { SuggestionMenu, SuggestionMenuOptions } from '@blocknote/core/extensions';
+import { autoPlacement, offset, shift, size } from '@octanejs/floating-ui';
+import { FC, useEffect, useMemo } from 'octane';
+
+import { useBlockNoteEditor } from '../../../hooks/useBlockNoteEditor.js';
+import { useEditorDOMElement } from '../../../hooks/useEditorDomElement.js';
+import { useExtension, useExtensionState } from '../../../hooks/useExtension.js';
+import { FloatingUIOptions } from '../../Popovers/FloatingUIOptions.js';
+import { GenericPopover, GenericPopoverReference } from '../../Popovers/GenericPopover.js';
+import { getDefaultReactEmojiPickerItems } from './getDefaultReactEmojiPickerItems.js';
+import { GridSuggestionMenu } from './GridSuggestionMenu.js';
+import { GridSuggestionMenuWrapper } from './GridSuggestionMenuWrapper.js';
+import { DefaultReactGridSuggestionItem, GridSuggestionMenuProps } from './types.js';
+
+type ArrayElement<A> = A extends readonly (infer T)[] ? T : never;
+
+type ItemType<GetItemsType extends (query: string) => Promise<any[]>> =
+	ArrayElement<Awaited<ReturnType<GetItemsType>>>;
+
+export function GridSuggestionMenuController<
+	// This is a bit hacky, but only way I found to make types work so the optionality
+	// of suggestionMenuComponent depends on the return type of getItems
+	GetItemsType extends (query: string) => Promise<any[]> = (query: string) => Promise<
+		DefaultReactGridSuggestionItem[]
+	>,
+>(
+	props: {
+		triggerCharacter: string;
+		getItems?: GetItemsType;
+		columns: number;
+		shouldOpen?: SuggestionMenuOptions['shouldOpen'];
+		minQueryLength?: number;
+		floatingUIOptions?: FloatingUIOptions;
+		/**
+ * Override the DOM node this floating element portals into. Falls back to
+ * `editor.portalElement` (which by default is mounted inside `bn-container`)
+ * when omitted.
+ */
+		portalElement?: HTMLElement | null;
+	} & (ItemType<GetItemsType> extends DefaultReactGridSuggestionItem
+		? {
+				// can be undefined
+				gridSuggestionMenuComponent?: FC<GridSuggestionMenuProps<ItemType<GetItemsType>>>;
+				onItemClick?: (item: ItemType<GetItemsType>) => void;
+			}
+		: {
+				// getItems doesn't return DefaultSuggestionItem, so suggestionMenuComponent is required
+				gridSuggestionMenuComponent: FC<GridSuggestionMenuProps<ItemType<GetItemsType>>>;
+				onItemClick: (item: ItemType<GetItemsType>) => void;
+			}),
+) {
+	const editor = useBlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>();
+	const editorDOMElement = useEditorDOMElement();
+
+	const {
+		triggerCharacter,
+		gridSuggestionMenuComponent,
+		columns,
+		shouldOpen,
+		minQueryLength,
+		onItemClick,
+		getItems,
+	} = props;
+
+	const onItemClickOrDefault = useMemo(() => {
+		if (onItemClick) {
+			return onItemClick;
+		}
+		return (item: ItemType<GetItemsType>) => {
+			item.onItemClick(editor);
+		};
+	}, [editor, onItemClick]);
+
+	const getItemsOrDefault = useMemo(() => {
+		if (getItems) {
+			return getItems;
+		}
+		return (async (query: string) => await getDefaultReactEmojiPickerItems(
+			editor,
+			query,
+		)) as any as typeof getItems;
+	}, [editor, getItems])!;
+
+	const suggestionMenu = useExtension(SuggestionMenu);
+
+	useEffect(() => {
+		suggestionMenu.addSuggestionMenu({ triggerCharacter, shouldOpen });
+	}, [suggestionMenu, triggerCharacter, shouldOpen]);
+
+	const state = useExtensionState(SuggestionMenu);
+	const reference = useExtensionState(SuggestionMenu, {
+		selector: (state) => {
+			// Use first child as the editor DOM element may itself be scrollable.
+			// For FloatingUI to auto-update the position during scrolling, the
+			// `contextElement` must be a descendant of the scroll container.
+			return {
+				element: (editorDOMElement?.firstChild || undefined) as Element | undefined,
+				getBoundingClientRect: () => state?.referencePos || new DOMRect(),
+			} satisfies GenericPopoverReference;
+		},
+	});
+
+	const floatingUIOptions = useMemo<FloatingUIOptions>(
+		() => ({
+			...props.floatingUIOptions,
+			useFloatingOptions: {
+				open: state?.show && state?.triggerCharacter === triggerCharacter,
+				onOpenChange: (open) => {
+					if (!open) {
+						suggestionMenu.closeMenu();
+					}
+				},
+				placement: 'bottom-start',
+				middleware: [
+					offset(10),
+					// Flips the menu placement to maximize the space available, and prevents
+					// the menu from being cut off by the confines of the screen.
+					autoPlacement({
+						allowedPlacements: ['bottom-start', 'top-start'],
+						padding: 10,
+					}),
+					shift(),
+					size({
+						apply({ elements, availableHeight }) {
+							elements.floating.style.maxHeight = `${Math.max(0, availableHeight)}px`;
+						},
+						padding: 10,
+					}),
+				],
+				...props.floatingUIOptions?.useFloatingOptions,
+			},
+			focusManagerProps: {
+				disabled: true,
+				...props.floatingUIOptions?.focusManagerProps,
+			},
+			elementProps: {
+				// Prevents editor blurring when clicking the scroll bar.
+				onMouseDownCapture: (event) => event.preventDefault(),
+				style: {
+					zIndex: 70,
+				},
+				...props.floatingUIOptions?.elementProps,
+			},
+		}),
+		[
+			props.floatingUIOptions,
+			state?.show,
+			state?.triggerCharacter,
+			suggestionMenu,
+			triggerCharacter,
+		],
+	);
+
+	if (
+		!state ||
+			!state.ignoreQueryLength && minQueryLength &&
+				(state.query.startsWith(' ') || state.query.length < minQueryLength)
+	) {
+		return null;
+	}
+
+	return <GenericPopover
+		reference={reference}
+		portalElement={props.portalElement}
+		{...floatingUIOptions}
+	>
+		{triggerCharacter &&
+			<GridSuggestionMenuWrapper
+				query={state.query}
+				closeMenu={suggestionMenu.closeMenu}
+				clearQuery={suggestionMenu.clearQuery}
+				getItems={getItemsOrDefault}
+				columns={columns}
+				gridSuggestionMenuComponent={gridSuggestionMenuComponent ||
+					GridSuggestionMenu<ItemType<GetItemsType>>}
+				onItemClick={onItemClickOrDefault}
+			/>}
+	</GenericPopover>;
+}

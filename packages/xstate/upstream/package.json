@@ -1,0 +1,79 @@
+{
+  "name": "@xstate/react",
+  "version": "6.1.0",
+  "description": "XState tools for React",
+  "keywords": [
+    "state",
+    "machine",
+    "statechart",
+    "scxml",
+    "state",
+    "graph",
+    "react",
+    "hook"
+  ],
+  "author": "David Khourshid <davidkpiano@gmail.com>",
+  "homepage": "https://github.com/statelyai/xstate/tree/main/packages/xstate-react#readme",
+  "license": "MIT",
+  "main": "dist/xstate-react.cjs.js",
+  "module": "dist/xstate-react.esm.js",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/xstate-react.cjs.mjs",
+        "default": "./dist/xstate-react.cjs.js"
+      },
+      "development": {
+        "module": "./dist/xstate-react.development.esm.js",
+        "import": "./dist/xstate-react.development.cjs.mjs",
+        "default": "./dist/xstate-react.development.cjs.js"
+      },
+      "module": "./dist/xstate-react.esm.js",
+      "import": "./dist/xstate-react.cjs.mjs",
+      "default": "./dist/xstate-react.cjs.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "imports": {
+    "#is-development": {
+      "development": "./src/true.ts",
+      "default": "./src/false.ts"
+    }
+  },
+  "types": "dist/xstate-react.cjs.d.ts",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/statelyai/xstate.git"
+  },
+  "scripts": {},
+  "bugs": {
+    "url": "https://github.com/statelyai/xstate/issues"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
+    "xstate": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "xstate": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "use-isomorphic-layout-effect": "^1.1.2",
+    "use-sync-external-store": "^1.2.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.2.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@types/use-sync-external-store": "^0.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "rxjs": "^7.8.1",
+    "xstate": "workspace:^"
+  }
+}

@@ -1,0 +1,119 @@
+.LayerTree {
+	color: var(--puck-color-grey-03);
+	font-family: var(--puck-font-family);
+	font-size: var(--puck-font-size-xxs);
+	margin: 0;
+	position: relative;
+	list-style: none;
+	padding: 0;
+}
+
+.LayerTree-zoneTitle {
+	color: var(--puck-color-grey-05);
+	font-size: var(--puck-font-size-xxxs);
+	text-transform: uppercase;
+}
+
+.LayerTree-helper {
+	text-align: center;
+	color: var(--puck-color-grey-07);
+	margin: 8px 4px;
+}
+
+.Layer {
+	position: relative;
+	border: 1px solid transparent;
+	border-radius: 4px;
+}
+
+.Layer-inner {
+	border: 1px solid transparent;
+	border-radius: 4px;
+	transition: color 50ms ease-in;
+}
+
+.Layer--containsZone > .Layer-inner {
+	padding-inline-start: 0;
+}
+
+.Layer-clickable {
+	align-items: center;
+	background: none;
+	border: 0;
+	border-radius: 4px;
+	color: inherit;
+	cursor: pointer;
+	display: flex;
+	font: inherit;
+	padding-inline-start: 12px;
+	padding-inline-end: 4px;
+	width: 100%;
+}
+
+.Layer-clickable:focus-visible {
+	outline: 2px solid var(--puck-color-azure-05);
+	outline-offset: 2px;
+	position: relative;
+	z-index: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.Layer:not(.Layer--isSelected) > .Layer-inner:hover {
+		border-color: var(--puck-color-azure-10);
+		background: var(--puck-color-azure-11);
+		color: var(--puck-color-azure-04);
+		transition: none;
+	}
+}
+
+.Layer--isSelected {
+	border-color: var(--puck-color-azure-08);
+}
+
+.Layer--isSelected > .Layer-inner {
+	background: var(--puck-color-azure-10);
+}
+
+.Layer--isSelected > .Layer-inner > .Layer-clickable > .Layer-chevron,
+.Layer--childIsSelected > .Layer-inner > .Layer-clickable > .Layer-chevron {
+	transform: scaleY(-1);
+}
+
+.Layer-zones {
+	display: none;
+	margin-inline-start: 12px;
+}
+
+.Layer--isSelected > .Layer-zones,
+.Layer--childIsSelected > .Layer-zones {
+	display: block;
+}
+
+.Layer-zones > .LayerTree {
+	margin-inline-start: 12px;
+}
+
+.Layer-title,
+.LayerTree-zoneTitle {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin: 8px 4px;
+	overflow-x: hidden;
+}
+
+.Layer-name {
+	overflow-x: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.Layer-icon {
+	color: var(--puck-color-rose-07);
+	margin-top: 4px;
+}
+
+.Layer-zoneIcon {
+	color: var(--puck-color-grey-08);
+	margin-top: 4px;
+}

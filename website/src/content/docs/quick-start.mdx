@@ -17,7 +17,7 @@ import { PackageInstall } from '../../components/PackageInstall.tsrx';
 	<p className="doc-callout-title">Before you begin</p>
 	<p>
 		{
-			'You need Node.js 22.22.2 or newer. Octane is currently alpha software, so pin versions when you use it in a real project.'
+			'You need Node.js 22.22.2 or newer. Octane is currently beta software, so pin versions when you use it in a real project.'
 		}
 	</p>
 </aside>
@@ -171,8 +171,8 @@ export function TodoList(props) @{
 		}
 		<code>.tsrx</code>
 		{' files, install '}
-		<a href="https://marketplace.visualstudio.com/items?itemName=Ripple-TS.ripple-ts-vscode-plugin">
-			{'TSRX for VS Code'}
+		<a href="https://marketplace.visualstudio.com/items?itemName=TSRX.tsrx-vscode-plugin">
+			{'TSRX Syntax for VS Code'}
 		</a>
 		{'.'}
 	</p>
@@ -182,6 +182,37 @@ The same family includes `@if` for two-way branches, `@switch` for several choic
 `@try` for loading and error states. Plain JavaScript still belongs in the setup part of
 the function. The [TSRX vs TSX/JSX guide](/docs/tsrx-vs-tsx) shows when each syntax is the
 better fit.
+
+CSS lives next to the markup it styles. A `<style>` block styles the items beside it
+and everything below them, never the element that contains it — the compiler hashes
+its selectors and stamps the hash on those elements, so `li` here never styles another
+component's list. The block and the list are siblings in a fragment, which is how a
+block reaches the element it sits beside:
+
+```tsrx
+export function TodoList(props) @{
+	<>
+		<style>
+			.todos {
+				padding: 0;
+				list-style: none;
+			}
+			li {
+				padding: 0.25rem 0;
+			}
+		</style>
+		<ul class="todos">
+			@for (const todo of props.todos; key todo.id) {
+				<li>{todo.label as string}</li>
+			}
+		</ul>
+	</>
+}
+```
+
+Assign a block to a variable and it becomes a theme with a `$class` that other scopes
+can `apply`. [Styling](/docs/styling) covers scopes, themes, emission order, and the
+compiler's style diagnostics.
 
 <aside className="doc-callout tip">
 	<p className="doc-callout-title">Your next stop</p>
@@ -200,4 +231,5 @@ better fit.
 - [Core APIs](/docs/core-apis) — roots, hooks, boundaries, actions, and SSR.
 - [Differences from React](/docs/differences-from-react) — the deliberate
   divergences (everything else matching React is the point).
-- [Bindings](/docs/bindings) — the `@octanejs/*` ports of the React ecosystem.
+- [Integrations and bindings](/docs/bindings) — app-framework connections and the
+  `@octanejs/*` ports of the React ecosystem.

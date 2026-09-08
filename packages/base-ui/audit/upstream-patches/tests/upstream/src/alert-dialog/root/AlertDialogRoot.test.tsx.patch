@@ -1,0 +1,40 @@
+diff --git a/tests/upstream/src/alert-dialog/root/AlertDialogRoot.test.tsx b/tests/upstream/src/alert-dialog/root/AlertDialogRoot.test.tsx
+--- a/tests/upstream/src/alert-dialog/root/AlertDialogRoot.test.tsx
++++ b/tests/upstream/src/alert-dialog/root/AlertDialogRoot.test.tsx
+@@ -280,7 +280,7 @@ describe('<AlertDialog.Root />', () => {
+ 
+   describe('prop: actionsRef', () => {
+     it('unmounts the alert dialog when the `unmount` method is called', async () => {
+-      const actionsRef = React.createRef<AlertDialog.Root.Actions>();
++      const actionsRef = ({current:null} as React.RefObject<AlertDialog.Root.Actions | null>);
+ 
+       const { user } = await render(
+         <AlertDialog.Root
+@@ -319,7 +319,7 @@ describe('<AlertDialog.Root />', () => {
+     });
+ 
+     it('clears manual unmount state after the `unmount` method is called', async () => {
+-      const actionsRef = React.createRef<AlertDialog.Root.Actions>();
++      const actionsRef = ({current:null} as React.RefObject<AlertDialog.Root.Actions | null>);
+       let shouldPreventUnmount = true;
+ 
+       const { user } = await render(
+@@ -365,7 +365,7 @@ describe('<AlertDialog.Root />', () => {
+     });
+ 
+     it('closes the alert dialog when the `close` method is called', async () => {
+-      const actionsRef = React.createRef<AlertDialog.Root.Actions>();
++      const actionsRef = ({current:null} as React.RefObject<AlertDialog.Root.Actions | null>);
+ 
+       await render(
+         <AlertDialog.Root defaultOpen actionsRef={actionsRef}>
+@@ -1171,7 +1171,8 @@ describe('<AlertDialog.Root />', () => {
+         expect(screen.queryByTestId('popup')).not.toBe(null);
+       });
+ 
+-      expect(onOpenChangeComplete.mock.calls.length).toBe(2);
++      // Octane does not replay mount effects in Strict Mode (renderer contract).
++        expect(onOpenChangeComplete.mock.calls.length).toBe(1);
+       expect(onOpenChangeComplete.mock.calls[0][0]).toBe(true);
+     });
+ 

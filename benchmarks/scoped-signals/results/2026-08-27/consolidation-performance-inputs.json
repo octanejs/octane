@@ -1,0 +1,843 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "supplemental-public-source-native-consolidation",
+  "generatedAt": "2026-08-27T20:47:26.194Z",
+  "baselineRef": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+  "candidateInputsStillMatch": true,
+  "candidateSourceFilesChecked": 85,
+  "primaryScope": "Authored .tsrx compiled @{ } native templates; ordinary return JSX is a secondary compatibility surface.",
+  "timingInterpretation": "Compare baseline and candidate within the final matched native run. Broad intervals are inconclusive. The pre-reachability diagnostic and final run have different absolute timings for both baseline and candidate and do not establish a global speedup caused by the reachability fix.",
+  "primaryComparisons": [
+    {
+      "scenario": "unread-block",
+      "enabled": false,
+      "mode": "client",
+      "operation": "mount_us",
+      "ratio": 1.1269878433776304,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "unread-block",
+      "enabled": false,
+      "mode": "client",
+      "operation": "prop_update_us",
+      "ratio": 1.5034545958036947,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "unread-block",
+      "enabled": false,
+      "mode": "client",
+      "operation": "unmount_us",
+      "ratio": 1.265644646778533,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "unread-block",
+      "enabled": false,
+      "mode": "server",
+      "operation": "render_us",
+      "ratio": 1.1905447228039645,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "unread-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "mount_us",
+      "ratio": 1.0396592071324864,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "unread-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "prop_update_us",
+      "ratio": 1.0036430907732823,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "unread-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "unmount_us",
+      "ratio": 1.1148119268348622,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "unread-block",
+      "enabled": true,
+      "mode": "server",
+      "operation": "render_us",
+      "ratio": 1.697537012117425,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "single-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "mount_us",
+      "ratio": 0.9860107219479813,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "single-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "prop_update_us",
+      "ratio": 1.285162457332017,
+      "relation": "higher, separate"
+    },
+    {
+      "scenario": "single-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "unmount_us",
+      "ratio": 1.0389612626284184,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "single-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "signal_update_us",
+      "ratio": 1.1467426946724462,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "single-block",
+      "enabled": true,
+      "mode": "server",
+      "operation": "render_us",
+      "ratio": 0.85395181764804,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "repeated-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "mount_us",
+      "ratio": 0.9097938864886639,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "repeated-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "prop_update_us",
+      "ratio": 0.9484128127044309,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "repeated-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "unmount_us",
+      "ratio": 0.9870582701535794,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "repeated-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "signal_update_us",
+      "ratio": 1.099363562018911,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "repeated-block",
+      "enabled": true,
+      "mode": "server",
+      "operation": "render_us",
+      "ratio": 1.1261688273146655,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "distinct-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "mount_us",
+      "ratio": 0.9900849505563424,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "distinct-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "prop_update_us",
+      "ratio": 1.025988181023207,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "distinct-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "unmount_us",
+      "ratio": 1.0691803460355989,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "distinct-block",
+      "enabled": true,
+      "mode": "client",
+      "operation": "signal_update_us",
+      "ratio": 1.0090397591947682,
+      "relation": "overlap"
+    },
+    {
+      "scenario": "distinct-block",
+      "enabled": true,
+      "mode": "server",
+      "operation": "render_us",
+      "ratio": 1.0440747607805658,
+      "relation": "overlap"
+    }
+  ],
+  "deterministicGuardMethod": "Evaluate committed ratio definitions against the recorded native targets; the standalone full workspace benchmark launcher was not run.",
+  "ratioGuardFile": {
+    "path": "benchmarks/baselines/ratios.json",
+    "sha256": "34ab55884817df41685b8796d69e2b103973818da184268a2b05e6f56cde3c68"
+  },
+  "guardResults": [
+    {
+      "suite": "scoped-native-reads",
+      "op": "five_dependency_hit_calls",
+      "target": "current:native",
+      "reference": "work-model",
+      "maxRatio": 0,
+      "note": "An actual compiled component using use() with five stable factory dependencies must reuse its created resource while unrelated props update. Factory calls are counted outside the component AST, and every render checks the visible value.",
+      "targetScore": 0,
+      "referenceScore": 1,
+      "ratio": 0,
+      "status": "passed-against-recorded-result"
+    },
+    {
+      "suite": "scoped-native-reads",
+      "op": "five_dependency_miss_calls",
+      "target": "current:native",
+      "reference": "work-model",
+      "maxRatio": 1,
+      "note": "Each of 32 changes cycling through all five use() factory dependencies must refresh the resource once and display the new value. This guards generic automatic caching without pinning private compiler helper names.",
+      "targetScore": 32,
+      "referenceScore": 32,
+      "ratio": 1,
+      "status": "passed-against-recorded-result"
+    }
+  ],
+  "localLogs": [
+    {
+      "name": "consolidation-bundles-before-reachability-fix.log",
+      "localPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-bundles-before-reachability-fix.log",
+      "tracked": false,
+      "sha256": "40d7e3580cb9cb76407d711cc285265181c6168d396bed32ffbae88581c3af50",
+      "bytes": 490
+    },
+    {
+      "name": "consolidation-bundles.log",
+      "localPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-bundles.log",
+      "tracked": false,
+      "sha256": "5df9c3c73cf10f95544c315e9828a60b35b63c30392f6ed1869b81d81b27a801",
+      "bytes": 490
+    },
+    {
+      "name": "consolidation-engine-baseline-stack-failure.log",
+      "localPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-engine-baseline-stack-failure.log",
+      "tracked": false,
+      "sha256": "cd2df29dd74a68143980b94394ec898033dd6413b892fb3affa2c12a41a04c91",
+      "bytes": 67625
+    },
+    {
+      "name": "consolidation-engine-baseline.log",
+      "localPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-engine-baseline.log",
+      "tracked": false,
+      "sha256": "3d8a9a87d6a87ca2f0ade22558f9e57133aa4f493a9f85d0229f682a4e42c118",
+      "bytes": 1184
+    },
+    {
+      "name": "consolidation-engine-current.log",
+      "localPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-engine-current.log",
+      "tracked": false,
+      "sha256": "3d8a9a87d6a87ca2f0ade22558f9e57133aa4f493a9f85d0229f682a4e42c118",
+      "bytes": 1184
+    },
+    {
+      "name": "consolidation-foreign-retention-fault.log",
+      "localPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-foreign-retention-fault.log",
+      "tracked": false,
+      "sha256": "4408519b7d5dfac54014d22ecf069bb9157ef8e9538a7f90a909f5c224c56103",
+      "bytes": 304
+    },
+    {
+      "name": "consolidation-foreign-retention.log",
+      "localPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-foreign-retention.log",
+      "tracked": false,
+      "sha256": "4408519b7d5dfac54014d22ecf069bb9157ef8e9538a7f90a909f5c224c56103",
+      "bytes": 304
+    },
+    {
+      "name": "consolidation-native-costs-before-reachability-fix.log",
+      "localPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-native-costs-before-reachability-fix.log",
+      "tracked": false,
+      "sha256": "a20cc4c3433ebc5293ef6056d4849274e50b796c8cb2b7f16c346a3046181d90",
+      "bytes": 693
+    },
+    {
+      "name": "consolidation-native-costs.log",
+      "localPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/results/2026-08-27/consolidation-native-costs.log",
+      "tracked": false,
+      "sha256": "a20cc4c3433ebc5293ef6056d4849274e50b796c8cb2b7f16c346a3046181d90",
+      "bytes": 693
+    }
+  ],
+  "compilerPreload": {
+    "localPath": "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+    "sha256": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a"
+  },
+  "compilerDependencyEvidence": [
+    {
+      "phase": "native-cost-evidence-before-reachability-fix",
+      "localPath": "/private/tmp/octane-native-source-compiler-NVcMdO/native-cost-evidence-before-reachability-fix/dependency-loads-79489.json",
+      "sha256": "f005b21e985d7756237f17f6c386fb528e83d1c358023cd70f17f170cb8a677c",
+      "bytes": 197159,
+      "recordedDependencyLoads": [
+        {
+          "specifier": "esbuild",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js",
+          "package": "esbuild",
+          "version": "0.28.1"
+        },
+        {
+          "specifier": "happy-dom",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/happy-dom@20.11.0_bufferutil@4.1.0_utf-8-validate@5.0.10/node_modules/happy-dom/lib/index.js",
+          "package": "happy-dom",
+          "version": "20.11.0"
+        },
+        {
+          "specifier": "@tsrx/core",
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/index.js",
+          "package": "@tsrx/core",
+          "version": "0.1.61"
+        },
+        {
+          "specifier": "alien-signals",
+          "file": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/cjs/index.cjs",
+          "package": "alien-signals",
+          "version": "3.2.0"
+        },
+        {
+          "specifier": "devalue",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+          "package": "devalue",
+          "version": "5.8.2"
+        },
+        {
+          "specifier": "acorn",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/acorn@8.17.0/node_modules/acorn/dist/acorn.mjs",
+          "package": "acorn",
+          "version": "8.17.0"
+        },
+        {
+          "specifier": "@sveltejs/acorn-typescript",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@sveltejs+acorn-typescript@1.0.13_acorn@8.17.0/node_modules/@sveltejs/acorn-typescript/index.js",
+          "package": "@sveltejs/acorn-typescript",
+          "version": "1.0.13"
+        },
+        {
+          "specifier": "zimmerframe",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/zimmerframe@1.1.4/node_modules/zimmerframe/src/walk.js",
+          "package": "zimmerframe",
+          "version": "1.1.4"
+        },
+        {
+          "specifier": "@noble/hashes/sha2.js",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@noble+hashes@2.2.0/node_modules/@noble/hashes/sha2.js",
+          "package": "@noble/hashes",
+          "version": "2.2.0"
+        },
+        {
+          "specifier": "@noble/hashes/utils.js",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@noble+hashes@2.2.0/node_modules/@noble/hashes/utils.js",
+          "package": "@noble/hashes",
+          "version": "2.2.0"
+        },
+        {
+          "specifier": "is-reference",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/is-reference@3.0.3/node_modules/is-reference/src/index.js",
+          "package": "is-reference",
+          "version": "3.0.3"
+        },
+        {
+          "specifier": "esrap",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/esrap@2.3.2/node_modules/esrap/src/index.js",
+          "package": "esrap",
+          "version": "2.3.2"
+        },
+        {
+          "specifier": "@jridgewell/sourcemap-codec",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@jridgewell+sourcemap-codec@1.5.5/node_modules/@jridgewell/sourcemap-codec/dist/sourcemap-codec.mjs",
+          "package": "@jridgewell/sourcemap-codec",
+          "version": "1.5.5"
+        },
+        {
+          "specifier": "esrap/languages/tsx",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/esrap@2.3.2/node_modules/esrap/src/languages/tsx/index.js",
+          "package": "esrap",
+          "version": "2.3.2"
+        },
+        {
+          "specifier": "magic-string",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/magic-string@0.30.21/node_modules/magic-string/dist/magic-string.es.mjs",
+          "package": "magic-string",
+          "version": "0.30.21"
+        },
+        {
+          "specifier": "oxc-tsrx/tsrx-core-compat",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/oxc-tsrx@0.5.0_svelte@5.56.7/node_modules/oxc-tsrx/dist/tsrx-core-compat/index.js",
+          "package": "oxc-tsrx",
+          "version": "0.5.0"
+        },
+        {
+          "specifier": "oxc-tsrx/parser",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/oxc-tsrx@0.5.0_svelte@5.56.7/node_modules/oxc-tsrx/dist/parser.js",
+          "package": "oxc-tsrx",
+          "version": "0.5.0"
+        }
+      ],
+      "loadedFileCount": 652,
+      "loadedTaggedCompilerFiles": [
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/index.js",
+          "sha256": "2ff04b2091592a162d51b0b09c9ee496059fafb65a76940bdda345aaefb9b20f"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/parse/parse-module.js",
+          "sha256": "77e1a81b75d649c29ab34d95492268b4b52d6a9882a9ce2378c605c0c6cac0e1"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/parse/index.js",
+          "sha256": "7794f96808cc23e35da941e4c3be22959b654a1afe003bdb22c8824666aa8ca4"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/ast.js",
+          "sha256": "2a092489284ba70eccfae6e8881551e164bd8bff1e7ecb732f7d915128e7220a"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/builders.js",
+          "sha256": "3e17fff257bab8e56669d817f5f4169922aa93420dbabeaec302c6f2b53f341d"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/patterns.js",
+          "sha256": "48f5eb215e524950d9145febb83b55591f2a6e78c4e2e729b73f27f0221bdefe"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/sanitize_template_string.js",
+          "sha256": "65813ee9ce27bcd76575645485468addb54fd36d7aa591b0c41c3fbc9e173ac2"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/plugin.js",
+          "sha256": "e112f901410225e6cb02202ed4fb20c57ef8e41b2300cd5a60bbf9216d300ce6"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/parse/style.js",
+          "sha256": "bf1dcf86a5e9f3199837d40dacfec44b0a058a694f6971b50a4dd5707c27b041"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/hashing.js",
+          "sha256": "8576b3db953002c6ccbb89fa3489eb23402172ec197500484b9b92957a7dfafb"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/errors.js",
+          "sha256": "7da78a060fc242b46075399d2fb75e93f0b4cfe6fae7d981979e78d184db7e49"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/diagnostics.js",
+          "sha256": "a75367ea44b5db55a1a3ef4a761ae9c43cdf176ffaf57f52c15f287a867caa75"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/analyze/validation.js",
+          "sha256": "7168e011a9feb57f58aaf0c6f0f2a1deb8a31cddffc316ce711774273405e986"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/scope.js",
+          "sha256": "8278c4a3d8cee2dc62ce98655a4098ef4689fd736f7734485ac2ae208c4b2e18"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils.js",
+          "sha256": "083706d60b52b40af5f3a7f727844bb38ca4dfa6f4973650a5dd2d896ee08595"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/dom.js",
+          "sha256": "7f935ec75ad850ce0e003220f1310f44405e3b90c528c4399915cc38920660d7"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/identifier-utils.js",
+          "sha256": "8e57c94b0aeb963b66ffe8db5db1c00ce7edb64d2dca8be9be2496c9868d3230"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/constants.js",
+          "sha256": "ca299843b99a3a6ba6236c368a019d55cab5377cb7d2b21f71a4067259069e22"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/comment-utils.js",
+          "sha256": "8207b1a4f2ed8d2c9a1cfc558d7d0d4fa65e93b9dcea35cee14c86d8dec6aa19"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/analyze/index.js",
+          "sha256": "094e6c81664bc1e26fb1793114fe2df0ca5983e67edd6e25a586946b288b6cd6"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/events.js",
+          "sha256": "ee3ca75c737b5ebaaa2c42db2d6bf862e12614d551ef62f901a300184e5d6142"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/normalize_css_property_name.js",
+          "sha256": "629e0165cefe649d8b7235e25bc4388def6930f479b5e0983dbf311cbd19dae4"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/escaping.js",
+          "sha256": "9d8ca7f2fba0bbfcf8d87fbcbfd4ec47c731a93898e3bdf8f5d8abed2f60f928"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/imports.js",
+          "sha256": "224a1b2c2a98354925d4199a20acb43a187b5ce6c8cb0d9a7ce95457ecf3ec00"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx/index.js",
+          "sha256": "6c4b6ef03851fbad271dc7a419bc3f8070dfc215ff18f24e60be0e424755e136"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/analyze/css-analyze.js",
+          "sha256": "aa3376875e5def14844dea149e29453270f37286e319eec83863f62fbd5ccc8e"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/analyze/prune.js",
+          "sha256": "90f949eb84da4f9229bcd2ea2e541c999f35c5c18cae4b3c664844bfd21f3851"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx/helpers.js",
+          "sha256": "f6057a0b77a4de7047461a9d28e8eed0b21ddf89c964a54266f07c0880f667ae"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx/ast-builders.js",
+          "sha256": "0af14269af9cbd8aee949598c2148796d2e569b7a0503e467e30b48753af81ec"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/stylesheet.js",
+          "sha256": "86153bc11d19e28fd34a2a33ac9b02dc69ca36da707c23a1440148846634aef9"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/lazy.js",
+          "sha256": "7c14e3f04a942a69ba4e39989c8a1bb4e0e9f7a04f0419654421cad45e6c4c52"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/await.js",
+          "sha256": "51244d596d3bc85786b035018e25613304aed5efa05f4b470ca5541aa46a956d"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/scoping.js",
+          "sha256": "33eb768d1999ade2c9aa67b4861e49eb8b74ddf6526e2f6532fc7e62e504ba39"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/style-ref.js",
+          "sha256": "45ef2ec5727183f2e4788cc317dc0490ae48dbc66721921231d6d8d23d62e699"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx-interleave.js",
+          "sha256": "4cd07808bfeb4f2b9eec9a0f1030cf02f23a047245e3147b5aa059ae8e6205a5"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx-hoist.js",
+          "sha256": "3679e5fb5a1aab29ff37d102749333e5bb82edcd75bc37e82d4fbaadf2ceccc2"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx/server-module.js",
+          "sha256": "b0dce75043d18e691443eecce7dfdd2a73d827ec3339bc9b4fe9ac47cec9babb"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/segments.js",
+          "sha256": "fbe1e4562a61051014c52c8d99f8e1b86ae7ec6ff727e9f17f3c7075879cf6d7"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/source-map-utils.js",
+          "sha256": "176fa31c159c0055db73ac8e41769d63c62eec6bbeb28d7219289fc092c27506"
+        }
+      ]
+    },
+    {
+      "phase": "native-cost-evidence",
+      "localPath": "/private/tmp/octane-native-source-compiler-NVcMdO/native-cost-evidence/dependency-loads-84442.json",
+      "sha256": "5db1a73f9193c6ced9974d46ce5cb6f20dffcbd0120737562555272c98485de6",
+      "bytes": 197159,
+      "recordedDependencyLoads": [
+        {
+          "specifier": "esbuild",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js",
+          "package": "esbuild",
+          "version": "0.28.1"
+        },
+        {
+          "specifier": "happy-dom",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/happy-dom@20.11.0_bufferutil@4.1.0_utf-8-validate@5.0.10/node_modules/happy-dom/lib/index.js",
+          "package": "happy-dom",
+          "version": "20.11.0"
+        },
+        {
+          "specifier": "@tsrx/core",
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/index.js",
+          "package": "@tsrx/core",
+          "version": "0.1.61"
+        },
+        {
+          "specifier": "alien-signals",
+          "file": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/cjs/index.cjs",
+          "package": "alien-signals",
+          "version": "3.2.0"
+        },
+        {
+          "specifier": "devalue",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+          "package": "devalue",
+          "version": "5.8.2"
+        },
+        {
+          "specifier": "acorn",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/acorn@8.17.0/node_modules/acorn/dist/acorn.mjs",
+          "package": "acorn",
+          "version": "8.17.0"
+        },
+        {
+          "specifier": "@sveltejs/acorn-typescript",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@sveltejs+acorn-typescript@1.0.13_acorn@8.17.0/node_modules/@sveltejs/acorn-typescript/index.js",
+          "package": "@sveltejs/acorn-typescript",
+          "version": "1.0.13"
+        },
+        {
+          "specifier": "zimmerframe",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/zimmerframe@1.1.4/node_modules/zimmerframe/src/walk.js",
+          "package": "zimmerframe",
+          "version": "1.1.4"
+        },
+        {
+          "specifier": "@noble/hashes/sha2.js",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@noble+hashes@2.2.0/node_modules/@noble/hashes/sha2.js",
+          "package": "@noble/hashes",
+          "version": "2.2.0"
+        },
+        {
+          "specifier": "@noble/hashes/utils.js",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@noble+hashes@2.2.0/node_modules/@noble/hashes/utils.js",
+          "package": "@noble/hashes",
+          "version": "2.2.0"
+        },
+        {
+          "specifier": "is-reference",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/is-reference@3.0.3/node_modules/is-reference/src/index.js",
+          "package": "is-reference",
+          "version": "3.0.3"
+        },
+        {
+          "specifier": "esrap",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/esrap@2.3.2/node_modules/esrap/src/index.js",
+          "package": "esrap",
+          "version": "2.3.2"
+        },
+        {
+          "specifier": "@jridgewell/sourcemap-codec",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@jridgewell+sourcemap-codec@1.5.5/node_modules/@jridgewell/sourcemap-codec/dist/sourcemap-codec.mjs",
+          "package": "@jridgewell/sourcemap-codec",
+          "version": "1.5.5"
+        },
+        {
+          "specifier": "esrap/languages/tsx",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/esrap@2.3.2/node_modules/esrap/src/languages/tsx/index.js",
+          "package": "esrap",
+          "version": "2.3.2"
+        },
+        {
+          "specifier": "magic-string",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/magic-string@0.30.21/node_modules/magic-string/dist/magic-string.es.mjs",
+          "package": "magic-string",
+          "version": "0.30.21"
+        },
+        {
+          "specifier": "oxc-tsrx/tsrx-core-compat",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/oxc-tsrx@0.5.0_svelte@5.56.7/node_modules/oxc-tsrx/dist/tsrx-core-compat/index.js",
+          "package": "oxc-tsrx",
+          "version": "0.5.0"
+        },
+        {
+          "specifier": "oxc-tsrx/parser",
+          "file": "/Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/oxc-tsrx@0.5.0_svelte@5.56.7/node_modules/oxc-tsrx/dist/parser.js",
+          "package": "oxc-tsrx",
+          "version": "0.5.0"
+        }
+      ],
+      "loadedFileCount": 652,
+      "loadedTaggedCompilerFiles": [
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/index.js",
+          "sha256": "2ff04b2091592a162d51b0b09c9ee496059fafb65a76940bdda345aaefb9b20f"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/parse/parse-module.js",
+          "sha256": "77e1a81b75d649c29ab34d95492268b4b52d6a9882a9ce2378c605c0c6cac0e1"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/parse/index.js",
+          "sha256": "7794f96808cc23e35da941e4c3be22959b654a1afe003bdb22c8824666aa8ca4"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/ast.js",
+          "sha256": "2a092489284ba70eccfae6e8881551e164bd8bff1e7ecb732f7d915128e7220a"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/builders.js",
+          "sha256": "3e17fff257bab8e56669d817f5f4169922aa93420dbabeaec302c6f2b53f341d"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/patterns.js",
+          "sha256": "48f5eb215e524950d9145febb83b55591f2a6e78c4e2e729b73f27f0221bdefe"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/sanitize_template_string.js",
+          "sha256": "65813ee9ce27bcd76575645485468addb54fd36d7aa591b0c41c3fbc9e173ac2"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/plugin.js",
+          "sha256": "e112f901410225e6cb02202ed4fb20c57ef8e41b2300cd5a60bbf9216d300ce6"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/parse/style.js",
+          "sha256": "bf1dcf86a5e9f3199837d40dacfec44b0a058a694f6971b50a4dd5707c27b041"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/hashing.js",
+          "sha256": "8576b3db953002c6ccbb89fa3489eb23402172ec197500484b9b92957a7dfafb"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/errors.js",
+          "sha256": "7da78a060fc242b46075399d2fb75e93f0b4cfe6fae7d981979e78d184db7e49"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/diagnostics.js",
+          "sha256": "a75367ea44b5db55a1a3ef4a761ae9c43cdf176ffaf57f52c15f287a867caa75"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/analyze/validation.js",
+          "sha256": "7168e011a9feb57f58aaf0c6f0f2a1deb8a31cddffc316ce711774273405e986"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/scope.js",
+          "sha256": "8278c4a3d8cee2dc62ce98655a4098ef4689fd736f7734485ac2ae208c4b2e18"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils.js",
+          "sha256": "083706d60b52b40af5f3a7f727844bb38ca4dfa6f4973650a5dd2d896ee08595"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/dom.js",
+          "sha256": "7f935ec75ad850ce0e003220f1310f44405e3b90c528c4399915cc38920660d7"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/identifier-utils.js",
+          "sha256": "8e57c94b0aeb963b66ffe8db5db1c00ce7edb64d2dca8be9be2496c9868d3230"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/constants.js",
+          "sha256": "ca299843b99a3a6ba6236c368a019d55cab5377cb7d2b21f71a4067259069e22"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/comment-utils.js",
+          "sha256": "8207b1a4f2ed8d2c9a1cfc558d7d0d4fa65e93b9dcea35cee14c86d8dec6aa19"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/analyze/index.js",
+          "sha256": "094e6c81664bc1e26fb1793114fe2df0ca5983e67edd6e25a586946b288b6cd6"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/events.js",
+          "sha256": "ee3ca75c737b5ebaaa2c42db2d6bf862e12614d551ef62f901a300184e5d6142"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/normalize_css_property_name.js",
+          "sha256": "629e0165cefe649d8b7235e25bc4388def6930f479b5e0983dbf311cbd19dae4"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/utils/escaping.js",
+          "sha256": "9d8ca7f2fba0bbfcf8d87fbcbfd4ec47c731a93898e3bdf8f5d8abed2f60f928"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/imports.js",
+          "sha256": "224a1b2c2a98354925d4199a20acb43a187b5ce6c8cb0d9a7ce95457ecf3ec00"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx/index.js",
+          "sha256": "6c4b6ef03851fbad271dc7a419bc3f8070dfc215ff18f24e60be0e424755e136"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/analyze/css-analyze.js",
+          "sha256": "aa3376875e5def14844dea149e29453270f37286e319eec83863f62fbd5ccc8e"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/analyze/prune.js",
+          "sha256": "90f949eb84da4f9229bcd2ea2e541c999f35c5c18cae4b3c664844bfd21f3851"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx/helpers.js",
+          "sha256": "f6057a0b77a4de7047461a9d28e8eed0b21ddf89c964a54266f07c0880f667ae"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx/ast-builders.js",
+          "sha256": "0af14269af9cbd8aee949598c2148796d2e569b7a0503e467e30b48753af81ec"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/stylesheet.js",
+          "sha256": "86153bc11d19e28fd34a2a33ac9b02dc69ca36da707c23a1440148846634aef9"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/lazy.js",
+          "sha256": "7c14e3f04a942a69ba4e39989c8a1bb4e0e9f7a04f0419654421cad45e6c4c52"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/await.js",
+          "sha256": "51244d596d3bc85786b035018e25613304aed5efa05f4b470ca5541aa46a956d"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/scoping.js",
+          "sha256": "33eb768d1999ade2c9aa67b4861e49eb8b74ddf6526e2f6532fc7e62e504ba39"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/style-ref.js",
+          "sha256": "45ef2ec5727183f2e4788cc317dc0490ae48dbc66721921231d6d8d23d62e699"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx-interleave.js",
+          "sha256": "4cd07808bfeb4f2b9eec9a0f1030cf02f23a047245e3147b5aa059ae8e6205a5"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx-hoist.js",
+          "sha256": "3679e5fb5a1aab29ff37d102749333e5bb82edcd75bc37e82d4fbaadf2ceccc2"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/jsx/server-module.js",
+          "sha256": "b0dce75043d18e691443eecce7dfdd2a73d827ec3339bc9b4fe9ac47cec9babb"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/transform/segments.js",
+          "sha256": "fbe1e4562a61051014c52c8d99f8e1b86ae7ec6ff727e9f17f3c7075879cf6d7"
+        },
+        {
+          "file": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/tsrx/src/source-map-utils.js",
+          "sha256": "176fa31c159c0055db73ac8e41769d63c62eec6bbeb28d7219289fc092c27506"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Source-only measurements with an explicitly authorized public tagged compiler; configured registry403 prevented a full locked workspace installation and CI qualification.",
+    "No browser layout, paint, frame or hydration timing; no V8 allocation claims.",
+    "Graph comparator requires the explicitly recorded8MiB Node stack at scale10000; the initial default-stack raw-Alien failure is preserved and is not a passing run.",
+    "Foreign-retention workload covers retained synchronous success across owner retirement, not async producers, history, DOM or DevTools.",
+    "Local logs and dependency-load manifests remain local; these hashes describe their original raw bytes, not normalized published report files."
+  ]
+}

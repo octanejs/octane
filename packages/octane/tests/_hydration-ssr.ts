@@ -10,11 +10,13 @@ type HydrationBinding =
 	| 'aria'
 	| 'base-ui'
 	| 'docusaurus'
+	| 'formisch'
 	| 'monaco-editor'
 	| 'pdf'
 	| 'rainbowkit'
 	| 'react-map-gl'
-	| 'solana-react'
+	| 'select'
+	| 'solana-kit'
 	| 'testing-library';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
@@ -59,10 +61,14 @@ function bindingAliases(binding: HydrationBinding) {
 		];
 	}
 
-	if (binding === 'solana-react') {
+	if (binding === 'formisch') {
+		return [{ find: /^@octanejs\/formisch$/, replacement: resolve(source, 'index.ts') }];
+	}
+
+	if (binding === 'solana-kit') {
 		return [
 			{
-				find: /^@octanejs\/solana-react$/,
+				find: /^@octanejs\/solana-kit$/,
 				replacement: resolve(source, 'index.ts'),
 			},
 		];
@@ -111,6 +117,8 @@ function bindingAliases(binding: HydrationBinding) {
 		return [{ find: /^@octanejs\/react-map-gl$/, replacement: resolve(source, 'index.ts') }];
 	}
 
+	if (binding === 'select') return [];
+
 	if (binding === 'testing-library') {
 		// Its hydration fixtures import `octane` and nothing else — the binding
 		// itself is what the TEST mounts through, never what the server renders.
@@ -119,7 +127,7 @@ function bindingAliases(binding: HydrationBinding) {
 
 	return [
 		{ find: /^@octanejs\/base-ui$/, replacement: resolve(source, 'index.ts') },
-		{ find: /^@octanejs\/base-ui\/(.*)$/, replacement: `${source}/$1.ts` },
+		{ find: /^@octanejs\/base-ui\/(.*)$/, replacement: `${source}/$1` },
 		{
 			find: /^@octanejs\/floating-ui$/,
 			replacement: resolve(repositoryRoot, 'packages/floating-ui/src/index.ts'),
@@ -138,6 +146,12 @@ async function withHydrationServer<T>(
 		logLevel: 'silent',
 		appType: 'custom',
 		plugins: [octane({ ssr: true })],
+		ssr: {
+			noExternal:
+				binding === 'base-ui'
+					? ['@octanejs/base-ui', '@octanejs/base-ui-utils', '@octanejs/floating-ui']
+					: [],
+		},
 		resolve: {
 			alias: [
 				{ find: /^octane$/, replacement: serverRuntime },

@@ -1,0 +1,207 @@
+diff --git a/tests/upstream/src/number-field/input/NumberFieldInput.test.tsx b/tests/upstream/src/number-field/input/NumberFieldInput.test.tsx
+--- a/tests/upstream/src/number-field/input/NumberFieldInput.test.tsx
++++ b/tests/upstream/src/number-field/input/NumberFieldInput.test.tsx
+@@ -62,7 +62,7 @@ describe('<NumberField.Input />', () => {
+     );
+     const input = screen.getByRole('textbox');
+     await act(async () => input.focus());
+-    fireEvent.change(input, { target: { value: 'abc' } });
++    fireEvent.input(input, { target: { value: 'abc' } });
+     expect(input).toHaveValue('');
+   });
+ 
+@@ -86,7 +86,7 @@ describe('<NumberField.Input />', () => {
+     );
+     const input = screen.getByRole('textbox');
+     await act(async () => input.focus());
+-    fireEvent.change(input, { target: { value: '123' } });
++    fireEvent.input(input, { target: { value: '123' } });
+     expect(input).toHaveValue('123');
+   });
+ 
+@@ -270,7 +270,7 @@ describe('<NumberField.Input />', () => {
+ 
+     // The parent intentionally never mirrors `onValueChange` back into `value`, so the numeric
+     // state stays 0 while the visible text is dirty.
+-    fireEvent.change(input, { target: { value: '1.5' } });
++    fireEvent.input(input, { target: { value: '1.5' } });
+     expect(onValueChange.mock.lastCall?.[0]).toBe(1.5);
+ 
+     // ArrowUp must step from the dirty text (1.5 -> 2.5), not the stale numeric state (0 -> 1).
+@@ -335,7 +335,7 @@ describe('<NumberField.Input />', () => {
+     await act(async () => input.focus());
+ 
+     // Dirty text the parent never mirrors back into `value` (still 0).
+-    fireEvent.change(input, { target: { value: '1.5' } });
++    fireEvent.input(input, { target: { value: '1.5' } });
+ 
+     // A non-mutating navigation key must not mark the input as synced.
+     fireEvent.keyDown(input, { key: 'ArrowLeft' });
+@@ -358,7 +358,7 @@ describe('<NumberField.Input />', () => {
+     const input = screen.getByRole('textbox');
+     await act(async () => input.focus());
+ 
+-    fireEvent.change(input, { target: { value: '1.5' } });
++    fireEvent.input(input, { target: { value: '1.5' } });
+     fireEvent.keyDown(input, { key: 'ArrowLeft' });
+ 
+     // The button commits the dirty text before stepping, so it must step from 1.5, not 0.
+@@ -379,7 +379,7 @@ describe('<NumberField.Input />', () => {
+     await act(async () => input.focus());
+ 
+     // Parent never mirrors onValueChange, so the numeric state stays 0 while the text is dirty.
+-    fireEvent.change(input, { target: { value: '5' } });
++    fireEvent.input(input, { target: { value: '5' } });
+     expect(onValueChange.mock.lastCall?.[0]).toBe(5);
+ 
+     // A cursor key must not clear dirty authority, so blur commits the typed text (5) rather
+@@ -449,7 +449,7 @@ describe('<NumberField.Input />', () => {
+     // First comma is allowed
+     expect(dispatchKey(',')).toBe(true);
+     // Simulate a typical user value with a digit before decimal to let change handler accept it
+-    fireEvent.change(input, { target: { value: '1,' } });
++    fireEvent.input(input, { target: { value: '1,' } });
+     expect(input).toHaveValue('1,');
+ 
+     // Second comma should be blocked
+@@ -457,7 +457,7 @@ describe('<NumberField.Input />', () => {
+ 
+     // Grouping '.' should be allowed multiple times
+     expect(dispatchKey('.')).toBe(true);
+-    fireEvent.change(input, { target: { value: '1.,' } });
++    fireEvent.input(input, { target: { value: '1.,' } });
+     expect(dispatchKey('.')).toBe(true);
+   });
+ 
+@@ -480,7 +480,7 @@ describe('<NumberField.Input />', () => {
+     expect(dispatchKey(' ')).toBe(true);
+ 
+     // Simulate a typical user value using a regular space as group
+-    fireEvent.change(input, { target: { value: '1 234' } });
++    fireEvent.input(input, { target: { value: '1 234' } });
+     expect(input).toHaveValue('1 234');
+   });
+ 
+@@ -492,7 +492,7 @@ describe('<NumberField.Input />', () => {
+     );
+     const input = screen.getByRole('textbox');
+     await act(async () => input.focus());
+-    fireEvent.change(input, { target: { value: '1234' } });
++    fireEvent.input(input, { target: { value: '1234' } });
+     expect(input).toHaveValue('1234');
+     fireEvent.blur(input);
+     expect(input).toHaveValue((1234).toLocaleString());
+@@ -506,7 +506,7 @@ describe('<NumberField.Input />', () => {
+     );
+     const input = screen.getByRole('textbox');
+     await act(async () => input.focus());
+-    fireEvent.change(input, { target: { value: '-1' } });
++    fireEvent.input(input, { target: { value: '-1' } });
+     expect(input).toHaveValue('-1');
+     fireEvent.blur(input);
+     expect(input).toHaveValue('0');
+@@ -520,7 +520,7 @@ describe('<NumberField.Input />', () => {
+     );
+     const input = screen.getByRole('textbox');
+     await act(async () => input.focus());
+-    fireEvent.change(input, { target: { value: '1' } });
++    fireEvent.input(input, { target: { value: '1' } });
+     expect(input).toHaveValue('1');
+     fireEvent.blur(input);
+     expect(input).toHaveValue('0');
+@@ -534,7 +534,7 @@ describe('<NumberField.Input />', () => {
+     );
+     const input = screen.getByRole('textbox');
+     await act(async () => input.focus());
+-    fireEvent.change(input, { target: { value: '1.5' } });
++    fireEvent.input(input, { target: { value: '1.5' } });
+     expect(input).toHaveValue('1.5');
+     fireEvent.blur(input);
+     expect(input).toHaveValue((1.5).toLocaleString());
+@@ -548,7 +548,7 @@ describe('<NumberField.Input />', () => {
+     );
+     const input = screen.getByRole('textbox');
+     await act(async () => input.focus());
+-    fireEvent.change(input, { target: { value: '3' } });
++    fireEvent.input(input, { target: { value: '3' } });
+     expect(input).toHaveValue('3');
+     fireEvent.blur(input);
+     expect(input).toHaveValue('3');
+@@ -1103,7 +1103,7 @@ describe('<NumberField.Input />', () => {
+       'tr-TR',
+     );
+ 
+-    fireEvent.change(input, { target: { value: formatted } });
++    fireEvent.input(input, { target: { value: formatted } });
+     fireEvent.blur(input);
+ 
+     expect(onValueChange.mock.lastCall?.[0]).toBe(0.0123);
+@@ -1208,7 +1208,7 @@ describe('<NumberField.Input />', () => {
+     await act(async () => {
+       input.focus();
+     });
+-    fireEvent.change(input, { target: { value: formattedOverflow } });
++    fireEvent.input(input, { target: { value: formattedOverflow } });
+     fireEvent.blur(input);
+ 
+     expect(onValueChange).not.toHaveBeenCalled();
+@@ -1238,7 +1238,7 @@ describe('<NumberField.Input />', () => {
+     await act(async () => {
+       input.focus();
+     });
+-    fireEvent.change(input, { target: { value: '1.239' } });
++    fireEvent.input(input, { target: { value: '1.239' } });
+     fireEvent.blur(input);
+ 
+     expect(onValueCommitted).not.toHaveBeenCalled();
+@@ -1385,7 +1385,7 @@ describe('<NumberField.Input />', () => {
+     const input = screen.getByRole<HTMLInputElement>('textbox');
+     await act(async () => input.focus());
+ 
+-    fireEvent.change(input, { target: { value: '1234,5' } });
++    fireEvent.input(input, { target: { value: '1234,5' } });
+     expect(input).toHaveValue('1234,5');
+ 
+     fireEvent.blur(input);
+@@ -1545,7 +1545,7 @@ describe('<NumberField.Input />', () => {
+       await render(
+         <Field.Root data-testid="field">
+           <NumberField.Root defaultValue={1234}>
+-            <NumberField.Input onFocus={(event) => event.preventDefault()} />
++            <NumberField.Input onFocus={(event) => event.preventBaseUIHandler()} />
+           </NumberField.Root>
+         </Field.Root>,
+       );
+@@ -1561,14 +1561,14 @@ describe('<NumberField.Input />', () => {
+       await render(
+         <Field.Root data-testid="field">
+           <NumberField.Root onValueCommitted={onValueCommitted}>
+-            <NumberField.Input onBlur={(event) => event.preventDefault()} />
++            <NumberField.Input onBlur={(event) => event.preventBaseUIHandler()} />
+           </NumberField.Root>
+         </Field.Root>,
+       );
+ 
+       const input = screen.getByRole('textbox');
+       await act(async () => input.focus());
+-      fireEvent.change(input, { target: { value: '5.10' } });
++      fireEvent.input(input, { target: { value: '5.10' } });
+       fireEvent.blur(input);
+ 
+       expect(input).toHaveValue('5.10');
+@@ -1581,13 +1581,13 @@ describe('<NumberField.Input />', () => {
+ 
+       await render(
+         <NumberField.Root defaultValue={5} onValueChange={onValueChange}>
+-          <NumberField.Input onChange={(event) => event.preventDefault()} />
++          <NumberField.Input onInput={(event) => event.preventDefault()} />
+         </NumberField.Root>,
+       );
+ 
+       const input = screen.getByRole('textbox');
+       await act(async () => input.focus());
+-      fireEvent.change(input, { target: { value: '9' }, cancelable: true });
++      fireEvent.input(input, { target: { value: '9' }, cancelable: true });
+ 
+       expect(input).toHaveValue('5');
+       expect(onValueChange).not.toHaveBeenCalled();

@@ -53,6 +53,10 @@ import type { ElementDescriptor, FragmentInstance } from './index.js';
  */
 export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
+export interface CSSProperties extends React.CSSProperties {
+	cssFloat?: React.CSSProperties['float'];
+}
+
 export type ClassValue =
 	| string
 	| number
@@ -62,15 +66,14 @@ export type ClassValue =
 	| readonly ClassValue[]
 	| { readonly [name: string]: unknown };
 
-/**
- * React's synthetic handler props (all of `DOMAttributes` except children and
- * dangerouslySetInnerHTML). The NAMES are octane's public event surface; only
- * the parameter types change (native instead of synthetic).
- */
-type ReactSyntheticProps = Exclude<
-	keyof React.DOMAttributes<Element>,
-	'children' | 'dangerouslySetInnerHTML'
->;
+// React's types restrict dialog lifecycle handlers to <dialog>, but Octane
+// delegates these events through logical ancestors in both phases.
+type DialogLifecycleProps = 'onCancel' | 'onCancelCapture' | 'onClose' | 'onCloseCapture';
+
+/** Handler names whose parameters are native rather than React synthetic events. */
+type ReactSyntheticProps =
+	| Exclude<keyof React.DOMAttributes<Element>, 'children' | 'dangerouslySetInnerHTML'>
+	| DialogLifecycleProps;
 
 /**
  * Convert one React synthetic handler type to its native form: the parameter
@@ -86,6 +89,8 @@ type NativeHandler<H, T> =
 
 type NativeEventHandlers<P, T> = {
 	[K in Extract<keyof P, ReactSyntheticProps>]?: NativeHandler<P[K], T>;
+} & {
+	[K in DialogLifecycleProps]?: (event: Event & { currentTarget: T }) => void;
 };
 
 /** Props whose lowercase spelling is not a native attribute with equivalent behavior. */
@@ -133,15 +138,16 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 		class?: ClassValue;
 		className?: ClassValue;
 		for?: string;
-		style?: string | React.CSSProperties;
+		xmlns?: string;
+		style?: string | CSSProperties;
 		children?: unknown;
 	};
 
 declare namespace Octane {
 	type Key = string | number | bigint;
 
-	/** Octane ref forms: callback (optional cleanup), object, or (nested) arrays. */
-	type Ref<T> = React.Ref<T> | readonly Ref<T>[];
+	/** Ref forms: callback (optional cleanup), object, or nested arrays with optional entries. */
+	type Ref<T> = React.Ref<T> | readonly (Ref<T> | undefined)[];
 
 	interface Attributes {
 		key?: Key | null | undefined;
@@ -175,6 +181,7 @@ declare namespace Octane {
 	interface FieldsetHTMLAttributes<T> extends Transformed<React.FieldsetHTMLAttributes<T>, T> {}
 	interface FormHTMLAttributes<T> extends Transformed<React.FormHTMLAttributes<T>, T> {}
 	interface HTMLAttributes<T> extends Transformed<React.HTMLAttributes<T>, T> {}
+	interface AllHTMLAttributes<T> extends Transformed<React.AllHTMLAttributes<T>, T> {}
 	interface HtmlHTMLAttributes<T> extends Transformed<React.HtmlHTMLAttributes<T>, T> {}
 	interface IframeHTMLAttributes<T> extends Transformed<React.IframeHTMLAttributes<T>, T> {}
 	interface ImgHTMLAttributes<T> extends Transformed<React.ImgHTMLAttributes<T>, T> {}
@@ -292,6 +299,9 @@ declare namespace Octane {
 			children: {};
 		}
 		interface IntrinsicAttributes extends Octane.Attributes {}
+		// Foreign React class elements may be transported through ReactCompat.
+		// React owns these refs; Octane still does not execute class components.
+		interface IntrinsicClassAttributes<T> extends React.ClassAttributes<T> {}
 		interface IntrinsicElements {
 			a: Octane.DetailedHTMLProps<
 				Octane.AnchorHTMLAttributes<HTMLAnchorElement>,

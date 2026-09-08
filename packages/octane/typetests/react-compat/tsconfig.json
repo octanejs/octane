@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsxImportSource": "octane",
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }]
+  },
+  "include": ["./*.test-d.tsrx", "../react-compat-components.react.tsx"]
+}

@@ -2,7 +2,7 @@
 
 > [!NOTE]
 > Deferred hydration is experimental. Its API and compiler protocol may change
-> while Octane is in alpha.
+> while Octane is in beta.
 
 `<Hydrate>` keeps useful server-rendered HTML visible while delaying the work
 that makes a subtree interactive. It is intended for initial-page content that
@@ -116,11 +116,12 @@ Available strategies:
 | `condition(booleanOrGetter)` | Hydrates once the condition is truthy. |
 | `never()` | Keeps initial server HTML permanently static. |
 
-`interaction()` listens for `pointerenter`, `focusin`, `pointerdown`, and
-`click` by default. Supported custom events are `auxclick`, `click`,
-`contextmenu`, `dblclick`, `focusin`, `keydown`, `keyup`, `mousedown`,
-`mouseenter`, `mouseover`, `mouseup`, `pointerdown`, `pointerenter`,
-`pointerover`, and `pointerup`.
+`interaction()` listens for `pointerenter`, `focusin`, `pointerdown`,
+`touchstart`, `touchend`, `beforeinput`, `input`, `compositionstart`,
+`compositionupdate`, `compositionend`, and `click` by default. Supported custom
+events also include `auxclick`, `contextmenu`, `dblclick`, `keydown`, `keyup`,
+`mousedown`, `mouseenter`, `mouseover`, `mouseup`, `pointerover`, and
+`pointerup`.
 
 #### Capture interactions before `hydrateRoot()`
 
@@ -168,20 +169,29 @@ chunk would not be worthwhile:
 
 The compiler recognizes `Hydrate` imported from `octane`, including an import
 alias. Split children must be authored directly inside the boundary. Extraction
-rejects function-as-children, hook calls directly inside the extracted JSX,
-scoped `<style>` elements (their rules belong to the owning component's single
-style scope), and `this` or `super` captures; move that work into a child
-component or opt out with `split={false}`. Ordinary lexical values can be
-captured by the generated child component.
+rejects function-as-children, hook calls directly inside the extracted JSX, and
+`this` or `super` captures; move that work into a child component or opt out
+with `split={false}`. Ordinary lexical values can be captured by the generated
+child component.
+
+A scoped `<style>` whose whole lexical style scope sits inside the split child
+compiles (plan S8.5). The scope is the children list the block is written in:
+its sibling blocks and the host elements they stamp. Both the server compile and
+the extracted child keep the authored-position hash, so hydration adopts the
+server classes. A scope that straddles the boundary — blocks or stamped host
+elements on both sides — is still a compile error (`OCTANE_HYDRATE_SPLIT_STYLE`).
+Keep that scope entirely inside the boundary, move it entirely outside, extract
+a child component, or set `split={false}`. A `<style>` nested in a function
+never joined the enclosing scopes and may move with the split child.
 
 Generated Hydrate chunks are not eagerly module-preloaded. Lazy-module discovery
 for independently suspended siblings never enters a dormant Hydrate boundary,
 so its child code remains deferred until activation or an explicit prefetch
 strategy. The Vite and Rsbuild app integrations still link CSS reachable from a
-route's deferred chunks, because that route's server HTML needs its styling
-before the child JavaScript loads. This eager CSS collection follows the route
-entry's asset graph; it does not turn deferred JavaScript into an eager
-dependency.
+route's deferred chunks, including its layout and configured root fallbacks,
+because that route's server HTML needs its styling before the child JavaScript
+loads. This eager CSS collection follows the composed route's asset graphs; it
+does not turn deferred JavaScript into an eager dependency.
 
 ### `prefetch`
 
@@ -264,8 +274,10 @@ When a descendant module is reachable only through a pruned static declaration
 chain, it is absent from the client manifest; a CSS file imported only by that
 module is absent too. Import ordinary stylesheets from an eager route/layout
 module. Scoped `<style>` remains safe: the client compiler retains a directly
-authored style long enough to preserve the surrounding component's scope hash,
-while SSR collects styles owned by removed descendant components and emits them
+authored style long enough to preserve the hash of the sibling scope it sits in
+(the children list that holds the block)
+(so the elements around the boundary keep the same class chain), while SSR
+collects the style scopes owned by removed descendant components and emits them
 with the rendered static content.
 
 For streamed static content, a synchronous unhandled server error still reaches
@@ -379,8 +391,10 @@ static-HTML exception.
 Nested boundaries hydrate parent-first. Interaction intent can wake an
 unresolved ancestor chain, after which Octane replays a same-type event for the
 target boundary. A `never()` ancestor keeps every deferred descendant inert.
-Native event payload details such as pointer coordinates are not guaranteed to
-survive replay.
+Replay preserves supported platform event classes and their captured keyboard,
+pointer, mouse, touch, input, composition, and focus data where the browser can
+construct that event. A replayed event is still programmatic: it cannot restore
+the original event's trusted status or expired transient user activation.
 
 If activation races a pending renderer-owned streamed Suspense reveal, the
 boundary waits for that reveal or its client-render degradation before adopting
@@ -392,3 +406,7 @@ wrapper in layout and HTML nesting; direct placement inside SVG or MathML is
 unsupported because an HTML parser moves a `<div>` out of foreign content before
 hydration. The exact permanent-static form described above is wrapper-free and
 inherits its HTML, SVG, or MathML parser namespace.
+
+For the proposed next step—omitting an inert page shell while independently
+hydrating its live islands—see [Static shells and independently hydrated islands](./hydration-islands-plan.md).
+That design is not a shipped hydration mode.

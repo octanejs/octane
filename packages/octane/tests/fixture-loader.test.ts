@@ -30,6 +30,32 @@ export function List() {
 `;
 
 describe('loadCompiledFixtureSource', () => {
+	it.each([
+		["import { answer as value } from '@test/fixture-values';", 'value'],
+		["import * as values from '@test/fixture-values';", 'values.answer'],
+		["import value from '@test/fixture-values';", 'value'],
+	])('evaluates a supplied external module: %s', (declaration, expression) => {
+		const mod = loadCompiledFixtureSource(
+			`${declaration}\nexport function readValue() { return ${expression}; }`,
+			{
+				id: '/src/external-fixture.ts',
+				mode: 'client',
+				compileOptions: { hmr: false },
+				runtimeModules: { '@test/fixture-values': { answer: 42, default: 42 } },
+			},
+		);
+		expect(mod.readValue()).toBe(42);
+	});
+
+	it('rejects an external import that was not explicitly supplied', () => {
+		expect(() =>
+			loadCompiledFixtureSource(
+				"import { answer } from '@test/missing'; export function readValue() { return answer; }",
+				{ id: '/src/missing-fixture.ts', mode: 'client', compileOptions: { hmr: false } },
+			),
+		).toThrow(/contains an import\/export shape the shared loader cannot evaluate/);
+	});
+
 	it('evaluates client modules whose tail and siblings reference exported components by name', () => {
 		const mod = loadCompiledFixtureSource(source, {
 			id: '/packages/octane/tests/_fixtures/fixture-loader-exports.tsx',

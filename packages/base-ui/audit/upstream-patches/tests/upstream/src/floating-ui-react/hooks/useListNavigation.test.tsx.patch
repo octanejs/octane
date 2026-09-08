@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/src/floating-ui-react/hooks/useListNavigation.test.tsx b/tests/upstream/src/floating-ui-react/hooks/useListNavigation.test.tsx
+--- a/tests/upstream/src/floating-ui-react/hooks/useListNavigation.test.tsx
++++ b/tests/upstream/src/floating-ui-react/hooks/useListNavigation.test.tsx
+@@ -342,7 +342,7 @@ describe('useListNavigation', () => {
+         }),
+       ]);
+ 
+-      function onChange(event: React.ChangeEvent<HTMLInputElement>) {
++      function onInput(event: React.InputEvent<HTMLInputElement>) {
+         const value = event.target.value;
+         setInputValue(value);
+ 
+@@ -361,7 +361,7 @@ describe('useListNavigation', () => {
+           <input
+             {...getReferenceProps({
+               ref: refs.setReference,
+-              onChange,
++              onInput,
+               value: inputValue,
+               placeholder: 'Enter fruit',
+               'aria-autocomplete': 'list',

@@ -35,6 +35,9 @@ type ServerErrorArguments = {
 	47: [unknown];
 	48: [unknown];
 	57: [];
+	58: [];
+	59: [unknown];
+	60: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -156,6 +159,15 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 			case 57:
 				return formatDevErrorMessage(
 					'prerenderToNodeStream requires a Node.js runtime with process.getBuiltinModule; use prerender() in non-Node environments.',
+					args,
+				);
+			case 58:
+				return formatDevErrorMessage('Unsupported native-read compiler/runtime version.', args);
+			case 59:
+				return formatDevErrorMessage('%s requires an active server component.', args);
+			case 60:
+				return formatDevErrorMessage(
+					'A component suspended without a Suspense boundary during synchronous server rendering. Use prerender() or a streaming renderer to await it.',
 					args,
 				);
 			default:

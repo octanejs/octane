@@ -1,0 +1,24 @@
+diff --git a/tests/upstream/useFieldArray/prepend.test.tsx b/tests/upstream/useFieldArray/prepend.test.tsx
+--- a/tests/upstream/useFieldArray/prepend.test.tsx
++++ b/tests/upstream/useFieldArray/prepend.test.tsx
+@@ -17,7 +17,10 @@ import noop from '../../../src/utils/noop';
+ 
+ let i = 0;
+ 
+-vi.mock('../../../src/logic/generateId', () => () => String(i++));
++// octane: vitest module mock — path resolved from tests/upstream/useFieldArray/, factory returns { default }
++vi.mock('../../../src/logic/generateId', () => ({
++  default: () => String(i++),
++}));
+ 
+ describe('prepend', () => {
+   beforeEach(() => {
+@@ -508,7 +511,7 @@ describe('prepend', () => {
+     });
+ 
+     it('should not invoke resolver per register during prepend; only array-scoped + final isValid', async () => {
+-      const resolver = jest
++      const resolver = vi
+         .fn()
+         .mockImplementation((values) => ({ values, errors: {} }));
+ 

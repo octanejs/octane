@@ -1,0 +1,88 @@
+{
+  "name": "react-calendar",
+  "version": "6.0.1",
+  "description": "Ultimate calendar for your React app.",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "main": "./dist/index.js",
+  "source": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./*": "./*"
+  },
+  "scripts": {
+    "build": "yarn build-js && yarn copy-styles",
+    "build-js": "tsc --project tsconfig.build.json",
+    "clean": "node -e \"fs.rmSync('./dist', { recursive: true, force: true })\"",
+    "copy-styles": "cpy 'src/**/*.css' dist",
+    "format": "biome format",
+    "lint": "biome lint",
+    "prepack": "yarn clean && yarn build",
+    "test": "yarn lint && yarn tsc && yarn format && yarn unit",
+    "tsc": "tsc",
+    "unit": "vitest",
+    "watch": "yarn build-js --watch & node --eval \"fs.watch('src', () => child_process.exec('yarn copy-styles'))\""
+  },
+  "keywords": [
+    "calendar",
+    "date",
+    "date-picker",
+    "month-picker",
+    "react"
+  ],
+  "author": {
+    "name": "Wojciech Maj",
+    "email": "kontakt@wojtekmaj.pl"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@wojtekmaj/date-utils": "^2.0.2",
+    "clsx": "^2.0.0",
+    "get-user-locale": "^3.0.0",
+    "warning": "^4.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.2",
+    "@types/node": "*",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/warning": "^3.0.0",
+    "@vitest/browser-playwright": "^4.1.0",
+    "cpy-cli": "^5.0.0",
+    "playwright": "^1.55.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.0",
+    "vitest-browser-react": "^2.2.0"
+  },
+  "peerDependencies": {
+    "@types/react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",
+    "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist/**/*",
+    "src/**/*",
+    "!**/*.spec.ts",
+    "!**/*.spec.tsx"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wojtekmaj/react-calendar.git",
+    "directory": "packages/react-calendar"
+  },
+  "funding": "https://github.com/wojtekmaj/react-calendar?sponsor=1"
+}

@@ -1,0 +1,67 @@
+.Drawer {
+	display: flex;
+	flex-direction: column;
+	font-family: var(--puck-font-family);
+	gap: 12px;
+}
+
+.Drawer-draggable {
+	position: relative;
+}
+
+.Drawer-draggableBg {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	pointer-events: none;
+	z-index: -1;
+}
+
+.DrawerItem-draggable {
+	background: var(--puck-color-white);
+	cursor: grab;
+	padding: 12px;
+	display: flex;
+	border: 1px var(--puck-color-grey-09) solid;
+	border-radius: 4px;
+	font-size: var(--puck-font-size-xxs);
+	justify-content: space-between;
+	align-items: center;
+	transition:
+		background-color 50ms ease-in,
+		color 50ms ease-in;
+}
+
+.DrawerItem--disabled .DrawerItem-draggable {
+	background: var(--puck-color-grey-11);
+	color: var(--puck-color-grey-05);
+	cursor: not-allowed; /** Move this out of inline styles */
+}
+
+.DrawerItem:focus-visible {
+	outline: 0;
+}
+
+.Drawer:not(.Drawer--isDraggingFrom) .DrawerItem:focus-visible .DrawerItem-draggable {
+	border-radius: 4px;
+	outline: 2px solid var(--puck-color-azure-05);
+	outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.Drawer:not(.Drawer--isDraggingFrom)
+		.DrawerItem:not(.DrawerItem--disabled)
+		.DrawerItem-draggable:hover {
+		background-color: var(--puck-color-azure-12);
+		color: var(--puck-color-azure-04);
+		transition: none;
+	}
+}
+
+.DrawerItem-name {
+	overflow-x: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

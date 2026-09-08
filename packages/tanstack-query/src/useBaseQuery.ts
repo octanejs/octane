@@ -133,10 +133,11 @@ export function useBaseQuery(
 
 	(client.getDefaultOptions().queries as any)?._experimental_afterQuery?.(defaultedOptions, result);
 
-	// experimental_prefetchInRender: kick the fetch during render so
-	// `result.promise` settles even if the component unmounts, and finalize the
-	// observer's thenable (via updateResult) when the data lands.
+	// Query core before 5.102 supports experimental_prefetchInRender. Start the
+	// fetch during render so `result.promise` settles even if the component
+	// unmounts, then finalize the observer's thenable when the data lands.
 	if (
+		'experimental_prefetchInRender' in defaultedOptions &&
 		defaultedOptions.experimental_prefetchInRender &&
 		!environmentManager.isServer() &&
 		willFetch(result, isRestoring)

@@ -16,14 +16,25 @@ Use this when asked to prepare a branch and pull request for an Octane change.
    git diff --stat
    ```
 2. Read `AGENTS.md` and `docs/packages.md`.
-3. Confirm no unrelated local changes are included.
+3. For a new task, fetch the remote default branch and create a dedicated new
+   worktree and non-default branch from it. For an existing pull request, use
+   its already-dedicated worktree.
+4. Verify the task worktree is not the primary checkout and its current branch
+   is neither `main` nor `master`.
+5. Confirm no unrelated local changes are included.
+
+The primary checkout and local default branches are read-only. Never implement,
+install dependencies, generate artifacts, test with commands that write files,
+stage, or commit there. Preserve any state already present and move to the task
+worktree before doing work.
 
 ## Branch and implementation hygiene
 
 - Branch names: `fix/<short-topic>`, `feat/<short-topic>`, `docs/<short-topic>`, or `test/<short-topic>`.
 - Keep commits focused.
 - Add changesets for user-facing package changes; skip docs-only/test-only/internal tooling.
-- If changing RuleSync source, edit `.rulesync/rules/*` and run `pnpm rules:generate`.
+- If changing RuleSync source, edit `.rulesync/rules/*` or
+  `.rulesync/skills/*` and run `pnpm rules:generate`.
 
 ## Validation checklist
 
@@ -97,7 +108,7 @@ review the resulting diff. Include every relevant generated change in the
 commit:
 
 ```bash
-git checkout -b <branch>
+git branch --show-current
 pnpm sync
 git status --short
 git add <files>
@@ -117,15 +128,15 @@ both labels as a bot, which does.
 ## Draft and readiness gates
 
 Open every PR as a draft. Nothing has run against the pushed diff yet, and the
-draft state is what says so. By default, leave readiness and merging to a
-maintainer. When the user explicitly authorizes the agent to mark the PR ready,
-check every gate below against the current head and live base. The required-check
-gate has one bootstrap exception: when Actions has produced no required checks
-for the current head because the PR is still a draft, the first transition to
-ready is allowed after every non-CI gate and all relevant local validation pass.
+draft state is what says so. A request to create a PR through completion
+authorizes the agent to mark it ready after every non-CI gate below and all
+relevant local validation pass, unless the user explicitly asks to leave it as
+a draft. The required-check gate has this bootstrap exception: when Actions has
+produced no required checks for the current head because the PR is still a
+draft, the first transition to ready is allowed after every non-CI gate passes.
 That transition starts CI; it is not evidence that CI passed.
 
-- every required check is terminal and successful;
+- every required and relevant CI check is terminal and successful;
 - every actionable review comment and review thread is resolved on the current head;
 - no reviewer or bot review is still in progress or expected for an older head;
 - the head contains the live base branch, not merely the base SHA cached when the PR opened;
@@ -135,17 +146,20 @@ That transition starts CI; it is not evidence that CI passed.
 These are independent gates. Green checks do not prove that review feedback is
 resolved, and resolved feedback does not prove that the branch still merges.
 After the bootstrap transition, keep the PR ready while required checks run. Do
-not describe it as fully ready or merge-ready until those checks are terminal
-and successful; if a required check fails, address it and restart the gates.
+not describe the work as done, complete, fully ready, or merge-ready until every
+required and relevant CI check for the current pushed head is terminal and
+successful; if a check fails, address it, push the fix, and restart the gates.
 Re-check mergeability and the live base after the last push and immediately
 before `gh pr ready`. If the base moved, incorporate it without rewriting a
 published branch, rerun sync and validation, push, and start the gates again.
 
-Unless the user explicitly requested monitoring, do not sit on `gh pr checks --watch`. Repository CI intentionally skips
-every job while the pull request is a draft and starts on the
-`ready_for_review` event. Cursor Bugbot still reviews every pull request,
-including drafts, outside Actions, so people can watch and respond to its issue
-comments before making a draft ready. Vercel may also report separately.
+Monitor required and relevant CI checks after the PR is ready and continue
+through failures until the current pushed head is green. Use bounded polling
+intervals so status updates can still be shared. Repository CI intentionally
+skips every job while the pull request is a draft and starts on the
+`ready_for_review` event, so a draft-only skipped result is not green. Cursor
+Bugbot still reviews every pull request, including drafts, outside Actions;
+Vercel may also report separately.
 
 ## Declare provenance in the PR body
 
@@ -181,5 +195,6 @@ issues.
 ## Final response
 
 Return PR URL, branch, commit summary, provenance declared, and validation
-evidence.
-The PR stays a draft.
+evidence, including required and relevant CI results for the current pushed
+head and the PR's final draft/readiness state. Do not say the work is done or
+complete unless required and relevant CI is green.

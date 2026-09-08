@@ -1,0 +1,661 @@
+diff --git a/tests/upstream/src/number-field/root/NumberFieldRoot.test.tsx b/tests/upstream/src/number-field/root/NumberFieldRoot.test.tsx
+--- a/tests/upstream/src/number-field/root/NumberFieldRoot.test.tsx
++++ b/tests/upstream/src/number-field/root/NumberFieldRoot.test.tsx
+@@ -88,7 +88,7 @@ describe('<NumberField />', () => {
+       const onValueChange = vi.fn();
+       await render(<NumberField value={1} onValueChange={onValueChange} />);
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '  ' } });
++      fireEvent.input(input, { target: { value: '  ' } });
+       expect(onValueChange.mock.calls[0][0]).toBe(null);
+     });
+   });
+@@ -106,7 +106,7 @@ describe('<NumberField />', () => {
+     );
+ 
+     const input = screen.getByRole('textbox');
+-    fireEvent.change(input, { target: { value: '0.11' } });
++    fireEvent.input(input, { target: { value: '0.11' } });
+ 
+     const hiddenInput = document.querySelector(
+       'input[type="number"][name="quantity"]',
+@@ -131,7 +131,7 @@ describe('<NumberField />', () => {
+     );
+ 
+     const input = screen.getByRole('textbox');
+-    fireEvent.change(input, { target: { value: '0.11' } });
++    fireEvent.input(input, { target: { value: '0.11' } });
+ 
+     const hiddenInput = document.querySelector(
+       'input[type="number"][name="quantity"]',
+@@ -156,7 +156,7 @@ describe('<NumberField />', () => {
+     );
+ 
+     const input = screen.getByRole('textbox');
+-    fireEvent.change(input, { target: { value: '0.11' } });
++    fireEvent.input(input, { target: { value: '0.11' } });
+ 
+     const hiddenInput = document.querySelector(
+       'input[type="number"][name="quantity"]',
+@@ -185,7 +185,7 @@ describe('<NumberField />', () => {
+       }
+       await render(<App />);
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '2' } });
++      fireEvent.input(input, { target: { value: '2' } });
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(2);
+     });
+@@ -206,7 +206,7 @@ describe('<NumberField />', () => {
+       }
+       await render(<App />);
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '5' } });
++      fireEvent.input(input, { target: { value: '5' } });
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(5);
+     });
+@@ -227,7 +227,7 @@ describe('<NumberField />', () => {
+       }
+       await render(<App />);
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '' } });
++      fireEvent.input(input, { target: { value: '' } });
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(null);
+     });
+@@ -237,7 +237,7 @@ describe('<NumberField />', () => {
+       await render(<NumberField onValueChange={onValueChange} />);
+       const input = screen.getByRole('textbox');
+ 
+-      fireEvent.change(input, { target: { value: '12' } });
++      fireEvent.input(input, { target: { value: '12' } });
+ 
+       expect(onValueChange).toHaveBeenCalledTimes(1);
+       const [, details] = onValueChange.mock.calls[0] as [
+@@ -252,7 +252,7 @@ describe('<NumberField />', () => {
+       await render(<NumberField defaultValue={5} onValueChange={onValueChange} />);
+       const input = screen.getByRole('textbox');
+ 
+-      fireEvent.change(input, { target: { value: '' } });
++      fireEvent.input(input, { target: { value: '' } });
+ 
+       expect(onValueChange).toHaveBeenCalledTimes(1);
+       const [, details] = onValueChange.mock.calls[0] as [
+@@ -339,13 +339,13 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       // Type '1' -> parseable
+-      fireEvent.change(input, { target: { value: '1' } });
++      fireEvent.input(input, { target: { value: '1' } });
+       // Type '12' -> parseable
+-      fireEvent.change(input, { target: { value: '12' } });
++      fireEvent.input(input, { target: { value: '12' } });
+       // Type '12.' -> parseable (treated as 12)
+-      fireEvent.change(input, { target: { value: '12.' } });
++      fireEvent.input(input, { target: { value: '12.' } });
+       // Type '12.a' -> not parseable, should not fire
+-      fireEvent.change(input, { target: { value: '12.a' } });
++      fireEvent.input(input, { target: { value: '12.a' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(3);
+       expect(onValueChange.mock.calls[0][0]).toBe(1);
+@@ -365,14 +365,14 @@ describe('<NumberField />', () => {
+ 
+       // Simulate IME composition of non-numeric text; intermediate values like 'ni'
+       fireEvent.compositionStart(input);
+-      fireEvent.change(input, { target: { value: 'n' } });
+-      fireEvent.change(input, { target: { value: 'ni' } });
++      fireEvent.input(input, { target: { value: 'n' } });
++      fireEvent.input(input, { target: { value: 'ni' } });
+       fireEvent.compositionEnd(input);
+ 
+       expect(onValueChange.mock.calls.length).toBe(0);
+ 
+       // Now enter a Han numeral which is parseable
+-      fireEvent.change(input, { target: { value: '一' } });
++      fireEvent.input(input, { target: { value: '一' } });
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(1);
+ 
+@@ -391,12 +391,12 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       // '-' or '.' alone aren't parseable
+-      fireEvent.change(input, { target: { value: '-' } });
+-      fireEvent.change(input, { target: { value: '.' } });
++      fireEvent.input(input, { target: { value: '-' } });
++      fireEvent.input(input, { target: { value: '.' } });
+       // '0.' is parseable (-> 0)
+-      fireEvent.change(input, { target: { value: '0.' } });
+-      fireEvent.change(input, { target: { value: '-1' } });
+-      fireEvent.change(input, { target: { value: '-1.5' } });
++      fireEvent.input(input, { target: { value: '0.' } });
++      fireEvent.input(input, { target: { value: '-1' } });
++      fireEvent.input(input, { target: { value: '-1.5' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(3);
+       expect(onValueChange.mock.calls[0][0]).toBe(0);
+@@ -442,11 +442,11 @@ describe('<NumberField />', () => {
+       );
+       const input = screen.getByRole('textbox');
+ 
+-      fireEvent.change(input, { target: { value: '1' } }); // 1
+-      fireEvent.change(input, { target: { value: `1${groupSeparator}` } }); // 1 (group symbol)
+-      fireEvent.change(input, { target: { value: `1${groupSeparator}2` } }); // 12
+-      fireEvent.change(input, { target: { value: `1${groupSeparator}23` } }); // 123
+-      fireEvent.change(input, { target: { value: `1${groupSeparator}234` } }); // 1234
++      fireEvent.input(input, { target: { value: '1' } }); // 1
++      fireEvent.input(input, { target: { value: `1${groupSeparator}` } }); // 1 (group symbol)
++      fireEvent.input(input, { target: { value: `1${groupSeparator}2` } }); // 12
++      fireEvent.input(input, { target: { value: `1${groupSeparator}23` } }); // 123
++      fireEvent.input(input, { target: { value: `1${groupSeparator}234` } }); // 1234
+ 
+       expect(onValueChange.mock.calls.length).toBe(5);
+       expect(onValueChange.mock.calls[0][0]).toBe(1);
+@@ -473,9 +473,9 @@ describe('<NumberField />', () => {
+       );
+       const input = screen.getByRole('textbox');
+ 
+-      fireEvent.change(input, { target: { value: '1' } }); // 1
+-      fireEvent.change(input, { target: { value: '1,' } }); // 1 (decimal separator typed)
+-      fireEvent.change(input, { target: { value: '1,5' } }); // 1.5
++      fireEvent.input(input, { target: { value: '1' } }); // 1
++      fireEvent.input(input, { target: { value: '1,' } }); // 1 (decimal separator typed)
++      fireEvent.input(input, { target: { value: '1,5' } }); // 1.5
+ 
+       expect(onValueChange.mock.calls.length).toBe(3);
+       expect(onValueChange.mock.calls[0][0]).toBe(1);
+@@ -500,9 +500,9 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       // Typing digits in percent style represents a fraction (12 -> 0.12)
+-      fireEvent.change(input, { target: { value: '12' } });
++      fireEvent.input(input, { target: { value: '12' } });
+       // Typing with explicit percent sign also remains 0.12
+-      fireEvent.change(input, { target: { value: '12%' } });
++      fireEvent.input(input, { target: { value: '12%' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(2);
+       expect(onValueChange.mock.calls[0][0]).toBe(0.12);
+@@ -530,7 +530,7 @@ describe('<NumberField />', () => {
+ 
+       // Typing `2` after the rendered `1%` yields `1%2`, which must reformat to `12%` on blur.
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '1%2' } });
++      fireEvent.input(input, { target: { value: '1%2' } });
+       fireEvent.blur(input);
+ 
+       expect(input).toHaveValue('12%');
+@@ -570,8 +570,8 @@ describe('<NumberField />', () => {
+       await render(<NumberField onValueChange={onValueChange} format={format} />);
+       const input = screen.getByRole('textbox');
+ 
+-      fireEvent.change(input, { target: { value: formatPartialValue('1') } });
+-      fireEvent.change(input, {
++      fireEvent.input(input, { target: { value: formatPartialValue('1') } });
++      fireEvent.input(input, {
+         target: { value: formatPartialValue(`1${groupSeparator}2`) },
+       });
+ 
+@@ -596,7 +596,7 @@ describe('<NumberField />', () => {
+ 
+       // Type a trailing digit. Previously every keystroke was rejected because the multi-character
+       // `R$` symbol failed the per-character validation in the change handler.
+-      fireEvent.change(input, { target: { value: `${formatted}7` } });
++      fireEvent.input(input, { target: { value: `${formatted}7` } });
+ 
+       expect(input).toHaveValue(`${formatted}7`);
+       expect(onValueChange.mock.calls.length).toBe(1);
+@@ -615,8 +615,8 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       // The `km/h` unit must not block editing the numeric region.
+-      fireEvent.change(input, { target: { value: '1 km/h' } });
+-      fireEvent.change(input, { target: { value: '12 km/h' } });
++      fireEvent.input(input, { target: { value: '1 km/h' } });
++      fireEvent.input(input, { target: { value: '12 km/h' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(2);
+       expect(onValueChange.mock.calls[0][0]).toBe(1);
+@@ -630,7 +630,7 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       // `1.5E3` should parse to 1500 rather than being rejected for the `E` separator.
+-      fireEvent.change(input, { target: { value: '1.5E3' } });
++      fireEvent.input(input, { target: { value: '1.5E3' } });
+ 
+       expect(input).toHaveValue('1.5E3');
+       expect(onValueChange.mock.calls.length).toBe(1);
+@@ -646,7 +646,7 @@ describe('<NumberField />', () => {
+       // RTL locales (e.g. fa-IR) insert a U+200E LEFT-TO-RIGHT MARK around the exponent sign in
+       // scientific notation. Inject one into an otherwise-valid value so the test is deterministic
+       // across ICU versions: the validator must ignore the control character rather than reject it.
+-      fireEvent.change(input, { target: { value: '5E\u200E-1' } });
++      fireEvent.input(input, { target: { value: '5E\u200E-1' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(0.5);
+@@ -674,7 +674,7 @@ describe('<NumberField />', () => {
+       const formatted = formatter.format(12.34);
+       const withoutCurrency = formatted.replace('€', '');
+ 
+-      fireEvent.change(input, { target: { value: withoutCurrency } });
++      fireEvent.input(input, { target: { value: withoutCurrency } });
+ 
+       expect(input).toHaveValue(withoutCurrency);
+       expect(onValueChange.mock.calls.length).toBe(1);
+@@ -711,7 +711,7 @@ describe('<NumberField />', () => {
+       const keydownResult = fireEvent.keyDown(input, { key: 'Backspace' });
+       expect(keydownResult).toBe(true);
+ 
+-      fireEvent.change(input, { target: { value: afterBackspace } });
++      fireEvent.input(input, { target: { value: afterBackspace } });
+ 
+       expect(input).toHaveValue(afterBackspace);
+       expect(onValueChange.mock.calls.length).toBe(1);
+@@ -723,7 +723,7 @@ describe('<NumberField />', () => {
+       await render(<NumberField onValueCommitted={onValueCommitted} />);
+       const input = screen.getByRole('textbox');
+ 
+-      fireEvent.change(input, { target: { value: '.' } });
++      fireEvent.input(input, { target: { value: '.' } });
+       expect(input).toHaveValue('.');
+       fireEvent.blur(input);
+ 
+@@ -738,7 +738,7 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '123.' } });
++      fireEvent.input(input, { target: { value: '123.' } });
+       fireEvent.blur(input);
+ 
+       expect(onValueCommitted.mock.calls.length).toBe(1);
+@@ -752,7 +752,7 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '' } });
++      fireEvent.input(input, { target: { value: '' } });
+       fireEvent.blur(input);
+ 
+       expect(onValueCommitted.mock.calls.length).toBe(1);
+@@ -765,7 +765,7 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '1000' } });
++      fireEvent.input(input, { target: { value: '1000' } });
+       fireEvent.blur(input);
+ 
+       expect(onValueCommitted.mock.calls.length).toBe(1);
+@@ -779,7 +779,7 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '-50' } });
++      fireEvent.input(input, { target: { value: '-50' } });
+       fireEvent.blur(input);
+ 
+       expect(onValueCommitted.mock.calls.length).toBe(1);
+@@ -919,7 +919,7 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '' } });
++      fireEvent.input(input, { target: { value: '' } });
+       fireEvent.blur(input);
+ 
+       expect(onValueCommitted.mock.calls.length).toBe(0);
+@@ -1022,7 +1022,7 @@ describe('<NumberField />', () => {
+       await render(<App />);
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '4' } });
++      fireEvent.input(input, { target: { value: '4' } });
+ 
+       expect(input).toHaveValue('4');
+       expect(fn.mock.calls[0][0]).toBe(5);
+@@ -1048,7 +1048,7 @@ describe('<NumberField />', () => {
+       await render(<App />);
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '6' } });
++      fireEvent.input(input, { target: { value: '6' } });
+ 
+       expect(input).toHaveValue('6');
+     });
+@@ -1075,7 +1075,7 @@ describe('<NumberField />', () => {
+       await render(<App />);
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '6' } });
++      fireEvent.input(input, { target: { value: '6' } });
+ 
+       expect(input).toHaveValue('6');
+       expect(fn.mock.calls[0][0]).toBe(5);
+@@ -1101,7 +1101,7 @@ describe('<NumberField />', () => {
+       await render(<App />);
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '4' } });
++      fireEvent.input(input, { target: { value: '4' } });
+ 
+       expect(input).toHaveValue('4');
+       expect(fn.mock.calls[0][0]).toBe(4);
+@@ -1119,7 +1119,7 @@ describe('<NumberField />', () => {
+       fireEvent.keyDown(input, { key: '-', preventDefault: preventDefaultSpy });
+       expect(preventDefaultSpy).toHaveBeenCalledTimes(0);
+ 
+-      fireEvent.change(input, { target: { value: '-1' } });
++      fireEvent.input(input, { target: { value: '-1' } });
+       expect(input).toHaveValue('-1');
+     });
+ 
+@@ -1136,7 +1136,7 @@ describe('<NumberField />', () => {
+       );
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '6' } });
++      fireEvent.input(input, { target: { value: '6' } });
+ 
+       const hiddenInput = document.querySelector(
+         'input[type="number"][name="quantity"]',
+@@ -1187,7 +1187,7 @@ describe('<NumberField />', () => {
+       );
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '6' } });
++      fireEvent.input(input, { target: { value: '6' } });
+ 
+       const hiddenInput = document.querySelector(
+         'input[type="number"][name="quantity"]',
+@@ -1600,7 +1600,7 @@ describe('<NumberField />', () => {
+       await act(async () => submitButton.click());
+       expect(fieldValue).toBe('');
+ 
+-      fireEvent.change(screen.getByRole('textbox'), { target: { value: '50' } });
++      fireEvent.input(screen.getByRole('textbox'), { target: { value: '50' } });
+       await act(async () => submitButton.click());
+       expect(fieldValue).toBe('50');
+     });
+@@ -1747,7 +1747,7 @@ describe('<NumberField />', () => {
+       expect(input).toHaveAttribute('aria-invalid', 'true');
+       expect(screen.queryByTestId('error')).toHaveTextContent('test');
+ 
+-      fireEvent.change(input, { target: { value: '5' } });
++      fireEvent.input(input, { target: { value: '5' } });
+ 
+       expect(input).not.toHaveAttribute('aria-invalid');
+       expect(screen.queryByTestId('error')).toBe(null);
+@@ -1915,7 +1915,7 @@ describe('<NumberField />', () => {
+ 
+       expect(input).not.toHaveAttribute('data-dirty');
+ 
+-      fireEvent.change(input, { target: { value: '1' } });
++      fireEvent.input(input, { target: { value: '1' } });
+ 
+       expect(input).toHaveAttribute('data-dirty', '');
+     });
+@@ -1934,11 +1934,11 @@ describe('<NumberField />', () => {
+ 
+         expect(input).not.toHaveAttribute('data-filled');
+ 
+-        fireEvent.change(input, { target: { value: '1' } });
++        fireEvent.input(input, { target: { value: '1' } });
+ 
+         expect(input).toHaveAttribute('data-filled', '');
+ 
+-        fireEvent.change(input, { target: { value: '' } });
++        fireEvent.input(input, { target: { value: '' } });
+ 
+         expect(input).not.toHaveAttribute('data-filled');
+       });
+@@ -1956,7 +1956,7 @@ describe('<NumberField />', () => {
+ 
+         expect(input).toHaveAttribute('data-filled');
+ 
+-        fireEvent.change(input, { target: { value: '' } });
++        fireEvent.input(input, { target: { value: '' } });
+ 
+         expect(input).not.toHaveAttribute('data-filled');
+       });
+@@ -2045,12 +2045,12 @@ describe('<NumberField />', () => {
+         const input = screen.getByRole('textbox');
+         expect(input).not.toHaveAttribute('aria-invalid');
+ 
+-        fireEvent.change(input, { target: { value: '1' } });
++        fireEvent.input(input, { target: { value: '1' } });
+         fireEvent.blur(input);
+         expect(input).not.toHaveAttribute('aria-invalid');
+         expect(screen.queryByTestId('error')).toBe(null);
+ 
+-        fireEvent.change(input, { target: { value: '' } });
++        fireEvent.input(input, { target: { value: '' } });
+         fireEvent.blur(input);
+         expect(input).not.toHaveAttribute('aria-invalid');
+         expect(screen.queryByTestId('error')).toBe(null);
+@@ -2061,7 +2061,7 @@ describe('<NumberField />', () => {
+         expect(screen.getByTestId('root')).toHaveAttribute('data-invalid');
+         expect(input).toHaveAttribute('data-invalid');
+ 
+-        fireEvent.change(input, { target: { value: '2' } });
++        fireEvent.input(input, { target: { value: '2' } });
+         expect(input).not.toHaveAttribute('aria-invalid');
+         expect(screen.queryByTestId('error')).toBe(null);
+         expect(screen.getByTestId('root')).not.toHaveAttribute('data-invalid');
+@@ -2069,15 +2069,15 @@ describe('<NumberField />', () => {
+         expect(screen.getByTestId('root')).toHaveAttribute('data-valid');
+         expect(input).toHaveAttribute('data-valid');
+         // re-invalidate the field value
+-        fireEvent.change(input, { target: { value: '1' } });
++        fireEvent.input(input, { target: { value: '1' } });
+         expect(input).toHaveAttribute('aria-invalid', 'true');
+         expect(screen.queryByTestId('error')).toHaveTextContent('custom error');
+ 
+-        fireEvent.change(input, { target: { value: '3' } });
++        fireEvent.input(input, { target: { value: '3' } });
+         expect(input).not.toHaveAttribute('aria-invalid');
+         expect(screen.queryByTestId('error')).toBe(null);
+ 
+-        fireEvent.change(input, { target: { value: '' } });
++        fireEvent.input(input, { target: { value: '' } });
+         expect(input).toHaveAttribute('aria-invalid', 'true');
+         expect(screen.queryByTestId('error')).toHaveTextContent('valueMissing error');
+       });
+@@ -2100,7 +2100,7 @@ describe('<NumberField />', () => {
+ 
+         expect(input).not.toHaveAttribute('aria-invalid');
+ 
+-        fireEvent.change(input, { target: { value: '1' } });
++        fireEvent.input(input, { target: { value: '1' } });
+ 
+         expect(input).toHaveAttribute('aria-invalid', 'true');
+       });
+@@ -2160,12 +2160,12 @@ describe('<NumberField />', () => {
+         const input = screen.getByTestId('input');
+         expect(input).not.toHaveAttribute('aria-invalid');
+ 
+-        fireEvent.change(input, { target: { value: '1' } });
++        fireEvent.input(input, { target: { value: '1' } });
+         expect(input).not.toHaveAttribute('aria-invalid');
+         fireEvent.blur(input);
+         expect(input).toHaveAttribute('aria-invalid', 'true');
+         // revalidation
+-        fireEvent.change(input, { target: { value: '2' } });
++        fireEvent.input(input, { target: { value: '2' } });
+         expect(input).not.toHaveAttribute('aria-invalid');
+         expect(screen.queryByTestId('error')).toBe(null);
+       });
+@@ -2191,12 +2191,12 @@ describe('<NumberField />', () => {
+           input.focus();
+         });
+ 
+-        fireEvent.change(input, { target: { value: '0.11' } });
++        fireEvent.input(input, { target: { value: '0.11' } });
+         fireEvent.click(screen.getByText('submit'));
+ 
+         expect(handleSubmit.mock.calls.length).toBe(0);
+ 
+-        fireEvent.change(input, { target: { value: '0.1' } });
++        fireEvent.input(input, { target: { value: '0.1' } });
+         fireEvent.click(screen.getByText('submit'));
+ 
+         expect(handleSubmit.mock.calls.length).toBe(1);
+@@ -2228,13 +2228,13 @@ describe('<NumberField />', () => {
+ 
+       expect(screen.queryByTestId('error')).toBe(null);
+ 
+-      fireEvent.change(input, { target: { value: '0.11' } });
++      fireEvent.input(input, { target: { value: '0.11' } });
+       fireEvent.click(screen.getByText('submit'));
+ 
+       expect(handleSubmit.mock.calls.length).toBe(0);
+       expect(screen.getByTestId('error')).toHaveTextContent('step mismatch');
+ 
+-      fireEvent.change(input, { target: { value: '0.1' } });
++      fireEvent.input(input, { target: { value: '0.1' } });
+       fireEvent.click(screen.getByText('submit'));
+ 
+       expect(handleSubmit.mock.calls.length).toBe(1);
+@@ -2285,7 +2285,7 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '1' } });
++      fireEvent.input(input, { target: { value: '1' } });
+       fireEvent.blur(input);
+ 
+       expect(validate.mock.calls.length).toBe(1);
+@@ -2308,7 +2308,7 @@ describe('<NumberField />', () => {
+       const input = screen.getByRole('textbox');
+ 
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '1000' } });
++      fireEvent.input(input, { target: { value: '1000' } });
+       fireEvent.blur(input);
+ 
+       expect(validate.mock.calls.length).toBe(1);
+@@ -2342,7 +2342,7 @@ describe('<NumberField />', () => {
+       // internal block-revalidation flag and commits an error, but since the stored value is
+       // unchanged `useValueChanged` won't fire to reset the flag.
+       fireEvent.focus(input);
+-      fireEvent.change(input, { target: { value: '9' } });
++      fireEvent.input(input, { target: { value: '9' } });
+       fireEvent.blur(input);
+       expect(input).toHaveValue('5');
+       expect(input).toHaveAttribute('aria-invalid', 'true');
+@@ -2548,7 +2548,7 @@ describe('<NumberField />', () => {
+ 
+       const input = screen.getByRole('textbox');
+       // ۱۲٫۳۴ => 12.34
+-      fireEvent.change(input, { target: { value: '۱۲٫۳۴' } });
++      fireEvent.input(input, { target: { value: '۱۲٫۳۴' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(12.34);
+@@ -2572,7 +2572,7 @@ describe('<NumberField />', () => {
+ 
+       const input = screen.getByRole('textbox');
+       // ۱۲٬۳۴۵٫۶۷ => 12345.67
+-      fireEvent.change(input, { target: { value: '۱۲٬۳۴۵٫۶۷' } });
++      fireEvent.input(input, { target: { value: '۱۲٬۳۴۵٫۶۷' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(12345.67);
+@@ -2597,7 +2597,7 @@ describe('<NumberField />', () => {
+ 
+       const input = screen.getByRole('textbox');
+ 
+-      fireEvent.change(input, { target: { value: '１，２３４．５６' } });
++      fireEvent.input(input, { target: { value: '１，２３４．５６' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(1234.56);
+@@ -2622,13 +2622,13 @@ describe('<NumberField />', () => {
+       await render(<App />);
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '١٢٪' } });
++      fireEvent.input(input, { target: { value: '١٢٪' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(0.12);
+ 
+       // reset by typing again
+-      fireEvent.change(input, { target: { value: '12؉' } });
++      fireEvent.input(input, { target: { value: '12؉' } });
+       expect(onValueChange.mock.calls.length).toBe(2);
+       expect(onValueChange.mock.calls[1][0]).toBe(0.012);
+     });
+@@ -2638,12 +2638,12 @@ describe('<NumberField />', () => {
+       await render(<NumberField onValueChange={onValueChange} />);
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '12' } });
++      fireEvent.input(input, { target: { value: '12' } });
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(12);
+ 
+-      fireEvent.change(input, { target: { value: '12%' } });
+-      fireEvent.change(input, { target: { value: '12‰' } });
++      fireEvent.input(input, { target: { value: '12%' } });
++      fireEvent.input(input, { target: { value: '12‰' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(input).toHaveValue('12');
+@@ -2667,7 +2667,7 @@ describe('<NumberField />', () => {
+       await render(<App />);
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '1234−' } });
++      fireEvent.input(input, { target: { value: '1234−' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(-1234);
+@@ -2691,7 +2691,7 @@ describe('<NumberField />', () => {
+       await render(<App />);
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '(1,234.5)' } });
++      fireEvent.input(input, { target: { value: '(1,234.5)' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(0);
+       expect(input).toHaveValue('');
+@@ -2715,7 +2715,7 @@ describe('<NumberField />', () => {
+       await render(<App />);
+ 
+       const input = screen.getByRole('textbox');
+-      fireEvent.change(input, { target: { value: '1.234.567.89' } });
++      fireEvent.input(input, { target: { value: '1.234.567.89' } });
+ 
+       expect(onValueChange.mock.calls.length).toBe(1);
+       expect(onValueChange.mock.calls[0][0]).toBe(1234567.89);
+@@ -2745,7 +2745,7 @@ describe('<NumberField />', () => {
+       dataTransfer.setData('text/plain', '123');
+ 
+       fireEvent.paste(input, { clipboardData: dataTransfer });
+-      fireEvent.change(input, { target: { value: '123' } });
++      fireEvent.input(input, { target: { value: '123' } });
+       expect(input).toHaveValue('123');
+     });
+ 
+@@ -2757,7 +2757,7 @@ describe('<NumberField />', () => {
+       dataTransfer.setData('text/plain', 'abc');
+ 
+       fireEvent.paste(input, { clipboardData: dataTransfer });
+-      fireEvent.change(input, { target: { value: 'abc' } });
++      fireEvent.input(input, { target: { value: 'abc' } });
+       expect(input).toHaveValue('');
+       fireEvent.blur(input);
+       expect(input).toHaveValue('');
+@@ -2831,7 +2831,7 @@ describe('<NumberField />', () => {
+     await render(<NumberField />);
+     const input = screen.getByRole('textbox') as HTMLInputElement;
+     input.focus();
+-    fireEvent.change(input, { target: { value: '123' } });
++    fireEvent.input(input, { target: { value: '123' } });
+ 
+     const navigateKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'];
+     navigateKeys.forEach((key) => {

@@ -3,6 +3,7 @@
 Octane binding for the complete public contract of `react-popper@2.3.0`.
 
 ```bash
+npm install @octanejs/popper @popperjs/core
 pnpm add @octanejs/popper @popperjs/core
 ```
 

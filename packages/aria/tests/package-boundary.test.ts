@@ -30,6 +30,7 @@ interface ProductionBundle {
 
 const productionBundlers = ['esbuild', 'vite'] as const;
 const productionBundles = new Map<ProductionBundler, ProductionBundle>();
+const productionBuildTimeout = 60_000;
 
 async function buildConsumer(bundler: ProductionBundler): Promise<ProductionBundle> {
 	if (bundler === 'esbuild') {
@@ -97,7 +98,7 @@ beforeAll(async () => {
 	for (const bundler of productionBundlers) {
 		productionBundles.set(bundler, await buildConsumer(bundler));
 	}
-});
+}, productionBuildTimeout);
 
 function consumerBundle(bundler: ProductionBundler): ProductionBundle {
 	const bundle = productionBundles.get(bundler);
@@ -192,6 +193,9 @@ describe('@octanejs/aria package boundary', () => {
 				'process.env.NODE_ENV': JSON.stringify('production'),
 			},
 			format: 'iife',
+			// The components barrel contains compiler-authored TSX. Preserve unused JSX
+			// until tree shaking rather than resolving Octane's type-only JSX entry.
+			jsx: 'preserve',
 			logLevel: 'silent',
 			metafile: true,
 			minify: true,

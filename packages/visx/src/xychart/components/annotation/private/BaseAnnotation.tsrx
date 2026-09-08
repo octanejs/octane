@@ -1,5 +1,5 @@
 import { useContext, useMemo } from 'octane';
-import type { FC } from 'react';
+import type { ComponentBody } from 'octane';
 import type { AnnotationProps, EditableAnnotationProps } from '@octanejs/visx/annotation';
 import type { ScaleInput } from '@octanejs/visx/scale';
 import { coerceNumber } from '@octanejs/visx/scale';
@@ -18,7 +18,7 @@ export type BaseAnnotationProps<XScale extends AxisScale, YScale extends AxisSca
 	| 'onDragMove'
 	| 'onDragStart'> & {
 		/** Annotation component to render. */
-		AnnotationComponent: FC<AnnotationProps> | FC<EditableAnnotationProps>;
+		AnnotationComponent: ComponentBody<AnnotationProps> | ComponentBody<EditableAnnotationProps>;
 		/** Key for series to which datum belongs (used for x/yAccessors). Alternatively xAccessor + yAccessor may be specified. */
 		dataKey?: string;
 		/** Datum to annotate, used for Annotation positioning. */

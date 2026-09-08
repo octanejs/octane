@@ -166,6 +166,34 @@ describe('.tsx return-form component children — server matches client (descrip
 });
 
 describe('descriptorChildren component marker', () => {
+	it('recognizes public ReactCompat and an import alias without bundler metadata', () => {
+		for (const imported of ['ReactCompat', 'ReactCompat as Island']) {
+			const name = imported.endsWith('Island') ? 'Island' : 'ReactCompat';
+			const source = `import { ${imported} } from 'octane/react';
+				import Counter from './Counter.react.tsx';
+				export function App() @{ <${name}><Counter start={3}/></${name}> }`;
+			for (const code of [clientCode(source), serverCode(source)]) {
+				expect(elementDescriptorCalls(code, 'Counter')).toHaveLength(1);
+				expect(runtimeImports(code, ['markChildrenBlock']).size).toBe(0);
+			}
+			const server = parseModule(serverCode(source), 'compiled.js');
+			expect(
+				server.body.some(
+					(node: any) =>
+						node.type === 'ImportDeclaration' && node.source.value === 'octane/react/server',
+				),
+			).toBe(true);
+		}
+	});
+
+	it('does not special-case an unrelated component named ReactCompat', () => {
+		const source = `import { ReactCompat } from './ordinary.tsrx';
+			export function App() @{ <ReactCompat><button>child</button></ReactCompat> }`;
+		for (const code of [clientCode(source), serverCode(source)]) {
+			expect(runtimeImports(code, ['markChildrenBlock']).size).toBe(1);
+		}
+	});
+
 	const SOURCE = `
 		import { descriptorChildren } from 'octane';
 		function Inspector(props) @{ <section>{props.children}</section> }
@@ -217,6 +245,25 @@ describe('descriptorChildren component marker', () => {
 					(value) => value.type === 'CallExpression' && blocks.has(value.callee?.name),
 				),
 			).toBe(false);
+		}
+	});
+
+	it('keeps a local shadow of an imported marked binding on the ordinary template path', () => {
+		const source = `
+			import { Slottable as Alias } from './slot.tsrx';
+			export function App(Alias) @{ <Alias><button>ordinary</button></Alias> }`;
+		for (const mode of [undefined, 'server'] as const) {
+			const code = compile(source, 'consumer.tsrx', {
+				...(mode ? { mode } : null),
+				isDescriptorChildrenImport: (request: string, imported: string) =>
+					request === './slot.tsrx' && imported === 'Slottable',
+			} as any).code;
+			const blocks = runtimeImports(code, ['markChildrenBlock']);
+			expect(
+				childrenValues(code).some(
+					(value) => value.type === 'CallExpression' && blocks.has(value.callee?.name),
+				),
+			).toBe(true);
 		}
 	});
 

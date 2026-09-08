@@ -441,9 +441,9 @@ function TrendPanel(props: {
 		</header>
 		@if (props.pendingRange !== null) {
 			<div class="chart-progress" role="status">
-				Loading the
+				Loading the{' '}
 				{props.pendingRange === '7d' ? '7-day' : '30-day'}
-				window…
+				{' '}window…
 			</div>
 		}
 		<div class="chart-measure-shell">

@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/src/menu/positioner/MenuPositioner.test.tsx b/tests/upstream/src/menu/positioner/MenuPositioner.test.tsx
+--- a/tests/upstream/src/menu/positioner/MenuPositioner.test.tsx
++++ b/tests/upstream/src/menu/positioner/MenuPositioner.test.tsx
+@@ -30,10 +30,10 @@ vi.mock('../../internals/useAnchorPositioning', async () => {
+   };
+ });
+ 
+-const Trigger = React.forwardRef(function Trigger(
+-  props: Menu.Trigger.Props,
+-  ref: React.ForwardedRef<any>,
++const Trigger = (function Trigger(
++  propsWithRef: (Menu.Trigger.Props) & { ref?: React.Ref<any> },
+ ) {
++  const { ref: ref = null, ...props } = propsWithRef;
+   return <Menu.Trigger {...props} ref={ref} render={<div />} nativeButton={false} />;
+ });
+ 

@@ -43,6 +43,27 @@ This harness starts directly on the background renderer; production
 first-screen adoption and the subsequent capability handoff are covered by the
 Lynx first-screen integration tests and the real-browser harness below.
 
+### Native eager-capacity fixture
+
+The `BENCH_AUTOROWS` production builds at 1k, 6k, 7k, 7.5k, 8k, and 10k are
+inputs to the opt-in issue #888 capacity diagnostic. They preserve the table's
+seven-native-elements-per-row topology plus 42 fixed chrome elements. They are
+unranked capacity probes, not a substitute for the separate bounded
+`list`/`list-item` workload, and load-to-crash chronology is never a timing
+sample.
+
+```bash
+for rows in 1000 6000 7000 7500 8000 10000; do
+  BENCH_AUTOROWS="$rows" pnpm --dir benchmarks/lynx-table build:app
+done
+node --test benchmarks/lynx-table/stages/native-fixture.test.mjs
+```
+
+The fixture test pins the topology and exact supported scales. Strict Android
+process/log classification, accepted-sample policy, immutable campaign
+receipts, and the no-CDP device procedure belong to the external
+`Huxpro/lynx-js-framework-benchmark` runner.
+
 ## 2. Lynx-for-Web wall-clock harness (`web/run-web.mjs`, informational)
 
 ```bash

@@ -1,13 +1,13 @@
+import type { RegisteredCell } from '../../context/CellsContext';
 import { createSelector } from 'reselect';
-import { ReactElement } from 'octane';
-import { CellProps } from '../..';
-import { computePieSectors, PieSectorDataItem } from '../../polar/Pie';
+
+import { computePieSectors, PieSectorDataItem } from '../../polar/Pie.tsrx';
 import { RechartsRootState } from '../store';
 import { selectChartDataAndAlwaysIgnoreIndexes } from './dataSelectors';
 import { ChartData, ChartDataState } from '../chartDataSlice';
 import { ChartOffsetInternal } from '../../util/types';
 import { selectChartOffsetInternal } from './selectChartOffsetInternal';
-import type { LegendPayload } from '../../component/DefaultLegendContent';
+import type { LegendPayload } from '../../component/DefaultLegendContent.tsrx';
 import { getTooltipNameProp, getValueByDataKey } from '../../util/ChartUtils';
 import { selectUnfilteredPolarItems } from './polarSelectors';
 import type { PieSettings } from '../types/PieSettings';
@@ -25,12 +25,12 @@ const selectSynchronisedPieSettings: (
 );
 
 // Keep stable reference to an empty array to prevent re-renders
-const emptyArray: ReadonlyArray<ReactElement> = [];
+const emptyArray: ReadonlyArray<RegisteredCell> = [];
 const pickCells = (
 	_state: RechartsRootState,
 	_id: GraphicalItemId,
-	cells: ReadonlyArray<ReactElement> | undefined,
-): ReadonlyArray<ReactElement> | undefined => {
+	cells: ReadonlyArray<RegisteredCell> | undefined,
+): ReadonlyArray<RegisteredCell> | undefined => {
 	if (cells?.length === 0) {
 		return emptyArray;
 	}
@@ -40,7 +40,7 @@ const pickCells = (
 export const selectDisplayedData: (
 	state: RechartsRootState,
 	id: GraphicalItemId,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => ChartData | undefined = createSelector(
 	[selectChartDataAndAlwaysIgnoreIndexes, selectSynchronisedPieSettings, pickCells],
 	(
@@ -59,7 +59,7 @@ export const selectDisplayedData: (
 		}
 
 		if ((!displayedData || !displayedData.length) && cells != null) {
-			displayedData = cells.map((cell: ReactElement<CellProps>) => ({
+			displayedData = cells.map((cell: RegisteredCell) => ({
 				...pieSettings.presentationProps,
 				...cell.props,
 			}));
@@ -76,13 +76,13 @@ export const selectDisplayedData: (
 export const selectPieLegend: (
 	state: RechartsRootState,
 	id: GraphicalItemId,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => ReadonlyArray<LegendPayload> | undefined = createSelector(
 	[selectDisplayedData, selectSynchronisedPieSettings, pickCells],
 	(
 		displayedData: ChartData | undefined,
 		pieSettings: PieSettings | undefined,
-		cells: ReadonlyArray<ReactElement> | undefined,
+		cells: ReadonlyArray<RegisteredCell> | undefined,
 	): ReadonlyArray<LegendPayload> | undefined => {
 		if (displayedData == null || pieSettings == null) {
 			return undefined;
@@ -93,7 +93,8 @@ export const selectPieLegend: (
 			if (cells?.[i]?.props?.fill) {
 				color = cells[i].props.fill;
 			} else if (typeof entry === 'object' && entry != null && 'fill' in entry) {
-				color = entry.fill;
+				// Per-datum overrides follow the same SVG color contract as Cell/Pie.
+				color = (entry as { fill?: LegendPayload['color'] }).fill;
 			} else {
 				color = pieSettings.fill;
 			}
@@ -112,7 +113,7 @@ export const selectPieLegend: (
 export const selectPieSectors: (
 	state: RechartsRootState,
 	id: GraphicalItemId,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => ReadonlyArray<PieSectorDataItem> | undefined = createSelector(
 	[selectDisplayedData, selectSynchronisedPieSettings, pickCells, selectChartOffsetInternal],
 	(

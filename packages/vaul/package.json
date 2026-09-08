@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/vaul",
-  "version": "0.0.5",
+  "version": "0.0.19",
   "description": "Octane binding for Vaul drawers",
   "type": "module",
   "engines": {
@@ -28,12 +28,15 @@
   "files": [
     "src",
     "LICENSE",
+    "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md",
     "status.json"
   ],
   "scripts": {
-    "test": "vitest run --root ../.. --project vaul --project vaul-differential --project vaul-ssr --project vaul-browser --project vaul-browser-conformance",
+    "test": "pnpm upstream:check && vitest run --root ../.. --project vaul --project vaul-differential --project vaul-ssr --project vaul-browser --project vaul-browser-conformance",
+    "parity:inventory": "node ../../scripts/react-parity/vaul-runtime-inventory.mjs",
+    "upstream:check": "node ../../scripts/react-parity/verify-provenance.mjs",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
@@ -41,7 +44,7 @@
     "@types/react": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@types/react-dom": "catalog:default",

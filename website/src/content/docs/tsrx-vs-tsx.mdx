@@ -36,6 +36,12 @@ Choose **TSRX** for new Octane code when lists and branches are a large part of 
 output. It keeps rendered control flow in the template and gives the compiler an
 explicit path to optimize it.
 
+Scoped `<style>` blocks belong to both dialects: a block styles the template scope it
+sits in, and an assigned block (`const theme = <style>…</style>`) is a theme with a
+`$class` you can pass around or `apply` elsewhere. TSRX adds scopes of its own —
+each `@{ ... }` body and every directive arm can carry a block that reaches only that
+scope. See [Styling](/docs/styling).
+
 The practical default is simple: do not rewrite working TSX just to change the file
 extension. Start new components in TSRX, then choose whichever style makes each file
 easier to understand.
@@ -66,6 +72,24 @@ export function Counter() {
 These compile to the same kind of component. `@{ ... }` is optional in a `.tsrx`
 file, so use a normal function body when an early return or a non-JSX value reads
 better.
+
+Within JSX, a nested `@{ ... }` creates a child render scope at that sibling
+position. It can capture parent locals and use hooks whose state survives parent
+updates. Its final JSX node is optional, so a code-only block can run setup while
+rendering no element; an empty block disappears, and a render-only block is
+transparent grouping.
+
+```tsrx
+<section>
+	@{
+		const [count, setCount] = useState(0);
+		<button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>
+	}
+	@{
+		props.observe();
+	}
+</section>
+```
 
 <h2 id="rendered-control-flow">Branches and lists that read top to bottom</h2>
 
@@ -145,7 +169,7 @@ React.
 	<p className="doc-callout-title">The file extension does not change the framework</p>
 	<p>
 		{
-			'Both dialects use the same hooks, context, portals, Suspense, transitions, native events, SSR, and hydration. The Vite, Rspack, and Rsbuild integrations compile both, while octane/compiler/volar adds editor support for .tsrx.'
+			'Both dialects use the same hooks, context, portals, Suspense, transitions, native events, scoped <style> blocks, SSR, and hydration. The Vite, Rspack, and Rsbuild integrations compile both, while octane/compiler/volar adds editor support for .tsrx.'
 		}
 	</p>
 </aside>
@@ -162,14 +186,15 @@ keyed `.map()`.
 
 <code>.tsrx</code>
 {' files, install '}
-<a href="https://marketplace.visualstudio.com/items?itemName=Ripple-TS.ripple-ts-vscode-plugin">
-	{'TSRX for VS Code'}
+<a href="https://marketplace.visualstudio.com/items?itemName=TSRX.tsrx-vscode-plugin">
+	{'TSRX Syntax for VS Code'}
 </a>
 {'.'}
 
 <h2 id="next">Next</h2>
 
 - [Quick start](/docs/quick-start) — install, mount, and the `.tsrx` essentials.
+- [Styling](/docs/styling) — scoped `<style>` blocks, class maps, and `apply`.
 - [Build tools](/docs/build-tools) — Vite, Rspack, and Rsbuild integration.
 - [Core APIs](/docs/core-apis) — roots, hooks, boundaries, actions, and SSR.
 - [Differences from React](/docs/differences-from-react) — the deliberate

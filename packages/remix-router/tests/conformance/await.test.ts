@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createMemoryRouter } from '@octanejs/remix-router';
-import { mount, nextPaint } from '../_helpers';
+import { act, mount, nextPaint } from '../_helpers';
 import { App, ErrorProbe } from '../_fixtures/basic.tsrx';
 import { AwaitPage, AwaitRenderPropPage, AwaitNoErrorElementPage } from '../_fixtures/await.tsrx';
 import { createElement } from 'octane';
@@ -33,7 +33,7 @@ describe('<Await>', () => {
 		expect(r.find('.fallback').textContent).toBe('loading');
 		expect(r.findAll('.value').length).toBe(0);
 
-		resolve('hello');
+		await act(() => resolve('hello'));
 		await flush();
 		expect(r.findAll('.fallback').length).toBe(0);
 		expect(r.find('.value').textContent).toBe('got:hello');
@@ -49,8 +49,9 @@ describe('<Await>', () => {
 		await flush();
 		expect(r.find('.fallback').textContent).toBe('loading');
 
-		resolve('world');
+		await act(() => resolve('world'));
 		await flush();
+		expect(r.findAll('.fallback').length).toBe(0);
 		expect(r.find('.value').textContent).toBe('rp:world');
 		r.unmount();
 	});
@@ -64,7 +65,7 @@ describe('<Await>', () => {
 		await flush();
 		expect(r.find('.fallback').textContent).toBe('loading');
 
-		reject(new Error('oh no'));
+		await act(() => reject(new Error('oh no')));
 		await flush();
 		expect(r.findAll('.fallback').length).toBe(0);
 		expect(r.findAll('.value').length).toBe(0);
@@ -83,7 +84,7 @@ describe('<Await>', () => {
 		await flush();
 		expect(r.find('.fallback').textContent).toBe('loading');
 
-		reject(new Error('bubble'));
+		await act(() => reject(new Error('bubble')));
 		await flush();
 		expect(r.findAll('.fallback').length).toBe(0);
 		expect(r.find('.err').textContent).toBe('error:bubble');
@@ -108,8 +109,9 @@ describe('<Await>', () => {
 		await flush();
 		expect(r.find('.fallback').textContent).toBe('loading');
 
-		resolve(undefined);
+		await act(() => resolve(undefined));
 		await flush();
+		expect(r.findAll('.fallback').length).toBe(0);
 		expect(r.find('.value').textContent).toBe('got:undefined');
 		r.unmount();
 	});

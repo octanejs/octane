@@ -1,0 +1,50 @@
+diff --git a/tests/upstream/src/number-field/decrement/NumberFieldDecrement.test.tsx b/tests/upstream/src/number-field/decrement/NumberFieldDecrement.test.tsx
+--- a/tests/upstream/src/number-field/decrement/NumberFieldDecrement.test.tsx
++++ b/tests/upstream/src/number-field/decrement/NumberFieldDecrement.test.tsx
+@@ -371,7 +371,7 @@ describe('<NumberField.Decrement />', () => {
+ 
+     await act(() => input.focus());
+ 
+-    fireEvent.change(input, { target: { value: '100' } });
++    fireEvent.input(input, { target: { value: '100' } });
+     fireEvent.click(screen.getByRole('button'));
+ 
+     expect(input).toHaveValue('99');
+@@ -389,7 +389,7 @@ describe('<NumberField.Decrement />', () => {
+ 
+     await act(() => input.focus());
+ 
+-    fireEvent.change(input, { target: { value: '100' } });
++    fireEvent.input(input, { target: { value: '100' } });
+     fireEvent.pointerDown(screen.getByRole('button'));
+ 
+     expect(input).toHaveValue('99');
+@@ -472,12 +472,12 @@ describe('<NumberField.Decrement />', () => {
+ 
+       expect(screen.getByRole('textbox')).toHaveValue('1');
+ 
+-      fireEvent.change(screen.getByRole('textbox'), { target: { value: '1.9' } });
++      fireEvent.input(screen.getByRole('textbox'), { target: { value: '1.9' } });
+       fireEvent.click(button);
+ 
+       expect(screen.getByRole('textbox')).toHaveValue('1');
+ 
+-      fireEvent.change(screen.getByRole('textbox'), { target: { value: '-0.2' } });
++      fireEvent.input(screen.getByRole('textbox'), { target: { value: '-0.2' } });
+       fireEvent.click(button);
+ 
+       expect(screen.getByRole('textbox')).toHaveValue('-1');
+@@ -500,11 +500,11 @@ describe('<NumberField.Decrement />', () => {
+       fireEvent.click(button);
+       expect(input).toHaveValue('5');
+ 
+-      fireEvent.change(input, { target: { value: '9.112' } });
++      fireEvent.input(input, { target: { value: '9.112' } });
+       fireEvent.click(button);
+       expect(input).toHaveValue('9');
+ 
+-      fireEvent.change(input, { target: { value: '1.112' } });
++      fireEvent.input(input, { target: { value: '1.112' } });
+       fireEvent.click(button);
+       expect(input).toHaveValue('1');
+     });

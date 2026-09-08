@@ -22,6 +22,7 @@ import { createRequire } from 'node:module';
 import { join, relative } from 'node:path';
 import { encodePlaygroundHash } from '../src/lib/playground-hash.ts';
 import { PLAYGROUND_REACT_VERSION } from '../src/lib/playground-sandbox.ts';
+import { LYNX_EXAMPLES } from '../src/content/lynx-examples.ts';
 import {
 	getFreePort,
 	spawnServer as spawnServerIn,
@@ -64,7 +65,9 @@ const ROUTES = [
 	'/docs/lynx',
 	'/docs/react-compat',
 	'/docs/profiling',
+	'/docs/browser-support',
 	'/docs/bindings',
+	'/docs/bindings?q=TanStack%20Router&kind=binding#binding-tanstack-router',
 	'/errors',
 	'/errors/3?args%5B%5D=%22quoted%22',
 	'/benchmarks',
@@ -330,12 +333,210 @@ async function waitForLocatorText(
 	);
 }
 
+// Exercise the same sample selector after dev and production hydration. The
+// clipboard capture observes the public browser API without OS permissions.
+async function assertHomepageIntegrationSamples(baseUrl: string) {
+	const { page, errors } = await loadRoute(baseUrl, '/', {
+		// The sample is already visible in SSR HTML. Let the hydration entry's
+		// dynamic imports settle before the first single-shot interaction.
+		waitForNetworkIdle: true,
+		beforeNavigation: async (page) => {
+			await page.addInitScript(() => {
+				const writes: string[] = [];
+				Object.defineProperty(window, 'integrationClipboardWrites', { value: writes });
+				Object.defineProperty(navigator, 'clipboard', {
+					configurable: true,
+					value: {
+						writeText: async (text: string) => {
+							writes.push(text);
+						},
+					},
+				});
+			});
+		},
+	});
+	try {
+		const choices = page.getByRole('group', { name: 'React integration example' });
+		const reactInOctane = choices.getByRole('button', { name: 'React in Octane', exact: true });
+		const octaneInReact = choices.getByRole('button', { name: 'Octane in React', exact: true });
+		const panel = page.locator('#compat-example');
+		const code = panel.locator('pre code');
+		const copy = panel.getByRole('button', { name: 'Copy the selected integration sample' });
+		const copiedSamples: string[] = [];
+		const pollOptions = { timeout: PLAYWRIGHT_ACTION_TIMEOUT };
+
+		const readSelectedSample = async (reactSelected: boolean) => {
+			await expect
+				.poll(() => reactInOctane.getAttribute('aria-pressed'), pollOptions)
+				.toBe(String(reactSelected));
+			await expect
+				.poll(() => octaneInReact.getAttribute('aria-pressed'), pollOptions)
+				.toBe(String(!reactSelected));
+			await expect
+				.poll(() => panel.locator('.compat-code-name').innerText(), pollOptions)
+				.toBe(reactSelected ? 'App.tsrx' : 'App.tsx');
+			await code.waitFor({ state: 'visible' });
+			const visibleCode = await code.innerText();
+			expect(visibleCode).toContain(reactSelected ? '<ReactCompat>' : '<OctaneCompat>');
+			return visibleCode;
+		};
+		const copySelectedSample = async () => {
+			copiedSamples.push(await code.innerText());
+			await copy.click();
+			await expect
+				.poll(
+					() =>
+						page.evaluate(
+							() =>
+								(window as Window & { integrationClipboardWrites?: string[] })
+									.integrationClipboardWrites,
+						),
+					pollOptions,
+				)
+				.toEqual(copiedSamples);
+			await expect.poll(() => copy.innerText(), pollOptions).toBe('Copied');
+		};
+
+		// The hero's visible console line is emitted by its mount effect, so it
+		// proves this non-deferred homepage has committed instead of merely
+		// displaying server markup. Do not retry the copy or selection actions.
+		await expect
+			.poll(() => page.getByRole('log').innerText(), pollOptions)
+			.toContain('count is now 0');
+
+		const reactSample = await readSelectedSample(true);
+		await copySelectedSample();
+		await octaneInReact.click();
+		const octaneSample = await readSelectedSample(false);
+		expect(octaneSample).not.toBe(reactSample);
+		// Once the new code is visible, the old copy status must already be gone;
+		// waiting for it could accidentally accept the previous sample's timer.
+		expect(await copy.innerText()).toBe('Copy');
+		await copySelectedSample();
+
+		// Native buttons must activate from both keyboard gestures, not only a
+		// pointer click. Returning to a sample also starts with fresh copy status.
+		await reactInOctane.focus();
+		await page.keyboard.press('Enter');
+		expect(await readSelectedSample(true)).toBe(reactSample);
+		expect(await copy.innerText()).toBe('Copy');
+		await copySelectedSample();
+		await octaneInReact.focus();
+		await page.keyboard.press('Space');
+		expect(await readSelectedSample(false)).toBe(octaneSample);
+		expect(await copy.innerText()).toBe('Copy');
+		// Match the adjacent interactive homepage checks: browser resource-load
+		// diagnostics are separate from runtime, hydration, and page errors.
+		const real = errors.filter((error) => !error.startsWith('Failed to load resource:'));
+		expect(real).toEqual([]);
+	} finally {
+		await page.close();
+	}
+}
+
 // The end-to-end contract behind the compiler's exact-origin channel, run
 // against BOTH servers: the dev pipeline and the production build compile the
 // playground through different toolchains, and this has to hold on each.
 // Hovering a directive or clause keyword marks it in the SOURCE pane; clicking
 // additionally takes the compiled pane to the code it lowered to, favouring the
 // arm's implementation over the identifier that references it.
+/**
+ * Screen point of the `nth` occurrence of `word` in the playground's SOURCE
+ * pane (negative counts from the end). CodeMirror renders only the lines
+ * around its scroll position, so a keyword further down the source has no
+ * DOM node until the editor is scrolled there: sweep the scroller, record
+ * every rendered occurrence by its document-coordinate line top, scroll the
+ * chosen one into the middle of the editor, and read its node after the
+ * re-render. Scroll changes are applied in a DEFERRED measure phase, and a
+ * rect read in the same tick belongs to the PRE-scroll layout, so every
+ * scroll is followed by two animation frames before the DOM is read.
+ */
+async function locateSourceKeyword(page: import('playwright').Page, word: string, index = 0) {
+	return page.evaluate(
+		async ({ word, index }) => {
+			const content = document.querySelectorAll('.pg-editor .cm-content')[0] as
+				HTMLElement | undefined;
+			const scroller = content?.closest('.cm-scroller') as HTMLElement | null | undefined;
+			if (!content || !scroller) return null;
+			const settle = () =>
+				new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+			// `behavior: 'instant'` is load-bearing: the site sets
+			// `scroll-behavior: smooth` on <html> for readers who accept motion
+			// (headless Chromium is one), and an animating scroller is still
+			// moving frames later, so the rect would be measured mid-flight. It
+			// has to be `instant`, not `auto`: `auto` means "use the computed
+			// scroll-behavior", which is the smooth one.
+			content.closest('.cm-editor')?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+			const hits = () => {
+				const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+				const found: { node: Node; at: number; top: number }[] = [];
+				while (walker.nextNode()) {
+					const node = walker.currentNode;
+					const text = node.textContent!;
+					for (let at = text.indexOf(word); at !== -1; at = text.indexOf(word, at + 1)) {
+						const line = (node.parentElement as HTMLElement | null)?.closest('.cm-line');
+						const top =
+							(line?.getBoundingClientRect().top ?? 0) -
+							scroller.getBoundingClientRect().top +
+							scroller.scrollTop;
+						found.push({ node, at, top });
+					}
+				}
+				return found;
+			};
+			// CodeMirror re-renders the viewport in a measure phase after the
+			// scroll event, and a slow runner can take more than two frames to get
+			// there. Wait until the editor has painted a line inside the visible
+			// range at the new position before reading the DOM.
+			const rendered = async () => {
+				const visible = () => {
+					const box = scroller.getBoundingClientRect();
+					return Array.from(content.querySelectorAll('.cm-line')).some((line) => {
+						const rect = line.getBoundingClientRect();
+						return rect.bottom > box.top && rect.top < box.bottom;
+					});
+				};
+				for (let frame = 0; frame < 30; frame++) {
+					await settle();
+					if (visible()) return;
+				}
+			};
+			const occurrences = new Map<string, { top: number; at: number }>();
+			const step = Math.max(120, scroller.clientHeight * 0.5);
+			for (let y = 0; ; y += step) {
+				scroller.scrollTop = y;
+				await rendered();
+				for (const hit of hits()) {
+					occurrences.set(`${Math.round(hit.top)}:${hit.at}`, { top: hit.top, at: hit.at });
+				}
+				if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1) break;
+				if (scroller.scrollTop < y - 1) break;
+			}
+			const ordered = [...occurrences.values()].sort((a, b) => a.top - b.top || a.at - b.at);
+			const target = ordered.at(index);
+			if (!target) return null;
+			scroller.scrollTop = Math.max(0, target.top - scroller.clientHeight / 2);
+			await rendered();
+			let hit = hits().find(
+				(candidate) => Math.abs(candidate.top - target.top) < 2 && candidate.at === target.at,
+			);
+			for (let frame = 0; !hit && frame < 30; frame++) {
+				await settle();
+				hit = hits().find(
+					(candidate) => Math.abs(candidate.top - target.top) < 2 && candidate.at === target.at,
+				);
+			}
+			if (!hit) return null;
+			const range = document.createRange();
+			range.setStart(hit.node, hit.at + 1);
+			range.setEnd(hit.node, hit.at + 2);
+			const rect = range.getBoundingClientRect();
+			return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+		},
+		{ word, index },
+	);
+}
+
 async function assertControlFlowKeywordMapping(baseUrl: string) {
 	// The end-to-end contract behind the compiler's exact-origin channel:
 	// hovering a directive or clause keyword in the source lights up the code
@@ -358,53 +559,14 @@ async function assertControlFlowKeywordMapping(baseUrl: string) {
 		// that introduces its own directives in a prose comment mentions each
 		// one before using it, and a comment is correctly unmapped.
 		const probeKeyword = async (keyword: string, action: 'hover' | 'click', nth = 0) => {
-			const point = await page.evaluate(
-				async ({ word, index }) => {
-					const find = () => {
-						const content = document.querySelectorAll('.pg-editor .cm-content')[0];
-						const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-						const hits: { node: Node; at: number }[] = [];
-						while (walker.nextNode()) {
-							const node = walker.currentNode;
-							const at = node.textContent!.indexOf(word);
-							if (at !== -1) hits.push({ node, at });
-						}
-						return hits.at(index) ?? null;
-					};
-					const found = find();
-					if (!found) return null;
-					// CodeMirror renders only around its scroll position, so bring the
-					// keyword into view — then let the scroll settle. CodeMirror
-					// applies it in a DEFERRED measure phase, and a rect read in the
-					// same tick belongs to the PRE-scroll layout, which puts the
-					// pointer on whatever line has since moved into that spot.
-					//
-					// `behavior: 'instant'` is load-bearing: the site sets
-					// `scroll-behavior: smooth` on <html> for readers who accept
-					// motion (headless Chromium is one), scrollIntoView scrolls EVERY
-					// ancestor scroller it touches, and an animating one is still
-					// moving frames later — so the rect would be measured mid-flight.
-					// It has to be `instant`, not `auto`: `auto` means "use the
-					// computed scroll-behavior", which is the smooth one.
-					(found.node.parentElement as HTMLElement)?.scrollIntoView({
-						block: 'center',
-						behavior: 'instant',
-					});
-					await new Promise((resolve) =>
-						requestAnimationFrame(() => requestAnimationFrame(resolve)),
-					);
-					// Re-find after the flush: the re-render replaces the nodes the
-					// first walk held.
-					const hit = find();
-					if (!hit) return null;
-					const range = document.createRange();
-					range.setStart(hit.node, hit.at + 1);
-					range.setEnd(hit.node, hit.at + 2);
-					const rect = range.getBoundingClientRect();
-					return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-				},
-				{ word: keyword, index: nth },
-			);
+			let point = await locateSourceKeyword(page, keyword, nth);
+			// Under concurrent browser load, a CodeMirror measure can remain
+			// pending for an entire virtualized sweep. Repeat the bounded sweep so
+			// the assertion below still distinguishes a delayed viewport from a
+			// genuinely absent source token.
+			for (let attempt = 1; point === null && attempt < 3; attempt++) {
+				point = await locateSourceKeyword(page, keyword, nth);
+			}
 			if (!point) return null;
 			const before = await page.evaluate(
 				() =>
@@ -835,6 +997,52 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 	);
 
 	it.concurrent(
+		'keeps command-palette results readable in a constrained viewport',
+		{ timeout: 30_000 },
+		async () => {
+			const context = await browser.newContext({ viewport: { width: 746, height: 374 } });
+			const page = await context.newPage();
+			const errors: string[] = [];
+			page.on('console', (message) => {
+				if (message.type() === 'error') errors.push(message.text());
+			});
+			page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+			try {
+				await page.goto(`http://localhost:${DEV_PORT}/docs/bindings`, {
+					waitUntil: 'networkidle',
+				});
+				await page.keyboard.press('Control+K');
+				await page.locator('.search-input').fill('tanstack');
+				const firstResult = page.locator('.search-entity').first();
+				await firstResult.waitFor();
+
+				const geometry = await firstResult.evaluate((card) => {
+					const cardBox = card.getBoundingClientRect();
+					const contentBox = card.querySelector('.search-entity-primary')!.getBoundingClientRect();
+					const board = card.parentElement!;
+					return {
+						boardIsScrollable: board.scrollHeight > board.clientHeight,
+						cardBottom: cardBox.bottom,
+						contentBottom: contentBox.bottom,
+					};
+				});
+
+				expect(geometry.boardIsScrollable).toBe(true);
+				expect(geometry.cardBottom).toBeGreaterThanOrEqual(geometry.contentBottom);
+				expect(errors.filter((error) => !error.includes('Failed to load resource'))).toEqual([]);
+			} finally {
+				await context.close();
+			}
+		},
+	);
+
+	it.concurrent(
+		'the homepage selects and copies the active React integration sample by pointer and keyboard',
+		{ timeout: 45_000 },
+		() => assertHomepageIntegrationSamples(`http://localhost:${DEV_PORT}`),
+	);
+
+	it.concurrent(
 		'the homepage benchmark explorer preserves its complete SSR view through hydration',
 		async () => {
 			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/');
@@ -875,7 +1083,17 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 					),
 				}));
 
-				await page.waitForTimeout(750);
+				// Capture the server node and geometry above, then wait for the client
+				// module graph and hydration commit before exercising delegated events.
+				await page.waitForLoadState('networkidle');
+				await page.waitForFunction(
+					() =>
+						new Promise<boolean>((resolve) =>
+							requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))),
+						),
+					null,
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+				);
 
 				expect(await page.locator('.recharts-wrapper').count()).toBe(0);
 				expect(await page.locator('.bench-plot-shell').count()).toBe(0);
@@ -1498,6 +1716,17 @@ describe(
 			expect(serverFallbackIndex).toBeGreaterThan(filesystemIndex);
 			expect(existsSync(join(outputDir, 'static/playground-runtime.json'))).toBe(true);
 			expect(existsSync(join(outputDir, 'functions/__server.func/index.mjs'))).toBe(true);
+			for (const asset of [
+				'lynx-runtime/static/js/client.js',
+				'lynx-runtime/static/css/client.css',
+				...LYNX_EXAMPLES.flatMap(({ id, entry }) => [
+					`lynx-examples/${id}/example-metadata.json`,
+					`lynx-examples/${id}/example-source.json`,
+					`lynx-examples/${id}/dist/${entry}.web.bundle`,
+				]),
+			]) {
+				expect(existsSync(join(outputDir, 'static', asset)), asset).toBe(true);
+			}
 
 			const functionConfig = JSON.parse(
 				readFileSync(join(outputDir, 'functions/__server.func/.vc-config.json'), 'utf8'),
@@ -1514,6 +1743,63 @@ describe(
 				try {
 					expect(errors).toEqual([]);
 					expect(main.length).toBeGreaterThan(0);
+				} finally {
+					await page.close();
+				}
+			},
+		);
+
+		it.concurrent(
+			'the homepage selects and copies the active React integration sample by pointer and keyboard',
+			{ timeout: 45_000 },
+			() => assertHomepageIntegrationSamples(PREVIEW_ORIGIN),
+		);
+
+		it.concurrent(
+			'ecosystem directory preserves filter edits through browser history',
+			{ timeout: 30_000 },
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/docs/bindings', {
+					waitForNetworkIdle: true,
+				});
+				try {
+					const kind = page.locator('#ecosystem-kind');
+					const category = page.locator('#ecosystem-category');
+					const initialHistoryLength = await page.evaluate(() => history.length);
+					await kind.selectOption('binding');
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(await page.evaluate(() => history.length)).toBe(initialHistoryLength + 1);
+					await category.selectOption('state-management');
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('category') === 'state-management',
+					);
+					expect(await page.evaluate(() => history.length)).toBe(initialHistoryLength + 2);
+					expect(await page.locator('#binding-zustand').count()).toBe(1);
+
+					await page.goBack();
+					await page.waitForFunction(() => !new URL(location.href).searchParams.has('category'));
+					expect(await kind.inputValue()).toBe('binding');
+					expect(await category.inputValue()).toBe('');
+
+					await page.goBack();
+					await page.waitForFunction(() => !new URL(location.href).searchParams.has('kind'));
+					expect(await kind.inputValue()).toBe('');
+
+					await page.goForward();
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(await kind.inputValue()).toBe('binding');
+
+					await page.getByRole('button', { name: 'Reset search and filters' }).click();
+					await page.waitForFunction(() => new URL(location.href).search === '');
+					await page.goBack();
+					await page.waitForFunction(
+						() => new URL(location.href).searchParams.get('kind') === 'binding',
+					);
+					expect(errors).toEqual([]);
 				} finally {
 					await page.close();
 				}
@@ -2093,32 +2379,7 @@ describe(
 									?.querySelectorAll('.cm-mapped') ?? [],
 							).map((mark) => mark.textContent),
 						);
-					const point = await page.evaluate(async () => {
-						const find = () => {
-							const content = document.querySelectorAll('.pg-editor .cm-content')[0];
-							const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-							while (walker.nextNode()) {
-								const at = walker.currentNode.textContent!.indexOf('@if');
-								if (at !== -1) return { node: walker.currentNode, at };
-							}
-							return null;
-						};
-						if (!find()) return null;
-						(find()!.node.parentElement as HTMLElement)?.scrollIntoView({
-							block: 'center',
-							behavior: 'instant',
-						});
-						await new Promise((resolve) =>
-							requestAnimationFrame(() => requestAnimationFrame(resolve)),
-						);
-						const hit = find();
-						if (!hit) return null;
-						const range = document.createRange();
-						range.setStart(hit.node, hit.at + 1);
-						range.setEnd(hit.node, hit.at + 2);
-						const rect = range.getBoundingClientRect();
-						return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-					});
+					const point = await locateSourceKeyword(page, '@if');
 					expect(point, '@if not found in the source pane').not.toBeNull();
 
 					await page.mouse.move(0, 0);
@@ -2363,6 +2624,72 @@ describe(
 					await preview
 						.getByRole('button', { name: 'clicks: 4' })
 						.waitFor({ timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			90_000,
+		);
+
+		it.concurrent(
+			'playground runs the ReactCompat Octane-host example end to end',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground', {
+					beforeNavigation: installReactCdnMirror,
+				});
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.selectOption('.pg-select', 'react-compat');
+					await page.locator('.pg-tab', { hasText: 'Counter.react.tsx' }).waitFor();
+					const preview = page.frameLocator('iframe[title="Playground preview"]');
+					await preview.locator('h3', { hasText: 'React island' }).waitFor({ timeout: 30_000 });
+					const note = preview.getByRole('textbox', { name: 'React note' });
+					const originalInput = await note.elementHandle();
+					expect(originalInput).not.toBeNull();
+					await note.fill('kept by React');
+					await preview.getByRole('button', { name: 'React count: 3', exact: true }).click();
+					await waitForLocatorText(preview.locator('.reported'), 'React reported: 4');
+
+					// Host updates carry new props without losing the React state or DOM.
+					await preview.getByRole('button', { name: 'Rename React counter', exact: true }).click();
+					await preview.getByRole('button', { name: 'Renamed count: 4', exact: true }).waitFor();
+					await preview.getByRole('button', { name: 'Next initial count: 3', exact: true }).click();
+					await preview
+						.getByRole('button', { name: 'Next initial count: 4', exact: true })
+						.waitFor();
+					expect(await note.inputValue()).toBe('kept by React');
+					expect(
+						await originalInput!.evaluate(
+							(node) => node === document.querySelector('[aria-label="React note"]'),
+						),
+					).toBe(true);
+
+					// A React 19 ref is usable from the Octane host.
+					await preview.getByRole('button', { name: 'Focus React input', exact: true }).click();
+					expect(await originalInput!.evaluate((node) => node === document.activeElement)).toBe(
+						true,
+					);
+
+					// React-local Suspense leaves the surrounding Octane app interactive.
+					await preview.getByRole('button', { name: 'Load React data', exact: true }).click();
+					await waitForLocatorText(preview.getByRole('status'), 'React loading…');
+					await preview.getByRole('button', { name: 'Rename React counter', exact: true }).click();
+					await preview.getByRole('button', { name: 'React count: 4', exact: true }).waitFor();
+					await waitForLocatorText(preview.getByRole('status'), 'React data ready');
+
+					// Real deletion resets React state on the next mount and reconnects the ref.
+					await preview.getByRole('button', { name: 'Unmount React island', exact: true }).click();
+					await note.waitFor({ state: 'detached' });
+					await preview.getByRole('button', { name: 'Next initial count: 4', exact: true }).click();
+					await preview.getByRole('button', { name: 'Mount React island', exact: true }).click();
+					await preview.getByRole('button', { name: 'React count: 5', exact: true }).waitFor();
+					expect(await note.inputValue()).toBe('React-owned input');
+					await waitForLocatorText(preview.getByRole('status'), 'No request yet');
+					await preview.getByRole('button', { name: 'Focus React input', exact: true }).click();
+					expect(await note.evaluate((node) => node === document.activeElement)).toBe(true);
+					expect(await originalInput!.evaluate((node) => node.isConnected)).toBe(false);
+					await originalInput!.dispose();
 					expect(errors).toEqual([]);
 				} finally {
 					await page.close();

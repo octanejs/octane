@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import * as ServerRuntime from 'octane/server';
+import { prerender } from 'octane/static';
 import { compile } from '../src/compiler/compile.js';
 import { createContext, createElement, flushSync, hydrateRoot } from '../src/index.js';
 import { act, flushEffects, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { AutoMemoApp } from './_fixtures/auto-memo.tsrx';
+import { CompilerNameCollisionApp } from './_fixtures/auto-memo-name-collisions.tsrx';
 import { ParentCaptureApp } from './_fixtures/auto-memo-parent-capture.tsrx';
 import {
 	TsxAutoMemoApp,
@@ -27,7 +29,7 @@ function expectCompilerRegion(code: string): void {
 	// Dependencies are snapshotted into temporaries once per render; the guard
 	// compares and publishes those exact values.
 	expect(code).toMatch(/const __memoDep[\w$]* = \(?[^;]+\)?;/);
-	expect(code).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*/);
+	expect(code).toMatch(/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)/);
 	expect(code).toMatch(
 		/if \(__memoCache[\w$]* === __memoCommitted[\w$]*\) __memoCache[\w$]* = __memoCache[\w$]*\.slice\(\);/,
 	);
@@ -1458,6 +1460,9 @@ describe('compiler-owned component-region memoization', () => {
 	it('preserves dependency, context, child-state, and custom-comparator behavior', () => {
 		const root = mount(AutoMemoApp);
 		const initialOpaqueVersion = trailingVersion(root.find('.opaque').textContent);
+		const initialTransitiveVersion = trailingVersion(
+			root.find('#auto-transitive-live').textContent,
+		);
 		expect(root.find('.own-1').textContent).toBe('t0:a:0');
 		// The destructured-param twin renders through the same cached-region
 		// machinery and must be behaviorally indistinguishable from the
@@ -1473,6 +1478,9 @@ describe('compiler-owned component-region memoization', () => {
 		expect(trailingVersion(root.find('.custom').textContent)).toBe(initialOpaqueVersion + 1);
 		expect(trailingVersion(root.find('.returned-opaque-a').textContent)).toBe(
 			initialOpaqueVersion + 1,
+		);
+		expect(trailingVersion(root.find('#auto-transitive-live').textContent)).toBe(
+			initialTransitiveVersion + 1,
 		);
 
 		root.click('.own-1');
@@ -2781,7 +2789,7 @@ describe('compiler-owned component-region memoization', () => {
 		},
 	);
 
-	it('preserves promise-valued children from async map callbacks', () => {
+	it('preserves promise-valued children from async map callbacks', async () => {
 		const source = `
 			import { Suspense } from 'octane';
 			function AsyncMapApp(props) {
@@ -2808,10 +2816,16 @@ describe('compiler-owned component-region memoization', () => {
 			mode: 'client',
 			compileOptions: { hmr: false, dev: false },
 		});
-		expect(() => mount(client.App, { rows, onItem })).toThrow(
-			/Objects are not valid as an Octane child.*\[object Promise\]/,
-		);
-		expect(events).toEqual(['callback:1']);
+		const rendered = mount(client.App, { rows, onItem });
+		try {
+			expect(rendered.container.textContent).toBe('pending');
+			expect(events).toEqual(['callback:1']);
+			await act(async () => {});
+			expect(rendered.find('li').textContent).toBe('first');
+			expect(rendered.find('li').getAttribute('data-callback')).toBe('1');
+		} finally {
+			rendered.unmount();
+		}
 
 		events.length = 0;
 		const server = loadCompiledFixtureSource(source, {
@@ -2819,10 +2833,12 @@ describe('compiler-owned component-region memoization', () => {
 			mode: 'server',
 			compileOptions: { hmr: false, dev: false },
 		});
-		expect(() => ServerRuntime.renderToString(server.App, { rows, onItem })).toThrow(
-			/Objects are not valid as an Octane child.*\[object Promise\]/,
-		);
-		expect(events).toEqual(['callback:1']);
+		const result = await prerender(server.App, { rows, onItem });
+		const container = document.createElement('div');
+		container.innerHTML = result.html;
+		expect(container.querySelector('li')?.textContent).toBe('first');
+		expect(container.querySelector('li')?.getAttribute('data-callback')).toBe('1');
+		expect(events.length).toBeGreaterThan(0);
 	});
 
 	it.each([
@@ -4649,10 +4665,10 @@ describe('compiler-owned component-region memoization', () => {
 		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(?props\.label\)?;/);
 		expect(defaultBuild).not.toMatch(/const __memoDep[\w$]* = \(?props\)?;/);
 		expect(defaultBuild).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
 		);
 		expect(defaultBuild).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot\([^;]*, Returned,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot\([^;]*, Returned,/,
 		);
 		expectNoCompilerRegion(optedOut);
 		expectNoCompilerRegion(hmrBuild);
@@ -4670,7 +4686,7 @@ describe('compiler-owned component-region memoization', () => {
 		expectCompilerRegion(typed);
 		expect(typed).toContain('componentSlotVoid as');
 		expect(typed).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlotVoid\([^;]*, Child,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotVoid\([^;]*, Child,/,
 		);
 		expect(typed).not.toMatch(/const __memoDep[\w$]* = \(?Foo\)?;/);
 
@@ -4699,7 +4715,7 @@ describe('compiler-owned component-region memoization', () => {
 		expect(nestedDefaultMemo).toContain('componentSlotVoid as');
 		expect(nestedDefaultMemo).toContain('compilerCacheContext as');
 		expect(nestedDefaultMemo).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
 		);
 
 		const nestedCustomMemo = compile(
@@ -4724,6 +4740,130 @@ describe('compiler-owned component-region memoization', () => {
 		expect(transitiveCapture.match(/const __memoDep[\w$]* = \(?live\)?;/g)).toHaveLength(2);
 	});
 
+	it('classifies stable hookful dependency graphs independently of declaration order', () => {
+		const compileGraph = (
+			declarations: string,
+			root = 'StableParent',
+			privateLets = 'leafSetter',
+		) =>
+			compile(
+				`import { useState } from 'octane';
+				 import { live } from './live';
+				 let ${privateLets
+						.split(',')
+						.map((name) => `${name} = null`)
+						.join(', ')};
+				 ${declarations}
+				 function StableProbe() @{
+					const [tick, setTick] = useState(0);
+					<section><${root} /></section>
+				 }
+				 export function App() @{ <StableProbe /> }`,
+				'auto-memo-stable-hookful-graph.tsrx',
+				{ hmr: false, dev: false, autoMemo: true },
+			).code;
+		const graphSummary = (code: string, publications: string[]) => ({
+			captures: code.match(/const __memoDep[\w$]* = \(?live\)?;/g)?.length ?? 0,
+			publications: publications.reduce(
+				(count, publication) =>
+					count + (code.match(new RegExp(`!== ${publication}\\b`, 'g'))?.length ?? 0),
+				0,
+			),
+		});
+		const leaf = `function StableLeaf() @{
+			const [value, setValue] = useState(0);
+			leafSetter = setValue;
+			<span>{live + value as string}</span>
+		}`;
+		const parent = `function StableParent() @{ <StableLeaf /> }`;
+
+		expect(graphSummary(compileGraph(`${leaf}\n${parent}`), ['leafSetter'])).toEqual({
+			captures: 1,
+			publications: 1,
+		});
+		expect(graphSummary(compileGraph(`${parent}\n${leaf}`), ['leafSetter'])).toEqual({
+			captures: 1,
+			publications: 1,
+		});
+
+		const cycle = compileGraph(
+			`function CycleA() @{
+				const [value, setValue] = useState(0);
+				leafSetter = setValue;
+				<><CycleB /><span>{live + value as string}</span></>
+			 }
+			 function CycleB() @{ <><CycleA /><CycleA /></> }`,
+			'CycleB',
+		);
+		expect(graphSummary(cycle, ['leafSetter'])).toEqual({
+			captures: 2,
+			publications: 2,
+		});
+
+		const publicationGraph = (count: number) => {
+			const names = Array.from({ length: count }, (_, index) => `setter${index}`);
+			const leaves = names
+				.map(
+					(name, index) => `function PublicationLeaf${index}() @{
+						const [value, setValue] = useState(0);
+						${name} = setValue;
+						<span>{live + value as string}</span>
+					}`,
+				)
+				.join('\n');
+			const calls = names.map((_, index) => `<PublicationLeaf${index} />`).join('');
+			return {
+				code: compileGraph(
+					`${leaves}\nfunction PublicationParent() @{ <>${calls}</> }`,
+					'PublicationParent',
+					names.join(','),
+				),
+				names,
+			};
+		};
+		const atLimit = publicationGraph(16);
+		const aboveLimit = publicationGraph(17);
+		expect(graphSummary(atLimit.code, atLimit.names)).toEqual({
+			captures: 1,
+			publications: 16,
+		});
+		expect(graphSummary(aboveLimit.code, aboveLimit.names)).toEqual({
+			captures: 0,
+			publications: 0,
+		});
+	});
+
+	it('preserves authored locals that overlap compiler-generated names', () => {
+		const selections: string[] = [];
+		const root = mount(CompilerNameCollisionApp, {
+			first: 1,
+			second: 2,
+			third: 3,
+			fourth: 4,
+			fifth: 5,
+			sixth: 6,
+			onSelect: () => selections.push('selected'),
+		});
+
+		expect(root.find('#compiler-name-collision-total').textContent).toBe('21');
+		root.click('#compiler-name-collision');
+		expect(selections).toEqual(['selected']);
+
+		root.update(CompilerNameCollisionApp, {
+			first: 2,
+			second: 3,
+			third: 4,
+			fourth: 5,
+			fifth: 6,
+			sixth: 7,
+			onSelect: () => selections.push('updated'),
+		});
+		expect(root.find('#compiler-name-collision-total').textContent).toBe('27');
+		root.click('#compiler-name-collision');
+		expect(selections).toEqual(['selected', 'updated']);
+		root.unmount();
+	});
+
 	it('memoizes destructured-props callees while pattern-evaluating shapes fall back', () => {
 		// A destructuring param is the same one-props snapshot as `(props)`,
 		// read once at entry, so these callees earn the region cache.
@@ -4740,7 +4880,9 @@ describe('compiler-owned component-region memoization', () => {
 				{ hmr: false, autoMemo: true },
 			).code;
 			expectCompilerRegion(code);
-			expect(code).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot/);
+			expect(code).toMatch(
+				/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot/,
+			);
 		}
 
 		// Patterns that evaluate expressions of their own (defaults, computed
@@ -4785,7 +4927,7 @@ describe('compiler-owned component-region memoization', () => {
 		).code;
 		expectCompilerRegion(unrelatedRefRead);
 		expect(unrelatedRefRead).toMatch(
-			/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot[\w$]*\([^;]*, Child,/,
+			/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot[\w$]*\([^;]*, Child,/,
 		);
 
 		// Laundering the read through locals — directly, transitively, or via a
@@ -4912,7 +5054,7 @@ describe('compiler-owned component-region memoization', () => {
 			{ hmr: false, autoMemo: true },
 		).code;
 		expect(tsxCode).toContain('__memoCommitted');
-		expect(tsxCode).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*/);
+		expect(tsxCode).toMatch(/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)/);
 
 		const rejected = [
 			// A component-tag spread nested in the callee body…
@@ -5064,13 +5206,13 @@ describe('compiler-owned component-region memoization', () => {
 				autoMemo: true,
 			}).code;
 			expect(
-				/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Clean,/.test(
+				/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Clean,/.test(
 					code,
 				),
 				`${order}: the component reading no import should memoize`,
 			).toBe(true);
 			expect(
-				/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Dirty,/.test(
+				/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Dirty,/.test(
 					code,
 				),
 				`${order}: the component reading an imported member should not memoize`,

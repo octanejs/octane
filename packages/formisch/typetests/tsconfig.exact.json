@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "skipLibCheck": false,
+    "types": ["node"],
+    "noEmit": true,
+    "noErrorTruncation": true
+  },
+  "include": ["./upstream/packages/core/**/*.test-d.ts"]
+}

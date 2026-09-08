@@ -1,0 +1,249 @@
+import type { CSSProperties, HTMLAttributes, Ref } from "react";
+
+export type PanelSize = {
+  asPercentage: number;
+  inPixels: number;
+};
+
+export type GroupResizeBehavior =
+  | "preserve-relative-size"
+  | "preserve-pixel-size";
+
+/**
+ * Numeric Panel constraints are represented as numeric percentages (0..100)
+ * Values specified using other CSS units must be pre-converted.
+ */
+export type PanelConstraints = {
+  collapsedSize: number;
+  collapsible: boolean;
+  defaultSize: number | undefined;
+  disabled: boolean | undefined;
+  groupResizeBehavior?: GroupResizeBehavior | undefined;
+  maxSize: number;
+  minSize: number;
+  panelId: string;
+};
+
+export type SizeUnit = "px" | "%" | "em" | "rem" | "vh" | "vw";
+
+export type RegisteredPanel = {
+  id: string;
+  idIsStable: boolean;
+  element: HTMLDivElement;
+  mutableValues: {
+    expandToSize: number | undefined;
+    prevSize: PanelSize | undefined;
+  };
+  onResize: OnPanelResize | undefined;
+  panelConstraints: PanelConstraintProps;
+};
+
+/**
+ * Imperative Panel API
+ *
+ * ℹ️ The `usePanelRef` and `usePanelCallbackRef` hooks are exported for convenience use in TypeScript projects.
+ */
+export interface PanelImperativeHandle {
+  /**
+   * Collapse the Panel to it's `collapsedSize`.
+   *
+   * ⚠️ This method will do nothing if the Panel is not `collapsible` or if it is already collapsed.
+   */
+  collapse: () => void;
+
+  /**
+   * Expand a collapsed Panel to its most recent size.
+   *
+   * ⚠️ This method will do nothing if the Panel is not currently collapsed.
+   */
+  expand: () => void;
+
+  /**
+   * Get the current size of the Panel in pixels as well as a percentage of the parent group (0..100).
+   *
+   * @return Panel size (in pixels and as a percentage of the parent group)
+   */
+  getSize: () => {
+    asPercentage: number;
+    inPixels: number;
+  };
+
+  /**
+   * The Panel is currently collapsed.
+   */
+  isCollapsed: () => boolean;
+
+  /**
+   * Update the Panel's size.
+   *
+   * Size can be in the following formats:
+   * - Percentage of the parent Group (0..100)
+   * - Pixels
+   * - Relative font units (em, rem)
+   * - Viewport relative units (vh, vw)
+   *
+   * ℹ️ Numeric values are assumed to be pixels.
+   * Strings without explicit units are assumed to be percentages (0%..100%).
+   * Percentages may also be specified as strings ending with "%" (e.g. "33%")
+   * Pixels may also be specified as strings ending with the unit "px".
+   * Other units should be specified as strings ending with their CSS property units (e.g. 1rem, 50vh)
+   *
+   * @param size New panel size
+   * @return Applied size (after validation)
+   */
+  resize: (size: number | string) => void;
+}
+
+type BasePanelAttributes = Omit<HTMLAttributes<HTMLDivElement>, "onResize">;
+
+export type PanelProps = BasePanelAttributes & {
+  /**
+   * CSS class name.
+   *
+   * ⚠️ Class is applied to nested `HTMLDivElement` to avoid styles that interfere with Flex layout.
+   */
+  className?: string | undefined;
+
+  /**
+   * Panel size when collapsed; defaults to 0%.
+   */
+  collapsedSize?: number | string | undefined;
+
+  /**
+   * This panel can be collapsed.
+   *
+   * ℹ️ A collapsible panel will collapse when it's size is less than of the specified `minSize`
+   */
+  collapsible?: boolean | undefined;
+
+  /**
+   * Default size of Panel within its parent group; default is auto-assigned based on the total number of Panels.
+   *
+   * ℹ️ Interpretation rules:
+   * - Numbers are interpreted as pixels (e.g. `defaultSize={200}` is 200 pixels)
+   * - Strings without explicit units are interpreted as percentage (e.g. `defaultSize="50"` is 50 percent)
+   * - Use explicit units (e.g. "px", "%", "em", "rem", "vh", or "vw") to change interpretation
+   *
+   * ⚠️ Percentage based sizes may cause slight layout shift when server-rendering.
+   * For more information see the documentation.
+   */
+  defaultSize?: number | string | undefined;
+
+  /**
+   * When disabled, a panel cannot be resized either directly or indirectly (by resizing another panel).
+   */
+  disabled?: boolean | undefined;
+
+  /**
+   * Ref attached to the root `HTMLDivElement`.
+   */
+  elementRef?: Ref<HTMLDivElement | null> | undefined;
+
+  /**
+   * How should this Panel behave if the parent Group is resized?
+   * Defaults to `preserve-relative-size`.
+   *
+   * - `preserve-relative-size`: Retain the current relative size (as a percentage of the Group)
+   * - `preserve-pixel-size`: Retain its current size (in pixels)
+   *
+   * ℹ️ Panel min/max size constraints may impact this behavior.
+   *
+   * ⚠️ A Group must contain at least one Panel with `preserve-relative-size` resize behavior.
+   */
+  groupResizeBehavior?:
+    | "preserve-relative-size"
+    | "preserve-pixel-size"
+    | undefined;
+
+  /**
+   * Uniquely identifies this panel within the parent group.
+   * Falls back to `useId` when not provided.
+   *
+   * ℹ️ This prop is used to associate persisted group layouts with the original panel.
+   *
+   * ℹ️ This value will also be assigned to the `data-panel` attribute.
+   */
+  id?: string | number | undefined;
+
+  /**
+   * Maximum size of Panel within its parent group; defaults to `"100%"`.
+   *
+   * ℹ️ Interpretation rules:
+   * - Numbers are interpreted as pixels (e.g. `maxSize={200}` is 200 pixels)
+   * - Strings without explicit units are interpreted as percentage (e.g. `maxSize="50"` is 50 percent)
+   * - Use explicit units (e.g. "px", "%", "em", "rem", "vh", or "vw") to change interpretation
+   */
+  maxSize?: number | string | undefined;
+
+  /**
+   * Minimum size of Panel within its parent group; defaults to 0%.
+   *
+   * ℹ️ Interpretation rules:
+   * - Numbers are interpreted as pixels (e.g. `minSize={200}` is 200 pixels)
+   * - Strings without explicit units are interpreted as percentage (e.g. `minSize="50"` is 50 percent)
+   * - Use explicit units (e.g. "px", "%", "em", "rem", "vh", or "vw") to change interpretation
+   */
+  minSize?: number | string | undefined;
+
+  /**
+   * Called when panel sizes change.
+   *
+   * @param panelSize Panel size (both as a percentage of the parent Group and in pixels)
+   * @param id Panel id (if one was provided as a prop)
+   * @param prevPanelSize Previous panel size (will be undefined on mount)
+   */
+  onResize?:
+    | ((
+        panelSize: PanelSize,
+        id: string | number | undefined,
+        prevPanelSize: PanelSize | undefined
+      ) => void)
+    | undefined;
+
+  /**
+   * Exposes the following imperative API:
+   * - `collapse(): void`
+   * - `expand(): void`
+   * - `getSize(): number`
+   * - `isCollapsed(): boolean`
+   * - `resize(size: number): void`
+   *
+   * ℹ️ The `usePanelRef` and `usePanelCallbackRef` hooks are exported for convenience use in TypeScript projects.
+   */
+  panelRef?: Ref<PanelImperativeHandle | null> | undefined;
+
+  /**
+   * CSS properties.
+   *
+   * ⚠️ Style is applied to nested `HTMLDivElement` to avoid styles that interfere with Flex layout.
+   */
+  style?: CSSProperties | undefined;
+};
+
+export type OnPanelResize = PanelProps["onResize"];
+
+/**
+ * Size constraints may be specified in a variety of ways:
+ * - Percentage of the parent Group (0..100)
+ * - Pixels
+ * - Relative font units (em, rem)
+ * - Viewport relative units (vh, vw)
+ *
+ * Numeric values are assumed to be pixels.
+ * Strings without explicit units are assumed to be percentages (0%..100%).
+ *
+ * Percentages may also be specified as strings ending with "%" (e.g. "33%")
+ * Pixels may also be specified as strings ending with the unit "px".
+ *
+ * Other units should be specified as strings ending with their CSS property units (e.g. 1rem, 50vh)
+ */
+export type PanelConstraintProps = Pick<
+  PanelProps,
+  | "collapsedSize"
+  | "collapsible"
+  | "defaultSize"
+  | "disabled"
+  | "groupResizeBehavior"
+  | "maxSize"
+  | "minSize"
+>;

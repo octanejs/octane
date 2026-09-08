@@ -1,0 +1,247 @@
+{
+  "mode": "supplemental-canonical-generators",
+  "notLockedWorkspace": true,
+  "node": "v26.4.0",
+  "nodeExecutable": "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+  "sync": {
+    "report": "/private/tmp/octane-pr877-sync-generators-fbMss0/result.json",
+    "reportSha256": "2bc79825d1ff4d33d1fe6721fcc1cc6bc76d712aaa2949076db1706426f4ab27",
+    "sourceManifest": "/private/tmp/octane-pr877-sync-generators-fbMss0/final-source-manifest.json",
+    "sourceManifestSha256": "f8f5e201f267e60e0e24706316742ee525a96eb790488717b2c163e309c44907",
+    "sourceFileCount": 1686,
+    "packageDirectoryCount": 113,
+    "physicalSourceTsrxPaths": 855,
+    "sourceChangedDuringRun": [],
+    "unexpectedStagedChanges": [],
+    "commands": [
+      {
+        "script": "cli:data",
+        "args": [
+          "--import",
+          "/private/tmp/octane-pr877-sync-generators-fbMss0/record-loads.mjs",
+          "--import",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+          "scripts/generate-cli-data.mjs"
+        ],
+        "cwd": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository",
+        "exitCode": 0,
+        "result": "/private/tmp/octane-pr877-sync-generators-fbMss0/01-cli-data/result.json",
+        "resultSha256": "c16d8d787b4c35cd5a59b596fdd588a33ad1daef5280c4334a7383ea9532dc86"
+      },
+      {
+        "script": "cli:data:check",
+        "args": [
+          "--import",
+          "/private/tmp/octane-pr877-sync-generators-fbMss0/record-loads.mjs",
+          "--import",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+          "scripts/generate-cli-data.mjs",
+          "--check"
+        ],
+        "cwd": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository",
+        "exitCode": 0,
+        "result": "/private/tmp/octane-pr877-sync-generators-fbMss0/02-cli-data-check/result.json",
+        "resultSha256": "d9d593792c14b548382a9a477353a9e21388427dc0d5178f13a7a9177c51098e"
+      },
+      {
+        "script": "scaffold:manifest",
+        "args": [
+          "--import",
+          "/private/tmp/octane-pr877-sync-generators-fbMss0/record-loads.mjs",
+          "--import",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+          "scripts/generate-scaffold-manifest.mjs"
+        ],
+        "cwd": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository",
+        "exitCode": 0,
+        "result": "/private/tmp/octane-pr877-sync-generators-fbMss0/03-scaffold-manifest/result.json",
+        "resultSha256": "c556938d0d69084c81ab94f0e6839df102d6f51a8f88ac3fb4e9a9fff85b906d"
+      },
+      {
+        "script": "scaffold:manifest:check",
+        "args": [
+          "--import",
+          "/private/tmp/octane-pr877-sync-generators-fbMss0/record-loads.mjs",
+          "--import",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+          "scripts/generate-scaffold-manifest.mjs",
+          "--check"
+        ],
+        "cwd": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository",
+        "exitCode": 0,
+        "result": "/private/tmp/octane-pr877-sync-generators-fbMss0/04-scaffold-manifest-check/result.json",
+        "resultSha256": "cd34c533c1012f8a07a1c4a61e568968b552dce701c676c53d79922867f3c931"
+      },
+      {
+        "script": "consumer:tsconfigs",
+        "args": [
+          "--import",
+          "/private/tmp/octane-pr877-sync-generators-fbMss0/record-loads.mjs",
+          "--import",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+          "scripts/generate-consumer-tsconfigs.mjs"
+        ],
+        "cwd": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository",
+        "exitCode": 0,
+        "result": "/private/tmp/octane-pr877-sync-generators-fbMss0/05-consumer-tsconfigs/result.json",
+        "resultSha256": "6afd5e3b9911ba31b0f509bb27117e7120126a4f591e3f2d5c697ab07c0b67b6"
+      },
+      {
+        "script": "consumer:tsconfigs:check",
+        "args": [
+          "--import",
+          "/private/tmp/octane-pr877-sync-generators-fbMss0/record-loads.mjs",
+          "--import",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+          "scripts/generate-consumer-tsconfigs.mjs",
+          "--check"
+        ],
+        "cwd": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository",
+        "exitCode": 0,
+        "result": "/private/tmp/octane-pr877-sync-generators-fbMss0/06-consumer-tsconfigs-check/result.json",
+        "resultSha256": "7988f177a68af8bae2c90b2651af8751d6627d25fe45403be2b4992b1f368b80"
+      },
+      {
+        "script": "rules:generate",
+        "args": [
+          "--import",
+          "/private/tmp/octane-pr877-sync-generators-fbMss0/record-loads.mjs",
+          "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/node_modules/.pnpm/rulesync@8.32.0_supports-color@10.2.2_valibot@1.4.2_typescript@5.9.3_/node_modules/rulesync/dist/cli/index.js",
+          "generate"
+        ],
+        "cwd": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository",
+        "exitCode": 0,
+        "result": "/private/tmp/octane-pr877-sync-generators-fbMss0/07-rules-generate/result.json",
+        "resultSha256": "1fbe39348271b174f8162fa8c6c9edc98e6b06f3558ee4bb5e626fe4b3c92bd3"
+      },
+      {
+        "script": "context:budget:check",
+        "args": [
+          "--import",
+          "/private/tmp/octane-pr877-sync-generators-fbMss0/record-loads.mjs",
+          "scripts/check-context-budget.mjs"
+        ],
+        "cwd": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository",
+        "exitCode": 0,
+        "result": "/private/tmp/octane-pr877-sync-generators-fbMss0/08-context-budget-check/result.json",
+        "resultSha256": "5847f485f5896ef840ce6240d6ecbe6da833ee4c4fec04a5c92a061af0c51d27"
+      }
+    ],
+    "dependencies": [
+      {
+        "name": "prettier",
+        "version": "3.9.6",
+        "manifestPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/node_modules/.pnpm/prettier@3.9.6/node_modules/prettier/package.json",
+        "manifestSha256": "b69988ff94407ccd6f9e1e66d92f54da25fdc5d14c219902fdb1ed17702f886b"
+      },
+      {
+        "name": "@tsrx/prettier-plugin",
+        "version": "0.3.126",
+        "manifestPath": "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/prettier-plugin/package.json",
+        "manifestSha256": "a9af04efc01e5fe8a2fd3eff167df3cbf81d7ed5a922f9ca3e13a208fdd8153b"
+      },
+      {
+        "name": "prettier-plugin-svelte",
+        "version": "4.1.1",
+        "manifestPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/node_modules/.pnpm/prettier-plugin-svelte@4.1.1_prettier@3.9.6_svelte@5.56.7/node_modules/prettier-plugin-svelte/package.json",
+        "manifestSha256": "a634c8ee71085f8edd14171b90ce67e6888811766cde54fefb4e98dbefc4212c"
+      },
+      {
+        "name": "@clack/prompts",
+        "version": "1.7.0",
+        "manifestPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/node_modules/.pnpm/@clack+prompts@1.7.0/node_modules/@clack/prompts/package.json",
+        "manifestSha256": "94428ab2d003e96b494eb3a772e1dc26f80126bdf7dbb1b54b55c5f9373daea5",
+        "stagedLink": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository/packages/cli/node_modules/@clack/prompts",
+        "lockedVersion": "1.7.0"
+      },
+      {
+        "name": "picocolors",
+        "version": "1.1.1",
+        "manifestPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/node_modules/.pnpm/picocolors@1.1.1/node_modules/picocolors/package.json",
+        "manifestSha256": "ef2ac226c4811d312e12c64214c453878653e834482125ae475f27cea60de737",
+        "stagedLink": "/private/tmp/octane-pr877-sync-generators-fbMss0/repository/packages/cli/node_modules/picocolors",
+        "lockedVersion": "1.1.1"
+      },
+      {
+        "name": "rulesync",
+        "version": "8.32.0",
+        "manifestPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/node_modules/.pnpm/rulesync@8.32.0_supports-color@10.2.2_valibot@1.4.2_typescript@5.9.3_/node_modules/rulesync/package.json",
+        "manifestSha256": "1cda4469824cc5cea0cd6ec5274906a042d4b8f2103dbd1705d2863c60c46125",
+        "entryPoint": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/node_modules/.pnpm/rulesync@8.32.0_supports-color@10.2.2_valibot@1.4.2_typescript@5.9.3_/node_modules/rulesync/dist/cli/index.js",
+        "entryPointSha256": "72a580623ccf70a3e8d7c7c1e16bc848f3c281067aabb7563018c35ad67863e1"
+      }
+    ],
+    "copied": {
+      "copiedAt": "2026-08-27T23:54:28.417Z",
+      "copied": [
+        {
+          "relative": "packages/cli/src/data/octane-data.json",
+          "before": "6e1821dcaee518506a13e45d7fa206ac6c01d3a500ed4f6e7a886968ab16ef41",
+          "after": "5276b579eddb87782e5a79be6fe13be0499cfe5903cb0afc7589be50eb2ee178"
+        }
+      ],
+      "worktreeInputChanges": [],
+      "generatorResultSha256": "2bc79825d1ff4d33d1fe6721fcc1cc6bc76d712aaa2949076db1706426f4ab27",
+      "topologyUnchanged": true
+    }
+  },
+  "errorCodes": {
+    "report": "/private/tmp/octane-pr877-final-error-codes-NEDAPM/result.json",
+    "reportSha256": "7e9a0df967b5af1765ad5c009b4d8e3b6ec8e15933375fcc334417503f079d27",
+    "sourceHashes": {
+      ".prettierignore": "e4504a8b4abf46aa0256f37044dbea21c4a4af965791832916d6c2009ea80160",
+      ".prettierrc": "12fecb39d7c5a5ef391437f7b94271134200e5f3d37e6285af3b555597638247",
+      "package.json": "2ea6e625d70aa54c94d39c91738082316a2e94ee68823de81bea82b8f6e0547d",
+      "packages/octane/error-codes/codes.json": "ef0ee6cf7500266fb2b48880f57ded27f722e09b439ee1e529bd84f792f4ab4b",
+      "packages/octane/package.json": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a",
+      "packages/octane/src/error-codes.client.generated.ts": "4f5423b6e82ee98892c8ea13f3a2d098ea2f32d36f35426e5f4fde14adbd46b9",
+      "packages/octane/src/error-codes.server.generated.ts": "1b9a7236728144615c9fc38febe8acb633425c18cc69b461314ce43ca809573f",
+      "packages/octane/src/runtime.server.ts": "1d4ecc33733e24335479b77475f2195e1b6a0d85dd653df1e752904bbb90a740",
+      "packages/octane/src/runtime.ts": "738d9417d4495a6058024a89bf8fb4519209f68ed4a932237f9b992734a6c839",
+      "pnpm-lock.yaml": "8ea32857607beda8b520797b9885fbdb46fa30886edc2a7966186428cf36a912",
+      "pnpm-workspace.yaml": "121866e4ffbff1a1a7f39db5c21c43cb6e0dd3b11180dbab37d639c01b6d8bf2",
+      "scripts/error-codes/generate.mjs": "2e5144b2759df5c57e02e2f0bf357933e53ba2d71713f28628f4fa0f4be3d069",
+      "scripts/error-codes/generate.test.mjs": "507f87c930652a204e701cd0a23f68de870a97ac5a967e9b805ebeb11f54336c"
+    },
+    "sourceChangedDuringRun": [],
+    "stagedSourceChangedDuringRun": [],
+    "commands": [
+      {
+        "args": [
+          "--import",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+          "scripts/error-codes/generate.mjs",
+          "--check"
+        ],
+        "cwd": "/private/tmp/octane-pr877-final-error-codes-NEDAPM/repository",
+        "exitCode": 0
+      },
+      {
+        "args": [
+          "--import",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+          "--test",
+          "scripts/error-codes/generate.test.mjs"
+        ],
+        "cwd": "/private/tmp/octane-pr877-final-error-codes-NEDAPM/repository",
+        "exitCode": 0
+      }
+    ],
+    "testsPassed": 4,
+    "loadedFileRecordsVerified": 72,
+    "compatibilityBaseEnvironment": null
+  },
+  "corpus": {
+    "report": "/private/tmp/octane-pr877-corpus-authority-Nf4MVp/provenance.json",
+    "reportSha256": "0ae2733e4f2edeaa36ba2f2300864002b8ce903ae085b1e33846be15c6f97ce6",
+    "owner": "signals_validation_plan",
+    "sourceFilesReconfirmedUnchanged": 90,
+    "cliCatalogIsCorpusInput": false
+  },
+  "limitations": [
+    "These are direct executions of the canonical package scripts, not a completed locked pnpm sync.",
+    "Prettier plugins use the previously verified public tagged TSRX source; locked npm payload availability is not established.",
+    "All package manifests, root/workspace/formatter configs, physical source .tsrx paths, and generator inputs are copied unchanged.",
+    "Only relevant source/data/generated output scopes are staged; this is not a complete repository dependency installation."
+  ]
+}

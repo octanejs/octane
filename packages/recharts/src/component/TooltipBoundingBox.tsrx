@@ -1,5 +1,5 @@
+import type { CSSProperties, OctaneNode } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import type { OctaneNode } from 'octane';
 
 import {
 	AllowInDimension,
@@ -27,7 +27,7 @@ export type TooltipBoundingBoxProps = {
 	reverseDirection: AllowInDimension;
 	useTranslate3d: boolean;
 	viewBox: CartesianViewBox;
-	wrapperStyle: React.CSSProperties;
+	wrapperStyle: CSSProperties;
 	lastBoundingBox: ElementOffset;
 	innerRef: SetElementOffset;
 	hasPortalFromProps: boolean;
@@ -100,7 +100,7 @@ function TooltipBoundingBoxImpl(props: TooltipBoundingBoxProps) {
 		useTranslate3d: props.useTranslate3d,
 		viewBox: props.viewBox,
 	});
-	const positionStyle: React.CSSProperties =
+	const positionStyle: CSSProperties =
 		props.hasPortalFromProps
 			? {}
 			: {
@@ -117,13 +117,12 @@ function TooltipBoundingBoxImpl(props: TooltipBoundingBoxProps) {
 					top: 0,
 					left: 0,
 				};
-	const outerStyle: React.CSSProperties = {
+	const outerStyle: CSSProperties = {
 		...positionStyle,
 		visibility: !state.dismissed && props.active && props.hasPayload ? 'visible' : 'hidden',
 		...props.wrapperStyle,
 	};
 	return <div
-		// @ts-expect-error typescript library does not recognize xmlns attribute, but it's required for an HTML chunk inside SVG.
 		xmlns="http://www.w3.org/1999/xhtml"
 		tabIndex={-1}
 		className={cssClasses}

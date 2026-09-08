@@ -1,17 +1,16 @@
-// @ts-nocheck -- public props retain React DOM compatibility at the Octane render boundary.
 import { useCallback, useEffect, useRef } from 'octane';
 import type {
 	ButtonHTMLAttributes,
 	CSSProperties,
 	HTMLAttributes,
-	MouseEvent as ReactMouseEvent,
+	MouseEvent,
 	MouseEventHandler,
 	OptionHTMLAttributes,
-	Ref,
 	SelectHTMLAttributes,
 	TableHTMLAttributes,
 	ThHTMLAttributes,
-} from 'react';
+} from 'octane';
+import type { Ref } from 'react';
 import type { CalendarDay, CalendarMonth, CalendarWeek } from '../classes/index.js';
 import type { Modifiers } from '../types/index.js';
 import { UI } from '../UI.js';
@@ -143,10 +142,10 @@ export type NavProps =
 export function Nav(props: NavProps) @{
 	const { onPreviousClick, onNextClick, previousMonth, nextMonth, ...navProps } = props;
 	const { components, classNames, styles, labels: { labelPrevious, labelNext } } = useDayPicker();
-	const handleNextClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+	const handleNextClick = useCallback((event: MouseEvent<HTMLButtonElement>) => {
 		if (nextMonth) onNextClick?.(event);
 	}, [nextMonth, onNextClick]);
-	const handlePreviousClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
+	const handlePreviousClick = useCallback((event: MouseEvent<HTMLButtonElement>) => {
 		if (previousMonth) onPreviousClick?.(event);
 	}, [previousMonth, onPreviousClick]);
 	<nav {...navProps}>

@@ -1,0 +1,8 @@
+packages:
+  - storybook
+  - .
+onlyBuiltDependencies:
+  - '@biomejs/biome'
+  - esbuild
+  - msw
+  - simple-git-hooks

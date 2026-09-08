@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-08-28T00:01:57.451Z",
+  "sourceManifestSha256": "fe3cae2cfdc6f92ad71e2e242d90683430a116e4b5a31fb66d3ea9d78e878c53",
+  "sourceFiles": 1144,
+  "liveAndCopyUnchanged": true,
+  "completeInputEnumerationMatched": true,
+  "baselineFiles": 120,
+  "baselineUnchanged": true,
+  "harnessUnchanged": true,
+  "tenCommonBundlesIdenticalAcrossAllThreeRuns": true,
+  "fullResultSha256": "2944dcd3cc4116773c89de5f9d2ea98dbf4ef32a34c27cc0317f0e6c8eb87efa",
+  "criticalSourceHashes": {
+    "packages/octane/src/runtime.ts": "738d9417d4495a6058024a89bf8fb4519209f68ed4a932237f9b992734a6c839",
+    "packages/octane/src/runtime.server.ts": "1d4ecc33733e24335479b77475f2195e1b6a0d85dd653df1e752904bbb90a740",
+    "packages/octane/src/signals/native-read-client.ts": "5266fce49bb217e7a3c73aedf5aeed5aff0a8dfda37f001a649181022df01288",
+    "packages/octane/src/signals/native-read-collector.ts": "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3"
+  }
+}

@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/global/styles/sizeStyleToPixels.test.ts b/tests/upstream/global/styles/sizeStyleToPixels.test.ts
+--- a/tests/upstream/global/styles/sizeStyleToPixels.test.ts
++++ b/tests/upstream/global/styles/sizeStyleToPixels.test.ts
+@@ -1,14 +1,16 @@
+ import { beforeEach, describe, expect, test } from "vitest";
+ import {
++  mockGetComputedStyle,
+   setDefaultElementStyle,
+   setElementStyle
+ } from "../../utils/test/mockGetComputedStyle";
+-import { sizeStyleToPixels } from "./sizeStyleToPixels";
++import { sizeStyleToPixels } from "../../../../src/global/styles/sizeStyleToPixels";
+ 
+ describe("sizeStyleToPixels", () => {
+   let panelElement: HTMLElement;
+ 
+   beforeEach(() => {
++    mockGetComputedStyle();
+     panelElement = document.createElement("div");
+   });
+ 

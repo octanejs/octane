@@ -2,20 +2,40 @@
 
 React Aria for the [octane](https://github.com/octanejs/octane) renderer — a
 faithful port of Adobe's [React Aria](https://react-spectrum.adobe.com/react-aria/)
-(`react-aria`, `react-stately`, and eventually `react-aria-components`) onto
+(`react-aria`, `react-stately`, and `react-aria-components`) onto
 octane's hooks and native event system.
+
+## Installation
+
+```sh
+npm install @octanejs/aria
+pnpm add @octanejs/aria
+```
 
 - `@octanejs/aria` — the `react-aria` behavior-hook surface.
 - `@octanejs/aria/stately` — the `react-stately` state-hook surface.
-- `@octanejs/aria/components` — the `react-aria-components` surface (planned).
+- `@octanejs/aria/components` — the complete public export surface of
+  `react-aria-components@1.20.0`.
 
-Ported from the pinned `adobe/react-spectrum` checkout at the commit publishing
-`react-aria@3.50.0` / `react-stately@3.48.0` / `react-aria-components@1.19.0`,
-and proven by differential parity: the same fixture runs through
-`@octanejs/aria` and the real React packages, asserting byte-identical DOM.
+Ported from the pinned `adobe/react-spectrum` checkout at commit
+`5ecb3333001313e83898cd07644227897e3bae1f`, which publishes
+`react-aria@3.51.0`, `react-stately@3.49.0`, and
+`react-aria-components@1.20.0`. The components entry point has an exact checked
+crosswalk: all 286 runtime exports and all 327 type exports match the pinned
+package, with no missing or extra names. Existing families retain differential
+tests against React; calendar/date, color, drag and drop, file, data, toast, and
+layout additions have focused public-behavior coverage. The 1.20 release adds
+TokenField and PreviewTrigger, keyboard shortcut bindings, and context-menu triggers.
 
 Status, supported surface, and known divergences: `status.json` (rendered into
-`docs/bindings-status.md`). Plan and progress: `docs/aria-migration-plan.md`.
+`docs/bindings-status.md`). Source provenance and refresh instructions:
+`UPSTREAM.md`.
+
+Verify the pinned public surface with:
+
+```bash
+pnpm --filter @octanejs/aria exports:check
+```
 
 ## Notable divergences
 
@@ -24,3 +44,4 @@ Status, supported surface, and known divergences: `status.json` (rendered into
   inputs). React Aria's public value-level `onChange(value)` callbacks are
   unchanged.
 - `forwardRef` becomes octane's ref-as-prop (React 19 style).
+- React Server Components are not part of the Octane binding.

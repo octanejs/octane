@@ -109,6 +109,8 @@ export function useSubmenuTriggerState(...args: any[]): SubmenuTriggerState {
 			// https://github.com/adobe/react-spectrum/pull/4976#discussion_r1336472863
 			setOpen: () => {},
 			toggle,
+			point: null,
+			setPoint: () => {},
 		}),
 		[isOpen, open, close, closeAll, focusStrategy, toggle, submenuLevel],
 		subSlot(slot, 'state'),

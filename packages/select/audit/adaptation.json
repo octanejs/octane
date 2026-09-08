@@ -1,0 +1,1823 @@
+{
+  "schemaVersion": 1,
+  "upstreamCases": 258,
+  "adaptedCases": 255,
+  "notApplicableCases": 3,
+  "pendingCases": 0,
+  "permittedTransforms": [
+    "import React APIs from Octane equivalents",
+    "re-author JSX component fixtures as compiled .tsrx components",
+    "replace React Testing Library mounting with @octanejs/testing-library",
+    "replace React synthetic input events with equivalent native input events",
+    "replace Jest mocks with Vitest mocks",
+    "preserve upstream suite and test titles exactly"
+  ],
+  "cases": [
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000defaults - snapshot",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "defaults - snapshot",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Async.test.ts"
+    },
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000in case of callbacks display the most recently-requested loaded options (if results are returned out of order)",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "in case of callbacks display the most recently-requested loaded options (if results are returned out of order)",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Async.test.ts"
+    },
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000in case of callbacks should handle an error by setting options to an empty array",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "in case of callbacks should handle an error by setting options to an empty array",
+      "disposition": "not-applicable",
+      "reason": "Pinned react-select leaves this as an open product question rather than an asserted Async contract; adapting it would invent callback-error → empty-options semantics the published package does not ship."
+    },
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000load option prop with defaultOptions true with callback  > should resolve options",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "load option prop with defaultOptions true with callback  > should resolve options",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Async.test.ts"
+    },
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000load option prop with defaultOptions true with promise  > should resolve options",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "load option prop with defaultOptions true with promise  > should resolve options",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Async.test.ts"
+    },
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000load options prop with defaultOptions true and inputValue prop",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "load options prop with defaultOptions true and inputValue prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Async.test.ts"
+    },
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000load options props with no default options with callback > should resolve the options",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "load options props with no default options with callback > should resolve the options",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Async.test.ts"
+    },
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000load options props with no default options with promise > should resolve the options",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "load options props with no default options with promise > should resolve the options",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Async.test.ts"
+    },
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000to create new cache for each instance",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "to create new cache for each instance",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Async.test.ts"
+    },
+    {
+      "id": "src/__tests__/Async.test.tsx\u0000to not call loadOptions again for same value when cacheOptions is true",
+      "upstreamFile": "src/__tests__/Async.test.tsx",
+      "fullName": "to not call loadOptions again for same value when cacheOptions is true",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Async.test.ts"
+    },
+    {
+      "id": "src/__tests__/AsyncCreatable.test.tsx\u0000creates an inner Select",
+      "upstreamFile": "src/__tests__/AsyncCreatable.test.tsx",
+      "fullName": "creates an inner Select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/AsyncCreatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/AsyncCreatable.test.tsx\u0000defaults - snapshot",
+      "upstreamFile": "src/__tests__/AsyncCreatable.test.tsx",
+      "fullName": "defaults - snapshot",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/AsyncCreatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/AsyncCreatable.test.tsx\u0000render decorated select with props passed",
+      "upstreamFile": "src/__tests__/AsyncCreatable.test.tsx",
+      "fullName": "render decorated select with props passed",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/AsyncCreatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/AsyncCreatable.test.tsx\u0000to show loading and then create option in menu",
+      "upstreamFile": "src/__tests__/AsyncCreatable.test.tsx",
+      "fullName": "to show loading and then create option in menu",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/AsyncCreatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/AsyncCreatable.test.tsx\u0000to show the create option in menu",
+      "upstreamFile": "src/__tests__/AsyncCreatable.test.tsx",
+      "fullName": "to show the create option in menu",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/AsyncCreatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000close by hitting escape with search text present multi select > should remove the search text",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "close by hitting escape with search text present multi select > should remove the search text",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000close by hitting escape with search text present single select > should remove the search text",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "close by hitting escape with search text present single select > should remove the search text",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000compareOption() method multi select > should handle options with custom structure",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "compareOption() method multi select > should handle options with custom structure",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000compareOption() method single select > should handle options with custom structure",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "compareOption() method single select > should handle options with custom structure",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000defaults - snapshot",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "defaults - snapshot",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000filterOptions returns invalid value ( null ) multi select > should not show \"create...\" prompt\"",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "filterOptions returns invalid value ( null ) multi select > should not show \"create...\" prompt\"",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000filterOptions returns invalid value ( null ) single select > should not show \"create...\" prompt\"",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "filterOptions returns invalid value ( null ) single select > should not show \"create...\" prompt\"",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000filtered option is an exact match for an existing option multi select > should not show \"create...\" prompt\"",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "filtered option is an exact match for an existing option multi select > should not show \"create...\" prompt\"",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000filtered option is an exact match for an existing option single select > should not show \"create...\" prompt\"",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "filtered option is an exact match for an existing option single select > should not show \"create...\" prompt\"",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000formatCreateLabel() prop multi select > should show label of custom option as per text returned from formatCreateLabel",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "formatCreateLabel() prop multi select > should show label of custom option as per text returned from formatCreateLabel",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000formatCreateLabel() prop single select > should show label of custom option as per text returned from formatCreateLabel",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "formatCreateLabel() prop single select > should show label of custom option as per text returned from formatCreateLabel",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000getNewOptionData() prop multi select > should create option as per label returned from getNewOptionData",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "getNewOptionData() prop multi select > should create option as per label returned from getNewOptionData",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000getNewOptionData() prop single select > should create option as per label returned from getNewOptionData",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "getNewOptionData() prop single select > should create option as per label returned from getNewOptionData",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000inputValue does not match any option after filter multi select > should show a placeholder \"create...\" prompt",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "inputValue does not match any option after filter multi select > should show a placeholder \"create...\" prompt",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000inputValue does not match any option after filter single select > should show a placeholder \"create...\" prompt",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "inputValue does not match any option after filter single select > should show a placeholder \"create...\" prompt",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000isValidNewOption() prop multi select > should show \"create...\" prompt only if isValidNewOption returns thruthy value",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "isValidNewOption() prop multi select > should show \"create...\" prompt only if isValidNewOption returns thruthy value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000isValidNewOption() prop single select > should show \"create...\" prompt only if isValidNewOption returns thruthy value",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "isValidNewOption() prop single select > should show \"create...\" prompt only if isValidNewOption returns thruthy value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Creatable.test.tsx\u0000should remove the new option after closing on blur",
+      "upstreamFile": "src/__tests__/Creatable.test.tsx",
+      "fullName": "should remove the new option after closing on blur",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Creatable.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000Clicking Enter on a focused select while !menuIsOpen > should not invoke event.preventDefault",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "Clicking Enter on a focused select while !menuIsOpen > should not invoke event.preventDefault",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000Clicking Enter on a focused select while menuIsOpen && focusedOption && !isComposing  > should invoke event.preventDefault",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "Clicking Enter on a focused select while menuIsOpen && focusedOption && !isComposing  > should invoke event.preventDefault",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000Clicking dropdown indicator on select with closed menu with primary button on mouse multi select > should call onMenuOpen prop when select is opened and onMenuClose prop when select is closed",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "Clicking dropdown indicator on select with closed menu with primary button on mouse multi select > should call onMenuOpen prop when select is opened and onMenuClose prop when select is closed",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000Clicking dropdown indicator on select with closed menu with primary button on mouse single select > should call onMenuOpen prop when select is opened and onMenuClose prop when select is closed",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "Clicking dropdown indicator on select with closed menu with primary button on mouse single select > should call onMenuOpen prop when select is opened and onMenuClose prop when select is closed",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000Clicking dropdown indicator on select with open menu with primary button on mouse multi select > should call onMenuOpen prop when select is opened and onMenuClose prop when select is closed",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "Clicking dropdown indicator on select with open menu with primary button on mouse multi select > should call onMenuOpen prop when select is opened and onMenuClose prop when select is closed",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000Clicking dropdown indicator on select with open menu with primary button on mouse single select > should call onMenuOpen prop when select is opened and onMenuClose prop when select is closed",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "Clicking dropdown indicator on select with open menu with primary button on mouse single select > should call onMenuOpen prop when select is opened and onMenuClose prop when select is closed",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000`required` prop multi select > should validate with value",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "`required` prop multi select > should validate with value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000`required` prop single select (isSearchable is false) > should validate with value",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "`required` prop single select (isSearchable is false) > should validate with value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000`required` prop single select > should validate with value",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "`required` prop single select > should validate with value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > A11yTexts can be provided through ariaLiveMessages prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > A11yTexts can be provided through ariaLiveMessages prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > announces already selected values when focused",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > announces already selected values when focused",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > announces cleared values",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > announces cleared values",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > aria-activedescendant for basic options test-input-name",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > aria-activedescendant for basic options test-input-name",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > aria-activedescendant for basic options test-input-name\u00002",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > aria-activedescendant for basic options test-input-name",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > aria-activedescendant for grouped options test-input-name",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > aria-activedescendant for grouped options test-input-name",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > aria-activedescendant for grouped options test-input-name\u00002",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > aria-activedescendant for grouped options test-input-name",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > aria-activedescendant should not exist if hideSelectedOptions=true",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > aria-activedescendant should not exist if hideSelectedOptions=true",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > interacting with disabled options shows correct A11yText",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > interacting with disabled options shows correct A11yText",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > interacting with multi values options shows correct A11yText",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > interacting with multi values options shows correct A11yText",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > passes through aria-errormessage prop multi select > should pass aria-errormessage prop down to input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > passes through aria-errormessage prop multi select > should pass aria-errormessage prop down to input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > passes through aria-errormessage prop single select > should pass aria-errormessage prop down to input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > passes through aria-errormessage prop single select > should pass aria-errormessage prop down to input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > passes through aria-invalid prop multi select > should pass aria-invalid prop down to input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > passes through aria-invalid prop multi select > should pass aria-invalid prop down to input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > passes through aria-invalid prop single select > should pass aria-invalid prop down to input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > passes through aria-invalid prop single select > should pass aria-invalid prop down to input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > passes through aria-label prop multi select > should pass aria-labelledby prop down to input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > passes through aria-label prop multi select > should pass aria-labelledby prop down to input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > passes through aria-label prop single select > should pass aria-labelledby prop down to input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > passes through aria-label prop single select > should pass aria-labelledby prop down to input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > passes through aria-labelledby prop multi select > should pass aria-labelledby prop down to input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > passes through aria-labelledby prop multi select > should pass aria-labelledby prop down to input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > passes through aria-labelledby prop single select > should pass aria-labelledby prop down to input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > passes through aria-labelledby prop single select > should pass aria-labelledby prop down to input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > screenReaderStatus function prop > to pass custom text to A11yText",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > screenReaderStatus function prop > to pass custom text to A11yText",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000accessibility > to show the number of options available in A11yText when the menu is Open",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "accessibility > to show the number of options available in A11yText when the menu is Open",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000autoFocus multi select > should focus select on mount",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "autoFocus multi select > should focus select on mount",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000autoFocus single select > should focus select on mount",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "autoFocus single select > should focus select on mount",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on de-selecting an option in multi select enter key is pressed while focusing option > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on de-selecting an option in multi select enter key is pressed while focusing option > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on de-selecting an option in multi select option is clicked > should call onChange() prop with correct selected options and meta",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on de-selecting an option in multi select option is clicked > should call onChange() prop with correct selected options and meta",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on de-selecting an option in multi select option with boolean value > option is clicked > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on de-selecting an option in multi select option with boolean value > option is clicked > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on de-selecting an option in multi select option with number value > option is clicked > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on de-selecting an option in multi select option with number value > option is clicked > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on de-selecting an option in multi select space key is pressed while focusing option > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on de-selecting an option in multi select space key is pressed while focusing option > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on de-selecting an option in multi select tab key is pressed while focusing option > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on de-selecting an option in multi select tab key is pressed while focusing option > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option multi select > enter key is pressed while focusing option > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option multi select > enter key is pressed while focusing option > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option multi select > option is clicked > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option multi select > option is clicked > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option multi select > option with boolean value > option is clicked > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option multi select > option with boolean value > option is clicked > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option multi select > option with number value > option is clicked > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option multi select > option with number value > option is clicked > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option multi select > space key is pressed while focusing option > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option multi select > space key is pressed while focusing option > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option multi select > tab key is pressed while focusing option > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option multi select > tab key is pressed while focusing option > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option single select > enter key is pressed while focusing option > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option single select > enter key is pressed while focusing option > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option single select > option is clicked > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option single select > option is clicked > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option single select > option with boolean value > option is clicked > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option single select > option with boolean value > option is clicked > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option single select > option with number value > option is clicked > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option single select > option with number value > option is clicked > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option single select > space key is pressed while focusing option > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option single select > space key is pressed while focusing option > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000calls onChange on selecting an option single select > tab key is pressed while focusing option > should call onChange() prop with selected option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "calls onChange on selecting an option single select > tab key is pressed while focusing option > should call onChange() prop with selected option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000clear select by clicking on clear button > should not call onMenuOpen",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "clear select by clicking on clear button > should not call onMenuOpen",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000clearing select using clear button to not call onMenuOpen or onMenuClose",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "clearing select using clear button to not call onMenuOpen or onMenuClose",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000click to open select multi select > should focus the first option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "click to open select multi select > should focus the first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000click to open select single select > should focus the first option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "click to open select single select > should focus the first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000clicking on disabled option multi select > should not select the disabled option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "clicking on disabled option multi select > should not select the disabled option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000clicking on disabled option single select > should not select the disabled option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "clicking on disabled option single select > should not select the disabled option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000clicking on select using secondary button on mouse multi select > secondary click is ignored > should not call onMenuOpen and onMenuClose prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "clicking on select using secondary button on mouse multi select > secondary click is ignored > should not call onMenuOpen and onMenuClose prop",
+      "disposition": "not-applicable",
+      "reason": "Upstream marks this matrix entry skipped because its asserted secondary-button menu gating conflicts with observed browser behavior on the pin; encoding it would invent a contested oracle rather than adapt a shipped contract."
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000clicking on select using secondary button on mouse single select > secondary click is ignored > should not call onMenuOpen and onMenuClose prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "clicking on select using secondary button on mouse single select > secondary click is ignored > should not call onMenuOpen and onMenuClose prop",
+      "disposition": "not-applicable",
+      "reason": "Upstream marks this matrix entry skipped because its asserted secondary-button menu gating conflicts with observed browser behavior on the pin; encoding it would invent a contested oracle rather than adapt a shipped contract."
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000clicking when focused does not open select when openMenuOnClick=false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "clicking when focused does not open select when openMenuOnClick=false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000close menu on hitting escape and clear input value if menu is open even if escapeClearsValue and isClearable are true",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "close menu on hitting escape and clear input value if menu is open even if escapeClearsValue and isClearable are true",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000closeMenuOnSelect prop > when passed as false it should not call onMenuClose on selecting option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "closeMenuOnSelect prop > when passed as false it should not call onMenuClose on selecting option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000display placeholder once value is removed multi select > should display placeholder once the value is removed from select",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "display placeholder once value is removed multi select > should display placeholder once the value is removed from select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000display placeholder once value is removed single select > should display placeholder once the value is removed from select",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "display placeholder once value is removed single select > should display placeholder once the value is removed from select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000does not select anything when a disabled option is the only item in the list after a search",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "does not select anything when a disabled option is the only item in the list after a search",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000filterOption prop is null multi select > should show all the options other than selected options",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "filterOption prop is null multi select > should show all the options other than selected options",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000filterOption prop is null single select > should show all the options",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "filterOption prop is null single select > should show all the options",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000filterOption() prop - default filter behavior single select > should ignore accented char in query",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "filterOption() prop - default filter behavior single select > should ignore accented char in query",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000filterOption() prop - default filter behavior single select > should match accented char",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "filterOption() prop - default filter behavior single select > should match accented char",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000filterOption() prop - should filter only if function returns truthy for value multi select > should filter all options other that options in value of select",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "filterOption() prop - should filter only if function returns truthy for value multi select > should filter all options other that options in value of select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000filterOption() prop - should filter only if function returns truthy for value single select > should filter all options as per searchString",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "filterOption() prop - should filter only if function returns truthy for value single select > should filter all options as per searchString",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > ArrowDown key on first option should focus second option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > ArrowDown key on first option should focus second option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > ArrowDown key on last option should focus first option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > ArrowDown key on last option should focus first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > ArrowUp key on first option should focus last option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > ArrowUp key on first option should focus last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > ArrowUp key on last option should focus second last option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > ArrowUp key on last option should focus second last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > End key takes down to the last option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > End key takes down to the last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > Home key takes up to the first option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > Home key takes up to the first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > PageDown key takes to the last option is options below is less then page size",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > PageDown key takes to the last option is options below is less then page size",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > PageDown key takes us to next page with custom pageSize of 8",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > PageDown key takes us to next page with custom pageSize of 8",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > PageDown key takes us to next page with default page size of 5",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > PageDown key takes us to next page with default page size of 5",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > PageUp key takes us to first option - previous options < pageSize",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > PageUp key takes us to first option - previous options < pageSize",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > PageUp key takes us to previous page with default page size of 5",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > PageUp key takes us to previous page with default page size of 5",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu multi select > PageUp key takes us to previous page with default page size of 9",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu multi select > PageUp key takes us to previous page with default page size of 9",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > ArrowDown key on first option should focus second option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > ArrowDown key on first option should focus second option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > ArrowDown key on last option should focus first option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > ArrowDown key on last option should focus first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > ArrowUp key on first option should focus last option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > ArrowUp key on first option should focus last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > ArrowUp key on last option should focus second last option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > ArrowUp key on last option should focus second last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > End key takes down to the last option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > End key takes down to the last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > Home key takes up to the first option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > Home key takes up to the first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > PageDown key takes to the last option is options below is less then page size",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > PageDown key takes to the last option is options below is less then page size",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > PageDown key takes us to next page with custom pageSize 7",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > PageDown key takes us to next page with custom pageSize 7",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > PageDown key takes us to next page with default page size of 5",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > PageDown key takes us to next page with default page size of 5",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > PageUp key takes us to first option - (previous options < pageSize)",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > PageUp key takes us to first option - (previous options < pageSize)",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > PageUp key takes us to previous page with custom pageSize of 7",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > PageUp key takes us to previous page with custom pageSize of 7",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > PageUp key takes us to previous page with default page size of 5",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > PageUp key takes us to previous page with default page size of 5",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000focus on options > keyboard interaction with Menu single select > disabled options should be focusable",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "focus on options > keyboard interaction with Menu single select > disabled options should be focusable",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000formatGroupLabel function prop > to format Group label",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "formatGroupLabel function prop > to format Group label",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000formatOptionLabel multi select > should format label of options according to text returned by formatOptionLabel",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "formatOptionLabel multi select > should format label of options according to text returned by formatOptionLabel",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000formatOptionLabel single select > should format label of options according to text returned by formatOptionLabel",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "formatOptionLabel single select > should format label of options according to text returned by formatOptionLabel",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000getOptionLabel() prop > to format the option label",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "getOptionLabel() prop > to format the option label",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hidden input field is not present if name is not passes",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hidden input field is not present if name is not passes",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hidden input field is present if name passes",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hidden input field is present if name passes",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting ArrowUp key on closed select should focus last element",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting ArrowUp key on closed select should focus last element",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting Enter on option should not call onChange if the event comes from IME",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting Enter on option should not call onChange if the event comes from IME",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting escape does not call onChange if menu is Open",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting escape does not call onChange if menu is Open",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting escape on select option multi select > should not call onChange prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting escape on select option multi select > should not call onChange prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting escape on select option single select > should not call onChange prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting escape on select option single select > should not call onChange prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting escape with inputValue in select multi select > should call onInputChange prop with empty string as inputValue",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting escape with inputValue in select multi select > should call onInputChange prop with empty string as inputValue",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting escape with inputValue in select single select > should call onInputChange prop with empty string as inputValue",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting escape with inputValue in select single select > should call onInputChange prop with empty string as inputValue",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting spacebar should not select option if isSearchable is true (default)",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting spacebar should not select option if isSearchable is true (default)",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting spacebar should select option if isSearchable is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting spacebar should select option if isSearchable is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000hitting tab on option should not call onChange if tabSelectsValue is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "hitting tab on option should not call onChange if tabSelectsValue is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000instanceId prop > to have instanceId as id prefix for the select components",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "instanceId prop > to have instanceId as id prefix for the select components",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000isClearable is false single select > should not show the X (clear) button",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "isClearable is false single select > should not show the X (clear) button",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000isClearable is false test-input-name",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "isClearable is false test-input-name",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000isDisabled prop multi select > should add isDisabled prop to select components",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "isDisabled prop multi select > should add isDisabled prop to select components",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000isDisabled prop single select > should add isDisabled prop to select components",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "isDisabled prop single select > should add isDisabled prop to select components",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000isOptionDisabled() prop multi select > should add isDisabled as true prop only to options that are disabled",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "isOptionDisabled() prop multi select > should add isDisabled as true prop only to options that are disabled",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000isOptionDisabled() prop single select > should add isDisabled as true prop only to options that are disabled",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "isOptionDisabled() prop single select > should add isDisabled as true prop only to options that are disabled",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000isOptionSelected() prop > multi select > to not show the selected options in Menu for multiSelect",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "isOptionSelected() prop > multi select > to not show the selected options in Menu for multiSelect",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000isOptionSelected() prop > single select > mark value as isSelected if isOptionSelected returns true for the option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "isOptionSelected() prop > single select > mark value as isSelected if isOptionSelected returns true for the option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000isRtl boolean prop sets direction: rtl on container",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "isRtl boolean prop sets direction: rtl on container",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000menuIsOpen prop multi select > should show menu if menuIsOpen is true and hide menu if menuIsOpen prop is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "menuIsOpen prop multi select > should show menu if menuIsOpen is true and hide menu if menuIsOpen prop is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000menuIsOpen prop single select > should show menu if menuIsOpen is true and hide menu if menuIsOpen prop is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "menuIsOpen prop single select > should show menu if menuIsOpen is true and hide menu if menuIsOpen prop is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000multi select >  calls onChange when option is selected and isSearchable is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "multi select >  calls onChange when option is selected and isSearchable is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000multi select > call onChange with all values but last selected value and remove event on hitting backspace",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "multi select > call onChange with all values but last selected value and remove event on hitting backspace",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000multi select > clicking on X next to option will call onChange with all options other that the clicked option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "multi select > clicking on X next to option will call onChange with all options other that the clicked option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000multi select > have default value delimiter seperated",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "multi select > have default value delimiter seperated",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000multi select > removes the selected option from the menu options when isSearchable is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "multi select > removes the selected option from the menu options when isSearchable is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000multi select > to not hide the selected options from the menu if hideSelectedOptions is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "multi select > to not hide the selected options from the menu if hideSelectedOptions is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000multi select > to not show selected value in options",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "multi select > to not show selected value in options",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000multi select > with multi character delimiter",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "multi select > with multi character delimiter",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000name prop multi select > should assign the given name",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "name prop multi select > should assign the given name",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000name prop single select > should assign the given name",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "name prop single select > should assign the given name",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000no option found on search based on filterOption prop multi select > should show NoOptionsMessage",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "no option found on search based on filterOption prop multi select > should show NoOptionsMessage",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000no option found on search based on filterOption prop single Select > should show NoOptionsMessage",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "no option found on search based on filterOption prop single Select > should show NoOptionsMessage",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000noOptionsMessage() function prop multi select > should show NoOptionsMessage returned from noOptionsMessage function prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "noOptionsMessage() function prop multi select > should show NoOptionsMessage returned from noOptionsMessage function prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000noOptionsMessage() function prop single Select > should show NoOptionsMessage returned from noOptionsMessage function prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "noOptionsMessage() function prop single Select > should show NoOptionsMessage returned from noOptionsMessage function prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000not render any groups when there is not a single match when filtering",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "not render any groups when there is not a single match when filtering",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000onBlur prop multi select > should call onBlur handler on blur on input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "onBlur prop multi select > should call onBlur handler on blur on input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000onBlur prop single select > should call onBlur handler on blur on input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "onBlur prop single select > should call onBlur handler on blur on input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000onFocus prop is called on on focus of input multi select > should call onFocus handler on focus on input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "onFocus prop is called on on focus of input multi select > should call onFocus handler on focus on input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000onFocus prop is called on on focus of input single select > should call onFocus handler on focus on input",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "onFocus prop is called on on focus of input single select > should call onFocus handler on focus on input",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000onFocus prop with autoFocus multi select > should call auto focus only once when select is autoFocus",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "onFocus prop with autoFocus multi select > should call auto focus only once when select is autoFocus",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000onFocus prop with autoFocus single select > should call auto focus only once when select is autoFocus",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "onFocus prop with autoFocus single select > should call auto focus only once when select is autoFocus",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000onInputChange() function prop to be called on blur",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "onInputChange() function prop to be called on blur",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000onMenuClose() function prop to be called on blur",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "onMenuClose() function prop to be called on blur",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000placeholder multi select > should display default placeholder \"Select...\"",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "placeholder multi select > should display default placeholder \"Select...\"",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000placeholder multi select > should display provided placeholder",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "placeholder multi select > should display provided placeholder",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000placeholder single select > should display default placeholder \"Select...\"",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "placeholder single select > should display default placeholder \"Select...\"",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000placeholder single select > should display provided node placeholder",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "placeholder single select > should display provided node placeholder",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000placeholder single select > should display provided string placeholder",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "placeholder single select > should display provided string placeholder",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000pressing enter on disabled option multi select > should not select the disabled option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "pressing enter on disabled option multi select > should not select the disabled option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000pressing enter on disabled option single select > should not select the disabled option",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "pressing enter on disabled option single select > should not select the disabled option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000render custom Input Component",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "render custom Input Component",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000render custom Menu Component",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "render custom Menu Component",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000render custom Option Component",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "render custom Option Component",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000renders with custom theme",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "renders with custom theme",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000required on input is not there by default multi select > should not have required attribute",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "required on input is not there by default multi select > should not have required attribute",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000required on input is not there by default single select > should not have required attribute",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "required on input is not there by default single select > should not have required attribute",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000sets inputMode=\"none\" when isSearchable is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "sets inputMode=\"none\" when isSearchable is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000should call not call onChange on hitting backspace when backspaceRemovesValue is true and isMulti is true and there are no values",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "should call not call onChange on hitting backspace when backspaceRemovesValue is true and isMulti is true and there are no values",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000should call onChange with `null` on hitting backspace when backspaceRemovesValue is true and isMulti is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "should call onChange with `null` on hitting backspace when backspaceRemovesValue is true and isMulti is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000should call onChange with an array on hitting backspace when backspaceRemovesValue is true and isMulti is true",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "should call onChange with an array on hitting backspace when backspaceRemovesValue is true and isMulti is true",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000should not call onChange on hitting backspace even when backspaceRemovesValue is true if isClearable is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "should not call onChange on hitting backspace even when backspaceRemovesValue is true if isClearable is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000should not call onChange on hitting backspace when backspaceRemovesValue is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "should not call onChange on hitting backspace when backspaceRemovesValue is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000single select > passing multiple values > should select the first value",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "single select > passing multiple values > should select the first value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000snapshot - defaults",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "snapshot - defaults",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000to clear value when hitting escape if escapeClearsValue and isClearable are true",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "to clear value when hitting escape if escapeClearsValue and isClearable are true",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000to not clear value when hitting escape if escapeClearsValue is false (default) and isClearable is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "to not clear value when hitting escape if escapeClearsValue is false (default) and isClearable is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000to not clear value when hitting escape if escapeClearsValue is false (default) and isClearable is true",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "to not clear value when hitting escape if escapeClearsValue is false (default) and isClearable is true",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000to not clear value when hitting escape if escapeClearsValue is true and isClearable is false",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "to not clear value when hitting escape if escapeClearsValue is true and isClearable is false",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000to only render groups with at least one match when filtering",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "to only render groups with at least one match when filtering",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000update the value prop multi select > should update the value when prop is updated",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "update the value prop multi select > should update the value when prop is updated",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000update the value prop multi select > value of options is number > should update the value when prop is updated",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "update the value prop multi select > value of options is number > should update the value when prop is updated",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000update the value prop single select > should update the value when prop is updated",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "update the value prop single select > should update the value when prop is updated",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000update the value prop single select > value of options is number > should update the value when prop is updated",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "update the value prop single select > value of options is number > should update the value when prop is updated",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value of hidden input control multi select > options with boolean values > should set value of input as value prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value of hidden input control multi select > options with boolean values > should set value of input as value prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value of hidden input control multi select > options with number values > should set value of input as value prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value of hidden input control multi select > options with number values > should set value of input as value prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value of hidden input control multi select > should set value of input as value prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value of hidden input control multi select > should set value of input as value prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value of hidden input control multi select > with delimiter prop > options with boolean values > should set value of input as value prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value of hidden input control multi select > with delimiter prop > options with boolean values > should set value of input as value prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value of hidden input control multi select > with delimiter prop > options with number values > should set value of input as value prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value of hidden input control multi select > with delimiter prop > options with number values > should set value of input as value prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value of hidden input control multi select > with delimiter prop > should set value of input as value prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value of hidden input control multi select > with delimiter prop > should set value of input as value prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value of hidden input control single select > options with boolean values > should set value of input as value prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value of hidden input control single select > options with boolean values > should set value of input as value prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value of hidden input control single select > options with number values > should set value of input as value prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value of hidden input control single select > options with number values > should set value of input as value prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value of hidden input control single select > should set value of input as value prop",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value of hidden input control single select > should set value of input as value prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value prop multi select > should set it as initial value",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value prop multi select > should set it as initial value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value prop multi select > with option values as number > should set it as initial value",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value prop multi select > with option values as number > should set it as initial value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value prop single select > should set it as initial value",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value prop single select > should set it as initial value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/Select.test.tsx\u0000value prop single select > with option values as number > should set it as initial value",
+      "upstreamFile": "src/__tests__/Select.test.tsx",
+      "fullName": "value prop single select > with option values as number > should set it as initial value",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/Select.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000If menuIsOpen prop is passed Menu should not close on clicking Dropdown Indicator",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "If menuIsOpen prop is passed Menu should not close on clicking Dropdown Indicator",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selecting an option > mouse interaction multi select > clicking on an option > should select the clicked option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selecting an option > mouse interaction multi select > clicking on an option > should select the clicked option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selecting an option > mouse interaction single select > clicking on an option > should select the clicked option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selecting an option > mouse interaction single select > clicking on an option > should select the clicked option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > (open select -> 1 x ArrowUp -> Enter) > should select the last option in the select",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > (open select -> 1 x ArrowUp -> Enter) > should select the last option in the select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > (open select -> 1 x PageDown -> 1 x ArrowDown -> 1 x PageUp -> Enter) > should select the second option - default pageSize 5",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > (open select -> 1 x PageDown -> 1 x ArrowDown -> 1 x PageUp -> Enter) > should select the second option - default pageSize 5",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > (open select -> 1 x PageDown -> Enter) > should select the first option on next page - default pageSize 5",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > (open select -> 1 x PageDown -> Enter) > should select the first option on next page - default pageSize 5",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > (open select -> 2 x ArrowDown -> 2 x ArrowUp -> Enter) > should select the first option in the select",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > (open select -> 2 x ArrowDown -> 2 x ArrowUp -> Enter) > should select the first option in the select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > (open select -> 3 x ArrowDown -> Enter) > should select the forth option in the select",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > (open select -> 3 x ArrowDown -> Enter) > should select the forth option in the select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > (open select -> 3 x PageDown -> Home -> Enter) > should select the last option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > (open select -> 3 x PageDown -> Home -> Enter) > should select the last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > (open select -> End -> Enter) > should select the last option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > (open select -> End -> Enter) > should select the last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > cycle options > ( open select -> End -> ArrowDown -> Enter) > should select the first option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > cycle options > ( open select -> End -> ArrowDown -> Enter) > should select the first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > cycle options > (open select -> ArrowUp -> Enter) > should select the last option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > cycle options > (open select -> ArrowUp -> Enter) > should select the last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction multi select > open select and hit enter > should select first option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction multi select > open select and hit enter > should select first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > (open select -> 1 x ArrowUp -> Enter) > should select the last option in the select",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > (open select -> 1 x ArrowUp -> Enter) > should select the last option in the select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > (open select -> 1 x PageDown -> 1 x ArrowDown -> 1 x PageUp -> Enter) > should select the second option - default pageSize 5",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > (open select -> 1 x PageDown -> 1 x ArrowDown -> 1 x PageUp -> Enter) > should select the second option - default pageSize 5",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > (open select -> 1 x PageDown -> Enter) > should select the first option on next page - default pageSize 5",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > (open select -> 1 x PageDown -> Enter) > should select the first option on next page - default pageSize 5",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > (open select -> 2 x ArrowDown -> 2 x ArrowUp -> Enter) > should select the first option in the select",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > (open select -> 2 x ArrowDown -> 2 x ArrowUp -> Enter) > should select the first option in the select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > (open select -> 3 x ArrowDown -> Enter) > should select the forth option in the select",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > (open select -> 3 x ArrowDown -> Enter) > should select the forth option in the select",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > (open select -> 3 x PageDown -> Home -> Enter) > should select the last option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > (open select -> 3 x PageDown -> Home -> Enter) > should select the last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > (open select -> End -> Enter) > should select the last option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > (open select -> End -> Enter) > should select the last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > cycle options > ( open select -> End -> ArrowDown -> Enter) > should select the first option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > cycle options > ( open select -> End -> ArrowDown -> Enter) > should select the first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > cycle options > (open select -> ArrowUp -> Enter) > should select the last option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > cycle options > (open select -> ArrowUp -> Enter) > should select the last option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Integration tests > selection an option > keyboard interaction single select > open select and hit enter > should select first option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Integration tests > selection an option > keyboard interaction single select > open select and hit enter > should select first option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Menu is controllable by menuIsOpen prop",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Menu is controllable by menuIsOpen prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Menu to open by default if menuIsOpen prop is true multi select > should keep Menu open by default if true is passed for menuIsOpen prop",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Menu to open by default if menuIsOpen prop is true multi select > should keep Menu open by default if true is passed for menuIsOpen prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000Menu to open by default if menuIsOpen prop is true single select > should keep Menu open by default if true is passed for menuIsOpen prop",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "Menu to open by default if menuIsOpen prop is true single select > should keep Menu open by default if true is passed for menuIsOpen prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000`required` prop > should validate",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "`required` prop > should validate",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000click on dropdown indicator multi select > should toggle Menu",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "click on dropdown indicator multi select > should toggle Menu",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000click on dropdown indicator single select > should toggle Menu",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "click on dropdown indicator single select > should toggle Menu",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000defaultInputValue prop > should update the inputValue on change of input if defaultInputValue prop is provided",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "defaultInputValue prop > should update the inputValue on change of input if defaultInputValue prop is provided",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000defaultMenuIsOpen prop > should open by menu default and clicking on Dropdown Indicator should toggle menu",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "defaultMenuIsOpen prop > should open by menu default and clicking on Dropdown Indicator should toggle menu",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000defaultValue prop > should update the value on selecting option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "defaultValue prop > should update the value on selecting option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000defaults > snapshot",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "defaults > snapshot",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000inputValue prop > should not update the inputValue when on change of input if inputValue prop is provided",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "inputValue prop > should not update the inputValue when on change of input if inputValue prop is provided",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000multi select > selecting multiple values",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "multi select > selecting multiple values",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000passes down the className prop",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "passes down the className prop",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    },
+    {
+      "id": "src/__tests__/StateManaged.test.tsx\u0000value prop > should not update the value on selecting option",
+      "upstreamFile": "src/__tests__/StateManaged.test.tsx",
+      "fullName": "value prop > should not update the value on selecting option",
+      "disposition": "adapted",
+      "adaptedFile": "packages/select/tests/upstream/StateManaged.test.ts"
+    }
+  ]
+}

@@ -4,11 +4,14 @@ import {
 	CalendarFixture,
 	ControlledNavigationFixture,
 	ConstraintsFixture,
+	DropdownNavigationFixture,
 	MultipleFixture,
+	NativeEventFixture,
 	NavigationFixture,
 	RangeFixture,
 	TimeZoneNavigationFixture,
 	UncontrolledBoundsFixture,
+	nativeDayEvents,
 } from './_fixtures/calendar.tsrx';
 
 const dayButton = (container: HTMLElement, label: string) =>
@@ -35,11 +38,34 @@ describe('react-day-picker v10.0.1 adapted calendar behavior', () => {
 		view.unmount();
 	});
 
+	it('delivers the same native click to day and selection callbacks', async () => {
+		const view = mount(NativeEventFixture);
+		const day = dayButton(view.container, '15');
+		const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+		await act(() => day.dispatchEvent(click));
+		expect(nativeDayEvents.click).toBe(click);
+		expect(nativeDayEvents.selection).toBe(click);
+		const keyDown = new KeyboardEvent('keydown', { key: 'x', bubbles: true });
+		await act(() => day.dispatchEvent(keyDown));
+		expect(nativeDayEvents.keyDown).toBe(keyDown);
+		view.unmount();
+	});
+
 	// @parity-case runtime:month-navigation
 	it('navigates to the next month through the public nav button', async () => {
 		const view = mount(NavigationFixture);
 		const next = view.container.querySelector('button[aria-label*="next"]') as HTMLButtonElement;
 		await act(() => next.click());
+		expect(view.container.textContent).toContain('September 2026');
+		view.unmount();
+	});
+
+	it('navigates with the native dropdown change event', async () => {
+		const view = mount(DropdownNavigationFixture);
+		const month = view.container.querySelector('select') as HTMLSelectElement;
+		expect(month.value).toBe('7');
+		month.value = '8';
+		await act(() => month.dispatchEvent(new Event('change', { bubbles: true })));
 		expect(view.container.textContent).toContain('September 2026');
 		view.unmount();
 	});

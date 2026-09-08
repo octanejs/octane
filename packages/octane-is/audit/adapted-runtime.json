@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "project": "octane-is",
+  "roots": ["packages/octane-is/tests"],
+  "files": ["packages/octane-is/tests/adapted.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:ab271415b83a9e49",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs identifies valid element types"
+    },
+    {
+      "id": "runtime:50faf032d93f99c2",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify context consumers"
+    },
+    {
+      "id": "runtime:e3b7ec9e46eedac0",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify context providers"
+    },
+    {
+      "id": "runtime:c89b644adba12546",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify elements"
+    },
+    {
+      "id": "runtime:1268409966e007c8",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify fragments"
+    },
+    {
+      "id": "runtime:8e3f47517eaf1c53",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify lazy"
+    },
+    {
+      "id": "runtime:2d0cb706e2b12e71",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify memo"
+    },
+    {
+      "id": "runtime:c02357a77a4429f6",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify portals"
+    },
+    {
+      "id": "runtime:f321a4fcb6033d91",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify profile root"
+    },
+    {
+      "id": "runtime:c64ba0d78ccf5ae2",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify ref forwarding component"
+    },
+    {
+      "id": "runtime:f3cc0a5804b32d0b",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify strict mode"
+    },
+    {
+      "id": "runtime:be4115fdefde9840",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify suspense"
+    },
+    {
+      "id": "runtime:acbfb9e764858887",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should identify suspense list"
+    },
+    {
+      "id": "runtime:41cce4de2f306232",
+      "file": "packages/octane-is/tests/adapted.test.ts",
+      "fullName": "ReactIs should return undefined for unknown/invalid types"
+    }
+  ],
+  "snapshots": 0
+}

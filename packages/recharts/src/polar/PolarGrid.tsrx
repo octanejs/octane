@@ -1,6 +1,7 @@
+import type { FunctionComponent, SVGProps } from '../util/OctaneTypes.ts';
 import { clsx } from 'clsx';
 import * as React from 'octane';
-import { SVGProps } from 'octane';
+
 import { polarToCartesian } from '../util/PolarUtils';
 import { AxisId } from '../state/cartesianAxisSlice';
 import { useAppSelector } from '../state/hooks';
@@ -8,7 +9,7 @@ import { selectPolarGridAngles, selectPolarGridRadii } from '../state/selectors/
 import { selectPolarViewBox } from '../state/selectors/polarAxisSelectors';
 import { PolarViewBoxRequired } from '../util/types';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 
@@ -107,7 +108,7 @@ interface PolarGridProps extends ZIndexable {
 	fillOpacity?: number | string;
 }
 
-export type Props = SVGProps<SVGLineElement> & PolarGridProps;
+export type Props = Omit<SVGProps<SVGLineElement>, 'ref'> & PolarGridProps;
 
 type PropsWithDefaults =
 	Props & {
@@ -148,7 +149,7 @@ const getPolygonPath = (
 };
 
 // Draw axis of radial line
-const PolarAngles: React.FC<PropsWithDefaults> = (props: PropsWithDefaults) => {
+const PolarAngles: FunctionComponent<PropsWithDefaults> = (props: PropsWithDefaults) => {
 	const { cx, cy, innerRadius, outerRadius, polarAngles, radialLines } = props;
 
 	if (!polarAngles || !polarAngles.length || !radialLines) {
@@ -174,7 +175,7 @@ const PolarAngles: React.FC<PropsWithDefaults> = (props: PropsWithDefaults) => {
 };
 
 // Draw concentric circles
-const ConcentricCircle: React.FC<ConcentricProps> = (props) => {
+const ConcentricCircle: FunctionComponent<ConcentricProps> = (props) => {
 	const { cx, cy, radius } = props;
 	const concentricCircleProps = {
 		...svgPropertiesNoEvents(props),
@@ -193,7 +194,7 @@ const ConcentricCircle: React.FC<ConcentricProps> = (props) => {
 };
 
 // Draw concentric polygons
-const ConcentricPolygon: React.FC<ConcentricProps> = (props: ConcentricProps) => {
+const ConcentricPolygon: FunctionComponent<ConcentricProps> = (props: ConcentricProps) => {
 	const { radius } = props;
 	const concentricPolygonProps = {
 		...svgPropertiesNoEvents(props),

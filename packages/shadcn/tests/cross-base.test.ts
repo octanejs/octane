@@ -20,7 +20,12 @@ const dataSlots = (source: string): Set<string> =>
 	new Set([...source.matchAll(/data-slot="([^"]+)"/g)].map((m) => m[1]));
 
 const exportedNames = (source: string): Set<string> =>
-	new Set([...source.matchAll(/^export\s+(?:function|const)\s+([A-Za-z_]\w*)/gm)].map((m) => m[1]));
+	new Set([
+		...[...source.matchAll(/^export\s+(?:function|const)\s+([A-Za-z_]\w*)/gm)].map((m) => m[1]),
+		...[...source.matchAll(/^export\s*\{([^}]+)\}/gm)].flatMap((m) =>
+			m[1].split(',').map((name) => name.trim()),
+		),
+	]);
 
 // What is and is not shared across primitive bases.
 //
@@ -39,6 +44,15 @@ const exportedNames = (source: string): Set<string> =>
 // below meaningful: an accidental omission still fails, while a real
 // primitive-level difference is stated once, with its reason.
 const KNOWN_DIVERGENCES: Record<string, { slots?: string[]; exports?: string[]; why: string }> = {
+	'base-ui/select.tsrx': {
+		slots: ['select'],
+		why: 'Upstream exports SelectPrimitive.Root directly; the root owns state and has no host element.',
+	},
+	'base-ui/navigation-menu.tsrx': {
+		slots: ['navigation-menu-viewport'],
+		exports: ['NavigationMenuViewport'],
+		why: 'Upstream Base UI composes its viewport inside NavigationMenuPositioner rather than exporting NavigationMenuViewport.',
+	},
 	// Upstream keeps its cva variant maps PRIVATE in the aria base, where the
 	// Radix base publishes them. Nothing structural differs — the parts and their
 	// classes are all still there.

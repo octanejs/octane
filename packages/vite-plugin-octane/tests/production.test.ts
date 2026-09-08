@@ -65,6 +65,13 @@ function listFiles(root: string, current = root): string[] {
 	});
 }
 
+function findBuiltAsset(root: string, extension: '.css' | '.js', contents: string) {
+	return listFiles(root).find(
+		(file) =>
+			file.endsWith(extension) && fs.readFileSync(path.join(root, file), 'utf8').includes(contents),
+	);
+}
+
 async function startBrowserProbeOrigin(): Promise<{ server: Server; origin: string }> {
 	const server = createHttpServer((_request, response) => {
 		response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -289,6 +296,46 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 				expect(bodyRegionOf(html)).not.toContain('<title>');
 				expect(bodyRegionOf(html)).not.toContain('fixture page description');
 			}
+		}
+	});
+
+	it('styles layout-owned deferred content before its JavaScript loads', async () => {
+		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+		const clientRoot = path.join(distDir, 'client');
+		const stylesheet = findBuiltAsset(clientRoot, '.css', '.vite-layout-deferred-hydration-proof');
+		const javascript = findBuiltAsset(
+			clientRoot,
+			'.js',
+			'vite-layout-deferred-hydration-chunk-proof',
+		);
+		expect(stylesheet).toBeTruthy();
+		expect(javascript).toBeTruthy();
+
+		const response = await handler(new Request('http://localhost/layout-assets'));
+		const html = await response.text();
+		expect(response.status).toBe(200);
+		expect(html).toContain('vite-layout-deferred-hydration-chunk-proof: 0');
+		expect(html).toContain(`<link rel="stylesheet" href="/${stylesheet}">`);
+		expect(html).not.toContain(`src="/${javascript}"`);
+		expect(html).not.toContain(`<link rel="modulepreload" href="/${javascript}">`);
+
+		const { chromium } = await import('playwright');
+		const browser = await chromium.launch({ headless: true });
+		try {
+			const context = await browser.newContext({ javaScriptEnabled: false });
+			const page = await context.newPage();
+			const requests: string[] = [];
+			page.on('request', (request) => requests.push(new URL(request.url()).pathname));
+			await page.goto(productionOrigin + '/layout-assets', { waitUntil: 'load' });
+			expect(
+				await page
+					.locator('.vite-layout-deferred-hydration-proof')
+					.evaluate((element) => getComputedStyle(element).color),
+			).toBe('rgb(0, 128, 128)');
+			expect(requests).not.toContain('/' + javascript);
+			await context.close();
+		} finally {
+			await browser.close();
 		}
 	});
 
@@ -573,6 +620,9 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		expect(response.status).toBe(200);
 		const prodHtml = await response.text();
 		expect(prodHtml).toContain('Fixture failed: Error: fixture root boundary');
+		const stylesheet = findBuiltAsset(path.join(distDir, 'client'), '.css', '.root-catch');
+		expect(stylesheet).toBeTruthy();
+		expect(prodHtml).toContain(`<link rel="stylesheet" href="/${stylesheet}">`);
 
 		const devResponse = await fetch(devOrigin + '/pages/error');
 		expect(devResponse.status).toBe(200);
@@ -633,6 +683,9 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		const html = await response.text();
 		expect(html).toContain('Loading fixture…');
 		expect(html).toContain('Fixture page pending');
+		const stylesheet = findBuiltAsset(path.join(distDir, 'client'), '.css', '.root-pending');
+		expect(stylesheet).toBeTruthy();
+		expect(html).toContain(`<link rel="stylesheet" href="/${stylesheet}">`);
 	});
 
 	it('bundles module-server exports and executes them through production RPC', async () => {

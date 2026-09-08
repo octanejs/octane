@@ -20,6 +20,10 @@ import {
 	OCTANE_CARDS,
 	TARGET_CARDS,
 } from '../src/content/benchmarks.ts';
+import { BINDING_CATEGORIES } from '../src/content/bindings.ts';
+import ecosystemIndex from '../src/content/ecosystem-index.json';
+import type { EcosystemEntity } from '../src/lib/ecosystem-search-core.ts';
+import { ecosystemPackageGuideHref } from '../src/lib/ecosystem-presentation.ts';
 
 const origin = inject('productionOrigin');
 const outputDir = inject('productionOutputDir');
@@ -57,10 +61,39 @@ describe('built Start server', () => {
 		expect(fs.existsSync(path.join(staticRoot, 'playground-runtime.json'))).toBe(true);
 	});
 
+	it('serves the documented shadcn registry paths', async () => {
+		for (const registryPath of [
+			'/r/button.json',
+			'/r/styles/base-nova/button.json',
+			'/r/styles/radix-nova/button.json',
+			'/r/styles/aria-nova/button.json',
+		]) {
+			const { response, html } = await get(registryPath);
+			expect(response.status, registryPath).toBe(200);
+			expect(response.headers.get('content-type'), registryPath).toMatch(/^application\/json\b/);
+			expect(JSON.parse(html), registryPath).toMatchObject({
+				name: 'button',
+				type: 'registry:ui',
+			});
+		}
+	});
+
 	it('server-renders the home page with the hydration payload', async () => {
 		const { response, html } = await get('/');
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toMatch(/^text\/html\b/);
+		const websiteData = Array.from(
+			html.matchAll(/<script(?=[^>]*\btype="application\/ld\+json")[^>]*>([\s\S]*?)<\/script>/g),
+		)
+			.map((match) => JSON.parse(match[1]!))
+			.find((data) => data['@type'] === 'WebSite');
+		expect(websiteData).toEqual({
+			'@context': 'https://schema.org',
+			'@type': 'WebSite',
+			name: 'Octane',
+			alternateName: ['OctaneJS', 'octanejs.dev'],
+			url: 'https://octanejs.dev/',
+		});
 		expect(html).toContain('<main');
 		expect(classCount(html, 'home')).toBeGreaterThan(0);
 		// The complete explorer is deterministic server markup: no-JS, hydration,
@@ -120,6 +153,51 @@ describe('built Start server', () => {
 		expect(html).toContain('<h1>');
 		expect(classCount(html, 'prose')).toBeGreaterThan(0);
 		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
+	});
+
+	it('server-renders the complete ecosystem directory without JavaScript', async () => {
+		const { response, html } = await get('/docs/bindings');
+		const entities = ecosystemIndex as EcosystemEntity[];
+		const bindingsByPackage = new Map(
+			entities
+				.filter((entity) => entity.kind === 'library-binding')
+				.map((entity) => [entity.packageName, entity]),
+		);
+		const orderedEntities = [
+			...entities.filter((entity) => entity.kind === 'framework-integration'),
+			...BINDING_CATEGORIES.flatMap((category) =>
+				[...category.packages]
+					.sort((left, right) => left.title.localeCompare(right.title))
+					.map(({ packageName }) => bindingsByPackage.get(packageName)!),
+			),
+		];
+		expect(response.status).toBe(200);
+		expect(classCount(html, 'ecosystem-entity')).toBe(entities.length);
+		expect(orderedEntities).toHaveLength(entities.length);
+
+		let previousPosition = -1;
+		for (const entity of orderedEntities) {
+			const position = html.indexOf(`id="${entity.id}"`);
+			expect(position, entity.id).toBeGreaterThan(previousPosition);
+			previousPosition = position;
+			expect(html, entity.packageName).toContain(
+				`href="${ecosystemPackageGuideHref(entity.packageName)}"`,
+			);
+		}
+	});
+
+	it('server-renders a filtered ecosystem result from its shareable URL', async () => {
+		const { response, html } = await get('/docs/bindings?q=TanStack%20Router&kind=binding');
+		expect(response.status).toBe(200);
+		expect(classCount(html, 'ecosystem-directory')).toBe(1);
+		expect(html).toContain('for “TanStack Router”');
+		expect(html).not.toContain('id="ecosystem-search"');
+		expect(html).toContain('id="binding-tanstack-router"');
+		expect(html).toContain('id="binding-tanstack-router-ssr-query"');
+		expect(html.indexOf('id="binding-tanstack-router"')).toBeLessThan(
+			html.indexOf('id="binding-tanstack-router-ssr-query"'),
+		);
+		expect(html).not.toContain('id="integration-tanstack-start"');
 	});
 
 	it('server-renders the Core APIs guide, TOC, and live-example shell', async () => {

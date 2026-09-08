@@ -1,0 +1,21 @@
+export * as Select from './index.parts';
+
+export type * from './root/SelectRoot.tsrx';
+export type * from './label/SelectLabel.tsrx';
+export type * from './trigger/SelectTrigger.tsrx';
+export type * from './value/SelectValue.tsrx';
+export type * from './icon/SelectIcon.tsrx';
+export type * from './portal/SelectPortal.tsrx';
+export type * from './backdrop/SelectBackdrop.tsrx';
+export type * from './positioner/SelectPositioner.tsrx';
+export type * from './popup/SelectPopup.tsrx';
+export type * from './list/SelectList.tsrx';
+export type * from './item/SelectItem.tsrx';
+export type * from './item-indicator/SelectItemIndicator.tsrx';
+export type * from './item-text/SelectItemText.tsrx';
+export type * from './arrow/SelectArrow.tsrx';
+export type * from './scroll-down-arrow/SelectScrollDownArrow.tsrx';
+export type * from './scroll-up-arrow/SelectScrollUpArrow.tsrx';
+export type * from './group/SelectGroup.tsrx';
+export type * from './group-label/SelectGroupLabel.tsrx';
+export type * from './separator/SelectSeparator.tsrx';

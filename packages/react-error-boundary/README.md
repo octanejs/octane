@@ -4,6 +4,13 @@ Octane adapter for the public `react-error-boundary@6.1.2` API. It uses
 Octane's native `@try`/`@catch` boundary rather than shipping another error
 catching engine.
 
+## Installation
+
+```sh
+npm install @octanejs/react-error-boundary
+pnpm add @octanejs/react-error-boundary
+```
+
 ```tsrx
 import { ErrorBoundary } from '@octanejs/react-error-boundary';
 import { getErrorMessage } from '@octanejs/react-error-boundary';

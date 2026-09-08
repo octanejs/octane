@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "@portabletext/react",
+    "version": "8.0.1",
+    "commit": "52770c934266773c0b52ae3a8e3bc2a0c8137985"
+  },
+  "surface": "Complete runtime surface: PortableText, defaultComponents, mergeComponents, toPlainText, PortableTextBlock and ListNestMode, plus renderer component and TypeGen helper types.",
+  "divergences": [
+    "Renderer callbacks return OctaneNode rather than ReactNode.",
+    "Custom component refs and events use Octane's normal ref prop and native DOM events.",
+    "PortableTextReactComponents and ReactPortableTextList are compatibility aliases; Octane-named equivalents are preferred."
+  ],
+  "ssr": "Supported and differential-tested against @portabletext/react@8.0.1 static markup.",
+  "verified": "2026-08-24",
+  "notes": [
+    "Portable Text parsing, mark-tree construction and list nesting remain in the official framework-neutral toolkit.",
+    "The port contains no browser globals or DOM-specific rendering logic."
+  ],
+  "docs": ["docs/sanity-react-port-research.md"]
+}

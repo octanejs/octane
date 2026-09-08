@@ -41,7 +41,7 @@ import { type OctaneNode } from 'octane';
 import { Menu as MenuPrimitive } from '@octanejs/base-ui/menu';
 import { CheckIcon, ChevronRightIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 
@@ -57,21 +57,23 @@ export function DropdownMenuTrigger(props: Record<string, unknown>) @{
 	<MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
 }
 
-export interface BaseUiPositioningProps {
-	/** Forwarded to the Positioner; see the note at the top of this file. */
-	side?: 'top' | 'right' | 'bottom' | 'left';
-	sideOffset?: number;
-	align?: 'start' | 'center' | 'end';
-	alignOffset?: number;
-	anchor?: unknown;
-	positionMethod?: 'absolute' | 'fixed';
-	collisionBoundary?: unknown;
-	collisionPadding?: unknown;
-	collisionAvoidance?: unknown;
-	arrowPadding?: number;
-	sticky?: boolean;
-	disableAnchorTracking?: boolean;
-}
+/** Props routed to the Positioner rather than the popup. */
+export type BaseUiPositioningProps =
+	Pick<
+		MenuPrimitive.Positioner.Props,
+		| 'side'
+		| 'sideOffset'
+		| 'align'
+		| 'alignOffset'
+		| 'anchor'
+		| 'positionMethod'
+		| 'collisionBoundary'
+		| 'collisionPadding'
+		| 'collisionAvoidance'
+		| 'arrowPadding'
+		| 'sticky'
+		| 'disableAnchorTracking'
+	>;
 
 export interface DropdownMenuContentProps extends Props, BaseUiPositioningProps {}
 
@@ -170,7 +172,10 @@ export function DropdownMenuRadioGroup(props: Record<string, unknown>) @{
 	<MenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />
 }
 
-export function DropdownMenuRadioItem(props: Props & { inset?: boolean }) @{
+export function DropdownMenuRadioItem(props: Omit<MenuPrimitive.RadioItem.Props, 'className'> & {
+	className?: string;
+	inset?: boolean;
+}) @{
 	const { className, children: _children, inset, ...rest } = props;
 
 	<MenuPrimitive.RadioItem

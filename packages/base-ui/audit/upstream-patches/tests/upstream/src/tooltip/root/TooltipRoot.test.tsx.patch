@@ -1,0 +1,28 @@
+diff --git a/tests/upstream/src/tooltip/root/TooltipRoot.test.tsx b/tests/upstream/src/tooltip/root/TooltipRoot.test.tsx
+--- a/tests/upstream/src/tooltip/root/TooltipRoot.test.tsx
++++ b/tests/upstream/src/tooltip/root/TooltipRoot.test.tsx
+@@ -532,7 +532,8 @@ describe('<Tooltip.Root />', () => {
+           expect(screen.queryByTestId('popup')).not.toBe(null);
+         });
+ 
+-        expect(onOpenChangeComplete.mock.calls.length).toBe(2);
++        // Octane does not replay mount effects in Strict Mode (renderer contract).
++        expect(onOpenChangeComplete.mock.calls.length).toBe(1);
+         expect(onOpenChangeComplete.mock.calls[0][0]).toBe(true);
+       });
+ 
+@@ -2898,10 +2899,10 @@ type TestTooltipProps = {
+   portalProps?: Tooltip.Portal.Props;
+   positionerProps?: Tooltip.Positioner.Props;
+   popupProps?: Tooltip.Popup.Props;
+-  portalChildren?: React.ReactNode;
+-  beforeTrigger?: React.ReactNode;
+-  betweenTriggerAndPortal?: React.ReactNode;
+-  afterPortal?: React.ReactNode;
++  portalChildren?: React.OctaneNode;
++  beforeTrigger?: React.OctaneNode;
++  betweenTriggerAndPortal?: React.OctaneNode;
++  afterPortal?: React.OctaneNode;
+ };
+ 
+ function ContainedTriggerTooltip(props: TestTooltipProps) {

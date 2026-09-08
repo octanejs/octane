@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'octane';
+import { useEffect, useLayoutEffect } from 'octane';
 
 function Leaf(props) @{
 	useLayoutEffect((log) => {
@@ -58,5 +58,31 @@ export function CrossDepthRefs(props) @{
 	<>
 		<RefLeaf name="shallowRef" log={props.log} />
 		<RefBranch log={props.log} />
+	</>
+}
+
+// Each level owns both phases. A depth-only sort would place the later branch
+// ahead of the shallow sibling, while an enqueue-only sort would place each
+// ancestor ahead of its child.
+function NestedLifecycle(props) @{
+	useLayoutEffect((log, depth, version) => {
+		log.push('layout ' + depth + ':' + version);
+		return () => log.push('~layout ' + depth + ':' + version);
+	}, [props.log, props.depth, props.version]);
+	useEffect((log, depth, version) => {
+		log.push('passive ' + depth + ':' + version);
+		return () => log.push('~passive ' + depth + ':' + version);
+	}, [props.log, props.depth, props.version]);
+	@if (props.depth > 0) {
+		<NestedLifecycle depth={props.depth - 1} version={props.version} log={props.log} />
+	} @else {
+		<span>{props.version}</span>
+	}
+}
+
+export function NestedLifecycleOrder(props) @{
+	<>
+		<Leaf name="shallow" log={props.log} />
+		<NestedLifecycle depth={props.depth} version={props.version} log={props.log} />
 	</>
 }

@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { OctaneCompat } from 'octane/react';
-import { drainPassiveEffects } from '../../src/index';
+import { act as octaneAct, drainPassiveEffects } from '../../src/index';
 import { executeHydrationFixture } from '../_hydration-ssr';
 import { h, mountReactHost, reactAct } from './_react-host';
 import { Web3HostContext } from './_fixtures/web3-host-context';
@@ -212,13 +212,15 @@ describe('incremental React adoption — Wagmi and RainbowKit island', () => {
 		expect(serverConnectButton?.textContent).toBe('Connect Wallet');
 
 		const errors = (consoleErrorSpy = vi.spyOn(console, 'error'));
-		await reactAct(async () => {
-			hydratedRoot = hydrateRoot(
-				container,
-				h(ReactWeb3Host, { ...props, route: 'portfolio' }) as never,
-			);
+		await octaneAct(async () => {
+			await reactAct(async () => {
+				hydratedRoot = hydrateRoot(
+					container,
+					h(ReactWeb3Host, { ...props, route: 'portfolio' }) as never,
+				);
+			});
+			await flushHostedEffects();
 		});
-		await flushHostedEffects();
 		expect(errors).not.toHaveBeenCalled();
 		errors.mockRestore();
 		consoleErrorSpy = undefined;

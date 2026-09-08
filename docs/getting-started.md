@@ -162,8 +162,10 @@ buffered (`renderToString`) or streaming (`renderToPipeableStream` /
 
 Buffered renders hand back `{ html, css }`. Hoisted `<title>`, `<meta>`, and
 `<link>` fold into `html` (as in React 19), and `css` is the deduped scoped
-`<style>` tags, which the client's `injectStyle` matches during hydration so
-styles cross the boundary exactly once.
+`<style>` tags — one per style scope the render executed, so a component with
+nested or control-flow scopes contributes several — which the client's
+`injectStyle` matches by hash during hydration so styles cross the boundary
+exactly once.
 
 ```ts
 // entry-server.ts

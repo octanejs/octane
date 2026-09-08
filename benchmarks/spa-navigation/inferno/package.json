@@ -1,0 +1,18 @@
+{
+  "name": "inferno-spa-navigation-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Native Inferno SPA-navigation fixture with routed subtree mount and teardown operations.",
+  "scripts": {
+    "dev": "vite --host --port 5328 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5328 --strictPort"
+  },
+  "dependencies": {
+    "inferno": "catalog:default"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}

@@ -1,4 +1,24 @@
 import { Hydrate, Suspense, use, useId, useState } from 'octane';
+import { Suspense as RetrySiblingSuspense, type HydrateProps } from 'octane';
+
+type HydrationGate = { pending: boolean; promise: Promise<void> };
+function DelayedHydrationButton({ gate }: { gate: HydrationGate }) {
+	if (gate.pending) throw gate.promise;
+	const [count, setCount] = useState(0);
+	return <button
+		data-delayed-hydration=""
+		onClick={() => setCount(count + 1)}
+	>{count as number}</button>;
+}
+
+export function DelayedHydrationBoundary({ gate }: { gate: HydrationGate }) {
+	return <>
+		<span>Shell</span>
+		<Suspense fallback="Loading">
+			<DelayedHydrationButton gate={gate} />
+		</Suspense>
+	</>;
+}
 
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the
@@ -11,6 +31,41 @@ import { Hydrate, Suspense, use, useId, useState } from 'octane';
 export function AsyncLeaf(props) @{
 	const value = use(props.promise);
 	<div id="leaf">{value as string}</div>
+}
+
+type ReplayedStreamProps = {
+	promise: Promise<string>;
+	onClick?: (value: string) => void;
+};
+
+function ReplayedStreamContent(props: ReplayedStreamProps & { parentSettled: boolean }) @{
+	const [settled, setSettled] = useState(false);
+	if (!settled) setSettled(true);
+	@try {
+		const value = use(props.promise);
+		const contentId = useId();
+		<button
+			id={contentId}
+			data-replayed-stream=""
+			onClick={() => props.onClick?.(value)}
+		>{(props.parentSettled && settled ? 'Accepted: ' : 'Discarded: ') + value as string}</button>
+	} @pending {
+		<p>{'Waiting for replayed content'}</p>
+	}
+}
+
+export function ReplayedStreamBoundary(props: ReplayedStreamProps) @{
+	const [settled, setSettled] = useState(false);
+	const shellId = useId();
+	if (!settled) setSettled(true);
+	<main aria-describedby={shellId}>
+		<p id={shellId}>{'Replay shell'}</p>
+		<ReplayedStreamContent
+			parentSettled={settled}
+			promise={props.promise}
+			onClick={props.onClick}
+		/>
+	</main>
 }
 
 export function DeferredAsyncLeaf(props) @{
@@ -33,6 +88,34 @@ export function DeferredStreamedSuspense(props) @{
 			<DeferredStreamedButton promise={props.promise} onClick={props.onClick} />
 		</Suspense>
 	</Hydrate>
+}
+
+function HydrationRetrySibling(props: { promise: Promise<string> }) @{
+	const [show, setShow] = useState(true);
+	<aside>
+		<button id="remove-stream-sibling" onClick={() => setShow(false)}>{'Remove sibling'}</button>
+		@if (show) {
+			<RetrySiblingSuspense fallback={<span id="stream-sibling-pending">{'Loading sibling'}</span>}>
+				<AsyncLeaf promise={props.promise} />
+			</RetrySiblingSuspense>
+		}
+	</aside>
+}
+
+export function DeferredStreamWithRetrySibling(props: Pick<HydrateProps, 'when' | 'onHydrated'> & {
+	promise: Promise<string>;
+	siblingPromise: Promise<string>;
+	onClick?: (value: string) => void;
+}) @{
+	<main>
+		<DeferredStreamedSuspense
+			promise={props.promise}
+			when={props.when}
+			onClick={props.onClick}
+			onHydrated={props.onHydrated}
+		/>
+		<HydrationRetrySibling promise={props.siblingPromise} />
+	</main>
 }
 
 function NestedDeferredStreamedButton(props) @{
@@ -118,6 +201,41 @@ export function Boundary(props) @{
 			<span class="loading">{'loading'}</span>
 		} @catch (err) {
 			<span class="err">{err.message as string}</span>
+		}
+	</div>
+}
+
+export function ThrownResourceBoundary(props: { read: () => string; promise: Promise<string> }) @{
+	<div>
+		@try {
+			const resource = props.read();
+			const seeded = use(props.promise);
+			<span class="resource-value">{resource + ':' + seeded as string}</span>
+		} @pending {
+			<span class="resource-loading">loading resource</span>
+		} @catch (error: unknown, _reset: () => void) {
+			<span class="resource-error">{String(error)}</span>
+		}
+	</div>
+}
+
+export function ThrownResourceFallbackBoundary(props: {
+	primaryRead: () => string;
+	fallbackRead: () => string;
+}) @{
+	<div>
+		@try {
+			@try {
+				<span class="resource-primary">{props.primaryRead() as string}</span>
+			} @pending {
+				<span class="resource-fallback">{props.fallbackRead() as string}</span>
+			} @catch (error: unknown, _reset: () => void) {
+				<span class="resource-inner-error">{String(error)}</span>
+			}
+		} @pending {
+			<span class="resource-outer-loading">loading outer resource</span>
+		} @catch (error: unknown, _reset: () => void) {
+			<span class="resource-outer-error">{String(error)}</span>
 		}
 	</div>
 }
@@ -209,6 +327,44 @@ export function NestedRejectionBoundary(props) @{
 	</div>
 }
 
+// Wayfinder-shaped streamed rejection: the try arm calls a factory through
+// use(), so the compiler emits seedOrCreate. Hydration must adopt the streamed
+// @catch DOM instead of minting a second alert beside it.
+async function loadFactoryForecast(scenario: string, attempt: number): Promise<string> {
+	await Promise.resolve();
+	if (scenario === 'weather-failure' && attempt === 0) {
+		throw new Error('The Kyoto forecast desk did not answer.');
+	}
+	return 'Clear mornings, cool after dusk.';
+}
+
+export function FactoryRejectionBoundary(props: { scenario: string }) @{
+	const [attempt, setAttempt] = useState(0);
+	<section class="weather-card">
+		@try {
+			const summary = use(loadFactoryForecast(props.scenario, attempt));
+			<h2 class="factory-ok">{summary}</h2>
+		} @pending {
+			<p class="factory-pending">Checking the local weather…</p>
+		} @catch (_error, reset) {
+			<div class="factory-error weather-error" role="alert">
+				<h2>The local weather desk did not answer.</h2>
+				<button
+					type="button"
+					onClick={function () {
+						setAttempt(function (current) {
+							return current + 1;
+						});
+						reset();
+					}}
+				>
+					Retry local forecast
+				</button>
+			</div>
+		}
+	</section>
+}
+
 // The inner catch deliberately rethrows the raw reason. Hydration must retain
 // its private adoption token while unwinding so the outer catch can claim the
 // already-rendered server range without exposing the token to user code.
@@ -296,19 +452,21 @@ export function IdBoundary(props) @{
 // hydration container's first children are style tags — hydrateRoot must skip
 // them when positioning the adoption cursor.
 export function StyledBoundary(props) @{
-	<div id="sbox" class="frame">
-		@try {
-			const value = use(props.promise);
-			<span class="ok">{value as string}</span>
-		} @pending {
-			<span class="loading">{'loading'}</span>
-		}
+	<>
 		<style>
 			.frame {
 				color: rgb(1, 2, 3);
 			}
 		</style>
-	</div>
+		<div id="sbox" class="frame">
+			@try {
+				const value = use(props.promise);
+				<span class="ok">{value as string}</span>
+			} @pending {
+				<span class="loading">{'loading'}</span>
+			}
+		</div>
+	</>
 }
 
 function LateStyledContent(props) @{

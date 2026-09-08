@@ -4,6 +4,13 @@ An experimental React Three Fiber 9-compatible web renderer for Octane. Octane
 keeps ownership of component execution, hooks, context, Suspense, refs, and
 effects; this package supplies the Three-specific host layer.
 
+## Installation
+
+```sh
+npm install @octanejs/three three
+pnpm add @octanejs/three three
+```
+
 Milestones 0–10 are implemented across this package and Octane's renderer SDK
 foundation. The current technical preview includes:
 

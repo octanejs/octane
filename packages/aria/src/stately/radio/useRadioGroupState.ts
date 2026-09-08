@@ -1,9 +1,13 @@
+interface FocusEvents {
+	onFocus?: (event: FocusEvent) => void;
+	onBlur?: (event: FocusEvent) => void;
+	onFocusChange?: (isFocused: boolean) => void;
+}
 // Ported from react-stately (source: .react-spectrum/packages/react-stately/src/radio/useRadioGroupState.ts).
 // octane adaptations: public-hook slot threading (splitSlot/subSlot) per the binding
 // convention; the module-level instance/name counters port verbatim. The public
 // value-level `onChange` callback is unchanged (the onInput rule applies only to DOM wiring).
 import type {
-	FocusEvents,
 	HelpTextProps,
 	InputBase,
 	InputDOMProps,

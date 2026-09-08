@@ -1,12 +1,15 @@
 # Harbor
 
 A server-rendered **React 19** pricing page that hosts three compiled Octane
-islands through `<OctaneCompat>` (`octane/react`) — the repo's first
-React-hosted example, and the browser E2E regression fixture for the
-React↔Octane boundary that the compat plan calls for before public release.
-It is living proof of the homepage's "Incrementally migrate. With
-OctaneCompat." claim: React owns the shell (providers, header state, error
-boundary, streaming SSR server); Octane owns three islands.
+islands through `<OctaneCompat>` (`octane/react`). This example covers
+**React hosting Octane**: React owns the shell (providers, header state, error
+boundary, streaming SSR server), and Octane owns three islands.
+
+For React components inside an Octane app, use `ReactCompat` instead. The
+[React compatibility guide](https://octanejs.dev/docs/react-compat) covers both
+directions. In the [Playground](https://octanejs.dev/playground), choose
+**OctaneCompat in React (multi-file)** for Harbor's direction or
+**ReactCompat in Octane (multi-file)** for the reverse.
 
 ## What it proves
 

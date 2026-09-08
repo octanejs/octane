@@ -1,12 +1,16 @@
+import type { OctaneNode } from '../util/OctaneTypes.ts';
+
 // Port of container/ClipPathProvider.tsx — mints the chart's clip path id,
 // renders the <defs><clipPath> sized to the plot area, and provides the id.
 import { createContext, useContext, useState } from 'octane';
 import { uniqueId } from '../util/DataUtils';
 import { usePlotArea } from '../hooks';
 
-const ClipPathIdContext = createContext(undefined);
+const ClipPathIdContext = createContext<string | undefined>(undefined);
 
-export function ClipPathProvider(props) @{
+export function ClipPathProvider(props: {
+	children: OctaneNode;
+}) @{
 	const { children } = props;
 	const [clipPathId] = useState(uniqueId('recharts') + '-clip');
 	const plotArea = usePlotArea();

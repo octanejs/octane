@@ -1,0 +1,712 @@
+diff --git a/tests/upstream/src/field/root/FieldRoot.test.tsx b/tests/upstream/src/field/root/FieldRoot.test.tsx
+--- a/tests/upstream/src/field/root/FieldRoot.test.tsx
++++ b/tests/upstream/src/field/root/FieldRoot.test.tsx
+@@ -1,4 +1,12 @@
+ /** @jsxImportSource octane */
++import { FieldRootExtraFixture1 } from './../../../../fixtures/FieldRoot-extra-ssr.tsrx';
++import { FieldRootExtraFixture1 as ServerFieldRootExtraFixture1 } from './../../../../fixtures/FieldRoot-extra-ssr.tsrx?octane-ssr';
++registerServerComponent(FieldRootExtraFixture1, ServerFieldRootExtraFixture1);
++import { FieldRootHydrationFixture1, FieldRootHydrationFixture2 } from './../../../../fixtures/FieldRoot-functions-ssr.tsrx';
++import { FieldRootHydrationFixture1 as ServerFieldRootHydrationFixture1, FieldRootHydrationFixture2 as ServerFieldRootHydrationFixture2 } from './../../../../fixtures/FieldRoot-functions-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(FieldRootHydrationFixture1, ServerFieldRootHydrationFixture1);
++registerServerComponent(FieldRootHydrationFixture2, ServerFieldRootHydrationFixture2);
+ import { vi, expect, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { Form } from '@octanejs/base-ui/form';
+@@ -24,7 +32,7 @@ import { useFieldRootContext } from '../../internals/field-root-context/FieldRoo
+ 
+ type ActivityProps = {
+   mode: 'visible' | 'hidden';
+-  children: React.ReactNode;
++  children: React.OctaneNode;
+ };
+ 
+ const Activity = (React as typeof React & { Activity: React.ComponentType<ActivityProps> })
+@@ -43,8 +51,8 @@ describe('<Field.Root />', () => {
+     children,
+     ...rootProps
+   }: React.ComponentProps<typeof Field.Root> & {
+-    firstControl: React.ReactNode;
+-    secondControl: React.ReactNode;
++    firstControl: React.OctaneNode;
++    secondControl: React.OctaneNode;
+   }) {
+     const [swapped, setSwapped] = React.useState(false);
+     return (
+@@ -219,13 +227,7 @@ describe('<Field.Root />', () => {
+ 
+   it.skipIf(isJSDOM)('does not set `aria-labelledby` during SSR when Field.Label is absent', () => {
+     renderToString(
+-      <Field.Root>
+-        <Select.Root>
+-          <Select.Trigger data-testid="trigger">
+-            <Select.Value placeholder="Pick one" />
+-          </Select.Trigger>
+-        </Select.Root>
+-      </Field.Root>,
++      <FieldRootExtraFixture1 />,
+     );
+ 
+     expect(screen.getByTestId('trigger')).not.toHaveAttribute('aria-labelledby');
+@@ -234,33 +236,9 @@ describe('<Field.Root />', () => {
+   it.skipIf(isJSDOM)(
+     'keeps `aria-labelledby` valid when toggling from Checkbox.Root to Select.Root after hydration',
+     async () => {
+-      function TestCase() {
+-        const [showSelect, setShowSelect] = React.useState(false);
+-
+-        return (
+-          <React.Fragment>
+-            <Field.Root>
+-              <Field.Label nativeLabel={false} render={<div />} data-testid="label">
+-                Label
+-              </Field.Label>
+-              {showSelect ? (
+-                <Select.Root>
+-                  <Select.Trigger data-testid="trigger">
+-                    <Select.Value placeholder="Pick one" />
+-                  </Select.Trigger>
+-                </Select.Root>
+-              ) : (
+-                <Checkbox.Root data-testid="checkbox" />
+-              )}
+-            </Field.Root>
+-            <button type="button" onClick={() => setShowSelect((prev) => !prev)}>
+-              Toggle
+-            </button>
+-          </React.Fragment>
+-        );
+-      }
++      
+ 
+-      const { hydrate } = renderToString(<TestCase />);
++      const { hydrate } = renderToString(<FieldRootHydrationFixture1 />);
+       const label = screen.getByTestId('label');
+       const checkbox = screen.getByTestId('checkbox');
+ 
+@@ -286,31 +264,9 @@ describe('<Field.Root />', () => {
+   it.skipIf(isJSDOM)(
+     'removes `aria-labelledby` when Field.Label is removed after hydration',
+     async () => {
+-      function TestCase() {
+-        const [showLabel, setShowLabel] = React.useState(true);
+-
+-        return (
+-          <React.Fragment>
+-            <Field.Root>
+-              {showLabel ? (
+-                <Field.Label nativeLabel={false} render={<div />} data-testid="label">
+-                  Label
+-                </Field.Label>
+-              ) : null}
+-              <Select.Root>
+-                <Select.Trigger data-testid="trigger">
+-                  <Select.Value placeholder="Pick one" />
+-                </Select.Trigger>
+-              </Select.Root>
+-            </Field.Root>
+-            <button type="button" onClick={() => setShowLabel(false)}>
+-              Remove Label
+-            </button>
+-          </React.Fragment>
+-        );
+-      }
++      
+ 
+-      const { hydrate } = renderToString(<TestCase />);
++      const { hydrate } = renderToString(<FieldRootHydrationFixture2 />);
+       const label = screen.getByTestId('label');
+       const trigger = screen.getByTestId('trigger');
+ 
+@@ -587,7 +543,7 @@ describe('<Field.Root />', () => {
+       expect(message).toBe(null);
+ 
+       fireEvent.focus(control);
+-      fireEvent.change(control, { target: { value: 'abc' } });
++      fireEvent.input(control, { target: { value: 'abc' } });
+       expect(validateSpy.mock.calls.length).toBe(0);
+       expect(screen.queryByText('error')).toBe(null);
+ 
+@@ -620,11 +576,11 @@ describe('<Field.Root />', () => {
+ 
+       fireEvent.focus(input);
+       // revalidate
+-      fireEvent.change(input, { target: { value: 'ab' } });
++      fireEvent.input(input, { target: { value: 'ab' } });
+       expect(screen.queryByText('value missing')).toBe(null);
+       expect(screen.queryByText('custom error')).not.toBe(null);
+ 
+-      fireEvent.change(input, { target: { value: '' } });
++      fireEvent.input(input, { target: { value: '' } });
+       expect(screen.queryByText('value missing')).not.toBe(null);
+       // expect(screen.queryByText('custom error')).toBe(null);
+     });
+@@ -652,7 +608,7 @@ describe('<Field.Root />', () => {
+ 
+         const control = screen.getByTestId('control');
+ 
+-        fireEvent.change(control, { target: { value: 'abc' } });
++        fireEvent.input(control, { target: { value: 'abc' } });
+ 
+         expect(control).not.toHaveAttribute('aria-invalid');
+         expect(control).not.toHaveAttribute('data-invalid');
+@@ -694,7 +650,7 @@ describe('<Field.Root />', () => {
+           const root = screen.getByTestId('root');
+           const control = screen.getByTestId('control');
+ 
+-          fireEvent.change(control, { target: { value: 'taken' } });
++          fireEvent.input(control, { target: { value: 'taken' } });
+           if (validationMode === 'onBlur') {
+             fireEvent.blur(control);
+           } else if (validationMode === 'onSubmit') {
+@@ -738,7 +694,7 @@ describe('<Field.Root />', () => {
+           const root = screen.getByTestId('root');
+           const control = screen.getByTestId('control');
+ 
+-          fireEvent.change(control, { target: { value: 'good' } });
++          fireEvent.input(control, { target: { value: 'good' } });
+           if (validationMode === 'onBlur') {
+             fireEvent.blur(control);
+           }
+@@ -754,7 +710,7 @@ describe('<Field.Root />', () => {
+             fireEvent.focus(control);
+             fireEvent.blur(control);
+           } else {
+-            fireEvent.change(control, { target: { value: 'taken' } });
++            fireEvent.input(control, { target: { value: 'taken' } });
+           }
+ 
+           // A valid result never blocks submission, so it retires to neutral mid-flight.
+@@ -801,7 +757,7 @@ describe('<Field.Root />', () => {
+           const root = screen.getByTestId('root');
+           const control = screen.getByTestId('control');
+ 
+-          fireEvent.change(control, { target: { value: 'taken' } });
++          fireEvent.input(control, { target: { value: 'taken' } });
+           if (validationMode === 'onBlur') {
+             fireEvent.blur(control);
+           }
+@@ -819,7 +775,7 @@ describe('<Field.Root />', () => {
+             fireEvent.focus(control);
+             fireEvent.blur(control);
+           } else {
+-            fireEvent.change(control, { target: { value: 'taken2' } });
++            fireEvent.input(control, { target: { value: 'taken2' } });
+           }
+ 
+           // The resolved error stays published mid-flight so it keeps blocking submission.
+@@ -868,7 +824,7 @@ describe('<Field.Root />', () => {
+         const root = screen.getByTestId('root');
+         const control = screen.getByTestId('control');
+ 
+-        fireEvent.change(control, { target: { value: 'nope' } });
++        fireEvent.input(control, { target: { value: 'nope' } });
+ 
+         await act(async () => {
+           resolvers[resolvers.length - 1](null);
+@@ -877,7 +833,7 @@ describe('<Field.Root />', () => {
+ 
+         expect(root).toHaveAttribute('data-invalid', '');
+ 
+-        fireEvent.change(control, { target: { value: 'name@example.com' } });
++        fireEvent.input(control, { target: { value: 'name@example.com' } });
+ 
+         // `nextState` already carries the fresh native verdict, so the previous native error must
+         // not survive the pending window and keep blocking submission.
+@@ -1401,7 +1357,7 @@ describe('<Field.Root />', () => {
+         fireEvent.click(screen.getByText('submit'));
+         expect(screen.queryByTestId('error')).not.toBe(null);
+ 
+-        fireEvent.change(control, { target: { value: 'http://example' } });
++        fireEvent.input(control, { target: { value: 'http://example' } });
+         expect(screen.queryByTestId('error')).toBe(null);
+       });
+     });
+@@ -1426,7 +1382,7 @@ describe('<Field.Root />', () => {
+ 
+         expect(message).toBe(null);
+ 
+-        fireEvent.change(control, { target: { value: 't' } });
++        fireEvent.input(control, { target: { value: 't' } });
+ 
+         expect(control).toHaveAttribute('data-invalid', '');
+         expect(control).toHaveAttribute('aria-invalid', 'true');
+@@ -1453,7 +1409,7 @@ describe('<Field.Root />', () => {
+ 
+         expect(message).toBe(null);
+ 
+-        fireEvent.change(control, { target: { value: 't' } });
++        fireEvent.input(control, { target: { value: 't' } });
+ 
+         expect(control).not.toHaveAttribute('data-invalid');
+ 
+@@ -1514,8 +1470,8 @@ describe('<Field.Root />', () => {
+         const control = screen.getByTestId('control');
+ 
+         fireEvent.focus(control);
+-        fireEvent.change(control, { target: { value: 'a' } });
+-        fireEvent.change(control, { target: { value: '' } });
++        fireEvent.input(control, { target: { value: 'a' } });
++        fireEvent.input(control, { target: { value: '' } });
+         fireEvent.blur(control);
+ 
+         expect(control).toHaveAttribute('data-invalid', '');
+@@ -1562,8 +1518,8 @@ describe('<Field.Root />', () => {
+ 
+         const control = screen.getByRole<HTMLInputElement>('textbox');
+ 
+-        fireEvent.change(control, { target: { value: 'old' } });
+-        fireEvent.change(control, { target: { value: 'new' } });
++        fireEvent.input(control, { target: { value: 'old' } });
++        fireEvent.input(control, { target: { value: 'new' } });
+ 
+         await act(async () => {
+           resolvers.new(null);
+@@ -1603,8 +1559,8 @@ describe('<Field.Root />', () => {
+         expect(error).toBe(null);
+ 
+         fireEvent.focus(control);
+-        fireEvent.change(control, { target: { value: 'a' } });
+-        fireEvent.change(control, { target: { value: '' } });
++        fireEvent.input(control, { target: { value: 'a' } });
++        fireEvent.input(control, { target: { value: '' } });
+         fireEvent.blur(control);
+ 
+         error = screen.getByTestId('error');
+@@ -1643,13 +1599,13 @@ describe('<Field.Root />', () => {
+           expect(message).toBe(null);
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: 't' } });
++          fireEvent.input(control, { target: { value: 't' } });
+           fireEvent.blur(control);
+ 
+           expect(control).not.toHaveAttribute('aria-invalid', 'true');
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: '' } });
++          fireEvent.input(control, { target: { value: '' } });
+           fireEvent.blur(control);
+ 
+           expect(control).toHaveAttribute('aria-invalid');
+@@ -1674,19 +1630,19 @@ describe('<Field.Root />', () => {
+           expect(control).not.toHaveAttribute('aria-invalid');
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: 'tt' } });
++          fireEvent.input(control, { target: { value: 'tt' } });
+           fireEvent.blur(control);
+ 
+           expect(control).toHaveAttribute('aria-invalid', 'true');
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: '' } });
++          fireEvent.input(control, { target: { value: '' } });
+           fireEvent.blur(control);
+ 
+           expect(control).toHaveAttribute('aria-invalid', 'true');
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: 'email@email.com' } });
++          fireEvent.input(control, { target: { value: 'email@email.com' } });
+           fireEvent.blur(control);
+ 
+           expect(control).not.toHaveAttribute('aria-invalid');
+@@ -1708,14 +1664,14 @@ describe('<Field.Root />', () => {
+           const control = screen.getByTestId('control');
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: 'invalid' } });
++          fireEvent.input(control, { target: { value: 'invalid' } });
+           fireEvent.blur(control);
+ 
+           expect(screen.getByTestId('type-error')).not.toBe(null);
+           expect(screen.queryByTestId('required-error')).toBe(null);
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: '' } });
++          fireEvent.input(control, { target: { value: '' } });
+ 
+           expect(screen.queryByTestId('type-error')).toBe(null);
+           expect(screen.getByTestId('required-error')).not.toBe(null);
+@@ -1737,15 +1693,15 @@ describe('<Field.Root />', () => {
+           expect(screen.queryByTestId('error')).toBe(null);
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: 'a' } });
+-          fireEvent.change(control, { target: { value: '' } });
++          fireEvent.input(control, { target: { value: 'a' } });
++          fireEvent.input(control, { target: { value: '' } });
+           fireEvent.blur(control);
+ 
+           expect(control).toHaveAttribute('aria-invalid', 'true');
+           expect(screen.getByTestId('error')).not.toBe(null);
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: 't' } });
++          fireEvent.input(control, { target: { value: 't' } });
+ 
+           // The field becomes temporarily valid because only 'valueMissing' is checked for immediate clearing.
+           // Other errors like 'typeMismatch' are deferred to the next blur/submit.
+@@ -1759,7 +1715,7 @@ describe('<Field.Root />', () => {
+           expect(screen.getByTestId('error').textContent).not.toBe('');
+ 
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: 'test@example.com' } });
++          fireEvent.input(control, { target: { value: 'test@example.com' } });
+ 
+           expect(control).not.toHaveAttribute('aria-invalid', 'true');
+           expect(screen.queryByTestId('error')).toBe(null);
+@@ -1799,8 +1755,8 @@ describe('<Field.Root />', () => {
+ 
+           // Mark as touched and dirtied
+           fireEvent.focus(control);
+-          fireEvent.change(control, { target: { value: 'a' } });
+-          fireEvent.change(control, { target: { value: '' } });
++          fireEvent.input(control, { target: { value: 'a' } });
++          fireEvent.input(control, { target: { value: '' } });
+           fireEvent.blur(control);
+ 
+           // valueMissing is true, and markedDirtyRef is true, so valid should be false
+@@ -1854,13 +1810,13 @@ describe('<Field.Root />', () => {
+ 
+       expect(message).toBe(null);
+ 
+-      fireEvent.change(control, { target: { value: 't' } });
++      fireEvent.input(control, { target: { value: 't' } });
+ 
+       expect(control).not.toHaveAttribute('aria-invalid');
+ 
+       clock.tick(99);
+ 
+-      fireEvent.change(control, { target: { value: 'te' } });
++      fireEvent.input(control, { target: { value: 'te' } });
+ 
+       clock.tick(99);
+ 
+@@ -1960,7 +1916,7 @@ describe('<Field.Root />', () => {
+ 
+       await renderFakeTimers(<App />);
+ 
+-      fireEvent.change(screen.getByTestId('control'), { target: { value: 'abc' } });
++      fireEvent.input(screen.getByTestId('control'), { target: { value: 'abc' } });
+ 
+       clock.tick(99);
+ 
+@@ -1990,12 +1946,12 @@ describe('<Field.Root />', () => {
+ 
+       const control = screen.getByRole<HTMLInputElement>('textbox');
+ 
+-      fireEvent.change(control, { target: { value: 'old' } });
++      fireEvent.input(control, { target: { value: 'old' } });
+       clock.tick(100);
+ 
+       expect(validate.mock.lastCall?.[0]).toBe('old');
+ 
+-      fireEvent.change(control, { target: { value: 'new' } });
++      fireEvent.input(control, { target: { value: 'new' } });
+ 
+       await act(async () => {
+         resolvers.old('old error');
+@@ -2044,7 +2000,7 @@ describe('<Field.Root />', () => {
+ 
+       await render(<App />);
+ 
+-      fireEvent.change(screen.getByTestId('control'), { target: { value: 'abc' } });
++      fireEvent.input(screen.getByTestId('control'), { target: { value: 'abc' } });
+       expect(validate).toHaveBeenCalledTimes(1);
+ 
+       fireEvent.click(screen.getByText('unmount'));
+@@ -2090,7 +2046,7 @@ describe('<Field.Root />', () => {
+       const control = screen.getByTestId('control');
+ 
+       fireEvent.focus(control);
+-      fireEvent.change(control, { target: { value: 'taken' } });
++      fireEvent.input(control, { target: { value: 'taken' } });
+       fireEvent.blur(control);
+       await flushMicrotasks();
+ 
+@@ -2134,7 +2090,7 @@ describe('<Field.Root />', () => {
+ 
+       await renderFakeTimers(<App />);
+ 
+-      fireEvent.change(screen.getByTestId('control'), { target: { value: 'abc' } });
++      fireEvent.input(screen.getByTestId('control'), { target: { value: 'abc' } });
+ 
+       clock.tick(99);
+ 
+@@ -2162,7 +2118,7 @@ describe('<Field.Root />', () => {
+         </Field.Root>,
+       );
+ 
+-      fireEvent.change(screen.getByTestId('control'), { target: { value: 'abc' } });
++      fireEvent.input(screen.getByTestId('control'), { target: { value: 'abc' } });
+ 
+       clock.tick(100);
+ 
+@@ -2206,7 +2162,7 @@ describe('<Field.Root />', () => {
+       const control = screen.getByTestId<HTMLInputElement>('control');
+       control.setCustomValidity('external error');
+ 
+-      fireEvent.change(control, { target: { value: 'abc' } });
++      fireEvent.input(control, { target: { value: 'abc' } });
+ 
+       expect(control.validationMessage).toBe('external error');
+       expect(control).toHaveAttribute('data-invalid', '');
+@@ -2224,13 +2180,13 @@ describe('<Field.Root />', () => {
+       const control = screen.getByTestId<HTMLInputElement>('control');
+ 
+       fireEvent.focus(control);
+-      fireEvent.change(control, { target: { value: 'a' } });
+-      fireEvent.change(control, { target: { value: '' } });
++      fireEvent.input(control, { target: { value: 'a' } });
++      fireEvent.input(control, { target: { value: '' } });
+       fireEvent.blur(control);
+       expect(control).toHaveAttribute('data-invalid', '');
+ 
+       control.setCustomValidity('external error');
+-      fireEvent.change(control, { target: { value: 'abc' } });
++      fireEvent.input(control, { target: { value: 'abc' } });
+ 
+       expect(control.validationMessage).toBe('external error');
+       expect(control).toHaveAttribute('data-invalid', '');
+@@ -2252,13 +2208,13 @@ describe('<Field.Root />', () => {
+       const control = screen.getByRole<HTMLInputElement>('textbox');
+ 
+       fireEvent.focus(control);
+-      fireEvent.change(control, { target: { value: 'a' } });
+-      fireEvent.change(control, { target: { value: '' } });
++      fireEvent.input(control, { target: { value: 'a' } });
++      fireEvent.input(control, { target: { value: '' } });
+       fireEvent.blur(control);
+       expect(control).toHaveAttribute('data-invalid', '');
+ 
+       control.setCustomValidity('external error');
+-      fireEvent.change(control, { target: { value: 'abc' } });
++      fireEvent.input(control, { target: { value: 'abc' } });
+ 
+       expect(screen.queryByTestId('type-mismatch')).toBe(null);
+       expect(handleValidity.mock.lastCall?.[0].validity.typeMismatch).toBe(false);
+@@ -2280,11 +2236,11 @@ describe('<Field.Root />', () => {
+ 
+       const control = screen.getByTestId<HTMLInputElement>('control');
+ 
+-      fireEvent.change(control, { target: { value: 'bad' } });
++      fireEvent.input(control, { target: { value: 'bad' } });
+ 
+       expect(control.validationMessage).toBe('custom error\nmore');
+ 
+-      fireEvent.change(control, { target: { value: 'good' } });
++      fireEvent.input(control, { target: { value: 'good' } });
+ 
+       expect(control.validationMessage).toBe('');
+       expect(screen.queryByTestId('error')).toBe(null);
+@@ -2304,11 +2260,11 @@ describe('<Field.Root />', () => {
+       const control = screen.getByTestId<HTMLInputElement>('control');
+       control.setCustomValidity('external error');
+ 
+-      fireEvent.change(control, { target: { value: 'bad' } });
++      fireEvent.input(control, { target: { value: 'bad' } });
+ 
+       expect(control.validationMessage).toBe('custom error');
+ 
+-      fireEvent.change(control, { target: { value: 'good' } });
++      fireEvent.input(control, { target: { value: 'good' } });
+ 
+       expect(control.validationMessage).toBe('external error');
+       expect(screen.getByTestId('error')).toHaveTextContent('external error');
+@@ -2328,13 +2284,13 @@ describe('<Field.Root />', () => {
+       const control = screen.getByTestId<HTMLInputElement>('control');
+       control.setCustomValidity('external error');
+ 
+-      fireEvent.change(control, { target: { value: 'bad' } });
++      fireEvent.input(control, { target: { value: 'bad' } });
+ 
+       expect(control.validationMessage).toBe('custom error');
+ 
+       control.setCustomValidity('');
+ 
+-      fireEvent.change(control, { target: { value: 'good' } });
++      fireEvent.input(control, { target: { value: 'good' } });
+ 
+       expect(control.validationMessage).toBe('');
+       expect(screen.queryByTestId('error')).toBe(null);
+@@ -2392,10 +2348,10 @@ describe('<Field.Root />', () => {
+ 
+       const control = screen.getByTestId<HTMLInputElement>('control');
+ 
+-      fireEvent.change(control, { target: { value: 'bad' } });
++      fireEvent.input(control, { target: { value: 'bad' } });
+       expect(control.validationMessage).toBe('custom error');
+ 
+-      fireEvent.change(control, { target: { value: 'a@b.co' } });
++      fireEvent.input(control, { target: { value: 'a@b.co' } });
+ 
+       expect(control.validity.customError).toBe(false);
+       expect(control.validationMessage).toBe('');
+@@ -2462,7 +2418,7 @@ describe('<Field.Root />', () => {
+         expect(control.willValidate).toBe(false);
+         control.setCustomValidity('external error');
+ 
+-        fireEvent.change(control, { target: { value: 'abc' } });
++        fireEvent.input(control, { target: { value: 'abc' } });
+ 
+         expect(control).not.toHaveAttribute('data-invalid');
+         expect(screen.queryByTestId('error')).toBe(null);
+@@ -2495,7 +2451,7 @@ describe('<Field.Root />', () => {
+       const control = screen.getByTestId<HTMLInputElement>('control');
+       control.setCustomValidity('external error');
+ 
+-      fireEvent.change(control, { target: { value: 'abc' } });
++      fireEvent.input(control, { target: { value: 'abc' } });
+ 
+       expect(screen.getByTestId('error')).toHaveTextContent('custom error');
+ 
+@@ -2561,14 +2517,14 @@ describe('<Field.Root />', () => {
+         expect(label).not.toHaveAttribute('data-dirty');
+         expect(description).not.toHaveAttribute('data-dirty');
+ 
+-        fireEvent.change(control, { target: { value: 'value' } });
++        fireEvent.input(control, { target: { value: 'value' } });
+ 
+         expect(root).toHaveAttribute('data-dirty', '');
+         expect(control).toHaveAttribute('data-dirty', '');
+         expect(label).toHaveAttribute('data-dirty', '');
+         expect(description).toHaveAttribute('data-dirty', '');
+ 
+-        fireEvent.change(control, { target: { value: '' } });
++        fireEvent.input(control, { target: { value: '' } });
+ 
+         expect(root).not.toHaveAttribute('data-dirty');
+         expect(control).not.toHaveAttribute('data-dirty');
+@@ -2590,12 +2546,12 @@ describe('<Field.Root />', () => {
+ 
+         expect(root).not.toHaveAttribute('data-dirty');
+ 
+-        fireEvent.change(control, { target: { value: '5' } });
++        fireEvent.input(control, { target: { value: '5' } });
+         await waitFor(() => {
+           expect(root).toHaveAttribute('data-dirty', '');
+         });
+ 
+-        fireEvent.change(control, { target: { value: '' } });
++        fireEvent.input(control, { target: { value: '' } });
+         await waitFor(() => {
+           expect(root).not.toHaveAttribute('data-dirty');
+         });
+@@ -2703,10 +2659,10 @@ describe('<Field.Root />', () => {
+         const control = screen.getByTestId('control');
+         expect(root).not.toHaveAttribute('data-dirty');
+ 
+-        fireEvent.change(control, { target: { value: 'x' } });
++        fireEvent.input(control, { target: { value: 'x' } });
+         expect(root).toHaveAttribute('data-dirty', '');
+ 
+-        fireEvent.change(control, { target: { value: '' } });
++        fireEvent.input(control, { target: { value: '' } });
+         expect(root).not.toHaveAttribute('data-dirty');
+       });
+ 
+@@ -2731,7 +2687,7 @@ describe('<Field.Root />', () => {
+         await render(<App />);
+         const root = screen.getByTestId('root');
+ 
+-        fireEvent.change(screen.getByTestId('control'), { target: { value: 'b' } });
++        fireEvent.input(screen.getByTestId('control'), { target: { value: 'b' } });
+         await waitFor(() => {
+           expect(root).toHaveAttribute('data-dirty', '');
+         });
+@@ -2741,7 +2697,7 @@ describe('<Field.Root />', () => {
+ 
+         expect(root).toHaveAttribute('data-dirty', '');
+ 
+-        fireEvent.change(screen.getByTestId('control'), { target: { value: 'a' } });
++        fireEvent.input(screen.getByTestId('control'), { target: { value: 'a' } });
+         await waitFor(() => {
+           expect(root).not.toHaveAttribute('data-dirty');
+         });
+@@ -2760,13 +2716,13 @@ describe('<Field.Root />', () => {
+         fireEvent.click(screen.getByText('swap'));
+         const control = screen.getByTestId('control');
+ 
+-        fireEvent.change(control, { target: { value: 'y' } });
++        fireEvent.input(control, { target: { value: 'y' } });
+         await waitFor(() => {
+           expect(root).toHaveAttribute('data-dirty', '');
+         });
+ 
+         // The baseline is still the field's original value, not the swapped-in control's default.
+-        fireEvent.change(control, { target: { value: 'a' } });
++        fireEvent.input(control, { target: { value: 'a' } });
+         await waitFor(() => {
+           expect(root).not.toHaveAttribute('data-dirty');
+         });
+@@ -2783,12 +2739,12 @@ describe('<Field.Root />', () => {
+         const root = screen.getByTestId('root');
+         const control = screen.getByTestId('control');
+ 
+-        fireEvent.change(control, { target: { value: '5' } });
++        fireEvent.input(control, { target: { value: '5' } });
+         await waitFor(() => {
+           expect(root).toHaveAttribute('data-dirty', '');
+         });
+ 
+-        fireEvent.change(control, { target: { value: '' } });
++        fireEvent.input(control, { target: { value: '' } });
+         await waitFor(() => {
+           expect(root).not.toHaveAttribute('data-dirty');
+         });
+@@ -2816,14 +2772,14 @@ describe('<Field.Root />', () => {
+         expect(label).not.toHaveAttribute('data-filled');
+         expect(description).not.toHaveAttribute('data-filled');
+ 
+-        fireEvent.change(control, { target: { value: 'value' } });
++        fireEvent.input(control, { target: { value: 'value' } });
+ 
+         expect(root).toHaveAttribute('data-filled', '');
+         expect(control).toHaveAttribute('data-filled', '');
+         expect(label).toHaveAttribute('data-filled', '');
+         expect(description).toHaveAttribute('data-filled', '');
+ 
+-        fireEvent.change(control, { target: { value: '' } });
++        fireEvent.input(control, { target: { value: '' } });
+ 
+         expect(root).not.toHaveAttribute('data-filled');
+         expect(control).not.toHaveAttribute('data-filled');
+@@ -2897,7 +2853,7 @@ describe('<Field.Root />', () => {
+ 
+   describe('defaultValue behavior', () => {
+     it('should not reset to defaultValue when input value is programmatically changed and then focused', async () => {
+-      const inputRef = React.createRef<HTMLInputElement>();
++      const inputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+       await render(
+         <Field.Root>
+@@ -2921,7 +2877,7 @@ describe('<Field.Root />', () => {
+     });
+ 
+     it('should not reset to defaultValue when input value is programmatically changed to non-empty value and then focused', async () => {
+-      const inputRef = React.createRef<HTMLInputElement>();
++      const inputRef = ({current:null} as React.RefObject<HTMLInputElement | null>);
+ 
+       await render(
+         <Field.Root>
+@@ -2985,7 +2941,7 @@ describe('<Field.Root />', () => {
+         </Field.Root>,
+       );
+ 
+-      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'changed' } });
++      fireEvent.input(screen.getByRole('textbox'), { target: { value: 'changed' } });
+ 
+       expect(screen.getByTestId('root')).not.toHaveAttribute('data-dirty');
+     });
+@@ -3090,7 +3046,7 @@ describe('<Field.Root />', () => {
+       const { user } = await render(<App />);
+       const control = screen.getByRole('textbox');
+ 
+-      fireEvent.change(control, { target: { value: 'valid' } });
++      fireEvent.input(control, { target: { value: 'valid' } });
+       await user.click(screen.getByText('validate'));
+ 
+       expect(validate.mock.lastCall?.[0]).toBe('valid');

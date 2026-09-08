@@ -8,11 +8,13 @@ import BuildTools from './docs/build-tools.mdx';
 import FrameworkIntegrations from './docs/framework-integrations.mdx';
 import Cli from './docs/cli.mdx';
 import CoreApis from './docs/core-apis.mdx';
+import Styling from './docs/styling.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
 import Lynx from './docs/lynx.mdx';
 import ReactCompat from './docs/react-compat.mdx';
 import PublishingLibraries from './docs/publishing-libraries.mdx';
+import BrowserSupport from './docs/browser-support.mdx';
 import Bindings from './docs/bindings.mdx';
 import Profiling from './docs/profiling.mdx';
 import { docsMeta, type DocMeta, type DocSection } from './docs-meta.ts';
@@ -29,12 +31,14 @@ const components: Record<string, DocEntry['component']> = {
 	'framework-integrations': FrameworkIntegrations,
 	cli: Cli,
 	'core-apis': CoreApis,
+	styling: Styling,
 	'tsrx-vs-tsx': TsrxVsTsx,
 	'differences-from-react': DifferencesFromReact,
 	lynx: Lynx,
 	'react-compat': ReactCompat,
 	profiling: Profiling,
 	'publishing-libraries': PublishingLibraries,
+	'browser-support': BrowserSupport,
 	bindings: Bindings,
 };
 

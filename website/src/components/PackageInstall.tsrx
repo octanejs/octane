@@ -141,56 +141,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 		document.getElementById(id + '-tab-' + choice)?.focus();
 	};
 
-	<div class="pkg">
-		<div class="pkg-head">
-			<div
-				class="pkg-tabs"
-				role="tablist"
-				aria-label={props.command === 'server-entry' ? 'JavaScript runtime' : 'Package manager'}
-				onKeyDown={onTablistKeyDown}
-			>
-				@for (const choice of choices; key choice) {
-					<button
-						type="button"
-						role="tab"
-						id={id + '-tab-' + choice}
-						aria-selected={selected === choice}
-						aria-controls={id + '-panel'}
-						tabIndex={selected === choice ? 0 : -1}
-						class={['pkg-tab', selected === choice && 'pkg-tab-active']}
-						onClick={() => setSelection(choice)}
-					>{choice as string}</button>
-				}
-			</div>
-			<button
-				type="button"
-				class="pkg-copy"
-				aria-label="Copy the command to the clipboard"
-				onClick={copyCommand}
-			>
-				<span
-					class="pkg-copy-icon"
-					style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
-					aria-hidden="true"
-				></span>
-				<span class="pkg-copy-label">
-					{copied ? 'Copied' : 'Copy'}
-				</span>
-			</button>
-		</div>
-		<pre
-			class="pkg-pre"
-			id={id + '-panel'}
-			role="tabpanel"
-			aria-labelledby={id + '-tab-' + selected}
-		>
-			<code class="pkg-code" ref={codeEl}>
-				@for (const tok of tokens; key tok.id) {
-					<span class={'pkg-tok-' + tok.kind}>{tok.text as string}</span>
-				}
-			</code>
-		</pre>
-
+	<>
 		<style>
 			.pkg {
 				margin: 1.4rem 0;
@@ -312,7 +263,57 @@ export function PackageInstall(props: PackageInstallProps) @{
 				color: var(--pkg-arg);
 			}
 		</style>
-	</div>
+		<div class="pkg">
+			<div class="pkg-head">
+				<div
+					class="pkg-tabs"
+					role="tablist"
+					aria-label={props.command === 'server-entry' ? 'JavaScript runtime' : 'Package manager'}
+					onKeyDown={onTablistKeyDown}
+				>
+					@for (const choice of choices; key choice) {
+						<button
+							type="button"
+							role="tab"
+							id={id + '-tab-' + choice}
+							aria-selected={selected === choice}
+							aria-controls={id + '-panel'}
+							tabIndex={selected === choice ? 0 : -1}
+							class={['pkg-tab', selected === choice && 'pkg-tab-active']}
+							onClick={() => setSelection(choice)}
+						>{choice as string}</button>
+					}
+				</div>
+				<button
+					type="button"
+					class="pkg-copy"
+					aria-label="Copy the command to the clipboard"
+					onClick={copyCommand}
+				>
+					<span
+						class="pkg-copy-icon"
+						style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
+						aria-hidden="true"
+					></span>
+					<span class="pkg-copy-label">
+						{copied ? 'Copied' : 'Copy'}
+					</span>
+				</button>
+			</div>
+			<pre
+				class="pkg-pre"
+				id={id + '-panel'}
+				role="tabpanel"
+				aria-labelledby={id + '-tab-' + selected}
+			>
+				<code class="pkg-code" ref={codeEl}>
+					@for (const tok of tokens; key tok.id) {
+						<span class={'pkg-tok-' + tok.kind}>{tok.text as string}</span>
+					}
+				</code>
+			</pre>
+		</div>
+	</>
 }
 
 // New docs should use the general name for non-install recipes. Keep the

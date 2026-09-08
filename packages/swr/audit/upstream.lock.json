@@ -1,0 +1,540 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "swr",
+    "version": "2.4.2",
+    "repository": {
+      "owner": "vercel",
+      "repo": "swr",
+      "subdirectory": null
+    },
+    "commit": "f1c1fd855f1e9e7c85755e4232ea4b03c7f81910",
+    "integrity": "sha512-ej644Y2bvkIajfR32KGeSSdBXQW+ScjGjkybZgSE7kFpk9eGnV44XY9FJylXi+W75pavSX1PVNB57W5EbhGIYw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "2eb01c9bb506815f353fc3053a396b0a4ec1b15255cdcf292a437ecc9f5e6ae2"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    ".swcrc",
+    "LICENSE",
+    "jest.config.build.js",
+    "jest.config.js",
+    "package.json",
+    "src",
+    "test",
+    "tsconfig.json"
+  ],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": ".swcrc",
+      "gitBlob": "d2435c90e9e857ede365533bc2edffb130808ebf",
+      "size": 244
+    },
+    {
+      "path": "jest.config.build.js",
+      "gitBlob": "26660854f694b4668248c1d522b530b946ce5f11",
+      "size": 166
+    },
+    {
+      "path": "jest.config.js",
+      "gitBlob": "91d1985e461ef6c3ffc1ecd1d1e11965bc775061",
+      "size": 932
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "11f712fa9dcefd3f7c2b83e0fe0d546277d81404",
+      "size": 1069
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "339e0f1da9d04b54d3b23bfac91aee73f1518593",
+      "size": 5324
+    },
+    {
+      "path": "src/_internal/constants.ts",
+      "gitBlob": "32d45ce118de5625f2670ad867ff66f0c1fe5894",
+      "size": 39
+    },
+    {
+      "path": "src/_internal/events.ts",
+      "gitBlob": "b055b80671a85a51627091a4c8e5ec568028f8c4",
+      "size": 132
+    },
+    {
+      "path": "src/_internal/index.react-server.ts",
+      "gitBlob": "0ebbec81d57a92c45aa99b9ca682ec5efb0d64d5",
+      "size": 128
+    },
+    {
+      "path": "src/_internal/index.ts",
+      "gitBlob": "dfe9a814853468f0596c79f7d9b9d76a84cc7536",
+      "size": 1157
+    },
+    {
+      "path": "src/_internal/types.ts",
+      "gitBlob": "c5dee2f2eb384c905c05ee6f0bc834bcc9e29729",
+      "size": 34202
+    },
+    {
+      "path": "src/_internal/utils/cache.ts",
+      "gitBlob": "c44e65f37900234932fde1e37a632cd66c710636",
+      "size": 4768
+    },
+    {
+      "path": "src/_internal/utils/config-context.ts",
+      "gitBlob": "eeade58b587e8ec2545c33485bcf2aadc6f276af",
+      "size": 2205
+    },
+    {
+      "path": "src/_internal/utils/config.ts",
+      "gitBlob": "ce05caea2566ac1d5220c5034feb5c80436e8da1",
+      "size": 1775
+    },
+    {
+      "path": "src/_internal/utils/devtools.ts",
+      "gitBlob": "2bab2d49d9d744fc7aa7d8ed75e2d949de5e2872",
+      "size": 392
+    },
+    {
+      "path": "src/_internal/utils/env.ts",
+      "gitBlob": "a0369b52261f1d54b4a08050528f52dbc0e16ef7",
+      "size": 1263
+    },
+    {
+      "path": "src/_internal/utils/global-state.ts",
+      "gitBlob": "bceb3b6f76b39dddec52f793d9c120332581c4c1",
+      "size": 181
+    },
+    {
+      "path": "src/_internal/utils/hash.ts",
+      "gitBlob": "7c992ca6ceba8dcbf7cfbdb23097986d3324d49b",
+      "size": 2332
+    },
+    {
+      "path": "src/_internal/utils/helper.ts",
+      "gitBlob": "da3092f289899f72ca12df301e3975c0b2e0d140",
+      "size": 1863
+    },
+    {
+      "path": "src/_internal/utils/merge-config.ts",
+      "gitBlob": "00bff3601a827d2725d501092b59d0f48fde30f4",
+      "size": 629
+    },
+    {
+      "path": "src/_internal/utils/middleware-preset.ts",
+      "gitBlob": "cb8abf2811a1bccca660802a938bd778d79f9719",
+      "size": 162
+    },
+    {
+      "path": "src/_internal/utils/mutate.ts",
+      "gitBlob": "071af7803e92a4f1dc45062dc6998225b2e27691",
+      "size": 7033
+    },
+    {
+      "path": "src/_internal/utils/normalize-args.ts",
+      "gitBlob": "9312aff95fe68193a661e79de6bd415d53826094",
+      "size": 545
+    },
+    {
+      "path": "src/_internal/utils/preload.ts",
+      "gitBlob": "7d9c755b0c795b0daa0a4f06ad5710f0605e27c4",
+      "size": 1975
+    },
+    {
+      "path": "src/_internal/utils/resolve-args.ts",
+      "gitBlob": "ed71b9230877602322af62ce6d41ddc624e57119",
+      "size": 967
+    },
+    {
+      "path": "src/_internal/utils/serialize.ts",
+      "gitBlob": "8b3ad128e9c216ee2cc73caadbe97d6b1227c23d",
+      "size": 651
+    },
+    {
+      "path": "src/_internal/utils/shared.ts",
+      "gitBlob": "f9e0f115e71f80ed862ede46625a27f366b279cd",
+      "size": 801
+    },
+    {
+      "path": "src/_internal/utils/subscribe-key.ts",
+      "gitBlob": "a2132db2edcd749a34ad72d74719a346809f9b9f",
+      "size": 620
+    },
+    {
+      "path": "src/_internal/utils/timestamp.ts",
+      "gitBlob": "78697044679240b3569e79a6b92d23356997ff33",
+      "size": 90
+    },
+    {
+      "path": "src/_internal/utils/use-swr-config.ts",
+      "gitBlob": "6d67e3b70a6b71c6781bbd25462eed29b78665dc",
+      "size": 467
+    },
+    {
+      "path": "src/_internal/utils/web-preset.ts",
+      "gitBlob": "7637e450ebf383c7f86ba05da1f2fbd288a773fb",
+      "size": 1936
+    },
+    {
+      "path": "src/_internal/utils/with-middleware.ts",
+      "gitBlob": "d1e22380fff309df061fb965423cf2d3289c4821",
+      "size": 666
+    },
+    {
+      "path": "src/immutable/index.ts",
+      "gitBlob": "573eca3c36a6e7f5bea2e838e58b639ca312ef58",
+      "size": 517
+    },
+    {
+      "path": "src/index/config.ts",
+      "gitBlob": "b5e796c177ab89eeb547d9718766fba2145600f8",
+      "size": 136
+    },
+    {
+      "path": "src/index/index.react-server.ts",
+      "gitBlob": "50b3528d1c3dd0684172df1fc99430d9aee46b05",
+      "size": 86
+    },
+    {
+      "path": "src/index/index.ts",
+      "gitBlob": "56912273de1cb9c566098eae008675fbebbd132e",
+      "size": 710
+    },
+    {
+      "path": "src/index/serialize.ts",
+      "gitBlob": "51d634d25c15c363ddf071decd0699f16e3d3c5f",
+      "size": 164
+    },
+    {
+      "path": "src/index/use-swr.ts",
+      "gitBlob": "68b7bcebb20aaba31a40c950ce0fc3a9d2eaa2a6",
+      "size": 28045
+    },
+    {
+      "path": "src/infinite/index.react-server.ts",
+      "gitBlob": "0945e0af8acbb600af8b4378b40c04dfe6189160",
+      "size": 49
+    },
+    {
+      "path": "src/infinite/index.ts",
+      "gitBlob": "99ae46d75d3e1e6b611c8fe7287906156e06f1ce",
+      "size": 11204
+    },
+    {
+      "path": "src/infinite/serialize.ts",
+      "gitBlob": "19695389bf0ebf4b11fd26872749416839dad155",
+      "size": 415
+    },
+    {
+      "path": "src/infinite/types.ts",
+      "gitBlob": "4237b6abae992f974d67f1cda53179822c40135d",
+      "size": 4513
+    },
+    {
+      "path": "src/mutation/index.ts",
+      "gitBlob": "363c2138bac5d122fd9ef6b20b4b6d711f4b874b",
+      "size": 5091
+    },
+    {
+      "path": "src/mutation/state.ts",
+      "gitBlob": "e3fe4bd94342d4b417b037258081c211f86d0a52",
+      "size": 2613
+    },
+    {
+      "path": "src/mutation/types.ts",
+      "gitBlob": "c3623b7efca9139de99bacd046de445036f94ddb",
+      "size": 7584
+    },
+    {
+      "path": "src/subscription/index.ts",
+      "gitBlob": "41ab8864f3279400ff7d619de03289458c063bcc",
+      "size": 3576
+    },
+    {
+      "path": "src/subscription/types.ts",
+      "gitBlob": "c9345db0fd947a999dad7979488c3c88d35b69fc",
+      "size": 944
+    },
+    {
+      "path": "test/jest-setup.ts",
+      "gitBlob": "c44951a680db0164bd78df59b06bd366a534a39b",
+      "size": 35
+    },
+    {
+      "path": "test/tsconfig.json",
+      "gitBlob": "4cf0256290045555564ba60f893fb9ed2a2eff0e",
+      "size": 537
+    },
+    {
+      "path": "test/type/.eslintrc",
+      "gitBlob": "b486fc647e14c696a68ab19a2600952a2df9f2cb",
+      "size": 88
+    },
+    {
+      "path": "test/type/config.tsx",
+      "gitBlob": "ff0498c372b061d2bddad645fec69e335e979f7c",
+      "size": 6209
+    },
+    {
+      "path": "test/type/fetcher.ts",
+      "gitBlob": "3a476aa04442ad7ef66adf1b23bc3bb9c8a59e7b",
+      "size": 10579
+    },
+    {
+      "path": "test/type/helper-types.tsx",
+      "gitBlob": "abea1e30d8e82357a59b6e6c70dc5d4b1932a82e",
+      "size": 439
+    },
+    {
+      "path": "test/type/internal.tsx",
+      "gitBlob": "bfbdc24c3161b0c95874a69468162f05fd4bd318",
+      "size": 205
+    },
+    {
+      "path": "test/type/mutate.ts",
+      "gitBlob": "890bbdd84becbc251ae6fdd5ba44dd42ffb74dd1",
+      "size": 2971
+    },
+    {
+      "path": "test/type/mutation.ts",
+      "gitBlob": "3ced723aa613fe5a40af8e83fc6f08f37999a78d",
+      "size": 270
+    },
+    {
+      "path": "test/type/option-fetcher.ts",
+      "gitBlob": "0a6d3c2bb8d10a7657f3d68224b72dc59283f06a",
+      "size": 11169
+    },
+    {
+      "path": "test/type/preload.ts",
+      "gitBlob": "6fe70f0804cfb55ae1d831103b2fa16d0edafe47",
+      "size": 1089
+    },
+    {
+      "path": "test/type/subscription.ts",
+      "gitBlob": "42d419ae3cd4b1d6093ec4f8a83bf85f58122248",
+      "size": 2728
+    },
+    {
+      "path": "test/type/suspense/helper-types.tsx",
+      "gitBlob": "0d571f58e6bb72ad34d43a494ca75d7842d130d0",
+      "size": 517
+    },
+    {
+      "path": "test/type/suspense/suspense.ts",
+      "gitBlob": "faa7fded79d2a6d2d6150ffa4c983acf1e413b5d",
+      "size": 277
+    },
+    {
+      "path": "test/type/suspense/tsconfig.json",
+      "gitBlob": "706abd8cd286931533afd9fe17dc14d56a8e1509",
+      "size": 186
+    },
+    {
+      "path": "test/type/trigger.ts",
+      "gitBlob": "e397e7e0e51f284cf79dfaf7bcdcccc2c5c0f427",
+      "size": 3919
+    },
+    {
+      "path": "test/type/tsconfig.json",
+      "gitBlob": "ed5b1350906ab793878e8bc0ae597a37a589665d",
+      "size": 201
+    },
+    {
+      "path": "test/type/utils.ts",
+      "gitBlob": "f0810ee4cabbc882e8eb098d25362151f966e2df",
+      "size": 143
+    },
+    {
+      "path": "test/unit/serialize.test.ts",
+      "gitBlob": "3fdf801568bf6859ed99b6dc9a579816ad5b4f2d",
+      "size": 541
+    },
+    {
+      "path": "test/unit/utils.test.tsx",
+      "gitBlob": "918fb4328f977058953d9d42e0629b43a30fad63",
+      "size": 4557
+    },
+    {
+      "path": "test/unit/web-preset.test.ts",
+      "gitBlob": "09d775ae29c05d0846411667dce030ca07ef9702",
+      "size": 2818
+    },
+    {
+      "path": "test/use-swr-cache.test.tsx",
+      "gitBlob": "f8f7b80540c81aa6346b2e281619213683ec07a7",
+      "size": 13270
+    },
+    {
+      "path": "test/use-swr-concurrent-rendering.test.tsx",
+      "gitBlob": "915bdd84e4d095b8acaabf23f0679312cc2fcf51",
+      "size": 1879
+    },
+    {
+      "path": "test/use-swr-config-callbacks.test.tsx",
+      "gitBlob": "db6438e8d461a9a91230c646d38259bd764c9845",
+      "size": 6739
+    },
+    {
+      "path": "test/use-swr-config.test.tsx",
+      "gitBlob": "fa59490d1c1049976a83c03f0fec71dce5177b28",
+      "size": 6069
+    },
+    {
+      "path": "test/use-swr-context-config.test.tsx",
+      "gitBlob": "a8a0461527b6f3ba9bc4a01418e19da6191b8bf8",
+      "size": 2166
+    },
+    {
+      "path": "test/use-swr-devtools.test.tsx",
+      "gitBlob": "9c8b7f73a473e0986603fc2ca3fadb0ba7fd002e",
+      "size": 1174
+    },
+    {
+      "path": "test/use-swr-error.test.tsx",
+      "gitBlob": "b12a7a7f98535e360324ed173fcd2d91b65a55e3",
+      "size": 15369
+    },
+    {
+      "path": "test/use-swr-fetcher.test.tsx",
+      "gitBlob": "f9f748ee54cb76dfcede5018aae664f8b14b505e",
+      "size": 3318
+    },
+    {
+      "path": "test/use-swr-focus.test.tsx",
+      "gitBlob": "02d3a372ef42848fd26b7fff23ec51ddc30b516b",
+      "size": 6298
+    },
+    {
+      "path": "test/use-swr-immutable.test.tsx",
+      "gitBlob": "4ff61ae6843171da8422b77c7b6f73cea500f978",
+      "size": 8239
+    },
+    {
+      "path": "test/use-swr-infinite-preload.test.tsx",
+      "gitBlob": "d68e6eeef2d94ca8f498fbc46bb22f2e09bfd53a",
+      "size": 8378
+    },
+    {
+      "path": "test/use-swr-infinite.test.tsx",
+      "gitBlob": "3e8b0b80df5f3e01f829f65e52f746981fa409df",
+      "size": 49658
+    },
+    {
+      "path": "test/use-swr-integration.test.tsx",
+      "gitBlob": "a039e863cbec0b41ed19b3fc501aa9d5106e11c2",
+      "size": 15382
+    },
+    {
+      "path": "test/use-swr-key.test.tsx",
+      "gitBlob": "5fd467aaae9bb5b5b6e26f81c8d490570d473e45",
+      "size": 6560
+    },
+    {
+      "path": "test/use-swr-laggy.test.tsx",
+      "gitBlob": "e6473861c2afb93ea89e0eb2c14b173316c8a847",
+      "size": 7902
+    },
+    {
+      "path": "test/use-swr-legacy-react.test.tsx",
+      "gitBlob": "dc08c8ab384d34e07dbbac4f9d2a6259214eb81b",
+      "size": 2128
+    },
+    {
+      "path": "test/use-swr-loading.test.tsx",
+      "gitBlob": "6be5fb744de0246b5827c97980c51ab44f25e2f7",
+      "size": 9929
+    },
+    {
+      "path": "test/use-swr-local-mutation.test.tsx",
+      "gitBlob": "bdadf9562e2f1c152d61351fe8d6ed603d16d564",
+      "size": 51494
+    },
+    {
+      "path": "test/use-swr-middlewares.test.tsx",
+      "gitBlob": "a784783f2a9f7c5884c6f55e1e264e6bf232336c",
+      "size": 7744
+    },
+    {
+      "path": "test/use-swr-node-env.test.tsx",
+      "gitBlob": "30851cd0f3f0e377bad1b6dada7ac1ac9bd4eae1",
+      "size": 1182
+    },
+    {
+      "path": "test/use-swr-offline.test.tsx",
+      "gitBlob": "7bd05d0bc4a4d1ea1a2fc925798070ea35429fb1",
+      "size": 1575
+    },
+    {
+      "path": "test/use-swr-preload.test.tsx",
+      "gitBlob": "8efe2a03bb919e22fe70f01107e0ed7a5a8ca19e",
+      "size": 5967
+    },
+    {
+      "path": "test/use-swr-promise.test.tsx",
+      "gitBlob": "165e75b5e82778aee927710479ca42fae7d8dbef",
+      "size": 5239
+    },
+    {
+      "path": "test/use-swr-reconnect.test.tsx",
+      "gitBlob": "a5f1aeae9de5d3783952f09ebf34a24513f4d2cf",
+      "size": 2981
+    },
+    {
+      "path": "test/use-swr-refresh.test.tsx",
+      "gitBlob": "56b1bfa255517d978ee234e74845fd6684619631",
+      "size": 18720
+    },
+    {
+      "path": "test/use-swr-remote-mutation.test.tsx",
+      "gitBlob": "bdaef55eb815dc828525a1ed9c66cfc7e2a9942a",
+      "size": 27325
+    },
+    {
+      "path": "test/use-swr-revalidate.test.tsx",
+      "gitBlob": "b36a04f094ba37e378684c068011b9d34083ac53",
+      "size": 5163
+    },
+    {
+      "path": "test/use-swr-server.test.tsx",
+      "gitBlob": "8d81df6f4ee1b17c2004ade7d92fe4317d8bb0b8",
+      "size": 6062
+    },
+    {
+      "path": "test/use-swr-streaming-ssr.test.tsx",
+      "gitBlob": "c8301fcdedb47c972753578ab627e45bffc80386",
+      "size": 2424
+    },
+    {
+      "path": "test/use-swr-subscription.test.tsx",
+      "gitBlob": "9ba56380df30e1a88734e9cf3fd76fb254d40325",
+      "size": 8507
+    },
+    {
+      "path": "test/use-swr-suspense.test.tsx",
+      "gitBlob": "30ca8b2df20f4d90717809169d5cd2c3f3fcfbcf",
+      "size": 13001
+    },
+    {
+      "path": "test/utils.tsx",
+      "gitBlob": "aa0542fdd7507dbc2714b8b080f2eb98fd614d8d",
+      "size": 3427
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "28f184506ee4b2c35017abe869a45ac77d42909d",
+      "size": 757
+    }
+  ],
+  "fingerprint": "2a22d66d2c5a54a4dce7397f06faa385fa25ea7485e6421fbb7a64083d425f22"
+}

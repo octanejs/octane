@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "pin": {
+    "package": "react-select",
+    "version": "5.10.2",
+    "commit": "052e864b4990a67c4ee416851c34d1eb7b58267b"
+  },
+  "typeEvidence": {
+    "pairedFixtures": ["typetests/local.ts", "typetests/upstream.ts"],
+    "compatibilityFixture": "typetests/compat.ts",
+    "browserFixtureProject": "tests/browser/tsconfig.json",
+    "platformTypeAdaptations": [
+      "OctaneNode replaces ReactNode in renderable callback and component contracts",
+      "native DOM events replace React synthetic events",
+      "Octane style objects replace Emotion CSSObjectWithLabel at renderer-owned boundaries"
+    ],
+    "coverage": {
+      "pairedConsumerCompilation": "all-six-entry-points",
+      "exactStructuralAssertions": "all-framework-neutral-declarations-and-complete-entry-point-props-member-inventories",
+      "rendererOwnedContracts": "ported-with-documented-platform-adaptations"
+    },
+    "entryPoints": [".", "./base", "./async", "./animated", "./creatable", "./async-creatable"]
+  },
+  "entryPoints": [
+    {
+      "path": ".",
+      "runtimeExports": {
+        "default": "ported-and-tested",
+        "NonceProvider": "ported-and-tested",
+        "components": "ported-and-tested",
+        "createFilter": "ported-and-tested",
+        "defaultTheme": "ported-and-tested",
+        "mergeStyles": "ported-and-tested",
+        "useStateManager": "ported-and-tested"
+      },
+      "types": "ported-and-tested-with-platform-adaptations"
+    },
+    {
+      "path": "./base",
+      "runtimeExports": { "default": "ported-and-tested", "defaultProps": "ported-and-tested" },
+      "types": "ported-and-tested-with-platform-adaptations"
+    },
+    {
+      "path": "./async",
+      "runtimeExports": { "default": "ported-and-tested", "useAsync": "ported-and-tested" },
+      "types": "ported-and-tested-with-platform-adaptations"
+    },
+    {
+      "path": "./animated",
+      "runtimeExports": {
+        "default": "ported-and-tested",
+        "Input": "ported-and-tested",
+        "MultiValue": "ported-and-tested",
+        "Placeholder": "ported-and-tested",
+        "SingleValue": "ported-and-tested",
+        "ValueContainer": "ported-and-tested"
+      },
+      "types": "ported-and-tested-with-platform-adaptations"
+    },
+    {
+      "path": "./creatable",
+      "runtimeExports": { "default": "ported-and-tested", "useCreatable": "ported-and-tested" },
+      "types": "ported-and-tested-with-platform-adaptations"
+    },
+    {
+      "path": "./async-creatable",
+      "runtimeExports": { "default": "ported-and-tested" },
+      "types": "ported-and-tested-with-platform-adaptations"
+    }
+  ],
+  "summary": {
+    "entryPoints": 6,
+    "runtimeExports": 20,
+    "portedAndTested": 20,
+    "waitingOnPrerequisite": 0,
+    "notStarted": 0
+  }
+}

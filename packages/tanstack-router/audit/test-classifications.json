@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/tanstack-router/tests/conformance/blocker.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane navigation-blocker integration; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/concurrent-navigation.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane concurrent navigation lifecycle; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/divergences.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates the documented separate devtools distribution as an Octane framework contract; not same-scenario React-parity evidence."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/features.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks adapted Router feature behavior through Octane; it is not a pristine React suite."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/generator-plugin-mask.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks TSRX generator integration; it has no React runtime oracle."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/hooks.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane Router hooks; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/lifecycle-boundaries.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane lifecycle and boundary integration; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/link-passthrough.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane anchor prop forwarding; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/link.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane Link matching and navigation contracts; documented divergences live in parity-link-divergences.test.ts."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/not-found.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane not-found rendering; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/parity-link-divergences.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates plain ref props and native link callback events as an Octane framework contract; not same-scenario React-parity evidence."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/parity.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks adapted Router wiring; it is not a pristine or differential React suite."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/router.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the broader Octane Router contract; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-router/tests/conformance/same-route-search.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane same-route search updates; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-router/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs exact initial, multi-navigation, params, active-link, and not-found scenarios against @tanstack/react-router@1.170.18."
+    },
+    {
+      "path": "packages/tanstack-router/tests/harness/setup.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks fail-closed React fixture compilation for the parity harness itself."
+    },
+    {
+      "path": "packages/tanstack-router/tests/ssr/ssr.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the retained Octane adapter SSR behavior cited to TanStack Router PR #7847; it is not a React SSR oracle."
+    },
+    {
+      "path": "packages/tanstack-router/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
+    }
+  ]
+}

@@ -20,7 +20,15 @@ export async function run(container: HTMLElement) {
 	const button = container.querySelector('#minimal-binding-action') as HTMLButtonElement;
 	const before = button.textContent;
 	button.click();
-	await Promise.resolve();
+	// A store update can arrive before the passive subscription mounts. Observe
+	// its committed snapshot after the subscription catches up with the store.
+	const deadline = performance.now() + 2_000;
+	while (button.textContent !== '1') {
+		if (performance.now() >= deadline) {
+			throw new Error('The bound store did not commit its increment.');
+		}
+		await new Promise((resolve) => setTimeout(resolve, 10));
+	}
 	const after = button.textContent;
 	root.unmount();
 	return { before, after, cleaned: container.childNodes.length === 0 };

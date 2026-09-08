@@ -1,0 +1,66 @@
+diff --git a/tests/upstream/src/otp-field/input/OTPFieldInput.test.tsx b/tests/upstream/src/otp-field/input/OTPFieldInput.test.tsx
+--- a/tests/upstream/src/otp-field/input/OTPFieldInput.test.tsx
++++ b/tests/upstream/src/otp-field/input/OTPFieldInput.test.tsx
+@@ -132,7 +132,7 @@ describe('<OTPField.Input />', () => {
+       inputs[0].focus();
+     });
+ 
+-    fireEvent.change(inputs[0], { target: { value: '1' } });
++    fireEvent.input(inputs[0], { target: { value: '1' } });
+ 
+     expect(document.activeElement).toBe(inputs[1]);
+   });
+@@ -147,7 +147,7 @@ describe('<OTPField.Input />', () => {
+       lastInput.focus();
+     });
+ 
+-    fireEvent.change(lastInput, { target: { value: '6' } });
++    fireEvent.input(lastInput, { target: { value: '6' } });
+ 
+     expect(document.activeElement).toBe(lastInput);
+     expect(lastInput.selectionStart).toBe(0);
+@@ -169,7 +169,7 @@ describe('<OTPField.Input />', () => {
+       inputs[0].focus();
+     });
+ 
+-    fireEvent.change(inputs[0], { target: { value: '1' } });
++    fireEvent.input(inputs[0], { target: { value: '1' } });
+ 
+     expect(inputs.map((input) => input.value)).toEqual(['', '', '', '', '', '']);
+     expect(document.activeElement).toBe(inputs[0]);
+@@ -184,7 +184,7 @@ describe('<OTPField.Input />', () => {
+       firstInput.focus();
+     });
+ 
+-    fireEvent.change(firstInput, { target: { value: 'a' } });
++    fireEvent.input(firstInput, { target: { value: 'a' } });
+ 
+     expect(firstInput).toHaveValue('1');
+     expect(document.activeElement).toBe(firstInput);
+@@ -226,7 +226,7 @@ describe('<OTPField.Input />', () => {
+       <OTPField.Root data-testid="root" length={1}>
+         <OTPField.Input
+           onFocus={(event) => {
+-            event.preventDefault();
++            event.preventBaseUIHandler();
+           }}
+         />
+       </OTPField.Root>,
+@@ -249,7 +249,7 @@ describe('<OTPField.Input />', () => {
+         <OTPField.Root data-testid="root" length={1}>
+           <OTPField.Input
+             onBlur={(event) => {
+-              event.preventDefault();
++              event.preventBaseUIHandler();
+             }}
+           />
+         </OTPField.Root>
+@@ -584,7 +584,7 @@ describe('<OTPField.Input />', () => {
+       inputs[0].focus();
+     });
+ 
+-    fireEvent.change(inputs[0], { target: { value: '1' } });
++    fireEvent.input(inputs[0], { target: { value: '1' } });
+     expect(document.activeElement).toBe(inputs[1]);
+ 
+     await user.tab();

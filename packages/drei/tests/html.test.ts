@@ -9,6 +9,7 @@ import {
 } from '@react-three/fiber';
 import { Html as ReactHtml } from '@react-three/drei/web/Html.js';
 import { createRoot as createOctaneRoot } from '@octanejs/three';
+import { flushSync } from 'octane';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { Html, defaultCalculatePosition } from '../src/web/Html.three.tsrx';
@@ -186,7 +187,7 @@ describe('Html', () => {
 		const pair = await mountPair({ onMount: () => mounts++, onCleanup: () => cleanups++ });
 		const button = pair.octaneHost.querySelector('.html-content') as HTMLButtonElement;
 		expect(button.textContent).toBe('dark:label:0');
-		button.click();
+		flushSync(() => button.click());
 		expect(button.textContent).toBe('dark:label:1');
 		expect(mounts).toBe(1);
 		pair.octaneRoot.unmount();

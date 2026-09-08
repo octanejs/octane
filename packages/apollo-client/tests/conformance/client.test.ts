@@ -77,13 +77,17 @@ function createControlledClient() {
 }
 
 describe('@octanejs/apollo-client client hooks', () => {
-	it('useQuery source is accepted when its package opts into Strong mode', () => {
+	it('keeps useQuery in compatibility mode because it mutates render snapshots', () => {
 		const packageRoot = resolve(process.cwd(), 'packages/apollo-client');
 		const filename = resolve(packageRoot, 'src/react/hooks/useQuery.js');
-		const compiler = createOctaneCompiler({ root: packageRoot, strong: true });
+		const source = readFileSync(filename, 'utf8');
+		const compiler = createOctaneCompiler({ root: packageRoot });
 
-		expect(compiler.transform(readFileSync(filename, 'utf8'), filename)?.code).toEqual(
-			expect.any(String),
+		expect(compiler.transform(source, filename)?.code).toEqual(expect.any(String));
+
+		const strongCompiler = createOctaneCompiler({ root: packageRoot, strong: true });
+		expect(() => strongCompiler.transform(source, filename)).toThrow(
+			/OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION/,
 		);
 	});
 

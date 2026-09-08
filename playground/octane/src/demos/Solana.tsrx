@@ -1,5 +1,5 @@
 import { useState } from 'octane';
-import { ClientProvider, useClient } from '@octanejs/solana-react';
+import { ClientProvider, useClient } from '@octanejs/solana-kit';
 
 type DemoClient = {
 	readonly label: string;

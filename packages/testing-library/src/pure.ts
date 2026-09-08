@@ -3,7 +3,7 @@
  *
  * Strategy (docs/react-library-compat-plan.md §2): `@testing-library/dom` is
  * framework-agnostic, so it is depended on VERBATIM and re-exported wholesale
- * (queries, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, …). Only
+ * (queries, `screen`, `within`, `waitFor`, `prettyDOM`, …). Only
  * react-testing-library's thin React layer is ported here, onto octane:
  *
  *  - `render` / `cleanup` / `renderHook` mount through octane's `createRoot`
@@ -22,6 +22,7 @@
  */
 import {
 	act,
+	isInActScope,
 	createElement,
 	createRoot,
 	drainPassiveEffects,
@@ -33,6 +34,7 @@ import {
 	withSlot,
 	type ComponentBody,
 	type ElementDescriptor,
+	type OctaneNode,
 	type Root,
 } from 'octane';
 import {
@@ -43,6 +45,7 @@ import {
 } from '@testing-library/dom';
 import type { BoundFunctions, Queries } from '@testing-library/dom';
 import { getIsOctaneActEnvironment, setOctaneActEnvironment } from './act-environment';
+import { fireEvent as octaneFireEvent } from './fire-event';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // dom-testing-library config wiring (RTL pure.js does the same three hooks).
@@ -87,13 +90,8 @@ configureDTL({
 			setOctaneActEnvironment(previousActEnvironment);
 		}
 	},
-	// Every `fireEvent` dispatch runs through here. Octane's DISCRETE delegated
-	// events (click/input/keydown/…) already commit synchronously on their own
-	// (maybeFlushDiscrete → flushSync), but fireEvent also dispatches event types
-	// with no discrete path — non-delegated or programmatic events whose updates
-	// would otherwise sit queued until the next microtask, i.e. after the test's
-	// assertion. flushSync commits those too, and the passive drain mirrors RTL's
-	// act(): effects scheduled by the event have run before fireEvent returns.
+	// Every fireEvent dispatch commits its updates and drains passive effects
+	// before returning, including programmatic and non-discrete events.
 	eventWrapper: (cb) => {
 		let result: unknown;
 		flushSync(() => {
@@ -112,6 +110,7 @@ configureDTL({
 interface RootEntry {
 	container: Element;
 	root: Root;
+	valueRoot: boolean;
 }
 const mountedContainers = new Set<Element>();
 const mountedRootEntries: RootEntry[] = [];
@@ -120,13 +119,11 @@ const mountedRootEntries: RootEntry[] = [];
 // UI normalization — octane's two authoring forms into one mountable element.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** What `render`/`rerender` accept: a component body, or a `createElement` result. */
-export type OctaneUI<P = any> = ComponentBody<P> | ElementDescriptor<P>;
+/** A component body with optional props, or any Octane renderable. */
+export type OctaneUI<P = any> = ComponentBody<P> | OctaneNode;
 
-// A root can only mount a COMPONENT. `render(createElement('div', …))` (RTL's
-// `render(<div/>)`) produces a HOST descriptor, so it is returned from a pass-
-// through component and rendered by the runtime's value-position renderer.
-function ValueRoot(props: { children: unknown }): unknown {
+// Arrays and host values share a stable value-rendering owner across rerenders.
+function ValueRoot(props: { children: OctaneNode }): OctaneNode {
 	return props.children;
 }
 
@@ -141,12 +138,12 @@ function toElement<P>(ui: OctaneUI<P>, props: P | undefined): ElementDescriptor 
 		return ui;
 	}
 	if (typeof ui !== 'function') {
-		throw new Error(
-			'render/rerender expects an octane component (a function) or an element ' +
-				`descriptor from createElement(...); received ${typeof ui}.`,
-		);
+		if (props !== undefined) {
+			throw new Error('render/rerender only accepts the props option with a bare component.');
+		}
+		return createElement(ValueRoot, { children: ui });
 	}
-	return createElement(ui, props);
+	return createElement(ui as ComponentBody<P>, props);
 }
 
 function wrapUiIfNeeded(
@@ -156,8 +153,10 @@ function wrapUiIfNeeded(
 	return wrapperComponent ? createElement(wrapperComponent, { children: element }) : element;
 }
 
-function mountable(element: ElementDescriptor): ElementDescriptor {
-	return typeof element.type === 'string'
+function mountable(element: ElementDescriptor, valueRoot: boolean): ElementDescriptor {
+	// Retain one value-rendering owner when rerender moves between an array,
+	// fragment, and single element. Keyed children keep their state across them.
+	return valueRoot && element.type !== ValueRoot
 		? createElement(ValueRoot, { children: element })
 		: element;
 }
@@ -174,14 +173,21 @@ function mountable(element: ElementDescriptor): ElementDescriptor {
 // `waitFor`/`findBy*`/`act` are for, same as RTL.
 function settleSync(): void {
 	for (let i = 0; i < 50 && hasPendingWork(); i++) {
-		drainPassiveEffects();
-		flushSync(() => {});
+		// Passive effects may schedule state updates too. They belong to this
+		// testing-library commit, so keep the drain inside its synchronous scope.
+		flushSync(() => {
+			drainPassiveEffects();
+		});
 	}
 }
 
 // Commit a render synchronously — flushSync for the render itself, then the
 // cascade settle. Equivalent to RTL's `act(() => root.render(ui))` (sync form).
 function commitRender(root: Root, element: ElementDescriptor): void {
+	if (isInActScope()) {
+		root.render(element);
+		return;
+	}
 	flushSync(() => {
 		root.render(element);
 	});
@@ -246,27 +252,32 @@ export function render<P = any>(ui: OctaneUI<P>, options: RenderOptions<P> = {})
 		container = baseElement.appendChild(document.createElement('div'));
 	}
 
-	const element = mountable(wrapUiIfNeeded(toElement(ui, props), WrapperComponent));
+	const normalized = wrapUiIfNeeded(toElement(ui, props), WrapperComponent);
+	const previousEntry = mountedRootEntries.find((entry) => entry.container === container);
+	const valueRoot =
+		previousEntry?.valueRoot ??
+		(typeof normalized.type !== 'function' || normalized.type === ValueRoot);
+	const element = mountable(normalized, valueRoot);
 
 	let root: Root;
 	if (!mountedContainers.has(container)) {
 		if (hydrate) {
-			// hydrateRoot adopts the server DOM during creation (it renders once,
-			// synchronously) — only the effect settle is left to do.
-			root = hydrateRoot(container, element);
+			// Adoption queues insertion/layout effects. Commit those before the
+			// passive settle, so descendants can use callbacks installed by them.
+			root = flushSync(() => hydrateRoot(container, element));
 			settleSync();
 		} else {
 			root = createRoot(container);
 			commitRender(root, element);
 		}
-		mountedRootEntries.push({ container, root });
+		mountedRootEntries.push({ container, root, valueRoot });
 		// Track the container regardless of whether WE created it, so cleanup()
 		// handles caller-supplied containers too (RTL does the same).
 		mountedContainers.add(container);
 	} else {
 		// Same container rendered again → reuse its root (same component updates
 		// props in place; a different component tears down and remounts).
-		root = mountedRootEntries.find((entry) => entry.container === container)!.root;
+		root = previousEntry!.root;
 		commitRender(root, element);
 	}
 
@@ -294,16 +305,22 @@ export function render<P = any>(ui: OctaneUI<P>, options: RenderOptions<P> = {})
 			let element: ElementDescriptor;
 			if (rerenderUi === undefined) {
 				element = toElement(ui, props); // re-run with the original props
-			} else if (isValidElement(rerenderUi) || typeof rerenderUi === 'function') {
-				element = toElement(rerenderUi as OctaneUI, rerenderOptions?.props);
-			} else {
+			} else if (
+				rerenderUi !== null &&
+				typeof rerenderUi === 'object' &&
+				!isValidElement(rerenderUi) &&
+				!Array.isArray(rerenderUi) &&
+				Object.prototype.hasOwnProperty.call(rerenderUi, 'props')
+			) {
 				// `{ props }` shorthand: reuse the ORIGINAL component with new props.
 				const comp = isValidElement(ui) ? (ui as ElementDescriptor).type : ui;
 				element = createElement(comp as any, (rerenderUi as { props?: any }).props);
+			} else {
+				element = toElement(rerenderUi, rerenderOptions?.props);
 			}
 			// The wrapper is re-applied so component identity is stable across
 			// rerenders (same body ⇒ octane updates props in place).
-			commitRender(root, mountable(wrapUiIfNeeded(element, WrapperComponent)));
+			commitRender(root, mountable(wrapUiIfNeeded(element, WrapperComponent), valueRoot));
 		},
 		asFragment: () => document.createRange().createContextualFragment(container.innerHTML),
 		...(getQueriesForElement(baseElement, queries as any) as BoundFunctions<typeof defaultQueries>),
@@ -407,10 +424,93 @@ export function renderHook<Result, Props = undefined>(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports — everything dom-testing-library ships, plus the octane layer.
-// `fireEvent` is dom-testing-library's own (see fire-event.ts for why there is
-// deliberately NO react-testing-library-style event remapping on top).
+// fireEvent adds native focus/blur pairs for delegated focus handlers.
+// Other convenience helpers retain DOM Testing Library's event semantics.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export * from '@testing-library/dom';
-export { fireEvent } from './fire-event';
+export const fireEvent = octaneFireEvent;
+// Explicit value exports keep older SSR module runners from replacing our
+// focus-aware fireEvent with the DOM helper during wildcard re-export.
+export {
+	buildQueries,
+	configure,
+	createEvent,
+	findAllByAltText,
+	findAllByDisplayValue,
+	findAllByLabelText,
+	findAllByPlaceholderText,
+	findAllByRole,
+	findAllByTestId,
+	findAllByText,
+	findAllByTitle,
+	findByAltText,
+	findByDisplayValue,
+	findByLabelText,
+	findByPlaceholderText,
+	findByRole,
+	findByTestId,
+	findByText,
+	findByTitle,
+	getAllByAltText,
+	getAllByDisplayValue,
+	getAllByLabelText,
+	getAllByPlaceholderText,
+	getAllByRole,
+	getAllByTestId,
+	getAllByText,
+	getAllByTitle,
+	getByAltText,
+	getByDisplayValue,
+	getByLabelText,
+	getByPlaceholderText,
+	getByRole,
+	getByTestId,
+	getByText,
+	getByTitle,
+	getConfig,
+	getDefaultNormalizer,
+	getElementError,
+	getNodeText,
+	getQueriesForElement,
+	getRoles,
+	getSuggestedQuery,
+	isInaccessible,
+	logDOM,
+	logRoles,
+	prettyDOM,
+	prettyFormat,
+	queries,
+	queryAllByAltText,
+	queryAllByAttribute,
+	queryAllByDisplayValue,
+	queryAllByLabelText,
+	queryAllByPlaceholderText,
+	queryAllByRole,
+	queryAllByTestId,
+	queryAllByText,
+	queryAllByTitle,
+	queryByAltText,
+	queryByAttribute,
+	queryByDisplayValue,
+	queryByLabelText,
+	queryByPlaceholderText,
+	queryByRole,
+	queryByTestId,
+	queryByText,
+	queryByTitle,
+	screen,
+	waitFor,
+	waitForElementToBeRemoved,
+	within,
+} from '@testing-library/dom';
+export {
+	getMultipleElementsFoundError,
+	makeFindQuery,
+	makeGetAllQuery,
+	makeSingleQuery,
+	queryHelpers,
+	wrapAllByQueryWithSuggestion,
+	wrapSingleQueryWithSuggestion,
+} from './dom-query-helpers';
+export type * from '@testing-library/dom';
 export { act } from 'octane';

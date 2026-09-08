@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { flushSync, hydrateRoot } from '../../src/index.js';
+import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import { flushEffects } from '../_helpers.js';
 import * as ServerRT from 'octane/server';
 import {
@@ -154,7 +154,7 @@ describe('hydrateRoot — <Activity>', () => {
 		root.unmount();
 	});
 
-	it('re-hides try content freshly mounted by a hydration resume inside a hidden Activity', async () => {
+	it('keeps a preserved hydration arm hidden until its Activity becomes visible', async () => {
 		const { html } = ServerRT.renderToString(server.ActivitySuspenseHydration, {
 			mode: 'visible',
 			suspend: false,
@@ -173,15 +173,13 @@ describe('hydrateRoot — <Activity>', () => {
 		});
 		flushSync(() => {});
 
-		const pending = container.querySelector('#activity-resume-pending') as HTMLElement;
-		expect(container.querySelector('#activity-resumed-content')).toBeNull();
-		expect(pending.style.display).toBe('none');
-		resolve('client');
-		await Promise.resolve();
-		flushSync(() => {});
+		expect(container.querySelector('#activity-resume-pending')).toBeNull();
+		expect(container.querySelector('#activity-resumed-content')).toBe(serverContent);
+		expect((serverContent as HTMLElement).style.display).toBe('none');
+		await act(() => resolve('client'));
 
 		const resumed = container.querySelector('#activity-resumed-content') as HTMLElement;
-		expect(resumed).not.toBe(serverContent);
+		expect(resumed).toBe(serverContent);
 		expect(resumed.textContent).toBe('client');
 		expect(resumed.style.display).toBe('none');
 

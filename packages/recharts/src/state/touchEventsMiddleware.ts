@@ -1,0 +1,152 @@
+// Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
+import type { NativeTouchEvent } from '../util/OctaneTypes';
+import {
+	createAction,
+	createListenerMiddleware,
+	ListenerEffectAPI,
+	PayloadAction,
+} from '@reduxjs/toolkit';
+
+import { AppDispatch, RechartsRootState } from './store';
+import { setActiveMouseOverItemIndex, setMouseOverAxisIndex } from './tooltipSlice';
+import { selectActivePropsFromChartPointer } from './selectors/selectActivePropsFromChartPointer';
+
+import { getRelativeCoordinate } from '../util/getRelativeCoordinate';
+import { selectTooltipEventType } from './selectors/selectTooltipEventType';
+import {
+	DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME,
+	DATA_ITEM_INDEX_ATTRIBUTE_NAME,
+} from '../util/Constants';
+import { selectTooltipCoordinate } from './selectors/touchSelectors';
+import { selectAllGraphicalItemsSettings } from './selectors/tooltipSelectors';
+import { RelativePointer } from '../util/types';
+import { createEventProxy } from '../util/createEventProxy';
+
+export const touchEventAction = createAction<NativeTouchEvent<HTMLDivElement>>('touchMove');
+
+export const touchEventMiddleware = createListenerMiddleware<RechartsRootState>();
+
+let rafId: number | null = null;
+let timeoutId: ReturnType<typeof setTimeout> | null = null;
+let latestChartPointers: ReadonlyArray<RelativePointer> | null = null;
+let latestTouchEvent: NativeTouchEvent<HTMLDivElement> | null = null;
+
+touchEventMiddleware.startListening({
+	actionCreator: touchEventAction,
+	effect: (
+		action: PayloadAction<NativeTouchEvent<HTMLDivElement>>,
+		listenerApi: ListenerEffectAPI<RechartsRootState, AppDispatch>,
+	) => {
+		const touchEvent = action.payload;
+		if (touchEvent.touches == null || touchEvent.touches.length === 0) {
+			return;
+		}
+
+		latestTouchEvent = createEventProxy(touchEvent);
+
+		const state = listenerApi.getState();
+		const { throttleDelay, throttledEvents } = state.eventSettings;
+		const isThrottled = throttledEvents === 'all' || throttledEvents.includes('touchmove');
+
+		if (rafId !== null) {
+			cancelAnimationFrame(rafId);
+			rafId = null;
+		}
+		if (timeoutId !== null && (typeof throttleDelay !== 'number' || !isThrottled)) {
+			clearTimeout(timeoutId);
+			timeoutId = null;
+		}
+
+		latestChartPointers = Array.from(touchEvent.touches).map((touch) =>
+			getRelativeCoordinate({
+				clientX: touch.clientX,
+				clientY: touch.clientY,
+				currentTarget: touchEvent.currentTarget,
+			}),
+		);
+
+		const callback = () => {
+			if (latestTouchEvent == null) {
+				return;
+			}
+
+			const currentState = listenerApi.getState();
+			const tooltipEventType = selectTooltipEventType(
+				currentState,
+				currentState.tooltip.settings.shared,
+			);
+			if (tooltipEventType === 'axis') {
+				const latestTouchPointer = latestChartPointers?.[0];
+				if (latestTouchPointer == null) {
+					rafId = null;
+					timeoutId = null;
+					return;
+				}
+				const activeProps = selectActivePropsFromChartPointer(currentState, latestTouchPointer);
+				if (activeProps?.activeIndex != null) {
+					listenerApi.dispatch(
+						setMouseOverAxisIndex({
+							activeIndex: activeProps.activeIndex,
+							activeDataKey: undefined,
+							activeCoordinate: activeProps.activeCoordinate,
+						}),
+					);
+				}
+			} else if (tooltipEventType === 'item') {
+				const touch = latestTouchEvent.touches[0];
+				if (document.elementFromPoint == null || touch == null) {
+					return;
+				}
+				const target = document.elementFromPoint(touch.clientX, touch.clientY);
+				if (!target || !target.getAttribute) {
+					return;
+				}
+				const itemIndex = target.getAttribute(DATA_ITEM_INDEX_ATTRIBUTE_NAME);
+				const graphicalItemId =
+					target.getAttribute(DATA_ITEM_GRAPHICAL_ITEM_ID_ATTRIBUTE_NAME) ?? undefined;
+				const settings = selectAllGraphicalItemsSettings(currentState).find(
+					(item) => item.id === graphicalItemId,
+				);
+				if (itemIndex == null || settings == null || graphicalItemId == null) {
+					return;
+				}
+				const { dataKey } = settings;
+				const coordinate = selectTooltipCoordinate(currentState, itemIndex, graphicalItemId);
+
+				listenerApi.dispatch(
+					setActiveMouseOverItemIndex({
+						activeDataKey: dataKey,
+						activeIndex: itemIndex,
+						activeCoordinate: coordinate,
+						activeGraphicalItemId: graphicalItemId,
+					}),
+				);
+			}
+			rafId = null;
+			timeoutId = null;
+		};
+
+		if (!isThrottled) {
+			callback();
+			return;
+		}
+
+		if (throttleDelay === 'raf') {
+			rafId = requestAnimationFrame(callback);
+		} else if (typeof throttleDelay === 'number') {
+			if (timeoutId === null) {
+				callback();
+				latestTouchEvent = null;
+
+				timeoutId = setTimeout(() => {
+					if (latestTouchEvent) {
+						callback();
+					} else {
+						timeoutId = null;
+						rafId = null;
+					}
+				}, throttleDelay);
+			}
+		}
+	},
+});

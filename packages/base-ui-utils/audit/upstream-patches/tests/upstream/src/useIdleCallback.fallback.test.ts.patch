@@ -1,0 +1,8 @@
+diff --git a/tests/upstream/src/useIdleCallback.fallback.test.ts b/tests/upstream/src/useIdleCallback.fallback.test.ts
+--- a/tests/upstream/src/useIdleCallback.fallback.test.ts
++++ b/tests/upstream/src/useIdleCallback.fallback.test.ts
+@@ -1,3 +1,4 @@
++/** @jsxImportSource octane */
+ import { expect, vi, beforeAll, afterAll, describe, it } from 'vitest';
+ 
+ type IdleCallbackModule = typeof import('./useIdleCallback');

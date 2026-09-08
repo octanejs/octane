@@ -36,7 +36,7 @@ const fixture = (name: string): string =>
 	resolve(__dirname, `../_fixtures/shadcn-diff/${name}.tsrx`);
 // React fixtures are precompiled into THIS package's cache (see differential
 // _setup.ts) so the React side resolves react/radix-ui/lucide-react from here.
-const CACHE = resolve(__dirname, '.react-cache');
+const CACHE = resolve(__dirname, '.react-cache/radix');
 
 async function waitForBoth(
 	octane: DiffMount,

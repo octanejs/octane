@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "intersection-observer-pristine",
+  "roots": ["packages/intersection-observer/tests"],
+  "files": ["packages/intersection-observer/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:dc670b4f71d77e7d",
+      "file": "packages/intersection-observer/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned react-intersection-observer 10.1.0 suite unchanged"
+    }
+  ],
+  "snapshots": 0
+}

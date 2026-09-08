@@ -14,7 +14,14 @@ import type {
 	LynxContextProxy,
 	LynxContextProxyEvent,
 } from '../../packages/lynx/src/core/protocol.js';
+import {
+	LYNX_BACKGROUND_TO_MAIN_EVENT,
+	LYNX_MAIN_TO_BACKGROUND_EVENT,
+	LYNX_TRANSPORT_PROTOCOL_VERSION,
+	LYNX_TRANSPORT_RENDERER,
+} from '../../packages/lynx/src/core/protocol.js';
 import type { LynxElementEventListener } from '../../packages/lynx/src/core/papi.js';
+import { decodeLynxTransportValue } from '../../packages/lynx/src/core/transport-codec.js';
 import { BenchApp, EmptyApp, type BenchRow } from './src/App.lynx.tsrx';
 
 interface FakeNode {
@@ -78,6 +85,7 @@ export class FakeElementPAPI {
 	readonly nodes = new Map<number, FakeNode>();
 	flushes = 0;
 	createdElements = 0;
+	onSetId: ((node: FakeNode, value: string | null) => void) | null = null;
 
 	private create(type: string, text = ''): FakeNode {
 		const sign = this.nextSign++;
@@ -159,6 +167,7 @@ export class FakeElementPAPI {
 			},
 			__SetID: (node: FakeNode, id: string | null) => {
 				node.id = id;
+				this.onSetId?.(node, id);
 			},
 			__FlushElementTree: () => {
 				this.flushes++;
@@ -232,6 +241,13 @@ export class FakeElementPAPI {
 			if (node.attributes?.has('octane-ref') === true) count++;
 		}
 		return count;
+	}
+
+	rootChildId(): string | null {
+		const page = [...this.nodes.values()].find(
+			(node) => node.type === 'page' && node.parent === null,
+		);
+		return page?.children[0]?.id ?? null;
 	}
 }
 
@@ -331,6 +347,76 @@ export interface LynxTransportMetrics {
 	readonly compactAcknowledgements: number;
 }
 
+export interface ReentrantCommitResult {
+	readonly durationMs: number;
+	readonly acknowledgements: number;
+	readonly completions: number;
+	readonly finalId: string | null;
+	readonly finalVersion: number | undefined;
+	readonly diagnostics: readonly string[];
+}
+
+/** Drain a synchronous burst queued reentrantly during one native host update. */
+export function runReentrantCommits(count: number): ReentrantCommitResult {
+	if (!Number.isSafeInteger(count) || count <= 0) {
+		throw new TypeError(
+			`Reentrant commit count must be a positive safe integer, received ${count}.`,
+		);
+	}
+	const contexts = createContextPair();
+	const papi = new FakeElementPAPI();
+	const diagnostics: Error[] = [];
+	let acknowledgements = 0;
+	let completions = 0;
+	const main = installLynxMainThread({
+		target: papi.globals(),
+		context: contexts.main,
+		onDiagnostic: (error) => diagnostics.push(error),
+	});
+	contexts.background.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+		const type = (event.data as { readonly type?: unknown }).type;
+		if (type === 'ack') acknowledgements++;
+		else if (type === 'complete') completions++;
+	});
+	const dispatchCommit = (version: number, commands: readonly Record<string, unknown>[]): void => {
+		contexts.background.dispatchEvent({
+			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+			data: {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				root: 1,
+				version,
+				type: 'commit',
+				batch: { renderer: LYNX_TRANSPORT_RENDERER, version, commands },
+			},
+		});
+	};
+	dispatchCommit(1, [
+		{ op: 'create', id: 1, type: 'view', props: { id: 'initial' } },
+		{ op: 'insert', parent: null, id: 1, before: null },
+	]);
+	papi.onSetId = () => {
+		papi.onSetId = null;
+		for (let index = 0; index < count; index++) {
+			dispatchCommit(index + 3, [{ op: 'update', id: 1, props: { id: `queued-${index}` } }]);
+		}
+	};
+	const started = performance.now();
+	dispatchCommit(2, [{ op: 'update', id: 1, props: { id: 'outer' } }]);
+	const durationMs = performance.now() - started;
+	const finalVersion = main.activeIdentity()?.version;
+	const finalId = papi.rootChildId();
+	main.close();
+	return {
+		durationMs,
+		acknowledgements,
+		completions,
+		finalId,
+		finalVersion,
+		diagnostics: diagnostics.map((error) => error.message),
+	};
+}
+
 function transportMetrics(harness: Harness): LynxTransportMetrics {
 	let commands = 0;
 	let templateCommands = 0;
@@ -342,8 +428,11 @@ function transportMetrics(harness: Harness): LynxTransportMetrics {
 	let compactAcknowledgements = 0;
 	const sharedPrograms = new Set<object>();
 	for (const event of harness.transportMessages) {
-		if (event.data === null || typeof event.data !== 'object') continue;
-		const message = event.data as {
+		// Decoded, not read: the transport encodes, so `event.data` is the string
+		// the receiver parses. Reading it raw would count zero commands and no
+		// acknowledgements while still producing a number.
+		if (typeof event.data !== 'string') continue;
+		const message = decodeLynxTransportValue(event.data) as {
 			readonly type?: unknown;
 			readonly encoding?: unknown;
 			readonly batch?: {

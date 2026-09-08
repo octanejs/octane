@@ -3,6 +3,7 @@
 // requestAnimationFrame).
 import { createContext, useContext, useMemo } from 'octane';
 import { animationControllerImpl } from './AnimationControllerImpl';
+import type { AnimationController } from './AnimationController';
 
 const AnimationControllerContext = createContext(animationControllerImpl);
 
@@ -13,7 +14,9 @@ const AnimationControllerContext = createContext(animationControllerImpl);
  */
 export const AnimationControllerProvider = AnimationControllerContext.Provider;
 
-export function useAnimationController(animationControllerFromProps: unknown) {
+export function useAnimationController(
+	animationControllerFromProps?: AnimationController,
+): AnimationController {
 	const animationControllerFromContext = useContext(AnimationControllerContext);
 	return useMemo(
 		() => animationControllerFromProps ?? animationControllerFromContext,

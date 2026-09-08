@@ -1,0 +1,25 @@
+diff --git a/tests/upstream/react/visual/lib/Button.tsx b/tests/upstream/react/visual/lib/Button.tsx
+--- a/tests/upstream/react/visual/lib/Button.tsx
++++ b/tests/upstream/react/visual/lib/Button.tsx
+@@ -1,10 +1,11 @@
+ import c from 'clsx';
+ import * as React from 'octane';
+ 
+-export const Button = React.forwardRef<
+-  HTMLButtonElement,
+-  React.ButtonHTMLAttributes<HTMLButtonElement>
+->(function Button(props, ref) {
++// OCTANE DIVERGENCE[floating-ui-ref-prop]: Octane passes refs as ordinary props.
++export function Button({
++  ref,
++  ...props
++}: React.ButtonHTMLAttributes<HTMLButtonElement> & {ref?: unknown}) {
+   return (
+     <button
+       {...props}
+@@ -15,4 +16,4 @@ export const Button = React.forwardRef<
+       )}
+     />
+   );
+-});
++}

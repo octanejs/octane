@@ -26,6 +26,7 @@ import {
 	createRoot as octaneCreateRoot,
 	flushSync as octaneFlushSync,
 	drainPassiveEffects as octaneDrainEffects,
+	act as octaneAct,
 } from '../../src/index.js';
 import { existsSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
@@ -331,15 +332,15 @@ export async function mountDifferential(
 	document.body.appendChild(octaneContainer);
 	document.body.appendChild(reactContainer);
 
-	// Octane mount.
+	// Both mounts use their public test boundary, just like subsequent steps.
 	const octaneRoot = octaneCreateRoot(octaneContainer);
-	octaneRoot.render(OctaneComp, initialProps);
-	octaneFlushSync(() => {});
-
-	// React mount.
 	const rRoot: ReactRoot = reactCreateRoot(reactContainer);
-	await reactAct(async () => {
-		rRoot.render(React.createElement(ReactComp, initialProps));
+	await octaneAct(async () => {
+		octaneRoot.render(OctaneComp, initialProps);
+		octaneFlushSync(() => {});
+		await reactAct(async () => {
+			rRoot.render(React.createElement(ReactComp, initialProps));
+		});
 	});
 
 	function mkMount(container: HTMLElement, isReact: boolean): DiffMount {
@@ -472,26 +473,34 @@ export async function mountDifferential(
 	const octane = mkMount(octaneContainer, false);
 	const react = mkMount(reactContainer, true);
 
-	async function settle(): Promise<void> {
+	async function settle(action?: () => void | Promise<void>): Promise<void> {
 		// Settle octane's async work too: a store notify (useSyncExternalStore),
 		// transition, or deferred value schedules its re-render as a passive effect
 		// that flushSync (used inside `click`) doesn't drain. Without this the rig
 		// only sees synchronous (useState) updates. Strictly more draining — inert
 		// for fixtures that were already settled.
-		octaneDrainEffects();
 		// Drain React commits + effects, including external stores that chain work
 		// from a renderer-completion promise. Keeping one macrotask inside act()
 		// gives those promise continuations a chance to enqueue their final commit
 		// without escaping React's test boundary. When Vitest fake timers are
 		// active, flush the 0-delay timer explicitly so the await can resolve.
-		await reactAct(async () => {
-			const wait = new Promise<void>(function (resolve) {
-				setTimeout(resolve, 0);
+		// Keep Octane's act scope active when an action resolves a promise. React
+		// event helpers and callers own their act boundaries: an extra outer React
+		// act would prevent nested waits from observing commits until the action
+		// itself returns. The final React act drains remaining work; the separate
+		// no-act timing oracle tests the real retry commit budget.
+		await octaneAct(async () => {
+			if (action !== undefined) await action();
+			await reactAct(async () => {
+				octaneDrainEffects();
+				const wait = new Promise<void>(function (resolve) {
+					setTimeout(resolve, 0);
+				});
+				if (typeof vi.isFakeTimers === 'function' && vi.isFakeTimers()) {
+					await vi.advanceTimersByTimeAsync(0);
+				}
+				await wait;
 			});
-			if (typeof vi.isFakeTimers === 'function' && vi.isFakeTimers()) {
-				await vi.advanceTimersByTimeAsync(0);
-			}
-			await wait;
 		});
 	}
 
@@ -499,8 +508,7 @@ export async function mountDifferential(
 		name: string,
 		fn: (i: DiffMount, r: DiffMount) => void | Promise<void>,
 	): Promise<void> {
-		await fn(octane, react);
-		await settle();
+		await settle(() => fn(octane, react));
 		const i = normaliseHtml(octaneContainer.innerHTML);
 		const r = normaliseHtml(reactContainer.innerHTML);
 		if (i !== r) {
@@ -519,8 +527,7 @@ export async function mountDifferential(
 		_name: string,
 		fn: (i: DiffMount, r: DiffMount) => void | Promise<void>,
 	): Promise<void> {
-		await fn(octane, react);
-		await settle();
+		await settle(() => fn(octane, react));
 	}
 
 	function unmount(): void {

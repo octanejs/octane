@@ -159,3 +159,14 @@ export type { TableBodyProps } from './table/TableBody';
 export type { RowProps, RowElement } from './table/Row';
 export type { CellProps, CellElement, CellRenderer } from './table/Cell';
 export type { ITableCollection } from './table/TableCollection';
+
+export { useTokenFieldState } from './tokenfield/useTokenFieldState';
+export type { TokenFieldProps, TokenFieldState } from './tokenfield/useTokenFieldState';
+export { TokenFieldValue } from './tokenfield/TokenFieldValue';
+export type {
+	TokenFieldSegment,
+	TextSegment,
+	TokenSegment,
+	Position,
+	TokenFieldValueOptions,
+} from './tokenfield/TokenFieldValue';

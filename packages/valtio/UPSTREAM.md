@@ -11,7 +11,7 @@
 - License: MIT
 - React oracle: workspace React 19.2.7
 
-The published artifact supplies the runtime and declaration boundary. The canonical tagged repository supplies the source and tests. The package reuses `valtio/vanilla` and `valtio/vanilla/utils` unchanged; only the React-facing hooks are adapted.
+The published artifact supplies the runtime and declaration boundary. The canonical tagged repository supplies the source and test audit. The package reuses `valtio/vanilla` and `valtio/vanilla/utils` unchanged; only the React-facing hooks are adapted.
 
 ## Export crosswalk
 

@@ -12,6 +12,7 @@ const { chromium } = requireFromNews('playwright');
 const appDirectory = fileURLToPath(new URL('../news/octane-tsrx/', import.meta.url));
 const EVENTS = 128;
 const FIELDS = 512;
+const PORTAL_CYCLES = 3;
 const failures = [];
 
 let browser;
@@ -29,7 +30,7 @@ try {
 				emptyOutDir: true,
 				minify: 'esbuild',
 				rollupOptions: {
-					input: path.join(appDirectory, 'runtime-stress.html'),
+					input: path.join(appDirectory, 'event-work.html'),
 					output: {
 						chunkFileNames: 'assets/[name]-[hash].js',
 						entryFileNames: 'assets/[name]-[hash].js',
@@ -47,7 +48,7 @@ try {
 		if (address === null || typeof address === 'string') {
 			throw new Error('The production event fixture did not expose a TCP port');
 		}
-		target = `http://127.0.0.1:${address.port}/runtime-stress.html`;
+		target = `http://127.0.0.1:${address.port}/event-work.html`;
 	}
 
 	browser = await chromium.launch({
@@ -56,19 +57,33 @@ try {
 	});
 	const page = await browser.newPage();
 	await page.goto(target, { waitUntil: 'load' });
-	await page.waitForFunction(() => globalThis.__runtimeStress?.ready === true, null, {
-		timeout: 10_000,
-	});
+	await page.waitForFunction(
+		() =>
+			globalThis.__runtimeStress?.ready === true &&
+			typeof globalThis.__eventWorkPortalLifecycle === 'function',
+		null,
+		{
+			timeout: 10_000,
+		},
+	);
 	observed = await page.evaluate(
-		({ events, fields }) => {
+		({ events, fields, portalCycles }) => {
 			const form = document.querySelector('#stress-form');
 			if (form === null) throw new Error('Missing controlled benchmark form');
 			if (document.querySelectorAll('input[data-field-index]').length !== fields) {
 				throw new Error('The application did not mount its complete controlled form');
 			}
+			// Mount through compiled JSX child position, not a createElement value
+			// portal. After its owner unmounts, ordinary input work must be portal-free.
+			const portalLifecycle = globalThis.__eventWorkPortalLifecycle(portalCycles);
 
 			const originalDefineProperty = Object.defineProperty;
 			const originalPush = Array.prototype.push;
+			const originalPreviousSibling = Object.getOwnPropertyDescriptor(
+				Node.prototype,
+				'previousSibling',
+			);
+			const originalComparePosition = Node.prototype.compareDocumentPosition;
 			const setInputValue = Object.getOwnPropertyDescriptor(
 				HTMLInputElement.prototype,
 				'value',
@@ -83,6 +98,8 @@ try {
 			let nativeBubbles = 0;
 			let frameworkCaptures = 0;
 			let invalidCurrentTargets = 0;
+			let previousSiblingReads = 0;
+			let documentPositionComparisons = 0;
 			const capture = () => nativeCaptures++;
 			const bubble = () => nativeBubbles++;
 
@@ -112,6 +129,17 @@ try {
 				}
 				return originalPush.apply(this, values);
 			};
+			Object.defineProperty(Node.prototype, 'previousSibling', {
+				...originalPreviousSibling,
+				get() {
+					previousSiblingReads++;
+					return originalPreviousSibling.get.call(this);
+				},
+			});
+			Node.prototype.compareDocumentPosition = function (node) {
+				documentPositionComparisons++;
+				return originalComparePosition.call(this, node);
+			};
 
 			try {
 				for (let index = 0; index < events; index++) {
@@ -126,6 +154,8 @@ try {
 				currentInput = null;
 				Object.defineProperty = originalDefineProperty;
 				Array.prototype.push = originalPush;
+				Object.defineProperty(Node.prototype, 'previousSibling', originalPreviousSibling);
+				Node.prototype.compareDocumentPosition = originalComparePosition;
 				document.removeEventListener('input', capture, true);
 				document.removeEventListener('input', bubble);
 				delete globalThis.__octaneDelegatedInputCapture;
@@ -143,6 +173,7 @@ try {
 				}
 			}
 			return {
+				...portalLifecycle,
 				eventHosts: document.querySelectorAll('input[data-field-index]').length,
 				events,
 				nativeCaptures,
@@ -155,9 +186,11 @@ try {
 				descriptors: descriptors.size,
 				getters: getters.size,
 				capturePaths: capturePaths.size,
+				previousSiblingReads,
+				documentPositionComparisons,
 			};
 		},
-		{ events: EVENTS, fields: FIELDS },
+		{ events: EVENTS, fields: FIELDS, portalCycles: PORTAL_CYCLES },
 	);
 } finally {
 	try {
@@ -186,6 +219,25 @@ if (observed.definitions !== EVENTS * 2) {
 }
 for (const key of ['descriptors', 'getters', 'capturePaths']) {
 	if (observed[key] > 1) failures.push(`${key}: ${observed[key]} exceeds 1`);
+}
+if (observed.portalCycles !== PORTAL_CYCLES)
+	failures.push(`portalCycles: ${observed.portalCycles} is not ${PORTAL_CYCLES}`);
+for (const key of ['portalCaptures', 'portalClicks', 'portalBubbles']) {
+	if (observed[key] !== PORTAL_CYCLES * 3)
+		failures.push(`${key}: ${observed[key]} is not ${PORTAL_CYCLES * 3}`);
+}
+for (const key of ['portalRefsMounted', 'portalRefsCleared']) {
+	if (observed[key] !== PORTAL_CYCLES * 2)
+		failures.push(`${key}: ${observed[key]} is not ${PORTAL_CYCLES * 2}`);
+}
+for (const key of [
+	'portalDetachedClicks',
+	'portalNodesAfterUnmount',
+	'previousSiblingReads',
+	'documentPositionComparisons',
+]) {
+	if (observed[key] !== 0)
+		failures.push(`${key}: ${observed[key]} is not zero after portal cleanup`);
 }
 
 console.log('Production delegated-event work:');
@@ -217,5 +269,5 @@ if (failures.length > 0) {
 	for (const failure of failures) console.error(`✗ ${failure}`);
 	process.exitCode = 1;
 } else {
-	console.log('All deterministic delegated-event allocation gates passed.');
+	console.log('All deterministic delegated-event work and lifecycle gates passed.');
 }

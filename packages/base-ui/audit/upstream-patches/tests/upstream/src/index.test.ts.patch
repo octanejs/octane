@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/src/index.test.ts b/tests/upstream/src/index.test.ts
+--- a/tests/upstream/src/index.test.ts
++++ b/tests/upstream/src/index.test.ts
+@@ -19,7 +19,7 @@ describe('@octanejs/base-ui', () => {
+   });
+ 
+   it.skipIf(!isJSDOM)('should resolve internals and auxiliary exports', async () => {
+-    const packageJson = await import('../package.json');
++    const packageJson = await import('../../../package.json');
+     const subpathExports = packageJson.exports;
+ 
+     const internalKeys = Object.keys(subpathExports).filter((key) =>
+@@ -36,7 +36,7 @@ describe('@octanejs/base-ui', () => {
+   });
+ 
+   it.skipIf(!isJSDOM)('should have the correct root exports', async () => {
+-    const packageJson = await import('../package.json');
++    const packageJson = await import('../../../package.json');
+     const subpathExports = packageJson.exports;
+ 
+     await Promise.all(

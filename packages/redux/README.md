@@ -2,6 +2,13 @@
 
 [React Redux](https://react-redux.js.org) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/redux redux
+pnpm add @octanejs/redux redux
+```
+
 The react-redux 9.3.0 hooks + `Provider` surface (`useSelector`, `useDispatch`,
 `useStore`, and the custom-context factory variants) reimplemented on octane's
 `useSyncExternalStore` — works with any Redux 5 / Redux Toolkit store by

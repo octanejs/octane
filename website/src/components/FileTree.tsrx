@@ -65,11 +65,11 @@ function buildTree(entries: readonly FileTreeEntry[]): TreeNode[] {
 /**
  * One level of the tree, recursing through itself.
  *
- * It renders markup only. A `@{ … }` body ends with exactly one output node, so
- * this cannot carry a `<style>` beside its list — and a `<style>` *inside* a
- * `<ul>` is not valid markup either. The wrapper below owns the styling for
- * every depth instead, which is also why these class names are prefixed: they
- * are reached through `:global`, so they are not scoped for us.
+ * It renders markup only. The `<style>` block written beside the wrapper in
+ * `FileTree` styles that wrapper and everything below it, every depth included,
+ * so no level carries a block of its own. That is also why these class names
+ * are prefixed: they are reached through `:global`, so they are not scoped for
+ * us.
  */
 function FileTreeLevel(props: { nodes: readonly TreeNode[] }) @{
 	<ul class="ft-level">
@@ -92,9 +92,7 @@ function FileTreeLevel(props: { nodes: readonly TreeNode[] }) @{
 export function FileTree(props: FileTreeProps) @{
 	const nodes = buildTree(props.entries);
 
-	<div class="file-tree" role="group" aria-label={props.label}>
-		<FileTreeLevel nodes={nodes} />
-
+	<>
 		<style>
 			/* The docs' panel treatment, minus the code-block header: there is no
 			   language to label and nothing worth copying. */
@@ -154,5 +152,8 @@ export function FileTree(props: FileTreeProps) @{
 				line-height: 1.4;
 			}
 		</style>
-	</div>
+		<div class="file-tree" role="group" aria-label={props.label}>
+			<FileTreeLevel nodes={nodes} />
+		</div>
+	</>
 }

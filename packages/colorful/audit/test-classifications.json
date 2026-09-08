@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/colorful/audit/type-probes/public-api.test.ts",
+      "disposition": "paired-repo-authored-react-type-oracle",
+      "oracle": "Repo-authored pristine React declaration/type-oracle probes against pinned react-colorful 5.8.0, paired with packages/colorful/typetests/public-api.test.ts (pristine type-probe lane)."
+    },
+    {
+      "path": "packages/colorful/tests/browser/parity.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises real-browser Octane picker interaction; it is not a paired React oracle."
+    },
+    {
+      "path": "packages/colorful/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the controlled picker scenario against published react-colorful@5.8.0 on the exact React oracle catalog."
+    },
+    {
+      "path": "packages/colorful/tests/hydration/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane hydration adoption for pickers; it is not compared with React hydration."
+    },
+    {
+      "path": "packages/colorful/tests/runtime/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Public-export smoke for the Octane package entry; not a React oracle."
+    },
+    {
+      "path": "packages/colorful/tests/runtime/owner-document.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane ownerDocument stylesheet targeting; unpaired framework contract."
+    },
+    {
+      "path": "packages/colorful/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane SSR render determinism; it is not React-parity evidence."
+    },
+    {
+      "path": "packages/colorful/tests/upstream/components.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted titles from tag/tests/components.test.js against the Octane binding."
+    },
+    {
+      "path": "packages/colorful/tests/upstream/csp.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted title from tag/tests/csp.test.js against the Octane binding."
+    },
+    {
+      "path": "packages/colorful/tests/upstream/shadowDom.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted title from tag/tests/shadowDom.test.js against the Octane binding."
+    },
+    {
+      "path": "packages/colorful/tests/upstream/utils.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted titles from tag/tests/utils.test.js against the Octane binding."
+    },
+    {
+      "path": "packages/colorful/typetests/public-api.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted Octane public type probes paired with audit/type-probes/public-api.test.ts after permitted transformations."
+    }
+  ]
+}

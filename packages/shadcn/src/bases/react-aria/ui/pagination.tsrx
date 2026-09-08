@@ -1,4 +1,4 @@
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import type { HostProps } from '../../../lib/types';
 import { LinkButton } from './button.tsrx';
 import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from '@octanejs/lucide';

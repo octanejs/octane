@@ -109,7 +109,17 @@ their conformance tests land.
 
 ## Intentional divergences (pre-existing documented Octane designs)
 
+The adapted suite's intentional differences are recorded bidirectionally:
+every `OCTANE DIVERGENCE[id]` marker resolves to the structured ledger in
+`packages/hook-form/audit/react-parity.json`, and every ledger entry must have
+a source/test marker plus executable case identities. The ledger covers native
+event delivery, scheduler batching, resolver notifications, async `act` flush
+boundaries, reset render counts, and eager equal-value bailout behavior. It
+also records classification, consumer impact, and migration guidance. These
+are ordinary passing tests; the binding suite contains no skipped or
+expected-failure cases.
+
 ## Release
 
-`@octanejs/hook-form@0.1.0` (patch-track alpha, like the other bindings).
+`@octanejs/hook-form@0.1.0` (on the 0.x patch track, like the other bindings).
 Changesets: `hook-form-binding.md`, `sync-act-and-zero-arg-hooks.md`.

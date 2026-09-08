@@ -1,0 +1,3948 @@
+{
+  "baselineCommit": "a6ffaefd65a25802800e69a752c8b1c85476c9e3",
+  "candidate": "same commit plus runtime.server.ts working-tree diff",
+  "sourceSha256": {
+    "baselineRuntime": "49dd03f67a0216a69a552ef3815b845f2ea16ee8a4ca0d8d3f20284adbc828d3",
+    "candidateRuntime": "948b04feb9773d784425f4af3b99dffb3f16753636a154b4bacadce85e0e1394"
+  },
+  "scope": "Unchanged application and harness, local production workerd SSR only; not Cloudflare adapter wrapper or deployed-edge TTFB",
+  "versions": {
+    "vite": "8.1.5",
+    "miniflare": "4.20260714.0",
+    "workerd": "1.20260714.1",
+    "tsrxCore": "0.1.61",
+    "oxcTsrx": "0.5.0"
+  },
+  "runs": [
+    {
+      "delayMs": 20,
+      "baselineCompletedAt": "2026-08-28T21:15:50.505Z",
+      "candidateCompletedAt": "2026-08-28T21:48:39.792Z",
+      "environment": {
+        "node": "v26.4.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M5 Max",
+        "compatibilityDate": "2026-07-14"
+      },
+      "fixtureSha256": {
+        "Pages.tsrx": "02b63190c091a757eee606905fdc16aa9fdb2dbc239ce594471e3033a48c9776",
+        "data.ts": "f4ea376f4145dab2ff469910a05f52a7a31afbbcd0f2934641fd7fa1ff3ab46b",
+        "worker.ts": "2d3f5b846e623de0886cecd7551d4b7f213943204c0a5aa6cc9c47a4967d9571",
+        "backend.js": "e909ebafc80547c1f64305de49371411160bf94411525b0c5f534aeb9e8c8c78",
+        "run.mjs": "dd0fccf40d172752b6a9f2be3ad7bc32fdc6b0b0e7d0037ee99551756f1686c6"
+      },
+      "iterations": 7,
+      "rounds": 3,
+      "workerBytes": {
+        "before": 64486,
+        "after": 64631
+      },
+      "cases": [
+        {
+          "config": {
+            "name": "local/blocked",
+            "pattern": "local",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 304.19125,
+              "firstData": 304.19125,
+              "total": 304.20354
+            },
+            "ttfbRangeMs": [300.75996, 311.54929],
+            "totalRangeMs": [300.77292, 311.80379],
+            "parentPasses": 15,
+            "backendCalls": 150,
+            "rounds": [
+              {
+                "ttfb": 307.03854,
+                "firstData": 307.03854,
+                "total": 307.05267
+              },
+              {
+                "ttfb": 302.67808,
+                "firstData": 302.67808,
+                "total": 302.79575
+              },
+              {
+                "ttfb": 303.42808,
+                "firstData": 303.42808,
+                "total": 303.61796
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 261.897,
+              "firstData": 261.897,
+              "total": 262.10075
+            },
+            "ttfbRangeMs": [257.28908, 277.43917],
+            "totalRangeMs": [257.30146, 277.64829],
+            "parentPasses": 14,
+            "backendCalls": 140,
+            "rounds": [
+              {
+                "ttfb": 261.59417,
+                "firstData": 261.59417,
+                "total": 261.60862
+              },
+              {
+                "ttfb": 259.42958,
+                "firstData": 259.42958,
+                "total": 259.44079
+              },
+              {
+                "ttfb": 263.55517,
+                "firstData": 263.55517,
+                "total": 263.76692
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "inline/blocked",
+            "pattern": "inline",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 23.46525,
+              "firstData": 23.46525,
+              "total": 23.48108
+            },
+            "ttfbRangeMs": [22.503, 34.25858],
+            "totalRangeMs": [22.61313, 34.28071],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 23.46525,
+                "firstData": 23.46525,
+                "total": 23.48108
+              },
+              {
+                "ttfb": 22.73783,
+                "firstData": 22.73783,
+                "total": 22.76733
+              },
+              {
+                "ttfb": 25.3005,
+                "firstData": 25.3005,
+                "total": 25.53487
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 22.94742,
+              "firstData": 22.94742,
+              "total": 23.01404
+            },
+            "ttfbRangeMs": [21.96612, 25.6],
+            "totalRangeMs": [21.98121, 25.83642],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 22.75175,
+                "firstData": 22.75175,
+                "total": 22.77696
+              },
+              {
+                "ttfb": 22.92292,
+                "firstData": 22.92292,
+                "total": 22.93717
+              },
+              {
+                "ttfb": 24.27804,
+                "firstData": 24.27804,
+                "total": 24.50142
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "memo/blocked",
+            "pattern": "memo",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 304.25104,
+              "firstData": 304.25104,
+              "total": 304.26342
+            },
+            "ttfbRangeMs": [300.37404, 312.72158],
+            "totalRangeMs": [300.49796, 313.00125],
+            "parentPasses": 15,
+            "backendCalls": 150,
+            "rounds": [
+              {
+                "ttfb": 303.0345,
+                "firstData": 303.0345,
+                "total": 303.04858
+              },
+              {
+                "ttfb": 303.48988,
+                "firstData": 303.48988,
+                "total": 303.618
+              },
+              {
+                "ttfb": 308.70058,
+                "firstData": 308.70058,
+                "total": 308.87175
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 261.50058,
+              "firstData": 261.50058,
+              "total": 261.52558
+            },
+            "ttfbRangeMs": [258.02838, 265.35021],
+            "totalRangeMs": [258.04138, 265.56471],
+            "parentPasses": 14,
+            "backendCalls": 140,
+            "rounds": [
+              {
+                "ttfb": 259.96867,
+                "firstData": 259.96867,
+                "total": 259.98346
+              },
+              {
+                "ttfb": 259.427,
+                "firstData": 259.427,
+                "total": 259.4385
+              },
+              {
+                "ttfb": 264.03737,
+                "firstData": 264.03737,
+                "total": 264.25021
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "prepared/blocked",
+            "pattern": "prepared",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 22.98658,
+              "firstData": 22.98658,
+              "total": 22.99829
+            },
+            "ttfbRangeMs": [22.54121, 25.81146],
+            "totalRangeMs": [22.57458, 25.98408],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 22.98658,
+                "firstData": 22.98658,
+                "total": 22.99829
+              },
+              {
+                "ttfb": 22.71142,
+                "firstData": 22.71142,
+                "total": 22.72379
+              },
+              {
+                "ttfb": 24.50167,
+                "firstData": 24.50167,
+                "total": 24.73583
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 23.01721,
+              "firstData": 23.01721,
+              "total": 23.15079
+            },
+            "ttfbRangeMs": [22.57454, 24.31304],
+            "totalRangeMs": [22.58596, 24.44508],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 23.29571,
+                "firstData": 23.29571,
+                "total": 23.43329
+              },
+              {
+                "ttfb": 22.96092,
+                "firstData": 22.96092,
+                "total": 23.01104
+              },
+              {
+                "ttfb": 23.122,
+                "firstData": 23.122,
+                "total": 23.32021
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "use-site/blocked",
+            "pattern": "use-site",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 214.843,
+              "firstData": 214.843,
+              "total": 214.85663
+            },
+            "ttfbRangeMs": [212.88379, 222.50521],
+            "totalRangeMs": [212.89471, 222.51633],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 214.843,
+                "firstData": 214.843,
+                "total": 214.85663
+              },
+              {
+                "ttfb": 213.36921,
+                "firstData": 213.36921,
+                "total": 213.49025
+              },
+              {
+                "ttfb": 216.38083,
+                "firstData": 216.38083,
+                "total": 216.40646
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 215.063,
+              "firstData": 215.063,
+              "total": 215.24429
+            },
+            "ttfbRangeMs": [210.40912, 218.68771],
+            "totalRangeMs": [210.44496, 218.93663],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 215.17071,
+                "firstData": 215.17071,
+                "total": 215.37925
+              },
+              {
+                "ttfb": 215.08625,
+                "firstData": 215.08625,
+                "total": 215.2745
+              },
+              {
+                "ttfb": 214.01158,
+                "firstData": 214.01158,
+                "total": 214.02379
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "local-request-cache/blocked",
+            "pattern": "local",
+            "shell": false,
+            "count": 10,
+            "cache": "request"
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 22.75683,
+              "firstData": 22.75683,
+              "total": 22.80908
+            },
+            "ttfbRangeMs": [22.56283, 25.26842],
+            "totalRangeMs": [22.57337, 26.29783],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 24.25983,
+                "firstData": 24.25983,
+                "total": 24.42708
+              },
+              {
+                "ttfb": 22.70483,
+                "firstData": 22.70483,
+                "total": 22.74954
+              },
+              {
+                "ttfb": 22.71054,
+                "firstData": 22.71054,
+                "total": 22.72375
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 23.69958,
+              "firstData": 23.69958,
+              "total": 23.88458
+            },
+            "ttfbRangeMs": [22.585, 28.41125],
+            "totalRangeMs": [22.59579, 28.44646],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 23.69958,
+                "firstData": 23.69958,
+                "total": 23.88458
+              },
+              {
+                "ttfb": 22.76725,
+                "firstData": 22.76725,
+                "total": 22.77846
+              },
+              {
+                "ttfb": 24.21133,
+                "firstData": 24.21133,
+                "total": 24.4895
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "serial/blocked",
+            "pattern": "serial",
+            "shell": false,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 64.64046,
+              "firstData": 64.64046,
+              "total": 64.69567
+            },
+            "ttfbRangeMs": [63.59175, 65.58317],
+            "totalRangeMs": [63.60488, 66.27429],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 64.64204,
+                "firstData": 64.64204,
+                "total": 64.76129
+              },
+              {
+                "ttfb": 64.48842,
+                "firstData": 64.48842,
+                "total": 64.51983
+              },
+              {
+                "ttfb": 64.73688,
+                "firstData": 64.73688,
+                "total": 64.96071
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 65.19979,
+              "firstData": 65.19979,
+              "total": 65.23508
+            },
+            "ttfbRangeMs": [63.71546, 66.01362],
+            "totalRangeMs": [63.73071, 66.23029],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 64.83088,
+                "firstData": 64.83088,
+                "total": 64.95638
+              },
+              {
+                "ttfb": 64.57467,
+                "firstData": 64.57467,
+                "total": 64.58767
+              },
+              {
+                "ttfb": 65.64917,
+                "firstData": 65.64917,
+                "total": 65.84863
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "parallel/blocked",
+            "pattern": "parallel",
+            "shell": false,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 22.31638,
+              "firstData": 22.31638,
+              "total": 22.32946
+            },
+            "ttfbRangeMs": [21.53525, 23.46329],
+            "totalRangeMs": [21.55467, 23.73262],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 22.31638,
+                "firstData": 22.31638,
+                "total": 22.32946
+              },
+              {
+                "ttfb": 22.18925,
+                "firstData": 22.18925,
+                "total": 22.201
+              },
+              {
+                "ttfb": 22.96804,
+                "firstData": 22.96804,
+                "total": 23.21879
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 22.75562,
+              "firstData": 22.75562,
+              "total": 22.94037
+            },
+            "ttfbRangeMs": [21.52137, 24.32512],
+            "totalRangeMs": [21.53746, 24.58587],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 22.22363,
+                "firstData": 22.22363,
+                "total": 22.34212
+              },
+              {
+                "ttfb": 22.9635,
+                "firstData": 22.9635,
+                "total": 23.16133
+              },
+              {
+                "ttfb": 23.324,
+                "firstData": 23.324,
+                "total": 23.6365
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "independent/blocked",
+            "pattern": "independent",
+            "shell": false,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 22.41596,
+              "firstData": 22.41596,
+              "total": 22.44058
+            },
+            "ttfbRangeMs": [22.13617, 24.09892],
+            "totalRangeMs": [22.14842, 24.36108],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 22.36771,
+                "firstData": 22.36771,
+                "total": 22.38087
+              },
+              {
+                "ttfb": 22.23167,
+                "firstData": 22.23167,
+                "total": 22.24346
+              },
+              {
+                "ttfb": 23.2045,
+                "firstData": 23.2045,
+                "total": 23.51967
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 22.88196,
+              "firstData": 22.88196,
+              "total": 23.10046
+            },
+            "ttfbRangeMs": [22.11829, 27.18604],
+            "totalRangeMs": [22.13121, 27.21625],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 22.19071,
+                "firstData": 22.19071,
+                "total": 22.25508
+              },
+              {
+                "ttfb": 22.99417,
+                "firstData": 22.99417,
+                "total": 23.20817
+              },
+              {
+                "ttfb": 22.94496,
+                "firstData": 22.94496,
+                "total": 23.13029
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "dependent/blocked",
+            "pattern": "dependent",
+            "shell": false,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 64.74596,
+              "firstData": 64.74596,
+              "total": 64.7885
+            },
+            "ttfbRangeMs": [64.04463, 65.85692],
+            "totalRangeMs": [64.05654, 65.87454],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 64.81871,
+                "firstData": 64.81871,
+                "total": 64.83175
+              },
+              {
+                "ttfb": 64.72042,
+                "firstData": 64.72042,
+                "total": 64.7335
+              },
+              {
+                "ttfb": 64.66846,
+                "firstData": 64.66846,
+                "total": 64.68096
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 64.80275,
+              "firstData": 64.80275,
+              "total": 64.87329
+            },
+            "ttfbRangeMs": [63.38988, 66.54063],
+            "totalRangeMs": [63.40267, 66.73554],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 64.51112,
+                "firstData": 64.51112,
+                "total": 64.618
+              },
+              {
+                "ttfb": 64.80275,
+                "firstData": 64.80275,
+                "total": 64.91408
+              },
+              {
+                "ttfb": 65.57783,
+                "firstData": 65.57783,
+                "total": 65.84454
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "local/shell",
+            "pattern": "local",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.92142,
+              "firstData": 302.69221,
+              "total": 302.83304
+            },
+            "ttfbRangeMs": [0.63204, 3.07204],
+            "totalRangeMs": [300.24067, 318.60529],
+            "parentPasses": 15,
+            "backendCalls": 150,
+            "rounds": [
+              {
+                "ttfb": 1.30138,
+                "firstData": 308.40142,
+                "total": 308.53929
+              },
+              {
+                "ttfb": 0.74142,
+                "firstData": 301.55288,
+                "total": 301.69633
+              },
+              {
+                "ttfb": 0.86829,
+                "firstData": 302.69221,
+                "total": 302.83304
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.16188,
+              "firstData": 261.02492,
+              "total": 261.52675
+            },
+            "ttfbRangeMs": [0.66312, 2.37017],
+            "totalRangeMs": [258.88446, 265.98612],
+            "parentPasses": 14,
+            "backendCalls": 140,
+            "rounds": [
+              {
+                "ttfb": 0.85508,
+                "firstData": 260.07358,
+                "total": 260.22779
+              },
+              {
+                "ttfb": 1.16188,
+                "firstData": 264.70258,
+                "total": 265.04588
+              },
+              {
+                "ttfb": 1.37358,
+                "firstData": 260.87146,
+                "total": 261.17296
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "inline/shell",
+            "pattern": "inline",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.89842,
+              "firstData": 23.28854,
+              "total": 23.30963
+            },
+            "ttfbRangeMs": [0.62967, 1.61413],
+            "totalRangeMs": [22.63117, 25.40737],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.86413,
+                "firstData": 22.98258,
+                "total": 23.10479
+              },
+              {
+                "ttfb": 0.94321,
+                "firstData": 23.29521,
+                "total": 23.31504
+              },
+              {
+                "ttfb": 1.34554,
+                "firstData": 23.28854,
+                "total": 23.30963
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.45104,
+              "firstData": 23.4375,
+              "total": 23.63167
+            },
+            "ttfbRangeMs": [0.66825, 1.97767],
+            "totalRangeMs": [22.58179, 26.53388],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.81521,
+                "firstData": 22.74004,
+                "total": 22.76004
+              },
+              {
+                "ttfb": 1.107,
+                "firstData": 24.06838,
+                "total": 24.25842
+              },
+              {
+                "ttfb": 1.49683,
+                "firstData": 23.81163,
+                "total": 23.97175
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "memo/shell",
+            "pattern": "memo",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.78417,
+              "firstData": 302.46788,
+              "total": 302.6325
+            },
+            "ttfbRangeMs": [0.64446, 1.49042],
+            "totalRangeMs": [300.26287, 309.34308],
+            "parentPasses": 15,
+            "backendCalls": 150,
+            "rounds": [
+              {
+                "ttfb": 0.79333,
+                "firstData": 302.35354,
+                "total": 302.48587
+              },
+              {
+                "ttfb": 0.77942,
+                "firstData": 301.95371,
+                "total": 302.15367
+              },
+              {
+                "ttfb": 0.76942,
+                "firstData": 303.71433,
+                "total": 303.85021
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.02787,
+              "firstData": 263.63729,
+              "total": 263.96979
+            },
+            "ttfbRangeMs": [0.67167, 2.01004],
+            "totalRangeMs": [257.32521, 280.2805],
+            "parentPasses": 14,
+            "backendCalls": 140,
+            "rounds": [
+              {
+                "ttfb": 0.7945,
+                "firstData": 258.78863,
+                "total": 258.94621
+              },
+              {
+                "ttfb": 1.58713,
+                "firstData": 265.32862,
+                "total": 265.59987
+              },
+              {
+                "ttfb": 1.02787,
+                "firstData": 263.63729,
+                "total": 263.96979
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "prepared/shell",
+            "pattern": "prepared",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.85829,
+              "firstData": 22.767,
+              "total": 22.86875
+            },
+            "ttfbRangeMs": [0.65408, 1.35225],
+            "totalRangeMs": [22.19662, 24.07196],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.04154,
+                "firstData": 23.27287,
+                "total": 23.43567
+              },
+              {
+                "ttfb": 0.70788,
+                "firstData": 22.58112,
+                "total": 22.6035
+              },
+              {
+                "ttfb": 0.78125,
+                "firstData": 22.69892,
+                "total": 22.716
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.88379,
+              "firstData": 23.0115,
+              "total": 23.0295
+            },
+            "ttfbRangeMs": [0.62404, 2.15833],
+            "totalRangeMs": [21.83087, 25.88021],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.69879,
+                "firstData": 23.0115,
+                "total": 23.0295
+              },
+              {
+                "ttfb": 0.78137,
+                "firstData": 22.41633,
+                "total": 22.54962
+              },
+              {
+                "ttfb": 1.52442,
+                "firstData": 23.91346,
+                "total": 24.07217
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "use-site/shell",
+            "pattern": "use-site",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.81287,
+              "firstData": 214.50633,
+              "total": 214.52717
+            },
+            "ttfbRangeMs": [0.56333, 3.60083],
+            "totalRangeMs": [212.33954, 218.62446],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.93425,
+                "firstData": 214.91187,
+                "total": 214.93533
+              },
+              {
+                "ttfb": 0.65804,
+                "firstData": 213.9945,
+                "total": 214.01896
+              },
+              {
+                "ttfb": 0.79683,
+                "firstData": 216.12829,
+                "total": 216.35442
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.8845,
+              "firstData": 214.42175,
+              "total": 214.46487
+            },
+            "ttfbRangeMs": [0.615, 1.411],
+            "totalRangeMs": [212.02971, 216.47329],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.69612,
+                "firstData": 213.58904,
+                "total": 213.61187
+              },
+              {
+                "ttfb": 0.79946,
+                "firstData": 214.3435,
+                "total": 214.46487
+              },
+              {
+                "ttfb": 1.19283,
+                "firstData": 216.03687,
+                "total": 216.21087
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "local-request-cache/shell",
+            "pattern": "local",
+            "shell": true,
+            "count": 10,
+            "cache": "request"
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.45496,
+              "firstData": 23.92487,
+              "total": 24.08346
+            },
+            "ttfbRangeMs": [0.675, 4.36517],
+            "totalRangeMs": [22.86604, 26.19575],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.97408,
+                "firstData": 23.05546,
+                "total": 23.07638
+              },
+              {
+                "ttfb": 1.52908,
+                "firstData": 24.208,
+                "total": 24.44671
+              },
+              {
+                "ttfb": 1.51917,
+                "firstData": 24.38667,
+                "total": 24.65879
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.2665,
+              "firstData": 23.48554,
+              "total": 23.69912
+            },
+            "ttfbRangeMs": [0.62412, 2.18912],
+            "totalRangeMs": [22.42488, 24.96892],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.7455,
+                "firstData": 22.6885,
+                "total": 22.70862
+              },
+              {
+                "ttfb": 1.68408,
+                "firstData": 24.36133,
+                "total": 24.76496
+              },
+              {
+                "ttfb": 1.5675,
+                "firstData": 24.19529,
+                "total": 24.40313
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "serial/shell",
+            "pattern": "serial",
+            "shell": true,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.99279,
+              "firstData": 64.67896,
+              "total": 64.87496
+            },
+            "ttfbRangeMs": [0.57438, 1.86188],
+            "totalRangeMs": [62.84887, 66.22638],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.66579,
+                "firstData": 64.50413,
+                "total": 64.52533
+              },
+              {
+                "ttfb": 1.15475,
+                "firstData": 65.437,
+                "total": 65.68362
+              },
+              {
+                "ttfb": 1.10417,
+                "firstData": 64.48071,
+                "total": 64.61121
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.73708,
+              "firstData": 64.51742,
+              "total": 64.53912
+            },
+            "ttfbRangeMs": [0.47738, 1.49783],
+            "totalRangeMs": [64.29325, 65.30442],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.72075,
+                "firstData": 64.51742,
+                "total": 64.53912
+              },
+              {
+                "ttfb": 0.62329,
+                "firstData": 64.38867,
+                "total": 64.41712
+              },
+              {
+                "ttfb": 1.22883,
+                "firstData": 64.86587,
+                "total": 65.08129
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "parallel/shell",
+            "pattern": "parallel",
+            "shell": true,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.12879,
+              "firstData": 22.38333,
+              "total": 22.41821
+            },
+            "ttfbRangeMs": [0.62083, 1.529],
+            "totalRangeMs": [21.50667, 23.9925],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.71504,
+                "firstData": 22.15929,
+                "total": 22.18088
+              },
+              {
+                "ttfb": 1.31696,
+                "firstData": 22.76563,
+                "total": 23.01521
+              },
+              {
+                "ttfb": 1.12879,
+                "firstData": 22.36975,
+                "total": 22.63046
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.76125,
+              "firstData": 22.17575,
+              "total": 22.19654
+            },
+            "ttfbRangeMs": [0.53329, 1.64738],
+            "totalRangeMs": [21.88808, 23.29512],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.76125,
+                "firstData": 22.17575,
+                "total": 22.19654
+              },
+              {
+                "ttfb": 0.61617,
+                "firstData": 21.99796,
+                "total": 22.02629
+              },
+              {
+                "ttfb": 1.40908,
+                "firstData": 22.81717,
+                "total": 23.00304
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "independent/shell",
+            "pattern": "independent",
+            "shell": true,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.90937,
+              "firstData": 22.35608,
+              "total": 22.39554
+            },
+            "ttfbRangeMs": [0.6495, 2.76375],
+            "totalRangeMs": [22.11454, 24.24733],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.82008,
+                "firstData": 22.15775,
+                "total": 22.24321
+              },
+              {
+                "ttfb": 1.83013,
+                "firstData": 23.14092,
+                "total": 23.33167
+              },
+              {
+                "ttfb": 0.7325,
+                "firstData": 22.21821,
+                "total": 22.23833
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.78558,
+              "firstData": 22.16367,
+              "total": 22.18308
+            },
+            "ttfbRangeMs": [0.57475, 2.25242],
+            "totalRangeMs": [22.04042, 23.39179],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.75933,
+                "firstData": 22.164,
+                "total": 22.18992
+              },
+              {
+                "ttfb": 0.67138,
+                "firstData": 22.13496,
+                "total": 22.15771
+              },
+              {
+                "ttfb": 1.19829,
+                "firstData": 22.62029,
+                "total": 22.81125
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "dependent/shell",
+            "pattern": "dependent",
+            "shell": true,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.69429,
+              "firstData": 64.72092,
+              "total": 64.73971
+            },
+            "ttfbRangeMs": [0.57083, 1.29971],
+            "totalRangeMs": [64.04658, 71.01679],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.72912,
+                "firstData": 64.69313,
+                "total": 64.716
+              },
+              {
+                "ttfb": 0.69342,
+                "firstData": 64.86467,
+                "total": 65.0145
+              },
+              {
+                "ttfb": 0.62512,
+                "firstData": 64.67629,
+                "total": 64.69392
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.96954,
+              "firstData": 65.14225,
+              "total": 65.17879
+            },
+            "ttfbRangeMs": [0.57921, 2.70629],
+            "totalRangeMs": [63.84279, 67.94867],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 1.04762,
+                "firstData": 65.14225,
+                "total": 65.30658
+              },
+              {
+                "ttfb": 0.75633,
+                "firstData": 64.97608,
+                "total": 64.99625
+              },
+              {
+                "ttfb": 1.49062,
+                "firstData": 65.434,
+                "total": 65.64429
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "local/per-card",
+            "pattern": "local",
+            "shell": true,
+            "each": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.05717,
+              "firstData": 108.93662,
+              "total": 109.09758
+            },
+            "ttfbRangeMs": [0.75196, 1.84658],
+            "totalRangeMs": [108.08842, 129.99533],
+            "parentPasses": 6,
+            "backendCalls": 60,
+            "rounds": [
+              {
+                "ttfb": 0.91329,
+                "firstData": 108.94558,
+                "total": 109.08942
+              },
+              {
+                "ttfb": 0.99,
+                "firstData": 108.78563,
+                "total": 109.09758
+              },
+              {
+                "ttfb": 1.10938,
+                "firstData": 109.12962,
+                "total": 109.27325
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.84608,
+              "firstData": 65.83833,
+              "total": 65.96958
+            },
+            "ttfbRangeMs": [0.69092, 2.01979],
+            "totalRangeMs": [64.91763, 69.93367],
+            "parentPasses": 5,
+            "backendCalls": 50,
+            "rounds": [
+              {
+                "ttfb": 1.5215,
+                "firstData": 68.539,
+                "total": 68.90125
+              },
+              {
+                "ttfb": 0.74975,
+                "firstData": 65.60567,
+                "total": 65.71838
+              },
+              {
+                "ttfb": 0.84608,
+                "firstData": 65.73475,
+                "total": 65.875
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "inline/per-card",
+            "pattern": "inline",
+            "shell": true,
+            "each": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.02971,
+              "firstData": 22.60817,
+              "total": 22.63371
+            },
+            "ttfbRangeMs": [0.66033, 2.41058],
+            "totalRangeMs": [21.86704, 24.09896],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.27438,
+                "firstData": 22.60817,
+                "total": 22.63371
+              },
+              {
+                "ttfb": 0.793,
+                "firstData": 22.34229,
+                "total": 22.36121
+              },
+              {
+                "ttfb": 1.21238,
+                "firstData": 23.10763,
+                "total": 23.37488
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.89608,
+              "firstData": 22.41346,
+              "total": 22.4325
+            },
+            "ttfbRangeMs": [0.68687, 2.26142],
+            "totalRangeMs": [22.21225, 26.29596],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.81221,
+                "firstData": 23.38396,
+                "total": 23.64258
+              },
+              {
+                "ttfb": 0.78412,
+                "firstData": 22.28521,
+                "total": 22.30242
+              },
+              {
+                "ttfb": 0.88463,
+                "firstData": 22.3435,
+                "total": 22.38279
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "prepared/per-card",
+            "pattern": "prepared",
+            "shell": true,
+            "each": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.88642,
+              "firstData": 22.38483,
+              "total": 22.44817
+            },
+            "ttfbRangeMs": [0.76742, 1.75983],
+            "totalRangeMs": [21.63017, 23.20396],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.9615,
+                "firstData": 22.53867,
+                "total": 22.56658
+              },
+              {
+                "ttfb": 0.83004,
+                "firstData": 22.34792,
+                "total": 22.36583
+              },
+              {
+                "ttfb": 0.88796,
+                "firstData": 22.51263,
+                "total": 22.53021
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.93717,
+              "firstData": 22.58871,
+              "total": 22.72446
+            },
+            "ttfbRangeMs": [0.67571, 5.52871],
+            "totalRangeMs": [21.75167, 29.08717],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.9125,
+                "firstData": 26.13075,
+                "total": 26.72358
+              },
+              {
+                "ttfb": 0.92529,
+                "firstData": 22.34492,
+                "total": 22.42058
+              },
+              {
+                "ttfb": 0.79708,
+                "firstData": 22.35904,
+                "total": 22.45058
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "use-site/per-card",
+            "pattern": "use-site",
+            "shell": true,
+            "each": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.87142,
+              "firstData": 22.41983,
+              "total": 22.43804
+            },
+            "ttfbRangeMs": [0.71225, 1.8455],
+            "totalRangeMs": [22.16304, 23.78763],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.08704,
+                "firstData": 22.6205,
+                "total": 22.64708
+              },
+              {
+                "ttfb": 0.83729,
+                "firstData": 22.37621,
+                "total": 22.39783
+              },
+              {
+                "ttfb": 0.84913,
+                "firstData": 22.41983,
+                "total": 22.43804
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.68846,
+              "firstData": 23.23104,
+              "total": 23.24954
+            },
+            "ttfbRangeMs": [0.67688, 4.67842],
+            "totalRangeMs": [22.21404, 25.36575],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.74608,
+                "firstData": 23.41233,
+                "total": 23.45283
+              },
+              {
+                "ttfb": 0.77492,
+                "firstData": 22.30583,
+                "total": 22.32646
+              },
+              {
+                "ttfb": 1.8465,
+                "firstData": 23.826,
+                "total": 24.08483
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "duplicate/no-cache",
+            "pattern": "use-site",
+            "shell": false,
+            "count": 10,
+            "unique": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 214.66421,
+              "firstData": 214.66421,
+              "total": 214.67983
+            },
+            "ttfbRangeMs": [212.26929, 217.31617],
+            "totalRangeMs": [212.28067, 217.60358],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 215.27758,
+                "firstData": 215.27758,
+                "total": 215.46658
+              },
+              {
+                "ttfb": 214.39467,
+                "firstData": 214.39467,
+                "total": 214.40913
+              },
+              {
+                "ttfb": 214.05062,
+                "firstData": 214.05062,
+                "total": 214.06371
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 214.27871,
+              "firstData": 214.27871,
+              "total": 214.41292
+            },
+            "ttfbRangeMs": [212.61917, 216.97754],
+            "totalRangeMs": [212.63104, 217.26188],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 214.65662,
+                "firstData": 214.65662,
+                "total": 214.67388
+              },
+              {
+                "ttfb": 213.52917,
+                "firstData": 213.52917,
+                "total": 213.54271
+              },
+              {
+                "ttfb": 215.08758,
+                "firstData": 215.08758,
+                "total": 215.10075
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "duplicate/request-cache",
+            "pattern": "use-site",
+            "shell": false,
+            "count": 10,
+            "unique": 3,
+            "cache": "request"
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 65.24646,
+              "firstData": 65.24646,
+              "total": 65.36029
+            },
+            "ttfbRangeMs": [64.35638, 65.81758],
+            "totalRangeMs": [64.36979, 65.99858],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 65.60146,
+                "firstData": 65.60146,
+                "total": 65.77738
+              },
+              {
+                "ttfb": 65.0515,
+                "firstData": 65.0515,
+                "total": 65.06842
+              },
+              {
+                "ttfb": 64.88029,
+                "firstData": 64.88029,
+                "total": 64.8925
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 65.24725,
+              "firstData": 65.24725,
+              "total": 65.39758
+            },
+            "ttfbRangeMs": [64.1965, 66.271],
+            "totalRangeMs": [64.20892, 66.44938],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 64.90492,
+                "firstData": 64.90492,
+                "total": 64.92592
+              },
+              {
+                "ttfb": 65.29988,
+                "firstData": 65.29988,
+                "total": 65.48237
+              },
+              {
+                "ttfb": 65.78275,
+                "firstData": 65.78275,
+                "total": 65.93054
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "duplicate/no-cache-per-card",
+            "pattern": "use-site",
+            "shell": true,
+            "each": true,
+            "count": 10,
+            "unique": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.31671,
+              "firstData": 22.91638,
+              "total": 22.96062
+            },
+            "ttfbRangeMs": [0.77329, 3.48479],
+            "totalRangeMs": [21.72433, 24.606],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.63762,
+                "firstData": 23.08542,
+                "total": 23.50933
+              },
+              {
+                "ttfb": 1.13025,
+                "firstData": 22.83821,
+                "total": 22.86263
+              },
+              {
+                "ttfb": 1.39304,
+                "firstData": 22.91638,
+                "total": 22.93692
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.4435,
+              "firstData": 22.75125,
+              "total": 22.77092
+            },
+            "ttfbRangeMs": [0.75679, 2.1275],
+            "totalRangeMs": [21.87725, 24.74912],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.99796,
+                "firstData": 22.50508,
+                "total": 22.52762
+              },
+              {
+                "ttfb": 1.97025,
+                "firstData": 23.16158,
+                "total": 23.59133
+              },
+              {
+                "ttfb": 0.89137,
+                "firstData": 22.48613,
+                "total": 22.50238
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "duplicate/request-cache-per-card",
+            "pattern": "use-site",
+            "shell": true,
+            "each": true,
+            "count": 10,
+            "unique": 3,
+            "cache": "request"
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.05796,
+              "firstData": 22.63537,
+              "total": 22.67146
+            },
+            "ttfbRangeMs": [0.71758, 1.61363],
+            "totalRangeMs": [21.59971, 23.52579],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 1.45092,
+                "firstData": 22.65254,
+                "total": 22.74488
+              },
+              {
+                "ttfb": 1,
+                "firstData": 22.63537,
+                "total": 22.65629
+              },
+              {
+                "ttfb": 1.00629,
+                "firstData": 22.48817,
+                "total": 22.67146
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.78029,
+              "firstData": 22.4565,
+              "total": 22.60754
+            },
+            "ttfbRangeMs": [0.5985, 1.801],
+            "totalRangeMs": [21.69167, 23.52542],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.6805,
+                "firstData": 22.26296,
+                "total": 22.28571
+              },
+              {
+                "ttfb": 1.61067,
+                "firstData": 22.50317,
+                "total": 22.7225
+              },
+              {
+                "ttfb": 0.72562,
+                "firstData": 22.4565,
+                "total": 22.47504
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "data-cache/cold",
+            "pattern": "parallel",
+            "shell": false,
+            "count": 3,
+            "cache": "data",
+            "cold": true
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 22.324,
+              "firstData": 22.324,
+              "total": 22.347
+            },
+            "ttfbRangeMs": [21.40842, 26.88129],
+            "totalRangeMs": [21.41954, 26.89783],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 22.62612,
+                "firstData": 22.62612,
+                "total": 22.64404
+              },
+              {
+                "ttfb": 22.25621,
+                "firstData": 22.25621,
+                "total": 22.30783
+              },
+              {
+                "ttfb": 22.16321,
+                "firstData": 22.16321,
+                "total": 22.277
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 22.77846,
+              "firstData": 22.77846,
+              "total": 22.96658
+            },
+            "ttfbRangeMs": [22.18938, 23.366],
+            "totalRangeMs": [22.36954, 23.66862],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 22.50938,
+                "firstData": 22.50938,
+                "total": 22.65921
+              },
+              {
+                "ttfb": 22.83346,
+                "firstData": 22.83346,
+                "total": 23.02008
+              },
+              {
+                "ttfb": 23.02087,
+                "firstData": 23.02087,
+                "total": 23.23262
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "data-cache/warm",
+            "pattern": "parallel",
+            "shell": false,
+            "count": 3,
+            "cache": "data",
+            "warm": true
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.82412,
+              "firstData": 0.82412,
+              "total": 0.90029
+            },
+            "ttfbRangeMs": [0.62042, 1.56683],
+            "totalRangeMs": [0.68871, 1.72417],
+            "parentPasses": 2,
+            "backendCalls": 0,
+            "rounds": [
+              {
+                "ttfb": 1.13171,
+                "firstData": 1.13171,
+                "total": 1.23517
+              },
+              {
+                "ttfb": 0.82412,
+                "firstData": 0.82412,
+                "total": 0.89833
+              },
+              {
+                "ttfb": 0.68167,
+                "firstData": 0.68167,
+                "total": 0.70438
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.72704,
+              "firstData": 0.72704,
+              "total": 0.74338
+            },
+            "ttfbRangeMs": [0.47625, 1.26637],
+            "totalRangeMs": [0.51754, 1.40046],
+            "parentPasses": 2,
+            "backendCalls": 0,
+            "rounds": [
+              {
+                "ttfb": 0.56458,
+                "firstData": 0.56458,
+                "total": 0.62613
+              },
+              {
+                "ttfb": 0.81021,
+                "firstData": 0.81021,
+                "total": 0.89508
+              },
+              {
+                "ttfb": 0.85729,
+                "firstData": 0.85729,
+                "total": 0.94283
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "delayMs": 0,
+      "baselineCompletedAt": "2026-08-28T21:18:05.722Z",
+      "candidateCompletedAt": "2026-08-28T21:49:06.017Z",
+      "environment": {
+        "node": "v26.4.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M5 Max",
+        "compatibilityDate": "2026-07-14"
+      },
+      "fixtureSha256": {
+        "Pages.tsrx": "02b63190c091a757eee606905fdc16aa9fdb2dbc239ce594471e3033a48c9776",
+        "data.ts": "f4ea376f4145dab2ff469910a05f52a7a31afbbcd0f2934641fd7fa1ff3ab46b",
+        "worker.ts": "2d3f5b846e623de0886cecd7551d4b7f213943204c0a5aa6cc9c47a4967d9571",
+        "backend.js": "e909ebafc80547c1f64305de49371411160bf94411525b0c5f534aeb9e8c8c78",
+        "run.mjs": "dd0fccf40d172752b6a9f2be3ad7bc32fdc6b0b0e7d0037ee99551756f1686c6"
+      },
+      "iterations": 7,
+      "rounds": 3,
+      "workerBytes": {
+        "before": 64486,
+        "after": 64631
+      },
+      "cases": [
+        {
+          "config": {
+            "name": "local/blocked",
+            "pattern": "local",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 4.70871,
+              "firstData": 4.70871,
+              "total": 4.83033
+            },
+            "ttfbRangeMs": [4.24679, 13.53837],
+            "totalRangeMs": [4.25508, 13.667],
+            "parentPasses": 15,
+            "backendCalls": 150,
+            "rounds": [
+              {
+                "ttfb": 4.98129,
+                "firstData": 4.98129,
+                "total": 4.996
+              },
+              {
+                "ttfb": 4.64929,
+                "firstData": 4.64929,
+                "total": 4.65854
+              },
+              {
+                "ttfb": 4.70871,
+                "firstData": 4.70871,
+                "total": 4.83033
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 4.06125,
+              "firstData": 4.06125,
+              "total": 4.07721
+            },
+            "ttfbRangeMs": [3.86179, 15.90267],
+            "totalRangeMs": [3.86829, 15.97508],
+            "parentPasses": 14,
+            "backendCalls": 140,
+            "rounds": [
+              {
+                "ttfb": 4.18538,
+                "firstData": 4.18538,
+                "total": 4.19517
+              },
+              {
+                "ttfb": 4.06125,
+                "firstData": 4.06125,
+                "total": 4.07096
+              },
+              {
+                "ttfb": 3.94733,
+                "firstData": 3.94733,
+                "total": 3.95475
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "inline/blocked",
+            "pattern": "inline",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.1905,
+              "firstData": 1.1905,
+              "total": 1.25625
+            },
+            "ttfbRangeMs": [0.96254, 3.17783],
+            "totalRangeMs": [1.00642, 3.26479],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.52042,
+                "firstData": 1.52042,
+                "total": 1.545
+              },
+              {
+                "ttfb": 1.01554,
+                "firstData": 1.01554,
+                "total": 1.07542
+              },
+              {
+                "ttfb": 1.25225,
+                "firstData": 1.25225,
+                "total": 1.34462
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.11642,
+              "firstData": 1.11642,
+              "total": 1.16721
+            },
+            "ttfbRangeMs": [0.87433, 1.81146],
+            "totalRangeMs": [0.90296, 1.90375],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.21679,
+                "firstData": 1.21679,
+                "total": 1.27367
+              },
+              {
+                "ttfb": 1.01442,
+                "firstData": 1.01442,
+                "total": 1.05992
+              },
+              {
+                "ttfb": 1.03892,
+                "firstData": 1.03892,
+                "total": 1.07708
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "memo/blocked",
+            "pattern": "memo",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 4.96004,
+              "firstData": 4.96004,
+              "total": 5.02717
+            },
+            "ttfbRangeMs": [4.52233, 17.3425],
+            "totalRangeMs": [4.53508, 17.35379],
+            "parentPasses": 15,
+            "backendCalls": 150,
+            "rounds": [
+              {
+                "ttfb": 5.29225,
+                "firstData": 5.29225,
+                "total": 5.31088
+              },
+              {
+                "ttfb": 4.87721,
+                "firstData": 4.87721,
+                "total": 4.93954
+              },
+              {
+                "ttfb": 4.96004,
+                "firstData": 4.96004,
+                "total": 5.02717
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 4.17875,
+              "firstData": 4.17875,
+              "total": 4.18637
+            },
+            "ttfbRangeMs": [3.8215, 6.91571],
+            "totalRangeMs": [3.83658, 7.00304],
+            "parentPasses": 14,
+            "backendCalls": 140,
+            "rounds": [
+              {
+                "ttfb": 4.85254,
+                "firstData": 4.85254,
+                "total": 4.95554
+              },
+              {
+                "ttfb": 3.87604,
+                "firstData": 3.87604,
+                "total": 3.89638
+              },
+              {
+                "ttfb": 4.08142,
+                "firstData": 4.08142,
+                "total": 4.09054
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "prepared/blocked",
+            "pattern": "prepared",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.33929,
+              "firstData": 1.33929,
+              "total": 1.40754
+            },
+            "ttfbRangeMs": [1.02908, 3.67167],
+            "totalRangeMs": [1.08771, 3.78946],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.50392,
+                "firstData": 1.50392,
+                "total": 1.59763
+              },
+              {
+                "ttfb": 1.06554,
+                "firstData": 1.06554,
+                "total": 1.12117
+              },
+              {
+                "ttfb": 1.28904,
+                "firstData": 1.28904,
+                "total": 1.35583
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.12175,
+              "firstData": 1.12175,
+              "total": 1.13558
+            },
+            "ttfbRangeMs": [0.8725, 5.83467],
+            "totalRangeMs": [0.90821, 5.84179],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.26096,
+                "firstData": 1.26096,
+                "total": 1.339
+              },
+              {
+                "ttfb": 0.92483,
+                "firstData": 0.92483,
+                "total": 0.96204
+              },
+              {
+                "ttfb": 1.12175,
+                "firstData": 1.12175,
+                "total": 1.12887
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "use-site/blocked",
+            "pattern": "use-site",
+            "shell": false,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.61075,
+              "firstData": 1.61075,
+              "total": 1.65313
+            },
+            "ttfbRangeMs": [1.10046, 2.37829],
+            "totalRangeMs": [1.14404, 2.39117],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.86771,
+                "firstData": 1.86771,
+                "total": 1.96996
+              },
+              {
+                "ttfb": 1.74533,
+                "firstData": 1.74533,
+                "total": 1.757
+              },
+              {
+                "ttfb": 1.43242,
+                "firstData": 1.43242,
+                "total": 1.49946
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.26733,
+              "firstData": 1.26733,
+              "total": 1.30717
+            },
+            "ttfbRangeMs": [1.06646, 2.96229],
+            "totalRangeMs": [1.09763, 3.05542],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.56308,
+                "firstData": 1.56308,
+                "total": 1.63275
+              },
+              {
+                "ttfb": 1.15246,
+                "firstData": 1.15246,
+                "total": 1.15738
+              },
+              {
+                "ttfb": 1.254,
+                "firstData": 1.254,
+                "total": 1.28158
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "local-request-cache/blocked",
+            "pattern": "local",
+            "shell": false,
+            "count": 10,
+            "cache": "request"
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.4365,
+              "firstData": 1.4365,
+              "total": 1.51925
+            },
+            "ttfbRangeMs": [1.00887, 1.99004],
+            "totalRangeMs": [1.06137, 2.07967],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.77596,
+                "firstData": 1.77596,
+                "total": 1.85129
+              },
+              {
+                "ttfb": 1.39583,
+                "firstData": 1.39583,
+                "total": 1.50046
+              },
+              {
+                "ttfb": 1.1015,
+                "firstData": 1.1015,
+                "total": 1.16333
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.00971,
+              "firstData": 1.00971,
+              "total": 1.06025
+            },
+            "ttfbRangeMs": [0.86921, 2.19275],
+            "totalRangeMs": [0.91454, 2.31908],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.25279,
+                "firstData": 1.25279,
+                "total": 1.31463
+              },
+              {
+                "ttfb": 0.97371,
+                "firstData": 0.97371,
+                "total": 1.02633
+              },
+              {
+                "ttfb": 0.94967,
+                "firstData": 0.94967,
+                "total": 0.98992
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "serial/blocked",
+            "pattern": "serial",
+            "shell": false,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.76346,
+              "firstData": 0.76346,
+              "total": 0.82075
+            },
+            "ttfbRangeMs": [0.42788, 1.16279],
+            "totalRangeMs": [0.46017, 1.17421],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.884,
+                "firstData": 0.884,
+                "total": 0.96417
+              },
+              {
+                "ttfb": 0.81304,
+                "firstData": 0.81304,
+                "total": 0.82075
+              },
+              {
+                "ttfb": 0.47179,
+                "firstData": 0.47179,
+                "total": 0.51067
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.54183,
+              "firstData": 0.54183,
+              "total": 0.58329
+            },
+            "ttfbRangeMs": [0.43292, 0.85546],
+            "totalRangeMs": [0.464, 0.89642],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.74775,
+                "firstData": 0.74775,
+                "total": 0.81125
+              },
+              {
+                "ttfb": 0.48575,
+                "firstData": 0.48575,
+                "total": 0.52083
+              },
+              {
+                "ttfb": 0.53854,
+                "firstData": 0.53854,
+                "total": 0.58075
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "parallel/blocked",
+            "pattern": "parallel",
+            "shell": false,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.72908,
+              "firstData": 0.72908,
+              "total": 0.80746
+            },
+            "ttfbRangeMs": [0.38967, 2.22129],
+            "totalRangeMs": [0.4235, 2.28671],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.94513,
+                "firstData": 0.94513,
+                "total": 0.95825
+              },
+              {
+                "ttfb": 0.88788,
+                "firstData": 0.88788,
+                "total": 0.896
+              },
+              {
+                "ttfb": 0.47063,
+                "firstData": 0.47063,
+                "total": 0.51071
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.49254,
+              "firstData": 0.49254,
+              "total": 0.53229
+            },
+            "ttfbRangeMs": [0.40329, 2.32754],
+            "totalRangeMs": [0.43562, 2.38663],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.56679,
+                "firstData": 0.56679,
+                "total": 0.61513
+              },
+              {
+                "ttfb": 0.47271,
+                "firstData": 0.47271,
+                "total": 0.51221
+              },
+              {
+                "ttfb": 0.45338,
+                "firstData": 0.45338,
+                "total": 0.49421
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "independent/blocked",
+            "pattern": "independent",
+            "shell": false,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.78721,
+              "firstData": 0.78721,
+              "total": 0.79925
+            },
+            "ttfbRangeMs": [0.37562, 1.19867],
+            "totalRangeMs": [0.41046, 1.20925],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.85763,
+                "firstData": 0.85763,
+                "total": 0.98196
+              },
+              {
+                "ttfb": 0.8935,
+                "firstData": 0.8935,
+                "total": 0.91075
+              },
+              {
+                "ttfb": 0.445,
+                "firstData": 0.445,
+                "total": 0.49154
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.53054,
+              "firstData": 0.53054,
+              "total": 0.58033
+            },
+            "ttfbRangeMs": [0.39546, 0.74942],
+            "totalRangeMs": [0.42979, 0.82129],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.62746,
+                "firstData": 0.62746,
+                "total": 0.68213
+              },
+              {
+                "ttfb": 0.47288,
+                "firstData": 0.47288,
+                "total": 0.50767
+              },
+              {
+                "ttfb": 0.42983,
+                "firstData": 0.42983,
+                "total": 0.4425
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "dependent/blocked",
+            "pattern": "dependent",
+            "shell": false,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.64113,
+              "firstData": 0.64113,
+              "total": 0.687
+            },
+            "ttfbRangeMs": [0.46408, 1.15617],
+            "totalRangeMs": [0.50092, 1.16571],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.68038,
+                "firstData": 0.68038,
+                "total": 0.72754
+              },
+              {
+                "ttfb": 0.96929,
+                "firstData": 0.96929,
+                "total": 1.05233
+              },
+              {
+                "ttfb": 0.51108,
+                "firstData": 0.51108,
+                "total": 0.54479
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.57279,
+              "firstData": 0.57279,
+              "total": 0.60792
+            },
+            "ttfbRangeMs": [0.49208, 2.346],
+            "totalRangeMs": [0.52117, 2.35025],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.64996,
+                "firstData": 0.64996,
+                "total": 0.69988
+              },
+              {
+                "ttfb": 0.55008,
+                "firstData": 0.55008,
+                "total": 0.59587
+              },
+              {
+                "ttfb": 0.54175,
+                "firstData": 0.54175,
+                "total": 0.58396
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "local/shell",
+            "pattern": "local",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.63721,
+              "firstData": 5.52688,
+              "total": 5.64317
+            },
+            "ttfbRangeMs": [0.45475, 1.26154],
+            "totalRangeMs": [4.69621, 8.50537],
+            "parentPasses": 15,
+            "backendCalls": 150,
+            "rounds": [
+              {
+                "ttfb": 0.65521,
+                "firstData": 4.99633,
+                "total": 5.10746
+              },
+              {
+                "ttfb": 0.63721,
+                "firstData": 6.08921,
+                "total": 6.2325
+              },
+              {
+                "ttfb": 0.61804,
+                "firstData": 5.52688,
+                "total": 5.64317
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.61962,
+              "firstData": 4.69546,
+              "total": 4.79208
+            },
+            "ttfbRangeMs": [0.43637, 1.48821],
+            "totalRangeMs": [3.71983, 8.75092],
+            "parentPasses": 14,
+            "backendCalls": 140,
+            "rounds": [
+              {
+                "ttfb": 0.65817,
+                "firstData": 4.89921,
+                "total": 5.04517
+              },
+              {
+                "ttfb": 0.44788,
+                "firstData": 4.01271,
+                "total": 4.11833
+              },
+              {
+                "ttfb": 1.30429,
+                "firstData": 6.351,
+                "total": 6.48996
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "inline/shell",
+            "pattern": "inline",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.67804,
+              "firstData": 1.31275,
+              "total": 1.39467
+            },
+            "ttfbRangeMs": [0.53488, 1.81267],
+            "totalRangeMs": [1.16646, 3.88108],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.60808,
+                "firstData": 1.23387,
+                "total": 1.24104
+              },
+              {
+                "ttfb": 0.59925,
+                "firstData": 1.30421,
+                "total": 1.39467
+              },
+              {
+                "ttfb": 0.86246,
+                "firstData": 1.62942,
+                "total": 1.71392
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.61192,
+              "firstData": 1.31008,
+              "total": 1.38658
+            },
+            "ttfbRangeMs": [0.41521, 1.14958],
+            "totalRangeMs": [0.96554, 2.64375],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.90842,
+                "firstData": 1.61858,
+                "total": 1.71946
+              },
+              {
+                "ttfb": 0.48367,
+                "firstData": 1.06167,
+                "total": 1.06721
+              },
+              {
+                "ttfb": 0.87358,
+                "firstData": 1.64433,
+                "total": 1.76742
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "memo/shell",
+            "pattern": "memo",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.57442,
+              "firstData": 5.08467,
+              "total": 5.18933
+            },
+            "ttfbRangeMs": [0.50075, 5.21567],
+            "totalRangeMs": [4.34804, 14.15854],
+            "parentPasses": 15,
+            "backendCalls": 150,
+            "rounds": [
+              {
+                "ttfb": 0.54392,
+                "firstData": 4.42425,
+                "total": 4.55513
+              },
+              {
+                "ttfb": 0.55563,
+                "firstData": 4.66425,
+                "total": 4.76204
+              },
+              {
+                "ttfb": 0.57508,
+                "firstData": 7.14025,
+                "total": 7.25283
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.59533,
+              "firstData": 4.34617,
+              "total": 4.451
+            },
+            "ttfbRangeMs": [0.42917, 3.07021],
+            "totalRangeMs": [3.73658, 9.74104],
+            "parentPasses": 14,
+            "backendCalls": 140,
+            "rounds": [
+              {
+                "ttfb": 0.67408,
+                "firstData": 5.88558,
+                "total": 6.01475
+              },
+              {
+                "ttfb": 0.46221,
+                "firstData": 3.82225,
+                "total": 3.92579
+              },
+              {
+                "ttfb": 0.70858,
+                "firstData": 4.60462,
+                "total": 4.70696
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "prepared/shell",
+            "pattern": "prepared",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.59912,
+              "firstData": 1.25083,
+              "total": 1.31029
+            },
+            "ttfbRangeMs": [0.3945, 1.05058],
+            "totalRangeMs": [0.93492, 2.62983],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.663,
+                "firstData": 1.30779,
+                "total": 1.31679
+              },
+              {
+                "ttfb": 0.47733,
+                "firstData": 1.01675,
+                "total": 1.06583
+              },
+              {
+                "ttfb": 0.6695,
+                "firstData": 1.60354,
+                "total": 1.72037
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.516,
+              "firstData": 1.12462,
+              "total": 1.15533
+            },
+            "ttfbRangeMs": [0.41062, 1.07762],
+            "totalRangeMs": [0.97846, 2.13392],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.78854,
+                "firstData": 1.83996,
+                "total": 1.8675
+              },
+              {
+                "ttfb": 0.45321,
+                "firstData": 0.99675,
+                "total": 1.03554
+              },
+              {
+                "ttfb": 0.516,
+                "firstData": 1.10875,
+                "total": 1.13167
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "use-site/shell",
+            "pattern": "use-site",
+            "shell": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.41733,
+              "firstData": 1.49158,
+              "total": 1.52317
+            },
+            "ttfbRangeMs": [0.29617, 3.03004],
+            "totalRangeMs": [1.20612, 4.41592],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.42279,
+                "firstData": 1.34296,
+                "total": 1.38633
+              },
+              {
+                "ttfb": 0.34771,
+                "firstData": 1.23279,
+                "total": 1.27388
+              },
+              {
+                "ttfb": 0.69383,
+                "firstData": 2.81346,
+                "total": 2.82888
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.42213,
+              "firstData": 1.39725,
+              "total": 1.41421
+            },
+            "ttfbRangeMs": [0.31671, 1.97796],
+            "totalRangeMs": [1.13063, 2.85592],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.55246,
+                "firstData": 2.11654,
+                "total": 2.13054
+              },
+              {
+                "ttfb": 0.32613,
+                "firstData": 1.25688,
+                "total": 1.26162
+              },
+              {
+                "ttfb": 0.3765,
+                "firstData": 1.32067,
+                "total": 1.37408
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "local-request-cache/shell",
+            "pattern": "local",
+            "shell": true,
+            "count": 10,
+            "cache": "request"
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.55454,
+              "firstData": 1.37487,
+              "total": 1.39417
+            },
+            "ttfbRangeMs": [0.389, 1.37458],
+            "totalRangeMs": [0.96779, 2.11075],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.73062,
+                "firstData": 1.37487,
+                "total": 1.39417
+              },
+              {
+                "ttfb": 0.47625,
+                "firstData": 1.13246,
+                "total": 1.21354
+              },
+              {
+                "ttfb": 0.63004,
+                "firstData": 1.48071,
+                "total": 1.52337
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.49433,
+              "firstData": 1.13167,
+              "total": 1.18946
+            },
+            "ttfbRangeMs": [0.38967, 0.94054],
+            "totalRangeMs": [0.94475, 1.835],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.68713,
+                "firstData": 1.36346,
+                "total": 1.37288
+              },
+              {
+                "ttfb": 0.44171,
+                "firstData": 1.01363,
+                "total": 1.05437
+              },
+              {
+                "ttfb": 0.47454,
+                "firstData": 1.07954,
+                "total": 1.08383
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "serial/shell",
+            "pattern": "serial",
+            "shell": true,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.37904,
+              "firstData": 0.56762,
+              "total": 0.61063
+            },
+            "ttfbRangeMs": [0.27804, 0.59375],
+            "totalRangeMs": [0.43908, 1.17367],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.40629,
+                "firstData": 0.62704,
+                "total": 0.63454
+              },
+              {
+                "ttfb": 0.30121,
+                "firstData": 0.48496,
+                "total": 0.51367
+              },
+              {
+                "ttfb": 0.41988,
+                "firstData": 0.62029,
+                "total": 0.7115
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.35137,
+              "firstData": 0.53758,
+              "total": 0.57417
+            },
+            "ttfbRangeMs": [0.29733, 1.53863],
+            "totalRangeMs": [0.50646, 1.89821],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.48429,
+                "firstData": 0.786,
+                "total": 0.79363
+              },
+              {
+                "ttfb": 0.31183,
+                "firstData": 0.50308,
+                "total": 0.52596
+              },
+              {
+                "ttfb": 0.34337,
+                "firstData": 0.50412,
+                "total": 0.54317
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "parallel/shell",
+            "pattern": "parallel",
+            "shell": true,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.3895,
+              "firstData": 0.504,
+              "total": 0.54117
+            },
+            "ttfbRangeMs": [0.29242, 0.94992],
+            "totalRangeMs": [0.42458, 1.27842],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.45058,
+                "firstData": 0.58638,
+                "total": 0.59563
+              },
+              {
+                "ttfb": 0.3315,
+                "firstData": 0.43129,
+                "total": 0.46304
+              },
+              {
+                "ttfb": 0.3895,
+                "firstData": 0.504,
+                "total": 0.54075
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.41392,
+              "firstData": 0.54879,
+              "total": 0.58333
+            },
+            "ttfbRangeMs": [0.319, 0.90967],
+            "totalRangeMs": [0.45579, 1.0825],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.45479,
+                "firstData": 0.58308,
+                "total": 0.64858
+              },
+              {
+                "ttfb": 0.34908,
+                "firstData": 0.48458,
+                "total": 0.4885
+              },
+              {
+                "ttfb": 0.41392,
+                "firstData": 0.59408,
+                "total": 0.62667
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "independent/shell",
+            "pattern": "independent",
+            "shell": true,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.39963,
+              "firstData": 0.51621,
+              "total": 0.58883
+            },
+            "ttfbRangeMs": [0.30242, 0.91529],
+            "totalRangeMs": [0.42954, 1.1795],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.51887,
+                "firstData": 0.65021,
+                "total": 0.66496
+              },
+              {
+                "ttfb": 0.34788,
+                "firstData": 0.45308,
+                "total": 0.48371
+              },
+              {
+                "ttfb": 0.39963,
+                "firstData": 0.49579,
+                "total": 0.58883
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.40271,
+              "firstData": 0.54838,
+              "total": 0.56333
+            },
+            "ttfbRangeMs": [0.32583, 0.71833],
+            "totalRangeMs": [0.46667, 0.98038],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.42204,
+                "firstData": 0.56546,
+                "total": 0.58258
+              },
+              {
+                "ttfb": 0.35908,
+                "firstData": 0.47675,
+                "total": 0.51925
+              },
+              {
+                "ttfb": 0.39942,
+                "firstData": 0.55333,
+                "total": 0.56333
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "dependent/shell",
+            "pattern": "dependent",
+            "shell": true,
+            "count": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.41679,
+              "firstData": 0.69671,
+              "total": 0.75267
+            },
+            "ttfbRangeMs": [0.31963, 1.27862],
+            "totalRangeMs": [0.59479, 2.05138],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.41283,
+                "firstData": 0.70258,
+                "total": 0.75267
+              },
+              {
+                "ttfb": 0.34967,
+                "firstData": 0.63817,
+                "total": 0.67929
+              },
+              {
+                "ttfb": 0.48412,
+                "firstData": 0.78438,
+                "total": 0.83371
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.351,
+              "firstData": 0.6285,
+              "total": 0.63646
+            },
+            "ttfbRangeMs": [0.30688, 1.06292],
+            "totalRangeMs": [0.53292, 1.34242],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.38738,
+                "firstData": 0.62896,
+                "total": 0.69629
+              },
+              {
+                "ttfb": 0.30971,
+                "firstData": 0.55804,
+                "total": 0.58221
+              },
+              {
+                "ttfb": 0.351,
+                "firstData": 0.63767,
+                "total": 0.65537
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "local/per-card",
+            "pattern": "local",
+            "shell": true,
+            "each": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.66542,
+              "firstData": 2.42025,
+              "total": 2.54392
+            },
+            "ttfbRangeMs": [0.43575, 1.47],
+            "totalRangeMs": [2.18942, 5.35154],
+            "parentPasses": 6,
+            "backendCalls": 60,
+            "rounds": [
+              {
+                "ttfb": 0.66725,
+                "firstData": 2.42888,
+                "total": 2.55833
+              },
+              {
+                "ttfb": 0.51604,
+                "firstData": 2.25262,
+                "total": 2.33713
+              },
+              {
+                "ttfb": 0.82287,
+                "firstData": 3.44887,
+                "total": 3.63504
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.51375,
+              "firstData": 1.733,
+              "total": 1.84625
+            },
+            "ttfbRangeMs": [0.45929, 1.02767],
+            "totalRangeMs": [1.6425, 5.37096],
+            "parentPasses": 5,
+            "backendCalls": 50,
+            "rounds": [
+              {
+                "ttfb": 0.49688,
+                "firstData": 1.6295,
+                "total": 1.728
+              },
+              {
+                "ttfb": 0.51375,
+                "firstData": 1.72217,
+                "total": 1.82137
+              },
+              {
+                "ttfb": 0.60546,
+                "firstData": 1.92713,
+                "total": 2.02758
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "inline/per-card",
+            "pattern": "inline",
+            "shell": true,
+            "each": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.63042,
+              "firstData": 0.86858,
+              "total": 0.92167
+            },
+            "ttfbRangeMs": [0.46583, 3.974],
+            "totalRangeMs": [0.70375, 4.49421],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.63042,
+                "firstData": 0.86858,
+                "total": 0.92167
+              },
+              {
+                "ttfb": 0.5005,
+                "firstData": 0.72563,
+                "total": 0.75804
+              },
+              {
+                "ttfb": 0.99675,
+                "firstData": 1.4245,
+                "total": 1.50971
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.51808,
+              "firstData": 0.78604,
+              "total": 0.82271
+            },
+            "ttfbRangeMs": [0.42642, 1.24196],
+            "totalRangeMs": [0.67275, 1.52821],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.52333,
+                "firstData": 0.84204,
+                "total": 0.85275
+              },
+              {
+                "ttfb": 0.44221,
+                "firstData": 0.67967,
+                "total": 0.70108
+              },
+              {
+                "ttfb": 0.54742,
+                "firstData": 0.82763,
+                "total": 0.85346
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "prepared/per-card",
+            "pattern": "prepared",
+            "shell": true,
+            "each": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.55237,
+              "firstData": 0.83096,
+              "total": 0.86433
+            },
+            "ttfbRangeMs": [0.47771, 0.96963],
+            "totalRangeMs": [0.73325, 2.01217],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.55237,
+                "firstData": 0.85104,
+                "total": 0.85604
+              },
+              {
+                "ttfb": 0.53171,
+                "firstData": 0.774,
+                "total": 0.81112
+              },
+              {
+                "ttfb": 0.59071,
+                "firstData": 0.95538,
+                "total": 1.04617
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.49363,
+              "firstData": 0.76183,
+              "total": 0.78675
+            },
+            "ttfbRangeMs": [0.43921, 1.03142],
+            "totalRangeMs": [0.69538, 1.3265],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.51167,
+                "firstData": 0.76504,
+                "total": 0.81279
+              },
+              {
+                "ttfb": 0.49363,
+                "firstData": 0.74079,
+                "total": 0.75958
+              },
+              {
+                "ttfb": 0.49358,
+                "firstData": 0.80625,
+                "total": 0.80896
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "use-site/per-card",
+            "pattern": "use-site",
+            "shell": true,
+            "each": true,
+            "count": 10
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.60929,
+              "firstData": 0.88833,
+              "total": 0.92167
+            },
+            "ttfbRangeMs": [0.49442, 0.78875],
+            "totalRangeMs": [0.75558, 1.10075],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.615,
+                "firstData": 0.91896,
+                "total": 0.9265
+              },
+              {
+                "ttfb": 0.55558,
+                "firstData": 0.78517,
+                "total": 0.83046
+              },
+              {
+                "ttfb": 0.63358,
+                "firstData": 0.90438,
+                "total": 1.04396
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.52521,
+              "firstData": 0.79075,
+              "total": 0.815
+            },
+            "ttfbRangeMs": [0.44287, 1.07575],
+            "totalRangeMs": [0.68696, 1.65242],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.50842,
+                "firstData": 0.79363,
+                "total": 0.83683
+              },
+              {
+                "ttfb": 0.48883,
+                "firstData": 0.76987,
+                "total": 0.81458
+              },
+              {
+                "ttfb": 0.53471,
+                "firstData": 0.79075,
+                "total": 0.82904
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "duplicate/no-cache",
+            "pattern": "use-site",
+            "shell": false,
+            "count": 10,
+            "unique": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 1.34458,
+              "firstData": 1.34458,
+              "total": 1.36104
+            },
+            "ttfbRangeMs": [1.08583, 1.99667],
+            "totalRangeMs": [1.12729, 2.06892],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.35479,
+                "firstData": 1.35479,
+                "total": 1.36104
+              },
+              {
+                "ttfb": 1.33608,
+                "firstData": 1.33608,
+                "total": 1.34233
+              },
+              {
+                "ttfb": 1.37421,
+                "firstData": 1.37421,
+                "total": 1.41567
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 1.23279,
+              "firstData": 1.23279,
+              "total": 1.26512
+            },
+            "ttfbRangeMs": [1.04708, 1.97912],
+            "totalRangeMs": [1.08396, 1.98504],
+            "parentPasses": 11,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 1.18633,
+                "firstData": 1.18633,
+                "total": 1.23629
+              },
+              {
+                "ttfb": 1.19654,
+                "firstData": 1.19654,
+                "total": 1.24525
+              },
+              {
+                "ttfb": 1.2895,
+                "firstData": 1.2895,
+                "total": 1.33704
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "duplicate/request-cache",
+            "pattern": "use-site",
+            "shell": false,
+            "count": 10,
+            "unique": 3,
+            "cache": "request"
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.65442,
+              "firstData": 0.65442,
+              "total": 0.69617
+            },
+            "ttfbRangeMs": [0.53042, 2.12483],
+            "totalRangeMs": [0.56708, 2.19879],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.65442,
+                "firstData": 0.65442,
+                "total": 0.69617
+              },
+              {
+                "ttfb": 0.57296,
+                "firstData": 0.57296,
+                "total": 0.61721
+              },
+              {
+                "ttfb": 0.94633,
+                "firstData": 0.94633,
+                "total": 0.95112
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.63196,
+              "firstData": 0.63196,
+              "total": 0.67254
+            },
+            "ttfbRangeMs": [0.52329, 1.21496],
+            "totalRangeMs": [0.55512, 1.25862],
+            "parentPasses": 4,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.63196,
+                "firstData": 0.63196,
+                "total": 0.67254
+              },
+              {
+                "ttfb": 0.63975,
+                "firstData": 0.63975,
+                "total": 0.67583
+              },
+              {
+                "ttfb": 0.62275,
+                "firstData": 0.62275,
+                "total": 0.65733
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "duplicate/no-cache-per-card",
+            "pattern": "use-site",
+            "shell": true,
+            "each": true,
+            "count": 10,
+            "unique": 3
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.60079,
+              "firstData": 0.92313,
+              "total": 0.96633
+            },
+            "ttfbRangeMs": [0.48633, 0.99525],
+            "totalRangeMs": [0.74504, 1.41163],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.80254,
+                "firstData": 1.03179,
+                "total": 1.14292
+              },
+              {
+                "ttfb": 0.58112,
+                "firstData": 0.85529,
+                "total": 0.90496
+              },
+              {
+                "ttfb": 0.60079,
+                "firstData": 0.88737,
+                "total": 0.943
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.53221,
+              "firstData": 0.82058,
+              "total": 0.84504
+            },
+            "ttfbRangeMs": [0.43467, 1.01558],
+            "totalRangeMs": [0.732, 1.28838],
+            "parentPasses": 2,
+            "backendCalls": 10,
+            "rounds": [
+              {
+                "ttfb": 0.60725,
+                "firstData": 0.89321,
+                "total": 0.90029
+              },
+              {
+                "ttfb": 0.47096,
+                "firstData": 0.75592,
+                "total": 0.76233
+              },
+              {
+                "ttfb": 0.53221,
+                "firstData": 0.8065,
+                "total": 0.84421
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "duplicate/request-cache-per-card",
+            "pattern": "use-site",
+            "shell": true,
+            "each": true,
+            "count": 10,
+            "unique": 3,
+            "cache": "request"
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.47854,
+              "firstData": 0.64304,
+              "total": 0.67233
+            },
+            "ttfbRangeMs": [0.40775, 0.68442],
+            "totalRangeMs": [0.59925, 9.6455],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.52592,
+                "firstData": 0.67596,
+                "total": 0.74104
+              },
+              {
+                "ttfb": 0.45167,
+                "firstData": 0.61604,
+                "total": 0.64804
+              },
+              {
+                "ttfb": 0.47296,
+                "firstData": 0.68812,
+                "total": 0.6925
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.45417,
+              "firstData": 0.64363,
+              "total": 0.67508
+            },
+            "ttfbRangeMs": [0.37271, 1.14042],
+            "totalRangeMs": [0.54217, 1.34492],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.50629,
+                "firstData": 0.66954,
+                "total": 0.67508
+              },
+              {
+                "ttfb": 0.40746,
+                "firstData": 0.58917,
+                "total": 0.61567
+              },
+              {
+                "ttfb": 0.48267,
+                "firstData": 0.65158,
+                "total": 0.69525
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "data-cache/cold",
+            "pattern": "parallel",
+            "shell": false,
+            "count": 3,
+            "cache": "data",
+            "cold": true
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.47517,
+              "firstData": 0.47517,
+              "total": 0.50525
+            },
+            "ttfbRangeMs": [0.39958, 0.64529],
+            "totalRangeMs": [0.43021, 0.65213],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.45025,
+                "firstData": 0.45025,
+                "total": 0.48571
+              },
+              {
+                "ttfb": 0.50617,
+                "firstData": 0.50617,
+                "total": 0.54542
+              },
+              {
+                "ttfb": 0.47517,
+                "firstData": 0.47517,
+                "total": 0.48312
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.46146,
+              "firstData": 0.46146,
+              "total": 0.49467
+            },
+            "ttfbRangeMs": [0.412, 0.76367],
+            "totalRangeMs": [0.44446, 0.76842],
+            "parentPasses": 2,
+            "backendCalls": 3,
+            "rounds": [
+              {
+                "ttfb": 0.48725,
+                "firstData": 0.48725,
+                "total": 0.52804
+              },
+              {
+                "ttfb": 0.50058,
+                "firstData": 0.50058,
+                "total": 0.51596
+              },
+              {
+                "ttfb": 0.45204,
+                "firstData": 0.45204,
+                "total": 0.48454
+              }
+            ]
+          }
+        },
+        {
+          "config": {
+            "name": "data-cache/warm",
+            "pattern": "parallel",
+            "shell": false,
+            "count": 3,
+            "cache": "data",
+            "warm": true
+          },
+          "before": {
+            "medianMs": {
+              "ttfb": 0.33063,
+              "firstData": 0.33063,
+              "total": 0.38542
+            },
+            "ttfbRangeMs": [0.24408, 0.48146],
+            "totalRangeMs": [0.27108, 0.49304],
+            "parentPasses": 2,
+            "backendCalls": 0,
+            "rounds": [
+              {
+                "ttfb": 0.35142,
+                "firstData": 0.35142,
+                "total": 0.38825
+              },
+              {
+                "ttfb": 0.40842,
+                "firstData": 0.40842,
+                "total": 0.42571
+              },
+              {
+                "ttfb": 0.2695,
+                "firstData": 0.2695,
+                "total": 0.29883
+              }
+            ]
+          },
+          "after": {
+            "medianMs": {
+              "ttfb": 0.32933,
+              "firstData": 0.32933,
+              "total": 0.36721
+            },
+            "ttfbRangeMs": [0.29592, 0.449],
+            "totalRangeMs": [0.32362, 0.49329],
+            "parentPasses": 2,
+            "backendCalls": 0,
+            "rounds": [
+              {
+                "ttfb": 0.36037,
+                "firstData": 0.36037,
+                "total": 0.40679
+              },
+              {
+                "ttfb": 0.34088,
+                "firstData": 0.34088,
+                "total": 0.3615
+              },
+              {
+                "ttfb": 0.31725,
+                "firstData": 0.31725,
+                "total": 0.35158
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -3,6 +3,13 @@
 [Zag](https://zagjs.com/) state-machine bindings for the
 [Octane](https://github.com/octanejs/octane) UI framework.
 
+## Installation
+
+```sh
+npm install @octanejs/zag
+pnpm add @octanejs/zag
+```
+
 This package ports `@zag-js/react@1.42.0` onto Octane while reusing the
 framework-agnostic `@zag-js/core`, `@zag-js/store`, `@zag-js/types`, and
 `@zag-js/utils` packages unchanged. It is the runtime substrate for Octane

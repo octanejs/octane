@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-pacer",
-  "version": "0.0.28",
+  "version": "0.0.43",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -24,7 +24,9 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "LICENSE.upstream",
+    "README.md",
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": "./src/index.ts",
@@ -52,7 +54,7 @@
   },
   "peerDependencies": {
     "@octanejs/tanstack-store": "workspace:*",
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@octanejs/tanstack-store": "workspace:*",

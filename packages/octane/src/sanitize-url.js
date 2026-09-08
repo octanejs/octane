@@ -36,6 +36,12 @@ const RESERVED_HYPHENATED_NATIVE_TAGS = new Set([
  * hydration comparison, and the final write.
  */
 export function sanitizeURL(url) {
+	// A match can begin only with C0/space or J/j. Ordinary printable ASCII
+	// prefixes cannot match, regardless of the suffix, so they need not trigger
+	// the regex's first-use compilation. Keep every other prefix on the exact
+	// same policy, including empty strings, controls, and non-ASCII input.
+	const first = url.charCodeAt(0);
+	if (first > 32 && first < 127 && first !== 74 && first !== 106) return url;
 	return IS_JAVASCRIPT_PROTOCOL.test(url) ? BLOCKED_JAVASCRIPT_URL : url;
 }
 

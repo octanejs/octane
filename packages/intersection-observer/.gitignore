@@ -1,0 +1,4 @@
+# The committed upstream/ tree is pinned byte-exact by audit/upstream.lock.json
+# (verified offline against upstream git blob shas). The adapted suite below is
+# regenerated from it plus audit/upstream-patches/; never commit it.
+/tests/upstream/

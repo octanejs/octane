@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["vitest/globals"],
+    "noEmit": true,
+    "allowJs": true,
+    "rootDir": "."
+  },
+  "include": [
+    "__tests__",
+    "benchmark",
+    "lib",
+    "src",
+    "umd",
+    "*.mjs",
+    "*.mts",
+    "*.ts"
+  ]
+}

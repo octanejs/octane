@@ -128,7 +128,8 @@ export type UseQueryResult<TData = unknown, TError = DefaultError> = UseBaseQuer
 
 export type UseSuspenseQueryResult<TData = unknown, TError = DefaultError> = DistributiveOmit<
 	DefinedQueryObserverResult<TData, TError>,
-	'isPlaceholderData' | 'promise'
+	// Query core 5.102 removed the experimental promise result field.
+	Extract<'isPlaceholderData' | 'promise', keyof DefinedQueryObserverResult<TData, TError>>
 >;
 
 export type DefinedUseQueryResult<
@@ -148,7 +149,7 @@ export type DefinedUseInfiniteQueryResult<
 
 export type UseSuspenseInfiniteQueryResult<TData = unknown, TError = DefaultError> = OmitKeyof<
 	DefinedInfiniteQueryObserverResult<TData, TError>,
-	'isPlaceholderData' | 'promise'
+	Extract<'isPlaceholderData' | 'promise', keyof DefinedInfiniteQueryObserverResult<TData, TError>>
 >;
 
 export type AnyUseMutationOptions = UseMutationOptions<any, any, any, any>;

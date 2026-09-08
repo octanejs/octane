@@ -70,7 +70,13 @@ function assertServerObservation(
 	html: string,
 	props: any,
 ): void {
-	entry.assert({ mode, variant, root: parseHtml(html), html, serverProps: props });
+	entry.assert({
+		mode,
+		variant,
+		root: parseHtml(html),
+		html,
+		serverProps: props,
+	});
 }
 
 async function assertHydrationObservation(
@@ -210,12 +216,46 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 		);
 	});
 
+	it.each([
+		'!javascript:not-a-protocol',
+		'~javascript:not-a-protocol',
+		'/javascript:not-a-protocol',
+		'./javascript:not-a-protocol',
+		'Jupiter/page',
+		'jupiter/page',
+		'\u007fjavascript:not-a-protocol',
+		'\u00a0javascript:not-a-protocol',
+	])('preserves the non-script URL %j', async (url) => {
+		await expectInRenderMatrix({
+			component: 'DynamicLink',
+			props: () => ({ url }),
+			mismatchServerProps: () => ({ url: SAFE_SERVER_URL }),
+			assert: ({ root }) => expectAttr(root, '#link', 'href', url),
+		});
+	});
+
+	it('blocks a script URL with an uppercase first letter', async () => {
+		await expectInRenderMatrix(urlCase('DynamicLink', '#link', 'href', 'JaVaScRiPt:notfine'));
+	});
+
+	it.each(Array.from({ length: 33 }, (_, code) => code))(
+		'blocks script URLs after leading ASCII code %i',
+		async (code) => {
+			await expectInRenderMatrix(
+				urlCase('DynamicLink', '#link', 'href', String.fromCharCode(code) + 'JaVaScRiPt:notfine'),
+			);
+		},
+	);
+
 	// Per ReactDOMServerIntegrationUntrustedURL-test.js:61.
 	it('a javascript protocol href', async () => {
 		await expectInRenderMatrix({
 			component: 'DynamicLinks',
 			props: () => ({ first: UNSAFE_URL, last: 'javascript:notfineagain' }),
-			mismatchServerProps: () => ({ first: SAFE_SERVER_URL, last: SAFE_SERVER_URL + 'last' }),
+			mismatchServerProps: () => ({
+				first: SAFE_SERVER_URL,
+				last: SAFE_SERVER_URL + 'last',
+			}),
 			assert: ({ root }) => {
 				expectAttr(root, '#first', 'href', EXPECTED_SAFE_URL);
 				expectAttr(root, '#last', 'href', EXPECTED_SAFE_URL);
@@ -228,15 +268,19 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 		try {
 			expectAttr(rendered.container, '#static-first', 'href', EXPECTED_SAFE_URL);
 			expectAttr(rendered.container, '#static-last', 'href', EXPECTED_SAFE_URL);
+			expectAttr(rendered.container, '#static-uppercase', 'href', EXPECTED_SAFE_URL);
 		} finally {
 			rendered.root.unmount();
 		}
 		const staticServer = parseHtml(ServerRT.renderToString(server.StaticUnsafeLinks).html);
 		expectAttr(staticServer, '#static-first', 'href', EXPECTED_SAFE_URL);
 		expectAttr(staticServer, '#static-last', 'href', EXPECTED_SAFE_URL);
+		expectAttr(staticServer, '#static-uppercase', 'href', EXPECTED_SAFE_URL);
 
 		// Hoisted metadata and public resource-hint APIs are URL sinks too.
-		const headHtml = ServerRT.renderToString(server.HeadLink, { url: UNSAFE_URL }).html;
+		const headHtml = ServerRT.renderToString(server.HeadLink, {
+			url: UNSAFE_URL,
+		}).html;
 		expect(headHtml).toContain(`href="${EXPECTED_SAFE_URL}"`);
 		const headBefore = new Set(document.head.querySelectorAll('link'));
 		const headClient = renderDetached(client.HeadLink, { url: UNSAFE_URL });
@@ -572,7 +616,9 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 
 	// Per ReactDOMServerIntegrationUntrustedURL-test.js:184.
 	it('rejects a javascript protocol href if it is added during an update', () => {
-		const rendered = renderDetached(client.DynamicLink, { url: 'http://thisisfine/' });
+		const rendered = renderDetached(client.DynamicLink, {
+			url: 'http://thisisfine/',
+		});
 		try {
 			expectAttr(rendered.container, '#link', 'href', 'http://thisisfine/');
 			ClientRT.flushSync(() => rendered.root.render(client.DynamicLink, { url: UNSAFE_URL }));
@@ -583,7 +629,11 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 	});
 
 	// Per ReactDOMServerIntegrationUntrustedURL-test.js:197.
-	it('only the first invocation of toString', async () => {
+	it.each([
+		['https://react.dev/', 'https://react.dev/'],
+		['Jupiter/page', 'Jupiter/page'],
+		['JaVaScRiPt:notfine', EXPECTED_SAFE_URL],
+	])('uses only the first invocation of toString for %j', async (firstValue, expected) => {
 		type CoercionProps = { url: object; coercionCount: () => number };
 		const makeProps = (): CoercionProps => {
 			let calls = 0;
@@ -591,7 +641,7 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 				url: {
 					toString() {
 						calls++;
-						return calls === 1 ? 'https://react.dev/' : UNSAFE_URL;
+						return calls === 1 ? firstValue : UNSAFE_URL;
 					},
 				},
 				coercionCount: () => calls,
@@ -602,7 +652,7 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 			props: makeProps,
 			mismatchServerProps: () => ({ url: SAFE_SERVER_URL }),
 			assert(observation) {
-				expectAttr(observation.root, '#link', 'href', 'https://react.dev/');
+				expectAttr(observation.root, '#link', 'href', expected);
 				for (const props of [observation.serverProps, observation.clientProps]) {
 					if (typeof props?.coercionCount === 'function') expect(props.coercionCount()).toBe(1);
 				}
@@ -613,12 +663,16 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 	// Per ReactDOMServerIntegrationUntrustedURL-test.js:238. Distinct unsafe
 	// strings force two writes and prove the shared RegExp carries no global state.
 	it('rejects a javascript protocol href if it is added during an update twice', () => {
-		const rendered = renderDetached(client.DynamicLink, { url: 'http://thisisfine/' });
+		const rendered = renderDetached(client.DynamicLink, {
+			url: 'http://thisisfine/',
+		});
 		try {
 			ClientRT.flushSync(() => rendered.root.render(client.DynamicLink, { url: UNSAFE_URL }));
 			expectAttr(rendered.container, '#link', 'href', EXPECTED_SAFE_URL);
 			ClientRT.flushSync(() =>
-				rendered.root.render(client.DynamicLink, { url: 'javascript:notfineagain' }),
+				rendered.root.render(client.DynamicLink, {
+					url: 'javascript:notfineagain',
+				}),
 			);
 			expectAttr(rendered.container, '#link', 'href', EXPECTED_SAFE_URL);
 		} finally {

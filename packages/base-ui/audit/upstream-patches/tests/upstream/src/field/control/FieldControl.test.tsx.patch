@@ -1,0 +1,138 @@
+diff --git a/tests/upstream/src/field/control/FieldControl.test.tsx b/tests/upstream/src/field/control/FieldControl.test.tsx
+--- a/tests/upstream/src/field/control/FieldControl.test.tsx
++++ b/tests/upstream/src/field/control/FieldControl.test.tsx
+@@ -1,4 +1,8 @@
+ /** @jsxImportSource octane */
++import { FieldControlHydrationFixture1 } from './../../../../fixtures/FieldControl-functions-ssr.tsrx';
++import { FieldControlHydrationFixture1 as ServerFieldControlHydrationFixture1 } from './../../../../fixtures/FieldControl-functions-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(FieldControlHydrationFixture1, ServerFieldControlHydrationFixture1);
+ import * as React from 'octane';
+ import { expect, vi, describe, it } from 'vitest';
+ import {
+@@ -42,11 +46,11 @@ describe('<Field.Control />', () => {
+     const control = screen.getByTestId('control');
+     const initialRenderCount = renderCountRef.current;
+ 
+-    fireEvent.change(control, { target: { value: 'a' } });
++    fireEvent.input(control, { target: { value: 'a' } });
+     const afterFirstChange = renderCountRef.current;
+ 
+-    fireEvent.change(control, { target: { value: 'ab' } });
+-    fireEvent.change(control, { target: { value: 'abc' } });
++    fireEvent.input(control, { target: { value: 'ab' } });
++    fireEvent.input(control, { target: { value: 'abc' } });
+ 
+     expect(renderCountRef.current).toBe(afterFirstChange);
+     expect(afterFirstChange).toBeLessThanOrEqual(initialRenderCount + 1);
+@@ -77,11 +81,11 @@ describe('<Field.Control />', () => {
+     const control = screen.getByTestId('control');
+ 
+     // The first keystroke also flips dirty and filled, so measure the steady state after it.
+-    fireEvent.change(control, { target: { value: 'a' } });
++    fireEvent.input(control, { target: { value: 'a' } });
+     const settledRenderCount = renderCountRef.current;
+ 
+-    fireEvent.change(control, { target: { value: 'ab' } });
+-    fireEvent.change(control, { target: { value: 'abc' } });
++    fireEvent.input(control, { target: { value: 'ab' } });
++    fireEvent.input(control, { target: { value: 'abc' } });
+ 
+     // The controlled echo must not schedule a second render per keystroke.
+     expect(renderCountRef.current).toBe(settledRenderCount + 2);
+@@ -96,7 +100,7 @@ describe('<Field.Control />', () => {
+       </Field.Root>,
+     );
+ 
+-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a' } });
++    fireEvent.input(screen.getByRole('textbox'), { target: { value: 'a' } });
+ 
+     expect(validate).toHaveBeenCalledTimes(1);
+     expect(validate.mock.lastCall?.[0]).toBe('a');
+@@ -116,7 +120,7 @@ describe('<Field.Control />', () => {
+ 
+     await render(<App />);
+ 
+-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a' } });
++    fireEvent.input(screen.getByRole('textbox'), { target: { value: 'a' } });
+ 
+     expect(validate).toHaveBeenCalledTimes(1);
+   });
+@@ -138,11 +142,11 @@ describe('<Field.Control />', () => {
+ 
+     expect(root).not.toHaveAttribute('data-dirty');
+ 
+-    fireEvent.change(control, { target: { value: '56' } });
++    fireEvent.input(control, { target: { value: '56' } });
+ 
+     expect(root).toHaveAttribute('data-dirty', '');
+ 
+-    fireEvent.change(control, { target: { value: '5' } });
++    fireEvent.input(control, { target: { value: '5' } });
+ 
+     expect(root).not.toHaveAttribute('data-dirty');
+   });
+@@ -194,7 +198,7 @@ describe('<Field.Control />', () => {
+     await render(<App />);
+ 
+     const control = screen.getByRole('textbox');
+-    fireEvent.change(control, { target: { value: 'foo ' } });
++    fireEvent.input(control, { target: { value: 'foo ' } });
+     fireEvent.blur(control);
+ 
+     await flushMicrotasks();
+@@ -229,7 +233,7 @@ describe('<Field.Control />', () => {
+     await render(<App />);
+ 
+     const control = screen.getByRole('textbox');
+-    fireEvent.change(control, { target: { value: 'foo ' } });
++    fireEvent.input(control, { target: { value: 'foo ' } });
+     fireEvent.blur(control);
+ 
+     await flushMicrotasks();
+@@ -267,7 +271,7 @@ describe('<Field.Control />', () => {
+     await render(<App />);
+ 
+     const control = screen.getByRole('textbox');
+-    fireEvent.change(control, { target: { value: 'foo' } });
++    fireEvent.input(control, { target: { value: 'foo' } });
+     fireEvent.blur(control);
+ 
+     await flushMicrotasks();
+@@ -364,7 +368,7 @@ describe('<Field.Control />', () => {
+       </Field.Root>,
+     );
+ 
+-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a' } });
++    fireEvent.input(screen.getByRole('textbox'), { target: { value: 'a' } });
+ 
+     expect(validate).not.toHaveBeenCalled();
+   });
+@@ -522,7 +526,7 @@ describe('<Field.Control />', () => {
+ 
+     const control = screen.getByTestId('control');
+ 
+-    fireEvent.change(control, { target: { value: '' } });
++    fireEvent.input(control, { target: { value: '' } });
+ 
+     expect(control).toHaveAttribute('aria-invalid', 'true');
+     expect(screen.getByText('Required')).toBeInTheDocument();
+@@ -533,16 +537,9 @@ describe('<Field.Control />', () => {
+       .mockName('console.error')
+       .mockImplementation(() => {});
+ 
+-    function App() {
+-      return (
+-        <Field.Root data-testid="root">
+-          <Field.Label data-testid="label">Name</Field.Label>
+-          <Field.Control autoFocus />
+-        </Field.Root>
+-      );
+-    }
++    
+ 
+-    const { hydrate } = renderToString(<App />);
++    const { hydrate } = renderToString(<FieldControlHydrationFixture1 />);
+ 
+     const control = screen.getByRole('textbox');
+     expect(control).toHaveAttribute('autofocus');

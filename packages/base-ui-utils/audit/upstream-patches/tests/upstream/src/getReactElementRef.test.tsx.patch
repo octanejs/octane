@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/src/getReactElementRef.test.tsx b/tests/upstream/src/getReactElementRef.test.tsx
+--- a/tests/upstream/src/getReactElementRef.test.tsx
++++ b/tests/upstream/src/getReactElementRef.test.tsx
+@@ -14,7 +14,7 @@ describe('getReactElementRef', () => {
+   });
+ 
+   it('returns the ref of a React element', () => {
+-    const ref = React.createRef<HTMLDivElement>();
++    const ref = ({ current: null } as React.RefObject<HTMLDivElement | null>);
+     const element = <div ref={ref} />;
+ 
+     expect(getReactElementRef(element)).toBe(ref);

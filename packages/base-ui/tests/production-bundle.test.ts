@@ -4,6 +4,8 @@ import { createRequire } from 'node:module';
 import { resolve, sep } from 'node:path';
 import { build } from 'esbuild';
 import { describe, expect, it } from 'vitest';
+import { createOctaneSourcePlugin } from '../../../scripts/packed-source-compiler.mjs';
+import { octane } from '../../octane/src/compiler/vite.js';
 
 interface BrowserRealm {
 	window: Window & {
@@ -55,7 +57,7 @@ function verifySeparator(code: string): void {
 
 function unrelatedComponents(modules: string[]): string[] {
 	return modules.filter((module) =>
-		/(?:^|\/)packages\/base-ui\/src\/(?:dialog|popover)\.ts$/.test(module),
+		/(?:^|\/)packages\/base-ui\/src\/(?:dialog|popover|select|combobox)\//.test(module),
 	);
 }
 
@@ -63,6 +65,7 @@ describe('@octanejs/base-ui public production imports', () => {
 	it('renders the selected Separator without retaining unrelated component modules', async () => {
 		const result = await build({
 			entryPoints: [consumerEntry],
+			plugins: [await createOctaneSourcePlugin(packageDirectory)],
 			bundle: true,
 			define: productionDefines,
 			format: 'iife',
@@ -91,6 +94,7 @@ describe('@octanejs/base-ui public production imports', () => {
 		};
 		const result = await buildWithVite({
 			configFile: false,
+			plugins: [octane()],
 			root: packageDirectory,
 			mode: 'production',
 			logLevel: 'silent',

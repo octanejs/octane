@@ -7,7 +7,7 @@ import { createElement, type OctaneNode } from 'octane';
 import { Select as SelectPrimitive } from '@octanejs/radix';
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from '@octanejs/lucide';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 
 type Props = { className?: string; children?: OctaneNode } & Record<string, unknown>;
 

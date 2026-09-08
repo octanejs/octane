@@ -71,6 +71,7 @@ const BASE_URLS = {
 	'vue-vapor': 'http://localhost:5181/',
 	preact: 'http://localhost:5268/',
 	svelte: 'http://localhost:5279/',
+	inferno: 'http://localhost:5332/',
 };
 
 const TARGETS = process.env.TARGETS
@@ -83,6 +84,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'vue-vapor', url: BASE_URLS['vue-vapor'] },
 			{ name: 'preact', url: BASE_URLS.preact },
 			{ name: 'svelte', url: BASE_URLS.svelte },
+			{ name: 'inferno', url: BASE_URLS.inferno },
 		];
 
 const OPS = [

@@ -1,26 +1,30 @@
-import { use, useState, useTransition } from 'octane';
+import { use, useLayoutEffect, useReducer, useState, useTransition } from 'octane';
 
 // ---------------------------------------------------------------------------
 // Regression fixtures for the transition-priority DESCENDANT re-suspend hold.
 //
 // A `@try`/`@pending` boundary wraps a child component `Child` that holds its
 // OWN value state and calls `use(promiseFor(value))`, so the child suspends per
-// value. When the value changes, the CHILD re-renders on its OWN (the suspend
-// originates in a descendant block, NOT the try-body block — handleSuspense
-// sees sourceBlock === the child block). React's `useTransition` contract: when
+// value. When the value changes, the child independently schedules the update. React's `useTransition` contract: when
 // that re-render is at transition priority and the boundary already has
 // committed content, the previously committed content stays on screen until the
 // new tree is ready — NO fallback flash. A non-transition (urgent) re-suspend
 // SHOULD swap to the @pending fallback.
 //
-// The boundary does NOT use useTransition (that would cascade a re-render of
-// the whole try subtree, turning the descendant suspend into an own-body
-// suspend). isPending is surfaced from a SIBLING `PendingProbe` that sits
-// OUTSIDE the @try — it has its own useTransition() hook, so when the global
-// transition pending count is held open by the descendant's suspended
-// transition, the probe re-renders and reports `pending`. Reading it from
-// inside the held subtree would only ever show the stale (held) DOM.
-// ---------------------------------------------------------------------------
+// The sibling probe owns no actions and must stay idle while a descendant's
+// separately owned transition holds its content.
+
+interface ReaderProps {
+	promiseFor: (value: number) => PromiseLike<number>;
+	revision?: number;
+	useReducer?: boolean;
+	failOnRevision?: boolean;
+}
+
+interface ParentProps extends ReaderProps {
+	bindParent: (update: () => void) => void;
+	onLayout: (revision: number) => void;
+}
 
 let _setValueTransition: ((v: number) => void) | null = null;
 let _setValueUrgent: ((v: number) => void) | null = null;
@@ -35,9 +39,6 @@ export function setValueUrgent(v: number): void {
 	_setValueUrgent!(v);
 }
 
-// A sibling outside the @try whose own useTransition hook reflects the global
-// transition pending count. Stays mounted (and re-renderable) throughout, so it
-// can report `pending` while the descendant transition is held.
 function PendingProbe() @{
 	const [isPending] = useTransition();
 	<span id="pending">
@@ -48,22 +49,29 @@ function PendingProbe() @{
 // The child OWNS its value state, so changing it re-renders ONLY the child —
 // the re-suspend originates in this descendant block. `start` (a useTransition
 // setter) makes the value change transition-priority.
-function TransitionChild(props) @{
-	const [value, setValue] = useState(1);
-	const [, start] = useTransition();
+function TransitionChild(props: ReaderProps) @{
+	const [value, setValue] =
+		props.useReducer ? useReducer((_value: number, next: number) => next, 1) : useState(1);
+	const [isPending, start] = useTransition();
 	_setValueTransition = (v) => start(() => setValue(v));
+	_setValueUrgent = (v) => setValue(v);
+	if (props.failOnRevision && props.revision) throw new Error('urgent child error');
 	const v = use(props.promiseFor(value));
-	<span id="content">{'content-' + v as string}</span>
+	<span
+		id="content"
+		data-pending={isPending ? 'pending' : 'idle'}
+		data-parent={props.revision}
+	>{'content-' + v as string}</span>
 }
 
-function UrgentChild(props) @{
+function UrgentChild(props: ReaderProps) @{
 	const [value, setValue] = useState(1);
 	_setValueUrgent = (v) => setValue(v);
 	const v = use(props.promiseFor(value));
 	<span id="content">{'content-' + v as string}</span>
 }
 
-export function TransitionDescendantSuspend(props) @{
+export function TransitionDescendantSuspend(props: ReaderProps) @{
 	<div>
 		<PendingProbe />
 		@try {
@@ -74,7 +82,28 @@ export function TransitionDescendantSuspend(props) @{
 	</div>
 }
 
-export function UrgentDescendantSuspend(props) @{
+export function UrgentParentWithTransitionChild(props: ParentProps) @{
+	const [revision, setRevision] = useState(0);
+	props.bindParent(() => setRevision((value) => value + 1));
+	useLayoutEffect(() => props.onLayout(revision), [revision]);
+	<div data-revision={revision}>
+		<PendingProbe />
+		@try {
+			<TransitionChild
+				promiseFor={props.promiseFor}
+				revision={revision}
+				useReducer={props.useReducer}
+				failOnRevision={props.failOnRevision}
+			/>
+		} @pending {
+			<span id="fallback">{'fallback'}</span>
+		} @catch (error) {
+			<span role="alert">{(error as Error).message as string}</span>
+		}
+	</div>
+}
+
+export function UrgentDescendantSuspend(props: ReaderProps) @{
 	<div>
 		@try {
 			<UrgentChild promiseFor={props.promiseFor} />

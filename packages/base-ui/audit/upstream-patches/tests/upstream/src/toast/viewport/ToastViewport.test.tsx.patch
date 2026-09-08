@@ -1,0 +1,96 @@
+diff --git a/tests/upstream/src/toast/viewport/ToastViewport.test.tsx b/tests/upstream/src/toast/viewport/ToastViewport.test.tsx
+--- a/tests/upstream/src/toast/viewport/ToastViewport.test.tsx
++++ b/tests/upstream/src/toast/viewport/ToastViewport.test.tsx
+@@ -251,10 +251,10 @@ describe('<Toast.Viewport />', () => {
+     const root = await screen.findByTestId('root');
+     const viewport = screen.getByTestId('viewport');
+ 
+-    fireEvent.mouseEnter(root);
++    fireEvent.mouseEnter(screen.getByRole('region', { name: 'Notifications' }));
+     expect(viewport).toHaveAttribute('data-expanded');
+ 
+-    fireEvent.mouseLeave(root);
++    fireEvent.mouseLeave(screen.getByRole('region', { name: 'Notifications' }));
+     expect(viewport).not.toHaveAttribute('data-expanded');
+   });
+ 
+@@ -276,9 +276,9 @@ describe('<Toast.Viewport />', () => {
+     await user.keyboard('{F6}');
+     await user.tab();
+ 
+-    fireEvent.mouseEnter(root);
++    fireEvent.mouseEnter(screen.getByRole('region', { name: 'Notifications' }));
+     expect(viewport).toHaveAttribute('data-expanded');
+-    fireEvent.mouseLeave(root);
++    fireEvent.mouseLeave(screen.getByRole('region', { name: 'Notifications' }));
+     expect(viewport).toHaveAttribute('data-expanded');
+   });
+ 
+@@ -460,7 +460,7 @@ describe('<Toast.Viewport />', () => {
+       const button = screen.getByRole('button', { name: 'add' });
+ 
+       fireEvent.click(button);
+-      fireEvent.mouseEnter(screen.getByTestId('root'));
++      fireEvent.mouseEnter(screen.getByRole('region', { name: 'Notifications' }));
+ 
+       clock.tick(5001);
+ 
+@@ -480,11 +480,11 @@ describe('<Toast.Viewport />', () => {
+       const button = screen.getByRole('button', { name: 'add' });
+ 
+       fireEvent.click(button);
+-      fireEvent.mouseEnter(screen.getByTestId('root'));
++      fireEvent.mouseEnter(screen.getByRole('region', { name: 'Notifications' }));
+ 
+       clock.tick(5000);
+ 
+-      fireEvent.mouseLeave(screen.getByTestId('root'));
++      fireEvent.mouseLeave(screen.getByRole('region', { name: 'Notifications' }));
+ 
+       clock.tick(4999);
+ 
+@@ -617,7 +617,7 @@ describe('<Toast.Viewport />', () => {
+       const button = screen.getByRole('button', { name: 'add' });
+ 
+       fireEvent.click(button);
+-      fireEvent.mouseEnter(screen.getByTestId('root'));
++      fireEvent.mouseEnter(screen.getByRole('region', { name: 'Notifications' }));
+ 
+       const viewport = screen.getByTestId('viewport');
+       expect(viewport).toHaveAttribute('data-expanded');
+@@ -646,7 +646,7 @@ describe('<Toast.Viewport />', () => {
+       const button = screen.getByRole('button', { name: 'add' });
+ 
+       fireEvent.click(button);
+-      fireEvent.mouseEnter(screen.getByTestId('root'));
++      fireEvent.mouseEnter(screen.getByRole('region', { name: 'Notifications' }));
+ 
+       const viewport = screen.getByTestId('viewport');
+       fireEvent.pointerDown(viewport, { pointerType: 'touch' });
+@@ -670,7 +670,7 @@ describe('<Toast.Viewport />', () => {
+       const button = screen.getByRole('button', { name: 'add' });
+ 
+       fireEvent.click(button);
+-      fireEvent.mouseEnter(screen.getByTestId('root'));
++      fireEvent.mouseEnter(screen.getByRole('region', { name: 'Notifications' }));
+ 
+       // Only touch activity ends the paused interaction; a mouse press outside
+       // is followed by a `mouseleave`, which handles the collapse instead.
+@@ -804,7 +804,7 @@ describe('<Toast.Viewport />', () => {
+         Object.defineProperty(blurEvent, 'composedPath', { value: () => [window] });
+ 
+         // Hovering pauses the timer.
+-        fireEvent.mouseEnter(root);
++        fireEvent.mouseEnter(screen.getByRole('region', { name: 'Notifications' }));
+         clock.tick(1000);
+ 
+         // The window loses focus while still hovering.
+@@ -814,7 +814,7 @@ describe('<Toast.Viewport />', () => {
+ 
+         // Leaving with the pointer must not resume the timer while the window is
+         // blurred, otherwise the toast could expire off-screen.
+-        fireEvent.mouseLeave(root);
++        fireEvent.mouseLeave(screen.getByRole('region', { name: 'Notifications' }));
+         clock.tick(10000);
+ 
+         expect(screen.queryByTestId('root')).not.toBe(null);

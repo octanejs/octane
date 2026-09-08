@@ -11,15 +11,20 @@
 | Runtime oracle | React `19.2.7`, ReactDOM `19.2.7` |
 | Framework-neutral dependency | `@react-spring/rafz@10.1.2` |
 | License | MIT, © Paul Henschel and React Spring contributors |
-| Vendored inventory | 167 files; `SHA256SUMS` digest `10e6fb1c530efe9409d9f3184488bc7d57bcbae3c92ee97553859e4cd0eda993` |
+| Vendored inventory | 167 files, lock-pinned by `audit/upstream.lock.json` |
 
 The npm artifacts contain compiled JavaScript, declarations, README files, and
 licenses, but not the canonical TypeScript source or test suites. The
 byte-exact source, runtime tests, type tests, package manifests, web target,
 Parallax demo, and licenses therefore come from the canonical repository at the
 tag commit. They live under `upstream/`, retain the repository layout, are
-excluded from the published `files`, and are locked file-by-file by
-`upstream/SHA256SUMS`.
+excluded from the published `files`, and verify offline against the upstream
+git blob shas recorded in `audit/upstream.lock.json`. The pinned license is
+republished at the package root as `LICENSE.upstream`.
+
+Run `pnpm --dir packages/spring upstream:verify` to detect a modified,
+missing, renamed, or unexpected vendored file. The verifier itself has negative
+controls in `scripts/react-parity/react-spring-upstream-lib.test.mjs`.
 
 The reusable runtime boundary is deliberately narrow: the port consumes the
 exact framework-neutral `@react-spring/rafz` package. Source under upstream
@@ -85,3 +90,15 @@ exports.
 The pinned boundary contains the executable unit/type-test files under
 `packages/{animated,core,rafz,shared}` and `targets/web`, plus setup and the
 Parallax demo. The vendored files are the authoritative work list.
+
+Runtime identities are inventoried by the pristine Vitest lane and mapped
+one-for-one in `audit/upstream-case-dispositions.json` to an adapted identity,
+a reused-dependency note, or an explicit `awaiting-adaptation` reason. Negative
+controls reject missing/extra pristine identities, adapted title drift, and
+skipped adapted cases. Repo-authored conformance/hydration/browser suites stay
+in the ordinary shards and are not React-parity ownership.
+
+Type programs under `*.test-d.ts` / `*.test-d.tsx` run pristine via
+`audit/type-probes/tsconfig.pristine-upstream.json`. One-for-one adapted type
+counterparts live under `typetests/upstream/` and still require Octane public
+type-surface work before the adapted-types lane is green.

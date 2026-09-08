@@ -4,6 +4,13 @@ MobX bindings for Octane. The package re-exports the framework-independent
 `mobx` core and implements the `mobx-react-lite` function-component surface with
 Octane hooks.
 
+## Installation
+
+```sh
+npm install @octanejs/mobx
+pnpm add @octanejs/mobx
+```
+
 ```tsrx
 import { makeAutoObservable, observer } from '@octanejs/mobx';
 

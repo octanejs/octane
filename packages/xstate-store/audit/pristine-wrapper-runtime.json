@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "xstate-store-pristine",
+  "roots": ["packages/xstate-store/tests"],
+  "files": ["packages/xstate-store/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:ec50e7f4a9e59d76",
+      "file": "packages/xstate-store/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned @xstate/store-react 2.0.0 suite unchanged"
+    }
+  ]
+}

@@ -3,10 +3,17 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import remapping from '@jridgewell/remapping';
 import { canonicalModuleId, cleanModuleId, createOctaneCompiler } from 'octane/compiler/bundler';
 import {
+	clearCssModuleBuildInfo,
+	CSS_MODULE_CONTEXT_KEY,
+	finishCssModuleConstants,
+	prepareCssModuleConstants,
+} from './css-module-data.js';
+import {
 	inferRspackEnvironment,
 	normalizeLoaderOptions,
 	selectLayerCompilerOptions,
 } from './shared.js';
+import { loadDescriptorChildrenImports } from './descriptor-children.js';
 
 function realRoot(path) {
 	try {
@@ -85,6 +92,7 @@ async function resolveClientOnlyImports(context, compiler, source, id) {
 export default function octaneLoader(source, inputSourceMap) {
 	this.cacheable?.(true);
 	clearBuildInfo(this._module);
+	clearCssModuleBuildInfo(this._module);
 
 	try {
 		const options = normalizeLoaderOptions(this.getOptions?.() ?? {});
@@ -111,6 +119,7 @@ export default function octaneLoader(source, inputSourceMap) {
 			root,
 			profile,
 			...(options.strong === undefined ? null : { strong: options.strong }),
+			...(options.nativeReads === undefined ? null : { nativeReads: options.nativeReads }),
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(compilerOptions.renderers === undefined
 				? null
@@ -125,14 +134,25 @@ export default function octaneLoader(source, inputSourceMap) {
 			warn: (message) => this.emitWarning?.(new Error(message)),
 		});
 		const id = realModuleId(this.resource ?? this.resourcePath);
-		const finish = (clientOnlyImports, callback) => {
+		const authoredSource = String(source);
+		const cssModuleConstants =
+			this[CSS_MODULE_CONTEXT_KEY]?.enabled === true
+				? prepareCssModuleConstants(this, compiler, authoredSource, id, {
+						environment,
+						hmr,
+						dev,
+					})
+				: null;
+		const finish = (clientOnlyImports, isDescriptorChildrenImport, callback) => {
 			try {
-				const result = compiler.transform(String(source), id, {
+				const result = compiler.transform(authoredSource, id, {
 					environment,
 					hmr,
 					dev,
 					profile,
 					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
+					...(isDescriptorChildrenImport === null ? null : { isDescriptorChildrenImport }),
+					...cssModuleConstants?.transformOptions,
 				});
 
 				if (result === null) {
@@ -141,6 +161,7 @@ export default function octaneLoader(source, inputSourceMap) {
 				}
 
 				registerDependencies(this, result);
+				finishCssModuleConstants(this, cssModuleConstants, result);
 				if (result.kind === 'none') {
 					callback(null, source, this.sourceMap === false ? undefined : inputSourceMap);
 					return;
@@ -172,22 +193,31 @@ export default function octaneLoader(source, inputSourceMap) {
 			environment === 'server' && typeof compiler.clientReferenceForFile === 'function'
 				? compiler.clientReferenceForFile(id)
 				: null;
-		if (
+		const needsServerImports =
 			environment === 'server' &&
 			currentReference === null &&
-			typeof this.getResolve === 'function'
-		) {
-			const requests = compiler.findServerImportRequests(String(source), id);
-			if (requests.length > 0) {
-				const asyncCallback = this.async?.() ?? callback;
-				resolveClientOnlyImports(this, compiler, source, id).then(
-					(imports) => finish(imports, asyncCallback),
-					(error) => asyncCallback(error instanceof Error ? error : new Error(String(error))),
-				);
-				return;
-			}
+			typeof this.getResolve === 'function';
+		const requests = needsServerImports
+			? compiler.findServerImportRequests(authoredSource, id)
+			: [];
+		const mayUseDescriptorImports =
+			typeof this.getResolve === 'function' &&
+			(environment !== 'server' || currentReference === null) &&
+			/\.(?:tsrx|tsx)$/.test(cleanModuleId(id)) &&
+			/<\s*[A-Z_$]/.test(authoredSource) &&
+			authoredSource.includes('import');
+		if (requests.length > 0 || mayUseDescriptorImports) {
+			const asyncCallback = this.async?.() ?? callback;
+			Promise.all([
+				requests.length > 0 ? resolveClientOnlyImports(this, compiler, authoredSource, id) : [],
+				mayUseDescriptorImports ? loadDescriptorChildrenImports(this, authoredSource, id) : null,
+			]).then(
+				([imports, descriptorImport]) => finish(imports, descriptorImport, asyncCallback),
+				(error) => asyncCallback(error instanceof Error ? error : new Error(String(error))),
+			);
+			return;
 		}
-		finish([], callback);
+		finish([], null, callback);
 	} catch (error) {
 		this.callback(error instanceof Error ? error : new Error(String(error)));
 	}

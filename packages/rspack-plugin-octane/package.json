@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/rspack-plugin",
-  "version": "0.1.34",
+  "version": "0.1.48",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -48,11 +48,14 @@
   },
   "peerDependencies": {
     "@rspack/core": "^2.0.0",
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@rspack/core": "catalog:default",
+    "@types/jsdom": "catalog:default",
     "@types/node": "catalog:default",
+    "css-loader": "6.11.0",
+    "jsdom": "catalog:default",
     "octane": "workspace:*",
     "vitest": "catalog:default"
   }

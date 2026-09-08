@@ -1,12 +1,20 @@
 {
   "name": "@octanejs/input-otp",
-  "version": "0.0.5",
+  "version": "0.0.19",
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "Accessible one-time password inputs for Octane, ported from input-otp 1.4.2.",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src/use-previous.ts",
+        "src/use-pwm-badge.ts"
+      ]
+    }
+  },
+  "description": "Accessible one-time password inputs for Octane, ported from input-otp 1.5.0.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -24,6 +32,7 @@
   "types": "src/index.ts",
   "files": [
     "src",
+    "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md"
   ],
@@ -31,11 +40,15 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project input-otp && vitest run --root ../.. --project input-otp-server && vitest run --root ../.. --project input-otp-browser && vitest run --root ../.. --project input-otp-differential",
-    "typecheck": "tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "audit:generate": "node ../../scripts/react-parity/input-otp-generate.mjs",
+    "audit:verify": "node ../../scripts/react-parity/input-otp-check.mjs",
+    "audit:negative-controls": "node ../../scripts/react-parity/input-otp-negative-controls.mjs",
+    "test": "vitest run --root ../.. --project input-otp-pristine-browser && vitest run --root ../.. --project input-otp && vitest run --root ../.. --project input-otp-server && vitest run --root ../.. --project input-otp-browser && vitest run --root ../.. --project input-otp-differential",
+    "typecheck": "tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "typecheck:pristine": "tsc --noEmit -p audit/type-probes/tsconfig.pristine.json"
   },
   "peerDependencies": {
-    "octane": "workspace:*"
+    "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.2",
@@ -43,7 +56,7 @@
     "@types/react-dom": "19.2.3",
     "@tsrx/react": "catalog:default",
     "octane": "workspace:*",
-    "input-otp": "1.4.2",
+    "input-otp": "1.5.0",
     "playwright": "catalog:default",
     "react": "19.2.7",
     "react-dom": "19.2.7",

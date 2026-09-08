@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/global/utils/adjustLayoutByDelta.test.ts b/tests/upstream/global/utils/adjustLayoutByDelta.test.ts
+--- a/tests/upstream/global/utils/adjustLayoutByDelta.test.ts
++++ b/tests/upstream/global/utils/adjustLayoutByDelta.test.ts
+@@ -1,7 +1,7 @@
+ import { describe, expect, test } from "vitest";
+-import type { Layout } from "../../components/group/types";
+-import type { PanelConstraints } from "../../components/panel/types";
+-import { adjustLayoutByDelta as adjustLayoutByDeltaExternal } from "./adjustLayoutByDelta";
++import type { Layout } from "../../../../src/components/group/types";
++import type { PanelConstraints } from "../../../../src/components/panel/types";
++import { adjustLayoutByDelta as adjustLayoutByDeltaExternal } from "../../../../src/global/utils/adjustLayoutByDelta";
+ 
+ type Args = Parameters<typeof adjustLayoutByDeltaExternal>[0];
+ 

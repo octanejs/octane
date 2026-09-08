@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 // expected union from the workspace manifests, so publishing a new binding
 // without registering it in either catalog fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
+	'react-is': '@octanejs/octane-is',
 	'@gsap/react': '@octanejs/gsap',
 	animejs: '@octanejs/animejs',
 	'usehooks-ts': '@octanejs/usehooks-ts',
@@ -16,22 +17,27 @@ export const KNOWN_BINDINGS = {
 	'mobx-react-lite': '@octanejs/mobx',
 	'mobx-react': '@octanejs/mobx',
 	'@apollo/client': '@octanejs/apollo-client',
-	'@solana/react': '@octanejs/solana-react',
+	'@solana/react': '@octanejs/solana-kit',
 	'@tanstack/ai-react': '@octanejs/tanstack-ai',
 	'@tanstack/react-db': '@octanejs/tanstack-db',
 	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',
 	'@tanstack/react-form': '@octanejs/tanstack-form',
+	'@formisch/react': '@octanejs/formisch',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	swr: '@octanejs/swr',
 	wagmi: '@octanejs/wagmi',
 	'@rainbow-me/rainbowkit': '@octanejs/rainbowkit',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
 	'@tanstack/react-store': '@octanejs/tanstack-store',
+	'@xstate/react': '@octanejs/xstate',
+	'@xstate/store-react': '@octanejs/xstate-store',
+	'@xyflow/react': '@octanejs/xyflow',
 	'@tanstack/react-router-ssr-query': '@octanejs/tanstack-router-ssr-query',
 	'@tanstack/react-hotkeys': '@octanejs/tanstack-hotkeys',
 	'@tanstack/react-pacer': '@octanejs/tanstack-pacer',
 	'@tanstack/react-table': '@octanejs/tanstack-table',
 	'@tanstack/react-virtual': '@octanejs/tanstack-virtual',
+	'react-waypoint': '@octanejs/waypoint',
 	'react-window': '@octanejs/window',
 	'framer-motion': '@octanejs/motion',
 	motion: '@octanejs/motion',
@@ -46,6 +52,10 @@ export const KNOWN_BINDINGS = {
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
 	'react-pdf': '@octanejs/pdf',
+	'@portabletext/react': '@octanejs/portabletext',
+	'@sanity/icons': '@octanejs/sanity-icons',
+	'@sanity/react-loader': '@octanejs/sanity-loader',
+	'@sanity/logos': '@octanejs/sanity-logos',
 	'@monaco-editor/react': '@octanejs/monaco-editor',
 	'lucide-react': '@octanejs/lucide',
 	'@phosphor-icons/react': '@octanejs/phosphor-icons',
@@ -56,12 +66,19 @@ export const KNOWN_BINDINGS = {
 	'react-stately': '@octanejs/aria',
 	'radix-ui': '@octanejs/radix',
 	'react-hook-form': '@octanejs/hook-form',
+	'better-auth/react': '@octanejs/better-auth',
 	'@base-ui-components/react': '@octanejs/base-ui',
+	'@base-ui/react': '@octanejs/base-ui',
+	'@base-ui/utils': '@octanejs/base-ui-utils',
 	'@dnd-kit/react': '@octanejs/dnd-kit',
 	'embla-carousel-react': '@octanejs/embla-carousel',
 	'react-dropzone': '@octanejs/dropzone',
 	sonner: '@octanejs/sonner',
 	'react-error-boundary': '@octanejs/react-error-boundary',
+	'react-email': '@octanejs/email',
+	'@react-email/components': '@octanejs/email',
+	'react-resizable-panels': '@octanejs/resizable-panels',
+	'react-select': '@octanejs/select',
 	'react-transition-group': '@octanejs/transition-group',
 	'react-day-picker': '@octanejs/day-picker',
 	'input-otp': '@octanejs/input-otp',
@@ -71,6 +88,13 @@ export const KNOWN_BINDINGS = {
 	'react-intersection-observer': '@octanejs/intersection-observer',
 	'react-draggable': '@octanejs/draggable',
 	'react-colorful': '@octanejs/colorful',
+	'use-stick-to-bottom': '@octanejs/stick-to-bottom',
+	'react-image-crop': '@octanejs/image-crop',
+	'react-content-loader': '@octanejs/content-loader',
+	'react-to-print': '@octanejs/to-print',
+	'react-calendar': '@octanejs/calendar',
+	'thinking-orbs': '@octanejs/thinking-orbs',
+	'@formkit/auto-animate': '@octanejs/auto-animate',
 	streamdown: '@octanejs/streamdown',
 	'react-syntax-highlighter': '@octanejs/syntax-highlighter',
 	// The official plugins are consolidated as subpaths of the same package.
@@ -88,6 +112,7 @@ export const KNOWN_BINDINGS = {
 	'react-map-gl/mapbox': '@octanejs/react-map-gl',
 	'@vis.gl/react-mapbox': '@octanejs/react-map-gl',
 	'@react-three/fiber': '@octanejs/three',
+	'@opentui/react': '@octanejs/opentui',
 	'@react-three/drei': '@octanejs/drei',
 	'@visx/visx': '@octanejs/visx',
 	'@visx/a11y': '@octanejs/visx',
@@ -145,11 +170,13 @@ export const KNOWN_BINDINGS = {
 	'@react-rxjs/utils': '@octanejs/rxjs',
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
+	'html-react-parser': '@octanejs/html-react-parser',
 	'@inertiajs/react': '@octanejs/inertia',
 	ink: '@octanejs/ink',
 	'@mdx-js/react': '@octanejs/mdx',
 	'dexie-react-hooks': '@octanejs/dexie',
 	'@livestore/react': '@octanejs/livestore',
+	wouter: '@octanejs/wouter',
 };
 
 // Octane-specific ecosystem packages that have no React import to rewrite.
@@ -158,6 +185,7 @@ export const KNOWN_BINDINGS = {
 export const KNOWN_NATIVE_BINDINGS = new Set([
 	'@octanejs/devtools',
 	'@octanejs/electron',
+	'@octanejs/email-cli',
 	'@octanejs/tauri',
 ]);
 
@@ -181,12 +209,16 @@ export const KNOWN_VANILLA_CORES = {
 	'@tanstack/react-form': '@tanstack/form-core',
 	'@floating-ui/react': '@floating-ui/dom',
 	'@dnd-kit/react': '@dnd-kit/dom',
+	'@opentui/react': '@opentui/core',
 	'embla-carousel-react': 'embla-carousel',
 	'@xstate/react': 'xstate',
+	'@xstate/store-react': '@xstate/store',
+	'@xyflow/react': '@xyflow/system',
 	'react-redux': 'redux',
 	'@reduxjs/toolkit': 'redux',
 	'react-i18next': 'i18next',
 	'react-hook-form': null,
+	'@formkit/auto-animate': '@formkit/auto-animate',
 	'react-alien-signals': 'alien-signals',
 	zustand: 'zustand/vanilla',
 	valtio: 'valtio/vanilla',
@@ -264,11 +296,11 @@ export const REACT_API_MAP = {
 		note: "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not).",
 	},
 	Component: {
-		status: 'unsupported',
+		status: 'rewrite',
 		note: 'No class components. Rewrite as a function component.',
 	},
 	PureComponent: {
-		status: 'unsupported',
+		status: 'rewrite',
 		note: 'No class components. Rewrite as a function component with memo.',
 	},
 	StrictMode: {
@@ -277,7 +309,7 @@ export const REACT_API_MAP = {
 	},
 	Profiler: { status: 'unsupported', note: 'Not present.' },
 	SuspenseList: { status: 'unsupported', note: 'Not present.' },
-	findDOMNode: { status: 'unsupported', note: 'Removed in React 19 too. Use refs.' },
+	findDOMNode: { status: 'rewrite', note: 'Removed in React 19 too. Use refs.' },
 	renderToString: {
 		status: 'rewrite',
 		note: 'Use renderToString() from octane/server (sync) or prerender() from octane/static (async, awaits Suspense); both return { html, css }.',
@@ -445,6 +477,20 @@ export async function collectSourceFiles(root, out = [], depth = 0) {
 
 export function scanSource(source) {
 	const apis = new Map();
+	const symbolExports = new Map();
+	// Introspection libraries export element-kind symbols, not components.
+	// Require the right-hand identifier to resolve to an actual Symbol.for
+	// declaration; ordinary component exports/render calls remain API uses.
+	const symbols = new Set(
+		[...source.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*Symbol\.for\(\s*['"][^'"]+['"]\s*\)/g)].map(
+			(match) => match[1],
+		),
+	);
+	for (const match of source.matchAll(
+		/\bexports\.([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*;/g,
+	)) {
+		if (symbols.has(match[2])) symbolExports.set(match[1], (symbolExports.get(match[1]) ?? 0) + 1);
+	}
 	for (const name of Object.keys(REACT_API_MAP)) {
 		if (name === 'onChange') continue;
 		const matches = source.match(new RegExp(`\\b${name}\\b`, 'g'));
@@ -464,13 +510,14 @@ export function scanSource(source) {
 		}
 	}
 	const classComponent = /\bextends\s+(React\.)?(Pure)?Component\b/.test(source);
-	return { apis, imports, classComponent };
+	return { apis, imports, classComponent, symbolExports };
 }
 
 export async function scanPath(root) {
 	const files = await collectSourceFiles(resolve(root));
 	const totals = new Map();
 	const imports = new Set();
+	const symbolExports = new Map();
 	let classComponents = false;
 	for (const file of files) {
 		let source;
@@ -484,20 +531,32 @@ export async function scanPath(root) {
 			totals.set(name, (totals.get(name) ?? 0) + count);
 		}
 		for (const spec of result.imports) imports.add(spec);
+		for (const [name, count] of result.symbolExports) {
+			symbolExports.set(name, (symbolExports.get(name) ?? 0) + count);
+		}
 		classComponents ||= result.classComponent;
 	}
-	return { filesScanned: files.length, totals, imports, classComponents };
+	return { filesScanned: files.length, totals, imports, classComponents, symbolExports };
 }
 
-function apiRows(totals) {
+function apiRows(totals, symbolExports) {
 	return [...totals.entries()]
-		.map(([name, count]) => ({ name, count, ...REACT_API_MAP[name] }))
+		.map(([name, count]) =>
+			symbolExports.get(name) === count
+				? {
+						name,
+						count,
+						status: 'rewrite',
+						note: 'Exported element-kind marker: map to the Octane kind; predicates for unsupported kinds remain false. This does not require rendering that component.',
+					}
+				: { name, count, ...REACT_API_MAP[name] },
+		)
 		.sort((a, b) => b.count - a.count);
 }
 
 function verdictFor(rows, classComponents) {
-	if (classComponents || rows.some((row) => row.status === 'unsupported')) return 'needs-rework';
-	if (rows.some((row) => row.status === 'rewrite' || row.status === 'partial')) {
+	if (rows.some((row) => row.status === 'unsupported')) return 'needs-rework';
+	if (classComponents || rows.some((row) => row.status === 'rewrite' || row.status === 'partial')) {
 		return 'bridgeable-with-rewrites';
 	}
 	return 'bridgeable';
@@ -552,7 +611,7 @@ export async function bridgeReport({ packageName, path, projectRoot }) {
 	}
 
 	const scan = await scanPath(scanRoot);
-	const rows = apiRows(scan.totals);
+	const rows = apiRows(scan.totals, scan.symbolExports);
 	report.filesScanned = scan.filesScanned;
 	report.reactImports = [...scan.imports];
 	report.classComponents = scan.classComponents;
@@ -575,7 +634,7 @@ export function bridgeReportFromSource(source, { packageName } = {}) {
 		report.vanillaCore = detectVanillaCore(packageName, null);
 	}
 	const scan = scanSource(source);
-	const rows = apiRows(scan.apis);
+	const rows = apiRows(scan.apis, scan.symbolExports);
 	report.reactImports = [...scan.imports];
 	report.classComponents = scan.classComponent;
 	report.apis = rows;

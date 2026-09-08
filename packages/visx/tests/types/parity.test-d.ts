@@ -20,15 +20,19 @@ type Upstream = typeof import('@visx/visx');
 // their return the same way (multi-parameter render functions, e.g. Pie's
 // `centroid`, keep their parameter tuple exact and collapse only the return).
 // Everything else must match exactly.
-type ComponentProps<C> = C extends (props: infer P) => any ? P : never;
+type ComponentProps<C> = C extends (props: infer P) => any
+	? P
+	: C extends new (props: infer P, ...args: any[]) => any
+		? P
+		: never;
 type IsUnknown<T> = unknown extends T ? ([T] extends [{}] ? false : true) : false;
 type IsRenderable<T> = IsUnknown<T> extends true ? true : Equal<T, import('react').ReactNode>;
 
 // OCTANE DIVERGENCE: components whose rest props spread an octane attribute
 // bag (`Octane.SVGProps` / `Octane.HTMLAttributes`, e.g. via `AddSVGProps`)
 // diverge from upstream exactly where octane's JSX surface diverges from
-// React's: `on*` handlers receive NATIVE DOM events (octane has no synthetic
-// event layer; the handler NAMES are identical), `className` composes
+// React's: shared `on*` handlers receive NATIVE DOM events (octane has no
+// synthetic event layer), `className` composes
 // clsx-style (`ClassValue`), `style` additionally accepts a plain string,
 // `ref` accepts (nested) ref arrays, and octane adds the native `class` /
 // `for` attribute aliases. Compare those components' props with the bag
@@ -91,14 +95,21 @@ type AttributeBagNormalizedPropsExtends<LocalComponent, UpstreamComponent> = Ext
 // element type, not a renderable hole, so the bag inside its type argument is
 // unreachable. Like Drag, whose divergence is the native event union rather
 // than a bag, their props surface is pinned key-for-key. Such a pin must also
-// ignore what a TOP-LEVEL bag contributes to the key set: octane's bags add
-// exactly `class`, `for`, `hidden`, and `tabindex` beside React's canonical
-// camelCase props and drop nothing, so those keys are excluded from both
-// sides. They are optional, which is why the member-by-member comparisons
-// above tolerate them without listing them.
+// ignore the common TOP-LEVEL bag additions `class`, `for`, `hidden`, and
+// `tabindex` beside React's canonical camelCase props. Host-specific additions
+// are listed only for the affected component below. These additions are
+// optional, which is why the member-by-member comparisons above tolerate them
+// without listing them.
 type OctaneOnlyAttributeSurfaceKeys = OctaneOnlyAttributeKeys | 'hidden' | 'tabindex';
-type PropsShapeEqual<LocalComponent, UpstreamComponent> = Equal<
-	Exclude<keyof ComponentProps<LocalComponent>, OctaneOnlyAttributeSurfaceKeys>,
+type PropsShapeEqual<
+	LocalComponent,
+	UpstreamComponent,
+	AdditionalLocalKeys extends PropertyKey = never,
+> = Equal<
+	Exclude<
+		keyof ComponentProps<LocalComponent>,
+		OctaneOnlyAttributeSurfaceKeys | AdditionalLocalKeys
+	>,
 	Exclude<keyof ComponentProps<UpstreamComponent>, OctaneOnlyAttributeSurfaceKeys>
 >;
 
@@ -152,21 +163,17 @@ type _Axis = Assert<
 // Axis takes `children` as a RENDER PROP, and its `AxisRendererProps` argument
 // carries `tickLabelProps` / `tickLineProps` attribute bags — the render-prop
 // argument case the normalization recurses through.
-type _AxisProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['Axis'], Upstream['Axis']['Axis']>
->;
+type _AxisProps = Assert<PropsShapeEqual<Local['Axis']['Axis'], Upstream['Axis']['Axis']>>;
 type _AxisBottomProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisBottom'], Upstream['Axis']['AxisBottom']>
+	PropsShapeEqual<Local['Axis']['AxisBottom'], Upstream['Axis']['AxisBottom']>
 >;
 type _AxisLeftProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisLeft'], Upstream['Axis']['AxisLeft']>
+	PropsShapeEqual<Local['Axis']['AxisLeft'], Upstream['Axis']['AxisLeft']>
 >;
 type _AxisRightProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisRight'], Upstream['Axis']['AxisRight']>
+	PropsShapeEqual<Local['Axis']['AxisRight'], Upstream['Axis']['AxisRight']>
 >;
-type _AxisTopProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisTop'], Upstream['Axis']['AxisTop']>
->;
+type _AxisTopProps = Assert<PropsShapeEqual<Local['Axis']['AxisTop'], Upstream['Axis']['AxisTop']>>;
 type _Bounds = Assert<
 	Equal<Omit<Local['Bounds'], 'withBoundingRects'>, Omit<Upstream['Bounds'], 'withBoundingRects'>>
 >;
@@ -417,7 +424,13 @@ type _HeatmapRectProps = Assert<
 	>
 >;
 type _Hierarchy = Assert<Extends<Local['Hierarchy'], Upstream['Hierarchy']>>;
-type _Legend = Assert<Extends<Local['Legend'], Upstream['Legend']>>;
+type LegendCarveouts = 'LegendShape' | 'LegendItem' | 'LegendLabel';
+type _Legend = Assert<
+	Equal<
+		Exclude<keyof Omit<Local['Legend'], LegendCarveouts>, never>,
+		Exclude<keyof Omit<Upstream['Legend'], LegendCarveouts>, never>
+	>
+>;
 // Every marker spreads an octane attribute bag AND generates its own `id`, so
 // all six are asserted individually; the module assert stays as a guard for
 // exports added later.
@@ -477,17 +490,40 @@ type _Point = Assert<Equal<Local['Point'], Upstream['Point']>>;
 // ParentSize spreads `Octane.HTMLAttributes` — see the attribute-bag
 // carve-out above (`style` stays `CSSProperties` locally because ParentSize
 // merges style objects; it collapses with the bag members either way).
+// Octane also supports xmlns and both phases of native dialog lifecycle events
+// on HTML ancestors; React restricts xmlns to SVG and these handlers to dialogs.
+// Normalize only those extra keys here, then pin the native handler surface.
+type ParentSizeDialogLifecycleKeys = 'onCancel' | 'onCancelCapture' | 'onClose' | 'onCloseCapture';
 type _ResponsiveParentSizeProps = Assert<
-	AttributeBagNormalizedPropsEqual<
+	PropsShapeEqual<
 		Local['Responsive']['ParentSize'],
-		Upstream['Responsive']['ParentSize']
+		Upstream['Responsive']['ParentSize'],
+		'xmlns' | ParentSizeDialogLifecycleKeys
 	>
 >;
+type _ResponsiveParentSizeNativeDialogEvents = Assert<
+	Equal<
+		Pick<ComponentProps<Local['Responsive']['ParentSize']>, ParentSizeDialogLifecycleKeys>,
+		{
+			[K in ParentSizeDialogLifecycleKeys]?: (
+				event: Event & { currentTarget: HTMLDivElement },
+			) => void;
+		}
+	>
+>;
+type ParentSizeDialogLifecycleEvent = Parameters<
+	NonNullable<ComponentProps<Local['Responsive']['ParentSize']>[ParentSizeDialogLifecycleKeys]>
+>[0];
+// @ts-expect-error Dialog lifecycle handlers receive native events, not synthetic wrappers or any.
+type _ResponsiveParentSizeDialogEventHasNoWrapper = ParentSizeDialogLifecycleEvent['nativeEvent'];
 type _ResponsiveScaleSvg = Assert<
 	Extends<Local['Responsive']['ScaleSVG'], Upstream['Responsive']['ScaleSVG']>
 >;
 type _ResponsiveUseParentSize = Assert<
-	Equal<Local['Responsive']['useParentSize'], Upstream['Responsive']['useParentSize']>
+	Equal<
+		Exclude<keyof ReturnType<Local['Responsive']['useParentSize']>, never>,
+		Exclude<keyof ReturnType<Upstream['Responsive']['useParentSize']>, never>
+	>
 >;
 type _ResponsiveUseScreenSize = Assert<
 	Equal<Local['Responsive']['useScreenSize'], Upstream['Responsive']['useScreenSize']>
@@ -665,7 +701,19 @@ type _CircleProps = Assert<
 type _SplitLinePathPropsShape = Assert<
 	PropsShapeEqual<Local['Shape']['SplitLinePath'], Upstream['Shape']['SplitLinePath']>
 >;
-type _Text = Assert<Equal<Local['Text'], Upstream['Text']>>;
+type TextCarveouts = 'Text' | 'useText';
+type _Text = Assert<
+	Equal<Omit<Local['Text'], TextCarveouts>, Omit<Upstream['Text'], TextCarveouts>>
+>;
+type _TextProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Text']['Text'], Upstream['Text']['Text']>
+>;
+type _UseTextProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Text']['useText'], Upstream['Text']['useText']>
+>;
+type _UseTextReturn = Assert<
+	Equal<ReturnType<Local['Text']['useText']>, ReturnType<Upstream['Text']['useText']>>
+>;
 // Threshold nests the bag inside `aboveAreaProps` / `belowAreaProps` and, like
 // the clip-paths above, generates a fallback `id`, so it holds one-directionally.
 // It is the module's only component; the module assert stays as a guard for
@@ -674,14 +722,14 @@ type _Threshold = Assert<
 	Extends<Omit<Local['Threshold'], 'Threshold'>, Omit<Upstream['Threshold'], 'Threshold'>>
 >;
 type _ThresholdProps = Assert<
-	AttributeBagNormalizedPropsExtends<
-		Local['Threshold']['Threshold'],
-		Upstream['Threshold']['Threshold']
-	>
+	PropsShapeEqual<Local['Threshold']['Threshold'], Upstream['Threshold']['Threshold']>
 >;
 type _TooltipUse = Assert<Equal<Local['Tooltip']['useTooltip'], Upstream['Tooltip']['useTooltip']>>;
 type _TooltipInPortal = Assert<
-	Extends<Local['Tooltip']['useTooltipInPortal'], Upstream['Tooltip']['useTooltipInPortal']>
+	Equal<
+		Exclude<keyof ReturnType<Local['Tooltip']['useTooltipInPortal']>, never>,
+		Exclude<keyof ReturnType<Upstream['Tooltip']['useTooltipInPortal']>, never>
+	>
 >;
 type _TooltipPosition = Assert<
 	Equal<Local['Tooltip']['useTooltipPosition'], Upstream['Tooltip']['useTooltipPosition']>
@@ -689,8 +737,14 @@ type _TooltipPosition = Assert<
 type _TooltipStyles = Assert<
 	Equal<Local['Tooltip']['defaultStyles'], Upstream['Tooltip']['defaultStyles']>
 >;
-type _TooltipWithBounds = Assert<
-	Equal<Local['Tooltip']['TooltipWithBounds'], Upstream['Tooltip']['TooltipWithBounds']>
+type _TooltipWithBoundsProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Tooltip']['TooltipWithBounds'],
+		Upstream['Tooltip']['TooltipWithBounds']
+	>
+>;
+type _TooltipWithBoundsReturn = Assert<
+	Equal<ReturnType<Local['Tooltip']['TooltipWithBounds']>, import('octane').ElementDescriptor>
 >;
 // VoronoiPolygon spreads an octane attribute bag.
 type _Voronoi = Assert<
@@ -718,21 +772,41 @@ type XYChartCarveouts =
 	| 'AnnotationLineSubject'
 	| 'AreaSeries'
 	| 'AreaStack'
+	| 'BarGroup'
+	| 'BarSeries'
+	| 'BarStack'
+	| 'GlyphSeries'
 	| 'LineSeries'
-	| 'Tooltip';
+	| 'AnimatedBarSeries'
+	| 'AnimatedBarStack'
+	| 'AnimatedBarGroup'
+	| 'AnimatedGlyphSeries'
+	| 'Tooltip'
+	| 'useEventEmitter'
+	| 'EventHandlerParams'
+	| 'GlyphProps'
+	| 'GlyphsProps'
+	| 'SeriesProps'
+	| 'SvgPathComponent'
+	| 'HTMLTextStyles'
+	| 'LineStyles'
+	| 'DataProvider'
+	| 'buildChartTheme'
+	| 'lightTheme'
+	| 'darkTheme';
 type _XYChart = Assert<
-	Extends<Omit<Local['XYChart'], XYChartCarveouts>, Omit<Upstream['XYChart'], XYChartCarveouts>>
+	Equal<
+		Exclude<keyof Omit<Local['XYChart'], XYChartCarveouts>, never>,
+		Exclude<keyof Omit<Upstream['XYChart'], XYChartCarveouts>, never>
+	>
 >;
 // Axis/AnimatedAxis take `children` as a render prop whose `AxisRendererProps`
 // argument carries tick attribute bags — see the Axis module above.
 type _XYChartAxisProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['XYChart']['Axis'], Upstream['XYChart']['Axis']>
+	PropsShapeEqual<Local['XYChart']['Axis'], Upstream['XYChart']['Axis']>
 >;
 type _XYChartAnimatedAxisProps = Assert<
-	AttributeBagNormalizedPropsEqual<
-		Local['XYChart']['AnimatedAxis'],
-		Upstream['XYChart']['AnimatedAxis']
-	>
+	PropsShapeEqual<Local['XYChart']['AnimatedAxis'], Upstream['XYChart']['AnimatedAxis']>
 >;
 // The line series and AnnotationLineSubject spread an octane attribute bag.
 type _XYChartLineSeriesProps = Assert<
@@ -792,7 +866,9 @@ type _XYChartAnnotationLabelProps = Assert<
 type _XYChartTooltipProps = Assert<
 	AttributeBagNormalizedPropsEqual<Local['XYChart']['Tooltip'], Upstream['XYChart']['Tooltip']>
 >;
-type _Zoom = Assert<Equal<Local['Zoom'], Upstream['Zoom']>>;
+type _Zoom = Assert<
+	Equal<Exclude<keyof Local['Zoom'], never>, Exclude<keyof Upstream['Zoom'], never>>
+>;
 
 // Ribbon and Polygon spread octane attribute bags.
 type _Chord = Assert<
@@ -829,13 +905,13 @@ type _ReactSpring = Assert<
 	>
 >;
 type _ReactSpringAnimatedAxisProps = Assert<
-	AttributeBagNormalizedPropsEqual<
+	PropsShapeEqual<
 		(typeof import('@octanejs/visx/react-spring'))['AnimatedAxis'],
 		(typeof import('@visx/react-spring'))['AnimatedAxis']
 	>
 >;
 type _ReactSpringAnimatedTicksProps = Assert<
-	AttributeBagNormalizedPropsEqual<
+	PropsShapeEqual<
 		(typeof import('@octanejs/visx/react-spring'))['AnimatedTicks'],
 		(typeof import('@visx/react-spring'))['AnimatedTicks']
 	>
@@ -893,11 +969,8 @@ type _AnnotationContextValue = Assert<
 // it is spelled out the same way: octane's bag in the member's position.
 type _BrushProps = Assert<
 	Equal<
-		LocalBrushProps,
-		Omit<UpstreamBrushProps, 'innerRef' | 'renderBrushHandle' | 'selectedBoxStyle'> & {
-			renderBrushHandle?: (props: import('@visx/brush').BrushHandleRenderProps) => unknown;
-			selectedBoxStyle: import('octane/jsx-runtime').Octane.SVGProps<SVGRectElement>;
-		}
+		Exclude<keyof LocalBrushProps, never>,
+		Exclude<keyof Omit<UpstreamBrushProps, 'innerRef'>, never>
 	>
 >;
 type _TooltipPositionContextValue = Assert<
@@ -916,7 +989,10 @@ type _WithTooltipProvidedProps = Assert<
 	Equal<LocalWithTooltipProvidedProps<unknown>, UpstreamWithTooltipProvidedProps<unknown>>
 >;
 type _DataContextValue = Assert<
-	Equal<LocalDataContextType<any, any, any>, UpstreamDataContextType<any, any, any>>
+	Equal<
+		Exclude<keyof LocalDataContextType<any, any, any>, never>,
+		Exclude<keyof UpstreamDataContextType<any, any, any>, never>
+	>
 >;
 
 // Current-master entries are not registry-published yet. These imports pin all

@@ -107,16 +107,16 @@ export function useStep(...runtime: [maxStep: number, slot?: symbol]): [number, 
 	const { args: rawArgs, slot } = splitSlot(runtime);
 	const args = rawArgs as [number];
 	const maxStep = args[0]!;
-	const [currentStep, setCurrentStep] = useState(1, subSlot(slot, 'state'));
+	const [currentStep, setCurrentStep, getCurrentStep] = useState(1, subSlot(slot, 'state'));
 	const canGoToNextStep = currentStep + 1 <= maxStep;
 	const canGoToPrevStep = currentStep - 1 > 0;
 	const setStep = useCallback(
 		(step: SetStateAction<number>) => {
-			setCurrentStep((current: number) => {
-				const next = typeof step === 'function' ? step(current) : step;
-				if (next < 1 || next > maxStep) throw new Error('Step not valid');
-				return next;
-			});
+			// Validation belongs to this imperative API, before a render is queued.
+			// The getter also includes earlier accepted actions from this same turn.
+			const next = typeof step === 'function' ? step(getCurrentStep()) : step;
+			if (!(next >= 1 && next <= maxStep)) throw new Error('Step not valid');
+			setCurrentStep(next);
 		},
 		[maxStep],
 		subSlot(slot, 'set'),

@@ -4,6 +4,13 @@ SWR 2.4.2 for [Octane](https://github.com/octanejs/octane). The binding preserve
 the root API plus `infinite`, `immutable`, `mutation`, `subscription`, `_internal`,
 and the upstream package's conditional server entry points.
 
+## Installation
+
+```sh
+npm install @octanejs/swr
+pnpm add @octanejs/swr
+```
+
 ```tsx
 import useSWR, { mutate } from '@octanejs/swr'
 
@@ -71,6 +78,11 @@ require that global are not compatible. Hostile accessors and non-array ambient
 values are ignored without evaluation.
 
 ## Verification and license
+
+The global parity harness executes the pinned React Jest suite, three unchanged
+upstream TypeScript projects, three adapted Octane type projects, and the full
+adapted runtime inventory. See [`audit/react-parity.json`](./audit/react-parity.json)
+and [`UPSTREAM.md`](./UPSTREAM.md).
 
 MIT — contains source derived from [SWR](https://github.com/vercel/swr)
 (MIT, © 2023 Vercel, Inc.), adapted for Octane.

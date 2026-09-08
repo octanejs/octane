@@ -1,5 +1,207 @@
 # @octanejs/visx
 
+## 0.1.48
+
+### Patch Changes
+
+- Updated dependencies [1846318]
+  - @octanejs/floating-ui@0.1.52
+
+## 0.1.47
+
+### Patch Changes
+
+- fc0ba16: Remove four unused runtime dependency declarations and share the internal D3
+  number-or-accessor overload helper across the chord, hierarchy, and shape ports.
+  - @octanejs/floating-ui@0.1.51
+
+## 0.1.46
+
+### Patch Changes
+
+- ddaa8c5: Promote Octane to beta and begin the 0.2 release line.
+- Updated dependencies [ddaa8c5]
+  - @octanejs/floating-ui@0.1.51
+
+## 0.1.45
+
+### Patch Changes
+
+- 07a26be: Reuse categorical-domain lookup work in `useCategoricalScale` and
+  `useColorScale` instead of scanning the whole domain for every color assignment.
+
+  Small domains keep the existing linear path. At the measured 64-key crossover,
+  the indexed path already amortizes its construction within one complete-domain
+  pass. In the same-run 4,096-key benchmark, including construction, lookup time
+  drops from about 1.59 ms to 0.04 ms per 1,000 calls while preserving first-match
+  duplicates and missing-key fallbacks.
+
+- Updated dependencies [9321d39]
+- Updated dependencies [fdb711a]
+- Updated dependencies [5e80135]
+- Updated dependencies [ad499d0]
+- Updated dependencies [892da9a]
+- Updated dependencies [babf8d7]
+- Updated dependencies [2785a2f]
+- Updated dependencies [df82fbc]
+- Updated dependencies [0824502]
+- Updated dependencies [47c8f54]
+  - octane@0.1.51
+  - @octanejs/floating-ui@0.1.50
+
+## 0.1.44
+
+### Patch Changes
+
+- Updated dependencies [157543f]
+- Updated dependencies [4d13159]
+- Updated dependencies [a944ff3]
+- Updated dependencies [f9f0d23]
+- Updated dependencies [edf2b9d]
+- Updated dependencies [9779569]
+- Updated dependencies [96c86fc]
+  - octane@0.1.50
+  - @octanejs/floating-ui@0.1.49
+
+## 0.1.43
+
+### Patch Changes
+
+- Updated dependencies [8adc693]
+- Updated dependencies [3bcc1d3]
+- Updated dependencies [a51c8c6]
+  - octane@0.1.49
+  - @octanejs/floating-ui@0.1.48
+
+## 0.1.42
+
+### Patch Changes
+
+- Updated dependencies [3ca30fc]
+- Updated dependencies [efdc8cb]
+- Updated dependencies [922df8c]
+- Updated dependencies [8a8afd8]
+- Updated dependencies [cfa753b]
+- Updated dependencies [37a8ca1]
+- Updated dependencies [c84edbb]
+- Updated dependencies [d5175ca]
+- Updated dependencies [4a4996e]
+  - octane@0.1.48
+  - @octanejs/floating-ui@0.1.47
+
+## 0.1.41
+
+### Patch Changes
+
+- Updated dependencies [af0d999]
+- Updated dependencies [c800a1f]
+- Updated dependencies [c1bb057]
+- Updated dependencies [97b9349]
+- Updated dependencies [4393bea]
+- Updated dependencies [7dfef16]
+- Updated dependencies [7e62361]
+- Updated dependencies [964783a]
+- Updated dependencies [d3dbd78]
+  - octane@0.1.47
+  - @octanejs/floating-ui@0.1.46
+
+## 0.1.40
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+  - @octanejs/floating-ui@0.1.45
+
+## 0.1.39
+
+### Patch Changes
+
+- 6927595: Fix strict browser TypeScript consumption of source-published chart bindings.
+
+  Recharts now publishes authored TypeScript for its chart utilities and state,
+  resolves component imports explicitly, and exports the component implementations'
+  own prop types. Visx supports strict browser source checks without Node globals.
+  Remix Router's published declarations retain native anchor and form ref types.
+  Redux Toolkit's query hooks type their bundler environment without Node globals.
+
+  Fix deferred native chart events, keep imperative and Cell refs off unrelated
+  hosts, and resolve missing radial geometry without dropping data rows.
+
+  Octane accepts optional refs in composed ref arrays and supports nested ref arrays
+  in `useImperativeHandle`, including callback cleanup and primitive handles. Require
+  the published TSRX compiler fix for ref-and-spread expressions rather than relying
+  on a workspace-only patch.
+
+  Publish the Volar compiler with its tested parser/printer dependencies and checked
+  public declarations, preventing newer transitive printers from corrupting typed
+  tuple parameters in installed consumers. Preserve generic Pie props and the
+  native group targets of polar-axis events.
+
+- Updated dependencies [5b1e6a3]
+- Updated dependencies [31abee5]
+- Updated dependencies [fd6ce69]
+- Updated dependencies [5f7a457]
+- Updated dependencies [5227d7b]
+- Updated dependencies [6927595]
+- Updated dependencies [f1a7802]
+  - octane@0.1.45
+  - @octanejs/floating-ui@0.1.44
+
+## 0.1.38
+
+### Patch Changes
+
+- 3004ba5: Type published visx source against Octane attribute bags and native DOM events so a consumer `tsrx-tsc` check drops from 90 diagnostics to the leftover #737 spread+ref sites.
+- Updated dependencies [9b06e47]
+- Updated dependencies [7535acd]
+  - octane@0.1.44
+  - @octanejs/floating-ui@0.1.43
+
+## 0.1.37
+
+### Patch Changes
+
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+  - @octanejs/floating-ui@0.1.42
+
+## 0.1.36
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+  - @octanejs/floating-ui@0.1.41
+
+## 0.1.35
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+  - @octanejs/floating-ui@0.1.40
+
+## 0.1.34
+
+### Patch Changes
+
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+  - @octanejs/floating-ui@0.1.39
+
 ## 0.1.33
 
 ### Patch Changes

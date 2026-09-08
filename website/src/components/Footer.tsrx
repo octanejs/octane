@@ -9,62 +9,7 @@ import discordUrl from '../assets/discord.svg';
 import githubUrl from '../assets/github.svg';
 
 export function Footer() @{
-	<footer class="footer">
-		<div class="footer-inner">
-			<p class="footer-note">{'MIT licensed. Built with Octane (TSRX).'}</p>
-			<nav aria-label="Octane on social media">
-				<ul class="footer-social">
-					<li>
-						<a
-							class="footer-icon"
-							href={SOCIAL.x}
-							target="_blank"
-							rel="noreferrer"
-							title="X"
-							aria-label="Octane on X"
-						>
-							<span
-								class="footer-icon-glyph"
-								style={'--icon:url("' + xUrl + '")'}
-								aria-hidden="true"
-							></span>
-						</a>
-					</li>
-					<li>
-						<a
-							class="footer-icon"
-							href={SOCIAL.discord}
-							target="_blank"
-							rel="noreferrer"
-							title="Discord"
-							aria-label="Octane on Discord"
-						>
-							<span
-								class="footer-icon-glyph"
-								style={'--icon:url("' + discordUrl + '")'}
-								aria-hidden="true"
-							></span>
-						</a>
-					</li>
-					<li>
-						<a
-							class="footer-icon"
-							href={SOCIAL.github}
-							target="_blank"
-							rel="noreferrer"
-							title="GitHub"
-							aria-label="Octane on GitHub"
-						>
-							<span
-								class="footer-icon-glyph"
-								style={'--icon:url("' + githubUrl + '")'}
-								aria-hidden="true"
-							></span>
-						</a>
-					</li>
-				</ul>
-			</nav>
-		</div>
+	<>
 		<style>
 			.footer {
 				border-top: 1px solid var(--border);
@@ -129,5 +74,62 @@ export function Footer() @{
 				-webkit-mask: var(--icon) center / contain no-repeat;
 			}
 		</style>
-	</footer>
+		<footer class="footer">
+			<div class="footer-inner">
+				<p class="footer-note">{'MIT licensed. Built with Octane (TSRX).'}</p>
+				<nav aria-label="Octane on social media">
+					<ul class="footer-social">
+						<li>
+							<a
+								class="footer-icon"
+								href={SOCIAL.x}
+								target="_blank"
+								rel="noreferrer"
+								title="X"
+								aria-label="Octane on X"
+							>
+								<span
+									class="footer-icon-glyph"
+									style={'--icon:url("' + xUrl + '")'}
+									aria-hidden="true"
+								></span>
+							</a>
+						</li>
+						<li>
+							<a
+								class="footer-icon"
+								href={SOCIAL.discord}
+								target="_blank"
+								rel="noreferrer"
+								title="Discord"
+								aria-label="Octane on Discord"
+							>
+								<span
+									class="footer-icon-glyph"
+									style={'--icon:url("' + discordUrl + '")'}
+									aria-hidden="true"
+								></span>
+							</a>
+						</li>
+						<li>
+							<a
+								class="footer-icon"
+								href={SOCIAL.github}
+								target="_blank"
+								rel="noreferrer"
+								title="GitHub"
+								aria-label="Octane on GitHub"
+							>
+								<span
+									class="footer-icon-glyph"
+									style={'--icon:url("' + githubUrl + '")'}
+									aria-hidden="true"
+								></span>
+							</a>
+						</li>
+					</ul>
+				</nav>
+			</div>
+		</footer>
+	</>
 }

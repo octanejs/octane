@@ -6,6 +6,13 @@
  * retains Octane's existing DOM `createContext` identity.
  */
 export * from './universal-core.js';
+export {
+	createSubSlot,
+	subSlot,
+	type SubSlot,
+	type SlotlessSubSlot,
+	type SubSlotOptions,
+} from './sub-slot.js';
 
 export { createContext } from './runtime.js';
 export {

@@ -2,6 +2,13 @@
 
 Octane binding for `react-textarea-autosize@8.5.9`.
 
+## Installation
+
+```sh
+npm install @octanejs/textarea-autosize
+pnpm add @octanejs/textarea-autosize
+```
+
 ```tsrx
 import TextareaAutosize from '@octanejs/textarea-autosize';
 

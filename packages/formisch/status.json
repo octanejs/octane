@@ -1,0 +1,22 @@
+{
+  "upstream": {
+    "package": "@formisch/react",
+    "version": "1.0.0-rc.0",
+    "commit": "4c494fd8cf105efd04a4b179e9c090595a0bf041"
+  },
+  "surface": "Ports the Formisch React adapter surface while vendoring its React-selected core and modular methods into one React-free Octane package.",
+  "divergences": [
+    "Octane native text controls use `onInput`; selects, checkboxes, and radios use native `onChange`.",
+    "React synthetic event and renderable types are replaced with native DOM events and OctaneNode.",
+    "React StrictMode-specific delayed signal cleanup is omitted in favor of Octane lifecycle cleanup."
+  ],
+  "ssr": "Supported and tested: sequential requests stay isolated, hydration adopts existing form controls, and native input updates activate after hydration.",
+  "verified": "2026-07-30",
+  "notes": [
+    "Valibot remains an external peer dependency.",
+    "Byte-exact core, methods, React adapter, and upstream test sources are pinned under upstream/ and documented in UPSTREAM.md.",
+    "All 549 upstream runtime cases execute in pristine and adapted lanes; all eight type artifacts execute in pristine tsc and adapted tsrx-tsc lanes with assertion inventories and negative controls.",
+    "Differential coverage compares a representative programmatic field update with the real @formisch/react adapter.",
+    "The React StrictMode effect-replay case is retained as an explicit Octane divergence because Octane does not implement StrictMode double invocation."
+  ]
+}

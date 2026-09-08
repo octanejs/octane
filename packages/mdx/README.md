@@ -4,6 +4,13 @@
 UI framework — documentation stays in `.mdx`/`.md` and renders as **compiled octane
 components**.
 
+## Installation
+
+```sh
+npm install @octanejs/mdx
+pnpm add @octanejs/mdx
+```
+
 The split mirrors `docs/react-library-compat-plan.md` §2: **@mdx-js/mdx's
 compiler is framework-agnostic and reused verbatim** — with `jsx: true` it
 emits the compiled document as classic JSX *source*, which is exactly the

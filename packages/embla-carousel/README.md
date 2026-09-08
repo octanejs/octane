@@ -3,6 +3,13 @@
 Octane binding for `embla-carousel-react@8.6.0`. It keeps the familiar default
 `useEmblaCarousel` API while reusing Embla's framework-neutral runtime.
 
+## Installation
+
+```sh
+npm install @octanejs/embla-carousel
+pnpm add @octanejs/embla-carousel
+```
+
 ```tsrx
 import useEmblaCarousel from '@octanejs/embla-carousel';
 

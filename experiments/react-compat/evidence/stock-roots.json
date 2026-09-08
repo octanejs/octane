@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "reactVersion": "19.2.7",
+  "runner": {
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "browserVersions": {
+    "development": "149.0.7827.55",
+    "production": "149.0.7827.55"
+  },
+  "stockRootControls": {
+    "development:suspension": {
+      "urgent": {
+        "name": "urgent-suspension",
+        "reactVersion": "19.2.7",
+        "observations": {
+          "waiting": {
+            "resourceRequested": true,
+            "transitionPending": false,
+            "fallbackEffectObserved": true,
+            "fallbackEffectActive": true,
+            "fallbackVisible": true,
+            "previousContentVisible": false,
+            "previousContentIdentityPreserved": true,
+            "retainedAcrossPaint": false
+          },
+          "settled": {
+            "content": "resolved",
+            "transitionPending": false,
+            "fallbackEffectEverObserved": true
+          }
+        }
+      },
+      "transition": {
+        "name": "transition-suspension",
+        "reactVersion": "19.2.7",
+        "observations": {
+          "waiting": {
+            "resourceRequested": true,
+            "transitionPending": true,
+            "fallbackEffectObserved": false,
+            "fallbackEffectActive": false,
+            "fallbackVisible": false,
+            "previousContentVisible": true,
+            "previousContentIdentityPreserved": true,
+            "retainedAcrossPaint": true
+          },
+          "settled": {
+            "content": "resolved",
+            "transitionPending": false,
+            "fallbackEffectEverObserved": false
+          }
+        }
+      }
+    },
+    "development:detached": {
+      "name": "detached-root",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "beforeUnmount": {
+          "hostConnected": false,
+          "hostHidden": false,
+          "localVisible": false,
+          "localIdentityPreserved": true,
+          "refAttachedWhileConnected": false,
+          "refActive": true,
+          "layoutActive": true,
+          "passiveActive": true,
+          "subscriptionMessage": "while-detached",
+          "externalPortalVisible": true,
+          "externalPortalContent": "while-detached",
+          "cleanups": []
+        },
+        "afterUnmount": {
+          "refActive": false,
+          "layoutActive": false,
+          "passiveActive": false,
+          "subscriptionMessage": "while-detached",
+          "externalPortalPresent": false,
+          "cleanups": ["layout", "passive", "ref"]
+        }
+      }
+    },
+    "development:hidden": {
+      "name": "hidden-root",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "beforeUnmount": {
+          "hostConnected": true,
+          "hostHidden": true,
+          "localVisible": false,
+          "localIdentityPreserved": true,
+          "refAttachedWhileConnected": true,
+          "refActive": true,
+          "layoutActive": true,
+          "passiveActive": true,
+          "subscriptionMessage": "while-hidden",
+          "externalPortalVisible": true,
+          "externalPortalContent": "while-hidden",
+          "cleanups": []
+        },
+        "afterUnmount": {
+          "refActive": false,
+          "layoutActive": false,
+          "passiveActive": false,
+          "subscriptionMessage": "while-hidden",
+          "externalPortalPresent": false,
+          "cleanups": ["layout", "passive", "ref"]
+        }
+      }
+    },
+    "production:suspension": {
+      "urgent": {
+        "name": "urgent-suspension",
+        "reactVersion": "19.2.7",
+        "observations": {
+          "waiting": {
+            "resourceRequested": true,
+            "transitionPending": false,
+            "fallbackEffectObserved": true,
+            "fallbackEffectActive": true,
+            "fallbackVisible": true,
+            "previousContentVisible": false,
+            "previousContentIdentityPreserved": true,
+            "retainedAcrossPaint": false
+          },
+          "settled": {
+            "content": "resolved",
+            "transitionPending": false,
+            "fallbackEffectEverObserved": true
+          }
+        }
+      },
+      "transition": {
+        "name": "transition-suspension",
+        "reactVersion": "19.2.7",
+        "observations": {
+          "waiting": {
+            "resourceRequested": true,
+            "transitionPending": true,
+            "fallbackEffectObserved": false,
+            "fallbackEffectActive": false,
+            "fallbackVisible": false,
+            "previousContentVisible": true,
+            "previousContentIdentityPreserved": true,
+            "retainedAcrossPaint": true
+          },
+          "settled": {
+            "content": "resolved",
+            "transitionPending": false,
+            "fallbackEffectEverObserved": false
+          }
+        }
+      }
+    },
+    "production:detached": {
+      "name": "detached-root",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "beforeUnmount": {
+          "hostConnected": false,
+          "hostHidden": false,
+          "localVisible": false,
+          "localIdentityPreserved": true,
+          "refAttachedWhileConnected": false,
+          "refActive": true,
+          "layoutActive": true,
+          "passiveActive": true,
+          "subscriptionMessage": "while-detached",
+          "externalPortalVisible": true,
+          "externalPortalContent": "while-detached",
+          "cleanups": []
+        },
+        "afterUnmount": {
+          "refActive": false,
+          "layoutActive": false,
+          "passiveActive": false,
+          "subscriptionMessage": "while-detached",
+          "externalPortalPresent": false,
+          "cleanups": ["layout", "passive", "ref"]
+        }
+      }
+    },
+    "production:hidden": {
+      "name": "hidden-root",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "beforeUnmount": {
+          "hostConnected": true,
+          "hostHidden": true,
+          "localVisible": false,
+          "localIdentityPreserved": true,
+          "refAttachedWhileConnected": true,
+          "refActive": true,
+          "layoutActive": true,
+          "passiveActive": true,
+          "subscriptionMessage": "while-hidden",
+          "externalPortalVisible": true,
+          "externalPortalContent": "while-hidden",
+          "cleanups": []
+        },
+        "afterUnmount": {
+          "refActive": false,
+          "layoutActive": false,
+          "passiveActive": false,
+          "subscriptionMessage": "while-hidden",
+          "externalPortalPresent": false,
+          "cleanups": ["layout", "passive", "ref"]
+        }
+      }
+    }
+  }
+}

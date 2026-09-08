@@ -16,59 +16,7 @@ export function Hero() @{
 	const { copied, copy } = useCopyToClipboard();
 	const copySample = () => copy(sampleEl.current?.innerText ?? '');
 
-	<section class="hero">
-		<div class="hero-copy">
-			<h1 class="hero-title">
-				{'React’s programming model, '}
-				<span class="hero-accent">compiled</span>
-				{'.'}
-			</h1>
-			<p class="hero-sub">
-				{'The successor to '}
-				<a
-					href="https://github.com/infernojs/inferno"
-					target="_blank"
-					rel="noreferrer"
-				>{'Inferno'}</a>
-				{', built around the same focus on performance. It brings React’s hooks, Suspense, and actions to a compiler-first architecture. No virtual DOM, rules of hooks, or dependency arrays you have to maintain yourself. The compiler tracks what your code uses automatically.'}
-			</p>
-			<div class="hero-actions">
-				<Link to="/docs/$slug" params={{ slug: 'quick-start' }} class="btn-primary">
-					Get started
-				</Link>
-				<Link to="/docs/$slug" params={{ slug: 'differences-from-react' }} class="btn-ghost">
-					Differences from React
-				</Link>
-			</div>
-		</div>
-		<div class="hero-code">
-			<div class="hero-code-bar">
-				<span class="dot dot-r"></span>
-				<span class="dot dot-y"></span>
-				<span class="dot dot-g"></span>
-				<span class="hero-code-name">Counter.tsrx</span>
-				<button
-					type="button"
-					class="code-copy"
-					aria-label="Copy the sample to the clipboard"
-					onClick={copySample}
-				>
-					<span
-						class="code-copy-icon"
-						style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
-						aria-hidden="true"
-					></span>
-					<span>
-						{copied ? 'Copied' : 'Copy'}
-					</span>
-				</button>
-			</div>
-			<div class="hero-code-body" ref={sampleEl}>
-				<CodeSample />
-			</div>
-			<HeroDemo />
-		</div>
-
+	<>
 		<style>
 			.hero {
 				display: grid;
@@ -213,5 +161,58 @@ export function Hero() @{
 				line-height: 1.5;
 			}
 		</style>
-	</section>
+		<section class="hero">
+			<div class="hero-copy">
+				<h1 class="hero-title">
+					{'React’s programming model, '}
+					<span class="hero-accent">compiled</span>
+					{'.'}
+				</h1>
+				<p class="hero-sub">
+					{'The successor to '}
+					<a
+						href="https://github.com/infernojs/inferno"
+						target="_blank"
+						rel="noreferrer"
+					>{'Inferno'}</a>
+					{', built around the same focus on performance. It brings React’s hooks, Suspense, and actions to a compiler-first architecture. No virtual DOM, rules of hooks, or dependency arrays you have to maintain yourself. The compiler tracks what your code uses automatically.'}
+				</p>
+				<div class="hero-actions">
+					<Link to="/docs/$slug" params={{ slug: 'quick-start' }} class="btn-primary">
+						Get started
+					</Link>
+					<Link to="/docs/$slug" params={{ slug: 'differences-from-react' }} class="btn-ghost">
+						Differences from React
+					</Link>
+				</div>
+			</div>
+			<div class="hero-code">
+				<div class="hero-code-bar">
+					<span class="dot dot-r"></span>
+					<span class="dot dot-y"></span>
+					<span class="dot dot-g"></span>
+					<span class="hero-code-name">Counter.tsrx</span>
+					<button
+						type="button"
+						class="code-copy"
+						aria-label="Copy the sample to the clipboard"
+						onClick={copySample}
+					>
+						<span
+							class="code-copy-icon"
+							style={'--icon:url("' + (copied ? checkUrl : copyUrl) + '")'}
+							aria-hidden="true"
+						></span>
+						<span>
+							{copied ? 'Copied' : 'Copy'}
+						</span>
+					</button>
+				</div>
+				<div class="hero-code-body" ref={sampleEl}>
+					<CodeSample />
+				</div>
+				<HeroDemo />
+			</div>
+		</section>
+	</>
 }

@@ -1,0 +1,22 @@
+diff --git a/tests/upstream/src/menu/root/MenuRoot.test.tsx b/tests/upstream/src/menu/root/MenuRoot.test.tsx
+--- a/tests/upstream/src/menu/root/MenuRoot.test.tsx
++++ b/tests/upstream/src/menu/root/MenuRoot.test.tsx
+@@ -2016,7 +2016,8 @@ describe('<Menu.Root />', () => {
+           expect(screen.queryByTestId('menu')).not.toBe(null);
+         });
+ 
+-        expect(onOpenChangeComplete.mock.calls.length).toBe(2);
++        // Octane does not replay mount effects in Strict Mode (renderer contract).
++        expect(onOpenChangeComplete.mock.calls.length).toBe(1);
+         expect(onOpenChangeComplete.mock.calls[0][0]).toBe(true);
+       });
+ 
+@@ -3221,7 +3222,7 @@ type TestMenuProps = {
+   triggerProps?: Menu.Trigger.Props;
+   submenuProps?: Menu.SubmenuRoot.Props;
+   submenuTriggerProps?: Menu.SubmenuTrigger.Props;
+-  children?: React.ReactNode;
++  children?: React.OctaneNode;
+ };
+ 
+ function TestMenuContents(props: TestMenuProps) {

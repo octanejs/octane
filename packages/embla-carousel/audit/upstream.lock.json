@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "embla-carousel-react",
+    "version": "8.6.0",
+    "repository": {
+      "owner": "davidjerleke",
+      "repo": "embla-carousel",
+      "subdirectory": "packages"
+    },
+    "commit": "0fe65834136f1aa35e4c1a4a477e5ccb4bb5ee54",
+    "integrity": "sha512-0/PjqU7geVmo6F734pmPqpyHqiM99olvyecY7zdweCw+6tKEXnrE90pBiBbMMU8s5tICemzpQ3hi5EpxzGW+JA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "992490064b90ec94c302fe5f29dcc14cb44145857064e46f9ffe6c8f511c1093"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "embla-carousel-react/src/components/useEmblaCarousel.ts",
+    "embla-carousel-react/src/index.ts",
+    "embla-carousel-reactive-utils/src/__tests__/utils.test.ts",
+    "embla-carousel-reactive-utils/src/components/utils.ts",
+    "embla-carousel-reactive-utils/src/index.ts"
+  ],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "embla-carousel-react/src/components/useEmblaCarousel.ts",
+      "gitBlob": "181525781a2776ec7d47f19fabee81acd1c9232e",
+      "size": 1887
+    },
+    {
+      "path": "embla-carousel-react/src/index.ts",
+      "gitBlob": "9ccc16e60a790fc81bdb5058f9789babde1b80f6",
+      "size": 151
+    },
+    {
+      "path": "embla-carousel-reactive-utils/src/__tests__/utils.test.ts",
+      "gitBlob": "e8271e5e019f2b8b72638b804ea48fb9d91ec4b0",
+      "size": 6271
+    },
+    {
+      "path": "embla-carousel-reactive-utils/src/components/utils.ts",
+      "gitBlob": "84ea9310e9a41f49b184b5755d964bf93f037cac",
+      "size": 1929
+    },
+    {
+      "path": "embla-carousel-reactive-utils/src/index.ts",
+      "gitBlob": "b671128e0b14e02fe29fc345248a024af31a8cb8",
+      "size": 116
+    }
+  ],
+  "fingerprint": "e0e5c352d766a74e459fd73a8a4e1e3eb66ec05197823f23797712377be0c966"
+}

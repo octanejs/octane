@@ -1,0 +1,339 @@
+.ExternalInput-actions {
+	display: flex;
+}
+
+.ExternalInput-button {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--puck-color-white);
+	border: 1px solid var(--puck-color-grey-09);
+	border-radius: 4px;
+	color: var(--puck-color-azure-04);
+	padding: 12px 16px;
+	font-weight: 500;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	transition: background-color 50ms ease-in;
+	position: relative;
+	overflow: hidden;
+	flex-grow: 1;
+}
+
+.ExternalInput--dataSelected .ExternalInput-button {
+	color: var(--puck-color-grey-03);
+	display: block;
+	border-top-right-radius: 0px;
+	border-bottom-right-radius: 0px;
+}
+
+.ExternalInput--readOnly .ExternalInput-button {
+	background-color: var(--puck-color-grey-11);
+}
+
+.ExternalInput-detachButton {
+	border: 1px solid var(--puck-color-grey-09);
+	border-top-right-radius: 4px;
+	border-bottom-right-radius: 4px;
+	background-color: var(--puck-color-grey-12);
+	color: var(--puck-color-grey-05);
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	justify-content: center;
+	padding: 8px 12px;
+	position: relative;
+	transition:
+		background-color 50ms ease-in,
+		color 50ms ease-in;
+	margin-inline-start: -1px;
+}
+
+.ExternalInput-button:focus-visible,
+.ExternalInput-detachButton:focus-visible {
+	outline: 2px solid var(--puck-color-azure-05);
+	outline-offset: 2px;
+	z-index: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.ExternalInput:not(.ExternalInput--readOnly) .ExternalInput-button:hover,
+	.ExternalInput:not(.ExternalInput--readOnly) .ExternalInput-detachButton:hover {
+		background: var(--puck-color-azure-12);
+		transition: none;
+	}
+
+	.ExternalInput:not(.ExternalInput--readOnly) .ExternalInput-detachButton:hover {
+		color: var(--puck-color-azure-04);
+	}
+}
+
+.ExternalInput:not(.ExternalInput--readOnly) .ExternalInput-button:active,
+.ExternalInput:not(.ExternalInput--readOnly) .ExternalInput-detachButton:active {
+	background: var(--puck-color-azure-11);
+	transition: none;
+}
+
+.ExternalInputModal {
+	color: var(--puck-color-black);
+	display: grid;
+	grid-template-rows: min-content minmax(128px, 100%) min-content;
+	grid-template-columns: 100%;
+	position: relative;
+	min-height: 50dvh;
+	max-height: 90dvh;
+}
+
+.ExternalInputModal-grid {
+	display: flex;
+	flex-direction: column;
+}
+
+@media (min-width: 458px) {
+	.ExternalInputModal-grid {
+		display: grid;
+		grid-template-columns: 100%;
+	}
+
+	.ExternalInputModal--filtersToggled .ExternalInputModal-grid {
+		grid-template-columns: 25% 75%;
+	}
+}
+
+.ExternalInputModal-filters {
+	border-bottom: 1px solid var(--puck-color-grey-09);
+}
+
+.ExternalInputModal--filtersToggled .ExternalInputModal-filters {
+	display: none; /* Hide filters by default on smaller viewports */
+}
+
+@media (min-width: 458px) {
+	.ExternalInputModal-filters {
+		border-inline-end: 1px solid var(--puck-color-grey-09);
+		display: none;
+	}
+
+	.ExternalInputModal--filtersToggled .ExternalInputModal-filters {
+		display: block; /* Show filters by default on larger viewports */
+	}
+}
+
+.ExternalInputModal-masthead {
+	background-color: var(--puck-color-grey-12);
+	border-bottom: 1px solid var(--puck-color-grey-09);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 24px;
+	padding: 24px;
+}
+
+.ExternalInputModal-tableWrapper {
+	position: relative;
+	overflow-x: auto;
+	overflow-y: auto;
+	flex-grow: 1;
+}
+
+.ExternalInputModal-table {
+	border-collapse: unset;
+	border-spacing: 0px;
+	color: var(--puck-color-grey-02);
+	position: relative;
+	z-index: 0;
+	min-width: 100%;
+}
+
+.ExternalInputModal-thead {
+	background-color: var(--puck-color-white);
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+.ExternalInputModal-th {
+	border-bottom: 1px solid var(--puck-color-grey-09);
+	color: var(--puck-color-grey-04);
+	font-weight: 500;
+	font-size: 14px;
+	padding: 16px 24px;
+}
+
+.ExternalInputModal-td {
+	border-bottom: 1px solid var(--puck-color-grey-10);
+	padding: 16px 24px;
+}
+
+.ExternalInputModal-tr .ExternalInputModal-td:first-of-type {
+	font-weight: 500;
+	width: 1%; /* Prevent growing */
+	white-space: nowrap; /* Prevent growing */
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.ExternalInputModal-tbody .ExternalInputModal-tr:hover {
+		background: var(--puck-color-azure-12);
+		color: var(--puck-color-azure-04);
+		cursor: pointer;
+		position: relative;
+		margin-inline-start: -5px;
+	}
+
+	.ExternalInputModal-tbody .ExternalInputModal-tr:hover .ExternalInputModal-td:first-of-type {
+		border-inline-start: 4px solid var(--puck-color-azure-04);
+		padding-inline-start: 20px;
+	}
+}
+
+.ExternalInputModal-tbody .ExternalInputModal-tr:last-of-type .ExternalInputModal-td {
+	border-bottom: none;
+}
+
+.ExternalInputModal-tableWrapper {
+	display: none;
+}
+
+.ExternalInputModal--hasData .ExternalInputModal-tableWrapper {
+	display: block;
+}
+
+.ExternalInputModal-loadingBanner {
+	display: none;
+	background-color: color-mix(in srgb, var(--puck-color-white) 90%, transparent);
+	padding: 64px;
+	align-items: center;
+	justify-content: center;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+}
+
+.ExternalInputModal--isLoading .ExternalInputModal-loadingBanner {
+	display: flex;
+}
+
+.ExternalInputModal-searchForm {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	flex-grow: 1;
+}
+
+@media (min-width: 458px) {
+	.ExternalInputModal-searchForm {
+		flex-wrap: nowrap;
+	}
+}
+
+.ExternalInputModal-search {
+	display: flex;
+	background: var(--puck-color-white);
+	border-width: 1px;
+	border-style: solid;
+	border-color: var(--puck-color-grey-09);
+	border-radius: 4px;
+	flex-grow: 1;
+	transition: border-color 50ms ease-in;
+}
+
+.ExternalInputModal-search:focus-within {
+	border-color: var(--puck-color-grey-05);
+	outline: 2px solid var(--puck-color-azure-05);
+	transition: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.ExternalInputModal-search:hover {
+		border-color: var(--puck-color-grey-05);
+		transition: none;
+	}
+}
+
+.ExternalInputModal-searchIcon {
+	align-items: center;
+	background: var(--puck-color-grey-12);
+	border-bottom-left-radius: 4px;
+	border-top-left-radius: 4px;
+	border-inline-end: 1px solid var(--puck-color-grey-09);
+	color: var(--puck-color-grey-07);
+	display: flex;
+	justify-content: center;
+	padding: 12px 15px;
+	transition: color 50ms ease-in;
+}
+
+.ExternalInputModal-search:focus-within .ExternalInputModal-searchIcon {
+	color: var(--puck-color-grey-04);
+	transition: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.ExternalInputModal-search:hover .ExternalInputModal-searchIcon {
+		color: var(--puck-color-grey-04);
+		transition: none;
+	}
+}
+
+.ExternalInputModal-searchIconText {
+	clip: rect(0 0 0 0);
+	clip-path: inset(100%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+.ExternalInputModal-searchInput {
+	border: none;
+	border-radius: 4px;
+	background: var(--puck-color-white);
+	font-family: inherit;
+	font-size: 14px;
+	padding: 12px 15px;
+	width: 100%;
+}
+
+.ExternalInputModal-searchInput:focus {
+	outline: 0;
+}
+
+.ExternalInputModal-searchActions {
+	display: flex;
+	gap: 8px;
+	height: 44px;
+	width: 100%;
+}
+
+@media (min-width: 458px) {
+	.ExternalInputModal-searchActions {
+		width: auto;
+	}
+}
+
+.ExternalInputModal-searchActionIcon {
+	align-self: center;
+}
+
+.ExternalInputModal-footerContainer {
+	background-color: var(--puck-color-grey-12);
+	border-top: 1px solid var(--puck-color-grey-09);
+	color: var(--puck-color-grey-04);
+	padding: 16px;
+}
+
+.ExternalInputModal-footer {
+	font-weight: 500;
+	font-size: 14px;
+	text-align: right;
+}
+
+.ExternalInputModal-field {
+	color: var(--puck-color-grey-04);
+	margin: 16px;
+	margin-bottom: 12px;
+	display: block;
+}

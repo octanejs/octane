@@ -5,6 +5,13 @@ framework-agnostic `@dnd-kit/dom` implementation, so sensors, collision
 detection, modifiers, accessibility, feedback, and sortable mechanics stay
 on the official upstream core.
 
+## Installation
+
+```sh
+npm install @octanejs/dnd-kit
+pnpm add @octanejs/dnd-kit
+```
+
 ```tsrx
 import { DragDropProvider } from '@octanejs/dnd-kit';
 import { useSortable } from '@octanejs/dnd-kit/sortable';

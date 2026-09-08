@@ -1,0 +1,51 @@
+/** @jsxImportSource octane */
+'use client';
+import * as React from 'octane';
+import type { FieldValidityData } from '../../field/root/FieldRoot.tsrx';
+import { NOOP } from '../noop';
+import type { Form } from '../../form/Form.tsrx';
+
+export type Errors = Record<string, string | string[]>;
+
+export interface FormContext {
+	errors: Errors;
+	clearErrors: (name: string | undefined) => void;
+	elementRef: React.RefObject<HTMLFormElement | null>;
+	formRef: React.RefObject<{
+		fields: Map<
+			string,
+			{
+				name: string | undefined;
+				/**
+				 * After this returns, the field registry entry reflects the latest synchronous
+				 * validity verdict. Async validators do not block submit.
+				 */
+				validate: () => void;
+				validityData: FieldValidityData;
+				controlRef: React.RefObject<HTMLElement | null>;
+				getValue: () => unknown;
+			}
+		>;
+	}>;
+	validationMode: Form.ValidationMode;
+	submitCountRef: React.RefObject<number>;
+}
+
+export const FormContext = React.createContext<FormContext>({
+	elementRef: { current: null },
+	formRef: {
+		current: {
+			fields: new Map(),
+		},
+	},
+	errors: {},
+	clearErrors: NOOP,
+	validationMode: 'onSubmit',
+	submitCountRef: {
+		current: 0,
+	},
+});
+
+export function useFormContext() {
+	return React.useContext(FormContext);
+}

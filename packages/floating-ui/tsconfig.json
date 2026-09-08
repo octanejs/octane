@@ -6,12 +6,16 @@
     "jsx": "preserve",
     "jsxImportSource": "octane",
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
+    "paths": {
+      "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"]
+    },
     "types": ["node"],
     "strict": true
   },

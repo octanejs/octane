@@ -5,7 +5,7 @@ import { Group } from '@octanejs/visx/group';
 import type { HierarchyRectangularNode, HierarchyNode } from 'd3-hierarchy';
 import { treemap as d3treemap } from 'd3-hierarchy';
 import HierarchyDefaultRectNode from '../HierarchyDefaultRectNode.tsrx';
-import setNumberOrNumberAccessor from '../utils/setNumOrNumAccessor';
+import setNumberOrNumberAccessor from '../../internal/setNumberOrNumberAccessor';
 import type { TileMethod } from '../types';
 
 export type NodeComponentProps<Datum> = { node: HierarchyRectangularNode<Datum> };

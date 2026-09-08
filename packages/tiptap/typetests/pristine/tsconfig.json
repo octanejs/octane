@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "target": "esnext",
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "skipLibCheck": true,
+    "types": ["react"],
+    "noEmit": true,
+    "noErrorTruncation": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["./types.test-d.ts"]
+}

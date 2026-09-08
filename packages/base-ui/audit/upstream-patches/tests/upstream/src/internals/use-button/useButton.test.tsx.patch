@@ -1,0 +1,44 @@
+diff --git a/tests/upstream/src/internals/use-button/useButton.test.tsx b/tests/upstream/src/internals/use-button/useButton.test.tsx
+--- a/tests/upstream/src/internals/use-button/useButton.test.tsx
++++ b/tests/upstream/src/internals/use-button/useButton.test.tsx
+@@ -1,4 +1,9 @@
+ /** @jsxImportSource octane */
++import { UseButtonHydrationFixture1, UseButtonHydrationFixture2 } from './../../../../fixtures/useButton-functions-ssr.tsrx';
++import { UseButtonHydrationFixture1 as ServerUseButtonHydrationFixture1, UseButtonHydrationFixture2 as ServerUseButtonHydrationFixture2 } from './../../../../fixtures/useButton-functions-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(UseButtonHydrationFixture1, ServerUseButtonHydrationFixture1);
++registerServerComponent(UseButtonHydrationFixture2, ServerUseButtonHydrationFixture2);
+ import { expect, vi, describe, it } from 'vitest';
+ import * as React from 'octane';
+ import { act, fireEvent, screen } from '@mui/internal-test-utils';
+@@ -810,26 +815,17 @@ describe('useButton', () => {
+ 
+   describe.skipIf(isJSDOM)('server-side rendering', () => {
+     it('should server-side render', async () => {
+-      function TestButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+-        const { disabled, ...otherProps } = props;
+-        const { getButtonProps } = useButton({ disabled, native: false });
+-
+-        return <span {...getButtonProps(otherProps)} />;
+-      }
++      
+ 
+-      const { container } = await renderToString(<TestButton disabled />);
++      const { container } = await renderToString(<UseButtonHydrationFixture1 disabled />);
+ 
+       expect(container.firstChild).toHaveProperty('role', 'button');
+     });
+ 
+     it('adds disabled attribute', async () => {
+-      function TestButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+-        const { disabled, ...otherProps } = props;
+-        const { getButtonProps } = useButton({ disabled });
+-        return <button {...getButtonProps(otherProps)} />;
+-      }
++      
+ 
+-      renderToString(<TestButton disabled>Submit</TestButton>);
++      renderToString(<UseButtonHydrationFixture2 disabled>Submit</UseButtonHydrationFixture2>);
+       expect(screen.getByRole('button')).toHaveProperty('disabled');
+     });
+   });

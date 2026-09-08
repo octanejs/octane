@@ -30,6 +30,10 @@ describe('page titles', () => {
 		await waitFor(() => expect(document.title).toBe('Octane — Differences from React'));
 		cleanup();
 
+		await renderRoute('/docs/bindings');
+		await waitFor(() => expect(document.title).toBe('Octane — Integrations and bindings'));
+		cleanup();
+
 		// /docs renders the default document, and titles itself after it.
 		await renderRoute('/docs');
 		await waitFor(() => expect(document.title).toBe('Octane — Quick start'));

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "pairs": [
+    {
+      "upstream": "packages/select/typetests/upstream.ts",
+      "adapted": "packages/select/typetests/local.ts"
+    }
+  ],
+  "inventories": {
+    "upstream": "packages/select/audit/upstream-types.json",
+    "adapted": "packages/select/audit/local-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/select/typetests/tsconfig.upstream.json",
+      "sourcePolicy": "repo-authored React declaration probes against pinned react-select 5.10.2"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/select/typetests/tsconfig.local.json",
+      "sourcePolicy": "structurally equivalent Octane public probes after permitted transformations"
+    }
+  },
+  "permittedTransformations": [
+    {
+      "kind": "import-root",
+      "rule": "react-select package roots and subpaths map to the mirrored Octane src modules, including .tsrx extensions where the adapted import exists"
+    },
+    {
+      "kind": "negative-control",
+      "rule": "Matching @ts-expect-error controls must reject the same invalid call shapes on both sides"
+    }
+  ],
+  "divergences": []
+}

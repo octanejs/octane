@@ -1,0 +1,19 @@
+diff --git a/tests/upstream/test/floating-ui-tests/Button.tsx b/tests/upstream/test/floating-ui-tests/Button.tsx
+--- a/tests/upstream/test/floating-ui-tests/Button.tsx
++++ b/tests/upstream/test/floating-ui-tests/Button.tsx
+@@ -4,12 +4,10 @@ import * as React from 'octane';
+ import styles from './Button.module.css';
+ 
+ /** @internal */
+-export const Button = React.forwardRef<
+-  HTMLButtonElement,
+-  React.ButtonHTMLAttributes<HTMLButtonElement>
+->(function Button(props, ref) {
++export const Button = function Button(props: (React.ButtonHTMLAttributes<HTMLButtonElement>) & { ref?: React.Ref<HTMLButtonElement> }) {
++  const ref = props.ref ?? null;
+   return (
+     // eslint-disable-next-line react/button-has-type
+     <button {...props} ref={ref} className={c(props.className, styles.Button)} />
+   );
+-});
++};

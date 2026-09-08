@@ -9,6 +9,7 @@ The adapter is pinned and surface-tested against `@apollo/client@4.2.6`.
 ## Install
 
 ```bash
+npm install @octanejs/apollo-client @apollo/client graphql rxjs
 pnpm add @octanejs/apollo-client @apollo/client graphql rxjs
 ```
 

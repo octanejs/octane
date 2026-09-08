@@ -1,0 +1,730 @@
+{
+  "baselineRef": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+  "baselineRoot": "/private/tmp/octane-final-verification-yCm8IZ/baseline-cd9-monorepo",
+  "sourceRepository": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+  "archiveSha256": "d2c512c27e8a88a9ab50e1864cfdae2522d4694ce2a27ccc63539424e1af5b46",
+  "topology": "Root package.json and pnpm-workspace.yaml plus relevant package manifests are copied from this exact commit. Prior source-only archives and measurements remain untouched.",
+  "allFilesMatchGit": true,
+  "files": [
+    {
+      "path": "benchmarks/scoped-signals/package.json",
+      "bytes": 370,
+      "blob": "8c467df974a5949b512e656b2972f7b0febf1fe2",
+      "sha256": "06175864cb127d77ebe532478ea94eb3d496a91fb710a6dee0d5dba8062f224d"
+    },
+    {
+      "path": "package.json",
+      "bytes": 16457,
+      "blob": "8bfb5f28d256ef548585b82709e093312bcc4118",
+      "sha256": "2ea6e625d70aa54c94d39c91738082316a2e94ee68823de81bea82b8f6e0547d"
+    },
+    {
+      "path": "packages/octane/package.json",
+      "bytes": 7883,
+      "blob": "a1b177dc5a290f01a868b89309b95586dde88684",
+      "sha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+    },
+    {
+      "path": "packages/octane/src/aria-diagnostics.ts",
+      "bytes": 3186,
+      "blob": "03ced02df7c48544bd7bc979883af21c0c34d45e",
+      "sha256": "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48"
+    },
+    {
+      "path": "packages/octane/src/behavior-root.ts",
+      "bytes": 31154,
+      "blob": "42259f16ff044f927e5f1cc78e150962e3b8117f",
+      "sha256": "b974712331fd8d705a451438e3f174948fafa2b6d3d707e289b641892e7c5617"
+    },
+    {
+      "path": "packages/octane/src/compiler/bundler.js",
+      "bytes": 50744,
+      "blob": "55755cb2d74ab2976d53cceca1fb9149cef00e98",
+      "sha256": "dcc0a53ab53b77e546b0d012bba729401f98a292acd8605f2bc64aca8caf4008"
+    },
+    {
+      "path": "packages/octane/src/compiler/client-only-server.js",
+      "bytes": 25584,
+      "blob": "a3132e2e47dce6a872d95ff9709d95c1e5c0c5fb",
+      "sha256": "d4b4fc2557835c5c21b56f769e5fd784fe0844a562e160e308be9b773d88b2da"
+    },
+    {
+      "path": "packages/octane/src/compiler/compile-renderer-boundaries.js",
+      "bytes": 35886,
+      "blob": "066409c1c6aa83dd19b2f5c7336606087d375669",
+      "sha256": "5cc236a3344148e00ec84f3619df2240d45c30c126ca5f4901195e9a9a39d3a5"
+    },
+    {
+      "path": "packages/octane/src/compiler/compile-universal.js",
+      "bytes": 146414,
+      "blob": "c4f5219b9182db407ddcc158c73670aa736e6eb5",
+      "sha256": "43adf02aec773446c5e6158ede491973064d4f8923e18d235aa5b2d1c55503ba"
+    },
+    {
+      "path": "packages/octane/src/compiler/compile-valdi.js",
+      "bytes": 38702,
+      "blob": "be1036cd673e8356c351106321ea15d0ab85c441",
+      "sha256": "57015f01c787d1c9418e6407fa9af11e81c8088a001b499a96f281bd24db626f"
+    },
+    {
+      "path": "packages/octane/src/compiler/compile.js",
+      "bytes": 1110896,
+      "blob": "91e4d954c13f129843d7a4ac7a9e7feb7434760f",
+      "sha256": "c81c6ab2664dedb98a1a6499a0adf24c667d2d5b3ac7c209ba5d434bcfbd1a73"
+    },
+    {
+      "path": "packages/octane/src/compiler/css-module-constants.js",
+      "bytes": 11321,
+      "blob": "b75287749302514a6a8ecf8a5aa8d58b288f93a7",
+      "sha256": "1fa82c2d4a6192f50a471263ff2005e40230f7425c75734bc3ab22299da72edf"
+    },
+    {
+      "path": "packages/octane/src/compiler/css-module-imports.js",
+      "bytes": 8999,
+      "blob": "da184964365d76ae77dcb346a729853550fb0db4",
+      "sha256": "773a8b72065e0a87ab7f26fc5008cb8fe84466b1a97528b432a4692bfd256b34"
+    },
+    {
+      "path": "packages/octane/src/compiler/fat-segments.js",
+      "bytes": 7544,
+      "blob": "cae5f49ee25d910a9b181d9c318f2aa540d6e97c",
+      "sha256": "a52585e6658955f57bc8e6606ce1bb3d0994f97cde8d9e6de972a951847ac506"
+    },
+    {
+      "path": "packages/octane/src/compiler/hook-deps.js",
+      "bytes": 55134,
+      "blob": "49d0940f66b9db3a54bb2fa624747851de5fd87b",
+      "sha256": "b75f0f521ec677f089dc4158b35b47e37cbdc1b6c20fb18df164883a6a18dae3"
+    },
+    {
+      "path": "packages/octane/src/compiler/hook-names.js",
+      "bytes": 667,
+      "blob": "7e7ba507e7c83575e621f5b633e1a73684f5fc0e",
+      "sha256": "26be46b93f38c217ad808f8431ddba699dc2684b05fb75b849b26f40fd03b68d"
+    },
+    {
+      "path": "packages/octane/src/compiler/hydrate-boundaries.js",
+      "bytes": 56797,
+      "blob": "484259b918f7378240799fc0361c2dffd37e25aa",
+      "sha256": "ae9e4338a436b13777b45550ec71b44a1a2ab2d7a08281deb3682ccf08563047"
+    },
+    {
+      "path": "packages/octane/src/compiler/index.d.ts",
+      "bytes": 7256,
+      "blob": "ff925286bf97e42dd24fe92da54f7b76d0bf8f72",
+      "sha256": "34272ac1825e2011f0b0049e1bc7dfd38c76d0114d566d6874a1d61041e03382"
+    },
+    {
+      "path": "packages/octane/src/compiler/index.js",
+      "bytes": 509,
+      "blob": "c80a0c3f5d948496508e3b4508df61c323f582de",
+      "sha256": "c7ff03a70dee28acf8e971f3c80fa4dd3699cbf528426319e5f6e987870c5dba"
+    },
+    {
+      "path": "packages/octane/src/compiler/inline-hook-memo.js",
+      "bytes": 21500,
+      "blob": "f9520afc56e60f81d1f5766e18838429aade3f2e",
+      "sha256": "3abbca52516834edec1a2545773f7fdaf9dc6ad5aeabbbf1b3172dc17e719f4c"
+    },
+    {
+      "path": "packages/octane/src/compiler/jsx-namespace.js",
+      "bytes": 771,
+      "blob": "837fc8562ffbb4f093d39bc8b786bf819da26cf5",
+      "sha256": "00a42ab13881cc8212e93692e604be1fb9d9fb36451a8319f3e824b9490c85ef"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-change-diagnostics.js",
+      "bytes": 16884,
+      "blob": "245d721ef5a942023fbfcf88a900196023e95206",
+      "sha256": "f551acc8370c4f3d6a0828bc331292bb674271a627b0c487952b2d17670764ae"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-read-codegen.js",
+      "bytes": 2115,
+      "blob": "10d8b304ad552a40d0cde54330b07e5034cbbda7",
+      "sha256": "1657027217688040ff4ed7b73236d66c42c74f5f54ea19869cd8b465d4ab57bc"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-read-diagnostics.js",
+      "bytes": 22349,
+      "blob": "d5dcd0117cb0683a4a05fa9b6feac3c5398ed4b4",
+      "sha256": "14090401ed07684a1123e7f19815dcf6dbadf3cb71b192863582dbde9c5959a2"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-read-facts.js",
+      "bytes": 606,
+      "blob": "febf16d625e17fefdbfac1c40c2d8d3349b74321",
+      "sha256": "c75d83fe712de902efaff4604bf5482e154b9759ffa267160f2f131036fb48bf"
+    },
+    {
+      "path": "packages/octane/src/compiler/native-read-types.js",
+      "bytes": 12688,
+      "blob": "f7334cf8f6e8b1e4fa22546b2da59b82113b0640",
+      "sha256": "dd9d59584603f9f358244f020004aabfdf3058f9c2d0440db2806231bfe0e137"
+    },
+    {
+      "path": "packages/octane/src/compiler/parser.browser.js",
+      "bytes": 42,
+      "blob": "85cd6a91210bd14e091b3801e125d54eb79b20a5",
+      "sha256": "ada30a0a075cf7c62b34da7bd2b51c229fff187cdcbe244ff7f2a86a4ca4983d"
+    },
+    {
+      "path": "packages/octane/src/compiler/parser.node.js",
+      "bytes": 57,
+      "blob": "2cb57ecaae0911e3070d238b7260a32cb58a88f8",
+      "sha256": "92724194394182a8deff2c70006b76141f55931059270cf69bcc1e5037793b70"
+    },
+    {
+      "path": "packages/octane/src/compiler/plain-hook-memo.js",
+      "bytes": 9076,
+      "blob": "c059c7844e0d17d2a913a9c8cd3e55f0d5af5d7f",
+      "sha256": "792660882e3d71e7046ea0f810b246b43391d9dfb21bdac6f6ad901a35d2a0b8"
+    },
+    {
+      "path": "packages/octane/src/compiler/pragma.js",
+      "bytes": 2677,
+      "blob": "92459648240fa0cfbc063e3ef8db75f1f5e20688",
+      "sha256": "b7163cba5e48122e0b58923759c5c6bc2ee7a20b65f880489c2ee61e16ffac5c"
+    },
+    {
+      "path": "packages/octane/src/compiler/register.js",
+      "bytes": 4717,
+      "blob": "fc16d647a2b6bce255beeb3f51591bfd39c78eb8",
+      "sha256": "60f4c4d00758cde51da27a2756ac33f66a31452683f77c45b6601480ee7a69be"
+    },
+    {
+      "path": "packages/octane/src/compiler/renderer-boundaries.js",
+      "bytes": 15481,
+      "blob": "e7677e48a9fe3574a2174f1f184818a39cecf4d2",
+      "sha256": "62fd9d8769e0794be5e910321a54cbd7fbee9eeda582b23f49fda3f02df21872"
+    },
+    {
+      "path": "packages/octane/src/compiler/renderers.js",
+      "bytes": 22904,
+      "blob": "b44581c915da260a1ca22a6ab0bc7fd0a6fe401e",
+      "sha256": "80c4f1debbe8096b0bd61dfc93b3ef540d89800db06fcdfc9ba8438f64675c9d"
+    },
+    {
+      "path": "packages/octane/src/compiler/runtime-requests.js",
+      "bytes": 1187,
+      "blob": "7a3f52c79c1738abf6b49f27b5bfdde83eaaf1d0",
+      "sha256": "50aaf16128fde2ac6eaf4ea2e44ddacf2fdd07c60f8557cf4b6e1e8c95fb6b96"
+    },
+    {
+      "path": "packages/octane/src/compiler/slot-hooks.js",
+      "bytes": 41144,
+      "blob": "35838bba027c9816caaadb78c9486b18f4272d63",
+      "sha256": "209a07c40b7daa5b5caaee3c9a83ac90f517ee4dc4fee61d9fd2ce523d858bd4"
+    },
+    {
+      "path": "packages/octane/src/compiler/strong-mode.js",
+      "bytes": 87769,
+      "blob": "22f5b0b9a87d18a24665ac5cfd627523aeff710b",
+      "sha256": "cb672339136ab675b85153cfe9713a7874fdf27973bf1cf61c9215603986be0d"
+    },
+    {
+      "path": "packages/octane/src/compiler/text-type-facts.js",
+      "bytes": 3485,
+      "blob": "2c16fa498d6dc6414d4c51c6722eff69a09cf669",
+      "sha256": "50f2150438ce7a402ae41b647899d549d0e23f0a8193ff0b7967db2444c8a641"
+    },
+    {
+      "path": "packages/octane/src/compiler/typescript.d.ts",
+      "bytes": 2763,
+      "blob": "325e4fdbb276f20ac2ec3ff5c250fc0f641f836f",
+      "sha256": "ed79fb715f944e98f20c725975cccb179af98f745ec28439aaeed2c54bbf0c2c"
+    },
+    {
+      "path": "packages/octane/src/compiler/typescript.js",
+      "bytes": 21536,
+      "blob": "c34405c726a2961af27af23217f2a84cfb8280bd",
+      "sha256": "ae4ef9206170846ae16fc8fd68df273d359beb697323c6d4451e33e3c5a6cdd2"
+    },
+    {
+      "path": "packages/octane/src/compiler/universal-runtime.js",
+      "bytes": 1889,
+      "blob": "a10f5cab7cc25629a4f9a00b46ffe618038ab689",
+      "sha256": "385bbb540e9a8bbfd4277b51623fb9ca6de618ff56b110e6d794f7884bdf453a"
+    },
+    {
+      "path": "packages/octane/src/compiler/vite.d.ts",
+      "bytes": 5342,
+      "blob": "069996b0d71e5b15013baf26eb95f1c13df29a21",
+      "sha256": "48d8ffcb4850168509f89aadde91a7abef7b8db850d8930dab57c5b0b7bbb8ac"
+    },
+    {
+      "path": "packages/octane/src/compiler/vite.js",
+      "bytes": 32022,
+      "blob": "418c695146cc09f7129ba5203143437e0deaa343",
+      "sha256": "5b310833bb9ab4973264f0f99266e7b1fd177eb9055a1e05678565ade640da45"
+    },
+    {
+      "path": "packages/octane/src/compiler/volar.d.ts",
+      "bytes": 775,
+      "blob": "221e483552ed3c5093a03586c04c1022f2623cd1",
+      "sha256": "0905786c49b1de67ae9429cf88cecb9357afed487d05dfb781ef71e7108ce8a2"
+    },
+    {
+      "path": "packages/octane/src/compiler/volar.js",
+      "bytes": 20458,
+      "blob": "fd0650a702e30081466e63408798f3d1a98547ef",
+      "sha256": "9f8776350de4a5c3c9f75f3f655136ce3307d284dd2caa9b3a877a1cd9c04d51"
+    },
+    {
+      "path": "packages/octane/src/component-flags.ts",
+      "bytes": 1060,
+      "blob": "0742abbf83455fcd45db1ef09219d314be0afcf1",
+      "sha256": "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a"
+    },
+    {
+      "path": "packages/octane/src/constants.ts",
+      "bytes": 11566,
+      "blob": "a994d5e724ea6f0c920657cd459a4a2d56b8bdcf",
+      "sha256": "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7"
+    },
+    {
+      "path": "packages/octane/src/css.ts",
+      "bytes": 4865,
+      "blob": "dda5d74e9536ff6a7d7bcd7ed82cf3fccc863e43",
+      "sha256": "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57"
+    },
+    {
+      "path": "packages/octane/src/devtools-hook.ts",
+      "bytes": 10879,
+      "blob": "fba4c0a1d978afe3845327fef178c534a33e00e2",
+      "sha256": "a9974cd69d87b664465a5a78a9ecd3f19fba83bd4c67c3c31f60cf87595b96c0"
+    },
+    {
+      "path": "packages/octane/src/dom-tables.d.ts",
+      "bytes": 880,
+      "blob": "dd76da9abc40028b138f3a5bfb3cd03693069110",
+      "sha256": "3d54e62a3ff4061cd5af4396b2f43a8a99e8949de72b341a6a3711c28c4a0c6a"
+    },
+    {
+      "path": "packages/octane/src/dom-tables.js",
+      "bytes": 16957,
+      "blob": "b006e5a5220a784ad2aa5e2fda1808e840188a0f",
+      "sha256": "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d"
+    },
+    {
+      "path": "packages/octane/src/error-codes.client.generated.ts",
+      "bytes": 7500,
+      "blob": "90aedbcde14a5b1c8b8847116845a4013d4a6134",
+      "sha256": "3fac871a6372981f5ff6da8d64d8990f5128ee3144f73b129c462c2ff6e8063a"
+    },
+    {
+      "path": "packages/octane/src/error-codes.server.generated.ts",
+      "bytes": 5109,
+      "blob": "4c59b8a1147953199c581f8fefc2ea76ce61cc07",
+      "sha256": "68a911785707f93a13c78bd29a6c40c36c6c9b6e1ddf43802b2207dfe7d815aa"
+    },
+    {
+      "path": "packages/octane/src/error-message.ts",
+      "bytes": 1260,
+      "blob": "b945dfd6a98c250db13fd5db4524b18d5ad8581c",
+      "sha256": "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936"
+    },
+    {
+      "path": "packages/octane/src/form-diagnostics.ts",
+      "bytes": 4068,
+      "blob": "8e109ac1a36d1d9e344b809c1f8b9475d9b931a6",
+      "sha256": "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54"
+    },
+    {
+      "path": "packages/octane/src/has-own.ts",
+      "bytes": 59,
+      "blob": "e5e820fcdfec0ba3c137a2655306a1f5ebe71ac9",
+      "sha256": "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2"
+    },
+    {
+      "path": "packages/octane/src/head-ownership.ts",
+      "bytes": 1686,
+      "blob": "7fb5bb8e22da4dbd00df371cdc4fc83e15ee353e",
+      "sha256": "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493"
+    },
+    {
+      "path": "packages/octane/src/host-property-diagnostics.ts",
+      "bytes": 6351,
+      "blob": "d837fe23397e45a2711dfcaf21f36b16ebbce6ff",
+      "sha256": "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0"
+    },
+    {
+      "path": "packages/octane/src/html-tree-validation.ts",
+      "bytes": 8021,
+      "blob": "beeebfa63907e7327120f39f5e5b6195d78ab92b",
+      "sha256": "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6"
+    },
+    {
+      "path": "packages/octane/src/hydration/condition.ts",
+      "bytes": 508,
+      "blob": "346670d7d1e8c572f933168c41de59cdfa436df8",
+      "sha256": "524ff50256ff823842b4f60bd9e281e0ab7579f7575c9bbb4f6156bdca126d04"
+    },
+    {
+      "path": "packages/octane/src/hydration/event-capture.ts",
+      "bytes": 8953,
+      "blob": "31531705edd3b1fa8764ae804223f01675a69175",
+      "sha256": "a1c5c824509c079a53a93703e8e8fbc3f86e8d0663d2326d6ea30d6c0258773a"
+    },
+    {
+      "path": "packages/octane/src/hydration/idle.ts",
+      "bytes": 985,
+      "blob": "42eb88a102d8c2b4c8964f7ec622dd042ab34a4d",
+      "sha256": "a6335fc272a18c63df21d29cefde68b9d713909cd37ab30c1f7db23b2962568b"
+    },
+    {
+      "path": "packages/octane/src/hydration/index.ts",
+      "bytes": 998,
+      "blob": "a2da7bd8b0fa6e171de5d8db134c617013f92da7",
+      "sha256": "ed542822781256276f67c33ba1b4722b906617b87760dc7d2f604c33d060914d"
+    },
+    {
+      "path": "packages/octane/src/hydration/interaction-config.ts",
+      "bytes": 325,
+      "blob": "6b99a3c4d1a6aa9f6924ebf78874adcb1ea89ea8",
+      "sha256": "8ba375ff87f8a91f9a528b438909952c93eb4939d7906df4ddce9a094f9c0cbd"
+    },
+    {
+      "path": "packages/octane/src/hydration/interaction.ts",
+      "bytes": 1352,
+      "blob": "b5c936b8c5465915e9f713fea776e48507f18c81",
+      "sha256": "6d827cde9b125b63900ec91c3b4478b30aac3bf67ffa91060245d076935ac163"
+    },
+    {
+      "path": "packages/octane/src/hydration/load.ts",
+      "bytes": 382,
+      "blob": "f19a7b3834e53e1a5e7df2bea8ab67d67a6b5975",
+      "sha256": "f0a74f3af4d80f426f12c45a04891853b0f7968bbd83b5886667373ef2bbd09d"
+    },
+    {
+      "path": "packages/octane/src/hydration/media.ts",
+      "bytes": 908,
+      "blob": "518b57f6e4aa6038805a4d46da8613933e78817c",
+      "sha256": "2853b8aedb7ac68ea03ee61d2dfafcb42dc3d108e7f47646e342ec795ce07486"
+    },
+    {
+      "path": "packages/octane/src/hydration/never.ts",
+      "bytes": 309,
+      "blob": "bd7a086a54d408a1a64b988c92a4a0ea2234fc07",
+      "sha256": "b9383f3252e3861ec0d7659c3d2fd74a92156d5cdc734d014f1ac7e7959b605a"
+    },
+    {
+      "path": "packages/octane/src/hydration/types.ts",
+      "bytes": 3442,
+      "blob": "64180d09ec33befbf6afe5b9ac908c784d0266ed",
+      "sha256": "53355f242727209457c7720f6385bb3d2785f089eda28309198759ee0cf6ce02"
+    },
+    {
+      "path": "packages/octane/src/hydration/visible.ts",
+      "bytes": 2528,
+      "blob": "628e2053abd242fa6ff7aaeb497e2f4b5b676a5e",
+      "sha256": "ad0f9d194ea2f7957b0f683cbed78e8f4162e4ebd0a9ff10c0f23dc2361ea014"
+    },
+    {
+      "path": "packages/octane/src/index.ts",
+      "bytes": 7515,
+      "blob": "f1cc98bdbb526ff3e114574d7d474309d0e8f23c",
+      "sha256": "61248363056932245b73648cb977dc54c9769ffd95879052d3266d6e741434ee"
+    },
+    {
+      "path": "packages/octane/src/internal/client.ts",
+      "bytes": 320,
+      "blob": "5d7ec50a677075b6351a148a81349563db818f95",
+      "sha256": "d1659b39f960af866dcbf4977f16f1cf6e215a77bb489a390893c69cf5bfddfe"
+    },
+    {
+      "path": "packages/octane/src/internal/server.ts",
+      "bytes": 196,
+      "blob": "8bd7ebb95789abcea178b36bd8775b269235c57b",
+      "sha256": "06b606d0b1451e819fa12e2b4a34c28e40feac32a485f28fdb6c8f51ca9718e3"
+    },
+    {
+      "path": "packages/octane/src/jsx-runtime.d.ts",
+      "bytes": 31771,
+      "blob": "a1266897e8dd6125d40542c44a3321265ee1615c",
+      "sha256": "ca269c09cee81daf13491f3df36277a81f1f81fc6ec9ee6c2647efa3f243a40e"
+    },
+    {
+      "path": "packages/octane/src/method-dep.ts",
+      "bytes": 2372,
+      "blob": "e7ea038eb651e7589e98976ff61d219808dc8e15",
+      "sha256": "4a9f35fdabd13fc43b01442c4bab936547d129ee8f19817cda8c4dcef8f50a6f"
+    },
+    {
+      "path": "packages/octane/src/profiling.ts",
+      "bytes": 19510,
+      "blob": "f7db70ad42b1c2cb288a9606b7603d6d1b0dbf94",
+      "sha256": "0eb11ae3d569dad7a235ba856195db6b001a868bd772071165cb6c1e2d6881d1"
+    },
+    {
+      "path": "packages/octane/src/react/fiber-adapter.ts",
+      "bytes": 4811,
+      "blob": "04642203e4c81a1ac575a21a1787c3c7f661eaa2",
+      "sha256": "7da0054d4525d6c3e0c5c51cf32f072505d4127586e5f53c4e5123e748d3e660"
+    },
+    {
+      "path": "packages/octane/src/react/index.ts",
+      "bytes": 24648,
+      "blob": "42e072b383ddd549170525f350f9c3fa70c08911",
+      "sha256": "dd734ad65ddab90f7c770c5b2d4aa04e9a39e883363e130125d98f4ceed614c1"
+    },
+    {
+      "path": "packages/octane/src/react/server.ts",
+      "bytes": 6220,
+      "blob": "b30d5a23fb59520e375f97692b6e53d9afab7c10",
+      "sha256": "fcd0c93269ea656265c4fccd1c56368b751e6e0dcfaaf318e0ed81bb661c2fd7"
+    },
+    {
+      "path": "packages/octane/src/react/shared.ts",
+      "bytes": 7252,
+      "blob": "8d309ee544f7b234ec62cc860f4fd6003dd231d4",
+      "sha256": "ba5a9879863cae4a86890c6e3391e76ec14c691b7309382325acc8e4c168a712"
+    },
+    {
+      "path": "packages/octane/src/renderer-bridge.ts",
+      "bytes": 2181,
+      "blob": "344b066bd22ee07cbd01660f6b0fca4a5f765b7c",
+      "sha256": "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824"
+    },
+    {
+      "path": "packages/octane/src/resource-hint-diagnostics.ts",
+      "bytes": 4079,
+      "blob": "88052833f8d1b1a5cdb31f22a3ccea41055a916d",
+      "sha256": "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915"
+    },
+    {
+      "path": "packages/octane/src/runtime.server.ts",
+      "bytes": 364929,
+      "blob": "9b9981ea66c7aabe3af62aa8ca21b3757f129438",
+      "sha256": "66d094c2ab47ae21c85a7d62c328edafa4230d8a778afa37a563759029360803"
+    },
+    {
+      "path": "packages/octane/src/runtime.ts",
+      "bytes": 1331970,
+      "blob": "b69f2bda2340bd1b35915e4b0c4716f15281112c",
+      "sha256": "72d8c0efdb97e7763b2cfa7e74a13e8c24bd57a48b2b19aed121f17bd0537d49"
+    },
+    {
+      "path": "packages/octane/src/sanitize-url.d.ts",
+      "bytes": 290,
+      "blob": "f852d6ee9fff1af896a62a66a4762fa70d22da12",
+      "sha256": "c22a26a0c412caa40b28b8e2912be087970e9b766beefd28c65f876d1d714554"
+    },
+    {
+      "path": "packages/octane/src/sanitize-url.js",
+      "bytes": 3249,
+      "blob": "4e4b9c0b32566174c73f6f845b52870ba7796cca",
+      "sha256": "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7"
+    },
+    {
+      "path": "packages/octane/src/server-rpc-client.ts",
+      "bytes": 1100,
+      "blob": "c3bd0f094ab43e9d5c8fb5e8b02f114bdc9286bd",
+      "sha256": "c2c2f9ef0639bd92d7f13fda4756cdafb6a5b386e255a14f3d9e05648089848e"
+    },
+    {
+      "path": "packages/octane/src/server/index.ts",
+      "bytes": 4848,
+      "blob": "35631fc96338beeb134402985da08761740284a7",
+      "sha256": "349d0f1543b59852a2c677b06335f4032d71188d3692eb51354587958edf4ae1"
+    },
+    {
+      "path": "packages/octane/src/server/rpc.ts",
+      "bytes": 1206,
+      "blob": "5053268f9bb3f8406279858c9efa1e12c072cec0",
+      "sha256": "641fc3832cf6f2dc2a352b5fb37543cd45c04115719761c407dc8b0385c2ed23"
+    },
+    {
+      "path": "packages/octane/src/shared-value-helpers.ts",
+      "bytes": 1957,
+      "blob": "ef8adcab20c84dfcd5a5d1a63c6ab24a543ca3f8",
+      "sha256": "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908"
+    },
+    {
+      "path": "packages/octane/src/signals/client.ts",
+      "bytes": 996,
+      "blob": "5b484b3a17eb1dee20978381a6bf4487e822cda8",
+      "sha256": "f64cfce5c9d17567cca9e5621c14d7ebd4f09db217bb0b2ce89dd697c684aac5"
+    },
+    {
+      "path": "packages/octane/src/signals/encoding.ts",
+      "bytes": 3773,
+      "blob": "a349afcfcf85969588b144d0d8ca826c0fbdbda0",
+      "sha256": "57625f36035059cca2c473a5ac0e8038b27b4d57eaa422a3bcd185b9dc38d88c"
+    },
+    {
+      "path": "packages/octane/src/signals/engine.ts",
+      "bytes": 20578,
+      "blob": "a4d3b81ba47fd5cb4ef3df3fbd9c8a4da14a8704",
+      "sha256": "18eb70cbf0e4e44affa31adbf61d4adbfdfb1965aa975803e14f2ee3df2ac729"
+    },
+    {
+      "path": "packages/octane/src/signals/errors.ts",
+      "bytes": 843,
+      "blob": "5a17a686bdbb8e8498e80aab99ffd7ccfcd05ba6",
+      "sha256": "6a9a9561a4e37085c76ae714f6ec774f19646d3c6ef0e0f5dbc44ae6e16ee451"
+    },
+    {
+      "path": "packages/octane/src/signals/graph.ts",
+      "bytes": 18881,
+      "blob": "5ca74ecdea5f0b19ae3f1ae6d7e4b6b6e34a6104",
+      "sha256": "719371959354ca916d11a76bb162eac93fb4efacf056d14290d5768bfe9dc3a5"
+    },
+    {
+      "path": "packages/octane/src/signals/index.ts",
+      "bytes": 619,
+      "blob": "4618b2d725dec7f419a7915c532ee481815290eb",
+      "sha256": "c4400e3eacea0f52049d3559b26be14dd3485a897135b54ec8cd5f2ad43de17d"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-client.ts",
+      "bytes": 12886,
+      "blob": "0e12a66420e6dd06eb5caca433f5c95a8099039d",
+      "sha256": "60bbe148943897f242f7d0d4682a4d3846a161a9649e78092f8380937c42327b"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-collector.ts",
+      "bytes": 5263,
+      "blob": "1ae5838a2509f72f92f23147f63c799b1899dc96",
+      "sha256": "a89c9f39847ae4c30cc11d39f1fe75fb5a156649938620555017b59af868422b"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-events.ts",
+      "bytes": 1912,
+      "blob": "b33ef6cf00bcaca9a045ebc6eb2f5a2519bbbd24",
+      "sha256": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-inspection.ts",
+      "bytes": 1099,
+      "blob": "32419fff458c9d8127b4d8904a9d689df1fd831d",
+      "sha256": "83a05cd237aec68a18ce0ae37d265e4ddd5bf68d4e258c0584ab1f2eb9dcd8c2"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-retry.ts",
+      "bytes": 1319,
+      "blob": "5180e247a26cdd5d5e7ba43530c8b5d524b0ab26",
+      "sha256": "40abc7188a0b07a3665b410889bf725fdd0ba82c90b3568456282fe243b95ac7"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-seeds.ts",
+      "bytes": 5933,
+      "blob": "b3e7b162d2e9835d19f796e1d9891d20480c4dee",
+      "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8"
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-server.ts",
+      "bytes": 3642,
+      "blob": "1fe0442773ae4d58d90f2bff72e1793911efb4b9",
+      "sha256": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614"
+    },
+    {
+      "path": "packages/octane/src/signals/read-protocol.ts",
+      "bytes": 5327,
+      "blob": "51b00b91437c511882db851e936c36f52a8fe3c8",
+      "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417"
+    },
+    {
+      "path": "packages/octane/src/signals/requests.ts",
+      "bytes": 17115,
+      "blob": "87872516bb2e630306be78e6cf87be14e4d08ade",
+      "sha256": "71c13917b62d698b96fd74fbe23ac60fa8eae2c4515bb72b804c89693efd4a2a"
+    },
+    {
+      "path": "packages/octane/src/signals/server.ts",
+      "bytes": 1021,
+      "blob": "16fd4c6643da78c526d1f4ec01875653c4426192",
+      "sha256": "7dfa84a92f00259350fefd7df5e7c866f752e3dad31d2ff8862a709958f681fd"
+    },
+    {
+      "path": "packages/octane/src/signals/types.ts",
+      "bytes": 4748,
+      "blob": "1e4b012b80ecda8b03f5c9fb0552178d6161a269",
+      "sha256": "e1bbc4c88950681c911cbe94a19b2dc1a4f979bce3b56a4358c7928f8c48a8b9"
+    },
+    {
+      "path": "packages/octane/src/static/index.ts",
+      "bytes": 1224,
+      "blob": "4338f5f5db19a757b39ce265b66be6f672a68052",
+      "sha256": "d2060d6064eca67ff5eb102dc3fe2822b0854c64b751d29c749259801d907468"
+    },
+    {
+      "path": "packages/octane/src/stream-protocol.ts",
+      "bytes": 3295,
+      "blob": "4eee21416fa51dafda8d91794f39286a27b3e220",
+      "sha256": "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce"
+    },
+    {
+      "path": "packages/octane/src/sub-slot.ts",
+      "bytes": 3028,
+      "blob": "d105cca451c08c20117b1bd29001d0a36060cd0e",
+      "sha256": "9d81f691d524c1938c86c5342096e53b853e8a03b79b33afd860f8b4d84d98db"
+    },
+    {
+      "path": "packages/octane/src/testing.ts",
+      "bytes": 847,
+      "blob": "ba90cd59b444c4d5a4f5a62b30a6849e5839efde",
+      "sha256": "95e7286e36dd3a64ea8679349c51889c126e9021eabb3365307f9875161019f0"
+    },
+    {
+      "path": "packages/octane/src/tsrx-iterable.ts",
+      "bytes": 503,
+      "blob": "09debfcef73c27c71b10783e456f0a1bbcf8dd7e",
+      "sha256": "8dfb16d235cd2bbaffe04df9e03745093158805424300b273c73de9ffe16fed1"
+    },
+    {
+      "path": "packages/octane/src/tsrx-spread.ts",
+      "bytes": 1232,
+      "blob": "671b8f999a57d88c64d070ecde565cea0ddf015e",
+      "sha256": "e06c59ecb3b90e15ecb1b9b0ed165b724902d74cb1b95605154797165e27ff1b"
+    },
+    {
+      "path": "packages/octane/src/universal-core.ts",
+      "bytes": 445575,
+      "blob": "a2fad9c41253836f0a7e6dedba9e8b50ad687090",
+      "sha256": "3417593f2d34134efc9dd757f9324972ec667178c03e54f83b246084ba96700c"
+    },
+    {
+      "path": "packages/octane/src/universal-dom-boundary.ts",
+      "bytes": 11882,
+      "blob": "2ea9195df864e3b02d8f3351348d67ab8d4c9faa",
+      "sha256": "64008e1de161117e5bd3e3880d77bcbbb8b0e71d1a197f3f811aea6ee96d8e99"
+    },
+    {
+      "path": "packages/octane/src/universal-native.ts",
+      "bytes": 1812,
+      "blob": "f3aab935182d05e9544cc69c6551cfa93e3466b1",
+      "sha256": "6e6bb62254667ecdb8bb47ac3b96d1fc1a745e5506894b1b1ef0b8939de138d3"
+    },
+    {
+      "path": "packages/octane/src/universal.ts",
+      "bytes": 594,
+      "blob": "3e9ef923aa441b0c8afb7853cb5f9ff0be55d0ce",
+      "sha256": "9c5d25b95a562043652ff35a61198119297b6380ca68837fcdd13bba565ba7fb"
+    },
+    {
+      "path": "packages/octane/src/version.ts",
+      "bytes": 171,
+      "blob": "51ccef3f5e913d5a49f06a9e6aaa391ae8172801",
+      "sha256": "b9c17315c757b9ad8825f72249dd0a2771f1d12934d3726983abdb0747d2fbf3"
+    },
+    {
+      "path": "packages/octane/tsconfig.json",
+      "bytes": 460,
+      "blob": "9f0025b7c1d91e1e6cc6499bc8cd8d483607ce94",
+      "sha256": "3ff16e067d0d950320a1226b014c189ae932c093d031c597de55fabeb23550d7"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "bytes": 2394612,
+      "blob": "62c9fefaeb1d5ad876f790a8a16c12f2854bcc1c",
+      "sha256": "8ea32857607beda8b520797b9885fbdb46fa30886edc2a7966186428cf36a912"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "bytes": 19620,
+      "blob": "d72ea2156ced23329252bc0c734d48187260eb32",
+      "sha256": "121866e4ffbff1a1a7f39db5c21c43cb6e0dd3b11180dbab37d639c01b6d8bf2"
+    }
+  ]
+}

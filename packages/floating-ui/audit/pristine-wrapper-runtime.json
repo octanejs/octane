@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "floating-ui-pristine",
+  "roots": ["packages/floating-ui/tests/upstream-original.test.ts"],
+  "files": ["packages/floating-ui/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "pristine:floating-ui-original-suite",
+      "file": "packages/floating-ui/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned @floating-ui/react 0.27.19 suites unchanged"
+    }
+  ],
+  "snapshots": 0
+}

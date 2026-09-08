@@ -88,6 +88,18 @@ octane({
 - Dependency arrays are compiler-inferred when omitted
 - Nested [`Hydrate`](https://octanejs.dev/docs/core-apis#deferred-hydration) works inside islands once the compiler is on; Astro `client:*` still controls when the island hydrates
 
+## Scoped CSS
+
+Scoped `<style>` blocks inside islands compile to `injectStyle(hash, css)`
+calls — one per style scope, in lexical order — emitted as module-level
+statements on the client and inside the component body per request on the
+server, where the island render collects them into `<style data-octane>` tags
+next to its markup. A theme (`export const theme = <style>…</style>`) is an
+ordinary module value, so importing it injects its sheet ahead of the
+importer's own scopes. There is no virtual CSS module and no CSS HMR path:
+editing a block re-evaluates the module like any other source change, and
+Astro's own `<style>` handling never sees this CSS.
+
 ## Container renderer
 
 ```ts

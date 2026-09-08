@@ -1,3 +1,30 @@
+import type { NativeMouseEvent, SVGProps } from '../util/OctaneTypes.ts';
+import type { AnimationDuration } from '../util/types';
+import type { EasingInput } from '../animation/easing';
+
+export type RectRadius = number | [number, number, number, number];
+interface RectangleProps {
+	className?: SVGProps<SVGPathElement>['className'];
+	x?: number;
+	y?: number;
+	width?: number;
+	height?: number;
+	radius?: RectRadius;
+	isAnimationActive?: boolean;
+	isUpdateAnimationActive?: boolean;
+	animationBegin?: number;
+	animationDuration?: AnimationDuration;
+	animationEasing?: EasingInput;
+	onClick?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseDown?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseUp?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseMove?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseOver?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseOut?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseEnter?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseLeave?: (e: NativeMouseEvent<SVGPathElement>) => void;
+}
+export type Props = Omit<SVGProps<SVGPathElement>, 'radius'> & RectangleProps;
 // Port of shape/Rectangle.tsx — a rectangle path with per-corner rounding.
 // Phase 0 ports the STATIC path (isUpdateAnimationActive defaults false, and
 // standalone Rectangles never animate); the width/height update animation and
@@ -10,7 +37,7 @@ import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { round } from '../util/round';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
 
-function getRectanglePath(x, y, width, height, radius) {
+function getRectanglePath(x: number, y: number, width: number, height: number, radius: RectRadius) {
 	const roundedWidth = round(width);
 	const roundedHeight = round(height);
 	const maxRadius = Math.min(Math.abs(roundedWidth) / 2, Math.abs(roundedHeight) / 2);
@@ -134,9 +161,9 @@ export const defaultRectangleProps = {
 	animationBegin: 0,
 	animationDuration: 1500,
 	animationEasing: 'ease',
-};
+} as const satisfies Partial<Props>;
 
-export function Rectangle(rectangleProps) {
+export function Rectangle(rectangleProps: Props) {
 	const props = resolveDefaultProps(rectangleProps, defaultRectangleProps);
 	const { x, y, width, height, radius, className } = props;
 

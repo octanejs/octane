@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true
+  },
+  "files": [
+    "src/index.ts",
+    "src/editor/BlockNoteContext.ts",
+    "src/hooks/useBlockNoteEditor.ts",
+    "src/hooks/useCreateBlockNote.tsrx"
+  ],
+  "include": [],
+  "exclude": []
+}

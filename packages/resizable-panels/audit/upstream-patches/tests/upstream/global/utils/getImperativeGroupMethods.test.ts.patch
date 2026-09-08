@@ -1,0 +1,50 @@
+diff --git a/tests/upstream/global/utils/getImperativeGroupMethods.test.ts b/tests/upstream/global/utils/getImperativeGroupMethods.test.ts
+--- a/tests/upstream/global/utils/getImperativeGroupMethods.test.ts
++++ b/tests/upstream/global/utils/getImperativeGroupMethods.test.ts
+@@ -1,17 +1,33 @@
++// Fidelity: exact pinned upstream test identities and assertions; imports and DOM harness are Octane-adapted.
++import { afterEach, beforeEach, describe, expect, test, vi, type Mock } from "vitest";
++import type { PanelConstraints } from "../../../../src/components/panel/types";
++import { mountGroup } from "../../../../src/global/mountGroup";
++import { subscribeToMountedGroup } from "../../../../src/global/mutable-state/groups";
++import { mockGroup } from "../../global/test/mockGroup";
++import { getImperativeGroupMethods } from "../../../../src/global/utils/getImperativeGroupMethods";
++import { resetMockGroupIdCounter } from "../../global/test/mockGroup";
+ import {
+-  afterEach,
+-  beforeEach,
+-  describe,
+-  expect,
+-  test,
+-  vi,
+-  type Mock
+-} from "vitest";
+-import type { PanelConstraints } from "../../components/panel/types";
+-import { mountGroup } from "../mountGroup";
+-import { subscribeToMountedGroup } from "../mutable-state/groups";
+-import { mockGroup } from "../test/mockGroup";
+-import { getImperativeGroupMethods } from "./getImperativeGroupMethods";
++  mockBoundingClientRect,
++  unmockBoundingClientRect
++} from "../../utils/test/mockBoundingClientRect";
++import {
++  mockGetComputedStyle,
++  unmockGetComputedStyle
++} from "../../utils/test/mockGetComputedStyle";
++import { mockResizeObserver, unmockResizeObserver } from "../../utils/test/mockResizeObserver";
++
++beforeEach(() => {
++  mockBoundingClientRect();
++  mockGetComputedStyle();
++  mockResizeObserver();
++});
++
++afterEach(() => {
++  resetMockGroupIdCounter();
++  unmockResizeObserver();
++  unmockGetComputedStyle();
++  unmockBoundingClientRect();
++});
+ 
+ describe("getImperativeGroupMethods", () => {
+   let removeChangeListener: (() => void) | undefined = undefined;

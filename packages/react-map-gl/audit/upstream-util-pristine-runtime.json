@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "project": "react-map-gl-upstream-pristine",
+  "roots": ["packages/react-map-gl/tests/upstream", "packages/react-map-gl/tests/upstream-util"],
+  "files": ["packages/react-map-gl/tests/upstream-util/pristine.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:c54967d593bece99",
+      "file": "packages/react-map-gl/tests/upstream-util/pristine.test.ts",
+      "fullName": "upstream util specs (pristine) applyReactStyle"
+    },
+    {
+      "id": "runtime:96ce71df0f8ec012",
+      "file": "packages/react-map-gl/tests/upstream-util/pristine.test.ts",
+      "fullName": "upstream util specs (pristine) applyViewStateToTransform"
+    },
+    {
+      "id": "runtime:9eabcf9b443eea5b",
+      "file": "packages/react-map-gl/tests/upstream-util/pristine.test.ts",
+      "fullName": "upstream util specs (pristine) arePointsEqual"
+    },
+    {
+      "id": "runtime:0e9928e452a5f8e1",
+      "file": "packages/react-map-gl/tests/upstream-util/pristine.test.ts",
+      "fullName": "upstream util specs (pristine) compareClassNames"
+    },
+    {
+      "id": "runtime:45e244a68d2ef92b",
+      "file": "packages/react-map-gl/tests/upstream-util/pristine.test.ts",
+      "fullName": "upstream util specs (pristine) declares every collected upstream case"
+    },
+    {
+      "id": "runtime:c7612905314524c8",
+      "file": "packages/react-map-gl/tests/upstream-util/pristine.test.ts",
+      "fullName": "upstream util specs (pristine) deepEqual"
+    },
+    {
+      "id": "runtime:00cfa51db82851f8",
+      "file": "packages/react-map-gl/tests/upstream-util/pristine.test.ts",
+      "fullName": "upstream util specs (pristine) normalizeStyle"
+    }
+  ]
+}

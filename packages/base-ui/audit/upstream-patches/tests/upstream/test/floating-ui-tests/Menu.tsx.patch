@@ -1,0 +1,67 @@
+diff --git a/tests/upstream/test/floating-ui-tests/Menu.tsx b/tests/upstream/test/floating-ui-tests/Menu.tsx
+--- a/tests/upstream/test/floating-ui-tests/Menu.tsx
++++ b/tests/upstream/test/floating-ui-tests/Menu.tsx
+@@ -58,7 +58,7 @@ const MenuContext = React.createContext<MenuContextType>({
+ interface MenuProps {
+   label: string;
+   nested?: boolean;
+-  children?: React.ReactNode;
++  children?: React.OctaneNode;
+   keepMounted?: boolean;
+   orientation?: 'vertical' | 'horizontal' | 'both';
+   grid?: boolean;
+@@ -66,11 +66,11 @@ interface MenuProps {
+ }
+ 
+ /** @internal */
+-export const MenuComponent = React.forwardRef<
+-  HTMLButtonElement,
+-  MenuProps & React.HTMLProps<HTMLButtonElement>
+->(function Menu(
+-  {
++export const MenuComponent = (function Menu(
++  propsWithRef: (MenuProps & React.HTMLProps<HTMLButtonElement>) & { ref?: React.Ref<HTMLButtonElement> },
++) {
++  const { ref: forwardedRef = null, ...propsWithRefRest } = propsWithRef;
++  const {
+     children,
+     label,
+     keepMounted = false,
+@@ -78,9 +78,7 @@ export const MenuComponent = React.forwardRef<
+     orientation: orientationOption,
+     openOnFocus = false,
+     ...props
+-  },
+-  forwardedRef,
+-) {
++  } = propsWithRefRest;
+   const [isOpen, setIsOpen] = React.useState(false);
+   const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
+   const [allowHover, setAllowHover] = React.useState(false);
+@@ -313,10 +311,9 @@ interface MenuItemProps {
+ }
+ 
+ /** @internal */
+-export const MenuItem = React.forwardRef<
+-  HTMLButtonElement,
+-  MenuItemProps & React.ButtonHTMLAttributes<HTMLButtonElement>
+->(function MenuItem({ label, disabled, ...props }, forwardedRef) {
++export const MenuItem = (function MenuItem(propsWithRef: (MenuItemProps & React.ButtonHTMLAttributes<HTMLButtonElement>) & { ref?: React.Ref<HTMLButtonElement> }) {
++  const { ref: forwardedRef = null, ...propsWithRefRest } = propsWithRef;
++  const { label, disabled, ...props } = propsWithRefRest;
+   const menu = React.useContext(MenuContext);
+   const item = useCompositeListItem({ label: disabled ? null : label });
+   const tree = useFloatingTree();
+@@ -371,10 +368,8 @@ export const MenuItem = React.forwardRef<
+ });
+ 
+ /** @internal */
+-export const Menu = React.forwardRef<
+-  HTMLButtonElement,
+-  MenuProps & React.HTMLProps<HTMLButtonElement>
+->(function MenuWrapper(props, ref) {
++export const Menu = (function MenuWrapper(propsWithRef: (MenuProps & React.HTMLProps<HTMLButtonElement>) & { ref?: React.Ref<HTMLButtonElement> }) {
++  const { ref: ref = null, ...props } = propsWithRef;
+   const parentId = useFloatingParentNodeId();
+ 
+   if (parentId === null) {

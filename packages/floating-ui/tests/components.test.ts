@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount } from '../../octane/tests/_helpers';
 import { OverlayApp } from './_fixtures/overlay.tsx';
 
@@ -53,6 +53,7 @@ describe('@octanejs/floating-ui — FloatingArrow', () => {
 });
 
 import { Dialog } from './_fixtures/dialog.tsx';
+import { FocusKeyStabilityApp } from './_fixtures/focus-key-stability.tsx';
 
 describe('@octanejs/floating-ui — FloatingFocusManager (modal)', () => {
 	it('traps focus + aria-hides outside content while open, cleans up on close', async () => {
@@ -77,6 +78,37 @@ describe('@octanejs/floating-ui — FloatingFocusManager (modal)', () => {
 		// markOthers cleanup restores the outside element.
 		expect(outside.getAttribute('aria-hidden')).toBe(null);
 		r.unmount();
+	});
+
+	it('preserves consumer DOM identity when conditional focus controls toggle', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const r = mount(FocusKeyStabilityApp);
+		try {
+			await nextPaint();
+			await nextPaint();
+
+			const portal = document.querySelector('[data-floating-ui-portal]') as HTMLElement;
+			const content = portal.querySelector('.managed-content') as HTMLElement;
+			expect(portal.children.length).toBe(5);
+
+			(r.container.querySelector('.toggle-guards') as HTMLButtonElement).click();
+			await nextPaint();
+			expect(portal.children.length).toBe(1);
+			expect(portal.querySelector('.managed-content')).toBe(content);
+
+			(r.container.querySelector('.toggle-guards') as HTMLButtonElement).click();
+			await nextPaint();
+			expect(portal.children.length).toBe(5);
+			expect(portal.querySelector('.managed-content')).toBe(content);
+			expect(
+				warn.mock.calls.some(([message]) =>
+					String(message).includes('each element in an array child'),
+				),
+			).toBe(false);
+		} finally {
+			r.unmount();
+			warn.mockRestore();
+		}
 	});
 });
 

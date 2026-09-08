@@ -1,0 +1,131 @@
+{
+  "suite": "lynx-handle-retirement",
+  "iterations": 8,
+  "targets": [
+    {
+      "name": "handles-1024",
+      "ops": {
+        "prepare_per_1000_acknowledgements": {
+          "score": 0.2348144531249985,
+          "median": 0.24076269531247974,
+          "min": 0.22965527343749015,
+          "mean": 0.3205718994140627,
+          "p95": 0.8218994140625213,
+          "sd": 0.20383509614432302,
+          "rme": 53.166694946359335,
+          "scoreRme": 2.761801643013177,
+          "warmupRatio": 1.586712414223338,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "curve": "materialized-handles",
+        "compactHosts": 65568,
+        "retirementHostCount": 8,
+        "preparationsPerSample": 1024,
+        "correctness": "pass",
+        "materializedChecksum": 1828363885,
+        "retiredChecksum": 1463068797,
+        "survivorChecksum": 2652267877,
+        "materialized": 1024,
+        "retiredMaterialized": 4,
+        "survivingMaterialized": 1020,
+        "rollback": "restored"
+      }
+    },
+    {
+      "name": "handles-65536",
+      "ops": {
+        "prepare_per_1000_acknowledgements": {
+          "score": 0.24639472656249328,
+          "median": 0.28629589843748304,
+          "min": 0.2303056640624579,
+          "mean": 0.3150683593749898,
+          "p95": 0.7118730468749779,
+          "sd": 0.16240552593509594,
+          "rme": 43.100485509348196,
+          "scoreRme": 11.721196975335015,
+          "warmupRatio": 1.4257023751110764,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "curve": "materialized-handles",
+        "compactHosts": 65568,
+        "retirementHostCount": 8,
+        "preparationsPerSample": 1024,
+        "correctness": "pass",
+        "materializedChecksum": 702855789,
+        "retiredChecksum": 1463068797,
+        "survivorChecksum": 2681885029,
+        "materialized": 65536,
+        "retiredMaterialized": 4,
+        "survivingMaterialized": 65532,
+        "rollback": "restored"
+      }
+    },
+    {
+      "name": "range-1024",
+      "ops": {
+        "prepare_per_1000_acknowledgements": {
+          "score": 1.0877441406250021,
+          "median": 1.6783037109374677,
+          "min": 0.874674804687503,
+          "mean": 1.350321533203122,
+          "p95": 2.0043134765624915,
+          "sd": 0.46613544208382357,
+          "rme": 28.864303579845835,
+          "scoreRme": 41.60189370026741,
+          "warmupRatio": 1.4856804776226513,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "curve": "compact-range",
+        "compactHosts": 65568,
+        "retirementHostCount": 1024,
+        "preparationsPerSample": 1024,
+        "correctness": "pass",
+        "materializedChecksum": 1124478021,
+        "retiredChecksum": 3880120165,
+        "survivorChecksum": 3077173093,
+        "materialized": 64,
+        "retiredMaterialized": 32,
+        "survivingMaterialized": 32,
+        "rollback": "restored"
+      }
+    },
+    {
+      "name": "range-65536",
+      "ops": {
+        "prepare_per_1000_acknowledgements": {
+          "score": 1.0712482421874947,
+          "median": 1.7451171874999782,
+          "min": 0.8725175781250094,
+          "mean": 1.4478199462890637,
+          "p95": 2.3093261718750147,
+          "sd": 0.6027086118529388,
+          "rme": 34.807993808379415,
+          "scoreRme": 43.72065661333843,
+          "warmupRatio": 1.6556009153311477,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "curve": "compact-range",
+        "compactHosts": 65568,
+        "retirementHostCount": 65536,
+        "preparationsPerSample": 1024,
+        "correctness": "pass",
+        "materializedChecksum": 1124478021,
+        "retiredChecksum": 3880120165,
+        "survivorChecksum": 3077173093,
+        "materialized": 64,
+        "retiredMaterialized": 32,
+        "survivingMaterialized": 32,
+        "rollback": "restored"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

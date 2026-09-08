@@ -1,0 +1,209 @@
+{
+  "suite": "tsrx-component-graph",
+  "iterations": 8,
+  "targets": [
+    {
+      "name": "dependent-first",
+      "ops": {
+        "compile": {
+          "score": 494.2424083999998,
+          "median": 498.30195800000365,
+          "min": 462.8869580000028,
+          "mean": 496.69260400000076,
+          "p95": 530.5340829999986,
+          "sd": 22.4512976055773,
+          "rme": 3.779548347432351,
+          "scoreRme": 7.147583824819851,
+          "warmupRatio": 1.0313202747010617,
+          "samples": 8,
+          "p99": 530.5340829999986
+        }
+      },
+      "meta": {
+        "components": 2400,
+        "callEdges": 2399,
+        "liveBindingWitnesses": 2399,
+        "warmPlans": 0,
+        "hoistedDeclarations": 2399,
+        "sourceBytes": 139419,
+        "outputBytes": 2138039,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "dependency-first",
+      "ops": {
+        "compile": {
+          "score": 536.310366600001,
+          "median": 542.5500000000029,
+          "min": 478.5455000000002,
+          "mean": 527.2387395000005,
+          "p95": 569.8879589999997,
+          "sd": 32.335261831638995,
+          "rme": 5.128085062524686,
+          "scoreRme": 6.753768683755107,
+          "warmupRatio": 0.963470048277824,
+          "samples": 8,
+          "p99": 569.8879589999997
+        }
+      },
+      "meta": {
+        "components": 2400,
+        "callEdges": 2399,
+        "liveBindingWitnesses": 2399,
+        "warmPlans": 0,
+        "hoistedDeclarations": 0,
+        "sourceBytes": 139419,
+        "outputBytes": 2100843,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "warm-dependent-first",
+      "ops": {
+        "compile": {
+          "score": 765.8919999999969,
+          "median": 773.1593749999956,
+          "min": 705.5251250000001,
+          "mean": 769.4359322499986,
+          "p95": 876.0220830000035,
+          "sd": 52.75026912216275,
+          "rme": 5.732424816742934,
+          "scoreRme": 4.689081244908276,
+          "warmupRatio": 1.0142630313412389,
+          "samples": 8,
+          "p99": 876.0220830000035
+        }
+      },
+      "meta": {
+        "components": 2400,
+        "callEdges": 2399,
+        "liveBindingWitnesses": 0,
+        "warmPlans": 2400,
+        "hoistedDeclarations": 2399,
+        "sourceBytes": 139415,
+        "outputBytes": 3579946,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "warm-dependency-first",
+      "ops": {
+        "compile": {
+          "score": 856.2485333999982,
+          "median": 853.3986670000013,
+          "min": 775.5342500000006,
+          "mean": 829.8232187499984,
+          "p95": 906.5747090000004,
+          "sd": 49.413228219371966,
+          "rme": 4.979019153515896,
+          "scoreRme": 6.328479257609127,
+          "warmupRatio": 0.9499547365881658,
+          "samples": 8,
+          "p99": 906.5747090000004
+        }
+      },
+      "meta": {
+        "components": 2400,
+        "callEdges": 2399,
+        "liveBindingWitnesses": 0,
+        "warmPlans": 2400,
+        "hoistedDeclarations": 0,
+        "sourceBytes": 139415,
+        "outputBytes": 3544990,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "anchorless-dependent-first-9600",
+      "ops": {
+        "compile": {
+          "score": 2139.193816600001,
+          "median": 2168.3402080000014,
+          "min": 1949.2245000000003,
+          "mean": 2127.465739625,
+          "p95": 2232.3574579999986,
+          "sd": 104.81369771430656,
+          "rme": 4.119472606699313,
+          "scoreRme": 5.399131810964701,
+          "warmupRatio": 1.0006758855550062,
+          "samples": 8,
+          "p99": 2232.3574579999986
+        },
+        "compile_per_1000_components": {
+          "score": 222.83268922916673,
+          "median": 225.86877166666682,
+          "min": 203.04421875000003,
+          "mean": 221.61101454427086,
+          "p95": 232.5372352083332,
+          "sd": 10.91809351190694,
+          "rme": 4.119472606699317,
+          "scoreRme": 5.399131810964705,
+          "warmupRatio": 1.0006758855550064,
+          "samples": 8,
+          "p99": 232.5372352083332
+        }
+      },
+      "meta": {
+        "components": 9600,
+        "callEdges": 9599,
+        "locallyUnsafeRoots": 1,
+        "transitivelyUnsafeRoots": 9600,
+        "appTemplateAnchors": 2,
+        "singleRootCapabilities": 2,
+        "warmPlans": 0,
+        "hoistedDeclarations": 9599,
+        "autoMemo": false,
+        "sourceBytes": 1111506,
+        "outputBytes": 5642053,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "anchorless-dependency-first-9600",
+      "ops": {
+        "compile": {
+          "score": 2158.1978500000014,
+          "median": 2168.342042000004,
+          "min": 2015.5780830000003,
+          "mean": 2136.011265500001,
+          "p95": 2250.2690000000002,
+          "sd": 93.24680357347516,
+          "rme": 3.6501992050069805,
+          "scoreRme": 4.054309181143221,
+          "warmupRatio": 0.9829561230449745,
+          "samples": 8,
+          "p99": 2250.2690000000002
+        },
+        "compile_per_1000_components": {
+          "score": 224.8122760416668,
+          "median": 225.86896270833375,
+          "min": 209.95605031250003,
+          "mean": 222.50117348958346,
+          "p95": 234.40302083333333,
+          "sd": 9.71320870557033,
+          "rme": 3.6501992050069805,
+          "scoreRme": 4.054309181143224,
+          "warmupRatio": 0.9829561230449745,
+          "samples": 8,
+          "p99": 234.40302083333333
+        }
+      },
+      "meta": {
+        "components": 9600,
+        "callEdges": 9599,
+        "locallyUnsafeRoots": 1,
+        "transitivelyUnsafeRoots": 9600,
+        "appTemplateAnchors": 2,
+        "singleRootCapabilities": 2,
+        "warmPlans": 0,
+        "hoistedDeclarations": 0,
+        "autoMemo": false,
+        "sourceBytes": 1111506,
+        "outputBytes": 5919317,
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

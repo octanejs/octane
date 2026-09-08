@@ -1,0 +1,31 @@
+# Mac OSX Files
+.DS_Store
+.Trashes
+.LSOverride
+
+# Node Modules
+node_modules
+npm-debug.log
+
+# General Files
+.sass-cache
+.hg
+.idea
+.svn
+.cache
+.project
+.tmp
+.eslintignore
+biome.json
+.flowconfig
+.editorconfig
+storybook/.storybook
+pnpm-lock.yaml
+
+# Project files
+coverage
+storybook/stories
+tests
+example
+jest-setup.js
+__tests__

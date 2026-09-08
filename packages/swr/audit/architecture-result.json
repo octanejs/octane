@@ -1,0 +1,13 @@
+{
+  "framework": "octane",
+  "command": "vitest run packages/swr/tests/probes/architecture.test.ts packages/octane/tests/hydration/hydration.test.ts packages/octane/tests/hydration/suspense-hydrate.test.ts packages/octane/tests/streaming-ssr.test.ts --config packages/swr/tests/probes/vitest.config.mjs",
+  "files": { "total": 4, "passed": 4, "failed": 0 },
+  "tests": { "total": 65, "passed": 65, "failed": 0 },
+  "contracts": [
+    "external-store subscription, update, store replacement, and cleanup",
+    "mutation-like transition commit",
+    "hostile devtools global isolation",
+    "server rendering and streaming",
+    "hydration and Suspense hydration"
+  ]
+}

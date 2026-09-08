@@ -1,14 +1,24 @@
+import type { RegisteredCell } from '../context/CellsContext.ts';
+
+import type {
+	MutableRefObject,
+	NativeMouseEvent,
+	NativeTouchEvent,
+	OctaneElement,
+	OctaneNode,
+	SVGProps,
+} from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { MutableRefObject, ReactElement, ReactNode, SVGProps, useMemo, useRef } from 'octane';
+import { useMemo, useRef } from 'octane';
 import get from 'es-toolkit/compat/get';
 
 import { clsx } from 'clsx';
 import { selectPieLegend, selectPieSectors } from '../state/selectors/pieSelectors';
 import { useAppSelector } from '../state/hooks';
-import { Layer } from '../container/Layer';
-import { Curve, Props as CurveProps } from '../shape/Curve';
-import { Sector } from '../shape/Sector';
-import { Text } from '../component/Text';
+import { Layer } from '../container/Layer.tsrx';
+import { Curve, Props as CurveProps } from '../shape/Curve.tsrx';
+import { Sector } from '../shape/Sector.tsrx';
+import { Text, type RenderableText, type TextAnchor } from '../component/Text.tsrx';
 import { getMaxRadius, polarToCartesian } from '../util/PolarUtils';
 import { getPercentValue, interpolate, isNumber, mathSign } from '../util/DataUtils';
 import { getTooltipNameProp, getValueByDataKey } from '../util/ChartUtils';
@@ -29,7 +39,7 @@ import {
 	ShapeAnimationProps,
 	TooltipType,
 } from '../util/types';
-import { Shape } from '../util/ActiveShapeUtils';
+import { Shape } from '../util/ActiveShapeUtils.tsrx';
 import {
 	TooltipTriggerInfo,
 	useMouseClickItemDispatch,
@@ -38,7 +48,7 @@ import {
 } from '../context/tooltipContext';
 import { TooltipPayload, TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { Formatter } from '../component/DefaultTooltipContent';
+import { Formatter } from '../component/DefaultTooltipContent.tsrx';
 import {
 	selectActiveTooltipDataKey,
 	selectActiveTooltipGraphicalItemId,
@@ -53,10 +63,10 @@ import {
 	AnimatedItems,
 	AnimationInterpolateFn,
 	useAnimationCallbacks,
-} from '../animation/AnimatedItems';
+} from '../animation/AnimatedItems.tsrx';
 import { AnimationMatchByProp, matchAppend } from '../animation/matchBy';
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
-import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId';
+import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import { SetPolarGraphicalItem } from '../state/SetGraphicalItem';
 import type { PiePresentationProps, PieSettings } from '../state/types/PieSettings';
 import {
@@ -69,9 +79,9 @@ import {
 	PolarLabelListContextProvider,
 	PolarLabelListEntry,
 	Props as LabelListProps,
-} from '../component/LabelList';
+} from '../component/LabelList.tsrx';
 import { GraphicalItemId } from '../state/graphicalItemsSlice';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { ChartData } from '../state/chartDataSlice';
 import { getClassNameFromUnknown } from '../util/getClassNameFromUnknown';
@@ -118,24 +128,27 @@ interface PieDef {
 }
 
 type PieLabelLine =
-	| ReactElement<SVGElement>
-	| ((props: any) => ReactElement<SVGElement>)
+	| OctaneElement<CurveProps>
+	| ((props: CurveProps & { index: number }) => OctaneNode)
 	| SVGProps<SVGPathElement>
 	| boolean;
 
 interface PieLabelExtraProps {
 	stroke: string;
 	index: number;
-	textAnchor: string;
+	textAnchor: TextAnchor;
 }
 
 export type PieLabelRenderProps =
 	Omit<SVGPropsNoEvents<PieSvgAttributes>, 'offset'> & Omit<
 		PieSectorDataItem,
-		'offset'
-	> & PieLabelExtraProps & Coordinate;
+		'offset' | 'ref'
+	> & Pick<SVGProps<SVGTextElement>, 'ref'> & PieLabelExtraProps & Coordinate;
 
-export type LabelListPropsWithPosition = LabelListProps & { position: LabelListProps['position'] };
+export type LabelListPropsWithPosition =
+	Omit<LabelListProps, keyof PieCoordinate> & Partial<PieCoordinate> & {
+		position: LabelListProps['position'];
+	};
 
 /**
  * The `label` prop in Pie accepts a variety of alternatives.
@@ -161,12 +174,12 @@ export type PieLabel =
  * If label prop is a function, or a React component, it will be called once for each label.
  * The result of each call will be rendered.
  */
-	  ((props: PieLabelRenderProps) => ReactNode | ReactElement<SVGElement>)
+	  ((props: PieLabelRenderProps) => RenderableText | OctaneElement<PieLabelRenderProps>)
 	| /*
- * If label prop is a ReactElement, it will get cloned and receive brand-new surprise props.
+ * If label prop is a OctaneElement, it will get cloned and receive brand-new surprise props.
  * I do not recommend this variant
  */
-	  ReactElement<SVGElement>;
+	  OctaneElement<PieLabelRenderProps>;
 
 export type PieSectorData =
 	GeometrySector & TooltipTriggerInfo & {
@@ -208,58 +221,58 @@ interface PieEvents {
 	/**
  * The customized event handler of click on the sectors in this group.
  */
-	onClick?: (data: PieSectorDataItem, index: number, e: React.MouseEvent<
+	onClick?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mousedown on the sectors in this group.
  */
-	onMouseDown?: (data: PieSectorDataItem, index: number, e: React.MouseEvent<
+	onMouseDown?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseup on the sectors in this group.
  */
-	onMouseUp?: (data: PieSectorDataItem, index: number, e: React.MouseEvent<
+	onMouseUp?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mousemove on the sectors in this group.
  */
-	onMouseMove?: (data: PieSectorDataItem, index: number, e: React.MouseEvent<
+	onMouseMove?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseover on the sectors in this group.
  */
-	onMouseOver?: (data: PieSectorDataItem, index: number, e: React.MouseEvent<
+	onMouseOver?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseout on the sectors in this group.
  */
-	onMouseOut?: (data: PieSectorDataItem, index: number, e: React.MouseEvent<
+	onMouseOut?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseenter on the sectors in this group.
  */
-	onMouseEnter?: (data: PieSectorDataItem, index: number, e: React.MouseEvent<
+	onMouseEnter?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseleave on the sectors in this group.
  */
-	onMouseLeave?: (data: PieSectorDataItem, index: number, e: React.MouseEvent<
+	onMouseLeave?: (data: PieSectorDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
-	onTouchStart?: (data: PieSectorDataItem, index: number, e: React.TouchEvent<
+	onTouchStart?: (data: PieSectorDataItem, index: number, e: NativeTouchEvent<
 		SVGGraphicsElement
 	>) => void;
-	onTouchMove?: (data: PieSectorDataItem, index: number, e: React.TouchEvent<
+	onTouchMove?: (data: PieSectorDataItem, index: number, e: NativeTouchEvent<
 		SVGGraphicsElement
 	>) => void;
-	onTouchEnd?: (data: PieSectorDataItem, index: number, e: React.TouchEvent<
+	onTouchEnd?: (data: PieSectorDataItem, index: number, e: NativeTouchEvent<
 		SVGGraphicsElement
 	>) => void;
 }
@@ -283,7 +296,7 @@ interface PieProps<DataPointType = any, DataValueType = any> extends DataProvide
  * @example <Pie activeShape={<CustomActiveShape />} />
  * @example https://recharts.github.io/examples/CustomActiveShapePieChart
  */
-	activeShape?: ActiveShape<PieSectorDataItem>;
+	activeShape?: ActiveShape<PieSectorDataItem, SVGPathElement>;
 	/**
  * Specifies when the animation should begin, the unit of this option is ms.
  * @defaultValue 400
@@ -348,7 +361,7 @@ interface PieProps<DataPointType = any, DataValueType = any> extends DataProvide
  * The shape of inactive sector.
  * @deprecated Use the `shape` prop to modify each sector.
  */
-	inactiveShape?: ActiveShape<PieSectorDataItem>;
+	inactiveShape?: ActiveShape<PieSectorDataItem, SVGPathElement>;
 	/**
  * If set false, animation will be disabled.
  * If set "auto", the animation will be disabled in SSR and will respect the user's prefers-reduced-motion system preference for accessibility.
@@ -361,7 +374,7 @@ interface PieProps<DataPointType = any, DataValueType = any> extends DataProvide
  * - `false`: no labels are rendered;
  * - `object` that has `position` prop: the props of LabelList component;
  * - `object` that does not have `position` prop: the props of a custom Pie label (similar to Label with position "outside"); this variant supports `labelLine`
- * - `ReactElement`: a custom SVG label element, such as `<text>` or `<g>`.
+ * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
  *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
  * - `function`: a render function of custom label.
  *
@@ -375,7 +388,7 @@ interface PieProps<DataPointType = any, DataValueType = any> extends DataProvide
 	/**
  * If false set, label lines will not be drawn. If true set, label lines will be drawn which have the props calculated internally.
  * If object set, label lines will be drawn which have the props merged by the internal calculated props and the option.
- * If ReactElement set, the option can be the custom label line element.
+ * If OctaneElement set, the option can be the custom label line element.
  * If set a function, the function will be called to render customized label line.
  * @defaultValue true
  * @example <Pie labelLine={<CustomizedLabelLine />} />
@@ -456,9 +469,10 @@ export type PieCoordinate = {
 };
 
 const defaultPieSectorShape = Sector;
+const PieSectorShape = Shape<PieSectorShapeProps, SVGPathElement>;
 
 function SetPiePayloadLegend(props: {
-	cells: ReadonlyArray<ReactElement> | undefined;
+	cells: ReadonlyArray<RegisteredCell> | undefined;
 	id: GraphicalItemId;
 }) {
 	const legendPayload = useAppSelector((state) => selectPieLegend(state, props.id, props.cells));
@@ -474,18 +488,18 @@ type PieSectorsProps =
 		/**
  * @deprecated
  */
-		activeShape: ActiveShape<Readonly<PieSectorDataItem>> | undefined;
+		activeShape: ActiveShape<Readonly<PieSectorDataItem>, SVGPathElement> | undefined;
 		/**
  * @deprecated
  */
-		inactiveShape: ActiveShape<Readonly<PieSectorDataItem>> | undefined;
+		inactiveShape: ActiveShape<Readonly<PieSectorDataItem>, SVGPathElement> | undefined;
 		shape: PieShape;
 		allOtherPieProps: WithoutId<InternalProps>;
 		id: GraphicalItemId;
 	};
 
 function getActiveShapeFill(
-	activeShape: ActiveShape<Readonly<PieSectorDataItem>> | undefined,
+	activeShape: ActiveShape<Readonly<PieSectorDataItem>, SVGPathElement> | undefined,
 ): string | undefined {
 	// activeShape can be boolean/function/element/object; only element/object can carry a static fill value.
 	if (
@@ -494,7 +508,11 @@ function getActiveShapeFill(
 		return undefined;
 	}
 
-	if (React.isValidElement(activeShape)) {
+	if (
+		React.isValidElement<Partial<Readonly<PieSectorDataItem>> & SVGProps<SVGPathElement>>(
+			activeShape,
+		)
+	) {
 		// React element form: <Sector fill="..."/> or custom element with fill prop.
 		const fill = activeShape.props?.fill;
 		return typeof fill === 'string' ? fill : undefined;
@@ -617,9 +635,8 @@ const parseDeltaAngle = (startAngle: number, endAngle: number) => {
 	return sign * deltaAngle;
 };
 
-const renderLabelLineItem = (option: PieLabelLine, props: CurveProps) => {
-	if (React.isValidElement(option)) {
-		// @ts-expect-error we can't know if the type of props matches the element
+const renderLabelLineItem = (option: PieLabelLine, props: CurveProps & { index: number }) => {
+	if (React.isValidElement<CurveProps>(option)) {
 		return React.cloneElement(option, props);
 	}
 	if (typeof option === 'function') {
@@ -635,24 +652,20 @@ const renderLabelLineItem = (option: PieLabelLine, props: CurveProps) => {
 	return <Curve {...otherProps} type="linear" className={className} />;
 };
 
-const renderLabelItem = (option: PieLabel, props: PieLabelRenderProps, value: unknown) => {
-	if (React.isValidElement(option)) {
-		// @ts-expect-error element cloning is not typed
+const renderLabelItem = (option: PieLabel, props: PieLabelRenderProps, value: RenderableText) => {
+	if (React.isValidElement<PieLabelRenderProps>(option)) {
 		return React.cloneElement(option, props);
 	}
-	let label = value;
+	let label: RenderableText | OctaneElement<PieLabelRenderProps> = value;
 	if (typeof option === 'function') {
 		label = option(props);
-		if (React.isValidElement(label)) {
+		if (React.isValidElement<PieLabelRenderProps>(label)) {
 			return label;
 		}
 	}
 
 	const className = clsx('recharts-pie-label-text', getClassNameFromUnknown(option));
-	return <Text {...props} alignmentBaseline="middle" className={className}>
-		{/* @ts-expect-error we pass unknown but Text expects string | number */}
-		{label}
-	</Text>;
+	return <Text {...props} alignmentBaseline="middle" className={className}>{label}</Text>;
 };
 
 function PieLabels({
@@ -678,6 +691,9 @@ function PieLabels({
 			20;
 
 	const labels = sectors.map((entry, i) => {
+		// The Cell ref belongs to its sector, not to the label or connector.
+		// Label and labelLine options may supply their own native refs below.
+		const { ref: sectorRef, ...labelEntry } = entry;
 		const midAngle = (entry.startAngle + entry.endAngle) / 2;
 		const endPoint = polarToCartesian(
 			entry.cx,
@@ -687,20 +703,17 @@ function PieLabels({
 		);
 		const labelProps: PieLabelRenderProps = {
 			...pieProps,
-			...entry,
-			// @ts-expect-error customLabelProps is contributing unknown props
+			...labelEntry,
 			stroke: 'none',
 			...customLabelProps,
 			index: i,
 			textAnchor: getTextAnchor(endPoint.x, entry.cx),
 			...endPoint,
 		};
-		const lineProps: CurveProps = {
+		const lineProps: CurveProps & { index: number } = {
 			...pieProps,
-			...entry,
-			// @ts-expect-error customLabelLineProps is contributing unknown props
+			...labelEntry,
 			fill: 'none',
-			// @ts-expect-error customLabelLineProps is contributing unknown props
 			stroke: entry.fill,
 			...customLabelLineProps,
 			index: i,
@@ -714,8 +727,11 @@ function PieLabels({
 		>
 			<Layer>
 				{labelLine && renderLabelLineItem(labelLine, lineProps)}
-				{/* @ts-expect-error we send the full PieSectorDataItem */}
-				{renderLabelItem(label, labelProps, getValueByDataKey(entry, dataKey))}
+				{renderLabelItem(
+					label,
+					labelProps,
+					getValueByDataKey<unknown, RenderableText>(entry, dataKey),
+				)}
 			</Layer>
 		</ZIndexLayer>;
 	});
@@ -815,7 +831,7 @@ function PieSectors(props: PieSectorsProps) {
 				onMouseLeave={onMouseLeaveFromContext(entry, i)}
 				onClick={onClickFromContext(entry, i)}
 			>
-				<Shape
+				<PieSectorShape
 					option={sectorOptions ?? shape}
 					DefaultShape={defaultPieSectorShape}
 					shapeProps={sectorProps}
@@ -833,7 +849,7 @@ export function computePieSectors({
 }: {
 	pieSettings: PieSettings;
 	displayedData: ChartData;
-	cells: ReadonlyArray<ReactElement> | undefined;
+	cells: ReadonlyArray<RegisteredCell> | undefined;
 	offset: ChartOffsetInternal;
 }): ReadonlyArray<PieSectorDataItem> | undefined {
 	const { cornerRadius, startAngle, endAngle, dataKey, nameKey, tooltipType } = pieSettings;
@@ -877,8 +893,10 @@ export function computePieSectors({
 			const percent = (isNumber(val) ? val : 0) / sum;
 			let tempStartAngle;
 
-			// @ts-expect-error can't spread unknown
-			const entryWithCellInfo: RealPieData = { ...entry, ...cells && cells[i] && cells[i].props };
+			const entryWithCellInfo: RealPieData = {
+				...entry as Record<string, unknown>,
+				...cells && cells[i] && cells[i].props,
+			};
 			const sectorColor =
 				entryWithCellInfo != null && 'fill' in entryWithCellInfo &&
 				typeof entryWithCellInfo.fill === 'string'
@@ -947,7 +965,7 @@ function PieLabelListProvider({
 }: {
 	showLabels: boolean;
 	sectors: ReadonlyArray<PieSectorDataItem>;
-	children: ReactNode;
+	children: OctaneNode;
 }) {
 	const labelListEntries: ReadonlyArray<PolarLabelListEntry> = useMemo(() => {
 		if (!showLabels || !sectors) {
@@ -1183,8 +1201,13 @@ type PropsWithResolvedDefaults = RequiresDefaultProps<Props, typeof defaultPiePr
  * @provides LabelListContext
  * @provides CellReader
  */
-function PieFn(outsideProps: Props) {
-	const props: PropsWithResolvedDefaults = resolveDefaultProps(outsideProps, defaultPieProps);
+function PieFn<DataPointType = any, DataValueType = any>(
+	outsideProps: Props<DataPointType, DataValueType>,
+) {
+	const props: PropsWithResolvedDefaults = resolveDefaultProps<Props, typeof defaultPieProps>(
+		outsideProps,
+		defaultPieProps,
+	);
 	const { id: externalId, ...propsWithoutId } = props;
 	const presentationProps: PiePresentationProps | null = svgPropertiesNoEvents(propsWithoutId);
 
@@ -1219,6 +1242,5 @@ function PieFn(outsideProps: Props) {
 		</>}
 	</RegisterGraphicalItemId>;
 }
-export const Pie = PieFn as (outsideProps: Props<DataPointType, DataValueType>) => ReactElement;
-// @ts-expect-error we need to set the displayName for debugging purposes
+export const Pie = PieFn as typeof PieFn & { displayName?: string };
 Pie.displayName = 'Pie';

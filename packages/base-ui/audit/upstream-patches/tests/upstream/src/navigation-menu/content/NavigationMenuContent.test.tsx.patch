@@ -1,0 +1,63 @@
+diff --git a/tests/upstream/src/navigation-menu/content/NavigationMenuContent.test.tsx b/tests/upstream/src/navigation-menu/content/NavigationMenuContent.test.tsx
+--- a/tests/upstream/src/navigation-menu/content/NavigationMenuContent.test.tsx
++++ b/tests/upstream/src/navigation-menu/content/NavigationMenuContent.test.tsx
+@@ -1,4 +1,9 @@
+ /** @jsxImportSource octane */
++import { NavigationMenuContentServerCase1, NavigationMenuContentServerCase2 } from './../../../../fixtures/NavigationMenuContent-ssr.tsrx';
++import { NavigationMenuContentServerCase1 as ServerNavigationMenuContentServerCase1, NavigationMenuContentServerCase2 as ServerNavigationMenuContentServerCase2 } from './../../../../fixtures/NavigationMenuContent-ssr.tsrx?octane-ssr';
++import { registerServerComponent } from './../../../../support/renderer';
++registerServerComponent(NavigationMenuContentServerCase1, ServerNavigationMenuContentServerCase1);
++registerServerComponent(NavigationMenuContentServerCase2, ServerNavigationMenuContentServerCase2);
+ import { expect, describe, it } from 'vitest';
+ import { NavigationMenu } from '@octanejs/base-ui/navigation-menu';
+ import { fireEvent, screen, flushMicrotasks, waitFor } from '@mui/internal-test-utils';
+@@ -30,23 +35,7 @@ describe('<NavigationMenu.Content />', () => {
+ 
+     it('keeps the content mounted (hidden) in the DOM when keepMounted is true', async () => {
+       renderToString(
+-        <NavigationMenu.Root>
+-          <NavigationMenu.List>
+-            <NavigationMenu.Item>
+-              <NavigationMenu.Trigger>Item 1</NavigationMenu.Trigger>
+-              <NavigationMenu.Content keepMounted data-testid="content-1">
+-                <NavigationMenu.Link href="#link-1">Link 1</NavigationMenu.Link>
+-              </NavigationMenu.Content>
+-            </NavigationMenu.Item>
+-          </NavigationMenu.List>
+-          <NavigationMenu.Portal>
+-            <NavigationMenu.Positioner>
+-              <NavigationMenu.Popup>
+-                <NavigationMenu.Viewport />
+-              </NavigationMenu.Popup>
+-            </NavigationMenu.Positioner>
+-          </NavigationMenu.Portal>
+-        </NavigationMenu.Root>,
++        <NavigationMenuContentServerCase1 />,
+       );
+ 
+       const contents = screen.queryAllByTestId('content-1');
+@@ -55,23 +44,7 @@ describe('<NavigationMenu.Content />', () => {
+ 
+     it('does not keep the content mounted in the DOM when keepMounted is false', async () => {
+       renderToString(
+-        <NavigationMenu.Root>
+-          <NavigationMenu.List>
+-            <NavigationMenu.Item>
+-              <NavigationMenu.Trigger>Item 1</NavigationMenu.Trigger>
+-              <NavigationMenu.Content data-testid="content-1">
+-                <NavigationMenu.Link href="#link-1">Link 1</NavigationMenu.Link>
+-              </NavigationMenu.Content>
+-            </NavigationMenu.Item>
+-          </NavigationMenu.List>
+-          <NavigationMenu.Portal>
+-            <NavigationMenu.Positioner>
+-              <NavigationMenu.Popup>
+-                <NavigationMenu.Viewport />
+-              </NavigationMenu.Popup>
+-            </NavigationMenu.Positioner>
+-          </NavigationMenu.Portal>
+-        </NavigationMenu.Root>,
++        <NavigationMenuContentServerCase2 />,
+       );
+ 
+       const contents = screen.queryAllByTestId('content-1');

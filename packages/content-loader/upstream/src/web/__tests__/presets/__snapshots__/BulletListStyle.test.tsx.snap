@@ -1,0 +1,114 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`BulletListStyle renders correctly 1`] = `
+<svg
+  aria-labelledby="BulletListStyle-aria"
+  role="img"
+  style={{}}
+  viewBox="0 0 245 125"
+>
+  <title
+    id="BulletListStyle-aria"
+  >
+    Loading...
+  </title>
+  <rect
+    clipPath="url(#BulletListStyle-diff)"
+    height="100%"
+    role="presentation"
+    style={
+      {
+        "fill": "url(#BulletListStyle-animated-diff)",
+      }
+    }
+    width="100%"
+    x="0"
+    y="0"
+  />
+  <defs>
+    <clipPath
+      id="BulletListStyle-diff"
+    >
+      <circle
+        cx="10"
+        cy="20"
+        r="8"
+      />
+      <rect
+        height="10"
+        rx="5"
+        ry="5"
+        width="220"
+        x="25"
+        y="15"
+      />
+      <circle
+        cx="10"
+        cy="50"
+        r="8"
+      />
+      <rect
+        height="10"
+        rx="5"
+        ry="5"
+        width="220"
+        x="25"
+        y="45"
+      />
+      <circle
+        cx="10"
+        cy="80"
+        r="8"
+      />
+      <rect
+        height="10"
+        rx="5"
+        ry="5"
+        width="220"
+        x="25"
+        y="75"
+      />
+      <circle
+        cx="10"
+        cy="110"
+        r="8"
+      />
+      <rect
+        height="10"
+        rx="5"
+        ry="5"
+        width="220"
+        x="25"
+        y="105"
+      />
+    </clipPath>
+    <linearGradient
+      gradientTransform="translate(-2 0)"
+      id="BulletListStyle-animated-diff"
+    >
+      <stop
+        offset="0%"
+        stopColor="#f5f6f7"
+        stopOpacity={1}
+      />
+      <stop
+        offset="50%"
+        stopColor="#eee"
+        stopOpacity={1}
+      />
+      <stop
+        offset="100%"
+        stopColor="#f5f6f7"
+        stopOpacity={1}
+      />
+      <animateTransform
+        attributeName="gradientTransform"
+        dur="20s"
+        repeatCount="indefinite"
+        type="translate"
+        values="-2 0; 0 0; 2 0"
+      />
+    </linearGradient>
+  </defs>
+</svg>
+`;

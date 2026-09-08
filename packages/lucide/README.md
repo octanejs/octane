@@ -8,6 +8,7 @@ data from `@lucide/icons`.
 ## Install
 
 ```bash
+npm install @octanejs/lucide
 pnpm add @octanejs/lucide
 ```
 

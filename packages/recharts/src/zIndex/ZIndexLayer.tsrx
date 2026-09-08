@@ -1,3 +1,12 @@
+import type { OctaneNode } from '../util/OctaneTypes.ts';
+
+export interface ZIndexable {
+	zIndex?: number;
+}
+type ZIndexLayerProps = {
+	zIndex: number | undefined;
+	children?: OctaneNode;
+};
 // Port of zIndex/ZIndexLayer.tsx — renders children into the redux-registered
 // <g> for the given zIndex via an octane portal (SVG has no CSS z-index).
 // Registration is deferred-cleanup: while a zIndex changes, the old portal
@@ -10,7 +19,7 @@ import { useIsInChartContext } from '../context/chartLayoutContext.ts';
 import { useIsPanorama } from '../context/PanoramaContext.ts';
 
 /** @since 3.4 */
-export function ZIndexLayer(props) {
+export function ZIndexLayer(props: ZIndexLayerProps) {
 	const { zIndex, children } = props;
 	// Outside a chart there is no zIndex portal state — render normally.
 	const isInChartContext = useIsInChartContext();
@@ -20,10 +29,10 @@ export function ZIndexLayer(props) {
 
 	// Deferred-cleanup bookkeeping: every registered zIndex, plus the last valid
 	// portal node to keep rendering into during a zIndex transition.
-	const lastPortalElementRef = useRef(undefined);
-	const registeredZIndexesRef = useRef(new Set());
+	const lastPortalElementRef = useRef<Element | undefined>(undefined);
+	const registeredZIndexesRef = useRef(new Set<number>());
 	const dispatch = useAppDispatch();
-	const portalElement = useAppSelector(
+	const portalElement: Element | undefined = useAppSelector(
 		(state) => selectZIndexPortalElement(state, zIndex, isPanorama),
 	);
 

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const fixture = join(dirname(fileURLToPath(import.meta.url)), '../_fixtures/devtools-diff.tsrx');
 const cacheDirectory = join(dirname(fileURLToPath(import.meta.url)), '.react-cache');
-const upstreamSrc = join(dirname(fileURLToPath(import.meta.url)), '../../upstream/package/src');
+const upstreamSrc = join(dirname(fileURLToPath(import.meta.url)), '../../upstream/src');
 
 function hashString(value: string): string {
 	let hash = 5381;

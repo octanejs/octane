@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "files": ["packages/dexie/typetests/public-api.test-d.ts"],
+  "assertionGroups": [
+    "all public hook exports",
+    "live-query result inference",
+    "optional integration declarations"
+  ]
+}

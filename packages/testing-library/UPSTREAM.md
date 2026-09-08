@@ -16,14 +16,20 @@ The package reuses DOM Testing Library unchanged and ports React Testing Library
 
 | Upstream entry/export | Octane disposition | Evidence |
 | --- | --- | --- |
-| root and `pure` DOM Testing Library exports | Re-exported unchanged | package dependency and all package tests |
+| root and `pure` DOM Testing Library exports except `fireEvent` | Re-exported unchanged | package dependency and all package tests |
 | `render`, `rerender`, `unmount`, `asFragment` | Ported | `render.test.ts`, cleanup tests, and independent raw-React differential case |
 | `cleanup` | Ported | `cleanup.test.ts` |
 | `renderHook` | Ported | `renderHook.test.ts` |
 | `act` and test-runner act environment | Ported | `act.test.ts` and async tests |
-| `fireEvent` | Ported with native-event divergence | `events.test.ts`, `events-native-parity.test.ts` |
+| `fireEvent` | Browser-ordered focus/blur pairs with bubbling focusin/out, preserving native helper cancellation results; native change and mouseEnter helpers | `audit-focus-events.test.ts`, `events.test.ts`, `events-native-parity.test.ts` |
 | hydration option | Ported onto `hydrateRoot` | `hydrate.test.ts` |
 | `ReactStrictMode`, `legacyRoot`, `onCaughtError`, `onRecoverableError` options | Not ported | explicit status gap |
+
+The focus helpers follow browser order: `focus` precedes `focusin`, and `blur`
+precedes `focusout`. The pinned upstream helper dispatches the bubbling event
+first to drive React's event adapter. Octane's helper always bubbles the paired
+event so `bubbles: false` on the native focus/blur event still reaches delegated
+handlers.
 
 ## Test-suite disposition
 

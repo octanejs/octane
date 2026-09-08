@@ -4,6 +4,7 @@ An Octane-native wallet connection UI preserving RainbowKit's defining provider,
 connect-control, modal-hook, and theme contracts.
 
 ```bash
+npm install @octanejs/rainbowkit @octanejs/wagmi @octanejs/tanstack-query viem
 pnpm add @octanejs/rainbowkit @octanejs/wagmi @octanejs/tanstack-query viem
 ```
 

@@ -5,6 +5,13 @@ the [Octane](https://github.com/octanejs/octane) renderer. Change the package
 import and keep the current v2 `List`, `Grid`, sizing, callback, ref, and
 imperative-scrolling contracts.
 
+## Installation
+
+```sh
+npm install @octanejs/window
+pnpm add @octanejs/window
+```
+
 ```diff
 -import { List } from 'react-window';
 +import { List } from '@octanejs/window';
@@ -70,6 +77,11 @@ match the React package. Two renderer-internal observations differ:
 - After keyed reordering, sibling effect order and equal-prop rerender counts
   can differ. Do not depend on sibling effect ordering; keyed state and DOM
   identity are preserved.
+
+The pinned source, npm declaration bundle, license, test inventory, allowed
+adaptations, and executable pristine/adapted/type/differential/SSR/hydration
+lanes are recorded in [`UPSTREAM.md`](./UPSTREAM.md) and
+[`audit/react-parity.json`](./audit/react-parity.json).
 
 ## License
 

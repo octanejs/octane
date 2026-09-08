@@ -1,0 +1,90 @@
+diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
+--- a/tests/upstream/useForm.test.tsx
++++ b/tests/upstream/useForm.test.tsx
+@@ -37,7 +37,13 @@ import {
+   useFormState,
+ } from '../../src';
+ 
+-vi.useFakeTimers();
++// octane: upstream enables jest fake timers file-wide and relies on
++// @testing-library/dom's waitFor auto-advancing them (it detects the `jest`
++// global). vitest has no `jest` global, so DTL takes the real-timers path and
++// its poll/timeout timers never fire under a fake clock — every waitFor whose
++// condition isn't mutation-driven hangs. Instead, the tests that actually
++// advance timers enable fake timers per-test and restore real timers at the
++// end (repo fake-timer pattern).
+ 
+ describe('useForm', () => {
+   describe('when component unMount', () => {
+@@ -80,7 +86,7 @@ describe('useForm', () => {
+         await result.current.handleSubmit(noop)({
+           preventDefault: noop,
+           persist: noop,
+-        } as React.SyntheticEvent);
++        });
+       });
+ 
+       expect(result.current.formState.errors.test).toBeDefined();
+@@ -104,7 +110,7 @@ describe('useForm', () => {
+         await result.current.handleSubmit(noop)({
+           preventDefault: noop,
+           persist: noop,
+-        } as React.SyntheticEvent);
++        });
+       });
+ 
+       expect(result.current.formState.errors.test).toBeDefined();
+@@ -1546,6 +1552,8 @@ describe('useForm', () => {
+ 
+       fireEvent.focus(input);
+ 
++      // octane: no synthetic event layer — React's onBlur is backed by native
++      // focusout, octane's onBlur by native blur; same user interaction.
+       fireEvent.blur(input);
+ 
+       expect(await screen.findByText('This is required.')).toBeVisible();
+@@ -1906,9 +1914,12 @@ describe('useForm', () => {
+     expect(getFieldState('lastName').isValidating).toBe(false);
+     expect(getFieldState('firstName').isValidating).toBe(false);
+     screen.getByText('stateValidation: false');
++    vi.useRealTimers();
+   });
+ 
+   it('should update isValidating without subscribing to validatingFields', async () => {
++    vi.useFakeTimers();
++
+     const App = () => {
+       const {
+         register,
+@@ -1955,6 +1966,7 @@ describe('useForm', () => {
+     await waitFor(() => {
+       expect(screen.queryByText('is validating')).not.toBeInTheDocument();
+     });
++    vi.useRealTimers();
+   });
+ 
+   it('should correctly handle multiple async validation triggers', async () => {
+@@ -2033,6 +2045,7 @@ describe('useForm', () => {
+ 
+     expect(formState.validatingFields).toStrictEqual({});
+     expect(getFieldState('lastName').isValidating).toBe(false);
++    vi.useRealTimers();
+   });
+ 
+   it('should update isValidating to true when using with resolver', async () => {
+@@ -2107,6 +2120,7 @@ describe('useForm', () => {
+     expect(formState.validatingFields).toStrictEqual({});
+     expect(getFieldState('lastName').isValidating).toBe(false);
+     expect(getFieldState('firstName').isValidating).toBe(false);
++    vi.useRealTimers();
+   });
+ 
+   it('should remove field from validatingFields on unregister', async () => {
+@@ -2150,6 +2164,7 @@ describe('useForm', () => {
+       vi.runAllTimers();
+     });
+     expect(formState.validatingFields).toEqual({});
++    vi.useRealTimers();
+   });
+ 
+   it('should update defaultValues async', async () => {

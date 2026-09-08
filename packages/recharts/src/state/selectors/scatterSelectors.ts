@@ -1,6 +1,7 @@
+import type { RegisteredCell } from '../../context/CellsContext';
 import { createSelector } from 'reselect';
-import { ReactElement } from 'octane';
-import { computeScatterPoints, ScatterPointItem } from '../../cartesian/Scatter';
+
+import { computeScatterPoints, ScatterPointItem } from '../../cartesian/Scatter.tsrx';
 import { RechartsRootState } from '../store';
 import { AxisId } from '../cartesianAxisSlice';
 import { selectChartDataWithIndexesIfNotInPanoramaPosition4 } from './dataSelectors';
@@ -23,7 +24,7 @@ const selectXAxisWithScale = (
 	_yAxisId: AxisId,
 	_zAxisId: AxisId,
 	_id: GraphicalItemId,
-	_cells: ReadonlyArray<ReactElement> | undefined,
+	_cells: ReadonlyArray<RegisteredCell> | undefined,
 	isPanorama: boolean,
 ) => selectAxisWithScale(state, 'xAxis', xAxisId, isPanorama);
 
@@ -33,7 +34,7 @@ const selectXAxisTicks = (
 	_yAxisId: AxisId,
 	_zAxisId: AxisId,
 	_id: GraphicalItemId,
-	_cells: ReadonlyArray<ReactElement> | undefined,
+	_cells: ReadonlyArray<RegisteredCell> | undefined,
 	isPanorama: boolean,
 ) => selectTicksOfGraphicalItem(state, 'xAxis', xAxisId, isPanorama);
 
@@ -43,7 +44,7 @@ const selectYAxisWithScale = (
 	yAxisId: AxisId,
 	_zAxisId: AxisId,
 	_id: GraphicalItemId,
-	_cells: ReadonlyArray<ReactElement> | undefined,
+	_cells: ReadonlyArray<RegisteredCell> | undefined,
 	isPanorama: boolean,
 ) => selectAxisWithScale(state, 'yAxis', yAxisId, isPanorama);
 
@@ -53,7 +54,7 @@ const selectYAxisTicks = (
 	yAxisId: AxisId,
 	_zAxisId: AxisId,
 	_id: GraphicalItemId,
-	_cells: ReadonlyArray<ReactElement> | undefined,
+	_cells: ReadonlyArray<RegisteredCell> | undefined,
 	isPanorama: boolean,
 ) => selectTicksOfGraphicalItem(state, 'yAxis', yAxisId, isPanorama);
 
@@ -78,8 +79,8 @@ const pickCells = (
 	_yAxisId: AxisId,
 	_zAxisId: AxisId,
 	_id: GraphicalItemId,
-	cells: ReadonlyArray<ReactElement> | undefined,
-): ReadonlyArray<ReactElement> | undefined => cells;
+	cells: ReadonlyArray<RegisteredCell> | undefined,
+): ReadonlyArray<RegisteredCell> | undefined => cells;
 
 const scatterChartDataSelector = (
 	state: RechartsRootState,
@@ -87,7 +88,7 @@ const scatterChartDataSelector = (
 	_yAxisId: AxisId,
 	_zAxisId: AxisId,
 	_id: GraphicalItemId,
-	_cells: ReadonlyArray<ReactElement> | undefined,
+	_cells: ReadonlyArray<RegisteredCell> | undefined,
 	isPanorama: boolean,
 ): ChartDataState =>
 	selectChartDataWithIndexesIfNotInPanoramaPosition4(state, undefined, undefined, isPanorama);
@@ -111,7 +112,7 @@ export const selectScatterPoints: (
 	yAxisId: AxisId,
 	zAxisId: AxisId,
 	id: GraphicalItemId,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 	isPanorama: boolean,
 ) => ReadonlyArray<ScatterPointItem> | undefined = createSelector(
 	[

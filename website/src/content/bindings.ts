@@ -3,10 +3,17 @@
 // editorial grouping and every count derived from it stay in sync with the repo.
 import bindingCategories from './bindings.json';
 
+export interface BindingCatalogEntry {
+	packageName: string;
+	title: string;
+	searchTerms?: readonly string[];
+	tags: readonly string[];
+}
+
 export interface BindingCategory {
 	title: string;
 	description: string;
-	packages: string[];
+	packages: BindingCatalogEntry[];
 }
 
 export const BINDING_CATEGORIES = bindingCategories satisfies BindingCategory[];
@@ -15,8 +22,3 @@ export const BINDING_COUNT = BINDING_CATEGORIES.reduce(
 	(total, category) => total + category.packages.length,
 	0,
 );
-
-export function bindingRepositoryHref(packageName: string): string {
-	const directory = packageName.slice('@octanejs/'.length);
-	return `https://github.com/octanejs/octane/tree/main/packages/${directory}`;
-}

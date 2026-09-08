@@ -1,0 +1,428 @@
+{
+  "schemaVersion": 1,
+  "reactVersion": "19.2.7",
+  "capability": "single-root-completed-commit-admission-only",
+  "runner": {
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "browserVersions": {
+    "development": "149.0.7827.55",
+    "production": "149.0.7827.55"
+  },
+  "candidateControls": {
+    "development:runInitialHold": {
+      "name": "initial-commit-held",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "tokenStatus": "committed",
+        "held": {
+          "content": null,
+          "portalContent": null,
+          "refActive": false,
+          "layoutValue": null,
+          "passiveValue": null,
+          "subscribed": false,
+          "lastMessage": null,
+          "layoutValues": [],
+          "passiveValues": []
+        },
+        "accepted": {
+          "content": "initial",
+          "portalContent": "initial",
+          "refActive": true,
+          "layoutValue": "initial",
+          "passiveValue": "initial",
+          "subscribed": true,
+          "lastMessage": "after-accept",
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        }
+      }
+    },
+    "development:runInternalUpdate": {
+      "name": "internal-state-update-held",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "held": {
+          "content": "initial",
+          "portalContent": "initial",
+          "refActive": true,
+          "layoutValue": "initial",
+          "passiveValue": "initial",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        },
+        "accepted": {
+          "content": "candidate",
+          "portalContent": "candidate",
+          "refActive": true,
+          "layoutValue": "candidate",
+          "passiveValue": "candidate",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial", "candidate"],
+          "passiveValues": ["initial", "candidate"]
+        },
+        "tokenStatus": "committed"
+      }
+    },
+    "development:runSupersededCandidate": {
+      "name": "superseded-candidate-rejected",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "lateAccept": false,
+        "oldTokenStatus": "aborted",
+        "latestTokenStatus": "committed",
+        "accepted": {
+          "content": "latest",
+          "portalContent": "latest",
+          "refActive": true,
+          "layoutValue": "latest",
+          "passiveValue": "latest",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial", "latest"],
+          "passiveValues": ["initial", "latest"]
+        },
+        "aborted": [
+          {
+            "id": 5,
+            "reason": "react-invalidated"
+          }
+        ]
+      }
+    },
+    "development:runExplicitAbort": {
+      "name": "explicit-abort-preserves-committed-ui",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "lateAccept": false,
+        "tokenStatus": "aborted",
+        "afterAbort": {
+          "content": "initial",
+          "portalContent": "initial",
+          "refActive": true,
+          "layoutValue": "initial",
+          "passiveValue": "initial",
+          "subscribed": true,
+          "lastMessage": "after-abort",
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        },
+        "recovered": {
+          "content": "latest",
+          "portalContent": "latest",
+          "refActive": true,
+          "layoutValue": "latest",
+          "passiveValue": "latest",
+          "subscribed": true,
+          "lastMessage": "after-abort",
+          "layoutValues": ["initial", "latest"],
+          "passiveValues": ["initial", "latest"]
+        },
+        "recoveredTokenStatus": "committed",
+        "aborted": [
+          {
+            "id": 8,
+            "reason": "explicit-abort"
+          }
+        ]
+      }
+    },
+    "development:runDisposeHeldCandidate": {
+      "name": "dispose-revokes-held-candidate",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "lateAccept": false,
+        "tokenStatus": "aborted",
+        "afterDispose": {
+          "content": null,
+          "portalContent": null,
+          "refActive": false,
+          "layoutValue": null,
+          "passiveValue": null,
+          "subscribed": false,
+          "lastMessage": "before-dispose",
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        },
+        "cleanups": ["layout", "passive", "ref", "subscription"]
+      }
+    },
+    "development:runUngatedRootWhileCandidateHeld": {
+      "name": "ungated-root-progresses-while-candidate-held",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "heldGated": {
+          "content": "initial",
+          "portalContent": "initial",
+          "refActive": true,
+          "layoutValue": "initial",
+          "passiveValue": "initial",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        },
+        "ungatedInitial": {
+          "content": "ungated-initial",
+          "refActive": true,
+          "layoutValue": "ungated-initial",
+          "passiveValue": "ungated-initial"
+        },
+        "ungatedUpdated": {
+          "content": "ungated-updated",
+          "refActive": true,
+          "layoutValue": "ungated-updated",
+          "passiveValue": "ungated-updated"
+        },
+        "acceptedGated": {
+          "content": "candidate",
+          "portalContent": "candidate",
+          "refActive": true,
+          "layoutValue": "candidate",
+          "passiveValue": "candidate",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial", "candidate"],
+          "passiveValues": ["initial", "candidate"]
+        },
+        "ungatedAfterGateAcceptance": {
+          "content": "ungated-updated",
+          "refActive": true,
+          "layoutValue": "ungated-updated",
+          "passiveValue": "ungated-updated"
+        }
+      }
+    },
+    "development:runSequentialRootAcceptance": {
+      "name": "sequential-roots-are-not-atomic",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "firstLayoutRead": {
+          "value": "candidate",
+          "sibling": "initial"
+        },
+        "betweenAccepts": {
+          "left": "candidate",
+          "right": "initial"
+        },
+        "settled": {
+          "left": "candidate",
+          "right": "candidate"
+        },
+        "atomicAcrossRoots": false
+      }
+    },
+    "production:runInitialHold": {
+      "name": "initial-commit-held",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "tokenStatus": "committed",
+        "held": {
+          "content": null,
+          "portalContent": null,
+          "refActive": false,
+          "layoutValue": null,
+          "passiveValue": null,
+          "subscribed": false,
+          "lastMessage": null,
+          "layoutValues": [],
+          "passiveValues": []
+        },
+        "accepted": {
+          "content": "initial",
+          "portalContent": "initial",
+          "refActive": true,
+          "layoutValue": "initial",
+          "passiveValue": "initial",
+          "subscribed": true,
+          "lastMessage": "after-accept",
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        }
+      }
+    },
+    "production:runInternalUpdate": {
+      "name": "internal-state-update-held",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "held": {
+          "content": "initial",
+          "portalContent": "initial",
+          "refActive": true,
+          "layoutValue": "initial",
+          "passiveValue": "initial",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        },
+        "accepted": {
+          "content": "candidate",
+          "portalContent": "candidate",
+          "refActive": true,
+          "layoutValue": "candidate",
+          "passiveValue": "candidate",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial", "candidate"],
+          "passiveValues": ["initial", "candidate"]
+        },
+        "tokenStatus": "committed"
+      }
+    },
+    "production:runSupersededCandidate": {
+      "name": "superseded-candidate-rejected",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "lateAccept": false,
+        "oldTokenStatus": "aborted",
+        "latestTokenStatus": "committed",
+        "accepted": {
+          "content": "latest",
+          "portalContent": "latest",
+          "refActive": true,
+          "layoutValue": "latest",
+          "passiveValue": "latest",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial", "latest"],
+          "passiveValues": ["initial", "latest"]
+        },
+        "aborted": [
+          {
+            "id": 5,
+            "reason": "react-invalidated"
+          }
+        ]
+      }
+    },
+    "production:runExplicitAbort": {
+      "name": "explicit-abort-preserves-committed-ui",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "lateAccept": false,
+        "tokenStatus": "aborted",
+        "afterAbort": {
+          "content": "initial",
+          "portalContent": "initial",
+          "refActive": true,
+          "layoutValue": "initial",
+          "passiveValue": "initial",
+          "subscribed": true,
+          "lastMessage": "after-abort",
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        },
+        "recovered": {
+          "content": "latest",
+          "portalContent": "latest",
+          "refActive": true,
+          "layoutValue": "latest",
+          "passiveValue": "latest",
+          "subscribed": true,
+          "lastMessage": "after-abort",
+          "layoutValues": ["initial", "latest"],
+          "passiveValues": ["initial", "latest"]
+        },
+        "recoveredTokenStatus": "committed",
+        "aborted": [
+          {
+            "id": 8,
+            "reason": "explicit-abort"
+          }
+        ]
+      }
+    },
+    "production:runDisposeHeldCandidate": {
+      "name": "dispose-revokes-held-candidate",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "lateAccept": false,
+        "tokenStatus": "aborted",
+        "afterDispose": {
+          "content": null,
+          "portalContent": null,
+          "refActive": false,
+          "layoutValue": null,
+          "passiveValue": null,
+          "subscribed": false,
+          "lastMessage": "before-dispose",
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        },
+        "cleanups": ["layout", "passive", "ref", "subscription"]
+      }
+    },
+    "production:runUngatedRootWhileCandidateHeld": {
+      "name": "ungated-root-progresses-while-candidate-held",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "heldGated": {
+          "content": "initial",
+          "portalContent": "initial",
+          "refActive": true,
+          "layoutValue": "initial",
+          "passiveValue": "initial",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial"],
+          "passiveValues": ["initial"]
+        },
+        "ungatedInitial": {
+          "content": "ungated-initial",
+          "refActive": true,
+          "layoutValue": "ungated-initial",
+          "passiveValue": "ungated-initial"
+        },
+        "ungatedUpdated": {
+          "content": "ungated-updated",
+          "refActive": true,
+          "layoutValue": "ungated-updated",
+          "passiveValue": "ungated-updated"
+        },
+        "acceptedGated": {
+          "content": "candidate",
+          "portalContent": "candidate",
+          "refActive": true,
+          "layoutValue": "candidate",
+          "passiveValue": "candidate",
+          "subscribed": true,
+          "lastMessage": null,
+          "layoutValues": ["initial", "candidate"],
+          "passiveValues": ["initial", "candidate"]
+        },
+        "ungatedAfterGateAcceptance": {
+          "content": "ungated-updated",
+          "refActive": true,
+          "layoutValue": "ungated-updated",
+          "passiveValue": "ungated-updated"
+        }
+      }
+    },
+    "production:runSequentialRootAcceptance": {
+      "name": "sequential-roots-are-not-atomic",
+      "reactVersion": "19.2.7",
+      "observations": {
+        "firstLayoutRead": {
+          "value": "candidate",
+          "sibling": "initial"
+        },
+        "betweenAccepts": {
+          "left": "candidate",
+          "right": "initial"
+        },
+        "settled": {
+          "left": "candidate",
+          "right": "candidate"
+        },
+        "atomicAcrossRoots": false
+      }
+    }
+  }
+}

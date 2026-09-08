@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/email/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares one shared welcome-email fixture through Octane render and @react-email/render on React."
+    },
+    {
+      "path": "packages/email/tests/differential/react-oracle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Smoke-checks the pinned @react-email/components oracle in isolation; parity evidence lives in parity.test.ts."
+    },
+    {
+      "path": "packages/email/tests/render.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane render entry-point and document contracts without a paired React oracle on the same fixture."
+    },
+    {
+      "path": "packages/email/tests/rich-content.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Markdown and Prism output against hand-written expectations; not React-parity evidence yet."
+    },
+    {
+      "path": "packages/email/tests/tailwind.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane Tailwind inlining contracts against hand-written expectations; not React-parity evidence yet."
+    }
+  ]
+}

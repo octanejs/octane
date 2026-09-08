@@ -1,4 +1,22 @@
-import { useState, useEffect, createElement, type OctaneNode } from 'octane';
+import {
+	useState,
+	useEffect,
+	useInsertionEffect,
+	useRef,
+	createElement,
+	type OctaneNode,
+} from 'octane';
+
+export function HydratableCallback(props: { onCall?: () => void }) @{
+	const callback = useRef<(() => void) | undefined>(undefined);
+	useInsertionEffect(() => {
+		callback.current = props.onCall;
+	}, [props.onCall]);
+	useEffect(() => {
+		callback.current?.();
+	}, []);
+	<span data-testid="callback">Ready</span>
+}
 
 interface CounterProps {
 	label: string;

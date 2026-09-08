@@ -1,14 +1,17 @@
 Please also reference the following rules as needed. The list below is provided in TOON format, and `@` stands for the project root directory.
 
-rules[3]:
+rules[4]:
   - path: @.agents/memories/core-engineering.md
     description: Performance-first engineering and self-review gates for Octane framework fundamentals
     applyTo[5]: packages/octane/src/**,packages/app-core/src/**,packages/vite-plugin-octane/src/**,packages/rspack-plugin-octane/src/**,packages/rsbuild-plugin-octane/src/**
+  - path: @.agents/memories/cursor-cloud.md
+    description: "Cursor Cloud VM setup: Node PATH, targeted test/typecheck, example dev servers"
+    applyTo[2]: .cursor/**,.cursor/environment.json
   - path: @.agents/memories/testing.md
     description: Octane test quality and observation-boundary rules
     applyTo[5]: **/*.test.*,**/*.spec.*,**/tests/**,**/_fixtures/**,benchmarks/**
   - path: @.agents/memories/tsrx-authoring.md
-    description: "Full .tsrx authoring reference: components, text holes, events, control flow, refs"
+    description: "Full .tsrx authoring reference: components, text holes, events, control flow, refs, scoped styles and themes ($class, apply)"
     applyTo[1]: **/*.tsrx
 
 # Additional Conventions Beyond the Built-in Functions
@@ -19,8 +22,7 @@ As this project's AI coding tool, you must follow the additional conventions bel
 
 Octane is Dominic Gannaway's successor to Inferno: a React-shaped UI framework
 with hooks, `memo`, context, portals, Suspense, and transitions, compiled ahead
-of time from `.tsrx`. The runtime, compiler, SSR, hydration, and large test suite
-work, but this is alpha and APIs still move.
+of time from `.tsrx`. It works end to end, but this is beta and APIs still move.
 
 Trust the source over any summary, this file included:
 
@@ -50,17 +52,24 @@ trigger first arises, even if it is a later step you chose:
 - `octane-core-extend`: before editing `packages/octane/src`.
 - `performance-audit`: a change that can move render, SSR, hydration, compiler
   output, or bundle cost.
-- `react-library-port`: a new or existing `@octanejs/*` binding.
+- `octane-react-library-port`: a new or existing `@octanejs/*` binding.
+- `react-library-port`: legacy compatibility trigger; immediately follow
+  `octane-react-library-port`.
 - `authoring-tsrx`: writing a new `.tsrx` file.
 - `triage`: the owning area is unclear.
 
 Each skill is `.rulesync/skills/<name>/SKILL.md`, with a generated per-tool copy;
 read that path directly if your tool cannot load a skill by name.
 
-Without `create-a-pr`: keep and tick provenance for agent work (clear or missing
-asserts human); never apply PR labels. Existing PR body edits must merge,
-preserve `<!-- CURSOR_SUMMARY -->` through `<!-- /CURSOR_SUMMARY -->`
-byte-for-byte, refetch before writing, and verify after.
+## Worktrees and CI
+
+New tasks use a dedicated worktree/non-default branch. Primary checkout and
+local `main`/`master` are read-only.
+
+A pushed PR is not done. Run current-head CI; fix failures until relevant checks
+pass. If draft CI skips, mark ready unless asked not to. Never claim done before
+green CI. Preserve `<!-- CURSOR_SUMMARY -->`…`<!-- /CURSOR_SUMMARY -->`; see
+`create-a-pr`.
 
 ## Your React instincts are the main failure mode here
 
@@ -109,7 +118,8 @@ Read a nearby `.tsrx` file first. The parts with no JavaScript equivalent:
   `@for (const x of xs; key x.id)`/`@empty`, `@switch`/`@case`/`@default`, and
   `@try`/`@pending`/`@catch`. Plain JS control flow stays in setup.
 
-Full reference: `.rulesync/rules/tsrx-authoring.md`.
+Full reference, including scoped `<style>` blocks and themes:
+`.rulesync/rules/tsrx-authoring.md`.
 
 ## Types
 
@@ -153,11 +163,12 @@ scripts. Root config uses `silent: true`. While diagnosing, pass
 `--silent=false` for all console output or `--silent=passed-only` for failing
 tests. CLI options override the config.
 
-For binding test setup, follow the `react-library-port` skill.
+For binding parity test setup, follow `docs/react-parity-testing.md` and the
+`octane-react-library-port` skill.
 
-Add a changeset for user-facing package changes; stay on the `patch` track while
-Octane is 0.x. Runtime, compiler, scheduler, reconciler, SSR/hydration, and build
-pipeline changes follow `.rulesync/rules/core-engineering.md`.
+Add changesets for user-facing changes. 0.x uses `patch`; coordinated core beta
+bumps may use `minor`, and `major` waits for 1.0. See `CONTRIBUTING.md`. Engine
+changes follow `.rulesync/rules/core-engineering.md`.
 
 Never mutate a parsed AST during compilation: rewrites are copy-on-write. Tests
 deep-freeze adopted parser ASTs, so an in-place write throws at the offending
@@ -170,3 +181,4 @@ Generated agent files come from `.rulesync/rules/`: edit those and run
 `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, and
 `.cursor/rules/project.mdc`. The other rules carry `globs`, so agents that
 support path-scoped rules load them only when you open a matching file.
+Cursor Cloud VM setup is `.rulesync/rules/cursor-cloud.md`.

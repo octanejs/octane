@@ -11,7 +11,7 @@ import {
 	type DisclosureProps,
 } from '@octanejs/aria/components';
 
-import { cn } from '../../../lib/utils';
+import { cn } from 'cn';
 import { ChevronDownIcon, ChevronUpIcon } from '@octanejs/lucide';
 
 export function Accordion({ className, ...props }: DisclosureGroupProps) {

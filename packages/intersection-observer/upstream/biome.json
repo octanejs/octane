@@ -1,0 +1,40 @@
+{
+  "$schema": "/node_modules/@biomejs/biome/configuration_schema.json",
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space"
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "noForEach": "off"
+      },
+      "correctness": {
+        "noUnusedVariables": {
+          "level": "warn",
+          "options": {
+            "ignoreRestSiblings": true
+          }
+        }
+      },
+      "style": {
+        "noUnusedTemplateLiteral": "off"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "off"
+      }
+    }
+  },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  }
+}

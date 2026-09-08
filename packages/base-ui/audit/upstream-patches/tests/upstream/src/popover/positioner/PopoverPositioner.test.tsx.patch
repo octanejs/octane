@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/src/popover/positioner/PopoverPositioner.test.tsx b/tests/upstream/src/popover/positioner/PopoverPositioner.test.tsx
+--- a/tests/upstream/src/popover/positioner/PopoverPositioner.test.tsx
++++ b/tests/upstream/src/popover/positioner/PopoverPositioner.test.tsx
+@@ -13,10 +13,10 @@ import {
+   waitSingleFrame,
+ } from '#test-utils';
+ 
+-const Trigger = React.forwardRef(function Trigger(
+-  props: Popover.Trigger.Props,
+-  ref: React.ForwardedRef<any>,
++const Trigger = (function Trigger(
++  propsWithRef: (Popover.Trigger.Props) & { ref?: React.Ref<any> },
+ ) {
++  const { ref: ref = null, ...props } = propsWithRef;
+   return <Popover.Trigger {...props} ref={ref} render={<div />} nativeButton={false} />;
+ });
+ 

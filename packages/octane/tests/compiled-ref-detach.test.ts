@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { mount, act } from './_helpers';
-import { flushSync } from '../src/index.js';
-import { SetterRefSwap, LoggedRefSwap } from './_fixtures/compiled-ref-detach.tsrx';
+import { createRoot, flushSync } from '../src/index.js';
+import {
+	SetterRefSwap,
+	LoggedRefSwap,
+	InlineSetterRef,
+	RefStateCausalLoop,
+} from './_fixtures/compiled-ref-detach.tsrx';
 
 // Regression: compiled `ref` binding unmount cleanups (and spread/hostComponent/
 // fragment-ref ones) detach at COMMIT via queueRefDetach, before that commit's
@@ -59,4 +64,34 @@ describe('compiled ref teardown detaches at commit', () => {
 		expect(r.current!.id).toBe('pa');
 		m.unmount();
 	});
+});
+
+describe('inline state setter refs', () => {
+	it('settles when a changed ref clears and restores the same node in one commit', async () => {
+		const view = mount(InlineSetterRef, {});
+		try {
+			await act(async () => {});
+			const button = view.container.querySelector('button')!;
+			expect(view.container.querySelector('output')?.textContent).toBe('first:0:attached');
+			view.click('button');
+			expect(view.container.querySelector('output')?.textContent).toBe('first:1:attached');
+			view.root.render(InlineSetterRef, { label: 'second' });
+			await act(async () => {});
+			expect(view.container.querySelector('button')).toBe(button);
+			expect(view.container.querySelector('output')?.textContent).toBe('second:1:attached');
+		} finally {
+			view.unmount();
+		}
+	});
+});
+
+it('retains the nested-update guard for state updates deferred from ref callbacks', async () => {
+	const root = createRoot(document.createElement('div'));
+	try {
+		await expect(act(() => root.render(RefStateCausalLoop))).rejects.toThrow(
+			/Maximum update depth exceeded/,
+		);
+	} finally {
+		root.unmount();
+	}
 });

@@ -1,0 +1,638 @@
+{
+  "schemaVersion": 1,
+  "commit": "e5deed330aa4231751a106445d93d62e4716a22f",
+  "repo": "https://github.com/vercel/streamdown.git",
+  "notes": "Complete inventory of executable and support artifacts under every upstream __tests__ tree at the pinned commit. npm tarballs omit these files; repository presence is authoritative. Each artifact is explicitly excluded from pristine / one-for-one adapted execution in this bounded harness.",
+  "summary": {
+    "artifacts": 104,
+    "runtimeTests": 101,
+    "support": 3,
+    "excluded": 104
+  },
+  "artifacts": [
+    {
+      "path": "packages/remend/__tests__/basic-input.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/bold-italic.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/bold.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/broken-markdown-variants.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/code-blocks.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/comparison-operators.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/coverage-gaps.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/custom-handlers.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/edge-cases.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/horizontal-rules.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/html-tags.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/images.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/inline-code.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/italic.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/katex.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/links.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/lists.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/mixed-formatting.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/setext-heading.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/single-tilde.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/streaming.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/strikethrough.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/underscore-bug.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/remend/__tests__/utils.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "remend is a framework-neutral Markdown repair package in the upstream monorepo. Its suite is present at the pin but is outside the @octanejs/streamdown React-binding parity surface for this bounded harness; exclude until a dedicated remend evidence lane is intentionally added."
+    },
+    {
+      "path": "packages/streamdown-cjk/__tests__/index.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Official plugin package suite artifact is present at the pin but not yet executed as a pristine or one-for-one adapted lane. Octane consolidates these plugins under @octanejs/streamdown subpaths and authenticates that distribution divergence with an adapted case; promote this artifact into a pristine/adapted lane in a follow-up."
+    },
+    {
+      "path": "packages/streamdown-code/__tests__/index.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Official plugin package suite artifact is present at the pin but not yet executed as a pristine or one-for-one adapted lane. Octane consolidates these plugins under @octanejs/streamdown subpaths and authenticates that distribution divergence with an adapted case; promote this artifact into a pristine/adapted lane in a follow-up."
+    },
+    {
+      "path": "packages/streamdown-math/__tests__/index.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Official plugin package suite artifact is present at the pin but not yet executed as a pristine or one-for-one adapted lane. Octane consolidates these plugins under @octanejs/streamdown subpaths and authenticates that distribution divergence with an adapted case; promote this artifact into a pristine/adapted lane in a follow-up."
+    },
+    {
+      "path": "packages/streamdown-mermaid/__tests__/index.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Official plugin package suite artifact is present at the pin but not yet executed as a pristine or one-for-one adapted lane. Octane consolidates these plugins under @octanejs/streamdown subpaths and authenticates that distribution divergence with an adapted case; promote this artifact into a pristine/adapted lane in a follow-up."
+    },
+    {
+      "path": "packages/streamdown-mermaid/__tests__/setup.ts",
+      "kind": "support",
+      "disposition": "excluded",
+      "reason": "Upstream suite support/fixture artifact inventoried with the executable suite. Excluded with its owning package tests until a pristine/adapted lane adopts it."
+    },
+    {
+      "path": "packages/streamdown/__tests__/__fixtures__/code-block-big-html.html",
+      "kind": "support",
+      "disposition": "excluded",
+      "reason": "Upstream suite support/fixture artifact inventoried with the executable suite. Excluded with its owning package tests until a pristine/adapted lane adopts it."
+    },
+    {
+      "path": "packages/streamdown/__tests__/allowed-tags.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/animate.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/caret.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/cjk-friendly.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/code-block-body.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/code-block-context.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/code-block-download.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/code-block-hydration.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/code-block-line-numbers.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/code-block-loading.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/code-block-memo.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/code-block-start-line.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/code-block.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/components-memo.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/components-rerender.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/components.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/copy-dropdown.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/coverage-final.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/custom-renderer.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/detect-direction.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/dollar-sign.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/download-dropdown.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/email-addresses.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/escape-html.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/final-coverage.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/footnote-section.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/footnotes.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/html-block-multiline.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/icon-context.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/image-cached.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/image-edge-cases.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/image-hydration.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/image.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/incomplete-code-block.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/inline-code.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/katex-classes.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/katex-lazy-load.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/latex-begin-issue.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/link-modal-keyboard.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/link-safety.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/list-animation-retrigger.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/markdown-filtering.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/markdown.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/matrix-equation.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/memo-comparators.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/mermaid-component.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/mermaid-download.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/mermaid-fullscreen.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/mermaid-utils.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/mermaid.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/nested-details-tables.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/node-attribute-removed.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/normalize-html-indentation.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/pan-zoom-interaction.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/pan-zoom.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/plugin-context.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/prefix.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/preprocess-custom-tags.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/preprocess-literal-tag-content.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/rehype-literal-tag-content.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/remaining-coverage.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/rtl-support.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/scroll-lock.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/setup.ts",
+      "kind": "support",
+      "disposition": "excluded",
+      "reason": "Upstream suite support/fixture artifact inventoried with the executable suite. Excluded with its owning package tests until a pristine/adapted lane adopts it."
+    },
+    {
+      "path": "packages/streamdown/__tests__/show-controls.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/streamdown-coverage.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/streamdown.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/table-dropdowns.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/table-fullscreen.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/table-utils.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/tel-links.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/translations.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/use-deferred-render.test.tsx",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    },
+    {
+      "path": "packages/streamdown/__tests__/utils.test.ts",
+      "kind": "runtime-test",
+      "disposition": "excluded",
+      "reason": "Pinned repository suite artifact is present but not yet executed as a pristine or one-for-one adapted lane. This bounded harness authenticates the Streamdown runtime through exact same-fixture differential cases and adapted divergence cases instead; promote this artifact into a pristine/adapted lane or keep the exclusion when a later full-suite port lands."
+    }
+  ]
+}

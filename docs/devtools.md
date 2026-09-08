@@ -51,6 +51,21 @@ app to describe it and shows:
   `memo-or-callback`) and current value.
 - **Context** — the context values the node reads, by name.
 - **Effect count** — the number of effects registered on the node.
+- **Native reads** — when `nativeReads: true` is enabled, the selected scope's
+  accepted reads, pending attempts, and suspended retry sources. Each read shows
+  its data scope/key, read mode, observed and current revisions, dependency keys,
+  retirement and historical-lease state. Async sources also report retained
+  values, refresh activity, stream connection state, and completion. These are
+  cached metadata: inspection never evaluates a derived computation, starts a
+  request, serializes a native value, or subscribes to a new source. Revisions
+  describe invalidation; they are not request attempt identifiers.
+
+Native read detail identifies the actual scheduled renderer owner separately
+from the selected scope, since a lightweight component can share its parent's
+Block. The bridge refreshes only the selected node after a flush and clears its
+detail when it leaves the tree. Hook-value previews show accessors as `[Getter]`
+without invoking them. Protocol version 3 adds the optional `nativeReads` detail
+and an `inspect-clear` event; runtimes without native inspection omit the detail.
 
 ## The Profiler tab
 

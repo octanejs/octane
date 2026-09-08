@@ -1,5 +1,6 @@
+import type { CSSProperties, OctaneElement, OctaneNode } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { CSSProperties, ReactElement, ReactNode, useEffect } from 'octane';
+import { useEffect } from 'octane';
 import { createPortal } from 'octane';
 import {
 	DefaultTooltipContent,
@@ -8,15 +9,15 @@ import {
 	Props as DefaultTooltipContentProps,
 	TooltipItemSorter,
 	ValueType,
-} from './DefaultTooltipContent';
-import { TooltipBoundingBox } from './TooltipBoundingBox';
+} from './DefaultTooltipContent.tsrx';
+import { TooltipBoundingBox } from './TooltipBoundingBox.tsrx';
 
 import { getUniqPayload, UniqueOption } from '../util/payload/getUniqPayload';
 import { AllowInDimension, AnimationDuration, EasingInput, Coordinate } from '../util/types';
 import { useViewBox } from '../context/chartLayoutContext';
 import { useAccessibilityLayer } from '../context/accessibilityContext';
 import { useElementOffset } from '../util/useElementOffset';
-import { Cursor, CursorDefinition } from './Cursor';
+import { Cursor, CursorDefinition } from './Cursor.tsrx';
 import {
 	selectActiveCoordinate,
 	selectActiveLabel,
@@ -33,12 +34,12 @@ import {
 	TooltipPayloadEntry,
 } from '../state/tooltipSlice';
 import { AxisId } from '../state/cartesianAxisSlice';
-import { useTooltipChartSynchronisation } from '../synchronisation/useChartSynchronisation';
+import { useTooltipChartSynchronisation } from '../synchronisation/useChartSynchronisation.tsrx';
 import { useTooltipEventType } from '../state/selectors/selectTooltipEventType';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 
 export type ContentType<TValue extends ValueType = ValueType, TName extends NameType = NameType> =
-	ReactElement | ((props: TooltipContentProps<TValue, TName>) => ReactNode);
+	OctaneElement | ((props: TooltipContentProps<TValue, TName>) => OctaneNode);
 
 function defaultUniqBy(entry: Payload<ValueType, NameType>) {
 	return entry.dataKey;
@@ -60,7 +61,7 @@ export type TooltipContentProps<
 function renderContent<TValue extends ValueType, TName extends NameType>(
 	content: ContentType<TValue, TName> | undefined,
 	props: TooltipContentProps,
-): ReactNode {
+): OctaneNode {
 	if (React.isValidElement(content)) {
 		return React.cloneElement(content, props);
 	}
@@ -143,8 +144,8 @@ export type TooltipProps<TValue extends ValueType = ValueType, TName extends Nam
  * Function to customize the value in the tooltip.
  * If you return an array, the first entry will be the formatted "value", and the second entry will be the formatted "name"
  */
-		formatter?: (value: TValue, name: TName, item: TooltipPayloadEntry, index: number, payload: TooltipPayload) => | ReactNode
-		| [ReactNode, ReactNode];
+		formatter?: (value: TValue, name: TName, item: TooltipPayloadEntry, index: number, payload: TooltipPayload) => | OctaneNode
+		| [OctaneNode, OctaneNode];
 		/**
  * If true, the tooltip will display information about hidden series.
  * Defaults to false.
@@ -173,7 +174,7 @@ export type TooltipProps<TValue extends ValueType = ValueType, TName extends Nam
 		/**
  * The formatter function of label in tooltip.
  */
-		labelFormatter?: (label: any, payload: TooltipPayload) => ReactNode;
+		labelFormatter?: (label: any, payload: TooltipPayload) => OctaneNode;
 		/**
  * The style of default tooltip label which is a p element.
  * @defaultValue {}

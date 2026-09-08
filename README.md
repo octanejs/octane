@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/octanejs/octane/actions/workflows/ci.yml"><img src="https://github.com/octanejs/octane/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="#status"><img src="https://img.shields.io/badge/status-alpha-orange" alt="status: alpha"></a>
+  <a href="#status"><img src="https://img.shields.io/badge/status-beta-yellow" alt="status: beta"></a>
   <a href="https://www.npmjs.com/package/octane"><img src="https://img.shields.io/npm/v/octane?logo=npm" alt="npm version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
@@ -47,7 +47,7 @@ docs into a `.tsx` file and it runs. Or author in `.tsrx`, the spiritual
 successor to JSX, and get template directives (`@if`, `@for`, `@switch`, `@try`)
 that compile to keyed fast paths, plus an `@{ … }` shorthand that puts setup next
 to the output. Mix both dialects in one app and import across the boundary.
-[TSRX for VS Code](https://marketplace.visualstudio.com/items?itemName=Ripple-TS.ripple-ts-vscode-plugin)
+[TSRX Syntax for VS Code](https://marketplace.visualstudio.com/items?itemName=TSRX.tsrx-vscode-plugin)
 adds syntax highlighting, diagnostics, navigation, and completions for `.tsrx`
 files.
 
@@ -73,9 +73,9 @@ the browser.
 **No virtual DOM.** Components re-render like React, but a compiled render path
 and an LIS-based keyed reconciler keep the runtime overhead minimal.
 
-Octane is deliberately narrow where React has grown wide: no class components, no
-Server Components, no synthetic event system. Those are choices, not gaps, and
-they are written down in
+Octane's native renderer is deliberately narrow where React has grown wide: no
+class components, no Server Components, no synthetic event system. Those are
+choices, not gaps, and they are written down in
 [Differences from React](https://octanejs.dev/docs/differences-from-react).
 
 ## Also in the box
@@ -96,8 +96,18 @@ they are written down in
 - **Behavior-only roots for externally owned DOM.** Attach abortable behavior
   and delegated native events to server-rendered or independently streamed
   markup without rendering it or taking reconciliation ownership.
+- **React interoperability in both directions.** Keep real React components
+  inside Octane with `ReactCompat`, or add Octane components to a React app with
+  `OctaneCompat`. Both are available from `octane/react`.
+- **Optional immutable render snapshots.** Add `"use strong"` to one module, or
+  enable Strong mode for an application, to assert pure renders, catch
+  detectable violations, and let production memoization condition every
+  user-authored render call shape on its witnessed inputs.
 - **`class` / `className` composes clsx-style** everywhere: strings, arrays,
-  objects, and nesting, at every apply site.
+  objects, and nesting, at every apply site. `<style>` blocks are
+  sibling-scoped (a block styles its siblings and everything below them, never
+  its parent), and `const theme = <style>…</style>` exposes `$class` plus one key
+  per class for `class={theme.dark}` and `<style apply={theme} />`.
 - **A current-state getter.** `useState` and `useReducer` return
   `[state, update, getState]`, so a delayed callback can read the latest value
   instead of a stale capture.
@@ -154,9 +164,59 @@ Rspack and Rsbuild are supported too. [Getting started](./docs/getting-started.m
 covers all three build tools, server rendering, hydration, streaming, deferred
 hydration, and profiling.
 
+## React interoperability
+
+`octane/react` lets each renderer keep ownership of its own components:
+
+| Boundary       | What it renders                               | React version                                             |
+| -------------- | --------------------------------------------- | --------------------------------------------------------- |
+| `ReactCompat`  | Real React components inside an Octane app    | Matching React and React DOM 19.2+ in the React 19 series |
+| `OctaneCompat` | Compiled Octane components inside a React app | React 19                                                  |
+
+For a React component in an Octane template:
+
+```tsrx
+// App.tsrx — compiled by Octane.
+import { ReactCompat } from 'octane/react';
+import { Counter } from './Counter.react';
+
+export function App() @{
+	<ReactCompat><Counter start={3} /></ReactCompat>
+}
+```
+
+```tsx
+/** @jsxImportSource react */
+// Counter.react.tsx — compiled by React's JSX transform.
+import { useState } from 'react';
+
+export function Counter({ start }: { start: number }) {
+	const [count, setCount] = useState(start);
+	return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+Keep native Octane components in `.tsrx` and React components under React's JSX
+transform. Mixed builds use `requireDirective: true` with both compilers; do not
+alias React to Octane. The [React interoperability guide](./docs/react-compat.md)
+includes compiler setup and the `component`/`props` form.
+
+`ReactCompat` preserves React state, events, and refs. Map native context into
+React explicitly with `bridgeReactContext(OctaneContext, ReactContext)` and the
+boundary's `contexts` prop. In the opposite direction, an Octane component
+inside `OctaneCompat` can read a real React context with Octane's `use` or
+`useContext`.
+
+Both boundaries have server implementations in `octane/react/server`. Octane's
+server compiler retargets the import automatically; React-owned server entries
+that bypass it must select the server entry explicitly. `ReactCompat` starts or
+updates React work after Octane commits, so Octane transitions and `flushSync()`
+do not synchronously commit the React root. See the guide for pending updates,
+SSR buffering, hydration, and nesting limits.
+
 ## Status
 
-Octane is in alpha. The runtime, compiler, and SSR/hydration paths all work, but
+Octane is in beta. The runtime, compiler, and SSR/hydration paths all work, but
 APIs still move.
 
 The core suite contains **3,900+ distinct behavioral tests** across conformance,
@@ -187,6 +247,8 @@ Octane itself. Good places to start:
   React ecosystem.
 - [Framework integrations](https://octanejs.dev/docs/framework-integrations):
   use Octane with Astro, Docusaurus, or TanStack Start.
+- [React interoperability](https://octanejs.dev/docs/react-compat): use
+  `ReactCompat` for React inside Octane, or `OctaneCompat` for Octane inside React.
 
 In this repository:
 
@@ -198,6 +260,9 @@ In this repository:
   [deferred hydration](./docs/deferred-hydration.md): the full references.
 - [Differences from React](./docs/differences-from-react.md): the divergence
   contract.
+- [ReactCompat](./docs/react-compat.md): React inside Octane, including compiler
+  ownership, context mapping, boundaries, SSR, and hydration; links to the
+  opposite `OctaneCompat` direction.
 - [Bindings status](./docs/bindings-status.md): what each `@octanejs/*` package
   ports, its upstream version, and its known divergences.
 
@@ -209,7 +274,8 @@ generated inventory; the shape of it is:
 - [`octane`](./packages/octane) is the runtime and the compiler together:
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
   and the compiler itself, exposed at `octane/compiler` with bundler adapters at
-  `octane/compiler/vite` and `octane/compiler/bundler`.
+  `octane/compiler/vite` and `octane/compiler/bundler`. Custom Node build pipelines
+  can opt into [type-aware text compilation](./docs/compiler-text-inference.md).
 - The app layer: [`@octanejs/app-core`](./packages/app-core) holds the
   bundler-neutral config, routing, SSR, hydration codegen, and production
   handler, and the [Vite](./packages/vite-plugin-octane),
@@ -238,6 +304,17 @@ partial or alpha, and
 [`docs/bindings-status.md`](./docs/bindings-status.md) is the generated table of
 record: upstream version, supported surface, known divergences, SSR/hydration
 coverage, and when the evidence was last checked.
+
+## Sponsors
+
+<a href="https://blacksmith.sh">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./website/src/assets/blacksmith-ci-on-dark.svg">
+    <img width="352" height="96" alt="CI powered by Blacksmith" src="./website/src/assets/blacksmith-ci-on-light.svg">
+  </picture>
+</a>
+
+**BlackSmith** - fast and efficient platform for running GitHub Actions, helping teams build, test, and deploy code faster while reducing CI costs. We thank Blacksmith for supporting our community as a sponsor!
 
 ## Contributing
 

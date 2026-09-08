@@ -16,11 +16,25 @@
  */
 import { useEffect } from 'octane';
 
+// This package publishes source, so a browser application compiles the file
+// below with its own tsconfig and runs it in a host that has neither
+// `@types/node` nor a `process` global. The reference is therefore declared
+// here and guarded at runtime; without the guard every `<Head>` render throws a
+// ReferenceError in any host that does not define one.
+//
+// The read stays spelled out as `process.env.NODE_ENV` because that is the
+// expression bundlers substitute with a literal. Where the identifier also
+// survives, Node and SSR, the production branch is exact. Where only the value
+// is substituted the guard reads false and the diagnostic behaves as it does in
+// development: one counter and one effect per owning `<Head>`, which is the
+// price of not throwing.
+declare const process: { readonly env: { readonly NODE_ENV?: string } } | undefined;
+
 let liveOwners = 0;
 let reported = false;
 
 export function useStrayOwnerDiagnostic(owns: boolean): void {
-	if (process.env.NODE_ENV === 'production') return;
+	if (typeof process !== 'undefined' && process.env.NODE_ENV === 'production') return;
 	useEffect(() => {
 		if (!owns) return;
 		liveOwners++;

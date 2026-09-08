@@ -19,7 +19,7 @@ export type ResizeObserverConstructor =
 export type Options = {
 	debounce?: number | { scroll?: number; resize?: number };
 	scroll?: boolean;
-	polyfill?: ResizeObserverConstructor;
+	polyfill?: ResizeObserverConstructor | (new (callback: ResizeObserverCallback) => ResizeObserver);
 	offsetSize?: boolean;
 };
 

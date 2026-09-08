@@ -1,0 +1,12 @@
+[
+  {
+    "path": "types.test-d.ts",
+    "sha256": "f359616f6752849da18e54bb0493701b4fd6711e66b3cc4183228d9a24170d24",
+    "assertionGroups": [
+      "8415d50032212fa5fbbdac307a8056f7403970313169fa2cb1a459a01a2c1590",
+      "136509442cb897c32baa091d54b1014f42c99b92d289a31eb490bee9eb2c053e",
+      "6ec44baab1242820a63f9cdddc49d4ff24bb013d341452ca6b915cef27d1fdd4",
+      "4754119597da9c16bec6b173c6c42abacabd6144e4c29ae95ef667a89af2e04a"
+    ]
+  }
+]

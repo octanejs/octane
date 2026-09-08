@@ -1,7 +1,7 @@
 # ssr-http — raw streaming API over real HTTP (cold + warm)
 
-Measures Octane's `renderToPipeableStream` (`octane/server`) against React 19
-Fizz (`react-dom/server`) through **real HTTP servers**, including **cold
+Measures Octane's `renderToPipeableStream` (`octane/server`), React 19 Fizz
+(`react-dom/server`), and Inferno's ordered queue stream through **real HTTP servers**, including **cold
 start**: process spawn → TCP listen → first body byte. It reuses the
 [streaming-ssr](../streaming-ssr/README.md) fixtures (identical page, identical
 data schedules) behind one identical ~20-line `node:http` host per target
@@ -34,7 +34,7 @@ Methodology notes:
 - TTFB is the first response **body** chunk, not headers.
 - Chunk counts/bytes are TCP-coalescing artifacts → reported under `meta`,
   never guarded.
-- Fixture bundles are built exactly like streaming-ssr's (`minify: false`, per
+- Fixture bundles are built exactly like streaming-ssr's (`minify: 'esbuild'`, per
   the fixtures' vite configs). Octane is bundled from TS source into the entry;
   react-dom stays external and loads its prebuilt minified production files —
   the same asymmetry real deployments have.

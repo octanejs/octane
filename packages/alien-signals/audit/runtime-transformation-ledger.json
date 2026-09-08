@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "pristineSource": "packages/alien-signals/upstream/src/index.test.ts",
+  "adaptedSource": "packages/alien-signals/tests/upstream-adapted.test.ts",
+  "fixtureSource": "packages/alien-signals/tests/_fixtures/hooks.tsrx",
+  "fixtureFileSha256": "af4c04c6f742e521980cfed5fc07d454395eca016385a52d6b027bc3496e4aca",
+  "permittedTransformations": [
+    {
+      "kind": "runner",
+      "rule": "bun:test + jest.fn become vitest + vi.fn"
+    },
+    {
+      "kind": "harness",
+      "rule": "renderHook/act/cleanup become mount/nextPaint/click/update against .tsrx fixtures"
+    },
+    {
+      "kind": "fixture-extraction",
+      "rule": "React hook bodies from renderHook callbacks live in tests/_fixtures/hooks.tsrx exports mounted by name"
+    },
+    {
+      "kind": "assertion-surface",
+      "rule": "result.current / result.current[0] / toEqual object receivers may become DOM textContent string forms of the same observable value; expect() receivers are compared (signal calls and literals must not weaken); matcher contracts (toBe/toEqual/toHaveBeenCalledTimes/toBeDefined/toBeGreaterThan) must still cover every pristine assertion value"
+    },
+    {
+      "kind": "async-flush",
+      "rule": "act(...) may become await nextPaint() around the same state transition; concurrent Promise.all microtask setters stay microtask-concurrent"
+    },
+    {
+      "kind": "citation",
+      "rule": "Every adapted case requires // Per src/index.test.ts:<line> citing the pristine it() line for that title"
+    },
+    {
+      "kind": "fixture-structure",
+      "rule": "Adapted result.find/click #ids must exist in hooks.tsrx; file sha256 alone cannot silence semantic id removal"
+    },
+    {
+      "kind": "per-case-transition",
+      "rule": "Each pristine hook-surface setter write (result.current / destructured setter alias inside act) must remain a hook-path transition in the adapted case: authenticated setter invocations inside a mountResult.click('#id') handler whose mounted fixture's #id onClick invokes a useSignal/useSetSignal setter on an always-executed handler statement (parsed from the fixture AST; dead branches, nested unused functions, and handlers that also call props.source(...) do not authenticate; count and normalized update shapes must match the pristine writes), or a SetterProbe-style recorded setter call bound from setters.at / setters[i] on an array that received .push of the record-callback parameter from a fixture whose active props.record(<useSignal setter>) call is parsed from the fixture AST (comments/decoys do not qualify). Incidental callees, stub-array aliases without push, clicks whose handlers call props.source directly, dead-code padding of setter shapes, and collapsing multiple queued functional updates into fewer setter invocations do not count. Replacing hook-path coverage with direct createSignal source writes is rejected even when assertion contracts and global fixture ids still match."
+    }
+  ],
+  "notes": "Title identity remains one-for-one. This ledger is enforced by scripts/react-parity/alien-signals-runtime-lib.mjs, which compares normalized assertion contracts (including expect receivers), Per citations, per-case hook-surface→authenticated-fixture-click/recorded-setter transitions, referenced fixture ids, and fixture-export fingerprints rather than titles alone."
+}

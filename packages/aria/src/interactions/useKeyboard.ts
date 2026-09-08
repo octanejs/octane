@@ -1,3 +1,9 @@
+import { chain } from '../utils/chain';
+import {
+	createKeyboardShortcutHandler,
+	type KeyboardShortcutBindings,
+} from './createKeyboardShortcutHandler';
+import { getEventTarget, nodeContains } from '../utils/shadowdom/DOMFunctions';
 // Ported from react-aria (source: .react-spectrum/packages/react-aria/src/interactions/useKeyboard.ts).
 // octane adaptations:
 // - `KeyboardEvents` / `DOMAttributes` from '@react-types/shared' are typed over React's
@@ -20,6 +26,9 @@ export interface KeyboardEvents {
 export type DOMAttributes = Record<string, any>;
 
 export interface KeyboardProps extends KeyboardEvents {
+	shortcuts?: KeyboardShortcutBindings;
+	allowRepeats?: boolean;
+	allowComposing?: boolean;
 	/** Whether the keyboard events should be disabled. */
 	isDisabled?: boolean;
 }
@@ -39,12 +48,51 @@ export function useKeyboard(...args: any[]): KeyboardResult {
 	const [user] = splitSlot(args);
 	const props = user[0] as KeyboardProps;
 
+	let { shortcuts, allowRepeats = false, allowComposing = false } = props;
+	let onKeyDown;
+	let onKeyUp;
+	if (shortcuts) {
+		let shortcutHandler = createKeyboardShortcutHandler(shortcuts);
+		let shortcutOnKeyDown = createEventHandler<KeyboardEvent>((e) => {
+			// If keyboard event didn't originate from a child of the current target,
+			// then it's a React event coming through a portal. We should ignore it.
+			if (!nodeContains(e.currentTarget as Node, getEventTarget(e) as Element)) {
+				e.continuePropagation();
+				return;
+			}
+			if ((e.repeat && !allowRepeats) || (e.isComposing && !allowComposing)) {
+				e.continuePropagation();
+				return;
+			}
+
+			shortcutHandler(e);
+		});
+		let shortcutOnKeyUp = createEventHandler<KeyboardEvent>((e) => {
+			// If keyboard event didn't originate from a child of the current target,
+			// then it's a React event coming through a portal. We should ignore it.
+			if (!nodeContains(e.currentTarget as Node, getEventTarget(e) as Element)) {
+				e.continuePropagation();
+				return;
+			}
+			if ((e.repeat && !allowRepeats) || (e.isComposing && !allowComposing)) {
+				e.continuePropagation();
+				return;
+			}
+			// implement shortcut handler on keyup, what should the map be called? or should it be another syntax on shortcuts?
+			e.continuePropagation();
+		});
+		onKeyDown = props.onKeyDown ? chain(props.onKeyDown, shortcutOnKeyDown) : shortcutOnKeyDown;
+		onKeyUp = props.onKeyUp ? chain(props.onKeyUp, shortcutOnKeyUp) : shortcutOnKeyUp;
+	} else {
+		onKeyDown = createEventHandler(props.onKeyDown);
+		onKeyUp = createEventHandler(props.onKeyUp);
+	}
 	return {
 		keyboardProps: props.isDisabled
 			? {}
 			: {
-					onKeyDown: createEventHandler(props.onKeyDown),
-					onKeyUp: createEventHandler(props.onKeyUp),
+					onKeyDown,
+					onKeyUp,
 				},
 	};
 }

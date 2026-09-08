@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "types:tanstack-router-public-api",
+      "testName": "registered route inference and link validation",
+      "fullName": "registered route inference and link validation"
+    }
+  ]
+}

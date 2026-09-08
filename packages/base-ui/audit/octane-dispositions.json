@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "contract": "docs/differences-from-react.md",
+  "dispositions": [
+    {
+      "category": "renderer-specific",
+      "files": [
+        "src/checkbox/root/CheckboxRoot.react17.test.tsx",
+        "src/otp-field/root/OTPFieldRoot.react17.test.tsx"
+      ],
+      "reason": "React 17 has no useId. Octane always provides hydration-safe IDs; emulating a missing React API would disable valid native behavior.",
+      "nativeCoverage": [
+        "packages/base-ui-utils/tests/upstream/src/useId.test.tsx",
+        "packages/base-ui/tests/upstream/src/checkbox/root/CheckboxRoot.test.tsx",
+        "packages/base-ui/tests/upstream/src/otp-field/root/OTPFieldRoot.test.tsx"
+      ]
+    },
+    {
+      "category": "renderer-specific",
+      "file": "src/internals/useRenderElement.test.tsx",
+      "suite": "lazy-wrapped render element (Flight shape)",
+      "reason": "React Server Components and the private Flight wire format are explicitly outside the Octane renderer contract.",
+      "nativeCoverage": [
+        "packages/base-ui/tests/upstream/src/internals/useRenderElement.test.tsx > handles lazy elements"
+      ]
+    },
+    {
+      "category": "renderer-specific",
+      "files": [
+        "tooltip/root/TooltipRoot.test.tsx",
+        "alert-dialog/root/AlertDialogRoot.test.tsx",
+        "preview-card/root/PreviewCardRoot.test.tsx",
+        "dialog/root/DialogRoot.test.tsx",
+        "popover/root/PopoverRoot.test.tsx",
+        "menu/radio-item/MenuRadioItem.test.tsx",
+        "menu/item/MenuItem.test.tsx",
+        "menu/checkbox-item/MenuCheckboxItem.test.tsx",
+        "menu/root/MenuRoot.test.tsx",
+        "select/root/SelectRoot.test.tsx"
+      ],
+      "reason": "Octane does not replay renders or mount effects in Strict Mode. Adapted callback counts represent one committed mount or update; unchanged-item bailout assertions remain intact. A React control with strict disabled reports the same one completion; strict enabled reports two.",
+      "nativeCoverage": [
+        "tooltip/root/TooltipRoot.test.tsx",
+        "alert-dialog/root/AlertDialogRoot.test.tsx",
+        "preview-card/root/PreviewCardRoot.test.tsx",
+        "dialog/root/DialogRoot.test.tsx",
+        "popover/root/PopoverRoot.test.tsx",
+        "menu/radio-item/MenuRadioItem.test.tsx",
+        "menu/item/MenuItem.test.tsx",
+        "menu/checkbox-item/MenuCheckboxItem.test.tsx",
+        "menu/root/MenuRoot.test.tsx",
+        "select/root/SelectRoot.test.tsx"
+      ],
+      "reactControl": "packages/base-ui/tests/react-controls/strict-effects.test.jsx"
+    }
+  ]
+}

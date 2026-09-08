@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/src/addEventListener.spec.ts b/tests/upstream/src/addEventListener.spec.ts
+--- a/tests/upstream/src/addEventListener.spec.ts
++++ b/tests/upstream/src/addEventListener.spec.ts
+@@ -1,5 +1,5 @@
+-import { expectType } from './testUtils';
+-import { addEventListener } from './addEventListener';
++import { expectType } from "../../../src/testUtils.ts";
++import { addEventListener } from "../../../src/addEventListener.ts";
+ 
+ const unsubscribeFromWindowPointerMove = addEventListener(window, 'pointermove', (event) => {
+   expectType<PointerEvent, typeof event>(event);

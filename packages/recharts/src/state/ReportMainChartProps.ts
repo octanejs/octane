@@ -5,8 +5,9 @@ import { useIsPanorama } from '../context/PanoramaContext';
 import { setLayout, setMargin } from './layoutSlice';
 import { useAppDispatch } from './hooks';
 import { propsAreEqual } from '../util/propsAreEqual';
+import type { LayoutType, Margin } from '../util/types';
 
-function ReportMainChartPropsImpl(props: { layout: unknown; margin: unknown }): null {
+function ReportMainChartPropsImpl(props: { layout: LayoutType; margin: Partial<Margin> }): null {
 	const { layout, margin } = props;
 	const dispatch = useAppDispatch();
 	const isPanorama = useIsPanorama();

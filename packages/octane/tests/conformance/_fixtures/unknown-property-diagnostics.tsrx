@@ -38,6 +38,8 @@ export function CanonicalInputProperties() @{
 	<input
 		id="canonical-input-properties"
 		maxLength={12}
+		minLength={4}
+		enterKeyHint="done"
 		inputMode="numeric"
 		autoCapitalize="none"
 		autoCorrect="off"

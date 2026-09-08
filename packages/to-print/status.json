@@ -1,0 +1,21 @@
+{
+  "upstream": {
+    "package": "react-to-print",
+    "version": "3.3.0",
+    "source": "https://github.com/MatthewHerbst/react-to-print/tree/853666f180006b68b533f216e58f974cc791a97f",
+    "license": "MIT"
+  },
+  "surface": "Public runtime surface at react-to-print 3.3.0: useReactToPrint and its option/content/fn types. Print pipeline utilities are ported unchanged aside from Octane ref and event types.",
+  "inventory": {
+    "supported": ["useReactToPrint", "UseReactToPrintFn", "UseReactToPrintOptions"],
+    "subpaths": []
+  },
+  "divergences": [
+    "Consumers import from @octanejs/to-print instead of react-to-print.",
+    "contentRef is a structural { current } ref object rather than React.RefObject.",
+    "The print callback accepts a native Event or a content getter; React.UIEvent is not used.",
+    "The plain TypeScript useReactToPrint hook forwards compiler-injected slots; a symbol in the options position is treated as empty options."
+  ],
+  "ssr": "The hook is client-only: it constructs an iframe and calls window.print (or a custom print function). Calling it during SSR has no DOM target.",
+  "verified": "2026-08-20"
+}

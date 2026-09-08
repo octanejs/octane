@@ -1,15 +1,16 @@
+import type { MutableRefObject, OctaneElement, OctaneNode } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { MutableRefObject, ReactElement, ReactNode, useMemo, useRef } from 'octane';
+import { useMemo, useRef } from 'octane';
 import { clsx } from 'clsx';
-import { BaseLineType, CurveType, Props as CurveProps } from '../shape/Curve';
-import { Layer } from '../container/Layer';
+import { BaseLineType, CurveType, Props as CurveProps } from '../shape/Curve.tsrx';
+import { Layer } from '../container/Layer.tsrx';
 import {
 	CartesianLabelListContextProvider,
 	CartesianLabelListEntry,
 	ImplicitLabelListType,
 	LabelListFromLabelProp,
-} from '../component/LabelList';
-import { Dots, DotsDotProps } from '../component/Dots';
+} from '../component/LabelList.tsrx';
+import { Dots, DotsDotProps } from '../component/Dots.tsrx';
 import { interpolate, isNan, isNullish, isNumber, noop } from '../util/DataUtils';
 import {
 	getCateCoordinateOfLine,
@@ -35,12 +36,12 @@ import {
 	TrapezoidViewBox,
 } from '../util/types';
 import { isClipDot } from '../util/ReactUtils';
-import type { LegendPayload } from '../component/DefaultLegendContent';
-import { Formatter } from '../component/DefaultTooltipContent';
-import { ActivePoints } from '../component/ActivePoints';
+import type { LegendPayload } from '../component/DefaultLegendContent.tsrx';
+import { Formatter } from '../component/DefaultTooltipContent.tsrx';
+import { ActivePoints } from '../component/ActivePoints.tsrx';
 import { TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { GraphicalItemClipPath, useNeedsClip } from './GraphicalItemClipPath';
+import { GraphicalItemClipPath, useNeedsClip } from './GraphicalItemClipPath.tsrx';
 import { BaseAxisWithScale } from '../state/selectors/axisSelectors';
 import { ChartData } from '../state/chartDataSlice';
 import { AreaPointItem, ComputedArea, selectArea } from '../state/selectors/areaSelectors';
@@ -53,7 +54,7 @@ import {
 	AnimatedItems,
 	AnimationInterpolateFn,
 	useAnimationCallbacks,
-} from '../animation/AnimatedItems';
+} from '../animation/AnimatedItems.tsrx';
 import {
 	AnimationItem,
 	AnimationMatchByProp,
@@ -64,19 +65,19 @@ import { useAnimationStartSnapshot } from '../animation/useAnimationStartSnapsho
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { usePlotArea } from '../hooks';
 import { WithIdRequired, WithoutId } from '../util/useUniqueId';
-import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId';
+import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import type { AreaSettings } from '../state/types/AreaSettings';
 import { SetCartesianGraphicalItem } from '../state/SetGraphicalItem';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import { getRadiusAndStrokeWidthFromDot } from '../util/getRadiusAndStrokeWidthFromDot';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents';
-import { Shape } from '../util/ActiveShapeUtils';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { Shape } from '../util/ActiveShapeUtils.tsrx';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { propsAreEqual } from '../util/propsAreEqual';
 import { AxisId } from '../state/cartesianAxisSlice';
 import type { StackDataPoint } from '../util/stacks/stackTypes';
-import { AreaRevealShape, AreaRevealShapeProps } from './AreaRevealShape';
+import { AreaRevealShape, AreaRevealShapeProps } from './AreaRevealShape.tsrx';
 
 /**
  * @inline
@@ -147,7 +148,7 @@ interface AreaProps<DataPointType = any, DataValueType = any> extends DataProvid
  * - `false`: dots do not change on user activity; both active and inactive dots follow the `dot` prop (see below)
  * - `true`: renders the active dot with default settings
  * - `object`: the props of the active dot. This will be merged with the internal calculated props of the active dot
- * - `ReactElement`: the custom active dot element
+ * - `OctaneElement`: the custom active dot element
  * - `function`: a render function of the custom active dot
  *
  * @defaultValue true
@@ -239,7 +240,7 @@ interface AreaProps<DataPointType = any, DataValueType = any> extends DataProvid
  * - `false`: no dots are drawn;
  * - `true`: renders the dots with default settings;
  * - `object`: the props of the dot. This will be merged with the internal calculated props of each dot;
- * - `ReactElement`: the custom dot element;
+ * - `OctaneElement`: the custom dot element;
  * - `function`: a render function of the custom dot.
  *
  * @defaultValue false
@@ -275,7 +276,7 @@ interface AreaProps<DataPointType = any, DataValueType = any> extends DataProvid
  * - `true`: renders default labels
  * - `false`: no labels are rendered
  * - `object`: the props of LabelList component
- * - `ReactElement`: a custom SVG label element, such as `<text>` or `<g>`.
+ * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
  *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
  * - `function`: a render function of custom label
  *
@@ -303,7 +304,7 @@ interface AreaProps<DataPointType = any, DataValueType = any> extends DataProvid
  */
 	onAnimationStart?: () => void;
 	/**
- * If set a ReactElement, the shape of area can be customized.
+ * If set a OctaneElement, the shape of area can be customized.
  * If set a function, the function will be called to render customized shape.
  * By default, renders a filled curve path with a clipPath entrance animation.
  *
@@ -470,7 +471,7 @@ const computeLegendPayloadFromAreaData = <DataPointType, ValueAxisType>(
 	];
 };
 
-const SetAreaTooltipEntrySettings = React.memo(<DataPointType, ValueAxisType>({
+function AreaTooltipEntrySettings<DataPointType, ValueAxisType>({
 	dataKey,
 	data,
 	stroke,
@@ -495,7 +496,7 @@ const SetAreaTooltipEntrySettings = React.memo(<DataPointType, ValueAxisType>({
 	| 'formatter'
 	| 'tooltipType'
 	| 'id'
->) => {
+>) {
 	const tooltipEntrySettings: TooltipPayloadConfiguration = {
 		dataDefinedOnItem: data,
 		getPosition: noop,
@@ -515,7 +516,11 @@ const SetAreaTooltipEntrySettings = React.memo(<DataPointType, ValueAxisType>({
 		},
 	};
 	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
-}) as (props: Pick<WithIdRequired<Props<DataPointType, ValueAxisType>>, 'dataKey' | 'data' | 'stroke' | 'strokeWidth' | 'fill' | 'name' | 'hide' | 'unit' | 'formatter' | 'tooltipType' | 'id'>) => ReactElement;
+}
+
+const SetAreaTooltipEntrySettings = React.memo(
+	AreaTooltipEntrySettings,
+) as typeof AreaTooltipEntrySettings;
 
 function AreaDotsWrapper({
 	clipPathId,
@@ -547,7 +552,7 @@ function AreaLabelListProvider({
 	points,
 }: {
 	showLabels: boolean;
-	children: ReactNode;
+	children: OctaneNode;
 	points: ReadonlyArray<AreaPointItem>;
 }) {
 	const labelListEntries: ReadonlyArray<CartesianLabelListEntry> = points.map((
@@ -754,7 +759,7 @@ function RenderArea({
  * So, useRef it is.
  */
 	const previousPointsRef = useRef<ReadonlyArray<AreaPointItem> | null>(null);
-	const previousBaselineRef = useRef<BaseLineType | undefined>();
+	const previousBaselineRef = useRef<BaseLineType | undefined>(undefined);
 
 	return <AreaWithAnimation
 		needClip={needClip}
@@ -921,8 +926,7 @@ export const getBaseValue = (
 
 	const numericAxis =
 		layout === 'horizontal' ? yAxis : xAxis;
-	// @ts-expect-error d3scale .domain() returns unknown, Math.max expects number
-	const domain: [number, number] = numericAxis.scale.domain();
+	const domain = numericAxis.scale.domain() as readonly [number, number];
 
 	if (numericAxis.type === 'number') {
 		const domainMax = Math.max(domain[0], domain[1]);
@@ -1044,7 +1048,9 @@ export function computeArea({
 	};
 }
 
-function AreaFn<DataPointType, ValueAxisType>(outsideProps: Props<DataPointType, ValueAxisType>) {
+function AreaFn<DataPointType = any, ValueAxisType = any>(
+	outsideProps: Props<DataPointType, ValueAxisType>,
+) {
 	const props = resolveDefaultProps(outsideProps, defaultAreaProps);
 	const isPanorama = useIsPanorama();
 	// Report all props to Redux store first, before calling hooks, to avoid circular dependencies.
@@ -1088,9 +1094,5 @@ function AreaFn<DataPointType, ValueAxisType>(outsideProps: Props<DataPointType,
  * @provides LabelListContext
  * @consumes CartesianChartContext
  */
-export const Area = React.memo(AreaFn, propsAreEqual) as (props: Props<
-	DataPointType,
-	ValueAxisType
->) => ReactElement;
-// @ts-expect-error we need to set the displayName for debugging purposes
+export const Area = React.memo(AreaFn, propsAreEqual) as typeof AreaFn & { displayName?: string };
 Area.displayName = 'Area';

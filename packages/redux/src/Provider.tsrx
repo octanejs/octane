@@ -21,7 +21,7 @@ export function Provider<A extends Action<string> = UnknownAction, S = unknown>(
 		return {
 			store,
 			subscription,
-			getServerState: serverState ? () => serverState : undefined,
+			getServerState: serverState !== undefined ? () => serverState : undefined,
 		};
 	}, [store, serverState]);
 

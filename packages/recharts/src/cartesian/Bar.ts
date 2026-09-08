@@ -2,3 +2,4 @@
 // barSelectors.js) import `computeBarRectangles` from '../../cartesian/Bar' —
 // this .ts entry forwards to the .tsrx implementation.
 export { Bar, computeBarRectangles, defaultBarProps } from './Bar.tsrx';
+export type * from './Bar.tsrx';

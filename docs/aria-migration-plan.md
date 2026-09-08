@@ -1,5 +1,15 @@
 # React Aria → octane migration plan (`@octanejs/aria`)
 
+> **Progress (2026-08-18): React Aria Components 1.19.0 public surface
+> COMPLETE.** `@octanejs/aria/components` now matches all 280 runtime exports
+> and 313 type exports from the pinned package, in both directions. The final
+> families are calendar/date/time, color, the drag-and-drop engine,
+> DropZone/FileTrigger, toast, data hooks, Virtualizer, and layout classes.
+> `exports:check` makes the export inventory executable; the Aria client project
+> passes 45 files / 370 tests. Existing SSR evidence is unchanged, so the root
+> `react-aria` and `/stately` surfaces and advanced-family SSR remain explicit
+> follow-up scopes rather than being folded into this components-entry claim.
+
 > **Progress (2026-07-25): foundational SSR and hydration covered.** A
 > dedicated Node-mode test project now verifies `SSRProvider`, server snapshots,
 > explicit accessible label relationships, and injected LTR/RTL locales without
@@ -453,28 +463,31 @@ click/hover/focus through the real components on both sides, byte-equal.
 behavior tests. The Tree/Table follow-up landed same-day with their hook
 areas: `useTree`/`useTreeItem` + RAC `Tree`; stately grid + stately table +
 the aria table hook area + RAC `Table` (column resizing wired; pixel math is
-layout-driven and covered behaviorally). `TableLayout` lands with the Phase-7
-Virtualizer.
+layout-driven and covered behaviorally). `TableLayout` landed with the Phase-7
+Virtualizer work.
 
-### Phase 6 — Date/time + color families
+### Phase 6 — Date/time + color families — COMPLETE 2026-08-18
 Stately calendar/date/color state + aria `useCalendar`/`useRangeCalendar`,
 `useDateField`/`useTimeField`, `useDatePicker`/`useDateRangePicker`, the color
 hooks, then RAC `Calendar`/`RangeCalendar`/`DateField`/`DatePicker`/
 `DateRangePicker`/`TimeField` and the `ColorPicker` family. The math is all in
 verbatim `@internationalized/date` — this family is broad but mechanical.
 
-### Phase 7 — Advanced subsystems (demand-driven order)
+### Phase 7 — Advanced RAC subsystems — COMPLETE 2026-08-18
 - **Drag & drop**: `useDrag`/`useDrop`, draggable/droppable collections, RAC
   `DropZone`/`FileTrigger` + collection DnD wiring.
 - **Virtualizer**: `@react-stately/virtualizer` + RAC `Virtualizer` + layouts.
 - **Toast**: `useToastState`, `useToast`, RAC toast components.
-- `useLandmark`, `aria-modal-polyfill` (`watchModals`) — port on demand.
+- `useLandmark` is included because RAC re-exports it. Root-only
+  `aria-modal-polyfill` (`watchModals`) remains demand-driven and is outside the
+  complete RAC entry-point claim.
 
-### Phase 8 — Polish
-SSR/hydration coverage for overlay + collection components (including the
-SSR collection-registration path), `status.json` finalization +
-`pnpm bindings:status`, README with divergence notes, changeset (patch track),
-`docs/bindings-status.md` regeneration.
+### Phase 8 — Polish — PARTIAL
+The export audit, provenance, `status.json`, README, and changeset are complete.
+Regenerating the repository-wide bindings status is blocked by unrelated
+invalid status/website-directory entries already present at HEAD. Broader
+SSR/hydration coverage for overlay, collection, and the newly completed
+advanced component families remains open.
 
 ## 4. First milestone (smallest end-to-end proof)
 

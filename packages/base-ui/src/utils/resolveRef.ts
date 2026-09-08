@@ -1,10 +1,14 @@
-// Ported from .base-ui/packages/react/src/utils/resolveRef.ts. Returns a ref object's
-// `.current`, or the value itself if it's already an element.
+import type * as React from 'octane';
+/**
+ * If the provided argument is a ref object, returns its `current` value.
+ * Otherwise, returns the argument itself.
+ */
 export function resolveRef<T extends HTMLElement | null | undefined>(
-	maybeRef: T | { current: T },
+	maybeRef: T | React.RefObject<T>,
 ): T {
 	if (maybeRef == null) {
-		return maybeRef as T;
+		return maybeRef;
 	}
+
 	return 'current' in maybeRef ? maybeRef.current : maybeRef;
 }
