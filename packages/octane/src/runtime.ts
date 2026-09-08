@@ -6674,7 +6674,9 @@ function schedulePostPaint(cb: () => void): void {
  * with a less predictable optimisation profile when the literal has many
  * fields). Compiled bodies stamp their dynamic per-call-site keys on the
  * `slots[0]` binding bag, NOT on the Block/Scope instance (see Scope.slots),
- * so every BlockImpl instance shares one hidden class outright.
+ * so every BlockImpl instance shares one hidden class outright. Feature-only
+ * fields also start as undefined here, rather than transitioning the shape
+ * when Suspense, Activity, or fetch-tree warming first uses them.
  *
  * Type-only declarations leave the fixed-order constructor assignments as the
  * only runtime field definitions, including in consumers that compile source
@@ -6764,6 +6766,18 @@ class BlockImpl {
 	declare block: Block;
 	// Metadata.
 	declare kind: BlockKind;
+	// Optional render and boundary state. Keep these on the common Block shape:
+	// otherwise ordinary renders and each optional feature fork its V8 map.
+	declare __warmEpisode: number | undefined;
+	declare __thenableDone: boolean | undefined;
+	declare __thenables: TrackedThenable<unknown>[] | undefined;
+	declare $$tryHandler: TryHandler | undefined;
+	declare __suspenseHandler:
+		((thenable: TrackedThenable<unknown>, sourceBlock: Block) => void) | null | undefined;
+	declare __trySlot: TrySlot | undefined;
+	declare __activitySlot: ActivitySlot | undefined;
+	declare __warmCache: Map<HookSlot, WarmEntry[]> | undefined;
+	declare __warmCacheEpisode: number | undefined;
 
 	constructor(
 		kind: BlockKind,
@@ -6832,8 +6846,17 @@ class BlockImpl {
 		this.parent = null;
 		this.block = this as unknown as Block;
 		this.kind = kind;
-		// This field was already type-only; keep its original last own-property position.
+		// Keep its original position after kind; optional fields follow it.
 		this.createdStamp = 0;
+		this.__warmEpisode = undefined;
+		this.__thenableDone = undefined;
+		this.__thenables = undefined;
+		this.$$tryHandler = undefined;
+		this.__suspenseHandler = undefined;
+		this.__trySlot = undefined;
+		this.__activitySlot = undefined;
+		this.__warmCache = undefined;
+		this.__warmCacheEpisode = undefined;
 	}
 }
 
@@ -31811,8 +31834,8 @@ export function activityBlock(
 			hiddenDom: null,
 			portals: null,
 		};
-		// Activity is a rare boundary, so keep this back-reference off the
-		// monomorphic Block shape (matching the existing Suspense __trySlot tag).
+		// All Blocks reserve this optional back-reference so Activity boundaries
+		// keep the same shape as ordinary and Suspense blocks.
 		(b as any).__activitySlot = state;
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
