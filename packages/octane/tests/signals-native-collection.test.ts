@@ -10,7 +10,7 @@ import * as client from './_fixtures/native-read-collection.tsrx';
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/native-read-collection.tsrx',
-	{ compileOptions: { nativeReads: true } },
+	{ compileOptions: {} },
 );
 
 describe('compiled component invocation native reads', () => {

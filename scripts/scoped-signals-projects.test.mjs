@@ -59,28 +59,25 @@ test('mounting and hydration fixtures exercise development, production, and Stro
 			'default controls must exclude native fixtures',
 		);
 	}
-	assert.deepEqual(byName.get('octane-signals').plugins[0].options, { nativeReads: true });
+	assert.deepEqual(byName.get('octane-signals').plugins[0].options, {});
 	assert.deepEqual(byName.get('octane-signals-prod').plugins[0].options, {
-		nativeReads: true,
 		hmr: false,
 	});
 	assert.equal(byName.get('octane-signals-prod').test.env.OCTANE_TEST_COMPILE_MODE, 'prod');
 	assert.deepEqual(byName.get('octane-signals-strong').plugins[0].options, {
-		nativeReads: true,
 		hmr: false,
 		strong: true,
 	});
 	assert.equal(byName.get('octane-signals-strong').test.env.OCTANE_TEST_COMPILE_MODE, 'prod');
 });
 
-test('native DevTools fixtures run only with profiling and native reads enabled', () => {
+test('native DevTools fixtures run only with profiling', () => {
 	for (const extension of ['ts', 'tsrx']) {
 		assert.deepEqual(selected(`packages/octane/tests/signals-devtools.test.${extension}`), [
 			'octane-signals-profile',
 		]);
 	}
 	assert.deepEqual(byName.get('octane-signals-profile').plugins[0].options, {
-		nativeReads: true,
 		hmr: false,
 		profile: true,
 	});

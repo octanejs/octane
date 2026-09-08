@@ -20,7 +20,7 @@ import { NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 import { METHOD_DEP_IMPORT, annotateHookCalls } from './hook-deps.js';
 import { inlinePlainHookMemos } from './plain-hook-memo.js';
 import { assertStrongMode } from './strong-mode.js';
-import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
+import { assertNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { nativeReadActivationIndex } from './native-read-codegen.js';
 import { findManualHookProviders, manualHookWrapperParameters } from './manual-hooks.js';
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
@@ -1284,7 +1284,7 @@ function parseHookSource(source, id) {
  *
  * @param {string} source raw module text
  * @param {string} id     module id (embedded in the stable Symbol.for key)
- * @param {{ environment?: 'client' | 'server', strong?: boolean, nativeReads?: boolean, hmr?: boolean, dev?: boolean, profile?: boolean, profileFilename?: string, inlineHookMemo?: boolean, manualSlots?: boolean, universalRuntime?: unknown, renderer?: { target?: string }, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
+ * @param {{ environment?: 'client' | 'server', strong?: boolean, hmr?: boolean, dev?: boolean, profile?: boolean, profileFilename?: string, inlineHookMemo?: boolean, manualSlots?: boolean, universalRuntime?: unknown, renderer?: { target?: string }, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
  *   `Symbol.for(stableKey)` so a re-imported module resolves the same hook
  *   slots (state survives HMR); off (ordinary prod builds and SSR) emits
  *   runtime-ranged Symbols. Profiling retains short described Symbols because
@@ -1295,7 +1295,6 @@ function parseHookSource(source, id) {
  * @returns {{ code: string, map: any } | null}
  */
 export function slotHooks(source, id, options) {
-	assertNativeReadOptions(options);
 	const environment = options?.environment ?? 'client';
 	if (environment !== 'client' && environment !== 'server') {
 		throw new Error(
@@ -1309,6 +1308,7 @@ export function slotHooks(source, id, options) {
 	} catch {
 		return null; // let the normal pipeline surface the parse error
 	}
+	options = nativeReadOptions(ast, options);
 	assertStrongMode(ast, source, id, options);
 	assertNativeReadDiagnostics(ast, source, id, options);
 	const importInfo = octaneHookLocals(

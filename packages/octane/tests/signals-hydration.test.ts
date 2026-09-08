@@ -15,7 +15,7 @@ import * as client from './_fixtures/signals-hydration.tsrx';
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/signals-hydration.tsrx',
-	{ compileOptions: { nativeReads: true } },
+	{ compileOptions: {} },
 );
 
 describe('native signal server output and adoption', () => {

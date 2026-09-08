@@ -17,6 +17,11 @@ wrapper is narrower: the wrapper must be locally declared in a fully compiled
 parameter to a supported hook. This package ships both the runtime and compiler,
 with the compiler exposed at `octane/compiler`.
 
+[Signals](https://octanejs.dev/docs/signals) are stable. Import `createScope` and
+`query` from `octane/signals`, or `useSignal$` from `octane/signals/client`, for
+scoped state, derived values, async resources, and native component reads.
+The standard compiler handles signals automatically; no extra option is needed.
+
 Custom Node build pipelines can opt into project-aware string-child inference
 through `octane/compiler/typescript`. See the
 [type-aware text compilation guide](https://github.com/octanejs/octane/blob/main/docs/compiler-text-inference.md).

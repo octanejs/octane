@@ -191,6 +191,33 @@ export const docsMeta: DocMeta[] = [
 		],
 	},
 	{
+		slug: 'signals',
+		title: 'Signals',
+		description:
+			'Stable scoped state, derived values, async resources, streams, and native component reads.',
+		group: 'Learn Octane',
+		searchTerms: [
+			'octane/signals',
+			'useSignal$',
+			'createScope',
+			'signal$',
+			'derived$',
+			'asyncSignal$',
+			'query',
+			'reactive state',
+		],
+		sections: [
+			{ id: 'local-state', title: 'Start with local state' },
+			{ id: 'shared-state', title: 'Own shared state with a scope' },
+			{ id: 'async-resources', title: 'Load data with queries' },
+			{ id: 'availability', title: 'Choose what to show while waiting' },
+			{ id: 'streams', title: 'Consume streams' },
+			{ id: 'hooks-and-memos', title: 'Use signals with existing hooks' },
+			{ id: 'server-rendering', title: 'Server rendering and hydration' },
+			{ id: 'reference', title: 'API reference and supported scope' },
+		],
+	},
+	{
 		slug: 'styling',
 		title: 'Styling',
 		description:

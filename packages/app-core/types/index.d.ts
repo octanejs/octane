@@ -395,8 +395,6 @@ export interface OctaneConfigOptions {
 	compiler?: {
 		/** Assert pure immutable-snapshot renders and reject detectable violations. @default false */
 		strong?: boolean;
-		/** Experimental native signal reads in DOM client/server render scopes. */
-		nativeReads?: boolean;
 		renderers?: ExperimentalRendererConfigOptions;
 	};
 	router?: {
@@ -458,7 +456,6 @@ export interface ResolvedOctaneConfig {
 	compiler: {
 		/** @default false */
 		strong: boolean;
-		nativeReads: boolean;
 		renderers: ExperimentalResolvedRendererConfig;
 	};
 	router: {

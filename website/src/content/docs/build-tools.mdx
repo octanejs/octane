@@ -37,6 +37,10 @@ All three integrations also accept `profile: true` for a client profiling
 build. See [Profiling](/docs/profiling) for Chrome tracks, render causes, the
 console API, and the recommended production-style workflow.
 
+[Signals](/docs/signals) work automatically with all three integrations. Import
+from `octane/signals` or `octane/signals/client` and keep the `$` suffix on signal
+capabilities. No `nativeReads` compiler option is required.
+
 <h2 id="vite">Vite</h2>
 
 Use `@octanejs/vite-plugin` for every Vite app:

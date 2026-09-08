@@ -1,0 +1,271 @@
+{
+  "baselineRef": "fbbb53d771b08e79abc4c2ad3f8af72d3e454ae0",
+  "candidateSourceRef": "9bd77b2cdde6e9bfdba3fc2a224a45fd083e158c",
+  "node": "v24.18.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "configuration": {
+    "samples": 5,
+    "updates": 2000,
+    "mounts": 64,
+    "ssrRenders": 1000,
+    "collectorCycles": 100000,
+    "warmups": 2,
+    "fiveDependencyRepeats": 32
+  },
+  "command": "BENCH_JSON=<report.json> node benchmarks/scoped-signals/run-native-costs.mjs --baseline-root=<archive-root> --baseline-ref=fbbb53d771b08e79abc4c2ad3f8af72d3e454ae0 --samples=5",
+  "result": "All 18 compiled renderer cases and their bundles are byte-identical to the baseline. Semantic controls and deterministic factory-call controls passed. Timing samples are not used to claim a speedup.",
+  "rawReportSha256": "61827a5794652806c3ec10a1c32c69f41d14fa8c1c3d37c285fddc16680c0161",
+  "cases": [
+    {
+      "case": "ordinary:unread-block:client",
+      "sourceSha256": "44e656e5311c0a851c2d4ec8e41e09844e1a5d5cdd17b1f311b5b861d7abc360",
+      "compiledSha256": "ab51a66366a9a82edc9a68e1cbfa8551587fed51f181383f60b643590c07655e",
+      "bundleSha256": "205940d6b7df856748609faf4e0fb275609e5531639869479a2960bf98cd0f7d",
+      "compiledBytes": 2919,
+      "bundleBytes": 160231,
+      "gzipBytes": 51797,
+      "brotliBytes": 45369,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "ordinary:unread-block:server",
+      "sourceSha256": "44e656e5311c0a851c2d4ec8e41e09844e1a5d5cdd17b1f311b5b861d7abc360",
+      "compiledSha256": "b8ba74666a62ffd7e77dc9e37f35e24d789a36b8f0c53f04746f85b05d8f32b5",
+      "bundleSha256": "e74fb93ff41d1b2b3b0364b4ef53f9d7817b565ad3cbeec113b6580c784510e9",
+      "compiledBytes": 1571,
+      "bundleBytes": 40237,
+      "gzipBytes": 14204,
+      "brotliBytes": 12839,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:unread-block:client",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ef4ad2acd19e4122f9392c569987700a9dcefa508b07a6c5721c580cd4ede457",
+      "bundleSha256": "98f5bddb54c980ca1359cbe6aec9a6527b26116843bc50d198f62e090cc563dd",
+      "compiledBytes": 7361,
+      "bundleBytes": 168073,
+      "gzipBytes": 54519,
+      "brotliBytes": 47731,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:unread-block:server",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ec0f8b656792200a1a7b8b7a0d96b45f33a31bc12d14c3575bcf7c9d897fd757",
+      "bundleSha256": "2c28800640a3523104462eaee156780ccdc9a7b6ea04f2df3b20a8990dd207be",
+      "compiledBytes": 5280,
+      "bundleBytes": 45561,
+      "gzipBytes": 16064,
+      "brotliBytes": 14531,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "ordinary:unread-return:client",
+      "sourceSha256": "44e656e5311c0a851c2d4ec8e41e09844e1a5d5cdd17b1f311b5b861d7abc360",
+      "compiledSha256": "ab51a66366a9a82edc9a68e1cbfa8551587fed51f181383f60b643590c07655e",
+      "bundleSha256": "9c2df4d36a17a7544d4df85f29768a5c7b8f3891425957c83091e1e07d13522d",
+      "compiledBytes": 2919,
+      "bundleBytes": 159999,
+      "gzipBytes": 51760,
+      "brotliBytes": 45231,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "ordinary:unread-return:server",
+      "sourceSha256": "44e656e5311c0a851c2d4ec8e41e09844e1a5d5cdd17b1f311b5b861d7abc360",
+      "compiledSha256": "b8ba74666a62ffd7e77dc9e37f35e24d789a36b8f0c53f04746f85b05d8f32b5",
+      "bundleSha256": "0e32ee0c9f9faa514e695a12e88005e9e7df03cda51c8defcd55b0fc60fc78fa",
+      "compiledBytes": 1571,
+      "bundleBytes": 40237,
+      "gzipBytes": 14206,
+      "brotliBytes": 12844,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:unread-return:client",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ef4ad2acd19e4122f9392c569987700a9dcefa508b07a6c5721c580cd4ede457",
+      "bundleSha256": "0f85cec2ba72020d614352209b1f2ec693796431541ab47a22d2af2e9928ce5c",
+      "compiledBytes": 7361,
+      "bundleBytes": 165679,
+      "gzipBytes": 53666,
+      "brotliBytes": 46977,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:unread-return:server",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ec0f8b656792200a1a7b8b7a0d96b45f33a31bc12d14c3575bcf7c9d897fd757",
+      "bundleSha256": "2efab6ff7df6a5a32f772a2136e17ed2ba520c18bcc6de0b33711d82799ecfb5",
+      "compiledBytes": 5280,
+      "bundleBytes": 46698,
+      "gzipBytes": 16469,
+      "brotliBytes": 14889,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:single-block:client",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ef4ad2acd19e4122f9392c569987700a9dcefa508b07a6c5721c580cd4ede457",
+      "bundleSha256": "52b80b62d8697e1848639d477fa3bded498468f54b8f1a42c3b0ebc8432d6913",
+      "compiledBytes": 7361,
+      "bundleBytes": 198035,
+      "gzipBytes": 63756,
+      "brotliBytes": 55888,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:single-block:server",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ec0f8b656792200a1a7b8b7a0d96b45f33a31bc12d14c3575bcf7c9d897fd757",
+      "bundleSha256": "69c26f45ffcb9bfd7cc6554edb0526dd6d2a9cb5f74df59500ccce3f7b7c7b73",
+      "compiledBytes": 5280,
+      "bundleBytes": 75611,
+      "gzipBytes": 25224,
+      "brotliBytes": 22803,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:single-return:client",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ef4ad2acd19e4122f9392c569987700a9dcefa508b07a6c5721c580cd4ede457",
+      "bundleSha256": "697338550405d6f8533a42976971c8a8eeafcbfc8b02cfb7e00fce9544002187",
+      "compiledBytes": 7361,
+      "bundleBytes": 195577,
+      "gzipBytes": 62899,
+      "brotliBytes": 55092,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:single-return:server",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ec0f8b656792200a1a7b8b7a0d96b45f33a31bc12d14c3575bcf7c9d897fd757",
+      "bundleSha256": "4028306b215e134356b32a75e3d49b016e189a695e58c9ccabc81a4d42e1a1fe",
+      "compiledBytes": 5280,
+      "bundleBytes": 76751,
+      "gzipBytes": 25645,
+      "brotliBytes": 23206,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:repeated-block:client",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ef4ad2acd19e4122f9392c569987700a9dcefa508b07a6c5721c580cd4ede457",
+      "bundleSha256": "ed5549f7547822946122c83bbcf5554351b5c2c19c7b1e130fd047ba157f6d27",
+      "compiledBytes": 7361,
+      "bundleBytes": 198061,
+      "gzipBytes": 63774,
+      "brotliBytes": 55936,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:repeated-block:server",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ec0f8b656792200a1a7b8b7a0d96b45f33a31bc12d14c3575bcf7c9d897fd757",
+      "bundleSha256": "0f086ef5f9910bbe4ac229c75908c971affa93b617115dce2a4de2f0a2ef38d1",
+      "compiledBytes": 5280,
+      "bundleBytes": 75637,
+      "gzipBytes": 25234,
+      "brotliBytes": 22858,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:distinct-block:client",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ef4ad2acd19e4122f9392c569987700a9dcefa508b07a6c5721c580cd4ede457",
+      "bundleSha256": "d5bc4871a70d95b252da45c65d7a173d3fc780933bfb04b59609e51802f5d452",
+      "compiledBytes": 7361,
+      "bundleBytes": 198056,
+      "gzipBytes": 63771,
+      "brotliBytes": 55872,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:distinct-block:server",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ec0f8b656792200a1a7b8b7a0d96b45f33a31bc12d14c3575bcf7c9d897fd757",
+      "bundleSha256": "ee5fc783bff5cb4883b1c1fb95a4f860a2ae60877bab3acf32977193fecd7b40",
+      "compiledBytes": 5280,
+      "bundleBytes": 75628,
+      "gzipBytes": 25230,
+      "brotliBytes": 22858,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "ordinary:five-dependencies:client",
+      "sourceSha256": "44e656e5311c0a851c2d4ec8e41e09844e1a5d5cdd17b1f311b5b861d7abc360",
+      "compiledSha256": "ab51a66366a9a82edc9a68e1cbfa8551587fed51f181383f60b643590c07655e",
+      "bundleSha256": "41a1f34c9bce683f3570cedc111b4fbe13baaf4e681117ea73b0ba5bf3d030a6",
+      "compiledBytes": 2919,
+      "bundleBytes": 166153,
+      "gzipBytes": 53760,
+      "brotliBytes": 47010,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    },
+    {
+      "case": "native:five-dependencies:client",
+      "sourceSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+      "compiledSha256": "ef4ad2acd19e4122f9392c569987700a9dcefa508b07a6c5721c580cd4ede457",
+      "bundleSha256": "b2fb1d385f4c61ed4710efbeac6a10273f08a4fc312d56eada0b1bb435c56c26",
+      "compiledBytes": 7361,
+      "bundleBytes": 174876,
+      "gzipBytes": 56791,
+      "brotliBytes": 49652,
+      "compiledDeltaBytes": 0,
+      "bundleDeltaBytes": 0
+    }
+  ],
+  "factoryControls": [
+    {
+      "target": "baseline",
+      "nativeReads": false,
+      "mountedCalls": 1,
+      "hitCalls": 0,
+      "missCalls": 32,
+      "output": "8:9:9:10:11"
+    },
+    {
+      "target": "baseline",
+      "nativeReads": true,
+      "mountedCalls": 1,
+      "hitCalls": 0,
+      "missCalls": 32,
+      "output": "8:9:9:10:11"
+    },
+    {
+      "target": "current",
+      "nativeReads": false,
+      "mountedCalls": 1,
+      "hitCalls": 0,
+      "missCalls": 32,
+      "output": "8:9:9:10:11"
+    },
+    {
+      "target": "current",
+      "nativeReads": true,
+      "mountedCalls": 1,
+      "hitCalls": 0,
+      "missCalls": 32,
+      "output": "8:9:9:10:11"
+    }
+  ]
+}

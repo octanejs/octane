@@ -550,7 +550,7 @@ const RUNTIME_TYPESCRIPT_NODES = new Set([
 	'TSTypeAssertion',
 ]);
 
-function forEachRuntimeAstChild(node, visit) {
+export function forEachRuntimeAstChild(node, visit) {
 	if (
 		typeof node?.type === 'string' &&
 		node.type.startsWith('TS') &&

@@ -234,6 +234,8 @@ Octane itself. Good places to start:
 
 - [Quick start](https://octanejs.dev/docs/quick-start): install, mount, and the
   `.tsrx` essentials.
+- [Signals](https://octanejs.dev/docs/signals): stable scoped state, derived values,
+  async resources, and native component reads without extra compiler options.
 - [Build tools](https://octanejs.dev/docs/build-tools): Vite, Rspack, or Rsbuild
   for SPA compilation and full-stack SSR.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): when to reach for
@@ -256,6 +258,7 @@ In this repository:
   streaming, deferred hydration, profiling.
 - [TSRX basics](./docs/tsrx-basics.md): components, hooks, control flow, class
   composition, text input events, strong mode.
+- [Signals](./docs/signals.md): ownership, async queries, retained values, and hydration.
 - [Server rendering](./docs/ssr.md) and
   [deferred hydration](./docs/deferred-hydration.md): the full references.
 - [Differences from React](./docs/differences-from-react.md): the divergence

@@ -1,7 +1,9 @@
 # Experimental scoped signals: implementation evidence
 
+> Historical implementation evidence. Signals are now stable; see the [current reference](signals.md). The validation claims below describe their recorded revisions.
+
 This remains an implementation experiment, not a
-release or merge recommendation. The [API guide](experimental-scoped-signals.md)
+release or merge recommendation. The [API guide](signals.md)
 describes the consolidated contract; the
 [accepted plan](plans/2026-08-27-experimental-scoped-async-signals-plan.md)
 records the broader acceptance gates. The author has marked

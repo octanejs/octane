@@ -1,4 +1,4 @@
-// Keep the opt-in fixture routing independent of compiler loading so its
+// Keep the signals fixture routing independent of compiler loading so its
 // coverage can be checked before the full workspace toolchain is installed.
 export const signalsNodeTests = [
 	'packages/octane/tests/signals-engine.test.ts',
@@ -42,7 +42,6 @@ export function scopedSignalsProjects(octane, defaultExclude = []) {
 			},
 			plugins: [
 				octane({
-					nativeReads: true,
 					...(mode !== 'dev' ? { hmr: false } : {}),
 					...(mode === 'strong' ? { strong: true } : {}),
 				}),
@@ -57,7 +56,7 @@ export function scopedSignalsProjects(octane, defaultExclude = []) {
 				globals: false,
 				env: { OCTANE_TEST_COMPILE_MODE: 'profile' },
 			},
-			plugins: [octane({ nativeReads: true, hmr: false, profile: true })],
+			plugins: [octane({ hmr: false, profile: true })],
 		},
 		{
 			testExecution: {
@@ -74,7 +73,7 @@ export function scopedSignalsProjects(octane, defaultExclude = []) {
 				testTimeout: 60_000,
 				hookTimeout: 60_000,
 			},
-			// The harnesses must enable nativeReads in their actual served Vite
+			// The harnesses exercise automatic signal support in their actual served Vite
 			// development and production builds, not just in a test-loader plugin.
 		},
 	];

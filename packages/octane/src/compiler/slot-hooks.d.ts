@@ -4,7 +4,6 @@ import type { CompilerProgram, CompileSourceMap } from './index.js';
 export interface SlotHooksOptions {
 	environment?: 'client' | 'server';
 	strong?: boolean;
-	nativeReads?: boolean;
 	hmr?: boolean;
 	dev?: boolean;
 	profile?: boolean;

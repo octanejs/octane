@@ -56,6 +56,8 @@ const git = (...args) =>
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-native-costs-'));
 const fixtureFile = path.join(HERE, 'native-costs.tsrx');
 const fixture = fs.readFileSync(fixtureFile, 'utf8');
+const ordinaryFixtureFile = path.join(HERE, 'ordinary-costs.tsrx');
+const ordinaryFixture = fs.readFileSync(ordinaryFixtureFile, 'utf8');
 const roots = [{ label: 'current', root: REPO }];
 if (options.has('baseline-root')) {
 	assert.ok(options.has('baseline-ref'), '--baseline-root requires an immutable --baseline-ref');
@@ -159,6 +161,7 @@ const payload = {
 		toolingRoot,
 		dependencies,
 		fixtureSha256: hash(fixture),
+		ordinaryFixtureSha256: hash(ordinaryFixture),
 		factorySha256: hashFile(path.join(HERE, 'native-cost-factory.mjs')),
 		runnerSha256: hashFile(import.meta.filename),
 		lockfileSha256: hashFile(path.join(REPO, 'pnpm-lock.yaml')),
@@ -225,12 +228,24 @@ async function buildCase(target, scenario, nativeReads, mode) {
 	const { compile } = await import(
 		pathToFileURL(path.join(packageRoot, 'src/compiler/compile.js')).href
 	);
-	const compilerOptions = { mode, dev: false, hmr: false, nativeReads };
-	const result = compile(fixture, fixtureFile, compilerOptions);
+	// Archived experimental compilers need their original switch. Current
+	// compilers select native capabilities from authored source automatically.
+	const legacyOption = readInput(path.join(packageRoot, 'src/compiler/index.d.ts'))
+		.toString()
+		.includes('nativeReads?: boolean');
+	const compilerOptions = {
+		mode,
+		dev: false,
+		hmr: false,
+		...(legacyOption ? { nativeReads } : {}),
+	};
+	const sourceFile = nativeReads ? fixtureFile : ordinaryFixtureFile;
+	const source = nativeReads ? fixture : ordinaryFixture;
+	const result = compile(source, sourceFile, compilerOptions);
 	assert.deepEqual(result.diagnostics, [], 'Benchmark fixture must compile without diagnostics');
 	const name = [target.label, nativeReads ? 'native' : 'ordinary', scenario.name, mode].join(':');
 	const entry = [
-		`export { ${scenario.component} as Component } from ${JSON.stringify(fixtureFile)};`,
+		`export { ${scenario.component} as Component } from ${JSON.stringify(sourceFile)};`,
 		mode === 'client'
 			? 'export { createRoot, flushSync } from "octane";'
 			: 'export { renderToString } from "octane/server";',
@@ -274,7 +289,7 @@ async function buildCase(target, scenario, nativeReads, mode) {
 						});
 					});
 					plugin.onLoad({ filter: /\.tsrx$/ }, ({ path: file }) => {
-						assert.equal(file, fixtureFile);
+						assert.equal(file, sourceFile);
 						return { contents: result.code, loader: 'js', resolveDir: HERE };
 					});
 					plugin.onLoad({ filter: /\.(?:[cm]?[jt]s|json)$/ }, ({ path: file }) => {
@@ -296,7 +311,7 @@ async function buildCase(target, scenario, nativeReads, mode) {
 	const inputs = Object.keys(output.metafile.inputs)
 		.filter((input) => !input.endsWith(name + '.mjs'))
 		.map((input) => {
-			if (path.resolve(REPO, input) === fixtureFile)
+			if (path.resolve(REPO, input) === sourceFile)
 				return { path: input, sha256: hash(result.code), compiledFixture: true };
 			const absolute = fs.realpathSync(path.resolve(REPO, input));
 			const source = readInput(absolute);
@@ -324,6 +339,7 @@ async function buildCase(target, scenario, nativeReads, mode) {
 	compiled.push({
 		name,
 		compilerOptions,
+		sourceSha256: hash(source),
 		entrySha256: hash(entry),
 		codeSha256: hash(result.code),
 		codeBytes: Buffer.byteLength(result.code),

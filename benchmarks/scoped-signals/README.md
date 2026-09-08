@@ -174,9 +174,9 @@ and a small engine write/subscription/disposal smoke must pass. These checks do
 not establish DOM or native rendering behavior. The runner reuses exact input
 bytes across builds and fails if those files change during the run.
 
-Reports remain marked preliminary while integration continues. Preserve each
-report and rerun into a new filename after source changes instead of replacing
-the earlier measurement. The first recorded comparison is in
+Historical reports retain the status recorded at their measured revision.
+Preserve each report and rerun into a new filename after source changes instead
+of replacing the earlier measurement. The first recorded comparison is in
 `results/2026-08-27/bundles-preliminary.json` with its interpretation in the
 adjacent `bundles-preliminary.md`.
 
@@ -226,8 +226,10 @@ evidence, not compiled `.tsrx`, browser, CI, or heap evidence.
 
 `run-native-costs.mjs` compiles one public `.tsrx` fixture with the archived and
 current compiler. It measures production synchronous mount, prop update, signal
-update, unmount, and server-render work. The two unread controls compile with
-native reads both disabled and enabled, without importing the signal engine.
+update, unmount, and server-render work. The two unread controls use an ordinary module and a module containing native
+capabilities, without importing the signal engine into either final bundle.
+Current compilers select tracking automatically; archived experimental compilers
+receive their original option. Both revisions compile identical source per case.
 Read cases cover one source, 16 reads of one source, and 16 distinct sources.
 Both `@{}` output and ordinary return-JSX output are included. Each case has its
 own bundled runtime so enabling collection cannot affect a disabled control.

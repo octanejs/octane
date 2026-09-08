@@ -81,7 +81,11 @@ import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { assertStrongMode } from './strong-mode.js';
-import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
+import {
+	assertNativeReadDiagnostics,
+	assertNativeReadOptions,
+	nativeReadOptions,
+} from './native-read-diagnostics.js';
 import {
 	captureNativeReadWitness,
 	wrapNativeReadScope,
@@ -8640,7 +8644,6 @@ export function compileForBundler(source, filename, options) {
 }
 
 function compileAuthored(source, filename, options, bundlerMetadata) {
-	assertNativeReadOptions(options);
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
@@ -8651,6 +8654,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	);
 	analyzeTsrx(analyzedAst, cleanFilename);
 	adoptParserAst(analyzedAst);
+	options = nativeReadOptions(analyzedAst, options);
 	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
 	const strongModeEnabled =
 		assertStrongMode(analyzedAst, source, cleanFilename, options)?.enabled === true;

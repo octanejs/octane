@@ -44,7 +44,6 @@ export interface PlainHookFixtureSourceOptions {
 	mode?: 'client' | 'server';
 	hmr?: boolean;
 	manualSlots?: boolean;
-	nativeReads?: boolean;
 	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
@@ -73,7 +72,6 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 		profile: false,
 		inlineHookMemo: options.inlineHookMemo,
 		manualSlots: options.manualSlots,
-		nativeReads: options.nativeReads,
 	});
 	// The plain path deliberately leaves TypeScript to its host toolchain.
 	// Strip it here exactly once, then use the same evaluation boundary as the

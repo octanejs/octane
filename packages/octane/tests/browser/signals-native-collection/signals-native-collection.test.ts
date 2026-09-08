@@ -71,7 +71,7 @@ function appConfig(kind: 'native' | 'ordinary', scratch: string): InlineConfig {
 		root: HERE,
 		cacheDir: join(scratch, 'vite-cache'),
 		logLevel: 'error',
-		plugins: [octane({ nativeReads: kind === 'native' })],
+		plugins: [octane()],
 		resolve: { alias },
 		server: {
 			host: '127.0.0.1',
