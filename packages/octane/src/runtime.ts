@@ -6262,6 +6262,8 @@ function blockIsAncestorOf(anc: Block, node: Block): boolean {
 // queue order. This is correct where a plain depth sort was not — a shallow node in an
 // earlier sibling subtree must fire before a deeper node in a LATER sibling subtree,
 // which depth alone gets backwards.
+// Nearby ancestors and siblings resolve before the full chain scans. These are
+// the common comparisons in a DFS-queued commit, including a deep linear tree.
 function comparePostOrder(
 	aBlock: Block | null,
 	aSeq: number,
@@ -6269,8 +6271,17 @@ function comparePostOrder(
 	bSeq: number,
 ): number {
 	if (aBlock !== bBlock && aBlock !== null && bBlock !== null) {
-		if (blockIsAncestorOf(aBlock, bBlock)) return 1; // a is ancestor of b → a fires AFTER b
-		if (blockIsAncestorOf(bBlock, aBlock)) return -1; // b is ancestor of a → a fires BEFORE b
+		const aParent = aBlock.parentBlock;
+		const bParent = bBlock.parentBlock;
+		if (aParent === bBlock) return -1;
+		if (bParent === aBlock) return 1;
+		if (aParent === bParent) return aSeq - bSeq;
+		for (let b = bParent; b !== null; b = b.parentBlock) {
+			if (b === aBlock) return 1;
+		}
+		for (let a = aParent; a !== null; a = a.parentBlock) {
+			if (a === bBlock) return -1;
+		}
 	}
 	return aSeq - bSeq;
 }
