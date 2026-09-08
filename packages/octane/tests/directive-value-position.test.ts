@@ -382,7 +382,7 @@ export function App() @{
 					// that read it are declared outside the callback.
 					const bound =
 						mode === 'client'
-							? /const \[[^\]]*\brow\b[^\]]*\] = __extra/
+							? /const row = __extra\[\d+\]/
 							: /const \[[^\]]*\brow\b[^\]]*\] = __props/;
 					expect(code).toMatch(bound);
 				});
@@ -400,7 +400,7 @@ export function App() @{
 					const { code } = compile(source, 'App.tsrx', { mode });
 					const bound =
 						mode === 'client'
-							? /const \[[^\]]*\brow\b[^\]]*\] = __extra/
+							? /const row = __extra\[\d+\]/
 							: /const \[[^\]]*\brow\b[^\]]*\] = __props/;
 					expect(code).toMatch(bound);
 				});

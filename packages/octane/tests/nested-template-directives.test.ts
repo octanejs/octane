@@ -3,7 +3,7 @@ import * as ServerRT from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import { loadServerFixture } from './_server-fixture.js';
 import { mount } from './_helpers.js';
-import { NestedStoryFeed } from './_fixtures/nested-template-directives.tsrx';
+import { NestedStoryFeed, SparseCaptureFeed } from './_fixtures/nested-template-directives.tsrx';
 
 const FIXTURE = 'packages/octane/tests/_fixtures/nested-template-directives.tsrx';
 const stories = [
@@ -22,6 +22,75 @@ function readAvailableStory(story: (typeof stories)[number]) {
 }
 
 describe('nested template directives', () => {
+	it('keeps captured values with their keyed rows across sparse nested arms', () => {
+		const original = [
+			{ id: 'a', label: 'A', selected: true },
+			{ id: 'b', label: 'B', selected: false },
+			{ id: 'c', label: 'C', selected: true },
+		];
+		const props = { rows: original, prefix: 'before', suffix: ' after' };
+		const result = mount(SparseCaptureFeed, props);
+		try {
+			expect(result.findAll('[data-row]').map((node) => node.textContent)).toEqual([
+				'A after',
+				'plain: B',
+				'C after',
+			]);
+			const first = result.find('[data-row="a"]');
+			const middle = result.find('[data-row="b"]');
+			const last = result.find('[data-row="c"]');
+
+			result.update(SparseCaptureFeed, {
+				...props,
+				rows: [original[2], original[1], original[0]],
+				prefix: 'new beginning',
+				suffix: ' updated',
+			});
+			expect(result.findAll('[data-row]').map((node) => node.textContent)).toEqual([
+				'C updated',
+				'plain: B',
+				'A updated',
+			]);
+			expect(result.find('[data-row="a"]')).toBe(first);
+			expect(result.find('[data-row="b"]')).toBe(middle);
+			expect(result.find('[data-row="c"]')).toBe(last);
+
+			result.update(SparseCaptureFeed, {
+				...props,
+				rows: [
+					original[2],
+					{ ...original[1], selected: true },
+					{ ...original[0], selected: false },
+				],
+				suffix: ' switched',
+			});
+			expect(result.findAll('[data-row]').map((node) => node.textContent)).toEqual([
+				'C switched',
+				'B switched',
+				'plain: A',
+			]);
+			expect(result.find('[data-row="c"]')).toBe(last);
+
+			result.update(SparseCaptureFeed, {
+				rows: [],
+				prefix: 'new beginning',
+				suffix: ' updated',
+			});
+			expect(result.findAll('[data-row]')).toHaveLength(0);
+			expect(result.find('#sparse-empty').textContent).toBe('empty: new beginning');
+
+			result.update(SparseCaptureFeed, {
+				rows: [original[0]],
+				prefix: 'ignored',
+				suffix: ' again',
+			});
+			expect(result.find('[data-row="a"]').textContent).toBe('A again');
+			expect(result.findAll('#sparse-empty')).toHaveLength(0);
+		} finally {
+			result.unmount();
+		}
+	});
+
 	it('renders and reorders stories with per-story error containment', () => {
 		const result = mount(NestedStoryFeed as any, {
 			visible: true,
