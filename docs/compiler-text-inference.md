@@ -116,12 +116,11 @@ A TypeScript type is a static contract, not a runtime conversion. For example,
 `String(count)` when conversion is intended. The compiler never removes that
 call or changes its evaluation count. Incorrect declarations, unchecked casts,
 and deliberately replaced JavaScript built-ins can still violate a typed
-program's assumptions. Recognized direct writes to the global `String`
-constructor disable new inferred text proofs in that module; an explicit
-authored `as string` keeps
-its existing text intent. The compiler cannot detect replacement in an unrelated
-module or independently verify whether an imported type has changed since a
-snapshot was taken.
+program's assumptions. Recognized direct writes to global `String`, `Number`,
+`BigInt`, or `Date` disable new inferred text proofs in that module; an explicit
+authored `as string` keeps its existing text intent. The compiler cannot detect
+replacement in an unrelated module or independently verify whether an imported
+type has changed since a snapshot was taken.
 
 These facts specialize DOM child text only. They do not change attribute
 coercion, `dangerouslySetInnerHTML` validation, or the treatment of unproven

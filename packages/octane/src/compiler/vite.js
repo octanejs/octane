@@ -619,7 +619,7 @@ export function octane(options = {}) {
 		typedTextEnabled = false;
 		textTypeFiles.clear();
 	};
-	const textFactsFor = (source, id) => {
+	const textFactsFor = (source, id, environment) => {
 		if (!typedTextEnabled || createTextTypeProject === null) return undefined;
 		const file = cleanModuleId(id);
 		if (!nodePath.isAbsolute(file) || !/\.(?:tsrx|tsx)$/.test(file) || !nodeFs.existsSync(file)) {
@@ -631,7 +631,12 @@ export function octane(options = {}) {
 		const canonical = compiler._canonicalModuleId(file);
 		const pragmaOwned = file.endsWith('.tsx') && compiler._pragmaClaimsOwnership(source);
 		if (!compiler._passesOwnershipGate(file, canonical, pragmaOwned)) return undefined;
-		if (resolveRendererForFile(compiler.renderers, canonical).target !== 'dom') return undefined;
+		const renderer = resolveRendererForFile(compiler.renderers, canonical);
+		if (
+			renderer.target !== 'dom' ||
+			(environment === 'server' && renderer.server === 'client-only')
+		)
+			return undefined;
 		textTypeProject ??= createTextTypeProject({
 			tsconfig: nodePath.resolve(projectRoot, options.textTypes.tsconfig),
 			root: projectRoot,
@@ -893,7 +898,7 @@ export function octane(options = {}) {
 						? null
 						: { _descriptorChildrenExportsProof: preflight.descriptorExportsProof }),
 					environment,
-					...(typedTextEnabled ? { textTypeFacts: textFactsFor(code, id) } : null),
+					...(typedTextEnabled ? { textTypeFacts: textFactsFor(code, id, environment) } : null),
 					hmr: !server && hmrEnabled ? 'vite' : false,
 					// DEV server transforms also carry SSR-only diagnostics. HMR itself
 					// remains client-only; an explicit `hmr: false` keeps both transforms
