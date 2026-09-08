@@ -7,6 +7,9 @@ import {
 	type UniversalAsyncCommitTransport,
 	type UniversalHostBatch,
 	type UniversalHostDriver,
+	type UniversalHostPropCodec,
+	type UniversalHostPropCodecContext,
+	type UniversalResourceHandle,
 	type UniversalSerializableValue,
 	type UniversalTransportAcknowledgement,
 	type UniversalTransportCommitMessage,
@@ -471,14 +474,17 @@ function createLoopback(container: TransportContainer) {
 	return api;
 }
 
-function transportRoot(withCodec = true) {
+function transportRoot(
+	withCodec = true,
+	driver?: UniversalHostDriver<TransportContainer, PublicHandle>,
+) {
 	const container: TransportContainer = {
 		renderer: RENDERER,
 		host: createObjectContainer(RENDERER),
 		publicInstances: new Map(),
 	};
 	const loopback = createLoopback(container);
-	const root = createUniversalRoot(container, createTransportDriver(withCodec), {
+	const root = createUniversalRoot(container, driver ?? createTransportDriver(withCodec), {
 		transport: loopback.transport,
 	});
 	loopback.bindRoot(root);
@@ -839,6 +845,122 @@ describe('universal asynchronous transport', () => {
 		);
 		expect(loopback.sentBatches).toEqual([]);
 		await root.unmountAsync();
+	});
+
+	it('keeps codec context snapshots and borrowed resource handles scoped to their root', async () => {
+		const contexts: UniversalHostPropCodecContext<TransportContainer>[] = [];
+		const codec: UniversalHostPropCodec<TransportContainer> = {
+			encode(context) {
+				contexts.push(context);
+				if (context.name === 'resource') {
+					const value = context.value as { id: string } | UniversalResourceHandle;
+					return {
+						kind: 'resource',
+						handle: '$$kind' in value ? value : context.createResourceHandle(value.id),
+					};
+				}
+				return { kind: 'value', value: context.value as UniversalSerializableValue };
+			},
+		};
+		const driver = {
+			...createTransportDriver(false),
+			props: undefined as UniversalHostPropCodec<TransportContainer> | undefined,
+		};
+		const { container, root } = transportRoot(false, driver);
+		// Drivers may make a codec available after constructing their root.
+		driver.props = codec;
+		const plan = universalPlan(RENDERER, {
+			kind: 'host',
+			type: 'card',
+			propsSlot: 0,
+			children: [{ kind: 'host', type: 'badge', propsSlot: 1 }],
+		});
+		const Scene = defineUniversalComponent(
+			RENDERER,
+			(props: {
+				resource: { id: string } | UniversalResourceHandle;
+				badge: { id: string };
+				label: string;
+			}) =>
+				universalValue(plan, [
+					universalProps([
+						['set', 'resource', props.resource],
+						['set', 'label', props.label],
+					]),
+					universalProps([['set', 'resource', props.badge]]),
+				]),
+		);
+		const firstResource = { id: 'texture-1' };
+		await root.renderAsync(Scene, {
+			resource: firstResource,
+			badge: { id: 'badge-1' },
+			label: 'first',
+		});
+		const initialContexts = contexts.slice();
+		expect(new Set(initialContexts.map((context) => context.createResourceHandle)).size).toBe(1);
+		const cardResource = initialContexts.find(
+			(context) => context.hostType === 'card' && context.name === 'resource',
+		)!;
+		const cardLabel = initialContexts.find(
+			(context) => context.hostType === 'card' && context.name === 'label',
+		)!;
+		const badgeResource = initialContexts.find(
+			(context) => context.hostType === 'badge' && context.name === 'resource',
+		)!;
+		expect(cardResource.value).toBe(firstResource);
+		expect(cardLabel.value).toBe('first');
+		expect(badgeResource.value).toEqual({ id: 'badge-1' });
+
+		const createLaterHandle = cardResource.createResourceHandle;
+		const laterHandle = createLaterHandle('texture-later');
+		await root.renderAsync(Scene, {
+			resource: laterHandle,
+			badge: { id: 'badge-2' },
+			label: 'second',
+		});
+		const updatedContexts = contexts.slice(initialContexts.length);
+		for (const context of updatedContexts) {
+			expect(context.createResourceHandle).toBe(createLaterHandle);
+		}
+		expect(updatedContexts).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ hostType: 'card', name: 'resource', value: laterHandle }),
+				expect.objectContaining({ hostType: 'card', name: 'label', value: 'second' }),
+				expect.objectContaining({
+					hostType: 'badge',
+					name: 'resource',
+					value: { id: 'badge-2' },
+				}),
+			]),
+		);
+		expect(cardResource.value).toBe(firstResource);
+		expect(cardLabel.value).toBe('first');
+		expect(badgeResource.value).toEqual({ id: 'badge-1' });
+		expect(container.host.children[0].props.resource).toMatchObject({
+			id: 'texture-later',
+		});
+
+		const other = transportRoot(false, driver);
+		await expect(
+			other.root.renderAsync(Scene, {
+				resource: laterHandle,
+				badge: { id: 'foreign-badge' },
+				label: 'foreign',
+			}),
+		).rejects.toThrow(/does not belong to renderer .* and this root/);
+		expect(other.container.host.children).toEqual([]);
+		expect(other.loopback.sentBatches).toEqual([]);
+		await other.root.renderAsync(Scene, {
+			resource: { id: 'own-texture' },
+			badge: { id: 'own-badge' },
+			label: 'recovered',
+		});
+		expect(other.container.host.children[0].props.resource).toMatchObject({
+			id: 'own-texture',
+		});
+		expect(contexts.at(-1)!.createResourceHandle).not.toBe(createLaterHandle);
+		await root.unmountAsync();
+		await other.root.unmountAsync();
 	});
 
 	it.each([false, true])(

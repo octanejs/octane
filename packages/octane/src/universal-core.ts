@@ -7077,6 +7077,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private readonly passiveTasks: (() => void)[] = [];
 	private hostAttachments: UniversalHostAttachmentState | null = null;
 	private collapsedTemplates: Set<LogicalRecord> | null = null;
+	private codecResourceHandle: ((id: string | number) => UniversalResourceHandle) | null = null;
 
 	constructor(
 		private readonly container: Container,
@@ -7853,25 +7854,24 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			// value contract even when the renderer did not install a custom codec.
 			return this.transport === null ? value : cloneSerializableValue(value);
 		}
+		const createResourceHandle = (this.codecResourceHandle ??= (id) => {
+			if ((typeof id !== 'string' && typeof id !== 'number') || String(id).length === 0) {
+				throw new TypeError('A universal resource handle ID must be a non-empty string or number.');
+			}
+			return Object.freeze({
+				$$kind: 'octane.universal.resource' as const,
+				renderer: this.renderer,
+				root: this.resourceRoot,
+				id,
+			});
+		});
 		const result = codec.encode({
 			container: this.container,
 			renderer: this.renderer,
 			hostType,
 			name,
 			value,
-			createResourceHandle: (id) => {
-				if ((typeof id !== 'string' && typeof id !== 'number') || String(id).length === 0) {
-					throw new TypeError(
-						'A universal resource handle ID must be a non-empty string or number.',
-					);
-				}
-				return Object.freeze({
-					$$kind: 'octane.universal.resource' as const,
-					renderer: this.renderer,
-					root: this.resourceRoot,
-					id,
-				});
-			},
+			createResourceHandle,
 		});
 		if (result === null || typeof result !== 'object') {
 			throw new TypeError(
