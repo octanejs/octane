@@ -19,7 +19,13 @@ export function FreshRootScopeHold(props) @{
 		@if (props.show) {
 			<NewRow label={props.label} external={props.external} />
 		}
-		<span id="committed-label" title={props.label}>{props.label as string}</span>
+		<span
+			id="committed-label"
+			title={props.label}
+			class={{ initial: props.label === 'initial', next: props.label === 'next' }}
+		>
+			{props.label as string}
+		</span>
 		<Reader promise={props.promise} />
 	</main>
 }

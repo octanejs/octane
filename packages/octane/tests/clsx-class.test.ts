@@ -160,6 +160,54 @@ describe('clsx class composition — client mount', () => {
 		r.unmount();
 	});
 
+	it('writes a composed object class only when its value changes', () => {
+		const r = mount(ObjectClass, { active: true, disabled: false });
+		const div = r.find('div');
+		const observer = new MutationObserver(() => {});
+		observer.observe(div, { attributes: true, attributeFilter: ['class'] });
+		try {
+			r.update(ObjectClass, { active: true, disabled: false });
+			expect(r.find('div')).toBe(div);
+			expect(div.getAttribute('class')).toBe('active');
+			expect(observer.takeRecords()).toHaveLength(0);
+
+			r.update(ObjectClass, { active: false, disabled: true });
+			expect(div.getAttribute('class')).toBe('disabled');
+			expect(observer.takeRecords()).toHaveLength(1);
+
+			r.update(ObjectClass, { active: false, disabled: false });
+			expect(div.getAttribute('class')).toBe('');
+			expect(div.hasAttribute('class')).toBe(true);
+			expect(observer.takeRecords()).toHaveLength(1);
+
+			r.update(ObjectClass, { active: false, disabled: false });
+			expect(observer.takeRecords()).toHaveLength(0);
+		} finally {
+			observer.disconnect();
+			r.unmount();
+		}
+	});
+
+	it('writes a composed array class only when its value changes on SVG', () => {
+		const r = mount(SvgClass, { on: true });
+		const svg = r.find('svg');
+		const observer = new MutationObserver(() => {});
+		observer.observe(svg, { attributes: true, attributeFilter: ['class'] });
+		try {
+			r.update(SvgClass, { on: true });
+			expect(r.find('svg')).toBe(svg);
+			expect(svg.getAttribute('class')).toBe('a b');
+			expect(observer.takeRecords()).toHaveLength(0);
+
+			r.update(SvgClass, { on: false });
+			expect(svg.getAttribute('class')).toBe('a');
+			expect(observer.takeRecords()).toHaveLength(1);
+		} finally {
+			observer.disconnect();
+			r.unmount();
+		}
+	});
+
 	it('scoped component composes the array AND appends the scope hash', () => {
 		const r = mount(ScopedArray, { on: true });
 		const cls = r.find('div').className;

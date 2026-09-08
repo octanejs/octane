@@ -444,8 +444,8 @@ function attrBindingHelper(bind) {
 // repeating the guard and previous-value publication in every component.
 // Certified repeated host rows select the ordinary writer and emit an inline
 // guard instead, avoiding a call and cache publication on unchanged rows.
-// Fresh classes deliberately remain unguarded; controlled form properties
-// likewise must reassert the live DOM value on every render.
+// Fresh classes compare their composed string in emitBindingUpdate; controlled
+// form properties must reassert the live DOM value on every render.
 function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 	const helper = attrBindingHelper(bind);
 	if (inlineBindingGuards) return helper;
@@ -456,7 +456,7 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 		case 'ariaAttr':
 			return `${helper}IfChanged`;
 		case 'class':
-			return bind.fresh ? helper : `${helper}IfChanged`;
+			return `${helper}IfChanged`;
 		default:
 			return helper;
 	}
@@ -14929,10 +14929,8 @@ function isMountStableInlineHandler(node, ctx) {
 	return true;
 }
 
-// Object/array/function literals allocate a new identity on every evaluation,
-// so an identity diff can never skip their update. This currently feeds the
-// class binding path, where dropping the dead previous-value field preserves
-// the exact setter frequency while shrinking both code and the binding bag.
+// Object/array/function literals allocate a new identity on every evaluation.
+// Class bindings compare their composed string instead of that fresh identity.
 function isFreshBindingExpr(node) {
 	const value = unwrapTsExpr(node);
 	return (
@@ -22466,6 +22464,7 @@ function planJsx(
 		// a mount-only import for deferred writes.
 		const attrHelper = attrBindingHelper(b);
 		if (attrHelper !== null) {
+			if (b.kind === 'class' && b.fresh) ctx.runtimeNeeded.add('normalizeClass');
 			if (!b.deferred) {
 				ctx.runtimeNeeded.add(attrHelper);
 				registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
@@ -23875,12 +23874,10 @@ function commitSourceRows(sources, valueOf) {
 // is byte-identical to the old unconditional mount write).
 function emitDeferredMount(bind, elVar, bag) {
 	// Whole-object `style` diffs on `_sty`; scalar styles and other values on `_prev`.
-	if (!(bind.kind === 'class' && bind.fresh)) {
-		bag.constField(
-			bind.kind === 'style' ? `_sty$${bind.id}` : `_prev$${bind.id}`,
-			bind.kind === 'styleProperty' ? 'style-unset' : 'undefined',
-		);
-	}
+	bag.constField(
+		bind.kind === 'style' ? `_sty$${bind.id}` : `_prev$${bind.id}`,
+		bind.kind === 'styleProperty' ? 'style-unset' : 'undefined',
+	);
 	const key = `_el$${bind.id}`;
 	if (!bag.host(key, elVar)) return null;
 	return inheritOriginLoc(
@@ -24088,9 +24085,15 @@ function emitBindingMount(bind, elVar, bag) {
 		}
 		case 'class': {
 			// On SVG/MathML hosts the `className` property is read-only — fall back
-			// to setAttribute. Compile-time choice, zero runtime branching.
-			const body = [b.const('_v', bind.expr), b.stmt(b.call(callee(), el(), V())), ...mountHost()];
-			if (!bind.fresh) body.push(b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())));
+			// to setAttribute. A fresh literal is always truthy, so composing it
+			// before the write preserves the nullish-vs-empty attribute contract.
+			const value = bind.fresh ? b.call('_$normalizeClass', bind.expr) : bind.expr;
+			const body = [
+				b.const('_v', value),
+				b.stmt(b.call(callee(), el(), V())),
+				...mountHost(),
+				b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
+			];
 			return st(b.block(body));
 		}
 		case 'style': {
@@ -24385,13 +24388,13 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 			return st(b.stmt(b.call(callee(), F('_el'), bind.expr)));
 		}
 		case 'class': {
-			if (bind.fresh) {
-				return st(b.stmt(b.call(callee(), F('_el'), bind.expr)));
-			}
+			// Recompose fresh literal values on every render, including when their
+			// members have getters, but skip the DOM write for an unchanged class.
+			const value = bind.fresh ? b.call('_$normalizeClass', bind.expr) : bind.expr;
 			if (inlineBindingGuards) {
 				return st(
 					b.block([
-						b.const('_v', bind.expr),
+						b.const('_v', value),
 						b.if(
 							b.binary('!==', F('_prev'), V()),
 							b.block([
@@ -24404,7 +24407,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 				);
 			}
 			return st(
-				b.stmt(b.assignment('=', F('_prev'), b.call(callee(), bind.expr, F('_prev'), F('_el')))),
+				b.stmt(b.assignment('=', F('_prev'), b.call(callee(), value, F('_prev'), F('_el')))),
 			);
 		}
 		case 'style': {
