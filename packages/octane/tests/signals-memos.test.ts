@@ -3,11 +3,42 @@ import { act, flushSync, hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
 import { createScope, query } from 'octane/signals';
 import { flushEffects, mount } from './_helpers';
-import { loadPlainHookFixtureSource, loadServerFixture } from './_server-fixture';
+import {
+	loadCompiledFixtureSource,
+	loadPlainHookFixtureSource,
+	loadServerFixture,
+} from './_server-fixture';
 import { deferred } from './_server-stream';
 import * as client from './_fixtures/signals-memos.tsrx';
 
 describe('native reads in inferred memos', () => {
+	it('tracks a quoted reader property without a direct signals import or compiler option', () => {
+		const { Reader } = loadCompiledFixtureSource(
+			`import { useMemo } from 'octane';
+export function Reader(props) @{
+  const { 'read$': read } = props;
+  const value = useMemo(read);
+  <output>{value as string}</output>
+}`,
+			{ id: 'quoted-reader.tsrx', mode: 'client' },
+		);
+		const scope = createScope({ scopeKey: 'quoted-reader' });
+		const value$ = scope.signal$('value', 'first');
+		const props = { read$: () => value$.get() };
+		const root = mount(Reader, props);
+		try {
+			const output = root.find('output');
+			expect(output.textContent).toBe('first');
+			root.update(Reader, props);
+			flushSync(() => value$.set('second'));
+			expect(root.find('output')).toBe(output);
+			expect(output.textContent).toBe('second');
+		} finally {
+			root.unmount();
+			scope.dispose();
+		}
+	});
+
 	it('refreshes inferred reads after a cache hit without changing explicit dependency contracts', () => {
 		const scope = createScope({ scopeKey: 'memo-contracts' });
 		const value$ = scope.signal$('value', 'first');
@@ -102,7 +133,7 @@ describe('native reads in inferred memos', () => {
 	it('seeds memo reads and adopts historical values before following live state', () => {
 		const server = loadServerFixture<typeof client>(
 			'packages/octane/tests/_fixtures/signals-memos.tsrx',
-			{ compileOptions: { nativeReads: true } },
+			{ compileOptions: {} },
 		);
 		const scope = createScope({ scopeKey: 'memo-hydration' });
 		const value$ = scope.signal$('value', 'server');
@@ -144,7 +175,7 @@ export function App(props) {
   const sampled = useMemo(() => props.label, [props.label]);
   return createElement('output', null, sampled + ':' + value);
 }`,
-				{ id: 'native-memo-hook.ts', inlineHookMemo, nativeReads: true },
+				{ id: 'native-memo-hook.ts', inlineHookMemo },
 			);
 			const scope = createScope({ scopeKey: 'memo-plain-' + inlineHookMemo });
 			const value$ = scope.signal$('value', 'first');

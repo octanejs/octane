@@ -177,9 +177,6 @@ export function resolveOctaneConfig(raw, options = {}) {
 	if (raw.compiler?.strong !== undefined && typeof raw.compiler.strong !== 'boolean') {
 		throw new Error('[octane] compiler.strong must be a boolean when provided.');
 	}
-	if (raw.compiler?.nativeReads !== undefined && typeof raw.compiler.nativeReads !== 'boolean') {
-		throw new Error('[octane] compiler.nativeReads must be a boolean when provided.');
-	}
 
 	if (raw.router?.routes !== undefined && !Array.isArray(raw.router.routes)) {
 		throw new Error('[octane] router.routes must be an array.');
@@ -239,7 +236,6 @@ export function resolveOctaneConfig(raw, options = {}) {
 		adapter: raw.adapter,
 		compiler: {
 			strong: raw.compiler?.strong ?? false,
-			nativeReads: raw.compiler?.nativeReads ?? false,
 			renderers: normalizeRendererConfig(raw.compiler?.renderers),
 		},
 		router: {

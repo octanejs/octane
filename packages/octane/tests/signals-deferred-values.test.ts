@@ -20,7 +20,7 @@ import * as client from './_fixtures/signals-deferred-values.tsrx';
 
 const server = loadServerFixture<typeof client>(
 	resolve(__dirname, '_fixtures/signals-deferred-values.tsrx'),
-	{ compileOptions: { nativeReads: true } },
+	{ compileOptions: {} },
 );
 
 describe('native reads in deferred JSX values', () => {

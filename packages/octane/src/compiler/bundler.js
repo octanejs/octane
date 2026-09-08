@@ -516,7 +516,6 @@ class OctaneBundlerCompiler {
 			profile: options.profile === true,
 			inlineHookMemo: options.inlineHookMemo !== false,
 			strong: options.strong === true,
-			nativeReads: options.nativeReads === true,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
@@ -1086,7 +1085,6 @@ class OctaneBundlerCompiler {
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
 		const inlineHookMemo = (options.inlineHookMemo ?? this.defaults.inlineHookMemo) !== false;
-		const nativeReads = (options.nativeReads ?? this.defaults.nativeReads) === true;
 		// An application's global policy never leaks into installed or linked
 		// compatibility packages, including workspace packages nested inside the
 		// project root. Modules may still opt themselves in with their own
@@ -1190,7 +1188,6 @@ class OctaneBundlerCompiler {
 				profileFilename,
 				...(inlineHookMemo ? null : { inlineHookMemo: false }),
 				...(strong ? { strong: true } : null),
-				...(nativeReads ? { nativeReads: true } : null),
 				...(universalRuntime === undefined ? null : { universalRuntime }),
 				// Keep the established DOM compiler call byte-for-byte equivalent. A
 				// renderer descriptor is an orthogonal compiler input only for the
@@ -1280,9 +1277,9 @@ class OctaneBundlerCompiler {
 			const nativeHookImport = /from\s*['"]octane\/signals\/(?:client|server)['"]/.test(code);
 			const hasHookRuntimeImport =
 				/from\s*['"]octane['"]/.test(code) ||
-				(nativeReads && /from\s*['"]octane\/server['"]/.test(code)) ||
+				/from\s*['"]octane\/server['"]/.test(code) ||
 				nativeHookImport ||
-				(nativeReads && /from\s*['"]octane\/signals['"]/.test(code));
+				/from\s*['"]octane\/signals['"]/.test(code);
 			// Manual factories can import only other binding helpers, so their
 			// escaping hooks still need a provider boundary. Unrelated helpers keep
 			// their cheap pass-through without collecting unused manifest watches.
@@ -1332,7 +1329,7 @@ class OctaneBundlerCompiler {
 				inlineHookMemo: inlinePlainMemo,
 				...(manualSlots ? { manualSlots: true } : null),
 				...(strong ? { strong: true } : null),
-				...(nativeReads ? { nativeReads: true, renderer } : null),
+				renderer,
 				...(specializeVoidRoot
 					? {
 							isVoidComponentImport: options.isVoidComponentImport,

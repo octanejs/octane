@@ -1,4 +1,4 @@
-/** Nominal marker for the experimental native signal API; it has no runtime payload. */
+/** Nominal marker for the native signal API; it has no runtime payload. */
 export declare const SIGNAL_HANDLE: unique symbol;
 export declare const QUERY_REQUEST: unique symbol;
 

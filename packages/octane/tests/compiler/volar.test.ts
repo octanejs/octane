@@ -124,8 +124,8 @@ describe('compileToVolarMappings', () => {
 	});
 
 	it.each([false, true])(
-		'type-checks authored Suspense alongside pending directives (nativeReads: %s)',
-		(nativeReads) => {
+		'type-checks authored Suspense alongside pending directives (signal module: %s)',
+		(signalModule) => {
 			const source = `import { Suspense } from 'octane';
 export function Panel(props: { primaryLabel: string; pendingLabel: string }) @{
 	<Suspense fallback={'outer'}>
@@ -168,7 +168,10 @@ export function Repeated() @{
 `,
 				];
 				const files = validSources.map((input, index) => {
-					const result = compileToVolarMappings(input, `Panel${index}.tsrx`, { nativeReads });
+					const result = compileToVolarMappings(
+						signalModule ? `${input}\nimport 'octane/signals';` : input,
+						`Panel${index}.tsrx`,
+					);
 					expect(result.errors).toEqual([]);
 					expect(result.diagnostics).toEqual([]);
 					if (index === 0) {
@@ -190,7 +193,10 @@ export function Repeated() @{
 				writeFileSync(inspectionFile, compileTypesInspection(source, 'Inspection.tsrx').code);
 				files.push(inspectionFile);
 				const invalidSource = source.replace('pendingLabel: string', 'pendingLabel: number');
-				const invalid = compileToVolarMappings(invalidSource, 'Invalid.tsrx', { nativeReads });
+				const invalid = compileToVolarMappings(
+					signalModule ? `${invalidSource}\nimport 'octane/signals';` : invalidSource,
+					'Invalid.tsrx',
+				);
 				expect(invalid.errors).toEqual([]);
 				const invalidFile = join(root, 'Invalid.tsx');
 				writeFileSync(invalidFile, invalid.code);

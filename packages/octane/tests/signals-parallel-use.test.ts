@@ -8,7 +8,7 @@ import * as client from './_fixtures/signals-parallel-use.tsrx';
 
 const server = loadServerFixture<typeof client>(
 	resolve(__dirname, '_fixtures/signals-parallel-use.tsrx'),
-	{ compileOptions: { nativeReads: true } },
+	{ compileOptions: {} },
 );
 
 function deferred<T>() {
