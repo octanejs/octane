@@ -12,6 +12,8 @@ export {
 	setAriaAttributeIfChanged,
 	setClassNameIfChanged,
 	setClassAttrIfChanged,
+	updateFreshClassName,
+	updateFreshClassAttr,
 	textHoleUpdate,
 	childTextHoleUpdate,
 } from '../../octane/src/internal/client.js';
