@@ -33302,7 +33302,6 @@ function mountItemsLinear<T>(
 	const adopt = state.adopt;
 	let adoptIndex = 0;
 	let prev: Block | null = null;
-	const mounted: Block[] = [];
 	try {
 		for (let i = 0; i < newLen; i++) {
 			const item = items[i];
@@ -33330,7 +33329,6 @@ function mountItemsLinear<T>(
 				ssrMarkerless,
 				adoptNode,
 			);
-			mounted.push(block);
 			oldItems.set(key, block);
 			block.key = key;
 			block.prevSibling = prev;
@@ -33350,8 +33348,9 @@ function mountItemsLinear<T>(
 		// every completed prefix item, while mountItem discards the throwing
 		// item itself. A retry then starts from a genuinely empty list instead
 		// of duplicating the completed prefix and overwriting its Map entry.
-		for (let i = mounted.length - 1; i >= 0; i--) {
-			const block = mounted[i];
+		while (prev !== null) {
+			const block = prev;
+			prev = block.prevSibling;
 			oldItems.delete(block.key);
 			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
 			unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
