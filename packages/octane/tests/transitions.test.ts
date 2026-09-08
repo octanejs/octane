@@ -1051,10 +1051,10 @@ describe('useTransition — the old screen stays whole', () => {
 				onOld,
 				onNext: action === 'replace' ? onNext : action === 'unset' ? null : undefined,
 			});
+			await act(() => {});
 			const title = document.head.querySelector('title[data-transition-held-listener="yes"]')!;
 			const clickTitle = () => title.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 			try {
-				await act(() => {});
 				clickTitle();
 				expect(onOld).toHaveBeenCalledTimes(1);
 				expect(onNext).not.toHaveBeenCalled();
