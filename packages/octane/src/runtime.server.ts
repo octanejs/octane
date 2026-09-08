@@ -325,7 +325,7 @@ interface Frame {
 	// child positions in @try content/pending/catch arms never share cache keys.
 	asyncScope: string;
 	/** Parser context supplied by, or inherited through, the component call site. */
-	namespace?: 'html' | 'svg' | 'mathml';
+	namespace: 'html' | 'svg' | 'mathml' | undefined;
 }
 interface Job {
 	comp: ServerComponent;
@@ -3569,6 +3569,7 @@ export function ssrComponent(
 						path: null,
 						deferred: false,
 						asyncScope: ASYNC_SCOPE,
+						namespace: explicitNamespace ?? undefined,
 					}
 				: {
 						parent: pf,
@@ -3579,12 +3580,12 @@ export function ssrComponent(
 						path: null,
 						deferred: false,
 						asyncScope: ASYNC_SCOPE,
+						namespace: explicitNamespace ?? pf.namespace,
 					};
 		// Function components are transparent to the HTML parser. Carry the active
 		// namespace through arbitrary wrapper chains; an explicitly compiled host
 		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the
 		// next component frame through ssrComponentNS.
-		frame.namespace = explicitNamespace ?? pf?.namespace;
 		return renderComponentFramed(comp, props, parent, frame, inherit);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
@@ -5917,6 +5918,7 @@ function runFullFramedPass(
 		path: '',
 		deferred: false,
 		asyncScope: '',
+		namespace: undefined,
 	};
 	CURRENT_COMP = component;
 	CURRENT_PROPS = props;
@@ -6026,6 +6028,7 @@ function runDiscoveryRound(
 				path: null,
 				deferred: false,
 				asyncScope: job.frame.asyncScope,
+				namespace: undefined,
 			};
 			try {
 				renderComponentFramed(job.comp, job.props, job.parentScope, frame);
