@@ -17410,15 +17410,51 @@ interface HeadSlot {
 	attrNames?: string[];
 }
 
-function removeHeadEventListeners(state: HeadSlot, attrs: Record<string, any> | null): void {
+// A shallow HeadSlot snapshot cannot undo mutations to its listener Map or the
+// native registrations. Snapshot once before the first change in a headBlock
+// pass: two different props can resolve to the same native event and handler,
+// which addEventListener deduplicates, so per-prop inverse operations are unsafe.
+function journalHeadEventListeners(state: HeadSlot): void {
+	const before = state.handlers === undefined ? null : new Map(state.handlers);
+	journalUndo(() => {
+		const handlers = state.handlers;
+		if (handlers !== undefined) {
+			for (const [name, listener] of handlers) {
+				const event = eventSlot(name)!;
+				state.el.removeEventListener(event.type, listener, event.capture);
+			}
+			handlers.clear();
+		}
+		if (before !== null) {
+			const restored = handlers ?? (state.handlers = new Map<string, EventListener>());
+			for (const [name, listener] of before) {
+				const event = eventSlot(name)!;
+				state.el.addEventListener(event.type, listener, event.capture);
+				restored.set(name, listener);
+			}
+		}
+	});
+}
+
+function removeHeadEventListeners(
+	state: HeadSlot,
+	attrs: Record<string, any> | null,
+	journalChanges = false,
+): boolean {
 	const handlers = state.handlers;
-	if (handlers === undefined) return;
+	if (handlers === undefined) return false;
+	let journaled = false;
 	for (const [name, listener] of handlers) {
 		if (attrs !== null && name in attrs) continue;
+		if (journalChanges && !journaled) {
+			journalHeadEventListeners(state);
+			journaled = true;
+		}
 		const event = eventSlot(name)!;
 		state.el.removeEventListener(event.type, listener, event.capture);
 		handlers.delete(name);
 	}
+	return journaled;
 }
 
 // Find the server-rendered `tag` inside `key`'s paired marker interval in <head>,
@@ -17506,7 +17542,9 @@ export function headBlock(
 		journalObjectOnce(state);
 		journalBag();
 	}
-	if (state.handlers !== undefined) removeHeadEventListeners(state, attrs);
+	let journaledHandlers =
+		state.handlers !== undefined &&
+		removeHeadEventListeners(state, attrs, TRANSITION_JOURNAL !== null);
 	const previousNames = state.attrNames;
 	if (previousNames !== undefined) {
 		for (let i = 0; i < previousNames.length; i++) {
@@ -17527,13 +17565,19 @@ export function headBlock(
 				const hs = state.handlers;
 				const prevH = hs?.get(k);
 				if (prevH === listener) continue;
+				const nextH = typeof listener === 'function' ? (listener as EventListener) : undefined;
+				if (
+					TRANSITION_JOURNAL !== null &&
+					!journaledHandlers &&
+					(prevH !== undefined || nextH !== undefined)
+				) {
+					journalHeadEventListeners(state);
+					journaledHandlers = true;
+				}
 				if (prevH !== undefined) el.removeEventListener(ev.type, prevH, ev.capture);
-				if (typeof listener === 'function') {
-					el.addEventListener(ev.type, listener as EventListener, ev.capture);
-					(hs ?? (state.handlers = new Map<string, EventListener>())).set(
-						k,
-						listener as EventListener,
-					);
+				if (nextH !== undefined) {
+					el.addEventListener(ev.type, nextH, ev.capture);
+					(hs ?? (state.handlers = new Map<string, EventListener>())).set(k, nextH);
 				} else {
 					hs?.delete(k);
 				}
