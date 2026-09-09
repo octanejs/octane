@@ -4690,6 +4690,10 @@ describe('universal nested boundary ownership', () => {
 		root.render(SceneWithEvent, { handler: (payload) => log.push(`first:${payload}`) });
 		const mesh = container.children[0];
 		const firstCommand = container.commits[0].commands.find((command) => command.op === 'event');
+		if (firstCommand?.op !== 'event' || firstCommand.listener === null) {
+			throw new Error('Expected the initial event listener.');
+		}
+		const listener = firstCommand.listener.id;
 		expect(firstCommand).toMatchObject({
 			op: 'event',
 			type: 'pointerdown',
@@ -4702,7 +4706,7 @@ describe('universal nested boundary ownership', () => {
 		// re-announcement is emitted — yet dispatch must reach the new closure.
 		const replacement = container.commits[1].commands.find((command) => command.op === 'event');
 		expect(replacement).toBeUndefined();
-		container.dispatchEvent(mesh.id, 'pointerdown', 'two');
+		root.dispatchEvent(listener, 'two');
 
 		root.render(SceneWithEvent, { handler: null });
 		expect(container.commits[2].commands).toContainEqual({
@@ -4713,6 +4717,9 @@ describe('universal nested boundary ownership', () => {
 		});
 		expect(() => container.dispatchEvent(mesh, 'pointerdown', 'three')).toThrow(
 			/no "pointerdown" listener/,
+		);
+		expect(() => root.dispatchEvent(listener, 'three')).toThrow(
+			/Unknown or inactive universal event listener/,
 		);
 		expect(log).toEqual(['first:one', 'second:two']);
 

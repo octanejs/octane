@@ -11586,17 +11586,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 				}
 				if ((treeFeatures & UNIVERSAL_TREE_EVENT) !== 0) {
-					// The accepted listener table is edited in place: this closure is
-					// already the accept point (EVENT_DISPATCHERS mutates here either
-					// way), retiring only the listeners of re-staged or removed hosts.
-					// Rebuilding from staged events would drop the live listeners of
-					// retained subtrees, which this commit never re-staged.
+					// Keep dispatchers for re-staged listeners: they read the current
+					// handler from this table. Retire only listeners absent from the
+					// accepted host events; retained subtrees are not re-staged here.
 					const handlers = this.handlers;
-					for (const listener of previousReplacedEventListeners) {
-						EVENT_DISPATCHERS.delete(listener);
-						this.publishedListeners.delete(listener);
-						handlers.delete(listener);
-					}
 					for (const listener of previousCollapsedEventListeners) {
 						EVENT_DISPATCHERS.delete(listener);
 						this.publishedListeners.delete(listener);
@@ -11605,12 +11598,20 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					for (const [record, events] of stagedEvents) {
 						if (!stagedVisibleEventRecords.has(record)) continue;
 						for (const event of events.values()) {
+							previousReplacedEventListeners.delete(event.listener);
 							handlers.set(event.listener, event);
-							this.publishedListeners.add(event.listener);
-							EVENT_DISPATCHERS.set(event.listener, (payload) =>
-								this.dispatchEvent(event.listener, payload),
-							);
+							if (!this.publishedListeners.has(event.listener)) {
+								this.publishedListeners.add(event.listener);
+								EVENT_DISPATCHERS.set(event.listener, (payload) =>
+									this.dispatchEvent(event.listener, payload),
+								);
+							}
 						}
+					}
+					for (const listener of previousReplacedEventListeners) {
+						EVENT_DISPATCHERS.delete(listener);
+						this.publishedListeners.delete(listener);
+						handlers.delete(listener);
 					}
 					for (const event of nextCollapsedEvents) {
 						handlers.set(event.listener, event);

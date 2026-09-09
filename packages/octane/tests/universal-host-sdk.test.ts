@@ -1207,7 +1207,17 @@ describe('universal prepared host SDK', () => {
 		const noInactiveSites = new Set<number>();
 		const sampled = [0, 15, 31];
 
-		root.render(Scene, { version: 'accepted', inactive: noInactiveSites });
+		const accepted = root.prepare(Scene, { version: 'accepted', inactive: noInactiveSites });
+		if (accepted.status !== 'prepared') throw new Error('Expected a prepared transaction.');
+		const template = accepted.batch.commands.find((command) => command.op === 'mount-template');
+		if (template?.op !== 'mount-template') throw new Error('Expected a host template command.');
+		const firstActionEvents = template.nodes[1]?.events;
+		const selectListener = firstActionEvents?.find((event) => event.type === 'select')?.listener.id;
+		const pressListener = firstActionEvents?.find((event) => event.type === 'press')?.listener.id;
+		if (selectListener === undefined || pressListener === undefined) {
+			throw new Error('Expected the first action listeners.');
+		}
+		accepted.commit();
 		const row = container.children[0];
 		const actions = [...row.children];
 		for (const index of sampled) {
@@ -1249,6 +1259,11 @@ describe('universal prepared host SDK', () => {
 			'next:16:select',
 			'next:30:select',
 		]);
+		expect(() => root.dispatchEvent(selectListener, undefined)).toThrow(
+			/Unknown or inactive universal event listener/,
+		);
+		root.dispatchEvent(pressListener, undefined);
+		expect(calls.at(-1)).toBe('next:0:press');
 
 		root.render(Scene, { version: 'restored', inactive: noInactiveSites });
 		for (const index of sampled) {
@@ -1258,6 +1273,11 @@ describe('universal prepared host SDK', () => {
 		expect(calls.slice(-6)).toEqual(
 			sampled.flatMap((index) => [`restored:${index}:select`, `restored:${index}:press`]),
 		);
+		expect(() => root.dispatchEvent(selectListener, undefined)).toThrow(
+			/Unknown or inactive universal event listener/,
+		);
+		root.dispatchEvent(pressListener, undefined);
+		expect(calls.at(-1)).toBe('restored:0:press');
 
 		root.unmount();
 		expect(container.children).toEqual([]);
