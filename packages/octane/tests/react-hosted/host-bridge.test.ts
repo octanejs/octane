@@ -9,7 +9,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as React from 'react';
-import { flushSync as octaneFlushSync } from '../../src/index.js';
+import {
+	bindRendererRegionOwner,
+	createContext,
+	createElement,
+	createRoot,
+	flushSync as octaneFlushSync,
+	use,
+} from '../../src/index.js';
 import { createLog } from '../_helpers.js';
 import {
 	h,
@@ -18,6 +25,7 @@ import {
 	reactAct,
 	IslandController,
 	OctaneCompatSpike,
+	RENDERER_REGION_OWNER,
 	SpikeErrorBoundary,
 } from './_react-host.js';
 import {
@@ -157,6 +165,51 @@ describe('react-hosted island — ownership and lifecycle', () => {
 });
 
 describe('react-hosted island — transparent context via the owner bridge', () => {
+	it('reads the latest owner after rebinding a retained root', () => {
+		const Theme = createContext('unbound-default');
+		function Envelope(props: { owner?: object }) {
+			if (props.owner !== undefined) bindRendererRegionOwner(props);
+			return createElement('output', { className: 'rebound-theme' }, use(Theme));
+		}
+		function ownedProps(value: string) {
+			const owner = {
+				active: true,
+				readContext: () => value,
+				routeError: () => false,
+				routeSuspense: () => false,
+				registerDispose: () => () => {},
+			};
+			const props = { owner };
+			Object.defineProperty(props, RENDERER_REGION_OWNER, { value: owner });
+			return props;
+		}
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		try {
+			root.render(Envelope, {});
+			const output = container.querySelector('.rebound-theme')!;
+			expect(output.textContent).toBe('unbound-default');
+			const dormant = ownedProps('activated-owner');
+			dormant.owner.active = false;
+			octaneFlushSync(() => root.render(Envelope, dormant));
+			expect(output.textContent).toBe('unbound-default');
+			dormant.owner.active = true;
+			octaneFlushSync(() =>
+				root.render(Envelope, { ...dormant, [RENDERER_REGION_OWNER]: dormant.owner }),
+			);
+			expect(output.textContent).toBe('activated-owner');
+			octaneFlushSync(() => root.render(Envelope, ownedProps('first-owner')));
+			expect(container.querySelector('.rebound-theme')).toBe(output);
+			expect(output.textContent).toBe('first-owner');
+			octaneFlushSync(() => root.render(Envelope, ownedProps('second-owner')));
+			expect(output.textContent).toBe('second-owner');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
 	const ThemeCtx = React.createContext('unset-theme');
 	const LocaleCtx = React.createContext('unset-locale');
 	const themePair = { react: ThemeCtx as React.Context<any>, mirror: MirrorTheme };

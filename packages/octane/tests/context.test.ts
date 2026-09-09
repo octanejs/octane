@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { prerender } from 'octane/static';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import {
+	createContext,
+	createElement,
+	createRoot,
+	flushSync,
+	hydrateRoot,
+	use,
+} from '../src/index.js';
 import { mount, act } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
 import {
@@ -278,6 +285,137 @@ describe('context — use() alongside other reads', () => {
 			expect(output.textContent).toBe('dark|alice|dark/alice');
 		} finally {
 			root?.unmount();
+			container.remove();
+		}
+	});
+});
+
+describe('context — retained provider resolution', () => {
+	it('distinguishes a provided undefined from the default after the provider changes', () => {
+		const Value = createContext<string | undefined>('fallback');
+		function Reader() {
+			return createElement('output', { className: 'optional-value' }, String(use(Value)));
+		}
+		function Host(props: { value: string | undefined }) {
+			return createElement(Value.Provider, { value: props.value }, createElement(Reader));
+		}
+		const r = mount(Host, { value: 'first' });
+		try {
+			const output = r.find('.optional-value');
+			expect(output.textContent).toBe('first');
+			r.update(Host, { value: undefined });
+			expect(r.find('.optional-value')).toBe(output);
+			expect(output.textContent).toBe('undefined');
+			r.update(Host, { value: 'second' });
+			expect(output.textContent).toBe('second');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('keeps second and third providers and a default distinct through independent updates', () => {
+		const First = createContext('first-default');
+		const Second = createContext('second-default');
+		const Third = createContext('third-default');
+		const Bare = createContext('bare-default');
+		function Reader() {
+			const values = [use(First), use(Second), use(Third), use(Bare)];
+			return createElement('output', { className: 'many-values' }, values.join('|'));
+		}
+		function Host(props: { first: string; second: string; third: string }) {
+			return createElement(
+				First.Provider,
+				{ value: props.first },
+				createElement(
+					Second.Provider,
+					{ value: props.second },
+					createElement(Third.Provider, { value: props.third }, createElement(Reader)),
+				),
+			);
+		}
+		const r = mount(Host, { first: 'a0', second: 'b0', third: 'c0' });
+		try {
+			const output = r.find('.many-values');
+			expect(output.textContent).toBe('a0|b0|c0|bare-default');
+			r.update(Host, { first: 'a0', second: 'b1', third: 'c0' });
+			expect(output.textContent).toBe('a0|b1|c0|bare-default');
+			r.update(Host, { first: 'a0', second: 'b1', third: 'c1' });
+			expect(output.textContent).toBe('a0|b1|c1|bare-default');
+			r.update(Host, { first: 'a1', second: 'b1', third: 'c1' });
+			expect(r.find('.many-values')).toBe(output);
+			expect(output.textContent).toBe('a1|b1|c1|bare-default');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('keeps earlier and later reads aligned when a second context read appears conditionally', () => {
+		const First = createContext('a-default');
+		const Second = createContext('b-default');
+		const Third = createContext('c-default');
+		function Reader(props: { readSecond: boolean }) {
+			const first = use(First);
+			const second = props.readSecond ? use(Second) : '(off)';
+			const third = use(Third);
+			return createElement(
+				'output',
+				{ className: 'conditional-values' },
+				`${first}|${second}|${third}`,
+			);
+		}
+		function Host(props: { readSecond: boolean; second: string; third: string }) {
+			return createElement(
+				First.Provider,
+				{ value: 'a0' },
+				createElement(
+					Second.Provider,
+					{ value: props.second },
+					createElement(
+						Third.Provider,
+						{ value: props.third },
+						createElement(Reader, { readSecond: props.readSecond }),
+					),
+				),
+			);
+		}
+		const r = mount(Host, { readSecond: false, second: 'b0', third: 'c0' });
+		try {
+			const output = r.find('.conditional-values');
+			expect(output.textContent).toBe('a0|(off)|c0');
+			r.update(Host, { readSecond: true, second: 'b0', third: 'c0' });
+			expect(output.textContent).toBe('a0|b0|c0');
+			r.update(Host, { readSecond: false, second: 'b0', third: 'c1' });
+			expect(output.textContent).toBe('a0|(off)|c1');
+			r.update(Host, { readSecond: true, second: 'b1', third: 'c1' });
+			expect(r.find('.conditional-values')).toBe(output);
+			expect(output.textContent).toBe('a0|b1|c1');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('reads a fresh provider after its root is unmounted and recreated', () => {
+		const Value = createContext('fallback');
+		function Reader() {
+			return createElement('output', { className: 'new-root-value' }, use(Value));
+		}
+		function Host(props: { value: string }) {
+			return createElement(Value.Provider, { value: props.value }, createElement(Reader));
+		}
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		let root = createRoot(container);
+		try {
+			root.render(Host, { value: 'old-root' });
+			const oldOutput = container.querySelector('.new-root-value')!;
+			expect(oldOutput.textContent).toBe('old-root');
+			root.unmount();
+			root = createRoot(container);
+			root.render(Host, { value: 'new-root' });
+			expect(oldOutput.isConnected).toBe(false);
+			expect(container.querySelector('.new-root-value')?.textContent).toBe('new-root');
+		} finally {
+			root.unmount();
 			container.remove();
 		}
 	});
