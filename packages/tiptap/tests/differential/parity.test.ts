@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	mountDifferential,
 	preloadDifferentialFixture,
+	type DiffPair,
 } from '../../../octane/tests/differential/_rig.js';
 import { flushEffects } from '../_helpers';
 
@@ -14,6 +15,14 @@ const customViewsAsPropFixture = resolve(
 	'../_fixtures/custom-views-as-prop-parity.tsrx',
 );
 const cache = resolve(__dirname, '.react-cache');
+
+async function unmountAndDrainEditorDestroy(differential: DiffPair): Promise<void> {
+	differential.unmount();
+	// @tiptap/react defers useEditor destruction by one macrotask so a
+	// same-tick remount can retain the editor. Keep jsdom alive through that
+	// task instead of letting Vitest tear the environment down first.
+	await new Promise<void>((resolveDestroy) => setTimeout(resolveDestroy, 0));
+}
 
 async function waitForPublishedSelection(...mounts: { container: HTMLElement }[]): Promise<void> {
 	for (let frame = 0; frame < 10; frame++) {
@@ -65,7 +74,8 @@ describe('differential: @octanejs/tiptap vs @tiptap/react', () => {
 		);
 		expect(differential.react.container.querySelector('output')?.textContent).toBe('Shared update');
 
-		differential.unmount();
+		await unmountAndDrainEditorDestroy(differential);
+		expect(editors.every((editor) => editor.isDestroyed)).toBe(true);
 	});
 
 	// @parity-case differential:tiptap-custom-views
@@ -218,7 +228,7 @@ describe('differential: @octanejs/tiptap vs @tiptap/react', () => {
 			'node:cleanup',
 		]);
 
-		differential.unmount();
+		await unmountAndDrainEditorDestroy(differential);
 	});
 
 	// @parity-case differential:tiptap-node-view-as-prop
@@ -239,6 +249,6 @@ describe('differential: @octanejs/tiptap vs @tiptap/react', () => {
 		expect(octaneNode.hasAttribute('as')).toBe(false);
 		expect(reactNode.hasAttribute('as')).toBe(true);
 
-		differential.unmount();
+		await unmountAndDrainEditorDestroy(differential);
 	});
 });

@@ -173,7 +173,7 @@
         {
           "path": "packages/tiptap/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "375525946b5dd778b68cf738d736ed227e4872884dba8b115f80a9889dff3bcd",
+          "sha256": "eb7a2a7514ce442d652e6fb9331c8ca20dfa291dd577688857ed2d6a434b8b93",
           "cases": [
             {
               "id": "differential:tiptap-editor",
@@ -220,7 +220,7 @@
         {
           "path": "packages/tiptap/tests/differential/mark-view-portal-cleanup.test.ts",
           "role": "test",
-          "sha256": "0ad96a5bdcef793e3b5800b69d196b0b3464030a34ee33e8c8ce5b063003fc34",
+          "sha256": "dde70ff31d1c6fbd4b97b2d23499e0405042f9310d3605dfc3e2963902fab8fe",
           "cases": [
             {
               "id": "differential:tiptap-mark-view-portal-cleanup",
