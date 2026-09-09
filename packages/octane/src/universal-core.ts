@@ -1176,7 +1176,11 @@ interface DraftOwner {
 	componentProps: any;
 	componentRevision: number;
 	parent: DraftOwner | null;
-	replayPath: readonly SuspendedOwnerSegment[];
+	// Built only when a pending memo needs to be matched across a replay.
+	replayPath: readonly SuspendedOwnerSegment[] | null;
+	// The claim chain survives a render-phase retry or a held boundary replacing
+	// parent.children, so unkeyed sibling ordinals remain the same on replay.
+	priorClaimedSibling: DraftOwner | null;
 	hooks: Map<unknown, UniversalHook>;
 	clonedHooks: Set<unknown>;
 	seenEffects: EffectHook[];
@@ -1193,7 +1197,6 @@ interface DraftOwner {
 	sequentialClaimCursor: number;
 	childOwnerBuckets: OwnerIdentityIndex<UniversalOwnerRecord[]> | null;
 	childClaimCursors: OwnerIdentityIndex<number> | null;
-	childReplayOrdinals: OwnerIdentityIndex<number> | null;
 	contextValues: Map<UniversalContext<any>, unknown> | null;
 	appliedUpdates: Map<unknown, AppliedUniversalHookUpdates>;
 	needsRender: boolean;
@@ -2236,7 +2239,7 @@ function createOwnerRecord(
 function draftOwner(
 	record: UniversalOwnerRecord,
 	parent: DraftOwner | null,
-	replayPath: readonly SuspendedOwnerSegment[],
+	replayPath: readonly SuspendedOwnerSegment[] | null,
 ): DraftOwner {
 	return {
 		record,
@@ -2244,6 +2247,7 @@ function draftOwner(
 		componentRevision: record.componentRevision,
 		parent,
 		replayPath,
+		priorClaimedSibling: parent?.children[parent.children.length - 1] ?? null,
 		hooks: new Map(record.hooks),
 		clonedHooks: new Set(),
 		seenEffects: [],
@@ -2253,7 +2257,6 @@ function draftOwner(
 		sequentialClaimCursor: 0,
 		childOwnerBuckets: null,
 		childClaimCursors: null,
-		childReplayOrdinals: null,
 		contextValues: record.contextValues === null ? null : new Map(record.contextValues),
 		appliedUpdates: new Map(),
 		needsRender: false,
@@ -2268,16 +2271,35 @@ function draftOwner(
 	};
 }
 
-function childReplayPath(
-	parent: DraftOwner,
-	component: UniversalComponent<any> | null,
-	identityPath: readonly unknown[],
-	key: unknown,
-): readonly SuspendedOwnerSegment[] {
-	const ordinals = (parent.childReplayOrdinals ??= createOwnerIdentityIndex());
-	const ordinal = readOwnerIdentity(ordinals, component, identityPath, key) ?? 0;
-	writeOwnerIdentity(ordinals, component, identityPath, key, ordinal + 1);
-	return [...parent.replayPath, { component, identityPath, key, ordinal }];
+function ownerReplayPath(owner: DraftOwner): readonly SuspendedOwnerSegment[] {
+	if (owner.replayPath !== null) return owner.replayPath;
+	const record = owner.record;
+	let ordinal = 0;
+	// Claims of the same component at the same site may be unkeyed. Their
+	// encounter order distinguishes pending memos during a Suspense replay.
+	for (
+		let sibling = owner.priorClaimedSibling;
+		sibling !== null;
+		sibling = sibling.priorClaimedSibling
+	) {
+		const previous = sibling.record;
+		if (
+			previous.component === record.component &&
+			Object.is(previous.key, record.key) &&
+			identityPathsEqual(previous.identityPath, record.identityPath)
+		) {
+			ordinal++;
+		}
+	}
+	return (owner.replayPath = [
+		...ownerReplayPath(owner.parent!),
+		{
+			component: record.component,
+			identityPath: record.identityPath,
+			key: record.key,
+			ordinal,
+		},
+	]);
 }
 
 function childOwnerBucket(
@@ -2358,7 +2380,7 @@ function adoptChildOwner(
 ): DraftOwner {
 	const attempt = currentAttempt();
 	parent.claimedChildren.add(record);
-	const draft = draftOwner(record, parent, childReplayPath(parent, component, identityPath, key));
+	const draft = draftOwner(record, parent, null);
 	parent.children.push(draft);
 	attempt.owners.push(draft);
 	return draft;
@@ -2490,7 +2512,6 @@ function executeOwner(
 		owner.claimedChildren = new Set();
 		owner.sequentialClaimCursor = 0;
 		owner.childClaimCursors = null;
-		owner.childReplayOrdinals = null;
 		owner.contextStable = null;
 		owner.needsRender = false;
 		owner.implicitSlot = 0;
@@ -2735,7 +2756,6 @@ function resetDraftChildren(owner: DraftOwner): void {
 	owner.claimedChildren = new Set();
 	owner.sequentialClaimCursor = 0;
 	owner.childClaimCursors = null;
-	owner.childReplayOrdinals = null;
 }
 
 function retainCommittedOwnerTree(owner: DraftOwner): void {
@@ -2748,13 +2768,8 @@ function retainCommittedOwnerTree(owner: DraftOwner): void {
 	owner.claimedChildren = new Set(owner.record.children);
 	owner.sequentialClaimCursor = 0;
 	owner.childClaimCursors = null;
-	owner.childReplayOrdinals = null;
 	for (const childRecord of owner.record.children) {
-		const child = draftOwner(
-			childRecord,
-			owner,
-			childReplayPath(owner, childRecord.component, childRecord.identityPath, childRecord.key),
-		);
+		const child = draftOwner(childRecord, owner, null);
 		owner.children.push(child);
 		currentAttempt().owners.push(child);
 		retainCommittedOwnerTree(child);
@@ -2844,11 +2859,7 @@ function retainCommittedTryArm(owner: DraftOwner): BlueprintNode[] | null {
 	const range = findLogicalRange(owner.record.root.rootRecordForRetention(), childRecord.rangeKey);
 	if (range === null) return null;
 	resetDraftChildren(owner);
-	const child = draftOwner(
-		childRecord,
-		owner,
-		childReplayPath(owner, childRecord.component, childRecord.identityPath, childRecord.key),
-	);
+	const child = draftOwner(childRecord, owner, null);
 	owner.children.push(child);
 	owner.claimedChildren.add(childRecord);
 	currentAttempt().owners.push(child);
@@ -2875,6 +2886,7 @@ function retainCommittedActivity(owner: DraftOwner): BlueprintNode[] {
 		: null;
 	resetDraftChildren(owner);
 	const retained = draftOwner(record, parent, owner.replayPath);
+	retained.priorClaimedSibling = owner.priorClaimedSibling;
 	retained.visibility = owner.visibility;
 	retained.canHandleSuspense = owner.canHandleSuspense;
 	retained.boundaryThenable = owner.boundaryThenable;
@@ -4796,7 +4808,7 @@ function findSuspendedMemo(
 		if (
 			Object.is(entry.slot, slot) &&
 			depsEqual(entry.deps, deps) &&
-			suspendedOwnerPathEqual(entry.ownerPath, owner.replayPath)
+			suspendedOwnerPathEqual(entry.ownerPath, ownerReplayPath(owner))
 		) {
 			return entry;
 		}
@@ -4821,13 +4833,13 @@ function collectSuspendedMemos(attempt: RenderAttempt): readonly SuspendedMemoEn
 				entries.some(
 					(entry) =>
 						Object.is(entry.slot, slot) &&
-						suspendedOwnerPathEqual(entry.ownerPath, owner.replayPath),
+						suspendedOwnerPathEqual(entry.ownerPath, ownerReplayPath(owner)),
 				)
 			) {
 				continue;
 			}
 			entries.push({
-				ownerPath: owner.replayPath,
+				ownerPath: ownerReplayPath(owner),
 				slot,
 				deps: hook.deps,
 				value: hook.value,

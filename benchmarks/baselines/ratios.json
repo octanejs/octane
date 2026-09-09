@@ -400,6 +400,14 @@
     "note": "Eight times as many retained fallback collapsed-template event sites should take no more than 1.5 times linear growth. The optimized node-local cursor measures about 7-8x; the former whole-template search measures about 26x on the same fixture."
   },
   {
+    "suite": "universal-native-hover",
+    "op": "hover_update_ms",
+    "target": "rows-80",
+    "reference": "rows-20",
+    "maxRatio": 8,
+    "note": "Issue #1007's four-layer native universal hover-selection tree grows fourfold in row count and host count (101 to 401), while each event still changes two row props and retains every host. The baseline measured about 4.3x; the 8x ceiling allows noisy same-run timing while rejecting superlinear materialization. The harness separately asserts exact host updates and teardown; V8 allocation profiles are local diagnostics."
+  },
+  {
     "suite": "universal-external-store",
     "op": "lifetime_subscribe_calls",
     "target": "stable-getter",

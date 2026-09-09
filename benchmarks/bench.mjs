@@ -861,6 +861,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Issue #1007: compiled native universal row selection with four
+		// component/view layers and real event-driven state updates.
+		name: 'universal-native-hover',
+		cwd: 'universal-native-hover',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Native universal external-store hooks: stable subscription lifetimes and
 		// bounded state-projection work across parent renders and notification bursts.
 		name: 'universal-external-store',
