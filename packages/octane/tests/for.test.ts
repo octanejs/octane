@@ -1604,6 +1604,56 @@ describe('large keyed list fills', () => {
 		r.unmount();
 	});
 
+	it('discards a small keyed prefix after a key error and a later suspension', async () => {
+		let failKey = true;
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const abortedPrefixes: Element[][] = [];
+		const items = makeRows(3).map(({ id, label }) => ({
+			get id() {
+				if (id === 3) {
+					abortedPrefixes.push(
+						Array.from(document.querySelectorAll('#fast-suspending-getter-list li')),
+					);
+					if (failKey) throw new Error('key failed');
+				}
+				return id;
+			},
+			get label() {
+				return id === 3 ? use(pending) : label;
+			},
+		}));
+		const r = mount(FastSuspendingGetterList, { items: [] });
+		try {
+			r.update(FastSuspendingGetterList, { items });
+			expect(r.find('#fast-suspending-getter-retry').textContent).toBe('key failed');
+			expect(abortedPrefixes[0]).toHaveLength(2);
+			expect(abortedPrefixes[0]!.every((row) => !row.isConnected)).toBe(true);
+			expect(abortedPrefixes[0]!.every((row) => row.parentNode === null)).toBe(true);
+			expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
+
+			failKey = false;
+			r.click('#fast-suspending-getter-retry');
+			expect(r.find('#fast-suspending-getter-pending').textContent).toBe('loading');
+			expect(abortedPrefixes[1]).toHaveLength(2);
+			expect(abortedPrefixes[1]!.every((row) => !row.isConnected)).toBe(true);
+			expect(abortedPrefixes[1]!.every((row) => row.parentNode === null)).toBe(true);
+			expect(r.findAll('.fast-suspending-getter-row')).toHaveLength(0);
+
+			await act(() => resolve('resolved row 3'));
+			const rows = r.findAll('.fast-suspending-getter-row');
+			expect(rows.map((row) => row.textContent)).toEqual(['row 1', 'row 2', 'resolved row 3']);
+			expect(rows.every((row) => row.isConnected)).toBe(true);
+			r.update(FastSuspendingGetterList, { items: items.toReversed() });
+			expect(r.findAll('.fast-suspending-getter-row')).toEqual(rows.toReversed());
+		} finally {
+			resolve('resolved row 3');
+			r.unmount();
+		}
+	});
+
 	it('adopts a populated server list without replacing its original rows or losing events', () => {
 		const items = makeRows();
 		const picked: number[] = [];
