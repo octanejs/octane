@@ -6150,29 +6150,36 @@ export function useOptimistic<S, V = S>(state: S): [S, (value: V) => void] {
 	return [state, NOOP];
 }
 
+const MEMO_OWNER = Symbol('memoOwner');
+const MEMO_MARKER_DESCRIPTOR: PropertyDescriptor = {
+	get(this: Function) {
+		return this === (this as any)[MEMO_OWNER];
+	},
+};
+const MEMO_DEFAULT_PROPS_DESCRIPTOR: PropertyDescriptor = {
+	configurable: true,
+	// Static hoisters must copy `type` along with this accessor.
+	get(this: { type: (...args: any[]) => any }) {
+		return (this.type as any).defaultProps;
+	},
+	set(this: { type: (...args: any[]) => any }, value: unknown) {
+		(this.type as any).defaultProps = value;
+	},
+};
 export function memo<C extends (...args: any[]) => any>(
 	component: C,
 ): C & { readonly type: C; displayName?: string } {
 	const memoWrapper = (props: any, scope: SSRScope, extra?: any): unknown =>
 		component(props, scope, extra);
+	Object.defineProperty(memoWrapper, MEMO_OWNER, { value: memoWrapper });
 	Object.defineProperty(memoWrapper, 'type', { value: component });
 	Object.defineProperty(memoWrapper, 'displayName', {
 		configurable: true,
 		writable: true,
 		value: (component as any).displayName || component.name || 'Memo',
 	});
-	Object.defineProperty(memoWrapper, '__memo', {
-		get() {
-			return this === memoWrapper;
-		},
-	});
-	Object.defineProperty(memoWrapper, 'defaultProps', {
-		configurable: true,
-		get: () => (component as any).defaultProps,
-		set: (value) => {
-			(component as any).defaultProps = value;
-		},
-	});
+	Object.defineProperty(memoWrapper, '__memo', MEMO_MARKER_DESCRIPTOR);
+	Object.defineProperty(memoWrapper, 'defaultProps', MEMO_DEFAULT_PROPS_DESCRIPTOR);
 	return memoWrapper as unknown as C & { readonly type: C; displayName?: string };
 }
 

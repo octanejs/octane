@@ -897,6 +897,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Distinct production client/server memo wrappers: creation and metadata
+		// reads, with plain-function and data-only controls in isolated processes.
+		name: 'memo-wrapper-shapes',
+		cwd: 'memo-wrapper-shapes',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Native universal external-store hooks: stable subscription lifetimes and
 		// bounded state-projection work across parent renders and notification bursts.
 		name: 'universal-external-store',

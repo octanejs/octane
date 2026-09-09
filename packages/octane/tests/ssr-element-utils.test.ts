@@ -16,6 +16,7 @@ const {
 	createPortal,
 	createScopedElement,
 	createScopedValue,
+	memo,
 	renderToStaticMarkup,
 } = Server as any;
 
@@ -29,6 +30,54 @@ function captureThrown(run: () => unknown): unknown {
 }
 
 describe('octane/server element utilities', () => {
+	it('renders distinct and nested memo wrappers with live defaults after static hoisting', () => {
+		const bodies = Array.from({ length: 6 }, (_, index) =>
+			Object.assign(
+				function Body(props: { label?: string }) {
+					return createElement('span', null, `${index}:${props.label}`);
+				},
+				{ defaultProps: { label: `initial-${index}` } },
+			),
+		);
+		const rows = bodies.map((Body) => memo(Body));
+		const Nested = memo(rows[2]);
+		const HoistedSource = memo(bodies[0]);
+		function Hoc(props: { label?: string }) {
+			return createElement('strong', null, `hoc:${props.label}`);
+		}
+		for (const key of Reflect.ownKeys(HoistedSource)) {
+			if (
+				key !== 'name' &&
+				key !== 'length' &&
+				key !== 'prototype' &&
+				key !== 'caller' &&
+				key !== 'arguments'
+			) {
+				Object.defineProperty(Hoc, key, Object.getOwnPropertyDescriptor(HoistedSource, key)!);
+			}
+		}
+		function View() {
+			return createElement('div', null, [
+				...rows.map((Row: any, index: number) =>
+					createElement(Row, { key: index, label: undefined }),
+				),
+				createElement(Nested, { key: 'nested' }),
+				createElement(Hoc, { key: 'hoc' }),
+			]);
+		}
+		const html = () => renderToStaticMarkup(View).html;
+		expect(html()).toBe(
+			'<div><span>0:initial-0</span><span>1:initial-1</span><span>2:initial-2</span><span>3:initial-3</span><span>4:initial-4</span><span>5:initial-5</span><span>2:initial-2</span><strong>hoc:initial-0</strong></div>',
+		);
+		bodies[0].defaultProps = { label: 'changed' };
+		bodies[2].defaultProps = { label: 'nested changed' };
+		rows[1].defaultProps = { label: 'set through wrapper' };
+		expect(html()).toBe(
+			'<div><span>0:changed</span><span>1:set through wrapper</span><span>2:nested changed</span><span>3:initial-3</span><span>4:initial-4</span><span>5:initial-5</span><span>2:nested changed</span><strong>hoc:changed</strong></div>',
+		);
+		expect(Server.renderToString(View).html).toContain('<strong>hoc:changed</strong>');
+	});
+
 	it.each(['renderToString', 'renderToStaticMarkup'] as const)(
 		'%s preserves omitted children when a component forwards merged props',
 		(renderMethod) => {

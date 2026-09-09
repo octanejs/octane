@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createElement, createRoot, HMR, hmr, lazy, memo, startTransition } from '../src/index.js';
+import {
+	createContext,
+	createElement,
+	createRoot,
+	HMR,
+	hmr,
+	lazy,
+	memo,
+	startTransition,
+	useContext,
+} from '../src/index.js';
 import { act, flushEffects, mount } from './_helpers';
 import { compile } from '../src/compiler/compile.js';
 import {
@@ -134,6 +144,85 @@ describe('state, component identity, and lifecycle contracts', () => {
 		try {
 			root.update(HoistedMemo, { value: 'new' });
 			expect(root.find('section').textContent).toBe('newold');
+		} finally {
+			root.unmount();
+		}
+	});
+	it('renders distinct memo components across prop and context changes', () => {
+		const Theme = createContext('light');
+		const rows = Array.from({ length: 8 }, (_, index) =>
+			memo(function Row(props: { label: string }) {
+				const theme = useContext(Theme);
+				return createElement('span', { 'data-row': String(index) }, `${theme}:${props.label}`);
+			}),
+		);
+		function Host(props: { theme: string; label: string }) {
+			return createElement(Theme.Provider, {
+				value: props.theme,
+				children: rows.map((Row, index) => createElement(Row, { key: index, label: props.label })),
+			});
+		}
+		const root = mount(Host, { theme: 'light', label: 'initial' });
+		const labels = () =>
+			Array.from(root.container.querySelectorAll('span'), (span) => span.textContent);
+		try {
+			expect(labels()).toEqual(Array(8).fill('light:initial'));
+			root.update(Host, { theme: 'dark', label: 'initial' });
+			expect(labels()).toEqual(Array(8).fill('dark:initial'));
+			root.update(Host, { theme: 'dark', label: 'updated' });
+			expect(labels()).toEqual(Array(8).fill('dark:updated'));
+		} finally {
+			root.unmount();
+		}
+	});
+	it('keeps nested memo defaults live and copied HOC behavior independent', () => {
+		const Body = Object.assign(
+			function Body(props: { label?: string | null }) {
+				return createElement('span', null, String(props.label));
+			},
+			{ defaultProps: { label: 'first' } },
+		);
+		const First = memo(Body);
+		const Second = memo(Body);
+		const Nested = memo(Second);
+		const HoistedSource = memo(Body, () => true);
+		function Hoc(props: { label?: string | null }) {
+			return createElement('strong', null, String(props.label));
+		}
+		for (const key of Reflect.ownKeys(HoistedSource)) {
+			if (
+				key !== 'name' &&
+				key !== 'length' &&
+				key !== 'prototype' &&
+				key !== 'caller' &&
+				key !== 'arguments'
+			) {
+				Object.defineProperty(Hoc, key, Object.getOwnPropertyDescriptor(HoistedSource, key)!);
+			}
+		}
+		function Host(props: { hocLabel?: string; revision: number }) {
+			return createElement('section', null, [
+				createElement(First, { key: 'first', label: undefined }),
+				createElement(Second, { key: 'second', label: undefined }),
+				createElement(Nested, { key: 'nested', label: null }),
+				createElement(Hoc, { key: 'hoc', label: props.hocLabel }),
+			]);
+		}
+		const root = mount(Host, { hocLabel: 'explicit', revision: 0 });
+		const content = () =>
+			Array.from(root.container.querySelectorAll('span, strong'), (node) => node.textContent);
+		try {
+			expect(content()).toEqual(['first', 'first', 'null', 'explicit']);
+			root.update(Host, { hocLabel: 'changed', revision: 1 });
+			expect(content()).toEqual(['first', 'first', 'null', 'changed']);
+			Body.defaultProps = { label: 'second' };
+			root.update(Host, { revision: 2 });
+			expect(content()).toEqual(['second', 'second', 'null', 'second']);
+			(First as typeof First & { defaultProps: { label: string } }).defaultProps = {
+				label: 'third',
+			};
+			root.update(Host, { revision: 3 });
+			expect(content()).toEqual(['third', 'third', 'null', 'third']);
 		} finally {
 			root.unmount();
 		}
