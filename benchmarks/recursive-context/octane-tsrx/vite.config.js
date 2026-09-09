@@ -13,6 +13,7 @@ export default defineConfig({
 				recursive: fileURLToPath(new URL('./index.html', import.meta.url)),
 				contextCache: fileURLToPath(new URL('./context-cache.html', import.meta.url)),
 				warmPlanControl: fileURLToPath(new URL('./warm-plan-control.html', import.meta.url)),
+				warmAdoption: fileURLToPath(new URL('./warm-adoption.html', import.meta.url)),
 			},
 		},
 	},

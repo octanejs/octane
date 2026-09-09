@@ -12596,6 +12596,9 @@ let CURRENT_WARM_CLAIMS: Set<object> | null = null;
 /** Flips true forever on first warm — gates useMemo's ancestor walk so apps
  * that never warm never pay for it. */
 let WARM_EVER = false;
+// New episodes cannot match an older attached cache. Keep the maximum rather
+// than the last attachment's episode: independent roots may resume older work.
+let LATEST_WARM_CACHE_EPISODE = 0;
 let WARM_DEPTH = 0;
 const WARM_DEPTH_CAP = 64;
 // Do not cap per-slot occurrence queues: dropping their FIFO head would map a
@@ -12627,6 +12630,8 @@ function warmCacheForOwner(owner: Block): Map<HookSlot, WarmEntry[]> {
 	}
 	(owner as any).__warmCache = cache;
 	(owner as any).__warmCacheEpisode = CURRENT_WARM_EPISODE;
+	if (CURRENT_WARM_EPISODE > LATEST_WARM_CACHE_EPISODE)
+		LATEST_WARM_CACHE_EPISODE = CURRENT_WARM_EPISODE;
 	return cache;
 }
 
@@ -12953,7 +12958,8 @@ function adoptWarmEntry(
 	deps: any[],
 	accept?: WarmMemoAccept,
 ): WarmEntry | WarmHarvestEntry | typeof WARM_MISS {
-	let b: Block | null = CURRENT_BLOCK;
+	// Root retries and held-transition harvests below are independently eligible.
+	let b: Block | null = CURRENT_WARM_EPISODE <= LATEST_WARM_CACHE_EPISODE ? CURRENT_BLOCK : null;
 	while (b !== null) {
 		const cache: Map<HookSlot, WarmEntry[]> | undefined = (b as any).__warmCache;
 		if ((b as any).__warmCacheEpisode === CURRENT_WARM_EPISODE && cache !== undefined) {

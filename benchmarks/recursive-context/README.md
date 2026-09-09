@@ -220,3 +220,30 @@ not wall-time pass/fail gates.
 
 Default: 10 warmups + 20 iters. Pass an integer to `bench` to override iters
 (`bench:long` runs 40).
+
+## Warm-cache ancestor work
+
+`pnpm --dir benchmarks/recursive-context bench:warm-adoption` builds a dedicated
+production entry and starts a preview on an ephemeral localhost port. The main
+`bench:work` pass runs the same guard using its existing preview and browser.
+The fixture mounts and updates a chain of ordinary synchronous custom-hook
+`useMemo` values after an unrelated async root has warmed and unmounted. Every
+value and surviving DOM node is checked. A fresh realm with no warming is the
+zero-work control; a pending parent/child resource pair checks the
+live warm-cache path, concurrent starts, final values, and one creation per
+resource through retry.
+
+The untimed runner enables detailed Chromium coverage on unminified production
+output. It finds `adoptWarmEntry`'s parent-property read through the emitted AST
+and uses the narrowest enclosing coverage range to count actual parent steps.
+No probes are inserted into authored components or runtime source. At depths
+32 and 128 (33 and 129 memo values), the baseline performs 1,089 and 16,641
+parent steps on both mount and update after unrelated warming. The guard
+requires zero steps while retaining all 33/129 adoption calls. The pending
+retry must still perform one warm-cache probe and one or two parent steps.
+
+`BENCH_JSON` records operation counts and source/helper hashes. Use `--measure`
+with the standalone runner to record historical implementations without the
+zero-parent-step ceiling. This measures ancestor lookup work, not total render
+cost or end-user latency; compiler and scheduler work outside the helper remains
+covered by the existing recursive-context suites.
