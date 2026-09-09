@@ -112,6 +112,7 @@ export const BENCHMARK_SUITES = [
 	'universal-owner-drafts',
 	'universal-draft-lookup',
 	'scoped-descriptor-shapes',
+	'memo-wrapper-shapes',
 	'universal-external-store',
 	'lynx-render',
 	'lynx-table',
