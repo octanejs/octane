@@ -1,5 +1,12 @@
 # @octanejs/mcp-server
 
+## 0.2.26
+
+### Patch Changes
+
+- 0ba4016: Reuse fresh universal owner draft collections during the first render pass instead of replacing them immediately.
+  Expose the new owner-draft benchmark in the MCP benchmark suite catalog.
+
 ## 0.2.25
 
 ### Patch Changes

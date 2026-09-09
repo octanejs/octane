@@ -1,5 +1,12 @@
 # @octanejs/adapter-vercel
 
+## 0.0.51
+
+### Patch Changes
+
+- Updated dependencies [2ffcc71]
+  - @octanejs/app-core@0.0.50
+
 ## 0.0.50
 
 ### Patch Changes

@@ -1,5 +1,38 @@
 # octane
 
+## 0.2.7
+
+### Patch Changes
+
+- 52ac66c: Avoid repeated ancestry scans when ordering effects and ref attachments from nearby components.
+- 1158956: Skip repeated class writes for fresh array, object, and function values when their composed class string has not changed. Preserve class composition, hydration, and SVG attribute behavior.
+- 7f3c096: Update the shadcn registry baseline to 4.21.0 and adopt cn 0.2.6 across the Base UI, Radix, and React Aria bindings. Add Base UI Select, Navigation Menu, and Scroll Area wrappers using the release's Nova styles and Base UI 1.8.0 primitives.
+
+  Hoist and deduplicate Base UI's scrollbar stylesheet. Preserve global CSS rules in compiled Float style resources so selectors remain active instead of being removed by scoped-style pruning.
+
+  Update React Aria Components to 1.20.0, React Aria to 3.51.0, and React Stately to 3.49.0. Add TokenField and PreviewTrigger, keyboard shortcut handling, context menus, and the coordinated accessibility and localization fixes.
+
+- 12ea12a: Skip cycle-tracking allocation for primitive universal host values crossing a transport.
+- 40f14c3: Build universal owner replay identities only when pending memos need them. Ordinary native renderer updates no longer allocate identity indexes and replay paths for every nested component.
+- 890527f: Reduce the retained size of delegated event handler bundles by placing their private brand after the function and argument fields. Preserve handler updates and in-flight dispatch snapshots.
+- 4d00715: Keep client blocks on a stable object shape across ordinary renders, Suspense, Activity, and fetch-tree warming by reserving optional fields when each block is constructed.
+- faae10e: Load captured values by index in hoisted client template helpers, avoiding array iteration on keyed item and conditional arm renders while preserving shared capture positions.
+- c9447c3: Avoid redundant emitted class-field definitions when constructing client blocks and scopes. Their existing constructors retain the same fields and property order while initializing them once.
+- d5de04f: Preserve keyed rows when a root render clears a list, mounts its `@empty` arm, refills the list, and then suspends. The empty arm now parks only its own DOM, so rollback keeps the original rows connected and reusable, including after a large owned-list clear.
+- 02ecadb: Recognize locally proven primitive string, number, and bigint DOM children while preserving explicit `as string` text bindings. Add an optional TypeScript project proof for one-shot Vite, Rspack, and Rsbuild production builds, with matching server and hydration output.
+- 1186622: Restore direct listeners on hoisted head elements after a suspended transition rolls back, including aliased native event handlers.
+- 31aff05: Reuse the keyed list sibling chain when unwinding an interrupted first fill.
+- d97637b: Reuse a root-bound resource handle factory across universal host prop codec calls.
+- f86fb48: Reuse universal event dispatchers across accepted updates to surviving listeners. Keep the latest handler and priority active, while retiring listeners when their event site is removed.
+- 0ba4016: Reuse fresh universal owner draft collections during the first render pass instead of replacing them immediately.
+  Expose the new owner-draft benchmark in the MCP benchmark suite catalog.
+- 2c1ffaa: Reduce root rollback work for newly created binding bags and blocks, compact keyed-list snapshots, and avoid redundant resolved-transition effect walks. Preserve exact keyed DOM, cleanup timing, and retry behavior across nested suspension windows.
+- c92b932: Skip scanning server Suspense arms for ViewTransition markers when none were rendered.
+- ab32364: Avoid scanning buffered server fragments for a document head when hoisted metadata is present.
+- 2ffcc71: Promote scoped signals to a stable API. Detect signal capabilities automatically in the compiler and remove the experimental `nativeReads` build option. Signal handles and helpers keep their `$` naming convention; local hooks, inferred memos, async resources, and DOM SSR/hydration work through the standard toolchain. Add the signals website guide and llms.txt reference.
+- 7fca4d3: Keep the server component frame namespace in the initial object shape, avoiding a later property transition while preserving HTML, SVG, and MathML parser context through renders and retries.
+- fbbb53d: Store one- and two-argument delegated callback captures directly on their handler bundles, avoiding a separate array per mounted handler.
+
 ## 0.2.6
 
 ### Patch Changes
