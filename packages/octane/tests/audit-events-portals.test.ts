@@ -257,6 +257,45 @@ export function App({report, label, read}) @{
 		}
 	});
 
+	it('reads the latest handlers after a nonbubbling capture updates the tree', () => {
+		const { App } = fixture(`
+export function App({label, capture, log}) @{
+	<section onPlayCapture={(event) => capture(event, label)} onPlay={(event) => log('parent', label, event.currentTarget)}>
+		<video onPlay={(event) => log('target', label, event.currentTarget)} />
+	</section>
+}`);
+		const calls: Array<[string, string, EventTarget | null]> = [];
+		let r: ReturnType<typeof mount>;
+		const log = (name: string, label: string, currentTarget: EventTarget | null) => {
+			calls.push([name, label, currentTarget]);
+		};
+		const capture = (event: Event, label: string) => {
+			log('capture', label, event.currentTarget);
+			if (label === 'old') r.update(App, { label: 'new', capture, log });
+		};
+		r = mount(App, { label: 'old', capture, log });
+		try {
+			const video = r.find('video');
+			const parent = r.find('section');
+			const play = () => video.dispatchEvent(new Event('play', { bubbles: false }));
+			play();
+			expect(calls).toEqual([
+				['capture', 'old', parent],
+				['target', 'new', video],
+				['parent', 'new', parent],
+			]);
+			calls.length = 0;
+			play();
+			expect(calls).toEqual([
+				['capture', 'new', parent],
+				['target', 'new', video],
+				['parent', 'new', parent],
+			]);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('captures a form action before submit handlers synchronously replace it', () => {
 		const calls: string[] = [];
 		let r: ReturnType<typeof mount>;
@@ -388,6 +427,42 @@ export function App({report, label, read}) @{
 			}
 		}
 		expect(run(false)).toEqual(run(true));
+	});
+
+	it('bubbles through nested roots without capture handlers after remount', () => {
+		const calls: string[] = [];
+		const container = document.createElement('div');
+		document.body.append(container);
+		const handler = (name: string) => () => calls.push(name);
+		const outer = createRoot(container);
+		outer.render(
+			h(
+				'section',
+				{ onAuditPathOnly: handler('outer') },
+				h('div', { id: 'inner-root', onAuditPathOnly: handler('container') }),
+			),
+		);
+		const host = container.querySelector('#inner-root')!;
+		let inner = createRoot(host);
+		const mountInner = () => inner.render(h('button', { onAuditPathOnly: handler('inner') }, 'go'));
+		const dispatch = () =>
+			container
+				.querySelector('button')!
+				.dispatchEvent(new Event('auditpathonly', { bubbles: true }));
+		try {
+			mountInner();
+			dispatch();
+			expect(calls).toEqual(['inner', 'container', 'outer']);
+			inner.unmount();
+			inner = createRoot(host);
+			mountInner();
+			dispatch();
+			expect(calls).toEqual(['inner', 'container', 'outer', 'inner', 'container', 'outer']);
+		} finally {
+			inner.unmount();
+			outer.unmount();
+			container.remove();
+		}
 	});
 
 	it('preserves portal child state for string and number keys across reorder', () => {

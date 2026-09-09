@@ -17949,11 +17949,17 @@ function isEventRoot(node: Node, epoch: number): boolean {
 	return membership !== undefined && membership.count > 0;
 }
 
-function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] {
-	const path = event.composedPath();
+function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | undefined {
 	// Every delegated type has a root capture observer, even without an authored
 	// capture handler. The outermost observer starts a fresh native delivery, so
 	// synchronously redispatching the same Event never inherits an old root epoch.
+	// One public root without portals needs only the epoch; its bubble listener
+	// can build the path once, after native target listeners have run.
+	if (_delegationTargets.size === 1 && portalEventTargetCount === 0) {
+		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
+		return;
+	}
+	const path = event.composedPath();
 	if (_delegationTargets.size === 1) {
 		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 		if (portalEventTargetCount !== 0) {
@@ -18818,7 +18824,8 @@ function finishCaptureDispatch(event: Event): void {
 }
 
 function dispatchDelegated(this: Node, event: Event): void {
-	if (delegatedCapture(event.type)) prepareDelegatedEvent(event, this);
+	const nativeCapture = delegatedCapture(event.type);
+	let path = nativeCapture ? prepareDelegatedEvent(event, this) : undefined;
 	(event as any)[DELEGATED_BUBBLE_VERSION] = ((event as any)[DELEGATED_BUBBLE_VERSION] || 0) + 1;
 	maybeEnqueueRestore(event);
 	const key = '$$' + event.type;
@@ -18842,12 +18849,10 @@ function dispatchDelegated(this: Node, event: Event): void {
 		// Non-bubbling families share one native capture callback. Run the logical
 		// capture queue first, independent of module registration order, and honor
 		// a stop within that phase before starting the emulated bubble queue.
-		if (
-			delegatedCapture(event.type) &&
-			_delegatedCapture.has(event.type) &&
-			dispatchDelegatedCapture.call(this, event)
-		)
-			return;
+		if (nativeCapture && _delegatedCapture.has(event.type)) {
+			path ??= event.composedPath();
+			if (dispatchDelegatedCapture.call(this, event, path)) return;
+		}
 		if (!_delegated.has(event.type)) return;
 		// Custom elements receive known nonbubbling events through authored
 		// capture handlers only. They do not install the native target listener
@@ -18858,7 +18863,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 			(event.type === 'invalid' || EMULATED_BUBBLING_EVENTS.includes(event.type))
 		)
 			return;
-		buildDelegatedPath(event, this);
+		buildDelegatedPath(event, this, path);
 		snapshotDelegatedSlots(pathBase, key, event);
 		stop = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
 		propagationStarted = true;
@@ -18909,9 +18914,10 @@ function dispatchDelegated(this: Node, event: Event): void {
 // Capture runs only this native listener's segment, in reverse path order.
 // Returning whether this queue stopped native propagation lets the shared
 // non-bubbling listener decide whether it may start its emulated bubble queue.
-function dispatchDelegatedCapture(this: Node, event: Event): boolean {
-	const path = prepareDelegatedEvent(event, this);
+function dispatchDelegatedCapture(this: Node, event: Event, path?: EventTarget[]): boolean {
+	path ??= prepareDelegatedEvent(event, this);
 	if (!_delegatedCapture.has(event.type)) return false;
+	path ??= event.composedPath();
 	if (!event.bubbles || !_delegated.has(event.type)) maybeEnqueueRestore(event);
 	const key = CAPTURE_PREFIX + event.type;
 	const pathBase = CAPTURE_PATH.length;
