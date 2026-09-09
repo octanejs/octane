@@ -2483,11 +2483,11 @@ function executeOwner(
 	for (let renderCount = initialRenderCount; ; renderCount++) {
 		ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
 		if (renderCount === 25) throw new Error('Too many universal render-phase updates.');
-		if (renderCount > 0) resetDraftChildren(owner);
-		owner.seenEffects = [];
-		owner.children = [];
+		if (renderCount > 0) {
+			resetDraftChildren(owner);
+			owner.seenEffects = [];
+		}
 		owner.retainedChildren = null;
-		owner.claimedChildren = new Set();
 		owner.sequentialClaimCursor = 0;
 		owner.childClaimCursors = null;
 		owner.childReplayOrdinals = null;

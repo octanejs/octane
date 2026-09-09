@@ -87,6 +87,7 @@ runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
 **universal-object-teardown**,
 **universal-template-events**, **universal-external-store**,
+**universal-owner-drafts**,
 **lynx-render**, **lynx-bundle-size**, **tsrx-renderer-validation-ranges**, and
 **tsrx-local-component-name-catalog** are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
