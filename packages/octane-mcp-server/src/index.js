@@ -111,6 +111,7 @@ export const BENCHMARK_SUITES = [
 	'universal-native-hover',
 	'universal-owner-drafts',
 	'universal-draft-lookup',
+	'scoped-descriptor-shapes',
 	'universal-external-store',
 	'lynx-render',
 	'lynx-table',

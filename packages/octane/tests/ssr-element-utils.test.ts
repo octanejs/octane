@@ -14,6 +14,8 @@ const {
 	isValidElement,
 	Children,
 	createPortal,
+	createScopedElement,
+	createScopedValue,
 	renderToStaticMarkup,
 } = Server as any;
 
@@ -110,6 +112,190 @@ describe('octane/server element utilities', () => {
 		const App = () => clone;
 		const { html } = renderToStaticMarkup(App);
 		expect(html).toBe('<span class="tick tick-big">v</span>');
+	});
+
+	it('keeps each deferred element child with its original scope through cloning and mapping', () => {
+		const reads: string[] = [];
+		const first = createScopedElement('span', { key: 'first', 'data-row': 'first' }, () => {
+			reads.push('first');
+			return 'alpha';
+		});
+		const second = createScopedElement('span', { key: 'second', 'data-row': 'second' }, () => {
+			reads.push('second');
+			return 'beta';
+		});
+		const clone = cloneElement(first, { 'data-cloned': 'yes' });
+		const mapped = Children.map([first, second], (child: unknown) => child);
+		const replaced = cloneElement(first, { children: 'replacement' });
+		expect(reads).toEqual([]);
+		expect(Object.keys(first)).toEqual(['$$kind', 'type', 'props', 'key', 'ref', 'children']);
+		expect(Object.getOwnPropertyDescriptor(first, 'children')).toMatchObject({
+			configurable: false,
+			enumerable: true,
+		});
+		expect(first.props.children).toBe('alpha');
+		expect(second.children).toBe('beta');
+		expect(clone.props.children).toBe('alpha');
+		expect(mapped[0].children).toBe('alpha');
+		expect(mapped[1].children).toBe('beta');
+		expect(replaced.props.children).toBe('replacement');
+		const html = renderToStaticMarkup(() => [clone, mapped[1], replaced]).html;
+		expect(html).toContain('<span data-row="first" data-cloned="yes">alpha</span>');
+		expect(html).toContain('<span data-row="second">beta</span>');
+		expect(html).toContain('<span data-row="first">replacement</span>');
+		expect(reads).toContain('first');
+		expect(reads).toContain('second');
+	});
+
+	it('preserves spread and default children observations while deferring their replacement', () => {
+		let sourceReads = 0;
+		let defaultReads = 0;
+		const Label = Object.assign(
+			(props: { children?: unknown; id?: string }) =>
+				createElement('span', { id: props.id }, props.children),
+			{
+				defaultProps: {
+					role: 'label',
+					get children() {
+						defaultReads++;
+						return 'unused default';
+					},
+					'data-after': 'suffix',
+				},
+			},
+		);
+		const spread = createScopedElement(
+			Label,
+			{
+				id: 'spread',
+				get children() {
+					sourceReads++;
+					return undefined;
+				},
+				title: 'provided',
+			},
+			() => 'deferred spread',
+		);
+		const defaulted = createScopedElement(Label, { id: 'defaulted' }, () => 'deferred default');
+		expect(sourceReads).toBe(1);
+		expect(defaultReads).toBe(2);
+		expect(Object.keys(spread.props)).toEqual(['id', 'children', 'title', 'role', 'data-after']);
+		expect(Object.keys(defaulted.props)).toEqual(['id', 'role', 'children', 'data-after']);
+		expect(spread.props.children).toBe('deferred spread');
+		expect(defaulted.props.children).toBe('deferred default');
+		const html = renderToStaticMarkup(() => [spread, defaulted]).html;
+		expect(html).toContain('<span id="spread">deferred spread</span>');
+		expect(html).toContain('<span id="defaulted">deferred default</span>');
+	});
+
+	it('respects inherited children when default props are applied', () => {
+		const assigned: unknown[] = [];
+		const prototype = {
+			get children() {
+				return undefined;
+			},
+			set children(value: unknown) {
+				assigned.push(value);
+			},
+		};
+		const source = Object.create(null);
+		Object.defineProperty(source, '__proto__', { enumerable: true, value: prototype });
+		source.id = 'inherited';
+		const Label = Object.assign(
+			(props: { children?: unknown }) => createElement('span', null, props.children),
+			{ defaultProps: { role: 'status', children: 'default', title: 'end' } },
+		);
+		const element = createScopedElement(Label, source, () => 'deferred');
+		expect(assigned).toEqual(['default']);
+		expect(Object.keys(element.props)).toEqual(['id', 'role', 'title', 'children']);
+		expect(element.props.children).toBe('deferred');
+		expect(renderToStaticMarkup(() => element).html).toContain('<span>deferred</span>');
+	});
+
+	it('runs inherited config setters before installing deferred children', () => {
+		const assigned: unknown[] = [];
+		const inherited = {
+			set children(value: unknown) {
+				assigned.push(value);
+			},
+			set touch(value: unknown) {
+				assigned.push(`touch:${String(value)}`);
+				(this as { children?: unknown }).children = 'from touch';
+			},
+		};
+		const config = Object.create(null) as Record<string, unknown>;
+		Object.defineProperty(config, '__proto__', { enumerable: true, value: inherited });
+		config.children = 'provided';
+		config.touch = 1;
+		const element = createScopedElement('span', config, () => 'deferred');
+		expect(assigned).toEqual(['provided', 'touch:1', 'from touch']);
+		expect(Object.keys(element.props)).toEqual(['children']);
+		expect(element.props.children).toBe('deferred');
+	});
+
+	it('allows a later inherited setter to write copied children', () => {
+		const property = '__octaneScopedTouchTest__';
+		const observed: unknown[] = [];
+		Object.defineProperty(Object.prototype, property, {
+			configurable: true,
+			set(this: { children?: unknown }, value: unknown) {
+				observed.push(value);
+				this.children = 'from inherited setter';
+			},
+		});
+		try {
+			const element = createScopedElement(
+				'span',
+				{ children: 'provided', [property]: 'trigger' },
+				() => 'deferred',
+			);
+			expect(observed).toEqual(['trigger']);
+			expect(element.props.children).toBe('deferred');
+		} finally {
+			delete (Object.prototype as Record<string, unknown>)[property];
+		}
+	});
+
+	it('keeps complete deferred records independent when inspected', () => {
+		const first = createScopedValue(() => createScopedElement('strong', { key: 'a' }, () => 'one'));
+		const second = createScopedValue(() => createScopedElement('em', { key: 'b' }, () => 'two'));
+		expect(Object.keys(first)).toEqual(['$$kind', 'type', 'props', 'key', 'ref', 'children']);
+		expect(first.type).toBe('strong');
+		expect(first.key).toBe('a');
+		expect(first.children).toBe('one');
+		expect(second.type).toBe('em');
+		expect(second.key).toBe('b');
+		expect(second.props.children).toBe('two');
+		expect(renderToStaticMarkup(() => [first, second]).html).toContain('<strong>one</strong>');
+		expect(renderToStaticMarkup(() => [first, second]).html).toContain('<em>two</em>');
+	});
+
+	it('clones and maps scoped values wrapping deferred scoped elements', () => {
+		const reads: string[] = [];
+		const first = createScopedValue(() =>
+			createScopedElement('span', { key: 'a' }, () => {
+				reads.push('a');
+				return 'alpha';
+			}),
+		);
+		const second = createScopedValue(() =>
+			createScopedElement('em', { key: 'b' }, () => {
+				reads.push('b');
+				return 'beta';
+			}),
+		);
+		const clone = cloneElement(first, { title: 'copy' });
+		const mapped = Children.map([first, second], (child: unknown) => child);
+		const flattened = Children.toArray([first, second]);
+		expect(reads).toEqual([]);
+		expect(clone.children).toBe('alpha');
+		expect(mapped[0].children).toBe('alpha');
+		expect(mapped[1].children).toBe('beta');
+		expect(flattened[0].children).toBe('alpha');
+		expect(flattened[1].children).toBe('beta');
+		expect(cloneElement(mapped[1]).children).toBe('beta');
+		expect(reads).toContain('a');
+		expect(reads).toContain('b');
 	});
 
 	it('throws on a non-element, like the client entry', () => {

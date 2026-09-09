@@ -83,6 +83,28 @@ function InspectContextAttribute(props: { child: OctaneNode }) {
 	);
 }
 
+function InspectDeferredChild(props: { child: OctaneNode; name: string }) {
+	const child = Children.only(props.child) as ElementDescriptor;
+	return (
+		<section
+			data-inspected-child={props.name}
+			data-prop-keys={Object.keys(child.props).join(',')}
+			data-observed-child={String(child.props.children)}
+		>
+			{child}
+		</section>
+	);
+}
+
+function DefaultChildren(props: { children?: OctaneNode; sequence?: string }) {
+	return (
+		<strong data-default-child="yes" data-seq={props.sequence}>
+			{props.children}
+		</strong>
+	);
+}
+(DefaultChildren as any).defaultProps = { children: 'default' };
+
 function InspectChildrenThenProvide(props: { child: OctaneNode }) {
 	const child = Children.only(props.child) as ElementDescriptor;
 	const inspected = String(child.props.children);
@@ -212,6 +234,56 @@ export function RootInspectedAttributeContext() {
 	return (
 		<ValueContext.Provider value="inner">
 			<InspectContextAttribute child={content} />
+		</ValueContext.Provider>
+	);
+}
+
+export function IndependentDeferredChildren(props: {
+	first: string;
+	second: string;
+	value: string;
+}) {
+	const first = (
+		<span data-sibling="first" data-order="one">
+			{props.first + ':' + getterValue.current}
+		</span>
+	);
+	const second = (
+		<span data-sibling="second" data-order="two">
+			{props.second + ':' + getterValue.current}
+		</span>
+	);
+	const flattened = Children.toArray(first)[0];
+	const mapped = Children.map(second, (child) =>
+		cloneElement(child as ElementDescriptor, { key: 'replacement', 'data-copy': 'yes' }),
+	)![0];
+	return (
+		<ValueContext.Provider value={props.value}>
+			<div data-outlet="independent-children">
+				<InspectDeferredChild child={flattened} name="first" />
+				<InspectDeferredChild child={mapped} name="second" />
+			</div>
+		</ValueContext.Provider>
+	);
+}
+
+export function DeferredChildrenSources(props: { value: string }) {
+	const spread = {
+		get children() {
+			return 'spread';
+		},
+		'data-seq': 'spread',
+	};
+	const fromSpread = <span {...spread}>{getterValue.current}</span>;
+	const fromDefaults = <DefaultChildren>{getterValue.current}</DefaultChildren>;
+	const defaultOnly = <DefaultChildren sequence={getterValue.current} />;
+	return (
+		<ValueContext.Provider value={props.value}>
+			<div data-outlet="children-sources">
+				<InspectDeferredChild child={fromSpread} name="spread" />
+				<InspectDeferredChild child={fromDefaults} name="defaults" />
+				<InspectDeferredChild child={defaultOnly} name="default-only" />
+			</div>
 		</ValueContext.Provider>
 	);
 }

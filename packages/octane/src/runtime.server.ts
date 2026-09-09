@@ -709,6 +709,161 @@ interface ElementDescriptor {
 // evaluation. The component serializer must pass these props through intact:
 // spreading them would invoke the child accessor before entering the component.
 const SCOPED_ELEMENT_PROPS = new WeakSet<object>();
+const SCOPED_CHILDREN_RESOLVER = Symbol('octane.scopedChildrenResolver');
+const SCOPED_VALUE_RESOLVER = Symbol('octane.scopedValueResolver');
+
+type DeferredChildren = { [SCOPED_CHILDREN_RESOLVER]: () => unknown };
+type DeferredValue = ElementDescriptor & { [SCOPED_VALUE_RESOLVER]: () => ElementDescriptor };
+
+function getScopedChildren(this: DeferredChildren): unknown {
+	return this[SCOPED_CHILDREN_RESOLVER]();
+}
+
+const SCOPED_CHILDREN_PROPERTY = { configurable: true, enumerable: true, get: getScopedChildren };
+
+function setScopedChildrenResolver(target: object, resolve: () => unknown): void {
+	Object.defineProperty(target, SCOPED_CHILDREN_RESOLVER, { value: resolve });
+}
+
+// Each deferred record keeps its resolver while sharing accessor identities.
+const SCOPED_VALUE_PROPERTIES: PropertyDescriptorMap = {
+	type: {
+		configurable: true,
+		enumerable: true,
+		get(this: DeferredValue) {
+			return this[SCOPED_VALUE_RESOLVER]().type;
+		},
+	},
+	props: {
+		configurable: true,
+		enumerable: true,
+		get(this: DeferredValue) {
+			return this[SCOPED_VALUE_RESOLVER]().props;
+		},
+	},
+	key: {
+		configurable: true,
+		enumerable: true,
+		get(this: DeferredValue) {
+			return this[SCOPED_VALUE_RESOLVER]().key;
+		},
+	},
+	ref: {
+		configurable: true,
+		enumerable: true,
+		get(this: DeferredValue) {
+			return this[SCOPED_VALUE_RESOLVER]().ref;
+		},
+	},
+	children: {
+		configurable: true,
+		enumerable: true,
+		get(this: DeferredValue) {
+			return this[SCOPED_VALUE_RESOLVER]().children;
+		},
+	},
+};
+
+function restoreWritableScopedChildren(props: any, name: string, value: unknown): boolean {
+	const inherited = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(props), name);
+	if (inherited?.get === undefined && inherited?.set === undefined) return false;
+	// An inherited accessor can write children before deferred children replace it.
+	Object.defineProperty(props, 'children', {
+		configurable: true,
+		enumerable: true,
+		writable: true,
+		value,
+	});
+	return true;
+}
+
+/** Copy a scoped element's config and defaults without eagerly reading its children. */
+function copyScopedElementConfig(type: any, config: any): any {
+	// A copied __proto__ can intercept later assignments. Keep the original
+	// copying/defaulting order before installing deferred children in that case.
+	if (
+		(config != null && hasOwnProp.call(config, '__proto__')) ||
+		hasOwnProp.call(Object.prototype, 'children')
+	) {
+		const props = copyElementConfig(config);
+		applyElementDefaultProps(type, props);
+		Object.defineProperty(props, 'children', SCOPED_CHILDREN_PROPERTY);
+		return props;
+	}
+	const props: any = {};
+	let copiedChildren: unknown;
+	let hasChildren = false;
+	let childrenAreWritable = false;
+	if (config != null) {
+		for (const name in config) {
+			if (name === 'key' || !hasOwnProp.call(config, name)) continue;
+			if (name === 'children') {
+				// Copying the config reads its getter once. Defining the accessor in
+				// this position also preserves Object.keys order for spread children.
+				copiedChildren = config[name];
+				Object.defineProperty(props, 'children', SCOPED_CHILDREN_PROPERTY);
+				hasChildren = true;
+			} else {
+				const value = config[name];
+				if (
+					hasChildren &&
+					!childrenAreWritable &&
+					!hasOwnProp.call(props, name) &&
+					restoreWritableScopedChildren(props, name, copiedChildren)
+				) {
+					childrenAreWritable = true;
+				}
+				props[name] = value;
+			}
+		}
+	}
+	const defaults = type?.defaultProps;
+	if (defaults != null) {
+		for (const name in defaults) {
+			if (name === 'children') {
+				// The ordinary defaulting pass reads this property only when its
+				// copied value is undefined. Keep that observable getter read without
+				// evaluating the deferred children in our replacement accessor.
+				if (
+					(childrenAreWritable ? props.children : hasChildren ? copiedChildren : props.children) ===
+					undefined
+				) {
+					const defaultChildren = defaults[name];
+					copiedChildren = defaultChildren;
+					if (childrenAreWritable) {
+						props.children = defaultChildren;
+					} else if (!hasChildren) {
+						// A caller-provided __proto__ (or modified Object.prototype)
+						// can intercept the original assignment. Keep that rare path's
+						// setter/throw and insert the accessor at the end afterward.
+						if (
+							Object.getPrototypeOf(props) !== Object.prototype ||
+							Object.getOwnPropertyDescriptor(Object.prototype, 'children') !== undefined
+						) {
+							props.children = defaultChildren;
+						} else {
+							Object.defineProperty(props, 'children', SCOPED_CHILDREN_PROPERTY);
+							hasChildren = true;
+						}
+					}
+				}
+			} else {
+				if (
+					hasChildren &&
+					!childrenAreWritable &&
+					!hasOwnProp.call(props, name) &&
+					restoreWritableScopedChildren(props, name, copiedChildren)
+				) {
+					childrenAreWritable = true;
+				}
+				if (props[name] === undefined) props[name] = defaults[name];
+			}
+		}
+	}
+	if (childrenAreWritable || !hasChildren)
+		Object.defineProperty(props, 'children', SCOPED_CHILDREN_PROPERTY);
+	return props;
+}
 
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
@@ -809,24 +964,16 @@ export function nativeCreateScopedValue(readElement: () => ElementDescriptor): E
 }
 
 function scopedValueDescriptor(resolve: () => ElementDescriptor): ElementDescriptor {
-	const descriptor: ElementDescriptor = {
-		$$kind: ELEMENT_TAG,
-		get type() {
-			return resolve().type;
-		},
-		get props() {
-			return resolve().props;
-		},
-		get key() {
-			return resolve().key;
-		},
-		get ref() {
-			return resolve().ref;
-		},
-		get children() {
-			return resolve().children;
-		},
-	};
+	const descriptor = { $$kind: ELEMENT_TAG } as ElementDescriptor;
+	// The client and server runtimes may share a realm. Seed this module's own
+	// resolver before the public accessor transitions so their distinct getters
+	// do not compete for the same initial V8 map.
+	Object.defineProperty(descriptor, SCOPED_VALUE_RESOLVER, { value: resolve });
+	Object.defineProperty(descriptor, 'type', SCOPED_VALUE_PROPERTIES.type);
+	Object.defineProperty(descriptor, 'props', SCOPED_VALUE_PROPERTIES.props);
+	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES.key);
+	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES.ref);
+	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES.children);
 	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
 	return descriptor;
 }
@@ -839,8 +986,7 @@ export function createScopedElement(
 ): ElementDescriptor {
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
-	const copiedProps = copyElementConfig(src);
-	applyElementDefaultProps(type, copiedProps);
+	const copiedProps = copyScopedElementConfig(type, src);
 
 	let resolved = false;
 	let resolvedScope: SSRScope | null = null;
@@ -866,8 +1012,7 @@ export function nativeCreateScopedElement(
 ): ElementDescriptor {
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
-	const copiedProps = copyElementConfig(src);
-	applyElementDefaultProps(type, copiedProps);
+	const copiedProps = copyScopedElementConfig(type, src);
 	return scopedElementDescriptor(
 		type,
 		copiedProps,
@@ -882,8 +1027,7 @@ function scopedElementDescriptor(
 	key: string | null,
 	children: () => unknown,
 ): ElementDescriptor {
-	const childProperty = { configurable: true, enumerable: true, get: children };
-	Object.defineProperty(copiedProps, 'children', childProperty);
+	setScopedChildrenResolver(copiedProps, children);
 	SCOPED_ELEMENT_PROPS.add(copiedProps);
 	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
@@ -891,9 +1035,9 @@ function scopedElementDescriptor(
 		props: copiedProps,
 		key,
 		ref: copiedProps.ref !== undefined ? copiedProps.ref : null,
-		children: null,
-	};
-	Object.defineProperty(descriptor, 'children', childProperty);
+	} as ElementDescriptor;
+	Object.defineProperty(descriptor, 'children', SCOPED_CHILDREN_PROPERTY);
+	setScopedChildrenResolver(descriptor, children);
 	return finalizeElementDescriptor(descriptor);
 }
 
@@ -1117,9 +1261,17 @@ export function cloneElement(
 	}
 	// Preserve deferred children until their represented component owns the read.
 	let scopedChildren: (() => unknown) | undefined;
+	let scopedResolver: (() => unknown) | undefined;
 	let props: any;
 	if (SCOPED_ELEMENT_PROPS.has(element.props)) {
 		scopedChildren = Object.getOwnPropertyDescriptor(element, 'children')!.get;
+		if (scopedChildren === getScopedChildren) {
+			scopedResolver = (element as ElementDescriptor & DeferredChildren)[SCOPED_CHILDREN_RESOLVER];
+		} else if (scopedChildren === SCOPED_VALUE_PROPERTIES.children.get) {
+			// A scoped value wrapping a scoped element reads its own resolver.
+			const get = scopedChildren;
+			scopedChildren = () => get!.call(element);
+		}
 		props = {};
 		for (const name in element.props) {
 			if (name !== 'key' && name !== 'children' && hasOwnProp.call(element.props, name)) {
@@ -1144,47 +1296,95 @@ export function cloneElement(
 	}
 	const n = children.length;
 	let kids: any;
-	let childProperty: PropertyDescriptor | undefined;
+	let preserveScopedChildren = false;
 	if (n === 1) {
 		kids = children[0];
 	} else if (n > 1) {
 		kids = children;
 	} else if (scopedChildren !== undefined && !replacedChildren) {
-		childProperty = { configurable: true, enumerable: true, get: scopedChildren };
-		Object.defineProperty(props, 'children', childProperty);
+		Object.defineProperty(
+			props,
+			'children',
+			scopedResolver === undefined
+				? { configurable: true, enumerable: true, get: scopedChildren }
+				: SCOPED_CHILDREN_PROPERTY,
+		);
+		if (scopedResolver !== undefined) setScopedChildrenResolver(props, scopedResolver);
 		SCOPED_ELEMENT_PROPS.add(props);
+		preserveScopedChildren = true;
 		kids = null;
 	} else {
 		// No new children: reuse `config.children` (now merged into props) or the original.
 		kids = 'children' in props ? props.children : element.children;
 	}
 	if (n > 0) props.children = kids;
-	const descriptor: ElementDescriptor = {
-		$$kind: ELEMENT_TAG,
-		type: element.type,
-		props,
-		key,
-		ref: props.ref !== undefined ? props.ref : null,
-		children: kids ?? null,
-	};
-	if (childProperty !== undefined) Object.defineProperty(descriptor, 'children', childProperty);
+	let descriptor: ElementDescriptor;
+	if (preserveScopedChildren) {
+		descriptor = {
+			$$kind: ELEMENT_TAG,
+			type: element.type,
+			props,
+			key,
+			ref: props.ref !== undefined ? props.ref : null,
+		} as ElementDescriptor;
+		Object.defineProperty(
+			descriptor,
+			'children',
+			scopedResolver === undefined
+				? { configurable: true, enumerable: true, get: scopedChildren }
+				: SCOPED_CHILDREN_PROPERTY,
+		);
+		if (scopedResolver !== undefined) setScopedChildrenResolver(descriptor, scopedResolver);
+	} else {
+		descriptor = {
+			$$kind: ELEMENT_TAG,
+			type: element.type,
+			props,
+			key,
+			ref: props.ref !== undefined ? props.ref : null,
+			children: kids ?? null,
+		};
+	}
 	return finalizeElementDescriptor(descriptor);
 }
 
 function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): ElementDescriptor {
 	// Traversal changes only the key, never the scope that resolves its children.
 	const scopedChildren = SCOPED_ELEMENT_PROPS.has(element.props);
-	const descriptor: ElementDescriptor = {
-		$$kind: ELEMENT_TAG,
-		type: element.type,
-		props: element.props,
-		key,
-		ref: element.ref,
-		children: scopedChildren ? null : element.children,
-	};
+	let descriptor: ElementDescriptor;
 	if (scopedChildren) {
 		const get = Object.getOwnPropertyDescriptor(element, 'children')!.get;
-		Object.defineProperty(descriptor, 'children', { configurable: true, enumerable: true, get });
+		const copiedGetter =
+			get === SCOPED_VALUE_PROPERTIES.children.get ? () => get!.call(element) : get;
+		descriptor = {
+			$$kind: ELEMENT_TAG,
+			type: element.type,
+			props: element.props,
+			key,
+			ref: element.ref,
+		} as ElementDescriptor;
+		Object.defineProperty(
+			descriptor,
+			'children',
+			get === getScopedChildren
+				? SCOPED_CHILDREN_PROPERTY
+				: { configurable: true, enumerable: true, get: copiedGetter },
+		);
+		if (get === getScopedChildren) {
+			setScopedChildrenResolver(
+				descriptor,
+				(element as ElementDescriptor & DeferredChildren)[SCOPED_CHILDREN_RESOLVER],
+			);
+		}
+	} else {
+		descriptor = {
+			$$kind: ELEMENT_TAG,
+			type: element.type,
+			props: element.props,
+			key,
+			ref: element.ref,
+			children: element.children,
+		};
 	}
 	return finalizeElementDescriptor(descriptor);
 }

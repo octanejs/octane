@@ -888,6 +888,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production client and server scoped descriptors: creation, field
+		// reads, enumeration, cloning, Children.map, and SSR with plain controls.
+		name: 'scoped-descriptor-shapes',
+		cwd: 'scoped-descriptor-shapes',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Native universal external-store hooks: stable subscription lifetimes and
 		// bounded state-projection work across parent renders and notification bursts.
 		name: 'universal-external-store',
