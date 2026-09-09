@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { act, mount, nextPaint } from './_helpers';
+import { act, mount, nextPaint, flushEffects } from './_helpers';
 import { flushSync, startTransition } from '../src/index.js';
 import {
 	LazyInit,
@@ -21,6 +21,7 @@ import {
 	EffectDeps,
 	CustomEffectDeps,
 	EffectAlways,
+	EffectArguments,
 	LayoutVsEffect,
 } from './_fixtures/hooks.tsrx';
 
@@ -382,5 +383,79 @@ describe('three-phase effect pipeline', () => {
 		await nextPaint();
 		expect(order).toEqual(['i', 'l', 'e']);
 		r.unmount();
+	});
+
+	describe.each<{ label: string; deps: unknown[] | null | undefined }>([
+		{ label: 'undefined dependencies', deps: undefined },
+		{ label: 'null dependencies', deps: null },
+		{ label: 'empty dependencies', deps: [] },
+		{ label: 'one dependency', deps: [1] },
+		{ label: 'two dependencies', deps: [1, 'two'] },
+		{ label: 'three dependencies', deps: [1, 'two', null] },
+		{ label: 'four dependencies', deps: [1, 'two', null, undefined] },
+	])('$label', ({ deps }) => {
+		it('passes positional values with a null receiver and retains each setup’s cleanup', () => {
+			const phases = ['insertion', 'layout', 'passive'] as const;
+			type Phase = (typeof phases)[number];
+			const logs: Record<Phase, unknown[]> = { insertion: [], layout: [], passive: [] };
+			const propsFor = (dependencies: unknown[] | null | undefined, version: number) => {
+				const callbackFor = (phase: Phase) =>
+					function (this: unknown, ...args: unknown[]) {
+						logs[phase].push(['setup', version, this, args]);
+						return () => {
+							logs[phase].push(['cleanup', version, args]);
+						};
+					};
+				return {
+					deps: dependencies,
+					label: String(version),
+					insertion: callbackFor('insertion'),
+					layout: callbackFor('layout'),
+					passive: callbackFor('passive'),
+				};
+			};
+			const firstArgs = deps ?? [];
+			const r = mount(EffectArguments, propsFor(deps, 1));
+			flushEffects();
+			for (const phase of phases) {
+				expect(logs[phase]).toEqual([['setup', 1, null, firstArgs]]);
+			}
+
+			const nextDeps = deps?.map((_, index) => `updated-${index}`) ?? deps;
+			const nextArgs = nextDeps ?? [];
+			const repeats = deps == null || deps.length > 0;
+			r.update(EffectArguments, propsFor(nextDeps, 2));
+			flushEffects();
+			expect(r.find('span').textContent).toBe('2');
+			for (const phase of phases) {
+				expect(logs[phase]).toEqual(
+					repeats
+						? [
+								['setup', 1, null, firstArgs],
+								['cleanup', 1, firstArgs],
+								['setup', 2, null, nextArgs],
+							]
+						: [['setup', 1, null, firstArgs]],
+				);
+			}
+
+			r.unmount();
+			flushEffects();
+			for (const phase of phases) {
+				expect(logs[phase]).toEqual(
+					repeats
+						? [
+								['setup', 1, null, firstArgs],
+								['cleanup', 1, firstArgs],
+								['setup', 2, null, nextArgs],
+								['cleanup', 2, nextArgs],
+							]
+						: [
+								['setup', 1, null, firstArgs],
+								['cleanup', 1, firstArgs],
+							],
+				);
+			}
+		});
 	});
 });
