@@ -19,6 +19,8 @@ import {
 	NestedSubmit,
 	ControlledInput,
 	RejectedInput,
+	CapturedNestedInput,
+	LateControlledInput,
 	ResetForm,
 	SubmitCompletedInput,
 } from './_fixtures/dispatch-commit-timing.tsrx';
@@ -134,6 +136,50 @@ describe('discrete dispatch commit timing (React batchedUpdates parity)', () => 
 		input.dispatchEvent(new Event('input', { bubbles: true }));
 		expect(input.value).toBe('fixed');
 		r.unmount();
+	});
+
+	it('restores a nested controlled edit when the outer click stops before its bubble handler', async () => {
+		let input: HTMLInputElement;
+		const r = mount(CapturedNestedInput, {
+			onCapture() {
+				setNativeValue(input, 'edited');
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+			},
+		});
+		try {
+			input = r.find('#nested-input') as HTMLInputElement;
+			const button = r.find('#captured-button') as HTMLButtonElement;
+			button.addEventListener('click', (event) => event.stopPropagation());
+			button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			// The input's own dispatch ran inside the click capture handler. Its
+			// restoration waits for the outer event's boundary even without bubble.
+			expect(input.value).toBe('edited');
+			await Promise.resolve();
+			expect(input.value).toBe('fixed');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('restores an input first controlled by a native target listener after capture', async () => {
+		const onCapture = () => {};
+		const r = mount(LateControlledInput, { onCapture });
+		try {
+			const input = r.find('#late-controlled') as HTMLInputElement;
+			input.addEventListener('input', (event) => {
+				r.update(LateControlledInput, { value: 'fixed', onCapture });
+				setNativeValue(input, 'edited');
+				event.stopPropagation();
+			});
+			setNativeValue(input, 'typed');
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			expect(r.find('#late-controlled')).toBe(input);
+			expect(input.value).toBe('edited');
+			await Promise.resolve();
+			expect(input.value).toBe('fixed');
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('a reset-button click that also clears controlled state leaves the control dirty, like React', async () => {

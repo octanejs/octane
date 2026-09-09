@@ -31,7 +31,7 @@ export function NestedSubmit() @{
 			type="button"
 			onClick={(e) => {
 				setStatus('submitting');
-				e.currentTarget.form.requestSubmit();
+				e.currentTarget.form!.requestSubmit();
 			}}
 		>
 			go
@@ -53,6 +53,21 @@ export function ControlledInput() @{
 export function RejectedInput() @{
 	const [value] = useState('fixed');
 	<input id="rejected" value={value} />
+}
+
+export function CapturedNestedInput(props: { onCapture: () => void }) @{
+	<div>
+		<button id="captured-button" type="button" onClickCapture={props.onCapture}>press</button>
+		<input id="nested-input" value="fixed" />
+	</div>
+}
+
+export function LateControlledInput(props: { value?: string; onCapture: () => void }) @{
+	<input
+		id="late-controlled"
+		{...(props.value === undefined ? {} : { value: props.value })}
+		onInputCapture={props.onCapture}
+	/>
 }
 
 // Controlled input beside a reset button whose click ALSO clears the state. A
