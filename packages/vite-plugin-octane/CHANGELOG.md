@@ -1,5 +1,15 @@
 # @octanejs/vite-plugin
 
+## 0.1.54
+
+### Patch Changes
+
+- 7ddaf82: Ignore virtual module IDs when watching `octane.config.ts` dependencies, so decorator helpers cannot crash the Vite dev server while imported files still trigger reloads.
+- 02ecadb: Recognize locally proven primitive string, number, and bigint DOM children while preserving explicit `as string` text bindings. Add an optional TypeScript project proof for one-shot Vite, Rspack, and Rsbuild production builds, with matching server and hydration output.
+- 2ffcc71: Promote scoped signals to a stable API. Detect signal capabilities automatically in the compiler and remove the experimental `nativeReads` build option. Signal handles and helpers keep their `$` naming convention; local hooks, inferred memos, async resources, and DOM SSR/hydration work through the standard toolchain. Add the signals website guide and llms.txt reference.
+- Updated dependencies [2ffcc71]
+  - @octanejs/app-core@0.0.50
+
 ## 0.1.53
 
 ### Patch Changes

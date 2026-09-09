@@ -1,5 +1,11 @@
 # @octanejs/app-core
 
+## 0.0.50
+
+### Patch Changes
+
+- 2ffcc71: Promote scoped signals to a stable API. Detect signal capabilities automatically in the compiler and remove the experimental `nativeReads` build option. Signal handles and helpers keep their `$` naming convention; local hooks, inferred memos, async resources, and DOM SSR/hydration work through the standard toolchain. Add the signals website guide and llms.txt reference.
+
 ## 0.0.49
 
 ### Patch Changes

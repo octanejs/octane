@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/aria@0.0.46",
+    "@octanejs/aria@0.0.47",
     "cn"
   ],
   "registryDependencies": [
