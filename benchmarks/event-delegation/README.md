@@ -21,6 +21,25 @@ It also requires the 128 capture traversals to reuse one path array. Native
 capture and bubbling, framework capture, event targets, all 128 controlled
 inputs, and their corresponding output text must remain correct.
 
+The gate also builds `event-work-no-capture.html` in a separate browser context.
+Its own compiled 512-field form has the same controlled input, validation, and
+output work but no authored input-capture handler. Importing the main form and
+passing an empty capture handler would still register capture at module load, so
+the second page uses a separate entry. An observer around the browser's native
+`Event.prototype.composedPath` counts only calls for the 128 dispatched input
+events and is restored before leaving each fixture. On the no-capture path the
+gate requires one path construction per event; the original capture
+fixture retains its capture and portal checks. These observers never run in the
+ordinary timing application. The unoptimized no-capture baseline constructs
+two paths per input event (256 for 128 events).
+
+The isolated page also dispatches one nonbubbling native `play` event on a
+`<video>`. Compiled form capture, video bubble, and form bubble handlers must
+run in that order with their own `currentTarget` and the video as `target`.
+Native document capture and video target listeners must fire, while a native
+document bubble listener must not. The shared delegated capture/bubble callback
+must call `composedPath()` once for the event (three calls before the change).
+
 Before those inputs, a separate work-only fixture mounts and unmounts two compiled
 JSX portals sharing `document.body` three times. Portal capture, target and bubble
 handlers and ref cleanup must all run; detached buttons must stop receiving
@@ -38,5 +57,5 @@ node benchmarks/event-delegation/work.mjs
 node benchmarks/bench.mjs --quick event-delegation
 ```
 
-Set `EVENT_URL` to an existing production `event-work.html` preview instead of
-building one.
+Set `EVENT_URL` to an existing production `event-work.html` preview that also
+serves `event-work-no-capture.html` instead of building one.

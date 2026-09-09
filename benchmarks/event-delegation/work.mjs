@@ -18,6 +18,7 @@ const failures = [];
 let browser;
 let productionServer;
 let observed;
+let noCaptureObserved;
 try {
 	let target = process.env.EVENT_URL;
 	if (!target) {
@@ -30,7 +31,10 @@ try {
 				emptyOutDir: true,
 				minify: 'esbuild',
 				rollupOptions: {
-					input: path.join(appDirectory, 'event-work.html'),
+					input: [
+						path.join(appDirectory, 'event-work.html'),
+						path.join(appDirectory, 'event-work-no-capture.html'),
+					],
 					output: {
 						chunkFileNames: 'assets/[name]-[hash].js',
 						entryFileNames: 'assets/[name]-[hash].js',
@@ -79,6 +83,7 @@ try {
 
 			const originalDefineProperty = Object.defineProperty;
 			const originalPush = Array.prototype.push;
+			const originalComposedPath = Event.prototype.composedPath;
 			const originalPreviousSibling = Object.getOwnPropertyDescriptor(
 				Node.prototype,
 				'previousSibling',
@@ -100,6 +105,7 @@ try {
 			let invalidCurrentTargets = 0;
 			let previousSiblingReads = 0;
 			let documentPositionComparisons = 0;
+			let inputComposedPaths = 0;
 			const capture = () => nativeCaptures++;
 			const bubble = () => nativeBubbles++;
 
@@ -129,6 +135,10 @@ try {
 				}
 				return originalPush.apply(this, values);
 			};
+			Event.prototype.composedPath = function () {
+				if (currentInput !== null && this.target === currentInput) inputComposedPaths++;
+				return originalComposedPath.call(this);
+			};
 			Object.defineProperty(Node.prototype, 'previousSibling', {
 				...originalPreviousSibling,
 				get() {
@@ -154,6 +164,7 @@ try {
 				currentInput = null;
 				Object.defineProperty = originalDefineProperty;
 				Array.prototype.push = originalPush;
+				Event.prototype.composedPath = originalComposedPath;
 				Object.defineProperty(Node.prototype, 'previousSibling', originalPreviousSibling);
 				Node.prototype.compareDocumentPosition = originalComparePosition;
 				document.removeEventListener('input', capture, true);
@@ -186,11 +197,129 @@ try {
 				descriptors: descriptors.size,
 				getters: getters.size,
 				capturePaths: capturePaths.size,
+				inputComposedPaths,
 				previousSiblingReads,
 				documentPositionComparisons,
 			};
 		},
 		{ events: EVENTS, fields: FIELDS, portalCycles: PORTAL_CYCLES },
+	);
+	// A second browser context loads only the controlled-input module. Importing
+	// the ordinary App here would register onInputCapture for this runtime copy
+	// before any event is dispatched, even if its handler value were undefined.
+	const noCapturePage = await browser.newPage();
+	await noCapturePage.goto(new URL('event-work-no-capture.html', target).href, {
+		waitUntil: 'load',
+	});
+	await noCapturePage.waitForFunction(() => globalThis.__runtimeStress?.ready === true, null, {
+		timeout: 10_000,
+	});
+	noCaptureObserved = await noCapturePage.evaluate(
+		({ events, fields }) => {
+			const form = document.querySelector('#stress-form');
+			const media = document.querySelector('#event-work-media');
+			if (form === null || document.querySelectorAll('input[data-field-index]').length !== fields) {
+				throw new Error('Missing controlled no-capture benchmark form');
+			}
+			if (media === null) throw new Error('Missing nonbubbling media event target');
+			const setInputValue = Object.getOwnPropertyDescriptor(
+				HTMLInputElement.prototype,
+				'value',
+			).set;
+			const originalComposedPath = Event.prototype.composedPath;
+			let currentInput = null;
+			let currentMedia = null;
+			let inputComposedPaths = 0;
+			let mediaComposedPaths = 0;
+			let nativeCaptures = 0;
+			let nativeBubbles = 0;
+			let nativeMediaCaptures = 0;
+			let nativeMediaTargets = 0;
+			let nativeMediaBubbles = 0;
+			let unexpectedFrameworkCaptures = 0;
+			let invalidMediaCurrentTargets = 0;
+			const mediaOrder = [];
+			const capture = () => nativeCaptures++;
+			const bubble = () => nativeBubbles++;
+			const mediaCapture = () => nativeMediaCaptures++;
+			const mediaTarget = () => nativeMediaTargets++;
+			const mediaBubble = () => nativeMediaBubbles++;
+			document.addEventListener('input', capture, true);
+			document.addEventListener('input', bubble);
+			document.addEventListener('play', mediaCapture, true);
+			media.addEventListener('play', mediaTarget);
+			document.addEventListener('play', mediaBubble);
+			globalThis.__octaneDelegatedInputCapture = () => unexpectedFrameworkCaptures++;
+			globalThis.__eventWorkMedia = (phase, event) => {
+				mediaOrder.push(phase);
+				const expected = phase === 'target-bubble' ? media : form;
+				if (event.target !== media || event.currentTarget !== expected) {
+					invalidMediaCurrentTargets++;
+				}
+			};
+			Event.prototype.composedPath = function () {
+				if (currentInput !== null && this.target === currentInput) inputComposedPaths++;
+				if (currentMedia !== null && this.type === 'play' && this.target === currentMedia)
+					mediaComposedPaths++;
+				return originalComposedPath.call(this);
+			};
+			try {
+				for (let index = 0; index < events; index++) {
+					currentInput = document.querySelector(`input[data-field-index="${index}"]`);
+					setInputValue.call(currentInput, `event-${index}`);
+					currentInput.dispatchEvent(
+						new InputEvent('input', { bubbles: true, data: String(index) }),
+					);
+					currentInput = null;
+				}
+				currentMedia = media;
+				media.dispatchEvent(new Event('play', { bubbles: false }));
+				currentMedia = null;
+			} finally {
+				currentInput = null;
+				currentMedia = null;
+				Event.prototype.composedPath = originalComposedPath;
+				document.removeEventListener('input', capture, true);
+				document.removeEventListener('input', bubble);
+				document.removeEventListener('play', mediaCapture, true);
+				media.removeEventListener('play', mediaTarget);
+				document.removeEventListener('play', mediaBubble);
+				delete globalThis.__octaneDelegatedInputCapture;
+				delete globalThis.__eventWorkMedia;
+			}
+			let updatedFields = 0;
+			let updatedOutputs = 0;
+			for (let index = 0; index < events; index++) {
+				const expected = `event-${index}`;
+				if (document.querySelector(`input[data-field-index="${index}"]`)?.value === expected) {
+					updatedFields++;
+				}
+				if (document.querySelector(`[data-field-output="${index}"]`)?.textContent === expected) {
+					updatedOutputs++;
+				}
+			}
+			return {
+				eventHosts: document.querySelectorAll('input[data-field-index]').length,
+				events,
+				inputComposedPaths,
+				mediaComposedPaths,
+				nativeCaptures,
+				nativeBubbles,
+				nativeMediaCaptures,
+				nativeMediaTargets,
+				nativeMediaBubbles,
+				unexpectedFrameworkCaptures,
+				frameworkBubbles: globalThis.__runtimeStress.stats.form.validationRequests,
+				updatedFields,
+				updatedOutputs,
+				mediaHandlers: mediaOrder.length,
+				mediaOrderCorrect: Number(
+					mediaOrder.join(',') === 'form-capture,target-bubble,form-bubble',
+				),
+				invalidMediaCurrentTargets,
+			};
+		},
+		{ events: EVENTS, fields: FIELDS },
 	);
 } finally {
 	try {
@@ -213,6 +342,9 @@ if (observed.eventHosts !== FIELDS)
 	failures.push(`eventHosts: ${observed.eventHosts} is not ${FIELDS}`);
 if (observed.invalidCurrentTargets !== 0) {
 	failures.push(`invalidCurrentTargets: ${observed.invalidCurrentTargets} is not zero`);
+}
+if (observed.inputComposedPaths > EVENTS * 2) {
+	failures.push(`inputComposedPaths: ${observed.inputComposedPaths} exceeds ${EVENTS * 2}`);
 }
 if (observed.definitions !== EVENTS * 2) {
 	failures.push(`definitions: ${observed.definitions} is not ${EVENTS * 2}`);
@@ -239,9 +371,48 @@ for (const key of [
 	if (observed[key] !== 0)
 		failures.push(`${key}: ${observed[key]} is not zero after portal cleanup`);
 }
+for (const key of [
+	'nativeCaptures',
+	'nativeBubbles',
+	'frameworkBubbles',
+	'updatedFields',
+	'updatedOutputs',
+]) {
+	if (noCaptureObserved[key] !== EVENTS)
+		failures.push(`no capture ${key}: ${noCaptureObserved[key]} is not ${EVENTS}`);
+}
+if (noCaptureObserved.eventHosts !== FIELDS) {
+	failures.push(`no capture eventHosts: ${noCaptureObserved.eventHosts} is not ${FIELDS}`);
+}
+if (noCaptureObserved.unexpectedFrameworkCaptures !== 0) {
+	failures.push(
+		`no capture unexpectedFrameworkCaptures: ${noCaptureObserved.unexpectedFrameworkCaptures} is not zero`,
+	);
+}
+if (noCaptureObserved.inputComposedPaths !== EVENTS) {
+	failures.push(
+		`no capture inputComposedPaths: ${noCaptureObserved.inputComposedPaths} is not ${EVENTS}`,
+	);
+}
+for (const key of ['nativeMediaCaptures', 'nativeMediaTargets', 'mediaOrderCorrect']) {
+	if (noCaptureObserved[key] !== 1)
+		failures.push(`no capture ${key}: ${noCaptureObserved[key]} is not 1`);
+}
+if (noCaptureObserved.mediaHandlers !== 3) {
+	failures.push(`no capture mediaHandlers: ${noCaptureObserved.mediaHandlers} is not 3`);
+}
+for (const key of ['nativeMediaBubbles', 'invalidMediaCurrentTargets']) {
+	if (noCaptureObserved[key] !== 0)
+		failures.push(`no capture ${key}: ${noCaptureObserved[key]} is not zero`);
+}
+if (noCaptureObserved.mediaComposedPaths !== 1) {
+	failures.push(`no capture mediaComposedPaths: ${noCaptureObserved.mediaComposedPaths} is not 1`);
+}
 
 console.log('Production delegated-event work:');
 console.table(observed);
+console.log('Production delegated-event work without authored capture:');
+console.table(noCaptureObserved);
 if (process.env.BENCH_JSON) {
 	const stat = (value) => ({ median: value, min: value, samples: 1 });
 	fs.writeFileSync(
@@ -254,6 +425,13 @@ if (process.env.BENCH_JSON) {
 						name: 'octane-tsrx-work',
 						ops: Object.fromEntries(
 							Object.entries(observed).map(([name, value]) => [name, stat(value)]),
+						),
+						meta: { gate: failures.length === 0 ? 'passed' : 'failed' },
+					},
+					{
+						name: 'octane-tsrx-no-capture-work',
+						ops: Object.fromEntries(
+							Object.entries(noCaptureObserved).map(([name, value]) => [name, stat(value)]),
 						),
 						meta: { gate: failures.length === 0 ? 'passed' : 'failed' },
 					},
