@@ -1143,6 +1143,9 @@ interface RenderAttempt {
 	owner: DraftOwner;
 	scope: UniversalOwnerRecord | null;
 	owners: DraftOwner[];
+	// Indexed on demand for reads of another owner's draft. Claims append to
+	// owners, and the last draft for a record must win after a retained retry.
+	draftLookup: { indexed: number; byRecord: Map<UniversalOwnerRecord, DraftOwner> } | null;
 	treeFeatures: number;
 	replayEntries: readonly SuspendedMemoEntry[];
 	retryThenables: Set<PromiseLike<unknown>>;
@@ -5167,10 +5170,20 @@ function currentDraftOwner(): DraftOwner {
 function findDraftOwner(record: UniversalOwnerRecord): DraftOwner | null {
 	const attempt = CURRENT_ATTEMPT;
 	if (attempt === null) return null;
-	for (let index = attempt.owners.length - 1; index >= 0; index--) {
-		if (attempt.owners[index].record === record) return attempt.owners[index];
+	const owners = attempt.owners;
+	const last = owners[owners.length - 1];
+	if (last !== undefined && last.record === record) return last;
+	let lookup = attempt.draftLookup;
+	if (lookup === null) {
+		lookup = { indexed: 0, byRecord: new Map() };
+		attempt.draftLookup = lookup;
 	}
-	return null;
+	for (let index = lookup.indexed; index < owners.length; index++) {
+		const owner = owners[index];
+		lookup.byRecord.set(owner.record, owner);
+	}
+	lookup.indexed = owners.length;
+	return lookup.byRecord.get(record) ?? null;
 }
 
 function applyUniversalHookUpdateQueue<T>(
@@ -8785,6 +8798,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			owner,
 			scope: target,
 			owners: [owner],
+			draftLookup: null,
 			treeFeatures: 0,
 			replayEntries: [],
 			retryThenables: new Set(),
@@ -9095,6 +9109,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			owner,
 			scope: null,
 			owners: [owner],
+			draftLookup: null,
 			treeFeatures: 0,
 			replayEntries,
 			retryThenables: new Set(),

@@ -110,6 +110,7 @@ export const BENCHMARK_SUITES = [
 	'universal-template-events',
 	'universal-native-hover',
 	'universal-owner-drafts',
+	'universal-draft-lookup',
 	'universal-external-store',
 	'lynx-render',
 	'lynx-table',
