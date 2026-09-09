@@ -18796,6 +18796,15 @@ function finishCaptureDispatch(event: Event): void {
 		return;
 	}
 	if (!DISCRETE_EVENTS.has(type)) return;
+	// A missed bubble can leave a restore queued by a nested event in capture.
+	// The target itself may also become controlled in a native listener below
+	// this root, so retain the fallback for form controls even when $$ctrl is
+	// not armed yet. Other events have no controlled work to finish here.
+	if (pendingRestores.length === 0) {
+		if (!RESTORE_EVENTS.has(type)) return;
+		const tag = (event.target as Element | null)?.localName;
+		if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return;
+	}
 	const bubbleVersion = (event as any)[DELEGATED_BUBBLE_VERSION];
 	const fallback = () => {
 		// A delivered bubble segment closes the capture segment's commit boundary

@@ -13,12 +13,14 @@ const appDirectory = fileURLToPath(new URL('../news/octane-tsrx/', import.meta.u
 const EVENTS = 128;
 const FIELDS = 512;
 const PORTAL_CYCLES = 3;
+const TRUSTED_CLICKS = 16;
 const failures = [];
 
 let browser;
 let productionServer;
 let observed;
 let noCaptureObserved;
+let trustedClickObserved;
 try {
 	let target = process.env.EVENT_URL;
 	if (!target) {
@@ -321,6 +323,107 @@ try {
 		},
 		{ events: EVENTS, fields: FIELDS },
 	);
+	// A native document capture listener opens the observation window before
+	// Octane's root capture listener. Document bubble closes it after the root
+	// bubble listener, so timers outside the click's delivery cannot enter it.
+	await noCapturePage.evaluate(() => {
+		const form = document.querySelector('#stress-form');
+		const button = document.querySelector('#event-work-trusted-click');
+		if (form === null || button === null) throw new Error('Missing trusted-click work target');
+		const originalSetTimeout = window.setTimeout;
+		const result = {
+			nativeCaptures: 0,
+			nativeBubbles: 0,
+			frameworkCaptures: 0,
+			buttonBubbles: 0,
+			formBubbles: 0,
+			invalidEvents: 0,
+			timersByClick: [],
+			order: [],
+		};
+		let activeClick = null;
+		const capture = (event) => {
+			if (event.target !== button) return;
+			result.nativeCaptures++;
+			if (activeClick !== null || !event.isTrusted) result.invalidEvents++;
+			activeClick = event;
+			result.order.push('document-capture');
+			result.timersByClick.push(0);
+		};
+		const bubble = (event) => {
+			if (event.target !== button) return;
+			result.nativeBubbles++;
+			if (activeClick !== event) result.invalidEvents++;
+			result.order.push('document-bubble');
+			activeClick = null;
+		};
+		document.addEventListener('click', capture, true);
+		document.addEventListener('click', bubble);
+		window.setTimeout = function (...args) {
+			if (activeClick !== null && args[1] === 0) {
+				result.timersByClick[result.timersByClick.length - 1]++;
+			}
+			return Reflect.apply(originalSetTimeout, window, args);
+		};
+		globalThis.__eventWorkClick = (phase, event) => {
+			if (phase === 'form-capture') result.frameworkCaptures++;
+			else if (phase === 'button-bubble') result.buttonBubbles++;
+			else if (phase === 'form-bubble') result.formBubbles++;
+			if (
+				event !== activeClick ||
+				!event.isTrusted ||
+				event.target !== button ||
+				event.currentTarget !== (phase === 'button-bubble' ? button : form)
+			) {
+				result.invalidEvents++;
+			}
+			result.order.push(phase);
+		};
+		globalThis.__trustedClickWork = {
+			result,
+			restore() {
+				window.setTimeout = originalSetTimeout;
+				document.removeEventListener('click', capture, true);
+				document.removeEventListener('click', bubble);
+				delete globalThis.__eventWorkClick;
+				delete globalThis.__trustedClickWork;
+			},
+		};
+	});
+	try {
+		const clickTarget = noCapturePage.locator('#event-work-trusted-click');
+		for (let index = 0; index < TRUSTED_CLICKS; index++) await clickTarget.click();
+		trustedClickObserved = await noCapturePage.evaluate((clicks) => {
+			const result = globalThis.__trustedClickWork.result;
+			const expectedOrder = [
+				'document-capture',
+				'form-capture',
+				'button-bubble',
+				'form-bubble',
+				'document-bubble',
+			];
+			return {
+				clicks,
+				nativeCaptures: result.nativeCaptures,
+				nativeBubbles: result.nativeBubbles,
+				frameworkCaptures: result.frameworkCaptures,
+				buttonBubbles: result.buttonBubbles,
+				formBubbles: result.formBubbles,
+				invalidEvents: result.invalidEvents,
+				orderCorrect: Number(
+					result.order.length === clicks * expectedOrder.length &&
+						result.order.every(
+							(phase, index) => phase === expectedOrder[index % expectedOrder.length],
+						),
+				),
+				zeroDelayTimers: result.timersByClick.reduce((sum, count) => sum + count, 0),
+				minTimersPerClick: Math.min(...result.timersByClick),
+				maxTimersPerClick: Math.max(...result.timersByClick),
+			};
+		}, TRUSTED_CLICKS);
+	} finally {
+		await noCapturePage.evaluate(() => globalThis.__trustedClickWork?.restore());
+	}
 } finally {
 	try {
 		await browser?.close();
@@ -408,11 +511,42 @@ for (const key of ['nativeMediaBubbles', 'invalidMediaCurrentTargets']) {
 if (noCaptureObserved.mediaComposedPaths !== 1) {
 	failures.push(`no capture mediaComposedPaths: ${noCaptureObserved.mediaComposedPaths} is not 1`);
 }
+for (const key of [
+	'nativeCaptures',
+	'nativeBubbles',
+	'frameworkCaptures',
+	'buttonBubbles',
+	'formBubbles',
+]) {
+	if (trustedClickObserved[key] !== TRUSTED_CLICKS) {
+		failures.push(`trusted click ${key}: ${trustedClickObserved[key]} is not ${TRUSTED_CLICKS}`);
+	}
+}
+if (trustedClickObserved.invalidEvents !== 0) {
+	failures.push(`trusted click invalidEvents: ${trustedClickObserved.invalidEvents} is not zero`);
+}
+if (trustedClickObserved.orderCorrect !== 1) {
+	failures.push('trusted click handler and native listener order is incorrect');
+}
+// Every click reaches the delegated root bubble, which closes its capture
+// boundary. A post-dispatch fallback task would have no remaining work.
+if (trustedClickObserved.zeroDelayTimers !== 0) {
+	failures.push(
+		`trusted click zeroDelayTimers: ${trustedClickObserved.zeroDelayTimers} is not zero`,
+	);
+}
+for (const key of ['minTimersPerClick', 'maxTimersPerClick']) {
+	if (trustedClickObserved[key] !== 0) {
+		failures.push(`trusted click ${key}: ${trustedClickObserved[key]} is not zero`);
+	}
+}
 
 console.log('Production delegated-event work:');
 console.table(observed);
 console.log('Production delegated-event work without authored capture:');
 console.table(noCaptureObserved);
+console.log('Production trusted captured-click work:');
+console.table(trustedClickObserved);
 if (process.env.BENCH_JSON) {
 	const stat = (value) => ({ median: value, min: value, samples: 1 });
 	fs.writeFileSync(
@@ -432,6 +566,13 @@ if (process.env.BENCH_JSON) {
 						name: 'octane-tsrx-no-capture-work',
 						ops: Object.fromEntries(
 							Object.entries(noCaptureObserved).map(([name, value]) => [name, stat(value)]),
+						),
+						meta: { gate: failures.length === 0 ? 'passed' : 'failed' },
+					},
+					{
+						name: 'octane-tsrx-trusted-click-work',
+						ops: Object.fromEntries(
+							Object.entries(trustedClickObserved).map(([name, value]) => [name, stat(value)]),
 						),
 						meta: { gate: failures.length === 0 ? 'passed' : 'failed' },
 					},

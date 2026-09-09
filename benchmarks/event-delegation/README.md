@@ -40,6 +40,17 @@ Native document capture and video target listeners must fire, while a native
 document bubble listener must not. The shared delegated capture/bubble callback
 must call `composedPath()` once for the event (three calls before the change).
 
+The same isolated page also mounts an idle button under a form with authored
+`onClickCapture`, button `onClick`, and form `onClick`. Playwright clicks the
+button 16 times, producing trusted native events. A temporary `setTimeout`
+observer counts zero-delay tasks only between a document capture listener
+(before Octane's root capture) and a document bubble listener (after Octane's
+root bubble). The gate checks native and framework handler order, trusted event
+identity and `currentTarget`, and zero timers for each click that reaches the
+bubble listener. This fixture registers capture only for `click`; the input
+gate above still exercises its own event type unchanged. The baseline scheduled
+one unnecessary fallback timer per click (16 total).
+
 Before those inputs, a separate work-only fixture mounts and unmounts two compiled
 JSX portals sharing `document.body` three times. Portal capture, target and bubble
 handlers and ref cleanup must all run; detached buttons must stop receiving
