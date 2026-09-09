@@ -86,8 +86,8 @@ the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
 **universal-object-teardown**,
-**universal-template-events**, **universal-external-store**,
-**universal-owner-drafts**,
+**universal-template-events**, **universal-native-hover**, **universal-owner-drafts**,
+**universal-external-store**,
 **lynx-render**, **lynx-bundle-size**, **tsrx-renderer-validation-ranges**, and
 **tsrx-local-component-name-catalog** are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
@@ -280,6 +280,7 @@ internally, get their own baseline and guard namespace.
 | `universal-leaf-update` | universal-leaf-update | none (Node-only) | universal update locality beside 0–4,000 unrelated component siblings through the compiler and native object driver: plain leaf `setState`, keyed `@for` item state, a leaf under an idle `@try`, a structural (insert/remove) update, and compact-row list selection |
 | `universal-object-teardown` | universal-object-teardown | none (Node-only) | transactional object-driver unmount scaling at 2, 4,096, and 16,384 flat siblings, with exact remove/destroy and empty-driver controls |
 | `universal-template-events` | universal-template-events | none (Node-only) | shape-stable handler updates across 128 and 1,024 retained native event sites through ordinary hosts and the fallback collapsed-template host capability, with host identity, stable listener IDs, latest-handler dispatch, and redundant-command controls |
+| `universal-native-hover` | universal-native-hover | none (Node-only) | compiled production native universal selection in 20 and 80 keyed rows, each with four component/view layers; 2,000 real hover updates per sample, host and prop identity checks, teardown, a same-run scaling ratio, and optional local V8 cumulative allocation profile |
 | `universal-owner-drafts` | universal-owner-drafts | none (Node-only) | retained object-driver roots with 0, 1, 128, and 1,024 changed-prop child owners; output, render, host identity, and structural-command controls |
 | `universal-external-store` | universal-external-store | none (Node-only) | 128 native universal store subscribers, getter/subscribe identity controls, notification bursts, and deterministic subscription-lifetime and state-projection guards |
 | `lynx-render` | lynx-render | none (Node-only) | dual-thread Lynx render CPU: empty startup, create 1,000 and 10,000 keyed rows through the real background root, transport, and main receiver over a cheap fake Element PAPI, plus a gate that a native tap reaches its background handler via the engine `publishEvent` receiver |

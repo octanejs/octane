@@ -6,10 +6,14 @@ import {
 	createUniversalRoot,
 	defineUniversalComponent,
 	rendererRegion,
+	universalComponent,
 	universalFor,
 	universalKey,
 	universalPlan,
+	universalTry,
 	universalValue,
+	use as useUniversal,
+	useMemo as useUniversalMemo,
 	useState as useUniversalState,
 	type ObjectHostInstance,
 	type RendererRegion,
@@ -439,6 +443,74 @@ describe('universal runtime semantic regressions', () => {
 		expect(instances(container, 'keyed-result').map((child) => child.props.value)).toEqual([
 			'value-a',
 			'value-b',
+		]);
+		root.unmount();
+	});
+
+	it('replays pending memos for distinct nested siblings after a render-phase retry', async () => {
+		const { container, root } = objectRoot();
+		const requests = new Map<string, ReturnType<typeof deferred<string>>[]>();
+		const load = vi.fn((id: string) => {
+			const request = deferred<string>();
+			const entries = requests.get(id) ?? [];
+			entries.push(request);
+			requests.set(id, entries);
+			return request.promise;
+		});
+		const resultPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'sibling-result',
+			bindings: [
+				['id', 0],
+				['value', 1],
+			],
+		});
+		const pendingPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'sibling-pending',
+			bindings: [['id', 0]],
+		});
+		const scenePlan = universalPlan('object', {
+			kind: 'host',
+			type: 'sibling-scene',
+			children: [
+				{ kind: 'slot', slot: 0 },
+				{ kind: 'slot', slot: 1 },
+			],
+		});
+		const Sibling = defineUniversalComponent('object', ({ id }: { id: string }) => {
+			const request = useUniversalMemo(() => load(id), [], 'shared-request');
+			return universalValue(resultPlan, [id, useUniversal(request)]);
+		});
+		const Scene = defineUniversalComponent('object', () => {
+			const [pass, setPass] = useUniversalState(0, 'pass');
+			if (pass === 0) setPass(1);
+			const child = (id: string) =>
+				universalTry(
+					() => universalComponent('object', Sibling, { id }),
+					() => universalValue(pendingPlan, [id]),
+				);
+			return universalValue(scenePlan, [child('a'), child('b')]);
+		});
+
+		root.render(Scene, undefined);
+		expect(instances(container, 'sibling-pending').map((child) => child.props.id)).toEqual([
+			'a',
+			'b',
+		]);
+		const initialRequests = load.mock.calls.length;
+		expect(requests.get('a')?.length).toBeGreaterThan(0);
+		expect(requests.get('b')?.length).toBeGreaterThan(0);
+		for (const [id, entries] of requests) {
+			for (const [index, request] of entries.entries()) request.resolve(`${id}:${index}`);
+		}
+		await flushMicrotasks();
+
+		expect(load).toHaveBeenCalledTimes(initialRequests);
+		expect(instances(container, 'sibling-pending')).toHaveLength(0);
+		expect(instances(container, 'sibling-result').map((child) => child.props.value)).toEqual([
+			`a:${requests.get('a')!.length - 1}`,
+			`b:${requests.get('b')!.length - 1}`,
 		]);
 		root.unmount();
 	});
