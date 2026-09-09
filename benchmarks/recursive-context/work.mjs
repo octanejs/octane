@@ -11,6 +11,7 @@ import { compile } from '../../packages/octane/src/compiler/compile.js';
 import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import { collectPreciseCalls } from '../lib/precise-work.mjs';
+import { collectWarmAdoptionWork } from './warm-adoption-work.mjs';
 
 // Standalone runs can target ephemeral previews so an unrelated worktree's
 // server on the standard benchmark ports cannot produce stale-bundle counts.
@@ -483,6 +484,10 @@ try {
 				`${results.warmPlanControl.useBatch}/${results.warmPlanControl.registerWarmPlan}`,
 		);
 	}
+	results.warmAdoption = await collectWarmAdoptionWork(
+		browser,
+		TARGETS.find((target) => target.name === 'octane-tsrx').url + 'warm-adoption.html',
+	);
 } finally {
 	await browser.close();
 }
@@ -589,6 +594,20 @@ if (outputPath) {
 				meta: {
 					gates: failures.some((failure) => failure.startsWith('ownPromise:')) ? 'fail' : 'pass',
 				},
+			},
+			{
+				name: 'octane-warm-adoption-work',
+				ops: Object.fromEntries(
+					Object.entries(results.warmAdoption).flatMap(([operation, measurements]) =>
+						Object.entries(measurements)
+							.filter(([, value]) => typeof value === 'number')
+							.map(([metric, value]) => [
+								`${operation}_${metric}`,
+								deterministicStatForJson(deterministicCount(value)),
+							]),
+					),
+				),
+				meta: { gates: 'pass' },
 			},
 			{
 				name: 'octane-context-cache-work',

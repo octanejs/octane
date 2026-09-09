@@ -1,4 +1,4 @@
-import { use } from 'octane';
+import { use, useMemo } from 'octane';
 import {
 	useImportedCaptured,
 	useImportedDependent,
@@ -30,6 +30,48 @@ export function DriftedWarmBoundary(props: DriftedWarmProps) @{
 			<DriftedWarmParent gate={props.gate} record={props.record} load={props.load} />
 		} @pending {
 			<p class="fallback">loading</p>
+		}
+	</>
+}
+
+export function OrdinaryMemoRoot(props: {
+	version: number;
+	create: (version: number) => { label: string };
+}) @{
+	const value = useMemo(() => props.create(props.version), [props.create, props.version]);
+	<p class="ordinary-memo-value">{value.label as string}</p>
+}
+
+function IndependentWarmPanel(props: {
+	name: string;
+	load: (name: string) => Promise<string>;
+}) @{
+	const value = use(props.load(props.name));
+	<p class="independent-warm-value">{value as string}</p>
+}
+
+export function IndependentWarmPanels(props: { load: (name: string) => Promise<string> }) @{
+	<main>
+		@try {
+			<IndependentWarmPanel name="first" load={props.load} />
+		} @pending {
+			<p class="first-pending">first pending</p>
+		}
+		@try {
+			<IndependentWarmPanel name="second" load={props.load} />
+		} @pending {
+			<p class="second-pending">second pending</p>
+		}
+	</main>
+}
+
+export function IndependentWarmRoot(props) @{
+	const Content = props.content;
+	<>
+		@try {
+			<Content load={props.load} version={props.version} />
+		} @pending {
+			<p class="root-pending">root pending</p>
 		}
 	</>
 }

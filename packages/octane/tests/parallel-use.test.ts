@@ -25,6 +25,9 @@ import {
 	SetupValueParallelHost,
 	DriftedWarmParent,
 	DriftedWarmBoundary,
+	OrdinaryMemoRoot,
+	IndependentWarmPanels,
+	IndependentWarmRoot,
 } from './_fixtures/parallel-use.tsrx';
 
 // Runtime behavior of the compiler's unconditional parallel-use pipeline.
@@ -1634,6 +1637,90 @@ describe('parallel use() — imported data hooks', () => {
 });
 
 describe('parallel use() — adjacent async component trees', () => {
+	it('retains pending requests while independent roots render and warm newer work', async () => {
+		const firstResources = freshResourceFetcher();
+		const secondResources = freshResourceFetcher();
+		const first = mount(IndependentWarmRoot, {
+			content: AdjacentPanelsHost,
+			load: firstResources.load,
+			version: 0,
+		});
+		let serial = 0;
+		const create = (version: number) => ({ label: `memo-v${version}-${++serial}` });
+		const ordinary = mount(OrdinaryMemoRoot, { create, version: 0 });
+		const second = mount(IndependentWarmRoot, {
+			content: AdjacentPanelsHost,
+			load: secondResources.load,
+			version: 1,
+		});
+		try {
+			const memoNode = ordinary.find('.ordinary-memo-value');
+			expect(memoNode.textContent).toBe('memo-v0-1');
+			ordinary.update(OrdinaryMemoRoot, { create, version: 0 });
+			expect(memoNode.textContent).toBe('memo-v0-1');
+			ordinary.update(OrdinaryMemoRoot, { create, version: 1 });
+			expect(ordinary.find('.ordinary-memo-value')).toBe(memoNode);
+			expect(memoNode.textContent).toBe('memo-v1-2');
+
+			await firstResources.settleRound(0);
+			expect(first.find('.activity-value').textContent).toBe('activity-v0');
+			expect(first.find('.activity-summary').textContent).toBe('activity-summary-v0');
+			expect(first.find('.insights-value').textContent).toBe('insights-v0');
+			expect(first.find('.insights-chart').textContent).toBe('insights-chart-v0');
+			expect(firstResources.calls.slice().sort()).toEqual([
+				'activity-summary:0',
+				'activity:0',
+				'insights-chart:0',
+				'insights:0',
+			]);
+			expect(second.find('.fallback').textContent).toBe('panels-loading');
+
+			await secondResources.settleRound(1);
+			expect(second.find('.activity-value').textContent).toBe('activity-v1');
+			expect(second.find('.activity-summary').textContent).toBe('activity-summary-v1');
+			expect(second.find('.insights-value').textContent).toBe('insights-v1');
+			expect(second.find('.insights-chart').textContent).toBe('insights-chart-v1');
+			expect(secondResources.calls.slice().sort()).toEqual([
+				'activity-summary:1',
+				'activity:1',
+				'insights-chart:1',
+				'insights:1',
+			]);
+			expect(ordinary.find('.ordinary-memo-value')).toBe(memoNode);
+			expect(memoNode.textContent).toBe('memo-v1-2');
+		} finally {
+			second.unmount();
+			ordinary.unmount();
+			first.unmount();
+		}
+	});
+
+	it('uses sibling requests started before their independent boundaries render', async () => {
+		const requests: Array<{ name: string } & Deferred<string>> = [];
+		const load = (name: string) => {
+			const request = { name, ...deferred<string>() };
+			requests.push(request);
+			return request.promise;
+		};
+		const root = mount(IndependentWarmRoot, { content: IndependentWarmPanels, load });
+		try {
+			expect(root.find('.first-pending').textContent).toBe('first pending');
+			expect(root.find('.second-pending').textContent).toBe('second pending');
+			expect(requests.map((request) => request.name)).toEqual(['first', 'second']);
+			await act(() => requests[1].resolve('second result'));
+			expect(root.find('.first-pending').textContent).toBe('first pending');
+			expect(root.find('.independent-warm-value').textContent).toBe('second result');
+			await act(() => requests[0].resolve('first result'));
+			expect(root.findAll('.independent-warm-value').map((node) => node.textContent)).toEqual([
+				'first result',
+				'second result',
+			]);
+			expect(requests.map((request) => request.name)).toEqual(['first', 'second']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('does not warm the final template after setup returns an alternate subtree', async () => {
 		const resources = resourceFetcher();
 		const r = mount(EarlyReturnPanelsHost, {

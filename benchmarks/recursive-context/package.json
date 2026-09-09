@@ -8,6 +8,7 @@
     "bench": "node run.mjs",
     "bench:work": "node work.mjs",
     "bench:cache": "node context-cache-work.mjs",
+    "bench:warm-adoption": "node warm-adoption-work.mjs",
     "bench:long": "node run.mjs 40"
   },
   "dependencies": {
