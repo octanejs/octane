@@ -4,6 +4,7 @@ import { useState, createContext, use, createPortal } from 'octane';
 export const ThemeCtx = createContext('light');
 export const UserCtx = createContext('anon');
 export const CountCtx = createContext(0);
+export const ShadowCtx = createContext('default');
 
 // Reads a single context value.
 export function ThemeReader() @{
@@ -192,4 +193,130 @@ export function LiveCount(props) @{
 			</ul>
 		</div>
 	</CountCtx.Provider>
+}
+
+function useProfileLabel() {
+	const theme = use(ThemeCtx);
+	const user = use(UserCtx);
+	return theme + '/' + user;
+}
+
+export function ContextOnlyReader(props: { selected: typeof ThemeCtx | typeof UserCtx }) @{
+	const theme = use(ThemeCtx);
+	const selected = use(props.selected);
+	const profile = useProfileLabel();
+	<output class="context-only">{theme + '|' + selected + '|' + profile as string}</output>
+}
+
+export function ContextOnlyHost() @{
+	const [theme, setTheme] = useState('light');
+	const [user, setUser] = useState('alice');
+	const [pickTheme, setPickTheme] = useState(false);
+	<div>
+		<button
+			id="change-theme"
+			onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+		>{'theme'}</button>
+		<button
+			id="change-user"
+			onClick={() => setUser(user === 'alice' ? 'bob' : 'alice')}
+		>{'user'}</button>
+		<button id="change-selection" onClick={() => setPickTheme(!pickTheme)}>{'selection'}</button>
+		<ThemeCtx.Provider value={theme}>
+			<UserCtx.Provider value={user}>
+				<ContextOnlyReader selected={pickTheme ? ThemeCtx : UserCtx} />
+			</UserCtx.Provider>
+		</ThemeCtx.Provider>
+	</div>
+}
+
+function MixedContextPromiseLeaf(props: { load: (key: string) => Promise<string> }) @{
+	const detail = use(props.load('detail'));
+	<span class="mixed-context-detail">{detail as string}</span>
+}
+
+function MixedContextPromiseReader(props: { load: (key: string) => Promise<string> }) @{
+	const first = use(props.load('first'));
+	const theme = use(ThemeCtx);
+	const second = use(props.load('second'));
+	<section>
+		<p class="mixed-context-promise">{theme + ':' + first + '/' + second as string}</p>
+		<MixedContextPromiseLeaf load={props.load} />
+	</section>
+}
+
+export function MixedContextPromiseHost(props: { load: (key: string) => Promise<string> }) @{
+	const [theme, setTheme] = useState('dark');
+	<div>
+		<button
+			id="change-pending-theme"
+			onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+		>{'theme'}</button>
+		<ThemeCtx.Provider value={theme}>
+			<>
+				@try {
+					<MixedContextPromiseReader load={props.load} />
+				} @pending {
+					<p class="mixed-context-pending">{'loading'}</p>
+				}
+			</>
+		</ThemeCtx.Provider>
+	</div>
+}
+
+function ContextAsyncFirst(props: { load: (key: string) => Promise<string> }) @{
+	const value = use(props.load('first'));
+	<span class="context-async-first">{value as string}</span>
+}
+
+function ContextAsyncSecond(props: { load: (key: string) => Promise<string> }) @{
+	const value = use(props.load('second'));
+	<span class="context-async-second">{value as string}</span>
+}
+
+function ContextOnlyAsyncSiblings(props: { load: (key: string) => Promise<string> }) @{
+	const theme = use(ThemeCtx);
+	<section class="context-async-siblings" data-theme={theme}>
+		<ContextAsyncFirst load={props.load} />
+		<ContextAsyncSecond load={props.load} />
+	</section>
+}
+
+export function ContextOnlyAsyncHost(props: { load: (key: string) => Promise<string> }) @{
+	const selectedLoad = props.load;
+	<ThemeCtx.Provider value="dark">
+		<>
+			@try {
+				<ContextOnlyAsyncSiblings load={selectedLoad} />
+			} @pending {
+				<p class="context-async-pending">{'loading'}</p>
+			}
+		</>
+	</ThemeCtx.Provider>
+}
+
+function ShadowedContextPromiseLeaf(props: { load: () => Promise<string> }) @{
+	const detail = use(props.load());
+	<span class="shadowed-context-detail">{detail as string}</span>
+}
+
+export function ShadowedContextPromiseHost(props: {
+	gate: Promise<string>;
+	load: () => Promise<string>;
+}) @{
+	<ThemeCtx.Provider value="dark">
+		<>
+			@try {
+				const theme = use(ThemeCtx);
+				const ShadowCtx = props.gate;
+				const value = use(ShadowCtx);
+				<section>
+					<span class="shadowed-context-result">{theme + ':' + value as string}</span>
+					<ShadowedContextPromiseLeaf load={props.load} />
+				</section>
+			} @pending {
+				<span class="shadowed-context-pending">{'loading'}</span>
+			}
+		</>
+	</ThemeCtx.Provider>
 }

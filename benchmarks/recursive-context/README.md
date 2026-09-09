@@ -148,14 +148,33 @@ Octane dialect timing rows also have order-balanced aliases: the primary
 TSRX→TSX pass is repeated TSX→TSRX, and the two fully-warmed sample sets are
 combined for TSX/TSRX ratio guards.
 
-`work.mjs` observes the emitted production bundles rather than adding source
-probes that could change compiler purity. A jitless Chromium precise-coverage
-pass caps blocks, generic slots, descriptors, keyed survivor work, and teardown
-scopes at their current levels while permitting reductions. Full/all-slot
-aggregates allow a generic slot to become a cheaper specialized slot without
-allowing duplicate dispatch. Every row requires live production-bundle coverage,
-and the root and partial updates must still execute exactly 1024 and 32 `setText`
-calls.
+`work.mjs` observes emitted production bundles rather than adding source probes
+that could change compiler purity. The unified runner first times the normal
+minified builds; then the untimed work pass rebuilds the two Octane fixtures with
+`vite build --minify false` so Chromium can attribute precise calls to named
+functions. Run `bench:work` with both Octane preview servers running; it also
+performs the diagnostic rebuild. A jitless Chromium precise-coverage pass caps
+blocks, generic slots, descriptors, keyed survivor work, and teardown scopes at
+their current levels while permitting reductions. Full/all-slot aggregates
+allow a generic slot to become a cheaper specialized slot without allowing
+duplicate dispatch. Every row requires live production-bundle coverage, and
+root and partial updates must still execute exactly 1024 and 32 `setText` calls.
+
+The TSRX leaf reads two local `createContext` values and no promises. Before
+removing its redundant context-only `useBatch`, the 1024-leaf mount and root
+update each called `useBatch` 3072 times; the 32-leaf partial update and
+remount each called it 94 times. Exact gates now require 2048 and 62 calls,
+respectively: the remaining calls register the independent child warm plans
+with `useBatch([], warmThunk)`. The JSX twin emits no `useBatch` calls for this
+fixture. The normal DOM checks in `run.mjs` still verify all 1024 leaf paths,
+both context values, the isolated 32-leaf provider update, and remount identity.
+
+The same work pass also compiles a plain TypeScript custom hook with two reads
+from a directly initialized module context in both client and server modes. Its
+codegen-size gate permits no growth beyond the authored source, preserves both
+`use()` calls, and requires zero generated `useBatch`/`puBatch` imports or calls.
+A separate mixed context/promise hook must still generate one batch call in each
+mode, confirming that the analyzer detects the helper when batching is needed.
 
 Default: 10 warmups + 20 iters. Pass an integer to `bench` to override iters
 (`bench:long` runs 40).

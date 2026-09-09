@@ -1,9 +1,13 @@
 // Deterministic, untimed production-work gate for Octane's TSRX/TSX twins.
 // Source counters would change the compiler's purity analysis, so this observes
-// the unminified production bundles through Chromium precise call coverage.
+// unminified production diagnostic builds through Chromium precise call coverage.
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import ts from 'typescript';
+import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import { collectPreciseCalls } from '../lib/precise-work.mjs';
 
@@ -11,6 +15,17 @@ const TARGETS = [
 	{ name: 'octane-tsrx', url: 'http://localhost:5185/' },
 	{ name: 'octane-jsx', url: 'http://localhost:5188/' },
 ];
+
+// The unified runner finishes its timed pass against normally minified assets
+// before invoking this untimed gate. Build the same production fixtures without
+// minification here so Chromium can attribute calls to the original function
+// names; the existing preview servers serve the refreshed assets.
+for (const target of TARGETS) {
+	execFileSync('pnpm', ['exec', 'vite', 'build', '--minify', 'false'], {
+		cwd: fileURLToPath(new URL(`${target.name}/`, import.meta.url)),
+		stdio: 'inherit',
+	});
+}
 
 const METRICS = [
 	'renderBlock',
@@ -24,6 +39,7 @@ const METRICS = [
 	'reconcileKeyed',
 	'updateSurvivor',
 	'setText',
+	'useBatch',
 	'unmountBlock',
 	'unmountScope',
 ];
@@ -40,6 +56,78 @@ const OPS = [
 	},
 	{ name: 'unmount', before: ['__mount'], operation: '__unmount' },
 ];
+
+// Plain .ts custom hooks use a separate compiler pass from the TSRX fixture.
+// The mixed source proves the AST reader still detects generated batch calls.
+const PLAIN_CONTEXT_HOOK = `import { createContext, use } from 'octane';
+const Ctx = createContext(0);
+export function usePair(): number {
+  const first = use(Ctx);
+  const second = use(Ctx);
+  return first + second;
+}`;
+const PLAIN_MIXED_HOOK = `import { createContext, use } from 'octane';
+const Ctx = createContext(0);
+export function useMixed(promise: Promise<number>): number {
+  const value = use(promise);
+  const local = use(Ctx);
+  return value + local;
+}`;
+
+function countImportedCalls(ast, importedName) {
+	const locals = new Set();
+	for (const statement of ast.statements) {
+		if (!ts.isImportDeclaration(statement)) continue;
+		const bindings = statement.importClause?.namedBindings;
+		if (!bindings || !ts.isNamedImports(bindings)) continue;
+		for (const specifier of bindings.elements) {
+			if ((specifier.propertyName?.text ?? specifier.name.text) === importedName) {
+				locals.add(specifier.name.text);
+			}
+		}
+	}
+	let calls = 0;
+	function visit(node) {
+		if (
+			ts.isCallExpression(node) &&
+			ts.isIdentifier(node.expression) &&
+			locals.has(node.expression.text)
+		) {
+			calls++;
+		}
+		ts.forEachChild(node, visit);
+	}
+	visit(ast);
+	return { imports: locals.size, calls };
+}
+
+function measurePlainHook(source, environment) {
+	const code =
+		slotHooks(source, 'recursive-context-custom-hook.ts', {
+			environment,
+			dev: false,
+			hmr: false,
+		})?.code ?? source;
+	const ast = ts.createSourceFile('compiled-custom-hook.ts', code, ts.ScriptTarget.Latest, true);
+	if (ast.parseDiagnostics.length > 0) {
+		throw new Error(`Plain ${environment} hook output contains invalid TypeScript`);
+	}
+	return {
+		bytes: Buffer.byteLength(code),
+		batch: countImportedCalls(ast, environment === 'server' ? 'puBatch' : 'useBatch'),
+		use: countImportedCalls(ast, 'use'),
+	};
+}
+
+const PLAIN_HOOKS = Object.fromEntries(
+	['client', 'server'].map((environment) => [
+		environment,
+		{
+			context: measurePlainHook(PLAIN_CONTEXT_HOOK, environment),
+			mixed: measurePlainHook(PLAIN_MIXED_HOOK, environment),
+		},
+	]),
+);
 
 // Scaffolding is bounded above so later direct-return lowering can reduce it
 // without rebaselining this gate. The visible update cardinality is exact.
@@ -58,6 +146,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
+			exact: { useBatch: 2048 },
 		},
 		update_root: {
 			maxFullSlotCalls: 1027,
@@ -72,7 +161,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { setText: 1024 },
+			exact: { setText: 1024, useBatch: 2048 },
 		},
 		update_partial: {
 			maxFullSlotCalls: 33,
@@ -87,7 +176,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { setText: 32 },
+			exact: { setText: 32, useBatch: 62 },
 		},
 		partial_unmount: {
 			maxFullSlotCalls: 0,
@@ -118,6 +207,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
+			exact: { useBatch: 62 },
 		},
 		unmount: {
 			maxFullSlotCalls: 0,
@@ -278,6 +368,22 @@ const browser = await chromium.launch({
 });
 const results = {};
 const failures = [];
+for (const [environment, { context, mixed }] of Object.entries(PLAIN_HOOKS)) {
+	if (context.batch.imports !== 0 || context.batch.calls !== 0) {
+		failures.push(`${environment}.plain_context: unexpected batch helper or call`);
+	}
+	if (context.use.calls !== 2) {
+		failures.push(`${environment}.plain_context: ${context.use.calls} context reads, expected 2`);
+	}
+	if (context.bytes > Buffer.byteLength(PLAIN_CONTEXT_HOOK)) {
+		failures.push(
+			`${environment}.plain_context: generated ${context.bytes} bytes exceeds authored size`,
+		);
+	}
+	if (mixed.batch.imports !== 1 || mixed.batch.calls !== 1) {
+		failures.push(`${environment}.plain_mixed: expected one imported batch call`);
+	}
+}
 try {
 	for (const target of TARGETS) {
 		results[target.name] = {};
@@ -297,38 +403,68 @@ try {
 }
 
 console.log(
-	'Operation                 | render | full | void | lite | child | descriptors | host/deopt/keyed/survivors | text | unmount block/scope',
+	'Operation                 | render | full | void | lite | child | descriptors | host/deopt/keyed/survivors | text | batch | unmount block/scope',
 );
 console.log(
-	'--------------------------+--------+------+------+------+-------+-------------+----------------------------+------+--------------------',
+	'--------------------------+--------+------+------+------+-------+-------------+----------------------------+------+-------+--------------------',
 );
 for (const target of TARGETS) {
 	for (const op of OPS) {
 		const c = results[target.name][op.name];
 		console.log(
-			`${`${target.name}.${op.name}`.padEnd(25)} | ${String(c.renderBlock).padStart(6)} | ${String(c.componentSlot).padStart(4)} | ${String(c.componentSlotVoid).padStart(4)} | ${String(c.componentSlotLite).padStart(4)} | ${String(c.childSlot).padStart(5)} | ${String(c.createElement).padStart(11)} | ${c.hostElementBody}/${c.deoptItemBody}/${c.reconcileKeyed}/${c.updateSurvivor} | ${String(c.setText).padStart(4)} | ${c.unmountBlock}/${c.unmountScope}`,
+			`${`${target.name}.${op.name}`.padEnd(25)} | ${String(c.renderBlock).padStart(6)} | ${String(c.componentSlot).padStart(4)} | ${String(c.componentSlotVoid).padStart(4)} | ${String(c.componentSlotLite).padStart(4)} | ${String(c.childSlot).padStart(5)} | ${String(c.createElement).padStart(11)} | ${c.hostElementBody}/${c.deoptItemBody}/${c.reconcileKeyed}/${c.updateSurvivor} | ${String(c.setText).padStart(4)} | ${String(c.useBatch).padStart(5)} | ${c.unmountBlock}/${c.unmountScope}`,
 		);
 	}
+}
+for (const [environment, { context, mixed }] of Object.entries(PLAIN_HOOKS)) {
+	console.log(
+		`plain-${environment}: context bytes=${context.bytes}, use calls=${context.use.calls}, batch imports/calls=${context.batch.imports}/${context.batch.calls}; mixed batch imports/calls=${mixed.batch.imports}/${mixed.batch.calls}`,
+	);
 }
 
 const outputPath = process.env.BENCH_JSON || process.env.WORK_JSON;
 if (outputPath) {
 	const payload = {
 		suite: 'recursive-context-work',
-		targets: TARGETS.map((target) => ({
-			name: `${target.name}-work`,
-			ops: Object.fromEntries(
-				OPS.flatMap((op) =>
-					METRICS.map((metric) => [
-						`${op.name}_${metric}`,
-						deterministicStatForJson(deterministicCount(results[target.name][op.name][metric])),
+		targets: [
+			...TARGETS.map((target) => ({
+				name: `${target.name}-work`,
+				ops: Object.fromEntries(
+					OPS.flatMap((op) =>
+						METRICS.map((metric) => [
+							`${op.name}_${metric}`,
+							deterministicStatForJson(deterministicCount(results[target.name][op.name][metric])),
+						]),
+					),
+				),
+				meta: {
+					gates: failures.some((failure) => failure.startsWith(`${target.name}.`))
+						? 'fail'
+						: 'pass',
+				},
+			})),
+			...Object.entries(PLAIN_HOOKS).map(([environment, { context, mixed }]) => ({
+				name: `plain-${environment}-work`,
+				ops: Object.fromEntries(
+					Object.entries({
+						context_bytes: context.bytes,
+						context_use_calls: context.use.calls,
+						context_batch_imports: context.batch.imports,
+						context_batch_calls: context.batch.calls,
+						mixed_batch_imports: mixed.batch.imports,
+						mixed_batch_calls: mixed.batch.calls,
+					}).map(([metric, value]) => [
+						metric,
+						deterministicStatForJson(deterministicCount(value)),
 					]),
 				),
-			),
-			meta: {
-				gates: failures.some((failure) => failure.startsWith(`${target.name}.`)) ? 'fail' : 'pass',
-			},
-		})),
+				meta: {
+					gates: failures.some((failure) => failure.startsWith(`${environment}.`))
+						? 'fail'
+						: 'pass',
+				},
+			})),
+		],
 	};
 	if (failures.length > 0) payload.failed = failures.join('; ');
 	fs.writeFileSync(outputPath, JSON.stringify(payload, null, '\t') + '\n');

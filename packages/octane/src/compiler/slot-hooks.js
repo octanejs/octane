@@ -24,6 +24,7 @@ import { assertNativeReadDiagnostics, nativeReadOptions } from './native-read-di
 import { nativeReadActivationIndex } from './native-read-codegen.js';
 import { findManualHookProviders, manualHookWrapperParameters } from './manual-hooks.js';
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
+import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
 import {
 	hookMethodName,
 	hasHookMethods,
@@ -868,6 +869,10 @@ function requireParallelHelper(st, imported) {
 
 function emitParallelUseRun(run, owner, st) {
 	if (run.uses.length === 0) return;
+	if (run.uses.every((entry) => isProvenContextUse(entry.arg, st.provenContextBindings))) {
+		// Leave plain source untouched when every read is a proven context.
+		return;
+	}
 	const memoName = st.nativeReads
 		? 'nativePuMemo'
 		: st.environment === 'server'
@@ -1396,6 +1401,7 @@ export function slotHooks(source, id, options) {
 		edits: [],
 		decls: [],
 		parallelHelpers: new Map(),
+		provenContextBindings: collectProvenContextBindings(ast),
 		usedNames: collectIdentifierNames(ast),
 		slotBaseName: null,
 		hookSlotsName: null,
