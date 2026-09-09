@@ -2600,7 +2600,7 @@ describe(
 							name: 'App.tsrx',
 							source: `import { createScope } from 'octane/signals';
 import { useSignal$ } from 'octane/signals/client';
-const scope = createScope();
+const scope = createScope({ scopeKey: 'shared' });
 const shared$ = scope.signal$('count', 0);
 export default function App() @{
 	const local$ = useSignal$(10);
