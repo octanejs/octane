@@ -23461,7 +23461,7 @@ export function hostComponent(
 		// delegating body whose target we update each render, so childSlot reconciles.
 		state.latest = childrenBody as ComponentBody;
 		if (state.body === undefined) {
-			state.body = ((...args: any[]) => (state!.latest as any)(...args)) as ComponentBody;
+			state.body = (props, scope, extra) => state!.latest!(props, scope, extra);
 		}
 		childSlot(state.childScope!, 0, el, state.body, null, false, el);
 	} else if (childrenBody != null || state.childScope!.slots[0] !== undefined) {
