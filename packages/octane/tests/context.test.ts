@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mount } from './_helpers';
+import { prerender } from 'octane/static';
+import { flushSync, hydrateRoot } from '../src/index.js';
+import { mount, act } from './_helpers';
+import { loadServerFixture } from './_server-fixture';
 import {
 	DynamicProvider,
 	CombinedDynamic,
@@ -12,6 +15,10 @@ import {
 	PortalledContext,
 	LiveCount,
 	StableChildren,
+	ContextOnlyHost,
+	MixedContextPromiseHost,
+	ContextOnlyAsyncHost,
+	ShadowedContextPromiseHost,
 } from './_fixtures/context.tsrx';
 
 describe('context — value updates', () => {
@@ -146,5 +153,132 @@ describe('context — through portals', () => {
 		expect(target.querySelector('.theme')!.textContent).toBe('from-portal-parent');
 		r.unmount();
 		target.remove();
+	});
+});
+
+describe('context — use() alongside other reads', () => {
+	it('direct reads, a custom hook, and a selected context follow provider updates', () => {
+		const r = mount(ContextOnlyHost);
+		try {
+			expect(r.find('.context-only').textContent).toBe('light|alice|light/alice');
+			r.click('#change-theme');
+			expect(r.find('.context-only').textContent).toBe('dark|alice|dark/alice');
+			r.click('#change-selection');
+			expect(r.find('.context-only').textContent).toBe('dark|dark|dark/alice');
+			r.click('#change-user');
+			expect(r.find('.context-only').textContent).toBe('dark|dark|dark/bob');
+			r.click('#change-selection');
+			expect(r.find('.context-only').textContent).toBe('dark|bob|dark/bob');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('starts independent descendant data while pending and reads the latest context', async () => {
+		const requests: string[] = [];
+		const jobs = new Map<string, { promise: Promise<string>; resolve: (value: string) => void }>();
+		for (const key of ['first', 'second', 'detail']) {
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => (resolve = done));
+			jobs.set(key, { promise, resolve });
+		}
+		const r = mount(MixedContextPromiseHost, {
+			load(key: string) {
+				requests.push(key);
+				return jobs.get(key)!.promise;
+			},
+		});
+		try {
+			// The descendant can begin before its parent has usable data.
+			expect(requests).toEqual(['first', 'second', 'detail']);
+			expect(r.find('.mixed-context-pending').textContent).toBe('loading');
+			r.click('#change-pending-theme');
+			await act(() => jobs.get('first')!.resolve('one'));
+			expect(r.find('.mixed-context-pending').textContent).toBe('loading');
+			await act(() => jobs.get('second')!.resolve('two'));
+			expect(r.find('.mixed-context-pending').textContent).toBe('loading');
+			await act(() => jobs.get('detail')!.resolve('more'));
+			expect(r.find('.mixed-context-promise').textContent).toBe('light:one/two');
+			expect(r.find('.mixed-context-detail').textContent).toBe('more');
+			r.click('#change-pending-theme');
+			expect(r.find('.mixed-context-promise').textContent).toBe('dark:one/two');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('starts an independent sibling request while a context-only parent is pending', async () => {
+		let resolveFirst!: (value: string) => void;
+		let resolveSecond!: (value: string) => void;
+		const first = new Promise<string>((resolve) => (resolveFirst = resolve));
+		const second = new Promise<string>((resolve) => (resolveSecond = resolve));
+		const requests: string[] = [];
+		const r = mount(ContextOnlyAsyncHost, {
+			load(key: string) {
+				requests.push(key);
+				return key === 'first' ? first : second;
+			},
+		});
+		try {
+			expect(r.find('.context-async-pending').textContent).toBe('loading');
+			// Both child requests begin in the first attempt, before either settles.
+			expect(requests).toEqual(['first', 'second']);
+			await act(() => {
+				resolveFirst('one');
+				resolveSecond('two');
+			});
+			expect(r.find('.context-async-siblings').getAttribute('data-theme')).toBe('dark');
+			expect(r.find('.context-async-first').textContent).toBe('one');
+			expect(r.find('.context-async-second').textContent).toBe('two');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('keeps a locally shadowed context name pending and starts its independent child', async () => {
+		let resolveGate!: (value: string) => void;
+		let resolveDetail!: (value: string) => void;
+		const gate = new Promise<string>((resolve) => (resolveGate = resolve));
+		const detail = new Promise<string>((resolve) => (resolveDetail = resolve));
+		let detailStarted = false;
+		const r = mount(ShadowedContextPromiseHost, {
+			gate,
+			load() {
+				detailStarted = true;
+				return detail;
+			},
+		});
+		try {
+			expect(r.find('.shadowed-context-pending').textContent).toBe('loading');
+			expect(detailStarted).toBe(true);
+			await act(() => resolveGate('ready'));
+			expect(r.find('.shadowed-context-pending').textContent).toBe('loading');
+			await act(() => resolveDetail('more'));
+			expect(r.find('.shadowed-context-result').textContent).toBe('dark:ready');
+			expect(r.find('.shadowed-context-detail').textContent).toBe('more');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('hydrates context-only reads and keeps provider updates live', async () => {
+		const server = loadServerFixture('packages/octane/tests/_fixtures/context.tsrx');
+		const { html } = await prerender(server.ContextOnlyHost, {});
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const output = container.querySelector('.context-only')!;
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			expect(output.textContent).toBe('light|alice|light/alice');
+			root = hydrateRoot(container, ContextOnlyHost);
+			flushSync(() => {});
+			expect(container.querySelector('.context-only')).toBe(output);
+			flushSync(() => (container.querySelector('#change-theme') as HTMLElement).click());
+			expect(output.textContent).toBe('dark|alice|dark/alice');
+		} finally {
+			root?.unmount();
+			container.remove();
+		}
 	});
 });

@@ -92,6 +92,7 @@ import {
 	wrapNativeWarmScope,
 } from './native-read-codegen.js';
 import { createTextTypeFactsLookup } from './text-type-facts.js';
+import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 
@@ -9185,6 +9186,7 @@ function compileInternal(
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
 		ctx.foreignImportLocals = imports.foreignLocals;
+		ctx.provenContextBindings = collectProvenContextBindings(ast);
 		ctx.activityModuleAst = ast;
 	}
 	if (ctx.dev) {
@@ -10456,6 +10458,7 @@ function compileServer(
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
 		ctx.foreignImportLocals = imports.foreignLocals;
+		ctx.provenContextBindings = collectProvenContextBindings(ast);
 		ctx.activityModuleAst = ast;
 	}
 	// M3 inherit-range exclusion set — must match the client compile's
@@ -16233,6 +16236,19 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 	function emitRun(run, out) {
 		const uses = run.members.filter((m) => m.call);
 		if (uses.length === 0) {
+			for (const m of run.members) out.push(m.stmt);
+			return;
+		}
+		if (
+			uses.every(
+				(m) =>
+					m.call._octaneImportedHook === 'use' &&
+					isProvenContextUse(m.creation, ctx.provenContextBindings),
+			)
+		) {
+			// Context reads cannot suspend. Preserve the authored statements in
+			// their original order, and leave the first warm thunk available for
+			// the next real data batch. The trailing child-only registration stays.
 			for (const m of run.members) out.push(m.stmt);
 			return;
 		}
