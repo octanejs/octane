@@ -109,6 +109,7 @@ export const BENCHMARK_SUITES = [
 	'universal-object-teardown',
 	'universal-template-events',
 	'universal-native-hover',
+	'universal-owner-drafts',
 	'universal-external-store',
 	'lynx-render',
 	'lynx-table',
