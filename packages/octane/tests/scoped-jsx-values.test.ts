@@ -1,7 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 
-import { flushSync, hydrateRoot, type ComponentBody } from '../src/index.js';
+import {
+	Children,
+	cloneElement,
+	createScopedElement,
+	createScopedValue,
+	flushSync,
+	hydrateRoot,
+	type ComponentBody,
+	type ElementDescriptor,
+} from '../src/index.js';
 import { act, mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import * as tsx from './_fixtures/scoped-jsx-values.tsx';
@@ -82,6 +91,22 @@ function InspectContextAttribute(props: { child: OctaneNode }) @{
 		{cloned}
 	</section>
 }
+
+function InspectDeferredChild(props: { child: OctaneNode; name: string }) @{
+	const child = Children.only(props.child) as ElementDescriptor;
+	<section
+		data-inspected-child={props.name}
+		data-prop-keys={Object.keys(child.props).join(',')}
+		data-observed-child={String(child.props.children)}
+	>
+		{child}
+	</section>
+}
+
+function DefaultChildren(props: { children?: OctaneNode; sequence?: string }) @{
+	<strong data-default-child="yes" data-seq={props.sequence}>{props.children}</strong>
+}
+(DefaultChildren as any).defaultProps = { children: 'default' };
 
 function InspectChildrenThenProvide(props: { child: OctaneNode }) @{
 	const child = Children.only(props.child) as ElementDescriptor;
@@ -189,6 +214,40 @@ export function RootInspectedAttributeContext() @{
 	</span>;
 	<ValueContext.Provider value="inner">
 		<InspectContextAttribute child={content} />
+	</ValueContext.Provider>
+}
+
+export function IndependentDeferredChildren(props: { first: string; second: string; value: string }) @{
+	const first = <span data-sibling="first" data-order="one">{(props.first + ':' + getterValue.current) as string}</span>;
+	const second = <span data-sibling="second" data-order="two">{(props.second + ':' + getterValue.current) as string}</span>;
+	const flattened = Children.toArray(first)[0];
+	const mapped = Children.map(second, (child) =>
+		cloneElement(child as ElementDescriptor, { key: 'replacement', 'data-copy': 'yes' }),
+	)![0];
+	<ValueContext.Provider value={props.value}>
+		<div data-outlet="independent-children">
+			<InspectDeferredChild child={flattened} name="first" />
+			<InspectDeferredChild child={mapped} name="second" />
+		</div>
+	</ValueContext.Provider>
+}
+
+export function DeferredChildrenSources(props: { value: string }) @{
+	const spread = {
+		get children() {
+			return 'spread';
+		},
+		'data-seq': 'spread',
+	};
+	const fromSpread = <span {...spread}>{getterValue.current as string}</span>;
+	const fromDefaults = <DefaultChildren>{getterValue.current as string}</DefaultChildren>;
+	const defaultOnly = <DefaultChildren sequence={getterValue.current} />;
+	<ValueContext.Provider value={props.value}>
+		<div data-outlet="children-sources">
+			<InspectDeferredChild child={fromSpread} name="spread" />
+			<InspectDeferredChild child={fromDefaults} name="defaults" />
+			<InspectDeferredChild child={defaultOnly} name="default-only" />
+		</div>
 	</ValueContext.Provider>
 }
 
@@ -787,6 +846,66 @@ for (const fixture of fixtures) {
 			container.remove();
 		});
 
+		it('keeps mapped and cloned siblings bound to their own deferred children', () => {
+			const result = mount(fixture.client.IndependentDeferredChildren, {
+				first: 'one',
+				second: 'two',
+				value: 'inner',
+			});
+			const assertChildren = (first: string, second: string) => {
+				const parent = result.find('[data-outlet="independent-children"]');
+				const observed = parent.querySelectorAll('[data-inspected-child]');
+				expect(Array.from(observed, (node) => node.getAttribute('data-observed-child'))).toEqual([
+					first,
+					second,
+				]);
+				expect(Array.from(observed, (node) => node.textContent)).toEqual([first, second]);
+				expect(Array.from(observed, (node) => node.getAttribute('data-prop-keys'))).toEqual([
+					'data-sibling,data-order,children',
+					'data-sibling,data-order,data-copy,children',
+				]);
+				expect(parent.querySelector('[data-sibling="second"]')?.getAttribute('data-copy')).toBe(
+					'yes',
+				);
+			};
+			assertChildren('one:inner', 'two:inner');
+
+			result.update(fixture.client.IndependentDeferredChildren, {
+				first: 'new-one',
+				second: 'new-two',
+				value: 'next',
+			});
+			assertChildren('new-one:next', 'new-two:next');
+			result.unmount();
+		});
+
+		it('preserves spread and default children precedence and property order', () => {
+			const result = mount(fixture.client.DeferredChildrenSources, { value: 'inner' });
+			const assertChildren = (value: string) => {
+				const parent = result.find('[data-outlet="children-sources"]');
+				const observed = parent.querySelectorAll('[data-inspected-child]');
+				expect(Array.from(observed, (node) => node.getAttribute('data-observed-child'))).toEqual([
+					value,
+					value,
+					'default',
+				]);
+				expect(Array.from(observed, (node) => node.textContent)).toEqual([value, value, 'default']);
+				expect(Array.from(observed, (node) => node.getAttribute('data-prop-keys'))).toEqual([
+					'children,data-seq',
+					'children',
+					'sequence,children',
+				]);
+				const defaulted = parent.querySelector('[data-inspected-child="default-only"]');
+				const content = defaulted?.querySelector('[data-default-child="yes"]');
+				expect(content?.textContent).toBe('default');
+				expect(content?.getAttribute('data-seq')).toBe(value);
+			};
+			assertChildren('inner');
+			result.update(fixture.client.DeferredChildrenSources, { value: 'next' });
+			assertChildren('next');
+			result.unmount();
+		});
+
 		it('evaluates fragment-nested host attributes inside their represented provider', () => {
 			const result = mount(fixture.client.FragmentNestedAttributeContext);
 			expect(
@@ -1054,6 +1173,136 @@ for (const fixture of fixtures) {
 		});
 	});
 }
+
+if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
+	it('preserves a caller-defined children getter on mapped and cloned elements', () => {
+		vi.stubEnv('NODE_ENV', 'production');
+		try {
+			const original = createScopedElement('span', { 'data-kind': 'original' }, () => 'scoped');
+			Object.defineProperty(original, 'children', {
+				configurable: true,
+				enumerable: true,
+				get(this: ElementDescriptor<{ 'data-kind': string }>) {
+					return `${this.props['data-kind']}:${this.key}`;
+				},
+			});
+
+			const cloned = cloneElement(original, { 'data-kind': 'clone', key: 'new-key' });
+			const mapped = Children.map([original], (child) =>
+				cloneElement(child as ElementDescriptor, { 'data-kind': 'mapped' }),
+			)![0] as ElementDescriptor;
+			const flattened = Children.toArray([original])[0] as ElementDescriptor;
+			expect(original.children).toBe('original:null');
+			expect(cloned.children).toBe('clone:new-key');
+			expect(mapped.children).toBe(`mapped:${mapped.key}`);
+			expect(flattened.children).toBe(`original:${flattened.key}`);
+		} finally {
+			vi.unstubAllEnvs();
+		}
+	});
+}
+
+it('clones and maps scoped values whose resolved elements defer children', () => {
+	const reads: string[] = [];
+	const first = createScopedValue(() =>
+		createScopedElement('span', { key: 'a' }, () => {
+			reads.push('a');
+			return 'alpha';
+		}),
+	);
+	const second = createScopedValue(() =>
+		createScopedElement('em', { key: 'b' }, () => {
+			reads.push('b');
+			return 'beta';
+		}),
+	);
+	const clone = cloneElement(first, { title: 'copy' });
+	const mapped = Children.map([first, second], (child) => child)!;
+	const flattened = Children.toArray([first, second]);
+	expect(reads).toEqual([]);
+	expect(clone.children).toBe('alpha');
+	expect(mapped[0].children).toBe('alpha');
+	expect(mapped[1].children).toBe('beta');
+	expect(flattened[0].children).toBe('alpha');
+	expect(flattened[1].children).toBe('beta');
+	expect(cloneElement(mapped[1] as ElementDescriptor).children).toBe('beta');
+	expect(reads).toContain('a');
+	expect(reads).toContain('b');
+});
+
+it('preserves inherited children setters and default prop order in scoped elements', () => {
+	function DefaultedChild() {
+		return null;
+	}
+	(DefaultedChild as any).defaultProps = { children: 'default', 'data-after': 'after' };
+	const assigned: unknown[] = [];
+	const inherited = {
+		get children() {
+			return undefined;
+		},
+		set children(value: unknown) {
+			assigned.push(value);
+		},
+	};
+	const config = Object.create(null) as Record<string, unknown>;
+	Object.defineProperty(config, '__proto__', {
+		configurable: true,
+		enumerable: true,
+		value: inherited,
+	});
+	config['data-before'] = 'before';
+	const descriptor = createScopedElement(DefaultedChild, config, () => 'scoped');
+
+	expect(assigned).toEqual(['default']);
+	expect(Object.keys(descriptor.props)).toEqual(['data-before', 'data-after', 'children']);
+	expect(descriptor.props.children).toBe('scoped');
+	expect(descriptor.children).toBe('scoped');
+});
+
+it('copies inherited children assignments before replacing them with scoped accessors', () => {
+	const assigned: unknown[] = [];
+	const inherited = {
+		set children(value: unknown) {
+			assigned.push(value);
+		},
+		set touch(value: unknown) {
+			assigned.push(`touch:${String(value)}`);
+			(this as { children?: unknown }).children = 'from touch';
+		},
+	};
+	const config = Object.create(null) as Record<string, unknown>;
+	Object.defineProperty(config, '__proto__', { enumerable: true, value: inherited });
+	config.children = 'provided';
+	config.touch = 1;
+	const descriptor = createScopedElement('span', config, () => 'deferred');
+	// The original copy invokes both setters before installing deferred children.
+	expect(assigned).toEqual(['provided', 'touch:1', 'from touch']);
+	expect(Object.keys(descriptor.props)).toEqual(['children']);
+	expect(descriptor.props.children).toBe('deferred');
+});
+
+it('allows later inherited setters to write copied children before deferral', () => {
+	const property = '__octaneScopedTouchTest__';
+	const observed: unknown[] = [];
+	Object.defineProperty(Object.prototype, property, {
+		configurable: true,
+		set(this: { children?: unknown }, value: unknown) {
+			observed.push(value);
+			this.children = 'from inherited setter';
+		},
+	});
+	try {
+		const descriptor = createScopedElement(
+			'span',
+			{ children: 'provided', [property]: 'trigger' },
+			() => 'deferred',
+		);
+		expect(observed).toEqual(['trigger']);
+		expect(descriptor.props.children).toBe('deferred');
+	} finally {
+		delete (Object.prototype as Record<string, unknown>)[property];
+	}
+});
 
 describe('TSRX directives nested in JSX values', () => {
 	it('retains the provider inside an active directive arm', () => {
