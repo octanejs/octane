@@ -11,6 +11,7 @@
 //   octane, octane/react, octane/internal/client, react family → left bare;
 //                         the sandbox import map resolves them (Octane's
 //                         public and compiler-only APIs share local blobs)
+//   octane/signals, octane/signals/client → shared local signal runtime blobs
 //   other octane/*      → error (not available in the playground)
 //   https://esm.sh/*    → allowed verbatim; any other URL → error
 //   any other bare id   → https://esm.sh/<id>?external=octane — `external`
@@ -45,6 +46,8 @@ const IMPORT_MAP_SPECIFIERS = new Set([
 	'octane',
 	'octane/internal/client',
 	'octane/react',
+	'octane/signals',
+	'octane/signals/client',
 	'react',
 	'react/jsx-runtime',
 	'react/jsx-dev-runtime',

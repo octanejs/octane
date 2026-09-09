@@ -143,6 +143,22 @@ describe('third-party import policy', () => {
 		);
 	});
 
+	it.each(['octane/signals', 'octane/signals/client'])(
+		'keeps %s available through the sandbox import map',
+		async (specifier) => {
+			const graph = await buildModuleGraph(
+				[app(`import * as signals from '${specifier}'; export const value = signals;`)],
+				APP,
+			);
+			expect(graph.ok).toBe(true);
+			if (!graph.ok) return;
+			const { init, parse } = await import('es-module-lexer');
+			await init;
+			const [imports] = parse(graph.modules[0].code);
+			expect(imports.map((entry) => entry.n)).toContain(specifier);
+		},
+	);
+
 	it('allows verbatim esm.sh URLs but no other URL imports', async () => {
 		const ok = await buildModuleGraph(
 			[app("import x from 'https://esm.sh/canvas-confetti';\nexport const y = x;")],
@@ -157,7 +173,12 @@ describe('third-party import policy', () => {
 	});
 
 	it('rejects octane subpaths the sandbox does not provide', async () => {
-		for (const specifier of ['octane/compiler', 'octane/internal/server', 'octane/not-provided']) {
+		for (const specifier of [
+			'octane/compiler',
+			'octane/internal/server',
+			'octane/signals/server',
+			'octane/not-provided',
+		]) {
 			const graph = await buildModuleGraph(
 				[app(`import * as unavailable from '${specifier}'; export const value = unavailable;`)],
 				APP,

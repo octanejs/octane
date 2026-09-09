@@ -10,7 +10,7 @@ import type { RuntimeManifest } from './src/lib/playground-sandbox.ts';
 // it into blob modules on its own side of the boundary.
 //
 // The runtime ships as a JSON MANIFEST of esbuild code-split chunks rather
-// than one file: `octane`, its compiler-only client ABI, and `octane/react`
+// than one file: `octane`, its compiler-only client ABI, signals, and `octane/react`
 // are separate entries sharing the core through common chunks. Bundling any
 // entry standalone would duplicate the runtime's hook/context singletons. React
 // itself stays EXTERNAL: the sandbox's import map resolves the react family to
@@ -25,6 +25,8 @@ export async function buildPlaygroundRuntimeManifest(): Promise<RuntimeManifest>
 			octane: require.resolve('octane'),
 			'octane-internal-client': require.resolve('octane/internal/client'),
 			'octane-react': require.resolve('octane/react'),
+			'octane-signals': require.resolve('octane/signals'),
+			'octane-signals-client': require.resolve('octane/signals/client'),
 		},
 		bundle: true,
 		splitting: true,
@@ -83,6 +85,8 @@ export async function buildPlaygroundRuntimeManifest(): Promise<RuntimeManifest>
 			octane: 'octane.mjs',
 			'octane/internal/client': 'octane-internal-client.mjs',
 			'octane/react': 'octane-react.mjs',
+			'octane/signals': 'octane-signals.mjs',
+			'octane/signals/client': 'octane-signals-client.mjs',
 		},
 		order,
 		files,

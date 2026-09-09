@@ -67,7 +67,13 @@ export const PLAYGROUND_REACT_VERSION = '19.2.0';
 
 /** Shape of the runtime manifest built by the playgroundRuntime() vite plugin. */
 export interface RuntimeManifest {
-	entries: { octane: string; 'octane/internal/client': string; 'octane/react': string };
+	entries: {
+		octane: string;
+		'octane/internal/client': string;
+		'octane/react': string;
+		'octane/signals': string;
+		'octane/signals/client': string;
+	};
 	order: string[];
 	files: Record<string, string>;
 }
@@ -145,6 +151,8 @@ window.addEventListener('message', async (event) => {
 					octane: blobs[entries['octane']],
 					'octane/internal/client': blobs[entries['octane/internal/client']],
 					'octane/react': blobs[entries['octane/react']],
+					'octane/signals': blobs[entries['octane/signals']],
+					'octane/signals/client': blobs[entries['octane/signals/client']],
 					react: esm('react@' + REACT_VERSION),
 					'react/jsx-runtime': esm('react@' + REACT_VERSION + '/jsx-runtime'),
 					'react/jsx-dev-runtime': esm('react@' + REACT_VERSION + '/jsx-dev-runtime'),

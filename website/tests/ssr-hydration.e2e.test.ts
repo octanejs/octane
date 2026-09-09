@@ -2590,6 +2590,51 @@ describe(
 		);
 
 		it.concurrent(
+			'playground runs shared and component-local signals in its sandbox',
+			async () => {
+				const hash = encodePlaygroundHash({
+					lang: 'tsrx',
+					entry: 'App.tsrx',
+					files: [
+						{
+							name: 'App.tsrx',
+							source: `import { createScope } from 'octane/signals';
+import { useSignal$ } from 'octane/signals/client';
+const scope = createScope();
+const shared$ = scope.signal$('count', 0);
+export default function App() @{
+	const local$ = useSignal$(10);
+	<div>
+		<button onClick={() => shared$.set(shared$.get() + 1)}>{'Shared: ' + shared$.get()}</button>
+		<button onClick={() => local$.set(local$.get() + 1)}>{'Local: ' + local$.get()}</button>
+	</div>
+}`,
+						},
+					],
+				});
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.click('.pg-consent-run');
+					const preview = page.frameLocator('iframe[title="Playground preview"]');
+					const shared = preview.getByRole('button', { name: 'Shared:' });
+					const local = preview.getByRole('button', { name: 'Local:' });
+					await waitForLocatorText(shared, 'Shared: 0');
+					await waitForLocatorText(local, 'Local: 10');
+					await shared.click();
+					await waitForLocatorText(shared, 'Shared: 1');
+					await local.click();
+					await waitForLocatorText(local, 'Local: 11');
+					await waitForLocatorText(shared, 'Shared: 1');
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			45_000,
+		);
+
+		it.concurrent(
 			'playground runs the OctaneCompat React-host example end to end',
 			async () => {
 				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground', {
