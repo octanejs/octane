@@ -5111,7 +5111,9 @@ function collectImmutableModuleFunctions(body) {
 	const declared = new Map();
 	for (const statement of body) {
 		const declaration =
-			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
 		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.type === 'Identifier') {
 			declared.set(declaration.id.name, declaration);
 		}
@@ -5126,10 +5128,31 @@ function collectImmutableModuleFunctions(body) {
 		}
 		if (seen.has(n)) return;
 		seen.add(n);
-		if (n.type === 'AssignmentExpression' && n.left?.type === 'Identifier') {
-			declared.delete(n.left.name);
-		} else if (n.type === 'UpdateExpression' && n.argument?.type === 'Identifier') {
-			declared.delete(n.argument.name);
+		const writeTarget =
+			n.type === 'AssignmentExpression'
+				? n.left
+				: n.type === 'UpdateExpression'
+					? n.argument
+					: n.type === 'VariableDeclarator'
+						? n.id
+						: (n.type === 'ForOfStatement' || n.type === 'ForInStatement') &&
+							  n.left?.type !== 'VariableDeclaration'
+							? n.left
+							: null;
+		if (writeTarget?.type === 'Identifier') {
+			declared.delete(writeTarget.name);
+		} else if (writeTarget !== null) {
+			const names = new Set();
+			collectPatternNames(unwrapTsExpr(writeTarget), names);
+			for (const name of names) declared.delete(name);
+		} else if (
+			n.type === 'CallExpression' &&
+			unwrapTsExpr(n.callee)?.type === 'Identifier' &&
+			unwrapTsExpr(n.callee).name === 'eval'
+		) {
+			// Direct eval can write a module function binding without a visible
+			// assignment node. Exclude those names from identity proofs.
+			declared.clear();
 		}
 		for (const key in n) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
@@ -14039,6 +14062,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		ctx.inlineHookMemo && ctx.mode !== 'server' && ctx._universalRuntimeUnit == null;
 	ctx._puInlineLowering = inlineLowering;
 	let warmThunk = null;
+	let staticChildOnly = false;
 	if (options && options.autoCallback) {
 		const creations = [];
 		const warmChildren = [];
@@ -14097,9 +14121,21 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
 		warmThunk = warm.thunk;
+		staticChildOnly = warm.staticChildOnly === true;
 		ctx._pendingWarm = warm.warmNode;
 	}
-	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
+	workingStatements = rewriteParallelUse(
+		workingStatements,
+		ctx,
+		name,
+		warmThunk,
+		staticChildOnly &&
+			ctx.mode !== 'server' &&
+			ctx._universalRuntimeUnit == null &&
+			ctx.moduleFunctionDeclarations.get(name)?.start === node.start
+			? staticChildWarmPlanProps(node, name)
+			: null,
+	);
 
 	// De-callback the hook memo tier (production client compile). Authored and
 	// auto-generated useMemo/useCallback declarations become inline flat-cache
@@ -14825,6 +14861,7 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 // Names bound by a binding pattern (params, declarator ids). Mirrors the
 // pattern handling of collectFreeIdentifiers' collectBindings.
 function collectPatternNames(pat, into) {
+	pat = unwrapTsExpr(pat);
 	if (!pat) return into;
 	switch (pat.type) {
 		case 'Identifier':
@@ -16124,8 +16161,61 @@ function isWarmSafeExpr(expr, paramNames, componentLocals, armLocals) {
 	return true;
 }
 
+// The registration records props now and invokes the already-attached module
+// plan only if a descendant suspends. A reassigned parameter would differ from
+// the old thunk's live lexical capture, including writes in JSX expressions or
+// nested callbacks. A same-name write in a shadowed scope merely declines the
+// optimization. Dynamic bindings are conservatively excluded as well.
+function staticChildWarmPlanProps(node, componentName) {
+	const params = node.params || [];
+	if (params.length > 1 || (params.length === 1 && params[0].type !== 'Identifier')) {
+		return null;
+	}
+	const name = params[0]?.name ?? null;
+	if (name === componentName) return null;
+	const seen = new WeakSet();
+	const bindsName = (pattern, binding) => {
+		if (binding === null || pattern === null) return false;
+		if (pattern.type === 'Identifier') return pattern.name === binding;
+		const names = new Set();
+		collectPatternNames(unwrapTsExpr(pattern), names);
+		return names.has(binding);
+	};
+	const unsafe = (value) => {
+		if (value === null || typeof value !== 'object') return false;
+		if (Array.isArray(value)) return value.some(unsafe);
+		if (seen.has(value)) return false;
+		seen.add(value);
+		if (
+			(value.type === 'AssignmentExpression' && bindsName(value.left, name)) ||
+			(value.type === 'UpdateExpression' && bindsName(value.argument, name)) ||
+			(value.type === 'VariableDeclarator' &&
+				(bindsName(value.id, name) || bindsName(value.id, componentName))) ||
+			((value.type === 'FunctionDeclaration' || value.type === 'ClassDeclaration') &&
+				value.id?.name === componentName) ||
+			(value.type === 'CatchClause' && bindsName(value.param, componentName)) ||
+			((value.type === 'ForOfStatement' || value.type === 'ForInStatement') &&
+				bindsName(value.left, name)) ||
+			(value.type === 'CallExpression' &&
+				unwrapTsExpr(value.callee)?.type === 'Identifier' &&
+				unwrapTsExpr(value.callee).name === 'eval') ||
+			(value.type === 'Identifier' && value.name === 'arguments') ||
+			value.type === 'ThisExpression' ||
+			value.type === 'Super' ||
+			value.type === 'MetaProperty'
+		) {
+			return true;
+		}
+		for (const key in value) {
+			if (!AST_WALK_SKIP_KEYS.has(key) && unsafe(value[key])) return true;
+		}
+		return false;
+	};
+	return unsafe(node.body) ? null : name === null ? b.unary('void', b.literal(0, '0')) : b.id(name);
+}
+
 // ── Pass B: run detection + hoist + batch ───────────────────────────────────
-function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
+function rewriteParallelUse(statements, ctx, componentName, warmThunk, staticPlanProps = null) {
 	let firstBatch = true;
 	const output = transformList(statements);
 	if (warmThunk) {
@@ -16137,15 +16227,39 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 		// same thunk below so it can still warm before setup reaches this registration.
 		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
 		const batchAlias = requireRuntimeForContext(ctx, batchHelper);
-		const registration = inheritOriginLoc(
+		const fallback = inheritOriginLoc(
 			b.stmt(b.call(batchAlias, b.array([]), warmThunk)),
 			warmThunk,
 		);
+		let registration = [fallback];
+		if (staticPlanProps !== null) {
+			// Hoisted functions can render before the module-tail markWarm stamp,
+			// and route extraction can leave that stamp behind. Only the common
+			// attached-plan path may omit the in-body closure and array.
+			const planName = allocCompilerName(ctx, '__warmPlan');
+			registration = [
+				inheritOriginLoc(b.const(planName, b.member(b.id(componentName), '__warm')), warmThunk),
+				inheritOriginLoc(
+					b.if(
+						b.binary('===', b.unary('typeof', b.id(planName)), b.literal('function', "'function'")),
+						b.stmt(
+							b.call(
+								requireRuntimeForContext(ctx, 'registerWarmPlan'),
+								b.id(planName),
+								staticPlanProps,
+							),
+						),
+						fallback,
+					),
+					warmThunk,
+				),
+			];
+		}
 		const finalIndex =
 			output.length > 0 && output[output.length - 1].type === 'ReturnStatement'
 				? output.length - 1
 				: output.length;
-		output.splice(finalIndex, 0, registration);
+		output.splice(finalIndex, 0, ...registration);
 	}
 	return output;
 
@@ -16442,7 +16556,19 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 			node,
 		);
 	}
-	return { thunk, warmNode };
+	return {
+		thunk,
+		warmNode,
+		// The module plan contains own creations before child calls. Reuse it
+		// for this component's registration only when it is child-only like the
+		// original thunk; otherwise a descendant suspend could refetch its own
+		// earlier memo. Memoized child props stay on the existing path too.
+		staticChildOnly:
+			warmNode !== null &&
+			thunk !== null &&
+			warmMemos.length === 0 &&
+			warmKids.every((child) => child.props.every((prop) => prop.memo == null)),
+	};
 }
 
 // ===========================================================================

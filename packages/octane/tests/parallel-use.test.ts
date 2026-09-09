@@ -1200,6 +1200,190 @@ describe('parallel use() — fetch-tree warming (nested chain)', () => {
 	});
 });
 
+describe('parallel use() — child plans across render attempts', () => {
+	it('starts eight independent descendants before a blocking sibling resolves, again on update', async () => {
+		const children = Array.from({ length: 8 }, (_, index) => `detail-${index}`);
+		const source = `
+			import { use } from 'octane';
+
+			function Gate(props) @{
+				const value = use(props.gate);
+				<span class="plan-gate">{value as string}</span>
+			}
+
+			function Detail(props) @{
+				const value = use(props.load(props.name, props.version));
+				<span class="plan-detail">{value as string}</span>
+			}
+
+			export function Branches(props) @{
+				<main>
+					<Gate gate={props.gate} />
+					${children
+						.map((name) => `<Detail name="${name}" load={props.load} version={props.version} />`)
+						.join('\n')}
+				</main>
+			}
+		`;
+		const client = loadCompiledFixtureSource(source, {
+			id: 'child-plan-eight-descendants.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const calls: string[] = [];
+		const jobs = new Map<string, Deferred<string>>();
+		const load = (name: string, version: number) => {
+			const key = `${name}:${version}`;
+			calls.push(key);
+			const job = deferred<string>();
+			jobs.set(key, job);
+			return job.promise;
+		};
+		const gate = deferred<string>();
+		const root = mount(client.Branches, { gate: gate.promise, load, version: 0 });
+		try {
+			const firstWave = children.map((name) => `${name}:0`);
+			expect(calls).toEqual(firstWave);
+			await act(() => {
+				gate.resolve('ready');
+				for (const key of firstWave) jobs.get(key)!.resolve(key);
+			});
+			expect(root.findAll('.plan-detail').map((node) => node.textContent)).toEqual(firstWave);
+			expect(calls).toEqual(firstWave);
+
+			const nextGate = deferred<string>();
+			root.update(client.Branches, { gate: nextGate.promise, load, version: 1 });
+			const secondWave = children.map((name) => `${name}:1`);
+			expect(calls).toEqual([...firstWave, ...secondWave]);
+			await act(() => {
+				nextGate.resolve('ready');
+				for (const key of secondWave) jobs.get(key)!.resolve(key);
+			});
+			expect(root.findAll('.plan-detail').map((node) => node.textContent)).toEqual(secondWave);
+			expect(calls).toEqual([...firstWave, ...secondWave]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([
+		['typed direct eval', "(eval as any)('Branches = Other');"],
+		['asserted array assignment', '[Branches!] = [Other];'],
+		['asserted object assignment', '({ value: Branches! } = { value: Other });'],
+	] as const)(
+		'warms a saved component after %s reassigns its module binding',
+		async (_label, reassign) => {
+			const source = `
+			import { use } from 'octane';
+			export const Saved = Branches;
+			function Gate(props) @{
+				const value = use(props.gate);
+				<span>{value as string}</span>
+			}
+			function Detail(props) @{
+				const value = use(props.load(props.name));
+				<span class="saved-plan-detail">{value as string}</span>
+			}
+			function Other(props) @{
+				<main><Gate gate={props.gate} /><Detail load={props.load} name="other" /></main>
+			}
+			function Branches(props) @{
+				<main><Gate gate={props.gate} /><Detail load={props.load} name="original" /></main>
+			}
+			${reassign}
+		`;
+			const client = loadCompiledFixtureSource(source, {
+				id: 'child-plan-saved-binding.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const gate = deferred<string>();
+			const detail = deferred<string>();
+			const calls: string[] = [];
+			const load = (name: string) => {
+				calls.push(name);
+				return detail.promise;
+			};
+			const root = mount(client.Saved, { gate: gate.promise, load });
+			try {
+				expect(calls).toEqual(['original']);
+				await act(() => {
+					gate.resolve('ready');
+					detail.resolve('original result');
+				});
+				expect(root.find('.saved-plan-detail').textContent).toBe('original result');
+				expect(calls).toEqual(['original']);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each([
+		[
+			'reassigned props object',
+			`function Branches(props) @{
+				props = { ...props, version: props.version + 1 };
+				<main><Gate gate={props.gate} /><Detail load={props.load} version={props.version} /></main>
+			}`,
+		],
+		[
+			'reassigned asserted props object',
+			`function Branches(props) @{
+				[props!] = [{ ...props, version: props.version + 1 }];
+				<main><Gate gate={props.gate} /><Detail load={props.load} version={props.version} /></main>
+			}`,
+		],
+		[
+			'reassigned destructured parameter',
+			`function Branches({ gate, load, version }) @{
+				version = version + 1;
+				<main><Gate gate={gate} /><Detail load={load} version={version} /></main>
+			}`,
+		],
+	] as const)(
+		'uses the current values after a %s before warming children',
+		async (description, body) => {
+			const source = `
+			import { use } from 'octane';
+			function Gate(props) @{
+				const value = use(props.gate);
+				<span class="rebound-plan-gate">{value as string}</span>
+			}
+			function Detail(props) @{
+				const value = use(props.load('detail', props.version));
+				<span class="rebound-plan-detail">{value as string}</span>
+			}
+			export ${body}
+		`;
+			const client = loadCompiledFixtureSource(source, {
+				id: `child-plan-${description.replace(/\W+/g, '-')}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const gate = deferred<string>();
+			const detail = deferred<string>();
+			const calls: number[] = [];
+			const load = (_key: string, version: number) => {
+				calls.push(version);
+				return detail.promise;
+			};
+			const root = mount(client.Branches, { gate: gate.promise, load, version: 0 });
+			try {
+				expect(calls).toEqual([1]);
+				await act(() => {
+					gate.resolve('ready');
+					detail.resolve('detail-v1');
+				});
+				expect(root.find('.rebound-plan-detail').textContent).toBe('detail-v1');
+				expect(calls).toEqual([1]);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+});
+
 describe('parallel use() — directives in JSX setup values', () => {
 	it('starts each creation once and reuses it across the suspense replay', async () => {
 		const calls: string[] = [];

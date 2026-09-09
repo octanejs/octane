@@ -167,11 +167,28 @@ root and partial updates must still execute exactly 1024 and 32 `setText` calls.
 The TSRX leaf reads two local `createContext` values and no promises. Before
 removing its redundant context-only `useBatch`, the 1024-leaf mount and root
 update each called `useBatch` 3072 times; the 32-leaf partial update and
-remount each called it 94 times. Exact gates now require 2048 and 62 calls,
-respectively: the remaining calls register the independent child warm plans
-with `useBatch([], warmThunk)`. The JSX twin emits no `useBatch` calls for this
-fixture. The normal DOM checks in `run.mjs` still verify all 1024 leaf paths,
-both context values, the isolated 32-leaf provider update, and remount identity.
+remount each called it 94 times. The baseline after that removal was 2048 and
+62 calls, respectively, all
+`useBatch([], warmThunk)` child-plan registrations. The child-only plan now
+registers through `registerWarmPlan(plan, props)`, with exact production-call
+gates of 2048 on mount/root update and 62 on partial update/remount. The same
+operations must call `useBatch` zero times; the JSX twin stays at zero for both
+helpers. `setText` still runs exactly 1024/32 times for root/partial updates.
+The normal DOM checks in `run.mjs` verify all 1024 leaf paths, both context
+values, the isolated 32-leaf provider update, and remount identity.
+
+A separate production entry (`warm-plan-control.html`) renders a parent with
+its own promise creation and a same-module async child. That parent must retain
+the direct batch and trailing `useBatch([], warmThunk)` because its warm plan
+does more than traverse children. A fresh Chromium pass confirms the visible
+parent/child values and that each resource starts exactly once; it requires
+four `useBatch` calls over the suspending mount/retry and zero
+`registerWarmPlan` calls. The work gate also parses production compiler output
+for this fixture, a child-only parent that reassigns its props after
+registration, and a parent whose body shadows its function name; each must
+retain the original `useBatch` path. Standalone work
+gate runs may set `RECURSIVE_WORK_TARGETS` to JSON target URLs for isolated
+ephemeral preview ports, avoiding stale assets from other worktrees.
 
 The same work pass also compiles a plain TypeScript custom hook with two reads
 from a directly initialized module context in both client and server modes. Its

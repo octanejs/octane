@@ -1147,15 +1147,12 @@ let CURRENT_BLOCK: Block | null = null;
 let CURRENT_EFFECT_RENDER_VERSION = 0;
 let CURRENT_EFFECT_REACHED = 0;
 let NEXT_EFFECT_RENDER_VERSION = 1;
-interface ActiveWarmPlan {
-	block: Block;
-	fn: () => void;
-}
-// Compiler-emitted empty useBatch calls register child-only warm plans on the
-// synchronous component render stack. A descendant's first pending batch runs
-// the active plans while every ancestor frame (and its current props closure)
-// is still live; render entry/exit checkpoints below provide stack discipline.
-const ACTIVE_WARM_PLANS: ActiveWarmPlan[] = [];
+// Compiler-emitted child-only warm plans register on the synchronous component
+// render stack. A descendant's first pending batch runs the active plans while
+// every ancestor frame and its props are still live; render entry/exit
+// checkpoints below provide stack discipline. Flat [block, plan, props] triples
+// avoid allocating a record for every render that has reachable async children.
+const ACTIVE_WARM_PLANS: any[] = [];
 // Warm entries live for exactly one outer render/suspension episode. A retry
 // re-enters with the episode recorded on its block; an ordinary update starts
 // a new one so consumed entries cannot suppress warming after prop changes or
@@ -12519,7 +12516,7 @@ export function useBatch(items: any[], warm?: () => void): void {
 	// the active render stack. It is intentionally lazy — a fully synchronous
 	// tree neither walks its children nor allocates a warm cache.
 	if (items.length === 0) {
-		if (warm !== undefined) ACTIVE_WARM_PLANS.push({ block: CURRENT_BLOCK!, fn: warm });
+		if (warm !== undefined) ACTIVE_WARM_PLANS.push(CURRENT_BLOCK!, warm, undefined);
 		return;
 	}
 	// Hydrating: every use() adopts a server seed synchronously — nothing to
@@ -12554,6 +12551,14 @@ export function useBatch(items: any[], warm?: () => void): void {
 		}
 	});
 	throw new SuspenseException(combined);
+}
+
+/** @internal Compiler-owned registration for a hoisted child-only warm plan. */
+export function registerWarmPlan(fn: (props: any) => void, props: any): void {
+	// This must register before the first descendant suspends, even in an app
+	// that has never warmed. The enclosing render's checkpoint drops the registration
+	// on normal return, suspension, and rollback.
+	ACTIVE_WARM_PLANS.push(CURRENT_BLOCK!, fn, props);
 }
 
 // ── Fetch-tree warming ──────────────────────────────────────────────────────
@@ -12634,10 +12639,10 @@ function recordRealWarmMemo(slot: HookSlot, deps: any[], source: MemoHookEntry):
 	const block = CURRENT_BLOCK;
 	if (block === null) return false;
 	let owner: Block | null = null;
-	for (let i = 0; i < ACTIVE_WARM_PLANS.length; i++) {
-		const plan = ACTIVE_WARM_PLANS[i];
-		if (!blockIsAncestor(plan.block, block)) continue;
-		owner = plan.block;
+	for (let i = 0; i < ACTIVE_WARM_PLANS.length; i += 3) {
+		const planBlock = ACTIVE_WARM_PLANS[i] as Block;
+		if (!blockIsAncestor(planBlock, block)) continue;
+		owner = planBlock;
 		break;
 	}
 	if (owner === null) return false;
@@ -12719,13 +12724,13 @@ function blockIsAncestor(ancestor: Block, block: Block): boolean {
  * adjacent descendants as well as the source branch. */
 function runActiveWarmPlans(local?: () => void): void {
 	const block = CURRENT_BLOCK!;
-	let plans: ActiveWarmPlan[] | null = null;
+	let plans: number[] | null = null;
 	let owner = block;
-	for (let i = 0; i < ACTIVE_WARM_PLANS.length; i++) {
-		const plan = ACTIVE_WARM_PLANS[i];
-		if (!blockIsAncestor(plan.block, block)) continue;
-		(plans ??= []).push(plan);
-		if (plans.length === 1) owner = plan.block;
+	for (let i = 0; i < ACTIVE_WARM_PLANS.length; i += 3) {
+		const planBlock = ACTIVE_WARM_PLANS[i] as Block;
+		if (!blockIsAncestor(planBlock, block)) continue;
+		(plans ??= []).push(i);
+		if (plans.length === 1) owner = planBlock;
 	}
 	if (plans === null && local === undefined) return;
 	runWarm(() => {
@@ -12733,7 +12738,8 @@ function runActiveWarmPlans(local?: () => void): void {
 			for (let i = 0; i < plans.length; i++) {
 				CURRENT_WARM_CLAIMS = new Set();
 				try {
-					plans[i].fn();
+					const index = plans[i];
+					(ACTIVE_WARM_PLANS[index + 1] as (props: any) => void)(ACTIVE_WARM_PLANS[index + 2]);
 				} catch {
 					// Each speculative plan is independent. One throwing getter or
 					// creation must not prevent adjacent plans from warming.

@@ -7,14 +7,19 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import ts from 'typescript';
+import { compile } from '../../packages/octane/src/compiler/compile.js';
 import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import { collectPreciseCalls } from '../lib/precise-work.mjs';
 
-const TARGETS = [
-	{ name: 'octane-tsrx', url: 'http://localhost:5185/' },
-	{ name: 'octane-jsx', url: 'http://localhost:5188/' },
-];
+// Standalone runs can target ephemeral previews so an unrelated worktree's
+// server on the standard benchmark ports cannot produce stale-bundle counts.
+const TARGETS = process.env.RECURSIVE_WORK_TARGETS
+	? JSON.parse(process.env.RECURSIVE_WORK_TARGETS)
+	: [
+			{ name: 'octane-tsrx', url: 'http://localhost:5185/' },
+			{ name: 'octane-jsx', url: 'http://localhost:5188/' },
+		];
 
 // The unified runner finishes its timed pass against normally minified assets
 // before invoking this untimed gate. Build the same production fixtures without
@@ -40,6 +45,7 @@ const METRICS = [
 	'updateSurvivor',
 	'setText',
 	'useBatch',
+	'registerWarmPlan',
 	'unmountBlock',
 	'unmountScope',
 ];
@@ -129,6 +135,54 @@ const PLAIN_HOOKS = Object.fromEntries(
 	]),
 );
 
+// The own-promise control must keep its direct batch and trailing warm thunk;
+// reassigned props and locally shadowed components need the legacy closure.
+// Inspect imported calls in the parsed production compiler output so helper
+// aliases and generated formatting cannot obscure either negative case.
+const REASSIGNED_PROPS_SOURCE = `import { use } from 'octane';
+function Child(props) @{
+  const value = use(props.load('child', props.version));
+  <span>{value as string}</span>
+}
+export function Parent(props) @{
+  <main>
+    {((props = props.next), '') as string}
+    <Child load={props.load} version={props.version} />
+  </main>
+}`;
+const SHADOWED_COMPONENT_SOURCE = `import { use } from 'octane';
+function Child(props) @{
+  const value = use(props.load('child', props.version));
+  <span>{value as string}</span>
+}
+export function Parent(props) @{
+  const Parent = () => null;
+  <main><Child load={props.load} version={props.version} /></main>
+}`;
+
+function measureCompiledControl(source, filename) {
+	const code = compile(source, filename, { dev: false, hmr: false }).code;
+	const ast = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
+	if (ast.parseDiagnostics.length > 0) throw new Error(`${filename}: invalid compiled TypeScript`);
+	return {
+		batch: countImportedCalls(ast, 'useBatch'),
+		plan: countImportedCalls(ast, 'registerWarmPlan'),
+		warmMemo: countImportedCalls(ast, 'warmMemo'),
+	};
+}
+
+const WARM_CONTROL_FILE = fileURLToPath(
+	new URL('./octane-tsrx/src/WarmPlanControl.tsrx', import.meta.url),
+);
+const COMPILED_CONTROLS = {
+	ownPromise: measureCompiledControl(fs.readFileSync(WARM_CONTROL_FILE, 'utf8'), WARM_CONTROL_FILE),
+	reassignedProps: measureCompiledControl(REASSIGNED_PROPS_SOURCE, 'warm-reassigned-props.tsrx'),
+	shadowedComponent: measureCompiledControl(
+		SHADOWED_COMPONENT_SOURCE,
+		'warm-shadowed-component.tsrx',
+	),
+};
+
 // Scaffolding is bounded above so later direct-return lowering can reduce it
 // without rebaselining this gate. The visible update cardinality is exact.
 const GATES = {
@@ -146,7 +200,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { useBatch: 2048 },
+			exact: { useBatch: 0, registerWarmPlan: 2048 },
 		},
 		update_root: {
 			maxFullSlotCalls: 1027,
@@ -161,7 +215,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { setText: 1024, useBatch: 2048 },
+			exact: { setText: 1024, useBatch: 0, registerWarmPlan: 2048 },
 		},
 		update_partial: {
 			maxFullSlotCalls: 33,
@@ -176,7 +230,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { setText: 32, useBatch: 62 },
+			exact: { setText: 32, useBatch: 0, registerWarmPlan: 62 },
 		},
 		partial_unmount: {
 			maxFullSlotCalls: 0,
@@ -193,6 +247,7 @@ const GATES = {
 				unmountBlock: 126,
 				unmountScope: 188,
 			},
+			exact: { useBatch: 0, registerWarmPlan: 0 },
 		},
 		partial_remount: {
 			maxFullSlotCalls: 33,
@@ -207,12 +262,13 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
-			exact: { useBatch: 62 },
+			exact: { useBatch: 0, registerWarmPlan: 62 },
 		},
 		unmount: {
 			maxFullSlotCalls: 0,
 			maxSlotCalls: 0,
 			max: { unmountBlock: 4099, unmountScope: 6146 },
+			exact: { useBatch: 0, registerWarmPlan: 0 },
 		},
 	},
 	'octane-jsx': {
@@ -229,6 +285,7 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
+			exact: { useBatch: 0, registerWarmPlan: 0 },
 		},
 		update_root: {
 			maxFullSlotCalls: 2049,
@@ -243,7 +300,7 @@ const GATES = {
 				reconcileKeyed: 1,
 				updateSurvivor: 2,
 			},
-			exact: { setText: 1024 },
+			exact: { setText: 1024, useBatch: 0, registerWarmPlan: 0 },
 		},
 		update_partial: {
 			maxFullSlotCalls: 64,
@@ -258,7 +315,7 @@ const GATES = {
 				reconcileKeyed: 1,
 				updateSurvivor: 2,
 			},
-			exact: { setText: 32 },
+			exact: { setText: 32, useBatch: 0, registerWarmPlan: 0 },
 		},
 		partial_unmount: {
 			maxFullSlotCalls: 0,
@@ -275,6 +332,7 @@ const GATES = {
 				unmountBlock: 162,
 				unmountScope: 222,
 			},
+			exact: { useBatch: 0, registerWarmPlan: 0 },
 		},
 		partial_remount: {
 			maxFullSlotCalls: 64,
@@ -289,11 +347,13 @@ const GATES = {
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
 			},
+			exact: { useBatch: 0, registerWarmPlan: 0 },
 		},
 		unmount: {
 			maxFullSlotCalls: 0,
 			maxSlotCalls: 0,
 			max: { unmountBlock: 5128, unmountScope: 7172 },
+			exact: { useBatch: 0, registerWarmPlan: 0 },
 		},
 	},
 };
@@ -384,6 +444,19 @@ for (const [environment, { context, mixed }] of Object.entries(PLAIN_HOOKS)) {
 		failures.push(`${environment}.plain_mixed: expected one imported batch call`);
 	}
 }
+for (const [name, control] of Object.entries(COMPILED_CONTROLS)) {
+	const expectedBatchCalls = name === 'ownPromise' ? 3 : 2;
+	const expectedWarmMemos = name === 'ownPromise' ? 2 : 1;
+	if (control.batch.imports !== 1 || control.batch.calls !== expectedBatchCalls) {
+		failures.push(`${name}: expected ${expectedBatchCalls} retained batch calls`);
+	}
+	if (control.plan.imports !== 0 || control.plan.calls !== 0) {
+		failures.push(`${name}: unexpected extracted child-only warm plan`);
+	}
+	if (control.warmMemo.calls !== expectedWarmMemos) {
+		failures.push(`${name}: expected ${expectedWarmMemos} warmable promise creations`);
+	}
+}
 try {
 	for (const target of TARGETS) {
 		results[target.name] = {};
@@ -398,23 +471,43 @@ try {
 			validate(target.name, op.name, counts, failures);
 		}
 	}
+	results.warmPlanControl = await collectPreciseCalls(browser, {
+		url: TARGETS.find((target) => target.name === 'octane-tsrx').url + 'warm-plan-control.html',
+		operation: '__mountWarmPlanControl',
+		after: ['__verifyWarmPlanControl'],
+		metrics: ['useBatch', 'registerWarmPlan'],
+	});
+	if (results.warmPlanControl.useBatch !== 4 || results.warmPlanControl.registerWarmPlan !== 0) {
+		failures.push(
+			`ownPromise: expected 4 batch calls and no extracted plan, got ` +
+				`${results.warmPlanControl.useBatch}/${results.warmPlanControl.registerWarmPlan}`,
+		);
+	}
 } finally {
 	await browser.close();
 }
 
 console.log(
-	'Operation                 | render | full | void | lite | child | descriptors | host/deopt/keyed/survivors | text | batch | unmount block/scope',
+	'Operation                 | render | full | void | lite | child | descriptors | host/deopt/keyed/survivors | text | batch/plan | unmount block/scope',
 );
 console.log(
-	'--------------------------+--------+------+------+------+-------+-------------+----------------------------+------+-------+--------------------',
+	'--------------------------+--------+------+------+------+-------+-------------+----------------------------+------+------------+--------------------',
 );
 for (const target of TARGETS) {
 	for (const op of OPS) {
 		const c = results[target.name][op.name];
 		console.log(
-			`${`${target.name}.${op.name}`.padEnd(25)} | ${String(c.renderBlock).padStart(6)} | ${String(c.componentSlot).padStart(4)} | ${String(c.componentSlotVoid).padStart(4)} | ${String(c.componentSlotLite).padStart(4)} | ${String(c.childSlot).padStart(5)} | ${String(c.createElement).padStart(11)} | ${c.hostElementBody}/${c.deoptItemBody}/${c.reconcileKeyed}/${c.updateSurvivor} | ${String(c.setText).padStart(4)} | ${String(c.useBatch).padStart(5)} | ${c.unmountBlock}/${c.unmountScope}`,
+			`${`${target.name}.${op.name}`.padEnd(25)} | ${String(c.renderBlock).padStart(6)} | ${String(c.componentSlot).padStart(4)} | ${String(c.componentSlotVoid).padStart(4)} | ${String(c.componentSlotLite).padStart(4)} | ${String(c.childSlot).padStart(5)} | ${String(c.createElement).padStart(11)} | ${c.hostElementBody}/${c.deoptItemBody}/${c.reconcileKeyed}/${c.updateSurvivor} | ${String(c.setText).padStart(4)} | ${`${c.useBatch}/${c.registerWarmPlan}`.padStart(10)} | ${c.unmountBlock}/${c.unmountScope}`,
 		);
 	}
+}
+console.log(
+	`own-promise async parent/child: batch/plan=${results.warmPlanControl.useBatch}/${results.warmPlanControl.registerWarmPlan}, resources=1/1 and visible output verified`,
+);
+for (const [name, { batch, plan, warmMemo }] of Object.entries(COMPILED_CONTROLS)) {
+	console.log(
+		`${name} compiled: batch calls=${batch.calls}, plan calls=${plan.calls}, warmable creations=${warmMemo.calls}`,
+	);
 }
 for (const [environment, { context, mixed }] of Object.entries(PLAIN_HOOKS)) {
 	console.log(
@@ -469,6 +562,34 @@ if (outputPath) {
 						: 'pass',
 				},
 			})),
+			...Object.entries(COMPILED_CONTROLS).map(([name, { batch, plan, warmMemo }]) => ({
+				name: `octane-${name}-compiled-work`,
+				ops: Object.fromEntries(
+					Object.entries({
+						batch_calls: batch.calls,
+						plan_calls: plan.calls,
+						warm_memo_calls: warmMemo.calls,
+					}).map(([metric, value]) => [
+						metric,
+						deterministicStatForJson(deterministicCount(value)),
+					]),
+				),
+				meta: {
+					gates: failures.some((failure) => failure.startsWith(`${name}:`)) ? 'fail' : 'pass',
+				},
+			})),
+			{
+				name: 'octane-own-promise-runtime-work',
+				ops: Object.fromEntries(
+					Object.entries(results.warmPlanControl).map(([metric, value]) => [
+						metric,
+						deterministicStatForJson(deterministicCount(value)),
+					]),
+				),
+				meta: {
+					gates: failures.some((failure) => failure.startsWith('ownPromise:')) ? 'fail' : 'pass',
+				},
+			},
 			{
 				name: 'octane-context-cache-work',
 				ops: Object.fromEntries(
