@@ -861,6 +861,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Universal owner drafts (Node-only): changed child props force 128 and
+		// 1,024 retained component owners through the public object root.
+		name: 'universal-owner-drafts',
+		cwd: 'universal-owner-drafts',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Native universal external-store hooks: stable subscription lifetimes and
 		// bounded state-projection work across parent renders and notification bursts.
 		name: 'universal-external-store',
