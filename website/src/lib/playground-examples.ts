@@ -119,6 +119,77 @@ export default function App() {
 }
 `;
 
+const SIGNALS_TSRX = `import { createScope } from 'octane/signals';
+import { useSignal$ } from 'octane/signals/client';
+
+// Shared state lives outside the component. Derived values track their reads.
+const scope = createScope({ scopeKey: 'playground-signals' });
+const shared$ = scope.signal$('count', 0);
+const doubled$ = scope.derived$('doubled', () => shared$.get() * 2);
+
+export default function App() @{
+	// Each component instance owns its local signal, disposed on unmount.
+	const local$ = useSignal$(10);
+
+	<>
+		<style>
+			.demo {
+				display: grid;
+				gap: 1rem;
+				justify-items: start;
+			}
+			button {
+				padding: 0.4rem 0.9rem;
+				border-radius: 8px;
+				border: 1px solid #8886;
+				background: transparent;
+				color: inherit;
+				cursor: pointer;
+			}
+		</style>
+		<div class="demo">
+			<section>
+				<h2>Shared signal</h2>
+				<button onClick={() => shared$.set((count) => count + 1)}>{'Shared: ' + shared$.get()}</button>
+				<p>{'Doubled: ' + doubled$.get()}</p>
+			</section>
+			<section>
+				<h2>Local signal</h2>
+				<button onClick={() => local$.set((count) => count + 1)}>{'Local: ' + local$.get()}</button>
+			</section>
+		</div>
+	</>
+}
+`;
+
+const SIGNALS_TSX = `import { createScope } from 'octane/signals';
+import { useSignal$ } from 'octane/signals/client';
+
+// Shared state lives outside the component. Derived values track their reads.
+const scope = createScope({ scopeKey: 'playground-signals' });
+const shared$ = scope.signal$('count', 0);
+const doubled$ = scope.derived$('doubled', () => shared$.get() * 2);
+
+export default function App() {
+	// Each component instance owns its local signal, disposed on unmount.
+	const local$ = useSignal$(10);
+
+	return (
+		<div style={{ display: 'grid', gap: '1rem', justifyItems: 'start' }}>
+			<section>
+				<h2>Shared signal</h2>
+				<button onClick={() => shared$.set((count) => count + 1)}>{'Shared: ' + shared$.get()}</button>
+				<p>{'Doubled: ' + doubled$.get()}</p>
+			</section>
+			<section>
+				<h2>Local signal</h2>
+				<button onClick={() => local$.set((count) => count + 1)}>{'Local: ' + local$.get()}</button>
+			</section>
+		</div>
+	);
+}
+`;
+
 const LIST_TSRX = `import { useState } from 'octane';
 
 // Keyed @for reconciliation — rows keep their DOM identity across
@@ -1641,6 +1712,15 @@ export const EXAMPLES: PlaygroundExample[] = [
 		variants: {
 			tsrx: workspace([{ name: 'App.tsrx', source: COUNTER_TSRX }]),
 			tsx: workspace([{ name: 'App.tsx', source: COUNTER_TSX }]),
+		},
+	},
+	{
+		id: 'signals',
+		label: 'Signals',
+		group: 'Basics',
+		variants: {
+			tsrx: workspace([{ name: 'App.tsrx', source: SIGNALS_TSRX }]),
+			tsx: workspace([{ name: 'App.tsx', source: SIGNALS_TSX }]),
 		},
 	},
 	{

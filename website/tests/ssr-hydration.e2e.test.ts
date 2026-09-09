@@ -2590,6 +2590,35 @@ describe(
 		);
 
 		it.concurrent(
+			'playground runs the Signals example selected from the dropdown',
+			async () => {
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				try {
+					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
+					await page.selectOption('.pg-select', 'signals');
+					const preview = page.frameLocator('iframe[title="Playground preview"]');
+					const shared = preview.getByRole('button', { name: 'Shared:' });
+					const local = preview.getByRole('button', { name: 'Local:' });
+					await waitForLocatorText(shared, 'Shared: 0');
+					await waitForLocatorText(local, 'Local: 10');
+					const doubled = preview.locator('p');
+					await waitForLocatorText(doubled, 'Doubled: 0');
+					await shared.click();
+					await waitForLocatorText(shared, 'Shared: 1');
+					await waitForLocatorText(doubled, 'Doubled: 2');
+					await local.click();
+					await waitForLocatorText(local, 'Local: 11');
+					await waitForLocatorText(shared, 'Shared: 1');
+					await waitForLocatorText(doubled, 'Doubled: 2');
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			},
+			45_000,
+		);
+
+		it.concurrent(
 			'playground runs the OctaneCompat React-host example end to end',
 			async () => {
 				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground', {
