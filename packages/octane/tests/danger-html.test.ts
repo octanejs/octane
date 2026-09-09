@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { flushSync } from '../src/index.js';
+import { createElement, flushSync } from '../src/index.js';
 import { mount } from './_helpers';
 import {
 	DangerHtml,
@@ -79,4 +79,51 @@ it('accepts a nullish coexisting child and keeps the raw HTML', () => {
 	// Filling the hole on a LATER render is rejected just the same.
 	expect(() => flushSync(() => setDangerChild('kid'))).toThrow(/dangerouslySetInnerHTML/);
 	r.unmount();
+});
+
+function MixedRawAndDeoptHosts(props: { raw: boolean; value: string }) {
+	return createElement(
+		'section',
+		null,
+		createElement(
+			'div',
+			{
+				id: 'raw-host',
+				dangerouslySetInnerHTML: props.raw ? { __html: '<b>raw</b>' } : null,
+			},
+			props.raw ? null : 'ordinary',
+		),
+		createElement('p', { id: 'mixed-host' }, [
+			createElement('em', { key: 'left' }, 'left'),
+			props.value,
+			createElement('strong', { key: 'right' }, 'right'),
+		]),
+	);
+}
+
+it('keeps foreign text and owned mixed children beside a raw HTML host', () => {
+	const r = mount(MixedRawAndDeoptHosts, { raw: true, value: 'first' });
+	try {
+		const raw = r.find('#raw-host');
+		const mixed = r.find('#mixed-host');
+		const foreign = document.createTextNode('foreign:');
+		mixed.insertBefore(foreign, mixed.firstChild);
+		expect(raw.innerHTML).toBe('<b>raw</b>');
+		expect(mixed.textContent).toBe('foreign:leftfirstright');
+
+		r.update(MixedRawAndDeoptHosts, { raw: false, value: 'second' });
+		expect(r.find('#raw-host')).toBe(raw);
+		expect(raw.textContent).toBe('ordinary');
+		expect(raw.querySelector('b')).toBeNull();
+		expect(r.find('#mixed-host')).toBe(mixed);
+		expect(mixed.firstChild).toBe(foreign);
+		expect(mixed.textContent).toBe('foreign:leftsecondright');
+
+		r.update(MixedRawAndDeoptHosts, { raw: true, value: 'third' });
+		expect(raw.innerHTML).toBe('<b>raw</b>');
+		expect(mixed.firstChild).toBe(foreign);
+		expect(mixed.textContent).toBe('foreign:leftthirdright');
+	} finally {
+		r.unmount();
+	}
 });

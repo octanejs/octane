@@ -13600,8 +13600,10 @@ function getNextSibling(node: Node): Node | null {
 }
 
 /** Pre-seed one expando key on a prototype (see bootstrap comment, trick 2). */
-function seedExpando(proto: object, key: string): void {
-	if (!(key in proto)) (proto as any)[key] = undefined;
+function seedExpando(proto: object, key: PropertyKey, enumerable = true): void {
+	if (key in proto) return;
+	if (enumerable) (proto as any)[key] = undefined;
+	else Object.defineProperty(proto, key, { value: undefined, writable: true, configurable: true });
 }
 
 let domOperationsReady = false;
@@ -13630,6 +13632,14 @@ function initDomOperations(): void {
 		// clone()/drainFrag() fragment-wrapper discriminants.
 		seedExpando(elementProto, '__oct_frag');
 		seedExpando(elementProto, '__oct_vfrag');
+		// Raw HTML ownership is polled by dynamic child slots after the first raw host.
+		// New private keys must not appear in for...in walks over DOM elements.
+		seedExpando(elementProto, DANGER_HTML_ACTIVE, false);
+		seedExpando(elementProto, DANGER_HTML_STATIC_CHILD, false);
+		seedExpando(elementProto, DANGER_HTML_SPREAD_CHILD, false);
+		// De-opt child scans and uncontrolled form baselines also read absent symbols.
+		seedExpando(elementProto, DEOPT_DESC, false);
+		seedExpando(elementProto, DEFAULT_VALUE_BASELINE, false);
 		if (process.env.NODE_ENV !== 'production') {
 			seedExpando(elementProto, '__oct_loc');
 		}
@@ -13639,6 +13649,7 @@ function initDomOperations(): void {
 	if (typeof CharacterData !== 'undefined' && Object.isExtensible(CharacterData.prototype)) {
 		seedExpando(CharacterData.prototype, '$$portalEnd');
 		seedExpando(CharacterData.prototype, '$$deoptKey');
+		seedExpando(CharacterData.prototype, DEOPT_DESC, false);
 	}
 }
 

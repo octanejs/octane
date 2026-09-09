@@ -319,6 +319,20 @@ describe('conformance: defaultValue / defaultChecked (uncontrolled)', () => {
 		r.unmount();
 	});
 
+	it('changing a pristine checkbox default keeps its mounted live selection', () => {
+		const r = mount(DefaultsCheckbox, { dc: true });
+		try {
+			const el = r.find('#dci') as HTMLInputElement;
+			expect(el.checked).toBe(true);
+			r.update(DefaultsCheckbox, { dc: false });
+			expect(r.find('#dci')).toBe(el);
+			expect(el.checked).toBe(true);
+			expect(el.defaultChecked).toBe(false);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('a reused descriptor input keeps its selection when a default is added later', () => {
 		const Input = (props: { defaultChecked?: boolean }) =>
 			createElement('input', { type: 'checkbox', ...props });
