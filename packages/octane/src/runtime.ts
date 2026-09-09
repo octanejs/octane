@@ -6362,9 +6362,9 @@ function runEffectBody(e: PendingEffect): void {
 		EFFECT_BODY_DEPTH++;
 		try {
 			// Spread deps as positional args (see PendingEffect.args). A no-deps
-			// effect has args === undefined, so the body is called with zero args.
+			// effect has args === undefined, which apply accepts as zero arguments.
 			// eslint-disable-next-line prefer-spread
-			cleanup = e.fn.apply(null, (e.args ?? []) as []);
+			cleanup = e.fn.apply(null, e.args as []);
 		} finally {
 			EFFECT_BODY_DEPTH--;
 			CURRENT_EFFECT_PHASE = previousPhase;

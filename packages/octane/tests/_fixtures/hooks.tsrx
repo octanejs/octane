@@ -208,3 +208,10 @@ export function EffectAlways(props) @{
 	useEffect(() => props.cb(props.n), null);
 	<span>{props.n as string}</span>
 }
+
+export function EffectArguments(props) @{
+	useInsertionEffect(props.insertion, props.deps);
+	useLayoutEffect(props.layout, props.deps);
+	useEffect(props.passive, props.deps);
+	<span>{props.label as string}</span>
+}

@@ -199,3 +199,29 @@ output (median/min/p95/sd per op per target).
   plain arrays, which is extra work octane/react/ripple don't do on the items
   ops (it's the idiomatic solid pattern for externally-produced immutable
   data, same as the dbmon bench).
+
+## Dispatch argument allocation guard
+
+```bash
+node benchmarks/effectful-list/dispatch.mjs
+node benchmarks/effectful-list/dispatch.mjs <baseline-git-ref>
+BENCH_JSON=/tmp/effect-dispatch.json node benchmarks/effectful-list/dispatch.mjs <baseline-git-ref>
+```
+
+This untimed companion extracts the actual `runEffectBody` declaration by
+TypeScript AST and compiles its production branch. It dispatches 1,000 effects
+in each of the three effect phases, with omitted arguments, an explicit empty
+array, and three explicit values. Separate clean and observed executions must
+agree on callback arguments and receiver, cleanup delivery, and exception
+handling. Stale revisions, disconnected bodies, and superseded publications
+are skipped. The default guard requires zero argument-array creation events;
+`--measure` records historical implementations without enforcing that ceiling.
+
+The observer runs after production transformation and counts source array-literal
+creation events inside this helper. Its collaborators are boundary stubs; the
+fixture and observer allocations are excluded. The existing browser workload
+and runtime tests cover lifecycle integration. These numbers do not measure
+heap allocation, garbage collection, or end-user latency: an optimizing engine
+may already remove a short-lived empty array. The JSON records Node/V8 versions
+and runtime/helper hashes; a paired run uses the same fixture and toolchain.
+The explicit-array cases are negative controls and must remain at zero.
