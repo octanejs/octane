@@ -124,9 +124,14 @@ What shipped, and where it deviates from the phases as written:
   modules now apply the same memoize/stratify/batch transform to lexically
   imported `use()` calls (including aliases), with client `useMemo`/`useBatch`
   and server `puMemo`/`puBatch` twins. The first direct batch carries its warm
-  thunk; once setup reaches the final output, child-only plans register through
-  an empty compiler batch and stay lazy until a descendant batch actually
-  suspends. Components with setup early returns conservatively publish no
+  thunk; once setup reaches the final output, descendant plans register and
+  stay lazy until a descendant batch actually suspends. The DOM client reuses
+  an attached child-only plan through `registerWarmPlan(plan, props)` when the
+  component binding and captured props are provably stable. The runtime keeps
+  flat block/plan/props triples on the render stack, avoiding a registration
+  object per render. Own creations, mutable bindings, and unattached plans
+  retain the empty compiler batch and lexical thunk. Components with setup
+  early returns conservatively publish no
   descendant plan. Every live ancestor plan warms into an episode-scoped cache
   owned above adjacent siblings. Warmable creation slots use globally
   composable Symbols (scope-local integers collide across sibling components),
