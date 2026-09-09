@@ -12,6 +12,7 @@ import {
 	universalProps,
 	universalValue,
 	useLayoutEffect,
+	useRef,
 	useState,
 } from '../src/universal-native.js';
 
@@ -160,6 +161,169 @@ describe('universal queued state values', () => {
 		state.root.render(state.Scene, {});
 		expect(state.container.children[0].props.value).toBe(10);
 		state.root.unmount();
+	});
+
+	it('keeps ancestor ref writes local across keyed siblings, nested preparations, and a retry', () => {
+		const ids = Array.from({ length: 32 }, (_, index) => `item-${index}`);
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const nestedContainer = createObjectContainer();
+		const nestedRoot = createUniversalRoot(nestedContainer, createObjectDriver());
+		const rowPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'ref-row',
+			bindings: [
+				['id', 0],
+				['before', 1],
+				['after', 2],
+				['predecessor', 3],
+			],
+		});
+		const nestedPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'nested-ref-result',
+			bindings: [['value', 0]],
+		});
+		const lifecycle: string[] = [];
+		const nestedReads: Array<{ outer: string; ownBefore: string; ownAfter: string }> = [];
+		const resumedReads: string[] = [];
+		const rowRefs = new Map<string, { current: string }>();
+		let sharedRef!: { current: string };
+		let nestedRef!: { current: string };
+		const Nested = defineUniversalComponent(
+			'object',
+			({ outer, version }: { outer: { current: string }; version: string }) => {
+				const own = useRef('nested:seed', 'nested-ref');
+				nestedRef = own;
+				const outerValue = outer.current;
+				const ownBefore = own.current;
+				own.current = `nested:${version}`;
+				nestedReads.push({ outer: outerValue, ownBefore, ownAfter: own.current });
+				return universalValue(nestedPlan, [outerValue]);
+			},
+		);
+		const Row = defineUniversalComponent(
+			'object',
+			({
+				id,
+				version,
+				shared,
+				nested,
+				previousId,
+			}: {
+				id: string;
+				version: string;
+				shared: { current: string };
+				nested: boolean;
+				previousId: string | null;
+			}) => {
+				const own = useRef('row:seed', 'row-ref');
+				rowRefs.set(id, own);
+				const predecessor = previousId === null ? null : rowRefs.get(previousId)!.current;
+				own.current = `${version}:${id}`;
+				useLayoutEffect(
+					() => {
+						lifecycle.push(`mount:${id}`);
+						return () => lifecycle.push(`cleanup:${id}`);
+					},
+					[],
+					'row-effect',
+				);
+				const before = shared.current;
+				shared.current = `${version}:${id}`;
+				if (nested) {
+					const prepared = nestedRoot.prepare(Nested, { outer: shared, version: 'prepared' });
+					prepared.abort();
+					resumedReads.push(shared.current);
+				}
+				return universalValue(rowPlan, [id, before, shared.current, predecessor]);
+			},
+		);
+		const Scene = defineUniversalComponent(
+			'object',
+			({
+				order,
+				version,
+				retry = false,
+			}: {
+				order: string[];
+				version: string;
+				retry?: boolean;
+			}) => {
+				const [pass, setPass] = useState(0, 'scene-pass');
+				if (retry && pass === 0) setPass(1);
+				const shared = useRef('seed', 'shared-ref');
+				sharedRef = shared;
+				return universalFor(
+					order,
+					(id) => id,
+					(id, index) =>
+						universalComponent('object', Row, {
+							id,
+							version: `${version}:${pass}`,
+							shared,
+							nested: version === 'prepared' && id === 'item-16',
+							previousId: index === 0 ? null : order[index - 1],
+						}),
+				);
+			},
+		);
+
+		root.render(Scene, { order: ids, version: 'initial' });
+		const committedRef = sharedRef;
+		const originalRows = new Map(container.children.map((row) => [row.props.id, row]));
+		expect(container.children.map((row) => row.props.before)).toEqual([
+			'seed',
+			...ids.slice(0, -1).map((id) => `initial:0:${id}`),
+		]);
+		expect(sharedRef.current).toBe(`initial:0:${ids.at(-1)}`);
+		expect(container.children.map((row) => row.props.predecessor)).toEqual([
+			null,
+			...ids.slice(0, -1).map((id) => `initial:0:${id}`),
+		]);
+		expect(lifecycle.toSorted()).toEqual(ids.map((id) => `mount:${id}`).toSorted());
+		nestedRoot.render(Nested, { outer: sharedRef, version: 'initial' });
+		const nestedHost = nestedContainer.children[0];
+		expect(nestedHost.props.value).toBe(`initial:0:${ids.at(-1)}`);
+		expect(nestedRef.current).toBe('nested:initial');
+
+		const prepared = root.prepare(Scene, { order: ids, version: 'prepared' });
+		expect(prepared.status).toBe('prepared');
+		expect(nestedReads.at(-1)).toEqual({
+			outer: `initial:0:${ids.at(-1)}`,
+			ownBefore: 'nested:initial',
+			ownAfter: 'nested:prepared',
+		});
+		expect(resumedReads).toEqual(['prepared:0:item-16']);
+		prepared.abort();
+		expect(sharedRef).toBe(committedRef);
+		expect(sharedRef.current).toBe(`initial:0:${ids.at(-1)}`);
+		expect(nestedRef.current).toBe('nested:initial');
+		expect(nestedContainer.children[0]).toBe(nestedHost);
+		expect(nestedHost.props.value).toBe(`initial:0:${ids.at(-1)}`);
+		expect(container.children.map((row) => row.props.after)).toEqual(
+			ids.map((id) => `initial:0:${id}`),
+		);
+		expect(lifecycle).toHaveLength(ids.length);
+
+		const reversed = [...ids].reverse();
+		root.render(Scene, { order: reversed, version: 'retry', retry: true });
+		expect(sharedRef).toBe(committedRef);
+		expect(sharedRef.current).toBe(`retry:1:${reversed.at(-1)}`);
+		expect(container.children.map((row) => row.props.after)).toEqual(
+			reversed.map((id) => `retry:1:${id}`),
+		);
+		expect(container.children.map((row) => row.props.predecessor)).toEqual([
+			null,
+			...reversed.slice(0, -1).map((id) => `retry:1:${id}`),
+		]);
+		for (const row of container.children) expect(row).toBe(originalRows.get(row.props.id));
+		expect(lifecycle).toHaveLength(ids.length);
+		root.unmount();
+		nestedRoot.unmount();
+		expect(lifecycle.toSorted()).toEqual(
+			ids.flatMap((id) => [`mount:${id}`, `cleanup:${id}`]).toSorted(),
+		);
 	});
 
 	it('retries a keyed render without publishing abandoned children or effects', () => {

@@ -87,6 +87,7 @@ runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
 **universal-object-teardown**,
 **universal-template-events**, **universal-native-hover**, **universal-owner-drafts**,
+**universal-draft-lookup**,
 **universal-external-store**,
 **lynx-render**, **lynx-bundle-size**, **tsrx-renderer-validation-ranges**, and
 **tsrx-local-component-name-catalog** are Node-only,
@@ -282,6 +283,7 @@ internally, get their own baseline and guard namespace.
 | `universal-template-events` | universal-template-events | none (Node-only) | shape-stable handler updates across 128 and 1,024 retained native event sites through ordinary hosts and the fallback collapsed-template host capability, with host identity, stable listener IDs, latest-handler dispatch, and redundant-command controls |
 | `universal-native-hover` | universal-native-hover | none (Node-only) | compiled production native universal selection in 20 and 80 keyed rows, each with four component/view layers; 2,000 real hover updates per sample, host and prop identity checks, teardown, a same-run scaling ratio, and optional local V8 cumulative allocation profile |
 | `universal-owner-drafts` | universal-owner-drafts | none (Node-only) | retained object-driver roots with 0, 1, 128, and 1,024 changed-prop child owners; output, render, host identity, and structural-command controls |
+| `universal-draft-lookup` | universal-draft-lookup | none (Node-only) | root-owned ref lookups from 0, 1, 128, and 1,024 changing child owners, with own-ref and plain-object controls and host, state, and structural-command checks |
 | `universal-external-store` | universal-external-store | none (Node-only) | 128 native universal store subscribers, getter/subscribe identity controls, notification bursts, and deterministic subscription-lifetime and state-projection guards |
 | `lynx-render` | lynx-render | none (Node-only) | dual-thread Lynx render CPU: empty startup, create 1,000 and 10,000 keyed rows through the real background root, transport, and main receiver over a cheap fake Element PAPI, plus a gate that a native tap reaches its background handler via the engine `publishEvent` receiver |
 | `lynx-table` | lynx-table | none (Node-only; separate Chromium harness) | deterministic per-operation wire cost of the cross-framework krausest table (command counts and serialized commit bytes vs a changed-rows floor) through the real dual-thread path and real tap tokens |

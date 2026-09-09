@@ -879,6 +879,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Universal draft lookup (Node-only): ancestor-owned refs read across
+		// 128 and 1,024 child owners, with own-ref and plain-property controls.
+		name: 'universal-draft-lookup',
+		cwd: 'universal-draft-lookup',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Native universal external-store hooks: stable subscription lifetimes and
 		// bounded state-projection work across parent renders and notification bursts.
 		name: 'universal-external-store',
