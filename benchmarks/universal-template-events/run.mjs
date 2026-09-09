@@ -1,6 +1,6 @@
-// Universal fallback collapsed-template event update benchmark. This exercises
-// the public universal root while keeping fixture construction and validation
-// outside the measured handler-only updates.
+// Universal event update benchmark. This exercises the public universal root
+// while keeping fixture construction and validation outside the measured
+// handler-only updates.
 process.env.NODE_ENV = 'production';
 
 import { spawnSync } from 'node:child_process';
@@ -20,13 +20,17 @@ if (!Number.isSafeInteger(iterations) || iterations <= 0) {
 	throw new TypeError(`iterations must be a positive safe integer, received ${rawIterations}.`);
 }
 
-const build = spawnSync('pnpm', ['--filter', 'octane', 'build'], {
-	cwd: REPO,
-	stdio: 'inherit',
-});
-if ((build.status ?? 1) !== 0) throw new Error('The octane package build failed.');
+const runtimeOverride = process.env.BENCH_RUNTIME_URL;
+if (runtimeOverride === undefined) {
+	const build = spawnSync('pnpm', ['--filter', 'octane', 'build'], {
+		cwd: REPO,
+		stdio: 'inherit',
+	});
+	if ((build.status ?? 1) !== 0) throw new Error('The octane package build failed.');
+}
 
-const runtimeUrl = pathToFileURL(path.join(REPO, 'packages/octane/dist/universal.js')).href;
+const runtimeUrl =
+	runtimeOverride ?? pathToFileURL(path.join(REPO, 'packages/octane/dist/universal.js')).href;
 let payload;
 
 try {
@@ -98,6 +102,9 @@ try {
 	}
 
 	const sizes = [128, 1_024];
+	const workloads = ['events', 'regular-events'].flatMap((kind) =>
+		sizes.map((size) => ({ kind, size, name: `${kind}-${size}` })),
+	);
 	const warmupUpdates = 16;
 	const updatesPerSample = 20;
 	const failures = [];
@@ -111,7 +118,7 @@ try {
 		return Array(size).fill(handler);
 	}
 
-	for (const size of sizes) {
+	for (const { kind, size, name } of workloads) {
 		const metrics = { templateMounts: 0 };
 		const dispatches = [];
 		const plan = universalPlan('object', {
@@ -128,24 +135,46 @@ try {
 			universalValue(plan, handlers),
 		);
 		const container = createObjectContainer('object');
-		const root = createUniversalRoot(container, createFallbackTemplateDriver(metrics));
+		const root = createUniversalRoot(
+			container,
+			kind === 'events' ? createFallbackTemplateDriver(metrics) : createObjectDriver('object'),
+		);
 		let epoch = 0;
 		root.render(Scene, { handlers: createHandlers(size, epoch++, dispatches) });
 		const scene = container.children[0];
 		const retainedHosts = [...scene.children];
-		if (metrics.templateMounts !== 1) {
-			failures.push(
-				`events-${size}: expected one fallback template mount, got ${metrics.templateMounts}`,
+		if (metrics.templateMounts !== (kind === 'events' ? 1 : 0)) {
+			failures.push(`${name}: unexpected fallback template mount count ${metrics.templateMounts}`);
+		}
+		const initialCommands = container.commits[0]?.commands ?? [];
+		let initialListenerIds = null;
+		if (kind === 'regular-events') {
+			if (initialCommands.some((command) => command.op.startsWith('mount-template'))) {
+				failures.push(`${name}: entered a template mount path`);
+			}
+			const listenerByHost = new Map(
+				initialCommands
+					.filter((command) => command.op === 'event' && command.listener !== null)
+					.map((command) => [command.id, command.listener.id]),
 			);
+			initialListenerIds = retainedHosts.map((host) => listenerByHost.get(host.id));
+			if (
+				initialListenerIds.some((listener) => typeof listener !== 'number') ||
+				new Set(initialListenerIds).size !== size
+			) {
+				failures.push(`${name}: expected one distinct initial listener ID per ordinary host`);
+			}
 		}
 		for (let index = 0; index < warmupUpdates; index++) {
 			root.render(Scene, { handlers: createHandlers(size, epoch++, dispatches) });
 		}
 		container.commits.length = 0;
-		fixtures.set(size, {
+		fixtures.set(name, {
 			container,
 			dispatches,
 			epoch,
+			initialListenerIds,
+			kind,
 			metrics,
 			retainedHosts,
 			root,
@@ -155,9 +184,9 @@ try {
 	}
 
 	for (let iteration = 0; iteration < iterations; iteration++) {
-		const order = iteration % 2 === 0 ? sizes : [...sizes].reverse();
-		for (const size of order) {
-			const fixture = fixtures.get(size);
+		const order = iteration % 2 === 0 ? workloads : [...workloads].reverse();
+		for (const { name, size } of order) {
+			const fixture = fixtures.get(name);
 			const handlerSets = Array.from({ length: updatesPerSample }, () =>
 				createHandlers(size, fixture.epoch++, fixture.dispatches),
 			);
@@ -168,18 +197,18 @@ try {
 	}
 
 	const targets = [];
-	for (const size of sizes) {
-		const fixture = fixtures.get(size);
+	for (const { kind, size, name } of workloads) {
+		const fixture = fixtures.get(name);
 		const scene = fixture.container.children[0];
 		const latestEpoch = fixture.epoch - 1;
 		if (fixture.container.instanceCount !== size + 1) {
 			failures.push(
-				`events-${size}: expected ${size + 1} retained hosts, got ${fixture.container.instanceCount}`,
+				`${name}: expected ${size + 1} retained hosts, got ${fixture.container.instanceCount}`,
 			);
 		}
 		for (let index = 0; index < size; index++) {
 			if (scene.children[index] !== fixture.retainedHosts[index]) {
-				failures.push(`events-${size}: host ${index} lost identity during handler updates`);
+				failures.push(`${name}: host ${index} lost identity during handler updates`);
 				break;
 			}
 		}
@@ -188,25 +217,38 @@ try {
 			0,
 		);
 		if (eventCommands !== 0) {
-			failures.push(`events-${size}: handler-only updates emitted ${eventCommands} event commands`);
+			failures.push(`${name}: handler-only updates emitted ${eventCommands} event commands`);
+		}
+		const hostCommands = fixture.container.commits.reduce(
+			(total, batch) => total + batch.commands.length,
+			0,
+		);
+		if (kind === 'regular-events' && hostCommands !== 0) {
+			failures.push(`${name}: handler-only updates emitted ${hostCommands} host commands`);
 		}
 		for (const index of [0, Math.floor(size / 2), size - 1]) {
 			const result = fixture.container.dispatchEvent(scene.children[index], 'select', index);
 			if (result !== latestEpoch) {
 				failures.push(
-					`events-${size}: host ${index} dispatched epoch ${String(result)}, expected ${latestEpoch}`,
+					`${name}: host ${index} dispatched epoch ${String(result)}, expected ${latestEpoch}`,
 				);
+			}
+			if (kind === 'regular-events' && fixture.initialListenerIds?.[index] !== undefined) {
+				const direct = fixture.root.dispatchEvent(fixture.initialListenerIds[index], index);
+				if (direct !== latestEpoch) {
+					failures.push(`${name}: original listener ${index} did not reach the latest handler`);
+				}
 			}
 		}
 		if (
-			fixture.dispatches.length !== 3 ||
+			fixture.dispatches.length !== (kind === 'regular-events' ? 6 : 3) ||
 			fixture.dispatches.some(({ epoch }) => epoch !== latestEpoch)
 		) {
-			failures.push(`events-${size}: final handlers did not own all semantic dispatches`);
+			failures.push(`${name}: final handlers did not own all semantic dispatches`);
 		}
 		const stats = summarizeSamples(fixture.samples);
 		targets.push({
-			name: `events-${size}`,
+			name,
 			ops: { event_update_ms: timingStatForJson(stats) },
 			meta: {
 				nodeVersion: process.version,
@@ -217,6 +259,8 @@ try {
 				retainedHosts: fixture.retainedHosts.length,
 				templateMounts: fixture.metrics.templateMounts,
 				handlerOnlyEventCommands: eventCommands,
+				handlerOnlyHostCommands: hostCommands,
+				initialListenerIds: fixture.initialListenerIds?.length ?? 0,
 				semanticDispatches: fixture.dispatches.length,
 				finalEpoch: latestEpoch,
 			},
