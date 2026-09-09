@@ -2590,42 +2590,26 @@ describe(
 		);
 
 		it.concurrent(
-			'playground runs shared and component-local signals in its sandbox',
+			'playground runs the Signals example selected from the dropdown',
 			async () => {
-				const hash = encodePlaygroundHash({
-					lang: 'tsrx',
-					entry: 'App.tsrx',
-					files: [
-						{
-							name: 'App.tsrx',
-							source: `import { createScope } from 'octane/signals';
-import { useSignal$ } from 'octane/signals/client';
-const scope = createScope({ scopeKey: 'shared' });
-const shared$ = scope.signal$('count', 0);
-export default function App() @{
-	const local$ = useSignal$(10);
-	<div>
-		<button onClick={() => shared$.set(shared$.get() + 1)}>{'Shared: ' + shared$.get()}</button>
-		<button onClick={() => local$.set(local$.get() + 1)}>{'Local: ' + local$.get()}</button>
-	</div>
-}`,
-						},
-					],
-				});
-				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, `/playground#${hash}`);
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
 				try {
 					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
-					await page.click('.pg-consent-run');
+					await page.selectOption('.pg-select', 'signals');
 					const preview = page.frameLocator('iframe[title="Playground preview"]');
 					const shared = preview.getByRole('button', { name: 'Shared:' });
 					const local = preview.getByRole('button', { name: 'Local:' });
 					await waitForLocatorText(shared, 'Shared: 0');
 					await waitForLocatorText(local, 'Local: 10');
+					const doubled = preview.locator('p');
+					await waitForLocatorText(doubled, 'Doubled: 0');
 					await shared.click();
 					await waitForLocatorText(shared, 'Shared: 1');
+					await waitForLocatorText(doubled, 'Doubled: 2');
 					await local.click();
 					await waitForLocatorText(local, 'Local: 11');
 					await waitForLocatorText(shared, 'Shared: 1');
+					await waitForLocatorText(doubled, 'Doubled: 2');
 					expect(errors).toEqual([]);
 				} finally {
 					await page.close();
