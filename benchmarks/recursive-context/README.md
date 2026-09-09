@@ -22,6 +22,7 @@ benchmarks/recursive-context/
 ├── svelte/           # Vite app, dev :5275 — Svelte 5 createContext + runes
 ├── run.mjs            # Playwright harness — drives all adapters
 ├── work.mjs           # untimed Chromium precise-call-coverage gates for Octane
+├── context-cache-work.mjs # Map-construction gate and observational update timings
 ├── package.json       # umbrella: `pnpm bench`
 └── README.md
 ```
@@ -97,6 +98,9 @@ node benchmarks/bench.mjs recursive-context
 The unified runner also executes `work.mjs` against the already-built Octane
 previews. Run it directly with `pnpm --dir benchmarks/recursive-context
 bench:work` when those two previews are already running.
+Run `pnpm --dir benchmarks/recursive-context bench:cache` for the focused
+context-cache gate. It builds the Octane production fixture and starts its own
+preview on an ephemeral local port; no other preview servers are needed.
 
 Output is a side-by-side table of median / min / p95 millis per op, followed by a
 pairwise ratio block, e.g.:
@@ -175,6 +179,27 @@ codegen-size gate permits no growth beyond the authored source, preserves both
 `use()` calls, and requires zero generated `useBatch`/`puBatch` imports or calls.
 A separate mixed context/promise hook must still generate one batch call in each
 mode, confirming that the analyzer detects the helper when batching is needed.
+
+The context-cache work pass builds a second production HTML entry in the TSRX
+fixture. It renders 512 keyed consumer components with zero, one, or two
+**distinct** context reads and identical visible DOM. An initialization script
+wraps the browser's native `Map` constructor; the harness resets its counter
+around mount, root-context update, second-context update, keyed reorder, and
+unmount. An explicit `new Map()` verifies the probe. It checks every row's
+text and identity after updates and reversal, including the second provider's
+new value in the two-context case, and checks teardown. The zero-context
+fixture controls for shared root, provider, and keyed-row allocations.
+
+Before the inline single-context cache, mount constructed 6 Maps for the
+zero-context control and 518 Maps each for one- and two-context consumers: 512
+extra Maps in each reader mode. The exact production gates now require zero
+extra Maps for the one-context mode and 512 for the two-context spill. All
+three modes must incur no extra Map construction over the zero-context control
+on subsequent updates, reorder, and teardown. The gate runs from `work.mjs`
+after its precise-coverage pass, and can also run independently via
+`bench:cache`. A fresh, uninstrumented browser realm records 40 batches of
+20 root updates per mode with 12 warmup updates; update times are diagnostics,
+not wall-time pass/fail gates.
 
 Default: 10 warmups + 20 iters. Pass an integer to `bench` to override iters
 (`bench:long` runs 40).

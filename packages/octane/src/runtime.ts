@@ -331,10 +331,12 @@ export interface Scope {
 	 * never drops a context it stamped, and a closer provider can't appear above a
 	 * surviving consumer — so only the provider's VALUE varies, read live from the
 	 * cached scope. Collapses useContextInternal's O(depth) walk to an O(1) read.
-	 * Lazily minted on a consumer's first `use()`, so non-consumer blocks (the
-	 * vast majority) carry just this one null field, not a per-context slot set.
+	 * The first context and its resolved owner live inline; only a second distinct
+	 * context allocates a Map. The owner is never the value itself, so Provider
+	 * updates remain visible on subsequent reads.
 	 */
-	$$ctxCache: Map<Context<any>, any> | null;
+	$$ctxCache: Context<any> | Map<Context<any>, Scope | typeof DEFAULT_CTX> | null;
+	$$ctxCacheOwner: Scope | typeof DEFAULT_CTX | null;
 	// Per-scope dense slot array. Holds, by COMPILE-TIME index, this scope's binding
 	// bag (slot 0) and every control-flow / component / child slot state — plus the
 	// runtime-internal slots (`__ret`, `__kids`, `_item`, `_children`, `_fb`). Indexing
@@ -6739,7 +6741,8 @@ class BlockImpl {
 	// block can bail its body and refresh just its consuming child blocks.
 	declare $$ctxDirect: Map<Context<any>, any> | null;
 	// Resolved-provider cache for `use(ctx)` — see Scope.$$ctxCache.
-	declare $$ctxCache: Map<Context<any>, any> | null;
+	declare $$ctxCache: Context<any> | Map<Context<any>, Scope | typeof DEFAULT_CTX> | null;
+	declare $$ctxCacheOwner: Scope | typeof DEFAULT_CTX | null;
 	// Armed for React's IMPLICIT same-element bailout (beginWork's
 	// oldProps === newProps skip). Set at value-position component mounts
 	// (childSlot) — the only sites that can receive a cached descriptor back.
@@ -6836,6 +6839,7 @@ class BlockImpl {
 		this.$$ctxReads = null;
 		this.$$ctxDirect = null;
 		this.$$ctxCache = null;
+		this.$$ctxCacheOwner = null;
 		this.$$implicitBail = false;
 		this.__thenableIdx = 0;
 		this.drainStamp = 0;
@@ -6893,7 +6897,8 @@ class ScopeImpl {
 	declare refFields: string[] | null;
 	declare $$ctxValues: Map<Context<any>, any> | null;
 	declare $$ctxReads: Map<Context<any>, any> | null;
-	declare $$ctxCache: Map<Context<any>, any> | null;
+	declare $$ctxCache: Context<any> | Map<Context<any>, Scope | typeof DEFAULT_CTX> | null;
+	declare $$ctxCacheOwner: Scope | typeof DEFAULT_CTX | null;
 	declare mounted: boolean;
 	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
 	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
@@ -6911,6 +6916,7 @@ class ScopeImpl {
 		this.$$ctxValues = null;
 		this.$$ctxReads = null;
 		this.$$ctxCache = null;
+		this.$$ctxCacheOwner = null;
 		this.mounted = false;
 		this.slots = [];
 	}
@@ -11882,7 +11888,8 @@ export function bindRendererRegionOwner(props: unknown): void {
 	const binding = { bridge, release };
 	RENDERER_REGION_DOM_BINDINGS.set(root, binding);
 	RENDERER_REGION_DOM_OWNERS.set(root, bridge);
-	root.$$ctxCache?.clear();
+	root.$$ctxCache = null;
+	root.$$ctxCacheOwner = null;
 	if (previous === undefined) {
 		(root.cleanups ??= []).push(() => {
 			const current = RENDERER_REGION_DOM_BINDINGS.get(root);
@@ -12071,13 +12078,43 @@ function createNativeScopedResolver<T>(read: () => T): () => T {
 	};
 }
 
+function cacheContextOwner(
+	reader: Scope | null,
+	context: Context<any>,
+	owner: Scope | typeof DEFAULT_CTX,
+): void {
+	if (reader === null) return;
+	const cache = reader.$$ctxCache;
+	if (cache === null) {
+		reader.$$ctxCache = context;
+		reader.$$ctxCacheOwner = owner;
+		return;
+	}
+	const inlineOwner = reader.$$ctxCacheOwner;
+	if (inlineOwner !== null) {
+		const spill = new Map<Context<any>, Scope | typeof DEFAULT_CTX>();
+		spill.set(cache as Context<any>, inlineOwner);
+		spill.set(context, owner);
+		reader.$$ctxCache = spill;
+		reader.$$ctxCacheOwner = null;
+	} else {
+		(cache as Map<Context<any>, Scope | typeof DEFAULT_CTX>).set(context, owner);
+	}
+}
+
 function readContextFrom<T>(reader: Scope | null, block: Block | null, context: Context<T>): T {
 	// One boolean test per context read; the map is allocated only for a
 	// descriptor that reads context while resolving.
 	if (SCOPED_READ_TRACKING) (SCOPED_READS ??= new Map()).set(context, context.$$version);
-	if (reader !== null && reader.$$ctxCache !== null) {
-		const hit = reader.$$ctxCache.get(context);
-		if (hit !== undefined) {
+	if (reader !== null) {
+		const cache = reader.$$ctxCache;
+		const hit =
+			cache === context
+				? reader.$$ctxCacheOwner
+				: cache !== null && reader.$$ctxCacheOwner === null
+					? (cache as Map<Context<any>, Scope | typeof DEFAULT_CTX>).get(context)
+					: undefined;
+		if (hit !== null && hit !== undefined) {
 			if (hit === DEFAULT_CTX) {
 				const bridge = rendererRegionOwnerForBlock(block);
 				return bridge === null ? context.defaultValue : bridge.readContext(context);
@@ -12090,7 +12127,7 @@ function readContextFrom<T>(reader: Scope | null, block: Block | null, context: 
 	while (scope !== null) {
 		const values = scope.$$ctxValues;
 		if (values !== null && values.has(context)) {
-			if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, scope);
+			cacheContextOwner(reader, context, scope);
 			return values.get(context) as T;
 		}
 		scope = scope.parent;
@@ -12099,14 +12136,14 @@ function readContextFrom<T>(reader: Scope | null, block: Block | null, context: 
 	while (current !== null) {
 		const values = current.$$ctxValues;
 		if (values !== null && values.has(context)) {
-			if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, current);
+			cacheContextOwner(reader, context, current);
 			return values.get(context) as T;
 		}
 		current = current.parentBlock;
 	}
 	const bridge = rendererRegionOwnerForBlock(block);
 	if (bridge !== null) return bridge.readContext(context);
-	if (reader !== null) (reader.$$ctxCache ??= new Map()).set(context, DEFAULT_CTX);
+	cacheContextOwner(reader, context, DEFAULT_CTX);
 	return context.defaultValue;
 }
 

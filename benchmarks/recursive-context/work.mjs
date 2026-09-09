@@ -422,6 +422,11 @@ for (const [environment, { context, mixed }] of Object.entries(PLAIN_HOOKS)) {
 	);
 }
 
+// The separate keyed-row fixture shares this Vite app but runs on an ephemeral
+// preview port so an existing preview of another worktree cannot hide a stale
+// bundle. It rebuilds with normal minification after precise coverage finishes.
+const { contextCacheResults } = await import('./context-cache-work.mjs');
+
 const outputPath = process.env.BENCH_JSON || process.env.WORK_JSON;
 if (outputPath) {
 	const payload = {
@@ -464,6 +469,20 @@ if (outputPath) {
 						: 'pass',
 				},
 			})),
+			{
+				name: 'octane-context-cache-work',
+				ops: Object.fromEntries(
+					Object.entries(contextCacheResults).flatMap(([variant, measurements]) =>
+						Object.entries(measurements).map(([operation, value]) => [
+							`${variant}_${operation}`,
+							operation === 'updateMs'
+								? value
+								: deterministicStatForJson(deterministicCount(value)),
+						]),
+					),
+				),
+				meta: { gates: 'pass' },
+			},
 		],
 	};
 	if (failures.length > 0) payload.failed = failures.join('; ');
