@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { mount } from './_helpers';
-import { flushSync, hostComponent } from '../src/index.js';
+import { flushEffects, mount } from './_helpers';
+import {
+	createElement,
+	flushSync,
+	hostComponent,
+	type ComponentBody,
+	type OctaneNode,
+} from '../src/index.js';
+import { HostComponentChildren } from './_fixtures/host-component-children.tsrx';
 
 // `hostComponent` (the runtime primitive behind @octanejs/motion's `motion.<tag>`) REUSES its
 // element across renders. Regressions fixed here:
@@ -15,7 +22,100 @@ const HostBody = (props: any, scope: any): void => {
 	hostComponent(scope, 0, props.tag ?? 'div', props.hp, null);
 };
 
-describe('hostComponent — no stale props/events on the reused element', () => {
+describe('hostComponent — reused host and children', () => {
+	it('renders the value returned by callable children', () => {
+		const host: ComponentBody<{ label: string }> = (props, scope) => {
+			hostComponent(scope, 0, 'section', null, () =>
+				createElement('strong', { id: 'returned-child' }, props.label),
+			);
+		};
+		const r = mount(host, { label: 'first' });
+		try {
+			const child = r.find('#returned-child');
+			expect(child.textContent).toBe('first');
+			r.update(host, { label: 'second' });
+			expect(r.find('#returned-child')).toBe(child);
+			expect(child.textContent).toBe('second');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('updates compiled children while retaining their state and cleaning up removed children', () => {
+		const host: ComponentBody<{ children?: OctaneNode }> = (props, scope) => {
+			hostComponent(scope, 0, 'section', { id: 'callable-host' }, props.children);
+		};
+		const lifecycle: string[] = [];
+		const attached: HTMLButtonElement[] = [];
+		const detached: HTMLButtonElement[] = [];
+		const onEffect = (label: string) => {
+			lifecycle.push(`setup:${label}`);
+			return () => {
+				lifecycle.push(`cleanup:${label}`);
+			};
+		};
+		const childRef = (element: HTMLButtonElement | null) => {
+			if (element === null) return;
+			attached.push(element);
+			return () => {
+				detached.push(element);
+			};
+		};
+		const props = { host, childRef, onEffect };
+		const r = mount(HostComponentChildren, { ...props, label: 'first', show: true });
+		try {
+			flushEffects();
+			const section = r.find('#callable-host');
+			const label = r.find('#host-label');
+			const button = r.find('#host-child');
+			expect(button.textContent).toBe('first:0');
+			expect(lifecycle).toEqual(['setup:first']);
+			expect(attached).toEqual([button]);
+
+			r.click('#host-child');
+			flushEffects();
+			expect(button.textContent).toBe('first:1');
+			r.update(HostComponentChildren, { ...props, label: 'second', show: true });
+			flushEffects();
+			expect(r.find('#callable-host')).toBe(section);
+			expect(r.find('#host-label')).toBe(label);
+			expect(label.textContent).toBe('second');
+			expect(r.find('#host-child')).toBe(button);
+			expect(button.textContent).toBe('second:1');
+			expect(lifecycle).toEqual(['setup:first', 'cleanup:first', 'setup:second']);
+			expect(attached).toEqual([button]);
+			expect(detached).toEqual([]);
+
+			r.update(HostComponentChildren, { ...props, label: 'empty', show: false });
+			flushEffects();
+			expect(r.find('#callable-host')).toBe(section);
+			expect(label.textContent).toBe('empty');
+			expect(r.findAll('#host-child')).toEqual([]);
+			expect(detached).toEqual([button]);
+			expect(lifecycle).toEqual(['setup:first', 'cleanup:first', 'setup:second', 'cleanup:second']);
+
+			r.update(HostComponentChildren, { ...props, label: 'third', show: true });
+			flushEffects();
+			const remounted = r.find('#host-child');
+			expect(r.find('#callable-host')).toBe(section);
+			expect(remounted).not.toBe(button);
+			expect(remounted.textContent).toBe('third:0');
+			expect(attached).toEqual([button, remounted]);
+			r.unmount();
+			flushEffects();
+			expect(lifecycle).toEqual([
+				'setup:first',
+				'cleanup:first',
+				'setup:second',
+				'cleanup:second',
+				'setup:third',
+				'cleanup:third',
+			]);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('removes attributes that disappear across renders', () => {
 		const r = mount(HostBody as any, { hp: { id: 'h', 'data-x': '1', title: 't', class: 'a' } });
 		const div = r.container.querySelector('#h')!;
