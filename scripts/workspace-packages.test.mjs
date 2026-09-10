@@ -1,8 +1,53 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import semver from 'semver';
-import { OCTANE_BETA_PEER_RANGE, validateWorkspacePackages } from './workspace-packages.mjs';
+import {
+	getBindingPackages,
+	getFrameworkIntegrationPackages,
+	getPublishablePackages,
+	getWorkspacePackages,
+	OCTANE_BETA_PEER_RANGE,
+	REPO_ROOT,
+	validateWorkspacePackages,
+} from './workspace-packages.mjs';
+
+test('explicit-root discovery uses only packages in the audited checkout', (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), 'workspace-discovery-'));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	for (const [dir, name, privatePackage] of [
+		['only-here', '@octanejs/only-here', false],
+		['internal', '@octanejs/internal', true],
+		['astro', '@octanejs/astro', false],
+	]) {
+		const directory = path.join(root, 'packages', dir);
+		mkdirSync(directory, { recursive: true });
+		writeFileSync(
+			path.join(directory, 'package.json'),
+			JSON.stringify({ name, version: '1.0.0', private: privatePackage }),
+		);
+	}
+	assert.deepEqual(
+		getWorkspacePackages(root).map((pkg) => pkg.name),
+		['@octanejs/astro', '@octanejs/internal', '@octanejs/only-here'],
+	);
+	assert.deepEqual(
+		getPublishablePackages(root).map((pkg) => pkg.name),
+		['@octanejs/astro', '@octanejs/only-here'],
+	);
+	assert.deepEqual(
+		getBindingPackages(root).map((pkg) => pkg.name),
+		['@octanejs/only-here'],
+	);
+	assert.deepEqual(
+		getFrameworkIntegrationPackages(root).map((pkg) => pkg.name),
+		['@octanejs/astro'],
+	);
+	assert.equal(getBindingPackages(root)[0].directory, path.join(root, 'packages/only-here'));
+	assert.deepEqual(getWorkspacePackages(), getWorkspacePackages(REPO_ROOT));
+});
 
 function workspacePackage(name, manifest = {}) {
 	return {

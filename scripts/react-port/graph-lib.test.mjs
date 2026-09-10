@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	buildCapabilityInventory,
@@ -55,6 +58,59 @@ function fixtureInventory() {
 }
 
 describe('repository capability inventory', () => {
+	test('reads audited registrations without executing source and retains broken metadata entries', (t) => {
+		const root = mkdtempSync(path.join(tmpdir(), 'capability-inventory-'));
+		t.after(() => rmSync(root, { recursive: true, force: true }));
+		const write = (relativePath, content) => {
+			const file = path.join(root, relativePath);
+			mkdirSync(path.dirname(file), { recursive: true });
+			writeFileSync(file, content);
+		};
+		write('packages/octane/src/index.ts', 'export const fixture = true;');
+		write('docs/differences-from-react.md', 'Fixture runtime differences');
+		const marker = path.join(root, 'source-executed');
+		const bridge = `
+import { writeFileSync } from 'node:fs';
+writeFileSync(${JSON.stringify(marker)}, 'must not run');
+export const KNOWN_BINDINGS = { 'react-fixture': '@octanejs/fixture' };
+export const KNOWN_NATIVE_BINDINGS = new Set(['@octanejs/missing']);
+export const KNOWN_VANILLA_CORES = { 'react-fixture': 'fixture-core', unsupported: null };
+export const REACT_API_MAP = { useFixture: { status: 'same', note: 'audited source' } };
+`;
+		write('packages/octane-mcp-server/src/bridge.js', bridge);
+		for (const name of ['fixture', 'missing', 'malformed']) {
+			write(`packages/${name}/package.json`, JSON.stringify({ name: `@octanejs/${name}` }));
+		}
+		write('packages/fixture/status.json', JSON.stringify({ verified: 'partial' }));
+		write('packages/malformed/status.json', '{');
+		const inventory = readRepositoryCapabilityInventory(root);
+		assert.deepEqual(Object.keys(inventory.bindings), [
+			'@octanejs/fixture',
+			'@octanejs/malformed',
+			'@octanejs/missing',
+		]);
+		assert.deepEqual(inventory.sourceBindings, { 'react-fixture': '@octanejs/fixture' });
+		assert.deepEqual(inventory.nativeBindings, ['@octanejs/missing']);
+		assert.deepEqual(inventory.vanillaCores, {
+			'react-fixture': 'fixture-core',
+			unsupported: null,
+		});
+		assert.equal(inventory.reactApis.useFixture.note, 'audited source');
+		assert.equal(inventory.bindings['@octanejs/fixture'].metadataErrors, undefined);
+		assert.equal(inventory.bindings['@octanejs/missing'].metadataErrors[0].code, 'missing-status');
+		assert.equal(
+			inventory.bindings['@octanejs/malformed'].metadataErrors[0].code,
+			'invalid-status',
+		);
+		assert.equal(existsSync(marker), false);
+		write(
+			'packages/octane-mcp-server/src/bridge.js',
+			bridge.replace("'fixture-core'", 'getCore()'),
+		);
+		assert.throws(() => readRepositoryCapabilityInventory(root), /static.*KNOWN_VANILLA_CORES/i);
+		assert.equal(existsSync(marker), false);
+	});
+
 	test('reads live bindings, vanilla cores, React API facts, and stable fingerprints', () => {
 		const inventory = readRepositoryCapabilityInventory();
 		assert.equal(inventory.schemaVersion, 1);
@@ -411,6 +467,49 @@ describe('union prerequisite graph', () => {
 		assert.equal(graph.nodes['pkg:react-covered'].action, 'extend-binding');
 		assert.equal(graph.nodes['pkg:react-covered'].state, 'blocked');
 		assert.match(graph.nodes['pkg:react-covered'].blockers.join('\n'), /required subpath/i);
+	});
+
+	test('prefers demonstrated vanilla imports even when an Octane wrapper exists', () => {
+		for (const specifier of ['react-covered', 'react-covered/advanced']) {
+			const target = licensedTarget('consumer', '1.0.0', { 'react-covered': '^2.0.0' });
+			target.sourceAnalysis = {
+				verdict: 'bridgeable',
+				filesScanned: 1,
+				truncated: false,
+				hazards: [],
+				apis: [],
+				imports: [specifier],
+			};
+			const graph = planPortGraph({
+				targets: [target],
+				inventory: fixtureInventory(),
+				dependencyClassifications: { 'react-covered': 'framework-neutral' },
+			});
+			assert.equal(graph.nodes['pkg:react-covered'].action, 'reuse-package');
+			assert.equal(graph.nodes['pkg:react-covered'].state, 'verified');
+			assert.equal(graph.nodes['pkg:consumer'].state, 'ready');
+		}
+	});
+
+	test('current React implementation evidence prevents direct vanilla reuse', () => {
+		for (const verdict of ['bridgeable', 'bridgeable-with-rewrites']) {
+			const prerequisite = licensedTarget('react-covered', '2.4.0');
+			prerequisite.requested = false;
+			prerequisite.sourceAnalysis = {
+				verdict,
+				filesScanned: 1,
+				truncated: false,
+				hazards: [],
+				apis: [{ name: 'useState', status: 'same' }],
+				imports: ['react'],
+			};
+			const graph = planPortGraph({
+				targets: [licensedTarget('consumer', '1.0.0', { 'react-covered': '^2.0.0' }), prerequisite],
+				inventory: fixtureInventory(),
+				dependencyClassifications: { 'react-covered': 'framework-neutral' },
+			});
+			assert.equal(graph.nodes['pkg:react-covered'].action, 'reuse-binding');
+		}
 	});
 
 	test('deduplicates a shared prerequisite and isolates an unrelated blocked branch', () => {

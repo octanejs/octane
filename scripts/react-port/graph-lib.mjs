@@ -1,15 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import {
-	KNOWN_BINDINGS,
-	KNOWN_NATIVE_BINDINGS,
-	KNOWN_VANILLA_CORES,
-	REACT_API_MAP,
-} from '../../packages/octane-mcp-server/src/bridge.js';
+import ts from 'typescript';
 import { getWorkspacePackages, REPO_ROOT } from '../workspace-packages.mjs';
 import { parseInput } from './input-lib.mjs';
 import { hasObservablePackageTests } from './package-tests-lib.mjs';
-import { fingerprint } from './preflight-lib.mjs';
+import { fingerprint } from './report-lib.mjs';
 import { rangesOverlap, satisfiesRange } from './version-lib.mjs';
 
 export { satisfiesRange } from './version-lib.mjs';
@@ -56,6 +51,7 @@ export function buildCapabilityInventory({
 					exports: [...(binding.exports ?? [])].sort(),
 					tested: binding.tested === true,
 					status: binding.status,
+					...(binding.metadataErrors ? { metadataErrors: binding.metadataErrors } : {}),
 				},
 			])
 			.sort(([left], [right]) => left.localeCompare(right)),
@@ -87,16 +83,121 @@ function hashFile(filePath) {
 	return fingerprint(readFileSync(filePath, 'utf8'));
 }
 
+// Registrations belong to the inspected checkout. Parse their literal data;
+// importing the bridge would execute that checkout's code in the audit process.
+function readBridgeRegistrations(repoRoot) {
+	const filePath = path.join(repoRoot, 'packages/octane-mcp-server/src/bridge.js');
+	const source = ts.createSourceFile(
+		filePath,
+		readFileSync(filePath, 'utf8'),
+		ts.ScriptTarget.Latest,
+		false,
+		ts.ScriptKind.JS,
+	);
+	if (source.parseDiagnostics.length) throw new Error(`Cannot parse registrations in ${filePath}`);
+	const declarations = new Map();
+	for (const statement of source.statements) {
+		if (
+			!ts.isVariableStatement(statement) ||
+			!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+		)
+			continue;
+		for (const declaration of statement.declarationList.declarations) {
+			if (ts.isIdentifier(declaration.name)) {
+				declarations.set(declaration.name.text, declaration.initializer);
+			}
+		}
+	}
+	function literal(node, name) {
+		if (node && ts.isStringLiteral(node)) return node.text;
+		if (node?.kind === ts.SyntaxKind.NullKeyword) return null;
+		if (node && ts.isArrayLiteralExpression(node)) {
+			return node.elements.map((element) => literal(element, name));
+		}
+		if (node && ts.isObjectLiteralExpression(node)) {
+			const entries = node.properties.map((property) => {
+				if (
+					!ts.isPropertyAssignment(property) ||
+					(!ts.isIdentifier(property.name) && !ts.isStringLiteral(property.name))
+				)
+					throw new Error(`Expected static registration data for ${name}`);
+				return [property.name.text, literal(property.initializer, name)];
+			});
+			if (new Set(entries.map(([key]) => key)).size !== entries.length) {
+				throw new Error(`Duplicate registration in ${name}`);
+			}
+			return Object.fromEntries(entries);
+		}
+		throw new Error(`Expected static registration data for ${name}`);
+	}
+	const result = {};
+	for (const name of [
+		'KNOWN_BINDINGS',
+		'KNOWN_NATIVE_BINDINGS',
+		'KNOWN_VANILLA_CORES',
+		'REACT_API_MAP',
+	]) {
+		let initializer = declarations.get(name);
+		if (name === 'KNOWN_NATIVE_BINDINGS') {
+			if (
+				!initializer ||
+				!ts.isNewExpression(initializer) ||
+				!ts.isIdentifier(initializer.expression) ||
+				initializer.expression.text !== 'Set' ||
+				initializer.arguments?.length !== 1
+			)
+				throw new Error(`Expected static Set registration data for ${name}`);
+			initializer = initializer.arguments[0];
+		}
+		result[name] = literal(initializer, name);
+	}
+	for (const name of ['KNOWN_BINDINGS', 'KNOWN_VANILLA_CORES', 'REACT_API_MAP']) {
+		if (!result[name] || Array.isArray(result[name]) || typeof result[name] !== 'object') {
+			throw new Error(`Expected registration object for ${name}`);
+		}
+	}
+	if (
+		!Array.isArray(result.KNOWN_NATIVE_BINDINGS) ||
+		result.KNOWN_NATIVE_BINDINGS.some((value) => typeof value !== 'string')
+	) {
+		throw new Error('Expected string registrations for KNOWN_NATIVE_BINDINGS');
+	}
+	for (const name of ['KNOWN_BINDINGS', 'KNOWN_VANILLA_CORES']) {
+		if (
+			Object.values(result[name]).some(
+				(value) => typeof value !== 'string' && !(name === 'KNOWN_VANILLA_CORES' && value === null),
+			)
+		) {
+			throw new Error(`Expected package names in ${name}`);
+		}
+	}
+	return result;
+}
+
 export function readRepositoryCapabilityInventory(repoRoot = REPO_ROOT) {
-	const workspacePackages = getWorkspacePackages();
+	const workspacePackages = getWorkspacePackages(repoRoot);
+	const registrations = readBridgeRegistrations(repoRoot);
 	const bindings = workspacePackages
 		.filter(
 			(workspacePackage) =>
 				!workspacePackage.private && workspacePackage.role === 'framework binding',
 		)
 		.map((binding) => {
-			if (!existsSync(binding.statusPath)) {
-				throw new Error(`Binding ${binding.name} has no status.json`);
+			let status = null;
+			const metadataErrors = [];
+			try {
+				status = JSON.parse(readFileSync(binding.statusPath, 'utf8'));
+				if (!status || typeof status !== 'object' || Array.isArray(status)) {
+					throw new Error('status.json must contain an object');
+				}
+			} catch (error) {
+				status = null;
+				metadataErrors.push({
+					code: error.code === 'ENOENT' ? 'missing-status' : 'invalid-status',
+					path: `packages/${binding.dir}/status.json`,
+					message:
+						error.code === 'ENOENT' ? `Binding ${binding.name} has no status.json` : error.message,
+				});
 			}
 			return {
 				name: binding.name,
@@ -105,16 +206,17 @@ export function readRepositoryCapabilityInventory(repoRoot = REPO_ROOT) {
 				tested:
 					typeof binding.manifest.scripts?.test === 'string' &&
 					hasObservablePackageTests(binding.directory),
-				status: JSON.parse(readFileSync(binding.statusPath, 'utf8')),
+				status,
+				...(metadataErrors.length ? { metadataErrors } : {}),
 			};
 		});
 	return buildCapabilityInventory({
 		bindings,
 		workspacePackages,
-		knownBindings: KNOWN_BINDINGS,
-		knownNativeBindings: KNOWN_NATIVE_BINDINGS,
-		knownVanillaCores: KNOWN_VANILLA_CORES,
-		reactApiMap: REACT_API_MAP,
+		knownBindings: registrations.KNOWN_BINDINGS,
+		knownNativeBindings: registrations.KNOWN_NATIVE_BINDINGS,
+		knownVanillaCores: registrations.KNOWN_VANILLA_CORES,
+		reactApiMap: registrations.REACT_API_MAP,
 		octanePublicSourceSha256: hashFile(path.join(repoRoot, 'packages/octane/src/index.ts')),
 		differencesSha256: hashFile(path.join(repoRoot, 'docs/differences-from-react.md')),
 	});
@@ -508,8 +610,17 @@ export function planPortGraph({
 		if (node.state === 'blocked') continue;
 		if (node.action === 'reimplement-in-parent') continue;
 
+		const reuseNeutralPackage =
+			!node.requested &&
+			classification === 'framework-neutral' &&
+			!node.feasibility?.requiresAdaptation &&
+			!node.feasibility?.classComponents &&
+			!node.feasibility?.apis?.length &&
+			!node.feasibility?.imports?.some((specifier) =>
+				/^(?:react|react-dom)(?:\/|$)/.test(specifier),
+			);
 		const existing = existingBindingAssessment(node, inventory);
-		if (existing?.adequate) {
+		if (existing?.adequate && !reuseNeutralPackage) {
 			node.state = 'verified';
 			node.action = 'reuse-binding';
 			assignBinding(node, existing.binding.name);
@@ -541,6 +652,14 @@ export function planPortGraph({
 			}
 			continue;
 		}
+		// A convenience wrapper does not change the ownership of a proven
+		// framework-neutral dependency, including its direct upstream subpaths.
+		if (reuseNeutralPackage) {
+			node.state = 'verified';
+			node.action = 'reuse-package';
+			continue;
+		}
+
 		if (inventory.sourceBindings[node.packageName]) {
 			assignBinding(node, inventory.sourceBindings[node.packageName]);
 			node.action =
@@ -561,11 +680,6 @@ export function planPortGraph({
 			continue;
 		}
 
-		if (!node.requested && classification === 'framework-neutral') {
-			node.state = 'verified';
-			node.action = 'reuse-package';
-			continue;
-		}
 		if (!node.requested && classification === 'reimplemented') {
 			applyCleanRoomReimplementation(node);
 			continue;
