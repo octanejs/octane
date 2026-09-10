@@ -516,6 +516,26 @@ non-idempotent globals such as `Date.now()` and `Math.random()`
 synchronous helpers; they do not prove arbitrary method bodies or imported code
 pure. Lazy state initialization may obtain an initial timestamp or random value.
 
+Reading unshadowed `window`, `document`, `localStorage`, `sessionStorage`,
+`navigator`, `location`, or `matchMedia` during render reports
+`OCTANE_STRONG_RENDER_AMBIENT_READ`. This includes `typeof` guards and constant
+aliases of those browser handles. Reading a `globalThis` property also reports
+the error, including computed properties whose names are unknown, except for
+known standard language builtins such as `globalThis.JSON`. Reading the
+`globalThis` object itself remains supported.
+Shadowed local names and scalar snapshots captured at module initialization are
+not browser-handle reads. The analysis does not generally prove aliases obtained
+through defaults, returned values, containers, arbitrary deeper properties, or
+imports. Those values still have to satisfy the render-snapshot contract.
+
+For changing browser state, use `useSyncExternalStore` with a server snapshot
+and render its returned snapshot. Browser reads in its snapshot callbacks,
+events, effects, and deferred callbacks remain supported. Lazy `useState` and
+`useReducer` initializers may also read browser state for an initial value. They
+still run during server rendering: guard unavailable browser APIs and ensure the
+server and client agree on initial output. A `typeof window` guard inside an
+ordinary render calculation does not make the calculation snapshot-safe.
+
 The directive is also an author assertion for production memoization, not just a
 request for diagnostics. Render output must not observe changing data through a
 stable ref, state getter, module variable, external store object, or hidden hook.

@@ -232,6 +232,14 @@ A Strong module cannot:
 - Read a reassigned module-scope `let` or `var` while rendering
   (`OCTANE_STRONG_RENDER_MODULE_STATE_READ`). Put changing values in state or
   context, or pass an immutable snapshot as a prop.
+- Read unshadowed `window`, `document`, `localStorage`, `sessionStorage`,
+  `navigator`, `location`, or `matchMedia` while rendering
+  (`OCTANE_STRONG_RENDER_AMBIENT_READ`). This includes `typeof` guards, known
+  browser handle aliases, and `globalThis` property reads except known standard
+  language builtins. Computed `globalThis` properties whose names are unknown
+  also report the error. Render a snapshot from
+  `useSyncExternalStore` with a server snapshot, or read browser state in an
+  event, effect, or lazy state initializer.
 - Assign to a ref's `current` value while rendering.
 - Read a `useRef` object's `current` while rendering
   (`OCTANE_STRONG_RENDER_REF_READ`). Keep refs as `ref` props and read them in
@@ -252,6 +260,16 @@ A Strong module cannot:
   `@{…}` block that uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
 - Declare a named native event handler outside the sole deeper nested `@{…}`
   block containing its direct `onX` use (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
+
+Browser reads in external-store snapshot callbacks, events, effects, deferred
+callbacks, and lazy `useState` or `useReducer` initializers remain supported.
+Lazy initializers still run during server rendering: guard browser APIs and
+ensure server and client initial output agrees. The check respects shadowed
+names, scalar module snapshots, the `globalThis` object itself, and known
+standard language builtins such as `globalThis.JSON`. It does not generally
+prove aliases obtained through defaults, returned values, containers, arbitrary
+deeper properties, or imports safe; those still need to satisfy the snapshot
+contract.
 
 A nested `@{…}` can place hooks and named event handlers beside the JSX that
 uses them:

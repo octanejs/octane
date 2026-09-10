@@ -6,6 +6,7 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 const RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 const RENDER_STATE_GETTER_CALL = 'OCTANE_STRONG_RENDER_STATE_GETTER_CALL';
 const RENDER_MODULE_STATE_READ = 'OCTANE_STRONG_RENDER_MODULE_STATE_READ';
+const RENDER_AMBIENT_READ = 'OCTANE_STRONG_RENDER_AMBIENT_READ';
 const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 const RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 const RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
@@ -4958,6 +4959,374 @@ function advance() { revision++; }
 export function App() { return <p>{revision}</p>; }`;
 		expect(() => slotHooks(plain, '/src/useRevision.ts')).toThrow(RENDER_MODULE_STATE_READ);
 		expect(() => compile(tsx, '/src/App.tsx')).toThrow(RENDER_MODULE_STATE_READ);
+	});
+});
+
+describe('Strong mode render-time ambient browser state reads', () => {
+	function component(render: string, moduleSetup = '') {
+		return `${moduleSetup}
+export function App(props) @{
+  ${render}
+}`;
+	}
+
+	it('rejects ambient browser state during render while compatibility remains legal', () => {
+		const source = 'export function App() @{ <p>{window.innerWidth as string}</p> }';
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+	});
+
+	it.each([
+		'window.innerWidth',
+		'document.visibilityState',
+		'localStorage.getItem("theme")',
+		'sessionStorage.getItem("theme")',
+		'navigator.language',
+		'location.pathname',
+		'matchMedia("(min-width: 600px)").matches',
+		'globalThis.window.innerWidth',
+		'globalThis.document.visibilityState',
+		'globalThis.localStorage.getItem("theme")',
+		'globalThis.sessionStorage.getItem("theme")',
+		'globalThis.navigator.language',
+		'globalThis.location.pathname',
+		'globalThis.matchMedia("(min-width: 600px)").matches',
+		'window["innerWidth"]',
+		'globalThis["localStorage"].getItem("theme")',
+		'window?.innerWidth',
+		'globalThis?.["document"]?.visibilityState',
+		'matchMedia?.("(min-width: 600px)")?.matches',
+		'globalThis[props.key]',
+		'typeof window',
+		'(window as Window).innerWidth',
+	])('rejects the ambient read %s', (expression) => {
+		const source = component(`<p>{${expression} as string}</p>`);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+	});
+
+	it.each([
+		['a local alias', 'const browser = window; <p>{browser.innerWidth as string}</p>'],
+		[
+			'destructuring during render',
+			'const { localStorage: storage } = globalThis; <p>{storage.getItem("theme") as string}</p>',
+		],
+		[
+			'an object shorthand value',
+			'const environment = { navigator }; <p>{environment.navigator.language}</p>',
+		],
+		[
+			'a computed object key',
+			'const entries = { [location.pathname]: true }; <p>{Object.keys(entries)[0]}</p>',
+		],
+		[
+			'an object spread',
+			'const environment = { ...window }; <p>{environment.innerWidth as string}</p>',
+		],
+		[
+			'a rest destructuring read',
+			'const { Math, ...environment } = globalThis; <p>{environment.innerWidth as string}</p>',
+		],
+		['a global property update', 'globalThis.innerWidth++; <p />'],
+		['a compound global property assignment', 'globalThis.innerWidth += 1; <p />'],
+		[
+			'an immediate callback',
+			'const width = (() => window.innerWidth)(); <p>{width as string}</p>',
+		],
+		[
+			'a memo calculation',
+			'const width = useMemo(() => window.innerWidth, []); <p>{width as string}</p>',
+		],
+	])('rejects ambient browser state through %s', (_shape, render) => {
+		const source = component(render, 'import { useMemo } from "octane";');
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+	});
+
+	it.each([
+		['a browser handle alias', 'const browser = window;', 'browser.innerWidth'],
+		[
+			'an alias of an alias',
+			'const browser = window; const environment = browser;',
+			'environment.innerWidth',
+		],
+		[
+			'a destructured browser handle',
+			'const { localStorage: storage } = globalThis;',
+			'storage.getItem("theme")',
+		],
+		[
+			'a browser function alias',
+			'const query = window.matchMedia;',
+			'query("(min-width: 600px)").matches',
+		],
+		[
+			'a global object alias',
+			'const environment = globalThis;',
+			'environment.document.visibilityState',
+		],
+		[
+			'a synchronous module helper',
+			'function readWidth() { return window.innerWidth; }',
+			'readWidth()',
+		],
+	])('follows %s into render', (_shape, setup, expression) => {
+		const source = component(`<p>{${expression} as string}</p>`, setup);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+	});
+
+	it('follows a module browser alias declared after the render root', () => {
+		const source = `${component('<p>{browser.innerWidth as string}</p>')}\nconst browser = window;`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+	});
+
+	it('follows a computed module browser alias when its constant key follows the render root', () => {
+		const source = `${component('<p>{browser.innerWidth as string}</p>')}
+const key = "window";
+const browser = globalThis[key];`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+	});
+
+	it('allows a standard globalThis builtin when its constant key follows the render root', () => {
+		const source = `${component('<p>{globalThis[key].max(1, 2) as string}</p>')}\nconst key = "Math";`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['a concatenated key before render', 'const key = "JS" + "ON";', true],
+		['a concatenated key after render', 'const key = "JS" + "ON";', false],
+		['a template key before render', 'const part = "SON"; const key = `J${part}`;', true],
+		['a template key after render', 'const part = "SON"; const key = `J${part}`;', false],
+	])('allows a standard globalThis builtin through %s', (_shape, setup, before) => {
+		const render = component('<p>{globalThis[key].stringify(props.value)}</p>');
+		const source = before ? `${setup}\n${render}` : `${render}\n${setup}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('checks an ambient helper default when its argument may be undefined', () => {
+		const helper = 'function read(root = globalThis) { return root.mutableCache; }';
+		const source = component('<p>{read(props.root) as string}</p>', helper);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+		const defined = component('<p>{read({ mutableCache: props.value }) as string}</p>', helper);
+		expect(() => compile(`"use strong";\n${defined}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('allows a globalThis optional member read after await while checking window before await', () => {
+		const source =
+			'"use strong"; export async function useData() { return globalThis?.[await Promise.resolve("JSON")]; }';
+		expect(() => slotHooks(source, '/src/useData.ts')).not.toThrow();
+		expect(() => slotHooks(source.replace('globalThis?', 'window?'), '/src/useData.ts')).toThrow(
+			RENDER_AMBIENT_READ,
+		);
+	});
+
+	it.each([
+		[
+			'nested globalThis destructuring',
+			'const { globalThis: { document: page } } = globalThis; <p>{page.title}</p>',
+		],
+		[
+			'helper parameter destructuring',
+			'function title({ document: page }) { return page.title; } <p>{title(globalThis)}</p>',
+		],
+		['a JSX spread', '<p {...globalThis} />'],
+		['a nested globalThis JSX spread', '<p {...globalThis.globalThis} />'],
+		['a nested globalThis component tag', '<globalThis.globalThis.Widget />'],
+	])('rejects ambient browser state through %s', (_shape, render) => {
+		const source = component(render);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+	});
+
+	it('checks a compound assignment before its awaited value while allowing an awaited target', () => {
+		const eager = component(
+			'(async () => { globalThis.innerWidth += await props.value; })(); <p />',
+		);
+		const deferred = component('(async () => { globalThis[await props.key] += 1; })(); <p />');
+		expect(() => compile(eager, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${eager}`, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
+		expect(() => compile(`"use strong";\n${deferred}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps ambient reads in events, effects, cleanup, and deferred work legal', () => {
+		const source = `"use strong";
+import { useEffect } from 'octane';
+const browser = window;
+function readWidth() { return browser.innerWidth; }
+export function App(props) @{
+  useEffect(() => {
+    props.record(document.visibilityState, readWidth());
+    return () => props.record(location.pathname);
+  }, []);
+  setTimeout(() => props.record(navigator.language), 0);
+  Promise.resolve().then(() => props.record(localStorage.getItem("theme")));
+  (async () => { await Promise.resolve(); props.record(sessionStorage.getItem("theme")); })();
+  <button onClick={() => props.record(readWidth(), matchMedia("(min-width: 600px)").matches)}>Check</button>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('allows lazy state and reducer initializers while checking eager arguments and memo callbacks', () => {
+		const source = `"use strong";
+import { useState, useReducer, useMemo } from 'octane';
+function initialWidth() { return window.innerWidth; }
+export function App() @{
+  const [width] = useState(initialWidth);
+  const [theme] = useState(() => localStorage.getItem("theme"));
+  const [language] = useReducer((value) => value, null, () => navigator.language);
+  <p>{width as string}{theme as string}{language as string}</p>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() =>
+			compile(
+				source.replace('useState(initialWidth)', 'useState(initialWidth())'),
+				'/src/App.tsrx',
+			),
+		).toThrow(RENDER_AMBIENT_READ);
+		expect(() =>
+			compile(
+				source.replace('useState(initialWidth)', 'useMemo(initialWidth, [])'),
+				'/src/App.tsrx',
+			),
+		).toThrow(RENDER_AMBIENT_READ);
+	});
+
+	it('allows subscribed browser snapshots with a server snapshot', () => {
+		const source = `"use strong";
+import { useSyncExternalStore } from 'octane';
+function subscribe(notify) {
+  window.addEventListener('resize', notify);
+  return () => window.removeEventListener('resize', notify);
+}
+function readWidth() { return window.innerWidth; }
+export function App() @{
+  const width = useSyncExternalStore(subscribe, readWidth, () => 0);
+  <p>{width as string}</p>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() =>
+			compile(
+				source.replace('subscribe, readWidth, () => 0', 'subscribe, window.readWidth, () => 0'),
+				'/src/App.tsrx',
+			),
+		).toThrow(RENDER_AMBIENT_READ);
+	});
+
+	it.each([
+		[
+			'parameter shadows',
+			'export function App({ window, document, localStorage, sessionStorage, navigator, location, matchMedia, globalThis }) @{ <p>{window.innerWidth + document.title + localStorage.value + sessionStorage.value + navigator.language + location.pathname + matchMedia() + globalThis.value as string}</p> }',
+		],
+		[
+			'local shadows',
+			component(
+				'const window = props.window; const globalThis = props.environment; <p>{window.innerWidth + globalThis.navigator.language as string}</p>',
+			),
+		],
+		[
+			'a shadowed globalThis component namespace',
+			'export function App({ globalThis }) @{ <globalThis.globalThis.Widget /> }',
+		],
+		[
+			'imported shadows',
+			component('<p>{location.pathname}</p>', 'import { location } from "./config";'),
+		],
+		[
+			'catch binding shadows',
+			component(
+				'let title = ""; try { throw props.error; } catch (document) { title = document.message; } <p>{title}</p>',
+			),
+		],
+		[
+			'plain property, class, and label names',
+			component(
+				'const entry = { window: props.value }; class Entry { document = 1; location() { return 2; } } navigator: { break navigator; } <p data-window={entry.window}>{new Entry().document as string}</p>',
+			),
+		],
+		[
+			'a module scalar snapshot',
+			component('<p>{width as string}</p>', 'const width = window.innerWidth;'),
+		],
+		[
+			'standard globalThis builtins',
+			component(
+				'const value = globalThis.JSON.stringify(globalThis.Math.max(props.value, 0)); <p>{value}</p>',
+			),
+		],
+		['a plain global property assignment', component('globalThis.innerWidth = props.width; <p />')],
+		[
+			'an unused cyclic module alias',
+			component('<p />', 'const first = second; const second = first;'),
+		],
+		[
+			'a statically skipped optional key and argument',
+			component('null?.[window.innerWidth]; (null?.read)?.(document.title); <p />'),
+		],
+	])('allows %s', (_shape, source) => {
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each(['client', 'server'] as const)(
+		'enforces ambient reads and preserves valid %s output',
+		(mode) => {
+			const invalid = component('<p>{window.innerWidth as string}</p>');
+			expect(() => compile(invalid, '/src/App.tsrx', { mode, strong: true } as any)).toThrow(
+				RENDER_AMBIENT_READ,
+			);
+			const source = component(
+				'<button onClick={() => props.record(window.innerWidth)}>Check</button>',
+			);
+			const ordinary = compile(source, '/src/App.tsrx', { mode });
+			const strong = compile(source, '/src/App.tsrx', { mode, strong: true } as any);
+			expect(strong.code).toBe(ordinary.code);
+			expect(strong.diagnostics).toEqual(ordinary.diagnostics);
+		},
+	);
+
+	it('locates the ambient browser read in compiler and Volar diagnostics', () => {
+		const source = `"use strong";\n${component('<p>{window.innerWidth as string}</p>')}`;
+		const offset = source.lastIndexOf('window');
+		try {
+			compile(source, '/src/App.tsrx');
+			throw new Error('expected a Strong render-time ambient read diagnostic');
+		} catch (error: any) {
+			expect(error).toMatchObject({ code: RENDER_AMBIENT_READ, filename: '/src/App.tsrx' });
+		}
+		const mapped = compileToVolarMappings(source, '/src/App.tsrx');
+		expect(mapped.diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: RENDER_AMBIENT_READ,
+				severity: 'error',
+				filename: '/src/App.tsrx',
+				start: expect.objectContaining({ offset }),
+			}),
+		);
+		expect(mapped.errors).toContainEqual(
+			expect.objectContaining({
+				code: RENDER_AMBIENT_READ,
+				type: 'usage',
+				fileName: '/src/App.tsrx',
+				pos: offset,
+			}),
+		);
+	});
+
+	it('rejects ambient reads in plain custom hooks and Octane TSX components', () => {
+		const plain = '"use strong"; export function useViewportWidth() { return window.innerWidth; }';
+		const tsx =
+			'/** @jsxImportSource octane */\n"use strong"; export function App() { return <p>{document.visibilityState}</p>; }';
+		expect(() => slotHooks(plain, '/src/useViewportWidth.ts')).toThrow(RENDER_AMBIENT_READ);
+		expect(() => compile(tsx, '/src/App.tsx')).toThrow(RENDER_AMBIENT_READ);
+		expect(compileToVolarMappings(tsx, '/src/App.tsx').diagnostics).toContainEqual(
+			expect.objectContaining({ code: RENDER_AMBIENT_READ, severity: 'error' }),
+		);
 	});
 });
 
