@@ -9669,6 +9669,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			record.parent = draft.parent?.record ?? null;
 			record.hooks = draft.hooks;
 			record.effectOrder = [...draft.seenEffects];
+			// Stable leaf updates have already checked predecessor effects before
+			// acceptance; keep only the hooks needed for future renders.
+			for (let index = 0; index < draft.seenEffects.length; index++) {
+				draft.seenEffects[index].previous = null;
+			}
 			record.children = draft.children.map((child) => child.record);
 			record.contextValues = draft.contextValues;
 			record.isBoundary = draft.isBoundary;
@@ -11679,6 +11684,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 					record.hooks = draft.hooks;
 					record.effectOrder = [...draft.seenEffects];
+					// Staging has already compared predecessor effects and captured any
+					// cleanups. A committed hook must not retain every prior render.
+					for (let index = 0; index < draft.seenEffects.length; index++) {
+						draft.seenEffects[index].previous = null;
+					}
 					if (draft.retainedChildren === null) {
 						record.children = draft.children.map((child) => child.record);
 					} else {

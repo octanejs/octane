@@ -7,6 +7,12 @@ public `octane/universal/native` renderer and uses the public object host driver
 An 80-row variant checks the cost of increasing the same component depth and
 number of hosts fourfold.
 
+The reporter's [Hermes reproduction](https://github.com/Josema/octane-and-solid-core-memory-reproduction)
+uses hand-authored universal plans and an empty-dependency effect in each view.
+Use that harness when investigating the issue's cumulative allocation, mounted
+heap, and garbage collection; this compiled Node suite exercises a different
+render path and has no view effects.
+
 Each sample keeps the tree mounted, dispatches 2,000 native host events, and
 flushes the resulting state update. The harness verifies the original 101 or
 401 host identities, four view layers per row, correct selected props, exactly
