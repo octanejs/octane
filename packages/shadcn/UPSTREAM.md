@@ -26,7 +26,9 @@ records their hashes and transformations. The release CLI's style transformer
 resolves Nova utility classes; Lucide resolves the default icon placeholders.
 The React references in `tests/differential/base-upstream/` retain React and the
 real `@base-ui/react@1.8.0` imports. Octane sources substitute the native bindings
-and omit the RSC directive.
+and omit the RSC directive. With the CLI's default menu color, `transform-menu`
+removes the unused `cn-menu-target` and `cn-menu-translucent` hooks from Select;
+neither shipped source nor its React reference retains those classes.
 
 The coverage table tracks 44 existing families, with 43 Base UI wrappers. It is
 not a complete upstream registry inventory. Base UI Sonner and additional
@@ -37,8 +39,9 @@ the binding's component surface.
 ## Evidence and prior lineage
 
 The new same-fixture differential cases compare Select controlled values,
-Navigation Menu links and trigger state, and Scroll Area viewport/scrollbar
-markup against the release's React implementations. Native tests additionally
+Navigation Menu links and trigger state, their opened popup content and positioners,
+and Scroll Area viewport/scrollbar markup against the release's React
+implementations. Native tests additionally
 exercise Select option selection, form submission and focus restoration,
 Navigation Menu opening and Escape, no-browser-globals SSR, and Select hydration
 adoption. Layout and pointer behavior in a real browser are not certified by

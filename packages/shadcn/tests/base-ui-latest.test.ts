@@ -31,6 +31,9 @@ describe('@octanejs/shadcn — Base UI 1.8 wrappers', () => {
 			trigger.click();
 		});
 		await settle();
+		const popup = document.querySelector<HTMLElement>('[data-slot="select-content"]')!;
+		// The default menu color is resolved by the CLI; these hooks have no rules in the shipped theme.
+		expect(popup.className).not.toMatch(/\bcn-menu-(?:target|translucent)\b/);
 		const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((element) =>
 			element.textContent?.includes('Pear'),
 		)!;
