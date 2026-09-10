@@ -3072,6 +3072,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 
 		switch (node.type) {
 			case 'ImportDeclaration':
+			case 'MetaProperty':
+			case 'BreakStatement':
+			case 'ContinueStatement':
 			case 'JSXIdentifier':
 			case 'Literal':
 			case 'ThisExpression':
@@ -3110,6 +3113,21 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'FunctionExpression':
 			case 'ArrowFunctionExpression':
 				visitFunction(node, scope, phase === 'module' ? 'render' : 'deferred');
+				return;
+			case 'ClassDeclaration':
+			case 'ClassExpression': {
+				const classScope = createScope(scope, 'block', [], node.id ? [node.id] : []);
+				visit(node.decorators, scope, phase);
+				visit(node.superClass, classScope, phase);
+				visit(node.body, classScope, phase);
+				return;
+			}
+			case 'MethodDefinition':
+			case 'PropertyDefinition':
+			case 'AccessorProperty':
+				visit(node.decorators, scope, phase);
+				if (node.computed) visit(node.key, scope, phase);
+				visit(node.value, scope, phase);
 				return;
 			case 'BlockStatement':
 			case 'JSXCodeBlock': {

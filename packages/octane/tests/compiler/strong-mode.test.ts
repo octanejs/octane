@@ -4830,6 +4830,74 @@ export function App(props) @{
 		).not.toThrow();
 	});
 
+	it.each([
+		['the `meta` name in `import.meta`', 'meta', 'const url = import.meta.url; <p>{url}</p>'],
+		[
+			'the `target` name in `new.target`',
+			'target',
+			'const ctor = new.target; <p>{ctor?.name as string}</p>',
+		],
+		[
+			'a public class field name',
+			'revision',
+			'class Entry { revision = 1; } const entry = new Entry(); <p>{entry.revision as string}</p>',
+		],
+		[
+			'a class method name',
+			'revision',
+			'class Entry { revision() { return 1; } } <p>{new Entry().revision() as string}</p>',
+		],
+		[
+			'a class getter name',
+			'revision',
+			'class Entry { get revision() { return 1; } } <p>{new Entry().revision as string}</p>',
+		],
+		[
+			'a named class expression binding',
+			'revision',
+			'const Entry = class revision { static self = revision; }; <p>{Entry.self.name}</p>',
+		],
+		['a break label', 'revision', 'revision: { break revision; } <p />'],
+		[
+			'a continue label',
+			'revision',
+			'revision: for (let index = 0; index < 1; index++) { continue revision; } <p />',
+		],
+	])('allows %s when a module variable has the same name', (_shape, name, render) => {
+		const source = `let ${name} = 0; function advance() { ${name}++; }
+export function App() @{
+  ${render}
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['a computed class field name', 'class Entry { [revision] = 1; } <p />'],
+		['a computed class method name', 'class Entry { [revision]() { return 1; } } <p />'],
+	])('rejects a real module binding read in %s', (_shape, render) => {
+		const source = component(render);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_MODULE_STATE_READ,
+		);
+	});
+
+	it.each([
+		['a class decorator', '@revision class Entry {}'],
+		['a class field decorator', 'class Entry { @revision field = 1; }'],
+		['a class method decorator', 'class Entry { @revision method() {} }'],
+	])('rejects a module binding read in %s', (_shape, declaration) => {
+		const source = `/** @jsxImportSource octane */
+let revision = (value) => value;
+function advance() { revision = (value) => value; }
+export function App() { ${declaration} return <p />; }`;
+		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsx')).toThrow(
+			RENDER_MODULE_STATE_READ,
+		);
+	});
+
 	it('allows a parameter that shadows the mutable module binding', () => {
 		const source = `"use strong";
 let revision = 0;
