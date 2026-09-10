@@ -149,7 +149,7 @@ depending on minified helper names or contaminating wall-clock measurements.
 
 The opt-in `unkeyed` mode of `style-work.mjs` checks the production de-opt list
 path with 1,000 unkeyed host descriptors and an explicit key `"0"`. The rows
-cross a compiled `.tsrx` child hole, so `scopedDeoptKey` runs once per row. An
+cross a compiled `.tsrx` child hole, so the scoped key helper runs once per row. An
 unrelated update supplies fresh descriptors; the gate checks row order and DOM
 identity, typed uncontrolled input values, focus, and separation between the
 implicit index zero and explicit key `"0"`. Chromium precise coverage counts
