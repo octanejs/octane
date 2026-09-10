@@ -82,6 +82,7 @@ const SKIP_KEYS = new Set([
 
 export const STRONG_RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 export const STRONG_RENDER_STATE_GETTER_CALL = 'OCTANE_STRONG_RENDER_STATE_GETTER_CALL';
+export const STRONG_RENDER_MODULE_STATE_READ = 'OCTANE_STRONG_RENDER_MODULE_STATE_READ';
 export const STRONG_EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 export const STRONG_RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 export const STRONG_RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
@@ -1211,6 +1212,25 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return reassignedBindings.has(identifier);
 	}
 	const moduleScope = createScope(null, 'module', ast.body ?? [], [], isReassigned);
+	const mutableModuleDeclarations = new Map();
+	const reassignedModuleNames = new Map();
+	function recordMutableModulePattern(pattern) {
+		if (pattern?.type === 'Identifier') {
+			let declarations = mutableModuleDeclarations.get(pattern.name);
+			if (declarations === undefined) {
+				mutableModuleDeclarations.set(pattern.name, (declarations = []));
+			}
+			declarations.push(pattern);
+		} else if (pattern?.type === 'AssignmentPattern' || pattern?.type === 'RestElement') {
+			recordMutableModulePattern(pattern.left ?? pattern.argument);
+		} else if (pattern?.type === 'ArrayPattern') {
+			for (const element of pattern.elements ?? []) recordMutableModulePattern(element);
+		} else if (pattern?.type === 'ObjectPattern') {
+			for (const property of pattern.properties ?? []) {
+				recordMutableModulePattern(property.argument ?? property.value);
+			}
+		}
+	}
 	const activeCallbacks = new Set();
 	const activeReturnCallbacks = new Set();
 	const callResults = new WeakMap();
@@ -1262,6 +1282,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	for (const statement of ast.body ?? []) {
 		const declaration = declarationOf(statement);
 		if (declaration?.type === 'VariableDeclaration') {
+			if (declaration.kind === 'let' && declaration.declare !== true) {
+				for (const binding of declaration.declarations ?? []) {
+					recordMutableModulePattern(binding.id);
+				}
+			}
 			for (const binding of declaration.declarations ?? []) {
 				if (binding.id?.type === 'Identifier') {
 					addNamedRenderRoot(unwrap(binding.init), binding.id.name);
@@ -1308,6 +1333,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (value.type === 'VariableDeclaration' && value.kind === 'var') {
 					for (const declaration of value.declarations ?? []) {
 						addPatternNames(declaration.id, names, OTHER_BINDING);
+						if (scope === moduleScope && value.declare !== true) {
+							recordMutableModulePattern(declaration.id);
+						}
 					}
 				}
 				for (const key in value) {
@@ -1345,6 +1373,52 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			STRONG_RENDER_STATE_GETTER_CALL,
 			node,
 			'Strong mode does not allow calling a state getter during render. Render from the state tuple snapshot; call the getter in an event, effect, or deferred callback for the latest scheduled state.',
+		);
+	}
+
+	function reportModuleStateRead(node) {
+		report(
+			STRONG_RENDER_MODULE_STATE_READ,
+			node,
+			'Strong mode does not allow reading a reassigned module variable during render. Move the value into state or context, or pass an immutable snapshot as a prop.',
+		);
+	}
+
+	function mutableModuleRead(name, scope) {
+		const declarations = mutableModuleDeclarations.get(name);
+		if (declarations === undefined || resolveScope(scope, name) !== moduleScope) {
+			return false;
+		}
+		let reassigned = reassignedModuleNames.get(name);
+		if (reassigned === undefined) {
+			reassigned = declarations.some(isReassigned);
+			reassignedModuleNames.set(name, reassigned);
+		}
+		return reassigned;
+	}
+
+	function definitelySkippedOptionalContinuation(expression, scope) {
+		let node = expression;
+		while (node != null) {
+			// Grouping ends the chain; the caller decides whether a grouped
+			// undefined value is itself behind an optional access.
+			if (node.type === 'ChainExpression') return false;
+			if (TRANSPARENT_EXPRESSIONS.has(node.type)) {
+				node = node.expression;
+				continue;
+			}
+			if (node.type !== 'CallExpression' && node.type !== 'MemberExpression') return false;
+			const target = node.type === 'CallExpression' ? node.callee : node.object;
+			if (node.optional === true && definitelyNullishOptionalValue(target, scope)) return true;
+			node = target;
+		}
+		return false;
+	}
+
+	function definitelyNullishOptionalValue(expression, scope) {
+		return (
+			(staticExpressionValue(expression, scope) & ~NULLISH_VALUE) === 0 ||
+			definitelySkippedOptionalContinuation(unwrap(expression), scope)
 		);
 	}
 
@@ -2998,12 +3072,36 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 
 		switch (node.type) {
 			case 'ImportDeclaration':
-			case 'Identifier':
 			case 'JSXIdentifier':
 			case 'Literal':
 			case 'ThisExpression':
 			case 'Super':
 				return;
+			case 'Identifier':
+				if (
+					readAccess &&
+					phase === 'render' &&
+					currentFunctionChecksRenderReads &&
+					mutableModuleRead(node.name, scope)
+				) {
+					reportModuleStateRead(node);
+				}
+				return;
+			case 'JSXOpeningElement': {
+				let name = node.name;
+				const member = name?.type === 'JSXMemberExpression';
+				while (name?.type === 'JSXMemberExpression') name = name.object;
+				if (
+					name?.type === 'JSXIdentifier' &&
+					(member || (!/^[a-z]/.test(name.name) && !name.name.includes('-'))) &&
+					phase === 'render' &&
+					currentFunctionChecksRenderReads &&
+					mutableModuleRead(name.name, scope)
+				) {
+					reportModuleStateRead(name);
+				}
+				break;
+			}
 			case 'ExportNamedDeclaration':
 			case 'ExportDefaultDeclaration':
 				visit(node.declaration, scope, phase);
@@ -3085,6 +3183,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			}
 			case 'MemberExpression': {
 				visit(node.object, scope, phase);
+				if (
+					node.optional === true
+						? definitelyNullishOptionalValue(node.object, scope)
+						: definitelySkippedOptionalContinuation(node.object, scope)
+				) {
+					return;
+				}
 				if (node.computed === true) {
 					const propertyPhase = phaseAfter(node.object, phase, true, node.optional === true);
 					visit(node.property, scope, propertyPhase);
@@ -3172,6 +3277,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						: null;
 				if (!FUNCTION_TYPES.has(callee?.type)) {
 					visit(node.callee, scope, phase);
+				}
+				if (
+					node.optional === true
+						? definitelyNullishOptionalValue(node.callee, scope)
+						: definitelySkippedOptionalContinuation(node.callee, scope)
+				) {
+					return;
 				}
 				let executionPhase = phaseAfter(node.callee, phase, true, node.optional === true);
 				const synchronousCallbackIndex =
@@ -3375,9 +3487,26 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				) {
 					reportRefRead(node.left);
 				}
+				if (
+					node.operator !== '=' &&
+					phase === 'render' &&
+					currentFunctionChecksRenderReads &&
+					unwrap(node.left)?.type === 'Identifier' &&
+					mutableModuleRead(unwrap(node.left).name, scope)
+				) {
+					reportModuleStateRead(unwrap(node.left));
+				}
 				return;
 			}
 			case 'UpdateExpression':
+				if (
+					phase === 'render' &&
+					currentFunctionChecksRenderReads &&
+					unwrap(node.argument)?.type === 'Identifier' &&
+					mutableModuleRead(unwrap(node.argument).name, scope)
+				) {
+					reportModuleStateRead(unwrap(node.argument));
+				}
 				if (phase === 'render' && currentRef(node.argument, scope)) reportRef(node.argument);
 				visit(node.argument, scope, phase, false);
 				if (phaseAfter(node.argument, phase, true) === 'render') {
