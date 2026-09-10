@@ -1203,7 +1203,193 @@ describe('parallel use() — fetch-tree warming (nested chain)', () => {
 	});
 });
 
+const REBOUND_OWN_SOURCE = `
+			import { use, useLayoutEffect } from 'octane';
+
+			function Detail(props) @{
+				const value = use(props.load(props.name, props.version));
+				useLayoutEffect(() => {
+					props.onMount(props.name);
+					return () => props.onCleanup(props.name);
+				}, []);
+				<span class="rebound-own-detail">{value as string}</span>
+			}
+
+			export function Branches(props) @{
+				props = { ...props, version: props.version + 1 };
+				const own = use(props.load('own', props.version));
+				<section>
+					<span class="rebound-own-value">{own as string}</span>
+					<Detail name="left" load={props.load} version={props.version} onMount={props.onMount} onCleanup={props.onCleanup} />
+					<Detail name="right" load={props.load} version={props.version} onMount={props.onMount} onCleanup={props.onCleanup} />
+				</section>
+			}
+
+			export function App(props) @{
+				const Content = props.content;
+				<>
+					@try {
+						<Content load={props.load} version={props.version} onMount={props.onMount} onCleanup={props.onCleanup} />
+					} @pending {
+						<span class="rebound-own-pending">loading</span>
+					}
+				</>
+			}
+		`;
+
 describe('parallel use() — child plans across render attempts', () => {
+	it('starts independent children after a fulfilled own request with rebound props', async () => {
+		const client = loadCompiledFixtureSource(REBOUND_OWN_SOURCE, {
+			id: 'child-plan-rebound-own-request.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const calls: string[] = [];
+		const jobs = new Map<string, Deferred<string>>();
+		const activeEffects = new Map<string, number>();
+		const load = (name: string, version: number): Promise<string> => {
+			const key = `${name}:${version}`;
+			calls.push(key);
+			if (name === 'own') {
+				// The own request is already available, so only descendant suspension
+				// can start the independent child requests in this render.
+				const value = `own-v${version}`;
+				return Object.assign(Promise.resolve(value), { status: 'fulfilled', value });
+			}
+			const job = deferred<string>();
+			jobs.set(key, job);
+			return job.promise;
+		};
+		const onMount = (name: string) => {
+			activeEffects.set(name, (activeEffects.get(name) ?? 0) + 1);
+		};
+		const onCleanup = (name: string) => {
+			activeEffects.set(name, (activeEffects.get(name) ?? 0) - 1);
+		};
+		const root = mount(client.App, {
+			content: client.Branches,
+			load,
+			version: 0,
+			onMount,
+			onCleanup,
+		});
+		try {
+			expect([...calls].sort()).toEqual(['left:1', 'own:1', 'right:1']);
+			expect(root.find('.rebound-own-pending').textContent).toBe('loading');
+			await act(() => jobs.get('right:1')!.resolve('right-v1'));
+			expect(root.find('.rebound-own-pending').textContent).toBe('loading');
+			expect([...calls].sort()).toEqual(['left:1', 'own:1', 'right:1']);
+			await act(() => jobs.get('left:1')!.resolve('left-v1'));
+			expect(root.find('.rebound-own-value').textContent).toBe('own-v1');
+			expect(root.findAll('.rebound-own-detail').map((node) => node.textContent)).toEqual([
+				'left-v1',
+				'right-v1',
+			]);
+			expect([...calls].sort()).toEqual(['left:1', 'own:1', 'right:1']);
+			expect(Object.fromEntries(activeEffects)).toEqual({ left: 1, right: 1 });
+
+			root.update(client.App, { content: client.Branches, load, version: 2, onMount, onCleanup });
+			expect(calls.slice(3).sort()).toEqual(['left:3', 'own:3', 'right:3']);
+			await act(() => {
+				jobs.get('left:3')!.resolve('left-v3');
+				jobs.get('right:3')!.resolve('right-v3');
+			});
+			expect(root.find('.rebound-own-value').textContent).toBe('own-v3');
+			expect(root.findAll('.rebound-own-detail').map((node) => node.textContent)).toEqual([
+				'left-v3',
+				'right-v3',
+			]);
+			expect(calls).toHaveLength(6);
+			expect(Object.fromEntries(activeEffects)).toEqual({ left: 1, right: 1 });
+		} finally {
+			root.unmount();
+		}
+		expect(Object.fromEntries(activeEffects)).toEqual({ left: 0, right: 0 });
+	});
+
+	it('starts independent children on an update after adopting server content', async () => {
+		const id = 'hydrated-child-plan-rebound-own-request.tsrx';
+		const server = loadCompiledFixtureSource(REBOUND_OWN_SOURCE, {
+			id,
+			mode: 'server',
+			compileOptions: { hmr: false, dev: false },
+		});
+		const client = loadCompiledFixtureSource(REBOUND_OWN_SOURCE, {
+			id,
+			mode: 'client',
+			compileOptions: { hmr: false, dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod' },
+		});
+		const noop = () => {};
+		const rendered = await prerender(server.Branches, {
+			load: (name: string, version: number) => Promise.resolve(`${name}-v${version}`),
+			version: 0,
+			onMount: noop,
+			onCleanup: noop,
+		});
+		const container = document.createElement('div');
+		container.innerHTML = rendered.html;
+		document.body.appendChild(container);
+		const own = container.querySelector('.rebound-own-value');
+		const details = Array.from(container.querySelectorAll('.rebound-own-detail'));
+		const calls: string[] = [];
+		const jobs = new Map<string, Deferred<string>>();
+		const load = (name: string, version: number): Promise<string> => {
+			const key = `${name}:${version}`;
+			calls.push(key);
+			if (name === 'own') {
+				const value = `own-v${version}`;
+				return Object.assign(Promise.resolve(value), { status: 'fulfilled', value });
+			}
+			let job = jobs.get(key);
+			if (job === undefined) {
+				job = deferred<string>();
+				jobs.set(key, job);
+			}
+			return job.promise;
+		};
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			root = hydrateRoot(container, client.Branches, {
+				load,
+				version: 0,
+				onMount: noop,
+				onCleanup: noop,
+			});
+			flushSync(() => {});
+			expect(calls).toEqual([]);
+			expect(own?.textContent).toBe('own-v1');
+			expect(details.map((node) => node.textContent)).toEqual(['left-v1', 'right-v1']);
+			expect(container.querySelector('.rebound-own-value')).toBe(own);
+			expect(Array.from(container.querySelectorAll('.rebound-own-detail'))).toEqual(details);
+
+			flushSync(() =>
+				root!.render(client.Branches, {
+					load,
+					version: 2,
+					onMount: noop,
+					onCleanup: noop,
+				}),
+			);
+			// Both independent descendants must start before either pending
+			// promise settles, even though the own read is already fulfilled.
+			expect([...calls].sort()).toEqual(['left:3', 'own:3', 'right:3']);
+			expect(own?.textContent).toBe('own-v1');
+			await act(() => jobs.get('right:3')!.resolve('right-v3'));
+			expect(own?.textContent).toBe('own-v1');
+			await act(() => jobs.get('left:3')!.resolve('left-v3'));
+			expect(container.querySelector('.rebound-own-value')?.textContent).toBe('own-v3');
+			expect(
+				Array.from(container.querySelectorAll('.rebound-own-detail')).map(
+					(node) => node.textContent,
+				),
+			).toEqual(['left-v3', 'right-v3']);
+			expect([...calls].sort()).toEqual(['left:3', 'own:3', 'right:3']);
+		} finally {
+			root?.unmount();
+			container.remove();
+		}
+	});
+
 	it('starts eight independent descendants before a blocking sibling resolves, again on update', async () => {
 		const children = Array.from({ length: 8 }, (_, index) => `detail-${index}`);
 		const source = `

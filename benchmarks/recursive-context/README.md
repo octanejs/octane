@@ -178,17 +178,34 @@ The normal DOM checks in `run.mjs` verify all 1024 leaf paths, both context
 values, the isolated 32-leaf provider update, and remount identity.
 
 A separate production entry (`warm-plan-control.html`) renders a parent with
-its own promise creation and a same-module async child. That parent must retain
-the direct batch and trailing `useBatch([], warmThunk)` because its warm plan
-does more than traverse children. A fresh Chromium pass confirms the visible
-parent/child values and that each resource starts exactly once; it requires
-four `useBatch` calls over the suspending mount/retry and zero
-`registerWarmPlan` calls. The work gate also parses production compiler output
-for this fixture, a child-only parent that reassigns its props after
-registration, and a parent whose body shadows its function name; each must
-retain the original `useBatch` path. Standalone work
-gate runs may set `RECURSIVE_WORK_TARGETS` to JSON target URLs for isolated
-ephemeral preview ports, avoiding stale assets from other worktrees.
+its own promise creation and a same-module async child. Its nonempty batch must
+still start the independent child before the parent suspends. A fresh Chromium
+pass verifies the visible parent/child values and that each resource starts
+exactly once. The fallback warm registration now uses `registerWarmPlan(thunk,
+undefined)`, so the suspending mount/retry requires three direct `useBatch`
+calls (parent twice, child once) and one plan registration on the successful
+parent retry. Parsed production output verifies that the parent
+keeps its direct batch, while the trailing empty batch array disappears.
+
+Other compiler controls cover child-only parents with reassigned props and a
+locally shadowed component name. Their in-body warm closure cannot be replaced
+by a lookup of the attached plan; the registration uses that same closure. A
+parent-only module imports its async child so its one previous `useBatch` import
+and call can disappear altogether: the candidate must emit zero batch imports
+and calls, one `registerWarmPlan` import and call, and no empty batch array.
+The same source compiled in server and universal modes keeps its existing
+empty-batch registration. Standalone work-gate runs may set
+`RECURSIVE_WORK_TARGETS` to JSON target URLs for isolated ephemeral preview
+ports, avoiding stale assets from other worktrees.
+
+Before this change, the parent/child browser fixture called `useBatch` four
+times and `registerWarmPlan` zero times on mount/retry. The three client
+compiler controls (own promise, reassigned props, shadowed name) emitted
+3/2/2 batch call sites, including one empty-array registration each. The
+parent-only module emitted one batch import, one empty-array call site, and no
+plan import. Server and universal output each emitted one empty batch call site
+for that module. These are deterministic source and browser call counts, not a
+measured latency or heap-allocation improvement.
 
 The same work pass also compiles a plain TypeScript custom hook with two reads
 from a directly initialized module context in both client and server modes. Its

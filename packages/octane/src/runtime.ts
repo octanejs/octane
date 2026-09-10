@@ -12553,7 +12553,7 @@ export function useBatch(items: any[], warm?: () => void): void {
 	throw new SuspenseException(combined);
 }
 
-/** @internal Compiler-owned registration for a hoisted child-only warm plan. */
+/** @internal Compiler-owned registration for a component warm plan. */
 export function registerWarmPlan(fn: (props: any) => void, props: any): void {
 	// This must register before the first descendant suspends, even in an app
 	// that has never warmed. The enclosing render's checkpoint drops the registration
