@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { confinedRepositoryPath, readRepositoryJson } from './repository-files.mjs';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PACKAGES_ROOT = path.join(REPO_ROOT, 'packages');
@@ -102,13 +103,15 @@ function roleFor(manifest) {
  */
 export function getWorkspacePackages(repoRoot = REPO_ROOT) {
 	const packagesRoot = path.resolve(repoRoot, 'packages');
+	confinedRepositoryPath(repoRoot, 'packages', 'directory');
 	return readdirSync(packagesRoot, { withFileTypes: true })
 		.filter((entry) => entry.isDirectory())
 		.flatMap((entry) => {
 			const directory = path.join(packagesRoot, entry.name);
+			confinedRepositoryPath(repoRoot, `packages/${entry.name}`, 'directory');
 			const manifestPath = path.join(directory, 'package.json');
 			if (!existsSync(manifestPath)) return [];
-			const manifest = readJson(manifestPath);
+			const manifest = readRepositoryJson(repoRoot, `packages/${entry.name}/package.json`);
 			return [
 				{
 					dir: entry.name,

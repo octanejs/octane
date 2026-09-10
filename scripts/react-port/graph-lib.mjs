@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { confinedRepositoryPath, readRepositoryJson } from '../repository-files.mjs';
 import { getWorkspacePackages, REPO_ROOT } from '../workspace-packages.mjs';
 import { parseInput } from './input-lib.mjs';
-import { hasObservablePackageTests } from './package-tests-lib.mjs';
+import { discoverPackageTests } from './package-tests-lib.mjs';
 import { fingerprint } from './report-lib.mjs';
 import { rangesOverlap, satisfiesRange } from './version-lib.mjs';
 
@@ -79,14 +80,23 @@ export function buildCapabilityInventory({
 	return { ...inventory, fingerprint: fingerprint(inventory) };
 }
 
-function hashFile(filePath) {
-	return fingerprint(readFileSync(filePath, 'utf8'));
+function hashFile(repoRoot, relativePath) {
+	return fingerprint(readFileSync(confinedRepositoryPath(repoRoot, relativePath), 'utf8'));
+}
+
+function hasConfinedPackageTests(repoRoot, binding) {
+	confinedRepositoryPath(repoRoot, `packages/${binding.dir}`, 'directory');
+	const tests = discoverPackageTests(binding.directory);
+	for (const file of tests) {
+		confinedRepositoryPath(repoRoot, path.relative(path.resolve(repoRoot), file));
+	}
+	return tests.length > 0;
 }
 
 // Registrations belong to the inspected checkout. Parse their literal data;
 // importing the bridge would execute that checkout's code in the audit process.
 function readBridgeRegistrations(repoRoot) {
-	const filePath = path.join(repoRoot, 'packages/octane-mcp-server/src/bridge.js');
+	const filePath = confinedRepositoryPath(repoRoot, 'packages/octane-mcp-server/src/bridge.js');
 	const source = ts.createSourceFile(
 		filePath,
 		readFileSync(filePath, 'utf8'),
@@ -185,16 +195,17 @@ export function readRepositoryCapabilityInventory(repoRoot = REPO_ROOT) {
 		.map((binding) => {
 			let status = null;
 			const metadataErrors = [];
+			const statusPath = `packages/${binding.dir}/status.json`;
 			try {
-				status = JSON.parse(readFileSync(binding.statusPath, 'utf8'));
+				status = readRepositoryJson(repoRoot, statusPath);
 				if (!status || typeof status !== 'object' || Array.isArray(status)) {
-					throw new Error('status.json must contain an object');
+					throw new Error(`${statusPath} must contain an object`);
 				}
 			} catch (error) {
 				status = null;
 				metadataErrors.push({
 					code: error.code === 'ENOENT' ? 'missing-status' : 'invalid-status',
-					path: `packages/${binding.dir}/status.json`,
+					path: statusPath,
 					message:
 						error.code === 'ENOENT' ? `Binding ${binding.name} has no status.json` : error.message,
 				});
@@ -205,7 +216,7 @@ export function readRepositoryCapabilityInventory(repoRoot = REPO_ROOT) {
 				exports: manifestExports(binding.manifest),
 				tested:
 					typeof binding.manifest.scripts?.test === 'string' &&
-					hasObservablePackageTests(binding.directory),
+					hasConfinedPackageTests(repoRoot, binding),
 				status,
 				...(metadataErrors.length ? { metadataErrors } : {}),
 			};
@@ -217,8 +228,8 @@ export function readRepositoryCapabilityInventory(repoRoot = REPO_ROOT) {
 		knownNativeBindings: registrations.KNOWN_NATIVE_BINDINGS,
 		knownVanillaCores: registrations.KNOWN_VANILLA_CORES,
 		reactApiMap: registrations.REACT_API_MAP,
-		octanePublicSourceSha256: hashFile(path.join(repoRoot, 'packages/octane/src/index.ts')),
-		differencesSha256: hashFile(path.join(repoRoot, 'docs/differences-from-react.md')),
+		octanePublicSourceSha256: hashFile(repoRoot, 'packages/octane/src/index.ts'),
+		differencesSha256: hashFile(repoRoot, 'docs/differences-from-react.md'),
 	});
 }
 

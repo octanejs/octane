@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	renameSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
@@ -57,7 +65,103 @@ function fixtureInventory() {
 	});
 }
 
+function repositoryFixture(t) {
+	const temporary = mkdtempSync(path.join(tmpdir(), 'capability-confinement-'));
+	t.after(() => rmSync(temporary, { recursive: true, force: true }));
+	const root = path.join(temporary, 'checkout');
+	const write = (relativePath, content) => {
+		const file = path.join(root, relativePath);
+		mkdirSync(path.dirname(file), { recursive: true });
+		writeFileSync(file, content);
+	};
+	write('packages/octane/src/index.ts', 'export const fixture = true;');
+	write('docs/differences-from-react.md', 'Fixture runtime differences');
+	write(
+		'packages/octane-mcp-server/src/bridge.js',
+		`export const KNOWN_BINDINGS = {};
+export const KNOWN_NATIVE_BINDINGS = new Set([]);
+export const KNOWN_VANILLA_CORES = {};
+export const REACT_API_MAP = {};`,
+	);
+	for (const name of ['fixture', 'healthy']) {
+		write(
+			`packages/${name}/package.json`,
+			JSON.stringify({ name: `@octanejs/${name}`, scripts: { test: 'node --test' } }),
+		);
+		write(`packages/${name}/status.json`, JSON.stringify({ verified: 'partial' }));
+	}
+	return { root, temporary, write };
+}
+
 describe('repository capability inventory', () => {
+	test('isolates unsafe status metadata without disclosing outside file contents', (t) => {
+		const { root, temporary } = repositoryFixture(t);
+		const outside = path.join(temporary, 'canary.json');
+		writeFileSync(outside, JSON.stringify({ marker: 'HARMLESS_OUTSIDE_CANARY' }));
+		const statusPath = path.join(root, 'packages/fixture/status.json');
+		rmSync(statusPath);
+		symlinkSync(outside, statusPath);
+		const inventory = readRepositoryCapabilityInventory(root);
+		const binding = inventory.bindings['@octanejs/fixture'];
+		assert.equal(binding.status, null);
+		assert.equal(binding.metadataErrors[0].code, 'invalid-status');
+		assert.match(binding.metadataErrors[0].message, /status\.json.*(?:escape|outside)/i);
+		assert.doesNotMatch(JSON.stringify(inventory), /HARMLESS_OUTSIDE_CANARY/);
+		assert.deepEqual(inventory.bindings['@octanejs/healthy'].status, { verified: 'partial' });
+	});
+
+	test('malformed status diagnostics contain the path without JSON content excerpts', (t) => {
+		const { root, write } = repositoryFixture(t);
+		write('packages/fixture/status.json', 'HARMLESS_STATUS_CANARY');
+		const inventory = readRepositoryCapabilityInventory(root);
+		const binding = inventory.bindings['@octanejs/fixture'];
+		assert.equal(binding.status, null);
+		assert.equal(binding.metadataErrors[0].code, 'invalid-status');
+		assert.match(binding.metadataErrors[0].message, /packages\/fixture\/status\.json/);
+		assert.doesNotMatch(JSON.stringify(inventory), /HARMLESS|STATUS_CANARY/);
+		assert.equal(inventory.bindings['@octanejs/healthy'].metadataErrors, undefined);
+	});
+
+	for (const relativePath of [
+		'packages/octane-mcp-server/src/bridge.js',
+		'packages/octane-mcp-server/src',
+		'packages/octane/src/index.ts',
+		'docs/differences-from-react.md',
+		'docs',
+		'packages',
+	]) {
+		test(`rejects outward links at ${relativePath} before inventory parsing or hashing`, (t) => {
+			const { root, temporary } = repositoryFixture(t);
+			const target = path.join(root, relativePath);
+			const outside = path.join(temporary, 'outside');
+			// Moving the valid fixture preserves the content: only its confinement changes.
+			renameSync(target, outside);
+			symlinkSync(outside, target);
+			assert.throws(() => readRepositoryCapabilityInventory(root), /(?:escape|outside)/i);
+		});
+	}
+
+	test('counts only confined regular files as observable test evidence', (t) => {
+		const { root, temporary, write } = repositoryFixture(t);
+		const outside = path.join(temporary, 'outside');
+		mkdirSync(outside);
+		writeFileSync(path.join(outside, 'fixture.test.js'), 'throw new Error("must not run");');
+		symlinkSync(outside, path.join(root, 'packages/fixture/tests'), 'dir');
+		symlinkSync(
+			path.join(outside, 'fixture.test.js'),
+			path.join(root, 'packages/fixture/outside.test.js'),
+		);
+		assert.equal(
+			readRepositoryCapabilityInventory(root).bindings['@octanejs/fixture'].tested,
+			false,
+		);
+		write('packages/fixture/inside.test.js', 'throw new Error("must not run");');
+		assert.equal(
+			readRepositoryCapabilityInventory(root).bindings['@octanejs/fixture'].tested,
+			true,
+		);
+	});
+
 	test('reads audited registrations without executing source and retains broken metadata entries', (t) => {
 		const root = mkdtempSync(path.join(tmpdir(), 'capability-inventory-'));
 		t.after(() => rmSync(root, { recursive: true, force: true }));

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import semver from 'semver';
@@ -47,6 +47,44 @@ test('explicit-root discovery uses only packages in the audited checkout', (t) =
 	);
 	assert.equal(getBindingPackages(root)[0].directory, path.join(root, 'packages/only-here'));
 	assert.deepEqual(getWorkspacePackages(), getWorkspacePackages(REPO_ROOT));
+});
+
+test('discovery rejects package metadata outside the inspected checkout', (t) => {
+	const temporary = mkdtempSync(path.join(tmpdir(), 'workspace-confinement-'));
+	t.after(() => rmSync(temporary, { recursive: true, force: true }));
+	const root = path.join(temporary, 'checkout');
+	const outside = path.join(temporary, 'outside');
+	mkdirSync(path.join(outside, 'fixture'), { recursive: true });
+	writeFileSync(
+		path.join(outside, 'fixture/package.json'),
+		JSON.stringify({ name: '@octanejs/outside-canary' }),
+	);
+	mkdirSync(root);
+	symlinkSync(outside, path.join(root, 'packages'), 'dir');
+	assert.throws(() => getWorkspacePackages(root), /packages.*(?:escape|outside)/i);
+
+	rmSync(path.join(root, 'packages'));
+	mkdirSync(path.join(root, 'packages/fixture'), { recursive: true });
+	symlinkSync(
+		path.join(outside, 'fixture/package.json'),
+		path.join(root, 'packages/fixture/package.json'),
+	);
+	assert.throws(() => getWorkspacePackages(root), /package\.json.*(?:escape|outside)/i);
+});
+
+test('malformed manifests report their path without copying JSON contents', (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), 'workspace-malformed-'));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	mkdirSync(path.join(root, 'packages/fixture'), { recursive: true });
+	writeFileSync(path.join(root, 'packages/fixture/package.json'), 'HARMLESS_MANIFEST_CANARY');
+	assert.throws(
+		() => getWorkspacePackages(root),
+		(error) => {
+			assert.match(error.message, /packages\/fixture\/package\.json/);
+			assert.doesNotMatch(error.message, /HARMLESS|MANIFEST_CANARY/);
+			return true;
+		},
+	);
 });
 
 function workspacePackage(name, manifest = {}) {
