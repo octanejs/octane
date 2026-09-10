@@ -109,6 +109,25 @@ shared contract: ms stats under `ops.render` (plus `opsPerSec`), payload
 bytes / marker counts / memory growth under `meta`, a top-level `failed` on any
 gate failure (and a non-zero exit).
 
+### Positional descriptor identity work gate (opt-in)
+
+`unkeyed-work.mjs` builds only its separate production SSR fixture entry under
+ignored `dist/unkeyed-work/`; the standard throughput fixtures and scores are
+untouched. Its 1,000 unkeyed component descriptors exercise the top-level
+server child-list identity path. One adjacent explicitly keyed child with key
+`"0"` checks that the two key namespaces stay distinct. The gate verifies row
+order, complete HTML/CSS equality, and an untimed count of positional key
+serialization before reporting warmed render timings. Compare the same output
+hash across a baseline and candidate build:
+
+```bash
+EXPECT_IMPLICIT_JSON=1000 node benchmarks/ssr-throughput/unkeyed-work.mjs 2
+EXPECTED_HTML_SHA=YOUR_BASELINE_SHA node benchmarks/ssr-throughput/unkeyed-work.mjs 2
+```
+
+Timing deltas within process-to-process variance are inconclusive; the
+serialization count is the deterministic work gate.
+
 ### Private loop HTML carriers — 2026-09-03
 
 Compared merged main `44d50dbc0` with private loop bodies returning serialized

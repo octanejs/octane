@@ -1143,8 +1143,12 @@ function scopedSsrDeoptKey(
 	item: any,
 	index: number,
 	key: any,
-): string {
+): string | number {
 	const explicit = isElementDescriptor(item) && item.key != null;
+	// The async-identity encoder keeps numbers distinct from strings. Preserve
+	// the encoded wrapper/explicit-key paths, but avoid serializing each plain
+	// top-level position before the encoder sees it.
+	if (path.length === 0 && !explicit) return index;
 	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
 }
 
