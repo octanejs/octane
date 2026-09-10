@@ -1,6 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import {
+	assertBindingSurfacePolicy,
+	assertUpstreamLockScope,
+	requiresUpstreamEvidence,
+} from '../binding-surface-policy.mjs';
 
 const LOCK_RELATIVE_PATH = path.join('audit', 'upstream.lock.json');
 const MARKER_RELATIVE_PATH = path.join('upstream', '.octane-materialize.json');
@@ -39,6 +44,15 @@ export function ensureMaterializedUpstream(repoRoot, { spawn = spawnSync } = {})
 		if (!entry.isDirectory()) continue;
 		const packageDirectory = path.join(packagesRoot, entry.name);
 		if (!existsSync(path.join(packageDirectory, LOCK_RELATIVE_PATH))) continue;
+		const lock = JSON.parse(readFileSync(path.join(packageDirectory, LOCK_RELATIVE_PATH), 'utf8'));
+		if (
+			!requiresUpstreamEvidence(
+				assertBindingSurfacePolicy(packageDirectory),
+				lock.identity?.packageName,
+			)
+		)
+			continue;
+		assertUpstreamLockScope(assertBindingSurfacePolicy(packageDirectory), lock);
 		if (treesPresent(packageDirectory)) continue;
 		const result = spawn(
 			process.execPath,

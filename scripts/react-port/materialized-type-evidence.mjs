@@ -4,6 +4,49 @@ import path from 'node:path';
 import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 import { planAdaptedFiles, validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
+import {
+	assertBindingSurfacePolicy,
+	assertUpstreamLockScope,
+	requiresUpstreamEvidence,
+	scopeUpstreamInventory,
+} from '../binding-surface-policy.mjs';
+
+/** Gate registration and crosswalk consumers share the same lock-checked copied inventory. */
+export function scopedUpstreamTestInventory({
+	node,
+	packageDirectory,
+	surfacePolicy = assertBindingSurfacePolicy(packageDirectory),
+	lock,
+}) {
+	const inventory = node.upstreamTestInventory ?? [];
+	if (surfacePolicy.mode === 'legacy') return inventory;
+	if (!surfacePolicy.requiresCopiedEvidence) return [];
+	if (!requiresUpstreamEvidence(surfacePolicy, node.identity?.packageName))
+		throw new Error(
+			'Copied surfaces require a matching pinned dependency before scoped evidence can run',
+		);
+	lock ??= validateUpstreamLock(
+		JSON.parse(readFileSync(path.join(packageDirectory, 'audit/upstream.lock.json'), 'utf8')),
+	);
+	assertUpstreamLockScope(surfacePolicy, lock);
+	for (const key of ['packageName', 'version', 'commit']) {
+		if (lock.identity[key] !== node.identity?.[key])
+			throw new Error(`Materialized type evidence has a different pinned ${key}`);
+	}
+	const scoped = scopeUpstreamInventory(surfacePolicy, inventory, node.identity.packageName);
+	const prefix = lock.identity.repository.subdirectory
+		? `${lock.identity.repository.subdirectory}/`
+		: '';
+	const lockedFiles = new Map(lock.files.map((file) => [file.path, file]));
+	for (const entry of scoped) {
+		const file = lockedFiles.get(
+			prefix && entry.path.startsWith(prefix) ? entry.path.slice(prefix.length) : entry.path,
+		);
+		if (!file || file.gitBlob !== entry.gitBlob || file.size !== entry.size)
+			throw new Error(`Scoped upstream inventory differs from its immutable lock: ${entry.path}`);
+	}
+	return scoped;
+}
 
 function assertionCounts(source, file) {
 	if (/@ts-(?:nocheck|ignore)\b/.test(source))
@@ -34,21 +77,32 @@ function assertionCounts(source, file) {
 // wrapping every statement in an extra invented assertion would change that
 // authority and exclude libraries that publish only subpath entry points.
 export function assertMaterializedTypeEvidence({ gateId, node, packageDirectory, programFiles }) {
+	const policy = assertBindingSurfacePolicy(packageDirectory);
+	if (!requiresUpstreamEvidence(policy, node.identity?.packageName))
+		throw new Error(
+			'Imported dependency type evidence must use public-types, not a materialized upstream suite',
+		);
 	const lock = validateUpstreamLock(
 		JSON.parse(readFileSync(path.join(packageDirectory, 'audit/upstream.lock.json'), 'utf8')),
 	);
+	assertUpstreamLockScope(policy, lock);
 	for (const key of ['packageName', 'version', 'commit']) {
-		if (lock.identity[key] !== node.identity?.[key]) {
+		if (lock.identity[key] !== node.identity?.[key])
 			throw new Error(`Materialized type evidence has a different pinned ${key}`);
-		}
 	}
+	const scopedInventory = scopedUpstreamTestInventory({
+		node,
+		packageDirectory,
+		surfacePolicy: policy,
+		lock,
+	});
 	const integrity = verifyPristineTree(lock, path.join(packageDirectory, 'upstream'));
 	if (Object.values(integrity).some((files) => files.length > 0)) {
 		throw new Error(
 			`Materialized type evidence has invalid pristine bytes: ${JSON.stringify(integrity)}`,
 		);
 	}
-	const inventory = (node.upstreamTestInventory ?? []).filter(({ kind }) => kind === 'type');
+	const inventory = scopedInventory.filter(({ kind }) => kind === 'type');
 	if (inventory.length === 0)
 		throw new Error('Materialized type evidence requires a pinned type inventory');
 	const prefix = lock.identity.repository.subdirectory

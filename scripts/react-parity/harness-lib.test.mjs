@@ -201,6 +201,50 @@ function verifiedManifest() {
 	return value;
 }
 
+test('loaded imported surface manifests use focused integration and public types while legacy manifests retain full suites', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'parity-imported-surface-'));
+	await mkdir(join(root, 'audit'));
+	await mkdir(join(root, 'src'));
+	await writeFile(
+		join(root, 'package.json'),
+		JSON.stringify({ exports: './src/index.ts', dependencies: { widget: '1.0.0' } }),
+	);
+	await writeFile(join(root, 'src/index.ts'), "export * from 'widget';\n");
+	await writeFile(join(root, 'consumer.test.ts'), 'export const evidence = true;');
+	await writeFile(
+		join(root, 'status.json'),
+		JSON.stringify({
+			surfaces: [
+				{
+					entrypoint: '.',
+					exports: ['*'],
+					ownership: 'imported',
+					files: ['src/index.ts'],
+					dependency: { package: 'widget', version: '1.0.0' },
+					evidence: ['consumer.test.ts'],
+				},
+			],
+		}),
+	);
+	const value = verifiedManifest();
+	value.lanes = [
+		differentialLane(),
+		{ ...typeLane('adapted-types'), evidenceOrigin: 'repo-authored' },
+	];
+	assert.throws(() => validateManifest(structuredClone(value)), /full pristine-upstream/);
+	await writeFile(join(root, 'audit/react-parity.json'), JSON.stringify(value));
+	assert.deepEqual(
+		(await loadManifest(join(root, 'audit/react-parity.json'))).lanes.map((lane) => lane.type),
+		['differential', 'adapted-types'],
+	);
+	value.lanes.pop();
+	await writeFile(join(root, 'audit/react-parity.json'), JSON.stringify(value));
+	await assert.rejects(
+		() => loadManifest(join(root, 'audit/react-parity.json')),
+		/public type evidence/,
+	);
+});
+
 test('accepts distinct lane types and builds deterministic argv without a shell', () => {
 	const value = manifest();
 	assert.deepEqual(validateManifest(value), value);

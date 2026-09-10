@@ -9,6 +9,8 @@ import {
 	mkdtempSync,
 	readFileSync,
 	readdirSync,
+	realpathSync,
+	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from 'node:fs';
@@ -19,10 +21,239 @@ import { fileURLToPath } from 'node:url';
 import { EVIDENCE_MATRIX_SCHEMA_VERSION, recordEvidence } from './evidence-lib.mjs';
 import { assertApprovedGateCommand } from './evidence.mjs';
 import { createBatchManifest } from './state-lib.mjs';
+import { buildUpstreamLock, gitBlobSha1 } from './materialize-lib.mjs';
+import { fixtureIdentity, fixtureTreeEntries } from './__fixtures__/materialize-fixtures.mjs';
 
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const MIT_TEXT =
 	'MIT License Copyright Fixture. Permission is hereby granted, free of charge, to any person obtaining a copy. The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY.';
+
+test('mixed cleanup binds type projects and crosswalks to the same pinned copied slice', (t) => {
+	const context = createReadyBatch();
+	const workspaceRoot = realpathSync(context.workspaceRoot);
+	const workRoot = realpathSync(context.workRoot);
+	const batchDirectory = realpathSync(context.batchDirectory);
+	const initialPath = path.join(batchDirectory, 'manifest.json');
+	const initial = JSON.parse(readFileSync(initialPath, 'utf8'));
+	initial.workspaceRoot = workspaceRoot;
+	writeFileSync(initialPath, JSON.stringify(initial));
+	t.after(() => rmSync(workspaceRoot, { recursive: true, force: true }));
+	const common = ['--work-root', workRoot, '--batch', 'fixture-batch', '--node', 'pkg:widget'];
+	assert.equal(runEvidence(['init', ...common, '--category', 'thin-core']).status, 0);
+	const packageDirectory = createCompletePackage(workspaceRoot);
+	const write = (file, value) => {
+		mkdirSync(path.dirname(path.join(packageDirectory, file)), { recursive: true });
+		writeFileSync(
+			path.join(packageDirectory, file),
+			typeof value === 'string' ? value : JSON.stringify(value),
+		);
+	};
+	const pkg = JSON.parse(readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
+	pkg.dependencies = { widget: '1.0.0' };
+	write('package.json', pkg);
+	const copied = 'export const copied = true;\n';
+	const source = "export * from 'widget';\nexport { copied } from './copied';\n";
+	const typeSource =
+		'declare const copied: true;\ncopied satisfies true;\n// @ts-expect-error copied is true\nconst invalid: false = copied;\n';
+	write('src/index.ts', source);
+	write('src/copied.ts', copied);
+	const ledger = [
+		{ path: 'src/index.ts', origin: 'authored', sha256: sha256(source) },
+		{ path: 'src/copied.ts', origin: 'adapted', packageName: 'widget', sha256: sha256(copied) },
+	];
+	write('audit/source-ledger.json', ledger);
+	const status = JSON.parse(readFileSync(path.join(packageDirectory, 'status.json'), 'utf8'));
+	status.surfaces = [
+		{
+			entrypoint: '.',
+			exports: ['*'],
+			ownership: 'imported',
+			files: ['src/index.ts'],
+			dependency: { package: 'widget', version: '1.0.0' },
+			evidence: ['tests/widget.test.ts'],
+		},
+		{
+			entrypoint: '.',
+			exports: ['copied'],
+			ownership: 'copied',
+			files: ['src/copied.ts'],
+			dependency: { package: 'widget', version: '1.0.0' },
+			upstreamPaths: ['src/copied.ts', 'tests/copied.types.ts'],
+			evidence: ['tests/widget.test.ts'],
+		},
+	];
+	write('status.json', status);
+	const sources = new Map([
+		['src/copied.ts', copied],
+		['tests/copied.types.ts', typeSource],
+	]);
+	const lock = buildUpstreamLock({
+		identity: fixtureIdentity({ packageName: 'widget' }),
+		license: { spdx: 'MIT' },
+		treeEntries: fixtureTreeEntries(sources),
+	});
+	write('audit/upstream.lock.json', lock);
+	for (const [file, bytes] of sources) write(`upstream/${file}`, bytes);
+	const inventoryEntry = (file, id) => ({
+		path: file,
+		kind: 'type',
+		gitBlob: gitBlobSha1(Buffer.from(typeSource)),
+		size: Buffer.byteLength(typeSource),
+		registrations: [
+			{
+				id,
+				source: `${file}:1`,
+				kind: 'type-assertion',
+				declarationId: id,
+				estimatedRegistrations: 1,
+				registrationIndex: 0,
+			},
+		],
+	});
+	const copiedEntry = inventoryEntry('tests/copied.types.ts', 'copied-type');
+	const batchPath = path.join(batchDirectory, 'manifest.json');
+	const batch = JSON.parse(readFileSync(batchPath, 'utf8'));
+	const node = batch.nodes['pkg:widget'];
+	node.upstreamTestInventory = [
+		inventoryEntry('tests/engine.types.ts', 'imported-type'),
+		copiedEntry,
+	];
+	writeFileSync(batchPath, JSON.stringify(batch));
+	write('tests/types/upstream/tsconfig.pristine.json', {
+		compilerOptions: { strict: true, skipLibCheck: false, noEmit: true },
+		files: ['../../../upstream/tests/copied.types.ts'],
+		reactPortEvidence: {
+			gate: 'upstream-types-pristine',
+			upstreamMode: 'materialized',
+			upstreamRegistrations: ['copied-type'],
+		},
+	});
+	assert.doesNotThrow(() =>
+		assertApprovedGateCommand(
+			['upstream-types-pristine'],
+			[
+				'pnpm',
+				'exec',
+				'tsc',
+				'--noEmit',
+				'-p',
+				'packages/widget/tests/types/upstream/tsconfig.pristine.json',
+			],
+			node,
+			{ workspaceRoot },
+		),
+	);
+	write('closure.json', {
+		runtimeDependencies: ['widget'],
+		adaptedSources: [{ packageName: 'widget', paths: ['src/copied.ts'] }],
+		sourceLedger: ledger,
+	});
+	const migrated = runEvidence([
+		'migrate',
+		...common,
+		'--closure',
+		path.join(packageDirectory, 'closure.json'),
+	]);
+	assert.equal(migrated.status, 0, migrated.stderr);
+	write('registrations.json', copiedEntry.registrations);
+	write('crosswalk.json', [
+		{ id: 'copied-type', classification: 'implemented', localEvidence: 'tests/widget.test.ts' },
+	]);
+	const verified = runEvidence([
+		'verify',
+		...common,
+		'--package-dir',
+		packageDirectory,
+		'--expected-directory',
+		'packages/widget',
+		'--closure',
+		path.join(packageDirectory, 'closure.json'),
+		'--registrations',
+		path.join(packageDirectory, 'registrations.json'),
+		'--crosswalk',
+		path.join(packageDirectory, 'crosswalk.json'),
+	]);
+	const report = JSON.parse(verified.stdout);
+	assert.equal(report.crosswalkReport.status, 'passed', JSON.stringify(report.crosswalkReport));
+	assert.deepEqual(
+		report.crosswalkReport.cases.map((entry) => entry.id),
+		['copied-type'],
+	);
+	assert.equal(report.status, 'blocked', 'Focused runtime/type/pack gates still require execution');
+});
+
+test('surface ownership requires an explicit scoped evidence migration and changing source invalidates the result', (t) => {
+	const { workspaceRoot, workRoot, batchDirectory } = createReadyBatch();
+	t.after(() => rmSync(workspaceRoot, { recursive: true, force: true }));
+	const common = ['--work-root', workRoot, '--batch', 'fixture-batch', '--node', 'pkg:widget'];
+	assert.equal(runEvidence(['init', ...common, '--category', 'thin-core']).status, 0);
+	const packageDirectory = createCompletePackage(workspaceRoot);
+	const packagePath = path.join(packageDirectory, 'package.json');
+	const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
+	pkg.dependencies = { widget: '1.0.0' };
+	writeFileSync(packagePath, JSON.stringify(pkg));
+	writeFileSync(path.join(packageDirectory, 'src/index.ts'), "export * from 'widget';\n");
+	const statusPath = path.join(packageDirectory, 'status.json');
+	const status = JSON.parse(readFileSync(statusPath, 'utf8'));
+	status.surfaces = [
+		{
+			entrypoint: '.',
+			exports: ['*'],
+			ownership: 'imported',
+			files: ['src/index.ts'],
+			dependency: { package: 'widget', version: '1.0.0' },
+			evidence: ['tests/widget.test.ts'],
+		},
+	];
+	writeFileSync(statusPath, JSON.stringify(status));
+	const closurePath = path.join(packageDirectory, 'closure.json');
+	writeFileSync(
+		closurePath,
+		JSON.stringify(completeClosure(packageDirectory, { runtimeDependencies: ['widget'] })),
+	);
+	const manifestPath = path.join(batchDirectory, 'manifest.json');
+	const original = readFileSync(manifestPath, 'utf8');
+	assert.equal(runEvidence(['init', ...common, '--category', 'thin-core']).status, 0);
+	assert.ok(
+		JSON.parse(readFileSync(manifestPath, 'utf8')).nodes['pkg:widget'].evidenceMatrix.gates[
+			'upstream-types-pristine'
+		],
+	);
+	const refused = runEvidence([
+		'record',
+		...common,
+		'--gate',
+		'generated-data',
+		'--status',
+		'inapplicable',
+		'--reason',
+		'No generated data',
+	]);
+	assert.equal(refused.status, 2);
+	assert.match(refused.stderr, /explicitly migrate/);
+	const migrated = runEvidence(['migrate', ...common, '--closure', closurePath]);
+	assert.equal(migrated.status, 0, migrated.stderr);
+	const matrix = JSON.parse(readFileSync(manifestPath, 'utf8')).nodes['pkg:widget'].evidenceMatrix;
+	assert.equal(matrix.gates['upstream-types-pristine'], undefined);
+	assert.equal(matrix.gates['package-tests'].status, 'required');
+	assert.ok(JSON.parse(original).nodes['pkg:widget'].evidenceMatrix.gates['upstream-crosswalk']);
+	writeFileSync(
+		path.join(packageDirectory, 'src/index.ts'),
+		"export * from 'widget';\n// changed source\n",
+	);
+	const stale = runEvidence([
+		'record',
+		...common,
+		'--gate',
+		'generated-data',
+		'--status',
+		'inapplicable',
+		'--reason',
+		'No generated data',
+	]);
+	assert.equal(stale.status, 2);
+	assert.match(stale.stderr, /changed source provenance/);
+});
 
 test('accepts the workspace native compiler executable with the same strict project checks', () => {
 	const { workspaceRoot } = createReadyBatch();

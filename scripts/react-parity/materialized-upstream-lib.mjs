@@ -9,6 +9,11 @@ import {
 	verifyPristineTree,
 } from '../react-port/materialize-lib.mjs';
 import { checkAdaptedTree } from '../react-port/materialize.mjs';
+import {
+	assertBindingSurfacePolicy,
+	assertUpstreamLockScope,
+	requiresUpstreamEvidence,
+} from '../binding-surface-policy.mjs';
 
 const MATERIALIZE_CLI = 'scripts/react-port/materialize.mjs';
 
@@ -19,9 +24,12 @@ export function verifyMaterializedAdaptedEvidence(root, packagePath, provenance)
 	}
 	verifyMaterializedUpstreamEvidence(root, packagePath);
 	const packageRoot = resolve(root, packagePath);
+	if (!requiresUpstreamEvidence(assertBindingSurfacePolicy(packageRoot))) return new Set();
 	const lock = validateUpstreamLock(
 		JSON.parse(readFileSync(join(packageRoot, UPSTREAM_LOCK_RELATIVE_PATH), 'utf8')),
 	);
+	if (!requiresUpstreamEvidence(assertBindingSurfacePolicy(packageRoot), lock.identity.packageName))
+		return new Set();
 	if (
 		lock.identity.version !== provenance.version ||
 		lock.identity.commit !== provenance.commit ||
@@ -43,6 +51,14 @@ export function discoverMaterializedUpstreamPackages(root) {
 		.filter((entry) => entry.isDirectory())
 		.map((entry) => `packages/${entry.name}`)
 		.filter((packagePath) => existsSync(resolve(root, packagePath, UPSTREAM_LOCK_RELATIVE_PATH)))
+		.filter((packagePath) => {
+			const packageRoot = resolve(root, packagePath);
+			const lock = JSON.parse(readFileSync(join(packageRoot, UPSTREAM_LOCK_RELATIVE_PATH), 'utf8'));
+			const policy = assertBindingSurfacePolicy(packageRoot);
+			if (!requiresUpstreamEvidence(policy, lock.identity?.packageName)) return false;
+			assertUpstreamLockScope(policy, lock);
+			return true;
+		})
 		.sort();
 }
 
@@ -78,9 +94,13 @@ export function materializeUpstreamEvidence(
  */
 export function verifyMaterializedUpstreamEvidence(root, packagePath) {
 	const packageRoot = resolve(root, packagePath);
+	const policy = assertBindingSurfacePolicy(packageRoot);
+	if (!requiresUpstreamEvidence(policy)) return { required: false };
 	const lock = validateUpstreamLock(
 		JSON.parse(readFileSync(join(packageRoot, UPSTREAM_LOCK_RELATIVE_PATH), 'utf8')),
 	);
+	if (!requiresUpstreamEvidence(policy, lock.identity.packageName)) return { required: false };
+	assertUpstreamLockScope(policy, lock);
 	const attribution = join(packageRoot, 'LICENSE.upstream');
 	const captured = lock.license.evidence ?? [];
 	if (captured.length > 0) {

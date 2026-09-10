@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getBindingPackages, readEcosystemCatalogs } from './workspace-packages.mjs';
+import { readBindingSurfacePolicy } from './binding-surface-policy.mjs';
 
 // Generates docs/bindings-status.md — the central status table for the
 // @octanejs/* framework bindings. The per-package data lives in a small
@@ -19,7 +20,7 @@ import { getBindingPackages, readEcosystemCatalogs } from './workspace-packages.
 // updating its status.json and regenerating in the same change.
 //
 // status.json schema (all strings are plain markdown):
-//   upstream.package   the React library this package ports (npm name)
+//   upstream.package   the upstream library this package integrates (npm name)
 //   upstream.version   the upstream version the port tracks
 //   surface            one-liner: what is implemented vs not
 //   divergences        string[] of intentional API/behavior differences ([]
@@ -56,6 +57,12 @@ for (const workspacePackage of getBindingPackages()) {
 
 	for (const field of ['upstream', 'surface', 'divergences', 'ssr', 'verified']) {
 		if (status[field] == null) errors.push(`packages/${dir}/status.json is missing "${field}"`);
+	}
+	try {
+		const policy = readBindingSurfacePolicy(path.dirname(statusPath));
+		errors.push(...policy.issues.map((issue) => `packages/${dir}/status.json: ${issue}`));
+	} catch (error) {
+		errors.push(`packages/${dir}/status.json surfaces: ${error.message}`);
 	}
 	if (status.upstream && (!status.upstream.package || !status.upstream.version))
 		errors.push(`packages/${dir}/status.json "upstream" needs { package, version }`);

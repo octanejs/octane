@@ -16,9 +16,13 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
+import { assertBindingSurfacePolicy } from '../binding-surface-policy.mjs';
 import { assertTsrxTypecheckSucceeded } from '../tsrx-typecheck.mjs';
 import { createTypeEvidenceProgram } from './type-program.mjs';
-import { assertMaterializedTypeEvidence } from './materialized-type-evidence.mjs';
+import {
+	assertMaterializedTypeEvidence,
+	scopedUpstreamTestInventory,
+} from './materialized-type-evidence.mjs';
 import { publicCompatibilityExport } from './public-compatibility.mjs';
 import {
 	pinnedPublicEntries,
@@ -32,6 +36,7 @@ import {
 	evaluateVerificationReadiness,
 	inspectBindingPackage,
 	isCurrentEvidenceMatrix,
+	migrateEvidenceMatrix,
 	recordEvidence,
 	validateUpstreamCrosswalk,
 } from './evidence-lib.mjs';
@@ -84,6 +89,7 @@ const TYPESCRIPT_LIBRARY_DIRECTORY = path.dirname(ts.getDefaultLibFilePath({}));
 function usage() {
 	return `Usage:
   node scripts/react-port/evidence.mjs init --batch <id> --node <pkg:id> --category <kind> [...]
+  node scripts/react-port/evidence.mjs migrate --batch <id> --node <pkg:id> --closure <json>
   node scripts/react-port/evidence.mjs record --batch <id> --node <pkg:id> --gate <id> --status <status> [evidence]
   node scripts/react-port/evidence.mjs run --batch <id> --node <pkg:id> --gate <id> [--gate <id> ...] -- <approved-gate-command>
   node scripts/react-port/evidence.mjs verify --batch <id> --node <pkg:id> --package-dir <path> \
@@ -106,8 +112,8 @@ function parseArguments(arguments_) {
 	const optionArguments = separatorIndex === -1 ? arguments_ : arguments_.slice(0, separatorIndex);
 	const commandArguments = separatorIndex === -1 ? [] : arguments_.slice(separatorIndex + 1);
 	const command = optionArguments[0];
-	if (!['init', 'record', 'run', 'verify'].includes(command))
-		throw new Error('Expected init, record, run, or verify');
+	if (!['init', 'migrate', 'record', 'run', 'verify'].includes(command))
+		throw new Error('Expected init, migrate, record, run, or verify');
 	const options = {
 		category: [],
 		gate: [],
@@ -1448,7 +1454,7 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 		if (!materialized && !within('tests/types') && !within('typetests')) {
 			throw new Error('Upstream type project must compile package-local upstream type sources');
 		}
-		const expectedRegistrations = (node.upstreamTestInventory ?? [])
+		const expectedRegistrations = scopedUpstreamTestInventory({ node, packageDirectory })
 			.filter(({ kind }) => kind === 'type')
 			.flatMap(({ registrations }) => registrations.map(({ id }) => id))
 			.sort();
@@ -1648,6 +1654,45 @@ async function operate(
 		);
 	}
 	assertCurrentEvidenceMatrix(node.evidenceMatrix);
+	const policyPackageDirectory = bindingPackageDirectory(
+		node,
+		manifest.workspaceRoot ?? path.dirname(path.resolve(options.workRoot)),
+	);
+	const policyClosurePath = options.closure ?? node.evidenceMatrix.surfacePolicy?.closurePath;
+	const policyClosure = policyClosurePath
+		? readJson(policyClosurePath, 'surface policy closure')
+		: undefined;
+	const surfacePolicy = assertBindingSurfacePolicy(policyPackageDirectory, {
+		sourceLedger: policyClosure?.sourceLedger,
+	});
+	if (command === 'migrate') {
+		if (!options.closure || !Array.isArray(policyClosure.sourceLedger))
+			throw new Error('migrate requires --closure with the actual sourceLedger');
+		node.evidenceMatrix = migrateEvidenceMatrix(node.evidenceMatrix, surfacePolicy);
+		node.evidenceMatrix.surfacePolicy.closurePath = path.resolve(options.closure);
+		delete node.evidence;
+		return {
+			schemaVersion: 1,
+			command,
+			status: 'passed',
+			nodeId: options.node,
+			state: node.state,
+			surfacePolicy: node.evidenceMatrix.surfacePolicy,
+		};
+	}
+	if (
+		surfacePolicy.mode === 'declared' &&
+		['fingerprint', 'requiresCopiedEvidence', 'requiresLifecycleEvidence'].some(
+			(field) => node.evidenceMatrix.surfacePolicy?.[field] !== surfacePolicy[field],
+		)
+	)
+		throw new Error(
+			'Surface ownership or supporting files changed; explicitly migrate evidence with the current --closure before recording results',
+		);
+	if (surfacePolicy.mode === 'legacy' && node.evidenceMatrix.surfacePolicy)
+		throw new Error(
+			'Declared surface policy was removed; restore it or reinitialize strict legacy evidence',
+		);
 	if (command === 'record') {
 		if (options.gate.length !== 1 || !options.status) {
 			throw new Error('record requires exactly one --gate and --status');
@@ -1798,9 +1843,8 @@ async function operate(
 	for (const required of [
 		'packageDir',
 		'expectedDirectory',
-		'registrations',
-		'crosswalk',
 		'closure',
+		...(surfacePolicy.requiresCopiedEvidence ? ['registrations', 'crosswalk'] : []),
 	]) {
 		if (!options[required])
 			throw new Error(
@@ -1822,17 +1866,32 @@ async function operate(
 			`--package-dir must match the graph-planned workspace directory: ${plannedPackageDirectory}`,
 		);
 	}
-	const registrations = readJson(options.registrations, 'registrations');
-	const crosswalk = readJson(options.crosswalk, 'crosswalk');
+	const registrations = surfacePolicy.requiresCopiedEvidence
+		? readJson(options.registrations, 'registrations')
+		: [];
+	const crosswalk = surfacePolicy.requiresCopiedEvidence
+		? readJson(options.crosswalk, 'crosswalk')
+		: [];
 	const closure = readJson(options.closure, 'closure');
 	let crosswalkReport;
 	try {
-		crosswalkReport = validateUpstreamCrosswalk(
-			registrations,
-			crosswalk,
-			node.upstreamTestInventory,
-			plannedPackageDirectory,
-		);
+		crosswalkReport = !surfacePolicy.requiresCopiedEvidence
+			? {
+					status: 'passed',
+					cases: [],
+					issues: [],
+					observed: 'No copied implementation requires an upstream test crosswalk.',
+				}
+			: validateUpstreamCrosswalk(
+					registrations,
+					crosswalk,
+					scopedUpstreamTestInventory({
+						node,
+						packageDirectory: plannedPackageDirectory,
+						surfacePolicy,
+					}),
+					plannedPackageDirectory,
+				);
 	} catch (error) {
 		crosswalkReport = {
 			status: 'blocked',
@@ -1847,6 +1906,7 @@ async function operate(
 		identity: node.identity,
 		expectedLicenseHashes: attribution.licenses,
 		expectedNoticeHashes: attribution.notices,
+		sourceLedger: closure.sourceLedger,
 	});
 	const closureReport = auditShippedClosure({
 		nodeId: options.node,
@@ -1858,11 +1918,12 @@ async function operate(
 		evidenceRoot: plannedPackageDirectory,
 		packageDirectory: plannedPackageDirectory,
 	});
-	setAutomatedGate(node.evidenceMatrix, 'upstream-crosswalk', crosswalkReport, {
-		artifact: path.resolve(options.crosswalk),
-		passedObserved: `${crosswalkReport.cases.length} upstream registrations classified`,
-		repair: 'Restore every registration and supply local evidence or a durable rationale.',
-	});
+	if (node.evidenceMatrix.gates['upstream-crosswalk'])
+		setAutomatedGate(node.evidenceMatrix, 'upstream-crosswalk', crosswalkReport, {
+			artifact: path.resolve(options.crosswalk),
+			passedObserved: `${crosswalkReport.cases.length} upstream registrations classified`,
+			repair: 'Restore every registration and supply local evidence or a durable rationale.',
+		});
 	for (const gateId of ['package-contract', 'provenance']) {
 		setAutomatedGate(node.evidenceMatrix, gateId, packageReport, {
 			artifact: plannedPackageDirectory,

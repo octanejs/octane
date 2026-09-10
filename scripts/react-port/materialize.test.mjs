@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -13,11 +14,17 @@ import {
 } from './__fixtures__/materialize-fixtures.mjs';
 import {
 	UPSTREAM_LOCK_RELATIVE_PATH,
+	buildUpstreamLock,
 	gitBlobSha1,
 	upstreamLockFingerprint,
 } from './materialize-lib.mjs';
 import { main } from './materialize.mjs';
 import { createBatchManifest } from './state-lib.mjs';
+import { ensureMaterializedUpstream } from './ensure-materialized.mjs';
+import {
+	discoverMaterializedUpstreamPackages,
+	verifyMaterializedUpstreamEvidence,
+} from '../react-parity/materialized-upstream-lib.mjs';
 
 const NODE_ID = 'pkg:mit-widget';
 const COMMIT = 'a'.repeat(40);
@@ -134,6 +141,186 @@ const LOCK_ARGUMENTS = (context) => [
 ];
 
 describe('materialize CLI lifecycle', () => {
+	test('same-dependency mixed bindings must scope old locks before any copied evidence is regenerated', async () => {
+		const context = scenario();
+		try {
+			const write = (file, value) => {
+				mkdirSync(path.dirname(path.join(context.packageDirectory, file)), { recursive: true });
+				writeFileSync(
+					path.join(context.packageDirectory, file),
+					typeof value === 'string' ? value : JSON.stringify(value),
+				);
+			};
+			const hash = (value) => createHash('sha256').update(value).digest('hex');
+			const copied = 'export function copied() { return 1; }\n';
+			const sources = new Map([
+				['LICENSE', 'MIT License fixture\n'],
+				['src/engine.js', 'export const engine = () => 1;\n'],
+				['src/copied.js', copied],
+				['tests/copied.test.js', "import { test } from 'node:test';\ntest('copied', () => {});\n"],
+			]);
+			const makeLock = () =>
+				buildUpstreamLock({
+					identity: fixtureIdentity(),
+					license: {
+						spdx: 'MIT',
+						evidence: [{ path: 'LICENSE', sha256: hash(sources.get('LICENSE')) }],
+					},
+					treeEntries: fixtureTreeEntries(sources),
+					adaptedMappings: [{ fromRoot: 'tests', toRoot: 'tests/upstream' }],
+				});
+			write('package.json', { exports: './src/index.ts', dependencies: { 'mit-widget': '1.0.0' } });
+			write('src/index.ts', "export * from 'mit-widget';\nexport { copied } from './copied';\n");
+			write('src/copied.ts', copied);
+			write('tests/consumer.ts', 'export const evidence = true;');
+			write('audit/source-ledger.json', [
+				{
+					path: 'src/copied.ts',
+					origin: 'adapted',
+					packageName: 'mit-widget',
+					sha256: hash(copied),
+				},
+			]);
+			write('status.json', {
+				surfaces: [
+					{
+						entrypoint: '.',
+						exports: ['*'],
+						ownership: 'imported',
+						files: ['src/index.ts'],
+						dependency: { package: 'mit-widget', version: '1.0.0' },
+						evidence: ['tests/consumer.ts'],
+					},
+					{
+						entrypoint: '.',
+						exports: ['copied'],
+						ownership: 'copied',
+						files: ['src/copied.ts'],
+						dependency: { package: 'mit-widget', version: '1.0.0' },
+						upstreamPaths: ['src/copied.js', 'tests/copied.test.js'],
+						evidence: ['tests/consumer.ts'],
+					},
+				],
+			});
+			write('audit/upstream.lock.json', makeLock());
+			const broad = await runCli(['run', '--package-dir', context.packageDirectory], {
+				fetchImpl: () => {
+					throw new Error('Network must not start for an obsolete broad lock');
+				},
+			});
+			assert.equal(broad.exitCode, 2);
+			assert.match(broad.stderr, /scope.*lock|lock.*scope/i);
+			assert.equal(existsSync(path.join(context.packageDirectory, 'upstream')), false);
+			assert.throws(
+				() => discoverMaterializedUpstreamPackages(context.root),
+				/scope.*lock|lock.*scope/i,
+			);
+			assert.throws(
+				() =>
+					ensureMaterializedUpstream(context.root, {
+						spawn: () => {
+							throw new Error('Must reject before spawning');
+						},
+					}),
+				/scope.*lock|lock.*scope/i,
+			);
+			assert.throws(
+				() => verifyMaterializedUpstreamEvidence(context.root, 'packages/mit-widget'),
+				/scope.*lock|lock.*scope/i,
+			);
+			sources.delete('src/engine.js');
+			write('audit/upstream.lock.json', makeLock());
+			write('LICENSE.upstream', sources.get('LICENSE'));
+			assert.deepEqual(discoverMaterializedUpstreamPackages(context.root), ['packages/mit-widget']);
+			const scoped = await runCli(['run', '--package-dir', context.packageDirectory], {
+				fetchImpl: fixtureFetch({ sources }),
+			});
+			assert.equal(scoped.exitCode, 0, scoped.stderr);
+			assert.equal(
+				existsSync(path.join(context.packageDirectory, 'upstream/src/engine.js')),
+				false,
+			);
+			assert.equal(
+				readFileSync(path.join(context.packageDirectory, 'upstream/src/copied.js'), 'utf8'),
+				copied,
+			);
+			assert.equal(
+				existsSync(path.join(context.packageDirectory, 'tests/upstream/copied.test.js')),
+				true,
+			);
+			assert.equal(
+				verifyMaterializedUpstreamEvidence(context.root, 'packages/mit-widget').files,
+				3,
+			);
+		} finally {
+			rmSync(context.root, { recursive: true, force: true });
+		}
+	});
+	test('removed imported snapshots stay absent through discovery, explicit verification, and direct materialization', async () => {
+		const context = scenario();
+		try {
+			assert.equal((await runCli(LOCK_ARGUMENTS(context))).exitCode, 0);
+			mkdirSync(path.join(context.packageDirectory, 'src'));
+			mkdirSync(path.join(context.packageDirectory, 'tests'));
+			writeFileSync(
+				path.join(context.packageDirectory, 'src/index.ts'),
+				"export * from 'mit-widget';\n",
+			);
+			writeFileSync(
+				path.join(context.packageDirectory, 'tests/consumer.ts'),
+				'export const evidence = true;',
+			);
+			writeFileSync(
+				path.join(context.packageDirectory, 'package.json'),
+				JSON.stringify({ exports: './src/index.ts', dependencies: { 'mit-widget': '1.0.0' } }),
+			);
+			writeFileSync(
+				path.join(context.packageDirectory, 'status.json'),
+				JSON.stringify({
+					surfaces: [
+						{
+							entrypoint: '.',
+							exports: ['*'],
+							ownership: 'imported',
+							files: ['src/index.ts'],
+							dependency: { package: 'mit-widget', version: '1.0.0' },
+							evidence: ['tests/consumer.ts'],
+						},
+					],
+				}),
+			);
+			assert.deepEqual(
+				ensureMaterializedUpstream(context.root, {
+					spawn: () => {
+						throw new Error('Must not regenerate imported snapshots');
+					},
+				}),
+				[],
+			);
+			assert.deepEqual(discoverMaterializedUpstreamPackages(context.root), []);
+			assert.deepEqual(verifyMaterializedUpstreamEvidence(context.root, 'packages/mit-widget'), {
+				required: false,
+			});
+			const result = await runCli(['run', '--package-dir', context.packageDirectory], {
+				fetchImpl: () => {
+					throw new Error('Must not fetch imported snapshots');
+				},
+			});
+			assert.equal(result.exitCode, 0, result.stderr);
+			assert.equal(JSON.parse(result.stdout).mode, 'not-required');
+			assert.equal(existsSync(path.join(context.packageDirectory, 'upstream')), false);
+			rmSync(path.join(context.packageDirectory, 'status.json'));
+			assert.throws(
+				() =>
+					ensureMaterializedUpstream(context.root, {
+						spawn: () => ({ status: 1, stderr: 'Legacy evidence still required' }),
+					}),
+				/Legacy evidence still required/,
+			);
+		} finally {
+			rmSync(context.root, { recursive: true, force: true });
+		}
+	});
 	test('reuses verified pristine bytes offline when only adapted header rules change', async () => {
 		const context = scenario();
 		await runCli(LOCK_ARGUMENTS(context));
