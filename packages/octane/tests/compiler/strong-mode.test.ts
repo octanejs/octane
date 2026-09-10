@@ -4618,6 +4618,156 @@ export function App() {
 	});
 });
 
+describe('Strong mode template switch arms', () => {
+	it('allows an arm-local value to shadow mutable module state', () => {
+		const source = `"use strong";
+let revision = 0;
+function advance() { revision++; }
+export function App(props) @{
+  @switch (props.kind) {
+    @case 'current': {
+      const revision = props.revision;
+      <p>{revision as string}</p>
+    }
+    @default: { <p /> }
+  }
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('checks a case test before entering its arm scope', () => {
+		const source = `"use strong";
+let revision = 0;
+function advance() { revision++; }
+export function App(props) @{
+  @switch (props.kind) {
+    @case revision: {
+      const revision = props.revision;
+      <p>{revision as string}</p>
+    }
+    @default: { <p /> }
+  }
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_MODULE_STATE_READ);
+	});
+
+	it.each([
+		{ mode: 'client', dev: true },
+		{ mode: 'server', dev: false },
+	])('preserves valid switch output in $mode compilation', (options) => {
+		const source = `let revision = 0;
+function advance() { revision++; }
+export function App(props) @{
+  @switch (props.kind) {
+    @case 'current': {
+      const revision = props.revision;
+      <p>{revision as string}</p>
+    }
+    @default: { <p /> }
+  }
+}`;
+		const ordinary = compile(source, '/src/App.tsrx', options);
+		const strong = compile(source, '/src/App.tsrx', { ...options, strong: true } as any);
+		expect(strong.code).toBe(ordinary.code);
+	});
+
+	it.each([
+		['refs', 'ref', 'const ref = useRef(0);', 'props.other', 'ref.current', RENDER_REF_READ],
+		[
+			'state getters',
+			'getN',
+			'const [, , getN] = useState(0);',
+			'() => 1',
+			'getN()',
+			RENDER_STATE_GETTER_CALL,
+		],
+		[
+			'state setters',
+			'setN',
+			'const [n, setN] = useState(0);',
+			'() => {}',
+			'setN(n + 1)',
+			RENDER_STATE_UPDATE,
+		],
+		[
+			'state arrays',
+			'items',
+			'const [items] = useState([1]);',
+			'[2]',
+			'items.push(3)',
+			RENDER_SNAPSHOT_MUTATION,
+		],
+	])(
+		'keeps %s from one arm visible in a sibling arm',
+		(_shape, name, declaration, other, read, code) => {
+			const source = `"use strong";
+import { useRef, useState } from 'octane';
+export function App(props) @{
+  ${declaration}
+  @switch (props.kind) {
+    @case 'other': {
+      const ${name} = ${other};
+      <p>{String(${name})}</p>
+    }
+    @default: { <p>{String(${read})}</p> }
+  }
+}`;
+			expect(() => compile(source, '/src/App.tsrx')).toThrow(code);
+		},
+	);
+
+	it('does not treat a shadowed ref read as a render ref read', () => {
+		const source = `"use strong";
+import { useRef } from 'octane';
+export function App(props) @{
+  const ref = useRef(0);
+  @switch (props.kind) {
+    @case 'other': {
+      const ref = props.other;
+      <p>{ref.current as string}</p>
+    }
+    @default: { <p /> }
+  }
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('follows an arm-local function called while rendering', () => {
+		const source = `"use strong";
+import { useRef } from 'octane';
+export function App(props) @{
+  const ref = useRef(0);
+  @switch (props.kind) {
+    @case 'read': {
+      function read() { return ref.current; }
+      <p>{read() as string}</p>
+    }
+    @default: { <p /> }
+  }
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_READ);
+	});
+
+	it('keeps same-named vars in separate arms when tracing a state updater', () => {
+		const source = `"use strong";
+import { useState } from 'octane';
+export function App(props) @{
+  @switch (props.kind) {
+    @case 'update': {
+      var [n, update] = useState(0);
+      update(n + 1);
+      <p />
+    }
+    @default: {
+      var update = () => {};
+      <p />
+    }
+  }
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
+	});
+});
+
 describe('Strong mode render-time mutable module state reads', () => {
 	function component(
 		render: string,
@@ -4882,6 +5032,28 @@ export function App() @{
 		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
 			RENDER_MODULE_STATE_READ,
 		);
+	});
+
+	it('allows an instance field initializer that runs only in an event handler', () => {
+		const source = `"use strong";
+let revision = 0;
+function advance() { revision++; }
+export function App() @{
+  class Entry { value = revision; }
+  <button onClick={() => { const entry = new Entry(); advance(); return entry.value; }} />
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('checks static field initializers when the class is defined during render', () => {
+		const source = `"use strong";
+let revision = 0;
+function advance() { revision++; }
+export function App() @{
+  class Entry { static value = revision; }
+  <p>{Entry.value as string}</p>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_MODULE_STATE_READ);
 	});
 
 	it.each([
