@@ -14,6 +14,7 @@ type DOMAttributes = Record<string, any>;
  */
 
 import { AriaButtonProps } from '../button/useButton';
+import { withSlot } from 'octane';
 import { AriaTextFieldProps, useTextField } from '../textfield/useTextField';
 import { RefObject, ValidationResult } from '@react-types/shared';
 import { InputHTMLAttributes, LabelHTMLAttributes } from '../compat/react';
@@ -69,6 +70,10 @@ export function useSearchField(
 	inputRef: RefObject<HTMLInputElement | null>,
 	_slot?: symbol,
 ): SearchFieldAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useSearchField, props, state, inputRef);
+	}
+
 	let stringFormatter = useLocalizedStringFormatter(intlMessages, '@react-aria/searchfield');
 	let { isDisabled, isReadOnly, onSubmit, onClear, type = 'search' } = props;
 

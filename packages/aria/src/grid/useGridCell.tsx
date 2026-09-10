@@ -14,6 +14,7 @@ type DOMAttributes = Record<string, any>;
  */
 
 import { FocusableElement, Key, RefObject } from '@react-types/shared';
+import { withSlot } from 'octane';
 import { focusSafely } from '../interactions/focusSafely';
 import {
 	getActiveElement,
@@ -89,6 +90,10 @@ export function useGridCell<T, C extends GridCollection<T>>(
 	ref: RefObject<FocusableElement | null>,
 	_slot?: symbol,
 ): GridCellAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useGridCell<T, C>, props, state, ref);
+	}
+
 	let {
 		node,
 		isVirtualized,

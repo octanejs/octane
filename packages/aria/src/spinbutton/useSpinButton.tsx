@@ -14,6 +14,7 @@ type DOMAttributes = Record<string, any>;
  */
 
 import { announce, clearAnnouncer } from '../live-announcer/LiveAnnouncer';
+import { withSlot } from 'octane';
 
 import { AriaButtonProps } from '../button/useButton';
 import { InputBase, RangeInputBase, Validation, ValueBase } from '@react-types/shared';
@@ -44,6 +45,10 @@ export interface SpinbuttonAria {
 }
 
 export function useSpinButton(props: SpinButtonProps, _slot?: symbol): SpinbuttonAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useSpinButton, props);
+	}
+
 	const _async = useRef<number | undefined>(undefined);
 	let {
 		value,

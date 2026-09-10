@@ -159,6 +159,24 @@ describe('@octanejs/aria/components — MenuTrigger + Menu + MenuItem', () => {
 		r.unmount();
 	});
 
+	it('provides keyboard propagation controls to a menu item callback', async () => {
+		const states: boolean[][] = [];
+		mountTracked(BasicMenuHarness, {
+			onItemKeyDown(e: any) {
+				states.push([e.isDefaultPrevented(), e.isPropagationStopped()]);
+				e.continuePropagation();
+				states.push([e.isDefaultPrevented(), e.isPropagationStopped()]);
+			},
+		});
+		await act(() => {});
+		await openMenu();
+		await keydown(q('[data-testid="item-open"]')!, 'F2');
+		expect(states).toEqual([
+			[false, true],
+			[false, false],
+		]);
+	});
+
 	it('fires onAction on item press, closes the menu, and restores focus to the trigger', async () => {
 		const onAction = vi.fn();
 		const r = mountTracked(BasicMenuHarness, { onAction });

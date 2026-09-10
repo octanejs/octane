@@ -84,6 +84,8 @@ export function StaticGridListHarness(props: {
 	disabledKeys?: any;
 	disabledBehavior?: any;
 	onSelectionChange?: (keys: any) => void;
+	keyboardNavigationBehavior?: 'arrow' | 'tab';
+	withNativeControls?: boolean;
 }) {
 	return (
 		<GridList
@@ -92,11 +94,20 @@ export function StaticGridListHarness(props: {
 			disabledKeys={props.disabledKeys}
 			disabledBehavior={props.disabledBehavior}
 			onSelectionChange={props.onSelectionChange}
+			keyboardNavigationBehavior={props.keyboardNavigationBehavior}
 		>
 			<GridListItem id="one" textValue="One">
 				<Checkbox slot="selection" />
 				One
 				<Button aria-label="Info One">i</Button>
+				{props.withNativeControls ? (
+					<>
+						<button type="button" aria-label="Native action">
+							Action
+						</button>
+						<input type="text" aria-label="Native text" />
+					</>
+				) : null}
 			</GridListItem>
 			<GridListItem id="two" textValue="Two">
 				<Checkbox slot="selection" />

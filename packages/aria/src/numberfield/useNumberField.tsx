@@ -42,7 +42,7 @@ import {
 	useState,
 } from '../compat/react';
 import { filterDOMProps } from '../utils/filterDOMProps';
-import { flushSync } from 'octane';
+import { flushSync, withSlot } from 'octane';
 import { getActiveElement, getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import intlMessages from '../intl/numberfield/index';
 import { isAndroid, isIOS, isIPhone } from '../utils/platform';
@@ -110,6 +110,10 @@ export function useNumberField(
 	inputRef: RefObject<HTMLInputElement | null>,
 	_slot?: symbol,
 ): NumberFieldAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useNumberField, props, state, inputRef);
+	}
+
 	let {
 		id,
 		decrementAriaLabel,

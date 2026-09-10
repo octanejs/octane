@@ -25,7 +25,7 @@ import {
 	KeyboardDelegate,
 	RefObject,
 } from '@react-types/shared';
-import { flushSync } from 'octane';
+import { flushSync, withSlot } from 'octane';
 import { FocusEvent, useEffect, useRef } from '../compat/react';
 import { focusSafely } from '../interactions/focusSafely';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
@@ -153,6 +153,10 @@ export function useSelectableCollection(
 	options: AriaSelectableCollectionOptions,
 	_slot?: symbol,
 ): SelectableCollectionAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useSelectableCollection, options);
+	}
+
 	let {
 		selectionManager: manager,
 		keyboardDelegate: delegate,
