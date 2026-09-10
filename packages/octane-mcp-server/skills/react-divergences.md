@@ -47,6 +47,25 @@ state or context, or pass an immutable snapshot as a prop. Read the ref or call
 the getter in an event, effect, or deferred callback.
 Compatibility modules keep their existing behavior.
 
+Reading unshadowed `window`, `document`, `localStorage`, `sessionStorage`,
+`navigator`, `location`, or `matchMedia` while rendering reports
+`OCTANE_STRONG_RENDER_AMBIENT_READ`. This includes `typeof` guards, constant
+browser handle aliases, and `globalThis` property reads except known standard
+language builtins. Computed `globalThis` properties whose names are unknown also
+report the error. Local shadowing, scalar module snapshots, the `globalThis`
+object itself, and standard language builtins such as `globalThis.JSON` remain valid.
+The analysis does not generally prove aliases obtained through defaults,
+returned values, containers, arbitrary deeper properties, or imports. Those
+values still have to satisfy the render-snapshot contract.
+
+Use `useSyncExternalStore` with a server snapshot for changing browser state;
+browser reads inside its snapshot callbacks remain legal. Events, effects,
+deferred callbacks, and lazy `useState` or `useReducer` initializers may also
+read browser state. Lazy initialization still runs during server rendering:
+guard unavailable browser APIs there and ensure server and client initial
+output agrees. A guard in an ordinary render calculation still reads ambient
+state and is rejected.
+
 ## Controlled inputs match React — on native events
 
 Controlled `value`/`checked` follow React's semantics exactly: the prop drives

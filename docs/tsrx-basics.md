@@ -747,6 +747,12 @@ These patterns become compile errors:
 - Reading a reassigned module-scope `let` or `var` during render
   (`OCTANE_STRONG_RENDER_MODULE_STATE_READ`). Move the changing value into
   state or context, or pass an immutable snapshot as a prop.
+- Reading unshadowed `window`, `document`, `localStorage`, `sessionStorage`,
+  `navigator`, `location`, or `matchMedia` during render
+  (`OCTANE_STRONG_RENDER_AMBIENT_READ`), including `typeof` guards and known
+  browser handle aliases. Reading `globalThis` properties also reports this
+  error, except for known standard language builtins. Read a subscribed snapshot
+  or move the read into an event, effect, or lazy state initializer.
 - Assigning to a `useRef` object's `current` during render.
 - Reading a `useRef` object's `current` during render
   (`OCTANE_STRONG_RENDER_REF_READ`). Pass the ref to a `ref` prop as usual; read
@@ -768,6 +774,47 @@ These patterns become compile errors:
   uses it (`OCTANE_STRONG_HOOK_LOCALITY`).
 - Declaring a named callback outside the sole nested `@{…}` block containing
   its native `onX` event (`OCTANE_STRONG_EVENT_HANDLER_LOCALITY`).
+
+### Read browser state through a snapshot
+
+Use `useSyncExternalStore` for browser values that can change. Its snapshot
+callbacks may read browser state; render from the snapshot returned by the hook.
+Supply a server snapshot for server rendering and hydration:
+
+```jsx
+"use strong";
+
+import { useSyncExternalStore } from 'octane';
+
+function subscribeResize(notify) {
+  window.addEventListener('resize', notify);
+  return () => window.removeEventListener('resize', notify);
+}
+
+export function ViewportWidth() @{
+  const width = useSyncExternalStore(
+    subscribeResize,
+    () => window.innerWidth,
+    () => 0,
+  );
+  <p>Viewport width: {width as string}</p>
+}
+```
+
+Browser reads in event handlers, effects, and deferred callbacks remain valid.
+Lazy `useState` and `useReducer` initializers may capture an initial browser
+value, but they still run during server rendering. Guard browser APIs there and
+ensure server and client initial output agrees. A `typeof window` guard in an
+ordinary render expression still reads ambient state and is rejected.
+
+The browser check respects local shadowing and follows constant aliases of
+known browser handles. It does not reject scalar snapshots captured at module
+initialization, the `globalThis` object itself, or known standard language
+builtins such as `globalThis.JSON`. Other `globalThis` property reads, including
+computed properties whose names are unknown, are rejected. The analysis does
+not generally prove aliases obtained through defaults, returned values,
+containers, arbitrary deeper properties, or imports. The render-snapshot
+contract still applies to those values.
 
 ### Keep work with its nested template block
 

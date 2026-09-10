@@ -65,6 +65,86 @@ const ARRAY_STATE_TUPLE_BINDING = {
 	getter: STATE_GETTER_BINDING,
 };
 const UNDEFINED_BINDING = { kind: 'constant', value: UNDEFINED_VALUE, primitive: undefined };
+const GLOBAL_OBJECT_BINDING = { kind: 'global-object' };
+const AMBIENT_GLOBAL_BINDINGS = new Map(
+	[
+		'window',
+		'document',
+		'localStorage',
+		'sessionStorage',
+		'navigator',
+		'location',
+		'matchMedia',
+	].map((name) => [name, { kind: 'ambient', name }]),
+);
+// Reading a standard language builtin is permitted here. Its calls still
+// follow the separate clock/randomness rules; this is not a purity whitelist.
+const LANGUAGE_GLOBALS = new Set([
+	'undefined',
+	'NaN',
+	'Infinity',
+	'globalThis',
+	'Object',
+	'Function',
+	'Boolean',
+	'Symbol',
+	'Error',
+	'AggregateError',
+	'EvalError',
+	'RangeError',
+	'ReferenceError',
+	'SyntaxError',
+	'TypeError',
+	'URIError',
+	'Number',
+	'BigInt',
+	'Math',
+	'Date',
+	'String',
+	'RegExp',
+	'Array',
+	'Int8Array',
+	'Uint8Array',
+	'Uint8ClampedArray',
+	'Int16Array',
+	'Uint16Array',
+	'Int32Array',
+	'Uint32Array',
+	'BigInt64Array',
+	'BigUint64Array',
+	'Float16Array',
+	'Float32Array',
+	'Float64Array',
+	'Map',
+	'Set',
+	'WeakMap',
+	'WeakSet',
+	'ArrayBuffer',
+	'SharedArrayBuffer',
+	'DataView',
+	'Atomics',
+	'JSON',
+	'Promise',
+	'Reflect',
+	'Proxy',
+	'WeakRef',
+	'FinalizationRegistry',
+	'Intl',
+	'Iterator',
+	'AsyncIterator',
+	'DisposableStack',
+	'AsyncDisposableStack',
+	'isFinite',
+	'isNaN',
+	'parseFloat',
+	'parseInt',
+	'decodeURI',
+	'decodeURIComponent',
+	'encodeURI',
+	'encodeURIComponent',
+	'escape',
+	'unescape',
+]);
 const SKIP_KEYS = new Set([
 	'type',
 	'start',
@@ -83,6 +163,7 @@ const SKIP_KEYS = new Set([
 export const STRONG_RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 export const STRONG_RENDER_STATE_GETTER_CALL = 'OCTANE_STRONG_RENDER_STATE_GETTER_CALL';
 export const STRONG_RENDER_MODULE_STATE_READ = 'OCTANE_STRONG_RENDER_MODULE_STATE_READ';
+export const STRONG_RENDER_AMBIENT_READ = 'OCTANE_STRONG_RENDER_AMBIENT_READ';
 export const STRONG_EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 export const STRONG_RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 export const STRONG_RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
@@ -1214,6 +1295,21 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	const moduleScope = createScope(null, 'module', ast.body ?? [], [], isReassigned);
 	const mutableModuleDeclarations = new Map();
 	const reassignedModuleNames = new Map();
+	const moduleAmbientAliases = new Map();
+	const activeAmbientAliases = new Set();
+	function recordModuleAmbientAliases(pattern, initializer, properties = []) {
+		if (pattern?.type === 'Identifier') {
+			moduleAmbientAliases.set(pattern.name, { initializer, properties });
+		} else if (pattern?.type === 'AssignmentPattern') {
+			recordModuleAmbientAliases(pattern.left, initializer, properties);
+		} else if (pattern?.type === 'ObjectPattern') {
+			for (const property of pattern.properties ?? []) {
+				if (property.type === 'Property') {
+					recordModuleAmbientAliases(property.value, initializer, [...properties, property]);
+				}
+			}
+		}
+	}
 	function recordMutableModulePattern(pattern) {
 		if (pattern?.type === 'Identifier') {
 			let declarations = mutableModuleDeclarations.get(pattern.name);
@@ -1288,6 +1384,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 			}
 			for (const binding of declaration.declarations ?? []) {
+				const initial = unwrap(binding.init);
+				if (
+					declaration.kind === 'const' &&
+					(initial?.type === 'Identifier' ||
+						initial?.type === 'MemberExpression' ||
+						initial?.type === 'Literal' ||
+						initial?.type === 'TemplateLiteral' ||
+						initial?.type === 'BinaryExpression')
+				) {
+					recordModuleAmbientAliases(binding.id, initial);
+				}
 				if (binding.id?.type === 'Identifier') {
 					addNamedRenderRoot(unwrap(binding.init), binding.id.name);
 				}
@@ -1382,6 +1489,116 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			node,
 			'Strong mode does not allow reading a reassigned module variable during render. Move the value into state or context, or pass an immutable snapshot as a prop.',
 		);
+	}
+
+	function reportAmbientRead(node) {
+		report(
+			STRONG_RENDER_AMBIENT_READ,
+			node,
+			'Strong mode does not allow reading browser globals during render. Use useSyncExternalStore with a server snapshot for live browser state, or read it in an effect or a lazy state initializer. Lazy initializers still need to handle server rendering.',
+		);
+	}
+
+	function ambientMemberBinding(object, key) {
+		if (object === GLOBAL_OBJECT_BINDING || object === AMBIENT_GLOBAL_BINDINGS.get('window')) {
+			if (key === 'globalThis') return GLOBAL_OBJECT_BINDING;
+			return AMBIENT_GLOBAL_BINDINGS.get(key) ?? null;
+		}
+		return null;
+	}
+
+	function ambientKeyValue(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type !== 'Identifier' || resolveScope(scope, node.name) !== moduleScope)
+			return UNKNOWN_PRIMITIVE;
+		const alias = moduleAmbientAliases.get(node.name);
+		if (
+			alias === undefined ||
+			alias.properties.length !== 0 ||
+			activeAmbientAliases.has(node.name)
+		) {
+			return UNKNOWN_PRIMITIVE;
+		}
+		// A render root can appear before the module constant used as its key.
+		activeAmbientAliases.add(node.name);
+		try {
+			return staticPrimitiveValue(alias.initializer, moduleScope, true);
+		} finally {
+			activeAmbientAliases.delete(node.name);
+		}
+	}
+
+	function ambientPropertyKey(property, scope) {
+		const key = property.type === 'Property' ? property.key : property.property;
+		return property.computed ? staticPrimitiveValue(key, scope, true) : (key?.name ?? key?.value);
+	}
+
+	function ambientReference(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type === 'Identifier' || node?.type === 'JSXIdentifier') {
+			const binding = resolve(scope, node.name);
+			if (binding?.kind === 'ambient' || binding === GLOBAL_OBJECT_BINDING) return binding;
+			if (binding === null) {
+				return node.name === 'globalThis'
+					? GLOBAL_OBJECT_BINDING
+					: (AMBIENT_GLOBAL_BINDINGS.get(node.name) ?? null);
+			}
+			const alias = moduleAmbientAliases.get(node.name);
+			if (
+				alias !== undefined &&
+				resolveScope(scope, node.name) === moduleScope &&
+				!activeAmbientAliases.has(node.name)
+			) {
+				// Module functions can precede their const aliases. Resolve only
+				// browser handles, never taint a copied scalar module snapshot.
+				activeAmbientAliases.add(node.name);
+				try {
+					let value = ambientReference(alias.initializer, moduleScope);
+					for (const property of alias.properties) {
+						value = ambientMemberBinding(value, ambientPropertyKey(property, moduleScope));
+					}
+					return value;
+				} finally {
+					activeAmbientAliases.delete(node.name);
+				}
+			}
+			return null;
+		}
+		if (node?.type === 'MemberExpression' || node?.type === 'JSXMemberExpression') {
+			const object = ambientReference(node.object, scope);
+			return object === GLOBAL_OBJECT_BINDING || object === AMBIENT_GLOBAL_BINDINGS.get('window')
+				? ambientMemberBinding(object, ambientPropertyKey(node, scope))
+				: null;
+		}
+		return null;
+	}
+
+	function isAmbientMemberRead(node, scope) {
+		const value = unwrap(node);
+		if (value?.type !== 'MemberExpression' && value?.type !== 'JSXMemberExpression') return false;
+		return (
+			ambientReference(value.object, scope) === GLOBAL_OBJECT_BINDING &&
+			!LANGUAGE_GLOBALS.has(ambientPropertyKey(value, scope))
+		);
+	}
+
+	function bindAmbientPattern(pattern, value, scope, bind) {
+		if (value !== GLOBAL_OBJECT_BINDING && value?.kind !== 'ambient') return;
+		if (pattern?.type === 'Identifier') {
+			bind(pattern, value);
+		} else if (pattern?.type === 'AssignmentPattern') {
+			bindAmbientPattern(pattern.left, value, scope, bind);
+		} else if (pattern?.type === 'ObjectPattern') {
+			for (const property of pattern.properties ?? []) {
+				if (property.type !== 'Property') continue;
+				bindAmbientPattern(
+					property.value,
+					ambientMemberBinding(value, ambientPropertyKey(property, scope)),
+					scope,
+					bind,
+				);
+			}
+		}
 	}
 
 	function mutableModuleRead(name, scope) {
@@ -1890,6 +2107,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	function definitelyDefined(value) {
+		if (value === GLOBAL_OBJECT_BINDING) return true;
 		if (value?.kind === 'constant' && value.primitive !== UNKNOWN_PRIMITIVE) {
 			return value.primitive !== undefined;
 		}
@@ -1931,7 +2149,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						? defaultValue
 						: definitelyDefined(value)
 							? value
-							: defaultValue?.kind === 'getter' || defaultValue?.kind === 'state-tuple'
+							: defaultValue?.kind === 'getter' ||
+								  defaultValue?.kind === 'state-tuple' ||
+								  defaultValue === GLOBAL_OBJECT_BINDING ||
+								  defaultValue?.kind === 'ambient'
 								? defaultValue
 								: OTHER_BINDING;
 				visitPatternExpressions(
@@ -1941,12 +2162,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					parameter.left.type === 'ObjectPattern' &&
 						(value?.kind === 'ref' ||
 							(usesDefault && isRefObject(parameter.right, parameterScope))),
+					value,
 				);
 				bindStateGetterPattern(parameter.left, value, parameterScope, bindGetter);
+				bindAmbientPattern(parameter.left, value, parameterScope, bindGetter);
 				parameter = parameter.left;
 			} else {
-				visitPatternExpressions(parameter, parameterScope, phase, value?.kind === 'ref');
+				visitPatternExpressions(parameter, parameterScope, phase, value?.kind === 'ref', value);
 				bindStateGetterPattern(parameter, value, parameterScope, bindGetter);
+				bindAmbientPattern(parameter, value, parameterScope, bindGetter);
 			}
 			if (parameter.type === 'Identifier' && !isReassigned(parameter)) {
 				parameterScope.bindings.set(parameter.name, value);
@@ -1999,14 +2223,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function visitPatternExpressions(pattern, scope, phase, refSource = false) {
+	function visitPatternExpressions(pattern, scope, phase, refSource = false, ambientSource = null) {
 		let executionPhase = phase;
 		if (pattern?.type === 'TSParameterProperty') {
-			return visitPatternExpressions(pattern.parameter, scope, phase);
+			return visitPatternExpressions(pattern.parameter, scope, phase, refSource, ambientSource);
 		} else if (pattern?.type === 'Identifier') {
 			if (executionPhase === 'render') reportRetainedRowMutation(pattern, scope);
 		} else if (pattern?.type === 'AssignmentPattern') {
-			executionPhase = visitPatternExpressions(pattern.left, scope, executionPhase);
+			executionPhase = visitPatternExpressions(
+				pattern.left,
+				scope,
+				executionPhase,
+				refSource,
+				ambientSource,
+			);
 			visit(pattern.right, scope, executionPhase);
 		} else if (pattern?.type === 'ArrayPattern') {
 			for (const element of pattern.elements ?? []) {
@@ -2018,6 +2248,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (property.computed) {
 					visit(property.key, scope, executionPhase);
 					executionPhase = phaseAfter(property.key, executionPhase);
+				}
+				if (
+					ambientSource === GLOBAL_OBJECT_BINDING &&
+					executionPhase === 'render' &&
+					currentFunctionChecksImpureCalls &&
+					(property.type === 'RestElement' ||
+						!LANGUAGE_GLOBALS.has(ambientPropertyKey(property, scope)))
+				) {
+					reportAmbientRead(property.type === 'RestElement' ? property : property.key);
 				}
 				const currentProperty =
 					refSource &&
@@ -2038,6 +2277,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					property.argument ?? property.value,
 					scope,
 					executionPhase,
+					false,
+					ambientSource === null
+						? null
+						: ambientMemberBinding(ambientSource, ambientPropertyKey(property, scope)),
 				);
 			}
 		} else if (pattern?.type === 'RestElement') {
@@ -2082,6 +2325,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				identifier.name,
 				declarationKind === 'const' || !isReassigned(identifier) ? value : OTHER_BINDING,
 			);
+		}
+		const ambient = ambientReference(initial, scope);
+		if (ambient !== null) {
+			bindAmbientPattern(declaration.id, ambient, scope, bind);
+			return;
 		}
 		const stateTuple = stateTupleBinding(initial, scope);
 		const snapshot =
@@ -2226,6 +2474,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			scope,
 			phaseAfter(declaration.init, phase),
 			declaration.id?.type === 'ObjectPattern' && isRefObject(declaration.init, scope),
+			declaration.id?.type === 'ObjectPattern' ? ambientReference(declaration.init, scope) : null,
 		);
 	}
 
@@ -2261,7 +2510,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		);
 	}
 
-	function staticPrimitiveValue(value, scope) {
+	function staticPrimitiveValue(value, scope, moduleConstantKeys = false) {
 		const expression = unwrap(value);
 		if (expression?.type === 'CallExpression') {
 			const result = callResult(expression, scope);
@@ -2273,7 +2522,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			if (binding?.kind === 'linked-key') return binding.value;
 			if (binding?.kind === 'constant') return binding.primitive;
 			if (binding == null && expression.name === 'undefined') return undefined;
-			return UNKNOWN_PRIMITIVE;
+			return moduleConstantKeys ? ambientKeyValue(expression, scope) : UNKNOWN_PRIMITIVE;
 		}
 		if (expression?.type === 'TemplateLiteral') {
 			let result = '';
@@ -2282,7 +2531,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (text == null) return UNKNOWN_PRIMITIVE;
 				result += text;
 				if (index < (expression.expressions?.length ?? 0)) {
-					const part = staticPrimitiveValue(expression.expressions[index], scope);
+					const part = staticPrimitiveValue(
+						expression.expressions[index],
+						scope,
+						moduleConstantKeys,
+					);
 					if (
 						part === UNKNOWN_PRIMITIVE ||
 						(part !== null && typeof part === 'object') ||
@@ -2297,8 +2550,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return result;
 		}
 		if (expression?.type === 'BinaryExpression' && expression.operator === '+') {
-			const left = staticPrimitiveValue(expression.left, scope);
-			const right = staticPrimitiveValue(expression.right, scope);
+			const left = staticPrimitiveValue(expression.left, scope, moduleConstantKeys);
+			const right = staticPrimitiveValue(expression.right, scope, moduleConstantKeys);
 			if (
 				left === UNKNOWN_PRIMITIVE ||
 				right === UNKNOWN_PRIMITIVE ||
@@ -2323,7 +2576,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 		if (expression?.type === 'UnaryExpression') {
 			if (expression.operator === 'void') return undefined;
-			const argument = staticPrimitiveValue(expression.argument, scope);
+			const argument = staticPrimitiveValue(expression.argument, scope, moduleConstantKeys);
 			if (expression.operator === '!') {
 				if (argument !== UNKNOWN_PRIMITIVE) return !argument;
 				const value = staticExpressionValue(expression.argument, scope);
@@ -2349,22 +2602,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 		if (expression?.type === 'SequenceExpression') {
 			const expressions = expression.expressions ?? [];
-			return staticPrimitiveValue(expressions[expressions.length - 1], scope);
+			return staticPrimitiveValue(expressions[expressions.length - 1], scope, moduleConstantKeys);
 		}
 		if (expression?.type === 'ConditionalExpression') {
 			const branches = conditionalExpressionBranches(expression, scope);
 			return branches === 1
-				? staticPrimitiveValue(expression.consequent, scope)
+				? staticPrimitiveValue(expression.consequent, scope, moduleConstantKeys)
 				: branches === 2
-					? staticPrimitiveValue(expression.alternate, scope)
+					? staticPrimitiveValue(expression.alternate, scope, moduleConstantKeys)
 					: UNKNOWN_PRIMITIVE;
 		}
 		if (expression?.type === 'LogicalExpression') {
 			const branches = logicalExpressionBranches(expression, scope);
 			return branches === 1
-				? staticPrimitiveValue(expression.left, scope)
+				? staticPrimitiveValue(expression.left, scope, moduleConstantKeys)
 				: branches === 2
-					? staticPrimitiveValue(expression.right, scope)
+					? staticPrimitiveValue(expression.right, scope, moduleConstantKeys)
 					: UNKNOWN_PRIMITIVE;
 		}
 		return UNKNOWN_PRIMITIVE;
@@ -2701,6 +2954,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 
 	function expressionBinding(expression, scope) {
 		const node = unwrap(expression);
+		const ambient = ambientReference(node, scope);
+		if (ambient !== null) return ambient;
 		if (node?.type === 'Identifier') {
 			const binding = resolve(scope, node.name);
 			if (
@@ -2891,7 +3146,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 
 	function visitSynchronousHookCallback(value, scope, phase, stateInitializer = false) {
 		const checkImpureCalls = currentFunctionChecksImpureCalls;
-		// Lazy state initialization may read a clock or randomness. Keep its
+		// Lazy state initialization may read a clock, randomness, or browser state. Keep its
 		// existing state/ref/Effect Event checks at the synchronous render phase.
 		if (stateInitializer) currentFunctionChecksImpureCalls = false;
 		try {
@@ -3084,6 +3339,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (
 					readAccess &&
 					phase === 'render' &&
+					currentFunctionChecksImpureCalls &&
+					ambientReference(node, scope)?.kind === 'ambient'
+				) {
+					reportAmbientRead(node);
+				}
+				if (
+					readAccess &&
+					phase === 'render' &&
 					currentFunctionChecksRenderReads &&
 					mutableModuleRead(node.name, scope)
 				) {
@@ -3093,7 +3356,28 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'JSXOpeningElement': {
 				let name = node.name;
 				const member = name?.type === 'JSXMemberExpression';
-				while (name?.type === 'JSXMemberExpression') name = name.object;
+				let ambientMember;
+				while (name?.type === 'JSXMemberExpression') {
+					if (
+						phase === 'render' &&
+						currentFunctionChecksImpureCalls &&
+						isAmbientMemberRead(name, scope)
+					) {
+						ambientMember = name;
+					}
+					name = name.object;
+				}
+				if (
+					name?.type === 'JSXIdentifier' &&
+					(member || (!/^[a-z]/.test(name.name) && !name.name.includes('-'))) &&
+					phase === 'render' &&
+					currentFunctionChecksImpureCalls
+				) {
+					const reference = ambientReference(name, scope);
+					if (reference?.kind === 'ambient' || ambientMember) {
+						reportAmbientRead(ambientMember ?? name);
+					}
+				}
 				if (
 					name?.type === 'JSXIdentifier' &&
 					(member || (!/^[a-z]/.test(name.name) && !name.name.includes('-'))) &&
@@ -3105,6 +3389,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				break;
 			}
+			case 'JSXSpreadAttribute':
+				visit(node.argument, scope, phase);
+				if (
+					currentFunctionChecksImpureCalls &&
+					phaseAfter(node.argument, phase) === 'render' &&
+					ambientReference(node.argument, scope) === GLOBAL_OBJECT_BINDING
+				) {
+					reportAmbientRead(node);
+				}
+				return;
 			case 'ExportNamedDeclaration':
 			case 'ExportDefaultDeclaration':
 				visit(node.declaration, scope, phase);
@@ -3180,6 +3474,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						const spreadPhase = phaseAfter(property.argument, executionPhase);
 						if (
 							spreadPhase === 'render' &&
+							currentFunctionChecksImpureCalls &&
+							ambientReference(property.argument, scope) === GLOBAL_OBJECT_BINDING
+						) {
+							reportAmbientRead(property);
+						}
+						if (
+							spreadPhase === 'render' &&
 							currentFunctionChecksRenderReads &&
 							isRefObject(property.argument, scope)
 						) {
@@ -3228,6 +3529,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					phaseAfter(node.object, phase, true, node.optional === true) === 'render'
 				) {
 					reportRefRead(node);
+				}
+				if (
+					readAccess &&
+					phase === 'render' &&
+					currentFunctionChecksImpureCalls &&
+					isAmbientMemberRead(node, scope)
+				) {
+					const propertyPhase = phaseAfter(node.object, phase, true, node.optional === true);
+					if (phaseAfter(node.computed ? node.property : null, propertyPhase) === 'render') {
+						reportAmbientRead(node);
+					}
 				}
 				return;
 			}
@@ -3482,11 +3794,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						scope,
 						phaseAfter(node.right, phase),
 						node.left.type === 'ObjectPattern' && isRefObject(node.right, scope),
+						node.left.type === 'ObjectPattern' ? ambientReference(node.right, scope) : null,
 					);
 					return;
 				}
 				visit(node.left, scope, phase, false);
 				const rightPhase = phaseAfter(node.left, phase, true);
+				if (
+					node.operator !== '=' &&
+					rightPhase === 'render' &&
+					currentFunctionChecksImpureCalls &&
+					(isAmbientMemberRead(node.left, scope) ||
+						(unwrap(node.left)?.type === 'Identifier' &&
+							ambientReference(node.left, scope)?.kind === 'ambient'))
+				) {
+					reportAmbientRead(unwrap(node.left));
+				}
 				visit(node.right, scope, rightPhase);
 				const executionPhase = phaseAfter(node.right, rightPhase);
 				if (executionPhase === 'render') {
@@ -3517,6 +3840,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return;
 			}
 			case 'UpdateExpression':
+				if (
+					phaseAfter(node.argument, phase) === 'render' &&
+					currentFunctionChecksImpureCalls &&
+					(isAmbientMemberRead(node.argument, scope) ||
+						(unwrap(node.argument)?.type === 'Identifier' &&
+							ambientReference(node.argument, scope)?.kind === 'ambient'))
+				) {
+					reportAmbientRead(unwrap(node.argument));
+				}
 				if (
 					phase === 'render' &&
 					currentFunctionChecksRenderReads &&
