@@ -1152,6 +1152,45 @@ function scopedSsrDeoptKey(
 	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
 }
 
+const SSR_DEOPT_KEY_STRINGIFY = JSON.stringify;
+
+function nestedImplicitSsrKeyPrefix(path: readonly (string | number)[]): string | null {
+	// Match the client's prefix optimization only for inert wrapper paths. A
+	// serializer replaced after import or toJSON hook still sees the full tuple.
+	if (JSON.stringify !== SSR_DEOPT_KEY_STRINGIFY || 'toJSON' in path) return null;
+	for (let i = 0; i < path.length; i++) {
+		const type = typeof path[i];
+		if (type !== 'string' && type !== 'number') return null;
+	}
+	return '[' + JSON.stringify(path) + ',"index",';
+}
+
+function appendNestedSsrDeoptKey(
+	outKeys: any[],
+	path: readonly (string | number)[],
+	item: any,
+	index: number,
+	key: any,
+	implicitPrefix: string | null | undefined,
+): string | null | undefined {
+	const explicit = isElementDescriptor(item) && item.key != null;
+	if (!explicit) {
+		// Reuse only within this synchronous container walk; retries and nested
+		// wrappers each build their own prefix. Fully keyed lists never need one.
+		if (implicitPrefix === undefined) implicitPrefix = nestedImplicitSsrKeyPrefix(path);
+		if (
+			implicitPrefix !== null &&
+			JSON.stringify === SSR_DEOPT_KEY_STRINGIFY &&
+			!('toJSON' in path)
+		) {
+			outKeys.push(implicitPrefix + index + ']');
+			return implicitPrefix;
+		}
+	}
+	outKeys.push(JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]));
+	return implicitPrefix;
+}
+
 // Mirror the client runtime's flattenReactChildContainer exactly: array and
 // Fragment wrappers disappear from the rendered leaf list, while their nesting,
 // kind, and explicit keys remain encoded into each leaf identity. Markup then has
@@ -1164,12 +1203,24 @@ function flattenSsrChildContainer(
 	path: readonly (string | number)[],
 ): void {
 	const count = children.length;
+	let implicitPrefix: string | null | undefined;
 	for (let i = 0; i < count; i++) {
 		const item = children[i];
 		if (isFragmentDescriptor(item)) {
 			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
 				outItems.push(fragmentRefDescriptor(item));
-				outKeys.push(scopedSsrDeoptKey(path, item, i, ssrDeoptKey(item, i)));
+				if (path.length === 0 || count === 1) {
+					outKeys.push(scopedSsrDeoptKey(path, item, i, ssrDeoptKey(item, i)));
+				} else {
+					implicitPrefix = appendNestedSsrDeoptKey(
+						outKeys,
+						path,
+						item,
+						i,
+						ssrDeoptKey(item, i),
+						implicitPrefix,
+					);
+				}
 				continue;
 			}
 			const nested = fragmentDescriptorChildren(item);
@@ -1202,7 +1253,20 @@ function flattenSsrChildContainer(
 			continue;
 		}
 		outItems.push(item);
-		outKeys.push(scopedSsrDeoptKey(path, item, i, ssrDeoptKey(item, i)));
+		// Keep flat lists on the small original helper; routing every leaf
+		// through the nested-prefix helper regresses production SSR throughput.
+		if (path.length === 0 || count === 1) {
+			outKeys.push(scopedSsrDeoptKey(path, item, i, ssrDeoptKey(item, i)));
+		} else {
+			implicitPrefix = appendNestedSsrDeoptKey(
+				outKeys,
+				path,
+				item,
+				i,
+				ssrDeoptKey(item, i),
+				implicitPrefix,
+			);
+		}
 	}
 }
 

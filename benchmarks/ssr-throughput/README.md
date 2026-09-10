@@ -128,6 +128,73 @@ EXPECTED_HTML_SHA=YOUR_BASELINE_SHA node benchmarks/ssr-throughput/unkeyed-work.
 Timing deltas within process-to-process variance are inconclusive; the
 serialization count is the deterministic work gate.
 
+### Nested descriptor identity work gate (opt-in)
+
+`nested-work.mjs` builds a separate minified production SSR entry into ignored
+`dist/nested-work-{label}/`. It renders 1,000 implicit component children and an
+adjacent explicit key `"0"` under one nested array. A flat list and a fully
+explicit nested list provide controls. Descriptors are prepared before rendering
+so the timed operation measures their traversal and serialization.
+
+The observer runs in its own process and installs its `JSON.stringify` wrapper
+before importing the built runtime. A second process imports the same artifact
+without the observer, checks complete HTML/CSS hashes and row order, then times
+rendering with 350 ms warmup per mode. Every timed render materializes its HTML
+with `Buffer.byteLength`. Reported calls describe serialization work, not V8
+allocation counts.
+
+At the baseline revision, freeze and measure its bundle:
+
+```bash
+NESTED_BUILD_LABEL=baseline node benchmarks/ssr-throughput/nested-work.mjs 0 --build-only
+NESTED_BUILD_LABEL=baseline EXPECT_NESTED_IMPLICIT_JSON=1000 EXPECT_NESTED_PATH_JSON=0 BENCH_JSON=/tmp/ssr-nested-baseline.json node benchmarks/ssr-throughput/nested-work.mjs 2 --no-build
+```
+
+After changing the runtime, preserve a separate candidate bundle. Set
+`EXPECTED_RESPONSE_SHA` to the baseline's `responseSha`; it combines the complete
+HTML and CSS hashes for all three modes:
+
+```bash
+NESTED_BUILD_LABEL=candidate node benchmarks/ssr-throughput/nested-work.mjs 0 --build-only
+NESTED_BUILD_LABEL=candidate EXPECTED_RESPONSE_SHA=YOUR_BASELINE_SHA BENCH_JSON=/tmp/ssr-nested-candidate.json node benchmarks/ssr-throughput/nested-work.mjs 2 --no-build
+```
+
+The candidate gate requires zero full nested implicit key serializations and
+one shared path serialization, while flat and fully explicit controls require
+zero shared paths. Zero seconds performs only semantic/work checks. Keep the
+built artifacts fixed and repeat the identical `--no-build` commands in
+A–B–B–A order to compare timing distributions. Output includes Node version,
+artifact SHA, raw/gzip bundle bytes, per-mode work counts, HTML/CSS hashes, and
+median/p95 render latency. The existing `unkeyed-work.mjs` gate is unchanged.
+
+#### Nested prefix reuse — 2026-09-10
+
+Compared merged main `afdc3618a` with nested implicit prefix reuse on Node
+26.4.0 / Darwin 25.6.0 / Apple M5 Max (arm64). Frozen minified production
+artifacts ran in A–B–B–A–A–B–B–A order, four fresh processes per variant, with
+350 ms warmup and two seconds of timing per mode. Values are the median and
+range of the four per-process medians:
+
+| Mode | Main ms, median [range] | Candidate ms, median [range] | JSON work, main → candidate |
+| --- | --- | --- | --- |
+| Nested implicit siblings | 2.168 [1.984–3.665] | 2.033 [1.982–2.132] | 1,000 full implicit keys → one shared path |
+| Flat siblings | 1.881 [1.744–3.266] | 1.843 [1.803–1.867] | Zero implicit/path serializations in both |
+| Fully explicit nested siblings | 2.184 [2.112–2.345] | 2.156 [2.112–2.180] | 1,001 explicit keys; zero shared paths in both |
+
+Every mode preserves all 1,001 rows and byte-identical HTML/CSS. The combined
+response checksum is `a88626f3f1917242e578e43611410e6aa8f542365572844f68286f72d8e10534`.
+The minified fixture bundle grows from 58,519 to 59,043 raw bytes and 20,021 to
+20,198 gzip bytes (+524 / +177). These are complete fixture bundle sizes.
+
+An initial version routed flat leaves through the larger helper and showed a
+17.1% median flat-list slowdown with separated ranges. Keeping the original
+small key helper for flat and singleton containers removed that separation in
+the final comparison above. One baseline process was slow across nested and
+flat modes; it remains included in the reported ranges. Final distributions
+overlap, so these runs establish reduced serialization work without a
+throughput claim. The final candidate artifact checksum is
+`de43e3e23ae90e3033249b19ef1dd8272ae5d56a05941624183bcb676910cf91`.
+
 ### Private loop HTML carriers — 2026-09-03
 
 Compared merged main `44d50dbc0` with private loop bodies returning serialized
