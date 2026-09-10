@@ -3421,7 +3421,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'AccessorProperty':
 				visit(node.decorators, scope, phase);
 				if (node.computed) visit(node.key, scope, phase);
-				visit(node.value, scope, phase);
+				visit(
+					node.value,
+					scope,
+					node.type === 'MethodDefinition' || node.static ? phase : 'deferred',
+				);
 				return;
 			case 'BlockStatement':
 			case 'JSXCodeBlock': {
@@ -3546,6 +3550,18 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'LabeledStatement':
 				visit(node.body, scope, phase);
 				return;
+			case 'JSXSwitchExpression': {
+				visit(node.discriminant, scope, phase);
+				let searchPhase = phaseAfter(node.discriminant, phase);
+				for (const branch of node.cases ?? []) {
+					visit(branch.test, scope, searchPhase);
+					searchPhase = phaseAfter(branch.test, searchPhase);
+					const caseScope = createScope(scope, 'function', branch.consequent ?? []);
+					predeclareHoistedVars(branch.consequent, caseScope);
+					visitStatements(branch.consequent, caseScope, searchPhase);
+				}
+				return;
+			}
 			case 'SwitchStatement': {
 				visit(node.discriminant, scope, phase);
 				const initialPhase =

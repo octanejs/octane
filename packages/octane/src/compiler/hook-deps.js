@@ -178,6 +178,7 @@ function collectHoistedVars(node, functionScope, root = true, bindingsOnly = fal
 	if (
 		bindingsOnly &&
 		(isFunction(node) ||
+			node.type === 'JSXSwitchExpression' ||
 			(!root && node.type === 'StaticBlock') ||
 			node.type === 'ClassDeclaration' ||
 			node.type === 'ClassExpression' ||
@@ -479,7 +480,22 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 			return;
 		}
 
-		if (node.type === 'SwitchStatement' || (bindingsOnly && node.type === 'JSXSwitchExpression')) {
+		if (bindingsOnly && node.type === 'JSXSwitchExpression') {
+			// Each template arm is a separate callback. Its `var` declarations
+			// belong to that callback, rather than to the enclosing function or
+			// another arm with a declaration of the same name.
+			walk(node.discriminant, scope);
+			for (const switchCase of node.cases || []) {
+				walk(switchCase.test, scope);
+				const caseScope = createScope(scope, 'function');
+				collectHoistedVars(switchCase.consequent, caseScope, true, true);
+				predeclareDirect(switchCase.consequent, caseScope, hookRuntimeModules, true);
+				for (const statement of switchCase.consequent || []) walk(statement, caseScope);
+			}
+			return;
+		}
+
+		if (node.type === 'SwitchStatement') {
 			// A switch body is one lexical scope shared by every unbraced case.
 			// Predeclare the direct case statements together so let/const/function
 			// captures resolve even when their declaration appears in a case list
