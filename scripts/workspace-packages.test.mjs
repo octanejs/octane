@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	unlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import semver from 'semver';
@@ -63,7 +71,7 @@ test('discovery rejects package metadata outside the inspected checkout', (t) =>
 	symlinkSync(outside, path.join(root, 'packages'), 'dir');
 	assert.throws(() => getWorkspacePackages(root), /packages.*(?:escape|outside)/i);
 
-	rmSync(path.join(root, 'packages'));
+	unlinkSync(path.join(root, 'packages'));
 	mkdirSync(path.join(root, 'packages/fixture'), { recursive: true });
 	symlinkSync(
 		path.join(outside, 'fixture/package.json'),
