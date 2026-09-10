@@ -742,6 +742,9 @@ These patterns become compile errors:
 - Calling a `useState`, `useReducer`, or `useLinkedState` updater during render.
 - Calling one of those updaters synchronously while an effect is being set up.
 - Assigning to a `useRef` object's `current` during render.
+- Reading a `useRef` object's `current` during render
+  (`OCTANE_STRONG_RENDER_REF_READ`). Pass the ref to a `ref` prop as usual; read
+  its current value in an event or effect, or use state for render output.
 - Calling a statically known `useEffectEvent` result during render
   (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
 - Including a statically known Effect Event in an explicit hook dependency list

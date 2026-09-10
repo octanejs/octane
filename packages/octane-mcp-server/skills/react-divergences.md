@@ -32,6 +32,15 @@ recompute after every render.
 (`[state, update, getState]`) that reads the latest scheduled hook-cell value.
 Ordinary two-item destructures keep the allocation-free React shape.
 
+## Strong mode reads render snapshots
+
+In a module with `"use strong"` or application-wide Strong enabled, reading a
+`useRef` object's `current` while rendering is a compiler error
+(`OCTANE_STRONG_RENDER_REF_READ`). Its value can change without a witnessed
+render input changing. Pass the ref directly to a `ref` prop, read it in an event
+or effect, or use state when its value must appear in render output. Compatibility
+modules keep their existing behavior.
+
 ## Controlled inputs match React — on native events
 
 Controlled `value`/`checked` follow React's semantics exactly: the prop drives
