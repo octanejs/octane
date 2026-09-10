@@ -111,6 +111,7 @@ CLEAR_1K=1 CPU_THROTTLE=4 TARGETS='[{"name":"octane-tsrx","url":"http://localhos
 
 This diagnostic reports `clear_1k` under the separate `js-framework-clear-1k`
 suite name. The canonical `clear` operation still starts from 10,000 rows.
+
 This local in-page click timer excludes paint and browser automation latency;
 its numbers should not be compared directly with the official benchmark's
 Chrome timeline measurements.
@@ -143,6 +144,32 @@ count, insertion position and order, survivor DOM identity, connectivity,
 delegated events, and selection, then uses precise production call coverage in
 a separate `--jitless` browser to guard reduced per-row framework work without
 depending on minified helper names or contaminating wall-clock measurements.
+
+### Implicit de-opt list key work gate
+
+The opt-in `unkeyed` mode of `style-work.mjs` checks the production de-opt list
+path with 1,000 unkeyed host descriptors and an explicit key `"0"`. The rows
+cross a compiled `.tsrx` child hole, so `scopedDeoptKey` runs once per row. An
+unrelated update supplies fresh descriptors; the gate checks row order and DOM
+identity, typed uncontrolled input values, focus, and separation between the
+implicit index zero and explicit key `"0"`. Chromium precise coverage counts
+the production helper calls. The readable production asset also identifies
+whether top-level implicit keys concatenate a string for each of the 1,000
+rows or use the numeric index. This is a deterministic source-work check, not
+a wall-time or measured heap-allocation comparison.
+
+```bash
+# From the repo root, build the separate fixture under the ignored
+# octane-tsrx/dist/unkeyed-work directory:
+pnpm --filter octane-tsrx-jsbench exec vite build --config vite.config.unkeyed.js
+pnpm --filter octane-tsrx-jsbench exec vite preview --config vite.config.unkeyed.js --host 127.0.0.1 --port 5316 --strictPort
+
+# In another terminal, require the numeric-key candidate:
+WORK_MODE=unkeyed WORK_REQUIRE_NUMERIC=1 TARGET_URL=http://127.0.0.1:5316/unkeyed-work.html node benchmarks/js-framework/style-work.mjs
+```
+
+Omit `WORK_REQUIRE_NUMERIC=1` to check an unchanged upstream baseline. Set
+`WORK_JSON=/path/to/result.json` to retain the machine-readable gate result.
 
 ## Keyed-reorder matrix (`run-reorder.mjs`)
 

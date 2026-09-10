@@ -23702,22 +23702,19 @@ function scopedDeoptKey(
 	item: any,
 	index: number,
 	key: any,
-): string {
-	// Reconciliation keys are an internal encoding, not raw user strings. Encode
-	// both wrapper path and leaf-key KIND so an implicit index 0 cannot alias an
-	// explicit key="0", and a user key that resembles a serialized wrapper path
-	// cannot alias a nested child. JSON quoting makes arbitrary user strings data,
-	// never structure, while remaining stable across renders without an intern map.
+): string | number {
+	// Reconciliation keys are internal: top-level implicit positions are numbers,
+	// explicit keys carry a 'k' prefix, and nested paths are JSON strings. These
+	// namespaces keep index 0 distinct from key="0" and user keys distinct from
+	// nested wrapper paths without allocating a string for every unkeyed child.
 	const explicit = (isElementDescriptor(item) || item?.$$kind === PORTAL_TAG) && item.key != null;
 	// The unwrapped top level — a plain children array or a single-layer Fragment,
 	// which is what every `{items.map(...)}` list and every binding's rendered
 	// output produces — is the hot path: it re-keys EVERY child on EVERY parent
 	// render, including renders where all children go on to bail. Skip the
-	// serializer there. A JSON encoding always begins with '[', so no 'k'/'i'
-	// prefixed key can collide with a nested wrapper path, and the differing
-	// prefixes keep an explicit key="0" distinct from an implicit index 0 — the
-	// same two aliasing properties the serialized form provides.
-	if (path.length === 0) return explicit ? 'k' + String(key) : 'i' + index;
+	// serializer there. JSON paths begin with '[', so they remain distinct from
+	// explicit 'k' keys; numeric indices are distinct from both string forms.
+	if (path.length === 0) return explicit ? 'k' + String(key) : index;
 	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
 }
 

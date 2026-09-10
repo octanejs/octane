@@ -5,6 +5,13 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 
+// An opt-in work case shares this already-registered benchmark entry. Its
+// separate fixture is never loaded by the ordinary inline-style run.
+if (process.env.WORK_MODE === 'unkeyed') {
+	await import('./unkeyed-work.mjs');
+	process.exit(process.exitCode ?? 0);
+}
+
 const DIALECT = process.env.WORK_DIALECT || 'tsrx';
 if (DIALECT !== 'tsrx' && DIALECT !== 'jsx') {
 	throw new Error(`Unsupported WORK_DIALECT ${JSON.stringify(DIALECT)}; expected "tsrx" or "jsx".`);
