@@ -744,6 +744,9 @@ These patterns become compile errors:
 - Calling a known third-tuple state getter during render
   (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`). Render from the first tuple member;
   read the latest scheduled state in an event, effect, or deferred callback.
+- Reading a reassigned module-scope `let` or `var` during render
+  (`OCTANE_STRONG_RENDER_MODULE_STATE_READ`). Move the changing value into
+  state or context, or pass an immutable snapshot as a prop.
 - Assigning to a `useRef` object's `current` during render.
 - Reading a `useRef` object's `current` during render
   (`OCTANE_STRONG_RENDER_REF_READ`). Pass the ref to a `ref` prop as usual; read

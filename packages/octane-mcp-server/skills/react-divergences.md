@@ -38,9 +38,13 @@ In a module with `"use strong"` or application-wide Strong enabled, reading a
 `useRef` object's `current` while rendering is a compiler error
 (`OCTANE_STRONG_RENDER_REF_READ`). Calling a known third-tuple state getter
 while rendering is also an error (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`): it
-can read scheduled state that differs from the render snapshot. Pass the ref
-directly to a `ref` prop and render from the state tuple's first member. Read
-the ref or call the getter in an event, effect, or deferred callback.
+can read scheduled state that differs from the render snapshot. Reading a
+reassigned module-scope `let` or `var` during render is an error too
+(`OCTANE_STRONG_RENDER_MODULE_STATE_READ`), since the variable can change
+without a witnessed render input. Pass the ref directly to a `ref` prop and
+render from the state tuple's first member. Move changing module values into
+state or context, or pass an immutable snapshot as a prop. Read the ref or call
+the getter in an event, effect, or deferred callback.
 Compatibility modules keep their existing behavior.
 
 ## Controlled inputs match React — on native events
