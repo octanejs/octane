@@ -879,6 +879,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production universal hook-slot allocation work in direct and nested
+		// public hooks, with retained state, refs, effects, and host identity.
+		name: 'universal-hook-slot',
+		cwd: 'universal-hook-slot',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Universal draft lookup (Node-only): ancestor-owned refs read across
 		// 128 and 1,024 child owners, with own-ref and plain-property controls.
 		name: 'universal-draft-lookup',
