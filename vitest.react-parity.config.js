@@ -5,7 +5,7 @@ import {
 } from './scripts/react-parity/vitest-batch-lib.mjs';
 
 const root = import.meta.dirname;
-const lanes = loadRequiredVitestLanes(root);
+const lanes = await loadRequiredVitestLanes(root);
 
 export default {
 	...baseConfig,

@@ -45,14 +45,9 @@ export function ensureMaterializedUpstream(repoRoot, { spawn = spawnSync } = {})
 		const packageDirectory = path.join(packagesRoot, entry.name);
 		if (!existsSync(path.join(packageDirectory, LOCK_RELATIVE_PATH))) continue;
 		const lock = JSON.parse(readFileSync(path.join(packageDirectory, LOCK_RELATIVE_PATH), 'utf8'));
-		if (
-			!requiresUpstreamEvidence(
-				assertBindingSurfacePolicy(packageDirectory),
-				lock.identity?.packageName,
-			)
-		)
-			continue;
-		assertUpstreamLockScope(assertBindingSurfacePolicy(packageDirectory), lock);
+		const policy = assertBindingSurfacePolicy(packageDirectory);
+		if (!requiresUpstreamEvidence(policy, lock.identity?.packageName)) continue;
+		assertUpstreamLockScope(policy, lock);
 		if (treesPresent(packageDirectory)) continue;
 		const result = spawn(
 			process.execPath,

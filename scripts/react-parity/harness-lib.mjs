@@ -5,7 +5,6 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { assertBindingSurfacePolicy } from '../binding-surface-policy.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -674,6 +673,7 @@ export function validateManifest(manifest, { surfacePolicy } = {}) {
 }
 
 export async function loadManifest(path) {
+	const { assertBindingSurfacePolicy } = await import('../binding-surface-policy.mjs');
 	return validateManifest(JSON.parse(await readFile(path, 'utf8')), {
 		surfacePolicy: assertBindingSurfacePolicy(dirname(dirname(path))),
 	});

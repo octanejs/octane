@@ -492,7 +492,7 @@ if (LOADED_BINDING_MANIFESTS.length === BINDING_MANIFESTS.length) {
 }
 
 if (!validateOnly && errors.length === 0) {
-	const vitestLanes = loadRequiredVitestLanes(REPO);
+	const vitestLanes = await loadRequiredVitestLanes(REPO);
 	console.log(
 		`planned native Vitest file shard ${parityShard.value} across ${vitestLanes.length} required lanes`,
 	);

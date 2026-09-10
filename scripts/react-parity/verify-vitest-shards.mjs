@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadRequiredVitestLanes, verifyBatchedVitestResult } from './vitest-batch-lib.mjs';
+import { loadDeclaredRequiredVitestLanes, verifyBatchedVitestResult } from './vitest-batch-lib.mjs';
 
 const repo = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const args = process.argv.slice(2);
@@ -37,7 +37,7 @@ if (reportFiles.length !== expectedShards) {
 }
 
 verifyBatchedVitestResult(
-	loadRequiredVitestLanes(repo),
+	loadDeclaredRequiredVitestLanes(repo),
 	reportFiles.map((file) => readFileSync(resolve(reportsDirectory, file), 'utf8')),
 	repo,
 );

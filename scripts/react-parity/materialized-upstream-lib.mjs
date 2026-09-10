@@ -24,12 +24,12 @@ export function verifyMaterializedAdaptedEvidence(root, packagePath, provenance)
 	}
 	verifyMaterializedUpstreamEvidence(root, packagePath);
 	const packageRoot = resolve(root, packagePath);
-	if (!requiresUpstreamEvidence(assertBindingSurfacePolicy(packageRoot))) return new Set();
+	const policy = assertBindingSurfacePolicy(packageRoot);
+	if (!requiresUpstreamEvidence(policy)) return new Set();
 	const lock = validateUpstreamLock(
 		JSON.parse(readFileSync(join(packageRoot, UPSTREAM_LOCK_RELATIVE_PATH), 'utf8')),
 	);
-	if (!requiresUpstreamEvidence(assertBindingSurfacePolicy(packageRoot), lock.identity.packageName))
-		return new Set();
+	if (!requiresUpstreamEvidence(policy, lock.identity.packageName)) return new Set();
 	if (
 		lock.identity.version !== provenance.version ||
 		lock.identity.commit !== provenance.commit ||
