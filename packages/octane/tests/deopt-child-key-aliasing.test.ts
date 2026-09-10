@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { createElement, Fragment, positionalChildren, useState, type OctaneNode } from 'octane';
+import {
+	createElement,
+	flushSync,
+	Fragment,
+	hydrateRoot,
+	positionalChildren,
+	useState,
+	type OctaneNode,
+} from 'octane';
+import { renderToString } from 'octane/server';
 import { mount } from './_helpers';
+import { loadServerFixture } from './_server-fixture';
 import { RowsHole } from './_fixtures/deopt-child-keys.tsrx';
 
 // Descriptors handed to a template HOLE reach the de-opt keyed list, which
@@ -18,6 +28,7 @@ import { RowsHole } from './_fixtures/deopt-child-keys.tsrx';
 // spelling — the encoding may change as long as these hold.
 
 const text = (nodes: Element[]) => nodes.map((n) => n.textContent);
+const server = loadServerFixture('packages/octane/tests/_fixtures/deopt-child-keys.tsrx');
 
 function TextHost({ value }: { value: OctaneNode }) {
 	return createElement('p', { 'data-testid': 'text' }, value);
@@ -262,6 +273,148 @@ describe('de-opt child keys — user keys never collide with wrapper paths', () 
 });
 
 describe('de-opt child keys — wrapper boundaries survive the top-level fast path', () => {
+	it('adopts mixed keyed and unkeyed server children before a keyed move', () => {
+		function rows(keyedFirst: boolean) {
+			const plain = createElement(
+				'li',
+				{ 'data-testid': 'plain' },
+				createElement('input', { 'data-testid': 'plain-input' }),
+			);
+			const keyed = createElement(
+				'li',
+				{ key: '0', 'data-testid': 'keyed' },
+				createElement('input', { 'data-testid': 'keyed-input' }),
+			);
+			const nested = [
+				createElement(
+					'li',
+					{ key: '0', 'data-testid': 'nested' },
+					createElement('input', { 'data-testid': 'nested-input' }),
+				),
+			];
+			return positionalChildren(keyedFirst ? [keyed, plain, nested] : [plain, keyed, nested]);
+		}
+
+		const initialRows = rows(false);
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(server.RowsHole, { rows: initialRows }).html;
+		document.body.appendChild(container);
+		const plain = container.querySelector('[data-testid="plain-input"]') as HTMLInputElement;
+		const keyed = container.querySelector('[data-testid="keyed-input"]') as HTMLInputElement;
+		const nested = container.querySelector('[data-testid="nested-input"]') as HTMLInputElement;
+		plain.value = 'typed plain';
+		keyed.value = 'typed keyed';
+		nested.value = 'typed nested';
+		plain.focus();
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			root = hydrateRoot(container, RowsHole, { rows: initialRows });
+			flushSync(() => {});
+			expect(container.querySelector('[data-testid="plain-input"]')).toBe(plain);
+			expect(container.querySelector('[data-testid="keyed-input"]')).toBe(keyed);
+			expect(container.querySelector('[data-testid="nested-input"]')).toBe(nested);
+			expect(document.activeElement).toBe(plain);
+			expect(plain.value).toBe('typed plain');
+			expect(keyed.value).toBe('typed keyed');
+			expect(nested.value).toBe('typed nested');
+
+			flushSync(() => root!.render(RowsHole, { rows: rows(true) }));
+			expect(
+				Array.from(container.querySelectorAll('li'), (el) => el.getAttribute('data-testid')),
+			).toEqual(['keyed', 'plain', 'nested']);
+			expect(container.querySelector('[data-testid="keyed-input"]')).toBe(keyed);
+			expect(keyed.value).toBe('typed keyed');
+			expect(container.querySelector('[data-testid="nested-input"]')).toBe(nested);
+			expect(nested.value).toBe('typed nested');
+			expect(container.querySelector('[data-testid="plain-input"]')).not.toBe(plain);
+			expect(
+				(container.querySelector('[data-testid="plain-input"]') as HTMLInputElement).value,
+			).toBe('');
+		} finally {
+			root?.unmount();
+			container.remove();
+		}
+	});
+
+	it('preserves unkeyed positions beside keyed and nested children after a keyed move', () => {
+		function App({ phase }: { phase: 0 | 1 | 2 }) {
+			const plain = createElement(
+				'li',
+				{ 'data-testid': 'plain' },
+				createElement('input', { 'data-testid': 'plain-input' }),
+			);
+			const keyed = createElement(
+				'li',
+				{ key: phase === 0 ? '0' : 0, 'data-testid': 'keyed' },
+				createElement('input', { 'data-testid': 'keyed-input' }),
+			);
+			const nested = [
+				createElement(
+					'li',
+					{ key: '0', 'data-testid': 'nested' },
+					createElement('input', { 'data-testid': 'nested-input' }),
+				),
+			];
+			const tail = createElement(
+				'li',
+				{ 'data-testid': 'tail' },
+				createElement('input', { 'data-testid': 'tail-input' }),
+			);
+			const rows = positionalChildren(
+				phase === 0
+					? [plain, keyed, nested, tail]
+					: phase === 1
+						? [plain, null, nested, tail, keyed]
+						: [keyed, plain, nested, tail],
+			);
+			return createElement(RowsHole, { rows });
+		}
+
+		const r = mount(App, { phase: 0 });
+		try {
+			const before = new Map(
+				(['plain', 'keyed', 'nested', 'tail'] as const).map((name) => [
+					name,
+					r.find(`[data-testid="${name}-input"]`) as HTMLInputElement,
+				]),
+			);
+			for (const [name, input] of before) input.value = name;
+			before.get('plain')!.focus();
+			expect(document.activeElement).toBe(before.get('plain'));
+
+			r.update(App, { phase: 1 });
+			expect(r.findAll('li').map((el) => el.getAttribute('data-testid'))).toEqual([
+				'plain',
+				'nested',
+				'tail',
+				'keyed',
+			]);
+			for (const [name, input] of before) {
+				expect(r.find(`[data-testid="${name}-input"]`)).toBe(input);
+				expect(input.value).toBe(name);
+			}
+			expect(document.activeElement).toBe(before.get('plain'));
+
+			r.update(App, { phase: 2 });
+			expect(r.findAll('li').map((el) => el.getAttribute('data-testid'))).toEqual([
+				'keyed',
+				'plain',
+				'nested',
+				'tail',
+			]);
+			for (const name of ['keyed', 'nested', 'tail'] as const) {
+				const input = r.find(`[data-testid="${name}-input"]`) as HTMLInputElement;
+				expect(input).toBe(before.get(name));
+				expect(input.value).toBe(name);
+			}
+			const newPlain = r.find('[data-testid="plain-input"]') as HTMLInputElement;
+			expect(newPlain).not.toBe(before.get('plain'));
+			expect(newPlain.value).toBe('');
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('carries a keyed fragment’s children through a reorder', () => {
 		function App() {
 			const [rev, setRev] = useState(false);
