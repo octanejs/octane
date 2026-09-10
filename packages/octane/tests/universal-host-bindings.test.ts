@@ -181,6 +181,56 @@ describe('universal host bindings', () => {
 		expect([second.subscriptionCount, second.unsubscriptionCount]).toEqual([1, 1]);
 	});
 
+	it('defers a source notification while a host transaction is prepared', () => {
+		const source = createSource(0);
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const Scene = defineUniversalComponent('object', (props: { label: string }) =>
+			universalValue(rowPlan, [universalHostBinding(source, (value) => value), props.label]),
+		);
+
+		root.render(Scene, { label: 'old' });
+		const row = container.children[0];
+		try {
+			const pending = root.prepare(Scene, { label: 'new' });
+			expect(pending.status).toBe('prepared');
+			expect(() => flushUniversalSync(() => source.set(1))).not.toThrow();
+			expect(row.props).toMatchObject({ active: 0, label: 'old' });
+			pending.commit();
+			flushUniversalSync(() => {});
+			expect(container.children[0]).toBe(row);
+			expect(row.props).toMatchObject({ active: 1, label: 'new' });
+		} finally {
+			root.unmount();
+		}
+		expect(source.listenerCount).toBe(0);
+	});
+
+	it('replays a deferred source notification after aborting a host transaction', () => {
+		const source = createSource(0);
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const Scene = defineUniversalComponent('object', (props: { label: string }) =>
+			universalValue(rowPlan, [universalHostBinding(source, (value) => value), props.label]),
+		);
+
+		root.render(Scene, { label: 'old' });
+		const row = container.children[0];
+		try {
+			const pending = root.prepare(Scene, { label: 'discarded' });
+			expect(pending.status).toBe('prepared');
+			flushUniversalSync(() => source.set(1));
+			expect(row.props).toMatchObject({ active: 0, label: 'old' });
+			pending.abort();
+			flushUniversalSync(() => {});
+			expect(container.children[0]).toBe(row);
+			expect(row.props).toMatchObject({ active: 1, label: 'old' });
+		} finally {
+			root.unmount();
+		}
+		expect(source.listenerCount).toBe(0);
+	});
+
 	it('applies two source changes to one host in the same accepted event update', () => {
 		const active = createSource(false);
 		const label = createSource('before');
@@ -526,7 +576,7 @@ describe('universal host bindings', () => {
 		root.unmount();
 	});
 
-	it('disposes earlier subscriptions if a later source fails during publication', () => {
+	it('keeps earlier accepted hosts responsive if a later new source fails', () => {
 		const first = createSource(1);
 		const second = {
 			get() {
@@ -544,10 +594,46 @@ describe('universal host bindings', () => {
 		]);
 
 		expect(() => root.render(Scene, undefined)).toThrow('source subscription failed');
-		const activeListeners = first.listenerCount;
+		expect(container.children).toHaveLength(2);
+		expect(first.listenerCount).toBe(1);
+		flushUniversalSync(() => first.set(3));
+		expect(container.children[0].props.active).toBe(3);
 		root.unmount();
-		expect(activeListeners).toBe(0);
 		expect(first.listenerCount).toBe(0);
+	});
+
+	it('keeps a previously mounted bound host connected if another source fails', () => {
+		const healthy = createSource(0);
+		const stableBinding = universalHostBinding(healthy, (value) => value);
+		const failing = {
+			get: () => 0,
+			subscribe(_notify: () => void): () => void {
+				throw new Error('new source subscription failed');
+			},
+		};
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const Scene = defineUniversalComponent('object', (props: { add: boolean }) => [
+			universalValue(rowPlan, [stableBinding, 'existing'], 'existing'),
+			props.add
+				? universalValue(rowPlan, [universalHostBinding(failing, (value) => value), 'new'], 'new')
+				: null,
+		]);
+
+		root.render(Scene, { add: false });
+		const existing = container.children[0];
+		expect(healthy.listenerCount).toBe(1);
+		try {
+			expect(() => root.render(Scene, { add: true })).toThrow('new source subscription failed');
+			expect(container.children).toHaveLength(2);
+			expect(container.children[0]).toBe(existing);
+			expect(healthy.listenerCount).toBe(1);
+			flushUniversalSync(() => healthy.set(1));
+			expect(existing.props.active).toBe(1);
+		} finally {
+			root.unmount();
+		}
+		expect(healthy.listenerCount).toBe(0);
 	});
 
 	it('disconnects after a source read fails following subscription', () => {
@@ -704,5 +790,88 @@ describe('universal host bindings', () => {
 			root.unmount();
 		}
 		expect(source.listenerCount).toBe(0);
+	});
+
+	it('reports both an accepted host failure and a queued source read failure', () => {
+		const backing = createSource(0);
+		const hostError = new Error('accepted host apply failed');
+		const sourceError = new Error('bound source read failed');
+		let failNextRead = false;
+		const source = {
+			get() {
+				if (failNextRead) {
+					failNextRead = false;
+					throw sourceError;
+				}
+				return backing.get();
+			},
+			subscribe(notify: () => void) {
+				return backing.subscribe(notify);
+			},
+		};
+		const container = createObjectContainer();
+		const baseDriver = createObjectDriver();
+		const driver = {
+			...baseDriver,
+			prepareBatch(
+				target: typeof container,
+				batch: (typeof container.commits)[number],
+				context: Parameters<typeof baseDriver.prepareBatch>[2],
+			) {
+				const prepared = baseDriver.prepareBatch(target, batch, context);
+				if (
+					!batch.commands.some(
+						(command) => command.op === 'update' && command.props.value === 'after',
+					)
+				) {
+					return prepared;
+				}
+				return {
+					...prepared,
+					apply() {
+						prepared.apply();
+						failNextRead = true;
+						backing.set(1);
+						throw hostError;
+					},
+				};
+			},
+		};
+		const root = createUniversalRoot(container, driver);
+		const stagePlan = universalPlan('object', {
+			kind: 'host',
+			type: 'stage',
+			bindings: [['value', 0]],
+		});
+		const bound = universalHostBinding(source, (value) => value);
+		const Bound = memo(
+			defineUniversalComponent('object', () => universalValue(rowPlan, [bound, 'bound'])),
+		);
+		let updateStage!: () => void;
+		const Scene = defineUniversalComponent('object', () => {
+			const [stage, setStage] = useState('before', 'stage');
+			updateStage = () => setStage('after');
+			return [universalComponent('object', Bound), universalValue(stagePlan, [stage])];
+		});
+
+		root.render(Scene, undefined);
+		const row = container.children[0];
+		try {
+			let reported: unknown;
+			try {
+				flushUniversalSync(() => updateStage());
+			} catch (error) {
+				reported = error;
+			}
+			expect(reported).toBeInstanceOf(AggregateError);
+			expect((reported as AggregateError).errors).toEqual([hostError, sourceError]);
+			expect(container.children[1].props.value).toBe('after');
+			expect(row.props.active).toBe(0);
+			flushUniversalSync(() => backing.set(2));
+			expect(row.props.active).toBe(2);
+		} finally {
+			root.unmount();
+		}
+		expect(backing.listenerCount).toBe(0);
 	});
 });

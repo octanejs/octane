@@ -836,6 +836,11 @@ export interface UniversalTransaction {
 	abort(): void;
 }
 
+interface UniversalRootPendingTransaction extends UniversalTransaction {
+	readonly transitionBatches: ReadonlySet<UniversalTransitionBatch>;
+	isAwaitingTransportAcknowledgement(): boolean;
+}
+
 export interface UniversalSuspendedAttempt {
 	readonly status: 'suspended' | 'aborted';
 	readonly thenable: PromiseLike<unknown>;
@@ -7170,7 +7175,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private readonly dirtyBoundSourceSet = new Set<UniversalHostBinding<unknown>['source']>();
 	private boundHostScheduled = false;
 	private readonly publishedListeners = new Set<number>();
-	private pending: UniversalTransactionImpl<Container, PublicInstance> | null = null;
+	private pending: UniversalRootPendingTransaction | null = null;
 	private suspended: UniversalSuspendedAttemptImpl | null = null;
 	private urgentBoundarySuspension: UniversalSuspendedAttemptImpl | null = null;
 	private awaitingReplay: SuspendedMemoReplay | null = null;
@@ -7535,9 +7540,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					this.boundSources.set(binding.source, group);
 					group.records.push(record);
 					try {
-						group.unsubscribe = binding.source.subscribe(() =>
-							this.queueHostBindingSource(binding.source),
-						);
+						group.unsubscribe = this.subscribeHostBindingSource(binding.source);
 					} catch (error) {
 						this.boundSources.delete(binding.source);
 						throw error;
@@ -7553,6 +7556,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			throw error;
 		}
 		return unsubscribeError;
+	}
+
+	private subscribeHostBindingSource(source: UniversalHostBinding<unknown>['source']): () => void {
+		// The listener survives individual bound hosts. Do not close over the
+		// first host's binding, which can retain its removed selector and payload.
+		return source.subscribe(() => this.queueHostBindingSource(source));
 	}
 
 	private queueHostBindingUpdate(record: LogicalRecord): void {
@@ -7594,6 +7603,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		}
 	}
 
+	/** @internal Restore a binding-only batch abandoned before host acceptance. */
+	restoreAbortedHostBindingRecords(records: readonly LogicalRecord[]): void {
+		this.restoreDirtyHostBindings(records);
+	}
+
 	private flushHostBindingUpdates(): void {
 		if (
 			(this.dirtyBoundHosts.length === 0 && this.dirtyBoundSources.length === 0) ||
@@ -7608,6 +7622,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			// The queued microtask has been consumed; the pending transaction or
 			// scheduled render will arrange the next drain once it settles.
 			this.boundHostScheduled = false;
+			if (!this.scheduled) SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 			return;
 		}
 		this.boundHostScheduled = false;
@@ -7634,7 +7649,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 			}
 		}
-		const updates: { record: LogicalRecord; props: Record<string, unknown> }[] = [];
+		const changedRecords: LogicalRecord[] = [];
 		const commands: UniversalHostCommand[] = [];
 		const soleSource = sources.length === 1 ? sources[0] : null;
 		let soleSourceRead = false;
@@ -7680,7 +7695,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					);
 				}
 				Object.freeze(next);
-				updates.push({ record, props: next });
+				changedRecords.push(record);
 				commands.push({ op: 'update', id: record.id, props: next });
 			}
 		} catch (error) {
@@ -7702,28 +7717,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			this.restoreDirtyHostBindings(records);
 			throw new TypeError('Invalid host binding batch token.');
 		}
-		const transaction = new UniversalTransactionImpl(
+		const transaction = new UniversalBoundHostTransaction(
 			this,
 			batch,
-			() => prepared.apply(),
-			null,
-			this.transportIdentity(batch.version),
-			() => {
-				for (let index = 0; index < updates.length; index++) {
-					updates[index].record.props = updates[index].props;
-				}
-			},
-			() => prepared.afterAccept?.(),
-			noopUniversalCommitTask,
-			noopUniversalCommitTask,
-			noopUniversalCommitTask,
-			null,
-			() => prepared.abort(),
-			() => {
-				for (let index = 0; index < records.length; index++)
-					this.queueHostBindingUpdate(records[index]);
-			},
-			EMPTY_UNIVERSAL_TRANSITION_BATCHES,
+			prepared,
+			changedRecords,
+			records,
 		);
 		this.pending = transaction;
 		transaction.commit();
@@ -8555,12 +8554,22 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			} catch (error) {
 				commitError = error;
 			}
+			let bindingError: unknown = NO_PENDING_PASSIVE_ERROR;
 			try {
 				this.flushHostBindingUpdates();
 			} catch (error) {
-				if (commitError === NO_PENDING_PASSIVE_ERROR) throw error;
+				bindingError = error;
+			}
+			if (commitError !== NO_PENDING_PASSIVE_ERROR && bindingError !== NO_PENDING_PASSIVE_ERROR) {
+				throw typeof AggregateError === 'function'
+					? new AggregateError(
+							[commitError, bindingError],
+							'Universal host commit and binding update both failed.',
+						)
+					: commitError;
 			}
 			if (commitError !== NO_PENDING_PASSIVE_ERROR) throw commitError;
+			if (bindingError !== NO_PENDING_PASSIVE_ERROR) throw bindingError;
 		}
 	}
 
@@ -12178,22 +12187,25 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					previous.deactivate();
 				}
 				// Publish bindings after the logical host and owner state has accepted.
-				let bindingUnsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
+				let bindingPublicationError: unknown = NO_PENDING_PASSIVE_ERROR;
 				for (const record of removedHosts) {
 					const error = this.dropHostBindings(record);
-					if (bindingUnsubscribeError === NO_PENDING_PASSIVE_ERROR) bindingUnsubscribeError = error;
+					if (bindingPublicationError === NO_PENDING_PASSIVE_ERROR) bindingPublicationError = error;
 				}
-				try {
-					for (const draft of hostDrafts) {
+				for (const draft of hostDrafts) {
+					try {
 						const error = this.commitHostBindings(draft.record, draft.blueprint as BlueprintHost);
-						if (bindingUnsubscribeError === NO_PENDING_PASSIVE_ERROR)
-							bindingUnsubscribeError = error;
+						if (bindingPublicationError === NO_PENDING_PASSIVE_ERROR)
+							bindingPublicationError = error;
+					} catch (error) {
+						// Host acceptance is already final. A failed source cleans up
+						// its own record; keep other accepted hosts subscribed and
+						// continue connecting the remaining hosts.
+						if (bindingPublicationError === NO_PENDING_PASSIVE_ERROR)
+							bindingPublicationError = error;
 					}
-				} catch (error) {
-					for (const draft of hostDrafts) this.dropHostBindings(draft.record);
-					throw error;
 				}
-				if (bindingUnsubscribeError !== NO_PENDING_PASSIVE_ERROR) throw bindingUnsubscribeError;
+				if (bindingPublicationError !== NO_PENDING_PASSIVE_ERROR) throw bindingPublicationError;
 				if (portalReleaseError !== NO_PENDING_PASSIVE_ERROR) throw portalReleaseError;
 			},
 			() => (preparedHost ?? preparedAsyncHost)?.afterAccept?.(),
@@ -12299,7 +12311,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		return transaction;
 	}
 
-	finish(transaction: UniversalTransactionImpl<Container, PublicInstance>): void {
+	finish(transaction: UniversalRootPendingTransaction): void {
 		if (this.pending === transaction) {
 			this.pending = null;
 			if (transaction.status === 'committed') {
@@ -12721,6 +12733,116 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 			},
 		};
+	}
+}
+
+/** Local binding-only batches keep the same acceptance and error ordering with less per-event state. */
+class UniversalBoundHostTransaction<
+	Container,
+	PublicInstance,
+> implements UniversalRootPendingTransaction {
+	private state: 'prepared' | 'committed' | 'aborted' = 'prepared';
+	private hostAccepted = false;
+	readonly transitionBatches = EMPTY_UNIVERSAL_TRANSITION_BATCHES;
+
+	constructor(
+		private readonly root: UniversalRootImpl<Container, PublicInstance>,
+		readonly batch: UniversalHostBatch,
+		private readonly prepared: UniversalPreparedHostBatch,
+		private readonly changedRecords: readonly LogicalRecord[],
+		private readonly records: readonly LogicalRecord[],
+	) {}
+
+	get status(): 'prepared' | 'committed' | 'aborted' {
+		return this.state;
+	}
+
+	isAwaitingTransportAcknowledgement(): boolean {
+		return false;
+	}
+
+	commit(): void {
+		if (this.state !== 'prepared' || this.hostAccepted) return;
+		// Like the general transaction, an apply error is post-accept: finish
+		// version and logical publication, then report the first failure.
+		this.hostAccepted = true;
+		let failure: unknown = NO_PENDING_PASSIVE_ERROR;
+		UNIVERSAL_COMMIT_TASK_DEPTH++;
+		try {
+			try {
+				this.prepared.apply();
+			} catch (error) {
+				failure = error;
+			}
+			try {
+				this.root.markBatchAccepted(this.batch.version);
+			} catch (error) {
+				if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
+			}
+			try {
+				// Binding-only batches contain update commands in changed-record order.
+				for (let index = 0; index < this.changedRecords.length; index++) {
+					this.changedRecords[index].props = (
+						this.batch.commands[index] as Extract<UniversalHostCommand, { op: 'update' }>
+					).props;
+				}
+			} catch (error) {
+				if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
+			}
+			try {
+				this.prepared.afterAccept?.();
+			} catch (error) {
+				if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
+			}
+		} finally {
+			UNIVERSAL_COMMIT_TASK_DEPTH--;
+			this.state = 'committed';
+			try {
+				this.root.finish(this);
+			} catch (error) {
+				if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
+			}
+		}
+		if (failure !== NO_PENDING_PASSIVE_ERROR) throw failure;
+	}
+
+	commitAsync(): Promise<void> {
+		try {
+			this.commit();
+			return Promise.resolve();
+		} catch (error) {
+			return Promise.reject(error);
+		}
+	}
+
+	abort(): void {
+		if (this.state !== 'prepared') return;
+		if (this.hostAccepted) {
+			throw new Error('A universal transaction cannot be aborted after its host batch committed.');
+		}
+		this.state = 'aborted';
+		let failure: unknown = NO_PENDING_PASSIVE_ERROR;
+		UNIVERSAL_COMMIT_TASK_DEPTH++;
+		try {
+			try {
+				this.prepared.abort();
+			} catch (error) {
+				failure = error;
+			}
+			try {
+				this.root.restoreAbortedHostBindingRecords(this.records);
+			} catch (error) {
+				if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
+			}
+		} finally {
+			UNIVERSAL_COMMIT_TASK_DEPTH--;
+			try {
+				this.root.finish(this);
+			} catch (error) {
+				if (failure === NO_PENDING_PASSIVE_ERROR) failure = error;
+			}
+		}
+		if (failure !== NO_PENDING_PASSIVE_ERROR) throw failure;
 	}
 }
 

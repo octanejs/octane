@@ -83,7 +83,7 @@ OCTANE_NATIVE_DIST="$OCTANE_ROOT/packages/octane/dist/universal-native.js" \
 ```
 
 On Hermes 1.0.0 (HBC 98, Hades), the patched 2,000-hover run allocated
-11,564,392 bytes for Octane and 5,823,776 bytes for Solid 2.0.0-rc.6. Mounted
+9,182,120 bytes for Octane and 5,823,776 bytes for Solid 2.0.0-rc.6. Mounted
 live JS after GC was about 0.94 MB versus 0.37 MB; both ended with an 8 MiB
 heap capacity, and Octane collected 7 times versus Solid's 6. Both produced
 101 hosts, 3,999 property changes, 2,000 events, 80 view effect creations and
