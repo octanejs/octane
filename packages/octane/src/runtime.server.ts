@@ -334,7 +334,7 @@ let PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 // active render pass (a mutable container, mirroring CSS's mutable Map, so a
 // per-pass local capture keeps accumulating via `HEAD.html +=` even though
 // strings are immutable). Folded into the result `html` by `spliceHead` (into
-// `<head>` when present, else prepended).
+// a document or leading fragment `<head>`, else prepended).
 interface HeadBuffer {
 	html: string;
 	/**
@@ -6564,8 +6564,9 @@ export function namespaceHeadElement(
  *
  * - `html` — the rendered markup. Hoisted document metadata (`<title>`/`<meta>`/
  *   `<link>`, collected via `ssrHeadEl`) is folded IN: spliced before `</head>`
- *   when the render produced a document, otherwise prepended. (React folds head
- *   resources into the document too, which is why folding is the default.)
+ *   when the render produced a document or a leading fragment `<head>`, otherwise
+ *   prepended. (React folds head resources into the document too, which is why
+ *   folding is the default.)
  * - `head`, the hoisted metadata on its own, present ONLY under
  *   `headChannel: 'separate'`; `html` then excludes it. For hosts that render
  *   into a `<head>`-bearing template they own rather than rendering the
@@ -6614,9 +6615,9 @@ export interface RenderOptions {
 	 * Where hoisted `<title>`/`<meta>`/`<link>` go.
 	 *
 	 * `'fold'` (default) keeps React's resource-hoisting shape: the metadata is
-	 * spliced into `html` before `</head>`, or prepended when the render is not a
-	 * document. `'separate'` withholds it from `html`/the streamed shell and hands
-	 * it over on its own, `RenderResult.head` for the buffered renderers,
+	 * spliced into `html` before `</head>` for a document or leading fragment
+	 * `<head>`, and otherwise prepended. `'separate'` withholds it from `html`/the
+	 * streamed shell and hands it over on its own, `RenderResult.head` for the buffered renderers,
 	 * `StreamOptions.onHeadReady` for the streaming ones.
 	 *
 	 * A host that renders into a `<head>`-bearing template it owns (rather than
@@ -6628,16 +6629,19 @@ export interface RenderOptions {
 	headChannel?: 'fold' | 'separate';
 }
 
-// Insert the hoisted head markup into `body`: before `</head>` when the render
-// produced a document (React-19 resource-hoisting shape), otherwise prepend it so
-// the caller/metaframework can place `html` in a document whose `<head>` then
-// contains the metadata. A document root always gains a `<head>`; any other
-// body with nothing to splice is returned as is, decided from its first bytes so
-// the common fragment response is never scanned for a `</head>`.
-function spliceHead(body: string, head: string): string {
-	if (!isDocumentRoot(body)) return head === '' ? body : head + body;
-	const headClose = body.indexOf('</head>');
+// Fold into a rendered document or a fragment that leads with an authored
+// <head> (the preamble shape used inside a host-owned <html>). Other fragments
+// keep the prepended metadata that a host can place in its own <head>. The
+// common fragment response is classified from its first bytes, never scanned.
+function spliceHead(body: string, head: string, documentRoot = isDocumentRoot(body)): string {
+	if (!documentRoot && (head === '' || !isLeadingHeadRoot(body)))
+		return head === '' ? body : head + body;
+	// A fragment's leading <head> may have an attribute containing "</head>";
+	// begin after its quote-aware opening tag instead of splicing into the attr.
+	const afterOpening = documentRoot ? 0 : documentHeadInsertionPoint(body);
+	const headClose = afterOpening === -1 ? -1 : body.indexOf('</head>', afterOpening);
 	if (headClose !== -1) return body.slice(0, headClose) + head + body.slice(headClose);
+	if (!documentRoot) return head + body;
 	const openingEnd = documentTagEnd(body, body.indexOf('<html') + 5);
 	if (openingEnd !== -1)
 		return body.slice(0, openingEnd) + '<head>' + head + '</head>' + body.slice(openingEnd);
@@ -7608,9 +7612,9 @@ function passToResult(
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
 	// Unclaimed view-transition arm candidates strip at emission (see vtSsrStrip).
-	// Stripping the two channels separately equals stripping the folded string -
-	// no match spans the join, which is what keeps `head + html` byte-identical
-	// to the folded `html`.
+	// Stripping the two channels separately equals stripping the folded string:
+	// no match spans the join. On body-only renders, `head + html` remains
+	// byte-identical to folded output; authored heads change the insertion point.
 	let result: RenderResult;
 	if (separateHead) {
 		result = {
@@ -8822,6 +8826,17 @@ function isDocumentRoot(body: string): boolean {
 	return next === 62 /* > */ || next === 32 || next === 9 || next === 10 || next === 13;
 }
 
+// A fragment can author its own leading <head> even when a surrounding server
+// template supplies <html>. That head receives hoisted metadata, but does not
+// make this an <html> root or cause the streaming doctype to be emitted.
+function isLeadingHeadRoot(body: string): boolean {
+	let i = 0;
+	while (body.startsWith('<!--[-->', i)) i += 8;
+	if (!body.startsWith('<head', i)) return false;
+	const next = body.charCodeAt(i + 5);
+	return next === 62 /* > */ || next === 32 || next === 9 || next === 10 || next === 13;
+}
+
 // Locate the insertion point just inside a document's opening <head> tag —
 // where renderer-owned leading styles and hoisted head elements belong in
 // document mode. Quote-aware so an attribute value containing '>' cannot
@@ -9298,9 +9313,12 @@ async function runStream(
 			shell += spliceHead(pass.body, leadingStyles + shellHead);
 		}
 	} else {
+		const shellPrefix = leadingStyles + shellHead;
 		shell += documentRoot
-			? spliceHead(pass.body, leadingStyles + shellHead)
-			: leadingStyles + shellHead + pass.body;
+			? spliceHead(pass.body, shellPrefix, true)
+			: shellPrefix === ''
+				? pass.body
+				: spliceHead(pass.body, shellPrefix, false);
 	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) shell += serializeNativeSignalSeeds(pass.signals, nonceAttr);

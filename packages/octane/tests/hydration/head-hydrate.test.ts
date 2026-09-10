@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { compile } from 'octane/compiler';
@@ -264,6 +264,38 @@ describe('hoisted document metadata — SSR', () => {
 });
 
 describe('hoisted document metadata — hydration', () => {
+	it('adopts separate metadata in a host-owned document with a body app root', () => {
+		const id = '/src/hosted-head.tsrx';
+		const serverPage = ownershipModule(id, 'server');
+		const clientPage = ownershipModule(id, 'client');
+		const { html, head } = ServerRT.renderToString(
+			serverPage.Page,
+			{ label: 'server' },
+			{ headChannel: 'separate' },
+		);
+		const parsed = new DOMParser().parseFromString(
+			`<!doctype html><html><head>${head}</head><body><div id="app">${html}</div></body></html>`,
+			'text/html',
+		);
+		const title = parsed.head.querySelector('title');
+		const main = parsed.querySelector('main');
+		const app = parsed.getElementById('app')!;
+		expect(title?.textContent).toBe('server');
+		expect(main?.textContent).toBe('server');
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(app, clientPage.Page, { label: 'server' }, { onRecoverableError });
+		expect(parsed.head.querySelector('title')).toBe(title);
+		expect(app.querySelector('main')).toBe(main);
+		flushSync(() => root.render(clientPage.Page, { label: 'client' }));
+		expect(parsed.head.querySelector('title')).toBe(title);
+		expect(title?.textContent).toBe('client');
+		expect(app.querySelector('main')).toBe(main);
+		expect(main?.textContent).toBe('client');
+		expect(onRecoverableError).not.toHaveBeenCalled();
+		root.unmount();
+		expect(title?.isConnected).toBe(false);
+	});
+
 	it('adopts the server head and single-root body, then removes owned nodes on unmount', () => {
 		const { html } = ServerRT.renderToString(server.Page, { params: {} });
 		// html folds head metadata to the front + body after. A document places the
