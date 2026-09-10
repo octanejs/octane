@@ -23697,12 +23697,27 @@ function deoptWrapperKind(value: any[]): DeoptWrapperKind {
 	return POSITIONAL_CHILDREN.has(value as object) ? 'fragment' : 'array';
 }
 
-function scopedDeoptKey(
+const DEOPT_KEY_STRINGIFY = JSON.stringify;
+
+function nestedImplicitKeyPrefix(path: readonly (string | number)[]): string | null {
+	// Object-valued wrapper keys and custom array serialization may differ for
+	// each leaf. Keep their existing full-key serialization path.
+	if (JSON.stringify !== DEOPT_KEY_STRINGIFY || 'toJSON' in path) return null;
+	for (let i = 0; i < path.length; i++) {
+		const type = typeof path[i];
+		if (type !== 'string' && type !== 'number') return null;
+	}
+	return '[' + JSON.stringify(path) + ',"index",';
+}
+
+function appendScopedDeoptKey(
+	outKeys: any[],
 	path: readonly (string | number)[],
 	item: any,
 	index: number,
 	key: any,
-): string | number {
+	implicitPrefix: string | null | undefined,
+): string | null | undefined {
 	// Reconciliation keys are internal: top-level implicit positions are numbers,
 	// explicit keys carry a 'k' prefix, and nested paths are JSON strings. These
 	// namespaces keep index 0 distinct from key="0" and user keys distinct from
@@ -23714,8 +23729,22 @@ function scopedDeoptKey(
 	// render, including renders where all children go on to bail. Skip the
 	// serializer there. JSON paths begin with '[', so they remain distinct from
 	// explicit 'k' keys; numeric indices are distinct from both string forms.
-	if (path.length === 0) return explicit ? 'k' + String(key) : index;
-	return JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]);
+	if (path.length === 0) {
+		outKeys.push(explicit ? 'k' + String(key) : index);
+		return implicitPrefix;
+	}
+	// Initialize only for the first implicit leaf: keyed-only wrappers must not
+	// pay for a prefix they cannot reuse. `null` disables caching for this scope;
+	// `undefined` means no implicit leaf has needed its prefix yet.
+	if (!explicit) {
+		if (implicitPrefix === undefined) implicitPrefix = nestedImplicitKeyPrefix(path);
+		if (implicitPrefix !== null && JSON.stringify === DEOPT_KEY_STRINGIFY && !('toJSON' in path)) {
+			outKeys.push(implicitPrefix + index + ']');
+			return implicitPrefix;
+		}
+	}
+	outKeys.push(JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]));
+	return implicitPrefix;
 }
 
 // Flatten arrays and Fragment descriptors to renderable leaves while retaining
@@ -23733,12 +23762,20 @@ function flattenReactChildContainer(
 ): void {
 	const keyFn = kind === 'fragment' ? deoptKeyPositional : deoptKey;
 	const count = children.length;
+	let implicitPrefix: string | null | undefined = count > 1 ? undefined : null;
 	for (let i = 0; i < count; i++) {
 		const item = children[i];
 		if (isFragmentDescriptor(item)) {
 			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
 				outItems.push(fragmentRefDescriptor(item));
-				outKeys.push(scopedDeoptKey(path, item, i, keyFn(item, i)));
+				implicitPrefix = appendScopedDeoptKey(
+					outKeys,
+					path,
+					item,
+					i,
+					keyFn(item, i),
+					implicitPrefix,
+				);
 				continue;
 			}
 			const nested = fragmentDescriptorChildren(item);
@@ -23771,8 +23808,14 @@ function flattenReactChildContainer(
 			continue;
 		}
 		outItems.push(item);
-		outKeys.push(scopedDeoptKey(path, item, i, keyFn(item, i)));
+		implicitPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), implicitPrefix);
 	}
+}
+
+function singleDeoptKey(item: any, key: any): string | number {
+	return (isElementDescriptor(item) || item?.$$kind === PORTAL_TAG) && item.key != null
+		? 'k' + String(key)
+		: 0;
 }
 
 function prepareDeoptList(
@@ -23787,7 +23830,7 @@ function prepareDeoptList(
 		if (value.ref != null || hasOwnProp.call(value.props, 'ref')) {
 			return {
 				items: [fragmentRefDescriptor(value)],
-				keys: [scopedDeoptKey([], value, 0, value.key ?? 0)],
+				keys: [singleDeoptKey(value, value.key ?? 0)],
 			};
 		}
 		const items: any[] = [];
@@ -23803,10 +23846,10 @@ function prepareDeoptList(
 		return { items, keys };
 	}
 	if (includeKeyedSingle && isElementDescriptor(value) && value.key != null) {
-		return { items: [value], keys: [scopedDeoptKey([], value, 0, value.key)] };
+		return { items: [value], keys: [singleDeoptKey(value, value.key)] };
 	}
 	if (forceSingle) {
-		return { items: [value], keys: [scopedDeoptKey([], value, 0, deoptKeyPositional(value, 0))] };
+		return { items: [value], keys: [singleDeoptKey(value, deoptKeyPositional(value, 0))] };
 	}
 	return null;
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	createElement,
+	createRoot,
 	flushSync,
 	Fragment,
 	hydrateRoot,
@@ -273,6 +274,144 @@ describe('de-opt child keys — user keys never collide with wrapper paths', () 
 });
 
 describe('de-opt child keys — wrapper boundaries survive the top-level fast path', () => {
+	it.each(['client mount', 'server hydration'] as const)(
+		'keeps nested sibling inputs through keyed wrapper reorders after %s',
+		(mode) => {
+			const escaped = 'quote"\\slash\n\u0000\ud800';
+			const wrapperKeys = {
+				first: `first:${escaped}`,
+				second: `second:${escaped}`,
+			};
+			const groupNames = ['first', 'second'] as const;
+			const row = (id: string, key?: string) =>
+				createElement(
+					'li',
+					key === undefined ? { 'data-row': id } : { key, 'data-row': id },
+					createElement('input', { 'data-input': id, defaultValue: id }),
+				);
+			const group = (name: (typeof groupNames)[number]) =>
+				createElement(
+					Fragment,
+					{ key: wrapperKeys[name] },
+					row(`${name}-outer-0`),
+					row(`${name}-outer-escaped`, escaped),
+					positionalChildren([
+						row(`${name}-inner-0`),
+						row(`${name}-inner-key-0`, '0'),
+						row(`${name}-inner-escaped`, escaped),
+					]),
+				);
+			const pathLikeKey = JSON.stringify([
+				['keyed-fragment', wrapperKeys.first, 'wrapper', 2],
+				'key',
+				escaped,
+			]);
+			const rows = (reverse: boolean) =>
+				positionalChildren([
+					...(reverse ? [...groupNames].reverse() : groupNames).map(group),
+					row('outside', pathLikeKey),
+				]);
+			const order = (reverse: boolean) => [
+				...(reverse ? [...groupNames].reverse() : groupNames).flatMap((name) => [
+					`${name}-outer-0`,
+					`${name}-outer-escaped`,
+					`${name}-inner-0`,
+					`${name}-inner-key-0`,
+					`${name}-inner-escaped`,
+				]),
+				'outside',
+			];
+
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			const initialRows = rows(false);
+			if (mode === 'server hydration') {
+				container.innerHTML = renderToString(server.RowsHole, { rows: initialRows }).html;
+			}
+			let root: ReturnType<typeof createRoot> | undefined;
+			try {
+				root =
+					mode === 'server hydration'
+						? hydrateRoot(container, RowsHole, { rows: initialRows })
+						: createRoot(container);
+				const activeRoot = root;
+				if (mode === 'client mount') activeRoot.render(RowsHole, { rows: initialRows });
+				flushSync(() => {});
+				const inputs = new Map(
+					Array.from(container.querySelectorAll<HTMLInputElement>('input[data-input]'), (input) => [
+						input.dataset.input!,
+						input,
+					]),
+				);
+				expect([...inputs.keys()]).toEqual(order(false));
+				for (const [id, input] of inputs) input.value = `typed:${id}`;
+				const focused = inputs.get('second-inner-0')!;
+				focused.focus();
+
+				for (const reverse of [true, false]) {
+					flushSync(() => activeRoot.render(RowsHole, { rows: rows(reverse) }));
+					expect(
+						Array.from(container.querySelectorAll('li'), (li) => li.getAttribute('data-row')),
+					).toEqual(order(reverse));
+					for (const [id, input] of inputs) {
+						expect(container.querySelector(`input[data-input="${id}"]`)).toBe(input);
+						expect(input.value).toBe(`typed:${id}`);
+					}
+					expect(document.activeElement).toBe(focused);
+				}
+			} finally {
+				root?.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it('preserves nested input state when array serialization is customized', () => {
+		const names = ['first', 'second'];
+		const rows = (reverse: boolean) =>
+			(reverse ? [...names].reverse() : names).map((name) =>
+				createElement(
+					Fragment,
+					{ key: name },
+					...[0, 1].map((index) =>
+						createElement('li', null, createElement('input', { 'data-input': `${name}-${index}` })),
+					),
+				),
+			);
+		const r = mount(RowsHole, { rows: rows(false) });
+		const previous = Object.getOwnPropertyDescriptor(Array.prototype, 'toJSON');
+		try {
+			const inputs = r.findAll('input') as HTMLInputElement[];
+			for (const input of inputs) input.value = `typed:${input.dataset.input}`;
+			inputs[0].focus();
+			// An application serializer can customize standalone primitive arrays
+			// while leaving arrays embedded in another value unchanged.
+			Object.defineProperty(Array.prototype, 'toJSON', {
+				configurable: true,
+				value(this: unknown[], key: string) {
+					return key === '' && this.every((value) => ['string', 'number'].includes(typeof value))
+						? this.join(':')
+						: this;
+				},
+			});
+			for (const reverse of [true, false]) {
+				r.update(RowsHole, { rows: rows(reverse) });
+				expect(r.findAll('input')).toEqual(
+					reverse ? [inputs[2], inputs[3], inputs[0], inputs[1]] : inputs,
+				);
+				for (const input of inputs) {
+					expect(r.find(`[data-input="${input.dataset.input}"]`)).toBe(input);
+					expect(input.value).toBe(`typed:${input.dataset.input}`);
+				}
+				expect(document.activeElement).toBe(inputs[0]);
+			}
+		} finally {
+			if (previous) Object.defineProperty(Array.prototype, 'toJSON', previous);
+			else Reflect.deleteProperty(Array.prototype, 'toJSON');
+			r.unmount();
+		}
+	});
+
 	it('adopts mixed keyed and unkeyed server children before a keyed move', () => {
 		function rows(keyedFirst: boolean) {
 			const plain = createElement(
