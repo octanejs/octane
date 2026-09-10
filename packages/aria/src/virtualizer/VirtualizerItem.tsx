@@ -36,6 +36,7 @@ export function VirtualizerItem(props: VirtualizerItemProps): JSX.Element {
 		layoutInfo,
 		virtualizer,
 		ref,
+		shouldObserveItemSize,
 	});
 
 	return (

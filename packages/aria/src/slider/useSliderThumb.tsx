@@ -18,6 +18,7 @@ import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { getSliderThumbId, sliderData } from './utils';
 import { mergeProps } from '../utils/mergeProps';
+import { withSlot } from 'octane';
 import React, {
 	ChangeEvent,
 	InputHTMLAttributes,
@@ -104,6 +105,10 @@ export function useSliderThumb(
 	state: SliderState,
 	_slot?: symbol,
 ): SliderThumbAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useSliderThumb, opts, state);
+	}
+
 	let {
 		index = 0,
 		isRequired,

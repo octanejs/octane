@@ -1,4 +1,3 @@
-import { chain } from '../utils/chain';
 import {
 	createKeyboardShortcutHandler,
 	type KeyboardShortcutBindings,
@@ -8,6 +7,7 @@ import { getEventTarget, nodeContains } from '../utils/shadowdom/DOMFunctions';
 // octane adaptations:
 // - `KeyboardEvents` / `DOMAttributes` from '@react-types/shared' are typed over React's
 //   synthetic events; local structural aliases over native KeyboardEvent replace them.
+// - Shortcut and user callbacks share the BaseEvent wrapper so both have propagation controls.
 // - Public-hook slot threading (splitSlot) per the binding convention; no octane base hooks
 //   are composed here, so the slot is absorbed and unused.
 import type { BaseEvent } from './createEventHandler';
@@ -53,7 +53,8 @@ export function useKeyboard(...args: any[]): KeyboardResult {
 	let onKeyUp;
 	if (shortcuts) {
 		let shortcutHandler = createKeyboardShortcutHandler(shortcuts);
-		let shortcutOnKeyDown = createEventHandler<KeyboardEvent>((e) => {
+		onKeyDown = createEventHandler<KeyboardEvent>((e) => {
+			props.onKeyDown?.(e);
 			// If keyboard event didn't originate from a child of the current target,
 			// then it's a React event coming through a portal. We should ignore it.
 			if (!nodeContains(e.currentTarget as Node, getEventTarget(e) as Element)) {
@@ -67,7 +68,8 @@ export function useKeyboard(...args: any[]): KeyboardResult {
 
 			shortcutHandler(e);
 		});
-		let shortcutOnKeyUp = createEventHandler<KeyboardEvent>((e) => {
+		onKeyUp = createEventHandler<KeyboardEvent>((e) => {
+			props.onKeyUp?.(e);
 			// If keyboard event didn't originate from a child of the current target,
 			// then it's a React event coming through a portal. We should ignore it.
 			if (!nodeContains(e.currentTarget as Node, getEventTarget(e) as Element)) {
@@ -81,8 +83,6 @@ export function useKeyboard(...args: any[]): KeyboardResult {
 			// implement shortcut handler on keyup, what should the map be called? or should it be another syntax on shortcuts?
 			e.continuePropagation();
 		});
-		onKeyDown = props.onKeyDown ? chain(props.onKeyDown, shortcutOnKeyDown) : shortcutOnKeyDown;
-		onKeyUp = props.onKeyUp ? chain(props.onKeyUp, shortcutOnKeyUp) : shortcutOnKeyUp;
 	} else {
 		onKeyDown = createEventHandler(props.onKeyDown);
 		onKeyUp = createEventHandler(props.onKeyUp);

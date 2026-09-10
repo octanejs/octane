@@ -23,6 +23,7 @@ import { GridNode } from '../upstream-exports/react-stately/private/grid/GridCol
 import intlMessages from '../intl/table/index';
 import { mergeProps } from '../utils/mergeProps';
 import { TableColumnResizeState } from '../upstream-exports/react-stately/useTableState';
+import { withSlot } from 'octane';
 import { useDescription } from '../utils/useDescription';
 import { useEffectEvent } from '../utils/useEffectEvent';
 import { useId } from '../utils/useId';
@@ -87,6 +88,10 @@ export function useTableColumnResize<T>(
 	ref: RefObject<HTMLInputElement | null>,
 	_slot?: symbol,
 ): TableColumnResizeAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useTableColumnResize<T>, props, state, ref);
+	}
+
 	let {
 		column: item,
 		triggerRef,

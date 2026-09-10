@@ -1386,7 +1386,7 @@ export interface TreeSectionProps<T> extends SectionProps<T>, DOMRenderProps<'di
  * A TreeSection represents a section within a Tree.
  */
 export const TreeSection: <T extends object = object>(
-	props: GridListHeaderProps & { ref?: any },
+	props: TreeSectionProps<T> & { ref?: any },
 ) => any = /*#__PURE__*/ createBranchComponent(SectionNode, function TreeSection<
 	T,
 >(props: TreeSectionProps<T>, forwardedRef: any, item?: Node<T>): any {
