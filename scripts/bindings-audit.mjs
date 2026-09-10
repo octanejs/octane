@@ -1,5 +1,15 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import {
+	closeSync,
+	fsyncSync,
+	mkdirSync,
+	openSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -80,6 +90,29 @@ function parseArgs(args) {
 	return parsed;
 }
 
+function writeReport(
+	output,
+	json,
+	{ writeFileSync: write = writeFileSync, renameSync: rename = renameSync } = {},
+) {
+	const destination = path.resolve(output);
+	const directory = path.dirname(destination);
+	mkdirSync(directory, { recursive: true });
+	const temporary = path.join(directory, `.bindings-audit-${randomUUID()}.tmp`);
+	const descriptor = openSync(temporary, 'wx');
+	try {
+		try {
+			write(descriptor, json);
+			fsyncSync(descriptor);
+		} finally {
+			closeSync(descriptor);
+		}
+		rename(temporary, destination);
+	} finally {
+		rmSync(temporary, { force: true });
+	}
+}
+
 export async function runCli(argv = process.argv.slice(2), options = {}) {
 	const stdout = options.stdout ?? process.stdout;
 	const stderr = options.stderr ?? process.stderr;
@@ -100,10 +133,7 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
 		}
 		const json = `${stableStringify(sanitizeForReport(report))}\n`;
 		const output = args.output ?? args.input;
-		if (output) {
-			mkdirSync(path.dirname(path.resolve(output)), { recursive: true });
-			writeFileSync(output, json);
-		}
+		if (output) writeReport(output, json, options);
 		stdout.write(args.operation === 'report' ? renderAuditReport(report, args.findingIds) : json);
 		const code = auditExitCode(report, args.findingIds);
 		if (code)

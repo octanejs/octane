@@ -14,7 +14,7 @@
   },
   "scripts": {
     "bindings:audit": "node scripts/bindings-audit.mjs",
-    "bindings:audit:test": "node --test scripts/bindings-audit.test.mjs",
+    "bindings:audit:test": "node --test scripts/bindings-audit.test.mjs scripts/bindings-audit-persistence.test.mjs",
     "test": "pnpm three:upstream:check && pnpm --dir packages/visx compile:check && pnpm --dir packages/visx types:check && vitest run",
     "pretypecheck": "pnpm typecheck:coverage && pnpm typecheck:audited-packages && pnpm --filter @octanejs/solana-kit typecheck",
     "three:test": "pnpm --filter @octanejs/three test",
