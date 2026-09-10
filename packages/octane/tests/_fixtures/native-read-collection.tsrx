@@ -1,5 +1,6 @@
 import { createElement, useLayoutEffect, useRef, useState } from 'octane';
 import type { Resource, SignalHandle } from 'octane/signals';
+import 'octane/signals';
 
 export interface CollectionProps {
 	count$: SignalHandle<number>;

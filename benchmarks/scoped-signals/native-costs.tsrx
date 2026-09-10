@@ -1,5 +1,6 @@
 import { use } from 'octane';
 import type { SignalHandle } from 'octane/signals';
+import 'octane/signals';
 import { make$ } from './native-cost-factory.mjs';
 
 interface ValueProps {

@@ -1,4 +1,4 @@
-import { createLexicalAnalysis, forEachRuntimeAstChild } from './compile-universal.js';
+import { createLexicalAnalysis } from './compile-universal.js';
 import { analyzeRendererBoundaries } from './renderer-boundaries.js';
 import { NATIVE_SIGNAL_NAME, NATIVE_MEMO_READ, nativeReadDiagnostic } from './native-read-facts.js';
 export { NATIVE_SIGNAL_NAME, NATIVE_MEMO_READ } from './native-read-facts.js';
@@ -65,40 +65,19 @@ function propertyName(node, computed = false) {
 }
 
 /**
- * Signal capabilities are part of authored source, not build configuration.
- * A `$` capability can arrive through props, a namespace, or an imported helper;
- * do not require a direct signals import or proof of the eventual read target.
- * Once selected, the entire module captures actual reads, including opaque calls.
- * Inspect runtime syntax rather than text so erased types, comments, and string
- * contents do not opt an ordinary module into native memoization and its adapter.
+ * Native reads are an explicit module capability. A runtime signals import,
+ * including a bare import for opaque readers, opts the entire module into
+ * capturing actual reads. Type-only imports and `$` names alone do not.
  */
 export function nativeReadOptions(ast, options) {
-	let nativeReads = false;
-	function visit(node) {
-		if (nativeReads || !node || typeof node !== 'object') return;
-		if (node.importKind === 'type' || node.exportKind === 'type') return;
-		if (
+	const nativeReads = ast.body.some(
+		(node) =>
 			node.type === 'ImportDeclaration' &&
-			node.specifiers.length > 0 &&
-			node.specifiers.every((specifier) => specifier.importKind === 'type')
-		) {
-			return;
-		}
-		if (
-			((node.type === 'Identifier' || node.type === 'JSXIdentifier') && node.name.endsWith('$')) ||
-			(node.type === 'ImportDeclaration' &&
-				(node.source?.value === SIGNALS_MODULE || LOCAL_MODULES.has(node.source?.value))) ||
-			((node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') &&
-				String(propertyName(node.property, node.computed) ?? '').endsWith('$')) ||
-			(node.type === 'Property' &&
-				String(propertyName(node.key, node.computed) ?? '').endsWith('$'))
-		) {
-			nativeReads = true;
-			return;
-		}
-		forEachRuntimeAstChild(node, visit);
-	}
-	visit(ast);
+			node.importKind !== 'type' &&
+			(node.source?.value === SIGNALS_MODULE || LOCAL_MODULES.has(node.source?.value)) &&
+			(node.specifiers.length === 0 ||
+				node.specifiers.some((specifier) => specifier.importKind !== 'type')),
+	);
 	return { ...options, nativeReads };
 }
 

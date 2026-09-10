@@ -7,6 +7,7 @@ import {
 	type OctaneNode,
 } from 'octane';
 import type { SignalHandle } from 'octane/signals';
+import 'octane/signals';
 
 export function FiveInputs(props: { a: string; b: string; c: string; d: string; e: string }) {
 	const values = [props.a, props.b, props.c, props.d, props.e];
