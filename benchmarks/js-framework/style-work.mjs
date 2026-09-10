@@ -11,6 +11,10 @@ if (process.env.WORK_MODE === 'unkeyed') {
 	await import('./unkeyed-work.mjs');
 	process.exit(process.exitCode ?? 0);
 }
+if (process.env.WORK_MODE === 'nested') {
+	await import('./nested-work.mjs');
+	process.exit(process.exitCode ?? 0);
+}
 
 const DIALECT = process.env.WORK_DIALECT || 'tsrx';
 if (DIALECT !== 'tsrx' && DIALECT !== 'jsx') {

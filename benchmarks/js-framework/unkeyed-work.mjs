@@ -1,6 +1,6 @@
 // Production browser work for top-level implicit de-opt list keys. Run through
 // style-work.mjs with WORK_MODE=unkeyed; no new benchmark suite is registered.
-// The fixture's pure-host descriptors reach scopedDeoptKey only because the
+// The fixture's pure-host descriptors reach the scoped key helper because the
 // list is handed through a compiled child hole.
 
 import fs from 'node:fs';
@@ -13,34 +13,44 @@ const ASSETS = path.join(HERE, 'octane-tsrx', 'dist', 'unkeyed-work', 'assets');
 const URL = process.env.TARGET_URL || 'http://localhost:5316/unkeyed-work.html';
 const ROWS = 1000;
 const ITEMS = ROWS + 1; // one explicit key="0" beside the 1,000 implicit indices
-const METRICS = ['scopedDeoptKey', 'deoptItemBody', 'reconcileKeyed'];
+const KEY_HELPERS = ['scopedDeoptKey', 'appendScopedDeoptKey'];
+const METRICS = [...KEY_HELPERS, 'deoptItemBody', 'reconcileKeyed'];
 
 function sourceWork() {
 	const sources = fs
 		.readdirSync(ASSETS)
 		.filter((name) => name.endsWith('.js'))
 		.map((name) => fs.readFileSync(path.join(ASSETS, name), 'utf8'));
-	const matches = sources.flatMap((source) => {
-		const start = source.indexOf('function scopedDeoptKey(');
-		if (start < 0) return [];
-		const end = source.indexOf('\n}', start);
-		if (end < 0) throw new Error('could not identify scopedDeoptKey in production output');
-		return [source.slice(start, end + 2)];
-	});
+	const matches = sources.flatMap((source) =>
+		KEY_HELPERS.flatMap((keyHelper) => {
+			const start = source.indexOf(`function ${keyHelper}(`);
+			if (start < 0) return [];
+			const end = source.indexOf('\n}', start);
+			if (end < 0) throw new Error(`could not identify ${keyHelper} in production output`);
+			return [{ keyHelper, body: source.slice(start, end + 2) }];
+		}),
+	);
 	if (matches.length !== 1) {
-		throw new Error(`expected one readable production scopedDeoptKey, found ${matches.length}`);
+		throw new Error(`expected one readable production scoped key helper, found ${matches.length}`);
 	}
-	const body = matches[0];
+	const { keyHelper, body } = matches[0];
 	const oldBranch =
+		keyHelper === 'scopedDeoptKey' &&
 		/if \(path\.length === 0\) return explicit \? ["']k["'] \+ String\(key\) : ["']i["'] \+ index;/.test(
 			body,
 		);
-	const numericBranch =
+	const numericReturn =
 		/if \(path\.length === 0\) return explicit \? ["']k["'] \+ String\(key\) : index;/.test(body);
+	const numericAppend =
+		/if \(path\.length === 0\) \{\s*outKeys\.push\(explicit \? ["']k["'] \+ String\(key\) : index\);\s*return implicitPrefix;\s*\}/.test(
+			body,
+		);
+	const numericBranch = keyHelper === 'scopedDeoptKey' ? numericReturn : numericAppend;
 	if (!oldBranch && !numericBranch) {
 		throw new Error('top-level implicit-key branch changed; review the source work gate');
 	}
 	return {
+		keyHelper,
 		implicitKeyStringConversionsPerRender: oldBranch ? ROWS : 0,
 		implicitKeyNumeric: numericBranch,
 	};
@@ -163,7 +173,9 @@ try {
 		const observed = await measure(browser, operation);
 		results[operation] = observed;
 		for (const [metric, expected] of Object.entries({
-			scopedDeoptKey: ITEMS,
+			...Object.fromEntries(
+				KEY_HELPERS.map((name) => [name, name === source.keyHelper ? ITEMS : 0]),
+			),
 			deoptItemBody: ITEMS,
 			reconcileKeyed: operation === 'update' ? 1 : 0,
 			rows: ITEMS,
