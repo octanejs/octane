@@ -4,6 +4,7 @@ import path from 'node:path';
 import ts from 'typescript';
 
 const OWNERSHIP = new Set(['imported', 'adapter', 'copied']);
+const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.tsrx', '.js', '.jsx', '.mjs', '.cjs'];
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const packageName = (specifier) =>
 	specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0];
@@ -29,7 +30,7 @@ function targets(value) {
 	return value && typeof value === 'object' ? Object.values(value).flatMap(targets) : [];
 }
 
-function sourceFacts(root, file, seen = new Set()) {
+function sourceFacts(root, file, manifest, seen = new Set()) {
 	if (seen.has(file)) throw new Error(`Cyclic export coverage requires review: ${file}`);
 	seen = new Set([...seen, file]);
 	const source = readFileSync(path.join(root, file), 'utf8');
@@ -66,17 +67,71 @@ function sourceFacts(root, file, seen = new Set()) {
 		visit(statement);
 		return found;
 	};
-	const resolveLocal = (specifier) => {
-		const base = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier));
+	const resolveLocal = (specifier, directory = path.posix.dirname(file)) => {
+		if (path.isAbsolute(specifier))
+			throw new Error(`Unresolved local module requires review: ${file}: ${specifier}`);
+		const base = path.posix.normalize(path.posix.join(directory, specifier));
 		const candidates = [
 			base,
-			...['.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.js'].map((suffix) => base + suffix),
+			...SOURCE_EXTENSIONS.map((extension) => base + extension),
+			...SOURCE_EXTENSIONS.map((extension) => `${base}/index${extension}`),
 		];
 		const resolved = candidates.find((candidate) => confinedFile(root, candidate));
 		if (!resolved)
 			throw new Error(`Unresolved local module requires review: ${file}: ${specifier}`);
 		return resolved;
 	};
+	const resolveModule = (specifier) => {
+		if (specifier.startsWith('#')) {
+			const mapped = targets(manifest.imports?.[specifier]);
+			if (mapped.length === 0)
+				throw new Error(`Unresolved package import requires review: ${file}: ${specifier}`);
+			// Every condition can ship; do not let a browser or server branch lose its owner.
+			return mapped.map((target) => {
+				if (target.startsWith('./')) return { file: resolveLocal(target, '') };
+				if (/^[#./]/.test(target))
+					throw new Error(`Unsupported package import requires review: ${file}: ${specifier}`);
+				return { specifier: target };
+			});
+		}
+		return specifier.startsWith('.') || path.isAbsolute(specifier)
+			? [{ file: resolveLocal(specifier) }]
+			: [{ specifier }];
+	};
+	const children = new Map();
+	const childFacts = (childFile) => {
+		if (!children.has(childFile)) {
+			const child = sourceFacts(root, childFile, manifest, seen);
+			child.files.forEach((item) => files.add(item));
+			child.forwarding.forEach((value, key) => forwarding.set(key, value));
+			children.set(childFile, child);
+		}
+		return children.get(childFile);
+	};
+	const visit = (node) => {
+		let reference;
+		if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+			reference = node.moduleSpecifier;
+		else if (
+			ts.isImportEqualsDeclaration(node) &&
+			ts.isExternalModuleReference(node.moduleReference)
+		)
+			reference = node.moduleReference.expression;
+		else if (
+			ts.isCallExpression(node) &&
+			(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+				(ts.isIdentifier(node.expression) && node.expression.text === 'require'))
+		) {
+			reference = node.arguments[0];
+			if (!reference || !ts.isStringLiteralLike(reference))
+				throw new Error(`Nonliteral module load requires review: ${file}`);
+		}
+		if (reference && ts.isStringLiteralLike(reference))
+			for (const resolved of resolveModule(reference.text))
+				if (resolved.file) childFacts(resolved.file);
+		ts.forEachChild(node, visit);
+	};
+	visit(ast);
 	for (const statement of ast.statements) {
 		if (
 			!ts.isExportDeclaration(statement) &&
@@ -84,46 +139,40 @@ function sourceFacts(root, file, seen = new Set()) {
 			!(ts.isImportDeclaration(statement) && statement.importClause?.isTypeOnly)
 		)
 			forwarding.set(file, false);
-		if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
-			if (statement.moduleSpecifier.text.startsWith('.')) {
-				const child = sourceFacts(root, resolveLocal(statement.moduleSpecifier.text), seen);
-				child.files.forEach((item) => files.add(item));
-				child.forwarding.forEach((value, key) => forwarding.set(key, value));
-			}
-		}
 		if (ts.isExportDeclaration(statement)) {
 			const specifier = statement.moduleSpecifier?.text;
 			if (!specifier) throw new Error(`Indirect local export requires review: ${file}`);
-			if (specifier.startsWith('.')) {
-				const child = sourceFacts(root, resolveLocal(specifier), seen);
-				child.files.forEach((item) => files.add(item));
-				child.forwarding.forEach((value, key) => forwarding.set(key, value));
-				if (!statement.exportClause)
-					exports.push(
-						...child.exports.map((item) => ({
-							...item,
-							erased: statement.isTypeOnly || item.erased,
-						})),
-					);
-				else if (ts.isNamedExports(statement.exportClause)) {
-					for (const element of statement.exportClause.elements) {
-						const original = (element.propertyName ?? element.name).text;
-						const found = child.exports.find((item) => item.name === original);
-						if (!found)
-							throw new Error(`Unresolved exported symbol requires review: ${file}: ${original}`);
-						exports.push({
-							...found,
-							name: element.name.text,
-							erased: statement.isTypeOnly || element.isTypeOnly || found.erased,
-						});
-					}
-				} else throw new Error(`Namespace export requires review: ${file}`);
-			} else {
-				if (!statement.exportClause) exports.push({ name: '*', file, specifier });
-				else if (ts.isNamedExports(statement.exportClause)) {
-					for (const element of statement.exportClause.elements)
-						exports.push({ name: element.name.text, file, specifier });
-				} else exports.push({ name: statement.exportClause.name.text, file, specifier });
+			for (const resolved of resolveModule(specifier)) {
+				if (resolved.file) {
+					const child = childFacts(resolved.file);
+					if (!statement.exportClause)
+						exports.push(
+							...child.exports.map((item) => ({
+								...item,
+								erased: statement.isTypeOnly || item.erased,
+							})),
+						);
+					else if (ts.isNamedExports(statement.exportClause)) {
+						for (const element of statement.exportClause.elements) {
+							const original = (element.propertyName ?? element.name).text;
+							const found = child.exports.find((item) => item.name === original);
+							if (!found)
+								throw new Error(`Unresolved exported symbol requires review: ${file}: ${original}`);
+							exports.push({
+								...found,
+								name: element.name.text,
+								erased: statement.isTypeOnly || element.isTypeOnly || found.erased,
+							});
+						}
+					} else throw new Error(`Namespace export requires review: ${file}`);
+				} else {
+					const specifier = resolved.specifier;
+					if (!statement.exportClause) exports.push({ name: '*', file, specifier });
+					else if (ts.isNamedExports(statement.exportClause)) {
+						for (const element of statement.exportClause.elements)
+							exports.push({ name: element.name.text, file, specifier });
+					} else exports.push({ name: statement.exportClause.name.text, file, specifier });
+				}
 			}
 		} else if (
 			statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
@@ -273,7 +322,7 @@ export function readBindingSurfacePolicy(packageDirectory, { sourceLedger } = {}
 				continue;
 			}
 			try {
-				const observed = sourceFacts(packageDirectory, file);
+				const observed = sourceFacts(packageDirectory, file, manifest);
 				for (const sourceFile of observed.files)
 					fingerprints[sourceFile] = digest(readFileSync(path.join(packageDirectory, sourceFile)));
 				for (const sourceFile of observed.files)
