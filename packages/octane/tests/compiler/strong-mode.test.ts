@@ -6,6 +6,7 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 const RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 const RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
+const RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
 const RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
 const RETAINED_ROW_MUTATION = 'OCTANE_STRONG_RETAINED_ROW_MUTATION';
 const RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
@@ -2210,7 +2211,7 @@ export function App(props) @{
 		],
 		[
 			'conditional reconcilers',
-			'useLinkedState(0, ref.current ? (value) => value : (value) => { ref.current = value; return value; });',
+			'useLinkedState(0, props.enabled ? (value) => value : (value) => { ref.current = value; return value; });',
 		],
 		[
 			'named computed comparators',
@@ -2223,7 +2224,7 @@ export function App(props) @{
 	])('rejects render-time ref writes from %s', (_label, setup) => {
 		const source = `"use strong";
 import { useLinkedState, useReducer, useRef, useState } from 'octane';
-export function App() @{
+export function App(props) @{
   const ref = useRef(0);
   ${setup}
   <div />
@@ -4051,7 +4052,6 @@ export function useCounter() {
 
 	it.each([
 		['assignments', 'ref.current = await Promise.resolve(1);'],
-		['compound assignments', 'ref.current += await Promise.resolve(1);'],
 		[
 			'awaited conditional tests',
 			'(await Promise.resolve(true)) ? (ref.current = 1) : (ref.current = 2);',
@@ -4067,6 +4067,18 @@ export function App() @{
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('rejects the ref read that precedes an awaited compound-assignment operand', () => {
+		const source = `"use strong";
+import { useRef } from 'octane';
+export function App() @{
+  const ref = useRef(0);
+  (async () => { ref.current += await Promise.resolve(1); })();
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_READ);
 	});
 
 	it('still rejects ref writes evaluated before a later yield', () => {
@@ -4194,6 +4206,209 @@ export function useCounter() {
 		expect(
 			compileToVolarMappings(source, '/src/Counter.tsrx', { strong: true } as any).diagnostics,
 		).toContainEqual(expect.objectContaining({ code: RENDER_STATE_UPDATE, severity: 'error' }));
+	});
+});
+
+describe('Strong mode render-time ref reads', () => {
+	function component(setup: string): string {
+		return `import { useRef, useEffect, useCallback, useMemo, useState } from 'octane';
+export function App(props) @{
+  const ref = useRef({ foo: 0 });
+  ${setup}
+  <div />
+}`;
+	}
+
+	it.each([
+		['direct property access', 'const value = ref.current;'],
+		['an immediate hook result', 'const value = useRef(0).current;'],
+		['an immutable ref alias', 'const alias = ref; const value = alias.current;'],
+		['a computed literal key', "const value = ref['current' as const];"],
+		['a computed constant key', "const key = 'current' as const; const value = ref[key];"],
+		['optional property access', 'const value = ref?.current;'],
+		['nested property mutation', 'ref.current.foo = 1;'],
+		['object destructuring', 'const { current: value } = ref;'],
+		['computed object destructuring', "const { ['current']: value } = ref;"],
+		['object spread', 'const copy = { ...ref };'],
+		['object rest', 'const { ...copy } = ref;'],
+		['sequence-tail members', 'const value = (0, ref).current;'],
+		['sequence-tail spreads', 'const copy = { ...(0, ref) };'],
+		['lazy state initializers', 'useState(() => ref.current);'],
+	])('rejects %s during render', (_label, setup) => {
+		const source = component(setup);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_REF_READ);
+	});
+
+	it('rejects a ref read used directly by rendered JSX', () => {
+		const source = `"use strong";
+import { useRef } from 'octane';
+export function App() @{
+  const ref = useRef(0);
+  <p>{ref.current as string}</p>
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_READ);
+	});
+
+	it.each([
+		['named helpers', 'function read() { return ref.current; } const value = read();'],
+		['argument aliases', 'function read(value) { return value.current; } const value = read(ref);'],
+		['immediately invoked callbacks', 'const value = (() => ref.current)();'],
+		['memo factories', 'const value = useMemo(() => ref.current, []);'],
+		['invoked useCallback results', 'const read = useCallback(() => ref.current, []); read();'],
+		[
+			'destructured helper parameters',
+			'function read({ current }) { return current; } const value = read(ref);',
+		],
+		[
+			'default destructured helper parameters',
+			'function read({ current } = ref) { return current; } const value = read();',
+		],
+	])('follows render-time ref reads through %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_REF_READ,
+		);
+	});
+
+	it('allows ref identities and reads in event, effect, cleanup, and deferred callbacks', () => {
+		const source = `"use strong";
+import { useRef, useEffect, useCallback } from 'octane';
+export function App(props) @{
+  const ref = useRef(null);
+  const readLater = useCallback(() => ref.current, []);
+  const identity = { ref };
+  useEffect(() => {
+    const mounted = ref.current;
+    setTimeout(() => ref.current, 0);
+    return () => { const cleaned = ref.current; };
+  }, []);
+  (async () => { await Promise.resolve(); const afterYield = ref.current; })();
+  <button ref={ref} onClick={() => { const clicked = readLater(); }} />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['unrelated objects', 'const other = { current: 1 }; const value = other.current;'],
+		['lexically shadowed refs', '{ const ref = { current: 1 }; const value = ref.current; }'],
+		[
+			'helper parameters with unrelated arguments',
+			'function read(value) { return value.current; } const value = read({ current: 1 });',
+		],
+		[
+			'destructured parameters with unrelated arguments',
+			'function read({ current }) { return current; } const value = read({ current: 1 });',
+		],
+		['unknown computed keys', 'const key = props.field; const value = ref[key];'],
+	])('preserves %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['aliased imports', "import { useRef as createRef } from 'octane';", 'createRef(0)'],
+		['namespace imports', "import * as Octane from 'octane';", "Octane['useRef' as const](0)"],
+	])('recognizes useRef through %s', (_label, imported, hook) => {
+		const source = `"use strong";
+${imported}
+export function App() @{
+  const ref = ${hook};
+  <p>{ref.current as string}</p>
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_REF_READ);
+	});
+
+	it.each(['client', 'server'] as const)('preserves valid ref code in %s output', (mode) => {
+		const source = component('const readLater = () => ref.current;');
+		const standard = compile(source, '/src/App.tsrx', { mode });
+		const strong = compile(source, '/src/App.tsrx', { mode, strong: true } as any);
+
+		expect(strong.code).toBe(standard.code);
+	});
+
+	it.each(['ref.current = 1;', 'ref.current += 1;', 'ref.current++;'])(
+		'keeps %s under the ref-write diagnostic',
+		(write) => {
+			const result = compileToVolarMappings(`"use strong";\n${component(write)}`, '/src/App.tsrx');
+			expect(result.diagnostics.map(({ code }) => code)).toEqual([RENDER_REF_WRITE]);
+		},
+	);
+
+	it('does not classify a deleted ref property as a read', () => {
+		const result = compileToVolarMappings(
+			`"use strong";\n${component('delete ref.current;')}`,
+			'/src/App.tsrx',
+		);
+		expect(result.diagnostics.map(({ code }) => code)).not.toContain(RENDER_REF_READ);
+	});
+
+	it.each([
+		{ mode: 'client', dev: true },
+		{ mode: 'server', dev: false },
+	])('enforces the same read diagnostic during $mode compilation', (options) => {
+		expect(() =>
+			compile(
+				`"use strong";\n${component('const value = ref.current;')}`,
+				'/src/App.tsrx',
+				options,
+			),
+		).toThrow(RENDER_REF_READ);
+	});
+
+	it('reports the ref expression location to the compiler and Volar', () => {
+		const source = `"use strong";\n${component('const value = ref.current;')}`;
+		const position = source.indexOf('ref.current');
+
+		try {
+			compile(source, '/src/App.tsrx');
+			throw new Error('expected a Strong render-time ref-read diagnostic');
+		} catch (error: any) {
+			expect(error).toMatchObject({
+				code: RENDER_REF_READ,
+				filename: '/src/App.tsrx',
+				loc: { line: 5 },
+			});
+		}
+
+		const result = compileToVolarMappings(source, '/src/App.tsrx');
+		expect(result.diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: RENDER_REF_READ,
+				severity: 'error',
+				filename: '/src/App.tsrx',
+				start: expect.objectContaining({ line: 5 }),
+			}),
+		);
+		expect(result.errors).toContainEqual(
+			expect.objectContaining({
+				code: RENDER_REF_READ,
+				type: 'usage',
+				fileName: '/src/App.tsrx',
+				pos: position,
+				loc: expect.objectContaining({ start: expect.objectContaining({ line: 5 }) }),
+			}),
+		);
+	});
+
+	it('enforces reads in plain hook modules and Octane TSX components', () => {
+		const hook = `"use strong";
+import { useRef } from 'octane';
+export function useValue() {
+  const ref = useRef(0);
+  return ref.current;
+}`;
+		const component = `/** @jsxImportSource octane */
+"use strong";
+import { useRef } from 'octane';
+export function App() {
+  const ref = useRef(0);
+  return <p>{ref.current}</p>;
+}`;
+
+		expect(() => slotHooks(hook, '/src/useValue.ts')).toThrow(RENDER_REF_READ);
+		expect(() => compile(component, '/src/App.tsx')).toThrow(RENDER_REF_READ);
 	});
 });
 

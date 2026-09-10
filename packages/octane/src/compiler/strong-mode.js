@@ -74,6 +74,7 @@ const SKIP_KEYS = new Set([
 export const STRONG_RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 export const STRONG_EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 export const STRONG_RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
+export const STRONG_RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
 export const STRONG_RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
 export const STRONG_RETAINED_ROW_MUTATION = 'OCTANE_STRONG_RETAINED_ROW_MUTATION';
 export const STRONG_RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
@@ -1266,6 +1267,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	let returnCycles = 0;
 	let currentFunctionIsAsync = false;
 	let currentFunctionChecksImpureCalls = false;
+	let currentFunctionChecksRefReads = false;
 	let currentRetainedRowScope = null;
 
 	function predeclareHoistedVars(node, scope) {
@@ -1334,6 +1336,32 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			node,
 			'Strong mode does not allow writing to useRef.current during render. Move the write to an event or effect, or express the value as state.',
 		);
+	}
+
+	function reportRefRead(node) {
+		report(
+			STRONG_RENDER_REF_READ,
+			node,
+			'Strong mode does not allow reading useRef.current during render. Read the ref in an event or effect, or use state or useLinkedState for values that drive render output.',
+		);
+	}
+
+	function isRefObject(value, scope) {
+		const object = unwrap(value);
+		if (object?.type === 'Identifier') return resolve(scope, object.name)?.kind === 'ref';
+		if (object?.type === 'SequenceExpression') {
+			return isRefObject(object.expressions?.[object.expressions.length - 1], scope);
+		}
+		return object?.type === 'CallExpression' && importedHook(object.callee, scope) === 'useRef';
+	}
+
+	function readCurrentRef(member, scope) {
+		const value = unwrap(member);
+		if (value?.type !== 'MemberExpression') return false;
+		const isCurrent = value.computed
+			? staticPrimitiveValue(value.property, scope) === 'current'
+			: value.property?.type === 'Identifier' && value.property.name === 'current';
+		return isCurrent && isRefObject(value.object, scope);
 	}
 
 	function reportSnapshotMutation(node) {
@@ -1796,17 +1824,25 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			if (parameter.type === 'TSParameterProperty') parameter = parameter.parameter;
 			let value = args === null ? OTHER_BINDING : (args[index] ?? UNDEFINED_BINDING);
 			if (parameter.type === 'AssignmentPattern') {
-				visitPatternExpressions(parameter.left, parameterScope, phase);
-				if (!definitelyDefined(value)) visit(parameter.right, parameterScope, phase);
+				const usesDefault = !definitelyDefined(value);
+				if (usesDefault) visit(parameter.right, parameterScope, phase);
 				value =
 					value.kind === 'constant' && value.primitive === undefined
 						? expressionBinding(parameter.right, parameterScope)
 						: definitelyDefined(value)
 							? value
 							: OTHER_BINDING;
+				visitPatternExpressions(
+					parameter.left,
+					parameterScope,
+					usesDefault ? phaseAfter(parameter.right, phase) : phase,
+					parameter.left.type === 'ObjectPattern' &&
+						(value?.kind === 'ref' ||
+							(usesDefault && isRefObject(parameter.right, parameterScope))),
+				);
 				parameter = parameter.left;
 			} else {
-				visitPatternExpressions(parameter, parameterScope, phase);
+				visitPatternExpressions(parameter, parameterScope, phase, value?.kind === 'ref');
 			}
 			if (parameter.type === 'Identifier' && !isReassigned(parameter)) {
 				parameterScope.bindings.set(parameter.name, value);
@@ -1818,11 +1854,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	function visitFunction(node, parentScope, phase, args = null) {
 		const enclosingFunctionIsAsync = currentFunctionIsAsync;
 		const enclosingFunctionChecksImpureCalls = currentFunctionChecksImpureCalls;
+		const enclosingFunctionChecksRefReads = currentFunctionChecksRefReads;
 		currentFunctionIsAsync = node.async === true;
 		if (phase === 'render' && !activeCallbacks.has(node)) {
 			// Ordinary module helpers may be used only by events. Check their
 			// standard calls when a known render root invokes them synchronously.
-			currentFunctionChecksImpureCalls =
+			currentFunctionChecksImpureCalls = currentFunctionChecksRefReads =
 				renderRoots.has(node) || node.body?.type === 'JSXCodeBlock';
 		}
 		try {
@@ -1854,10 +1891,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		} finally {
 			currentFunctionIsAsync = enclosingFunctionIsAsync;
 			currentFunctionChecksImpureCalls = enclosingFunctionChecksImpureCalls;
+			currentFunctionChecksRefReads = enclosingFunctionChecksRefReads;
 		}
 	}
 
-	function visitPatternExpressions(pattern, scope, phase) {
+	function visitPatternExpressions(pattern, scope, phase, refSource = false) {
 		let executionPhase = phase;
 		if (pattern?.type === 'TSParameterProperty') {
 			return visitPatternExpressions(pattern.parameter, scope, phase);
@@ -1871,11 +1909,27 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				executionPhase = visitPatternExpressions(element, scope, executionPhase);
 			}
 		} else if (pattern?.type === 'ObjectPattern') {
+			let currentExcluded = false;
 			for (const property of pattern.properties ?? []) {
 				if (property.computed) {
 					visit(property.key, scope, executionPhase);
 					executionPhase = phaseAfter(property.key, executionPhase);
 				}
+				const currentProperty =
+					refSource &&
+					property.type === 'Property' &&
+					(property.computed
+						? staticPrimitiveValue(property.key, scope)
+						: (property.key?.name ?? property.key?.value)) === 'current';
+				if (
+					refSource &&
+					executionPhase === 'render' &&
+					currentFunctionChecksRefReads &&
+					(currentProperty || (property.type === 'RestElement' && !currentExcluded))
+				) {
+					reportRefRead(currentProperty ? property.key : property);
+				}
+				if (currentProperty) currentExcluded = true;
 				executionPhase = visitPatternExpressions(
 					property.argument ?? property.value,
 					scope,
@@ -1885,7 +1939,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		} else if (pattern?.type === 'RestElement') {
 			executionPhase = visitPatternExpressions(pattern.argument, scope, executionPhase);
 		} else if (pattern?.type === 'MemberExpression') {
-			visit(pattern, scope, executionPhase);
+			visit(pattern, scope, executionPhase, false);
 			executionPhase = phaseAfter(pattern, executionPhase, true);
 			if (executionPhase === 'render') {
 				reportSnapshotWrite(pattern, scope);
@@ -2038,7 +2092,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	function bindDeclaration(declaration, declarationKind, scope, phase) {
 		bindDeclarationValue(declaration, declarationKind, scope);
 		visit(declaration.init, scope, phase);
-		return visitPatternExpressions(declaration.id, scope, phaseAfter(declaration.init, phase));
+		return visitPatternExpressions(
+			declaration.id,
+			scope,
+			phaseAfter(declaration.init, phase),
+			declaration.id?.type === 'ObjectPattern' && isRefObject(declaration.init, scope),
+		);
 	}
 
 	function visitCallback(node, parentScope, phase, args = null) {
@@ -2853,14 +2912,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function visit(node, scope, phase) {
+	function visit(node, scope, phase, readAccess = true) {
 		if (node == null || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
 			for (const child of node) visit(child, scope, phase);
 			return;
 		}
 		if (TRANSPARENT_EXPRESSIONS.has(node.type)) {
-			visit(node.expression, scope, phase);
+			visit(node.expression, scope, phase, readAccess);
 			return;
 		}
 		if (node.type?.startsWith('TS')) return;
@@ -2930,7 +2989,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				for (const property of node.properties ?? []) {
 					if (property.type === 'SpreadElement') {
 						visit(property.argument, scope, executionPhase);
-						executionPhase = phaseAfter(property.argument, executionPhase);
+						const spreadPhase = phaseAfter(property.argument, executionPhase);
+						if (
+							spreadPhase === 'render' &&
+							currentFunctionChecksRefReads &&
+							isRefObject(property.argument, scope)
+						) {
+							reportRefRead(property);
+						}
+						executionPhase = spreadPhase;
 						continue;
 					}
 					if (property.computed === true) {
@@ -2947,7 +3014,25 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'MemberExpression': {
 				visit(node.object, scope, phase);
 				if (node.computed === true) {
-					visit(node.property, scope, phaseAfter(node.object, phase, true, node.optional === true));
+					const propertyPhase = phaseAfter(node.object, phase, true, node.optional === true);
+					visit(node.property, scope, propertyPhase);
+					if (
+						readAccess &&
+						propertyPhase === 'render' &&
+						currentFunctionChecksRefReads &&
+						readCurrentRef(node, scope) &&
+						phaseAfter(node.property, propertyPhase) === 'render'
+					) {
+						reportRefRead(node);
+					}
+				} else if (
+					readAccess &&
+					phase === 'render' &&
+					currentFunctionChecksRefReads &&
+					readCurrentRef(node, scope) &&
+					phaseAfter(node.object, phase, true, node.optional === true) === 'render'
+				) {
+					reportRefRead(node);
 				}
 				return;
 			}
@@ -3075,11 +3160,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					// memo owns a component callback. lazy also accepts a module
 					// loader, so require JSX evidence before treating it as a render.
 					const checkImpureCalls = currentFunctionChecksImpureCalls;
+					const checkRefReads = currentFunctionChecksRefReads;
 					currentFunctionChecksImpureCalls = true;
+					currentFunctionChecksRefReads = true;
 					try {
 						visitCallback(component.node, component.scope, 'render');
 					} finally {
 						currentFunctionChecksImpureCalls = checkImpureCalls;
+						currentFunctionChecksRefReads = checkRefReads;
 					}
 					return;
 				}
@@ -3185,10 +3273,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'AssignmentExpression': {
 				if (node.left?.type === 'ArrayPattern' || node.left?.type === 'ObjectPattern') {
 					visit(node.right, scope, phase);
-					visitPatternExpressions(node.left, scope, phaseAfter(node.right, phase));
+					visitPatternExpressions(
+						node.left,
+						scope,
+						phaseAfter(node.right, phase),
+						node.left.type === 'ObjectPattern' && isRefObject(node.right, scope),
+					);
 					return;
 				}
-				visit(node.left, scope, phase);
+				visit(node.left, scope, phase, false);
 				const rightPhase = phaseAfter(node.left, phase, true);
 				visit(node.right, scope, rightPhase);
 				const executionPhase = phaseAfter(node.right, rightPhase);
@@ -3197,18 +3290,29 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					reportSnapshotWrite(node.left, scope);
 					reportRetainedRowMutation(node.left, scope);
 				}
+				// Compound and logical assignments read the old value before the
+				// right side, even when an await defers the eventual write.
+				if (
+					node.operator !== '=' &&
+					rightPhase === 'render' &&
+					currentFunctionChecksRefReads &&
+					(executionPhase !== 'render' || !currentRef(node.left, scope)) &&
+					readCurrentRef(node.left, scope)
+				) {
+					reportRefRead(node.left);
+				}
 				return;
 			}
 			case 'UpdateExpression':
 				if (phase === 'render' && currentRef(node.argument, scope)) reportRef(node.argument);
-				visit(node.argument, scope, phase);
+				visit(node.argument, scope, phase, false);
 				if (phaseAfter(node.argument, phase, true) === 'render') {
 					reportSnapshotWrite(node.argument, scope);
 					reportRetainedRowMutation(node.argument, scope);
 				}
 				return;
 			case 'UnaryExpression':
-				visit(node.argument, scope, phase);
+				visit(node.argument, scope, phase, node.operator !== 'delete');
 				if (node.operator === 'delete' && phaseAfter(node.argument, phase, true) === 'render') {
 					reportSnapshotWrite(node.argument, scope);
 					reportRetainedRowMutation(node.argument, scope);
@@ -3291,7 +3395,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					(alwaysAwaits(node.right) || (node.type === 'ForOfStatement' && node.await === true))
 						? 'deferred'
 						: phase;
-				visit(node.left, loop, executionPhase);
+				if (node.left?.type === 'ArrayPattern' || node.left?.type === 'ObjectPattern') {
+					visitPatternExpressions(node.left, loop, executionPhase);
+				} else {
+					visit(node.left, loop, executionPhase, false);
+				}
 				visit(node.body, loop, executionPhase);
 				return;
 			}
