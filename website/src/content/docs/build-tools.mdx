@@ -226,6 +226,9 @@ A Strong module cannot:
 
 - Call a state setter or reducer dispatcher while rendering.
 - Call one synchronously while an effect is being set up.
+- Call a known third-tuple state getter while rendering
+  (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`). Render from the state snapshot;
+  use the getter in events, effects, or deferred work.
 - Assign to a ref's `current` value while rendering.
 - Read a `useRef` object's `current` while rendering
   (`OCTANE_STRONG_RENDER_REF_READ`). Keep refs as `ref` props and read them in

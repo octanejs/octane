@@ -36,10 +36,12 @@ Ordinary two-item destructures keep the allocation-free React shape.
 
 In a module with `"use strong"` or application-wide Strong enabled, reading a
 `useRef` object's `current` while rendering is a compiler error
-(`OCTANE_STRONG_RENDER_REF_READ`). Its value can change without a witnessed
-render input changing. Pass the ref directly to a `ref` prop, read it in an event
-or effect, or use state when its value must appear in render output. Compatibility
-modules keep their existing behavior.
+(`OCTANE_STRONG_RENDER_REF_READ`). Calling a known third-tuple state getter
+while rendering is also an error (`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`): it
+can read scheduled state that differs from the render snapshot. Pass the ref
+directly to a `ref` prop and render from the state tuple's first member. Read
+the ref or call the getter in an event, effect, or deferred callback.
+Compatibility modules keep their existing behavior.
 
 ## Controlled inputs match React — on native events
 
