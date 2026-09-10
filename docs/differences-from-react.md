@@ -495,8 +495,12 @@ in compatibility mode unless their own source opts in.
 
 A Strong module cannot call a state updater during render or synchronously while
 setting up an effect, and it cannot read or assign to a `useRef` object's
-`current` during render (`OCTANE_STRONG_RENDER_REF_READ` for reads). The
-checks follow provable synchronous calls through `useCallback`, `useEffectEvent`,
+`current` during render (`OCTANE_STRONG_RENDER_REF_READ` for reads). It also
+rejects calling a known third-tuple state getter during render
+(`OCTANE_STRONG_RENDER_STATE_GETTER_CALL`): the getter can observe scheduled
+state that differs from the render snapshot. Read the state tuple's first member
+when rendering; call the getter in events, effects, or deferred work. The checks
+follow provable synchronous calls through `useCallback`, `useEffectEvent`,
 and functions returned by analyzable `useMemo` factories. Calling a statically
 known Effect Event during render or including it in an explicit hook dependency
 list is also a compile error. The hooks themselves remain supported, and other

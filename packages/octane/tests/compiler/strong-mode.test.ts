@@ -4,6 +4,7 @@ import { slotHooks } from '../../src/compiler/slot-hooks.js';
 import { compileToVolarMappings } from '../../src/compiler/volar.js';
 
 const RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
+const RENDER_STATE_GETTER_CALL = 'OCTANE_STRONG_RENDER_STATE_GETTER_CALL';
 const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 const RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 const RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
@@ -4409,6 +4410,209 @@ export function App() {
 
 		expect(() => slotHooks(hook, '/src/useValue.ts')).toThrow(RENDER_REF_READ);
 		expect(() => compile(component, '/src/App.tsx')).toThrow(RENDER_REF_READ);
+	});
+});
+
+describe('Strong mode render-time state getters', () => {
+	function component(setup: string): string {
+		return `import { useState, useReducer, useLinkedState, useEffect, useCallback, useMemo } from 'octane';
+export function App(props) @{
+  ${setup}
+  <div />
+}`;
+	}
+
+	it('rejects a live state getter during render while compatibility remains live', () => {
+		const source = `import { useState } from 'octane';
+export function App() @{
+  const [count, setCount, getCount] = useState(0);
+  const latest = getCount();
+  <button onClick={() => setCount(count + 1)}>{latest as string}</button>
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_GETTER_CALL,
+		);
+	});
+
+	it.each([
+		['useState', 'const [, , get] = useState(0); get();'],
+		['useReducer', 'const [, , get] = useReducer((value) => value, 0); get();'],
+		['useLinkedState', 'const [, , get] = useLinkedState(props.value, (value) => value); get();'],
+	])('diagnoses the latest-value getter from %s', (_hook, setup) => {
+		const source = component(setup);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_GETTER_CALL,
+		);
+	});
+
+	it.each([
+		['direct tuple indexing', 'const tuple = useState(0); tuple[2]();'],
+		['a tuple alias', 'const tuple = useState(0); const pair = tuple; pair[2]();'],
+		[
+			'a constant computed index',
+			'const tuple = useState(0); const index = 2 as const; tuple[index]?.();',
+		],
+		['a string index', "const tuple = useState(0); tuple['2']();"],
+		['direct hook indexing', 'useState(0)[2]();'],
+		['object destructuring', 'const { 2: get } = useState(0); get();'],
+		['a computed object key', 'const { [2]: get } = useState(0); get();'],
+		[
+			'array destructuring of an alias',
+			'const tuple = useState(0); const [, , get] = tuple; get();',
+		],
+		[
+			'getter aliases',
+			'const tuple = useState(0); const [, , get] = tuple; const latest = get; latest();',
+		],
+		['optional calls', 'const [, , get] = useState(0); get?.();'],
+	])('follows state getter calls through %s', (_shape, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_GETTER_CALL,
+		);
+	});
+
+	it.each([
+		['getter arguments', 'function read(getter) { return getter(); } read(getCount);'],
+		['tuple arguments', 'function read(pair) { return pair[2](); } read(tuple);'],
+		[
+			'destructured tuple parameters',
+			'function read([, , getter]) { return getter(); } read(tuple);',
+		],
+		['immediate callbacks', '((getter) => getter())(getCount);'],
+		['memo calculations', 'useMemo(() => getCount(), []);'],
+	])('follows render-time calls through %s', (_shape, expression) => {
+		const setup = `const tuple = useState(0); const [, , getCount] = tuple; ${expression}`;
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_GETTER_CALL,
+		);
+	});
+
+	it.each([
+		[
+			'getter parameter',
+			'const [, , get] = useState(0); function read(value = get) { return value(); } read(props.maybe);',
+		],
+		[
+			'destructured tuple parameter',
+			'const tuple = useState(0); function read([, , value] = tuple) { return value(); } read(props.maybe);',
+		],
+	])('checks a possible %s default when an argument can be undefined', (_shape, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_GETTER_CALL,
+		);
+	});
+
+	it.each([
+		[
+			'getter parameter',
+			'const [, , get] = useState(0); function read(value = get) { return value(); } read(() => 1);',
+		],
+		[
+			'destructured tuple parameter',
+			'const tuple = useState(0); function read([, , value] = tuple) { return value(); } read([0, () => {}, () => 1]);',
+		],
+	])('allows a definitely provided safe %s argument', (_shape, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['aliased hook imports', "import { useState as createState } from 'octane';", 'createState(0)'],
+		['namespace hook imports', "import * as Octane from 'octane';", 'Octane.useState(0)'],
+	])('recognizes %s', (_shape, imported, hook) => {
+		const source = `"use strong";
+${imported}
+export function App() @{
+  const [, , get] = ${hook};
+  <p>{get() as string}</p>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_GETTER_CALL);
+	});
+
+	it('keeps getters live in events, effects, cleanup, and deferred callbacks', () => {
+		const source = `"use strong";
+import { useState, useEffect, useCallback } from 'octane';
+export function App(props) @{
+  const [count, setCount, getCount] = useState(0);
+  const readLater = useCallback(() => getCount(), []);
+  useEffect(() => {
+    props.record(getCount());
+    return () => { props.record(getCount()); };
+  }, []);
+  setTimeout(() => props.record(getCount()), 0);
+  Promise.resolve().then(() => props.record(getCount()));
+  (async () => { await Promise.resolve(); props.record(getCount()); })();
+  <button onClick={() => { setCount(count + 1); props.record(readLater()); }}>
+    {count as string}
+  </button>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['unrelated tuple indexing', 'const tuple = [0, () => {}, () => 1]; tuple[2]();'],
+		[
+			'unrelated tuple arguments',
+			'function read([, , getter]) { return getter(); } read([0, () => {}, () => 1]);',
+		],
+		[
+			'shadowed getters',
+			'const [, , getCount] = useState(0); { const getCount = () => 1; getCount(); }',
+		],
+		['unknown tuple keys', 'const tuple = useState(0); const key = props.index; tuple[key]();'],
+	])('preserves %s', (_shape, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each(['client', 'server'] as const)('preserves valid getter code in %s output', (mode) => {
+		const source = component('const [, , get] = useState(0); const readLater = () => get();');
+		const standard = compile(source, '/src/App.tsrx', { mode });
+		const strong = compile(source, '/src/App.tsrx', { mode, strong: true } as any);
+		expect(strong.code).toBe(standard.code);
+		expect(strong.diagnostics).toEqual(standard.diagnostics);
+	});
+
+	it('locates the getter call in compiler and Volar diagnostics', () => {
+		const source = `"use strong";\n${component('const [, , getCount] = useState(0); getCount();')}`;
+		const position = source.indexOf('getCount();');
+		const result = compileToVolarMappings(source, '/src/App.tsrx');
+		expect(result.diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: RENDER_STATE_GETTER_CALL,
+				severity: 'error',
+				filename: '/src/App.tsrx',
+				start: expect.objectContaining({ offset: position }),
+				end: expect.objectContaining({ offset: position + 'getCount'.length }),
+			}),
+		);
+		expect(result.errors).toContainEqual(
+			expect.objectContaining({
+				code: RENDER_STATE_GETTER_CALL,
+				type: 'usage',
+				fileName: '/src/App.tsrx',
+				pos: position,
+			}),
+		);
+	});
+
+	it('enforces getters in plain custom hooks and Octane TSX components', () => {
+		const plain = `"use strong";
+import { useState } from 'octane';
+export function useCurrent() {
+  const [, , get] = useState(0);
+  return get();
+}`;
+		const tsx = `/** @jsxImportSource octane */
+"use strong";
+import { useReducer } from 'octane';
+export function App() {
+  const [, , get] = useReducer((value) => value, 0);
+  return <p>{get()}</p>;
+}`;
+		expect(() => slotHooks(plain, '/src/useCurrent.ts')).toThrow(RENDER_STATE_GETTER_CALL);
+		expect(() => compile(tsx, '/src/App.tsx')).toThrow(RENDER_STATE_GETTER_CALL);
 	});
 });
 
