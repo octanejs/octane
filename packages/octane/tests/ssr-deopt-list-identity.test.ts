@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createElement, Fragment, renderToPipeableStream, use } from 'octane/server';
+import {
+	createElement,
+	Fragment,
+	positionalChildren,
+	renderToPipeableStream,
+	use,
+} from 'octane/server';
 import { prerender } from 'octane/static';
 import { loadCompiledFixtureSource } from './_server-fixture';
 import {
@@ -94,7 +100,113 @@ function StreamingPage(props: { scenario: ListScenario }) {
 	]);
 }
 
+interface NestedSiblingScenario {
+	reverse: boolean;
+	values: Map<string, Promise<string>>;
+}
+
+function nestedSiblingOrder(reverse: boolean): string[] {
+	return (reverse ? ['second', 'first'] : ['first', 'second']).flatMap((group) =>
+		['outer-0', 'keyed', 'outer-1', 'inner-0', 'inner-1'].map((row) => `${group}-${row}`),
+	);
+}
+
+function nestedSiblingChildren(scenario: NestedSiblingScenario, component: typeof Row) {
+	return (scenario.reverse ? ['second', 'first'] : ['first', 'second']).map((group) => {
+		const row = (name: string, key?: string) => {
+			const kind = `${group}-${name}`;
+			return createElement(component, { kind, value: scenario.values.get(kind)!, key });
+		};
+		return createElement(
+			Fragment,
+			{ key: `quote"\\slash\n\u0000\ud800:${group}` },
+			row('outer-0'),
+			row('keyed', '0'),
+			row('outer-1'),
+			positionalChildren([row('inner-0'), row('inner-1')]),
+		);
+	});
+}
+
+function NestedSiblingsPage(props: { scenario: NestedSiblingScenario }) {
+	return createElement('ul', null, nestedSiblingChildren(props.scenario, Row));
+}
+
+function NestedStreamingSiblingsPage(props: { scenario: NestedSiblingScenario }) {
+	return createElement('ul', null, nestedSiblingChildren(props.scenario, StreamingRow));
+}
+
+function nestedSiblingRequest(reverse: boolean) {
+	const pending = new Map(nestedSiblingOrder(false).map((name) => [name, deferred<string>()]));
+	const scenario: NestedSiblingScenario = {
+		reverse,
+		values: new Map([...pending].map(([name, value]) => [name, value.promise])),
+	};
+	return { pending, scenario };
+}
+
 describe('server descriptor lists across async retries', () => {
+	it('keeps nested sibling results with their keyed wrappers across interleaved retries', async () => {
+		const first = nestedSiblingRequest(false);
+		const second = nestedSiblingRequest(true);
+		const firstResult = prerender(NestedSiblingsPage, { scenario: first.scenario });
+		const secondResult = prerender(NestedSiblingsPage, { scenario: second.scenario });
+
+		// Both requests suspend before their wrapper order changes. Each row must
+		// receive its own settled value when the complete page renders again.
+		first.scenario.reverse = true;
+		second.scenario.reverse = false;
+		for (const name of nestedSiblingOrder(true)) {
+			second.pending.get(name)!.resolve(`B-${name}`);
+			first.pending.get(name)!.resolve(`A-${name}`);
+		}
+
+		const [firstHtml, secondHtml] = await Promise.all([firstResult, secondResult]);
+		expect(rows(firstHtml.html)).toEqual(
+			nestedSiblingOrder(true).map((name) => `${name}:A-${name}`),
+		);
+		expect(rows(secondHtml.html)).toEqual(
+			nestedSiblingOrder(false).map((name) => `${name}:B-${name}`),
+		);
+	});
+
+	it('reveals nested implicit siblings independently when their stream resolves out of order', async () => {
+		const request = nestedSiblingRequest(false);
+		const output = createPipeableCollector();
+		const errors: unknown[] = [];
+		const stream = renderToPipeableStream(
+			NestedStreamingSiblingsPage,
+			{ scenario: request.scenario },
+			{ onError: (error) => errors.push(error) },
+		);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		try {
+			stream.pipe(output.destination);
+			await vi.waitFor(() => {
+				expect(rows(output.chunks.join(''))).toEqual(
+					nestedSiblingOrder(false).map((name) => `${name}:waiting`),
+				);
+			});
+
+			for (const name of ['second-inner-1', 'first-outer-1']) {
+				request.pending.get(name)!.resolve(`VALUE-${name}`);
+				await vi.waitFor(() => expect(output.chunks.join('')).toContain(`VALUE-${name}`));
+			}
+			for (const [name, value] of request.pending) value.resolve(`VALUE-${name}`);
+			container.innerHTML = await output.ended;
+			activateStreamedMarkup(container);
+			expect(rows(container.innerHTML)).toEqual(
+				nestedSiblingOrder(false).map((name) => `${name}:VALUE-${name}`),
+			);
+			expect(errors).toEqual([]);
+		} finally {
+			stream.abort();
+			container.remove();
+			resetStreamRuntimeGlobals();
+		}
+	});
+
 	it("does not reuse a nested unkeyed child's result for a new top-level position", async () => {
 		const plain = deferred<string>();
 		const keyed = deferred<string>();
