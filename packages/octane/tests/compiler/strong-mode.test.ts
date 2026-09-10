@@ -5,6 +5,7 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 
 const RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 const RENDER_STATE_GETTER_CALL = 'OCTANE_STRONG_RENDER_STATE_GETTER_CALL';
+const RENDER_MODULE_STATE_READ = 'OCTANE_STRONG_RENDER_MODULE_STATE_READ';
 const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 const RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 const RENDER_REF_READ = 'OCTANE_STRONG_RENDER_REF_READ';
@@ -4613,6 +4614,350 @@ export function App() {
 }`;
 		expect(() => slotHooks(plain, '/src/useCurrent.ts')).toThrow(RENDER_STATE_GETTER_CALL);
 		expect(() => compile(tsx, '/src/App.tsx')).toThrow(RENDER_STATE_GETTER_CALL);
+	});
+});
+
+describe('Strong mode render-time mutable module state reads', () => {
+	function component(
+		render: string,
+		moduleSetup = 'let revision = 0; function advance() { revision++; }',
+	) {
+		return `${moduleSetup}
+export function App(props) @{
+  ${render}
+}`;
+	}
+
+	it('rejects an updated module binding during render while compatibility remains live', () => {
+		const source = component('<p>{revision as string}</p>');
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_MODULE_STATE_READ,
+		);
+	});
+
+	it.each([
+		['a scalar read', 'const current = revision; <p>{current as string}</p>'],
+		['an attribute value', '<p data-revision={revision} />'],
+		[
+			'a synchronous module helper',
+			'function read() { return revision; } <p>{read() as string}</p>',
+		],
+		[
+			'a helper argument',
+			'function identity(value) { return value; } <p>{identity(revision) as string}</p>',
+		],
+		['an immediate callback', '<p>{(() => revision)() as string}</p>'],
+		['a computed property', 'const record = {}; <p>{record[revision] as string}</p>'],
+		[
+			'an optional computed property',
+			'const record = props.record; <p>{record?.[revision] as string}</p>',
+		],
+		['a memo calculation', 'useMemo(() => revision, []); <p />'],
+	])('rejects a mutable module read through %s', (_shape, render) => {
+		const source = `import { useMemo } from 'octane';\n${component(render)}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_MODULE_STATE_READ,
+		);
+	});
+
+	it.each([
+		['a reassigned var', 'var revision = 0; function advance() { revision++; }'],
+		[
+			'a destructured let',
+			'let { revision } = { revision: 0 }; function advance() { revision = 1; }',
+		],
+		['a reassigned exported let', 'export let revision = 0; function advance() { revision++; }'],
+	])('tracks %s at module scope', (_shape, setup) => {
+		expect(() =>
+			compile(`"use strong";\n${component('<p>{revision as string}</p>', setup)}`, '/src/App.tsrx'),
+		).toThrow(RENDER_MODULE_STATE_READ);
+	});
+
+	it.each(['(revision as number) += 1;', '(revision as number)++;'])(
+		'rejects the module-state read in %s',
+		(expression) => {
+			const source = component(`${expression} <p />`);
+			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+			expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+				RENDER_MODULE_STATE_READ,
+			);
+		},
+	);
+
+	it.each([
+		[
+			'an ordinary component tag',
+			'let Current = () => <p />; Current = () => <span />;',
+			'<Current />',
+		],
+		[
+			'an optional component expression',
+			'let Current = () => <p />; Current = () => <span />;',
+			'const tag = Current?.displayName; <p>{tag as string}</p>',
+		],
+		[
+			'an underscore-prefixed component tag',
+			'let _Widget = () => <p />; _Widget = () => <span />;',
+			'<_Widget />',
+		],
+		[
+			'a dollar-prefixed component tag',
+			'let $Widget = () => <p />; $Widget = () => <span />;',
+			'<$Widget />',
+		],
+		[
+			'a Unicode component tag',
+			'let ÄWidget = () => <p />; ÄWidget = () => <span />;',
+			'<ÄWidget />',
+		],
+		[
+			'a lowercase member component tag',
+			'let widget = { Part: () => <p /> }; widget = { Part: () => <span /> };',
+			'<widget.Part />',
+		],
+	])('rejects a mutable module component through %s', (_shape, setup, render) => {
+		const source = component(render, setup);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_MODULE_STATE_READ,
+		);
+	});
+
+	it.each([
+		['memo alias', "import { memo as wrap } from 'octane';", 'wrap(() => <p>{revision}</p>)'],
+		[
+			'memo namespace import',
+			"import * as Octane from 'octane';",
+			'Octane.memo(() => <p>{revision}</p>)',
+		],
+	])('checks module reads in a render root reached through %s', (_shape, imported, wrapped) => {
+		const source = `${imported}
+let revision = 0;
+function advance() { revision++; }
+export const App = ${wrapped};`;
+		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsx')).toThrow(
+			RENDER_MODULE_STATE_READ,
+		);
+	});
+
+	it('keeps module reads in events, effects, cleanup, and deferred work legal', () => {
+		const source = `"use strong";
+import { useEffect } from 'octane';
+let revision = 0;
+function advance() { revision++; }
+function readRevision() { return revision; }
+export function App(props) @{
+  useEffect(() => {
+    props.record(readRevision());
+    return () => props.record(revision);
+  }, []);
+  setTimeout(() => props.record(revision), 0);
+  Promise.resolve().then(() => props.record(revision));
+  (async () => { await Promise.resolve(); props.record(revision); })();
+  <button onClick={() => { advance(); props.record(readRevision()); }}>Check</button>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		[
+			'a module binding that is never reassigned',
+			'let revision = 0;',
+			'<p>{revision as string}</p>',
+		],
+		[
+			'a module constant object',
+			'const revision = { value: 0 }; revision.value = 1;',
+			'<p>{revision.value as string}</p>',
+		],
+		[
+			'a local shadow',
+			'let revision = 0; function advance() { revision++; }',
+			'const revision = props.value; <p>{revision as string}</p>',
+		],
+		[
+			'an unrelated prop',
+			'let revision = 0; function advance() { revision++; }',
+			'<p>{props.revision as string}</p>',
+		],
+		[
+			'a hoisted local var',
+			'let revision = 0; function advance() { revision++; }',
+			'const old = revision; var revision = 1; <p>{old as string}</p>',
+		],
+		[
+			'a module snapshot alias',
+			'let revision = 0; function advance() { revision++; } const captured = revision;',
+			'<p>{captured as string}</p>',
+		],
+		['an intrinsic tag', 'let Current = () => <p />; Current = () => <span />;', '<div />'],
+		[
+			'a shadowed component tag',
+			'let Current = () => <p />; Current = () => <span />;',
+			'const Current = () => <p />; <Current />',
+		],
+		[
+			'an optional chain that cannot evaluate its key',
+			'let revision = 0; function advance() { revision++; }',
+			'<p>{null?.[revision] as string}</p>',
+		],
+		[
+			'an optional call that cannot evaluate its argument',
+			'let revision = 0; function advance() { revision++; }',
+			'null?.(revision); <p />',
+		],
+		[
+			'an optional method that cannot evaluate its argument',
+			'let revision = 0; function advance() { revision++; }',
+			'null?.x(revision); <p />',
+		],
+		[
+			'an optional call of a skipped member',
+			'let revision = 0; function advance() { revision++; }',
+			'(null?.x)?.(revision); <p />',
+		],
+		[
+			'an optional property of a skipped member',
+			'let revision = 0; function advance() { revision++; }',
+			'(null?.x)?.[revision]; <p />',
+		],
+	])('allows %s', (_shape, setup, render) => {
+		expect(() =>
+			compile(`"use strong";\n${component(render, setup)}`, '/src/App.tsrx'),
+		).not.toThrow();
+	});
+
+	it.each([
+		['the `meta` name in `import.meta`', 'meta', 'const url = import.meta.url; <p>{url}</p>'],
+		[
+			'the `target` name in `new.target`',
+			'target',
+			'const ctor = new.target; <p>{ctor?.name as string}</p>',
+		],
+		[
+			'a public class field name',
+			'revision',
+			'class Entry { revision = 1; } const entry = new Entry(); <p>{entry.revision as string}</p>',
+		],
+		[
+			'a class method name',
+			'revision',
+			'class Entry { revision() { return 1; } } <p>{new Entry().revision() as string}</p>',
+		],
+		[
+			'a class getter name',
+			'revision',
+			'class Entry { get revision() { return 1; } } <p>{new Entry().revision as string}</p>',
+		],
+		[
+			'a named class expression binding',
+			'revision',
+			'const Entry = class revision { static self = revision; }; <p>{Entry.self.name}</p>',
+		],
+		['a break label', 'revision', 'revision: { break revision; } <p />'],
+		[
+			'a continue label',
+			'revision',
+			'revision: for (let index = 0; index < 1; index++) { continue revision; } <p />',
+		],
+	])('allows %s when a module variable has the same name', (_shape, name, render) => {
+		const source = `let ${name} = 0; function advance() { ${name}++; }
+export function App() @{
+  ${render}
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['a computed class field name', 'class Entry { [revision] = 1; } <p />'],
+		['a computed class method name', 'class Entry { [revision]() { return 1; } } <p />'],
+	])('rejects a real module binding read in %s', (_shape, render) => {
+		const source = component(render);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
+			RENDER_MODULE_STATE_READ,
+		);
+	});
+
+	it.each([
+		['a class decorator', '@revision class Entry {}'],
+		['a class field decorator', 'class Entry { @revision field = 1; }'],
+		['a class method decorator', 'class Entry { @revision method() {} }'],
+	])('rejects a module binding read in %s', (_shape, declaration) => {
+		const source = `/** @jsxImportSource octane */
+let revision = (value) => value;
+function advance() { revision = (value) => value; }
+export function App() { ${declaration} return <p />; }`;
+		expect(() => compile(source, '/src/App.tsx')).not.toThrow();
+		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsx')).toThrow(
+			RENDER_MODULE_STATE_READ,
+		);
+	});
+
+	it('allows a parameter that shadows the mutable module binding', () => {
+		const source = `"use strong";
+let revision = 0;
+function advance() { revision++; }
+export function App(revision) @{ <p>{revision as string}</p> }`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each(['client', 'server'] as const)('preserves valid code in %s output', (mode) => {
+		const source = component('<button onClick={() => revision++}>Update</button>');
+		const ordinary = compile(source, '/src/App.tsrx', { mode });
+		const strong = compile(source, '/src/App.tsrx', { mode, strong: true } as any);
+		expect(strong.code).toBe(ordinary.code);
+		expect(strong.diagnostics).toEqual(ordinary.diagnostics);
+	});
+
+	it('locates the authored module binding read in compiler and Volar diagnostics', () => {
+		const source = `"use strong";\n${component('<p>{revision as string}</p>')}`;
+		const offset = source.lastIndexOf('revision');
+		try {
+			compile(source, '/src/App.tsrx');
+			throw new Error('expected a Strong render-time module state diagnostic');
+		} catch (error: any) {
+			expect(error).toMatchObject({
+				code: RENDER_MODULE_STATE_READ,
+				filename: '/src/App.tsrx',
+			});
+		}
+		const mapped = compileToVolarMappings(source, '/src/App.tsrx');
+		expect(mapped.diagnostics).toContainEqual(
+			expect.objectContaining({
+				code: RENDER_MODULE_STATE_READ,
+				severity: 'error',
+				filename: '/src/App.tsrx',
+				start: expect.objectContaining({ offset }),
+				end: expect.objectContaining({ offset: offset + 'revision'.length }),
+			}),
+		);
+		expect(mapped.errors).toContainEqual(
+			expect.objectContaining({
+				code: RENDER_MODULE_STATE_READ,
+				type: 'usage',
+				fileName: '/src/App.tsrx',
+				pos: offset,
+			}),
+		);
+	});
+
+	it('rejects mutable module reads in plain custom hooks and Octane TSX components', () => {
+		const plain = `"use strong";
+let revision = 0;
+function advance() { revision++; }
+export function useRevision() { return revision; }`;
+		const tsx = `/** @jsxImportSource octane */
+"use strong";
+let revision = 0;
+function advance() { revision++; }
+export function App() { return <p>{revision}</p>; }`;
+		expect(() => slotHooks(plain, '/src/useRevision.ts')).toThrow(RENDER_MODULE_STATE_READ);
+		expect(() => compile(tsx, '/src/App.tsx')).toThrow(RENDER_MODULE_STATE_READ);
 	});
 });
 
