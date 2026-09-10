@@ -942,6 +942,19 @@ host scheduler boundary. The Three package composes that drain with Octane's
 DOM `flushSync`/`act`, so direct Three roots and DOM-owned `Canvas` boundaries
 settle under one public scheduling call without making DOM scheduling part of
 the universal ABI.
+
+For fine-grained native host updates, `universalHostBinding(source, select)`
+accepts a source with `get()` and `subscribe(notify)` methods as an ordinary host
+property value. A scoped `signal$` from `octane/signals` is one such source.
+The root shares one subscription per source, reads a notified source once for
+its bound hosts, and publishes changed selected properties in an accepted host batch. This
+updates the host without rerunning the component or its effects; a later
+component render reads the latest source value. Bindings are released when
+their host is replaced, hidden, or unmounted. They are opt-in for local direct
+roots and host properties the driver can update in place. Transported roots,
+DOM-owned bridges, event props, and specialized compact `universalFor` leaf
+descriptors do not support this path.
+
 Transition/deferred/action/form compatibility APIs currently execute without a
 separate lane scheduler, and `memo` does not yet provide a render bailout;
 those timing/optimization gaps do not weaken transactional ownership.

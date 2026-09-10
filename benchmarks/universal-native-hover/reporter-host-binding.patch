@@ -1,0 +1,42 @@
+--- a/octane.js
++++ b/octane.js
+@@ -8 +8 @@
+-  useState,
++  universalHostBinding,
+@@ -11,0 +12 @@
++import { createScope } from 'octane/signals';
+@@ -78,0 +80,2 @@
++  const scope = createScope({ scopeKey: 'native-hover-test' });
++  const selected$ = scope.signal$('selected', -1);
+@@ -119 +121,0 @@
+-    const [activeRow, setActiveRow] = useState(-1);
+@@ -125 +127 @@
+-        active: index === activeRow,
++        active: universalHostBinding(selected$, value => value === index),
+@@ -128 +130 @@
+-          setActiveRow(index);
++          selected$.set(index);
+@@ -147,0 +150 @@
++      scope.dispose();
+--- a/run.mjs
++++ b/run.mjs
+@@ -179,0 +180 @@
++  const nativeDist = process.env.OCTANE_NATIVE_DIST && path.resolve(process.env.OCTANE_NATIVE_DIST);
+@@ -190 +191,6 @@
+-      { name: 'octane', label: 'Octane', version: octaneVersion, variant: `published-${octaneVersion}` },
++      {
++        name: 'octane',
++        label: nativeDist === undefined ? 'Octane' : 'Octane local',
++        version: octaneVersion,
++        variant: nativeDist === undefined ? `published-${octaneVersion}` : `local-dist-${octaneVersion}`,
++      },
+@@ -194 +200,6 @@
+-      'octane/universal/native': path.join(octaneDirectory, 'universal-native.js'),
++      'octane/universal/native': nativeDist ?? path.join(octaneDirectory, 'universal-native.js'),
++      ...(nativeDist === undefined ? {} : {
++        'octane/signals': path.resolve(
++          process.env.OCTANE_SIGNALS_DIST ?? path.join(path.dirname(nativeDist), 'signals/index.js'),
++        ),
++      }),
+@@ -232,0 +244 @@
++  if (process.env.OCTANE_RAW_RESULTS === '1') console.log(`RAW_RESULT ${JSON.stringify(stats)}`);
