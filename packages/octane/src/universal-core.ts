@@ -4870,9 +4870,11 @@ function resolveHookSlot(slot: unknown): unknown {
 		throw new Error('Universal hooks require an active component owner.');
 	}
 	const own = slot ?? `implicit:${owner.implicitSlot++}`;
-	if (UNIVERSAL_SLOT_STACK.length === 0) return own;
+	const depth = UNIVERSAL_SLOT_STACK.length;
+	if (depth === 0) return own;
 	let key = '@octane:universal-hook:';
-	for (const part of [...UNIVERSAL_SLOT_STACK, own]) {
+	for (let index = 0; index <= depth; index++) {
+		const part = index === depth ? own : UNIVERSAL_SLOT_STACK[index];
 		const value =
 			typeof part === 'symbol'
 				? `s${part.description?.length ?? 0}:${part.description ?? ''}`

@@ -129,4 +129,84 @@ describe.each([
 			root.unmount();
 		}
 	});
+
+	it('retains nested hook state and refs across reordering and a failed coercion retry', async () => {
+		type Id = 'a' | 'b';
+		const failure = new Error('slot coercion failed');
+		let failingSite: Id | undefined;
+		function site(id: Id) {
+			let first = true;
+			return {
+				[Symbol.toPrimitive]() {
+					return Runtime.withSlot('coercion', () => {
+						if (failingSite === id) throw failure;
+						// Repeated coercion remains observable even when the first values match.
+						const value = first ? 'shared' : id;
+						first = !first;
+						return value;
+					});
+				},
+			};
+		}
+		const sites = { a: site('a'), b: site('b') };
+		const innerSite = Symbol('inner');
+		const stateSite = Symbol('state');
+		const refSite = Symbol('ref');
+		function useInner(id: Id) {
+			const [state, setState] = Runtime.useState(id.toUpperCase(), stateSite);
+			const ref = Runtime.useRef({ id }, refSite);
+			return { state, setState, ref };
+		}
+		function useOuter(id: Id) {
+			return Runtime.withSlot(innerSite, useInner, id);
+		}
+		let report = new Map<Id, ReturnType<typeof useOuter>>();
+		const plan = Runtime.universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['label', 0]],
+		});
+		const Scene = Runtime.defineUniversalComponent('object', (props: { order: Id[] }) => {
+			const next = new Map<Id, ReturnType<typeof useOuter>>();
+			for (const id of props.order) next.set(id, Runtime.withSlot(sites[id], useOuter, id));
+			report = next;
+			return Runtime.universalValue(plan, [
+				props.order.map((id) => `${id}:${next.get(id)!.state}`).join('|'),
+			]);
+		});
+		const container = Runtime.createObjectContainer();
+		const root = Runtime.createUniversalRoot(container, Runtime.createObjectDriver());
+		try {
+			root.render(Scene, { order: ['a', 'b'] });
+			const host = container.children[0];
+			const firstRef = report.get('a')!.ref;
+			const secondRef = report.get('b')!.ref;
+			expect(host.props.label).toBe('a:A|b:B');
+			expect(firstRef).not.toBe(secondRef);
+			expect(firstRef.current).toEqual({ id: 'a' });
+			expect(secondRef.current).toEqual({ id: 'b' });
+
+			report.get('a')!.setState('changed');
+			await Promise.resolve();
+			expect(host.props.label).toBe('a:changed|b:B');
+			root.render(Scene, { order: ['b', 'a'] });
+			expect(container.children[0]).toBe(host);
+			expect(host.props.label).toBe('b:B|a:changed');
+			expect(report.get('a')!.ref).toBe(firstRef);
+			expect(report.get('b')!.ref).toBe(secondRef);
+
+			failingSite = 'a';
+			expect(() => root.render(Scene, { order: ['a', 'b'] })).toThrow(failure);
+			expect(host.props.label).toBe('b:B|a:changed');
+			failingSite = undefined;
+			root.render(Scene, { order: ['a', 'b'] });
+			expect(container.children[0]).toBe(host);
+			expect(host.props.label).toBe('a:changed|b:B');
+			expect(report.get('a')!.ref).toBe(firstRef);
+			expect(report.get('b')!.ref).toBe(secondRef);
+		} finally {
+			root.unmount();
+		}
+		expect(container.children).toEqual([]);
+	});
 });
