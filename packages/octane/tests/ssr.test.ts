@@ -1091,6 +1091,31 @@ describe('SSR, hoisted head channel', () => {
 		`,
 		'head-fragment-document.tsrx',
 	);
+	const fragmentWithHeadChildMarkup = evalServer(
+		`
+		export function Page() @{
+			<>
+				<head>
+					<script data-note="</head>" dangerouslySetInnerHTML={{ __html: 'const marker = "</head>";' }} />
+					<meta charSet="utf-8" />
+				</head>
+				<body><title>Head child markup</title><main>body text</main></body>
+			</>
+		}
+		`,
+		'head-fragment-child-markup.tsrx',
+	);
+	const fragmentWithHeadComment = evalServer(
+		`
+		export function Page() @{
+			<>
+				<head dangerouslySetInnerHTML={{ __html: '<!-- </head> -->' }} />
+				<body><title>Comment in head</title><main>body text</main></body>
+			</>
+		}
+		`,
+		'head-fragment-comment-inside-head.tsrx',
+	);
 	const fragmentWithNestedHead = evalServer(
 		`
 		export function Page() @{
@@ -1223,6 +1248,75 @@ describe('SSR, hoisted head channel', () => {
 		expect(title).toBeGreaterThan(headOpen);
 		expect(title).toBeLessThan(headClose);
 		expect(html).not.toContain('<!DOCTYPE html>');
+	});
+
+	it('folds metadata after a head child containing closing-tag text', async () => {
+		for (const render of [RT.renderToString, RT.renderToStaticMarkup, prerender]) {
+			const { html } = await render(fragmentWithHeadChildMarkup.Page);
+			const parsed = new DOMParser().parseFromString(
+				`<!doctype html><html>${html}</html>`,
+				'text/html',
+			);
+			expect(parsed.head.querySelector('script')?.getAttribute('data-note')).toBe('</head>');
+			expect(parsed.head.querySelector('script')?.textContent).toContain('"</head>"');
+			expect(parsed.head.querySelector('meta[charset]')?.getAttribute('charset')).toBe('utf-8');
+			expect(parsed.title).toBe('Head child markup');
+			expect(parsed.body.querySelector('main')?.textContent).toBe('body text');
+		}
+		const stream = await RT.renderToReadableStream(fragmentWithHeadChildMarkup.Page);
+		const html = await new Response(stream).text();
+		const parsed = new DOMParser().parseFromString(
+			`<!doctype html><html>${html}</html>`,
+			'text/html',
+		);
+		expect(parsed.head.querySelector('script')?.getAttribute('data-note')).toBe('</head>');
+		expect(parsed.head.querySelector('meta[charset]')?.getAttribute('charset')).toBe('utf-8');
+		expect(parsed.title).toBe('Head child markup');
+	});
+
+	it('folds metadata after a comment containing closing-tag text in the head', async () => {
+		for (const render of [RT.renderToString, RT.renderToStaticMarkup, prerender]) {
+			const { html } = await render(fragmentWithHeadComment.Page);
+			const parsed = new DOMParser().parseFromString(
+				`<!doctype html><html>${html}</html>`,
+				'text/html',
+			);
+			expect(
+				[...parsed.head.childNodes].some(
+					(node) => node.nodeType === 8 && node.textContent?.includes('</head>'),
+				),
+			).toBe(true);
+			expect(parsed.title).toBe('Comment in head');
+			expect(parsed.body.querySelector('main')?.textContent).toBe('body text');
+		}
+	});
+
+	it('folds metadata after raw style text in a fragment head', () => {
+		const fragment = RT.createElement(
+			RT.Fragment,
+			null,
+			RT.createElement(
+				'head',
+				null,
+				RT.createElement('style', {
+					dangerouslySetInnerHTML: { __html: '/* </head> */ .safe { color: red }' },
+				}),
+			),
+			RT.createElement(
+				'body',
+				null,
+				RT.createElement('title', null, 'Style in head'),
+				RT.createElement('main', null, 'body text'),
+			),
+		);
+		const { html } = RT.renderToString(fragment);
+		const parsed = new DOMParser().parseFromString(
+			`<!doctype html><html>${html}</html>`,
+			'text/html',
+		);
+		expect(parsed.head.querySelector('style')?.textContent).toContain('/* </head> */');
+		expect(parsed.title).toBe('Style in head');
+		expect(parsed.body.querySelector('main')?.textContent).toBe('body text');
 	});
 
 	it('keeps a nested head from capturing fragment metadata', async () => {

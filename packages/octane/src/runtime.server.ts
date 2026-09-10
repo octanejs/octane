@@ -6636,10 +6636,9 @@ export interface RenderOptions {
 function spliceHead(body: string, head: string, documentRoot = isDocumentRoot(body)): string {
 	if (!documentRoot && (head === '' || !isLeadingHeadRoot(body)))
 		return head === '' ? body : head + body;
-	// A fragment's leading <head> may have an attribute containing "</head>";
-	// begin after its quote-aware opening tag instead of splicing into the attr.
-	const afterOpening = documentRoot ? 0 : documentHeadInsertionPoint(body);
-	const headClose = afterOpening === -1 ? -1 : body.indexOf('</head>', afterOpening);
+	const headClose = documentRoot
+		? body.indexOf('</head>')
+		: findFragmentHeadClose(body, documentHeadInsertionPoint(body));
 	if (headClose !== -1) return body.slice(0, headClose) + head + body.slice(headClose);
 	if (!documentRoot) return head + body;
 	const openingEnd = documentTagEnd(body, body.indexOf('<html') + 5);
@@ -8863,6 +8862,42 @@ function documentTagEnd(body: string, from: number): number {
 			if (code === quote) quote = 0;
 		} else if (code === 34 /* " */ || code === 39 /* ' */) quote = code;
 		else if (code === 62 /* > */) return i + 1;
+	}
+	return -1;
+}
+
+// Only a leading fragment <head> takes this path. Quoted attributes, comments,
+// and raw script/style text can contain "</head>" without closing the element.
+// Walk markup tags (quote-aware via documentTagEnd) rather than searching raw
+// bytes; ordinary fragments never pay for a body scan.
+function findFragmentHeadClose(body: string, from: number): number {
+	while (from !== -1) {
+		const start = body.indexOf('<', from);
+		if (start === -1) return -1;
+		if (body.startsWith('<!--', start)) {
+			const end = body.indexOf('-->', start + 4);
+			if (end === -1) return -1;
+			from = end + 3;
+			continue;
+		}
+		if (body.startsWith('</head>', start)) return start;
+		const end = documentTagEnd(body, start + 1);
+		if (end === -1) return -1;
+		let rawClose: string | null = null;
+		if (body.startsWith('<script', start)) {
+			const next = body.charCodeAt(start + 7);
+			if (next === 62 || next === 32 || next === 9 || next === 10 || next === 13)
+				rawClose = '</script>';
+		} else if (body.startsWith('<style', start)) {
+			const next = body.charCodeAt(start + 6);
+			if (next === 62 || next === 32 || next === 9 || next === 10 || next === 13)
+				rawClose = '</style>';
+		}
+		if (rawClose !== null) {
+			const rawEnd = body.indexOf(rawClose, end);
+			if (rawEnd === -1) return -1;
+			from = rawEnd + rawClose.length;
+		} else from = end;
 	}
 	return -1;
 }
