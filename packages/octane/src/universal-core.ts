@@ -35,6 +35,38 @@ const UNIVERSAL_CHILDREN = Symbol.for('octane.universal.children');
 const UNIVERSAL_IF = Symbol.for('octane.universal.if');
 const UNIVERSAL_SWITCH = Symbol.for('octane.universal.switch');
 const UNIVERSAL_FOR = Symbol.for('octane.universal.for');
+const UNIVERSAL_HOST_BINDING = Symbol('octane.universal.host-binding');
+
+export interface UniversalHostBinding<T> {
+	readonly $$kind: typeof UNIVERSAL_HOST_BINDING;
+	readonly source: {
+		get(): unknown;
+		subscribe(notify: () => void): () => void;
+	};
+	readonly select: (value: unknown) => T;
+	readonly getSnapshot: () => T;
+}
+
+/** Exploratory local-host binding; this is not a general component subscription. */
+export function universalHostBinding<T, U>(
+	source: { get(): T; subscribe(notify: () => void): () => void },
+	select: (value: T) => U,
+): UniversalHostBinding<U> {
+	return {
+		$$kind: UNIVERSAL_HOST_BINDING,
+		source,
+		select: select as (value: unknown) => U,
+		getSnapshot: () => select(source.get()),
+	};
+}
+
+function isUniversalHostBinding(value: unknown): value is UniversalHostBinding<unknown> {
+	return (
+		value !== null &&
+		typeof value === 'object' &&
+		(value as UniversalHostBinding<unknown>).$$kind === UNIVERSAL_HOST_BINDING
+	);
+}
 const UNIVERSAL_TRY = Symbol.for('octane.universal.try');
 const UNIVERSAL_CONTEXT = Symbol.for('octane.universal.context');
 const UNIVERSAL_ACTIVITY = Symbol.for('octane.universal.activity');
@@ -864,6 +896,7 @@ interface BlueprintHost {
 	key: UniversalKey | null;
 	type: string;
 	props: Record<string, unknown>;
+	hostBindings?: Map<string, UniversalHostBinding<unknown>>;
 	ref: unknown;
 	owner: UniversalOwnerRecord;
 	events: Map<string, BlueprintEvent>;
@@ -1173,6 +1206,7 @@ const UNIVERSAL_TREE_LIFECYCLE = 1 << 3;
 const UNIVERSAL_TREE_LOCAL_CALLBACK = 1 << 4;
 const UNIVERSAL_TREE_REF = 1 << 5;
 const UNIVERSAL_TREE_HIDDEN = 1 << 6;
+const UNIVERSAL_TREE_HOST_BINDING = 1 << 7;
 
 interface DraftOwner {
 	record: UniversalOwnerRecord;
@@ -2950,9 +2984,21 @@ function materializeOwnerlessLeafValue(
 	let events: Map<string, BlueprintEvent> | null = null;
 	let lifecycles: Map<string, BlueprintHostCallback> | null = null;
 	let localCallbacks: Map<string, BlueprintHostCallback> | null = null;
+	let hostBindings: Map<string, UniversalHostBinding<unknown>> | null = null;
 	const attempt = currentAttempt();
 	for (const name of Object.keys(props)) {
 		const handler = props[name];
+		if (isUniversalHostBinding(handler)) {
+			if (attempt.root.hasHostBindingUnsupportedConfiguration() || name.startsWith('on')) {
+				throw new Error(
+					'Experimental host bindings require an ordinary prop on a local direct root.',
+				);
+			}
+			markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
+			(hostBindings ??= new Map()).set(name, handler);
+			props[name] = attempt.root.encodeHostProp(node.type, name, handler.getSnapshot());
+			continue;
+		}
 		if (compilerLeafProps) {
 			if (isRendererRegion(handler)) markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
 			props[name] = attempt.root.encodeHostProp(node.type, name, handler);
@@ -3029,6 +3075,7 @@ function materializeOwnerlessLeafValue(
 		key: null,
 		type: node.type,
 		props,
+		...(hostBindings === null ? null : { hostBindings }),
 		ref: null,
 		owner: owner.record,
 		events: events ?? EMPTY_BLUEPRINT_EVENTS,
@@ -3300,6 +3347,11 @@ function materializeValue(
 				const host = compactHost!;
 				if (itemIndex === 0 && host.props !== undefined) {
 					for (const name of Object.keys(host.props)) {
+						if (isUniversalHostBinding(host.props[name])) {
+							throw new Error(
+								'Experimental host bindings cannot be used in compact universal leaf lists.',
+							);
+						}
 						if (isRendererRegion(host.props[name])) {
 							markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
 						}
@@ -3309,6 +3361,11 @@ function materializeValue(
 				if (bindings !== undefined) {
 					for (let bindingIndex = 0; bindingIndex < bindings.length; bindingIndex++) {
 						const binding = values[bindings[bindingIndex][1]];
+						if (isUniversalHostBinding(binding)) {
+							throw new Error(
+								'Experimental host bindings cannot be used in compact universal leaf lists.',
+							);
+						}
 						if (typeof binding === 'object' && binding !== null && isRendererRegion(binding)) {
 							markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
 						}
@@ -3806,6 +3863,13 @@ function materializeNode(
 		propsValue = normalizePropsValue(values[node.propsSlot] as any);
 		Object.assign(props, propsValue.props);
 	}
+	if (
+		isUniversalHostBinding(props.ref) ||
+		isUniversalHostBinding(props.key) ||
+		isUniversalHostBinding(props.children)
+	) {
+		throw new Error('Experimental host bindings require an ordinary host property.');
+	}
 	const hasKey = staticProps === null && (propsValue?.hasKey || hasOwnProp.call(props, 'key'));
 	const hostKey = normalizeUniversalKey(
 		propsValue?.hasKey ? propsValue.key : hasKey ? props.key : null,
@@ -3821,8 +3885,20 @@ function materializeNode(
 	let events: Map<string, BlueprintEvent> | null = null;
 	let lifecycles: Map<string, BlueprintHostCallback> | null = null;
 	let localCallbacks: Map<string, BlueprintHostCallback> | null = null;
+	let hostBindings: Map<string, UniversalHostBinding<unknown>> | null = null;
 	for (const name of staticProps === null ? Object.keys(props) : EMPTY_STATIC_PROP_NAMES) {
 		const handler = props[name];
+		if (isUniversalHostBinding(handler)) {
+			if (root.hasHostBindingUnsupportedConfiguration() || name.startsWith('on')) {
+				throw new Error(
+					'Experimental host bindings require an ordinary prop on a local direct root.',
+				);
+			}
+			markUniversalTreeFeature(UNIVERSAL_TREE_HOST_BINDING);
+			(hostBindings ??= new Map()).set(name, handler);
+			props[name] = root.encodeHostProp(node.type, name, handler.getSnapshot());
+			continue;
+		}
 		const lifecycle = root.classifyLifecycle(name, handler);
 		if (lifecycle !== null) {
 			delete props[name];
@@ -3906,6 +3982,7 @@ function materializeNode(
 			key: hostKey,
 			type: node.type,
 			props,
+			...(hostBindings === null ? null : { hostBindings }),
 			ref,
 			owner: CURRENT_OWNER!.record,
 			events: events ?? EMPTY_BLUEPRINT_EVENTS,
@@ -4006,6 +4083,7 @@ function materializeCollapsedTemplate(value: UniversalPlanValue): BlueprintHost 
 		for (const name of Object.keys(props)) {
 			const current = props[name];
 			if (
+				isUniversalHostBinding(current) ||
 				root.classifyLifecycle(name, current) !== null ||
 				root.classifyLocalCallback(name, current) !== null ||
 				isRendererRegion(current)
@@ -4085,6 +4163,7 @@ function prepareCollapsedTemplateValues(
 	for (let index = 0; index < prepared.values.length; index++) {
 		const binding = prepared.values[index];
 		const source = value.values[binding.slot];
+		if (isUniversalHostBinding(source)) return null;
 		if (binding.text) {
 			if (typeof source !== 'string' && typeof source !== 'number' && typeof source !== 'bigint') {
 				return null;
@@ -7074,6 +7153,22 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		PreparedCollapsedTemplateProgram | null
 	> | null = null;
 	private localCallbacks = new Map<number, CommittedHostCallback>();
+	private boundHosts: Map<
+		LogicalRecord,
+		{ name: string; binding: UniversalHostBinding<unknown> }[]
+	> | null = null;
+	private readonly boundSources = new Map<
+		UniversalHostBinding<unknown>['source'],
+		{
+			records: LogicalRecord[];
+			unsubscribe: () => void;
+		}
+	>();
+	private dirtyBoundHosts: LogicalRecord[] = [];
+	private readonly dirtyBoundHostSet = new Set<LogicalRecord>();
+	private dirtyBoundSources: UniversalHostBinding<unknown>['source'][] = [];
+	private readonly dirtyBoundSourceSet = new Set<UniversalHostBinding<unknown>['source']>();
+	private boundHostScheduled = false;
 	private readonly publishedListeners = new Set<number>();
 	private pending: UniversalTransactionImpl<Container, PublicInstance> | null = null;
 	private suspended: UniversalSuspendedAttemptImpl | null = null;
@@ -7378,6 +7473,260 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	private hasAsyncTransport(): boolean {
 		return this.transport?.mode === 'async';
+	}
+
+	hasHostBindingUnsupportedConfiguration(): boolean {
+		return this.transport !== null || this.bridge !== null;
+	}
+
+	private dropHostBindings(record: LogicalRecord): unknown {
+		const attached = this.boundHosts?.get(record);
+		if (attached === undefined) return NO_PENDING_PASSIVE_ERROR;
+		this.boundHosts!.delete(record);
+		this.dirtyBoundHostSet.delete(record);
+		const dirtyIndex = this.dirtyBoundHosts.indexOf(record);
+		if (dirtyIndex !== -1) this.dirtyBoundHosts.splice(dirtyIndex, 1);
+		let unsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
+		for (let index = 0; index < attached.length; index++) {
+			const source = attached[index].binding.source;
+			const group = this.boundSources.get(source);
+			if (group === undefined) continue;
+			const position = group.records.indexOf(record);
+			if (position >= 0) group.records.splice(position, 1);
+			if (group.records.length === 0) {
+				this.boundSources.delete(source);
+				try {
+					group.unsubscribe();
+				} catch (error) {
+					if (unsubscribeError === NO_PENDING_PASSIVE_ERROR) unsubscribeError = error;
+				}
+			}
+		}
+		return unsubscribeError;
+	}
+
+	private commitHostBindings(record: LogicalRecord, next: BlueprintHost): unknown {
+		const bindings = next.hostBindings;
+		if (bindings === undefined || next.visibility !== 'visible') {
+			return this.dropHostBindings(record);
+		}
+		const previous = this.boundHosts?.get(record);
+		if (previous !== undefined && previous.length === bindings.size) {
+			let unchanged = true;
+			let index = 0;
+			for (const [name, binding] of bindings) {
+				const current = previous[index++];
+				if (current.name !== name || current.binding !== binding) {
+					unchanged = false;
+					break;
+				}
+			}
+			if (unchanged) return NO_PENDING_PASSIVE_ERROR;
+		}
+		const unsubscribeError = this.dropHostBindings(record);
+		const connected: { name: string; binding: UniversalHostBinding<unknown> }[] = [];
+		(this.boundHosts ??= new Map()).set(record, connected);
+		try {
+			for (const [name, binding] of bindings) {
+				connected.push({ name, binding });
+				let group = this.boundSources.get(binding.source);
+				if (group === undefined) {
+					group = { records: [], unsubscribe: () => {} };
+					this.boundSources.set(binding.source, group);
+					group.records.push(record);
+					try {
+						group.unsubscribe = binding.source.subscribe(() =>
+							this.queueHostBindingSource(binding.source),
+						);
+					} catch (error) {
+						this.boundSources.delete(binding.source);
+						throw error;
+					}
+				} else if (!group.records.includes(record)) group.records.push(record);
+				const value = this.encodeHostProp(next.type, name, binding.getSnapshot());
+				if (!sameUniversalHostPropValue(record.props[name], value)) {
+					this.queueHostBindingUpdate(record);
+				}
+			}
+		} catch (error) {
+			this.dropHostBindings(record);
+			throw error;
+		}
+		return unsubscribeError;
+	}
+
+	private queueHostBindingUpdate(record: LogicalRecord): void {
+		if (this.unmounted || this.unmounting || !this.boundHosts?.has(record)) return;
+		if (!this.dirtyBoundHostSet.has(record)) {
+			this.dirtyBoundHostSet.add(record);
+			this.dirtyBoundHosts.push(record);
+		}
+		this.scheduleHostBindingUpdate();
+	}
+
+	private queueHostBindingSource(source: UniversalHostBinding<unknown>['source']): void {
+		if (this.unmounted || this.unmounting || !this.boundSources.has(source)) return;
+		if (!this.dirtyBoundSourceSet.has(source)) {
+			this.dirtyBoundSourceSet.add(source);
+			this.dirtyBoundSources.push(source);
+		}
+		this.scheduleHostBindingUpdate();
+	}
+
+	private scheduleHostBindingUpdate(): void {
+		SCHEDULED_UNIVERSAL_ROOTS.add(this);
+		if (this.boundHostScheduled) return;
+		this.boundHostScheduled = true;
+		this.__scheduleMicrotask(() => {
+			if (this.boundHostScheduled) this.flushHostBindingUpdates();
+		});
+	}
+
+	private restoreDirtyHostBindings(records: readonly LogicalRecord[]): void {
+		this.boundHostScheduled = false;
+		if (!this.scheduled) SCHEDULED_UNIVERSAL_ROOTS.delete(this);
+		for (let index = 0; index < records.length; index++) {
+			const record = records[index];
+			if (this.boundHosts?.has(record) && !this.dirtyBoundHostSet.has(record)) {
+				this.dirtyBoundHostSet.add(record);
+				this.dirtyBoundHosts.push(record);
+			}
+		}
+	}
+
+	private flushHostBindingUpdates(): void {
+		if (
+			(this.dirtyBoundHosts.length === 0 && this.dirtyBoundSources.length === 0) ||
+			this.unmounted ||
+			this.unmounting
+		) {
+			this.boundHostScheduled = false;
+			if (!this.scheduled) SCHEDULED_UNIVERSAL_ROOTS.delete(this);
+			return;
+		}
+		if (this.pending !== null || this.scheduled) {
+			// The queued microtask has been consumed; the pending transaction or
+			// scheduled render will arrange the next drain once it settles.
+			this.boundHostScheduled = false;
+			return;
+		}
+		this.boundHostScheduled = false;
+		SCHEDULED_UNIVERSAL_ROOTS.delete(this);
+		let records = this.dirtyBoundHosts;
+		const sources = this.dirtyBoundSources;
+		this.dirtyBoundHosts = [];
+		this.dirtyBoundHostSet.clear();
+		this.dirtyBoundSources = [];
+		this.dirtyBoundSourceSet.clear();
+		if (sources.length === 1 && records.length === 0) {
+			records = this.boundSources.get(sources[0])?.records.slice() ?? [];
+		} else if (sources.length !== 0) {
+			const seen = new Set(records);
+			for (let index = 0; index < sources.length; index++) {
+				const group = this.boundSources.get(sources[index]);
+				if (group === undefined) continue;
+				for (let recordIndex = 0; recordIndex < group.records.length; recordIndex++) {
+					const record = group.records[recordIndex];
+					if (!seen.has(record)) {
+						seen.add(record);
+						records.push(record);
+					}
+				}
+			}
+		}
+		const updates: { record: LogicalRecord; props: Record<string, unknown> }[] = [];
+		const commands: UniversalHostCommand[] = [];
+		const soleSource = sources.length === 1 ? sources[0] : null;
+		let soleSourceRead = false;
+		let soleSourceSnapshot: unknown;
+		const otherSourceSnapshots =
+			sources.length > 1 ? new Map<UniversalHostBinding<unknown>['source'], unknown>() : null;
+		try {
+			for (let recordIndex = 0; recordIndex < records.length; recordIndex++) {
+				const record = records[recordIndex];
+				const connected = this.boundHosts?.get(record);
+				if (connected === undefined || record.visibility !== 'visible') continue;
+				let next: Record<string, unknown> | null = null;
+				for (let bindingIndex = 0; bindingIndex < connected.length; bindingIndex++) {
+					const { name, binding } = connected[bindingIndex];
+					let raw: unknown;
+					if (binding.source === soleSource) {
+						if (!soleSourceRead) {
+							soleSourceSnapshot = binding.source.get();
+							soleSourceRead = true;
+						}
+						raw = soleSourceSnapshot;
+					} else if (otherSourceSnapshots !== null && sources.includes(binding.source)) {
+						if (!otherSourceSnapshots.has(binding.source)) {
+							otherSourceSnapshots.set(binding.source, binding.source.get());
+						}
+						raw = otherSourceSnapshots.get(binding.source);
+					} else {
+						raw = binding.source.get();
+					}
+					const selected = binding.select(raw);
+					const current = (next ?? record.props)[name];
+					if (this.driver.props === undefined && sameUniversalHostPropValue(current, selected))
+						continue;
+					const value = this.encodeHostProp(record.type!, name, selected);
+					if (sameUniversalHostPropValue(current, value)) continue;
+					(next ??= { ...record.props })[name] = value;
+				}
+				if (next === null) continue;
+				const kind = this.driver.updates?.classify(record.type!, record.props, next) ?? 'update';
+				if (kind !== 'update' || record.lifecycles.size !== 0) {
+					throw new Error(
+						'Experimental host bindings require update-only hosts without lifecycle callbacks.',
+					);
+				}
+				Object.freeze(next);
+				updates.push({ record, props: next });
+				commands.push({ op: 'update', id: record.id, props: next });
+			}
+		} catch (error) {
+			this.restoreDirtyHostBindings(records);
+			throw error;
+		}
+		if (commands.length === 0) return;
+		const batch = freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, commands);
+		let prepared: UniversalPreparedHostBatch;
+		try {
+			prepared = this.driver.prepareBatch(this.container, batch, {
+				invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
+			});
+		} catch (error) {
+			this.restoreDirtyHostBindings(records);
+			throw error;
+		}
+		if (!isValidPreparedHostBatch(prepared)) {
+			this.restoreDirtyHostBindings(records);
+			throw new TypeError('Invalid host binding batch token.');
+		}
+		const transaction = new UniversalTransactionImpl(
+			this,
+			batch,
+			() => prepared.apply(),
+			null,
+			this.transportIdentity(batch.version),
+			() => {
+				for (let index = 0; index < updates.length; index++) {
+					updates[index].record.props = updates[index].props;
+				}
+			},
+			() => prepared.afterAccept?.(),
+			noopUniversalCommitTask,
+			noopUniversalCommitTask,
+			noopUniversalCommitTask,
+			null,
+			() => prepared.abort(),
+			() => {
+				for (let index = 0; index < records.length; index++)
+					this.queueHostBindingUpdate(records[index]);
+			},
+			EMPTY_UNIVERSAL_TRANSITION_BATCHES,
+		);
+		this.pending = transaction;
+		transaction.commit();
 	}
 
 	private enqueueAsyncWork(work: () => Promise<void>): void {
@@ -8123,14 +8472,20 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	}
 
 	flushScheduledWork(): void {
-		if (!this.scheduled) return;
+		if (!this.scheduled) {
+			this.flushHostBindingUpdates();
+			return;
+		}
 		// A transported teardown is provisional until acknowledgement. Keep work
 		// raised by the still-accepted listener table queued so rejection can resume
 		// it against the accepted tree.
 		if (this.unmounting) return;
 		this.scheduled = false;
 		SCHEDULED_UNIVERSAL_ROOTS.delete(this);
-		if (this.unmounted || this.owner?.disposed || this.lastComponent === null) return;
+		if (this.unmounted || this.owner?.disposed || this.lastComponent === null) {
+			this.flushHostBindingUpdates();
+			return;
+		}
 		if (this.bridge !== null) {
 			this.bridge.invalidate();
 		} else if (this.hasAsyncTransport()) {
@@ -8173,7 +8528,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			});
 		} else {
 			const input = this.scheduledRenderInput();
-			if (input === null) return;
+			if (input === null) {
+				this.flushHostBindingUpdates();
+				return;
+			}
 			let attempt: UniversalPreparedAttempt;
 			try {
 				attempt = this.__prepareScheduled(input[0], input[1]);
@@ -8182,10 +8540,27 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				// handler it escapes into the host's microtask channel. A root created
 				// with onUncaughtError consumes its own report; the failed attempt is
 				// already discarded and recovery is unchanged.
-				if (!reportUniversalUncaughtError(this, error)) throw error;
+				try {
+					if (!reportUniversalUncaughtError(this, error)) throw error;
+				} finally {
+					// A binding notification may have deferred its own microtask while
+					// this scheduled render was active. Drain it even if rendering failed.
+					this.flushHostBindingUpdates();
+				}
 				return;
 			}
-			if (attempt.status === 'prepared') attempt.commit();
+			let commitError: unknown = NO_PENDING_PASSIVE_ERROR;
+			try {
+				if (attempt.status === 'prepared') attempt.commit();
+			} catch (error) {
+				commitError = error;
+			}
+			try {
+				this.flushHostBindingUpdates();
+			} catch (error) {
+				if (commitError === NO_PENDING_PASSIVE_ERROR) throw error;
+			}
+			if (commitError !== NO_PENDING_PASSIVE_ERROR) throw commitError;
 		}
 	}
 
@@ -9955,28 +10330,37 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		component: UniversalComponent<any>,
 		props: any,
 	): UniversalTransactionImpl<Container, PublicInstance> {
-		const compactTemplateUpdate = this.tryCreateCompactTemplateUpdateTransaction(
-			blueprint,
-			attempt,
-			component,
-			props,
-		);
-		if (compactTemplateUpdate !== null) return compactTemplateUpdate;
-		const compactLeafUpdate = this.tryCreateCompactLeafUpdateTransaction(
-			blueprint,
-			attempt,
-			component,
-			props,
-		);
-		if (compactLeafUpdate !== null) return compactLeafUpdate;
+		// Compact publications update host props without publishing host binding
+		// subscriptions. Bound trees use the general accepted transaction path.
+		const hasHostBindings =
+			(this.boundHosts?.size ?? 0) !== 0 ||
+			(attempt.treeFeatures & UNIVERSAL_TREE_HOST_BINDING) !== 0;
+		if (!hasHostBindings) {
+			const compactTemplateUpdate = this.tryCreateCompactTemplateUpdateTransaction(
+				blueprint,
+				attempt,
+				component,
+				props,
+			);
+			if (compactTemplateUpdate !== null) return compactTemplateUpdate;
+			const compactLeafUpdate = this.tryCreateCompactLeafUpdateTransaction(
+				blueprint,
+				attempt,
+				component,
+				props,
+			);
+			if (compactLeafUpdate !== null) return compactLeafUpdate;
+		}
 		this.expandCompactLeafLists(blueprint);
-		const stableLeafUpdate = this.tryCreateStableLeafUpdateTransaction(
-			blueprint,
-			attempt,
-			component,
-			props,
-		);
-		if (stableLeafUpdate !== null) return stableLeafUpdate;
+		if (!hasHostBindings) {
+			const stableLeafUpdate = this.tryCreateStableLeafUpdateTransaction(
+				blueprint,
+				attempt,
+				component,
+				props,
+			);
+			if (stableLeafUpdate !== null) return stableLeafUpdate;
+		}
 		const stagedPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
 		if (((this.treeFeatures | attempt.treeFeatures) & UNIVERSAL_TREE_PORTAL) === 0) {
 			return this.createPreparedTransaction(
@@ -11793,6 +12177,23 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					deactivatedRegionCells.add(cell);
 					previous.deactivate();
 				}
+				// Publish bindings after the logical host and owner state has accepted.
+				let bindingUnsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
+				for (const record of removedHosts) {
+					const error = this.dropHostBindings(record);
+					if (bindingUnsubscribeError === NO_PENDING_PASSIVE_ERROR) bindingUnsubscribeError = error;
+				}
+				try {
+					for (const draft of hostDrafts) {
+						const error = this.commitHostBindings(draft.record, draft.blueprint as BlueprintHost);
+						if (bindingUnsubscribeError === NO_PENDING_PASSIVE_ERROR)
+							bindingUnsubscribeError = error;
+					}
+				} catch (error) {
+					for (const draft of hostDrafts) this.dropHostBindings(draft.record);
+					throw error;
+				}
+				if (bindingUnsubscribeError !== NO_PENDING_PASSIVE_ERROR) throw bindingUnsubscribeError;
 				if (portalReleaseError !== NO_PENDING_PASSIVE_ERROR) throw portalReleaseError;
 			},
 			() => (preparedHost ?? preparedAsyncHost)?.afterAccept?.(),
@@ -11908,6 +12309,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 			if (this.hostAttachments !== null) this.queueHostAttachmentFlush();
 			this.ensureScheduledTransitionWork();
+			if (
+				(this.dirtyBoundHosts.length !== 0 || this.dirtyBoundSources.length !== 0) &&
+				!this.boundHostScheduled
+			) {
+				this.scheduleHostBindingUpdate();
+			}
 		}
 	}
 
@@ -12164,6 +12571,19 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		return {
 			batch,
 			finalize: (acceptedHostError) => {
+				let bindingUnsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
+				if (this.boundHosts !== null) {
+					for (const record of [...this.boundHosts.keys()]) {
+						const error = this.dropHostBindings(record);
+						if (bindingUnsubscribeError === NO_PENDING_PASSIVE_ERROR)
+							bindingUnsubscribeError = error;
+					}
+				}
+				this.dirtyBoundHosts = [];
+				this.dirtyBoundHostSet.clear();
+				this.dirtyBoundSources = [];
+				this.dirtyBoundSourceSet.clear();
+				this.boundHostScheduled = false;
 				this.scheduled = false;
 				this.scheduledUrgent = false;
 				this.scheduledFullRoot = false;
@@ -12253,6 +12673,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					});
 				}
 				const syncTasks = [...insertionTasks, ...layoutTasks, ...refTasks];
+				if (bindingUnsubscribeError !== NO_PENDING_PASSIVE_ERROR) {
+					syncTasks.unshift(() => {
+						throw bindingUnsubscribeError;
+					});
+				}
 				if (attachmentUnsubscribeError !== NO_PENDING_PASSIVE_ERROR) {
 					syncTasks.unshift(() => {
 						throw attachmentUnsubscribeError;
