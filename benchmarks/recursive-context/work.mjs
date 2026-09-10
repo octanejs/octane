@@ -94,6 +94,7 @@ function countImportedCalls(ast, importedName) {
 		}
 	}
 	let calls = 0;
+	let emptyArrayCalls = 0;
 	function visit(node) {
 		if (
 			ts.isCallExpression(node) &&
@@ -101,11 +102,17 @@ function countImportedCalls(ast, importedName) {
 			locals.has(node.expression.text)
 		) {
 			calls++;
+			if (
+				node.arguments[0] &&
+				ts.isArrayLiteralExpression(node.arguments[0]) &&
+				node.arguments[0].elements.length === 0
+			)
+				emptyArrayCalls++;
 		}
 		ts.forEachChild(node, visit);
 	}
 	visit(ast);
-	return { imports: locals.size, calls };
+	return { imports: locals.size, calls, emptyArrayCalls };
 }
 
 function measurePlainHook(source, environment) {
@@ -136,10 +143,10 @@ const PLAIN_HOOKS = Object.fromEntries(
 	]),
 );
 
-// The own-promise control must keep its direct batch and trailing warm thunk;
-// reassigned props and locally shadowed components need the legacy closure.
-// Inspect imported calls in the parsed production compiler output so helper
-// aliases and generated formatting cannot obscure either negative case.
+// The own-promise control must keep its direct batch. Reassigned props and a
+// locally shadowed component name need the in-body warm closure rather than the
+// attached plan. Inspect imports and calls in parsed production output so
+// helper aliases and generated formatting cannot obscure the split.
 const REASSIGNED_PROPS_SOURCE = `import { use } from 'octane';
 function Child(props) @{
   const value = use(props.load('child', props.version));
@@ -160,13 +167,20 @@ export function Parent(props) @{
   const Parent = () => null;
   <main><Child load={props.load} version={props.version} /></main>
 }`;
+// Keep the async child in its own module. This parent's only batch call is the
+// fallback registration, so the client output can drop the useBatch import.
+const FALLBACK_ONLY_SOURCE = `import AsyncChild from './AsyncChild.tsrx';
+export function Parent(props) @{
+  const Parent = () => null;
+  <main><AsyncChild load={props.load} version={props.version} /></main>
+}`;
 
-function measureCompiledControl(source, filename) {
-	const code = compile(source, filename, { dev: false, hmr: false }).code;
+function measureCompiledControl(source, filename, options = {}) {
+	const code = compile(source, filename, { dev: false, hmr: false, ...options }).code;
 	const ast = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
 	if (ast.parseDiagnostics.length > 0) throw new Error(`${filename}: invalid compiled TypeScript`);
 	return {
-		batch: countImportedCalls(ast, 'useBatch'),
+		batch: countImportedCalls(ast, options.mode === 'server' ? 'puBatch' : 'useBatch'),
 		plan: countImportedCalls(ast, 'registerWarmPlan'),
 		warmMemo: countImportedCalls(ast, 'warmMemo'),
 	};
@@ -182,6 +196,15 @@ const COMPILED_CONTROLS = {
 		SHADOWED_COMPONENT_SOURCE,
 		'warm-shadowed-component.tsrx',
 	),
+	fallbackOnly: measureCompiledControl(FALLBACK_ONLY_SOURCE, 'warm-fallback-only.tsrx'),
+};
+const NON_CLIENT_FALLBACK_CONTROLS = {
+	server: measureCompiledControl(FALLBACK_ONLY_SOURCE, 'warm-fallback-only.tsrx', {
+		mode: 'server',
+	}),
+	universal: measureCompiledControl(FALLBACK_ONLY_SOURCE, 'warm-fallback-only.tsrx', {
+		renderer: { id: 'object', module: 'octane/universal', target: 'universal' },
+	}),
 };
 
 // Scaffolding is bounded above so later direct-return lowering can reduce it
@@ -446,16 +469,33 @@ for (const [environment, { context, mixed }] of Object.entries(PLAIN_HOOKS)) {
 	}
 }
 for (const [name, control] of Object.entries(COMPILED_CONTROLS)) {
-	const expectedBatchCalls = name === 'ownPromise' ? 3 : 2;
-	const expectedWarmMemos = name === 'ownPromise' ? 2 : 1;
-	if (control.batch.imports !== 1 || control.batch.calls !== expectedBatchCalls) {
-		failures.push(`${name}: expected ${expectedBatchCalls} retained batch calls`);
+	const expectedBatchCalls = name === 'ownPromise' ? 2 : name === 'fallbackOnly' ? 0 : 1;
+	const expectedBatchImports = name === 'fallbackOnly' ? 0 : 1;
+	const expectedWarmMemos = name === 'ownPromise' ? 2 : name === 'fallbackOnly' ? 0 : 1;
+	if (
+		control.batch.imports !== expectedBatchImports ||
+		control.batch.calls !== expectedBatchCalls
+	) {
+		failures.push(
+			`${name}: expected ${expectedBatchImports} batch imports and ${expectedBatchCalls} direct batch calls`,
+		);
 	}
-	if (control.plan.imports !== 0 || control.plan.calls !== 0) {
-		failures.push(`${name}: unexpected extracted child-only warm plan`);
+	if (control.batch.emptyArrayCalls !== 0) {
+		failures.push(`${name}: unexpected empty batch arrays: ${control.batch.emptyArrayCalls}`);
+	}
+	if (control.plan.imports !== 1 || control.plan.calls !== 1) {
+		failures.push(`${name}: expected one explicit fallback warm-plan registration`);
 	}
 	if (control.warmMemo.calls !== expectedWarmMemos) {
 		failures.push(`${name}: expected ${expectedWarmMemos} warmable promise creations`);
+	}
+}
+for (const [name, { batch, plan, warmMemo }] of Object.entries(NON_CLIENT_FALLBACK_CONTROLS)) {
+	if (batch.imports !== 1 || batch.calls !== 1 || batch.emptyArrayCalls !== 1) {
+		failures.push(`${name}.fallbackOnly: expected one unchanged empty batch registration`);
+	}
+	if (plan.imports !== 0 || plan.calls !== 0 || warmMemo.calls !== 0) {
+		failures.push(`${name}.fallbackOnly: unexpected plan extraction or warm creation`);
 	}
 }
 try {
@@ -478,9 +518,9 @@ try {
 		after: ['__verifyWarmPlanControl'],
 		metrics: ['useBatch', 'registerWarmPlan'],
 	});
-	if (results.warmPlanControl.useBatch !== 4 || results.warmPlanControl.registerWarmPlan !== 0) {
+	if (results.warmPlanControl.useBatch !== 3 || results.warmPlanControl.registerWarmPlan !== 1) {
 		failures.push(
-			`ownPromise: expected 4 batch calls and no extracted plan, got ` +
+			`ownPromise: expected 3 direct batch calls and 1 fallback plan registration, got ` +
 				`${results.warmPlanControl.useBatch}/${results.warmPlanControl.registerWarmPlan}`,
 		);
 	}
@@ -511,7 +551,12 @@ console.log(
 );
 for (const [name, { batch, plan, warmMemo }] of Object.entries(COMPILED_CONTROLS)) {
 	console.log(
-		`${name} compiled: batch calls=${batch.calls}, plan calls=${plan.calls}, warmable creations=${warmMemo.calls}`,
+		`${name} compiled: batch calls=${batch.calls}, empty arrays=${batch.emptyArrayCalls}, plan calls=${plan.calls}, warmable creations=${warmMemo.calls}`,
+	);
+}
+for (const [name, { batch, plan }] of Object.entries(NON_CLIENT_FALLBACK_CONTROLS)) {
+	console.log(
+		`${name} fallback compiled: batch imports/calls=${batch.imports}/${batch.calls}, empty arrays=${batch.emptyArrayCalls}, plan calls=${plan.calls}`,
 	);
 }
 for (const [environment, { context, mixed }] of Object.entries(PLAIN_HOOKS)) {
@@ -571,7 +616,10 @@ if (outputPath) {
 				name: `octane-${name}-compiled-work`,
 				ops: Object.fromEntries(
 					Object.entries({
+						batch_imports: batch.imports,
 						batch_calls: batch.calls,
+						empty_batch_arrays: batch.emptyArrayCalls,
+						plan_imports: plan.imports,
 						plan_calls: plan.calls,
 						warm_memo_calls: warmMemo.calls,
 					}).map(([metric, value]) => [
@@ -581,6 +629,25 @@ if (outputPath) {
 				),
 				meta: {
 					gates: failures.some((failure) => failure.startsWith(`${name}:`)) ? 'fail' : 'pass',
+				},
+			})),
+			...Object.entries(NON_CLIENT_FALLBACK_CONTROLS).map(([name, { batch, plan }]) => ({
+				name: `octane-${name}-fallback-compiled-work`,
+				ops: Object.fromEntries(
+					Object.entries({
+						batch_imports: batch.imports,
+						batch_calls: batch.calls,
+						empty_batch_arrays: batch.emptyArrayCalls,
+						plan_calls: plan.calls,
+					}).map(([metric, value]) => [
+						metric,
+						deterministicStatForJson(deterministicCount(value)),
+					]),
+				),
+				meta: {
+					gates: failures.some((failure) => failure.startsWith(`${name}.fallbackOnly:`))
+						? 'fail'
+						: 'pass',
 				},
 			})),
 			{

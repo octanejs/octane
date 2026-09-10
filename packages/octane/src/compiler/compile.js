@@ -16225,10 +16225,26 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk, staticPla
 		// setup preserves early-return reachability: an alternate returned tree must
 		// not activate the final template's plan. The first direct batch receives the
 		// same thunk below so it can still warm before setup reaches this registration.
-		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
-		const batchAlias = requireRuntimeForContext(ctx, batchHelper);
+		// Only the DOM client has registerWarmPlan. Its two-argument form pushes
+		// the same block, thunk, and undefined props as an empty useBatch call,
+		// without creating an array on every render. Server and universal units
+		// continue to use their own batch helpers.
+		const fallbackHelper =
+			ctx.mode === 'client' && ctx._universalRuntimeUnit == null
+				? 'registerWarmPlan'
+				: ctx.mode === 'server'
+					? 'puBatch'
+					: 'useBatch';
 		const fallback = inheritOriginLoc(
-			b.stmt(b.call(batchAlias, b.array([]), warmThunk)),
+			b.stmt(
+				fallbackHelper === 'registerWarmPlan'
+					? b.call(
+							requireRuntimeForContext(ctx, fallbackHelper),
+							warmThunk,
+							b.unary('void', b.literal(0, '0')),
+						)
+					: b.call(requireRuntimeForContext(ctx, fallbackHelper), b.array([]), warmThunk),
+			),
 			warmThunk,
 		);
 		let registration = [fallback];
