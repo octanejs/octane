@@ -121,10 +121,24 @@ function acquire(report, repositoryUrl, options, role = 'library') {
 		timeoutMs: options.timeoutMs,
 		now: options.now,
 	});
+	if (receipt.status === 'complete') verifyReceiptCheckout(receipt);
 	receipt.id = `${baseline.id}-${baseline.receipts.length + 1}`;
 	baseline.receipts.push(receipt);
 	baseline.currentReceiptId = receipt.id;
 	return baseline;
+}
+
+function verifyReceiptCheckout(receipt) {
+	requireValue(
+		realpathSync(receipt.checkoutPath) ===
+			realpathSync(git(receipt.checkoutPath, 'rev-parse', '--show-toplevel').trim()),
+		'Receipt path is not a repository root',
+	);
+	requireValue(
+		git(receipt.checkoutPath, 'rev-parse', 'HEAD').trim() === receipt.sha &&
+			!git(receipt.checkoutPath, 'status', '--porcelain=v1', '--untracked-files=all').trim(),
+		'Receipt checkout is dirty or differs from its SHA',
+	);
 }
 
 function packageAt(receipt, packageName, directory) {
@@ -658,18 +672,7 @@ export function validateAuditReport(report, { findingIds = [], verifyCheckouts =
 					path.isAbsolute(receipt.checkoutPath),
 				'Invalid successful baseline receipt',
 			);
-			if (verifyCheckouts) {
-				requireValue(
-					realpathSync(receipt.checkoutPath) ===
-						realpathSync(git(receipt.checkoutPath, 'rev-parse', '--show-toplevel').trim()),
-					'Receipt path is not a repository root',
-				);
-				requireValue(
-					git(receipt.checkoutPath, 'rev-parse', 'HEAD').trim() === receipt.sha &&
-						!git(receipt.checkoutPath, 'status', '--porcelain=v1', '--untracked-files=all').trim(),
-					'Receipt checkout is dirty or differs from its SHA',
-				);
-			}
+			if (verifyCheckouts) verifyReceiptCheckout(receipt);
 		}
 	}
 	for (const binding of report.bindings) {
@@ -770,25 +773,35 @@ export function validateAuditReport(report, { findingIds = [], verifyCheckouts =
 	return report;
 }
 
-function assessmentFingerprint(finding) {
+function assessmentFingerprint(report, finding) {
 	return fingerprint({
 		baselines: finding.baselines,
-		assessedAt: finding.assessedAt ?? null,
 		releaseFingerprint: finding.releaseFingerprint ?? null,
-		evidenceIds: finding.evidenceIds,
+		consumerFailure: finding.consumerFailure ?? null,
+		evidence: sorted(finding.evidenceIds).map((id) => {
+			const evidence = report.evidence.find((item) => item.id === id);
+			return {
+				id,
+				origin: evidence.origin,
+				baselines: evidence.baselines,
+				factsFingerprint: evidence.factsFingerprint ?? null,
+				location: evidence.location ?? null,
+				observation: evidence.observation ?? null,
+			};
+		}),
 	});
 }
 
-function invalidate(finding, reasons, checkedAt) {
+function invalidate(report, finding, reasons) {
 	finding.invalidations ??= [];
+	const revision = assessmentFingerprint(report, finding);
 	for (const reason of reasons) {
-		const revision = assessmentFingerprint(finding);
 		const id = fingerprint({ reason, revision });
 		if (!finding.invalidations.some((item) => item.id === id))
 			finding.invalidations.push({
 				id,
 				assessmentFingerprint: revision,
-				observedAt: checkedAt,
+				observedAt: report.checkedAt,
 				...reason,
 			});
 	}
@@ -796,9 +809,13 @@ function invalidate(finding, reasons, checkedAt) {
 
 /** Refresh receipts, never rewrite an old finding's assessment baseline to the replacement SHA. */
 export async function revalidateAudit(input, options = {}) {
-	validateAuditReport(input, { findingIds: options.findingIds });
+	// Historical receipts retain source identity even after temporary checkout storage expires.
+	// acquire() verifies every replacement checkout before any current source is consumed.
+	validateAuditReport(input, { findingIds: options.findingIds, verifyCheckouts: false });
 	const report = structuredClone(input);
 	report.checkedAt = (options.now ?? now)();
+	// Collection failures remain attached to their evidence; refresh failures describe this pass.
+	report.failures = report.failures.filter((failure) => failure.code !== 'inventory-unavailable');
 	for (const baseline of report.baselines)
 		acquire(report, baseline.repositoryUrl, options, baseline.role);
 	const octane = current(
@@ -876,11 +893,11 @@ export async function revalidateAudit(input, options = {}) {
 				binding.releaseCheck.fingerprint
 			)
 				reasons.push({ code: 'release-changed', to: binding.releaseCheck.fingerprint });
-			invalidate(finding, reasons, report.checkedAt);
+			invalidate(report, finding, reasons);
 			const priorChange = finding.invalidations.some(
 				(item) =>
 					['upstream-changed', 'release-changed'].includes(item.code) &&
-					item.assessmentFingerprint === assessmentFingerprint(finding),
+					item.assessmentFingerprint === assessmentFingerprint(report, finding),
 			);
 			finding.freshness = incomplete
 				? 'incomplete'
@@ -923,10 +940,15 @@ export function renderAuditReport(report, findingIds = []) {
 		lines.push('', `${binding.name}: ${binding.collection}`);
 		for (const failure of [...binding.failures, ...(binding.releaseCheck?.failures ?? [])])
 			lines.push(`  ${failure.code}: ${failure.message}`);
-		for (const release of binding.releases)
-			lines.push(
-				`  ${release.package}: pinned ${release.pinnedVersion ?? 'unknown'}, latest stable ${release.latestStableVersion ?? 'unverified'}, default-branch package version ${release.defaultBranchVersion ?? 'unknown'}`,
+		for (const release of binding.releases) {
+			const refreshed = binding.releaseCheck?.releases.find(
+				(item) => item.package === release.package,
 			);
+			lines.push(
+				`  ${release.package}: pinned ${release.pinnedVersion ?? 'unknown'}, current registry latest stable ${refreshed?.latestStableVersion ?? 'unverified'}${refreshed ? ` fetched ${refreshed.registryFetchedAt}` : ''}`,
+				`    Collected source: default-branch package version ${release.defaultBranchVersion ?? 'unknown'}; collection registry latest stable ${release.latestStableVersion ?? 'unverified'}`,
+			);
+		}
 		lines.push(`  Reduction: ${binding.facts.reduction.assessment}`);
 		for (const tree of binding.facts.reduction.trees ?? [])
 			lines.push(

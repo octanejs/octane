@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { validateAuditReport } from './bindings-audit-lib.mjs';
 
 const cli = new URL('./bindings-audit.mjs', import.meta.url).href;
 
@@ -256,6 +257,7 @@ test('shared repository advancement invalidates every dependent finding and repe
 test('a new binding prevents an old all-selection claim even after repeated unchanged refresh', (t) => {
 	const f = fixture(t);
 	assert.equal(f.audit().status, 0);
+	const originalSha = git(f.source, 'rev-parse', 'HEAD');
 	f.addBinding('gamma');
 	f.commit(f.source);
 	for (let iteration = 0; iteration < 2; iteration++) {
@@ -266,6 +268,35 @@ test('a new binding prevents an old all-selection claim even after repeated unch
 		assert.deepEqual(report.selection.bindings, ['@octanejs/alpha', '@octanejs/beta']);
 		assert.ok(report.selection.latestInventoryNames.includes('@octanejs/gamma'));
 	}
+	git(f.source, 'reset', '--hard', originalSha);
+	const restored = f.invoke(['revalidate', '--input', f.output]);
+	assert.equal(restored.status, 2, restored.stderr);
+	assert.equal(JSON.parse(restored.stdout).selection.coverage, 'stale');
+});
+
+test('saved reports refresh after their historical temporary checkouts expire', (t) => {
+	const f = fixture(t);
+	assert.equal(f.audit().status, 0);
+	const original = JSON.parse(readFileSync(f.output, 'utf8'));
+	const forged = structuredClone(original);
+	forged.baselines[0].receipts.at(-1).sha = 'a'.repeat(40);
+	assert.throws(() => validateAuditReport(forged), /differs from its SHA/);
+	f.write(original.baselines[0].receipts.at(-1).checkoutPath, 'untracked.txt', 'modified cache');
+	assert.throws(() => validateAuditReport(original), /checkout is dirty/);
+	for (const baseline of original.baselines)
+		for (const receipt of baseline.receipts)
+			rmSync(receipt.checkoutPath, { recursive: true, force: true });
+	const result = f.invoke(['revalidate', '--input', f.output]);
+	assert.equal(result.status, 0, result.stderr);
+	const refreshed = JSON.parse(result.stdout);
+	for (const [index, baseline] of refreshed.baselines.entries()) {
+		assert.deepEqual(baseline.receipts.slice(0, -1), original.baselines[index].receipts);
+		const receipt = baseline.receipts.at(-1);
+		assert.ok(existsSync(receipt.checkoutPath));
+		assert.equal(git(receipt.checkoutPath, 'rev-parse', 'HEAD'), receipt.sha);
+		assert.equal(git(receipt.checkoutPath, 'status', '--porcelain'), '');
+	}
+	assert.equal(f.invoke(['report', '--input', f.output]).status, 0);
 });
 
 test('failed refresh retains successful receipts without presenting their SHAs as current', (t) => {
@@ -311,6 +342,46 @@ function addAssessment(report) {
 	report.findings.push(finding);
 	return finding;
 }
+
+test('successful inventory recovery clears refresh failures while preserving collection failures', (t) => {
+	const f = fixture(t);
+	assert.equal(f.audit(['--binding', 'alpha']).status, 0);
+	const original = JSON.parse(readFileSync(f.output, 'utf8'));
+	const finding = addAssessment(original);
+	f.write(f.root, 'report.json', original);
+	const originalSha = git(f.source, 'rev-parse', 'HEAD');
+	f.write(f.source, 'packages/octane-mcp-server/src/bridge.js', 'invalid registration source');
+	f.commit(f.source);
+	const failed = f.invoke(['revalidate', '--input', f.output, '--finding', finding.id]);
+	assert.equal(failed.status, 2, failed.stderr);
+	const report = JSON.parse(failed.stdout);
+	assert.ok(report.failures.some((failure) => failure.code === 'inventory-unavailable'));
+	git(f.source, 'reset', '--hard', originalSha);
+	report.findings.find((item) => item.id === finding.id).assessedAt = new Date().toISOString();
+	report.evidence.find((evidence) => evidence.id === finding.evidenceIds[0]).observation =
+		'Reran the disposal scenario on the restored source; the listener still fires.';
+	f.write(f.root, 'report.json', report);
+	const recovered = f.invoke(['revalidate', '--input', f.output, '--finding', finding.id]);
+	assert.equal(recovered.status, 0, recovered.stderr);
+	const fresh = JSON.parse(recovered.stdout);
+	assert.deepEqual(fresh.failures, []);
+	assert.equal(fresh.findings.find((item) => item.id === finding.id).freshness, 'current');
+	fresh.failures.push({
+		code: 'collection-incomplete',
+		message: 'Collection evidence is missing.',
+	});
+	fresh.bindings[0].failures.push({
+		code: 'collection-failed',
+		message: 'Missing source evidence.',
+	});
+	fresh.bindings[0].collection = 'incomplete';
+	f.write(f.root, 'report.json', fresh);
+	const incomplete = f.invoke(['revalidate', '--input', f.output, '--finding', finding.id]);
+	assert.equal(incomplete.status, 2, incomplete.stderr);
+	const retained = JSON.parse(incomplete.stdout);
+	assert.deepEqual(retained.failures, fresh.failures);
+	assert.deepEqual(retained.bindings[0].failures, fresh.bindings[0].failures);
+});
 
 test('same-report consumer assessments render with evidence and require explicit reassessment after changes', (t) => {
 	const f = fixture(t);
@@ -364,7 +435,7 @@ test('invalid report versions, selections, evidence, checkout SHAs and finding I
 			report.findings[0].baselines = {};
 		},
 		(report) => {
-			report.baselines[0].receipts[0].sha = 'a'.repeat(40);
+			report.baselines[0].receipts[0].sha = 'invalid-sha';
 		},
 		(report) => {
 			addAssessment(report).consumerFailure = {};
@@ -410,6 +481,13 @@ test('published release refresh can invalidate a finding without a Git change', 
 	);
 	assert.equal(report.bindings[0].releases[0].latestStableVersion, '2.0.0');
 	assert.equal(report.bindings[0].releaseCheck.releases[0].latestStableVersion, '3.0.0');
+	const human = f.invoke(['report', '--input', f.output], registry);
+	assert.equal(human.status, 2, human.stderr);
+	assert.match(human.stdout, /current registry latest stable 3\.0\.0/);
+	assert.match(human.stdout, /Collected source: default-branch package version 2\.1\.0-dev\.1/);
+	const unavailable = f.invoke(['report', '--input', f.output], {});
+	assert.equal(unavailable.status, 2, unavailable.stderr);
+	assert.match(unavailable.stdout, /current registry latest stable unverified/);
 });
 
 test('a changed or missing release repository requires re-audit, even if an assessment adopts its release fingerprint', (t) => {
@@ -516,6 +594,51 @@ test('a remote returning to an earlier SHA does not resurrect invalidated assess
 		JSON.parse(result.stdout).findings.find((item) => item.id === finding.id).freshness,
 		'stale',
 	);
+	const stale = JSON.parse(result.stdout);
+	const assessment = stale.findings.find((item) => item.id === finding.id);
+	assessment.assessedAt = new Date(Date.parse(assessment.assessedAt) + 1_000).toISOString();
+	f.write(f.root, 'report.json', stale);
+	const redated = f.invoke(['revalidate', '--input', f.output, '--finding', finding.id]);
+	assert.equal(redated.status, 2, redated.stderr);
+	assert.equal(
+		JSON.parse(redated.stdout).findings.find((item) => item.id === finding.id).freshness,
+		'stale',
+	);
+	stale.evidence.find((item) => item.id === assessment.evidenceIds[0]).observation =
+		'Repeated subscribe, dispose and emit on the restored source; callback still runs.';
+	f.write(f.root, 'report.json', stale);
+	const reassessed = f.invoke(['revalidate', '--input', f.output, '--finding', finding.id]);
+	assert.equal(reassessed.status, 0, reassessed.stderr);
+	assert.equal(
+		JSON.parse(reassessed.stdout).findings.find((item) => item.id === finding.id).freshness,
+		'current',
+	);
+});
+
+test('timestamps cannot clear release invalidation after the registry returns to its prior identity', (t) => {
+	const f = fixture(t);
+	assert.equal(f.audit(['--binding', 'alpha']).status, 0);
+	const original = JSON.parse(readFileSync(f.output, 'utf8'));
+	const finding = addAssessment(original);
+	f.write(f.root, 'report.json', original);
+	const registry = structuredClone(f.registry);
+	registry.engine.versions['3.0.0'] = { ...registry.engine.versions['2.0.0'], version: '3.0.0' };
+	assert.equal(f.invoke(['revalidate', '--input', f.output], registry).status, 2);
+	const stale = JSON.parse(readFileSync(f.output, 'utf8'));
+	const assessment = stale.findings.find((item) => item.id === finding.id);
+	assessment.assessedAt = new Date(Date.parse(assessment.assessedAt) + 1_000).toISOString();
+	f.write(f.root, 'report.json', stale);
+	const redated = f.invoke(['revalidate', '--input', f.output, '--finding', finding.id]);
+	assert.equal(redated.status, 2, redated.stderr);
+	assert.equal(
+		JSON.parse(redated.stdout).findings.find((item) => item.id === finding.id).freshness,
+		'stale',
+	);
+	stale.evidence.find((item) => item.id === assessment.evidenceIds[0]).observation =
+		'Reran the package consumer after registry recovery and reproduced the disposal defect.';
+	f.write(f.root, 'report.json', stale);
+	const reassessed = f.invoke(['revalidate', '--input', f.output, '--finding', finding.id]);
+	assert.equal(reassessed.status, 0, reassessed.stderr);
 });
 
 test('counts unfamiliar upstream layouts as snapshots requiring inspection', (t) => {
