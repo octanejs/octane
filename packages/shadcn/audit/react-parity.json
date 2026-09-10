@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "c05298b5a1159c771a641dac417549a61072199d9588d5273964781958dbf5ae"
+      "lockfileSha256": "1dd0431e07d1ba2ecc4a84e18c871e01d0c661cac7cdff6a9de723a6ce71fe98"
     }
   },
   "lanes": [
@@ -174,22 +174,22 @@
       "environment": "workspace-node",
       "project": "shadcn-base-ui-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Three bounded same-fixture React/Octane comparisons using the release Base UI source, Nova stylesheet and Lucide icon transforms. See UPSTREAM.md for retained prior Radix lineage and full scope limits.",
+      "notes": "Three bounded same-fixture React/Octane comparisons using the release Base UI source, Nova stylesheet and Lucide icon transforms. Select and NavigationMenu compare portaled positioners and popup content after opening; Select also compares options and scroll buttons. See UPSTREAM.md for retained prior Radix lineage and full scope limits.",
       "files": [
         {
           "path": "packages/shadcn/tests/differential/base-ui-latest.test.ts",
           "role": "test",
-          "sha256": "1b556a9bf90ff17688aa67de340c7d512db587b849799b4ab8c94028a1bb78b9",
+          "sha256": "b01f203ec57a9b2e4720f8ec3297b2e7efd15e4dbcb3fffa81da8d31a83d3c8a",
           "cases": [
             {
               "id": "differential:shadcn-base-select",
-              "testName": "Select preserves selected labels and controlled updates",
-              "fullName": "differential: shadcn 4.21 Base UI wrappers Select preserves selected labels and controlled updates"
+              "testName": "Select compares portaled group, options, scroll buttons and selection",
+              "fullName": "differential: shadcn 4.21 Base UI wrappers Select compares portaled group, options, scroll buttons and selection"
             },
             {
               "id": "differential:shadcn-base-navigation-menu",
-              "testName": "NavigationMenu preserves links, active state and trigger markup",
-              "fullName": "differential: shadcn 4.21 Base UI wrappers NavigationMenu preserves links, active state and trigger markup"
+              "testName": "NavigationMenu compares portaled content, links and Escape close",
+              "fullName": "differential: shadcn 4.21 Base UI wrappers NavigationMenu compares portaled content, links and Escape close"
             },
             {
               "id": "differential:shadcn-base-scroll-area",
@@ -201,7 +201,7 @@
         {
           "path": "packages/shadcn/tests/differential/base-upstream/select.tsx",
           "role": "support",
-          "sha256": "55152cd70652219f84880774bbe9b4d24802fce03c1988bf30fd51aec9ff59f9"
+          "sha256": "887cdc912a481c85ae067d776a6bc9bc1e0a3d21c711cd2cefc923666ada2b5b"
         },
         {
           "path": "packages/shadcn/upstream/base/select.tsx",

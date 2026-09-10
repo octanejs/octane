@@ -169,9 +169,7 @@
     "@octanejs/radix": "workspace:*",
     "@octanejs/sonner": "workspace:*",
     "class-variance-authority": "catalog:default",
-    "clsx": "catalog:default",
-    "cn": "catalog:default",
-    "tailwind-merge": "catalog:default"
+    "cn": "catalog:default"
   },
   "peerDependencies": {
     "octane": "workspace:^0.2.5"
@@ -179,12 +177,15 @@
   "devDependencies": {
     "@base-ui/react": "1.8.0",
     "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "clsx": "catalog:default",
     "esbuild": "catalog:default",
     "lucide-react": "catalog:default",
     "octane": "workspace:*",
     "radix-ui": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "tailwind-merge": "catalog:default",
     "vitest": "catalog:default"
   }
 }
