@@ -87,6 +87,7 @@ runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
 **universal-object-teardown**,
 **universal-template-events**, **universal-native-hover**, **universal-owner-drafts**,
+**universal-hook-slot**,
 **universal-draft-lookup**, **scoped-descriptor-shapes**, **memo-wrapper-shapes**,
 **universal-external-store**,
 **lynx-render**, **lynx-bundle-size**, **tsrx-renderer-validation-ranges**, and
@@ -283,6 +284,7 @@ internally, get their own baseline and guard namespace.
 | `universal-template-events` | universal-template-events | none (Node-only) | shape-stable handler updates across 128 and 1,024 retained native event sites through ordinary hosts and the fallback collapsed-template host capability, with host identity, stable listener IDs, latest-handler dispatch, and redundant-command controls |
 | `universal-native-hover` | universal-native-hover | none (Node-only) | compiled production native universal selection in 20 and 80 keyed rows, each with four component/view layers; 2,000 real hover updates per sample, host and prop identity checks, teardown, a same-run scaling ratio, and optional local V8 cumulative allocation profile |
 | `universal-owner-drafts` | universal-owner-drafts | none (Node-only) | retained object-driver roots with 0, 1, 128, and 1,024 changed-prop child owners; output, render, host identity, and structural-command controls |
+| `universal-hook-slot` | universal-hook-slot | none (Node-only) | production universal hook-slot array-creation events across direct and nested hook calls, with state/ref/memo/effect identity and output controls; deterministic zero-array guard |
 | `universal-draft-lookup` | universal-draft-lookup | none (Node-only) | root-owned ref lookups from 0, 1, 128, and 1,024 changing child owners, with own-ref and plain-object controls and host, state, and structural-command checks |
 | `scoped-descriptor-shapes` | scoped-descriptor-shapes | none (Node-only) | production client/server scoped element and value descriptor creation, reads, enumeration, cloning, Children.map and SSR, with plain-element controls and deferred-child/key/order checks |
 | `memo-wrapper-shapes` | memo-wrapper-shapes | none (Node-only) | production client/server creation and metadata reads across 128 and 1,024 distinct memo wrappers, with plain-function/data-only controls, live defaults, static-hoisting checks, and untimed V8 shape diagnostics |
