@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile } from '../../src/compiler/compile.js';
 import { compileToVolarMappings } from '../../src/compiler/volar.js';
@@ -7,6 +9,10 @@ import { slotHooks } from '../../src/compiler/slot-hooks.js';
 const NAMING = 'OCTANE_NATIVE_SIGNAL_NAME';
 const MEMO_READ = 'OCTANE_NATIVE_MEMO_READ';
 const FILENAME = '/src/native-reads.tsrx';
+const ORDINARY_DOLLAR = readFileSync(
+	resolve(import.meta.dirname, '../_fixtures/native-reads-ordinary-dollar.tsrx'),
+	'utf8',
+);
 const PREFIX = `import { createScope } from 'octane/signals';
 const scope = createScope();
 const count$ = scope.signal$('count', 0);
@@ -28,6 +34,37 @@ const modes = [
 ] as const;
 
 describe('automatic native signal compilation', () => {
+	it.each(['universal', 'valdi'])(
+		'compiles ordinary $ names on the %s renderer without a signals import',
+		(target) => {
+			const renderer = { id: 'scene', module: 'scene-runtime', target } as const;
+			if (target === 'universal') {
+				expect(() => compile(ORDINARY_DOLLAR, FILENAME, { renderer })).not.toThrow();
+			}
+			expect(() =>
+				compile(
+					`import $ from 'jquery';
+export function App(props) @{
+  const tick$ = props.delay;
+  const bag = { 'delay$': tick$ };
+  <group value={bag['delay$']} reader={props.reader$} library={$} />
+}`,
+					FILENAME,
+					{ renderer },
+				),
+			).not.toThrow();
+		},
+	);
+
+	it.each([{ dev: true }, { dev: false, hmr: false }])(
+		'keeps the ordinary DOM compile path for $ names in %j',
+		(options) => {
+			const plain = ORDINARY_DOLLAR.replaceAll('tick$', 'tick');
+			const compiled = compile(ORDINARY_DOLLAR, FILENAME, options).code;
+			expect(compiled.replaceAll('tick$', 'tick')).toBe(compile(plain, FILENAME, options).code);
+		},
+	);
+
 	it.each(modes)('compiles local signals without configuration in %j', (options) => {
 		const source = `import { useSignal$ } from 'octane/signals/client';
 export function Counter() @{ const count$ = useSignal$(0); <output>{String(count$.get())}</output> }`;
@@ -100,6 +137,7 @@ export function useCounter$() { return useSignal$(0); }`;
 			for (const component of [
 				'export function App() @{ <group /> }',
 				'export function App() { return <group />; }',
+				'export function App(props) @{ const tick$ = props.value; <group value={tick$} /> }',
 			]) {
 				const source = `${types}\n${component}`;
 				const options = {
@@ -108,13 +146,21 @@ export function useCounter$() { return useSignal$(0); }`;
 					renderer: { id: 'scene', module: 'scene-runtime', target: 'universal' as const },
 				};
 				expect(() => compile(source, FILENAME, options)).not.toThrow();
-				expect(compileToVolarMappings(source, FILENAME, options).diagnostics).toEqual([]);
+				expect(
+					compileToVolarMappings(source, FILENAME, {
+						renderers: {
+							registry: { scene: { module: 'scene-runtime', target: 'universal' } },
+							rules: [{ include: '**/*.tsrx', renderer: 'scene' }],
+						},
+					}).diagnostics,
+				).toEqual([]);
 			}
 		}
 	});
 
 	it('rejects an active non-DOM renderer boundary inside a DOM module', () => {
-		const source = `import { Canvas } from '@scene/bridge';
+		const source = `import 'octane/signals';
+import { Canvas } from '@scene/bridge';
 export function App(props) @{ <Canvas><mesh value={props.value$.get()} /></Canvas> }`;
 		expect(() =>
 			compile(source, FILENAME, {

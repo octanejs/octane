@@ -1,6 +1,6 @@
 # Signals
 
-`octane/signals` is Octane's stable, renderer-independent API for scoped state, derived values, async resources, and streams. Native component reads and `useSignal$` work with the standard Octane compiler; no signal-specific compiler option is needed. The compiler recognizes signal imports and `$` capability names, including handles passed through props and helpers imported from other modules.
+`octane/signals` is Octane's stable, renderer-independent API for scoped state, derived values, async resources, and streams. Native component reads and `useSignal$` work with the standard Octane compiler; no signal-specific compiler option is needed. Each module that consumes native reads needs a runtime import from `octane/signals`, `octane/signals/client`, or `octane/signals/server`, including modules that receive handles through props or call imported helpers. A `$` name alone does not enable native reads.
 
 The [website guide](https://octanejs.dev/docs/signals) introduces the API. This reference describes ownership, availability, and hydration in more detail. The [original implementation evidence](experimental-scoped-signals-evidence.md) and [implementation plan](plans/2026-08-27-experimental-scoped-async-signals-plan.md) are historical records.
 
@@ -106,11 +106,25 @@ export function Counter() @{
 }
 ```
 
+When a component receives its signal reader through props and has no signal API binding to import, import the signals module for its native-read compilation:
+
+```tsrx
+import { useMemo } from 'octane';
+import 'octane/signals';
+
+export function Reader(props: { read$: () => string }) @{
+	const value = useMemo(() => props.read$());
+	<output>{value as string}</output>
+}
+```
+
+The import must be a runtime import; `import type` does not enable native reads.
+
 Native reads use Octane's existing component scopes, blocks, scheduling, and acceptance machinery. The compiler carries read evidence through its own memoization and deferred values. A stable signal handle alone is not evidence that its value is unchanged. Committed subscriptions remain alive until replacement work is accepted, and discarded work releases its provisional subscriptions.
 
 Signal-consuming renderer modules activate a versioned private runtime capability before rendering. The runtime then collects reads around the actual component invocation, before parameter defaults and destructuring execute. Setup reads also remain tracked when a function returns an intermediate JSX variable or an explicit `createElement` result. Compiler body brackets join that same invocation; they do not create a second subscription owner. Compile native consumers and their custom hooks through the standard Octane toolchain so inferred memo caches carry native read evidence.
 
-Use `$` for signal bindings and functions that return native signals or hide live native reads. The naming diagnostics recognize the branded API, statically known native-capability aliases and helpers, and optional TypeScript facts. They do not rename old bindings or ordinary properties merely because they end in `$`. Opaque imported functions can exceed static naming analysis; compiler-owned caches must still preserve reads observed at runtime.
+Use `$` for signal bindings and functions that return native signals or hide live native reads. In a module with a runtime signals import, compiler naming diagnostics recognize the branded API and statically known native-capability aliases and helpers. Optional TypeScript name validation is separate and can diagnose imported signal types without enabling native reads. Neither check renames old bindings or ordinary properties merely because they end in `$`. Opaque imported functions can exceed static naming analysis; compiler-owned caches must still preserve reads observed at runtime.
 
 An inferred memo tracks its lexical dependencies and the native reads made while computing its result. A cache hit replays that read evidence so the component remains subscribed:
 

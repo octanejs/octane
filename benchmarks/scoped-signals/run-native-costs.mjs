@@ -328,11 +328,16 @@ async function buildCase(target, scenario, nativeReads, mode) {
 		}
 	}
 	if (!scenario.reads) {
+		const bundledInputs = Object.values(output.metafile.outputs).flatMap(({ inputs }) =>
+			Object.entries(inputs)
+				.filter(([, entry]) => entry.bytesInOutput > 0)
+				.map(([input]) => input),
+		);
 		assert.ok(
-			inputs.every(
-				(input) => !/alien-signals|\/signals\/(?:engine|graph|requests)\.ts/.test(input.path),
+			bundledInputs.every(
+				(input) => !/alien-signals|\/signals\/(?:engine|graph|requests)\.ts/.test(input),
 			),
-			'Unread control imported a signal engine',
+			'Unread control bundled a signal engine',
 		);
 	}
 	const codeMinified = transformSync(result.code, { minify: true }).code;

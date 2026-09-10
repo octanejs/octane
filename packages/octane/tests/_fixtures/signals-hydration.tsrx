@@ -1,6 +1,7 @@
 import { Hydrate, useLayoutEffect, useRef } from 'octane';
 import type { HydrateWhen } from 'octane/hydration';
 import type { Resource, Scope, WritableSignal } from 'octane/signals';
+import 'octane/signals';
 
 export interface NativeHydrationState {
 	scope: Scope;

@@ -1,5 +1,6 @@
 import { useMemo } from 'octane';
 import type { SignalHandle, WritableSignal } from 'octane/signals';
+import 'octane/signals';
 
 interface ReadProps {
 	count$: SignalHandle<number>;

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useMemo as memo } from 'octane';
 import * as Octane from 'octane';
+import 'octane/signals';
 
 export interface MemoReaderProps {
 	read$: () => string;

@@ -1,4 +1,5 @@
 import { use } from 'octane';
+import 'octane/signals';
 
 export interface NativeCreationProps {
 	make$: () => Promise<string>;

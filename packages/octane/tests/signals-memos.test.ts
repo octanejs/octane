@@ -12,9 +12,10 @@ import { deferred } from './_server-stream';
 import * as client from './_fixtures/signals-memos.tsrx';
 
 describe('native reads in inferred memos', () => {
-	it('tracks a quoted reader property without a direct signals import or compiler option', () => {
+	it('tracks a quoted reader property with an explicit signals import', () => {
 		const { Reader } = loadCompiledFixtureSource(
 			`import { useMemo } from 'octane';
+import 'octane/signals';
 export function Reader(props) @{
   const { 'read$': read } = props;
   const value = useMemo(read);
@@ -170,6 +171,7 @@ export function Reader(props) @{
 		it(`tracks inferred memos in plain modules (inline=${inlineHookMemo})`, () => {
 			const plain = loadPlainHookFixtureSource(
 				`import { createElement, useMemo } from 'octane';
+import 'octane/signals';
 export function App(props) {
   const value = useMemo(() => props.read$());
   const sampled = useMemo(() => props.label, [props.label]);

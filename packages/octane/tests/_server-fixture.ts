@@ -16,6 +16,7 @@ import * as HydrationRuntime from 'octane/hydration';
 import * as InternalClientRuntime from 'octane/internal/client';
 import * as InternalServerRuntime from 'octane/internal/server';
 import * as ClientRuntime from '../src/index.js';
+import 'octane/signals';
 
 export type CompiledFixtureModule = Record<string, any>;
 
@@ -125,6 +126,8 @@ export function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 		(_match: string, names: string) =>
 			importBinding(`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`),
 	);
+	// The signals entrypoint was initialized by this loader's own bare import.
+	code = code.replace(/import\s*['"]octane\/signals['"];?/g, '');
 	code = code.replace(
 		/import\s+(\*\s+as\s+[\w$]+|\{[^}]*\}|[\w$]+)\s+from\s*['"]([^'"]+)['"];?/g,
 		(match: string, binding: string, request: string) => {

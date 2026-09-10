@@ -228,7 +228,7 @@ evidence, not compiled `.tsrx`, browser, CI, or heap evidence.
 current compiler. It measures production synchronous mount, prop update, signal
 update, unmount, and server-render work. The two unread controls use an ordinary module and a module containing native
 capabilities, without importing the signal engine into either final bundle.
-Current compilers select tracking automatically; archived experimental compilers
+Current compilers select tracking from the fixture's explicit signals import; archived experimental compilers
 receive their original option. Both revisions compile identical source per case.
 Read cases cover one source, 16 reads of one source, and 16 distinct sources.
 Both `@{}` output and ordinary return-JSX output are included. Each case has its
