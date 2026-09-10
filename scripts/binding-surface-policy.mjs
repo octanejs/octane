@@ -461,20 +461,25 @@ export function assertUpstreamLockScope(policy, lock) {
 		);
 }
 
-export function scopeUpstreamInventory(policy, inventory, dependencyName) {
+export function scopeUpstreamInventory(policy, inventory, dependencyName, subdirectory = '') {
 	if (policy.mode === 'legacy' || !policy.valid) return inventory;
+	const prefix = subdirectory ? `${subdirectory}/` : '';
+	const localPath = (file) =>
+		prefix && file.startsWith(prefix) ? file.slice(prefix.length) : file;
 	const scopes = policy.surfaces
 		.filter(
 			(surface) =>
 				surface.ownership === 'copied' &&
 				(!dependencyName || surface.dependency.package === dependencyName),
 		)
-		.flatMap((surface) => surface.upstreamPaths);
-	const scoped = inventory.filter((item) =>
-		scopes.some(
-			(scope) => item.path === scope || item.path.startsWith(`${scope.replace(/\/$/, '')}/`),
-		),
-	);
+		.flatMap((surface) => surface.upstreamPaths.map(localPath));
+	const scoped = inventory.filter((item) => {
+		if (prefix && !item.path.startsWith(prefix)) return false;
+		const file = localPath(item.path);
+		return scopes.some(
+			(scope) => file === scope || file.startsWith(`${scope.replace(/\/$/, '')}/`),
+		);
+	});
 	if (scopes.length > 0 && inventory.length > 0 && scoped.length === 0)
 		throw new Error(
 			'Copied surface scopes match no pinned upstream inventory; review the scope before removing evidence',

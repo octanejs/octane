@@ -33,7 +33,12 @@ export function scopedUpstreamTestInventory({
 		if (lock.identity[key] !== node.identity?.[key])
 			throw new Error(`Materialized type evidence has a different pinned ${key}`);
 	}
-	const scoped = scopeUpstreamInventory(surfacePolicy, inventory, node.identity.packageName);
+	const scoped = scopeUpstreamInventory(
+		surfacePolicy,
+		inventory,
+		node.identity.packageName,
+		lock.identity.repository.subdirectory,
+	);
 	const prefix = lock.identity.repository.subdirectory
 		? `${lock.identity.repository.subdirectory}/`
 		: '';
