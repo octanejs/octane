@@ -14,10 +14,17 @@ It fingerprints and reads:
   verification state;
 - Octane public exports and `docs/differences-from-react.md`.
 
-An existing binding is reusable only when its registered upstream package,
-version lane, complete verification, and required package subpaths cover the
-consumer. Otherwise schedule an evidence-backed extension of that package. Never
-create a second binding under a different name.
+First determine whether the consumer can use the required framework-neutral API
+directly from its upstream package. Prove the published import and behavior; a
+missing Octane convenience subpath is then convenience coverage, not missing
+functionality, and does not require an extension. Use `update-bindings` for that
+assessment or for existing-binding maintenance and reduction.
+
+For integration that Octane must own, reuse an existing binding when its registered
+upstream package, version lane, verification, and required behavior cover the
+consumer. Otherwise schedule an evidence-backed extension in that package. Route
+only actual copied/rewritten React work into this full port workflow. Never create
+a second binding under a different name.
 
 ## Binding names
 

@@ -18,6 +18,12 @@ are blocked in this version. Never place a token in a URL or command argument.
 
 ## What preflight proves
 
+This full intake applies to React implementation ports and copied/adapted source.
+Existing-binding dependency, documentation, or adapter maintenance follows
+`update-bindings` without creating a port campaign. An ordinary upstream import
+retains dependency identity and normal shipped-license/package review; it does not
+require copying a source/license snapshot solely to satisfy this port procedure.
+
 For each input, require one canonical identity containing:
 
 - package name and exact published version;
@@ -71,7 +77,7 @@ the copied or adapted source as durable provenance and to preserve its warranty
 disclaimer. For BSD-3-Clause source, retain the upstream copyright notice, the
 conditions list, and its disclaimer, and never use upstream names to endorse
 the binding. For Apache-2.0 source, retain the upstream license text and every
-NOTICE file. In every case the upstream license ships byte-exact as
+NOTICE file. For copied/adapted source the upstream license ships byte-exact as
 `LICENSE.upstream` beside the binding's own MIT `LICENSE`. Always retain every
 applicable notice or attribution. Record the exact file paths and checksums
 from the report.
