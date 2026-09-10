@@ -24,7 +24,7 @@ function isolatedEnvironment() {
 	};
 }
 
-function storageIsInRepository(directory) {
+export function storageIsInRepository(directory) {
 	let ancestor = path.resolve(directory);
 	while (!existsSync(ancestor) && path.dirname(ancestor) !== ancestor) {
 		ancestor = path.dirname(ancestor);

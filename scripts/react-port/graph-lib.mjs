@@ -24,7 +24,7 @@ function sortedRecord(record) {
 	);
 }
 
-function manifestExports(manifest) {
+export function manifestExports(manifest) {
 	if (!manifest.exports) return manifest.main || manifest.module ? ['.'] : [];
 	if (typeof manifest.exports === 'string') return ['.'];
 	const keys = Object.keys(manifest.exports);
