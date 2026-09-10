@@ -43,7 +43,7 @@ import { useLayoutEffect } from '../utils/useLayoutEffect';
 import { useLocale } from '../i18n/I18nProvider';
 
 export interface AriaTokenFieldProps<T extends TokenFieldValue = TokenFieldValue>
-	extends TokenFieldProps<T>, AriaLabelingProps {
+	extends TokenFieldProps<T>, AriaLabelingProps, FocusableProps {
 	/**
 	 * The accessibility role of the token field.
 	 *

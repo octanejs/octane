@@ -20,6 +20,7 @@ import {
 	InputDOMProps,
 	ValidationResult,
 } from '@react-types/shared';
+import { withSlot } from 'octane';
 import { filterDOMProps } from '../utils/filterDOMProps';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { getFocusableTreeWalker } from '../focus/FocusScope';
@@ -62,6 +63,10 @@ export function useRadioGroup(
 	state: RadioGroupState,
 	_slot?: symbol,
 ): RadioGroupAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useRadioGroup, props, state);
+	}
+
 	let {
 		name,
 		form,

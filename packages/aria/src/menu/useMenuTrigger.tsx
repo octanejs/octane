@@ -15,6 +15,7 @@ type KeyboardEvent = BaseEvent<globalThis.KeyboardEvent>;
  */
 
 import { AriaButtonProps } from '../button/useButton';
+import { withSlot } from 'octane';
 import { AriaMenuOptions } from './useMenu';
 import { FocusableElement, FocusStrategy, RefObject } from '@react-types/shared';
 import { focusWithoutScrolling } from '../utils/focusWithoutScrolling';
@@ -63,6 +64,10 @@ export function useMenuTrigger<T>(
 	ref: RefObject<Element | null>,
 	_slot?: symbol,
 ): MenuTriggerAria<T> {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useMenuTrigger<T>, props, state, ref);
+	}
+
 	let { type = 'menu', isDisabled, trigger = 'press' } = props;
 
 	let menuTriggerId = useId();

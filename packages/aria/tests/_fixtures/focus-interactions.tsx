@@ -70,6 +70,25 @@ export function KeyboardProbe(props: { continuePropagation?: boolean }) {
 	);
 }
 
+export function ShortcutKeyboardProbe(props: {
+	onKeyDown: Parameters<typeof useKeyboard>[0]['onKeyDown'];
+	onKeyUp: Parameters<typeof useKeyboard>[0]['onKeyUp'];
+	onShortcut: () => void;
+	onParentKeyDown: (e: KeyboardEvent) => void;
+	onParentKeyUp: (e: KeyboardEvent) => void;
+}) {
+	const { keyboardProps } = useKeyboard({
+		shortcuts: { 'Control+k': props.onShortcut },
+		onKeyDown: props.onKeyDown,
+		onKeyUp: props.onKeyUp,
+	});
+	return (
+		<div onKeyDown={props.onParentKeyDown} onKeyUp={props.onParentKeyUp}>
+			<input id="kb-shortcuts" {...keyboardProps} />
+		</div>
+	);
+}
+
 // useHover: pointer enter/leave toggles isHovered (octane delegates enter/leave
 // capture-phase and invokes target-only, so non-bubbling native events reach the handler).
 export function HoverProbe() {

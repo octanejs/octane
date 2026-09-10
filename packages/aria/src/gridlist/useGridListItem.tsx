@@ -27,6 +27,7 @@ import { getOwnerDocument } from '../utils/domHelpers';
 import { getRowId, listMap } from './utils';
 import { getScrollParent } from '../utils/getScrollParent';
 import { HTMLAttributes, KeyboardEvent as ReactKeyboardEvent, useRef } from '../compat/react';
+import { withSlot } from 'octane';
 import { isFocusVisible } from '../interactions/useFocusVisible';
 import type { ListState } from '../upstream-exports/react-stately/useListState';
 import { mergeProps } from '../utils/mergeProps';
@@ -97,6 +98,10 @@ export function useGridListItem<T>(
 	ref: RefObject<FocusableElement | null>,
 	_slot?: symbol,
 ): GridListItemAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useGridListItem<T>, props, state, ref);
+	}
+
 	// Copied from useGridCell + some modifications to make it not so grid specific
 	let { node, isVirtualized, focusMode = 'row', allowsArrowNavigation } = props;
 
@@ -438,16 +443,12 @@ export function useGridListItem<T>(
 		rowProps.tabIndex = -1;
 	}
 
-	// we need to guard against space/enter triggering selection/row link via usePress (from itemProps) so check if propagation
-	// is stopped. this also fixes space not working in a textfield in a tree parent row
+	// Keep Space/Enter on a child control from reaching the row's usePress handler. With native
+	// events, stopPropagation() marks cancelBubble rather than exposing isPropagationStopped().
 	let baseOnKeyDown = rowProps.onKeyDown;
 	rowProps.onKeyDown = (e: ReactKeyboardEvent<FocusableElement>) => {
 		onKeyDown(e as ReactKeyboardEvent);
-		if (!(
-			'isPropagationStopped' in e &&
-			typeof e.isPropagationStopped === 'function' &&
-			e.isPropagationStopped()
-		)) {
+		if (!e.cancelBubble) {
 			baseOnKeyDown?.(e);
 		}
 	};

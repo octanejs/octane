@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { act, mount } from '../../octane/tests/_helpers';
 import {
 	FocusProbe,
@@ -7,6 +7,7 @@ import {
 	FocusableSpan,
 	HoverProbe,
 	KeyboardProbe,
+	ShortcutKeyboardProbe,
 } from './_fixtures/focus-interactions.tsx';
 
 // @octanejs/aria — focus/keyboard/hover interactions (useFocus / useFocusWithin /
@@ -78,6 +79,56 @@ describe('@octanejs/aria — useKeyboard', () => {
 		expect(btn.getAttribute('data-info')).toBe('b:wrapped:self');
 		expect(r.find('[data-testid="kb-parent"]').getAttribute('data-parent')).toBe('1');
 		r.unmount();
+	});
+
+	it('delivers the wrapped event to both key handlers when shortcuts are configured', async () => {
+		const observed: Array<[string, boolean, boolean]> = [];
+		const onShortcut = vi.fn();
+		const onParentKeyDown = vi.fn();
+		const onParentKeyUp = vi.fn();
+		const r = mount(ShortcutKeyboardProbe, {
+			onKeyDown: (e: any) => {
+				observed.push([e.key, e.isDefaultPrevented(), e.isPropagationStopped()]);
+				e.continuePropagation();
+			},
+			onKeyUp: (e: any) => {
+				observed.push([e.key, e.isDefaultPrevented(), e.isPropagationStopped()]);
+				e.continuePropagation();
+			},
+			onShortcut,
+			onParentKeyDown,
+			onParentKeyUp,
+		});
+		try {
+			const input = r.find('#kb-shortcuts');
+			const down = new KeyboardEvent('keydown', {
+				key: 'k',
+				ctrlKey: true,
+				bubbles: true,
+				cancelable: true,
+			});
+			await act(() => input.dispatchEvent(down));
+			await act(() =>
+				input.dispatchEvent(
+					new KeyboardEvent('keyup', {
+						key: 'k',
+						ctrlKey: true,
+						bubbles: true,
+						cancelable: true,
+					}),
+				),
+			);
+			expect(observed).toEqual([
+				['k', false, true],
+				['k', false, true],
+			]);
+			expect(onShortcut).toHaveBeenCalledTimes(1);
+			expect(down.defaultPrevented).toBe(true);
+			expect(onParentKeyDown).toHaveBeenCalledTimes(1);
+			expect(onParentKeyUp).toHaveBeenCalledTimes(1);
+		} finally {
+			r.unmount();
+		}
 	});
 });
 

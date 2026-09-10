@@ -61,7 +61,7 @@ export function useDialog(...args: any[]): DialogAria {
 	let titleId: string | undefined = useSlotId(undefined, subSlot(slot, 'title'));
 	titleId = props['aria-label'] ? undefined : titleId;
 
-	let contentId: string | undefined = useSlotId();
+	let contentId: string | undefined = useSlotId(undefined, subSlot(slot, 'content'));
 	contentId = role === 'alertdialog' && !props['aria-describedby'] ? contentId : undefined;
 
 	let isRefocusing = useRef(false, subSlot(slot, 'refocusing'));

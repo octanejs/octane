@@ -21,13 +21,14 @@ import { Text } from '../../src/components/Text';
 export function BasicMenuHarness(props: {
 	onAction?: (key: any) => void;
 	onOpenChange?: (isOpen: boolean) => void;
+	onItemKeyDown?: (e: any) => void;
 }) {
 	return (
 		<MenuTrigger onOpenChange={props.onOpenChange}>
 			<Button data-testid="trigger">Actions</Button>
 			<Popover data-testid="popover">
 				<Menu data-testid="menu" aria-label="Actions" onAction={props.onAction}>
-					<MenuItem id="open" data-testid="item-open">
+					<MenuItem id="open" data-testid="item-open" onKeyDown={props.onItemKeyDown}>
 						Open
 					</MenuItem>
 					<MenuItem id="rename" data-testid="item-rename">

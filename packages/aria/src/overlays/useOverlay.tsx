@@ -14,6 +14,7 @@ type DOMAttributes = Record<string, any>;
  */
 
 import { RefObject } from '@react-types/shared';
+import { withSlot } from 'octane';
 import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { isElementInChildOfActiveScope } from '../focus/FocusScope';
 import { useEffect, useRef } from '../compat/react';
@@ -73,6 +74,10 @@ export function useOverlay(
 	ref: RefObject<Element | null>,
 	_slot?: symbol,
 ): OverlayAria {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useOverlay, props, ref);
+	}
+
 	let {
 		onClose,
 		shouldCloseOnBlur,

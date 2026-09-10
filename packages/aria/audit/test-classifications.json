@@ -295,6 +295,16 @@
       "path": "packages/aria/tests/upstream-crosswalk.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks repository-authored crosswalk integrity; it is inventory evidence and does not claim execution of an upstream suite."
+    },
+    {
+      "path": "packages/aria/tests/virtualizer-item.test.tsx",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane's virtualized item integration with a simulated native ResizeObserver; it is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/typetests/public-components.test.tsx",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks public TokenField and TreeSection prop types through Octane JSX typechecking."
     }
   ]
 }

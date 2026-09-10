@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { act, mount } from '../../octane/tests/_helpers';
+import { TwoMenuTriggers } from './_fixtures/menu-trigger-manual-slots';
 import {
 	ListBoxHarness,
 	MenuHarness,
@@ -122,6 +123,25 @@ describe('@octanejs/aria — useListBox / useOption', () => {
 });
 
 describe('@octanejs/aria — useMenu / useMenuItem / useMenuTrigger', () => {
+	it('keeps two plain TypeScript menu triggers and their labels distinct', () => {
+		const r = mount(TwoMenuTriggers);
+		try {
+			const [firstTrigger, secondTrigger] = r.container.querySelectorAll('button');
+			const [firstMenu, secondMenu] = r.container.querySelectorAll('[role="menu"]');
+
+			expect(firstTrigger.id).toBeTruthy();
+			expect(secondTrigger.id).toBeTruthy();
+			expect(firstTrigger.id).not.toBe(secondTrigger.id);
+			expect(firstMenu.id).toBeTruthy();
+			expect(secondMenu.id).toBeTruthy();
+			expect(firstMenu.id).not.toBe(secondMenu.id);
+			expect(firstMenu.getAttribute('aria-labelledby')).toBe(firstTrigger.id);
+			expect(secondMenu.getAttribute('aria-labelledby')).toBe(secondTrigger.id);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('wires menu and menuitem roles (menuitemradio under single selection)', async () => {
 		const r = mount(MenuHarness, {});
 		const menu = r.container.querySelector('[role="menu"]') as HTMLElement;

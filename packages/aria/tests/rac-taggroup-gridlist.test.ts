@@ -302,6 +302,45 @@ describe('@octanejs/aria/components — GridList', () => {
 		expect(one.hasAttribute('data-selected')).toBe(false);
 	});
 
+	it('Space and Enter on native controls do not select their grid list row', async () => {
+		const changes: string[][] = [];
+		const r = mountTracked(StaticGridListHarness, {
+			selectionMode: 'multiple',
+			keyboardNavigationBehavior: 'tab',
+			withNativeControls: true,
+			onSelectionChange: (keys: Set<string>) => changes.push([...keys]),
+		});
+		await act(() => {});
+
+		const [row] = rows(r);
+		const button = row.querySelector('button[aria-label="Native action"]') as HTMLButtonElement;
+		const input = row.querySelector('input[aria-label="Native text"]') as HTMLInputElement;
+		expect(button).toBeTruthy();
+		expect(input).toBeTruthy();
+
+		for (const [control, key] of [
+			[button, ' '],
+			[button, 'Enter'],
+			[input, ' '],
+		] as const) {
+			await act(() => {
+				control.focus();
+				keydown(control, key);
+				control.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true }));
+			});
+			expect(changes).toEqual([]);
+			expect(row.getAttribute('aria-selected')).toBe('false');
+		}
+
+		await act(() => {
+			row.focus();
+			keydown(row, ' ');
+			row.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
+		});
+		expect(changes).toEqual([['one']]);
+		expect(row.getAttribute('aria-selected')).toBe('true');
+	});
+
 	it('the selection checkbox slot toggles row selection through CheckboxContext', async () => {
 		const log: any[] = [];
 		const r = mountTracked(StaticGridListHarness, {

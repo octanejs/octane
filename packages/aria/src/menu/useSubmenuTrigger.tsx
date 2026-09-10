@@ -13,6 +13,7 @@
  */
 
 import { AriaMenuItemProps } from './useMenuItem';
+import { withSlot } from 'octane';
 import { AriaMenuOptions } from './useMenu';
 import type { AriaPopoverProps } from '../overlays/usePopover';
 import { FocusableElement, FocusStrategy, Node, PressEvent, RefObject } from '@react-types/shared';
@@ -93,6 +94,10 @@ export function useSubmenuTrigger<T>(
 	ref: RefObject<FocusableElement | null>,
 	_slot?: symbol,
 ): SubmenuTriggerAria<T> {
+	if (_slot !== undefined) {
+		return withSlot(_slot, useSubmenuTrigger<T>, props, state, ref);
+	}
+
 	let {
 		parentMenuRef,
 		submenuRef,
