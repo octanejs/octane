@@ -2161,8 +2161,8 @@ function staticObjectToCssString(obj) {
 		properties.set(name, p.value.value);
 	}
 	for (const [name, value] of properties) {
-		if (value == null || value === false || value === '') continue;
-		const cssValue = value === true ? '' : cssStyleValue(name, value);
+		if (value == null || typeof value === 'boolean' || value === '') continue;
+		const cssValue = cssStyleValue(name, value);
 		parts.push(`${hyphenateStyleName(name)}: ${cssValue};`);
 	}
 	return parts.join(' ');
@@ -2205,6 +2205,18 @@ function mixedStaticStyle(obj) {
 		seen.set(normalized, name);
 
 		const value = property.value;
+		const unwrappedValue = unwrapTsExpr(value);
+		// Extracting an anonymous function/class into a temporary changes its
+		// inferred name. A discarded class can observe that name in a static
+		// initializer, so preserve the original object evaluation in this case.
+		if (
+			unwrappedValue?.type === 'ArrowFunctionExpression' ||
+			((unwrappedValue?.type === 'FunctionExpression' ||
+				unwrappedValue?.type === 'ClassExpression') &&
+				!unwrappedValue.id)
+		) {
+			return null;
+		}
 		if (
 			value?.type === 'Literal' &&
 			dynamics.length === 0 &&

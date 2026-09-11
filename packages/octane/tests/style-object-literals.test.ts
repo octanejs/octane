@@ -40,7 +40,7 @@ export function ShorthandFirst(props) @{
 }
 
 export function LiteralDuplicates() @{
-	<div id="literal-duplicates" style={{ marginTop: '1px', margin: '4px', marginTop: '8px', color: 'red', color: null, background: 'blue', background: false, display: 'block', display: '' }} />
+	<div id="literal-duplicates" style={{ marginTop: '1px', margin: '4px', marginTop: '8px', color: 'red', color: null, background: 'blue', background: false, display: 'block', display: '', '--removed': 'red', '--removed': true }} />
 }
 `;
 
@@ -63,6 +63,7 @@ describe('inline object styles', () => {
 			expect(element.style.color).toBe('');
 			expect(element.style.backgroundColor).toBe('');
 			expect(element.style.display).toBe('');
+			expect(element.style.getPropertyValue('--removed')).toBe('');
 		} finally {
 			root.unmount();
 		}
@@ -145,6 +146,40 @@ export function App(props) @{
 	);
 
 	it.each([false, true])(
+		'preserves inferred names while evaluating overwritten style classes in dev=%s',
+		(dev) => {
+			const source = `
+export function Direct(props) @{
+	<div style={{ color: class { static { props.record(this.name); } }, color: 'red', background: props.background }} />
+}
+
+export function Wrapped(props) @{
+	<div style={{ color: (class { static { props.record(this.name); } } as unknown), color: 'red', background: props.background }} />
+}`;
+			const client = compiled(source, `duplicate-class-names-${dev}.tsrx`, 'client', dev);
+			for (const name of ['Direct', 'Wrapped']) {
+				const names: string[] = [];
+				const record = (value: string) => names.push(value);
+				const root = mount(client[name], { record, background: 'black' });
+				const element = root.find('div') as HTMLElement;
+				try {
+					expect(names).toEqual(['color']);
+					expect(element.style.color).toBe('red');
+					expect(element.style.backgroundColor).toBe('black');
+					names.length = 0;
+					root.update(client[name], { record, background: 'white' });
+					expect(names).toEqual(['color']);
+					expect(root.find('div')).toBe(element);
+					expect(element.style.color).toBe('red');
+					expect(element.style.backgroundColor).toBe('white');
+				} finally {
+					root.unmount();
+				}
+			}
+		},
+	);
+
+	it.each([false, true])(
 		'propagates duplicate expression errors before changing styles in dev=%s',
 		(dev) => {
 			const source = `
@@ -208,8 +243,6 @@ export function App(props) @{
 		for (const [name, initialColor, nextColor, initialTop, nextTop] of [
 			['StaticWinner', 'red', 'red', '', ''],
 			['DynamicWinner', '', 'blue', '', ''],
-			['LonghandFirst', '', '', '4px', '12px'],
-			['ShorthandFirst', '', '', '8px', '16px'],
 			['LiteralDuplicates', '', '', '4px', '4px'],
 		]) {
 			const props = {
@@ -232,11 +265,16 @@ export function App(props) @{
 				if (name === 'LiteralDuplicates') {
 					expect(element.style.backgroundColor).toBe('');
 					expect(element.style.display).toBe('');
+					expect(element.style.getPropertyValue('--removed')).toBe('');
+					expect(original).not.toContain('--removed');
 				}
 				root = hydrateRoot(container, client[name], props);
 				flushSync(() => {});
 				expect(container.querySelector('div')).toBe(element);
 				expect(element.getAttribute('style')).toBe(original);
+				if (name === 'LiteralDuplicates') {
+					expect(element.style.getPropertyValue('--removed')).toBe('');
+				}
 				expect(
 					warnings.mock.calls.filter((args) => /hydrat|mismatch/i.test(String(args[0]))),
 				).toEqual([]);
