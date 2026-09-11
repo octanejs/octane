@@ -62,11 +62,18 @@ test('observed dependency and hook exports keep focused evidence without engine 
 
 test('default expression adapters are observed through named re-exports', (t) => {
 	const { root, write } = fixture(t);
-	write('src/hook.ts', "import { memo } from 'octane'; export default memo(() => null);");
 	write('src/index.ts', "export * from 'engine'; export { default as useEngine } from './hook';");
-	const policy = readBindingSurfacePolicy(root);
-	assert.equal(policy.valid, true, policy.issues.join('\n'));
-	assert.equal(policy.requiresLifecycleEvidence, true);
+	for (const source of [
+		"import { memo } from 'octane'; export default memo(() => null);",
+		"import { useEffect } from 'octane'; function useEngine() { useEffect(() => {}); } export default useEngine;",
+		"import { useEffect } from 'octane'; const useEngine = () => { useEffect(() => {}); }; export default useEngine;",
+		"import { useEffect } from 'octane'; const useEngine = () => { useEffect(() => {}); }; const adapter = useEngine; export default (adapter);",
+	]) {
+		write('src/hook.ts', source);
+		const policy = readBindingSurfacePolicy(root);
+		assert.equal(policy.valid, true, policy.issues.join('\n'));
+		assert.equal(policy.requiresLifecycleEvidence, true);
+	}
 });
 
 test('default identifiers need ownership even alongside named exports', (t) => {
@@ -87,6 +94,15 @@ test('default identifiers need ownership even alongside named exports', (t) => {
 		'a vanilla default cannot borrow integration from a named hook',
 	);
 	assert.ok(policy.issues.some((issue) => issue.includes('needs observed Octane integration')));
+	write(
+		'src/hook.ts',
+		"import { useEffect } from 'octane'; export function useEngine() { useEffect(() => {}); } const a = b; const b = a; export default a;",
+	);
+	assert.equal(
+		readBindingSurfacePolicy(root).valid,
+		false,
+		'circular aliases cannot establish integration',
+	);
 });
 
 test('local export stars exclude defaults and CommonJS assignments require explicit review', (t) => {

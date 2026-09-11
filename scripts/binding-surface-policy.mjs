@@ -67,6 +67,33 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 		visit(statement);
 		return found;
 	};
+	const localDeclarations = ast.statements.flatMap((statement) =>
+		ts.isVariableStatement(statement)
+			? [...statement.declarationList.declarations]
+			: ts.isFunctionDeclaration(statement)
+				? [statement]
+				: [],
+	);
+	const defaultIntegration = (expression, seen = new Set()) => {
+		while (
+			ts.isParenthesizedExpression(expression) ||
+			ts.isAsExpression(expression) ||
+			ts.isSatisfiesExpression(expression) ||
+			ts.isNonNullExpression(expression)
+		)
+			expression = expression.expression;
+		if (usesRuntimeIntegration(expression)) return true;
+		if (!ts.isIdentifier(expression) || seen.has(expression.text)) return false;
+		seen.add(expression.text);
+		const declarations = localDeclarations.filter(
+			(item) => item.name && ts.isIdentifier(item.name) && item.name.text === expression.text,
+		);
+		if (declarations.length !== 1) return false;
+		const declaration = declarations[0];
+		return ts.isFunctionDeclaration(declaration)
+			? usesRuntimeIntegration(declaration)
+			: !!declaration.initializer && defaultIntegration(declaration.initializer, seen);
+	};
 	const resolveLocal = (specifier, directory = path.posix.dirname(file)) => {
 		if (path.isAbsolute(specifier))
 			throw new Error(`Unresolved local module requires review: ${file}: ${specifier}`);
@@ -182,7 +209,7 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 			exports.push({
 				name: 'default',
 				file,
-				integration: usesRuntimeIntegration(statement),
+				integration: defaultIntegration(statement.expression),
 				erased: false,
 			});
 		} else if (
