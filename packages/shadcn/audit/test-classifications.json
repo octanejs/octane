@@ -22,6 +22,16 @@
       "reason": "Checks the partial Octane Base UI component base; it is not counted as React parity evidence."
     },
     {
+      "path": "packages/shadcn/tests/calendar-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane adoption of the server-rendered Calendar month grid and its live selection; it is not compared with React hydration."
+    },
+    {
+      "path": "packages/shadcn/tests/calendar.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane Calendar contract over @octanejs/day-picker (selection, range markers, navigation, dropdown caption, week numbers, disabled days, focus); the same-fixture React evidence lives in the differential lane."
+    },
+    {
       "path": "packages/shadcn/tests/composites.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane composite components and interactions; it is not counted as same-fixture React evidence."
@@ -39,7 +49,7 @@
     {
       "path": "packages/shadcn/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Same-fixture runtime comparison citing pinned shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544 sources apps/v4/registry/bases/radix/ui/{badge,button,tabs,dialog,dropdown-menu}.tsx; dialog/dropdown-menu keep import-path-only transforms, while badge/button/tabs document port-selected class-hook adaptations. The local React references are not themselves the pinned oracle."
+      "oracle": "Same-fixture runtime comparison citing pinned shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544 sources apps/v4/registry/bases/radix/ui/{badge,button,tabs,dialog,dropdown-menu}.tsx and, for Calendar, apps/v4/registry/bases/radix/ui/calendar.tsx at shadcn-ui/ui@7c9eaba1c0a6404c990c144a654792e3313c650d with real react-day-picker@10.0.1; dialog/dropdown-menu keep import-path-only transforms, while badge/button/tabs/calendar document port-selected class-hook adaptations. The local React references are not themselves the pinned oracle."
     },
     {
       "path": "packages/shadcn/tests/divergences.test.ts",
@@ -110,6 +120,11 @@
       "path": "packages/shadcn/tests/ssr/base-ui-latest.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the new Base UI wrappers without browser globals."
+    },
+    {
+      "path": "packages/shadcn/tests/ssr/calendar.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering of the Calendar configurations with no browser globals; it is not a React oracle."
     },
     {
       "path": "packages/shadcn/tests/ssr/server-tier2.test.ts",

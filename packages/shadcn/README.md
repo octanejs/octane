@@ -14,7 +14,7 @@ Upstream pin: `shadcn-ui/ui@7c9eaba1` + CLI `shadcn@4.21.0`.
 
 ## What ships
 
-- **44 component families across three bases**: the full Tier-1 static set, all 24
+- **45 component families across three bases**: the full Tier-1 static set, all 24
   radix-backed Tier-2 components, and the first Tier-3 composites (Sidebar with
   `useSidebar`/`useIsMobile`, Field), plus `cn()` and the default neutral theme
   tokens (`@octanejs/shadcn/theme.css`).
@@ -40,6 +40,11 @@ its viewport, and Base UI Select aliases its hostless Root.
 The Base UI wrappers target `@octanejs/base-ui`'s Base UI 1.8.0 API, including
 Select, Navigation Menu, and Scroll Area from the 4.21.0 registry with Nova
 utilities. Combobox is outside this package's current family inventory.
+
+Calendar has no primitive in either base it ships to: upstream's Radix and Base UI
+sources are the same file over `react-day-picker`, which is `@octanejs/day-picker`
+here. React Aria's calendar is a different component built on that library's own
+`Calendar`, and is not ported yet.
 
 All three bases use `cn@0.2.6`, matching the upstream update. Existing Octane
 adaptations and styling remain intact; `@octanejs/shadcn/cn` re-exports the same helper.

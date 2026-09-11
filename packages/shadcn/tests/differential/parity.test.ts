@@ -152,15 +152,15 @@ describe('differential: @octanejs/shadcn vs curated shadcn references on React',
 		d.unmount();
 	}, 90_000);
 
-	// @parity-case differential:shadcn-calendar-runtime
+	// Day SELECTION is deliberately not a step in any Calendar case. After a day click the two
+	// sides diverge on day-picker's `focused` day, and neither cause is this component's: upstream
+	// declares its `components` overrides inline, so React rebuilds the day-button type on every
+	// render and the removal of the focused button blurs it, clearing `focused`; octane keeps the
+	// day focused (the shipped component hoists those overrides, and octane does not emit a blur
+	// when a focused node is replaced). Selection, range markers, disabled days, and the focus
+	// effect are asserted against the DOM in calendar.test.ts.
 	//
-	// Day SELECTION is deliberately not a step here. After a day click the two sides diverge on
-	// day-picker's `focused` day, and neither cause is this component's: upstream declares its
-	// `components` overrides inline, so React rebuilds the day-button type on every render and the
-	// removal of the focused button blurs it, clearing `focused`; octane keeps the day focused
-	// (the shipped component hoists those overrides, and octane does not emit a blur when a
-	// focused node is replaced). Selection, range markers, disabled days, and the focus effect are
-	// asserted against the DOM in calendar.test.ts.
+	// @parity-case differential:shadcn-calendar-runtime
 	it('Calendar: month grid markup and month navigation, byte-identical', async () => {
 		const d = await mountDifferential(fixture('calendar'), 'CalendarApp', undefined, CACHE);
 		await d.step('mount (January 2024, nothing selected)', () => {});

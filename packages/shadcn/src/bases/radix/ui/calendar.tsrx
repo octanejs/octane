@@ -17,8 +17,9 @@
 //     layer declares them too. `cn-calendar-caption` and `cn-calendar-day-button` have no Nova
 //     rule and are dropped, as the unused `cn-menu-*` hooks are in Select; `cn-rtl-flip` is
 //     defined in theme.css and stays verbatim.
-//   - The four `components` overrides are module-level rather than inline object literals, so a
-//     re-render does not replace their component types; see the note above them.
+//   - The `components` overrides leave the inline object literal: three become module-level and
+//     the one that closes over `locale` is memoized, so a re-render does not replace their
+//     component types; see the note above them.
 //   - CalendarDayButton's ref is an ordinary prop, not forwardRef.
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@octanejs/lucide';
 import {
@@ -45,24 +46,26 @@ export type CalendarDayButtonProps =
 		locale?: Partial<Locale>;
 	};
 
-// Upstream declares these four overrides inline in the `components` prop, so every render of the
-// calendar creates new component types and remounts their whole subtree — 35 day buttons per
-// selection. They are hoisted here (and the one that closes over `locale` is memoized) so node
+// Upstream declares these overrides inline in the `components` prop, so every render creates new
+// component types and remounts their whole subtree: 35 day buttons per selection. Three are
+// module-level here, and the fourth (it closes over `locale`) is memoized in Calendar, so node
 // identity survives a re-render. The rendered markup is unchanged.
 function CalendarRoot({ className, rootRef, ...props }: RootProps) @{
 	<div data-slot="calendar" ref={rootRef} className={cn(className)} {...props} />
 }
 
-function CalendarChevron({ className, orientation, ...props }: ChevronProps) {
-	if (orientation === 'left') {
-		return <ChevronLeftIcon className={cn('cn-rtl-flip size-4', className)} {...props} />;
-	}
+function CalendarChevron({ className, orientation, ...props }: ChevronProps) @{
+	// Upstream maps left/right to their own icons and everything else to the dropdown's
+	// down-chevron. Only the horizontal pair mirrors in RTL.
+	const horizontal = orientation === 'left' || orientation === 'right';
+	const Icon =
+		!horizontal
+			? ChevronDownIcon
+			: orientation === 'left'
+				? ChevronLeftIcon
+				: ChevronRightIcon;
 
-	if (orientation === 'right') {
-		return <ChevronRightIcon className={cn('cn-rtl-flip size-4', className)} {...props} />;
-	}
-
-	return <ChevronDownIcon className={cn('size-4', className)} {...props} />;
+	<Icon className={cn(horizontal && 'cn-rtl-flip', 'size-4', className)} {...props} />
 }
 
 function CalendarWeekNumber({ children, ...props }: WeekNumberProps) @{
