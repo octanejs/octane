@@ -22,15 +22,16 @@ function explicit(): OctaneNode {
 	);
 }
 
-function makeRows(kind: Kind): OctaneNode[] {
+function makeRows(kind: Kind, reverse = false): OctaneNode[] {
 	const siblings: OctaneNode[] = [];
 	for (let index = 0; index < ROWS; index++) {
 		siblings.push(row(index, kind === 'explicit'));
 		if (index === 0) siblings.push(explicit());
 	}
+	if (reverse) siblings.reverse();
 	if (kind === 'flat') return siblings;
 	// A same-kind nested array plus a sibling gives each enclosed leaf a real
-	// wrapper path. Its explicit key remains the serialization control.
+	// wrapper path. The explicit key beside the first row checks key namespaces.
 	return [siblings, createElement('li', { key: 'tail', 'data-work-index': 'tail' }, 'tail')];
 }
 
@@ -41,6 +42,7 @@ const prepared: Record<Kind, [OctaneNode[], OctaneNode[]]> = {
 	flat: [makeRows('flat'), makeRows('flat')],
 	explicit: [makeRows('explicit'), makeRows('explicit')],
 };
+const reorderedExplicit = makeRows('explicit', true);
 const roots: Partial<Record<Kind, WorkRoot>> = {};
 const containers: Partial<Record<Kind, HTMLElement>> = {};
 const versions: Record<Kind, number> = { nested: 0, flat: 0, explicit: 0 };
@@ -81,6 +83,19 @@ export function runNestedWork(operation: string): void {
 		const kind = operation.slice(7) as Kind;
 		if (!KINDS.includes(kind)) throw new Error(`unknown nested work kind: ${kind}`);
 		update(kind);
+		return;
+	}
+	if (operation === 'reorder-explicit' || operation === 'restore-explicit') {
+		const root = roots.explicit;
+		if (!root) throw new Error('explicit work root is not mounted');
+		const reordered = operation === 'reorder-explicit';
+		versions.explicit = reordered ? 2 : 1;
+		root.render(NestedWorkRows, {
+			id: 'explicit-work-rows',
+			rows: reordered ? reorderedExplicit : prepared.explicit[1],
+			version: versions.explicit,
+		});
+		flushSync(() => {});
 		return;
 	}
 	if (operation === 'unmount') {
