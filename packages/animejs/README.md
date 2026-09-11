@@ -1,21 +1,25 @@
 # @octanejs/animejs
 
 [Anime.js](https://animejs.com) for [Octane](https://github.com/octanejs/octane).
-The package re-exports Anime.js and adds an Octane lifecycle hook for scoped DOM
-animations.
+Import vanilla animation APIs directly from `animejs`. Add `@octanejs/animejs`
+when you need `useAnimeScope` to manage scoped DOM animations through Octane's
+lifecycle. Existing Anime.js re-exports remain supported for compatibility.
 
 ## Installation
 
 ```sh
-npm install @octanejs/animejs
-pnpm add @octanejs/animejs
+npm install animejs@4.5.0 @octanejs/animejs
+pnpm add animejs@4.5.0 @octanejs/animejs
 ```
 
-The exact upstream pin, supported entry points, explicit subpath gaps, and test
+The exact upstream pin, supported entry points, direct upstream imports, and test
 dispositions are recorded in [`UPSTREAM.md`](./UPSTREAM.md).
+Keep the direct Anime.js dependency aligned with that pin so animations and
+`useAnimeScope` share the same upstream instance.
 
 ```tsx
-import { animate, useAnimeScope } from '@octanejs/animejs';
+import { animate } from 'animejs';
+import { useAnimeScope } from '@octanejs/animejs';
 
 export function Logo() @{
   const animation = useAnimeScope(() => {
@@ -44,13 +48,14 @@ rendering.
 Import the adapter subpath once before animating raw Three objects:
 
 ```ts
-import { animate } from '@octanejs/animejs';
-import '@octanejs/animejs/adapters/three';
+import { animate } from 'animejs';
+import 'animejs/adapters/three';
 
 animate(mesh, { x: 2, rotateY: 180 });
 ```
 
-The subpath is the official Anime.js adapter, passed through unchanged.
+This is the official Anime.js adapter. The existing
+`@octanejs/animejs/adapters/three` convenience path also passes it through unchanged.
 `@octanejs/three` exposes the real Three object through refs, so no translation
 layer is needed.
 
