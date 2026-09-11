@@ -10,7 +10,7 @@ import {
 import { getPublishablePackages, REPO_ROOT } from './workspace-packages.mjs';
 
 const DEFAULT_GITHUB_API_URL = 'https://api.github.com';
-const NPM_PROPAGATION_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 30_000, 30_000];
+const NPM_PROPAGATION_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 30_000, 30_000, 30_000];
 const RELEASE_TAGGER_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 const RELEASE_TAGGER_NAME = 'github-actions[bot]';
 
