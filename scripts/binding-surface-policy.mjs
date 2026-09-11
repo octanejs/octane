@@ -34,13 +34,33 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 	if (seen.has(file)) throw new Error(`Cyclic export coverage requires review: ${file}`);
 	seen = new Set([...seen, file]);
 	const source = readFileSync(path.join(root, file), 'utf8');
-	const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+	const sourcePath = path.resolve(root, file);
+	const ast = ts.createSourceFile(
+		sourcePath,
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX,
+	);
 	if (ast.parseDiagnostics.length)
 		throw new Error(`Unparsed source coverage requires review: ${file}`);
 	const exports = [];
 	const files = new Set([file]);
 	const forwarding = new Map([[file, true]]);
+	// Bind only this source file: lexical references need no dependency resolution or libraries.
+	const options = { noResolve: true, noLib: true, types: [], allowNonTsExtensions: true };
+	const checker = ts
+		.createProgram([sourcePath], options, {
+			...ts.createCompilerHost(options),
+			getSourceFile: (name) => (name === sourcePath ? ast : undefined),
+		})
+		.getTypeChecker();
 	const runtimeBindings = new Set();
+	const addRuntimeBinding = (name) => {
+		const symbol = checker.getSymbolAtLocation(name);
+		if (symbol?.declarations?.length === 1 && symbol.declarations[0] === name.parent)
+			runtimeBindings.add(symbol);
+	};
 	for (const statement of ast.statements) {
 		if (
 			!ts.isImportDeclaration(statement) ||
@@ -50,18 +70,24 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 		)
 			continue;
 		const clause = statement.importClause;
-		if (clause?.name) runtimeBindings.add(clause.name.text);
+		if (clause?.name) addRuntimeBinding(clause.name);
 		if (clause?.namedBindings && ts.isNamespaceImport(clause.namedBindings))
-			runtimeBindings.add(clause.namedBindings.name.text);
+			addRuntimeBinding(clause.namedBindings.name);
 		if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings))
 			for (const item of clause.namedBindings.elements)
-				if (!item.isTypeOnly) runtimeBindings.add(item.name.text);
+				if (!item.isTypeOnly) addRuntimeBinding(item.name);
 	}
 	const usesRuntimeIntegration = (statement) => {
 		let found = false;
 		const visit = (node) => {
 			if (ts.isTypeNode(node)) return;
-			if (ts.isIdentifier(node) && runtimeBindings.has(node.text)) found = true;
+			if (ts.isIdentifier(node)) {
+				const symbol =
+					ts.isShorthandPropertyAssignment(node.parent) && node.parent.name === node
+						? checker.getShorthandAssignmentValueSymbol(node.parent)
+						: checker.getSymbolAtLocation(node);
+				if (runtimeBindings.has(symbol)) found = true;
+			}
 			ts.forEachChild(node, visit);
 		};
 		visit(statement);

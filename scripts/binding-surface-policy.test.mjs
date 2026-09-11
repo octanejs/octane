@@ -68,6 +68,9 @@ test('default expression adapters are observed through named re-exports', (t) =>
 		"import { useEffect } from 'octane'; function useEngine() { useEffect(() => {}); } export default useEngine;",
 		"import { useEffect } from 'octane'; const useEngine = () => { useEffect(() => {}); }; export default useEngine;",
 		"import { useEffect } from 'octane'; const useEngine = () => { useEffect(() => {}); }; const adapter = useEngine; export default (adapter);",
+		"import { useEffect as effect } from 'octane'; function useEngine() { effect(() => {}); } export default useEngine;",
+		"import * as Octane from 'octane'; function useEngine() { Octane.useEffect(() => {}); } export default useEngine;",
+		"import { useEffect } from 'octane'; function useEngine() { const hooks = { useEffect }; hooks.useEffect(() => {}); } export default useEngine;",
 	]) {
 		write('src/hook.ts', source);
 		const policy = readBindingSurfacePolicy(root);
@@ -103,6 +106,36 @@ test('default identifiers need ownership even alongside named exports', (t) => {
 		false,
 		'circular aliases cannot establish integration',
 	);
+});
+
+test('shadowed Octane names cannot authorize adapter ownership', (t) => {
+	const { root, write } = fixture(t);
+	for (const declaration of [
+		'function useEngine(useEffect) { return 1; }',
+		'function useEngine(useEffect) { return useEffect(); }',
+		'const useEngine = function useEffect() { return 1; };',
+		'function useEffect() { return 1; } const useEngine = useEffect;',
+		'function useEngine() { const useEffect = () => 1; return useEffect(); }',
+		'function useEngine() { return { useEffect: 1 }; }',
+	]) {
+		for (const exportDefault of [false, true]) {
+			write(
+				'src/index.ts',
+				`export * from 'engine'; export { ${exportDefault ? 'default as ' : ''}useEngine } from './hook';`,
+			);
+			write(
+				'src/hook.ts',
+				`import { useEffect } from 'octane'; ${exportDefault ? `${declaration} export default useEngine;` : declaration.replace(/\b(function|const) useEngine/, 'export $1 useEngine')}`,
+			);
+			const policy = readBindingSurfacePolicy(root);
+			assert.equal(policy.valid, false, declaration);
+			assert.ok(
+				policy.issues.some((issue) => issue.includes('needs observed Octane integration')),
+				policy.issues.join('\n'),
+			);
+			assert.equal(policy.requiresCopiedEvidence, true);
+		}
+	}
 });
 
 test('local export stars exclude defaults and CommonJS assignments require explicit review', (t) => {
