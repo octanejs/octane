@@ -12,7 +12,7 @@ import {
 import { renderToString } from 'octane/server';
 import { mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
-import { RowsHole } from './_fixtures/deopt-child-keys.tsrx';
+import { MappedInputRows, RowsHole } from './_fixtures/deopt-child-keys.tsrx';
 
 // Descriptors handed to a template HOLE reach the de-opt keyed list, which
 // derives an internal reconciliation key per child from its wrapper path plus
@@ -34,6 +34,135 @@ const server = loadServerFixture('packages/octane/tests/_fixtures/deopt-child-ke
 function TextHost({ value }: { value: OctaneNode }) {
 	return createElement('p', { 'data-testid': 'text' }, value);
 }
+
+function InputRow({ id }: { id: string }) {
+	return createElement(
+		'li',
+		{ 'data-row': id },
+		createElement('input', { 'data-input': id, defaultValue: id }),
+	);
+}
+
+function NestedInputGroup({ id, reverse }: { id: string; reverse: boolean }) {
+	const keyed = ['0', 'last'].map((key) => createElement(InputRow, { key, id: `${id}-${key}` }));
+	return createElement(
+		'li',
+		{ 'data-group': id },
+		createElement('ul', null, [
+			createElement(InputRow, { id: `${id}-plain` }),
+			...(reverse ? keyed.reverse() : keyed),
+		]),
+	);
+}
+
+describe('lists rendered inside list items', () => {
+	it('keeps independent input state while outer and inner descriptor lists reorder', () => {
+		const rows = (order: string[], reverse: boolean) => [
+			createElement(InputRow, { id: 'plain' }),
+			...order.map((id) => createElement(NestedInputGroup, { key: id, id, reverse })),
+			createElement(InputRow, { id: 'tail' }),
+		];
+		const view = mount(RowsHole, { rows: rows(['0', 'b', 'c'], false) });
+		try {
+			const inputs = new Map(
+				(view.findAll('input') as HTMLInputElement[]).map((input) => [input.dataset.input!, input]),
+			);
+			for (const [id, input] of inputs) input.value = `typed:${id}`;
+			for (const [order, reverse] of [
+				[['c', '0', 'b'], true],
+				[['0', 'b', 'c'], false],
+			] as const) {
+				view.update(RowsHole, { rows: rows([...order], reverse) });
+				expect(view.findAll('[data-group]').map((node) => node.getAttribute('data-group'))).toEqual(
+					order,
+				);
+				expect(view.findAll('input').map((node) => node.getAttribute('data-input'))).toEqual([
+					'plain',
+					...order.flatMap((id) =>
+						(reverse ? ['plain', 'last', '0'] : ['plain', '0', 'last']).map(
+							(key) => `${id}-${key}`,
+						),
+					),
+					'tail',
+				]);
+				for (const [id, input] of inputs) {
+					expect(view.find(`[data-input="${id}"]`)).toBe(input);
+					expect(input.value).toBe(`typed:${id}`);
+				}
+			}
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it.each(['native map', 'custom map'] as const)(
+		'adopts mapped inputs through %s and retains them across map modes and nested reorders',
+		(mode) => {
+			const rows = (order: string[], reverse: boolean, custom: boolean) => {
+				const values = order.map((id) => ({
+					id,
+					label: id,
+					children: createElement('ul', null, [
+						createElement(NestedInputGroup, { key: 'nested', id: `${id}-nested`, reverse }),
+					]),
+				}));
+				if (custom) {
+					Object.defineProperty(values, 'map', {
+						value(callback: (value: (typeof values)[number], index: number) => unknown) {
+							return Array.prototype.map.call(this, callback);
+						},
+					});
+				}
+				return values;
+			};
+			const initial = ['0', 'b', 'c'];
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = renderToString(server.MappedInputRows, {
+				rows: rows(initial, false, false),
+			}).html;
+			const inputs = new Map(
+				Array.from(container.querySelectorAll<HTMLInputElement>('input'), (input) => [
+					input.dataset.input!,
+					input,
+				]),
+			);
+			for (const [id, input] of inputs) input.value = `typed:${id}`;
+			const errors: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				MappedInputRows,
+				{ rows: rows(initial, false, mode === 'custom map') },
+				{ onRecoverableError: (error) => errors.push(error) },
+			);
+			try {
+				flushSync(() => {});
+				for (const [order, reverse, custom] of [
+					[initial, false, mode === 'custom map'],
+					[['c', '0', 'b'], true, mode === 'native map'],
+					[initial, false, mode === 'custom map'],
+				] as const) {
+					flushSync(() =>
+						root.render(MappedInputRows, { rows: rows([...order], reverse, custom) }),
+					);
+					expect(
+						Array.from(container.querySelectorAll('.mapped-rows > li'), (node) =>
+							node.getAttribute('data-row'),
+						),
+					).toEqual(order);
+					for (const [id, input] of inputs) {
+						expect(container.querySelector(`[data-input="${id}"]`)).toBe(input);
+						expect(input.value).toBe(`typed:${id}`);
+					}
+				}
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+});
 
 describe('scalar host children', () => {
 	it('updates strings and numbers without replacing the surviving text node', () => {

@@ -1,6 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
-import { createElement, flushSync, hydrateRoot, use, type OctaneNode } from '../src/index.js';
+import {
+	createElement,
+	flushSync,
+	forBlock,
+	hostComponent,
+	hydrateRoot,
+	use,
+	type ComponentBody,
+	type OctaneNode,
+} from '../src/index.js';
 import { act, mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
 import {
@@ -71,6 +80,72 @@ import {
 import { SnapshotMappedList } from './_fixtures/for-strong.js';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
+
+describe('manual keyed lists', () => {
+	it('preserves object keys and callback arguments, and unmounts the root after an unhandled key error', () => {
+		type Row = { id: string; label: string };
+		type Props = { items: Row[]; getKey: (item: Row, index: number) => Row };
+		const ManualList: ComponentBody<Props> = (props, scope) => {
+			const parent = hostComponent(scope, 0, 'ul', null);
+			forBlock(scope, 1, parent, props.items, props.getKey, (item, rowScope) => {
+				hostComponent(
+					rowScope,
+					0,
+					'li',
+					{ 'data-id': item.id },
+					createElement('input', { defaultValue: item.label }),
+				);
+			});
+		};
+		const initial = ['a', 'b', 'c'].map((id) => ({ id, label: id }));
+		let current: Row[] = [];
+		let failKey = false;
+		const failure = new Error('key unavailable');
+		const calls: unknown[][] = [];
+		function getKey(this: void, item: Row, index: number): Row {
+			calls.push([...arguments]);
+			expect(this).toBeUndefined();
+			expect(item).toBe(current[index]);
+			if (failKey && item.id === 'new') throw failure;
+			return item;
+		}
+		const view = mount(ManualList, { items: current, getKey });
+		try {
+			current = initial;
+			view.update(ManualList, { items: current, getKey });
+			const inputs = view.findAll('input') as HTMLInputElement[];
+			for (const input of inputs) input.value = `typed:${input.value}`;
+			current = initial.toReversed();
+			view.update(ManualList, { items: current, getKey });
+			expect(view.findAll('input')).toEqual(inputs.toReversed());
+
+			current = [initial[2], { id: 'new', label: 'new' }, initial[0]];
+			failKey = true;
+			expect(() => view.update(ManualList, { items: current, getKey })).toThrow(failure);
+			// An unhandled render error unmounts the entire failed root.
+			expect(view.findAll('input')).toEqual([]);
+			expect(inputs.every((input) => !input.isConnected)).toBe(true);
+
+			failKey = false;
+			// The public root remains reusable; retry mounts fresh inputs.
+			view.update(ManualList, { items: current, getKey });
+			expect(view.findAll('li').map((row) => row.getAttribute('data-id'))).toEqual([
+				'c',
+				'new',
+				'a',
+			]);
+			expect((view.findAll('input') as HTMLInputElement[]).map((input) => input.value)).toEqual([
+				'c',
+				'new',
+				'a',
+			]);
+			expect(calls.length).toBeGreaterThan(0);
+			expect(calls.every((args) => args.length === 2)).toBe(true);
+		} finally {
+			view.unmount();
+		}
+	});
+});
 
 describe('forBlock — mount', () => {
 	it('mounts an empty list', () => {

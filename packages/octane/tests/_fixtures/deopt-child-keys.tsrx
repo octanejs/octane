@@ -6,3 +6,14 @@
 export function RowsHole(props) @{
 	<ul class="rows">{props.rows}</ul>
 }
+
+function MappedInputRow(props) @{
+	<li data-row={props.row.id}>
+		<input data-input={props.row.id} defaultValue={props.row.label} />
+		{props.row.children}
+	</li>
+}
+
+export function MappedInputRows(props) @{
+	<ul class="mapped-rows">{props.rows.map((row) => <MappedInputRow key={row.id} row={row} />)}</ul>
+}
