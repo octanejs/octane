@@ -1,5 +1,16 @@
 # octane
 
+## 0.2.9
+
+### Patch Changes
+
+- d377899: Preserve `import defer` and `import.defer()` syntax in compiled TSRX modules so supported loaders can defer dependency evaluation.
+- b0bc435: Compile fixed-key inline style object literals into per-property updates. Bake
+  literal declarations into the HTML template and update one dynamic property
+  with a scalar binding or set up multiple properties together before applying
+  guarded scalar updates. Retain general style object handling for spreads,
+  computed keys, and overlapping CSS aliases.
+
 ## 0.2.8
 
 ### Patch Changes
