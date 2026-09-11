@@ -191,12 +191,20 @@ async function registryPackage(packageName, options, cache) {
 
 async function releaseIdentity(dependency, options, cache) {
 	const { data, fetchedAt } = await registryPackage(dependency.package, options, cache);
-	requireValue(nonempty(dependency.version), `Missing pinned version for ${dependency.package}`);
-	compareVersions(dependency.version, dependency.version);
-	const pinned = data.versions[dependency.version];
+	requireValue(nonempty(dependency.version), `Missing version specifier for ${dependency.package}`);
+	const pinnedVersion = selectHighestSatisfyingVersion(
+		Object.keys(data.versions),
+		dependency.version,
+	);
 	requireValue(
-		pinned?.name === dependency.package && pinned.version === dependency.version,
-		`Published identity not found for ${dependency.package}@${dependency.version}`,
+		pinnedVersion,
+		`No published release matches ${dependency.package}@${dependency.version}`,
+	);
+	compareVersions(pinnedVersion, pinnedVersion);
+	const pinned = data.versions[pinnedVersion];
+	requireValue(
+		pinned?.name === dependency.package && pinned.version === pinnedVersion,
+		`Published identity not found for ${dependency.package}@${pinnedVersion}`,
 	);
 	const latestStableVersion = selectHighestSatisfyingVersion(Object.keys(data.versions), '*');
 	requireValue(latestStableVersion, `No stable release found for ${dependency.package}`);
@@ -207,7 +215,8 @@ async function releaseIdentity(dependency, options, cache) {
 	);
 	return {
 		package: dependency.package,
-		pinnedVersion: dependency.version,
+		versionSpec: dependency.version,
+		pinnedVersion,
 		latestStableVersion,
 		registryUrl: `https://registry.npmjs.org/${encodeURIComponent(dependency.package)}`,
 		registryFetchedAt: fetchedAt,
@@ -220,6 +229,12 @@ async function releaseIdentity(dependency, options, cache) {
 
 function releaseKey(releases) {
 	return fingerprint(releases.map(({ registryFetchedAt, ...release }) => release));
+}
+
+function releaseBaseline(release) {
+	return release.versionSpec && release.versionSpec !== release.pinnedVersion
+		? `declared ${release.versionSpec}; highest matching published release ${release.pinnedVersion ?? 'unknown'}`
+		: `pinned ${release.pinnedVersion ?? 'unknown'}`;
 }
 
 function dependenciesFor(binding, status, policy) {
@@ -563,7 +578,7 @@ export async function auditBindings({
 					report,
 					binding,
 					'dependency-update',
-					`${release.package}: pinned ${release.pinnedVersion}; latest stable published release ${release.latestStableVersion}. Default-branch changes are separate source facts.`,
+					`${release.package}: ${releaseBaseline(release)}; latest stable published release ${release.latestStableVersion}. Default-branch changes are separate source facts.`,
 				);
 			const missing =
 				release.publishedExports?.filter((entry) => !binding.facts.exportPaths?.includes(entry)) ??
@@ -842,7 +857,7 @@ export async function revalidateAudit(input, options = {}) {
 		for (const release of binding.releases) {
 			try {
 				const next = await releaseIdentity(
-					{ package: release.package, version: release.pinnedVersion },
+					{ package: release.package, version: release.versionSpec ?? release.pinnedVersion },
 					options,
 					cache,
 				);
@@ -945,7 +960,7 @@ export function renderAuditReport(report, findingIds = []) {
 				(item) => item.package === release.package,
 			);
 			lines.push(
-				`  ${release.package}: pinned ${release.pinnedVersion ?? 'unknown'}, current registry latest stable ${refreshed?.latestStableVersion ?? 'unverified'}${refreshed ? ` fetched ${refreshed.registryFetchedAt}` : ''}`,
+				`  ${release.package}: ${releaseBaseline(release)}, current registry latest stable ${refreshed?.latestStableVersion ?? 'unverified'}${refreshed ? ` fetched ${refreshed.registryFetchedAt}` : ''}`,
 				`    Collected source: default-branch package version ${release.defaultBranchVersion ?? 'unknown'}; collection registry latest stable ${release.latestStableVersion ?? 'unverified'}`,
 			);
 		}

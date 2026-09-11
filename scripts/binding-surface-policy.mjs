@@ -147,10 +147,12 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 					const child = childFacts(resolved.file);
 					if (!statement.exportClause)
 						exports.push(
-							...child.exports.map((item) => ({
-								...item,
-								erased: statement.isTypeOnly || item.erased,
-							})),
+							...child.exports
+								.filter((item) => item.name !== 'default')
+								.map((item) => ({
+									...item,
+									erased: statement.isTypeOnly || item.erased,
+								})),
 						);
 					else if (ts.isNamedExports(statement.exportClause)) {
 						for (const element of statement.exportClause.elements) {
@@ -174,6 +176,15 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 					} else exports.push({ name: statement.exportClause.name.text, file, specifier });
 				}
 			}
+		} else if (ts.isExportAssignment(statement)) {
+			if (statement.isExportEquals)
+				throw new Error(`CommonJS export assignment requires review: ${file}`);
+			exports.push({
+				name: 'default',
+				file,
+				integration: usesRuntimeIntegration(statement),
+				erased: false,
+			});
 		} else if (
 			statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
 		) {

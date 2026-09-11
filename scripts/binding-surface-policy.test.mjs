@@ -60,6 +60,54 @@ test('observed dependency and hook exports keep focused evidence without engine 
 	assert.deepEqual(scopeUpstreamInventory(policy, [{ path: 'tests/engine.test.ts' }]), []);
 });
 
+test('default expression adapters are observed through named re-exports', (t) => {
+	const { root, write } = fixture(t);
+	write('src/hook.ts', "import { memo } from 'octane'; export default memo(() => null);");
+	write('src/index.ts', "export * from 'engine'; export { default as useEngine } from './hook';");
+	const policy = readBindingSurfacePolicy(root);
+	assert.equal(policy.valid, true, policy.issues.join('\n'));
+	assert.equal(policy.requiresLifecycleEvidence, true);
+});
+
+test('default identifiers need ownership even alongside named exports', (t) => {
+	const { root, write, surfaces } = fixture(t);
+	write('package.json', { exports: { '.': './src/hook.ts' }, dependencies: { engine: '^1.0.0' } });
+	const source =
+		"import { useEffect } from 'octane'; export function useEngine() { useEffect(() => {}); } const value = 1; export default value;";
+	write('src/hook.ts', source);
+	write('status.json', { surfaces: [surfaces[1]] });
+	let policy = readBindingSurfacePolicy(root);
+	assert.equal(policy.valid, false);
+	assert.ok(policy.issues.some((issue) => issue.includes('default: uncovered')));
+	write('status.json', { surfaces: [{ ...surfaces[1], exports: ['useEngine', 'default'] }] });
+	policy = readBindingSurfacePolicy(root);
+	assert.equal(
+		policy.valid,
+		false,
+		'a vanilla default cannot borrow integration from a named hook',
+	);
+	assert.ok(policy.issues.some((issue) => issue.includes('needs observed Octane integration')));
+});
+
+test('local export stars exclude defaults and CommonJS assignments require explicit review', (t) => {
+	const { root, write } = fixture(t);
+	write(
+		'src/hook.ts',
+		"import { useEffect } from 'octane'; export function useEngine() { useEffect(() => {}); } export default 1;",
+	);
+	write('src/index.ts', "export * from 'engine'; export * from './hook';");
+	assert.equal(readBindingSurfacePolicy(root).valid, true);
+	write(
+		'src/hook.ts',
+		"import { useEffect } from 'octane'; export function useEngine() { useEffect(() => {}); } export = useEngine;",
+	);
+	const policy = readBindingSurfacePolicy(root);
+	assert.equal(policy.valid, false);
+	assert.ok(
+		policy.issues.some((issue) => issue.includes('CommonJS export assignment requires review')),
+	);
+});
+
 test('legacy packages keep upstream evidence and reads do not promote metadata', (t) => {
 	const { root, write } = fixture(t);
 	write('status.json', { verified: '2025-01-01' });

@@ -13,6 +13,13 @@ with discovered branch, full SHA, fetch time, checkout path, and checkout status
 Release metadata is independent of remote default-branch identity: a newer commit
 does not establish a published dependency update or a tested upgrade.
 
+Each release retains its input `versionSpec` and the concrete published version
+selected as `pinnedVersion`. Exact status or compatible upstream-lock pins take
+precedence. For a range, the selected version is the highest matching stable
+registry release, not evidence of the version installed by a consumer. Refreshes
+resolve the range again and invalidate findings if that release changes.
+Unresolved catalog and workspace specifiers remain explicitly incomplete.
+
 The `findings` and `evidence` arrays distinguish `origin: "collection"` from
 `origin: "assessment"`. Keep collected entries intact. To add an assessment:
 

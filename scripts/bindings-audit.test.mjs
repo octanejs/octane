@@ -521,6 +521,53 @@ test('a changed or missing release repository requires re-audit, even if an asse
 	}
 });
 
+test('declared dependency ranges resolve published releases and refresh when the matching release changes', (t) => {
+	const f = fixture(t);
+	const manifest = JSON.parse(
+		readFileSync(path.join(f.source, 'packages/alpha/package.json'), 'utf8'),
+	);
+	f.write(f.source, 'packages/alpha/tests/consumer.test.ts', 'test("consumer", () => {});');
+	for (const version of ['^1.0.0', '~1.0.0', '>=1.0.0 <2.0.0']) {
+		manifest.dependencies.engine = version;
+		f.write(f.source, 'packages/alpha/package.json', manifest);
+		f.write(f.source, 'packages/alpha/status.json', {
+			surfaces: [
+				{
+					entrypoint: '.',
+					exports: ['*'],
+					ownership: 'imported',
+					files: ['src/index.ts'],
+					dependency: { package: 'engine', version },
+					evidence: ['tests/consumer.test.ts'],
+				},
+			],
+		});
+		f.commit(f.source);
+		const result = f.audit(['--binding', 'alpha']);
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		const report = JSON.parse(result.stdout);
+		const release = report.bindings[0].releases[0];
+		assert.equal(release.versionSpec, version);
+		assert.equal(release.pinnedVersion, '1.0.0');
+		assert.equal(release.latestStableVersion, '2.0.0');
+		assert.ok(report.findings.some((finding) => finding.category === 'dependency-update'));
+		const human = f.invoke(['report', '--input', f.output]);
+		assert.match(human.stdout, /highest matching published release 1\.0\.0/);
+		assert.ok(human.stdout.includes(`declared ${version}`));
+		const registry = structuredClone(f.registry);
+		registry.engine.versions['1.0.1'] = { ...registry.engine.versions['1.0.0'], version: '1.0.1' };
+		const changed = f.invoke(['revalidate', '--input', f.output], registry);
+		assert.equal(changed.status, 2, changed.stderr);
+		const refreshed = JSON.parse(changed.stdout);
+		assert.equal(refreshed.bindings[0].releaseCheck.releases[0].pinnedVersion, '1.0.1');
+		assert.ok(
+			refreshed.findings.every((finding) =>
+				finding.invalidations.some((item) => item.code === 'release-changed'),
+			),
+		);
+	}
+});
+
 test('catalog dependencies use an exact status pin; extra unpinned policy dependencies remain explicitly incomplete', (t) => {
 	const f = fixture(t);
 	const manifest = JSON.parse(
