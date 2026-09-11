@@ -485,7 +485,9 @@ jobs:
       # Browser parity lanes launch Chromium through Playwright.
       # Keep this package-agnostic so adding a binding never patches the workflow.
       - name: Install Playwright Chromium
-        run: pnpm --filter website exec playwright install --with-deps chromium
+        run: |
+          bash scripts/ci-apt-https.sh
+          pnpm --filter website exec playwright install --with-deps chromium
 
       # The manifest runner executes every required runtime and type lane. Each
       # runner's JSON report proves the exact identities without a separate
@@ -607,7 +609,9 @@ jobs:
         run: pnpm install --prod false --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm --filter website exec playwright install --with-deps chromium
+        run: |
+          bash scripts/ci-apt-https.sh
+          pnpm --filter website exec playwright install --with-deps chromium
 
       # The sharded suite excludes these paths by name. If any one ever moves,
       # fail instead of silently losing its dedicated coverage.
@@ -660,7 +664,9 @@ jobs:
       - name: Install Playwright Chromium for package and Astro coverage
         id: install_heavy_node_chromium
         if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
-        run: pnpm --filter website exec playwright install --with-deps chromium
+        run: |
+          bash scripts/ci-apt-https.sh
+          pnpm --filter website exec playwright install --with-deps chromium
 
       # Keep each former lane as a named step, and let independent suites run
       # after a sibling failure when their own prerequisites are still valid.
@@ -740,7 +746,9 @@ jobs:
 
       - name: Install selected Playwright browser
         if: ${{ matrix.lane == 'browser' }}
-        run: pnpm exec playwright install --with-deps ${{ matrix.playwright_browser }}
+        run: |
+          bash scripts/ci-apt-https.sh
+          pnpm exec playwright install --with-deps ${{ matrix.playwright_browser }}
 
       - name: Run ${{ matrix.lane }} integration tests
         run: |
@@ -1017,7 +1025,9 @@ jobs:
         run: pnpm install --prod false --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm --filter hacker-news-example exec playwright install --with-deps chromium
+        run: |
+          bash scripts/ci-apt-https.sh
+          pnpm --filter hacker-news-example exec playwright install --with-deps chromium
 
       - name: Run example browser journeys
         run: pnpm examples:e2e -- --shard=${{ matrix.shard }}

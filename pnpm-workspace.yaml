@@ -293,14 +293,14 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.1.69
-    '@tsrx/prettier-plugin': ^0.3.135
-    '@tsrx/typescript-plugin': ^0.3.135
-    '@tsrx/ripple': ^0.1.62
-    '@tsrx/react': ^0.2.69
-    '@tsrx/solid': ^0.1.69
-    '@tsrx/vite-plugin-react': ^0.0.102
-    '@tsrx/vite-plugin-solid': ^0.0.99
+    '@tsrx/core': ^0.1.71
+    '@tsrx/prettier-plugin': ^0.3.138
+    '@tsrx/typescript-plugin': ^0.3.138
+    '@tsrx/ripple': ^0.1.65
+    '@tsrx/react': ^0.2.71
+    '@tsrx/solid': ^0.1.71
+    '@tsrx/vite-plugin-react': ^0.0.104
+    '@tsrx/vite-plugin-solid': ^0.0.101
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -605,18 +605,18 @@ minimumReleaseAgeExclude:
   - oxc-tsrx@0.5.0
   - '@ripple-ts/adapter@0.3.125'
   - '@ripple-ts/vite-plugin@0.3.125'
-  - '@tsrx/core@0.1.69'
-  - '@tsrx/prettier-plugin@0.3.135'
-  - '@tsrx/react@0.2.69'
-  - '@tsrx/ripple@0.1.62'
-  - '@tsrx/solid@0.1.69'
-  - '@tsrx/typescript-plugin@0.3.135'
-  - '@tsrx/vite-plugin-react@0.0.102'
-  - '@tsrx/vite-plugin-solid@0.0.99'
+  - '@tsrx/core@0.1.71'
+  - '@tsrx/prettier-plugin@0.3.138'
+  - '@tsrx/react@0.2.71'
+  - '@tsrx/ripple@0.1.65'
+  - '@tsrx/solid@0.1.71'
+  - '@tsrx/typescript-plugin@0.3.138'
+  - '@tsrx/vite-plugin-react@0.0.104'
+  - '@tsrx/vite-plugin-solid@0.0.101'
   - ripple@0.3.125
-  - '@tsrx/runtime@0.1.6'
-  - '@tsrx/react-runtime@0.1.6'
-  - '@tsrx/solid-runtime@0.1.6'
+  - '@tsrx/runtime@0.1.7'
+  - '@tsrx/react-runtime@0.1.7'
+  - '@tsrx/solid-runtime@0.1.7'
   - cn@0.2.6
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
