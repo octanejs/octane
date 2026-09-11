@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.2.28
+
+### Patch Changes
+
+- 432b25b: Expose the update-bindings skill in repository mode and route binding maintenance by source ownership, preserving direct upstream imports and copied-code evidence requirements.
+
 ## 0.2.27
 
 ### Patch Changes
