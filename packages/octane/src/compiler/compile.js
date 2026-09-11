@@ -37,6 +37,7 @@ import {
 	createStyleClassMapFromStylesheet,
 	clone_ast_node as cloneAstNode,
 	strongHash,
+	withDeferredImports,
 } from '@tsrx/core';
 import { parseModule } from '#octane/compiler-parser';
 import { createStyleScopePass } from './style-scopes.js';
@@ -436,6 +437,8 @@ function attrBindingHelper(bind) {
 			return 'setStyle';
 		case 'styleProperty':
 			return 'setStyleProperty';
+		case 'styleProperties':
+			return 'setStyleProperties';
 		// SVG/MathML `className` is read-only — setClassAttr sets the attribute and
 		// clsx-composes (setClassName composes on HTML).
 		case 'class':
@@ -2152,24 +2155,30 @@ function staticStyleObjectNeedsDevValidation(obj) {
 // dynamic styles are byte-identical in innerHTML.
 function staticObjectToCssString(obj) {
 	const parts = [];
+	const properties = new Map();
 	for (const p of obj.properties || []) {
 		const name = p.key.type === 'Identifier' ? p.key.name : p.key.value;
-		const value = p.value.value;
-		if (value == null || value === false || value === '') continue;
-		const cssValue = value === true ? '' : cssStyleValue(name, value);
+		properties.set(name, p.value.value);
+	}
+	for (const [name, value] of properties) {
+		if (value == null || typeof value === 'boolean' || value === '') continue;
+		const cssValue = cssStyleValue(name, value);
 		parts.push(`${hyphenateStyleName(name)}: ${cssValue};`);
 	}
 	return parts.join(' ');
 }
 
-// Preserve both CSS declaration order and JavaScript object evaluation order:
-// only a nonempty literal prefix followed by exactly one dynamic own property
-// can move into the template plus an independently guarded scalar binding.
+// A literal prefix can live in the template when all following properties have
+// fixed, unique names. The values still evaluate together at the authored
+// style attribute, before any DOM writes. Fixed literal values
+// after the first dynamic property stay in the ordered suffix. Spreads,
+// computed names, and accessors retain ordinary object evaluation and diffing.
 function mixedStaticStyle(obj) {
-	if (obj?.type !== 'ObjectExpression' || obj.properties.length < 2) return null;
-	const seen = new Set();
+	if (obj?.type !== 'ObjectExpression' || obj.properties.length === 0) return null;
+	const seen = new Map();
+	let duplicates = false;
 	const prefix = [];
-	let dynamic = null;
+	const dynamics = [];
 	for (const property of obj.properties) {
 		if (
 			(property.type !== 'Property' && property.type !== 'ObjectProperty') ||
@@ -2185,29 +2194,56 @@ function mixedStaticStyle(obj) {
 		}
 		const name = key.type === 'Identifier' ? key.name : key.value;
 		const normalized = hyphenateStyleName(name);
-		if (name === '__proto__' || name === 'dangerouslySetInnerHTML' || seen.has(normalized)) {
+		if (
+			name === '__proto__' ||
+			name === 'dangerouslySetInnerHTML' ||
+			(seen.has(normalized) && seen.get(normalized) !== name)
+		) {
 			return null;
 		}
-		seen.add(normalized);
+		if (seen.has(normalized)) duplicates = true;
+		seen.set(normalized, name);
 
 		const value = property.value;
-		if (value?.type === 'Literal') {
-			if (
-				dynamic !== null ||
-				(typeof value.value !== 'string' && typeof value.value !== 'number') ||
-				value.value === ''
-			) {
-				return null;
-			}
+		const unwrappedValue = unwrapTsExpr(value);
+		// Extracting an anonymous function/class into a temporary changes its
+		// inferred name. A discarded class can observe that name in a static
+		// initializer, so preserve the original object evaluation in this case.
+		if (
+			unwrappedValue?.type === 'ArrowFunctionExpression' ||
+			((unwrappedValue?.type === 'FunctionExpression' ||
+				unwrappedValue?.type === 'ClassExpression') &&
+				!unwrappedValue.id)
+		) {
+			return null;
+		}
+		if (
+			value?.type === 'Literal' &&
+			dynamics.length === 0 &&
+			(typeof value.value === 'string' || typeof value.value === 'number') &&
+			value.value !== ''
+		) {
 			prefix.push(property);
 		} else {
-			if (dynamic !== null) return null;
-			dynamic = { name, key, value };
+			dynamics.push({ name, key, value });
 		}
 	}
-	if (prefix.length === 0 || dynamic === null) return null;
+	// A duplicate retains its first insertion position but uses its last value.
+	// Keep every authored evaluation, including overwritten values, and avoid
+	// baking declarations that a later duplicate could replace or remove.
+	if (duplicates) {
+		return {
+			css: '',
+			dynamics: obj.properties.map((property) => ({
+				name: property.key.type === 'Identifier' ? property.key.name : property.key.value,
+				key: property.key,
+				value: property.value,
+			})),
+		};
+	}
+	if (dynamics.length === 0) return null;
 	const css = staticObjectToCssString({ properties: prefix });
-	return css === '' ? null : { css, ...dynamic };
+	return prefix.length !== 0 && css === '' ? null : { css, dynamics };
 }
 
 // ===========================================================================
@@ -9922,7 +9958,11 @@ function compileInternal(
 				}).nodes,
 			);
 			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'default' });
-		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
+		} else if (
+			node.type === 'ImportDeclaration' &&
+			node.source.value === 'octane' &&
+			node.phase !== 'defer'
+		) {
 			// Preserve ALL user-imported names from octane (Portal, createContext,
 			// use, custom helpers, etc.) — merged into the single prelude import.
 			addUserImportSpecifiers(ctx, node);
@@ -10572,8 +10612,16 @@ function compileServer(
 					: compileServerComponent({ ...node.declaration, default: true }, ctx)),
 			);
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
-			// User imports from 'octane' resolve to the server runtime instead.
-			addUserImportSpecifiers(ctx, node);
+			// Preserve the authored deferred namespace while routing it to the server runtime.
+			// Other user imports are merged into the eager server runtime prelude.
+			if (node.phase === 'defer') {
+				bodyNodes.push({
+					...node,
+					source: { ...node.source, value: 'octane/server', raw: '"octane/server"' },
+				});
+			} else {
+				addUserImportSpecifiers(ctx, node);
+			}
 		} else if (
 			(node.type === 'ImportDeclaration' ||
 				node.type === 'ExportNamedDeclaration' ||
@@ -14288,6 +14336,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			mountCallbackSinks,
 			options?.keyedSelection ?? null,
 			options?.inlineBindingGuards === true,
+			options?.mappedItem === true,
 		);
 	}
 	ctx.currentInvariantLocals = prevInvariantLocals;
@@ -22194,6 +22243,7 @@ function planJsx(
 	mountCallbackSinks = null,
 	keyedSelection = null,
 	inlineBindingGuards = false,
+	mappedItem = false,
 ) {
 	// DEV ONLY: per-element source-location map for THIS body (path-key → [line, col]),
 	// populated at the top of emitElementHtml and read in the binding mount loop to emit
@@ -22372,6 +22422,17 @@ function planJsx(
 			}
 		}
 		appendTemplateIr(rootTemplate, part);
+		if (mappedItem && jsxNodes.length === 1 && nodeIsComp) {
+			// A guarded map can switch to authored component descriptors on its
+			// next render. Both modes must own the same full component slot; a
+			// lite scope cannot be reconciled as that descriptor's component.
+			const rootComp = compCalls[compCalls.length - 1];
+			if (rootComp.liteEligible || rootComp.autoMemoLite) {
+				rootComp.singleRoot = ctx.componentInfo?.get(rootComp.compNode.name)?.singleRoot === true;
+			}
+			rootComp.liteEligible = false;
+			rootComp.autoMemoLite = false;
+		}
 		// M3 inherit-range: stamp the sole comp-call root's cc. Its own entry is
 		// the LAST one its emitNodeHtml pushed (nested children/prop ccs are
 		// pushed first, before makeCompCall returns to the root push).
@@ -22511,7 +22572,12 @@ function planJsx(
 		}
 		let mixedStylePaths = '';
 		for (const binding of elementBindings) {
-			if (binding.kind === 'styleProperty') mixedStylePaths += `|${binding.path.join('.')}`;
+			if (
+				(binding.kind === 'styleProperty' || binding.kind === 'styleProperties') &&
+				binding.staticCss !== ''
+			) {
+				mixedStylePaths += `|${binding.path.join('.')}`;
+			}
 		}
 		const cloneCall =
 			mixedStylePaths !== ''
@@ -22789,6 +22855,10 @@ function planJsx(
 			const arity = b.argExprs.length <= 2 ? String(b.argExprs.length) : 'N';
 			ctx.runtimeNeeded.add(`evt${arity}`);
 			if (!b.mountOnly) ctx.runtimeNeeded.add(`evt${arity}u`);
+		}
+		if (b.kind === 'styleProperties') {
+			ctx.runtimeNeeded.add('setStyleProperty');
+			ctx.runtimeNeeded.add('isHydratingStyle');
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
@@ -23945,6 +24015,7 @@ const DEFERRABLE_MOUNT_KINDS = new Set([
 	'class',
 	'style',
 	'styleProperty',
+	'styleProperties',
 	'formAction',
 	'htmlOnlyChild',
 ]);
@@ -24153,11 +24224,19 @@ function commitSourceRows(sources, valueOf) {
 // `setClassName(el, undefined)` no-op on a freshly-cloned element (so the output
 // is byte-identical to the old unconditional mount write).
 function emitDeferredMount(bind, elVar, bag) {
-	// Whole-object `style` diffs on `_sty`; scalar styles and other values on `_prev`.
+	// Whole-object styles diff on `_sty`; grouped styles use it only as a
+	// first-render marker. Each grouped property keeps a scalar previous value.
 	bag.constField(
-		bind.kind === 'style' ? `_sty$${bind.id}` : `_prev$${bind.id}`,
-		bind.kind === 'styleProperty' ? 'style-unset' : 'undefined',
+		bind.kind === 'style' || bind.kind === 'styleProperties'
+			? `_sty$${bind.id}`
+			: `_prev$${bind.id}`,
+		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'style-unset' : 'undefined',
 	);
+	if (bind.kind === 'styleProperties') {
+		for (let i = 0; i < bind.properties.length; i++) {
+			bag.constField(`_prev$${bind.id}_${i}`, 'undefined');
+		}
+	}
 	const key = `_el$${bind.id}`;
 	if (!bag.host(key, elVar)) return null;
 	return inheritOriginLoc(
@@ -24383,6 +24462,34 @@ function emitBindingMount(bind, elVar, bag) {
 					b.stmt(b.call(callee(), el(), V(), undefinedNode())),
 					...mountHost(),
 					b.stmt(b.assignment('=', local(`_sty$${bind.id}`), V())),
+				]),
+			);
+		}
+		case 'styleProperties': {
+			for (let i = 0; i < bind.properties.length; i++) bag.local(`_prev$${bind.id}_${i}`);
+			const entries =
+				bind.properties.length === bind.evaluations.length
+					? V()
+					: b.array(
+							bind.properties.flatMap((property) => [
+								inheritOriginLoc(b.literal(property.name), property.key),
+								b.member(V(), b.literal(property.evaluationIndex * 2 + 1), true),
+							]),
+						);
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(b.call(callee(), el(), entries, b.literal(bind.staticCss))),
+					...mountHost(),
+					...bind.properties.map((property, i) =>
+						b.stmt(
+							b.assignment(
+								'=',
+								local(`_prev$${bind.id}_${i}`),
+								b.member(V(), b.literal(property.evaluationIndex * 2 + 1), true),
+							),
+						),
+					),
 				]),
 			);
 		}
@@ -24732,6 +24839,55 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 					),
 				]),
 			);
+		}
+		case 'styleProperties': {
+			// Evaluate every authored value before the first CSS write, including
+			// fixed literal suffix values. Mount and hydration compare one complete
+			// style; ordinary updates only call the scalar setter for changed cells.
+			const values = bind.evaluations.map((value, i) => b.const(`_v${i}`, value));
+			const valueOf = (property) => b.id(`_v${property.evaluationIndex}`);
+			const entries = b.array(
+				bind.properties.flatMap((property) => [
+					inheritOriginLoc(b.literal(property.name), property.key),
+					valueOf(property),
+				]),
+			);
+			const publish = bind.properties.map((property, i) =>
+				b.stmt(b.assignment('=', bagFieldNode(bag, `_prev$${bind.id}_${i}`), valueOf(property))),
+			);
+			const grouped = [
+				b.stmt(b.call(callee(), F('_el'), entries, b.literal(bind.staticCss))),
+				...(bind.deferred ? [b.stmt(b.assignment('=', F('_sty'), b.literal(null)))] : []),
+				...publish,
+			];
+			const propertyCallee = () =>
+				attrLoweringToken(b.id(`_$${attrBindingHelper({ kind: 'styleProperty' })}`), bind);
+			const scalar = bind.properties.map((property, i) => {
+				const previous = bagFieldNode(bag, `_prev$${bind.id}_${i}`);
+				const value = valueOf(property);
+				return b.if(
+					b.binary('!==', previous, value),
+					b.block([
+						b.stmt(
+							b.call(
+								propertyCallee(),
+								F('_el'),
+								inheritOriginLoc(b.literal(property.name), property.key),
+								value,
+								b.literal(''),
+								previous,
+							),
+						),
+						b.stmt(b.assignment('=', previous, value)),
+					]),
+					null,
+				);
+			});
+			const hydrate = b.call('_$isHydratingStyle');
+			const needsGroup = bind.deferred
+				? b.logical('||', b.binary('===', F('_sty'), b.id('__s')), hydrate)
+				: hydrate;
+			return st(b.block([...values, b.if(needsGroup, b.block(grouped), b.block(scalar))]));
 		}
 		case 'spread': {
 			// setSpread does its own per-key diffing internally and handles cleanup
@@ -25913,8 +26069,8 @@ function emitElementHtml(
 		inner = resolveStyleExpr(inner, cssHash);
 
 		// `style={...}` — static literal object/string serialises into the HTML
-		// template (unless we're after a spread, which would clobber it); dynamic
-		// values become a setStyle binding.
+		// template (unless we're after a spread, which would clobber it); a fixed
+		// literal prefix plus dynamic suffix can avoid a whole-object diff.
 		if (attrName === 'style') {
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
 				const chunk = ` style="${escapeAttr(inner.value)}"`;
@@ -25942,27 +26098,59 @@ function emitElementHtml(
 			) {
 				const mixed = mixedStaticStyle(inner);
 				if (mixed !== null) {
-					appendBakedAttribute(
-						attrTemplate,
-						` style="${escapeAttr(mixed.css)}"`,
-						attrName,
-						attr.name,
-						inner,
-						ctx.inspect,
-					);
-					registerAttrLoweringOrigin(ctx, mixed.key, null, mixed.name);
-					bindings.push({
-						id: bindings.length,
-						kind: 'styleProperty',
-						name: mixed.name,
-						expr: tsrxExprNode(mixed.value, ctx, componentName, inlinedSubs),
-						path,
-						ns: hostNs,
-						nameOrigin: attr.name,
-						propertyOrigin: mixed.key,
-						staticOrigin: inner,
-						staticCss: mixed.css,
-					});
+					if (mixed.css !== '') {
+						appendBakedAttribute(
+							attrTemplate,
+							` style="${escapeAttr(mixed.css)}"`,
+							attrName,
+							attr.name,
+							inner,
+							ctx.inspect,
+						);
+					}
+					for (const entry of mixed.dynamics) {
+						registerAttrLoweringOrigin(ctx, entry.key, null, entry.name);
+					}
+					if (mixed.dynamics.length === 1) {
+						const entry = mixed.dynamics[0];
+						bindings.push({
+							id: bindings.length,
+							kind: 'styleProperty',
+							name: entry.name,
+							expr: tsrxExprNode(entry.value, ctx, componentName, inlinedSubs),
+							path,
+							ns: hostNs,
+							nameOrigin: attr.name,
+							propertyOrigin: entry.key,
+							staticOrigin: inner,
+							staticCss: mixed.css,
+						});
+					} else {
+						const entries = [];
+						const propertyBindings = new Map();
+						const evaluations = [];
+						for (const entry of mixed.dynamics) {
+							const value = tsrxExprNode(entry.value, ctx, componentName, inlinedSubs);
+							entries.push(inheritOriginLoc(b.literal(entry.name), entry.key), value);
+							propertyBindings.set(entry.name, {
+								name: entry.name,
+								key: entry.key,
+								evaluationIndex: evaluations.length,
+							});
+							evaluations.push(value);
+						}
+						bindings.push({
+							id: bindings.length,
+							kind: 'styleProperties',
+							expr: inheritOriginLoc(b.array(entries), inner),
+							properties: [...propertyBindings.values()],
+							evaluations,
+							path,
+							ns: hostNs,
+							nameOrigin: attr.name,
+							staticCss: mixed.css,
+						});
+					}
 					continue;
 				}
 			}
@@ -26876,6 +27064,7 @@ function hoistBodyHelper(
 	idOrigin = null,
 	keyedSelection = null,
 	inlineBindingGuards = false,
+	mappedItem = false,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
@@ -26923,7 +27112,9 @@ function hoistBodyHelper(
 		fakeOrigin,
 	);
 	const helperOptions =
-		inlineBindingGuards || keyedSelection !== null ? { keyedSelection, inlineBindingGuards } : null;
+		inlineBindingGuards || keyedSelection !== null || mappedItem
+			? { keyedSelection, inlineBindingGuards, mappedItem }
+			: null;
 	if (envNames == null) {
 		inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash, helperOptions));
 		return helperName;
@@ -28667,6 +28858,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		directiveKeywordOrigin(ctx, node),
 		keyedSelection,
 		hostMountSafe,
+		node.nativeArrayMap != null,
 	);
 
 	const mapCall = node.nativeArrayMap || null;
@@ -29464,7 +29656,7 @@ const esrapCommentOptions = {
 function printNodeWithMap(node, ctx) {
 	const printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node));
 	if (assertPrintedLocs()) assertNodeLocs(printable);
-	const { code, map } = esrapPrint(printable, esrapTsx(esrapCommentOptions), {
+	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(esrapCommentOptions)), {
 		sourceMapSource: ctx.mapSourceName,
 		sourceMapContent: ctx.mapSource,
 		sourceMapEncodeMappings: false,

@@ -76,7 +76,10 @@ makes every printed ratio a naive/tuned cliff number directly.
 
 The production style-work gate measures existing row creation, selection, and
 unrelated updates with Chromium precise call coverage. It verifies complete CSS
-values, selected rows, row identity, and the unchanged JSX control:
+values, selected rows, row identity, and the JSX whole-object control. Both naive
+entrypoints expose `window.__benchFlush`, like the tuned fixture, so the harness
+includes the scheduled DOM commit inside the instrumented click. Without that
+hook it could observe zero rows before the click had committed:
 
 ```bash
 # Build the existing naive fixtures with readable production helper names.
@@ -87,6 +90,59 @@ pnpm --filter octane-jsx-naive-jsbench preview &
 pnpm --dir benchmarks/js-framework bench:style-work
 WORK_DIALECT=jsx pnpm --dir benchmarks/js-framework bench:style-work
 ```
+
+### Fixed-key inline style literals
+
+The separate `style-literals.html` entry keeps the ordinary js-framework app's
+DOM workload and style authoring unchanged. It mounts 1,000 keyed rows in six
+cases:
+
+| case | authored `style` | expected path |
+| --- | --- | --- |
+| `single` | one static declaration and one dynamic value | baked prefix plus scalar setter |
+| `multi` | one static declaration and two dynamic values | baked prefix, grouped mount, guarded scalar updates |
+| `generic` | the same three declarations as `multi`, passed through `style={style}` | whole-object diff control |
+| `interleaved` | dynamic `left`, imported `display`, dynamic `right`, then static `opacity` | grouped mount and guarded scalar updates without a static prefix |
+| `duplicateStatic` | dynamic `color`, then static `color`, then dynamic `background` | grouped mount and guarded updates to `background` |
+| `duplicateDynamic` | static `color`, then dynamic `color` and `background` | grouped mount and guarded updates to both final values |
+
+The multi and generic cases produce the same CSS. The interleaved case covers
+the imported value and non-prefix literal order from issue #1048. The duplicate
+cases cover both overwritten-value examples in the issue's follow-up. They
+check that the final value wins, the first insertion determines CSS declaration
+order, and the dynamic color expression is evaluated even when overwritten.
+The gate checks every row's
+style and selection, DOM identity, CSSOM writes, and production helper calls on
+mount, selecting two successive rows, and an unrelated update. It tests work
+separately from correctness suites. The `generic` case must still take the
+whole-object path; this catches an over-broad literal optimization. Optional
+timings use a second, uninstrumented Chromium process, two warmups per operation,
+and report median and interquartile range over `WORK_SAMPLES` trials. Treat
+small timing differences as inconclusive; deterministic call and CSS write
+counts remain the regression gate. Independent runs can vary more than the
+interquartile range within a run, so compare repeated baseline and candidate
+runs before drawing a wall-time conclusion.
+
+```bash
+pnpm --filter octane-tsrx-naive-jsbench build:style-literals
+pnpm --filter octane-tsrx-naive-jsbench preview:style-literals &
+WORK_MODE=literals WORK_SAMPLES=9 WORK_JSON=/tmp/style-literals.json \
+  node benchmarks/js-framework/style-work.mjs
+```
+
+Build the ordinary naive fixture before `build:style-literals` when running both
+gates: its normal Vite build clears `dist/`, including the separate style entry.
+
+To measure an older compiler before grouped lowering, set
+`WORK_EXPECT_MULTI_OPTIMIZED=0` on the final command. Compare that baseline and
+the candidate with the same Node, Vite, `@tsrx/core`, Chromium, machine, and
+sampling settings.
+
+To measure the duplicate-key regression against a compiler that still uses
+whole-object updates for those two cases, set
+`WORK_EXPECT_DUPLICATES_OPTIMIZED=0`. Both duplicate cases require 1,000 generic
+style calls per operation in that baseline and zero after optimization;
+an unrelated update must write no CSS properties in either version.
 
 The naive fixtures also carry the keyed-reorder buttons (mirroring the tuned
 set), so `run-reorder.mjs` can drive them the same way — but the canonical

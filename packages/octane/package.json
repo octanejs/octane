@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.2.7",
+  "version": "0.2.10",
   "license": "MIT",
   "type": "module",
   "sideEffects": [

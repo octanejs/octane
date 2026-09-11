@@ -1,5 +1,62 @@
 # octane
 
+## 0.2.10
+
+### Patch Changes
+
+- b7a2c47: Optimize inline style objects with repeated property names using targeted property updates. Preserve every authored value evaluation, the final value of each key, and its original insertion order across client rendering, SSR, and hydration.
+
+## 0.2.9
+
+### Patch Changes
+
+- d377899: Preserve `import defer` and `import.defer()` syntax in compiled TSRX modules so supported loaders can defer dependency evaluation.
+- b0bc435: Compile fixed-key inline style object literals into per-property updates. Bake
+  literal declarations into the HTML template and update one dynamic property
+  with a scalar binding or set up multiple properties together before applying
+  guarded scalar updates. Retain general style object handling for spreads,
+  computed keys, and overlapping CSS aliases.
+
+## 0.2.8
+
+### Patch Changes
+
+- 8a3da65: Avoid scheduling a capture fallback task for ordinary delegated discrete events when no controlled form restoration is pending. Preserve the fallback for a controlled edit whose native bubble is stopped below the root, including controls armed after capture and restores queued by nested events.
+- 70c29ab: Avoid emitting a parallel `useBatch` for proven module-level context-only reads in TSRX and plain TypeScript. Mixed promise reads and child warming continue to batch as before.
+- 9b23f6c: Avoid building prefixed string keys for unkeyed top-level descriptor lists.
+- afdc361: Reuse the encoded wrapper path for nested unkeyed descriptor siblings during client reconciliation.
+- 7804852: Avoid temporary argument arrays when running effects without dependency arguments.
+- 612b639: Update the shared TSRX compiler dependency to `@tsrx/core` 0.1.71.
+- 621147d: Avoid allocating a rest-argument array when rendering children inside a reused host component.
+- 266302e: Keep the first resolved context provider inline on each consumer, allocating a
+  provider cache Map only when that consumer reads a second distinct context.
+  Continue reading provider values live through updates and hosted-root changes.
+- de3f2e6: Index universal owner drafts only when a render reads an earlier owner's hook or ref, preserving fast reads of the newest draft and the latest draft after retries.
+  Expose the new universal draft lookup benchmark in the MCP suite catalog.
+- c31f629: Add opt-in `universalHostBinding` for local direct native roots. A subscribed source can update selected host properties in one accepted batch without rebuilding the component tree on each change.
+- bf8568e: Require a runtime `octane/signals` import to enable native signal reads in a module. Unrelated `$`-suffixed names no longer change DOM compilation or reject non-DOM renderers; components receiving signal handles or readers through props can import `octane/signals` directly.
+- c6300cf: Avoid constructing a native event path during the capture observer when a single root has no portals, and reuse the path across the capture and emulated bubble queues of nonbubbling events.
+- c31f629: Release earlier effect hooks after accepted universal renderer updates. Repeated native renders with unchanged effect dependencies no longer retain the callback history until unmount.
+- 9b17f4e: Reuse static children-only warm plans when registering compiled component
+  descendants, avoiding a fresh empty batch and warm closure on each render while
+  preserving the first pending descendant's fetch discovery.
+- 593bf2e: Seed frequently polled DOM expando keys on native prototypes, including raw HTML ownership, de-opt descriptors, and uncontrolled value baselines.
+- 4a5edff: Skip ancestor cache searches for memo values when a new render cannot match any prefetched cache, while preserving suspended retries and transition resource reuse.
+- d4bf228: Avoid serializing top-level unkeyed descriptor positions into JSON for server async identity.
+- 3459196: Reuse nested implicit descriptor key prefixes during server rendering while preserving Suspense retry identities and hydration output.
+- f6a0b41: Place hoisted SSR metadata inside an authored head at a fragment root, and omit the SEO stray-owner diagnostic from production browser bundles.
+- 3606d04: Keep distinct client and server `memo()` wrappers on stable property shapes while preserving live defaults and static-hoisting behavior.
+  Expose the memo wrapper shape benchmark in the MCP suite catalog.
+- 1c28da5: Keep scoped JSX element and value descriptors on stable property shapes while preserving deferred children, cloning, and server rendering behavior.
+  Expose the scoped descriptor benchmark in the MCP suite catalog.
+- 1298a69: Reject known ambient browser-state reads during Strong renders with `OCTANE_STRONG_RENDER_AMBIENT_READ`, including browser handle aliases and `globalThis` property reads outside known standard language builtins. Preserve shadowing, events, effects, external-store snapshot callbacks, and lazy state initialization, and document how to render subscribed snapshots safely across server and client.
+- 856febc: Reject render-time reads of reassigned module-scope `let` and `var` bindings in Strong modules with source-located diagnostics. Keep compatibility modules and event, effect, and deferred reads unchanged, and document the snapshot-safe alternative.
+- 236d4b5: Reject render-time reads of `useRef.current` in Strong modules with a source-located diagnostic, while retaining event and effect reads and compatibility-mode behavior. Document the rule in Octane's authoring guidance and MCP skill.
+- a8f34fd: Reject render-time calls to known state getters from `useState`, `useReducer`, and `useLinkedState` in Strong modules, with source-located diagnostics. Keep event, effect, deferred, and compatibility-mode calls legal and document the snapshot-safe render pattern.
+- c3b0bea: Check Strong-mode `@switch` arms in their own lexical scopes so arm-local shadows and functions receive accurate render diagnostics without leaking bindings into sibling arms. Treat instance class field initializers as deferred work when a class is defined during render.
+- 9fd4fd8: Avoid allocating a temporary array when resolving nested universal hook slots.
+- e8f6067: Avoid empty batch arrays when registering client warm plans for complex components.
+
 ## 0.2.7
 
 ### Patch Changes

@@ -23,6 +23,7 @@ import testing, {
 } from '@octanejs/three/testing';
 import type { JSX as IntrinsicJSX } from '@octanejs/three/intrinsics';
 import type { JSX as RuntimeJSX } from '@octanejs/three/intrinsics/jsx-runtime';
+import * as THREE from 'three';
 
 type IntrinsicMesh = IntrinsicJSX.IntrinsicElements['mesh'];
 type RuntimeMesh = RuntimeJSX.IntrinsicElements['mesh'];
@@ -43,6 +44,12 @@ const intrinsicMesh: IntrinsicMesh = { position: [1, 2, 3] };
 const runtimeMesh: RuntimeMesh = intrinsicMesh;
 const rootMesh: RootMesh = runtimeMesh;
 const intrinsicMeshAgain: IntrinsicMesh = rootMesh;
+const constructedCameraOptions: CreateThreeTestRendererOptions = {
+	camera: new THREE.PerspectiveCamera(),
+};
+const declarativeCameraOptions: CreateThreeTestRendererOptions = {
+	camera: { position: [1, 2, 3] },
+};
 
 void rootCreate;
 void coreState;
@@ -55,7 +62,8 @@ void threeRenderer;
 void threeRendererBoundaries;
 void threeRendererRules;
 void intrinsicMeshAgain;
-void (undefined as unknown as CreateThreeTestRendererOptions);
+void constructedCameraOptions;
+void declarativeCameraOptions;
 void (undefined as unknown as MockEventData);
 void (undefined as unknown as MockSyntheticEvent);
 void (undefined as unknown as TestingRenderer);

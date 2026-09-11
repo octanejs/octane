@@ -7,6 +7,7 @@ async function expectMirrorSelection(start: number, end: number): Promise<void> 
 	const input = page.getByRole('textbox');
 	await expect.poll(async () => input.getAttribute('data-input-otp-mss')).toBe(String(start));
 	await expect.poll(async () => input.getAttribute('data-input-otp-mse')).toBe(String(end));
+	await expectSelection(input, [start, end]);
 }
 
 async function pressAndExpectSelection(key: string, start: number, end: number): Promise<void> {
@@ -14,7 +15,6 @@ async function pressAndExpectSelection(key: string, start: number, end: number):
 	await input.press(key);
 	await input.evaluate(() => document.dispatchEvent(new Event('selectionchange')));
 	await expectMirrorSelection(start, end);
-	await expectSelection(input, [start, end]);
 }
 
 it('should replace selected char if another is pressed', async () => {

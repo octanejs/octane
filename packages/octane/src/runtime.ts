@@ -14530,7 +14530,13 @@ class HydrationCapability {
 		}
 	}
 
-	applyStyle(el: HTMLElement | SVGElement, value: any, _prev: any, staticCss?: string): boolean {
+	applyStyle(
+		el: HTMLElement | SVGElement,
+		value: any,
+		_prev: any,
+		staticCss?: string,
+		entries?: readonly unknown[],
+	): boolean {
 		const mode = hydrationMismatchMode(el);
 		if (mode === 1) return true;
 		const style = (el as HTMLElement).style;
@@ -14546,7 +14552,14 @@ class HydrationCapability {
 		// while still detecting reordered, missing, added, and empty styles.
 		const expectedStyle = document.createElement('div').style;
 		if (staticCss !== undefined) expectedStyle.cssText = staticCss;
-		applyStyleValue(el, expectedStyle, value, undefined);
+		if (entries === undefined) applyStyleValue(el, expectedStyle, value, undefined);
+		else {
+			for (let i = 0; i < entries.length; i += 2) {
+				const entry = entries[i + 1];
+				if (entry != null && typeof entry !== 'boolean')
+					applyStyleProperty(el, expectedStyle, entries[i] as string, entry);
+			}
+		}
 		const expected = expectedStyle.cssText;
 		const expectsStyleAttribute = expected !== '';
 		if (before === expected && hadStyleAttribute === expectsStyleAttribute) return true;
@@ -16859,6 +16872,11 @@ function setDeoptClass(el: Element, value: unknown): void {
 
 const IMPORTANT_SUFFIX = '!important';
 
+/** Whether a grouped style must compare its complete value during hydration. @internal */
+export function isHydratingStyle(): boolean {
+	return activeHydration() !== null;
+}
+
 export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): void {
 	const style = (el as HTMLElement).style;
 	// Hydration treats the authored style as a complete value: rebuild it once so
@@ -16901,6 +16919,38 @@ export function setStyleProperty(
 	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
 	else applyStyleProperty(el, style, name, value);
+}
+
+/**
+ * Apply ordered fixed-key declarations on mount. The compiler writes changed
+ * values with scalar setters on updates; hydration compares the whole value.
+ * @internal
+ */
+export function setStyleProperties(
+	el: HTMLElement | SVGElement,
+	entries: readonly unknown[],
+	staticCss: string,
+): void {
+	const hydration = activeHydration();
+	if (hydration !== null) {
+		hydration.applyStyle(el, null, undefined, staticCss, entries);
+		return;
+	}
+	const style = (el as HTMLElement).style;
+	let journaled = false;
+	for (let i = 0; i < entries.length; i += 2) {
+		const value = entries[i + 1];
+		// No dynamic declaration exists yet. Removing a null or boolean value
+		// could erase a longhand supplied by the baked static prefix.
+		if (value == null || typeof value === 'boolean') continue;
+		if (!journaled && TRANSITION_JOURNAL !== null) {
+			journalAttr(el, 'style');
+			journaled = true;
+		}
+		const name = entries[i] as string;
+		if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, undefined, name)) continue;
+		applyStyleProperty(el, style, name, value);
+	}
 }
 
 function applyStyleValue(
@@ -25267,9 +25317,8 @@ function renderPreparedChildList(
 	const { items, keys } = preparedList;
 	const markerlessMappedFallback =
 		mappedFallback === true && hydration !== null && !hydration.isOpen(hydration.node);
-	const getKey = compiledMapKey
-		? (item: any, index: number) => 'k' + String(compiledMapKey(item, index))
-		: (_item: any, i: number) => keys![i];
+	const keySource = compiledMapKey || keys!;
+	const normalizeKey = !!compiledMapKey;
 	const wasMappedNative = state.forSlot.mappedNative === true;
 	let body =
 		compiledMapBody || (mappedFallback === true ? mappedDeoptItemBody : (deoptItemBody as any));
@@ -25277,7 +25326,7 @@ function renderPreparedChildList(
 		for (let index = 0; index < items.length; index++) {
 			const item = items[index];
 			if (!isHostDescriptor(item)) continue;
-			const block = state.forSlot.items.get(getKey(item, index));
+			const block = state.forSlot.items.get(readListKey(keySource, item, index, normalizeKey));
 			if (
 				block !== undefined &&
 				block.startMarker !== null &&
@@ -25387,23 +25436,25 @@ function renderPreparedChildList(
 			parentBlock,
 			state.forSlot,
 			items,
-			getKey,
+			keySource,
 			body,
 			compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
 			ssrMarkerless,
+			normalizeKey,
 		);
 	} else {
 		reconcileKeyed(
 			parentBlock,
 			state.forSlot,
 			items,
-			getKey,
+			keySource,
 			body,
 			pure,
 			compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
 			lite,
 			(fastFlags & 8) !== 0,
 			ssrMarkerless,
+			normalizeKey,
 		);
 	}
 	// Upgrade adoption: nodes the empty→fill mount didn't consume (old
@@ -33548,6 +33599,22 @@ function consumeAdoptQueuePrefix(adopt: Array<{ key: any; node: Node }>, count: 
 	adopt.length -= count;
 }
 
+type ListKeySource<T> = readonly any[] | ((item: T, index: number) => any);
+
+// Prepared descriptor keys already have their reconciliation encoding. Compiled
+// maps normalize each callback result at the original read site; ordinary @for
+// callbacks retain their raw key identity and receive exactly two arguments.
+// The source stays local to this call so nested item renders cannot replace it.
+function readListKey<T>(
+	keySource: ListKeySource<T>,
+	item: T,
+	index: number,
+	normalizeKey: boolean,
+): any {
+	if (typeof keySource !== 'function') return keySource[index];
+	return normalizeKey ? 'k' + String(keySource(item, index)) : keySource(item, index);
+}
+
 /**
  * Linear first-fill of an EMPTY keyed list — the hydration-adopt / first-mount
  * path: append (or adopt) each item in order and build the survivor machinery
@@ -33561,12 +33628,13 @@ function consumeAdoptQueuePrefix(adopt: Array<{ key: any; node: Node }>, count: 
 // Validate keys as the existing reconciler reads them. Never invoke a key
 // expression twice for diagnostics; repeated reads of the same index are legal.
 function checkedListKey<T>(
-	getKey: (item: T, index: number) => any,
+	keySource: ListKeySource<T>,
+	normalizeKey: boolean,
 ): (item: T, index: number) => any {
 	const seen = new Map<any, number>();
 	let warned = false;
 	return (item, index) => {
-		const key = getKey(item, index);
+		const key = readListKey(keySource, item, index, normalizeKey);
 		if (!warned && seen.has(key) && seen.get(key) !== index) {
 			warned = true;
 			const label =
@@ -33583,14 +33651,18 @@ function mountItemsLinear<T>(
 	parentBlock: Block,
 	state: ForSlot,
 	items: ArrayLike<T>,
-	getKey: (item: T, index: number) => any,
+	keySource: ListKeySource<T>,
 	itemBody: (item: T, scope: Scope) => void,
 	singleRoot: boolean | 2,
 	ssrMarkerless: boolean,
+	normalizeKey: boolean = false,
 ): void {
 	const newLen = items.length;
 	if (newLen === 0) return;
-	if (process.env.NODE_ENV !== 'production') getKey = checkedListKey(getKey);
+	if (process.env.NODE_ENV !== 'production') {
+		keySource = checkedListKey(keySource, normalizeKey);
+		normalizeKey = false;
+	}
 	// Every 0 -> N fill funnels through here (forBlock, the value-position array
 	// path, and reconcileKeyed's own empty branch). An empty list is still a
 	// shape to go back to: a fill during a render that may yet hold must come
@@ -33612,7 +33684,7 @@ function mountItemsLinear<T>(
 	try {
 		for (let i = 0; i < newLen; i++) {
 			const item = items[i];
-			const key = getKey(item, i);
+			const key = readListKey(keySource, item, i, normalizeKey);
 			let adoptNode: Node | null = null;
 			let anchor: Node = state.end;
 			if (adopt !== null && adoptIndex < adopt.length) {
@@ -33676,7 +33748,7 @@ function reconcileKeyed<T>(
 	parentBlock: Block,
 	state: ForSlot,
 	items: ArrayLike<T>,
-	getKey: (item: T, index: number) => any,
+	keySource: ListKeySource<T>,
 	itemBody: (item: T, scope: Scope) => void,
 	pure: boolean,
 	// true / false = compiler-static (compiled @for); 2 = de-opt per-item
@@ -33688,6 +33760,7 @@ function reconcileKeyed<T>(
 	// item's hydration pair. Kept separate from singleRoot because sole-component
 	// and conditional roots are markerless only on fresh client mounts today.
 	ssrMarkerless: boolean = false,
+	normalizeKey: boolean = false,
 ): void {
 	const oldItems = state.items;
 	const oldSize = state.size;
@@ -33701,10 +33774,22 @@ function reconcileKeyed<T>(
 	// Fast path: empty → fill — the linear first-fill pass (callers on the
 	// first-mount path dispatch to it directly and skip this function entirely).
 	if (oldSize === 0) {
-		mountItemsLinear(parentBlock, state, items, getKey, itemBody, singleRoot, ssrMarkerless);
+		mountItemsLinear(
+			parentBlock,
+			state,
+			items,
+			keySource,
+			itemBody,
+			singleRoot,
+			ssrMarkerless,
+			normalizeKey,
+		);
 		return;
 	}
-	if (process.env.NODE_ENV !== 'production') getKey = checkedListKey(getKey);
+	if (process.env.NODE_ENV !== 'production') {
+		keySource = checkedListKey(keySource, normalizeKey);
+		normalizeKey = false;
+	}
 	// Fast path: clear all.
 	if (newLen === 0) {
 		const ownedRootClear = journalShape && canDeferRootOwnedListClear(state);
@@ -33725,7 +33810,7 @@ function reconcileKeyed<T>(
 	let oldFirst: Block | null = state.head;
 	let prefixLen = 0;
 	while (oldFirst !== null && prefixLen < newLen) {
-		const newKey = getKey(items[prefixLen], prefixLen);
+		const newKey = readListKey(keySource, items[prefixLen], prefixLen, normalizeKey);
 		if (oldFirst.key !== newKey) break;
 		const block = oldFirst;
 		updateSurvivor(
@@ -33750,7 +33835,7 @@ function reconcileKeyed<T>(
 	let newEnd = newLen - 1;
 	let oldRemain = oldSize - prefixLen;
 	while (oldLast !== null && oldRemain > 0 && newEnd >= prefixLen) {
-		const newKey = getKey(items[newEnd], newEnd);
+		const newKey = readListKey(keySource, items[newEnd], newEnd, normalizeKey);
 		if (oldLast.key !== newKey) break;
 		const block = oldLast;
 		updateSurvivor(block, items[newEnd], newEnd, itemBody, pure, lite, indexIndependent, state.env);
@@ -33781,7 +33866,7 @@ function reconcileKeyed<T>(
 		let prev: Block | null = beforeMiddle;
 		for (let i = prefixLen; i <= newEnd; i++) {
 			const item = items[i];
-			const key = getKey(item, i);
+			const key = readListKey(keySource, item, i, normalizeKey);
 			const block = mountItem(
 				parentBlock,
 				parentNode,
@@ -33833,7 +33918,7 @@ function reconcileKeyed<T>(
 	const newKeys: any[] = new Array(newMidLen);
 	const newKeysToIdx = new Map<any, number>(); // key → MIDDLE-RELATIVE index (0..newMidLen-1)
 	for (let i = 0; i < newMidLen; i++) {
-		const key = getKey(items[prefixLen + i], prefixLen + i);
+		const key = readListKey(keySource, items[prefixLen + i], prefixLen + i, normalizeKey);
 		newKeys[i] = key;
 		newKeysToIdx.set(key, i);
 	}
