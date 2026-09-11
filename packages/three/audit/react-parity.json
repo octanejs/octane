@@ -299,7 +299,7 @@
         {
           "path": "packages/three/typetests/subpath-api.test.ts",
           "role": "support",
-          "sha256": "58f2908e4ddf4595b35335de27c907b4ab60bc31357d79fefa7aad1ad4b99ce5"
+          "sha256": "9e83adc4cc2fef155fa32f24a193ca453736a2a70348a5badc2f5f3d0875a1de"
         }
       ]
     }

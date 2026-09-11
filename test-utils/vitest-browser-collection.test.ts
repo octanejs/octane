@@ -24,8 +24,10 @@ export default { test: {
 		join(root, 'mocked.test.mjs'),
 		`
 import { it, vi } from 'vitest';
-import { value } from './dependency.mjs';
 vi.mock('./dependency.mjs', () => ({ value: 'mocked' }));
+// Import after registration so this test isolates mock cleanup between files;
+// it does not also depend on browser-transform timing for static-import hoisting.
+const { value } = await import('./dependency.mjs');
 if (value !== 'mocked') throw new Error('The first file must see its own mock');
 it('mocked', () => { throw new Error('Collection must not execute test bodies'); });
 `,

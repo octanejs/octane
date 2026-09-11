@@ -1,14 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { subSlot } from '../src/internal';
 
 describe('subSlot', () => {
-	beforeEach(() => {
-		vi.resetModules();
-	});
-
 	it('preserves derived identities across module re-evaluation', async () => {
 		const parent = Symbol.for('solana-kit:test-parent');
-		const first = await import('../src/internal');
-		const firstChild = first.subSlot(parent, 'client');
+		const firstChild = subSlot(parent, 'client');
 
 		vi.resetModules();
 		const second = await import('../src/internal');
@@ -17,8 +13,7 @@ describe('subSlot', () => {
 		expect(Symbol.keyFor(firstChild)).toBe('solana-kit:test-parent:client');
 	});
 
-	it('keeps distinct tags in distinct hook cells', async () => {
-		const { subSlot } = await import('../src/internal');
+	it('keeps distinct tags in distinct hook cells', () => {
 		const parent = Symbol.for('solana-kit:distinct-tags');
 
 		expect(subSlot(parent, 'client')).not.toBe(subSlot(parent, 'capability'));

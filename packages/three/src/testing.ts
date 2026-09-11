@@ -14,7 +14,7 @@ import {
 	getThreeEventStore,
 	runThreeEventScope,
 } from './core/driver.js';
-import { createRoot, type CanvasLike, type ThreeRoot } from './core/root.js';
+import { createRoot, type CameraProps, type CanvasLike, type ThreeRoot } from './core/root.js';
 import type { Renderer, RootStore } from './core/store.js';
 
 const DEFAULT_WIDTH = 1280;
@@ -26,7 +26,7 @@ export interface CreateThreeTestRendererOptions {
 	/** Logical canvas height. Defaults to 800. */
 	readonly height?: number;
 	/** Optional camera used by the configured root. Defaults to a perspective camera. */
-	readonly camera?: THREE.Camera;
+	readonly camera?: CameraProps;
 }
 
 /** Renderer recorder injected into a deterministic Three test root. */

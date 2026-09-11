@@ -9,6 +9,14 @@ async function expectMirrorSelection(start: number, end: number): Promise<void> 
 	const target = input();
 	await expect.poll(async () => target.getAttribute('data-input-otp-mss')).toBe(String(start));
 	await expect.poll(async () => target.getAttribute('data-input-otp-mse')).toBe(String(end));
+	await expect
+		.poll(async () =>
+			target.evaluate((element: HTMLInputElement) => [
+				element.selectionStart,
+				element.selectionEnd,
+			]),
+		)
+		.toEqual([start, end]);
 }
 
 async function setSelectionAndWait(start: number, end: number): Promise<void> {
