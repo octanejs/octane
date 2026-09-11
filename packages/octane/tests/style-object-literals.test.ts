@@ -22,6 +22,28 @@ export function AllDynamic(props) @{
 }
 `;
 
+const DUPLICATE_SOURCE = `
+export function StaticWinner(props) @{
+	<div id="static-winner" style={{ color: props.color, color: 'red', background: props.background }} />
+}
+
+export function DynamicWinner(props) @{
+	<div id="dynamic-winner" style={{ color: 'red', color: props.color, background: props.background }} />
+}
+
+export function LonghandFirst(props) @{
+	<div id="longhand-first" style={{ marginTop: props.discarded, margin: props.margin, marginTop: props.top }} />
+}
+
+export function ShorthandFirst(props) @{
+	<div id="shorthand-first" style={{ margin: props.discarded, marginTop: props.top, margin: props.margin }} />
+}
+
+export function LiteralDuplicates() @{
+	<div id="literal-duplicates" style={{ marginTop: '1px', margin: '4px', marginTop: '8px', color: 'red', color: null, background: 'blue', background: false, display: 'block', display: '', '--removed': 'red', '--removed': true }} />
+}
+`;
+
 function compiled(source: string, id: string, mode: 'client' | 'server', dev = false) {
 	return loadCompiledFixtureSource(source, {
 		id,
@@ -31,6 +53,251 @@ function compiled(source: string, id: string, mode: 'client' | 'server', dev = f
 }
 
 describe('inline object styles', () => {
+	it.each([false, true])('resolves duplicate literal keys before applying CSS in dev=%s', (dev) => {
+		const client = compiled(DUPLICATE_SOURCE, `duplicate-literals-${dev}.tsrx`, 'client', dev);
+		const root = mount(client.LiteralDuplicates);
+		const element = root.find('#literal-duplicates') as HTMLElement;
+		try {
+			expect(element.style.marginTop).toBe('4px');
+			expect(element.style.marginRight).toBe('4px');
+			expect(element.style.color).toBe('');
+			expect(element.style.backgroundColor).toBe('');
+			expect(element.style.display).toBe('');
+			expect(element.style.getPropertyValue('--removed')).toBe('');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it.each([false, true])('uses the final duplicate value on mount and update in dev=%s', (dev) => {
+		const client = compiled(DUPLICATE_SOURCE, `duplicate-values-${dev}.tsrx`, 'client', dev);
+		const fixed = mount(client.StaticWinner, { color: 'blue', background: 'black' });
+		const fixedElement = fixed.find('#static-winner') as HTMLElement;
+		try {
+			expect(fixedElement.style.color).toBe('red');
+			expect(fixedElement.style.backgroundColor).toBe('black');
+			for (const color of ['green', null, undefined, false, '']) {
+				fixed.update(client.StaticWinner, { color, background: 'white' });
+				expect(fixed.find('#static-winner')).toBe(fixedElement);
+				expect(fixedElement.style.color).toBe('red');
+				expect(fixedElement.style.backgroundColor).toBe('white');
+			}
+		} finally {
+			fixed.unmount();
+		}
+
+		const dynamic = mount(client.DynamicWinner, { color: null, background: 'black' });
+		const dynamicElement = dynamic.find('#dynamic-winner') as HTMLElement;
+		try {
+			expect(dynamicElement.style.color).toBe('');
+			expect(dynamicElement.style.backgroundColor).toBe('black');
+			for (const color of ['blue', null, 'green', undefined, 'purple', false, 'yellow', '']) {
+				dynamic.update(client.DynamicWinner, { color, background: 'white' });
+				expect(dynamic.find('#dynamic-winner')).toBe(dynamicElement);
+				expect(dynamicElement.style.color).toBe(typeof color === 'string' ? color : '');
+				expect(dynamicElement.style.backgroundColor).toBe('white');
+			}
+		} finally {
+			dynamic.unmount();
+		}
+	});
+
+	it.each([false, true])(
+		'evaluates overwritten style expressions in authored order in dev=%s',
+		(dev) => {
+			const source = `
+export function App(props) @{
+	<div
+		id="duplicate-order"
+		data-before={props.read('before')}
+		style={{ left: props.read('discarded'), color: props.read('color'), left: props.read('overwritten'), 'left': props.read('winner') }}
+		data-after={props.read('after')}
+	/>
+}`;
+			const client = compiled(source, `duplicate-order-${dev}.tsrx`, 'client', dev);
+			const calls: string[] = [];
+			const values: Record<string, string | number> = {
+				discarded: 5,
+				color: 'red',
+				overwritten: 8,
+				winner: 12,
+			};
+			const read = (key: string) => {
+				calls.push(key);
+				return values[key] ?? key;
+			};
+			const root = mount(client.App, { read });
+			const element = root.find('#duplicate-order') as HTMLElement;
+			try {
+				expect(calls).toEqual(['before', 'discarded', 'color', 'overwritten', 'winner', 'after']);
+				expect(element.style.left).toBe('12px');
+				expect(element.style.color).toBe('red');
+				calls.length = 0;
+				values.discarded = 20;
+				values.color = 'blue';
+				root.update(client.App, { read });
+				expect(calls).toEqual(['before', 'discarded', 'color', 'overwritten', 'winner', 'after']);
+				expect(element.style.left).toBe('12px');
+				expect(element.style.color).toBe('blue');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'preserves inferred names while evaluating overwritten style classes in dev=%s',
+		(dev) => {
+			const source = `
+export function Direct(props) @{
+	<div style={{ color: class { static { props.record(this.name); } }, color: 'red', background: props.background }} />
+}
+
+export function Wrapped(props) @{
+	<div style={{ color: (class { static { props.record(this.name); } } as unknown), color: 'red', background: props.background }} />
+}`;
+			const client = compiled(source, `duplicate-class-names-${dev}.tsrx`, 'client', dev);
+			for (const name of ['Direct', 'Wrapped']) {
+				const names: string[] = [];
+				const record = (value: string) => names.push(value);
+				const root = mount(client[name], { record, background: 'black' });
+				const element = root.find('div') as HTMLElement;
+				try {
+					expect(names).toEqual(['color']);
+					expect(element.style.color).toBe('red');
+					expect(element.style.backgroundColor).toBe('black');
+					names.length = 0;
+					root.update(client[name], { record, background: 'white' });
+					expect(names).toEqual(['color']);
+					expect(root.find('div')).toBe(element);
+					expect(element.style.color).toBe('red');
+					expect(element.style.backgroundColor).toBe('white');
+				} finally {
+					root.unmount();
+				}
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'propagates duplicate expression errors before changing styles in dev=%s',
+		(dev) => {
+			const source = `
+export function App(props) @{
+	<div id="duplicate-error" style={{ left: props.read('discarded'), color: props.read('color'), left: props.read('winner') }} />
+}`;
+			const client = compiled(source, `duplicate-error-${dev}.tsrx`, 'client', dev);
+			for (const failure of ['discarded', 'winner']) {
+				const calls: string[] = [];
+				const throwingRead = (key: string) => {
+					calls.push(key);
+					if (key === failure) throw new Error(`failed ${failure}`);
+					return key === 'color' ? 'blue' : 20;
+				};
+				const expectedCalls =
+					failure === 'discarded' ? ['discarded'] : ['discarded', 'color', 'winner'];
+				expect(() => mount(client.App, { read: throwingRead })).toThrow(`failed ${failure}`);
+				expect(calls).toEqual(expectedCalls);
+				const root = mount(client.App, { read: (key: string) => (key === 'color' ? 'red' : 5) });
+				const element = root.find('#duplicate-error') as HTMLElement;
+				try {
+					calls.length = 0;
+					expect(() => root.update(client.App, { read: throwingRead })).toThrow(
+						`failed ${failure}`,
+					);
+					expect(calls).toEqual(expectedCalls);
+					expect(element.style.left).toBe('5px');
+					expect(element.style.color).toBe('red');
+				} finally {
+					root.unmount();
+				}
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'retains the first insertion position of duplicate style keys in dev=%s',
+		(dev) => {
+			const client = compiled(DUPLICATE_SOURCE, `duplicate-position-${dev}.tsrx`, 'client', dev);
+			for (const name of ['LonghandFirst', 'ShorthandFirst']) {
+				const root = mount(client[name], { discarded: '1px', margin: '4px', top: '8px' });
+				const element = root.find('div') as HTMLElement;
+				try {
+					expect(element.style.marginTop).toBe(name === 'LonghandFirst' ? '4px' : '8px');
+					expect(element.style.marginRight).toBe('4px');
+					root.update(client[name], { discarded: '2px', margin: '12px', top: '16px' });
+					expect(root.find('div')).toBe(element);
+					expect(element.style.marginTop).toBe(name === 'LonghandFirst' ? '12px' : '16px');
+					expect(element.style.marginRight).toBe('12px');
+				} finally {
+					root.unmount();
+				}
+			}
+		},
+	);
+
+	it.each([false, true])('hydrates duplicate style values and key order in dev=%s', (dev) => {
+		const id = `duplicate-hydration-${dev}.tsrx`;
+		const server = compiled(DUPLICATE_SOURCE, id, 'server', dev);
+		const client = compiled(DUPLICATE_SOURCE, id, 'client', dev);
+		for (const [name, initialColor, nextColor, initialTop, nextTop] of [
+			['StaticWinner', 'red', 'red', '', ''],
+			['DynamicWinner', '', 'blue', '', ''],
+			['LiteralDuplicates', '', '', '4px', '4px'],
+		]) {
+			const props = {
+				color: null,
+				background: 'black',
+				discarded: '1px',
+				margin: '4px',
+				top: '8px',
+			};
+			const container = document.createElement('div');
+			container.innerHTML = renderToString(server[name], props).html;
+			document.body.appendChild(container);
+			const element = container.querySelector('div') as HTMLElement;
+			const original = element.getAttribute('style');
+			const warnings = vi.spyOn(console, 'error').mockImplementation(() => {});
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				expect(element.style.color).toBe(initialColor);
+				expect(element.style.marginTop).toBe(initialTop);
+				if (name === 'LiteralDuplicates') {
+					expect(element.style.backgroundColor).toBe('');
+					expect(element.style.display).toBe('');
+					expect(element.style.getPropertyValue('--removed')).toBe('');
+					expect(original).not.toContain('--removed');
+				}
+				root = hydrateRoot(container, client[name], props);
+				flushSync(() => {});
+				expect(container.querySelector('div')).toBe(element);
+				expect(element.getAttribute('style')).toBe(original);
+				if (name === 'LiteralDuplicates') {
+					expect(element.style.getPropertyValue('--removed')).toBe('');
+				}
+				expect(
+					warnings.mock.calls.filter((args) => /hydrat|mismatch/i.test(String(args[0]))),
+				).toEqual([]);
+				flushSync(() =>
+					root!.render(client[name], {
+						color: 'blue',
+						background: 'white',
+						discarded: '2px',
+						margin: '12px',
+						top: '16px',
+					}),
+				);
+				expect(container.querySelector('div')).toBe(element);
+				expect(element.style.color).toBe(nextColor);
+				expect(element.style.marginTop).toBe(nextTop);
+			} finally {
+				root?.unmount();
+				warnings.mockRestore();
+				container.remove();
+			}
+		}
+	});
+
 	it.each([false, true])('updates one and several dynamic values in dev=%s', (dev) => {
 		const client = compiled(SOURCE, `object-literals-${dev}.tsrx`, 'client', dev);
 		const single = mount(client.Single, { color: 'red' });

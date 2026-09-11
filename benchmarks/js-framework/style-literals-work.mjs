@@ -7,8 +7,9 @@ import { chromium } from 'playwright';
 const URL = process.env.TARGET_URL || 'http://127.0.0.1:5233/style-literals.html';
 const ROWS = 1000;
 const OPTIMIZED_MULTI = process.env.WORK_EXPECT_MULTI_OPTIMIZED !== '0';
+const OPTIMIZED_DUPLICATES = process.env.WORK_EXPECT_DUPLICATES_OPTIMIZED !== '0';
 const TIMING_SAMPLES = Number(process.env.WORK_SAMPLES || 0);
-const MODES = ['single', 'multi', 'generic', 'interleaved'];
+const MODES = ['single', 'multi', 'generic', 'interleaved', 'duplicateStatic', 'duplicateDynamic'];
 const OPS = [
 	{ name: 'mount_1k', setup: [], action: 'mount', changedRows: ROWS },
 	{ name: 'select_one', setup: ['mount'], action: 'select4', changedRows: 1 },
@@ -25,6 +26,8 @@ const METRICS = [
 	'MultiRow',
 	'GenericRow',
 	'InterleavedRow',
+	'DuplicateStaticRow',
+	'DuplicateDynamicRow',
 ];
 
 async function invoke(page, action) {
@@ -70,6 +73,7 @@ async function measure(browser, mode, operation) {
 		const observed = await page.evaluate(
 			async ({ action, mode, expectedRows }) => {
 				const before = Array.from(document.querySelectorAll('tbody tr'));
+				const colorEvaluationsBefore = window.__benchColorEvaluations();
 				const writes = { styleSets: 0, styleRemoves: 0, fontStyleWrites: 0 };
 				const set = CSSStyleDeclaration.prototype.setProperty;
 				const remove = CSSStyleDeclaration.prototype.removeProperty;
@@ -119,6 +123,18 @@ async function measure(browser, mode, operation) {
 						) {
 							throw new Error(`${action}: row ${index} lost an interleaved declaration`);
 						}
+					} else if (mode === 'duplicateStatic' || mode === 'duplicateDynamic') {
+						if (
+							cell.style.color !==
+								(mode === 'duplicateStatic' ? 'red' : selected ? 'blue' : 'black') ||
+							cell.style.backgroundColor !== (selected ? 'yellow' : 'white') ||
+							cell.style.cssText !==
+								`color: ${mode === 'duplicateStatic' ? 'red' : selected ? 'blue' : 'black'}; background: ${selected ? 'yellow' : 'white'};`
+						) {
+							throw new Error(
+								`${action}: row ${index} lost the final duplicate value or key order`,
+							);
+						}
 					} else {
 						if (
 							cell.style.fontStyle !== 'normal' ||
@@ -131,7 +147,11 @@ async function measure(browser, mode, operation) {
 						}
 					}
 				}
-				return { rows: rows.length, ...writes };
+				return {
+					rows: rows.length,
+					colorEvaluations: window.__benchColorEvaluations() - colorEvaluationsBefore,
+					...writes,
+				};
 			},
 			{ action: operation.action, mode, expectedRows: ROWS },
 		);
@@ -147,10 +167,15 @@ async function measure(browser, mode, operation) {
 
 function expected(mode, operation) {
 	const changes = operation.changedRows;
+	const duplicate = mode === 'duplicateStatic' || mode === 'duplicateDynamic';
 	const properties = mode === 'single' ? 1 : mode === 'interleaved' ? 3 : 2;
-	const changing = mode === 'interleaved' ? 2 : properties;
+	const changing = mode === 'duplicateStatic' ? 1 : mode === 'interleaved' ? 2 : properties;
 	const generic =
-		mode === 'generic' || ((mode === 'multi' || mode === 'interleaved') && !OPTIMIZED_MULTI);
+		mode === 'generic' ||
+		((mode === 'multi' || mode === 'interleaved') && !OPTIMIZED_MULTI) ||
+		(duplicate && !OPTIMIZED_DUPLICATES);
+	const mountWrites =
+		mode === 'interleaved' ? 4 : generic && !duplicate ? properties + 1 : properties;
 	return {
 		setStyle: generic ? ROWS : 0,
 		setStyleProperty:
@@ -160,22 +185,18 @@ function expected(mode, operation) {
 					? changes * changing
 					: 0,
 		setStyleProperties:
-			(mode === 'multi' || mode === 'interleaved') &&
-			OPTIMIZED_MULTI &&
+			(((mode === 'multi' || mode === 'interleaved') && OPTIMIZED_MULTI) ||
+				(duplicate && OPTIMIZED_DUPLICATES)) &&
 			operation.action === 'mount'
 				? ROWS
 				: 0,
 		applyStyleValue: generic ? ROWS : 0,
-		applyStyleProperty:
-			operation.action === 'mount'
-				? ROWS * (mode === 'interleaved' ? 4 : generic ? properties + 1 : properties)
-				: changes * changing,
-		styleSets:
-			operation.action === 'mount'
-				? ROWS * (mode === 'interleaved' ? 4 : generic ? properties + 1 : properties)
-				: changes * changing,
+		applyStyleProperty: operation.action === 'mount' ? ROWS * mountWrites : changes * changing,
+		styleSets: operation.action === 'mount' ? ROWS * mountWrites : changes * changing,
 		styleRemoves: 0,
-		fontStyleWrites: generic && mode !== 'interleaved' && operation.action === 'mount' ? ROWS : 0,
+		fontStyleWrites:
+			generic && mode !== 'interleaved' && !duplicate && operation.action === 'mount' ? ROWS : 0,
+		colorEvaluations: duplicate ? ROWS : 0,
 		rows: ROWS,
 	};
 }
@@ -266,12 +287,12 @@ try {
 
 const timing = failures.length === 0 ? await measureTiming() : null;
 
-console.log('case    operation        map grouped scalar CSS writes fixed writes rows');
+console.log('case             operation        map grouped scalar CSS writes fixed writes rows');
 for (const mode of MODES) {
 	for (const operation of OPS) {
 		const r = results[mode][operation.name];
 		console.log(
-			`${mode.padEnd(7)} ${operation.name.padEnd(16)} ${String(r.setStyle).padStart(4)} ` +
+			`${mode.padEnd(16)} ${operation.name.padEnd(16)} ${String(r.setStyle).padStart(4)} ` +
 				`${String(r.setStyleProperties).padStart(7)} ${String(r.setStyleProperty).padStart(6)} ` +
 				`${String(r.styleSets).padStart(10)} ${String(r.fontStyleWrites).padStart(12)} ${r.rows}`,
 		);
@@ -283,7 +304,7 @@ if (timing !== null) {
 		for (const operation of OPS) {
 			const t = timing[mode][operation.name];
 			console.log(
-				`${mode.padEnd(7)} ${operation.name.padEnd(16)} ` +
+				`${mode.padEnd(16)} ${operation.name.padEnd(16)} ` +
 					`${t.medianMs.toFixed(2)} [${t.p25Ms.toFixed(2)}, ${t.p75Ms.toFixed(2)}]`,
 			);
 		}

@@ -2155,24 +2155,28 @@ function staticStyleObjectNeedsDevValidation(obj) {
 // dynamic styles are byte-identical in innerHTML.
 function staticObjectToCssString(obj) {
 	const parts = [];
+	const properties = new Map();
 	for (const p of obj.properties || []) {
 		const name = p.key.type === 'Identifier' ? p.key.name : p.key.value;
-		const value = p.value.value;
-		if (value == null || value === false || value === '') continue;
-		const cssValue = value === true ? '' : cssStyleValue(name, value);
+		properties.set(name, p.value.value);
+	}
+	for (const [name, value] of properties) {
+		if (value == null || typeof value === 'boolean' || value === '') continue;
+		const cssValue = cssStyleValue(name, value);
 		parts.push(`${hyphenateStyleName(name)}: ${cssValue};`);
 	}
 	return parts.join(' ');
 }
 
 // A literal prefix can live in the template when all following properties have
-// fixed, unique names. The values still evaluate together at
-// the authored style attribute, before any DOM writes. Fixed literal values
+// fixed, unique names. The values still evaluate together at the authored
+// style attribute, before any DOM writes. Fixed literal values
 // after the first dynamic property stay in the ordered suffix. Spreads,
 // computed names, and accessors retain ordinary object evaluation and diffing.
 function mixedStaticStyle(obj) {
 	if (obj?.type !== 'ObjectExpression' || obj.properties.length === 0) return null;
-	const seen = new Set();
+	const seen = new Map();
+	let duplicates = false;
 	const prefix = [];
 	const dynamics = [];
 	for (const property of obj.properties) {
@@ -2190,12 +2194,29 @@ function mixedStaticStyle(obj) {
 		}
 		const name = key.type === 'Identifier' ? key.name : key.value;
 		const normalized = hyphenateStyleName(name);
-		if (name === '__proto__' || name === 'dangerouslySetInnerHTML' || seen.has(normalized)) {
+		if (
+			name === '__proto__' ||
+			name === 'dangerouslySetInnerHTML' ||
+			(seen.has(normalized) && seen.get(normalized) !== name)
+		) {
 			return null;
 		}
-		seen.add(normalized);
+		if (seen.has(normalized)) duplicates = true;
+		seen.set(normalized, name);
 
 		const value = property.value;
+		const unwrappedValue = unwrapTsExpr(value);
+		// Extracting an anonymous function/class into a temporary changes its
+		// inferred name. A discarded class can observe that name in a static
+		// initializer, so preserve the original object evaluation in this case.
+		if (
+			unwrappedValue?.type === 'ArrowFunctionExpression' ||
+			((unwrappedValue?.type === 'FunctionExpression' ||
+				unwrappedValue?.type === 'ClassExpression') &&
+				!unwrappedValue.id)
+		) {
+			return null;
+		}
 		if (
 			value?.type === 'Literal' &&
 			dynamics.length === 0 &&
@@ -2206,6 +2227,19 @@ function mixedStaticStyle(obj) {
 		} else {
 			dynamics.push({ name, key, value });
 		}
+	}
+	// A duplicate retains its first insertion position but uses its last value.
+	// Keep every authored evaluation, including overwritten values, and avoid
+	// baking declarations that a later duplicate could replace or remove.
+	if (duplicates) {
+		return {
+			css: '',
+			dynamics: obj.properties.map((property) => ({
+				name: property.key.type === 'Identifier' ? property.key.name : property.key.value,
+				key: property.key,
+				value: property.value,
+			})),
+		};
 	}
 	if (dynamics.length === 0) return null;
 	const css = staticObjectToCssString({ properties: prefix });
@@ -24420,17 +24454,26 @@ function emitBindingMount(bind, elVar, bag) {
 		}
 		case 'styleProperties': {
 			for (let i = 0; i < bind.properties.length; i++) bag.local(`_prev$${bind.id}_${i}`);
+			const entries =
+				bind.properties.length === bind.evaluations.length
+					? V()
+					: b.array(
+							bind.properties.flatMap((property) => [
+								inheritOriginLoc(b.literal(property.name), property.key),
+								b.member(V(), b.literal(property.evaluationIndex * 2 + 1), true),
+							]),
+						);
 			return st(
 				b.block([
 					b.const('_v', bind.expr),
-					b.stmt(b.call(callee(), el(), V(), b.literal(bind.staticCss))),
+					b.stmt(b.call(callee(), el(), entries, b.literal(bind.staticCss))),
 					...mountHost(),
-					...bind.properties.map((_, i) =>
+					...bind.properties.map((property, i) =>
 						b.stmt(
 							b.assignment(
 								'=',
 								local(`_prev$${bind.id}_${i}`),
-								b.member(V(), b.literal(i * 2 + 1), true),
+								b.member(V(), b.literal(property.evaluationIndex * 2 + 1), true),
 							),
 						),
 					),
@@ -24788,15 +24831,16 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 			// Evaluate every authored value before the first CSS write, including
 			// fixed literal suffix values. Mount and hydration compare one complete
 			// style; ordinary updates only call the scalar setter for changed cells.
-			const values = bind.properties.map((property, i) => b.const(`_v${i}`, property.value));
+			const values = bind.evaluations.map((value, i) => b.const(`_v${i}`, value));
+			const valueOf = (property) => b.id(`_v${property.evaluationIndex}`);
 			const entries = b.array(
-				bind.properties.flatMap((property, i) => [
+				bind.properties.flatMap((property) => [
 					inheritOriginLoc(b.literal(property.name), property.key),
-					b.id(`_v${i}`),
+					valueOf(property),
 				]),
 			);
-			const publish = bind.properties.map((_, i) =>
-				b.stmt(b.assignment('=', bagFieldNode(bag, `_prev$${bind.id}_${i}`), b.id(`_v${i}`))),
+			const publish = bind.properties.map((property, i) =>
+				b.stmt(b.assignment('=', bagFieldNode(bag, `_prev$${bind.id}_${i}`), valueOf(property))),
 			);
 			const grouped = [
 				b.stmt(b.call(callee(), F('_el'), entries, b.literal(bind.staticCss))),
@@ -24807,7 +24851,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 				attrLoweringToken(b.id(`_$${attrBindingHelper({ kind: 'styleProperty' })}`), bind);
 			const scalar = bind.properties.map((property, i) => {
 				const previous = bagFieldNode(bag, `_prev$${bind.id}_${i}`);
-				const value = b.id(`_v${i}`);
+				const value = valueOf(property);
 				return b.if(
 					b.binary('!==', previous, value),
 					b.block([
@@ -26070,17 +26114,24 @@ function emitElementHtml(
 						});
 					} else {
 						const entries = [];
-						const propertyBindings = [];
+						const propertyBindings = new Map();
+						const evaluations = [];
 						for (const entry of mixed.dynamics) {
 							const value = tsrxExprNode(entry.value, ctx, componentName, inlinedSubs);
 							entries.push(inheritOriginLoc(b.literal(entry.name), entry.key), value);
-							propertyBindings.push({ name: entry.name, key: entry.key, value });
+							propertyBindings.set(entry.name, {
+								name: entry.name,
+								key: entry.key,
+								evaluationIndex: evaluations.length,
+							});
+							evaluations.push(value);
 						}
 						bindings.push({
 							id: bindings.length,
 							kind: 'styleProperties',
 							expr: inheritOriginLoc(b.array(entries), inner),
-							properties: propertyBindings,
+							properties: [...propertyBindings.values()],
+							evaluations,
 							path,
 							ns: hostNs,
 							nameOrigin: attr.name,
