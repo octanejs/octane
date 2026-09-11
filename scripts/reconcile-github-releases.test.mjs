@@ -99,6 +99,35 @@ describe('GitHub release reconciliation', () => {
 		assert.equal(inspections, 3);
 	});
 
+	test('waits through two minutes of npm registry propagation by default', async () => {
+		const pkg = { name: '@octanejs/example', version: '0.1.2' };
+		const pending = {
+			invalid: [],
+			pending: [pkg],
+			published: [],
+			unbootstrapped: [],
+			unreachable: [],
+		};
+		const published = {
+			...pending,
+			pending: [],
+			published: [pkg],
+		};
+		let elapsed = 0;
+
+		const state = await waitForNpmPublication([pkg], {
+			inspectReleaseState: async () => (elapsed < 120_000 ? pending : published),
+			log: () => {},
+			sleep: async (delay) => {
+				elapsed += delay;
+			},
+		});
+
+		assert.equal(state, published);
+		assert.ok(elapsed >= 120_000);
+		assert.ok(elapsed <= 130_000);
+	});
+
 	test('pushes annotated missing tags atomically without repository identity and creates every missing release sequentially', async () => {
 		const { expectedSha, remote, repository, root } = await createRepositoryFixture();
 		try {
