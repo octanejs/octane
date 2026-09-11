@@ -83,8 +83,9 @@ The three buffered renderers return `RenderResult = { html, css }`:
   resolved, an inline `<script type="application/json" data-octane-suspense>`
   seed that hydration consumes. Hoisted `<title>`/`<meta>`/`<link>` (rendered
   anywhere in the tree, each preceded by an adoption marker comment) are folded
-  in by default — spliced into `<head>` when the render produced a document, else
-  prepended (React-19 resource hoisting). `headChannel: 'separate'` withholds
+  in by default — spliced into `<head>` when the render produced a document or a
+  fragment beginning with an authored `<head>`, else prepended (React-19 resource
+  hoisting). `headChannel: 'separate'` withholds
   them and returns them as `head` instead.
 - `head` — the hoisted metadata on its own, present **only** under
   `headChannel: 'separate'` (see `RenderOptions`).
@@ -190,6 +191,10 @@ terminal path as `abort`. Without `injection`, streamed output is unchanged
 apart from that doctype preamble (measured flat on the streaming-ssr
 benchmark).
 
+A streamed fragment that begins with an authored `<head>` receives hoisted
+metadata and renderer-owned leading scoped styles inside that head. It has no
+core-owned doctype and does not enter injection's document-tail mode.
+
 ### `renderToReadableStream(component, props?, options?)` — `octane/server`
 
 The same streaming engine over web streams: resolves with a
@@ -221,9 +226,17 @@ concurrently rather than awaiting `allReady` before reading. Same
   `<head>`-bearing template it owns, rather than rendering the document itself,
   needs `'separate'`: a body-only render has no `</head>` for the fold to target,
   so folding prepends the metadata into the body, where a `<title>` loses to the
-  template's and a canonical or description is ignored. Nothing but the position
-  of the metadata changes: `head + html` under `'separate'` is byte-identical to
-  `html` under `'fold'`.
+  template's and a canonical or description is ignored. For a body-only render,
+  `head + html` under `'separate'` is byte-identical to `html` under `'fold'`;
+  folding into an authored `<head>` instead inserts the metadata inside it.
+
+A fragment beginning with an authored `<head>` is suitable for server-only
+composition when the host supplies `<html>`. It cannot be hydrated with
+`hydrateRoot(document, FragmentPage)` because a Document root expects the
+rendered `<html>` element. To hydrate a host-owned document, render a body-only
+app with `headChannel: 'separate'`, place its metadata in the host's `<head>`,
+and hydrate the app container inside `<body>`. To hydrate an entire Document,
+render an `<html>` root.
 
 ### `setSsrSuspenseTimeout(ms)` / `getSsrSuspenseTimeout()`
 
