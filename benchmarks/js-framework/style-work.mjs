@@ -15,6 +15,10 @@ if (process.env.WORK_MODE === 'nested') {
 	await import('./nested-work.mjs');
 	process.exit(process.exitCode ?? 0);
 }
+if (process.env.WORK_MODE === 'key-callback') {
+	await import('./key-callback-work.mjs');
+	process.exit(process.exitCode ?? 0);
+}
 if (process.env.WORK_MODE === 'literals') {
 	await import('./style-literals-work.mjs');
 	process.exit(process.exitCode ?? 0);
