@@ -203,13 +203,16 @@ async function loadRoute(
 	options: {
 		beforeNavigation?: (page: import('playwright').Page, errors: string[]) => Promise<void>;
 		waitForNetworkIdle?: boolean;
+		viewport?: { width: number; height: number };
 		// Deliberate outlier for a caller that knowingly pays a cold dev server's
 		// on-demand compile, which is not an ordinary "wait for this to appear".
 		timeout?: number;
 	} = {},
 ) {
 	const actionTimeout = options.timeout ?? PLAYWRIGHT_ACTION_TIMEOUT;
-	const page = await browser!.newPage();
+	const page = await browser!.newPage(
+		options.viewport === undefined ? undefined : { viewport: options.viewport },
+	);
 	page.setDefaultTimeout(actionTimeout);
 	page.setDefaultNavigationTimeout(options.timeout ?? PLAYWRIGHT_NAVIGATION_TIMEOUT);
 	const errors: string[] = [];
@@ -1001,19 +1004,25 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 		'keeps command-palette results readable in a constrained viewport',
 		{ timeout: 30_000 },
 		async () => {
-			const context = await browser.newContext({ viewport: { width: 746, height: 374 } });
-			const page = await context.newPage();
-			const errors: string[] = [];
-			page.on('console', (message) => {
-				if (message.type() === 'error') errors.push(message.text());
+			const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/bindings', {
+				viewport: { width: 746, height: 374 },
 			});
-			page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
 			try {
-				await page.goto(`http://localhost:${DEV_PORT}/docs/bindings`, {
-					waitUntil: 'networkidle',
-				});
-				await page.keyboard.press('Control+K');
-				await page.locator('.search-input').fill('tanstack');
+				const trigger = page.locator('.search-trigger');
+				const searchInput = page.locator('.search-input');
+				// SSR exposes the trigger before hydration attaches its event. Opening is
+				// idempotent, so retry the observable interaction until the dialog exists.
+				await expect
+					.poll(
+						async () => {
+							if (await searchInput.isVisible()) return true;
+							await trigger.click();
+							return searchInput.isVisible();
+						},
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					)
+					.toBe(true);
+				await searchInput.fill('tanstack');
 				const firstResult = page.locator('.search-entity').first();
 				await firstResult.waitFor();
 
@@ -1032,7 +1041,7 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 				expect(geometry.cardBottom).toBeGreaterThanOrEqual(geometry.contentBottom);
 				expect(errors.filter((error) => !error.includes('Failed to load resource'))).toEqual([]);
 			} finally {
-				await context.close();
+				await page.close();
 			}
 		},
 	);
