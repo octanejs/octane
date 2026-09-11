@@ -37,6 +37,7 @@ import {
 	createStyleClassMapFromStylesheet,
 	clone_ast_node as cloneAstNode,
 	strongHash,
+	withDeferredImports,
 } from '@tsrx/core';
 import { parseModule } from '#octane/compiler-parser';
 import { createStyleScopePass } from './style-scopes.js';
@@ -9922,7 +9923,11 @@ function compileInternal(
 				}).nodes,
 			);
 			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'default' });
-		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
+		} else if (
+			node.type === 'ImportDeclaration' &&
+			node.source.value === 'octane' &&
+			node.phase !== 'defer'
+		) {
 			// Preserve ALL user-imported names from octane (Portal, createContext,
 			// use, custom helpers, etc.) — merged into the single prelude import.
 			addUserImportSpecifiers(ctx, node);
@@ -10572,8 +10577,16 @@ function compileServer(
 					: compileServerComponent({ ...node.declaration, default: true }, ctx)),
 			);
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
-			// User imports from 'octane' resolve to the server runtime instead.
-			addUserImportSpecifiers(ctx, node);
+			// Preserve the authored deferred namespace while routing it to the server runtime.
+			// Other user imports are merged into the eager server runtime prelude.
+			if (node.phase === 'defer') {
+				bodyNodes.push({
+					...node,
+					source: { ...node.source, value: 'octane/server', raw: '"octane/server"' },
+				});
+			} else {
+				addUserImportSpecifiers(ctx, node);
+			}
 		} else if (
 			(node.type === 'ImportDeclaration' ||
 				node.type === 'ExportNamedDeclaration' ||
@@ -29464,7 +29477,7 @@ const esrapCommentOptions = {
 function printNodeWithMap(node, ctx) {
 	const printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node));
 	if (assertPrintedLocs()) assertNodeLocs(printable);
-	const { code, map } = esrapPrint(printable, esrapTsx(esrapCommentOptions), {
+	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(esrapCommentOptions)), {
 		sourceMapSource: ctx.mapSourceName,
 		sourceMapContent: ctx.mapSource,
 		sourceMapEncodeMappings: false,
