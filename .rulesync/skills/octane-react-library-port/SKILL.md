@@ -1,10 +1,19 @@
 ---
 targets: ['*']
 name: octane-react-library-port
-description: Complete a verified local @octanejs binding for React libraries from npm names or npm/GitHub links/lists. Use for plain-language requests to port, assess, create, or extend a React-library binding. Enforces immutable provenance, approved-license or clean-room boundaries, capability reuse, dependency ordering, full-surface parity, implementation, tests, and machine evidence.
+description: Implement and verify new React-library ports or copied/rewritten React surfaces in Octane bindings from npm names or npm/GitHub links/lists. Enforces immutable provenance, license boundaries, dependency ordering, full-surface parity, and machine evidence. Existing-binding audits and maintenance start with update-bindings.
 ---
 
 # Complete React-library bindings for Octane
+
+## Route by source ownership
+
+For existing-binding audits, dependency/metadata maintenance, convenience imports,
+lifecycle fixes, or reduction, load
+[update-bindings](../update-bindings/SKILL.md) first. Continue here only for actual
+copied or rewritten React implementation. Demonstrated framework-neutral APIs
+should be imported from upstream; a missing Octane convenience export alone does
+not establish a functional gap or justify an upstream snapshot tree.
 
 ## Outcome contract
 
@@ -14,14 +23,16 @@ and progress reports are internal safety gates, never the outcome or a substitut
 for implementation.
 
 The invocation itself authorizes the complete safe local workflow, including
-local writes, tests, dependency install/repair, and generation. Do not ask the
-user to advance stages and do not end on a progress report. Never commit, push,
-open an issue, or open a PR without separate authority. Commit, push, issue, and
-PR actions require separate authority.
+local writes, tests, dependency install/repair, and generation within the user's
+requested implementation scope. Do not ask the user to advance stages and do not
+end on a progress report. Preserve shipping authorization already given; otherwise
+deliver local readiness. Load `create-a-pr` before its branch/commit/PR triggers.
 
-A binding covers one pinned upstream release, not a convenient subset. Account
-for every published export, runtime test, and type test with executable evidence
-or a precise disposition. Finish only when every requested branch is:
+A React implementation port covers one pinned upstream release, not a convenient
+subset. Account for every published export, runtime test, and type test with
+executable evidence or a precise disposition. In mixed packages, validated imported
+surfaces use dependency evidence while the owned React implementation retains its
+full provenance and parity obligations. Finish only when every requested branch is:
 
 - `verified`: its complete local binding passed the machine gate;
 - `satisfied`: a verified existing capability fully covers it; or
@@ -45,13 +56,14 @@ authority.
 - Require approved-license evidence for every copied/adapted byte. Unapproved or
   missing evidence forbids copying, not an independent implementation of public
   behavior.
-- Reuse framework-neutral cores and adequate `@octanejs/*` bindings. Extend an
-  incomplete binding in place; never create a competing package.
+- Consume framework-neutral APIs directly and reuse adequate `@octanejs/*`
+  integration. Extend a binding in place only for a demonstrated consumer gap;
+  missing convenience subpaths do not require extension.
 - Preserve existing changes. Adopt a partial package only when its recorded
   upstream name, version, commit, and approved license match the graph node.
 - A blocked node blocks its dependents, not unrelated actionable units. Rewrite
   volume, graph size, and effort are not feasibility blockers.
-- Stop after verified local readiness. Do not stage, commit, push, issue, or PR.
+- Complete verified local readiness and any already authorized shipping work.
 
 ## Workflow
 
@@ -118,7 +130,11 @@ authority.
    Repair runtime/compiler/SSR/tooling defects in their owning package with a
    regression, retaining the binding scenario as integration evidence.
 
-7. **Complete artifacts and evidence.** Pin the upstream boundary with
+7. **Complete artifacts and evidence for owned React implementation.** Apply the
+   shared observed-source policy described in the implementation reference.
+   Imported surfaces retain dependency, export, public-type, package-consumption,
+   and focused integration evidence; adapters add owned lifecycle checks. A mode
+   declaration alone cannot waive copied evidence. Pin the copied boundary with
    `pnpm react-port:materialize lock`, commit the byte-exact pristine tree it
    verifies offline, regenerate the adapted suite with `materialize run`, and
    record every genuine divergence as a minimal committed patch with
@@ -126,15 +142,15 @@ authority.
    `adaptedRewrites`, never in patches). Express pure-data provenance checks as
    `audit/provenance.json` for the shared verifier and register pristine
    runners with the shared `run-pristine.mjs` CLI (or `audit/pristine-suite.json`)
-   rather than writing per-package scripts. Inventory and
-   crosswalk every upstream
-   runtime/type case, register pristine/adapted lanes, and prove direct authored
+   rather than writing per-package scripts. Inventory and crosswalk every
+   applicable upstream runtime/type case, register pristine/adapted lanes, and prove direct authored
    source, precise public declarations, and packed Node plus browser/no-Node type
    consumers. Run the applicable matrix commands and fix discovery or command
    failures. Add the complete package contract, `UPSTREAM.md`, exact
    license/notices, README, `status.json`, generated catalogs, and a patch
    changeset for user-facing behavior. Re-audit actual shipped imports and
-   copied/adapted paths. Then run:
+   copied/adapted paths. Existing evidence reductions use the explicit migration
+   workflow in `update-bindings` before removing inputs. Then run:
 
    ```bash
    pnpm react-port:evidence verify --batch <id> --node pkg:<name> \
@@ -162,8 +178,9 @@ authority.
 Report completed packages and changed paths, immutable upstream identity and
 license, full-surface/crosswalk coverage, commands and observed results,
 provenance/attribution, collision adoptions, and each requested branch's terminal
-disposition. Mention commit or PR work only as an optional separately authorized
-next action.
+disposition. Independently review the actual diff for necessity before commit or
+push; passing gates do not justify unrelated work. Report shipping results when
+authorized and completed; otherwise deliver local readiness.
 
 ## Resume discipline
 

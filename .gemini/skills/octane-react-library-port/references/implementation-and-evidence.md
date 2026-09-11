@@ -5,8 +5,9 @@ package/output boundary and keep its evidence independently reviewable.
 
 ## Choose the owning change
 
-- `reuse-package`: add only the ordinary dependency and thin Octane surface that
-  is genuinely needed. Do not copy a working framework-neutral core.
+- `reuse-package`: consume the ordinary dependency directly. Add an Octane surface
+  only when the consumer needs Octane integration; missing convenience imports
+  alone are not a capability gap. Do not copy a working framework-neutral core.
 - `reuse-binding`: change no binding code unless the consumer proves a gap.
 - `extend-binding`: work in the registered package and add regression/parity
   evidence for the missing surface.
@@ -41,7 +42,41 @@ Do not estimate portability from rewrite volume. Re-author the complete pinned
 surface, then use the pristine/adapted runtime and type lanes plus the upstream
 crosswalk to prove one-for-one observable functionality.
 
+## Match evidence to observed ownership
+
+Existing-binding maintenance and reduction start with
+[update-bindings](../../update-bindings/SKILL.md). Its
+[ownership and removal reference](../../update-bindings/references/ownership-and-removal.md)
+describes the shared `scripts/binding-surface-policy.mjs` contract and migration.
+Use that validator to check optional `status.json.surfaces` against actual exported
+source, dependency identities, and source-ledger hashes. An `imported` or `adapter`
+label alone cannot relax requirements; absent policy keeps legacy strict evidence,
+and invalid or conflicting policy must be repaired before proceeding.
+
+Imported dependencies/re-exports retain dependency identity, license/package
+review, public exports and precise types, authored/packed source consumption, and
+focused integration evidence. They need no copied upstream tree or full
+pristine/adapted suites. Adapters additionally retain their owned hooks, effects,
+subscriptions, cleanup, lifecycle, SSR/hydration, and browser evidence where
+applicable. Copied/rewritten React surfaces keep immutable source provenance,
+scoped locks, crosswalks, and pristine/adapted runtime/type parity. Mixed packages
+receive the union of those obligations; imported surfaces do not enlarge the
+copied boundary.
+
+Do not create a campaign solely for documentation or authored adapter maintenance.
+When an authorized existing matrix needs reduced obligations, explicitly migrate
+the selected implementing node with its actual current closure before removing
+obsolete inputs. Migrate locks, registrations, verifiers, type programs, discovery,
+inventory, generators, and aggregate callers together; rerun invalidated gates.
+Preserve unaffected campaign nodes and evidence.
+
 ## Pin and materialize the upstream boundary
+
+This section applies where copied evidence is required by the validated policy,
+including the retained copied slice of a mixed package. Scope mixed locks to its
+declared copied `upstreamPaths` plus applicable licenses/notices before regeneration.
+It does not require new snapshots for imported surfaces. Follow explicit migration
+before reducing existing legacy evidence; deleting a tree alone cannot waive a gate.
 
 Inspect both the verified npm artifact and the canonical repository at the
 preflight commit. The registry may omit source, tests, fixtures, or build
@@ -160,7 +195,7 @@ gate: committing a patch is committing an adaptation. If immutable pin evidence
 cannot be established, block the port instead of silently reducing its claimed
 surface. Never point the pristine or adapted lanes at an unpinned checkout.
 
-Existing bindings that predate the lock keep their committed
+Existing bindings requiring copied evidence that predate the lock keep their committed
 `packages/<binding>/upstream/` and `tests/upstream/` trees plus ledger
 machinery as valid evidence. Migrate a legacy binding to the lock model when
 you next touch its pin. Many published pins lack the registry `gitHead`
@@ -233,17 +268,18 @@ A completed publishable binding normally has:
   sufficient in an existing Octane application; the package inventory check
   enforces the binding and required-peer closure in both commands. Also include
   `status.json`, tests, and strict authored/public/packed-consumer type programs;
-- a committed byte-exact `upstream/` pristine tree pinned by
+- for copied implementation, a committed byte-exact `upstream/` pristine tree pinned by
   `audit/upstream.lock.json` (offline-verified against upstream git blob shas),
   plus `audit/upstream-patches/` divergence patches and `.skip` rationales for
   the adapted suite, with the regenerated `tests/upstream` tree git-ignored;
-- registry-sourced evidence, when any, under `upstream-artifact/`, hash-pinned
+- registry-sourced copied-port evidence, when needed, under `upstream-artifact/`, hash-pinned
   by `audit/provenance.json` or the package's verifier;
 - `UPSTREAM.md` naming package, version/tag, immutable commit, source boundary,
   adapted/copied paths, excluded React shell, and behavioral oracle;
-- the binding's primary MIT `LICENSE`, plus a separately named, byte-exact root
-  attribution artifact such as `LICENSE.upstream` when the upstream license is
-  different (including Unlicense), with both included in published `files`;
+- the binding's primary MIT `LICENSE` and applicable retained attribution. Copied
+  source needs the byte-exact upstream attribution required by intake, such as
+  `LICENSE.upstream`, included in published `files`. An ordinary dependency ships
+  its own license and needs no new copied license snapshot just for an import;
 - every applicable upstream notice/attribution;
 - website binding catalog/generated status, package inventory, parity-gap/CLI
   data, and a patch changeset for user-facing package behavior.
@@ -260,6 +296,10 @@ structure. Any copied/adapted algorithm must remain inside the licensed source
 boundary recorded in `UPSTREAM.md` and the retained license.
 
 ## Upstream inventory and test crosswalk
+
+Apply this inventory to the owned React implementation and its required parity
+boundary. Imported-only and adapter-only surfaces use their validated focused
+evidence; mixed packages preserve the complete crosswalk for their copied slice.
 
 First prove what runtime and type suites exist at the pin by inspecting its
 workspace, package scripts, fixtures, snapshots, and test configuration. The
@@ -319,8 +359,11 @@ recorded as blocked, inapplicable, or a reason to return an unfinished port.
 
 ## Strict type evidence
 
-Type correctness is five obligations represented by six required evidence
-gates. Neither upstream command observation substitutes for the other:
+All ownership modes retain authored-source, public-type, and Node/browser packed
+consumer checks. Where copied evidence is required (including legacy policy),
+type correctness has five obligations represented by six gates; the two upstream
+observations remain separate. Valid imported/adapter policy removes only the
+upstream type gates, not the consumer/source checks below:
 
 1. Run the pristine upstream type suite with its original compiler and pinned
    React types, then the complete one-for-one adapted suite with Octane types.
@@ -481,7 +524,7 @@ The approved shapes are:
 - `pnpm packages:pack:check` for both packed-source rows and `package-pack`;
 - `pnpm sync` for generated data and `pnpm format:check` for formatting.
 
-Record all five strict type obligations under six dedicated evidence gates. The
+For copied or legacy policy, record all five strict type obligations under six dedicated evidence gates. The
 pristine and adapted upstream suites are separate observations with different
 compilers; present suites must never share a gate or command. The packed repository gate
 proves both installed-source contexts and the package boundary in one run:
@@ -508,14 +551,17 @@ pnpm react-port:evidence run --batch <id> --node pkg:<name> \
   --gate package-pack -- pnpm packages:pack:check
 ```
 
-The type-project paths may follow the closest binding, but all six gate results
-and the compiler semantics above are mandatory. Pristine and adapted programs
+The type-project paths may follow the closest binding. Run every gate required by
+the validated matrix: copied/legacy policy keeps all six, while imported/adapter
+policy retains authored, public, and both packed-source gates. Compiler semantics
+remain mandatory. Required pristine and adapted programs
 must have distinct package-local projects. The pristine project must contain a
 `pristine` path/name marker and the adapted project an `adapted` marker so the
 runner can bind each compiler to the right evidence. Do not use a shared project
 or substitute arbitrary commands for a gate-owned command.
 
-When the immutable upstream package has no TypeScript suite or declarations,
+When copied/legacy policy requires upstream type gates but the immutable upstream
+package has no TypeScript suite or declarations,
 record checked absence rather than inventing upstream type probes. The owned
 absence command is the only alternative for the two upstream type gates:
 
@@ -552,9 +598,10 @@ pnpm react-port:evidence record --batch <id> --node pkg:<name> \
 Always require:
 
 - package test suite and focused public-export behavior;
-- pristine/adapted upstream type parity, direct authored-source typecheck,
-  precise public types, and packed Node/browser source typechecks;
-- upstream test-registration crosswalk completeness;
+- direct authored-source typecheck, precise public types, and packed Node/browser
+  source typechecks; pristine/adapted upstream type parity where copied evidence
+  is required;
+- complete upstream test-registration crosswalk for required copied evidence;
 - public entrypoint/export and packed-consumer checks;
 - durable upstream/license/notice provenance;
 - final shipped dependency/source-closure audit;
@@ -592,7 +639,11 @@ prove. Do not weaken assertions to match a buggy implementation.
 
 ## Verification and readiness report
 
-Run the narrow package commands first, then the applicable repository gates:
+Run the narrow package commands first, then the applicable repository gates.
+Materialization and full pristine/adapted parity apply to required copied evidence;
+validated imported/adapter maintenance retains focused package and consumer checks.
+Use affected inventory/generator/aggregate gates to verify evidence removal does not
+skip retained coverage or recreate obsolete trees. Available gates include:
 
 ```bash
 pnpm react-port:materialize run --check --package-dir packages/<binding>
@@ -630,9 +681,10 @@ only validating metadata. Run affected core tests and the full root `pnpm test`
 after targeted evidence is green. Regenerate derived data from its source
 command; never edit generated files directly.
 
-Before verification, write three data files: the registration inventory covering
-the immutable preflight test-file inventory, its complete classified crosswalk,
-and a closure object. The closure contains expected `runtimeDependencies`,
+Before verification, write a closure object and, when copied evidence is required,
+the registration inventory covering the immutable preflight test-file inventory
+and its complete classified crosswalk. For a mixed package, that inventory retains
+the required copied boundary. The closure contains expected `runtimeDependencies`,
 expected `adaptedSources`, a `sourceLedger`, and `reimplementedDependencies`.
 The source ledger covers every source file reachable from public exports with
 its package-relative path, exact SHA-256, and `authored` or `adapted` origin; an
@@ -653,16 +705,20 @@ pnpm react-port:evidence verify --batch <id> --node pkg:<name> \
   --closure <closure.json>
 ```
 
+The command above is the copied/legacy form; omit `--registrations` and `--crosswalk`
+only when a validated, explicitly migrated policy removes those obligations.
 This command inspects package shape, exports, Octane singleton dependencies,
-status, `UPSTREAM.md`, forbidden ambient `.tsrx` declarations, the complete
-upstream crosswalk, and the final licensed graph closure. It also requires every
-published/source license and NOTICE SHA-256 captured at preflight to appear as
-exact packaged bytes in a root attribution artifact included by `files`. It
+status, `UPSTREAM.md`, forbidden ambient `.tsrx` declarations, the required
+upstream crosswalk, and the final licensed graph closure. Copied/legacy evidence
+also requires every published/source license and NOTICE SHA-256 captured at
+preflight to appear as exact packaged bytes in a root attribution artifact included
+by `files`; imported surfaces keep their applicable package/license review. It
 alone advances an `implementing` node to `verified`; missing required evidence
 leaves the node implementing and exits nonzero.
 
 The final machine/human report must name each command and observed result, link
 every required evidence row to a test/artifact, list attribution files and
 worktree adoptions, and state `verified` only when all required rows pass. Stop
-with local changes and readiness unless the user explicitly authorizes the
-separate commit/PR workflow.
+with local changes and readiness unless shipping is already authorized. Preserve
+existing authority and follow `create-a-pr` for its triggers; independently review
+the actual diff for necessity before committing or pushing.

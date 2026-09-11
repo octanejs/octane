@@ -596,7 +596,7 @@ describe('CI workflow aggregation', () => {
 			reactParityCheck,
 			/relativeFiles: nonVitestShard\.items\.map\(\(item\) => item\.relativeFile\)/,
 		);
-		assert.match(reactParityCheck, /const vitestLanes = loadRequiredVitestLanes\(REPO\)/);
+		assert.match(reactParityCheck, /const vitestLanes = await loadRequiredVitestLanes\(REPO\)/);
 		assert.doesNotMatch(reactParityCheck, /selectParityVitestShard|vitest-lane-timings/);
 		assert.match(reactParityCheck, /reportPath: process\.env\.REACT_PARITY_VITEST_REPORT/);
 		assert.match(reactParityCheck, /createRequiredNonVitestManifestShardPlan/);

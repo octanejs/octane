@@ -3,7 +3,7 @@ import { execFile, spawn } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -251,7 +251,9 @@ export function describeTestIdentityMismatch(expected, actual) {
 	return `${summarize('missing', missing)}\n  ${summarize('unexpected', unexpected)}`;
 }
 
-export function validateManifest(manifest) {
+export function validateManifest(manifest, { surfacePolicy } = {}) {
+	if (surfacePolicy && !surfacePolicy.valid)
+		throw new Error('Invalid binding surface policy cannot relax parity evidence');
 	if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest))
 		fail('root must be an object');
 	if (manifest.schemaVersion !== 1) fail('schemaVersion must be 1');
@@ -518,7 +520,10 @@ export function validateManifest(manifest) {
 			}
 		}
 	}
-	if (manifest.provenance.verification === 'verified') {
+	if (
+		manifest.provenance.verification === 'verified' &&
+		(surfacePolicy?.requiresCopiedEvidence ?? true)
+	) {
 		const requiredFullRuntime = (type, evidenceOrigin) =>
 			manifest.lanes.some(
 				(lane) =>
@@ -582,6 +587,32 @@ export function validateManifest(manifest) {
 				`verified provenance with ${typeSuiteState} upstream type tests requires available required pristine-types and adapted-types lanes with ${expectedOrigin} evidence${typeSuiteState === 'absent' ? ' when type lanes are declared' : ''}`,
 			);
 	}
+	if (
+		manifest.provenance.verification === 'verified' &&
+		surfacePolicy &&
+		!surfacePolicy.requiresCopiedEvidence
+	) {
+		if (
+			!manifest.lanes.some(
+				(lane) =>
+					lane.oracle === 'required' &&
+					lane.available !== false &&
+					lane.evidenceOrigin === 'repo-authored' &&
+					['differential', 'adapted-octane'].includes(lane.type),
+			)
+		)
+			fail('Imported and adapter surfaces require focused repo-authored integration evidence');
+		if (
+			!manifest.lanes.some(
+				(lane) =>
+					lane.oracle === 'required' &&
+					lane.available !== false &&
+					lane.evidenceOrigin === 'repo-authored' &&
+					lane.type === 'adapted-types',
+			)
+		)
+			fail('Imported and adapter surfaces require focused public type evidence');
+	}
 
 	if (!Array.isArray(manifest.divergences)) fail('divergences must be an array');
 	const divergenceIds = new Set();
@@ -642,7 +673,10 @@ export function validateManifest(manifest) {
 }
 
 export async function loadManifest(path) {
-	return validateManifest(JSON.parse(await readFile(path, 'utf8')));
+	const { assertBindingSurfacePolicy } = await import('../binding-surface-policy.mjs');
+	return validateManifest(JSON.parse(await readFile(path, 'utf8')), {
+		surfacePolicy: assertBindingSurfacePolicy(dirname(dirname(path))),
+	});
 }
 
 export async function verifyManifestFiles(manifest, root) {

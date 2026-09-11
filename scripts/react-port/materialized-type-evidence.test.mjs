@@ -5,7 +5,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { assertMaterializedTypeEvidence } from './materialized-type-evidence.mjs';
+import {
+	assertMaterializedTypeEvidence,
+	scopedUpstreamTestInventory,
+} from './materialized-type-evidence.mjs';
 import { buildUpstreamLock, gitBlobSha1 } from './materialize-lib.mjs';
 
 const roots = [];
@@ -89,6 +92,50 @@ test('accepts complete pinned and regenerated suites with subpath-only imports',
 	const { inputs } = fixture();
 	for (const lane of ['pristine', 'adapted'])
 		assert.doesNotThrow(() => assertMaterializedTypeEvidence(inputs(lane)));
+});
+test('copied evidence scopes select the pinned monorepo package and preserve provenance', () => {
+	const { node, packageDirectory } = fixture();
+	const surfacePolicy = {
+		mode: 'declared',
+		valid: true,
+		requiresCopiedEvidence: true,
+		surfaces: [
+			{
+				ownership: 'copied',
+				dependency: { package: node.identity.packageName },
+				upstreamPaths: ['src', 'package.json'],
+			},
+		],
+	};
+	const input = { node, packageDirectory, surfacePolicy };
+	const inventory = node.upstreamTestInventory;
+	assert.deepEqual(scopedUpstreamTestInventory(input), inventory);
+	const sibling = { ...inventory[0], path: 'packages/widget-other/src/api.spec.ts' };
+	assert.deepEqual(
+		scopedUpstreamTestInventory({
+			...input,
+			node: { ...node, upstreamTestInventory: [...inventory, sibling] },
+		}),
+		inventory,
+	);
+	assert.throws(
+		() =>
+			scopedUpstreamTestInventory({
+				...input,
+				node: { ...node, upstreamTestInventory: [sibling] },
+			}),
+		/match no pinned/,
+	);
+	surfacePolicy.surfaces[0].upstreamPaths = ['packages/widget/src', 'packages/widget/package.json'];
+	assert.deepEqual(scopedUpstreamTestInventory(input), inventory);
+	assert.throws(
+		() =>
+			scopedUpstreamTestInventory({
+				...input,
+				node: { ...node, upstreamTestInventory: [{ ...inventory[0], gitBlob: 'b'.repeat(40) }] },
+			}),
+		/differs from its immutable lock/,
+	);
 });
 test('rejects missing and unexpected adapted files without rewriting either tree', () => {
 	const { inputs, packageDirectory } = fixture();

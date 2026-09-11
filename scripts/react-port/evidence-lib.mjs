@@ -10,6 +10,10 @@ import {
 } from './preflight-lib.mjs';
 import { hasObservablePackageTests } from './package-tests-lib.mjs';
 import { octanePeerRangeFor } from '../workspace-packages.mjs';
+import {
+	assertBindingSurfacePolicy,
+	requiresUpstreamEvidence,
+} from '../binding-surface-policy.mjs';
 
 const EVIDENCE_STATUSES = new Set(['required', 'passed', 'failed', 'blocked', 'inapplicable']);
 const CROSSWALK_CLASSIFICATIONS = new Set([
@@ -134,8 +138,26 @@ function normalizeCategories(categories) {
 	return normalizedCategories;
 }
 
-function gateDefinitions(categories) {
-	return [...COMMON_GATES, ...categories.flatMap((category) => CATEGORY_GATES[category])];
+function gateDefinitions(categories, surfacePolicy) {
+	let definitions = [
+		...COMMON_GATES,
+		...categories.flatMap((category) => CATEGORY_GATES[category]),
+	];
+	if (surfacePolicy) {
+		if (
+			!/^[a-f0-9]{64}$/.test(surfacePolicy.fingerprint) ||
+			typeof surfacePolicy.requiresCopiedEvidence !== 'boolean' ||
+			typeof surfacePolicy.requiresLifecycleEvidence !== 'boolean'
+		)
+			throw new Error('Invalid evidence surface policy');
+		if (!surfacePolicy.requiresCopiedEvidence)
+			definitions = definitions.filter(
+				([id]) =>
+					!['upstream-crosswalk', 'upstream-types-pristine', 'upstream-types-adapted'].includes(id),
+			);
+		if (surfacePolicy.requiresLifecycleEvidence) definitions.push(...CATEGORY_GATES['hooks-store']);
+	}
+	return [...new Map(definitions.map((definition) => [definition[0], definition])).values()];
 }
 
 export function isCurrentEvidenceMatrix(matrix) {
@@ -150,7 +172,7 @@ export function isCurrentEvidenceMatrix(matrix) {
 	}
 	let definitions;
 	try {
-		definitions = gateDefinitions(normalizeCategories(matrix.categories));
+		definitions = gateDefinitions(normalizeCategories(matrix.categories), matrix.surfacePolicy);
 	} catch {
 		return false;
 	}
@@ -198,12 +220,22 @@ export function isCompleteEvidenceMatrix(matrix) {
 	);
 }
 
-export function createEvidenceMatrix({ categories, preflightArtifact }) {
+export function createEvidenceMatrix({ categories, preflightArtifact, surfacePolicy }) {
 	if (typeof preflightArtifact !== 'string' || !preflightArtifact) {
 		throw new Error('The preflight manifest/report artifact is required');
 	}
 	const normalizedCategories = normalizeCategories(categories);
-	const definitions = gateDefinitions(normalizedCategories);
+	if (surfacePolicy && !surfacePolicy.valid)
+		throw new Error('Invalid binding surface policy cannot relax evidence');
+	const selectedPolicy =
+		surfacePolicy?.mode === 'declared'
+			? {
+					fingerprint: surfacePolicy.fingerprint,
+					requiresCopiedEvidence: surfacePolicy.requiresCopiedEvidence,
+					requiresLifecycleEvidence: surfacePolicy.requiresLifecycleEvidence,
+				}
+			: undefined;
+	const definitions = gateDefinitions(normalizedCategories, selectedPolicy);
 	const gates = Object.fromEntries(definitions.map(gateRecord));
 	gates['identity-license'] = {
 		...gates['identity-license'],
@@ -214,8 +246,23 @@ export function createEvidenceMatrix({ categories, preflightArtifact }) {
 	return {
 		schemaVersion: EVIDENCE_MATRIX_SCHEMA_VERSION,
 		categories: normalizedCategories,
+		...(selectedPolicy ? { surfacePolicy: selectedPolicy } : {}),
 		gates,
 	};
+}
+
+/** Explicit migration retains immutable identity and invalidates affected verification passes. */
+export function migrateEvidenceMatrix(matrix, surfacePolicy) {
+	assertCurrentEvidenceMatrix(matrix);
+	if (!surfacePolicy.valid || surfacePolicy.mode !== 'declared')
+		throw new Error('Migration requires a valid declared binding surface policy');
+	const migrated = createEvidenceMatrix({
+		categories: matrix.categories,
+		preflightArtifact: matrix.gates['identity-license'].artifact ?? 'preflight-required',
+		surfacePolicy,
+	});
+	migrated.gates['identity-license'] = structuredClone(matrix.gates['identity-license']);
+	return migrated;
 }
 
 export function recordEvidence(matrix, gateId, evidence) {
@@ -471,6 +518,7 @@ export function inspectBindingPackage(
 		identity,
 		expectedLicenseHashes = [],
 		expectedNoticeHashes = [],
+		sourceLedger,
 	},
 ) {
 	const issues = [];
@@ -481,19 +529,28 @@ export function inspectBindingPackage(
 	}
 	const manifest = readJson(path.join(packageDirectory, 'package.json'), issues, 'package.json');
 	const status = readJson(path.join(packageDirectory, 'status.json'), issues, 'status.json');
+	let copiedEvidence = true;
+	try {
+		copiedEvidence = requiresUpstreamEvidence(
+			assertBindingSurfacePolicy(packageDirectory, { sourceLedger }),
+			identity.packageName,
+		);
+	} catch (error) {
+		issues.push(error.message);
+	}
 	const licenseArtifacts = attributionArtifacts(packageDirectory, LICENSE_ARTIFACT_PATTERN);
 	const noticeArtifacts = attributionArtifacts(packageDirectory, NOTICE_ARTIFACT_PATTERN);
-	if (expectedLicenseHashes.length === 0) {
+	if (copiedEvidence && expectedLicenseHashes.length === 0) {
 		issues.push('Preflight license evidence has no content hashes');
 	}
-	for (const expectedHash of new Set(expectedLicenseHashes)) {
+	for (const expectedHash of new Set(copiedEvidence ? expectedLicenseHashes : [])) {
 		if (!licenseArtifacts.some((artifact) => artifact.sha256 === expectedHash)) {
 			issues.push(
 				`No packaged LICENSE artifact retains exact upstream bytes for hash ${expectedHash}`,
 			);
 		}
 	}
-	for (const expectedHash of new Set(expectedNoticeHashes)) {
+	for (const expectedHash of new Set(copiedEvidence ? expectedNoticeHashes : [])) {
 		if (!noticeArtifacts.some((artifact) => artifact.sha256 === expectedHash)) {
 			issues.push(
 				`No packaged NOTICE artifact retains exact upstream bytes for hash ${expectedHash}`,
@@ -900,6 +957,11 @@ export function auditShippedClosure({
 		try {
 			derivedClosure = deriveShippedClosure(packageDirectory, sourceLedger);
 			issues.push(...derivedClosure.issues);
+			const policy = assertBindingSurfacePolicy(packageDirectory, { sourceLedger });
+			if (policy.mode === 'declared')
+				for (const surface of policy.surfaces) {
+					if (surface.ownership !== 'copied') plannedDependencies.add(surface.dependency.package);
+				}
 		} catch (error) {
 			issues.push(
 				`Could not derive shipped closure: ${error instanceof Error ? error.message : String(error)}`,

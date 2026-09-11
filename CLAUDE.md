@@ -32,9 +32,9 @@ trigger first arises, even if it is a later step you chose:
 - `octane-core-extend`: before editing `packages/octane/src`.
 - `performance-audit`: a change that can move render, SSR, hydration, compiler
   output, or bundle cost.
-- `octane-react-library-port`: a new or existing `@octanejs/*` binding.
-- `react-library-port`: legacy compatibility trigger; immediately follow
-  `octane-react-library-port`.
+- `update-bindings`: audit, maintain, or reduce existing bindings.
+- `octane-react-library-port`: new ports or copied React code.
+- `react-library-port`: legacy router.
 - `authoring-tsrx`: writing a new `.tsrx` file.
 - `triage`: the owning area is unclear.
 

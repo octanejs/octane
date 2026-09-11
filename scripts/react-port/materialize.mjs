@@ -38,6 +38,11 @@ import {
 } from './preflight-lib.mjs';
 import { credentialValuesFromEnvironment, sanitizeForReport } from './report-lib.mjs';
 import { validateBatchManifest } from './state-lib.mjs';
+import {
+	assertBindingSurfacePolicy,
+	assertUpstreamLockScope,
+	requiresUpstreamEvidence,
+} from '../binding-surface-policy.mjs';
 
 const ARCHIVE_MAX_BYTES = 192 * 1024 * 1024;
 const BLOB_MAX_BYTES = 16 * 1024 * 1024;
@@ -459,6 +464,7 @@ async function fetchGitBlob(owner, repo, gitBlob, size, options) {
 }
 
 function writeLockFile(options, lock) {
+	assertUpstreamLockScope(assertBindingSurfacePolicy(options.packageDirectory), lock);
 	const lockPath = path.join(options.packageDirectory, UPSTREAM_LOCK_RELATIVE_PATH);
 	mkdirSync(path.dirname(lockPath), { recursive: true });
 	writeFileSync(lockPath, `${JSON.stringify(lock, null, '\t')}\n`);
@@ -682,6 +688,8 @@ async function commandLockFromPin(options) {
 }
 
 async function commandLock(options) {
+	if (!requiresUpstreamEvidence(assertBindingSurfacePolicy(options.packageDirectory)))
+		throw new Error('Imported and adapter surfaces do not require an upstream source lock');
 	if (options.pin) return commandLockFromPin(options);
 	if (!options.batch || !options.node) {
 		throw new Error('lock requires --batch and --node from a completed preflight, or --pin');
@@ -690,7 +698,21 @@ async function commandLock(options) {
 }
 
 async function commandRun(options) {
+	const policy = assertBindingSurfacePolicy(options.packageDirectory);
+	if (!requiresUpstreamEvidence(policy))
+		return {
+			status: 'passed',
+			mode: 'not-required',
+			reason: 'Observed surfaces contain no copied implementation.',
+		};
 	const lock = readLock(options.packageDirectory);
+	if (!requiresUpstreamEvidence(policy, lock.identity.packageName))
+		return {
+			status: 'passed',
+			mode: 'not-required',
+			reason: 'This lock covers an imported dependency, not the retained copied implementation.',
+		};
+	assertUpstreamLockScope(policy, lock);
 	const pristineDirectory = path.join(options.packageDirectory, PRISTINE_RELATIVE_PATH);
 	const statePath = path.join(pristineDirectory, MATERIALIZE_STATE_FILE);
 	if (options.check) {

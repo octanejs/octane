@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
-import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
 
 import {
 	buildParityVitestProjects,
@@ -248,28 +247,45 @@ test('distinguishes the same file and test identity in unit and browser projects
 test('verifies shard reports in a checkout without materialization dependencies', async (t) => {
 	const root = await mkdtemp(join(tmpdir(), 'react-parity-aggregate-'));
 	t.after(() => rm(root, { recursive: true, force: true }));
-	for (const file of ['vitest-batch-lib.mjs', 'harness-lib.mjs']) {
-		await copyFile(new URL(file, import.meta.url), join(root, file));
+	const scriptsRoot = join(root, 'scripts/react-parity');
+	await mkdir(scriptsRoot, { recursive: true });
+	for (const file of ['vitest-batch-lib.mjs', 'harness-lib.mjs', 'verify-vitest-shards.mjs']) {
+		await copyFile(new URL(file, import.meta.url), join(scriptsRoot, file));
 	}
-	const selectedLane = lane('example', 'example', 'example.test.ts');
+	const selectedLane = {
+		...lane('example', 'example', 'example.test.ts'),
+		type: 'differential',
+		oracle: 'required',
+	};
+	await mkdir(join(root, 'packages/example/audit'), { recursive: true });
+	await writeFile(
+		join(root, 'packages/example/audit/react-parity.json'),
+		JSON.stringify({ lanes: [selectedLane] }),
+	);
 	const report = JSON.stringify({
 		testResults: [
 			{
-				name: join(root, 'example.test.ts'),
+				name: 'example.test.ts',
 				assertionResults: [{ fullName: 'example works', status: 'passed' }],
 			},
 		],
 	});
-	const script = `
-		import assert from 'node:assert/strict';
-		import { verifyBatchedVitestResult } from ${JSON.stringify(pathToFileURL(join(root, 'vitest-batch-lib.mjs')).href)};
-		const lanes = ${JSON.stringify([selectedLane])};
-		const reports = ${JSON.stringify([report])};
-		assert.equal(verifyBatchedVitestResult(lanes, reports, ${JSON.stringify(root)}), true);
-		assert.throws(() => verifyBatchedVitestResult(lanes, [], ${JSON.stringify(root)}));
-	`;
-	execFileSync(process.execPath, ['--input-type=module', '-e', script], {
-		cwd: root,
-		stdio: 'pipe',
-	});
+	await mkdir(join(root, 'reports'));
+	const reportPath = join(root, 'reports/shard-1.json');
+	await writeFile(reportPath, report);
+	const run = () =>
+		execFileSync(
+			process.execPath,
+			[
+				join(scriptsRoot, 'verify-vitest-shards.mjs'),
+				'--reports-directory',
+				join(root, 'reports'),
+				'--expected-shards',
+				'1',
+			],
+			{ cwd: root, stdio: 'pipe', encoding: 'utf8' },
+		);
+	assert.match(run(), /verified complete React parity Vitest coverage across 1 shard reports/);
+	await writeFile(reportPath, JSON.stringify({ testResults: [] }));
+	assert.throws(run, /did not execute every declared test identity exactly once/);
 });

@@ -11,9 +11,11 @@ import {
 	EVIDENCE_MATRIX_SCHEMA_VERSION,
 	evaluateVerificationReadiness,
 	inspectBindingPackage,
+	migrateEvidenceMatrix,
 	recordEvidence,
 	validateUpstreamCrosswalk,
 } from './evidence-lib.mjs';
+import { readBindingSurfacePolicy } from '../binding-surface-policy.mjs';
 
 const MIT_TEXT = `MIT License
 
@@ -61,6 +63,59 @@ function cleanRoomProof(localEvidence) {
 }
 
 describe('evidence matrix', () => {
+	test('explicit migration removes dependency suite obligations and retains only immutable identity evidence', async () => {
+		const root = await mkdtemp(path.join(tmpdir(), 'evidence-surface-'));
+		await mkdir(path.join(root, 'src'));
+		await mkdir(path.join(root, 'tests'));
+		await writeFile(
+			path.join(root, 'package.json'),
+			JSON.stringify({ exports: './src/index.ts', dependencies: { widget: '1.0.0' } }),
+		);
+		await writeFile(path.join(root, 'src/index.ts'), "export * from 'widget';\n");
+		await writeFile(path.join(root, 'tests/consumer.ts'), 'export const evidence = true;');
+		await writeFile(
+			path.join(root, 'status.json'),
+			JSON.stringify({
+				surfaces: [
+					{
+						entrypoint: '.',
+						exports: ['*'],
+						ownership: 'imported',
+						files: ['src/index.ts'],
+						dependency: { package: 'widget', version: '1.0.0' },
+						evidence: ['tests/consumer.ts'],
+					},
+				],
+			}),
+		);
+		const legacy = createEvidenceMatrix({
+			categories: ['thin-core'],
+			preflightArtifact: 'manifest.json',
+		});
+		recordEvidence(legacy, 'package-tests', {
+			status: 'passed',
+			command: 'pnpm test',
+			observed: 'Tests passed before migration',
+		});
+		recordEvidence(legacy, 'format', {
+			status: 'passed',
+			command: 'pnpm format:check',
+			observed: 'Formatting passed',
+		});
+		const migrated = migrateEvidenceMatrix(legacy, readBindingSurfacePolicy(root));
+		assert.equal(legacy.gates['package-tests'].status, 'passed');
+		assert.ok(legacy.gates['upstream-crosswalk']);
+		assert.equal(migrated.gates['upstream-crosswalk'], undefined);
+		assert.equal(migrated.gates['upstream-types-pristine'], undefined);
+		assert.equal(migrated.gates['upstream-types-adapted'], undefined);
+		assert.equal(migrated.gates['package-tests'].status, 'required');
+		assert.equal(migrated.gates.format.status, 'required');
+		assert.equal(migrated.gates['generated-data'].status, 'required');
+		assert.deepEqual(migrated.gates['identity-license'], legacy.gates['identity-license']);
+		assert.ok(migrated.gates['public-types']);
+		assert.ok(migrated.gates['package-pack']);
+		assertCurrentEvidenceMatrix(migrated);
+	});
 	test('derives mandatory gates from the binding category', () => {
 		const matrix = createEvidenceMatrix({
 			categories: ['hooks-store', 'ssr-sensitive'],

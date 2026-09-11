@@ -5,6 +5,10 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+	assertBindingSurfacePolicy,
+	requiresUpstreamEvidence,
+} from '../binding-surface-policy.mjs';
 import { assertPristineOracleEnvironment } from './alien-signals-pristine-runtime.mjs';
 import { verifyAlienSignalsTestClassifications } from './alien-signals-classifications-lib.mjs';
 import { verifyAlienSignalsRuntimeStructure } from './alien-signals-runtime-lib.mjs';
@@ -175,44 +179,67 @@ async function capture(label, check) {
 	}
 }
 
-await capture('react-hook-form upstream evidence', () => verifyHookFormUpstream(REPO));
-await capture('react-hook-form type evidence', () => verifyHookFormTypes(REPO));
-await capture('formisch upstream evidence', () =>
+async function captureBinding(binding, label, check) {
+	await capture(label, () => {
+		const policy = assertBindingSurfacePolicy(path.join(REPO, 'packages', binding));
+		return requiresUpstreamEvidence(policy) ? check() : undefined;
+	});
+}
+
+await captureBinding('hook-form', 'react-hook-form upstream evidence', () =>
+	verifyHookFormUpstream(REPO),
+);
+await captureBinding('hook-form', 'react-hook-form type evidence', () => verifyHookFormTypes(REPO));
+await captureBinding('formisch', 'formisch upstream evidence', () =>
 	verifyFormischUpstream(REPO, {
 		integrity: '3f9c1c6da89473296033cc2701405080b2cb11478724bc7f045063ee618aaf57',
 	}),
 );
-await capture('formisch type evidence', () =>
+await captureBinding('formisch', 'formisch type evidence', () =>
 	verifyTypeParity(REPO, { configPath: 'packages/formisch/audit/type-parity.json' }),
 );
-await capture('formisch test classifications', () => verifyFormischTestClassifications(REPO));
-await capture('react-intersection-observer upstream evidence', () =>
+await captureBinding('formisch', 'formisch test classifications', () =>
+	verifyFormischTestClassifications(REPO),
+);
+await captureBinding('intersection-observer', 'react-intersection-observer upstream evidence', () =>
 	verifyIntersectionObserverUpstream(REPO),
 );
-await capture('intersection-observer type evidence', () => verifyIntersectionObserverTypes(REPO));
-await capture('intersection-observer test classifications', () =>
+await captureBinding('intersection-observer', 'intersection-observer type evidence', () =>
+	verifyIntersectionObserverTypes(REPO),
+);
+await captureBinding('intersection-observer', 'intersection-observer test classifications', () =>
 	verifyIntersectionObserverTestClassifications(REPO),
 );
-await capture('react-dropzone evidence', () => verifyReactDropzoneEvidence(REPO));
-await capture('react-resizable-panels upstream evidence', () =>
+await captureBinding('dropzone', 'react-dropzone evidence', () =>
+	verifyReactDropzoneEvidence(REPO),
+);
+await captureBinding('resizable-panels', 'react-resizable-panels upstream evidence', () =>
 	verifyReactResizablePanelsUpstream(REPO),
 );
-await capture('react-resizable-panels type evidence', () => verifyReactResizablePanelsTypes(REPO));
-await capture('react-resizable-panels test classifications', () =>
+await captureBinding('resizable-panels', 'react-resizable-panels type evidence', () =>
+	verifyReactResizablePanelsTypes(REPO),
+);
+await captureBinding('resizable-panels', 'react-resizable-panels test classifications', () =>
 	verifyReactResizablePanelsTestClassifications(REPO),
 );
-await capture('react-select test classifications', () =>
+await captureBinding('select', 'react-select test classifications', () =>
 	verifyReactSelectTestClassifications(REPO),
 );
-await capture('livestore type evidence', () => verifyLivestoreTypes(REPO));
-await capture('livestore test classifications', () => verifyLivestoreTestClassifications(REPO));
-await capture('alien-signals type evidence', () => verifyAlienSignalsTypes(REPO));
-await capture('alien-signals runtime structure evidence', () =>
+await captureBinding('livestore', 'livestore type evidence', () => verifyLivestoreTypes(REPO));
+await captureBinding('livestore', 'livestore test classifications', () =>
+	verifyLivestoreTestClassifications(REPO),
+);
+await captureBinding('alien-signals', 'alien-signals type evidence', () =>
+	verifyAlienSignalsTypes(REPO),
+);
+await captureBinding('alien-signals', 'alien-signals runtime structure evidence', () =>
 	verifyAlienSignalsRuntimeStructure(REPO),
 );
-await capture('better-auth type evidence', () => verifyBetterAuthTypes(REPO));
-await capture('better-auth runtime inventory', () => verifyBetterAuthRuntimeInventory(REPO));
-await capture('alien-signals pristine oracle environment', () =>
+await captureBinding('better-auth', 'better-auth type evidence', () => verifyBetterAuthTypes(REPO));
+await captureBinding('better-auth', 'better-auth runtime inventory', () =>
+	verifyBetterAuthRuntimeInventory(REPO),
+);
+await captureBinding('alien-signals', 'alien-signals pristine oracle environment', () =>
 	assertPristineOracleEnvironment({
 		environmentPath: path.join(
 			REPO,
@@ -221,32 +248,52 @@ await capture('alien-signals pristine oracle environment', () =>
 		fromPath: path.join(REPO, 'packages/alien-signals'),
 	}),
 );
-await capture('alien-signals test classifications', () =>
+await captureBinding('alien-signals', 'alien-signals test classifications', () =>
 	verifyAlienSignalsTestClassifications(REPO),
 );
-await capture('@octanejs/tanstack-store type evidence', () => verifyTanstackStoreTypes(REPO));
-await capture('@octanejs/tanstack-store upstream evidence', () =>
+await captureBinding('tanstack-store', '@octanejs/tanstack-store type evidence', () =>
+	verifyTanstackStoreTypes(REPO),
+);
+await captureBinding('tanstack-store', '@octanejs/tanstack-store upstream evidence', () =>
 	verifyTanstackStoreUpstreamEvidence(REPO),
 );
-await capture('react-markdown type evidence', () => verifyReactMarkdownTypes(REPO));
-await capture('react-markdown test classifications', () =>
+await captureBinding('markdown', 'react-markdown type evidence', () =>
+	verifyReactMarkdownTypes(REPO),
+);
+await captureBinding('markdown', 'react-markdown test classifications', () =>
 	verifyReactMarkdownTestClassifications(REPO),
 );
-await capture('@octanejs/solana-kit type evidence', () => verifySolanaReactTypes(REPO));
-await capture('react-spring upstream evidence', () => verifyReactSpringUpstream(REPO));
-await capture('@octanejs/tanstack-table type evidence', () => verifyTanstackTableTypes(REPO));
-await capture('tanstack-table test classifications', () =>
+await captureBinding('solana-kit', '@octanejs/solana-kit type evidence', () =>
+	verifySolanaReactTypes(REPO),
+);
+await captureBinding('spring', 'react-spring upstream evidence', () =>
+	verifyReactSpringUpstream(REPO),
+);
+await captureBinding('tanstack-table', '@octanejs/tanstack-table type evidence', () =>
+	verifyTanstackTableTypes(REPO),
+);
+await captureBinding('tanstack-table', 'tanstack-table test classifications', () =>
 	verifyTanstackTableTestClassifications(REPO),
 );
-await capture('@octanejs/tiptap type evidence', () => verifyTiptapTypes(REPO));
-await capture('@octanejs/tiptap runtime crosswalk', () => verifyTiptapRuntimeCrosswalk(REPO));
-await capture('@octanejs/tiptap test classifications', () => verifyTiptapTestClassifications(REPO));
-await capture('@octanejs/motion type evidence', () => verifyMotionTypes(REPO));
-await capture('@octanejs/nuqs type evidence', () => verifyNuqsTypes(REPO));
-await capture('@octanejs/tanstack-pacer type evidence', () => verifyTanstackPacerTypes(REPO));
-await capture('@octanejs/colorful upstream evidence', () => verifyReactColorfulUpstream(REPO));
-await capture('@octanejs/colorful type evidence', () => verifyReactColorfulTypes(REPO));
-await capture('@octanejs/colorful test classifications', () =>
+await captureBinding('tiptap', '@octanejs/tiptap type evidence', () => verifyTiptapTypes(REPO));
+await captureBinding('tiptap', '@octanejs/tiptap runtime crosswalk', () =>
+	verifyTiptapRuntimeCrosswalk(REPO),
+);
+await captureBinding('tiptap', '@octanejs/tiptap test classifications', () =>
+	verifyTiptapTestClassifications(REPO),
+);
+await captureBinding('motion', '@octanejs/motion type evidence', () => verifyMotionTypes(REPO));
+await captureBinding('nuqs', '@octanejs/nuqs type evidence', () => verifyNuqsTypes(REPO));
+await captureBinding('tanstack-pacer', '@octanejs/tanstack-pacer type evidence', () =>
+	verifyTanstackPacerTypes(REPO),
+);
+await captureBinding('colorful', '@octanejs/colorful upstream evidence', () =>
+	verifyReactColorfulUpstream(REPO),
+);
+await captureBinding('colorful', '@octanejs/colorful type evidence', () =>
+	verifyReactColorfulTypes(REPO),
+);
+await captureBinding('colorful', '@octanejs/colorful test classifications', () =>
 	verifyReactColorfulTestClassifications(REPO),
 );
 for (const materializedPackage of discoverMaterializedUpstreamPackages(REPO)) {
@@ -254,20 +301,22 @@ for (const materializedPackage of discoverMaterializedUpstreamPackages(REPO)) {
 		verifyMaterializedUpstreamEvidence(REPO, materializedPackage),
 	);
 }
-await capture('zag type evidence', () => verifyZagTypes(REPO));
-await capture('zag test classifications', () => verifyZagTestClassifications(REPO));
-await capture('zag runtime inventory crosswalk', () => verifyZagRuntimeCrosswalk(REPO));
-await capture('embla-carousel test classifications', () =>
+await captureBinding('zag', 'zag type evidence', () => verifyZagTypes(REPO));
+await captureBinding('zag', 'zag test classifications', () => verifyZagTestClassifications(REPO));
+await captureBinding('zag', 'zag runtime inventory crosswalk', () =>
+	verifyZagRuntimeCrosswalk(REPO),
+);
+await captureBinding('embla-carousel', 'embla-carousel test classifications', () =>
 	verifyEmblaCarouselTestClassifications(REPO),
 );
-await capture('embla-carousel type parity', async () => {
+await captureBinding('embla-carousel', 'embla-carousel type parity', async () => {
 	const { verifyCommittedTypeParity } = await import(
 		path.join(REPO, 'packages/embla-carousel/audit/type-parity.mjs')
 	);
 	await verifyCommittedTypeParity();
 });
 if (!validateOnly) {
-	await capture('embla-carousel parity negative controls', () =>
+	await captureBinding('embla-carousel', 'embla-carousel parity negative controls', () =>
 		execFileSync(
 			process.execPath,
 			[
@@ -281,46 +330,58 @@ if (!validateOnly) {
 		),
 	);
 }
-await capture('react-transition-group upstream evidence', () =>
+await captureBinding('transition-group', 'react-transition-group upstream evidence', () =>
 	verifyReactTransitionGroupUpstream(REPO),
 );
-await capture('react-transition-group type evidence', () => verifyReactTransitionGroupTypes(REPO));
-await capture('react-transition-group test classifications', () =>
+await captureBinding('transition-group', 'react-transition-group type evidence', () =>
+	verifyReactTransitionGroupTypes(REPO),
+);
+await captureBinding('transition-group', 'react-transition-group test classifications', () =>
 	verifyReactTransitionGroupTestClassifications(REPO),
 );
-await capture('vaul upstream evidence', () => verifyVaulUpstream(REPO));
-await capture('vaul test classifications', () => verifyVaulTestClassifications(REPO));
-await capture('vaul adapted runtime structural evidence', () =>
+await captureBinding('vaul', 'vaul upstream evidence', () => verifyVaulUpstream(REPO));
+await captureBinding('vaul', 'vaul test classifications', () =>
+	verifyVaulTestClassifications(REPO),
+);
+await captureBinding('vaul', 'vaul adapted runtime structural evidence', () =>
 	verifyVaulAdaptedRuntimeStructure(REPO),
 );
-await capture('drei React-parity evidence', () => verifyDreiReactParity(REPO));
-await capture('drei type evidence', () => verifyDreiTypes(REPO));
-await capture('tanstack-hotkeys test classifications', () =>
+await captureBinding('drei', 'drei React-parity evidence', () => verifyDreiReactParity(REPO));
+await captureBinding('drei', 'drei type evidence', () => verifyDreiTypes(REPO));
+await captureBinding('tanstack-hotkeys', 'tanstack-hotkeys test classifications', () =>
 	verifyTanstackHotkeysTestClassifications(REPO),
 );
-await capture('tanstack-devtools test classifications', () =>
+await captureBinding('tanstack-devtools', 'tanstack-devtools test classifications', () =>
 	verifyTanstackDevtoolsTestClassifications(REPO),
 );
-await capture('@octanejs/visx type evidence', () => verifyVisxTypes(REPO));
-await capture('visx test classifications', () => verifyVisxTestClassifications(REPO));
-await capture('react-textarea-autosize test classifications', () =>
+await captureBinding('visx', '@octanejs/visx type evidence', () => verifyVisxTypes(REPO));
+await captureBinding('visx', 'visx test classifications', () =>
+	verifyVisxTestClassifications(REPO),
+);
+await captureBinding('textarea-autosize', 'react-textarea-autosize test classifications', () =>
 	verifyReactTextareaAutosizeTestClassifications(REPO),
 );
-await capture('react-textarea-autosize upstream crosswalk', () =>
+await captureBinding('textarea-autosize', 'react-textarea-autosize upstream crosswalk', () =>
 	verifyReactTextareaAutosizeCrosswalk(REPO),
 );
-await capture('react-textarea-autosize type evidence', () =>
+await captureBinding('textarea-autosize', 'react-textarea-autosize type evidence', () =>
 	verifyReactTextareaAutosizeTypes(REPO),
 );
-await capture('react-draggable type evidence', () => verifyReactDraggableTypes(REPO));
-await capture('react-draggable test classifications', () =>
+await captureBinding('draggable', 'react-draggable type evidence', () =>
+	verifyReactDraggableTypes(REPO),
+);
+await captureBinding('draggable', 'react-draggable test classifications', () =>
 	verifyReactDraggableTestClassifications(REPO),
 );
-await capture('@octanejs/popper type evidence', () => verifyPopperTypes(REPO));
-await capture('@octanejs/popper test classifications', () => verifyPopperTestClassifications(REPO));
-await capture('pdf test classifications', () => verifyPdfTestClassifications(REPO));
-await capture('@octanejs/xstate type evidence', () => verifyXstateTypes(REPO));
-await capture('@octanejs/xstate-store type evidence', () => verifyXstateStoreTypes(REPO));
+await captureBinding('popper', '@octanejs/popper type evidence', () => verifyPopperTypes(REPO));
+await captureBinding('popper', '@octanejs/popper test classifications', () =>
+	verifyPopperTestClassifications(REPO),
+);
+await captureBinding('pdf', 'pdf test classifications', () => verifyPdfTestClassifications(REPO));
+await captureBinding('xstate', '@octanejs/xstate type evidence', () => verifyXstateTypes(REPO));
+await captureBinding('xstate-store', '@octanejs/xstate-store type evidence', () =>
+	verifyXstateStoreTypes(REPO),
+);
 
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components.
@@ -405,6 +466,7 @@ for (const relativeFile of BINDING_MANIFESTS) {
 		const binding = relativeFile.split('/')[1];
 		if (
 			!SPECIALIZED_CLASSIFICATION_BINDINGS.has(binding) &&
+			requiresUpstreamEvidence(assertBindingSurfacePolicy(path.join(REPO, 'packages', binding))) &&
 			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
 		) {
 			verifyPortTestClassifications(REPO, binding);
@@ -430,7 +492,7 @@ if (LOADED_BINDING_MANIFESTS.length === BINDING_MANIFESTS.length) {
 }
 
 if (!validateOnly && errors.length === 0) {
-	const vitestLanes = loadRequiredVitestLanes(REPO);
+	const vitestLanes = await loadRequiredVitestLanes(REPO);
 	console.log(
 		`planned native Vitest file shard ${parityShard.value} across ${vitestLanes.length} required lanes`,
 	);

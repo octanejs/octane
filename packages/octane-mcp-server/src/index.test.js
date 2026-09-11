@@ -163,13 +163,18 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(plan.validationCommands).toContain('node benchmarks/bench.mjs --quick --ratios');
 	});
 
-	it('requires pinned-upstream coverage for binding work', () => {
+	it('routes binding work by ownership before choosing evidence', () => {
 		const plan = engineeringPlanFor(
 			{ scope: 'library', changeKind: 'feature', paths: ['packages/zustand/src/index.ts'] },
 			true,
 		);
 
-		expect(plan.requiredSkills).toContain('octane-react-library-port');
+		expect(plan.requiredSkills).toContain('react-library-port');
+		expect(plan.requiredSkills).not.toContain('octane-react-library-port');
+		expect(plan.gates.parity.join('\n')).toContain('update-bindings');
+		expect(plan.gates.parity.join('\n')).toContain('direct upstream imports');
+		expect(plan.gates.parity.join('\n')).toContain('For copied or rewritten code');
+		expect(plan.gates.parity.join('\n')).toContain('Preserve strict legacy evidence');
 		expect(plan.gates.parity.join('\n')).toContain('packages/<name>/UPSTREAM.md');
 		expect(plan.gates.parity.join('\n')).toContain('divergence');
 		expect(plan.gates.parity.join('\n')).toContain("pinned release's own suite");
@@ -179,7 +184,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			true,
 		);
 		expect(applicationPlan.gates.parity).toBeUndefined();
-		expect(applicationPlan.requiredSkills).not.toContain('octane-react-library-port');
+		expect(applicationPlan.requiredSkills).not.toContain('react-library-port');
 	});
 
 	it('blocks framework-core plans when maintainer tools are unavailable', () => {

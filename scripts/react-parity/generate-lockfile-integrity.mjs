@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { validateManifest } from './harness-lib.mjs';
+import { loadManifest } from './harness-lib.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
 
@@ -39,7 +39,7 @@ export async function generateLockfileIntegrity(root = REPO) {
 	const results = [];
 	for (const manifestPath of await discoverManifests(root)) {
 		const source = await readFile(manifestPath, 'utf8');
-		const manifest = validateManifest(JSON.parse(source));
+		const manifest = await loadManifest(manifestPath);
 		const digests = [];
 		for (const environment of Object.values(manifest.environments)) {
 			const lockfile = await readFile(resolveLockfile(root, environment.lockfile));

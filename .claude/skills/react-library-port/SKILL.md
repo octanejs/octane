@@ -1,15 +1,22 @@
 ---
 name: react-library-port
 description: >-
-  Compatibility entry point for autonomously porting React libraries to Octane
-  bindings.
+  Compatibility entry point for React-library work in Octane; routes
+  existing-binding maintenance to update-bindings and actual React
+  implementation ports to octane-react-library-port.
 ---
 # React library port compatibility entry point
 
-This is the stable legacy name for the `octane-react-library-port` workflow.
+This is the stable legacy entry point for React-library binding work.
 
-Immediately load `.rulesync/skills/octane-react-library-port/SKILL.md` in full,
-then follow that skill and its references exactly. Treat the library name,
-version, npm URL, or GitHub URL supplied with this skill as the port target. Do
-not stop after routing or preflight: the canonical skill's completed binding,
-verification, and terminal-state requirements remain the outcome.
+For existing-binding audits, maintenance, lifecycle fixes, dependency/metadata
+updates, convenience imports, or reduction, load and follow
+[update-bindings](../update-bindings/SKILL.md). A missing convenience wrapper does
+not justify porting framework-neutral code available through a direct import.
+
+For a new React-library port or actual copied/rewritten React implementation, load
+and follow [octane-react-library-port](../octane-react-library-port/SKILL.md).
+Preserve supplied library names, versions, and npm/GitHub inputs. Its implementation,
+verification, and terminal requirements apply to that port; routing alone does not
+complete an authorized implementation. Preserve the user's scope and any existing
+shipping authorization.

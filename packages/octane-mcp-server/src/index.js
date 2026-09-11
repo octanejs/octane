@@ -32,10 +32,11 @@ export const REPO_SKILLS = {
 	'handle-issue': '.rulesync/skills/handle-issue/SKILL.md',
 	'octane-core-extend': '.rulesync/skills/octane-core-extend/SKILL.md',
 	'performance-audit': '.rulesync/skills/performance-audit/SKILL.md',
-	// Temporary compatibility alias for callers using the pre-rename skill name.
+	// Stable entry point routes maintenance and React implementation ports.
 	'react-library-port': '.rulesync/skills/react-library-port/SKILL.md',
 	'octane-react-library-port': '.rulesync/skills/octane-react-library-port/SKILL.md',
 	triage: '.rulesync/skills/triage/SKILL.md',
+	'update-bindings': '.rulesync/skills/update-bindings/SKILL.md',
 };
 
 // Suite names from the unified runner manifest (`SUITES` in
@@ -331,16 +332,15 @@ export function engineeringPlanFor(input, repoMode = false) {
 	if (scope === 'framework-core' && repoMode) {
 		plan.requiredSkills.push('octane-core-extend', 'performance-audit');
 	}
-	// A binding is a port of one pinned upstream release, so its gates are about
-	// coverage of that release rather than the runtime cost gates above.
+	// Choose evidence after distinguishing imported APIs, adapters, and copied code.
 	if (plan.areas.some((entry) => entry.area === 'ecosystem-binding')) {
 		plan.gates.parity = [
-			'Port module by module from the pinned upstream release vendored under packages/<name>/upstream/, not from the README, the type declarations, or memory.',
-			'Account for every export of the pinned upstream React entry points in the packages/<name>/UPSTREAM.md crosswalk: ported, reused verbatim from a framework-neutral core, divergence, or not applicable, each with its evidence. An unfinished export is an explicit gap row.',
-			'Record what parity cannot reach as a divergence in UPSTREAM.md and status.json, with the reason, what the consumer should do instead, and a behavioral test pinning the Octane behavior.',
-			"Run the pinned release's own suite as the parity oracle: its framework-neutral tests unmodified against the reused core, its React-binding tests ported case by case with the upstream case names and citations. Record every upstream test file as run as-is, ported, or out of scope with the reason, and never weaken an upstream assertion to make it pass.",
+			'Route existing-binding audits and maintenance through update-bindings; use octane-react-library-port for new ports or copied/rewritten React implementation.',
+			'Prefer direct upstream imports for framework-neutral APIs. Keep Octane ownership focused on hooks and adapters, with consumer behavior, public-type, and lifecycle evidence for the owned integration.',
+			"For copied or rewritten code, pin the upstream release, account for its scoped exports in packages/<name>/UPSTREAM.md, and use the pinned release's own suite as the parity oracle. Record each divergence with its reason, consumer guidance, and behavioral evidence; never weaken upstream assertions.",
+			'Preserve strict legacy evidence until an explicit ownership migration proves which imported surfaces no longer need local copies. Retain provenance, license, and parity evidence for every copied slice.',
 		];
-		if (repoMode) plan.requiredSkills.push('octane-react-library-port');
+		if (repoMode) plan.requiredSkills.push('react-library-port');
 	}
 	if (scope === 'framework-core' && !repoMode) {
 		plan.blockingConditions = [

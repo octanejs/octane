@@ -3,8 +3,8 @@ import { isAbsolute, relative, resolve } from 'node:path';
 
 import {
 	isVitestLane,
+	loadManifest,
 	requiredExecutableLanes,
-	validateManifest,
 	verifyLaneRunResult,
 } from './harness-lib.mjs';
 
@@ -24,11 +24,21 @@ export function discoverReactParityManifestPaths(root) {
 		.sort();
 }
 
-export function loadRequiredVitestLanes(root) {
+export async function loadRequiredVitestLanes(root) {
+	const manifests = await Promise.all(
+		discoverReactParityManifestPaths(root).map((manifestPath) =>
+			loadManifest(resolve(root, manifestPath)),
+		),
+	);
+	return manifests.flatMap((manifest) => requiredExecutableLanes(manifest).filter(isVitestLane));
+}
+
+// Aggregate CI runs only after every shard has validated manifests and ownership.
+// It reads declared identities to verify their complete execution without requiring
+// the source-policy analyzer or installing materialization dependencies again.
+export function loadDeclaredRequiredVitestLanes(root) {
 	return discoverReactParityManifestPaths(root).flatMap((manifestPath) => {
-		const manifest = validateManifest(
-			JSON.parse(readFileSync(resolve(root, manifestPath), 'utf8')),
-		);
+		const manifest = JSON.parse(readFileSync(resolve(root, manifestPath), 'utf8'));
 		return requiredExecutableLanes(manifest).filter(isVitestLane);
 	});
 }
