@@ -436,6 +436,8 @@ function attrBindingHelper(bind) {
 			return 'setStyle';
 		case 'styleProperty':
 			return 'setStyleProperty';
+		case 'styleProperties':
+			return 'setStyleProperties';
 		// SVG/MathML `className` is read-only — setClassAttr sets the attribute and
 		// clsx-composes (setClassName composes on HTML).
 		case 'class':
@@ -2162,14 +2164,16 @@ function staticObjectToCssString(obj) {
 	return parts.join(' ');
 }
 
-// Preserve both CSS declaration order and JavaScript object evaluation order:
-// only a nonempty literal prefix followed by exactly one dynamic own property
-// can move into the template plus an independently guarded scalar binding.
+// A literal prefix can live in the template when all following properties have
+// fixed, unique names. The values still evaluate together at
+// the authored style attribute, before any DOM writes. Fixed literal values
+// after the first dynamic property stay in the ordered suffix. Spreads,
+// computed names, and accessors retain ordinary object evaluation and diffing.
 function mixedStaticStyle(obj) {
-	if (obj?.type !== 'ObjectExpression' || obj.properties.length < 2) return null;
+	if (obj?.type !== 'ObjectExpression' || obj.properties.length === 0) return null;
 	const seen = new Set();
 	const prefix = [];
-	let dynamic = null;
+	const dynamics = [];
 	for (const property of obj.properties) {
 		if (
 			(property.type !== 'Property' && property.type !== 'ObjectProperty') ||
@@ -2191,23 +2195,20 @@ function mixedStaticStyle(obj) {
 		seen.add(normalized);
 
 		const value = property.value;
-		if (value?.type === 'Literal') {
-			if (
-				dynamic !== null ||
-				(typeof value.value !== 'string' && typeof value.value !== 'number') ||
-				value.value === ''
-			) {
-				return null;
-			}
+		if (
+			value?.type === 'Literal' &&
+			dynamics.length === 0 &&
+			(typeof value.value === 'string' || typeof value.value === 'number') &&
+			value.value !== ''
+		) {
 			prefix.push(property);
 		} else {
-			if (dynamic !== null) return null;
-			dynamic = { name, key, value };
+			dynamics.push({ name, key, value });
 		}
 	}
-	if (prefix.length === 0 || dynamic === null) return null;
+	if (dynamics.length === 0) return null;
 	const css = staticObjectToCssString({ properties: prefix });
-	return css === '' ? null : { css, ...dynamic };
+	return prefix.length !== 0 && css === '' ? null : { css, dynamics };
 }
 
 // ===========================================================================
@@ -22511,7 +22512,12 @@ function planJsx(
 		}
 		let mixedStylePaths = '';
 		for (const binding of elementBindings) {
-			if (binding.kind === 'styleProperty') mixedStylePaths += `|${binding.path.join('.')}`;
+			if (
+				(binding.kind === 'styleProperty' || binding.kind === 'styleProperties') &&
+				binding.staticCss !== ''
+			) {
+				mixedStylePaths += `|${binding.path.join('.')}`;
+			}
 		}
 		const cloneCall =
 			mixedStylePaths !== ''
@@ -22789,6 +22795,10 @@ function planJsx(
 			const arity = b.argExprs.length <= 2 ? String(b.argExprs.length) : 'N';
 			ctx.runtimeNeeded.add(`evt${arity}`);
 			if (!b.mountOnly) ctx.runtimeNeeded.add(`evt${arity}u`);
+		}
+		if (b.kind === 'styleProperties') {
+			ctx.runtimeNeeded.add('setStyleProperty');
+			ctx.runtimeNeeded.add('isHydratingStyle');
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
@@ -23945,6 +23955,7 @@ const DEFERRABLE_MOUNT_KINDS = new Set([
 	'class',
 	'style',
 	'styleProperty',
+	'styleProperties',
 	'formAction',
 	'htmlOnlyChild',
 ]);
@@ -24153,11 +24164,19 @@ function commitSourceRows(sources, valueOf) {
 // `setClassName(el, undefined)` no-op on a freshly-cloned element (so the output
 // is byte-identical to the old unconditional mount write).
 function emitDeferredMount(bind, elVar, bag) {
-	// Whole-object `style` diffs on `_sty`; scalar styles and other values on `_prev`.
+	// Whole-object styles diff on `_sty`; grouped styles use it only as a
+	// first-render marker. Each grouped property keeps a scalar previous value.
 	bag.constField(
-		bind.kind === 'style' ? `_sty$${bind.id}` : `_prev$${bind.id}`,
-		bind.kind === 'styleProperty' ? 'style-unset' : 'undefined',
+		bind.kind === 'style' || bind.kind === 'styleProperties'
+			? `_sty$${bind.id}`
+			: `_prev$${bind.id}`,
+		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'style-unset' : 'undefined',
 	);
+	if (bind.kind === 'styleProperties') {
+		for (let i = 0; i < bind.properties.length; i++) {
+			bag.constField(`_prev$${bind.id}_${i}`, 'undefined');
+		}
+	}
 	const key = `_el$${bind.id}`;
 	if (!bag.host(key, elVar)) return null;
 	return inheritOriginLoc(
@@ -24383,6 +24402,25 @@ function emitBindingMount(bind, elVar, bag) {
 					b.stmt(b.call(callee(), el(), V(), undefinedNode())),
 					...mountHost(),
 					b.stmt(b.assignment('=', local(`_sty$${bind.id}`), V())),
+				]),
+			);
+		}
+		case 'styleProperties': {
+			for (let i = 0; i < bind.properties.length; i++) bag.local(`_prev$${bind.id}_${i}`);
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(b.call(callee(), el(), V(), b.literal(bind.staticCss))),
+					...mountHost(),
+					...bind.properties.map((_, i) =>
+						b.stmt(
+							b.assignment(
+								'=',
+								local(`_prev$${bind.id}_${i}`),
+								b.member(V(), b.literal(i * 2 + 1), true),
+							),
+						),
+					),
 				]),
 			);
 		}
@@ -24732,6 +24770,54 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 					),
 				]),
 			);
+		}
+		case 'styleProperties': {
+			// Evaluate every authored value before the first CSS write, including
+			// fixed literal suffix values. Mount and hydration compare one complete
+			// style; ordinary updates only call the scalar setter for changed cells.
+			const values = bind.properties.map((property, i) => b.const(`_v${i}`, property.value));
+			const entries = b.array(
+				bind.properties.flatMap((property, i) => [
+					inheritOriginLoc(b.literal(property.name), property.key),
+					b.id(`_v${i}`),
+				]),
+			);
+			const publish = bind.properties.map((_, i) =>
+				b.stmt(b.assignment('=', bagFieldNode(bag, `_prev$${bind.id}_${i}`), b.id(`_v${i}`))),
+			);
+			const grouped = [
+				b.stmt(b.call(callee(), F('_el'), entries, b.literal(bind.staticCss))),
+				...(bind.deferred ? [b.stmt(b.assignment('=', F('_sty'), b.literal(null)))] : []),
+				...publish,
+			];
+			const propertyCallee = () =>
+				attrLoweringToken(b.id(`_$${attrBindingHelper({ kind: 'styleProperty' })}`), bind);
+			const scalar = bind.properties.map((property, i) => {
+				const previous = bagFieldNode(bag, `_prev$${bind.id}_${i}`);
+				const value = b.id(`_v${i}`);
+				return b.if(
+					b.binary('!==', previous, value),
+					b.block([
+						b.stmt(
+							b.call(
+								propertyCallee(),
+								F('_el'),
+								inheritOriginLoc(b.literal(property.name), property.key),
+								value,
+								b.literal(''),
+								previous,
+							),
+						),
+						b.stmt(b.assignment('=', previous, value)),
+					]),
+					null,
+				);
+			});
+			const hydrate = b.call('_$isHydratingStyle');
+			const needsGroup = bind.deferred
+				? b.logical('||', b.binary('===', F('_sty'), b.id('__s')), hydrate)
+				: hydrate;
+			return st(b.block([...values, b.if(needsGroup, b.block(grouped), b.block(scalar))]));
 		}
 		case 'spread': {
 			// setSpread does its own per-key diffing internally and handles cleanup
@@ -25913,8 +25999,8 @@ function emitElementHtml(
 		inner = resolveStyleExpr(inner, cssHash);
 
 		// `style={...}` — static literal object/string serialises into the HTML
-		// template (unless we're after a spread, which would clobber it); dynamic
-		// values become a setStyle binding.
+		// template (unless we're after a spread, which would clobber it); a fixed
+		// literal prefix plus dynamic suffix can avoid a whole-object diff.
 		if (attrName === 'style') {
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
 				const chunk = ` style="${escapeAttr(inner.value)}"`;
@@ -25942,27 +26028,52 @@ function emitElementHtml(
 			) {
 				const mixed = mixedStaticStyle(inner);
 				if (mixed !== null) {
-					appendBakedAttribute(
-						attrTemplate,
-						` style="${escapeAttr(mixed.css)}"`,
-						attrName,
-						attr.name,
-						inner,
-						ctx.inspect,
-					);
-					registerAttrLoweringOrigin(ctx, mixed.key, null, mixed.name);
-					bindings.push({
-						id: bindings.length,
-						kind: 'styleProperty',
-						name: mixed.name,
-						expr: tsrxExprNode(mixed.value, ctx, componentName, inlinedSubs),
-						path,
-						ns: hostNs,
-						nameOrigin: attr.name,
-						propertyOrigin: mixed.key,
-						staticOrigin: inner,
-						staticCss: mixed.css,
-					});
+					if (mixed.css !== '') {
+						appendBakedAttribute(
+							attrTemplate,
+							` style="${escapeAttr(mixed.css)}"`,
+							attrName,
+							attr.name,
+							inner,
+							ctx.inspect,
+						);
+					}
+					for (const entry of mixed.dynamics) {
+						registerAttrLoweringOrigin(ctx, entry.key, null, entry.name);
+					}
+					if (mixed.dynamics.length === 1) {
+						const entry = mixed.dynamics[0];
+						bindings.push({
+							id: bindings.length,
+							kind: 'styleProperty',
+							name: entry.name,
+							expr: tsrxExprNode(entry.value, ctx, componentName, inlinedSubs),
+							path,
+							ns: hostNs,
+							nameOrigin: attr.name,
+							propertyOrigin: entry.key,
+							staticOrigin: inner,
+							staticCss: mixed.css,
+						});
+					} else {
+						const entries = [];
+						const propertyBindings = [];
+						for (const entry of mixed.dynamics) {
+							const value = tsrxExprNode(entry.value, ctx, componentName, inlinedSubs);
+							entries.push(inheritOriginLoc(b.literal(entry.name), entry.key), value);
+							propertyBindings.push({ name: entry.name, key: entry.key, value });
+						}
+						bindings.push({
+							id: bindings.length,
+							kind: 'styleProperties',
+							expr: inheritOriginLoc(b.array(entries), inner),
+							properties: propertyBindings,
+							path,
+							ns: hostNs,
+							nameOrigin: attr.name,
+							staticCss: mixed.css,
+						});
+					}
 					continue;
 				}
 			}

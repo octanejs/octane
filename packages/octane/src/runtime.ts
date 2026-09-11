@@ -14530,7 +14530,13 @@ class HydrationCapability {
 		}
 	}
 
-	applyStyle(el: HTMLElement | SVGElement, value: any, _prev: any, staticCss?: string): boolean {
+	applyStyle(
+		el: HTMLElement | SVGElement,
+		value: any,
+		_prev: any,
+		staticCss?: string,
+		entries?: readonly unknown[],
+	): boolean {
 		const mode = hydrationMismatchMode(el);
 		if (mode === 1) return true;
 		const style = (el as HTMLElement).style;
@@ -14546,7 +14552,14 @@ class HydrationCapability {
 		// while still detecting reordered, missing, added, and empty styles.
 		const expectedStyle = document.createElement('div').style;
 		if (staticCss !== undefined) expectedStyle.cssText = staticCss;
-		applyStyleValue(el, expectedStyle, value, undefined);
+		if (entries === undefined) applyStyleValue(el, expectedStyle, value, undefined);
+		else {
+			for (let i = 0; i < entries.length; i += 2) {
+				const entry = entries[i + 1];
+				if (entry != null && typeof entry !== 'boolean')
+					applyStyleProperty(el, expectedStyle, entries[i] as string, entry);
+			}
+		}
 		const expected = expectedStyle.cssText;
 		const expectsStyleAttribute = expected !== '';
 		if (before === expected && hadStyleAttribute === expectsStyleAttribute) return true;
@@ -16859,6 +16872,11 @@ function setDeoptClass(el: Element, value: unknown): void {
 
 const IMPORTANT_SUFFIX = '!important';
 
+/** Whether a grouped style must compare its complete value during hydration. @internal */
+export function isHydratingStyle(): boolean {
+	return activeHydration() !== null;
+}
+
 export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): void {
 	const style = (el as HTMLElement).style;
 	// Hydration treats the authored style as a complete value: rebuild it once so
@@ -16901,6 +16919,38 @@ export function setStyleProperty(
 	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
 	else applyStyleProperty(el, style, name, value);
+}
+
+/**
+ * Apply ordered fixed-key declarations on mount. The compiler writes changed
+ * values with scalar setters on updates; hydration compares the whole value.
+ * @internal
+ */
+export function setStyleProperties(
+	el: HTMLElement | SVGElement,
+	entries: readonly unknown[],
+	staticCss: string,
+): void {
+	const hydration = activeHydration();
+	if (hydration !== null) {
+		hydration.applyStyle(el, null, undefined, staticCss, entries);
+		return;
+	}
+	const style = (el as HTMLElement).style;
+	let journaled = false;
+	for (let i = 0; i < entries.length; i += 2) {
+		const value = entries[i + 1];
+		// No dynamic declaration exists yet. Removing a null or boolean value
+		// could erase a longhand supplied by the baked static prefix.
+		if (value == null || typeof value === 'boolean') continue;
+		if (!journaled && TRANSITION_JOURNAL !== null) {
+			journalAttr(el, 'style');
+			journaled = true;
+		}
+		const name = entries[i] as string;
+		if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, undefined, name)) continue;
+		applyStyleProperty(el, style, name, value);
+	}
 }
 
 function applyStyleValue(

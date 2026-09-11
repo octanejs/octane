@@ -577,7 +577,11 @@ describe('style prop — mixed static and dynamic inline objects', () => {
 			function Panel(props) @{
 				<section
 					id="mixed-inline-style-transition-panel"
-					style={{ position: 'absolute', color: props.step === 0 ? 'red' : 'blue' }}
+					style={{
+						position: 'absolute',
+						color: props.step === 0 ? 'red' : 'blue',
+						backgroundColor: props.step === 0 ? 'white' : 'black',
+					}}
 				>
 					<Value load={props.load} step={props.step} />
 				</section>
@@ -618,18 +622,21 @@ describe('style prop — mixed static and dynamic inline objects', () => {
 		const panel = root.find('#mixed-inline-style-transition-panel') as HTMLElement;
 		expect(panel.style.position).toBe('absolute');
 		expect(panel.style.color).toBe('red');
+		expect(panel.style.backgroundColor).toBe('white');
 		expect(root.find('#mixed-inline-style-transition-value').textContent).toBe('initial');
 
 		root.click('#mixed-inline-style-transition-update');
 		expect(root.find('#mixed-inline-style-transition-panel')).toBe(panel);
 		expect(panel.style.position).toBe('absolute');
 		expect(panel.style.color).toBe('red');
+		expect(panel.style.backgroundColor).toBe('white');
 		expect(root.findAll('#mixed-inline-style-transition-fallback')).toEqual([]);
 
 		await act(() => resolve('resolved'));
 		expect(root.find('#mixed-inline-style-transition-panel')).toBe(panel);
 		expect(panel.style.position).toBe('absolute');
 		expect(panel.style.color).toBe('blue');
+		expect(panel.style.backgroundColor).toBe('black');
 		expect(root.find('#mixed-inline-style-transition-value').textContent).toBe('resolved');
 		root.unmount();
 	});
@@ -898,6 +905,18 @@ describe('style prop — dynamic object form (setStyle)', () => {
 		// Drop background-color — removed property must clear from CSSOM.
 		r.update(DynamicObjectStyle, { s: { color: 'blue', 'font-size': '14px' } });
 		expect(div.style.backgroundColor).toBe('');
+		r.unmount();
+	});
+
+	it('lets a changed shorthand override an unchanged earlier longhand on update', () => {
+		const r = mount(DynamicObjectStyle, {
+			s: { marginLeft: '8px', margin: '4px' },
+		});
+		const div = r.find('#dyn') as HTMLElement;
+		expect(div.style.marginLeft).toBe('4px');
+
+		r.update(DynamicObjectStyle, { s: { marginLeft: '8px', margin: '12px' } });
+		expect(div.style.marginLeft).toBe('12px');
 		r.unmount();
 	});
 
