@@ -303,6 +303,24 @@ gzip bytes (+107 / +38). Asset-set SHA-256 values are
 `6a5fca951bdd27d1e1eb3dad0d9372b69859daaa0e29d0336af7da7de40372b9` (baseline)
 and `6b19ce09eb24956a00c0da2bdb26557b3bba227ed65aa1b4c2e3492e549522a8` (candidate).
 
+#### Guarded component-map compatibility check
+
+The hydration regression also exposed an existing compiler mismatch: native map
+item roots could use a lite scope, while a later custom-map result needs a full
+component slot. Guarded component-map roots now use compatible slots in both
+modes. The unchanged regression failed before this correction and passes in dev
+and production afterwards.
+
+For both a simple hookless mapped component and the nested-input fixture,
+standard production and server output were byte-identical. Dev output grew by
+5 bytes and production with `autoMemo: false` by 17 bytes as the call changed
+from a lite scope to a full component slot. Those modes pay the additional slot
+bookkeeping required to preserve identity across dispatch changes; these byte
+counts are not a heap-allocation measurement. Ordinary component `@for` output
+was unchanged in all four modes. Rebuilding the production work gate after the
+compiler correction reproduced the exact candidate bundle and readable-source
+checksums above, so its recorded work and timing evidence remains applicable.
+
 ## Keyed-reorder matrix (`run-reorder.mjs`)
 
 The canonical suite only ever reorders two rows (`swap`). `run-reorder.mjs`

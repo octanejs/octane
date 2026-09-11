@@ -14336,6 +14336,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			mountCallbackSinks,
 			options?.keyedSelection ?? null,
 			options?.inlineBindingGuards === true,
+			options?.mappedItem === true,
 		);
 	}
 	ctx.currentInvariantLocals = prevInvariantLocals;
@@ -22242,6 +22243,7 @@ function planJsx(
 	mountCallbackSinks = null,
 	keyedSelection = null,
 	inlineBindingGuards = false,
+	mappedItem = false,
 ) {
 	// DEV ONLY: per-element source-location map for THIS body (path-key → [line, col]),
 	// populated at the top of emitElementHtml and read in the binding mount loop to emit
@@ -22420,6 +22422,17 @@ function planJsx(
 			}
 		}
 		appendTemplateIr(rootTemplate, part);
+		if (mappedItem && jsxNodes.length === 1 && nodeIsComp) {
+			// A guarded map can switch to authored component descriptors on its
+			// next render. Both modes must own the same full component slot; a
+			// lite scope cannot be reconciled as that descriptor's component.
+			const rootComp = compCalls[compCalls.length - 1];
+			if (rootComp.liteEligible || rootComp.autoMemoLite) {
+				rootComp.singleRoot = ctx.componentInfo?.get(rootComp.compNode.name)?.singleRoot === true;
+			}
+			rootComp.liteEligible = false;
+			rootComp.autoMemoLite = false;
+		}
 		// M3 inherit-range: stamp the sole comp-call root's cc. Its own entry is
 		// the LAST one its emitNodeHtml pushed (nested children/prop ccs are
 		// pushed first, before makeCompCall returns to the root push).
@@ -27051,6 +27064,7 @@ function hoistBodyHelper(
 	idOrigin = null,
 	keyedSelection = null,
 	inlineBindingGuards = false,
+	mappedItem = false,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
@@ -27098,7 +27112,9 @@ function hoistBodyHelper(
 		fakeOrigin,
 	);
 	const helperOptions =
-		inlineBindingGuards || keyedSelection !== null ? { keyedSelection, inlineBindingGuards } : null;
+		inlineBindingGuards || keyedSelection !== null || mappedItem
+			? { keyedSelection, inlineBindingGuards, mappedItem }
+			: null;
 	if (envNames == null) {
 		inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash, helperOptions));
 		return helperName;
@@ -28842,6 +28858,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		directiveKeywordOrigin(ctx, node),
 		keyedSelection,
 		hostMountSafe,
+		node.nativeArrayMap != null,
 	);
 
 	const mapCall = node.nativeArrayMap || null;

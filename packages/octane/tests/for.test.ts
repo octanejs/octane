@@ -82,7 +82,7 @@ import { SnapshotMappedList } from './_fixtures/for-strong.js';
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
 
 describe('manual keyed lists', () => {
-	it('preserves object keys and callback arguments, and discards a failed list before retry', () => {
+	it('preserves object keys and callback arguments, and unmounts the root after an unhandled key error', () => {
 		type Row = { id: string; label: string };
 		type Props = { items: Row[]; getKey: (item: Row, index: number) => Row };
 		const ManualList: ComponentBody<Props> = (props, scope) => {
@@ -122,10 +122,12 @@ describe('manual keyed lists', () => {
 			current = [initial[2], { id: 'new', label: 'new' }, initial[0]];
 			failKey = true;
 			expect(() => view.update(ManualList, { items: current, getKey })).toThrow(failure);
+			// An unhandled render error unmounts the entire failed root.
 			expect(view.findAll('input')).toEqual([]);
 			expect(inputs.every((input) => !input.isConnected)).toBe(true);
 
 			failKey = false;
+			// The public root remains reusable; retry mounts fresh inputs.
 			view.update(ManualList, { items: current, getKey });
 			expect(view.findAll('li').map((row) => row.getAttribute('data-id'))).toEqual([
 				'c',
