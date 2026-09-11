@@ -1013,11 +1013,14 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 				// SSR exposes the trigger before hydration attaches its event. Opening is
 				// idempotent, so retry the observable interaction until the dialog exists.
 				await expect
-					.poll(async () => {
-						if (await searchInput.isVisible()) return true;
-						await trigger.click();
-						return searchInput.isVisible();
-					})
+					.poll(
+						async () => {
+							if (await searchInput.isVisible()) return true;
+							await trigger.click();
+							return searchInput.isVisible();
+						},
+						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+					)
 					.toBe(true);
 				await searchInput.fill('tanstack');
 				const firstResult = page.locator('.search-entity').first();
